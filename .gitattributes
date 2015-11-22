@@ -2,3 +2,4 @@
 petal/PosArrayMaster.py -text
 petal/PosModel.py -text
 petal/PosScheduler.py -text
+petal/PosState.py -text
