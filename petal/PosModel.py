@@ -142,18 +142,22 @@ class Axis(object):
         else:
             print 'bad axisid' + repr(self.axisid)
             return None
+			
     @property
     def nominal_positioning_range(self):
         """Calculated from physical range and hardstop debounce only.
+		Returns [1x2] array of [min,max]
         """
-        debounce = self.hardstop_debounce
         if self.axisid == PosModel.T:
             targetable_range = abs(self.state.kv('PHYSICAL_RANGE_T')) - np.sum(self.hardstop_debounce)            
             return np.array([-0.50,0.50])*targetable_range  # split theta range such that 0 is essentially in the middle
         elif self.axisid == PosModel.P:
             targetable_range = abs(self.state.kv('PHYSICAL_RANGE_P')) - np.sum(self.hardstop_debounce)    
             return np.array([-0.01,0.99])*targetable_range  # split phi range such that 0 is essentially at the minimum
-        
+        else:
+            print 'bad axisid' + repr(self.axisid)
+            return None
+			
     def set_range(self):
         """Updates minpos and maxpos, given the nominal range and the hardstop direction.
         """
