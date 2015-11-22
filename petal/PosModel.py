@@ -157,7 +157,7 @@ class Axis(object):
         else:
             print 'bad axisid' + repr(self.axisid)
             return None
-			
+   
     def set_range(self):
         """Updates minpos and maxpos, given the nominal range and the hardstop direction.
         """
@@ -174,3 +174,18 @@ class Axis(object):
             self.minpos = self.minpos + debounce_deltas[0]
             self.maxpos = self.minpos + nominal_travel
         self._last_hardstop_debounce = self.hardstop_debounce
+        
+    def seek_one_limit_within(self, seek_distance):
+        """Use to go hit a hardstop. For the distance argument, direction matters.
+        """
+        old_allow_exceed_limits = self.state.kv['ALLOW_EXCEED_LIMITS']
+        self.state.kv('ALLOW_EXCEED_LIMITS') = True
+        both_debounce_vals = self.hardstop_debounce
+        if seek_distance < 0:
+            abs_debounce = both_debounce_vals[0]
+        else:
+            abs_debounce = both_debounce_vals[1]
+        debounce_distance = -np.sign(seek_distance)*self.state.kv['SHOULD_DEBOUNCE_HARDSTOPS']*abs_debounce
+        self.register_move(seek_distance) #needs some thought on mechanics of this "registering move"
+        self.register_move(debounce_distance)
+        self.state.kv('ALLOW_EXCEED_LIMITS') = old_allow_exceed_limits
