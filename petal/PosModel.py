@@ -1,4 +1,5 @@
-# imports here
+import numpy as np
+import PosState
 
 class PosModel(object):
     """Software model of the physical positioner hardware.
@@ -18,37 +19,40 @@ class PosModel(object):
     gear_ratio_faulhaber = 256.0              # faulhaber "256:1", output rotation/motor input
     
     # internal motor/driver constants
-    __timer_update_rate    = 18e3   # Hz
-    __stepsize_creep       = 0.1    # deg
-    __stepsize_cruise      = 3.3    # deg
-    __spinup_distance      = 628.2  # deg
-    __period_creep         = 2.0    # timer intervals
-    __shaft_speed_cruise   = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
-    __shaft_speed_creep    = __timer_update_rate * __stepsize_creep / __period_creep  # deg/sec
+    _timer_update_rate    = 18e3   # Hz
+    _stepsize_creep       = 0.1    # deg
+    _stepsize_cruise      = 3.3    # deg
+    _spinup_distance      = 628.2  # deg
+    _period_creep         = 2.0    # timer intervals
+    _shaft_speed_cruise   = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
+    _shaft_speed_creep    = _timer_update_rate * _stepsize_creep / _period_creep  # deg/sec
  
-    def __init__(self,state=PosState()):
+    def __init__(self, state=PosState.PosState()):
         self.state = state
+        self.axis = [None,None]
+        self.axis[self.T] = Axis(self.state,self.T)
+        self.axis[self.P] = Axis(self.state,self.P)
 
     # getter functions
     @property    
     def speed_cruise_T(self):
         """Phi axis cruise speed at the output shaft in deg / sec."""
-        return self.__shaft_speed_cruise / self.state.kv['GEAR_T']  
+        return self._shaft_speed_cruise / self.state.kv['GEAR_T']  
         
     @property    
     def speed_cruise_P(self):
         """Phi axis cruise speed at the output shaft in deg / sec."""
-        return self.__shaft_speed_cruise / self.state.kv['GEAR_P']        
+        return self._shaft_speed_cruise / self.state.kv['GEAR_P']        
 
     @property
     def speed_creep_T(self):
         """Theta axis creep speed at the output shaft in deg / sec."""
-        return self.__shaft_speed_creep / self.state.kv['GEAR_T']
+        return self.shaft_speed_creep / self.state.kv['GEAR_T']
     
     @property
     def speed_creep_P(self):
         """Phi axis creep speed at the output shaft in deg / sec."""
-        return self.__shaft_speed_creep / self.state.kv['GEAR_P']
+        return self.shaft_speed_creep / self.state.kv['GEAR_P']
 
 	#	anti-collision keepout polygons (several types...)
 	#		ferrule holder and upper housing keepouts are always the same, see DESI-0XXX
@@ -71,7 +75,8 @@ class PosModel(object):
                 sequence of the steps-quantized (theta,phi) distances, in degrees
 
         The return values may be lists, i.e. if it's a "final" move, which really consists
-        of multiple submoves."""
+        of multiple submoves.
+        """
 
         # if it's a final move...
         #	get the backlash and creep parameters from PosState
@@ -84,3 +89,84 @@ class PosModel(object):
         #	calculate in degrees the quantized distance(s)
 
         return move_times, speed_modes, corrected_obs_dT, corrected_obs_dP, motor_steps_T, motor_steps_P
+
+
+class Axis(object):
+    """Handler for a motion axis. Provides move syntax and keeps tracks of position.
+    """
+    
+    # internal parameters
+    _last_hardstop_debounce    = 0.0   # used internally for accounting changes to range settings
+    _last_primary_hardstop_dir = 0.0   # 0, +1, -1, tells you which if any hardstop was last used to set travel limits
+   
+    def __init__(self, state, axisid):
+        self.maxpos = float("inf")
+        self.minpos = -float("inf")
+        self.state = state
+        self.axisid = axisid
+        self.set_range()
+
+    @property
+    def hardstop_debounce(self):
+        """Calculated distance to debounce from hardstop when homing.
+        Returns 1x2 array of [debounce_at_min_limit,debounce_at_max_limit].
+        These are positive quantities (i.e., they don't include any determination of directionality).
+        """
+        if self.axisid == PosModel.T:
+            if self.principle_hardstop_direction < 0:
+                return np.array([abs(self.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_T')),
+                                 abs(self.state.kv('SECONDARY_HARDSTOP_CLEARANCE_T'))])
+            else:
+                return np.array([abs(self.state.kv('SECONDARY_HARDSTOP_CLEARANCE_T')),
+                                 abs(self.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_T'))])
+        elif self.axisid == PosModel.P:
+            if self.principle_hardstop_direction < 0:
+                return np.array([abs(self.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_P')),
+                                 abs(self.state.kv('SECONDARY_HARDSTOP_CLEARANCE_P'))])
+            else:
+                return np.array([abs(self.state.kv('SECONDARY_HARDSTOP_CLEARANCE_P')),
+                                 abs(self.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_P'))])
+        else:
+            print 'bad axisid' + repr(self.axisid)
+            return None
+    
+    @property
+    def principle_hardstop_direction(self):
+        """The "principle" hardstop is the one which is struck during homing.
+        (The "secondary" hardstop is only struck when finding the total available travel range.)
+        """
+        if self.axisid == PosModel.T:
+            return self.state.kv['PRINCIPLE_HARDSTOP_DIR_T']
+        elif self.axisid == PosModel.P:
+            return self.state.kv['PRINCIPLE_HARDSTOP_DIR_P']
+        else:
+            print 'bad axisid' + repr(self.axisid)
+            return None
+    @property
+    def nominal_positioning_range(self):
+        """Calculated from physical range and hardstop debounce only.
+        """
+        debounce = self.hardstop_debounce
+        if self.axisid == PosModel.T:
+            targetable_range = abs(self.state.kv('PHYSICAL_RANGE_T')) - np.sum(self.hardstop_debounce)            
+            return np.array([-0.50,0.50])*targetable_range  # split theta range such that 0 is essentially in the middle
+        elif self.axisid == PosModel.P:
+            targetable_range = abs(self.state.kv('PHYSICAL_RANGE_P')) - np.sum(self.hardstop_debounce)    
+            return np.array([-0.01,0.99])*targetable_range  # split phi range such that 0 is essentially at the minimum
+        
+    def set_range(self):
+        """Updates minpos and maxpos, given the nominal range and the hardstop direction.
+        """
+        debounce_deltas = self.hardstop_debounce - self._last_hardstop_debounce
+        nominal_travel = np.diff(self.nominal_positioning_range)
+        if self._last_primary_hardstop_dir == 0.0:
+            self.minpos = np.amin(self.nominal_positioning_range)
+            self.maxpos = np.amax(self.nominal_positioning_range)
+            self._last_hardstop_debounce = self.hardstop_debounce
+        elif self._last_primary_hardstop_dir == 1.0:
+            self.maxpos = self.maxpos - debounce_deltas[1]
+            self.minpos = self.maxpos - nominal_travel
+        elif self._last_primary_hardstop_dir== -1.0:
+            self.minpos = self.minpos + debounce_deltas[0]
+            self.maxpos = self.minpos + nominal_travel
+        self._last_hardstop_debounce = self.hardstop_debounce
