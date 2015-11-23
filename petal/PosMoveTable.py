@@ -1,3 +1,5 @@
+import PosModel
+
 class PosMoveTable(object):
     """A move table contains the information for a single positioner's move
     sequence, in both axes. This object defines the move table structure, and
@@ -11,118 +13,142 @@ class PosMoveTable(object):
     """
     
     def __init__(self, posmodel=PosModel.PosModel()):
-        self.posmodel = posmodel       # the particular positioner this table applies to
-        self.final_backlash_on = True  # whether to do anti-backlash submoves on the final move
-        self.final_creep_on    = True  # whether to do precision creep submoves on the final move
-        self.__rows = [] # internal representation of the move data
+        self.posmodel = posmodel     # the particular positioner this table applies to
+        self.antibacklash_on = True  # whether to do anti-backlash submoves on the final move
+        self.final_creep_on  = True  # whether to do precision creep submoves on the final move
+        self.__rows = []             # internal representation of the move data
 
-        
     # getters
     def for_scheduler(self):
         """Version of the table suitable for move scheduling.
         Distances are given at the output shafts, in degrees.
         Times are given in seconds.
         """
-        # note to self... always return the quantized obs vals
-        #             ... always include the extra submoves if the top-level flags say so
-        
+        return self.__for_output_type('scheduler')
+            
     def for_hardware(self):
         """Version of the table suitable for the hardware side.
         Distances are given at the motor shafts, in discrete steps.
         Times are given in milliseconds.
         """
-        # note to self... organize the pauses so that there are only "postpauses", the way we're implementing the firmware
-        #             ... always include the extra submoves if the top-level flags say so
+        return self.__for_output_type('hardware')
 
     # setters
-    def set_move_in_obs_degrees(self, rowidx, axisid, distance):
-        """Scheduler uses this method to get move distances into the table.
-        If row index does not exist yet, then it will be added.
+    def set_move(self, rowidx, axisid, distance, speed='cruise'):
+        """Put or update a move distance into the table.
+        If row index does not exist yet, then it will be added, and any blank filler rows will be generated in-between.
+        By default the argument for speed is 'cruise', but it can be forced to 'creep' for special cases.
         """
-        
-    def set_move_in_motor_steps(self, rowidx, axisid, nsteps, speed_mode):
-        """PosModel uses this method to update existing move distances in the
-        table with their quantized values.
-        """
-        
-    def set_prepause(self, rowidx, axisid, prepause):
-        """For use by scheduler to get pauses before moves in.
-        """
-        
-    def set_postpause(self, rowidx, axisid, postpause):
-        """For use by scheduler to get pauses after moves in.
-        """
-                
-    # row manipulations            
-    def insert_row(self,index,posmoverow):
-        if index >= 0:
-            if index > self.__nrows:  # fill in some blanks in-between
-                for i in range(index - self.__nrows - 1):
-                    self.append_row(self.blankrow())
-            self.__table.insert(index,posmove_row)
-            
+        if rowidx >= len(self.__rows):
+            self.insert_new_row(rowidx)
+        if axisid == self.posmodel.T:
+            dist_label = 'dT'
+            speed_label = 'speed_mode_T'
+        elif axisid == self.posmodel.P:
+            dist_label = 'dP'
+            speed_label = 'speed_mode_P'
         else:
-            print "bad row index " + repr(index) + " for insertion"
+            print 'bad axisid ' + repr(axisid)
+            return
+        self.__rows[rowidx]._data[dist_label] = distance
+        self.__rows[rowidx]._data[speed_label] = speed
+        
+    def set_prepause(self, rowidx, prepause):
+        """Put or update a prepause into the table.
+        If row index does not exist yet, then it will be added, and any blank filler rows will be generated in-between.
+        """
+        if rowidx >= len(self.__rows):
+            self.insert_new_row(rowidx)
+        self.__rows[rowidx] = prepause
+        
+    def set_postpause(self, rowidx, postpause):
+        """Put or update a postpause into the table.
+        If row index does not exist yet, then it will be added, and any blank filler rows will be generated in-between.
+        """
+        if rowidx >= len(self.__rows):
+            self.insert_new_row(rowidx)
+        self.__rows[rowidx] = postpause 
+               
+    # row manipulations            
+    def insert_new_row(self,index):
+        newrow = PosMoveRow(self.posmodel)
+        self.__rows.insert(index,newrow)            
+        if index > len(self.__rows):
+            self.insert_new_row(index) # to fill in any blanks up to index
 
-    def append_row(self,posmoverow):
-        self.insert(self.__nrows,posmoverow)
+    def append_new_row(self):
+        self.insert_new_row(len(self.__rows))
         
     def delete_row(self,index):
-        if index >= 0 and index < self.__nrows:
-            del self.__table[index]
-        else:
-            print "error: no row at index " + repr(index) + " to delete"
+        del self.__rows[index]
 
-    # internal helper methods
-    @property
-    def __nrows(self):
-        """For internal operations, not general use.
-        """
-        return len(self.__table)
+    # internal methods
+    def __for_output_type(self,output_type):
+        # define the columns that will be filled in        
+        if output_type == 'scheduler':
+            table = {'nrows':0,'dT':[],'dP':[],'Tdot':[],'Pdot':[],'prepause':[],'move_time':[],'postpause':[]}
+        elif output_type == 'hardware':
+            table = {'nrows':0,'motor_steps_T':[],'motor_steps_P':[],'speed_mode_T':[],'speed_mode_P':[],'postpause':[]}
+        else:
+            print 'bad table output type ' + output_type        
+
+        i = 0
+        for row in self.__rows:
+
+            # insert an extra pause-only row if necessary, since hardware commands only really have postpauses           
+            if output_type == 'hardware' and row['prepause']:
+                table['motor_steps_T'].append(0)
+                table['motor_steps_P'].append(0)
+                table['speed_mode_T'].append('cruise') # though it doesn't really matter which
+                table['speed_mode_P'].append('cruise') # though it doesn't really matter which
+                table['postpause'].append(row['prepause'])
+
+            # check what kind of submove calculations if any
+            i += 1
+            if i == len(self.__rows):
+                should_antibacklash = self.antibacklash_on
+                should_final_creep = self.final_creep_on
+            else:
+                should_antibacklash = False
+                should_final_creep = False
+            
+            # use PosModel instance to get the real, quantized, calibrated values
+            true_move_T = self.posmodel(self.posmodel.T, row['dT'], row['speed_mode_T'], should_antibacklash, should_final_creep)
+            true_move_P = self.posmodel(self.posmodel.P, row['dP'], row['speed_mode_P'], should_antibacklash, should_final_creep)
+            
+            # fill in the output table according to type
+            if output_type == 'scheduler':
+                table['dT'].extend(true_move_T['obs_distance'])
+                table['dP'].extend(true_move_P['obs_distance'])
+                table['Tdot'].extend(true_move_T['obs_speed'])
+                table['Pdot'].extend(true_move_P['obs_speed'])
+                table['prepause'].extend(row['prepause'])
+            if output_type == 'hardware':
+                table['motor_steps_T'].extend(true_move_T['motor_step'])
+                table['motor_steps_P'].extend(true_move_P['motor_step'])
+                table['speed_mode_T'].extend(true_move_T['speed_mode'])
+                table['speed_mode_P'].extend(true_move_P['speed_mode'])
+
+            # fill in items general to all table types
+            while true_move_T['move_time']: # while loop here, since there may be multiple submoves
+                time1 = true_move_T['move_time'].pop(-1)
+                time2 = true_move_P['move_time'].pop(-1)
+                table['move_time'].extend(max([time1,time2]))            
+            table['postpause'].extend(row['postpause'])                  
+        table['nrows'] = len(table['dT'])
+        return table
 
         
 class PosMoveRow(object):
-    """Essentially this is a wrapper around a dictionary. The purpose is the
-    validations and updates in using the "setval" method. Values should not be
-    set in any other way. The general user should not ever directly use the
-    internal values of a PosMoveRow instance, but rather should rely on the
-    higher level table forms exportable by PosMoveTable.
+    """The general user does not directly use the internal values of a
+    PosMoveRow instance, but rather should rely on the higher level table
+    formats that are exported by PosMoveTable.
     """
-    def __init__(self, posmodel=PosModel.PosModel()):
-        self._posmodel = posmodel
-        self._data = self.defaultrow()
-
-    def defaultrow():
-        return {'obs_dT_continuous'  :0,        # [deg] ideal theta distance to move (as seen by external observer)
-                'obs_dP_continuous'  :0,        # [deg] ideal phi distance to move (as seen by external observer)
-                'obs_dT_quantized'   :0,        # [deg] real theta distance, quantized and calibrated to a particular number of motor steps
-                'obs_dP_quantized'   :0,        # [deg] real phi distance, quantized and calibrated to a particular number of motor steps
-                'motor_steps_T'      :0,        # [-] number of steps the hardware should move the theta motor shaft
-                'motor_steps_P'      :0,        # [-] number of steps the hardware should move the phi motor shaft
-                'speed_mode_T'       :'cruise', # ['cruise' or 'creep'] theta, whether to cruise (fast, coarse resolution) or creep (slow, fine resolution)
-                'speed_mode_P'       :'cruise', # ['cruise' or 'creep'] phi, whether to cruise (fast, coarse resolution) or creep (slow, fine resolution)
-                'speed_continuous_T' :self.posmodel.speed_cruise_T, # [deg/sec] ideal speed of theta rotation
-                'speed_continuous_P' :self.posmodel.speed_cruise_P, # [deg/sec] ideal speed of phi rotation
-                'prepause'           :0,        # [sec] delay for this number of seconds before executing the move
-                'move_time'          :0,        # [sec] time it takes the move to execute
-                'postpause'          :0,        # [sec] delay for this number of seconds after the move has completed
-                'add_antibacklash_T' :False,    # [bool] whether to add/replace this move with additional anti-backlash submoves
-                'add_antibacklash_P' :False,    # [bool] whether to add/replace this move with additional anti-backlash submoves
-                'add_final_creep_T'  :False,    # [bool] whether to add/replace this move with additional final creep submoves
-                'add_final_creep_P'  :False}    # [bool] whether to add/replace this move with additional final creep submoves
-
-    def setval(self,key,val):
-        """All value setting should be done via this method, so that validations
-        and updates to related fields can be performed."""
-        updates_list = []
-        if key == 'obs_dT_continuous' or key == 'obs_dP_continuous':
-            # update motor steps
-        if key == 'motor_steps_T' or key == 'motor_steps_P':
-            # update quantized vals
-        if key == 'obs_dT_quantized' or key == 'obs_dP_quantized':
-            # update move time
-        if key == 'speed_mode_T'
-            # update theta continuous speed
-        if key == 'speep_mode_P'
-            # update phi continuous speed
-        
+    def __init__(self):
+        self._data = {'dT'           : 0,        # [deg] ideal theta distance to move (as seen by external observer)
+                      'dP'           : 0,        # [deg] ideal phi distance to move (as seen by external observer)
+                      'speed_mode_T' : 'cruise', # ['cruise' or 'creep'] theta, whether to cruise (fast, coarse resolution) or creep (slow, fine resolution)
+                      'speed_mode_P' : 'cruise', # ['cruise' or 'creep'] phi, whether to cruise (fast, coarse resolution) or creep (slow, fine resolution)
+                      'prepause'     : 0,        # [sec] delay for this number of seconds before executing the move
+                      'move_time'    : 0,        # [sec] time it takes the move to execute
+                      'postpause'    : 0}        # [sec] delay for this number of seconds after the move has completed
