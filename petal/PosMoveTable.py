@@ -71,7 +71,7 @@ class PosMoveTable(object):
                
     # row manipulations            
     def insert_new_row(self,index):
-        newrow = PosMoveRow(self.posmodel)
+        newrow = PosMoveRow.PosMoveRow()
         self.__rows.insert(index,newrow)            
         if index > len(self.__rows):
             self.insert_new_row(index) # to fill in any blanks up to index
