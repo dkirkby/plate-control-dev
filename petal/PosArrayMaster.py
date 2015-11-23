@@ -7,7 +7,7 @@ class PosArrayMaster(object):
 	def __init__(self,list_of_posids):
 		self.positioners = some array of PosModel instances
 		
-	def setup_move_tables(PQtarget)
+	def setup_move_tables(Ptarg,Qtarg)
 		"""Given a list of target positions, returns the move tables (one for each
 		positioner) that get from start to target."""
 		
@@ -22,7 +22,7 @@ class PosArrayMaster(object):
 
 		return move_tables
 		
-	def update_encoded_positions(PQ)
+	def update_encoded_positions(P,Q)
 		"""Generally used after performing moves, so the PosModel instances can be
 		informed that the hardware move was done. The argued (P,Q) get stored to each
 		positioner. These aren't measured (FVC) positions."""
@@ -34,5 +34,4 @@ class PosArrayMaster(object):
 	def hardware_ready_move_tables(move_tables)
 		"""Strips out information that isn't necessary to send to petalbox, and
 		formats for sending."""
-		
-		return sanitized_move_tables
+		return move_tables.for_hardware
