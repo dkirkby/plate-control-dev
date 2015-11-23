@@ -88,8 +88,14 @@ class PosModel(object):
         #	estimate the move(s) times
         #	calculate in degrees the quantized distance(s)
 
-        return move_times, speed_modes, corrected_obs_dT, corrected_obs_dP, motor_steps_T, motor_steps_P
-
+        return {'n_submoves'    : n_submoves,
+                'move_times'    : move_times,
+                'speed_modes'   : speed_modes,
+                'obs_dT_corr'   : corrected_obs_dT,
+                'obs_dP_corr'   : corrected_obs_dP,
+                'motor_steps_T' : motor_steps_T,
+                'motor_steps_P' : motor_steps_P}
+        
 
 class Axis(object):
     """Handler for a motion axis. Provides move syntax and keeps tracks of position.
@@ -186,6 +192,6 @@ class Axis(object):
         else:
             abs_debounce = both_debounce_vals[1]
         debounce_distance = -np.sign(seek_distance)*self.state.kv['SHOULD_DEBOUNCE_HARDSTOPS']*abs_debounce
-        self.register_move(seek_distance) #needs some thought on mechanics of this "registering move"
-        self.register_move(debounce_distance)
+        move_list = move(seek_distance) # syntax needs some thought
+        move_list = add_move(debounce_distance)
         self.state.kv('ALLOW_EXCEED_LIMITS') = old_allow_exceed_limits
