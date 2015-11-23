@@ -1,5 +1,6 @@
 import numpy as np
 import PosState
+import PosMoveTable
 
 class PosModel(object):
     """Software model of the physical positioner hardware.
@@ -65,14 +66,13 @@ class PosModel(object):
 
 
 
-    def true_move(obs_dT, obs_dP, is_final_move):
-        """Input: (theta,phi) move as seen by the observer, in degrees
-        if it's a final move (i.e. that will need creep / anti-backlash added in)
+    def true_move(axisid, distance, should_antibacklash=True, should_final_creep=True):
+        """Input move distance on either the theta or phi axis, as seen by the
+        observer, in degrees. Also there are booleans for whether to do an
+        antibacklash submove, and whether to do a final creep submove.
         
-        Output: sequence of the predicted move times,
-                sequence of the integer number of motor steps on each axis
-                sequence of the speed modes ("cruise" or "creep")
-                sequence of the steps-quantized (theta,phi) distances, in degrees
+        Outputs are quantized distance [deg], speed [deg/sec], integer number
+        of motor steps, speed mode ['cruise' or 'creep'], and move time [sec]
 
         The return values may be lists, i.e. if it's a "final" move, which really consists
         of multiple submoves.
@@ -88,13 +88,11 @@ class PosModel(object):
         #	estimate the move(s) times
         #	calculate in degrees the quantized distance(s)
 
-        return {'n_submoves'    : n_submoves,
-                'move_times'    : move_times,
-                'speed_modes'   : speed_modes,
-                'obs_dT_corr'   : corrected_obs_dT,
-                'obs_dP_corr'   : corrected_obs_dP,
-                'motor_steps_T' : motor_steps_T,
-                'motor_steps_P' : motor_steps_P}
+        return {'obs_distance' : obs_distance,
+                'obs_speed'    : obs_speed,
+                'motor_step'   : motor_step,
+                'speed_mode'   : speed_mode,
+                'move_time'    : move_time}
         
 
 class Axis(object):
@@ -105,10 +103,10 @@ class Axis(object):
     _last_hardstop_debounce    = 0.0   # used internally for accounting changes to range settings
     _last_primary_hardstop_dir = 0.0   # 0, +1, -1, tells you which if any hardstop was last used to set travel limits
    
-    def __init__(self, state, axisid):
+    def __init__(self, posmodel, axisid):
         self.maxpos = float("inf")
         self.minpos = -float("inf")
-        self.state = state
+        self.posmodel = posmodel
         self.axisid = axisid
         self.set_range()
 
@@ -120,18 +118,18 @@ class Axis(object):
         """
         if self.axisid == PosModel.T:
             if self.principle_hardstop_direction < 0:
-                return np.array([abs(self.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_T')),
-                                 abs(self.state.kv('SECONDARY_HARDSTOP_CLEARANCE_T'))])
+                return np.array([abs(self.posmodel.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_T')),
+                                 abs(self.posmodel.state.kv('SECONDARY_HARDSTOP_CLEARANCE_T'))])
             else:
-                return np.array([abs(self.state.kv('SECONDARY_HARDSTOP_CLEARANCE_T')),
-                                 abs(self.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_T'))])
+                return np.array([abs(self.posmodel.state.kv('SECONDARY_HARDSTOP_CLEARANCE_T')),
+                                 abs(self.posmodel.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_T'))])
         elif self.axisid == PosModel.P:
             if self.principle_hardstop_direction < 0:
-                return np.array([abs(self.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_P')),
-                                 abs(self.state.kv('SECONDARY_HARDSTOP_CLEARANCE_P'))])
+                return np.array([abs(self.posmodel.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_P')),
+                                 abs(self.posmodel.state.kv('SECONDARY_HARDSTOP_CLEARANCE_P'))])
             else:
-                return np.array([abs(self.state.kv('SECONDARY_HARDSTOP_CLEARANCE_P')),
-                                 abs(self.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_P'))])
+                return np.array([abs(self.posmodel.state.kv('SECONDARY_HARDSTOP_CLEARANCE_P')),
+                                 abs(self.posmodel.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_P'))])
         else:
             print 'bad axisid' + repr(self.axisid)
             return None
@@ -142,9 +140,9 @@ class Axis(object):
         (The "secondary" hardstop is only struck when finding the total available travel range.)
         """
         if self.axisid == PosModel.T:
-            return self.state.kv['PRINCIPLE_HARDSTOP_DIR_T']
+            return self.posmodel.state.kv['PRINCIPLE_HARDSTOP_DIR_T']
         elif self.axisid == PosModel.P:
-            return self.state.kv['PRINCIPLE_HARDSTOP_DIR_P']
+            return self.posmodel.state.kv['PRINCIPLE_HARDSTOP_DIR_P']
         else:
             print 'bad axisid' + repr(self.axisid)
             return None
@@ -155,10 +153,10 @@ class Axis(object):
 		Returns [1x2] array of [min,max]
         """
         if self.axisid == PosModel.T:
-            targetable_range = abs(self.state.kv('PHYSICAL_RANGE_T')) - np.sum(self.hardstop_debounce)            
+            targetable_range = abs(self.posmodel.state.kv('PHYSICAL_RANGE_T')) - np.sum(self.hardstop_debounce)            
             return np.array([-0.50,0.50])*targetable_range  # split theta range such that 0 is essentially in the middle
         elif self.axisid == PosModel.P:
-            targetable_range = abs(self.state.kv('PHYSICAL_RANGE_P')) - np.sum(self.hardstop_debounce)    
+            targetable_range = abs(self.posmodel.state.kv('PHYSICAL_RANGE_P')) - np.sum(self.hardstop_debounce)    
             return np.array([-0.01,0.99])*targetable_range  # split phi range such that 0 is essentially at the minimum
         else:
             print 'bad axisid' + repr(self.axisid)
@@ -184,14 +182,19 @@ class Axis(object):
     def seek_one_limit_within(self, seek_distance):
         """Use to go hit a hardstop. For the distance argument, direction matters.
         """
-        old_allow_exceed_limits = self.state.kv['ALLOW_EXCEED_LIMITS']
-        self.state.kv('ALLOW_EXCEED_LIMITS') = True
+        old_allow_exceed_limits = self.posmodel.state.kv['ALLOW_EXCEED_LIMITS']
+        self.posmodel.state.kv('ALLOW_EXCEED_LIMITS') = True
         both_debounce_vals = self.hardstop_debounce
         if seek_distance < 0:
             abs_debounce = both_debounce_vals[0]
         else:
             abs_debounce = both_debounce_vals[1]
-        debounce_distance = -np.sign(seek_distance)*self.state.kv['SHOULD_DEBOUNCE_HARDSTOPS']*abs_debounce
-        move_list = move(seek_distance) # syntax needs some thought
-        move_list = add_move(debounce_distance)
-        self.state.kv('ALLOW_EXCEED_LIMITS') = old_allow_exceed_limits
+        debounce_distance = -np.sign(seek_distance)*self.posmodel.state.kv['SHOULD_DEBOUNCE_HARDSTOPS']*abs_debounce
+        #if self.posmodel.state.kv['LIMIT_APPROACH_CREEP_ONLY']:
+        #    speed_mode = 'creep'
+        #else:
+        #    speed_mode = 'cruise'
+        #move(0,self.axisid,seek_distance,speed_mode) # not really -- needs to pipe through Axis.move and thence through PosScheduler
+        #move(1,self.axisid,debounce_distance,'creep') # not really -- needs to pipe through Axis.move and thence through PosScheduler
+        self.posmodel.state.kv('ALLOW_EXCEED_LIMITS') = old_allow_exceed_limits
+        return move_table
