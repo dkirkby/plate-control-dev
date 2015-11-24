@@ -153,24 +153,21 @@ class Axis(object):
     """
     
     # internal parameters
-    _last_hardstop_debounce    = 0.0   # used internally for accounting changes to range settings
-    _last_primary_hardstop_dir = 0.0   # 0, +1, -1, tells you which if any hardstop was last used to set travel limits
+    
    
     def __init__(self, posmodel, axisid):
-        self.maxpos = float("inf")
-        self.minpos = -float("inf")
-        self.internal_pos = np.mean(self.nominal_positioning_range)
-        self.internal_pos_offset = 0.0  # internal_pos + internal_pos_offset --> pos, by definition
+        self.internal_pos = 0.0
+        self._internal_pos_offset = 0.0  # internal_pos + internal_pos_offset --> pos, by definition
+        self._last_primary_hardstop_dir = 0   # 0, +1, -1, tells you which if any hardstop was last used to set travel limits
         self.posmodel = posmodel
         self.axisid = axisid
-        self.set_range()
         self.postmove_cleanup_cmds = ''
 
     @property
     def pos(self):
         """Current position of the axis.
         """
-        return self.internal_pos + self.internal_pos_offset
+        return self.internal_pos + self._internal_pos_offset
 
     @property
     def hardstop_debounce(self):
@@ -210,7 +207,7 @@ class Axis(object):
             return None
 			
     @property
-    def nominal_positioning_range(self):
+    def debounced_range(self):
         """Calculated from physical range and hardstop debounce only.
 		Returns [1x2] array of [min,max]
         """
@@ -222,32 +219,21 @@ class Axis(object):
             return np.array([-0.01,0.99])*targetable_range  # split phi range such that 0 is essentially at the minimum
         else:
             print 'bad axisid' + repr(self.axisid)
-            return None
-   
-    def this_pos_is(self,real_pos):
-        """Tells the axis the offset between the internal position counter it tracks
-        and the real-world shaft position. The usage is generally for after hitting
-        a hard limit.
-        """
-        error = real_pos - self.pos
-        self.internal_pos_offset += error   
-   
-    def set_range(self):
-        """Updates minpos and maxpos, given the nominal range and the hardstop direction.
-        """
-        debounce_deltas = self.hardstop_debounce - self._last_hardstop_debounce
-        nominal_travel = np.diff(self.nominal_positioning_range)
-        if self._last_primary_hardstop_dir == 0:
-            self.minpos = np.amin(self.nominal_positioning_range)
-            self.maxpos = np.amax(self.nominal_positioning_range)
-            self._last_hardstop_debounce = self.hardstop_debounce
-        elif self._last_primary_hardstop_dir == 1:
-            self.maxpos = self.maxpos - debounce_deltas[1]
-            self.minpos = self.maxpos - nominal_travel
-        elif self._last_primary_hardstop_dir == -1:
-            self.minpos = self.minpos + debounce_deltas[0]
-            self.maxpos = self.minpos + nominal_travel
-        self._last_hardstop_debounce = self.hardstop_debounce
+            return None 
+    
+    @property
+    def maxpos(self):
+        if self._last_primary_hardstop_dir >= 0:
+            return np.amax(self.debounced_range)
+        else:
+            return self.minpos + self.debounced_range
+
+    @property
+    def minpos(self):
+        if self._last_primary_hardstop_dir < 0:
+            return np.amin(self.debounced_range)
+        else:
+            return self.maxpos - self.debounced_range
         
     def check_limits(self, distance):
         """Return distance after first truncating it (if necessary) according to software limits.
@@ -295,7 +281,7 @@ class Axis(object):
         """Typical homing routine to find the max pos, min pos and primary hardstop.
         The sequence is added to the argued schedule.
         """
-        seek_distance = np.absolute(np.diff(self.nominal_positioning_range)*self.state.kv['LIMIT_SEEK_EXCEED_RANGE_FACTOR'])                          
+        seek_distance = np.absolute(np.diff(self.debounced_range)*self.state.kv['LIMIT_SEEK_EXCEED_RANGE_FACTOR'])                          
         direction = np.sign(self.principle_hardstop_direction)
         self.add_seek_one_limit_sequence(schedule, direction*seek_distance)
         if direction > 0:
@@ -308,3 +294,12 @@ class Axis(object):
             self.postmove_cleanup_cmds += 'self.last_primary_hardstop_dir = -1.0\n'
         else:
             print 'bad direction ' + repr(direction)
+            
+           
+    def this_pos_is(self,real_pos):
+        """Tells the axis the offset between the internal position counter it tracks
+        and the real-world shaft position. The usage is generally for after hitting
+        a hard limit.
+        """
+        error = real_pos - self.pos
+        self._internal_pos_offset += error  
