@@ -36,7 +36,7 @@ class PosModel(object):
     default_move_options = {'BACKLASH_REMOVAL_ON'  : True,
                             'FINAL_CREEP_ON'       : True,
                             'ALLOW_EXCEED_LIMITS'  : False,
-                            'ONLY_CREEP_TO_LIMITS' : False}
+                            'ONLY_CREEP'           : False}
  
     def __init__(self, state=PosState.PosState()):
         self.state = state
@@ -138,6 +138,14 @@ class PosModel(object):
                 'motor_step'   : motor_step,
                 'speed_mode'   : speed_mode,
                 'move_time'    : move_time}
+    
+    def postmove_cleanup(self):
+        """Always perform this after positioner physical moves have been completed,
+        to update the internal tracking of shaft positions and variables.
+        """
+        for axis in self.axis:
+            exec(axis.postmove_cleanup_cmds)
+            axis.postmove_cleanup_cmds = ''
         
 
 class Axis(object):
@@ -156,6 +164,7 @@ class Axis(object):
         self.posmodel = posmodel
         self.axisid = axisid
         self.set_range()
+        self.postmove_cleanup_cmds = ''
 
     @property
     def pos(self):
@@ -215,19 +224,27 @@ class Axis(object):
             print 'bad axisid' + repr(self.axisid)
             return None
    
+    def this_pos_is(self,real_pos):
+        """Tells the axis the offset between the internal position counter it tracks
+        and the real-world shaft position. The usage is generally for after hitting
+        a hard limit.
+        """
+        error = real_pos - self.pos
+        self.internal_pos_offset += error   
+   
     def set_range(self):
         """Updates minpos and maxpos, given the nominal range and the hardstop direction.
         """
         debounce_deltas = self.hardstop_debounce - self._last_hardstop_debounce
         nominal_travel = np.diff(self.nominal_positioning_range)
-        if self._last_primary_hardstop_dir == 0.0:
+        if self._last_primary_hardstop_dir == 0:
             self.minpos = np.amin(self.nominal_positioning_range)
             self.maxpos = np.amax(self.nominal_positioning_range)
             self._last_hardstop_debounce = self.hardstop_debounce
-        elif self._last_primary_hardstop_dir == 1.0:
+        elif self._last_primary_hardstop_dir == 1:
             self.maxpos = self.maxpos - debounce_deltas[1]
             self.minpos = self.maxpos - nominal_travel
-        elif self._last_primary_hardstop_dir== -1.0:
+        elif self._last_primary_hardstop_dir == -1:
             self.minpos = self.minpos + debounce_deltas[0]
             self.maxpos = self.minpos + nominal_travel
         self._last_hardstop_debounce = self.hardstop_debounce
@@ -258,61 +275,36 @@ class Axis(object):
         """
         old_allow_exceed_limits = self.posmodel.state.kv['ALLOW_EXCEED_LIMITS']
         self.posmodel.state.kv('ALLOW_EXCEED_LIMITS') = True
+        old_only_creep = self.posmodel.state.kv['ONLY_CREEP']
+        if self.posmodel.state.kv['CREEP_TO_LIMITS']:
+            self.posmodel.state.kv['ONLY_CREEP'] = True
         both_debounce_vals = self.hardstop_debounce
         if seek_distance < 0:
             abs_debounce = both_debounce_vals[0]
         else:
             abs_debounce = both_debounce_vals[1]
         debounce_distance = -np.sign(seek_distance)*self.posmodel.state.kv['SHOULD_DEBOUNCE_HARDSTOPS']*abs_debounce
-        #if self.posmodel.state.kv['LIMIT_APPROACH_CREEP_ONLY']:
-        #    speed_mode = 'creep'
-        #else:
-        #    speed_mode = 'cruise'
-        #move(0,self.axisid,seek_distance,speed_mode) # not really -- needs to pipe through PosScheduler, maybe with a new move table handled by (whom? PosArrayMaster? PosModel?)
-        #move(1,self.axisid,debounce_distance,'creep') # not really -- needs to pipe through PosScheduler, maybe with a new move table handled by (whom? PosArrayMaster? PosModel?)
-        s = [0,0]
-        d = [0,0]
-        s[self.axisid] = seek_distance
-        d[self.axisid] = debounce_distance     
-        schedule.overall_move_request_with_forced_dtdp(self.posmodel, s[self.posmodel.T], s[self.posmodel.P])
-        schedule.overall_move_request_with_forced_dtdp(self.posmodel, d[self.posmodel.T], d[self.posmodel.P])
-        
+        table = PosMoveTable.PosMoveTable(self.posmodel)
+        table.set_move(0, self.axisid, seek_distance)
+        table.set_move(1, self.axisid, debounce_distance)
+        schedule.expert_add_move_table(table)
         self.posmodel.state.kv('ALLOW_EXCEED_LIMITS') = old_allow_exceed_limits
-        return move_table #?
+        self.posmodel.state.kv('ONLY_CREEP') = old_only_creep
         
-    def add_find_limits_sequence(self, schedule):
-        """Typical homing routine to find the max pos, min pos and at least primary hardstop.
+    def add_set_limits_sequence(self, schedule):
+        """Typical homing routine to find the max pos, min pos and primary hardstop.
         The sequence is added to the argued schedule.
         """
-        
         seek_distance = np.absolute(np.diff(self.nominal_positioning_range)*self.state.kv['LIMIT_SEEK_EXCEED_RANGE_FACTOR'])                          
-       
-        # seek secondary hardstop
-        if self.encoder_exists() and self.secondary_hardstop_exists:
-            if PosConstants.is_verbose(self.state.verbosity):
-                print('Axis {0}: seeking secondary limit \n'.format(self.axis_idx))
-            direction = -np.sign(self.principle_hardstop_direction)
-            self.add_seek_one_limit_sequence(schedule, direction*seek_distance)
-            if direction > 0:
-                self.max_is_here()
-            else:
-                self.min_is_here()
-        
-        # seek primary hardstop
         direction = np.sign(self.principle_hardstop_direction)
-        if direction != 0:
-            if PosConstants.is_verbose(self.state.verbosity):
-                print('Axis {0}: seeking primary limit \n'.format(self.axis_idx))
-            self.add_seek_one_limit_sequence(schedule, direction*seek_distance)
-            if self.encoder_exists() and direction > 0:
-                self.max_is_here()
-                self.last_primary_hardstop_dir = +1.0
-            elif self.encoder_exists():
-                self.min_is_here()
-                self.last_primary_hardstop_dir = -1.0
-            elif direction > 0:
-                self.this_pos_is(self.maxpos)
-                self.last_primary_hardstop_dir = +1.0
-            else:
-                self.this_pos_is(self.minpos)
-                self.last_primary_hardstop_dir = -1.0
+        self.add_seek_one_limit_sequence(schedule, direction*seek_distance)
+        if direction > 0:
+            self.postmove_cleanup_cmds = ''
+            self.postmove_cleanup_cmds += 'self.this_pos_is(self.maxpos)\n'
+            self.postmove_cleanup_cmds += 'self.last_primary_hardstop_dir = +1.0\n'
+        elif direction < 0:
+            self.postmove_cleanup_cmds = ''
+            self.postmove_cleanup_cmds += 'self.this_pos_is(self.minpos)\n'
+            self.postmove_cleanup_cmds += 'self.last_primary_hardstop_dir = -1.0\n'
+        else:
+            print 'bad direction ' + repr(direction)

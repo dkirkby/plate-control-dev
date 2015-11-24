@@ -36,24 +36,19 @@ class PosMoveTable(object):
     def set_move(self, rowidx, axisid, distance):
         """Put or update a move distance into the table.
         If row index does not exist yet, then it will be added, and any blank filler rows will be generated in-between.
-        By default the argument for speed is 'cruise', but it can be forced to 'creep' for special cases.
         """
         if rowidx >= len(self.__rows):
             self.insert_new_row(rowidx)
         if axisid == self.posmodel.T:
             dist_label = 'dT'
-            speed_label = 'speed_mode_T'
         elif axisid == self.posmodel.P:
             dist_label = 'dP'
-            speed_label = 'speed_mode_P'
         else:
             print 'bad axisid ' + repr(axisid)
-            return    
-        self.__rows[rowidx]._data[dist_label] = distance
-        self.__rows[rowidx]._data[speed_label] = speed
         for key in self.__rows[rowidx]._move_options.keys():
             self.__rows[rowidx]._move_options[key] = self.posmodel.state.kv[key]  # snapshot the current state
-        
+        self.__rows[rowidx]._data[dist_label] = distance
+
     def set_prepause(self, rowidx, prepause):
         """Put or update a prepause into the table.
         If row index does not exist yet, then it will be added, and any blank filler rows will be generated in-between.
@@ -103,8 +98,6 @@ class PosMoveTable(object):
             if output_type == 'hardware' and row['prepause']:
                 table['motor_steps_T'].append(0)
                 table['motor_steps_P'].append(0)
-                table['speed_mode_T'].append('cruise') # though it doesn't really matter which
-                table['speed_mode_P'].append('cruise') # though it doesn't really matter which
                 table['postpause'].append(row['prepause'])
             
             move_options = row._move_options.copy()
@@ -116,8 +109,8 @@ class PosMoveTable(object):
                 move_options['FINAL_CREEP_ON']      = False
             
             # use PosModel instance to get the real, quantized, calibrated values
-            true_move_T = self.posmodel(self.posmodel.T, row['dT'], row['speed_mode_T'], move_options)
-            true_move_P = self.posmodel(self.posmodel.P, row['dP'], row['speed_mode_P'], move_options)
+            true_move_T = self.posmodel(self.posmodel.T, row['dT'], move_options)
+            true_move_P = self.posmodel(self.posmodel.P, row['dP'], move_options)
             
             # fill in the output table according to type
             if output_type == 'scheduler':
@@ -151,8 +144,6 @@ class PosMoveRow(object):
     def __init__(self):
         self._data = {'dT'           : 0,        # [deg] ideal theta distance to move (as seen by external observer)
                       'dP'           : 0,        # [deg] ideal phi distance to move (as seen by external observer)
-                      'speed_mode_T' : 'cruise', # ['cruise' or 'creep'] theta, whether to cruise (fast, coarse resolution) or creep (slow, fine resolution)
-                      'speed_mode_P' : 'cruise', # ['cruise' or 'creep'] phi, whether to cruise (fast, coarse resolution) or creep (slow, fine resolution)
                       'prepause'     : 0,        # [sec] delay for this number of seconds before executing the move
                       'move_time'    : 0,        # [sec] time it takes the move to execute
                       'postpause'    : 0}        # [sec] delay for this number of seconds after the move has completed 
