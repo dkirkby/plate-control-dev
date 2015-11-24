@@ -1,4 +1,5 @@
 import PosModel
+import copy
 
 class PosMoveTable(object):
     """A move table contains the information for a single positioner's move
@@ -81,6 +82,10 @@ class PosMoveTable(object):
         
     def delete_row(self,index):
         del self.__rows[index]
+        
+    def extend(self, other_move_table):
+        for otherrow in other_move_table.__rows:
+            self.__rows.append(otherrow.copy())
 
     # internal methods
     def __for_output_type(self,output_type):
@@ -151,5 +156,8 @@ class PosMoveRow(object):
                       'prepause'     : 0,        # [sec] delay for this number of seconds before executing the move
                       'move_time'    : 0,        # [sec] time it takes the move to execute
                       'postpause'    : 0}        # [sec] delay for this number of seconds after the move has completed 
-       self._move_options = PosModel.default_move_options
+        self._move_options = PosModel.default_move_options
+        
+    def copy(self):
+        return copy.copy(self)
 

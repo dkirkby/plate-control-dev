@@ -11,7 +11,7 @@ class PosScheduler(object):
         self.move_tables = []
         self._start = []
         self._targt = []
-        self._is_forced_dtdp = []
+        self._is_forced = []
         
     def overall_move_request(posmodel, P, Q):
         """Adds a request to the scheduler for a given positioner to move to
@@ -21,15 +21,16 @@ class PosScheduler(object):
         self._targt.append([P,Q])
         self._is_forced_dtdp.append(False)
     
-    def overall_move_request_with_forced_dtdp(posmodel, dt, dp):
-        """Adds a request to the scheduler for a given positioner to move by
-        a relative amount (dtheta, dphi). Inherently such moves will NOT be
-        analyzed by the anticollision algorithm. Therefore calling this function
-        should generally be used only by an expert user.
+    def expert_add_move_table(move_table):
+        """Adds an externally-constructed move table to the schedule. The move
+        table will be skipped by the scheduling algorithm. Also, if there
+        is ANY such table in a given schedule, then the anti-collision algorithm
+        will NOT be used. Generally, this method should only be used for internal
+        calls by an expert user.
         """
-        self.move_tables.append(PosMoveTable.PosMoveTable(posmodel))
-        self._targt.append([dt,dp])
-        self._is_forced_dtdp.append(True)
+        self.move_tables.append(move_table)
+        self._targt.append([float('nan'),float('nan')])
+        self._is_forced.append(True)
             
     def schedule_moves(self, anticollision=True):
         """Executes the scheduling algorithm upon the stored list of move requests.
@@ -38,38 +39,36 @@ class PosScheduler(object):
         """
         self._start = [[0,0]] * len(self._start)
         for i in range(len(self.move_tables)):
-            if not(self._is_forced_dtdp[i]):
+            if self._is_forced[i]:
+                self._start[i] = [float('nan'),float('nan')]
+            else:
                 current_position = self.move_tables[i].posmodel.position_PQ
                 self._start[i] = current_position.transpose().tolist()
-        if not(anticollision) or any(self._is_forced_dtdp):
+        if not(anticollision) or any(self._is_forced):
             self.move_tables = self._schedule_without_anticollision()
         else:
             self.move_tables = self._schedule_with_anticollision()
          
-    # internal methods    
+    # internal methods
     def _schedule_without_anticollision(self):
-        start = np.transpose(np.array(self._start))
-        targt = np.transpose(np.array(self._targt))
+        for i in range(len(self.move_tables)):      
+            # convert global P,Q into local theta,phi
+            start = np.transpose(np.array(self._start[i]))
+            targt = np.transpose(np.array(self._targt[i]))
+            start = self.move_tables[i].posmodel.trans.QP_to_obsTP(start) # check format after PosTransforms updated
+            targt = self.move_tables[i].posmodel.trans.QP_to_obsTP(targt) # check format after PosTransforms updated
 
-        # check forced dtdp
-        for i in range(len(self._is_forced_dtdp)):
-            if self._is_forced_dtdp[i]:
-                start[:,i] = 0
-            else:
-                start = self.move_tables[i].posmodel.trans.QP_to_obsTP(start) # check format after PosTransforms updated
-                targt = self.move_tables[i].posmodel.trans.QP_to_obsTP(targt) # check format after PosTransforms updated
+            # delta = finish - start
+            dtdp = tp_targ - tp_start
 
-        # delta = finish - start
-        dtdp = tp_targ - tp_start
-
-        # set deltas and pauses into move tables
-        for i in range(len(self.move_tables)):
-            tbl = self.move_tables[i]
-            row = 0
-            tbl.set_move(row, tbl.posmodel.T, dtdp[0,i])
-            tbl.set_move(row, tbl.posmodel.P, dtdp[1,i])
-            tbl.set_prepause (row, 0.0)
-            tbl.set_postpause(row, 0,0)
+            # set deltas and pauses into move tables
+            if not(self._is_forced[i]):
+                row = 0 # for the anti-collision, this would vary
+                self.move_tables[i].set_move     (row, tbl.posmodel.T, dtdp[0,i])
+                self.move_tables[i].set_move     (row, tbl.posmodel.P, dtdp[1,i])
+                self.move_tables[i].set_prepause (row, 0.0)
+                self.move_tables[i].set_postpause(row, 0,0)
+                
         return move_tables
         
     def _schedule_with_anticollision(self):
