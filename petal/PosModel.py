@@ -30,6 +30,7 @@ class PosModel(object):
  
     def __init__(self, state=PosState.PosState()):
         self.state = state
+        self.trans = PosTransforms.PosTransforms(self.state)
         self.axis = [None,None]
         self.axis[self.T] = Axis(self.state,self.T)
         self.axis[self.P] = Axis(self.state,self.P)
@@ -65,7 +66,6 @@ class PosModel(object):
 	#	calibrated limits on travel ranges (tmin,tmax,pmin,pmax)
 
 
-
     def true_move(axisid, distance, should_antibacklash=True, should_final_creep=True):
         """Input move distance on either the theta or phi axis, as seen by the
         observer, in degrees. Also there are booleans for whether to do an
@@ -78,6 +78,20 @@ class PosModel(object):
         of multiple submoves.
         """
 
+        if axisid == self.T:
+            obs_distance = self.trans.obsT_to_shaftT # does this logic work here? use PosTransforms for a single axis? or just a dumb gear ratio?
+                                     # at what point do we do obsTP_to_shaftTP (i.e., both axes simultaneously? is that necessary)
+                                     # at what point do the ... offsets ... get figured in?
+                                     #                      ... gear ratios ...
+                                     #                      ... gear ratio calibrations ...
+        elif axisid == self.P:
+            obs_distance = self.trans.obsT_to_shaftP
+        else:
+            print 'bad axisid ' + repr(axisid)
+                
+        obs_distance = self.axis[axisid].check_limits(obs_distance)
+        
+        
         # if it's a final move...
         #	get the backlash and creep parameters from PosState
         #   break up the final move into appropriate submoves
@@ -179,6 +193,26 @@ class Axis(object):
             self.maxpos = self.minpos + nominal_travel
         self._last_hardstop_debounce = self.hardstop_debounce
         
+    def check_limits(self, distance):
+        """Return distance after first truncating it (if necessary) according to software limits.
+        """
+        if not(self.posmodel.state.kv['ALLOW_EXCEED_LIMITS']):
+            target_pos = self.pos + distance
+            if self.maxpos < self.minpos:
+                distance = 0
+                print('Axis {0} : allow_exceed_limits= {1} and maxpos = {2} is less than minpos = {3}; nomove made'.format(self.axis_idx, self.allow_exceed_limits, self.maxpos, self.minpos))
+            elif target_pos > self.maxpos:
+                new_distance = self.maxpos - self.pos
+                if PosConstants.is_verbose(self.state.verbosity):
+                    print(' Axis {0} : allow_exceed_limits = {1} , so no resquested move = {2}was truncated to ( maxpos-pos)= {3} \n'.format(self.axis_idx, self.allow_exceed_limits, distance, new_distance))
+                distance = new_distance
+            elif target_pos < self.minpos:
+                new_distance = self.minpos - self.pos
+                if PosConstants.is_verbose(self.state.verbosity):
+                    print('Axis {0} : allow_exceed_limits = {1}, so no resquested move = {2} was truncated to (minpos- pos)= {3} \n'.format(self.axis_idx, self.allow_exceed_limits, distance, new_distance))
+                distance = new_distance
+        return distance       
+        
     def seek_one_limit_within(self, seek_distance):
         """Use to go hit a hardstop. For the distance argument, direction matters.
         """
@@ -194,7 +228,43 @@ class Axis(object):
         #    speed_mode = 'creep'
         #else:
         #    speed_mode = 'cruise'
-        #move(0,self.axisid,seek_distance,speed_mode) # not really -- needs to pipe through Axis.move and thence through PosScheduler
-        #move(1,self.axisid,debounce_distance,'creep') # not really -- needs to pipe through Axis.move and thence through PosScheduler
+        #move(0,self.axisid,seek_distance,speed_mode) # not really -- needs to pipe through PosScheduler, maybe with a new move table handled by (whom? PosArrayMaster? PosModel?)
+        #move(1,self.axisid,debounce_distance,'creep') # not really -- needs to pipe through PosScheduler, maybe with a new move table handled by (whom? PosArrayMaster? PosModel?)
         self.posmodel.state.kv('ALLOW_EXCEED_LIMITS') = old_allow_exceed_limits
-        return move_table
+        return move_table #?
+        
+    def find_limits(self):
+        """Typical homing routine to find the max pos, min pos and at least primary hardstop.
+        """
+                          
+        seek_distance = np.absolute(np.diff(self.nominal_positioning_range)*self.state.kv['LIMIT_SEEK_EXCEED_RANGE_FACTOR'])[0]
+                          
+        # seek secondary hardstop
+        if self.encoder_exists() and self.secondary_hardstop_exists:
+            if PosConstants.is_verbose(self.state.verbosity):
+                print('Axis {0}: seeking secondary limit \n'.format(self.axis_idx))
+            direction = -np.sign(self.principle_hardstop_direction)
+            self.seek_one_limits_within(direction * seek_distance)
+            if direction > 0:
+                self.max_is_here()
+            else:
+                self.min_is_here()
+        # seek primary hardstop
+        direction = np.sign(self.principle_hardstop_direction)
+        if direction != 0:
+            if PosConstants.is_verbose(self.state.verbosity):
+                print('Axis {0}: seeking primary limit \n'.format(self.axis_idx))
+            self.seek_one_limits_within(direction * seek_distance)
+            if self.encoder_exists() and direction > 0:
+                self.max_is_here()
+                self.last_primary_hardstop_dir = +1.0
+            elif self.encoder_exists():
+                self.min_is_here()
+                self.last_primary_hardstop_dir = -1.0
+            elif direction > 0:
+                self.this_pos_is(self.maxpos)
+                self.last_primary_hardstop_dir = +1.0
+            else:
+                self.this_pos_is(self.minpos)
+                self.last_primary_hardstop_dir = -1.0
+        return seek_distance
