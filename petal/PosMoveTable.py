@@ -13,10 +13,8 @@ class PosMoveTable(object):
     """
     
     def __init__(self, posmodel=PosModel.PosModel()):
-        self.posmodel = posmodel     # the particular positioner this table applies to
-        self.antibacklash_on = True  # whether to do anti-backlash submoves on the final move
-        self.final_creep_on  = True  # whether to do precision creep submoves on the final move
-        self.__rows = []             # internal representation of the move data
+        self.posmodel = posmodel          # the particular positioner this table applies to
+        self.__rows = []                  # internal representation of the move data
 
     # getters
     def for_scheduler(self):
@@ -34,7 +32,7 @@ class PosMoveTable(object):
         return self.__for_output_type('hardware')
 
     # setters
-    def set_move(self, rowidx, axisid, distance, speed='cruise'):
+    def set_move(self, rowidx, axisid, distance):
         """Put or update a move distance into the table.
         If row index does not exist yet, then it will be added, and any blank filler rows will be generated in-between.
         By default the argument for speed is 'cruise', but it can be forced to 'creep' for special cases.
@@ -49,9 +47,11 @@ class PosMoveTable(object):
             speed_label = 'speed_mode_P'
         else:
             print 'bad axisid ' + repr(axisid)
-            return
+            return    
         self.__rows[rowidx]._data[dist_label] = distance
         self.__rows[rowidx]._data[speed_label] = speed
+        for key in self.__rows[rowidx]._move_options.keys():
+            self.__rows[rowidx]._move_options[key] = self.posmodel.state.kv[key]  # snapshot the current state
         
     def set_prepause(self, rowidx, prepause):
         """Put or update a prepause into the table.
@@ -94,7 +94,6 @@ class PosMoveTable(object):
 
         i = 0
         for row in self.__rows:
-
             # insert an extra pause-only row if necessary, since hardware commands only really have postpauses           
             if output_type == 'hardware' and row['prepause']:
                 table['motor_steps_T'].append(0)
@@ -102,19 +101,18 @@ class PosMoveTable(object):
                 table['speed_mode_T'].append('cruise') # though it doesn't really matter which
                 table['speed_mode_P'].append('cruise') # though it doesn't really matter which
                 table['postpause'].append(row['prepause'])
-
-            # check what kind of submove calculations if any
+            
+            move_options = row._move_options.copy()
+            
+            # only do final backlash / creep moves if it's really a final row
             i += 1
-            if i == len(self.__rows):
-                should_antibacklash = self.antibacklash_on
-                should_final_creep = self.final_creep_on
-            else:
-                should_antibacklash = False
-                should_final_creep = False
+            if i != len(self.__rows):
+                move_options['BACKLASH_REMOVAL_ON'] = False
+                move_options['FINAL_CREEP_ON']      = False
             
             # use PosModel instance to get the real, quantized, calibrated values
-            true_move_T = self.posmodel(self.posmodel.T, row['dT'], row['speed_mode_T'], should_antibacklash, should_final_creep)
-            true_move_P = self.posmodel(self.posmodel.P, row['dP'], row['speed_mode_P'], should_antibacklash, should_final_creep)
+            true_move_T = self.posmodel(self.posmodel.T, row['dT'], row['speed_mode_T'], move_options)
+            true_move_P = self.posmodel(self.posmodel.P, row['dP'], row['speed_mode_P'], move_options)
             
             # fill in the output table according to type
             if output_type == 'scheduler':
@@ -144,6 +142,7 @@ class PosMoveRow(object):
     PosMoveRow instance, but rather should rely on the higher level table
     formats that are exported by PosMoveTable.
     """
+                          
     def __init__(self):
         self._data = {'dT'           : 0,        # [deg] ideal theta distance to move (as seen by external observer)
                       'dP'           : 0,        # [deg] ideal phi distance to move (as seen by external observer)
@@ -151,4 +150,6 @@ class PosMoveRow(object):
                       'speed_mode_P' : 'cruise', # ['cruise' or 'creep'] phi, whether to cruise (fast, coarse resolution) or creep (slow, fine resolution)
                       'prepause'     : 0,        # [sec] delay for this number of seconds before executing the move
                       'move_time'    : 0,        # [sec] time it takes the move to execute
-                      'postpause'    : 0}        # [sec] delay for this number of seconds after the move has completed
+                      'postpause'    : 0}        # [sec] delay for this number of seconds after the move has completed 
+       self._move_options = PosModel.default_move_options
+

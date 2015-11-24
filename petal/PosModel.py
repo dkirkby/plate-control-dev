@@ -27,6 +27,15 @@ class PosModel(object):
     _period_creep         = 2.0    # timer intervals
     _shaft_speed_cruise   = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
     _shaft_speed_creep    = _timer_update_rate * _stepsize_creep / _period_creep  # deg/sec
+    
+    # List of particular PosState parameters that modify internal details of how a move
+    # gets divided into cruise / creep, antibacklash moves added, etc. What distinguishes
+    # these parameters is that they specify particular *modes* of motion. They are not
+    # calibration parameters or id #s or the like.
+    default_move_options = {'BACKLASH_REMOVAL_ON'  : True,
+                            'FINAL_CREEP_ON'       : True,
+                            'ALLOW_EXCEED_LIMITS'  : False,
+                            'ONLY_CREEP_TO_LIMITS' : False}
  
     def __init__(self, state=PosState.PosState()):
         self.state = state
@@ -55,6 +64,28 @@ class PosModel(object):
     def speed_creep_P(self):
         """Phi axis creep speed at the output shaft in deg / sec."""
         return self.shaft_speed_creep / self.state.kv['GEAR_P']
+        
+    @property
+    def position_PQ(self):
+        """2x1 current (P,Q) position as seen by an external observer looking toward the focal surface."""
+        return self.trans.shaftTP_to_obsQP(self.position_shaftTP) # nomenclature here might change when actually implemented in PosTransforms
+
+    @property
+    def position_xy(self):
+        """2x1 current (x,y) position as seen by an external observer looking toward the focal surface."""
+        return self.trans.shaftTP_to_obsXY(self.position_shaftTP)
+    
+    @property
+    def position_obsTP(self):
+        """2x1 current (theta,phi) position as seen by an external observer looking toward the fiber tip."""
+        return self.trans.shaftTP_to_obsTP(self.position_shaftTP)
+    
+    @property
+    def position_shaftTP(self):
+        """2x1 current (theta,phi) output shaft positions (no offsets or calibrations)."""
+        t = self.axis[self.T].pos
+        p = self.axis[self.P].pos
+        return np.array([[t],[p]])
 
 	#	anti-collision keepout polygons (several types...)
 	#		ferrule holder and upper housing keepouts are always the same, see DESI-0XXX
@@ -66,10 +97,9 @@ class PosModel(object):
 	#	calibrated limits on travel ranges (tmin,tmax,pmin,pmax)
 
 
-    def true_move(axisid, distance, should_antibacklash=True, should_final_creep=True):
+    def true_move(self, axisid, distance, options=self.default_move_options):
         """Input move distance on either the theta or phi axis, as seen by the
-        observer, in degrees. Also there are booleans for whether to do an
-        antibacklash submove, and whether to do a final creep submove.
+        observer, in degrees.
         
         Outputs are quantized distance [deg], speed [deg/sec], integer number
         of motor steps, speed mode ['cruise' or 'creep'], and move time [sec]
@@ -120,9 +150,17 @@ class Axis(object):
     def __init__(self, posmodel, axisid):
         self.maxpos = float("inf")
         self.minpos = -float("inf")
+        self.internal_pos = np.mean(self.nominal_positioning_range)
+        self.internal_pos_offset = 0.0  # internal_pos + internal_pos_offset --> pos, by definition
         self.posmodel = posmodel
         self.axisid = axisid
         self.set_range()
+
+    @property
+    def pos(self):
+        """Current position of the axis.
+        """
+        return self.internal_pos + self.internal_pos_offset
 
     @property
     def hardstop_debounce(self):
