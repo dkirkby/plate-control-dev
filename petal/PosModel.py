@@ -120,7 +120,7 @@ class PosModel(object):
         else:
             print 'bad axisid ' + repr(axisid)
                 
-        obs_distance = self.axis[axisid].check_limits(obs_distance)
+        obs_distance = self.axis[axisid].truncate_to_limits(obs_distance)
         
         
         # if it's a final move...
@@ -235,23 +235,18 @@ class Axis(object):
         else:
             return self.maxpos - self.debounced_range
         
-    def check_limits(self, distance):
+    def truncate_to_limits(self, distance):
         """Return distance after first truncating it (if necessary) according to software limits.
         """
         if not(self.posmodel.state.kv['ALLOW_EXCEED_LIMITS']):
             target_pos = self.pos + distance
             if self.maxpos < self.minpos:
                 distance = 0
-                print('Axis {0} : allow_exceed_limits= {1} and maxpos = {2} is less than minpos = {3}; nomove made'.format(self.axis_idx, self.allow_exceed_limits, self.maxpos, self.minpos))
             elif target_pos > self.maxpos:
                 new_distance = self.maxpos - self.pos
-                if PosConstants.is_verbose(self.state.verbosity):
-                    print(' Axis {0} : allow_exceed_limits = {1} , so no resquested move = {2}was truncated to ( maxpos-pos)= {3} \n'.format(self.axis_idx, self.allow_exceed_limits, distance, new_distance))
                 distance = new_distance
             elif target_pos < self.minpos:
                 new_distance = self.minpos - self.pos
-                if PosConstants.is_verbose(self.state.verbosity):
-                    print('Axis {0} : allow_exceed_limits = {1}, so no resquested move = {2} was truncated to (minpos- pos)= {3} \n'.format(self.axis_idx, self.allow_exceed_limits, distance, new_distance))
                 distance = new_distance
         return distance       
         
