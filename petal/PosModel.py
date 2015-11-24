@@ -1,6 +1,7 @@
 import numpy as np
 import PosState
 import PosMoveTable
+import PosScheduler
 
 class PosModel(object):
     """Software model of the physical positioner hardware.
@@ -251,8 +252,9 @@ class Axis(object):
                 distance = new_distance
         return distance       
         
-    def seek_one_limit_within(self, seek_distance):
+    def add_seek_one_limit_sequence(self, schedule, seek_distance):
         """Use to go hit a hardstop. For the distance argument, direction matters.
+        The sequence is added to the argued schedule.
         """
         old_allow_exceed_limits = self.posmodel.state.kv['ALLOW_EXCEED_LIMITS']
         self.posmodel.state.kv('ALLOW_EXCEED_LIMITS') = True
@@ -268,31 +270,40 @@ class Axis(object):
         #    speed_mode = 'cruise'
         #move(0,self.axisid,seek_distance,speed_mode) # not really -- needs to pipe through PosScheduler, maybe with a new move table handled by (whom? PosArrayMaster? PosModel?)
         #move(1,self.axisid,debounce_distance,'creep') # not really -- needs to pipe through PosScheduler, maybe with a new move table handled by (whom? PosArrayMaster? PosModel?)
+        s = [0,0]
+        d = [0,0]
+        s[self.axisid] = seek_distance
+        d[self.axisid] = debounce_distance     
+        schedule.overall_move_request_with_forced_dtdp(self.posmodel, s[self.posmodel.T], s[self.posmodel.P])
+        schedule.overall_move_request_with_forced_dtdp(self.posmodel, d[self.posmodel.T], d[self.posmodel.P])
+        
         self.posmodel.state.kv('ALLOW_EXCEED_LIMITS') = old_allow_exceed_limits
         return move_table #?
         
-    def find_limits(self):
+    def add_find_limits_sequence(self, schedule):
         """Typical homing routine to find the max pos, min pos and at least primary hardstop.
+        The sequence is added to the argued schedule.
         """
-                          
-        seek_distance = np.absolute(np.diff(self.nominal_positioning_range)*self.state.kv['LIMIT_SEEK_EXCEED_RANGE_FACTOR'])[0]
-                          
+        
+        seek_distance = np.absolute(np.diff(self.nominal_positioning_range)*self.state.kv['LIMIT_SEEK_EXCEED_RANGE_FACTOR'])                          
+       
         # seek secondary hardstop
         if self.encoder_exists() and self.secondary_hardstop_exists:
             if PosConstants.is_verbose(self.state.verbosity):
                 print('Axis {0}: seeking secondary limit \n'.format(self.axis_idx))
             direction = -np.sign(self.principle_hardstop_direction)
-            self.seek_one_limits_within(direction * seek_distance)
+            self.add_seek_one_limit_sequence(schedule, direction*seek_distance)
             if direction > 0:
                 self.max_is_here()
             else:
                 self.min_is_here()
+        
         # seek primary hardstop
         direction = np.sign(self.principle_hardstop_direction)
         if direction != 0:
             if PosConstants.is_verbose(self.state.verbosity):
                 print('Axis {0}: seeking primary limit \n'.format(self.axis_idx))
-            self.seek_one_limits_within(direction * seek_distance)
+            self.add_seek_one_limit_sequence(schedule, direction*seek_distance)
             if self.encoder_exists() and direction > 0:
                 self.max_is_here()
                 self.last_primary_hardstop_dir = +1.0
@@ -305,4 +316,3 @@ class Axis(object):
             else:
                 self.this_pos_is(self.minpos)
                 self.last_primary_hardstop_dir = -1.0
-        return seek_distance
