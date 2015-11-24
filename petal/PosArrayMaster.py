@@ -44,7 +44,7 @@ class PosArrayMaster(object):
 	def hardware_ready_move_tables(move_tables):
 		"""Strips out information that isn't necessary to send to petalbox, and
 		formats for sending. Any cases of multiple tables for one positioner are
-        grouped into a single table."""
+        merged in sequence into a single table."""
         i = 0
         while i < len(move_tables):
             j = i + 1
@@ -57,4 +57,6 @@ class PosArrayMaster(object):
             for e in extend_list
                 move_tables[i].extend(e)
             i += 1                  
-		return move_tables.for_hardware
+		for tbl in move_tables
+          hw_tables = tbl.for_hardware()
+        return hw_tables

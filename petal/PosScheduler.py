@@ -5,6 +5,10 @@ class PosScheduler(object):
     """Generates move table schedules in local (theta,phi) to get positioners
     from starts to finishes. The move tables are instances of the PosMoveTable
     class.
+    
+    Note that the schedule may contain multiple move tables for the same positioner,
+    under the assumption that another module (i.e. PosArrayMaster) will generally be
+    the one which merges any such tables in sequence, before sending off to the hardware. 
     """
     
     def __init__(self):
