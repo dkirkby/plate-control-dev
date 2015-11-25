@@ -4,7 +4,7 @@ import PosState
 
 class PosArrayMaster(object):
     """Orchestrates the modules to generate fiber positioner move sequences.
-	"""
+    """
  
     def __init__(self, posids):
         self.positioners = []
@@ -29,6 +29,16 @@ class PosArrayMaster(object):
         # Now for the full array, pass all the start and target (P,Q) to PosScheduler,
         # (as well as calibration values).
         self.move_tables = PosScheduler.schedule_moves(Ptarg,Qtarg,anticollision)
+        
+    def expert_setup_move_tables(self, posid, movecmd, val1, val2):
+        """Given a list of positioner ids, and corresponding move command strings,
+        and argument value pairs, generates the move tables to execute the commands.
+        Multiple commands to the same positioner are permitted, and will be executed
+        in sequence. There is NO anticollision calculation performed! Therefore
+        this function is generally recommended only for expert usage.
+        """
+        
+        
 			
     def hardware_ready_move_tables(self):
         """Strips out information that isn't necessary to send to petalbox, and
@@ -73,7 +83,7 @@ class PosArrayMaster(object):
                     j += 1
             for e in extend_list:
                 tbls[i].extend(e)
-            i += 1        
+            i += 1
         hw_tables = []
         for m in tbls:
             hw_tables.append(m.for_hardware())
