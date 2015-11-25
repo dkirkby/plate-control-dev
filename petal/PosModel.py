@@ -199,6 +199,8 @@ class PosModel(object):
         for axis in self.axis:
             exec(axis.postmove_cleanup_cmds)
             axis.postmove_cleanup_cmds = ''
+    
+    def 
 
 class Axis(object):
     """Handler for a motion axis. Provides move syntax and keeps tracks of position.

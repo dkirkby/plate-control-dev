@@ -7,39 +7,43 @@ class PosArrayMaster(object):
     """
  
     def __init__(self, posids):
-        self.positioners = []
+        self.posmodels = []
         for i in range(len(posids)):
             posstate = PosState.PosState(posids[i]) # or other appropriate syntax for loading that config
             posmodel = PosModel.PosModel(posstate)
-            self.positioners.append(posmodel)
+            self.posmodels.append(posmodel)
         self.posids = posids
-        self.move_tables = []
+        self.schedule = PosScheduler.PosScheduler()
 
-    def setup_move_tables(self, posid, Ptarg, Qtarg, anticollision=True):
-        """Given a list of positioner ids, and corresponding target positions, generates
-        the move tables that get from start to target. Only one set of target coordinates
-        per posid. Note the available flag to turn off anticollision algorithm.
+    def request_moves(self, posids, Ptargs, Qtargs):
+        """Input a list of positioner ids and corresponding target positions to
+        the scheduler.
         """
-        anticollision = False # temporary, since algorithm is not implemented yet in PosScheduler
-        #for i in posid:
-        #    pos = self.positioners[i]
-			# use PosModel to get calibration values
-			# use PosModel to get current local theta,phi
-			# use PosTransforms to convert current local theta,phi to Pstart, Qstart
-        # Now for the full array, pass all the start and target (P,Q) to PosScheduler,
-        # (as well as calibration values).
-        self.move_tables = PosScheduler.schedule_moves(Ptarg,Qtarg,anticollision)
+        for i in range(len(posids)):
+            j = self.posids.index(posids[i])
+            self.schedule.overall_move_request(self.posmodels[j], Ptargs[i], Qtargs[i])
+
+    def expert_request_moves(self, posids, movecmds, values1, values2):
+        """Input a list to the scheduler of positioner ids and corresponding
+        move command strings and argument value pairs.
         
-    def expert_setup_move_tables(self, posid, movecmd, val1, val2):
-        """Given a list of positioner ids, and corresponding move command strings,
-        and argument value pairs, generates the move tables to execute the commands.
-        Multiple commands to the same positioner are permitted, and will be executed
-        in sequence. There is NO anticollision calculation performed! Therefore
-        this function is generally recommended only for expert usage.
+        Usage of this method by design forces anticollision calculations to be
+        turned off for the entire schedule. This method is generally recommended
+        only for expert usage.
         """
+        for i in range(len(posids)):
+            #something
+            self.schedule.expert_add_move_table(move_table)
+            
+    def schedule_moves(self,anticollision=True):
+        """Generate the schedule of moves and submoves that get positioners
+        from start to target. Call this after having input all desired moves
+        using the move request methods. Note the available flag to turn the
+        anticollision algorithm on or off for the scheduling.
+        """
+        anticollision = False # temporary, since algorithm is not yet implemented in PosScheduler
+        self.schedule.schedule_moves(anticollision)
         
-        
-			
     def hardware_ready_move_tables(self):
         """Strips out information that isn't necessary to send to petalbox, and
         formats for sending. Any cases of multiple tables for one positioner are
@@ -71,7 +75,7 @@ class PosArrayMaster(object):
                 postpause     ... list of unsigned integers ... pause time after the row's motion, in milliseconds, before executing the next row
                 
         """
-        tbls = self.move_tables
+        tbls = self.schedule.move_tables
         i = 0
         while i < len(tbls):
             j = i + 1
@@ -93,6 +97,10 @@ class PosArrayMaster(object):
         """Always call this after performing a set of moves, so that PosModel instances
         can be informed that the hardware move was done.
         """
-        for m in self.move_tables:
+        for m in self.schedule.move_tables:
             cleanup_table = m.for_cleanup
             m.posmodel.postmove_cleanup(cleanup_table['dT'],cleanup_table['dP']) 
+        self.clear_schedule()
+        
+    def clear_schedule(self):
+        self.schedule = PosScheduler.PosScheduler()

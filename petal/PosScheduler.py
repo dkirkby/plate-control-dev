@@ -17,15 +17,15 @@ class PosScheduler(object):
         self._targt = []
         self._is_forced = []
         
-    def overall_move_request(posmodel, P, Q):
+    def overall_move_request(self, posmodel, P, Q):
         """Adds a request to the scheduler for a given positioner to move to
         the target position (P,Q).
         """
-        self.move_tables.append(PosMoveTable.PosMoveTable(posmodels))
+        self.move_tables.append(PosMoveTable.PosMoveTable(posmodel))
         self._targt.append([P,Q])
         self._is_forced_dtdp.append(False)
     
-    def expert_add_move_table(move_table):
+    def expert_add_move_table(self, move_table):
         """Adds an externally-constructed move table to the schedule. The move
         table will be skipped by the scheduling algorithm. Also, if there
         is ANY such table in a given schedule, then the anti-collision algorithm
