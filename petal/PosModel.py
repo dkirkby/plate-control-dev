@@ -1,6 +1,7 @@
 import numpy as np
 import PosState
 import PosMoveTable
+import PosTransforms
 import PosScheduler
 
 class PosModel(object):
@@ -66,18 +67,38 @@ class PosModel(object):
         t = self.axis[self.T].pos
         p = self.axis[self.P].pos
         return np.array([[t],[p]])
+        
+    @property
+    def position_motTP(self):
+        """2x1 current (theta,phi) nominal motor shaft positions."""
+        tp = self.position_shaftTP
+        tp[self.T,0] *= self.axis[self.T].gear_ratio
+        tp[self.P,0] *= self.axis[self.P].gear_ratio
+        return tp
+    
+    @property
+    def position_str(self):
+        """One-line string displaying current known position."""
+        deg = unichr(176).encode("latin-1")
+        mm = 'mm'
+        s = 'P:{:7.3f}{}, Q:{:7.3f}{} | X:{:7.3f}{}, Y:{:7.3f}{} | t:{:8.3f}{}, p:{:8.3f}{} | tmot:{:8.1f}{}, pmot:{:8.1f}{}'. \
+            format(self.position_PQ[0,0],mm,self.position_PQ[1,0],deg,
+                   self.position_xy[0,0],mm,self.position_xy[1,0],mm,
+                   self.position_obsTP[0,0],deg,self.position_obsTP[1,0],deg,
+                   self.position_motTP[0,0],deg,self.position_motTP[1,0],deg)
+        return s
 
-	# POSSIBLE DATA GETTERS NEEDED FOR ANTI-COLLISION?
+    # POSSIBLE DATA GETTERS NEEDED FOR ANTI-COLLISION?
     #   anti-collision keepout polygons (several types...)
-	#		ferrule holder and upper housing keepouts are always the same, see DESI-0XXX
-	#		petal level keepouts (such as being near edge, or near GFA, may vary per positioner)
+    #		ferrule holder and upper housing keepouts are always the same, see DESI-0XXX
+    #		petal level keepouts (such as being near edge, or near GFA, may vary per positioner)
     # ARE THESE NEEDED INDEPENDENTLY FOR ANTI-COLLISION, OR ARE THEY AUTO HANDLED BY THE POSTRANSFORMS MODULE?
-	#	calibrated arm lengths (R1,R2) 
-	#	calibrated angular offsets (t0,p0), e.g. theta clocking angle of mounting
-	#	calibrated center offsets, in local (x0,y0), offsets w.r.t. each positioner's nominal center
-	#	calibrated limits on travel ranges (tmin,tmax,pmin,pmax)
+    #	calibrated arm lengths (R1,R2) 
+    #	calibrated angular offsets (t0,p0), e.g. theta clocking angle of mounting
+    #	calibrated center offsets, in local (x0,y0), offsets w.r.t. each positioner's nominal center
+    #	calibrated limits on travel ranges (tmin,tmax,pmin,pmax)
 
-    def true_move(self, axisid, distance, options=self.default_move_options):
+    def true_move(self, axisid, distance, options=[]):
         """Input move distance on either the theta or phi axis, as seen by the
         observer, in degrees.
         
@@ -87,7 +108,8 @@ class PosModel(object):
         The return values are formatted as a dictionary of lists. (This handles the
         case where if it's a "final" move, it really consists of multiple submoves.)
         """
-
+        if not(options):
+            options = self.default_move_options
         if axisid == self.T:
             dist = self.trans.obsT_to_shaftT(distance)
         elif axisid == self.P:
@@ -184,7 +206,7 @@ class Axis(object):
    
     def __init__(self, posmodel, axisid):
         self._last_primary_hardstop_dir = 0   # 0, +1, -1, tells you which if any hardstop was last used to set travel limits
-        self.pos = 0 # internal tracking of shaft position
+        self.pos = 0 # internal tracking of nominal shaft position. by definition pos = (motor shaft position) / (gear ratio)
         self.posmodel = posmodel
         if not(axisid == self.posmodel.T or axisid == self.posmodel.P):
             print 'warning: bad axis id ' + repr(axisid)
