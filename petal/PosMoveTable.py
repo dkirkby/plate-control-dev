@@ -31,6 +31,12 @@ class PosMoveTable(object):
         Times are given in milliseconds.
         """
         return self.__for_output_type('hardware')
+    
+    def for_cleanup(self):
+        """Version of the table suitable for updating the software internal
+        position tracking after the physical move has been performed.
+        """
+        return self.__for_output_type('cleanup')
 
     # setters
     def set_move(self, rowidx, axisid, distance):
@@ -89,6 +95,8 @@ class PosMoveTable(object):
             table = {'nrows':0,'dT':[],'dP':[],'Tdot':[],'Pdot':[],'prepause':[],'move_time':[],'postpause':[]}
         elif output_type == 'hardware':
             table = {'nrows':0,'motor_steps_T':[],'motor_steps_P':[],'speed_mode_T':[],'speed_mode_P':[],'postpause':[]}
+        elif output_type == 'cleanup':       
+            table = {'nrows':0,'dT':[],'dP':[]}
         else:
             print 'bad table output type ' + output_type        
 
@@ -124,13 +132,15 @@ class PosMoveTable(object):
                 table['motor_steps_P'].extend(true_move_P['motor_step'])
                 table['speed_mode_T'].extend(true_move_T['speed_mode'])
                 table['speed_mode_P'].extend(true_move_P['speed_mode'])
-
-            # fill in items general to all table types
-            while true_move_T['move_time']: # while loop here, since there may be multiple submoves
-                time1 = true_move_T['move_time'].pop(-1)
-                time2 = true_move_P['move_time'].pop(-1)
-                table['move_time'].extend(max([time1,time2]))            
-            table['postpause'].extend(row['postpause'])                  
+            if output_type == 'cleanup':
+                table['dT'].extend(true_move_T['obs_distance'])
+                table['dP'].extend(true_move_P['obs_distance'])
+            if output_type == 'scheduler' or output_type == 'hardware':
+                while true_move_T['move_time']: # while loop here, since there may be multiple submoves
+                    time1 = true_move_T['move_time'].pop(-1)
+                    time2 = true_move_P['move_time'].pop(-1)
+                    table['move_time'].extend(max([time1,time2]))            
+                table['postpause'].extend(row['postpause'])
         table['nrows'] = len(table['dT'])
         return table
 

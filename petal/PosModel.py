@@ -139,35 +139,26 @@ class PosModel(object):
                 'speed_mode'   : speed_mode,
                 'move_time'    : move_time}
     
-    def postmove_cleanup(self):
+    def postmove_cleanup(self, dT, dP):
         """Always perform this after positioner physical moves have been completed,
         to update the internal tracking of shaft positions and variables.
         """
+        self.axis[self.T].pos += dT
+        self.axis[self.P].pos += dP
         for axis in self.axis:
             exec(axis.postmove_cleanup_cmds)
             axis.postmove_cleanup_cmds = ''
-        
 
 class Axis(object):
     """Handler for a motion axis. Provides move syntax and keeps tracks of position.
-    """
-    
-    # internal parameters
-    
+    """    
    
     def __init__(self, posmodel, axisid):
-        self.internal_pos = 0.0
-        self._internal_pos_offset = 0.0  # internal_pos + internal_pos_offset --> pos, by definition
         self._last_primary_hardstop_dir = 0   # 0, +1, -1, tells you which if any hardstop was last used to set travel limits
+        self.pos = 0 # internal tracking of shaft position
         self.posmodel = posmodel
         self.axisid = axisid
         self.postmove_cleanup_cmds = ''
-
-    @property
-    def pos(self):
-        """Current position of the axis.
-        """
-        return self.internal_pos + self._internal_pos_offset
 
     @property
     def hardstop_debounce(self):
@@ -281,20 +272,11 @@ class Axis(object):
         self.add_seek_one_limit_sequence(schedule, direction*seek_distance)
         if direction > 0:
             self.postmove_cleanup_cmds = ''
-            self.postmove_cleanup_cmds += 'self.this_pos_is(self.maxpos)\n'
+            self.postmove_cleanup_cmds += 'self.pos = self.maxpos\n'
             self.postmove_cleanup_cmds += 'self.last_primary_hardstop_dir = +1.0\n'
         elif direction < 0:
             self.postmove_cleanup_cmds = ''
-            self.postmove_cleanup_cmds += 'self.this_pos_is(self.minpos)\n'
+            self.postmove_cleanup_cmds += 'self.pos = self.minpos\n'
             self.postmove_cleanup_cmds += 'self.last_primary_hardstop_dir = -1.0\n'
         else:
             print 'bad direction ' + repr(direction)
-            
-           
-    def this_pos_is(self,real_pos):
-        """Tells the axis the offset between the internal position counter it tracks
-        and the real-world shaft position. The usage is generally for after hitting
-        a hard limit.
-        """
-        error = real_pos - self.pos
-        self._internal_pos_offset += error  
