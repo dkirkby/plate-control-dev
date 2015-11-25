@@ -102,25 +102,26 @@ class PosModel(object):
         """Input move distance on either the theta or phi axis, as seen by the
         observer, in degrees.
         
-        Outputs are quantized distance [deg], speed [deg/sec], integer number
-        of motor steps, speed mode ['cruise' or 'creep'], and move time [sec]
+        Outputs are quantized distance [deg], speed [deg/sec], integer number of
+        motor steps, speed mode ['cruise' or 'creep'], and move time [sec]
 
-        The return values may be lists, i.e. if it's a "final" move, which really consists
-        of multiple submoves.
+        The return values are formatted as a dictionary of lists. (This handles the
+        case where if it's a "final" move, it really consists of multiple submoves.)
         """
 
         if axisid == self.T:
-            obs_distance = self.trans.obsT_to_shaftT # does this logic work here? use PosTransforms for a single axis? or just a dumb gear ratio?
-                                     # at what point do we do obsTP_to_shaftTP (i.e., both axes simultaneously? is that necessary)
-                                     # at what point do the ... offsets ... get figured in?
-                                     #                      ... gear ratios ...
-                                     #                      ... gear ratio calibrations ...
+            dist = self.trans.obsT_to_shaftT(distance)
         elif axisid == self.P:
-            obs_distance = self.trans.obsT_to_shaftP
+            dist = self.trans.obsP_to_shaftP(distance)
         else:
             print 'bad axisid ' + repr(axisid)
-                
-        obs_distance = self.axis[axisid].truncate_to_limits(obs_distance)
+        dist = self.axis[axisid].truncate_to_limits(dist)
+        dist *= self.axis[axisid].gear_ratio
+        dist *= self.axis[axisid].ccw_sign
+        antibacklash_final_move_dir = self.axis[axisid].antibacklash_final_move_dir
+        antibacklash_final_move_dir *= self.axis[axisid].ccw_sign
+        
+        
         
         
         # if it's a final move...
@@ -157,6 +158,8 @@ class Axis(object):
         self._last_primary_hardstop_dir = 0   # 0, +1, -1, tells you which if any hardstop was last used to set travel limits
         self.pos = 0 # internal tracking of shaft position
         self.posmodel = posmodel
+        if not(axisid == self.posmodel.T or axisid == self.posmodel.P):
+            print 'warning: bad axis id ' + repr(axisid)
         self.axisid = axisid
         self.postmove_cleanup_cmds = ''
 
@@ -166,51 +169,42 @@ class Axis(object):
         Returns 1x2 array of [debounce_at_min_limit,debounce_at_max_limit].
         These are positive quantities (i.e., they don't include any determination of directionality).
         """
-        if self.axisid == PosModel.T:
+        if self.axisid == self.posmodel.T:
             if self.principle_hardstop_direction < 0:
                 return np.array([abs(self.posmodel.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_T')),
                                  abs(self.posmodel.state.kv('SECONDARY_HARDSTOP_CLEARANCE_T'))])
             else:
                 return np.array([abs(self.posmodel.state.kv('SECONDARY_HARDSTOP_CLEARANCE_T')),
                                  abs(self.posmodel.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_T'))])
-        elif self.axisid == PosModel.P:
+        else:
             if self.principle_hardstop_direction < 0:
                 return np.array([abs(self.posmodel.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_P')),
                                  abs(self.posmodel.state.kv('SECONDARY_HARDSTOP_CLEARANCE_P'))])
             else:
                 return np.array([abs(self.posmodel.state.kv('SECONDARY_HARDSTOP_CLEARANCE_P')),
                                  abs(self.posmodel.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_P'))])
-        else:
-            print 'bad axisid' + repr(self.axisid)
-            return None
-    
+
     @property
     def principle_hardstop_direction(self):
         """The "principle" hardstop is the one which is struck during homing.
         (The "secondary" hardstop is only struck when finding the total available travel range.)
         """
-        if self.axisid == PosModel.T:
+        if self.axisid == self.posmodel.T:
             return self.posmodel.state.kv['PRINCIPLE_HARDSTOP_DIR_T']
-        elif self.axisid == PosModel.P:
-            return self.posmodel.state.kv['PRINCIPLE_HARDSTOP_DIR_P']
         else:
-            print 'bad axisid' + repr(self.axisid)
-            return None
+            return self.posmodel.state.kv['PRINCIPLE_HARDSTOP_DIR_P']
 			
     @property
     def debounced_range(self):
         """Calculated from physical range and hardstop debounce only.
 		Returns [1x2] array of [min,max]
         """
-        if self.axisid == PosModel.T:
+        if self.axisid == self.posmodel.T:
             targetable_range = abs(self.posmodel.state.kv('PHYSICAL_RANGE_T')) - np.sum(self.hardstop_debounce)            
             return np.array([-0.50,0.50])*targetable_range  # split theta range such that 0 is essentially in the middle
-        elif self.axisid == PosModel.P:
+        else:
             targetable_range = abs(self.posmodel.state.kv('PHYSICAL_RANGE_P')) - np.sum(self.hardstop_debounce)    
             return np.array([-0.01,0.99])*targetable_range  # split phi range such that 0 is essentially at the minimum
-        else:
-            print 'bad axisid' + repr(self.axisid)
-            return None 
     
     @property
     def maxpos(self):
@@ -225,6 +219,27 @@ class Axis(object):
             return np.amin(self.debounced_range)
         else:
             return self.maxpos - self.debounced_range
+            
+    @property
+    def gear_ratio(self):
+        if self.axisid == self.posmodel.T:
+            return self.posmodel.state.kv['GEAR_T']
+        else:
+            return self.posmodel.state.kv['GEAR_P']
+        
+    @property
+    def ccw_sign(self):
+        if self.axisid == self.posmodel.T:
+            return self.posmodel.state.kv['MOTOR_CCW_DIR_T']
+        else:
+            return self.posmodel.state.kv['MOTOR_CCW_DIR_P']
+
+    @property
+    def antibacklash_final_move_dir(self):
+        if self.axisid == self.posmodel.T:
+            return self.posmodel.state.kv['ANTIBACKLASH_FINAL_MOVE_DIR_T']
+        else:
+            return self.posmodel.state.kv['ANTIBACKLASH_FINAL_MOVE_DIR_P']
         
     def truncate_to_limits(self, distance):
         """Return distance after first truncating it (if necessary) according to software limits.

@@ -55,23 +55,26 @@ class PosScheduler(object):
          
     # internal methods
     def _schedule_without_anticollision(self):
-        for i in range(len(self.move_tables)):      
+        i = 0        
+        for tbl in self.move_tables:      
             # convert global P,Q into local theta,phi
             start = np.transpose(np.array(self._start[i]))
             targt = np.transpose(np.array(self._targt[i]))
-            start = self.move_tables[i].posmodel.trans.QP_to_obsTP(start) # check format after PosTransforms updated
-            targt = self.move_tables[i].posmodel.trans.QP_to_obsTP(targt) # check format after PosTransforms updated
+            start = self.tbl.posmodel.trans.obsQP_to_obsTP(start) # check format after PosTransforms updated
+            targt = self.tbl.posmodel.trans.obsQP_to_obsTP(targt) # check format after PosTransforms updated
 
             # delta = finish - start
-            dtdp = tp_targ - tp_start
+            dtdp_obs = targt - start
 
-            # set deltas and pauses into move tables
+            # set deltas and pauses into move table
             if not(self._is_forced[i]):
                 row = 0 # for the anti-collision, this would vary
-                self.move_tables[i].set_move     (row, tbl.posmodel.T, dtdp[0,i])
-                self.move_tables[i].set_move     (row, tbl.posmodel.P, dtdp[1,i])
-                self.move_tables[i].set_prepause (row, 0.0)
-                self.move_tables[i].set_postpause(row, 0,0)
+                self.tbl.set_move     (row, tbl.posmodel.T, dtdp_obs[0,i])
+                self.tbl.set_move     (row, tbl.posmodel.P, dtdp_obs[1,i])
+                self.tbl.set_prepause (row, 0.0)
+                self.tbl.set_postpause(row, 0,0)
+            
+            i += 1
                 
         return move_tables
         

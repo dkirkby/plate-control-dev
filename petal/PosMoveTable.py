@@ -43,17 +43,12 @@ class PosMoveTable(object):
         """Put or update a move distance into the table.
         If row index does not exist yet, then it will be added, and any blank filler rows will be generated in-between.
         """
+        dist_label = {self.posmodel.T:'dT_ideal', self.posmodel.P:'dP_ideal'}
         if rowidx >= len(self.__rows):
             self.insert_new_row(rowidx)
-        if axisid == self.posmodel.T:
-            dist_label = 'dT'
-        elif axisid == self.posmodel.P:
-            dist_label = 'dP'
-        else:
-            print 'bad axisid ' + repr(axisid)
         for key in self.__rows[rowidx]._move_options.keys():
             self.__rows[rowidx]._move_options[key] = self.posmodel.state.kv[key]  # snapshot the current state
-        self.__rows[rowidx]._data[dist_label] = distance
+        self.__rows[rowidx]._data[dist_label[axisid]] = distance
 
     def set_prepause(self, rowidx, prepause):
         """Put or update a prepause into the table.
@@ -110,15 +105,15 @@ class PosMoveTable(object):
             
             move_options = row._move_options.copy()
             
-            # only do final backlash / creep moves if it's really a final row
+            # only allow requesting final backlash / creep moves if it's really a final row
             i += 1
             if i != len(self.__rows):
                 move_options['BACKLASH_REMOVAL_ON'] = False
                 move_options['FINAL_CREEP_ON']      = False
             
             # use PosModel instance to get the real, quantized, calibrated values
-            true_move_T = self.posmodel(self.posmodel.T, row['dT'], move_options)
-            true_move_P = self.posmodel(self.posmodel.P, row['dP'], move_options)
+            true_move_T = self.posmodel(self.posmodel.T, row['dT_ideal'], move_options)
+            true_move_P = self.posmodel(self.posmodel.P, row['dP_ideal'], move_options)
             
             # fill in the output table according to type
             if output_type == 'scheduler':
@@ -152,8 +147,8 @@ class PosMoveRow(object):
     """
                           
     def __init__(self):
-        self._data = {'dT'           : 0,        # [deg] ideal theta distance to move (as seen by external observer)
-                      'dP'           : 0,        # [deg] ideal phi distance to move (as seen by external observer)
+        self._data = {'dT_ideal'     : 0,        # [deg] ideal theta distance to move (as seen by external observer)
+                      'dP_ideal'     : 0,        # [deg] ideal phi distance to move (as seen by external observer)
                       'prepause'     : 0,        # [sec] delay for this number of seconds before executing the move
                       'move_time'    : 0,        # [sec] time it takes the move to execute
                       'postpause'    : 0}        # [sec] delay for this number of seconds after the move has completed 
