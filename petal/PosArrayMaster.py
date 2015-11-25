@@ -39,7 +39,7 @@ class PosArrayMaster(object):
             j = i + 1
             extend_list = []
             while j < len(tbls):
-                if tbls[i].posmodel.state.kv('SERIAL_ID') == tbls[j].posmodel.state.kv('SERIAL_ID'):
+                if tbls[i].posmodel.state.kv['SERIAL_ID'] == tbls[j].posmodel.state.kv['SERIAL_ID']:
                     extend_list.extend(tbls.pop(j))
                 else:
                     j += 1

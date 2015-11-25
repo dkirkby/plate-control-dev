@@ -26,8 +26,8 @@ class PosModel(object):
     _stepsize_cruise      = 3.3    # deg
     _spinup_distance      = 628.2  # deg
     _period_creep         = 2.0    # timer intervals
-    _shaft_speed_cruise   = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
-    _shaft_speed_creep    = _timer_update_rate * _stepsize_creep / _period_creep  # deg/sec
+    _motor_speed_cruise   = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
+    _motor_speed_creep    = _timer_update_rate * _stepsize_creep / _period_creep  # deg/sec
     
     # List of particular PosState parameters that modify internal details of how a move
     # gets divided into cruise / creep, antibacklash moves added, etc. What distinguishes
@@ -45,27 +45,6 @@ class PosModel(object):
         self.axis[self.T] = Axis(self.state,self.T)
         self.axis[self.P] = Axis(self.state,self.P)
 
-    # getter functions
-    @property    
-    def speed_cruise_T(self):
-        """Phi axis cruise speed at the output shaft in deg / sec."""
-        return self._shaft_speed_cruise / self.state.kv['GEAR_T']  
-        
-    @property    
-    def speed_cruise_P(self):
-        """Phi axis cruise speed at the output shaft in deg / sec."""
-        return self._shaft_speed_cruise / self.state.kv['GEAR_P']        
-
-    @property
-    def speed_creep_T(self):
-        """Theta axis creep speed at the output shaft in deg / sec."""
-        return self.shaft_speed_creep / self.state.kv['GEAR_T']
-    
-    @property
-    def speed_creep_P(self):
-        """Phi axis creep speed at the output shaft in deg / sec."""
-        return self.shaft_speed_creep / self.state.kv['GEAR_P']
-        
     @property
     def position_PQ(self):
         """2x1 current (P,Q) position as seen by an external observer looking toward the focal surface."""
@@ -88,15 +67,15 @@ class PosModel(object):
         p = self.axis[self.P].pos
         return np.array([[t],[p]])
 
-	#	anti-collision keepout polygons (several types...)
+	# POSSIBLE DATA GETTERS NEEDED FOR ANTI-COLLISION?
+    #   anti-collision keepout polygons (several types...)
 	#		ferrule holder and upper housing keepouts are always the same, see DESI-0XXX
 	#		petal level keepouts (such as being near edge, or near GFA, may vary per positioner)
-	#	(t_start,p_start) best known current position, in each positioner's local (theta,phi) coordinates
-	#	calibrated arm lengths (R1,R2)
+    # ARE THESE NEEDED INDEPENDENTLY FOR ANTI-COLLISION, OR ARE THEY AUTO HANDLED BY THE POSTRANSFORMS MODULE?
+	#	calibrated arm lengths (R1,R2) 
 	#	calibrated angular offsets (t0,p0), e.g. theta clocking angle of mounting
 	#	calibrated center offsets, in local (x0,y0), offsets w.r.t. each positioner's nominal center
 	#	calibrated limits on travel ranges (tmin,tmax,pmin,pmax)
-
 
     def true_move(self, axisid, distance, options=self.default_move_options):
         """Input move distance on either the theta or phi axis, as seen by the
@@ -115,30 +94,79 @@ class PosModel(object):
             dist = self.trans.obsP_to_shaftP(distance)
         else:
             print 'bad axisid ' + repr(axisid)
-        dist = self.axis[axisid].truncate_to_limits(dist)
-        dist *= self.axis[axisid].gear_ratio
-        dist *= self.axis[axisid].ccw_sign
-        antibacklash_final_move_dir = self.axis[axisid].antibacklash_final_move_dir
-        antibacklash_final_move_dir *= self.axis[axisid].ccw_sign
+        if not(options['ALLOW_EXCEED_LIMITS']):
+            dist = self.axis[axisid].truncate_to_limits(dist)
+        gear_ratio = self.axis[axisid].gear_ratio
+        ccw_sign = self.axis[axisid].ccw_sign
+        dist *= gear_ratio
+        dist *= ccw_sign
+        antibacklash_final_move_dir = ccw_sign * self.axis[axisid].antibacklash_final_move_dir
+        backlash_magnitude = gear_ratio * self.state.kv['BACKLASH'] * options['BACKLASH_REMOVAL_ON']
+        if np.sign(dist) == antibacklash_final_move_dir:
+            final_move  = np.sign(dist) * backlash_magnitude
+            undershoot  = -final_move * self.state.kv['BACKLASH_REMOVAL_BACKUP_FRACTION']
+            backup_move = -(final_move + undershoot)
+            overshoot   = 0;
+        else:
+            final_move  = -np.sign(dist) * backlash_magnitude
+            undershoot  = 0
+            backup_move = 0
+            overshoot   = -final_move        
+        primary_move = dist + overshoot + undershoot
         
-        
-        
-        
-        # if it's a final move...
-        #	get the backlash and creep parameters from PosState
-        #   break up the final move into appropriate submoves
-        # now in general...
-        #	unless it's been defined as a creep move, define it as cruise
-        #	(can't remember exact logic, but...) subtract out spin-up / spin-down distances
-        #   quantize move(s) into motor steps
-        #	estimate the move(s) times
-        #	calculate in degrees the quantized distance(s)
-
-        return {'obs_distance' : obs_distance,
-                'obs_speed'    : obs_speed,
-                'motor_step'   : motor_step,
-                'speed_mode'   : speed_mode,
-                'move_time'    : move_time}
+        opt = {}
+        move_data = {}
+        opt['primary'] = options.copy()
+        opt['backup']  = options.copy()
+        opt['final']   = options.copy()
+        opt['backup']['ONLY_CREEP'] = True
+        opt['final'] ['ONLY_CREEP'] = True
+        for m in [[primary_move,opt['primary']], [backup_move,opt['backup']], [final_move,opt['final']]]:
+            true_move = self.motor_true_move(axisid, m[0], m[1])
+            for key in true_move.keys():
+                if not(key in move_data.keys()):
+                    move_data[key] = []
+                move_data[key].extend(true_move[key])
+        n_submoves = len(move_data['obs_distance'])
+        for i in range(n_submoves):
+            move_data['obs_distance'][i] *= ccw_sign / gear_ratio
+            move_data['obs_speed'][i]    *= ccw_sign / gear_ratio
+        return move_data
+                
+    def motor_true_move(self, axisid, distance, options):
+        move_data = {'obs_distance' : [],
+                     'obs_speed'    : [],
+                     'motor_step'   : [],
+                     'speed_mode'   : [],
+                     'move_time'    : []}
+        dist_spinup = 2 * np.sign(distance) * self._spinup_distance
+        if options['ONLY_CREEP'] or (abs(distance) <= (abs(dist_spinup) + self.state.kv['NOM_FINAL_CREEP_DIST'])):
+            dist_spinup     = 0
+            dist_cruise     = 0
+            steps_cruise    = 0
+            dist_cruisespin = 0
+            net_dist_creep  = distance
+        else:                    
+            dist_creep      = np.sign(distance) * self.state.kv['NOM_FINAL_CREEP_DIST'] * options['FINAL_CREEP_ON'] # initial guess at how far to creep
+            dist_cruise     = distance - dist_spinup - dist_creep                # initial guess at how far to cruise
+            steps_cruise    = round(dist_cruise / self._stepsize_cruise)         # quantize cruise steps
+            dist_cruisespin = steps_cruise * self._stepsize_cruise + dist_spinup # actual distance covered while cruising
+            net_dist_creep  = distance - dist_cruisespin
+        steps_creep = round(net_dist_creep / self._stepsize_creep)
+        dist_creep = steps_creep * self._stepsize_creep
+        if steps_cruise:
+            move_data['obs_distance'].append(dist_cruisespin)
+            move_data['obs_speed'].append(self._motor_speed_cruise)
+            move_data['motor_step'].append(steps_cruise)
+            move_data['speed_mode'].append('cruise')
+            move_data['move_time'].append((abs(steps_cruise)*self._stepsize_cruise + 4*self._spinup_distance) / self._motor_speed_cruise)
+        if steps_creep:
+            move_data['obs_distance'].append(dist_creep)
+            move_data['obs_speed'].append(self._motor_speed_creep)
+            move_data['motor_step'].append(steps_creep)
+            move_data['speed_mode'].append('creep')
+            move_data['move_time'].append(abs(steps_creep)*self._stepsize_creep / self._motor_speed_creep)
+        return move_data
     
     def postmove_cleanup(self, dT, dP):
         """Always perform this after positioner physical moves have been completed,
@@ -171,18 +199,18 @@ class Axis(object):
         """
         if self.axisid == self.posmodel.T:
             if self.principle_hardstop_direction < 0:
-                return np.array([abs(self.posmodel.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_T')),
-                                 abs(self.posmodel.state.kv('SECONDARY_HARDSTOP_CLEARANCE_T'))])
+                return np.array([abs(self.posmodel.state.kv['PRINCIPLE_HARDSTOP_CLEARANCE_T']),
+                                 abs(self.posmodel.state.kv['SECONDARY_HARDSTOP_CLEARANCE_T'])])
             else:
-                return np.array([abs(self.posmodel.state.kv('SECONDARY_HARDSTOP_CLEARANCE_T')),
-                                 abs(self.posmodel.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_T'))])
+                return np.array([abs(self.posmodel.state.kv['SECONDARY_HARDSTOP_CLEARANCE_T']),
+                                 abs(self.posmodel.state.kv['PRINCIPLE_HARDSTOP_CLEARANCE_T'])])
         else:
             if self.principle_hardstop_direction < 0:
-                return np.array([abs(self.posmodel.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_P')),
-                                 abs(self.posmodel.state.kv('SECONDARY_HARDSTOP_CLEARANCE_P'))])
+                return np.array([abs(self.posmodel.state.kv['PRINCIPLE_HARDSTOP_CLEARANCE_P']),
+                                 abs(self.posmodel.state.kv['SECONDARY_HARDSTOP_CLEARANCE_P'])])
             else:
-                return np.array([abs(self.posmodel.state.kv('SECONDARY_HARDSTOP_CLEARANCE_P')),
-                                 abs(self.posmodel.state.kv('PRINCIPLE_HARDSTOP_CLEARANCE_P'))])
+                return np.array([abs(self.posmodel.state.kv['SECONDARY_HARDSTOP_CLEARANCE_P']),
+                                 abs(self.posmodel.state.kv['PRINCIPLE_HARDSTOP_CLEARANCE_P'])])
 
     @property
     def principle_hardstop_direction(self):
@@ -200,10 +228,10 @@ class Axis(object):
 		Returns [1x2] array of [min,max]
         """
         if self.axisid == self.posmodel.T:
-            targetable_range = abs(self.posmodel.state.kv('PHYSICAL_RANGE_T')) - np.sum(self.hardstop_debounce)            
+            targetable_range = abs(self.posmodel.state.kv['PHYSICAL_RANGE_T']) - np.sum(self.hardstop_debounce)            
             return np.array([-0.50,0.50])*targetable_range  # split theta range such that 0 is essentially in the middle
         else:
-            targetable_range = abs(self.posmodel.state.kv('PHYSICAL_RANGE_P')) - np.sum(self.hardstop_debounce)    
+            targetable_range = abs(self.posmodel.state.kv['PHYSICAL_RANGE_P']) - np.sum(self.hardstop_debounce)    
             return np.array([-0.01,0.99])*targetable_range  # split phi range such that 0 is essentially at the minimum
     
     @property
@@ -261,7 +289,7 @@ class Axis(object):
         The sequence is added to the argued schedule.
         """
         old_allow_exceed_limits = self.posmodel.state.kv['ALLOW_EXCEED_LIMITS']
-        self.posmodel.state.kv('ALLOW_EXCEED_LIMITS') = True
+        self.posmodel.state.kv['ALLOW_EXCEED_LIMITS'] = True
         old_only_creep = self.posmodel.state.kv['ONLY_CREEP']
         if self.posmodel.state.kv['CREEP_TO_LIMITS']:
             self.posmodel.state.kv['ONLY_CREEP'] = True
@@ -275,8 +303,8 @@ class Axis(object):
         table.set_move(0, self.axisid, seek_distance)
         table.set_move(1, self.axisid, debounce_distance)
         schedule.expert_add_move_table(table)
-        self.posmodel.state.kv('ALLOW_EXCEED_LIMITS') = old_allow_exceed_limits
-        self.posmodel.state.kv('ONLY_CREEP') = old_only_creep
+        self.posmodel.state.kv['ALLOW_EXCEED_LIMITS'] = old_allow_exceed_limits
+        self.posmodel.state.kv['ONLY_CREEP'] = old_only_creep
         
     def add_set_limits_sequence(self, schedule):
         """Typical homing routine to find the max pos, min pos and primary hardstop.
