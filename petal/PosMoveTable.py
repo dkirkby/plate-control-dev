@@ -87,11 +87,11 @@ class PosMoveTable(object):
     def __for_output_type(self,output_type):
         # define the columns that will be filled in        
         if output_type == 'scheduler':
-            table = {'nrows':0,'dT':[],'dP':[],'Tdot':[],'Pdot':[],'prepause':[],'move_time':[],'postpause':[]}
+            table = {'posid':'','nrows':0,'dT':[],'dP':[],'Tdot':[],'Pdot':[],'prepause':[],'move_time':[],'postpause':[]}
         elif output_type == 'hardware':
-            table = {'nrows':0,'motor_steps_T':[],'motor_steps_P':[],'speed_mode_T':[],'speed_mode_P':[],'postpause':[]}
+            table = {'posid':'','nrows':0,'motor_steps_T':[],'motor_steps_P':[],'speed_mode_T':[],'speed_mode_P':[],'move_time':[],'postpause':[]}
         elif output_type == 'cleanup':       
-            table = {'nrows':0,'dT':[],'dP':[]}
+            table = {'posid':'','nrows':0,'dT':[],'dP':[]}
         else:
             print 'bad table output type ' + output_type        
 
@@ -122,11 +122,14 @@ class PosMoveTable(object):
                 table['Tdot'].extend(true_move_T['obs_speed'])
                 table['Pdot'].extend(true_move_P['obs_speed'])
                 table['prepause'].extend(row['prepause'])
+                table['postpause'].extend(row['postpause'])
             if output_type == 'hardware':
                 table['motor_steps_T'].extend(true_move_T['motor_step'])
                 table['motor_steps_P'].extend(true_move_P['motor_step'])
                 table['speed_mode_T'].extend(true_move_T['speed_mode'])
                 table['speed_mode_P'].extend(true_move_P['speed_mode'])
+                for p in row['postpause']:
+                    table['postpause'].extend(round(p*1000)) # hardware postpause in integer milliseconds
             if output_type == 'cleanup':
                 table['dT'].extend(true_move_T['obs_distance'])
                 table['dP'].extend(true_move_P['obs_distance'])
@@ -135,7 +138,7 @@ class PosMoveTable(object):
                     time1 = true_move_T['move_time'].pop(-1)
                     time2 = true_move_P['move_time'].pop(-1)
                     table['move_time'].extend(max([time1,time2]))            
-                table['postpause'].extend(row['postpause'])
+        table['posid'] = self.posmodel.state.kv['SERIAL_ID']
         table['nrows'] = len(table['dT'])
         return table
 
