@@ -21,15 +21,14 @@ class PosArrayMaster(object):
         per posid. Note the available flag to turn off anticollision algorithm.
         """
         anticollision = False # temporary, since algorithm is not implemented yet in PosScheduler
-        for i in posid:
-            pos = self.positioners[i]
+        #for i in posid:
+        #    pos = self.positioners[i]
 			# use PosModel to get calibration values
 			# use PosModel to get current local theta,phi
 			# use PosTransforms to convert current local theta,phi to Pstart, Qstart
-
-        # now for the full array, pass all the start and target (P,Q) to PosScheduler,
-        # (as well as calibration values). You get back move tables.
-            self.move_tables = PosScheduler.schedule_moves(Ptarg,Qtarg,anticollision)
+        # Now for the full array, pass all the start and target (P,Q) to PosScheduler,
+        # (as well as calibration values).
+        self.move_tables = PosScheduler.schedule_moves(Ptarg,Qtarg,anticollision)
 			
     def hardware_ready_move_tables(self):
         """Strips out information that isn't necessary to send to petalbox, and
