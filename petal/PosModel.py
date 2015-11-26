@@ -25,10 +25,6 @@ class PosModel(object):
     _timer_update_rate    = 18e3   # Hz
     _stepsize_creep       = 0.1    # deg
     _stepsize_cruise      = 3.3    # deg
-    _spinup_distance      = 628.2  # deg
-    _period_creep         = 2.0    # timer intervals
-    _motor_speed_cruise   = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
-    _motor_speed_creep    = _timer_update_rate * _stepsize_creep / _period_creep  # deg/sec
     
     # List of particular PosState parameters that modify internal details of how a move
     # gets divided into cruise / creep, antibacklash moves added, etc. What distinguishes
@@ -45,48 +41,36 @@ class PosModel(object):
         self.axis = [None,None]
         self.axis[self.T] = Axis(self.state,self.T)
         self.axis[self.P] = Axis(self.state,self.P)
+        self._motor_speed_cruise = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
+        self._motor_speed_creep  = _timer_update_rate * _stepsize_creep / self.state.kv['CREEP_PERIOD']  # deg/sec
 
-    @property
-    def position_PQ(self):
-        """2x1 current (P,Q) position as seen by an external observer looking toward the focal surface."""
-        return self.trans.shaftTP_to_obsPQ(self.position_shaftTP) # nomenclature here might change when actually implemented in PosTransforms
-
-    @property
-    def position_xy(self):
-        """2x1 current (x,y) position as seen by an external observer looking toward the focal surface."""
-        return self.trans.shaftTP_to_obsXY(self.position_shaftTP)
-    
-    @property
-    def position_obsTP(self):
-        """2x1 current (theta,phi) position as seen by an external observer looking toward the fiber tip."""
-        return self.trans.shaftTP_to_obsTP(self.position_shaftTP)
-    
-    @property
-    def position_shaftTP(self):
-        """2x1 current (theta,phi) output shaft positions (no offsets or calibrations)."""
-        t = self.axis[self.T].pos
-        p = self.axis[self.P].pos
-        return np.array([[t],[p]])
-        
-    @property
-    def position_motTP(self):
-        """2x1 current (theta,phi) nominal motor shaft positions."""
-        tp = self.position_shaftTP
-        tp[self.T,0] *= self.axis[self.T].gear_ratio
-        tp[self.P,0] *= self.axis[self.P].gear_ratio
-        return tp
-    
     @property
     def position_str(self):
         """One-line string displaying current known position."""
         deg = unichr(176).encode("latin-1")
         mm = 'mm'
-        s = 'P:{:7.3f}{}, Q:{:7.3f}{} | X:{:7.3f}{}, Y:{:7.3f}{} | t:{:8.3f}{}, p:{:8.3f}{} | tmot:{:8.1f}{}, pmot:{:8.1f}{}'. \
-            format(self.position_PQ[0,0],mm,self.position_PQ[1,0],deg,
-                   self.position_xy[0,0],mm,self.position_xy[1,0],mm,
-                   self.position_obsTP[0,0],deg,self.position_obsTP[1,0],deg,
-                   self.position_motTP[0,0],deg,self.position_motTP[1,0],deg)
+        s = 'P:{:7.3f}{}, Q:{:7.3f}{} | X:{:7.3f}{}, Y:{:7.3f}{} | th_obs:{:8.3f}{}, ph_obs:{:8.3f}{} | th_mot:{:8.1f}{}, ph_mot:{:8.1f}{}'. \
+            format(self.state.kv['P'],mm,self.state.kv['Q'],deg,
+                   self.state.kv['X'],mm,self.state.kv['Y'],mm,
+                   self.state.kv['th_obs'],deg,self.state.kv['ph_obs'],deg,
+                   self.state.kv['th_mot'],deg,self.state.kv['ph_mot'],deg)
         return s
+
+    def update_dependent_position_variables(self):
+        """Updates position state variables based on internally-tracked axis positions.
+        """
+        self.state.kv['th_mot'] = self.axis[self.T].pos * self.axis[self.T].gear_ratio
+        self.state.kv['ph_mot'] = self.axis[self.P].pos * self.axis[self.P].gear_ratio
+        shaftTP = np.array([[self.posmodel.state.kv['th_shaft']],[self.posmodel.state.kv['ph_shaft']]])        
+        obsTP = self.trans.shaftTP_to_obsTP(shaftTP)
+        self.state.kv['th_obs'] = obsTP[0,0]
+        self.state.kv['ph_obs'] = obsTP[1,0]
+        XY = self.trans.shaftTP_to_obsXY(shaftTP)        
+        self.state.kv['X'] = obsXY[0,0]
+        self.state.kv['Y'] = obsXY[1,0]        
+        PQ = self.trans.obsXY_to_obsPQ(obsXY) # nomenclature here might change when actually implemented in PosTransforms
+        self.state.kv['P'] = obsPQ[0,0]
+        self.state.kv['Q'] = obsPQ[1,0]
 
     # POSSIBLE DATA GETTERS NEEDED FOR ANTI-COLLISION?
     #   anti-collision keepout polygons (several types...)
@@ -161,7 +145,7 @@ class PosModel(object):
                      'motor_step'   : [],
                      'speed_mode'   : [],
                      'move_time'    : []}
-        dist_spinup = 2 * np.sign(distance) * self._spinup_distance
+        dist_spinup = 2 * np.sign(distance) * self.state.kv['SPINUPDOWN_DISTANCE']
         if options['ONLY_CREEP'] or (abs(distance) <= (abs(dist_spinup) + self.state.kv['NOM_FINAL_CREEP_DIST'])):
             dist_spinup     = 0
             dist_cruise     = 0
@@ -181,7 +165,7 @@ class PosModel(object):
             move_data['obs_speed'].append(self._motor_speed_cruise)
             move_data['motor_step'].append(steps_cruise)
             move_data['speed_mode'].append('cruise')
-            move_data['move_time'].append((abs(steps_cruise)*self._stepsize_cruise + 4*self._spinup_distance) / self._motor_speed_cruise)
+            move_data['move_time'].append((abs(steps_cruise)*self._stepsize_cruise + 4*self.state.kv['SPINUPDOWN_DISTANCE']) / self._motor_speed_cruise)
         if steps_creep:
             move_data['obs_distance'].append(dist_creep)
             move_data['obs_speed'].append(self._motor_speed_creep)
@@ -228,27 +212,22 @@ class PosModel(object):
         """
         table = PosMoveTable.PosMoveTable(self)
         vals = np.array([[val1],[val2]])
+        start_tp = np.array([[self.axis[self.T].pos,[self.axis[self.P].pos]])
         if   movecmd == 'pq':
-            start_tp = self.position_shaftTP 
             targt_tp = self.trans.obsPQ_to_shaftTP(vals) # check format after PosTransforms updated
         elif movecmd == 'dpdq':
-            start_PQ = self.position_PQ
+            start_PQ = self.trans.shaftTP_to_obsPQ(start_tp) # check format after PosTransforms updated
             targt_PQ = start_PQ + vals
-            start_tp = self.trans.obsPQ_to_shaftTP(start_PQ)
-            targt_tp = self.trans.obsPQ_to_shaftTP(targt_PQ)
+            targt_tp = self.trans.obsPQ_to_shaftTP(targt_PQ) # check format after PosTransforms updated
         elif movecmd == 'xy':
-            start_tp = self.position_shaftTP
             targt_tp = self.trans.obsXY_to_shaftTP(vals)
         elif movecmd == 'dxdy':
-            start_xy = self.position_xy
+            start_xy = self.trans.shaftTP_to_obsXY(start_tp)
             targt_xy = start_xy + vals
-            start_tp = self.trans.obsXY_to_shaftTP(start_xy)
             targt_tp = self.trans.obsXY_to_shaftTP(targt_xy)
         elif movecmd == 'tp':
-            start_tp = self.position.shaftTP
             targt_tp = vals
         elif movecmd == 'dtdp':
-            start_tp = self.position.shaftTP
             targt_tp = start_tp + vals
         elif movecmd == 'home':
             for a in self.axis:
@@ -275,14 +254,30 @@ class Axis(object):
     """Handler for a motion axis. Provides move syntax and keeps tracks of position.
     """    
    
-    def __init__(self, posmodel, axisid):
+    def __init__(self, posmodel, axisid, pos=0):
         self._last_primary_hardstop_dir = 0   # 0, +1, -1, tells you which if any hardstop was last used to set travel limits
-        self.pos = 0 # internal tracking of nominal shaft position. by definition pos = (motor shaft position) / (gear ratio)
         self.posmodel = posmodel
         if not(axisid == self.posmodel.T or axisid == self.posmodel.P):
             print 'warning: bad axis id ' + repr(axisid)
         self.axisid = axisid
         self.postmove_cleanup_cmds = ''
+        self._pos = pos
+        self.posmodel.update_dependent_position_variables()
+
+    @property
+    def pos(self):
+        """Internally-tracked angular position of the axis.
+        By definition pos = (motor shaft position) / (gear ratio).
+        """
+        return self._pos
+    
+    @pos.setter
+    def pos(self,value):
+        """Set the internally-tracked angular position of the axis, and update
+        all the dependent position state variables.
+        """
+        self._pos = value        
+        self.posmodel.update_dependent_position_variables()
 
     @property
     def full_range(self):    

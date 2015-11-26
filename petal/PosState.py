@@ -29,7 +29,7 @@ class PosState(object):
     'LIMIT_SEEK_EXCEED_RANGE_FACTOR'
     'SHOULD_DEBOUNCE_HARDSTOPS'
     'BACKLASH_REMOVAL_BACKUP_FRACTION'
-    'CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD_AFTER_CREEP'
+    'CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP'
     'GEAR_T', 'GEAR_P'
     
     # rename these
@@ -38,20 +38,32 @@ class PosState(object):
     'BACKLASH_REMOVAL_DIR_T' --> 'ANTIBACKLASH_FINAL_MOVE_DIR_T' # +1 or -1 ... remove cw / ccw statements in old comment
     'BACKLASH_REMOVAL_DIR_P' --> 'ANTIBACKLASH_FINAL_MOVE_DIR_P' # +1 or -1 ... remove cw / ccw statements in old comment
     'ONLY_CREEP_TO_LIMITS' --> 'CREEP_TO_LIMITS'
+    'CURR_HOLD_AFTER_CREEP' --> 'HOLD_CURRENT'
     
     # new ones
-    'DEVICE_ID'           # string, id number of location on the petal or plate
-    'PETAL_ID'            # string, id number of the petal or plate it is mounted on
-    'MOTOR_ID_T'          # 0 or 1, which motor number in firmware commands corresponds to theta
-    'MOTOR_ID_P'          # 0 or 1, which motor number in firmware commands corresponds to phi
-    'ONLY_CREEP'          # boolean, if true disable cruising speed
-    'FINAL_CREEP_ON'      # boolean, if true do a finishing creep move after a cruise
-    'BACKLASH_REMOVAL_ON' # boolean, if true do an antibacklash sequence at end of a move
-    'FINAL_CREEP_DIST'    # float, distance in deg to creep after a cruise
-    'PRINCIPLE_HARDSTOP_CLEARANCE_T' # float, minimum distance in deg to stay clear of theta principle hardstop
-    'SECONDARY_HARDSTOP_CLEARANCE_T' # float, minimum distance in deg to stay clear of theta secondary hardstop
-    'PRINCIPLE_HARDSTOP_CLEARANCE_P' # float, minimum distance in deg to stay clear of phi principle hardstop
-    'SECONDARY_HARDSTOP_CLEARANCE_P' # float, minimum distance in deg to stay clear of phi secondary hardstop
+    'DEVICE_ID'           = 'test' # string, id number of location on the petal or plate
+    'PETAL_ID'            = 'test' # string, id of the petal or plate it is mounted on
+    'MOTOR_ID_T'          = 1      # 0 or 1, which motor number in firmware commands corresponds to theta
+    'MOTOR_ID_P'          = 0      # 0 or 1, which motor number in firmware commands corresponds to phi
+    'SPINUPDOWN_DISTANCE' = 628.2  # float, distance at the motor shaft in deg over which to spin up to cruise speed or down from cruise speed
+    'CREEP_PERIOD'        = 2      # int, number of timer intervals corresponding to a creep step
+    'ONLY_CREEP'          = 0      # boolean, if true disable cruising speed
+    'FINAL_CREEP_ON'      = 1      # boolean, if true do a finishing creep move after a cruise
+    'BACKLASH_REMOVAL_ON' = 1      # boolean, if true do an antibacklash sequence at end of a move
+    'FINAL_CREEP_DIST'    = 180.0  # float, distance in deg to creep after a cruise
+    'PRINCIPLE_HARDSTOP_CLEARANCE_T' = 10.0 # float, minimum distance in deg to stay clear of theta principle hardstop
+    'SECONDARY_HARDSTOP_CLEARANCE_T' =  5.0 # float, minimum distance in deg to stay clear of theta secondary hardstop
+    'PRINCIPLE_HARDSTOP_CLEARANCE_P' =  5.0 # float, minimum distance in deg to stay clear of phi principle hardstop
+    'SECONDARY_HARDSTOP_CLEARANCE_P' =  5.0 # float, minimum distance in deg to stay clear of phi secondary hardstop
+    'P'      # float, deg, dependent variable, expected global P position (syntax may need some refinement after implementing PosTransforms)
+    'Q'      # float, mm,  dependent variable, expected global Q position (syntax may need some refinement after implementing PosTransforms)
+    'x'      # float, mm,  dependent variable, expected global x position
+    'y'      # float, mm,  dependent variable, expected global y position
+    'th_obs' # float, deg, dependent variable, expected position of theta axis, as seen by an external observer (includes offsets, calibrations)
+    'ph_obs' # float, deg, dependent variable, expected position of phi axis, as seen by an external observer (includes offsets, calibrations)
+    'th_mot' # float, deg, dependent variable, expected position of theta motor
+    'ph_mot' # float, deg, dependent variable, expected position of phi motor
+
     
     # remove these
     'HARDSTOP_CLEARANCE'

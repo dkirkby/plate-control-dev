@@ -46,8 +46,9 @@ class PosScheduler(object):
             if self._is_forced[i]:
                 self._start[i] = [float('nan'),float('nan')]
             else:
-                current_position = self.move_tables[i].posmodel.position_PQ
-                self._start[i] = current_position.transpose().tolist()
+                current_P = self.move_tables[i].posmodel.state.kv['P_obs']
+                current_Q = self.move_tables[i].posmodel.state.kv['Q_obs']
+                self._start[i] = [current_P, current_Q]
         if not(anticollision) or any(self._is_forced):
             self.move_tables = self._schedule_without_anticollision()
         else:
