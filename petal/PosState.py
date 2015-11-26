@@ -55,15 +55,6 @@ class PosState(object):
     'SECONDARY_HARDSTOP_CLEARANCE_T' =  5.0 # float, minimum distance in deg to stay clear of theta secondary hardstop
     'PRINCIPLE_HARDSTOP_CLEARANCE_P' =  5.0 # float, minimum distance in deg to stay clear of phi principle hardstop
     'SECONDARY_HARDSTOP_CLEARANCE_P' =  5.0 # float, minimum distance in deg to stay clear of phi secondary hardstop
-    'P'      # float, deg, dependent variable, expected global P position (syntax may need some refinement after implementing PosTransforms)
-    'Q'      # float, mm,  dependent variable, expected global Q position (syntax may need some refinement after implementing PosTransforms)
-    'x'      # float, mm,  dependent variable, expected global x position
-    'y'      # float, mm,  dependent variable, expected global y position
-    'th_obs' # float, deg, dependent variable, expected position of theta axis, as seen by an external observer (includes offsets, calibrations)
-    'ph_obs' # float, deg, dependent variable, expected position of phi axis, as seen by an external observer (includes offsets, calibrations)
-    'th_mot' # float, deg, dependent variable, expected position of theta motor
-    'ph_mot' # float, deg, dependent variable, expected position of phi motor
-
     
     # remove these
     'HARDSTOP_CLEARANCE'

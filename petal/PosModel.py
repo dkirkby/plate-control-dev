@@ -45,32 +45,49 @@ class PosModel(object):
         self._motor_speed_creep  = _timer_update_rate * _stepsize_creep / self.state.kv['CREEP_PERIOD']  # deg/sec
 
     @property
-    def position_str(self):
-        """One-line string displaying current known position."""
+    def expected_current_position(self):
+        """Returns a dictionary of the current expected position in the various coordinate systems.
+        The keys are:
+            'P'      ... float, deg, dependent variable, expected global P position (syntax may need some refinement after implementing PosTransforms)
+            'Q'      ... float, mm,  dependent variable, expected global Q position (syntax may need some refinement after implementing PosTransforms)
+            'x'      ... float, mm,  dependent variable, expected global x position
+            'y'      ... float, mm,  dependent variable, expected global y position
+            'th_obs' ... float, deg, dependent variable, expected position of theta axis, as seen by an external observer (includes offsets, calibrations)
+            'ph_obs' ... float, deg, dependent variable, expected position of phi axis, as seen by an external observer (includes offsets, calibrations)
+            'th_shaft' ... float, deg, independent variable, the internally-tracked expected position of the theta shaft at the output of the gearbox
+            'ph_shaft' ... float, deg, independent variable, the internally-tracked expected position of the phi shaft at the output of the gearbox
+            'th_mot' ... float, deg, dependent variable, expected position of theta motor
+            'ph_mot' ... float, deg, dependent variable, expected position of phi motor
+        """
+        shaftTP = np.array([[self.axis[self.T].pos],[self.axis[self.P].pos]])        
+        d = {}
+        d['th_shaft'] = shaftTP[0,0]
+        d['ph_shaft'] = shaftTP[1,0]
+        d['th_mot'] = d['th_shaft'] * self.axis[self.T].gear_ratio
+        d['ph_mot'] = d['ph_shaft'] * self.axis[self.P].gear_ratio
+        obsTP = self.trans.shaftTP_to_obsTP(shaftTP)
+        d['th_obs'] = obsTP[0,0]
+        d['ph_obs'] = obsTP[1,0]
+        XY = self.trans.shaftTP_to_obsXY(shaftTP)        
+        d['x'] = obsXY[0,0]
+        d['y'] = obsXY[1,0]        
+        PQ = self.trans.obsXY_to_obsPQ(obsXY) # nomenclature here might change when actually implemented in PosTransforms
+        d['P'] = obsPQ[0,0]
+        d['Q'] = obsPQ[1,0]
+
+    @property
+    def expected_current_position_str(self):
+        """One-line string summarizing current expected position.
+        """
         deg = unichr(176).encode("latin-1")
         mm = 'mm'
-        s = 'P:{:7.3f}{}, Q:{:7.3f}{} | X:{:7.3f}{}, Y:{:7.3f}{} | th_obs:{:8.3f}{}, ph_obs:{:8.3f}{} | th_mot:{:8.1f}{}, ph_mot:{:8.1f}{}'. \
-            format(self.state.kv['P'],mm,self.state.kv['Q'],deg,
-                   self.state.kv['X'],mm,self.state.kv['Y'],mm,
-                   self.state.kv['th_obs'],deg,self.state.kv['ph_obs'],deg,
-                   self.state.kv['th_mot'],deg,self.state.kv['ph_mot'],deg)
+        pos = self.expected_current_position
+        s = 'P:{:7.3f}{}, Q:{:7.3f}{} | x:{:7.3f}{}, y:{:7.3f}{} | th_obs:{:8.3f}{}, ph_obs:{:8.3f}{} | th_mot:{:8.1f}{}, ph_mot:{:8.1f}{}'. \
+            format(pos['P'],mm, pos['Q'],deg,
+                   pos['x'],mm, pos['y'],mm,
+                   pos['th_obs'],deg, pos['ph_obs'],deg,
+                   pos['th_mot'],deg, pos['ph_mot'],deg)
         return s
-
-    def update_dependent_position_variables(self):
-        """Updates position state variables based on internally-tracked axis positions.
-        """
-        self.state.kv['th_mot'] = self.axis[self.T].pos * self.axis[self.T].gear_ratio
-        self.state.kv['ph_mot'] = self.axis[self.P].pos * self.axis[self.P].gear_ratio
-        shaftTP = np.array([[self.posmodel.state.kv['th_shaft']],[self.posmodel.state.kv['ph_shaft']]])        
-        obsTP = self.trans.shaftTP_to_obsTP(shaftTP)
-        self.state.kv['th_obs'] = obsTP[0,0]
-        self.state.kv['ph_obs'] = obsTP[1,0]
-        XY = self.trans.shaftTP_to_obsXY(shaftTP)        
-        self.state.kv['X'] = obsXY[0,0]
-        self.state.kv['Y'] = obsXY[1,0]        
-        PQ = self.trans.obsXY_to_obsPQ(obsXY) # nomenclature here might change when actually implemented in PosTransforms
-        self.state.kv['P'] = obsPQ[0,0]
-        self.state.kv['Q'] = obsPQ[1,0]
 
     # POSSIBLE DATA GETTERS NEEDED FOR ANTI-COLLISION?
     #   anti-collision keepout polygons (several types...)
@@ -212,7 +229,8 @@ class PosModel(object):
         """
         table = PosMoveTable.PosMoveTable(self)
         vals = np.array([[val1],[val2]])
-        start_tp = np.array([[self.axis[self.T].pos,[self.axis[self.P].pos]])
+        pos = self.expected_current_position
+        start_tp = np.array([[pos['th_shaft']],[pos['ph_shaft']]])
         if   movecmd == 'pq':
             targt_tp = self.trans.obsPQ_to_shaftTP(vals) # check format after PosTransforms updated
         elif movecmd == 'dpdq':
@@ -254,30 +272,14 @@ class Axis(object):
     """Handler for a motion axis. Provides move syntax and keeps tracks of position.
     """    
    
-    def __init__(self, posmodel, axisid, pos=0):
-        self._last_primary_hardstop_dir = 0   # 0, +1, -1, tells you which if any hardstop was last used to set travel limits
+    def __init__(self, posmodel, axisid, pos=0, last_primary_hardstop_dir=0):
         self.posmodel = posmodel
         if not(axisid == self.posmodel.T or axisid == self.posmodel.P):
             print 'warning: bad axis id ' + repr(axisid)
         self.axisid = axisid
         self.postmove_cleanup_cmds = ''
-        self._pos = pos
-        self.posmodel.update_dependent_position_variables()
-
-    @property
-    def pos(self):
-        """Internally-tracked angular position of the axis.
-        By definition pos = (motor shaft position) / (gear ratio).
-        """
-        return self._pos
-    
-    @pos.setter
-    def pos(self,value):
-        """Set the internally-tracked angular position of the axis, and update
-        all the dependent position state variables.
-        """
-        self._pos = value        
-        self.posmodel.update_dependent_position_variables()
+        self._last_primary_hardstop_dir = last_primary_hardstop_dir  # 0, +1, -1, tells you which if any hardstop was last used to set travel limits
+        self.pos = pos # Internally-tracked angular position of the axis. By definition pos = (motor shaft position) / (gear ratio).
 
     @property
     def full_range(self):    
