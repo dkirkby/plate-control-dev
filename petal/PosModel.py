@@ -49,7 +49,7 @@ class PosModel(object):
     @property
     def position_PQ(self):
         """2x1 current (P,Q) position as seen by an external observer looking toward the focal surface."""
-        return self.trans.shaftTP_to_obsQP(self.position_shaftTP) # nomenclature here might change when actually implemented in PosTransforms
+        return self.trans.shaftTP_to_obsPQ(self.position_shaftTP) # nomenclature here might change when actually implemented in PosTransforms
 
     @property
     def position_xy(self):
@@ -200,7 +200,76 @@ class PosModel(object):
             exec(axis.postmove_cleanup_cmds)
             axis.postmove_cleanup_cmds = ''
     
-    def 
+    def make_move_table(self, movecmd, val1, val2):
+        """Generate a move table for a given move command string. Generally
+        for expert or internal use only.
+
+        Move command strings:
+        
+          'pq'        ... move to absolute position (P,Q)
+
+          'xy'        ... move to absolute position (x,y)
+
+          'tp'        ... move to absolute position (theta, phi)
+
+          'dpdq'      ... move by a relative amount (delta P, delta Q)
+
+          'dxdy'      ... move by a relative amount (delta x, delta y)
+
+          'dtdp'      ... move by a relative amount (delta theta, delta phi
+          
+          'home'      ... find the primary hardstops on both axes, then debounce off them
+                              ... val1 and val2 are both ignored
+                              
+          'seeklimit' ... find the argued hardstop, but do NOT debounce off it
+                              ... sign of val1 or val2 says which direction to seek
+                              ... finite magnitudes of val1 or val2 are ignored
+                              ... val1 == 0 or val2 == 0 says do NOT seek on that axis
+        """
+        table = PosMoveTable.PosMoveTable(self)
+        vals = np.array([[val1],[val2]])
+        if   movecmd == 'pq':
+            start_tp = self.position_shaftTP 
+            targt_tp = self.trans.obsPQ_to_shaftTP(vals) # check format after PosTransforms updated
+        elif movecmd == 'dpdq':
+            start_PQ = self.position_PQ
+            targt_PQ = start_PQ + vals
+            start_tp = self.trans.obsPQ_to_shaftTP(start_PQ)
+            targt_tp = self.trans.obsPQ_to_shaftTP(targt_PQ)
+        elif movecmd == 'xy':
+            start_tp = self.position_shaftTP
+            targt_tp = self.trans.obsXY_to_shaftTP(vals)
+        elif movecmd == 'dxdy':
+            start_xy = self.position_xy
+            targt_xy = start_xy + vals
+            start_tp = self.trans.obsXY_to_shaftTP(start_xy)
+            targt_tp = self.trans.obsXY_to_shaftTP(targt_xy)
+        elif movecmd == 'tp':
+            start_tp = self.position.shaftTP
+            targt_tp = vals
+        elif movecmd == 'dtdp':
+            start_tp = self.position.shaftTP
+            targt_tp = start_tp + vals
+        elif movecmd == 'home':
+            for a in self.axis:
+                table.extend(a.seek_and_set_limits_sequence())
+            return table
+        elif movecmd == 'seeklimit':
+            search_dist(self.T) = np.sign(val1) * self.axis[self.T].limit_seeking_search_distance
+            search_dist(self.P) = np.sign(val2) * self.axis[self.P].limit_seeking_search_distance
+            old_SHOULD_DEBOUNCE_HARDSTOPS = self.state.kv['SHOULD_DEBOUNCE_HARDSTOPS']
+            self.state.kv['SHOULD_DEBOUNCE_HARDSTOPS'] = 0
+            for i in [self.T,self.P]:
+                table.extend(self.axis[i].seek_one_limit_sequence(search_dist[i]))
+            return table
+        else:
+            print 'move command ' + repr(movecmd) + ' not recognized'
+            return []
+        
+        delta_tp = targt_tp - start_tp
+        table.set_move(0, self.T, delta_tp[self.T,0])
+        table.set_move(0, self.P, delta_tp[self.P,0])
+        return table
 
 class Axis(object):
     """Handler for a motion axis. Provides move syntax and keeps tracks of position.
@@ -216,48 +285,25 @@ class Axis(object):
         self.postmove_cleanup_cmds = ''
 
     @property
-    def hardstop_debounce(self):
-        """Calculated distance to debounce from hardstop when homing.
-        Returns 1x2 array of [debounce_at_min_limit,debounce_at_max_limit].
-        These are positive quantities (i.e., they don't include any determination of directionality).
+    def full_range(self):    
+        """Calculated from physical range only, with no subtraction of debounce
+        distance.
+        Returns [1x2] array of [min,max]
         """
         if self.axisid == self.posmodel.T:
-            if self.principle_hardstop_direction < 0:
-                return np.array([abs(self.posmodel.state.kv['PRINCIPLE_HARDSTOP_CLEARANCE_T']),
-                                 abs(self.posmodel.state.kv['SECONDARY_HARDSTOP_CLEARANCE_T'])])
-            else:
-                return np.array([abs(self.posmodel.state.kv['SECONDARY_HARDSTOP_CLEARANCE_T']),
-                                 abs(self.posmodel.state.kv['PRINCIPLE_HARDSTOP_CLEARANCE_T'])])
-        else:
-            if self.principle_hardstop_direction < 0:
-                return np.array([abs(self.posmodel.state.kv['PRINCIPLE_HARDSTOP_CLEARANCE_P']),
-                                 abs(self.posmodel.state.kv['SECONDARY_HARDSTOP_CLEARANCE_P'])])
-            else:
-                return np.array([abs(self.posmodel.state.kv['SECONDARY_HARDSTOP_CLEARANCE_P']),
-                                 abs(self.posmodel.state.kv['PRINCIPLE_HARDSTOP_CLEARANCE_P'])])
-
-    @property
-    def principle_hardstop_direction(self):
-        """The "principle" hardstop is the one which is struck during homing.
-        (The "secondary" hardstop is only struck when finding the total available travel range.)
-        """
-        if self.axisid == self.posmodel.T:
-            return self.posmodel.state.kv['PRINCIPLE_HARDSTOP_DIR_T']
-        else:
-            return self.posmodel.state.kv['PRINCIPLE_HARDSTOP_DIR_P']
-			
-    @property
-    def debounced_range(self):
-        """Calculated from physical range and hardstop debounce only.
-		Returns [1x2] array of [min,max]
-        """
-        if self.axisid == self.posmodel.T:
-            targetable_range = abs(self.posmodel.state.kv['PHYSICAL_RANGE_T']) - np.sum(self.hardstop_debounce)            
+            targetable_range = abs(self.posmodel.state.kv['PHYSICAL_RANGE_T'])
             return np.array([-0.50,0.50])*targetable_range  # split theta range such that 0 is essentially in the middle
         else:
-            targetable_range = abs(self.posmodel.state.kv['PHYSICAL_RANGE_P']) - np.sum(self.hardstop_debounce)    
+            targetable_range = abs(self.posmodel.state.kv['PHYSICAL_RANGE_P'])
             return np.array([-0.01,0.99])*targetable_range  # split phi range such that 0 is essentially at the minimum
-    
+    @property
+    def debounced_range(self):
+        """Calculated from full range, accounting for removal of both the hardstop
+        clearance distances and the backlash removal distance.
+        Returns [1x2] array of [min,max]
+        """
+        return self.full_range + self.hardstop_debounce
+           
     @property
     def maxpos(self):
         if self._last_primary_hardstop_dir >= 0:
@@ -271,6 +317,49 @@ class Axis(object):
             return np.amin(self.debounced_range)
         else:
             return self.maxpos - self.debounced_range
+
+    @property
+    def hardstop_debounce(self):
+        """This is the amount to debounce off the hardstop after striking it.
+        It is the hardstop clearance distance plus the backlash removal distance.
+        Returns [1x2] array of [min,max]
+        """
+        return self.hardstop_clearance + self.backlash_clearance
+
+    @property
+    def hardstop_clearance(self):
+        """Minimum distance to stay clear from hardstop.
+        Returns 1x2 array of [clearance_at_min_limit, clearance_at_max_limit].
+        These are DIRECTIONAL quantities (i.e., the sign indicates the direction
+        in which one would debounce after hitting the given hardstop, to get
+        back into the accessible range).
+        """
+        if self.axisid == self.posmodel.T:
+            if self.principle_hardstop_direction < 0:
+                return np.array([+self.posmodel.state.kv['PRINCIPLE_HARDSTOP_CLEARANCE_T'],
+                                 -self.posmodel.state.kv['SECONDARY_HARDSTOP_CLEARANCE_T']])
+            else:
+                return np.array([+self.posmodel.state.kv['SECONDARY_HARDSTOP_CLEARANCE_T'],
+                                 -self.posmodel.state.kv['PRINCIPLE_HARDSTOP_CLEARANCE_T']])
+        else:
+            if self.principle_hardstop_direction < 0:
+                return np.array([+self.posmodel.state.kv['PRINCIPLE_HARDSTOP_CLEARANCE_P'],
+                                 -self.posmodel.state.kv['SECONDARY_HARDSTOP_CLEARANCE_P']])
+            else:
+                return np.array([+self.posmodel.state.kv['SECONDARY_HARDSTOP_CLEARANCE_P'],
+                                 -self.posmodel.state.kv['PRINCIPLE_HARDSTOP_CLEARANCE_P']])
+    
+    @property    
+    def backlash_clearance(self):
+        """Minimum clearance distance required for backlash removal moves.
+        Returns 1x2 array of [clearance_from_low_side_of_range, clearance_from_high_side].
+        These are DIRECTIONAL quantities (i.e., the sign indicates the direction
+        similarly as the hardstop clearance directions).
+        """
+        if self.antibacklash_final_move_dir > 0:
+            return np.array([[+self.posmodel.state.kv['BACKLASH']],[0]])
+        else:
+            return np.array([[0],[-self.posmodel.state.kv['BACKLASH']]])
             
     @property
     def gear_ratio(self):
@@ -292,6 +381,22 @@ class Axis(object):
             return self.posmodel.state.kv['ANTIBACKLASH_FINAL_MOVE_DIR_T']
         else:
             return self.posmodel.state.kv['ANTIBACKLASH_FINAL_MOVE_DIR_P']
+            
+    @property
+    def principle_hardstop_direction(self):
+        """The "principle" hardstop is the one which is struck during homing.
+        (The "secondary" hardstop is only struck when finding the total available travel range.)
+        """
+        if self.axisid == self.posmodel.T:
+            return self.posmodel.state.kv['PRINCIPLE_HARDSTOP_DIR_T']
+        else:
+            return self.posmodel.state.kv['PRINCIPLE_HARDSTOP_DIR_P']
+            
+    @property
+    def limit_seeking_search_distance(self):
+        """A distance magnitude that guarantees hitting a hard limit in either direction.
+        """
+        return np.abs(np.diff(self.full_range)*self.state.kv['LIMIT_SEEK_EXCEED_RANGE_FACTOR'])
         
     def truncate_to_limits(self, distance):
         """Return distance after first truncating it (if necessary) according to software limits.
@@ -307,36 +412,13 @@ class Axis(object):
                 new_distance = self.minpos - self.pos
                 distance = new_distance
         return distance       
-        
-    def add_seek_one_limit_sequence(self, schedule, seek_distance):
-        """Use to go hit a hardstop. For the distance argument, direction matters.
-        The sequence is added to the argued schedule.
+
+    def seek_and_set_limits_sequence(self):
+        """Typical routine used in homing to find the max pos, min pos and
+        primary hardstop. The sequence is returned in a move table.
         """
-        old_allow_exceed_limits = self.posmodel.state.kv['ALLOW_EXCEED_LIMITS']
-        self.posmodel.state.kv['ALLOW_EXCEED_LIMITS'] = True
-        old_only_creep = self.posmodel.state.kv['ONLY_CREEP']
-        if self.posmodel.state.kv['CREEP_TO_LIMITS']:
-            self.posmodel.state.kv['ONLY_CREEP'] = True
-        both_debounce_vals = self.hardstop_debounce
-        if seek_distance < 0:
-            abs_debounce = both_debounce_vals[0]
-        else:
-            abs_debounce = both_debounce_vals[1]
-        debounce_distance = -np.sign(seek_distance)*self.posmodel.state.kv['SHOULD_DEBOUNCE_HARDSTOPS']*abs_debounce
-        table = PosMoveTable.PosMoveTable(self.posmodel)
-        table.set_move(0, self.axisid, seek_distance)
-        table.set_move(1, self.axisid, debounce_distance)
-        schedule.expert_add_move_table(table)
-        self.posmodel.state.kv['ALLOW_EXCEED_LIMITS'] = old_allow_exceed_limits
-        self.posmodel.state.kv['ONLY_CREEP'] = old_only_creep
-        
-    def add_set_limits_sequence(self, schedule):
-        """Typical homing routine to find the max pos, min pos and primary hardstop.
-        The sequence is added to the argued schedule.
-        """
-        seek_distance = np.absolute(np.diff(self.debounced_range)*self.state.kv['LIMIT_SEEK_EXCEED_RANGE_FACTOR'])                          
         direction = np.sign(self.principle_hardstop_direction)
-        self.add_seek_one_limit_sequence(schedule, direction*seek_distance)
+        table = self.seek_one_limit_sequence(direction * self.limit_seeking_search_distance)
         if direction > 0:
             self.postmove_cleanup_cmds = ''
             self.postmove_cleanup_cmds += 'self.pos = self.maxpos\n'
@@ -347,3 +429,34 @@ class Axis(object):
             self.postmove_cleanup_cmds += 'self.last_primary_hardstop_dir = -1.0\n'
         else:
             print 'bad direction ' + repr(direction)
+        return table
+      
+    def seek_one_limit_sequence(self, seek_distance):
+        """Use to go hit a hardstop. For the distance argument, direction matters.
+        The sequence is returned in a move table.
+        """
+        table = PosMoveTable.PosMoveTable(self.posmodel)
+        old_allow_exceed_limits = self.posmodel.state.kv['ALLOW_EXCEED_LIMITS']
+        self.posmodel.state.kv['ALLOW_EXCEED_LIMITS'] = True
+        old_only_creep = self.posmodel.state.kv['ONLY_CREEP']
+        if self.posmodel.state.kv['CREEP_TO_LIMITS']:
+            self.posmodel.state.kv['ONLY_CREEP'] = True
+        both_debounce_vals = self.hardstop_debounce
+        if self.posmodel.state.kv['SHOULD_DEBOUNCE_HARDSTOPS']:
+            if seek_distance < 0:
+                debounce_distance = both_debounce_vals[0]
+            else:
+                debounce_distance = both_debounce_vals[1]
+        else:
+            debounce_distance = 0
+        for dist in [seek_distance,debounce_distance]:
+            if self.axisid == self.posmodel.T:
+                val1 = dist
+                val2 = 0
+            else:
+                val1 = 0
+                val2 = dist
+            table.extend(self.posmodel.make_move_table('dtdp',val1,val2))
+        self.posmodel.state.kv['ALLOW_EXCEED_LIMITS'] = old_allow_exceed_limits
+        self.posmodel.state.kv['ONLY_CREEP'] = old_only_creep
+        return table
