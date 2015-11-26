@@ -21,7 +21,7 @@ class PosArrayMaster(object):
         """
         for i in range(len(posids)):
             j = self.posids.index(posids[i])
-            self.schedule.overall_move_request(self.posmodels[j], Ptargs[i], Qtargs[i])
+            self.schedule.move_request(self.posmodels[j], Ptargs[i], Qtargs[i])
 
     def expert_request_moves(self, posids, movecmds, values1, values2):
         """Input a list to the scheduler of positioner ids and corresponding
@@ -32,8 +32,9 @@ class PosArrayMaster(object):
         only for expert usage.
         """
         for i in range(len(posids)):
-            #something
-            self.schedule.expert_add_move_table(move_table)
+            j = self.posids.index(posids[i])
+            move_table = self.posmodels[j].make_move_table(movecmds[i], values1[i], values2[i])
+            self.schedule.expert_move_request(move_table)
             
     def schedule_moves(self,anticollision=True):
         """Generate the schedule of moves and submoves that get positioners
