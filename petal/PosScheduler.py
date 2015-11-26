@@ -17,7 +17,7 @@ class PosScheduler(object):
         self._targt = []
         self._is_forced = []
         
-    def overall_move_request(self, posmodel, P, Q):
+    def move_request(self, posmodel, P, Q):
         """Adds a request to the scheduler for a given positioner to move to
         the target position (P,Q).
         """
@@ -25,7 +25,7 @@ class PosScheduler(object):
         self._targt.append([P,Q])
         self._is_forced_dtdp.append(False)
     
-    def expert_add_move_table(self, move_table):
+    def expert_move_request(self, move_table):
         """Adds an externally-constructed move table to the schedule. The move
         table will be skipped by the scheduling algorithm. Also, if there
         is ANY such table in a given schedule, then the anti-collision algorithm
@@ -60,8 +60,8 @@ class PosScheduler(object):
             # convert global P,Q into local theta,phi
             start = np.transpose(np.array(self._start[i]))
             targt = np.transpose(np.array(self._targt[i]))
-            start = self.tbl.posmodel.trans.obsQP_to_obsTP(start) # check format after PosTransforms updated
-            targt = self.tbl.posmodel.trans.obsQP_to_obsTP(targt) # check format after PosTransforms updated
+            start = self.tbl.posmodel.trans.obsPQ_to_obsTP(start) # check format after PosTransforms updated
+            targt = self.tbl.posmodel.trans.obsPQ_to_obsTP(targt) # check format after PosTransforms updated
 
             # delta = finish - start
             dtdp_obs = targt - start
