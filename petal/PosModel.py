@@ -169,7 +169,7 @@ class PosModel(object):
             dist_cruisespin = 0
             net_dist_creep  = distance
         else:                    
-            dist_creep      = np.sign(distance) * self.state.kv['NOM_FINAL_CREEP_DIST'] * options['FINAL_CREEP_ON'] # initial guess at how far to creep
+            dist_creep      = np.sign(distance) * self.state.kv['FINAL_CREEP_DIST'] * options['FINAL_CREEP_ON'] # initial guess at how far to creep
             dist_cruise     = distance - dist_spinup - dist_creep                # initial guess at how far to cruise
             steps_cruise    = round(dist_cruise / self._stepsize_cruise)         # quantize cruise steps
             dist_cruisespin = steps_cruise * self._stepsize_cruise + dist_spinup # actual distance covered while cruising
