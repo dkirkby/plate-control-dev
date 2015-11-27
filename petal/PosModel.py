@@ -89,15 +89,16 @@ class PosModel(object):
                    pos['th_mot'],deg, pos['ph_mot'],deg)
         return s
 
-    # POSSIBLE DATA GETTERS NEEDED FOR ANTI-COLLISION?
-    #   anti-collision keepout polygons (several types...)
-    #		ferrule holder and upper housing keepouts are always the same, see DESI-0XXX
-    #		petal level keepouts (such as being near edge, or near GFA, may vary per positioner)
-    # ARE THESE NEEDED INDEPENDENTLY FOR ANTI-COLLISION, OR ARE THEY AUTO HANDLED BY THE POSTRANSFORMS MODULE?
-    #	calibrated arm lengths (R1,R2) 
-    #	calibrated angular offsets (t0,p0), e.g. theta clocking angle of mounting
-    #	calibrated center offsets, in local (x0,y0), offsets w.r.t. each positioner's nominal center
-    #	calibrated limits on travel ranges (tmin,tmax,pmin,pmax)
+        
+    @property
+    def targetable_range_T(self):
+        """Returns a [1x2] array of theta_min, theta_max."""
+        return self.axis[self.T].debounced_range.tolist()
+        
+    @property
+    def targetable_range_P(self):
+        """Returns a [1x2] array of phi_min, phi_max."""
+        return self.axis[self.P].debounced_range.tolist()  
 
     def true_move(self, axisid, distance, options=[]):
         """Input move distance on either the theta or phi axis, as seen by the
@@ -267,6 +268,7 @@ class PosModel(object):
         table.set_move(0, self.T, delta_tp[self.T,0])
         table.set_move(0, self.P, delta_tp[self.P,0])
         return table
+  
 
 class Axis(object):
     """Handler for a motion axis. Provides move syntax and keeps tracks of position.
