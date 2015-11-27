@@ -60,8 +60,8 @@ class PosScheduler(object):
             # convert global P,Q into local theta,phi
             start = np.transpose(np.array(self._start[i]))
             targt = np.transpose(np.array(self._targt[i]))
-            start = self.tbl.posmodel.trans.obsPQ_to_obsTP(start) # check format after PosTransforms updated
-            targt = self.tbl.posmodel.trans.obsPQ_to_obsTP(targt) # check format after PosTransforms updated
+            start = tbl.posmodel.trans.obsPQ_to_obsTP(start) # check format after PosTransforms updated
+            targt = tbl.posmodel.trans.obsPQ_to_obsTP(targt) # check format after PosTransforms updated
 
             # delta = finish - start
             dtdp_obs = targt - start
@@ -69,17 +69,41 @@ class PosScheduler(object):
             # set deltas and pauses into move table
             if not(self._is_forced[i]):
                 row = 0 # for the anti-collision, this would vary
-                self.tbl.set_move     (row, tbl.posmodel.T, dtdp_obs[0,i])
-                self.tbl.set_move     (row, tbl.posmodel.P, dtdp_obs[1,i])
-                self.tbl.set_prepause (row, 0.0)
-                self.tbl.set_postpause(row, 0,0)
+                tbl.set_move     (row, tbl.posmodel.T, dtdp_obs[0,i])
+                tbl.set_move     (row, tbl.posmodel.P, dtdp_obs[1,i])
+                tbl.set_prepause (row, 0.0)
+                tbl.set_postpause(row, 0,0)
             
             i += 1
                 
         return move_tables
         
     def _schedule_with_anticollision(self):
+        # gather the general envelopes and keep-out zones (see DESI-0899, same for all positioners)
+        Ei = 6.800 # [mm] inner clear rotation envelope
+        Eo = 9.990 # [mm] outer clear rotation envelope
+        P2 = [] # (to-do) polygonal type II keepout zone
+        P3 = [] # (to-do) polygonal type III keepout zone
+        
+        # gather the location-specific keep-out zones (varies by positioner)
+        P4 = [] # will store a list of additional polygonal keepout zones due to nearby hardware (GFA), or petal seam, or dead neighbor positioner. if none, that entry is an empty list, so length still matches the # of move_tables
+        for tbl in self.move_tables:
+            P4.append([]) # (to-do)
+        
+        # gather the kinematics calibration data
+        R = [] # will store arm lengths for theta and phi
+        tp0 = [] # will store the (theta,phi) permanent offsets (e.g., theta clocking angle of mounting, phi clocking angle of construction)
+        PQ0 = [] # will store the (P,Q) locations of the fiber positioners' centers
+        t_range = [] # will store the (theta_min, theta_max) travel ranges
+        p_range = [] # will store the (phi_min, phi_max) travel ranges
+        for tbl in self.move_tables:
+            R.append(  [tbl.posmodel.state.kv['LENGTH_R1'], tbl.posmodel.state.kv['LENGTH_R2']])
+            tp0.append([tbl.posmodel.state.kv['POLYN_T0' ], tbl.posmodel.state.kv['POLYN_P0' ]])
+            PQ0.append([tbl.posmodel.state.kv['POLYN_Q0' ], tbl.posmodel.state.kv['POLYN_S0' ]]) # changing the P,Q to Q,S??
+            t_range.append(tbl.posmodel.targetable_range_T)
+            p_range.append(tbl.posmodel.targetable_range_P)
+            
         # anticollision algorithm goes here
-        # see the "without" anticollision method for bare skeleton of what needs to happen
+
         move_tables = self._schedule_without_anticollision() # placeholder to be replaced with real code
         return move_tables
