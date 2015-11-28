@@ -3,7 +3,10 @@ import PosScheduler
 import PosState
 
 class PosArrayMaster(object):
-    """Orchestrates the modules to generate fiber positioner move sequences.
+    """Maintains a list of instances of the Fiber Positioner software model
+    (PosModel). This module is the interface through which the motions of a 
+    group of positioners (e.g. on a Petal) is coordinated. In general, all
+    move requests and scheduling is accomplished with PosArrayMaster.
     """
  
     def __init__(self, posids):
