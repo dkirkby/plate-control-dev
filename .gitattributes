@@ -1,4 +1,5 @@
 * text=auto !eol
+petal/LegacyPositionerComm.py -text
 petal/PosArrayMaster.py -text
 petal/PosModel.py -text
 petal/PosMoveTable.py -text
