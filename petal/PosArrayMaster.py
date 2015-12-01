@@ -1,6 +1,7 @@
 import PosModel
 import PosScheduler
 import PosState
+import PetalComm
 
 class PosArrayMaster(object):
     """Maintains a list of instances of the Fiber Positioner software model
@@ -17,7 +18,44 @@ class PosArrayMaster(object):
             self.posmodels.append(posmodel)
         self.posids = posids
         self.schedule = PosScheduler.PosScheduler()
+        self.comm = PetalComm.PetalComm() # syntax? arguments?
+        
+    def request_schedule_execute_moves(self, posids, Ptargs, Qtargs, anticollision=True):
+        """Convenience wrapper for the complete sequence to cause an array of
+        positioners to go to targets Ptargs, Qtargs.
+        
+        The sequence of calls is executed directly in order, from request through
+        scheduling to executing the move and post-move cleanup. In practice, with
+        multiple petals and significant anti-collision algorithm processing time
+        and communication overhead time, it is anticipated that a simple call like
+        this will not be sufficiently multi-threaded, and furthermore that scheduling
+        may need to have been accomplished separately ahead of time. However, this
+        method gives the basic sequence of events that need to occur, and it should
+        be of value for testing and for scenarios where moves should be immediately
+        executed.
+        """
+        self.request_moves(posids, Ptargs, Qtargs)
+        self.schedule_moves(anticollision)
+        self.send_tables_and_execute_moves()
 
+    def expert_request_schedule_execute_moves(self, posids, movecmds, values1, values2):
+        """Convenience wrapper for the complete sequence to cause an array of
+        positioners to move in expert mode (with no anti-collision).
+
+        The sequence of calls is executed directly in order, from request through
+        scheduling to executing the move and post-move cleanup. See similar comments
+        in the method "request_schedule_execute_moves", regarding usage of this
+        simplistic method.
+        """
+        self.expert_request_moves(posids, movecmds, values1, values2)
+        self.schedule_moves(anticollision=False)
+        self.send_tables_and_execute_moves()
+        
+    def send_tables_and_execute_moves(self):
+        self.comm.send_tables(self.hardware_ready_move_tables) # syntax? arguments? return values?
+        self.comm.execute_moves() # syntax? arguments? return values?
+        self.postmove_cleanup()
+        
     def request_moves(self, posids, Ptargs, Qtargs):
         """Input a list of positioner ids and corresponding target positions to
         the scheduler.
