@@ -5,3 +5,4 @@ petal/PosModel.py -text
 petal/PosMoveTable.py -text
 petal/PosScheduler.py -text
 petal/PosState.py -text
+petalbox/posfirmware/fipos_fw_1.0.c -text
