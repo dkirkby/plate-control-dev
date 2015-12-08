@@ -48,8 +48,8 @@ class PosModel(object):
     def expected_current_position(self):
         """Returns a dictionary of the current expected position in the various coordinate systems.
         The keys are:
-            'P'      ... float, deg, dependent variable, expected global P position (syntax may need some refinement after implementing PosTransforms)
-            'Q'      ... float, mm,  dependent variable, expected global Q position (syntax may need some refinement after implementing PosTransforms)
+            'Q'      ... float, deg, dependent variable, expected global Q position (syntax may need some refinement after implementing PosTransforms)
+            'S'      ... float, mm,  dependent variable, expected global S position (syntax may need some refinement after implementing PosTransforms)
             'x'      ... float, mm,  dependent variable, expected global x position
             'y'      ... float, mm,  dependent variable, expected global y position
             'th_obs' ... float, deg, dependent variable, expected position of theta axis, as seen by an external observer (includes offsets, calibrations)
@@ -71,9 +71,9 @@ class PosModel(object):
         XY = self.trans.shaftTP_to_obsXY(shaftTP)        
         d['x'] = obsXY[0,0]
         d['y'] = obsXY[1,0]        
-        PQ = self.trans.obsXY_to_obsPQ(obsXY) # nomenclature here might change when actually implemented in PosTransforms
-        d['P'] = obsPQ[0,0]
-        d['Q'] = obsPQ[1,0]
+        QS = self.trans.obsXY_to_obsQS(obsXY) # nomenclature here might change when actually implemented in PosTransforms
+        d['Q'] = obsQS[0,0]
+        d['S'] = obsQS[1,0]
 
     @property
     def expected_current_position_str(self):
@@ -82,8 +82,8 @@ class PosModel(object):
         deg = unichr(176).encode("latin-1")
         mm = 'mm'
         pos = self.expected_current_position
-        s = 'P:{:7.3f}{}, Q:{:7.3f}{} | x:{:7.3f}{}, y:{:7.3f}{} | th_obs:{:8.3f}{}, ph_obs:{:8.3f}{} | th_mot:{:8.1f}{}, ph_mot:{:8.1f}{}'. \
-            format(pos['P'],mm, pos['Q'],deg,
+        s = 'Q:{:7.3f}{}, S:{:7.3f}{} | x:{:7.3f}{}, y:{:7.3f}{} | th_obs:{:8.3f}{}, ph_obs:{:8.3f}{} | th_mot:{:8.1f}{}, ph_mot:{:8.1f}{}'. \
+            format(pos['Q'],mm, pos['S'],deg,
                    pos['x'],mm, pos['y'],mm,
                    pos['th_obs'],deg, pos['ph_obs'],deg,
                    pos['th_mot'],deg, pos['ph_mot'],deg)
@@ -208,13 +208,13 @@ class PosModel(object):
 
         Move command strings:
         
-          'pq'        ... move to absolute position (P,Q)
+          'qs'        ... move to absolute position (Q,S)
 
           'xy'        ... move to absolute position (x,y)
 
           'tp'        ... move to absolute position (theta, phi)
 
-          'dpdq'      ... move by a relative amount (delta P, delta Q)
+          'dqds'      ... move by a relative amount (delta Q, delta S)
 
           'dxdy'      ... move by a relative amount (delta x, delta y)
 
@@ -232,12 +232,12 @@ class PosModel(object):
         vals = np.array([[val1],[val2]])
         pos = self.expected_current_position
         start_tp = np.array([[pos['th_shaft']],[pos['ph_shaft']]])
-        if   movecmd == 'pq':
-            targt_tp = self.trans.obsPQ_to_shaftTP(vals) # check format after PosTransforms updated
-        elif movecmd == 'dpdq':
-            start_PQ = self.trans.shaftTP_to_obsPQ(start_tp) # check format after PosTransforms updated
-            targt_PQ = start_PQ + vals
-            targt_tp = self.trans.obsPQ_to_shaftTP(targt_PQ) # check format after PosTransforms updated
+        if   movecmd == 'qs':
+            targt_tp = self.trans.obsQS_to_shaftTP(vals) # check format after PosTransforms updated
+        elif movecmd == 'dqds':
+            start_QS = self.trans.shaftTP_to_obsQS(start_tp) # check format after PosTransforms updated
+            targt_QS = start_QS + vals
+            targt_tp = self.trans.obsQS_to_shaftTP(targt_QS) # check format after PosTransforms updated
         elif movecmd == 'xy':
             targt_tp = self.trans.obsXY_to_shaftTP(vals)
         elif movecmd == 'dxdy':
