@@ -51,6 +51,7 @@ class PosState(object):
             return False
 
     def log_config(self):
+        "Not sure if need to create a log file"
         pass
 
 
