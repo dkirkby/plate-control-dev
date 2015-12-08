@@ -5,6 +5,7 @@ petal/PosModel.py -text
 petal/PosMoveTable.py -text
 petal/PosScheduler.py -text
 petal/PosState.py -text
+petal/configfile.conf -text
 petalbox/docs/systec-readme.txt -text
 petalbox/poscontrol/mvtest.py -text
 petalbox/poscontrol/socketcan.py -text
