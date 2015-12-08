@@ -7,6 +7,8 @@ petal/PosScheduler.py -text
 petal/PosState.py -text
 petal/configfile.conf -text
 petalbox/docs/systec-readme.txt -text
+petalbox/drivers/systec-readme.txt -text
+petalbox/drivers/systec_can-V0.9.0.tar.bz2 -text
 petalbox/poscontrol/mvtest.py -text
 petalbox/poscontrol/socketcan.py -text
 petalbox/posfirmware/fipos_fw_1.0.c -text
