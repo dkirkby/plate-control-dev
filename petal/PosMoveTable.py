@@ -93,7 +93,7 @@ class PosMoveTable(object):
         elif output_type == 'cleanup':       
             table = {'posid':'','nrows':0,'dT':[],'dP':[]}
         else:
-            print 'bad table output type ' + output_type        
+            print('bad table output type ' + output_type)        
 
         i = 0
         for row in self.__rows:
