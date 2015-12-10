@@ -1,11 +1,14 @@
 * text=auto !eol
 petal/LegacyPositionerComm.py -text
 petal/PosArrayMaster.py -text
+petal/PosConstants.py -text
 petal/PosModel.py -text
 petal/PosMoveTable.py -text
 petal/PosScheduler.py -text
 petal/PosState.py -text
+petal/PosTransforms.py -text
 petal/configfile.conf -text
+petal/configspec.ini -text
 petalbox/docs/systec-readme.txt -text
 petalbox/drivers/systec-readme.txt -text
 petalbox/drivers/systec_can-V0.9.0.tar.bz2 -text

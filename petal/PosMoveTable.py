@@ -1,3 +1,14 @@
+#############################
+# Classes: PosModel, Axis   #
+# Version: Python 3         #
+# Date: Dec. 9, 2015        #
+# Author: Joe Silber        #
+# Change log:               #
+#     1) calls PosState     #
+#     instead of PosModel   #
+#############################
+
+
 import PosModel
 import copy
 
@@ -13,8 +24,8 @@ class PosMoveTable(object):
     instead.
     """
     
-    def __init__(self, posmodel=PosModel.PosModel()):
-        self.posmodel = posmodel          # the particular positioner this table applies to
+    def __init__(self, posmodel=PosModel.Posmodel()):
+        self.posmodel = posmodel          # the particular positioner this table applies to PosModel.PosModel(PosState(pos_id)). Must call an instance.
         self.__rows = []                  # internal representation of the move data
 
     # getters
@@ -47,7 +58,7 @@ class PosMoveTable(object):
         if rowidx >= len(self.__rows):
             self.insert_new_row(rowidx)
         for key in self.__rows[rowidx]._move_options.keys():
-            self.__rows[rowidx]._move_options[key] = self.posmodel.state.kv[key]  # snapshot the current state
+            self.__rows[rowidx]._move_options[key] = self.posmodel.state.read(key)  # snapshot the current state
         self.__rows[rowidx]._data[dist_label[axisid]] = distance
 
     def set_prepause(self, rowidx, prepause):
@@ -93,9 +104,10 @@ class PosMoveTable(object):
         elif output_type == 'cleanup':       
             table = {'posid':'','nrows':0,'dT':[],'dP':[]}
         else:
-            print('bad table output type ' + output_type)        
+            print( 'bad table output type ' + output_type)        
 
         i = 0
+        table = []
         for row in self.__rows:
             # insert an extra pause-only row if necessary, since hardware commands only really have postpauses           
             if output_type == 'hardware' and row['prepause']:
@@ -112,8 +124,8 @@ class PosMoveTable(object):
                 move_options['FINAL_CREEP_ON']      = False
             
             # use PosModel instance to get the real, quantized, calibrated values
-            true_move_T = self.posmodel(self.posmodel.T, row['dT_ideal'], move_options)
-            true_move_P = self.posmodel(self.posmodel.P, row['dP_ideal'], move_options)
+            true_move_T = self.posmodel.true_move(self.posmodel.T, row['dT_ideal'], move_options)
+            true_move_P = self.posmodel.true_move(self.posmodel.P, row['dP_ideal'], move_options)
             
             # fill in the output table according to type
             if output_type == 'scheduler':
@@ -138,7 +150,7 @@ class PosMoveTable(object):
                     time1 = true_move_T['move_time'].pop(-1)
                     time2 = true_move_P['move_time'].pop(-1)
                     table['move_time'].extend(max([time1,time2]))            
-        table['posid'] = self.posmodel.state.kv['SERIAL_ID']
+        table['posid'] = self.posmodel.read('SERIAL_ID')
         table['nrows'] = len(table['dT'])
         return table
 

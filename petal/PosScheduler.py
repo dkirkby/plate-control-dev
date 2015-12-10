@@ -17,12 +17,12 @@ class PosScheduler(object):
         self._targt = []
         self._is_forced = []
         
-    def move_request(self, posmodel, Q, S):
+    def move_request(self, posmodel, P, Q):
         """Adds a request to the scheduler for a given positioner to move to
-        the target position (Q,S).
+        the target position (P,Q).
         """
         self.move_tables.append(PosMoveTable.PosMoveTable(posmodel))
-        self._targt.append([Q,S])
+        self._targt.append([P,Q])
         self._is_forced_dtdp.append(False)
     
     def expert_move_request(self, move_table):
@@ -47,7 +47,7 @@ class PosScheduler(object):
                 self._start[i] = [float('nan'),float('nan')]
             else:
                 current_position = self.move_tables[i].posmodel.expected_current_position
-                self._start[i] = [current_position['Q'], current_position['S']]
+                self._start[i] = [current_position['P'], current_position['Q']]
         if not(anticollision) or any(self._is_forced):
             self.move_tables = self._schedule_without_anticollision()
         else:
@@ -57,11 +57,11 @@ class PosScheduler(object):
     def _schedule_without_anticollision(self):
         i = 0        
         for tbl in self.move_tables:      
-            # convert global (Q,S) into local theta,phi
+            # convert global P,Q into local theta,phi
             start = np.transpose(np.array(self._start[i]))
             targt = np.transpose(np.array(self._targt[i]))
-            start = tbl.posmodel.trans.obsQS_to_obsTP(start) # check format after PosTransforms updated
-            targt = tbl.posmodel.trans.obsQS_to_obsTP(targt) # check format after PosTransforms updated
+            start = tbl.posmodel.trans.obsPQ_to_obsTP(start) # check format after PosTransforms updated
+            targt = tbl.posmodel.trans.obsPQ_to_obsTP(targt) # check format after PosTransforms updated
 
             # delta = finish - start
             dtdp_obs = targt - start
@@ -93,13 +93,13 @@ class PosScheduler(object):
         # gather the kinematics calibration data
         R = [] # will store arm lengths for theta and phi
         tp0 = [] # will store the (theta,phi) permanent offsets (e.g., theta clocking angle of mounting, phi clocking angle of construction)
-        QS0 = [] # will store the (Q,S) locations of the fiber positioners' centers
+        PQ0 = [] # will store the (P,Q) locations of the fiber positioners' centers
         t_range = [] # will store the (theta_min, theta_max) travel ranges
         p_range = [] # will store the (phi_min, phi_max) travel ranges
         for tbl in self.move_tables:
             R.append(  [tbl.posmodel.state.kv['LENGTH_R1'], tbl.posmodel.state.kv['LENGTH_R2']])
             tp0.append([tbl.posmodel.state.kv['POLYN_T0' ], tbl.posmodel.state.kv['POLYN_P0' ]])
-            QS0.append([tbl.posmodel.state.kv['POLYN_Q0' ], tbl.posmodel.state.kv['POLYN_S0' ]])
+            PQ0.append([tbl.posmodel.state.kv['POLYN_Q0' ], tbl.posmodel.state.kv['POLYN_S0' ]]) # changing the P,Q to Q,S??
             t_range.append(tbl.posmodel.targetable_range_T)
             p_range.append(tbl.posmodel.targetable_range_P)
             

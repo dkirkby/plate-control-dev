@@ -20,9 +20,9 @@ class PosArrayMaster(object):
         self.schedule = PosScheduler.PosScheduler()
         self.comm = PetalComm.PetalComm() # syntax? arguments?
         
-    def request_schedule_execute_moves(self, posids, Qtargs, Stargs, anticollision=True):
+    def request_schedule_execute_moves(self, posids, Ptargs, Qtargs, anticollision=True):
         """Convenience wrapper for the complete sequence to cause an array of
-        positioners to go to targets (Qtargs, Stargs).
+        positioners to go to targets Ptargs, Qtargs.
         
         The sequence of calls is executed directly in order, from request through
         scheduling to executing the move and post-move cleanup. In practice, with
@@ -34,7 +34,7 @@ class PosArrayMaster(object):
         be of value for testing and for scenarios where moves should be immediately
         executed.
         """
-        self.request_moves(posids, Qtargs, Stargs)
+        self.request_moves(posids, Ptargs, Qtargs) #should this be self.posids?
         self.schedule_moves(anticollision)
         self.send_tables_and_execute_moves()
 
@@ -52,17 +52,17 @@ class PosArrayMaster(object):
         self.send_tables_and_execute_moves()
         
     def send_tables_and_execute_moves(self):
-        self.comm.send_tables(self.hardware_ready_move_tables) # syntax? arguments? return values?
+        self.comm.send_tables(self.hardware_ready_move_tables()) # syntax? arguments? return values?
         self.comm.execute_moves() # syntax? arguments? return values?
         self.postmove_cleanup()
         
-    def request_moves(self, posids, Qtargs, Stargs):
+    def request_moves(self, posids, Ptargs, Qtargs):
         """Input a list of positioner ids and corresponding target positions to
         the scheduler.
         """
         for i in range(len(posids)):
             j = self.posids.index(posids[i])
-            self.schedule.move_request(self.posmodels[j], Qtargs[i], Stargs[i])
+            self.schedule.move_request(self.posmodels[j], Ptargs[i], Qtargs[i])
 
     def expert_request_moves(self, posids, movecmds, values1, values2):
         """Input a list to the scheduler of positioner ids and corresponding
@@ -123,7 +123,7 @@ class PosArrayMaster(object):
             j = i + 1
             extend_list = []
             while j < len(tbls):
-                if tbls[i].posmodel.state.kv['SERIAL_ID'] == tbls[j].posmodel.state.kv['SERIAL_ID']:
+                if tbls[i].posmodel.state.read'SERIAL_ID') == tbls[j].posmodel.state.read'SERIAL_ID'):
                     extend_list.extend(tbls.pop(j))
                 else:
                     j += 1
@@ -146,3 +146,5 @@ class PosArrayMaster(object):
         
     def clear_schedule(self):
         self.schedule = PosScheduler.PosScheduler()
+
+
