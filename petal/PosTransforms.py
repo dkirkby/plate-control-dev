@@ -45,7 +45,7 @@ class PosTransforms(object):
         INPUT: 2N array of positioner-aligned values XY values 
         """
         xy_polys = self.polyss()
-        XY = np.array([np.polyval(xy_polys['X'], xy[0]), np.polyval(xy_polys['Y'], xy[1])]).tolist()
+        XY = np.array([np.polyval(xy_polys['X'], xy[:,0]), np.polyval(xy_polys['Y'], xy[:,1])]).tolist()
         return XY
 
     def obsXY_to_posXY(self, xy):
@@ -53,14 +53,14 @@ class PosTransforms(object):
         RETURN: 2N array of XY values of the positioner_aligned
         INPUT: 2N array of observer values xy values returns
         """
-        xy_polys = self.xy_polyss()
+        xy_polys = self.polyss()
         xy = np.array(xy)
-        XYguess0 = xy[0]-xy_polys[0][-1]
-        XYguess1 = xy[1]-xy_polys[1][-1]
+        XYguess0 = xy[:,0]-xy_polys['X'][-1]
+        XYguess1 = xy[:,1]-xy_polys['Y'][-1]
         if xy.shape == (2,):
-            XY = [self.inverse_quadratic(xy_polys[0], [xy[0]], XYguess0[0]), self.inverse_quadratic(xy_polys[1], [xy[1]], XYguess1[0])][0]
+            XY = [self.inverse_quadratic(xy_polys['X'], [xy[:,0]], XYguess0[0]), self.inverse_quadratic(xy_polys['Y'], [xy[:,1]], XYguess1[0])][0]
         else :
-            XY = [self.inverse_quadratic(xy_polys[0], xy[0], XYguess0[0]), self.inverse_quadratic(xy_polys[1], xy[1], XYguess1[0])]
+            XY = [self.inverse_quadratic(xy_polys['X'], xy[:,0], XYguess0[0]), self.inverse_quadratic(xy_polys['Y'], xy[:,1], XYguess1[0])]
         return XY
 
     def shaftTP_to_obsTP(self, tp):
@@ -88,44 +88,38 @@ class PosTransforms(object):
         tp_polys = self.polyss()
         TP = np.zeros(tp.shape)
         TPguess = np.zeros(tp.shape)
-            
-        if T==True and P==False:
-            if tp.shape == (1,):
-                TPguess = tp - tp_polys['T'][-1]
-                inversefunc_T = lambda x: self.inverse_quadratic(tp_polys['T'], [x], Tguess)[0]
-                T = inversefunc_T(tp)
-                return T
-            else:
-                print('You have given more than one axis of data')
-        elif P==True and T==False:
-            if tp.shape == (1,):
-                TPguess = tp - tp_polys['P'][-1]
-                inversefunc_P = lambda x: self.inverse_quadratic(tp_polys['P'], [x], TPguess)[0]
-                P = inversefunc_P(tp)
-                return P
-            else:
-                print('You have given more than one axis of data')
-        else:
-            TPguess[PosContants.T] = tp[PosContants.T] - tp_polys['T'][-1]
-            TPguess[PosContants.P] = tp[PosContants.P] - tp_polys['P'][-1]
-            use_pp = [False, False]
 
-            if tp.shape == (2,):
-                inversefunc_T = lambda x: self.inverse_quadratic(tp_polys['T'], [x], TPguess[PosContants.T])[0]
-                inversefunc_P = lambda x: self.inverse_quadratic(tp_polys['P'], [x], TPguess[PosContants.P])[0]
-            else :
-                inversefunc_T = lambda x: self.inverse_quadratic(tp_polys['T'], x, TPguess[PosConstants.T])
-                inversefunc_P = lambda x: self.inverse_quadratic(tp_polys['P'], x, TPguess[PosConstants.P])
+        if tp.shape[0] == 1:
+            if T == True:
+                TPguess = tp - tp_polys['T'][-1]
+                inversefunc_T = lambda x: self.inverse_quadratic(tp_polys['T'], x, TPguess)[0]
+                TP = inversefunc_T(tp)
+
+            elif P == True:
+                TPguess = tp - tp_polys['P'][-1]
+                inversefunc_P = lambda x: self.inverse_quadratic(tp_polys['P'], x, TPguess)[0]
+                TP = inversefunc_P(tp)
+                
+            else:
+                print('You must identify whether this is theta or phi axis data')
+
+        elif tp.shape[0] == 2:
+            TPguess[PosConstants.T] = tp[PosConstants.T] - tp_polys['T'][-1]
+            TPguess[PosConstants.P] = tp[PosConstants.P] - tp_polys['P'][-1]
+            inversefunc_T = lambda x: self.inverse_quadratic(tp_polys['T'], x, TPguess[PosConstants.T])[0]
+            inversefunc_P = lambda x: self.inverse_quadratic(tp_polys['P'], x, TPguess[PosConstants.P])[0]
             TP[PosConstants.T] = inversefunc_T(tp[PosConstants.T])
             TP[PosConstants.P] = inversefunc_P(tp[PosConstants.P])
+            
+        use_pp = [False, False]
+        unchanged = TP == tp
+        for i in range(0, tp.shape[0]):
+            if unchanged[i].any and use_pp[i]:
+                TP_backup = self.obsTP_to_shaftTP(tp[:, unchanged[i]], True)
+                TP[i, unchanged[i]] = TP_backup[i]
+                print('obsTP_to_shaftTP: piecewise polynom inversion error. reverting to quadpoly')
 
-            unchanged = TP == tp
-            for i in range(0, tp.shape[0]):
-                if unchanged[i].any and use_pp[i]:
-                    TP_backup = self.obsTP_to_shaftTP(tp[:, unchanged[i]], True)
-                    TP[i, unchanged[i]] = TP_backup[i]
-                    print('obsTP_to_shaftTP: piecewise polynom inversion error. reverting to quadpoly')
-            return TP
+        return TP
 
 
     def obsXY_to_shaftTP(self, xy, r, shaft_range):
@@ -364,9 +358,12 @@ class PosTransforms(object):
                 x[nonreal] = inverse_quadratic(p[1:], y[nonreal], xguess[nonreal]) #just throw away the fending quadratic term
             return x.tolist()
 
-shaftTP = np.array([[0],[0]])
+distance = [3]
+distances = [[3],[3]]
 state = PosState.PosState(1020)
-r = np.array([[state.read('LENGTH_R1')],[state.read('LENGTH_R2')]])
-obsXY = PosTransforms(state).shaftTP_to_obsXY(shaftTP,r)
-print(obsXY[0],obsXY[1])
+
+#D1 = PosTransforms().obsTP_to_shaftTP(distance,T=True)
+#D = PosTransforms().obsTP_to_shaftTP(distance,P=True)
+D = PosTransforms().obsTP_to_shaftTP(distances)
+print(D)
 #PosTransforms().shaftTP_to_obsTP(shaftTP)

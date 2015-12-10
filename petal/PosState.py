@@ -74,6 +74,3 @@ class PosState(object):
 
     def log_config(self):
         pass
-
-
-

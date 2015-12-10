@@ -84,7 +84,7 @@ class PosModel(object):
         obsXY = self.trans.shaftTP_to_obsXY(shaftTP,r)   #This requires r      
         d['x'] = obsXY[0]
         d['y'] = obsXY[1,]        
-        QS = self.trans.obsXY_to_QS(obsXY)
+        QS = self.trans.obsXY_to_QS(obsXY) #Need to write this
         d['Q'] = obsQS[0,0]
         d['S'] = obsQS[1,0]
         return d

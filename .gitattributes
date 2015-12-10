@@ -9,6 +9,9 @@ petal/PosState.py -text
 petal/PosTransforms.py -text
 petal/configfile.conf -text
 petal/configspec.ini -text
+petal/pos_configs/configspec.ini -text
+petal/pos_configs/pos_1020.conf -text
+petal/pos_configs/pos_def.conf -text
 petalbox/docs/systec-readme.txt -text
 petalbox/drivers/systec-readme.txt -text
 petalbox/drivers/systec_can-V0.9.0.tar.bz2 -text
