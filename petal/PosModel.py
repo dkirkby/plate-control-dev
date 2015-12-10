@@ -244,20 +244,22 @@ class PosModel(object):
         """
         table = PosMoveTable.PosMoveTable(self)
         vals = np.array([[val1],[val2]])
+        r = np.array([[self.state.read('LENGTH_R1')],[self.state.read('LENGTH_R2')]])
+        shaft_range = np.array([[self.state.read('PHYSICAL_RANGE_T')],[self.state.read('PHYSICAL_RANGE_P')]]) 
         pos = self.expected_current_position()
         start_tp = np.array([[pos['th_shaft']],[pos['ph_shaft']]])
-        if   movecmd == 'pq':
-            targt_tp = self.trans.QS_to_shaftTP(vals) # check format after PosTransforms updated
-        elif movecmd == 'dpdq':
-            start_PQ = self.trans.shaftTP_to_QS(start_tp) # check format after PosTransforms updated
+        if   movecmd == 'qs':
+            targt_tp = self.trans.QS_to_shaftTP(vals)
+        elif movecmd == 'dqds':
+            start_PQ = self.trans.shaftTP_to_QS(start_tp)
             targt_PQ = start_PQ + vals
-            targt_tp = self.trans.QS_to_shaftTP(targt_PQ) # check format after PosTransforms updated
+            targt_tp = self.trans.QS_to_shaftTP(targt_PQ)
         elif movecmd == 'xy':
-            targt_tp = self.trans.obsXY_to_shaftTP(vals)
+            targt_tp = self.trans.obsXY_to_shaftTP(vals, r, shaft_range) # modified with r, shaft_range
         elif movecmd == 'dxdy':
-            start_xy = self.trans.shaftTP_to_obsXY(start_tp)
+            start_xy = self.trans.shaftTP_to_obsXY(start_tp, r) # modified with r
             targt_xy = start_xy + vals
-            targt_tp = self.trans.obsXY_to_shaftTP(targt_xy)
+            targt_tp = self.trans.obsXY_to_shaftTP(targt_xy, r,shaft_range) # modified with r, shaft_range
         elif movecmd == 'tp':
             targt_tp = vals
         elif movecmd == 'dtdp':
