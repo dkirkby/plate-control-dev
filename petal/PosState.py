@@ -8,19 +8,21 @@
 import os, sys
 import datetime
 #import newdict
-from configobj import ConfigObj
+from configobj import ConfigObj, flatten_errors
 from validate import Validator
 import PosConstants
 
 
 class PosState(object):
-    """
-    Class : PosState
-    Called by BUS_ID = pos_id
-    State variables for the positioner are generally stored, accessed,
+    """State variables for the positioner are generally stored, accessed,
     and queried through this class. The approach has been to put any
     parameters which may vary from positioner in this
     single object.
+    
+    INPUTS: pos_id = SERIAL_ID of positioner
+            conf   = configuration of positioner. If blank is DEFAULT
+
+    Note: There is a default positioner config file if no pos_id is supplied
     Values are stored in a config file.
     """
     def __init__(self,pos_id=None,conf=False):
@@ -31,43 +33,46 @@ class PosState(object):
         else:
             self.pos_id = str(pos_id)
 
-        #Set configuration of given positioner
-        if conf is False:
-            self.conf = 'DEF'
-        else:
-            self.conf = conf
-            
-        self.verbose = PosConstants.verbose
+        #Call the configuration file + validation file
         configpath = os.getcwd()+'/pos_configs/'
-        configfile = configpath+'pos_'+str(pos_id)+'.conf'
-        configspecfile = configpath+'/configspec.ini'       # Validation file
+        configfile = configpath+'pos_'+str(self.pos_id)+'.conf'
+        configspecfile = configpath+'/configspec.ini'     
         #configfile = os.environ.get('CONFPATH')+'configfile.conf'
-        self.config = ConfigObj(configfile,configspec = configspecfile)[self.conf]
-
+        config = ConfigObj(configfile,configspec = configspecfile)
+        
         #Validate
         validator = Validator()
         try:
-            self.config.validate(validator)
+            results = config.validate(validator)
         except:
-            print('Something is wrong with the config file')
+            print('Validation of file failed')
+
+        #Set configuration of given positioner
+        if conf is False:
+            self.conf = 'DEFAULT'
+        else:
+            self.conf = str(conf)
+            
+        self.config = config[str(self.conf)]
+
     
     def read(self,arg):
         """
         Returns current values of state variables as an array
         """
         if arg == 'GEAR_T':
-            gear_name = self.config[self.pos_id][arg]
+            gear_name = self.config[arg]
             self.value = PosConstants.gear_ratio[gear_name]
         elif arg == 'GEAR_P':
-            gear_name = self.config[self.pos_id][arg]
+            gear_name = self.config[arg]
             self.value = PosConstants.gear_ratio[gear_name]
         else: 
             try:
-                self.value = self.config[self.pos_id][arg]
+                self.value = self.config[arg]
                 return self.value
 
             except:
-                print('\n Error in reading Config file \n')
+                print('Error in reading Config file')
                 return False
 
     def write(self,arg,val):
@@ -75,11 +80,12 @@ class PosState(object):
         Change the values of the configuration file
         """
         try:
-            self.config[self.pos_id][arg] = val
+            self.config[arg] = val
             return True
         except:
-            print('\n Could not write to Config file \n')
+            print('Could not write to Config file')
             return False
 
     def log_config(self):
         pass
+
