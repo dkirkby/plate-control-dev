@@ -13,6 +13,7 @@ petal/pos_configs/pos_def.conf -text
 petalbox/docs/systec-readme.txt -text
 petalbox/drivers/systec-readme.txt -text
 petalbox/drivers/systec_can-V0.9.0.tar.bz2 -text
+petalbox/hwlib/dlptemp.py -text
 petalbox/poscontrol/mvtest.py -text
 petalbox/poscontrol/socketcan.py -text
 petalbox/posfirmware/fipos_fw_1.0.c -text
