@@ -104,3 +104,26 @@ if __name__ == "__main__":
 		print "Can't find temperature sensor module :( "
 		sys.exit()
 
+	if a:
+		while n > 0:
+#			x = raw_input('S/s to stop, any key to continue: ')
+#			if x.upper()=='S':
+#				sys.exit()
+			print "Reading # "+str(n)
+			r=dlp.read_temp(2)	
+			temp2.append(r)	
+			print "Temperature S2: ",r
+			r=dlp.read_temp(1)	
+			temp1.append(r)
+			print "Temperature S1: ",r
+			n=n-1
+	else:
+		print "Can't find temperature sensor module :( "
+		sys.exit()
+	
+	plt.hist(temp1,bins=20,histtype='step',normed=True,color='b',label='Temp1')
+	plt.hist(temp1,bins=20,histtype='step',normed=True,color='r',label='Temp2')
+#plt.hist(gaussian_numbers, bins=20, histtype='stepfilled', normed=True, color='b', label='Gaussian')
+#plt.hist(uniform_numbers, bins=20, histtype='stepfilled', normed=True, color='r', alpha=0.5, label='Uniform')
+#plt.title("Gaussian/Uniform Histogram")
+	plt.show()
