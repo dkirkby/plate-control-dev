@@ -23,17 +23,26 @@ class PosState(object):
     single object.
     Values are stored in a config file.
     """
-    def __init__(self,pos_id=None):
+    def __init__(self,pos_id=None,conf=False):
+
+        #Set positioner ID. If blank, will use default (pos_def.conf)
         if pos_id is None:
-            self.pos_id = 'DEF'
+            self.pos_id = 'def'
         else:
             self.pos_id = str(pos_id)
+
+        #Set configuration of given positioner
+        if conf is False:
+            self.conf = 'DEF'
+        else:
+            self.conf = conf
             
         self.verbose = PosConstants.verbose
-        configfile = os.getcwd()+'/configfile.conf' #Need to decide where to put this
-        configspecfile = os.getcwd()+'/configspec.ini' # Validation file
+        configpath = os.getcwd()+'/pos_configs/'
+        configfile = configpath+'pos_'+str(pos_id)+'.conf'
+        configspecfile = configpath+'/configspec.ini'       # Validation file
         #configfile = os.environ.get('CONFPATH')+'configfile.conf'
-        self.config = ConfigObj(configfile,configspec = configspecfile)
+        self.config = ConfigObj(configfile,configspec = configspecfile)[self.conf]
 
         #Validate
         validator = Validator()
