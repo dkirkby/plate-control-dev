@@ -5,13 +5,13 @@ import LegacyPositionerComm
 """
 
 # Initialization
-posids = [1020]
+posids = ['6M01']
 configs = ['DEFAULT']
-m = PosArrayMaster(posids,configs)
+m = PosArrayMaster.PosArrayMaster(posids,configs)
 
 # Initialization of communications
 # These commands are very specific to the hacked-together LegacyPositionerComm.
-comm = LegacyPositionerComm('COM5')
+comm = LegacyPositionerComm.LegacyPositionerComm('COM6')
 comm.master = m
 m.comm = comm
 
@@ -19,7 +19,7 @@ m.comm = comm
 should_home = False
 should_move_QS_grid = False
 should_move_abs_tp = False
-should_move_rel_dtdp = False
+should_move_rel_dtdp = True
 
 # Moves
 if should_home:

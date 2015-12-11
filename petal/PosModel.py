@@ -21,8 +21,10 @@ class PosModel(object):
     """
     
     
-    def __init__(self, state):
-        self.state = state #PosState.PosState(pos_id)
+    def __init__(self, state=None):
+        if not(state):
+            self.state = PosState.PosState()
+        self.state = state
         self.trans = PosTransforms.PosTransforms(self.state)
 
         #Axis identification

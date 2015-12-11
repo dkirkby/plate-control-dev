@@ -22,7 +22,7 @@ class LegacyPositionerComm(object):
         """
         self.steps_arg_n_bytes = 2  # number of bytes used to argue a quantity of steps to driver
         self.max_arguable_steps = self.steps_arg_n_bytes ** 16 - 1  # how large of an 'n steps' argument can be sent to driver
-        self.CAN_comm = LawicellCANUSB.LawicellCANUSB(com_port)  # object that communicates over CAN with hardware
+        self.CAN_comm = LawicellCANUSB(com_port)  # object that communicates over CAN with hardware
         self.settings_hold_time = 0.05 # seconds to wait for commands to get sent to firmware
         self.tables = [] # very specific to this hacked-together legacy implementation
         self.master = [] # very specific to this hacked-together legacy implementation
@@ -389,7 +389,7 @@ class LawicellCANUSB(object):
         """com_port argument is a string, such as 'COM5'
         """
         self.print_all_can_msgs = False
-        
+        self.com_port = com_port
         print('Initializing serial port at', self.com_port, '\n')
         self.port = serial.Serial(self.com_port)
         self.port.baudrate = 112500
@@ -464,7 +464,7 @@ class LawicellCANUSB(object):
         return bool
 
     def writeread(self, str1):
-        self.write(str1 +'\r' )
+        self.write(str1)
         ticstart = time.clock()
         while (time.clock() - ticstart) <= self.read_timeout: # TODO : try to figure out how to know that the positionner has already done the mvt
             time.sleep(self.read_poll_period)
@@ -474,7 +474,7 @@ class LawicellCANUSB(object):
     def write(self, str1):
         if not self.port.isOpen():
             self.port = serial.Serial(self.com_port)
-        self.port.write(str1)
+        self.port.write(bytes(str1,'utf-8'))
 
     def read(self):
         if not (self.port.isOpen()):

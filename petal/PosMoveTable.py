@@ -16,9 +16,11 @@ class PosMoveTable(object):
     instead.
     """
     
-    def __init__(self, posmodel=PosModel.Posmodel()):
-        self.posmodel = posmodel          # the particular positioner this table applies to PosModel.PosModel(PosState(pos_id)). Must call an instance.
-        self.__rows = []                  # internal representation of the move data
+    def __init__(self, posmodel=None):
+        if not(posmodel):
+            posmodel = PosModel.PosModel() 
+        self.posmodel = posmodel # the particular positioner this table applies to PosModel.PosModel(PosState(pos_id)). Must call an instance.
+        self.__rows = []         # internal representation of the move data
 
     # getters
     def for_scheduler(self):
