@@ -236,7 +236,7 @@ class PosTransforms(object):
         OUTPUT: S
         """
         p = np.array([5.00010E-01,9.99997E-01,1.91532E-07,1.72104E-09,7.31761E-11,-5.78982E-13,3.30271E-15,-1.11245E-17,1.90376E-20,-1.26341E-23])
-        p = [::-1] #reverses list
+        p = p[::-1] #reverses list
         Q = np.polyval(p,r)
         return Q
     
@@ -247,7 +247,7 @@ class PosTransforms(object):
         OUTPUT: R = sqrt(x^2+y^2)
         """
         p = np.array([5.00010E-01,9.99997E-01,1.91532E-07,1.72104E-09,7.31761E-11,-5.78982E-13,3.30271E-15,-1.11245E-17,1.90376E-20,-1.26341E-23])
-        p = [::-1] #reverses list
+        p = p[::-1] #reverses list
         p = np.poly1d(p)
 
         r = (p-s).roots
@@ -348,7 +348,7 @@ class PosTransforms(object):
                 unreach = np.where(unreachable == True )
                 x_unreachable = r[0] * np.cos(np.deg2rad(A[0,unreach])) + r[1] * np.cos(np.deg2rad(A[0, unreach]+ A[1,unreach]))
                 y_unreachable = r[0] * np.sin(np.deg2rad(A[0,unreach])) + r[1] * np.sin(np.deg2rad(A[0, unreach]+ A[1,unreach]))
-                erra1r = np.array(fun.cart2pol(x_unreachable[0], y_unreachable[0])) - np.array(fun.cart2pol(x[unreach], y[unreach]))
+                erra1r = np.array(PosTransforms.cart2pol(x_unreachable[0], y_unreachable[0])) - np.array(PosTransforms.cart2pol(x[unreach], y[unreach]))
                 A[:,unreach] = A[:, unreach] - erra1r[:,np.newaxis]
 
             below[i] = A[i] < np.min(ranges[i])
@@ -407,6 +407,12 @@ class PosTransforms(object):
             # also handle any non-real results from the sqrt
             nonreal = np.where(np.imag(discriminant))[0]
             if not(len(nonreal) == 0):
-                x[nonreal] = inverse_quadratic(p[1:], y[nonreal], xguess[nonreal]) #just throw away the fending quadratic term
+                x[nonreal] = PosTransforms.inverse_quadratic(p[1:], y[nonreal], xguess[nonreal]) #just throw away the fending quadratic term
             return x.tolist()
-
+    
+    @staticmethod
+    def cart2pol(x,y):
+        """transform cartesian coordinates to polar coordinates"""
+        r = np.sqrt(x**2+y**2)
+        theta = np.degrees(np.arctan2(y, x))
+        return r, theta
