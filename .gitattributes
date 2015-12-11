@@ -10,6 +10,7 @@ petal/PosTransforms.py -text
 petal/demo.py -text
 petal/pos_configs/configspec.ini -text
 petal/pos_configs/pos_1020.conf -text
+petal/pos_configs/pos_6M01.conf -text
 petal/pos_configs/pos_def.conf -text
 petalbox/docs/systec-readme.txt -text
 petalbox/drivers/systec-readme.txt -text
