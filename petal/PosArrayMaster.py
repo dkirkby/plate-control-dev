@@ -1,7 +1,7 @@
 import PosModel
 import PosScheduler
 import PosState
-import PetalComm
+#import PetalComm
 
 class PosArrayMaster(object):
     """Maintains a list of instances of the Fiber Positioner software model
@@ -19,7 +19,7 @@ class PosArrayMaster(object):
             self.posmodels.append(posmodel)
         self.posids = posids
         self.schedule = PosScheduler.PosScheduler()
-        self.comm = PetalComm.PetalComm() # syntax? arguments?
+        #self.comm = PetalComm.PetalComm() # syntax? arguments?
         
     def request_schedule_execute_moves(self, posids, Qtargs, Stargs, anticollision=True):
         """Convenience wrapper for the complete sequence to cause an array of
@@ -35,7 +35,7 @@ class PosArrayMaster(object):
         be of value for testing and for scenarios where moves should be immediately
         executed.
         """
-        self.request_moves(posids, Qtargs, Stargs) #should this be self.posids?
+        self.request_moves(posids, Qtargs, Stargs)
         self.schedule_moves(anticollision)
         self.send_tables_and_execute_moves()
 
@@ -124,7 +124,7 @@ class PosArrayMaster(object):
             j = i + 1
             extend_list = []
             while j < len(tbls):
-                if tbls[i].posmodel.state.read'SERIAL_ID') == tbls[j].posmodel.state.read'SERIAL_ID'):
+                if tbls[i].posmodel.state.read('SERIAL_ID') == tbls[j].posmodel.state.read('SERIAL_ID'):
                     extend_list.extend(tbls.pop(j))
                 else:
                     j += 1
@@ -142,10 +142,22 @@ class PosArrayMaster(object):
         """
         for m in self.schedule.move_tables:
             cleanup_table = m.for_cleanup
-            m.posmodel.postmove_cleanup(cleanup_table['dT'],cleanup_table['dP']) 
+            m.posmodel.postmove_cleanup(cleanup_table['dT'],cleanup_table['dP'])
+            print(m.posmodel.expected_current_position_str)
         self.clear_schedule()
         
     def clear_schedule(self):
         self.schedule = PosScheduler.PosScheduler()
+    
+    def get(self,posid,varname=''):
+        """Retrieve the state value identified by string varname, for positioner
+        identified by id posid. If no varname is specified, return the whole
+        posmodel.
+        """
+        i = self.posids.index(posid)
+        if varname == '':
+            return self.posmodels[i]
+        else:
+            return self.posmodels[i].state.read[varname]
 
 
