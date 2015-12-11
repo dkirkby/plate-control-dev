@@ -25,9 +25,9 @@ class LegacyPositionerComm(object):
         self.CAN_comm = LawicellCANUSB.LawicellCANUSB(com_port)  # object that communicates over CAN with hardware
         
     def set_motor_params(self, busid, creep_period, curr_spin_up_down, curr_cruise, curr_creep, hold_current):
-        self.set_creep_parameters(bus_id, hold_current, should_bump_creep_current = 0)
-        self.set_creep_periods(bus_id, creep_period)
-        self.set_currents(bus_id, curr_spin_up_down, curr_cruise, curr_creep)
+        self.set_creep_parameters(busid, hold_current, should_bump_creep_current = 0)
+        self.set_creep_periods(busid, creep_period)
+        self.set_currents(busid, curr_spin_up_down, curr_cruise, curr_creep)
    
     def move_motors(self, bus_id, steps_cruise, steps_creep):
         """Inputs: bus_id       ... canbus integer id of the positioner to command
@@ -41,7 +41,7 @@ class LegacyPositionerComm(object):
         steps_creep_ccw = [0,0]        
         steps_creep_cw = [0,0]
         for i in range(len(steps_creep)):
-            if steps_creep[i] > 0
+            if steps_creep[i] > 0:
                 steps_creep_ccw[i] = steps_creep[i]
             else:
                 steps_creep_cw[i] = -steps_creep[i]
