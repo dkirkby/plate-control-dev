@@ -8,8 +8,7 @@
 import numpy as np
 import PosState
 import PosMoveTable
-#import PosTransforms
-import PosScheduler
+import PosTransforms
 
 class PosModel(object):
     """Software model of the physical positioner hardware.
@@ -85,15 +84,15 @@ class PosModel(object):
         d['x'] = obsXY[0]
         d['y'] = obsXY[1,]        
         QS = self.trans.obsXY_to_QS(obsXY) #Need to write this
-        d['Q'] = obsQS[0,0]
-        d['S'] = obsQS[1,0]
+        d['Q'] = QS[0,0]
+        d['S'] = QS[1,0]
         return d
 
     @property
     def expected_current_position_str(self):
         """One-line string summarizing current expected position.
         """
-        deg = unichr(176).encode("latin-1")
+        deg = '\u00b0'
         mm = 'mm'
         pos = self.expected_current_position()
         s = 'P:{:7.3f}{}, Q:{:7.3f}{} | x:{:7.3f}{}, y:{:7.3f}{} | th_obs:{:8.3f}{}, ph_obs:{:8.3f}{} | th_mot:{:8.1f}{}, ph_mot:{:8.1f}{}'. \
@@ -102,7 +101,6 @@ class PosModel(object):
                    pos['th_obs'],deg, pos['ph_obs'],deg,
                    pos['th_mot'],deg, pos['ph_mot'],deg)
         return s
-
         
     @property
     def targetable_range_T(self):
