@@ -23,7 +23,44 @@ class LegacyPositionerComm(object):
         self.steps_arg_n_bytes = 2  # number of bytes used to argue a quantity of steps to driver
         self.max_arguable_steps = self.steps_arg_n_bytes ** 16 - 1  # how large of an 'n steps' argument can be sent to driver
         self.CAN_comm = LawicellCANUSB.LawicellCANUSB(com_port)  # object that communicates over CAN with hardware
+        self.settings_hold_time = 0.05 # seconds to wait for commands to get sent to firmware
+        self.tables = [] # very specific to this hacked-together legacy implementation
+        self.master = [] # very specific to this hacked-together legacy implementation
+
+# The send_tables and execute_moves command are what interface to the non-legacy other aspects of the code.
+    def send_tables(self,tables):
+        self.tables = tables # in non-legacy future code, this is where tables get uploaded to positioners
         
+    def execute_moves(self):
+        for tbl in self.tables:
+            self.set_motor_params(self.master.get(tbl['posid'],'BUS_ID'),
+                                  self.master.get(tbl['posid'],'CREEP_PERIOD'),
+                                  self.master.get(tbl['posid'],'CURR_SPIN_UP_DOWN'),
+                                  self.master.get(tbl['posid'],'CURR_CRUISE'),
+                                  self.master.get(tbl['posid'],'HOLD_CURRENT'))
+            for i in range(tbl['nrows']):
+                T = self.master.get(tbl['posid'],'MOTOR_ID_T')
+                P = self.master.get(tbl['posid'],'MOTOR_ID_P')
+                cruise_steps = [0,0]
+                creep_steps = [0,0]
+                if tbl['speed_mode_T'][i] == 'cruise':
+                    cruise_steps[T] = tbl['motor_steps_T']
+                elif tbl['speed_mode_T'][i] == 'creep':
+                    creep_steps[T] = tbl['motor_steps_T']
+                else:
+                    print('bad speed_mode_T')
+                if tbl['speed_mode_P'][i] == 'cruise':
+                    cruise_steps[P] = tbl['motor_steps_P']
+                elif tbl['speed_mode_P'][i] == 'creep':
+                    creep_steps[P] = tbl['motor_steps_P']
+                else:
+                    print('bad speed_mode_P')
+                self.move_motors(self.master.get(tbl['posid'],'BUS_ID'),cruise_steps,creep_steps)
+                print('Moving ' + str(self.master.get(tbl['posid'],'BUS_ID')) + ' by  Tcruise:' + str(cruise_steps[T]) + '  Tcreep:' + str(creep_steps[T]) + '  Pcruise:' + str(cruise_steps[P]) + '  Pcreep:' + str(creep_steps[P]))
+                time.sleep(tbl['move_time'][i])
+                time.sleep(tbl['post_pause'][i])               
+
+# The items below are all specific to legacy firmware, and not for general future usage or copying.        
     def set_motor_params(self, busid, creep_period, curr_spin_up_down, curr_cruise, curr_creep, hold_current):
         self.set_creep_parameters(busid, hold_current, should_bump_creep_current = 0)
         self.set_creep_periods(busid, creep_period)
