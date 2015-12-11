@@ -1,12 +1,4 @@
-#############################
-# Classes: PosModel, Axis   #
-# Version: Python 3         #
-# Date: Dec. 9, 2015        #
-# Author: Joe Silber        #
-# Change log:               #
-#     1) calls PosState     #
-#     instead of PosModel   #
-#############################
+# Author: Joseph H Silber, 2015
 
 
 import PosModel
@@ -150,7 +142,7 @@ class PosMoveTable(object):
                     time1 = true_move_T['move_time'].pop(-1)
                     time2 = true_move_P['move_time'].pop(-1)
                     table['move_time'].extend(max([time1,time2]))            
-        table['posid'] = self.posmodel.read('SERIAL_ID')
+        table['posid'] = self.posmodel.state.read('SERIAL_ID')
         table['nrows'] = len(table['dT'])
         return table
 
