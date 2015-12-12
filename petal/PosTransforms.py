@@ -1,9 +1,7 @@
 import numpy as np
-import PosConstants
-#import functionsnew as fun
+import PosConstants as pc
 import PosState
 from numpy.lib.scimath import sqrt as csqrt
-
 
 class PosTransforms(object):
     """This class includes the following transformations:
@@ -13,8 +11,6 @@ class PosTransforms(object):
     (4) QS <---> obsXY. This is XY as observed at the FVC
     (5) QS <---> flatXY. This is XY used for anticollision
     (6) QS <---> shaftTP. This is XY used for anticollision
-    
-    
 
     Use of Polyval function : the input arg must be a array who looks like [[c2], [c1], [c0]], where cn are the coefficient
     of the Polynomial function, the other ouput arg is the variables: array or float
@@ -27,123 +23,84 @@ class PosTransforms(object):
         else:
             self.state = state
 
-    def polyss(self):
-        """Reads in polynomial functions from state. Called with 'X','Y','T','P'
+    def poly(self,var):
+        """Reads in polynomial functions from state. Called with var argument 'X','Y','T','P'
         """
-        polyss = {}
-        polyss['X'] = np.array([[self.state.read('POLYN_X1')], [self.state.read('POLYN_X0')]])
-        polyss['Y'] = np.array([[self.state.read('POLYN_Y1')], [self.state.read('POLYN_Y0')]])
-        polyss['T'] = np.array([[self.state.read('POLYN_T2')], [self.state.read('POLYN_T1')],[self.state.read('POLYN_T0')]])
-        polyss['P'] = np.array([[self.state.read('POLYN_P2')], [self.state.read('POLYN_P1')], [self.state.read('POLYN_P0')]])
-        return polyss
+        if var == 'X':
+            return [self.state.read('POLYN_X1'), self.state.read('POLYN_X0')]
+        elif var == 'Y':
+            return [self.state.read('POLYN_Y1'), self.state.read('POLYN_Y0')]
+        elif var == 'T':
+            return [self.state.read('POLYN_T2'), self.state.read('POLYN_T1'), self.state.read('POLYN_T0')]
+        elif var == 'P':
+            return [self.state.read('POLYN_P2'), self.state.read('POLYN_P1'), self.state.read('POLYN_P0')]
+        else:
+            print('bad var ' + str(var))
 
     def posXY_to_obsXY(self, xy):
         """
-        RETURN: 2N array of XY values as seen by observer at FVC
-        INPUT: 2N array of positioner-aligned values XY values 
+        INPUT:  [2][N] array of positioner-aligned values XY values 
+        RETURN: [2][N] array of XY values as seen by observer at FVC
         """
-        xy_polys = self.polyss()
-        XY = np.array([np.polyval(xy_polys['X'], xy[:,0]), np.polyval(xy_polys['Y'], xy[:,1])]).tolist()
+        X = np.polyval(self.poly('X'), xy[0])
+        Y = np.polyval(self.poly('Y'), xy[1])
+        XY = np.array([X,Y]).tolist()
         return XY
 
     def obsXY_to_posXY(self, xy):
         """
-        RETURN: 2N array of XY values of the positioner_aligned
-        INPUT: 2N array of observer values xy values returns
+        INPUT:  [2][N] array of observer values xy values returns
+        RETURN: [2][N] array of XY values of the positioner_aligned
         """
-        xy_polys = self.polyss()
-        x = np.array(xy[:,0])
-        y = np.array(xy[:,1])
-        XYguess0 = x-xy_polys['X'][-1]
-        XYguess1 = y-xy_polys['Y'][-1]
-        if xy.shape == (2,):
-            XY = [self.inverse_quadratic(xy_polys['X'], [x], XYguess0[0]), self.inverse_quadratic(xy_polys['Y'], [y], XYguess1[0])][0]
-        else :
-            XY = [self.inverse_quadratic(xy_polys['X'], x, XYguess0[0]), self.inverse_quadratic(xy_polys['Y'], y, XYguess1[0])]
+        x = np.array(xy[0])
+        y = np.array(xy[1])
+        Xguess = x - self.poly('X')[-1]
+        Yguess = y - self.poly('Y')[-1]
+        XY = [self.inverse_quadratic(self.poly('X'), x, Xguess), self.inverse_quadratic(self.poly('Y'), y, Yguess)]
         return XY
 
     def shaftTP_to_obsTP(self, tp):
         """
-        RETURN: 2N array of tp values as seen by observer
-        INPUT: 2N array of theta phi shaft angle values
-
-        PosConstants.T,P give index for theta, phi
+        INPUT:  [2][N] array of theta phi shaft angle values
+        RETURN: [2][N] array of tp values as seen by observer
         """
-        tp_polys = self.polyss()
-        evalfunc_T = lambda x: np.polyval(tp_polys['T'], x)
-        evalfunc_P = lambda x: np.polyval(tp_polys['P'], x)
-        TP = np.array([evalfunc_T(tp[:,PosConstants.T]).tolist(),evalfunc_P(tp[:,PosConstants.P]).tolist()]).tolist()
+        T = np.polyval(self.poly('T'), tp[0])
+        P = np.polyval(self.poly('P'), tp[1])
+        TP = np.array([T,P]).tolist()
         return TP
 
-    def obsTP_to_shaftTP(self, tp, *args, T=False, P=False):
+    def obsTP_to_shaftTP(self, tp):
         """
-        RETURN: 2N array of tp values 
-        INPUT: 2N array of theta phi as seen by observer angle values
-        args: True --> force use of quadratic poly
+        INPUT:  [2][N] array of theta phi as seen by observer angle values
+        RETURN: [2][N] array of theta phi as seen at the output of the gearmotors
         """
-        note = '' #not sure that we need this. Took it out for time being.
-
-        tp = np.array(tp)
-        tp_polys = self.polyss()
-        TP = np.zeros(tp.shape)
-        TPguess = np.zeros(tp.shape)
-
-        if tp.shape[0] == 1:
-            if T == True:
-                TPguess = tp - tp_polys['T'][-1]
-                inversefunc_T = lambda x: self.inverse_quadratic(tp_polys['T'], x, TPguess)[0]
-                TP = inversefunc_T(tp)
-
-            elif P == True:
-                TPguess = tp - tp_polys['P'][-1]
-                inversefunc_P = lambda x: self.inverse_quadratic(tp_polys['P'], x, TPguess)[0]
-                TP = inversefunc_P(tp)
-                
-            else:
-                print('You must identify whether this is theta or phi axis data')
-
-        elif tp.shape[0] == 2:
-            TPguess[PosConstants.T] = tp[PosConstants.T] - tp_polys['T'][-1]
-            TPguess[PosConstants.P] = tp[PosConstants.P] - tp_polys['P'][-1]
-            inversefunc_T = lambda x: self.inverse_quadratic(tp_polys['T'], x, TPguess[PosConstants.T])[0]
-            inversefunc_P = lambda x: self.inverse_quadratic(tp_polys['P'], x, TPguess[PosConstants.P])[0]
-            TP[PosConstants.T] = inversefunc_T(tp[PosConstants.T])
-            TP[PosConstants.P] = inversefunc_P(tp[PosConstants.P])
-
-        #I don't fully understand this part
-        use_pp = [False, False]
-        unchanged = TP == tp
-        for i in range(0, tp.shape[0]):
-            if unchanged[i].any and use_pp[i]:
-                TP_backup = self.obsTP_to_shaftTP(tp[:, unchanged[i]], True)
-                TP[i, unchanged[i]] = TP_backup[i]
-                print('obsTP_to_shaftTP: piecewise polynom inversion error. reverting to quadpoly')
-
+        t = np.array(tp[0])
+        p = np.array(tp[1])
+        Tguess = t - self.poly('T')[-1]
+        Pguess = p - self.poly('P')[-1]
+        TP = [self.inverse_quadratic(self.poly('T'), t, Tguess), self.inverse_quadratic(self.poly('P'), p, Pguess)]
         return TP
-
 
     def obsXY_to_shaftTP(self, xy, r, shaft_range):
         """ Wrapper function for xy2tp, which includes handling of offsets for the
         (x,y) and (t,p) axes. The output "reachable" is a list of all the
         indexes of the points that were able to be reached
-        RETURN: 2N array of TP values and whether or not they are reachable
-        INPUT: 2N array of XY values as seen at the FVC, r = (r[1],r[2]), and shaft_range
+        INPUT:  [2][N] array of XY values as seen at the FVC
+                [2] array of arm lengths
+                [2][2] array of [[min(theta),max(theta)],[min(phi),max(phi)]]
+        RETURN: [2][N] array of TP values and whether or not they are reachable
         """
-        xy = np.array(xy)
-        XY = self.obsXY_to_posXY(xy)        # adjust observer xy into the position system XY
+        XY = self.obsXY_to_posXY(xy)        # adjust observer xy into the positioner system XY
         obs_range = self.shaftTP_to_obsTP(shaft_range) # want range used in next line to be according to observer (since observer sees the physical phi = 0)
-        if xy.shape == (2,):
-            [tp, reachable] = self.xy2tp([[XY[0]],[XY[1]]], r, obs_range) # calculate theta phi angles in observer space
-            tp = [tp[0][0], tp[1][0]]
-        else:
-            [tp, reachable] = self.xy2tp(XY, r, obs_range)
+        [tp, reachable] = self.xy2tp(XY, r, obs_range)
         TP = self.obsTP_to_shaftTP(tp)  # adjust angles back into shaft space
         return TP, reachable
 
     def shaftTP_to_obsXY(self, tp, r):
         """Wrapper function for tp2xy, which includes handling of offsets
-        RETURN: 2N array of XY values as seen at the FVC
-        INPUT: 2N array of shaft tp values and r = (r[1],r[2])
+        INPUT:  [2][N] array of shaft tp values
+                [2] array of arm lengths
+        RETURN: [2][N] array of XY values as seen at the FVC
         """
         TP = self.shaftTP_to_obsTP(tp)  # adjust shaft angles into observer space (since observer sees the physical phi = 0)
         xy = self.tp2xy(TP, r)  # calculate xy in posXY space
@@ -152,105 +109,97 @@ class PosTransforms(object):
 
     def QS_to_flatXY(self,qs):
         """
-        RETURN: XY flattened as 2N array
-        INPUT: QS values as 2N array
+        INPUT:  [2][N] array of QS values
+        RETURN: [2][N] array of XY values in a flat system (used for anti-collision) where S is treated as an uncurved radius value
         """
-        QS = np.array(qs)
-        aQ = np.arctan(QS[:,0])
-        S = QS[:,1]
-        
-        x = (np.sqrt((S**2*aQ**2)/(1+aQ**2)))
-        y = (np.sqrt((S**2-aQ**2)/2))
-        XY = np.array([x,y]).tolist()
+        Q = np.array(qs[0])
+        S = np.array(qs[1])
+        X = S * np.cos(np.deg2rad(Q))
+        Y = S * np.sin(np.deg2rad(Q))
+        XY = [X.tolist(),Y.tolist()]
         return XY
 
     def flatXY_to_QS(self,xy):
         """
-        RETURN:QS values as 2N array
-        INPUT: XY flattened as 2N array
+        INPUT:  [2][N] array of XY values in a flat system (used for anti-collision) where S is treated as an uncurved radius value
+        RETURN: [2][N] array of QS values
         """
-        XY = np.array(xy)
-        q = np.tan(XY[:,0]/XY[:,1])
-        s = np.sqrt(XY[:,0]**2+XY[:,1]**2)
-
-        QS = np.array([q,s]).tolist()
+        X = np.array(xy[0])
+        Y = np.array(xy[1])
+        Q = np.degrees(np.arctan2(Y,X))
+        S = np.sqrt(X**2 + Y**2)
+        QS = [Q.tolist(),S.tolist()]
         return QS
 
     def QS_to_obsXY(self,qs):
-        """Uses S2R function to convert between S and R.
-        RETURN: XY as observed at FVC as 2N array
-        INPUT: QS values as 2N array
         """
-        QS = np.array(qs)
-        aQ = np.arctan(QS[:,0])
-        S = QS[:,1]
-        R = self.S2R(S)
-
-        x = (np.sqrt((R**2*aQ**2)/(1+aQ**2)))
-        y = (np.sqrt((R**2-aQ**2)/2))
-        XY = np.array([x,y]).tolist()
+        INPUT:  [2][N] array of QS values
+        RETURN: [2][N] array of XY values, as observed at FVC
+        """
+        Q = np.array(qs[0])
+        R = self.S2R(qs[1])
+        X = R * np.cos(np.deg2rad(Q))
+        Y = R * np.sin(np.deg2rad(Q))
+        XY = [X.tolist(),Y.tolist()]
         return XY
      
     def obsXY_to_QS(self,xy):
-        """Uses R2S to convert between R and S
-        RETURN:QS values as 2N array
-        INPUT: XY flattened as 2N array
         """
-        XY = np.array(xy)
-        q = np.tan(XY[:,0]/XY[:,1])
-        r = np.sqrt(XY[:,0]**2+XY[:,1]**2)
-        s = self.R2S(r)
-
-        QS = np.array([q,s]).tolist()
+        INPUT:  [2][N] array of XY values, as observed at FVC
+        RETURN: [2][N] array of QS values
+        """
+        X = np.array(xy[0])
+        Y = np.array(xy[1])
+        Q = np.degrees(np.arctan2(Y,X))
+        R = np.sqrt(X**2 + Y**2)
+        S = self.R2S(R.tolist())
+        QS = [Q.tolist(),S]
         return QS
        
-    def QS_to_shaftXY(self,qs, r, shaft_range):
+    def QS_to_shaftTP(self, qs, r, shaft_range):
         """
-        RETURN: XY flattened as 2N array
-        INPUT: QS values as 2N array
-               r = arm lengths ([r[1],r[2]])
-               shaft_range = max range of ([theta,phi])
+        INPUT:  [2][N] array of QS
+                [2] array of arm lengths
+                [2][2] array of [[min(theta),max(theta)],[min(phi),max(phi)]]
+        RETURN: [2][N] array of TP values and whether or not they are reachable
         """
-        QS = np.array(qs)
-        obsXY = self.QS_to_obsXY(QS)
-        [shaft_tp, reachable] = self.obsXY_to_shaftTP(obsXY,r,shaft_range)
-        
-        return [shaft_tp, reachable]
+        obsXY = self.QS_to_obsXY(qs)
+        [shaftTP, reachable] = self.obsXY_to_shaftTP(obsXY,r,shaft_range)
+        return shaftTP, reachable
 
     def shaftTP_to_QS(self,tp,r):
         """
-        RETURN:QS values as 2N array
-        INPUT: XY flattened as 2N array
-               r = arm lengths ([r[1],r[2]])
+        INPUT:  [2][N] array of shaft tp values
+                [2] array of arm lengths
+        RETURN: [2][N] array of QS values
         """
-        TP = np.array(tp)
-        obsXY = self.shaftTP_to_obsXY(TP,r)
-        qs = self.obsXY_to_QS(obsXY)
-        QS = np.array(qs).tolist()
+        obsXY = self.shaftTP_to_obsXY(tp,r)
+        QS = self.obsXY_to_QS(obsXY)
         return QS
         
     @staticmethod
     def R2S(r):
-        """Takes polynomials from DESIdoc530 to convert from R to S.
-        INPUT: R = sqrt(x^2+y^2)
+        """Uses focal surface polynomials from DESI-0530 to convert from R to S.
+        (Lookup-table may be faster + simpler.)
+        INPUT:  R = sqrt(x^2+y^2)
         OUTPUT: S
         """
-        p = np.array([5.00010E-01,9.99997E-01,1.91532E-07,1.72104E-09,7.31761E-11,-5.78982E-13,3.30271E-15,-1.11245E-17,1.90376E-20,-1.26341E-23])
+        p = np.array(pc.R2Spoly)
         p = p[::-1] #reverses list
-        Q = np.polyval(p,r)
-        return Q
+        S = np.polyval(p,r)
+        return S.tolist()
     
     @staticmethod
     def S2R(s):
-        """Takes polynomials from DESIdoc530 and poly1d.roots to convert from S to R.
-        INPUT: S
+        """Uses focal surface polynomials from DESI-0530 and poly1d.roots to convert from S to R.
+        (Lookup-table may be faster + simpler.)
+        INPUT:  S
         OUTPUT: R = sqrt(x^2+y^2)
         """
-        p = np.array([5.00010E-01,9.99997E-01,1.91532E-07,1.72104E-09,7.31761E-11,-5.78982E-13,3.30271E-15,-1.11245E-17,1.90376E-20,-1.26341E-23])
+        p = np.array(pc.R2Spoly)
         p = p[::-1] #reverses list
         p = np.poly1d(p)
-
-        r = (p-s).roots
+        r = (p-np.array(s)).roots
         R = r[-1]
         return R        
 
