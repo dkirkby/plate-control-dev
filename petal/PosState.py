@@ -10,7 +10,6 @@ import configobj
 import validate
 import PosConstants
 
-
 class PosState(object):
     """State variables for the positioner are generally stored, accessed,
     and queried through this class. The approach has been to put any
@@ -50,20 +49,11 @@ class PosState(object):
         """
         Returns current values of state variables as an array
         """
-        if arg == 'GEAR_T':
+        if arg == 'GEAR_T' or arg == 'GEAR_P':
             gear_name = self.config[self.section][arg]
-            self.value = PosConstants.gear_ratio[gear_name]
-        elif arg == 'GEAR_P':
-            gear_name = self.config[self.section][arg]
-            self.value = PosConstants.gear_ratio[gear_name]
+            return PosConstants.gear_ratio[gear_name]
         else: 
-            try:
-                self.value = self.config[self.section][arg]
-                return self.value
-
-            except:
-                print('Error in reading Config file')
-                return False
+            return self.config[self.section][arg]
 
     def write(self,arg,val):
         """
