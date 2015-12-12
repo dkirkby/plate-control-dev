@@ -2,6 +2,7 @@
 
 
 import PosModel
+import PosConstants as pc
 import copy
 
 class PosMoveTable(object):
@@ -48,7 +49,7 @@ class PosMoveTable(object):
         """Put or update a move distance into the table.
         If row index does not exist yet, then it will be added, and any blank filler rows will be generated in-between.
         """
-        dist_label = {self.posmodel.T:'dT_ideal', self.posmodel.P:'dP_ideal'}
+        dist_label = {pc.T:'dT_ideal', pc.P:'dP_ideal'}
         if rowidx >= len(self.__rows):
             self.insert_new_row(rowidx)
         for key in self.__rows[rowidx]._move_options.keys():
@@ -118,8 +119,8 @@ class PosMoveTable(object):
                 move_options['FINAL_CREEP_ON']      = False
             
             # use PosModel instance to get the real, quantized, calibrated values
-            true_move_T = self.posmodel.true_move(self.posmodel.T, row['dT_ideal'], move_options)
-            true_move_P = self.posmodel.true_move(self.posmodel.P, row['dP_ideal'], move_options)
+            true_move_T = self.posmodel.true_move(pc.T, row['dT_ideal'], move_options)
+            true_move_P = self.posmodel.true_move(pc.P, row['dP_ideal'], move_options)
             
             # fill in the output table according to type
             if output_type == 'scheduler':

@@ -1,5 +1,3 @@
-
-
 import numpy as np
 
 """Constants used in the control of the Fiber Postioner """
@@ -11,23 +9,19 @@ deg_char = chr(deg_char_num)
 sqr_char = chr(sqr_char_num)
 rotmat2D = lambda angle: [np.cos(np.deg2rad(angle)), - np.sin(np.deg2rad(angle)), np.sin(np.deg2rad(angle)), np.cos(np.deg2rad(angle))]
 timestamp_format = 30  # ISO 8601 ' yyyymmddTHHMMSS'
-move_cmd_strs = ('abs_xy', 'rel_dxdy', 'abs_tp', 'rel_dtdp', 'homing', 'seek_limit', 'abs_R1R2', 'rel_dR1dR2')
-move_cmd_isabs = [1, 0, 1, 0, 0, 0, 1, 0]
-move_cmd_isxy = [1, 1, 0, 0, 0, 0, 0, 0]
 
 gear_ratio = {}
 gear_ratio['namiki'] = (46.0/14.0+1)**4  # namiki    "337:1", output rotation/motor input
 gear_ratio['maxon'] = 4100625.0/14641.0  # maxon     "280:1", output rotation/motor input
 gear_ratio['faulhaber'] = 256.0  		  # faulhaber "256:1", output rotation/motor input
-T = 0  # theta axis idx
-P = 1  # phi axis idx
+T = 0  # theta axis idx -- NOT the motor axis ID!!
+P = 1  # phi axis idx -- NOT the motor axis ID!!
 axis_labels = ('theta', 'phi')
 
 # enumeration of verbosity level to stdout
 not_verbose = 0
 verbose = 1
 very_verbose = 2
-
 
 def is_verbose(verbosity_enum):
     boole = True
@@ -40,3 +34,7 @@ def is_very_verbose(verbosity_enum):
     if verbosity_enum == very_verbose:
         boole = True
     return boole
+
+# Mapping of radial coordinate R to pseudo-radial coordinate S (distance along focal surface from optical axis)
+R2Spoly = [5.00010E-01,9.99997E-01,1.91532E-07,1.72104E-09,7.31761E-11,-5.78982E-13,3.30271E-15,-1.11245E-17,1.90376E-20,-1.26341E-23]
+# put lookup table data here
