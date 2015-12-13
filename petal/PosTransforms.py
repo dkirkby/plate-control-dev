@@ -347,38 +347,40 @@ class PosTransforms(object):
          """
         p = np.array(p, dtype=float)
         y = np.array(y, dtype=float)
-        if len(p) == 0:
-            x = xguess
+        if len(p) == 3:
+            a = p[0]
+            b = p[1]
+            c = p[2] - y
+        elif len(p) == 2:
+            a = 0
+            b = p[0]
+            c = p[1] - y
+        elif len(p) == 1:
+            a = 0
+            b = 0
+            c = p[0] - y
         else:
-            if p.size > 3:
-                p1 = p[-1]
-                p2 = p[-2]
-                p3 = p[-3]
-                p = np.array([p3,p2,p1])  # just throw away errant higher order terms
-            elif p.size < 3:
-                p = np.concatenate((np.array([np.zeros((3-p.size))]), p), axis=0)  # fill in any missing zeros
-            a = p[0][0]
-            b = p[1][0]
-            c = (p[2][0] - y)
-            discriminant = csqrt(b**2 - 4*a*c)
-            if b >= 0:
-                x1 = (-b-discriminant)/(2*a)
-                x2 = (2*c)/(-b-discriminant)
-            else:
-                x1 =(2*c)/(-b-discriminant)
-                x2 =(-b-discriminant)/(2*a)
-            xtest = np.array([x1,x2])
-            xdist = (xtest - xguess)**2
-            xselect = np.argmin(xdist, axis=0)
-            x = np.zeros(np.shape(y))
-            a = np.where(xselect == 0)
-            x[np.where(xselect == 0)] = xtest[0, np.where(xselect == 0)]
-            x[np.where(xselect == 1)] = xtest[1, np.where(xselect == 1)]
-            # also handle any non-real results from the sqrt
-            nonreal = np.where(np.imag(discriminant))[0]
-            if not(len(nonreal) == 0):
-                x[nonreal] = PosTransforms.inverse_quadratic(p[1:], y[nonreal], xguess[nonreal]) #just throw away the fending quadratic term
-            return x.tolist()
+            print('bad polynomial input ' + repr(p))
+            return None
+        discriminant = csqrt(b**2 - 4*a*c)
+        if b >= 0:
+            x1 = (-b-discriminant)/(2*a)
+            x2 = (2*c)/(-b-discriminant)
+        else:
+            x1 =(2*c)/(-b-discriminant)
+            x2 =(-b-discriminant)/(2*a)
+        xtest = np.array([x1,x2])
+        xdist = (xtest - xguess)**2
+        xselect = np.argmin(xdist, axis=0)
+        x = np.zeros(np.shape(y))
+        a = np.where(xselect == 0)
+        x[np.where(xselect == 0)] = xtest[0, np.where(xselect == 0)]
+        x[np.where(xselect == 1)] = xtest[1, np.where(xselect == 1)]
+        # also handle any non-real results from the sqrt
+        nonreal = np.where(np.imag(discriminant))[0]
+        if not(len(nonreal) == 0):
+            x[nonreal] = PosTransforms.inverse_quadratic(p[1:], y[nonreal], xguess[nonreal]) #just throw away the fending quadratic term
+        return x.tolist()
 
     @staticmethod
     def cart2pol(x,y):
