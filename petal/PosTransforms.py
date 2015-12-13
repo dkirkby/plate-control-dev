@@ -1,46 +1,53 @@
 import numpy as np
 import PosConstants as pc
-import PosState
+import PosModel
 from numpy.lib.scimath import sqrt as csqrt
 
 class PosTransforms(object):
-    """This class includes the following transformations:
-    (1) posXY <---> obsXY. XY_pos are the positioner aligned XY values
-    (2) shaftTP <---> obsTP. Theta,Phi shaft values and those observed at FVC
-    (3) shaftTP <---> obsXY. Thata/phi shaft values and XY at the FVC
-    (4) QS <---> obsXY. This is XY as observed at the FVC
-    (5) QS <---> flatXY. This is XY used for anticollision
-    (6) QS <---> shaftTP. This is XY used for anticollision
+    """This class provides transformations between positioner coordinate systems. All
+    coordinate transforms must be done via the methods provided here. This ensures
+    consistent and invertible definitions.
 
-    Use of Polyval function : the input arg must be a array who looks like [[c2], [c1], [c0]], where cn are the coefficient
-    of the Polynomial function, the other ouput arg is the variables: array or float
-    All input and output variables are basic objects from Python ( no Numpy objects )
+    An instance of PosTransforms is associated with a particular instance of PosModel,
+    so that the transforms will automatically draw on the correct calibration parameters
+    for that particular positioner.
+
+    The coordinate systems are:
+
+        posXY   ... (x,y) local to fiber positioner, centered on theta axis, looking at fiber tip
+        obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
+        shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
+        obsTP   ... (theta,phi) expected position of fiber tip, including offsets and calibrations
+        QS      ... (q,s) global to focal plate, q is angle about the optical axis, s is path distance from optical axis, along the curved focal surface, within a plane that intersects the optical axis
+        flatXY  ... (x,y) global to focal plate, with focal plate slightly stretched out and flattened (used for anti-collision)
+
+    The fundamental transformations provided are:
+
+        posXY   <--> obsXY
+        obsXY   <--> shaftTP
+        shaftTP <--> obsTP
+        obsXY   <--> QS
+        QS      <--> flatXY
+
+    These can be chained together in any order to convert among the various coordinate systems.
+
+    Note in practice that the coordinate S is similar, but not identical, to the radial distance
+    R from the optical axis. This similarity is because the DESI focal plate curvature is gentle.
+    See DESI-0530 for detail on the (Q,S) coordinate system.
     """
 
-    def __init__(self, state=None):
-        if state is None:
-            self.state = PosState.PosState()
-        else:
-            self.state = state
+    def __init__(self, posmodel=None):
+        if not(posmodel):
+            posmodel = PosModel.PosModel()
+        self.posmodel = posmodel
 
-    def poly(self,var):
-        """Reads in polynomial functions from state. Called with var argument 'X','Y','T','P'
-        """
-        if var == 'X':
-            return [self.state.read('POLYN_X1'), self.state.read('POLYN_X0')]
-        elif var == 'Y':
-            return [self.state.read('POLYN_Y1'), self.state.read('POLYN_Y0')]
-        elif var == 'T':
-            return [self.state.read('POLYN_T2'), self.state.read('POLYN_T1'), self.state.read('POLYN_T0')]
-        elif var == 'P':
-            return [self.state.read('POLYN_P2'), self.state.read('POLYN_P1'), self.state.read('POLYN_P0')]
-        else:
-            print('bad var ' + str(var))
-
+    # FUNDAMENTAL TRANSFORMATIONS
     def posXY_to_obsXY(self, xy):
         """
-        INPUT:  [2][N] array of positioner-aligned values XY values 
-        RETURN: [2][N] array of XY values as seen by observer at FVC
+        posXY   ... (x,y) local to fiber positioner, centered on theta axis, looking at fiber tip
+        obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
+        INPUT:  [2][N] array of [[x_values],[y_values]]
+        RETURN: [2][N] array of [[x_values],[y_values]]
         """
         X = np.polyval(self.poly('X'), xy[0])
         Y = np.polyval(self.poly('Y'), xy[1])
@@ -49,8 +56,10 @@ class PosTransforms(object):
 
     def obsXY_to_posXY(self, xy):
         """
-        INPUT:  [2][N] array of observer values xy values returns
-        RETURN: [2][N] array of XY values of the positioner_aligned
+        obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
+        posXY   ... (x,y) local to fiber positioner, centered on theta axis, looking at fiber tip
+        INPUT:  [2][N] array of [[x_values],[y_values]]
+        RETURN: [2][N] array of [[x_values],[y_values]]
         """
         x = np.array(xy[0])
         y = np.array(xy[1])
@@ -59,10 +68,42 @@ class PosTransforms(object):
         XY = [self.inverse_quadratic(self.poly('X'), x, Xguess), self.inverse_quadratic(self.poly('Y'), y, Yguess)]
         return XY
 
+    def obsXY_to_shaftTP(self, xy):
+        """
+        obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
+        shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
+        INPUT:  [2][N] array of [[x_values],[y_values]]
+        RETURN: [2][N] array of [[t_values],[p_values]]
+                [N]    array of [index_values]
+        The output "reachable" is a list of all the indexes of the points that were able to be reached.
+        """
+        r = [self.posmodel.state.read('LENGTH_R1'),self.posmodel.state.read('LENGTH_R2')]
+        shaft_range = [self.posmodel.full_range_T, self.posmodel.full_range_P]
+        XY = self.obsXY_to_posXY(xy)                    # adjust observer xy into the positioner system XY
+        obs_range = self.shaftTP_to_obsTP(shaft_range)  # want range used in next line to be according to observer (since observer sees the physical phi = 0)
+        (tp, reachable) = self.xy2tp(XY, r, obs_range)
+        TP = self.obsTP_to_shaftTP(tp)                  # adjust angles back into shaft space
+        return TP, reachable
+
+    def shaftTP_to_obsXY(self, tp):
+        """
+        shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
+        obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
+        INPUT:  [2][N] array of [[t_values],[p_values]]
+        RETURN: [2][N] array of [[x_values],[y_values]]
+        """
+        r = [self.posmodel.state.read('LENGTH_R1'),self.posmodel.state.read('LENGTH_R2')]
+        TP = self.shaftTP_to_obsTP(tp)  # adjust shaft angles into observer space (since observer sees the physical phi = 0)
+        xy = self.tp2xy(TP, r)  # calculate xy in posXY space
+        XY = self.posXY_to_obsXY(xy)  # adjust positionner XY into observer space
+        return XY
+
     def shaftTP_to_obsTP(self, tp):
         """
-        INPUT:  [2][N] array of theta phi shaft angle values
-        RETURN: [2][N] array of tp values as seen by observer
+        shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
+        obsTP   ... (theta,phi) expected position of fiber tip, including offsets and calibrations
+        INPUT:  [2][N] array of [[t_values],[p_values]]
+        RETURN: [2][N] array of [[t_values],[p_values]]
         """
         T = np.polyval(self.poly('T'), tp[0])
         P = np.polyval(self.poly('P'), tp[1])
@@ -71,9 +112,10 @@ class PosTransforms(object):
 
     def obsTP_to_shaftTP(self, tp):
         """
-        INPUT:  [2][N] array of theta phi as seen by observer angle values
-        RETURN: [2][N] array of theta phi as seen at the output of the gearmotors
-        """
+        obsTP   ... (theta,phi) expected position of fiber tip, including offsets and calibrations
+        shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
+        INPUT:  [2][N] array of [[t_values],[p_values]]
+        RETURN: [2][N] array of [[t_values],[p_values]]        """
         t = np.array(tp[0])
         p = np.array(tp[1])
         Tguess = t - self.poly('T')[-1]
@@ -81,36 +123,41 @@ class PosTransforms(object):
         TP = [self.inverse_quadratic(self.poly('T'), t, Tguess), self.inverse_quadratic(self.poly('P'), p, Pguess)]
         return TP
 
-    def obsXY_to_shaftTP(self, xy, r, shaft_range):
-        """ Wrapper function for xy2tp, which includes handling of offsets for the
-        (x,y) and (t,p) axes. The output "reachable" is a list of all the
-        indexes of the points that were able to be reached
-        INPUT:  [2][N] array of XY values as seen at the FVC
-                [2] array of arm lengths
-                [2][2] array of [[min(theta),max(theta)],[min(phi),max(phi)]]
-        RETURN: [2][N] array of TP values and whether or not they are reachable
+    def obsXY_to_QS(self,xy):
         """
-        XY = self.obsXY_to_posXY(xy)        # adjust observer xy into the positioner system XY
-        obs_range = self.shaftTP_to_obsTP(shaft_range) # want range used in next line to be according to observer (since observer sees the physical phi = 0)
-        [tp, reachable] = self.xy2tp(XY, r, obs_range)
-        TP = self.obsTP_to_shaftTP(tp)  # adjust angles back into shaft space
-        return TP, reachable
+        obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
+        QS      ... (q,s) global to focal plate, q is angle about the optical axis, s is path distance from optical axis, along the curved focal surface, within a plane that intersects the optical axis
+        INPUT:  [2][N] array of [[x_values],[y_values]]
+        RETURN: [2][N] array of [[q_values],[s_values]]
+        """
+        X = np.array(xy[0])
+        Y = np.array(xy[1])
+        Q = np.degrees(np.arctan2(Y,X))
+        R = np.sqrt(X**2 + Y**2)
+        S = self.R2S(R.tolist())
+        QS = [Q.tolist(),S]
+        return QS
 
-    def shaftTP_to_obsXY(self, tp, r):
-        """Wrapper function for tp2xy, which includes handling of offsets
-        INPUT:  [2][N] array of shaft tp values
-                [2] array of arm lengths
-        RETURN: [2][N] array of XY values as seen at the FVC
+    def QS_to_obsXY(self,qs):
         """
-        TP = self.shaftTP_to_obsTP(tp)  # adjust shaft angles into observer space (since observer sees the physical phi = 0)
-        xy = self.tp2xy(TP, r)  # calculate xy in posXY space
-        XY = self.posXY_to_obsXY(xy)  # adjust positionner XY into observer space
+        QS      ... (q,s) global to focal plate, q is angle about the optical axis, s is path distance from optical axis, along the curved focal surface, within a plane that intersects the optical axis
+        obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
+        INPUT:  [2][N] array of [[q_values],[s_values]]
+        RETURN: [2][N] array of [[x_values],[y_values]]
+        """
+        Q = np.array(qs[0])
+        R = self.S2R(qs[1])
+        X = R * np.cos(np.deg2rad(Q))
+        Y = R * np.sin(np.deg2rad(Q))
+        XY = [X.tolist(),Y.tolist()]
         return XY
 
     def QS_to_flatXY(self,qs):
         """
-        INPUT:  [2][N] array of QS values
-        RETURN: [2][N] array of XY values in a flat system (used for anti-collision) where S is treated as an uncurved radius value
+        QS      ... (q,s) global to focal plate, q is angle about the optical axis, s is path distance from optical axis, along the curved focal surface, within a plane that intersects the optical axis
+        flatXY  ... (x,y) global to focal plate, with focal plate slightly stretched out and flattened (used for anti-collision)
+        INPUT:  [2][N] array of [[q_values],[s_values]]
+        RETURN: [2][N] array of [[x_values],[y_values]]
         """
         Q = np.array(qs[0])
         S = np.array(qs[1])
@@ -121,8 +168,10 @@ class PosTransforms(object):
 
     def flatXY_to_QS(self,xy):
         """
-        INPUT:  [2][N] array of XY values in a flat system (used for anti-collision) where S is treated as an uncurved radius value
-        RETURN: [2][N] array of QS values
+        flatXY  ... (x,y) global to focal plate, with focal plate slightly stretched out and flattened (used for anti-collision)
+        QS      ... (q,s) global to focal plate, q is angle about the optical axis, s is path distance from optical axis, along the curved focal surface, within a plane that intersects the optical axis
+        INPUT:  [2][N] array of [[x_values],[y_values]]
+        RETURN: [2][N] array of [[q_values],[s_values]]
         """
         X = np.array(xy[0])
         Y = np.array(xy[1])
@@ -131,52 +180,24 @@ class PosTransforms(object):
         QS = [Q.tolist(),S.tolist()]
         return QS
 
-    def QS_to_obsXY(self,qs):
+    # CALIBRATION POLYNOMIAL GETTER
+    def poly(self,var):
+        """Get polynomial calibraton coefficients.
+        INPUT:  'X','Y','T','P' indicates which dimension to get the polynomial of
+        OUTPUT: list of polynomial coefficients
         """
-        INPUT:  [2][N] array of QS values
-        RETURN: [2][N] array of XY values, as observed at FVC
-        """
-        Q = np.array(qs[0])
-        R = self.S2R(qs[1])
-        X = R * np.cos(np.deg2rad(Q))
-        Y = R * np.sin(np.deg2rad(Q))
-        XY = [X.tolist(),Y.tolist()]
-        return XY
-     
-    def obsXY_to_QS(self,xy):
-        """
-        INPUT:  [2][N] array of XY values, as observed at FVC
-        RETURN: [2][N] array of QS values
-        """
-        X = np.array(xy[0])
-        Y = np.array(xy[1])
-        Q = np.degrees(np.arctan2(Y,X))
-        R = np.sqrt(X**2 + Y**2)
-        S = self.R2S(R.tolist())
-        QS = [Q.tolist(),S]
-        return QS
-       
-    def QS_to_shaftTP(self, qs, r, shaft_range):
-        """
-        INPUT:  [2][N] array of QS
-                [2] array of arm lengths
-                [2][2] array of [[min(theta),max(theta)],[min(phi),max(phi)]]
-        RETURN: [2][N] array of TP values and whether or not they are reachable
-        """
-        obsXY = self.QS_to_obsXY(qs)
-        [shaftTP, reachable] = self.obsXY_to_shaftTP(obsXY,r,shaft_range)
-        return shaftTP, reachable
+        if var == 'X':
+            return [self.posmodel.state.read('POLYN_X1'), self.posmodel.state.read('POLYN_X0')]
+        elif var == 'Y':
+            return [self.posmodel.state.read('POLYN_Y1'), self.posmodel.state.read('POLYN_Y0')]
+        elif var == 'T':
+            return [self.posmodel.state.read('POLYN_T2'), self.posmodel.state.read('POLYN_T1'), self.posmodel.state.read('POLYN_T0')]
+        elif var == 'P':
+            return [self.posmodel.state.read('POLYN_P2'), self.posmodel.state.read('POLYN_P1'), self.posmodel.state.read('POLYN_P0')]
+        else:
+            print('bad var ' + str(var))
 
-    def shaftTP_to_QS(self,tp,r):
-        """
-        INPUT:  [2][N] array of shaft tp values
-                [2] array of arm lengths
-        RETURN: [2][N] array of QS values
-        """
-        obsXY = self.shaftTP_to_obsXY(tp,r)
-        QS = self.obsXY_to_QS(obsXY)
-        return QS
-        
+    # STATIC INTERNAL METHODS
     @staticmethod
     def R2S(r):
         """Uses focal surface polynomials from DESI-0530 to convert from R to S.
@@ -188,7 +209,7 @@ class PosTransforms(object):
         p = p[::-1] #reverses list
         S = np.polyval(p,r)
         return S.tolist()
-    
+
     @staticmethod
     def S2R(s):
         """Uses focal surface polynomials from DESI-0530 and poly1d.roots to convert from S to R.
@@ -201,7 +222,7 @@ class PosTransforms(object):
         p = np.poly1d(p)
         r = (p-np.array(s)).roots
         R = r[-1]
-        return R        
+        return R
 
     @staticmethod
     def tp2xy(tp, r):
@@ -358,7 +379,7 @@ class PosTransforms(object):
             if not(len(nonreal) == 0):
                 x[nonreal] = PosTransforms.inverse_quadratic(p[1:], y[nonreal], xguess[nonreal]) #just throw away the fending quadratic term
             return x.tolist()
-    
+
     @staticmethod
     def cart2pol(x,y):
         """transform cartesian coordinates to polar coordinates"""
