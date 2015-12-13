@@ -1,5 +1,6 @@
 import numpy as np
 import PosMoveTable
+import PosConstants as pc
 
 class PosScheduler(object):
     """Generates move table schedules in local (theta,phi) to get positioners
@@ -17,12 +18,12 @@ class PosScheduler(object):
         self._targt = []
         self._is_forced = []
 
-    def move_request(self, posmodel, P, Q):
+    def move_request(self, posmodel, Q, S):
         """Adds a request to the scheduler for a given positioner to move to
-        the target position (P,Q).
+        the target position (Q,S).
         """
         self.move_tables.append(PosMoveTable.PosMoveTable(posmodel))
-        self._targt.append([P,Q])
+        self._targt.append([Q,S])
         self._is_forced_dtdp.append(False)
 
     def expert_move_request(self, move_table):
@@ -51,34 +52,35 @@ class PosScheduler(object):
                 self._start[0][i] = current_position['Q']
                 self._start[1][i] = current_position['S']
         if not(anticollision) or any(self._is_forced):
-            self.move_tables = self._schedule_without_anticollision()
+            self._schedule_without_anticollision()
         else:
-            self.move_tables = self._schedule_with_anticollision()
+            self._schedule_with_anticollision()
 
     # internal methods
     def _schedule_without_anticollision(self):
-        i = 0
-        for tbl in self.move_tables:
-            # convert global (Q,S) into local theta,phi
-            start = np.transpose(np.array(self._start[i]))
-            targt = np.transpose(np.array(self._targt[i]))
-            start = tbl.posmodel.trans.QS_to_obsTP(start)
-            targt = tbl.posmodel.trans.QS_to_obsTP(targt)
-
-            # delta = finish - start
-            dtdp_obs = targt - start
-
-            # set deltas and pauses into move table
+        for i in range(len(self.move_tables)):
             if not(self._is_forced[i]):
+                tbl = self.move_tables[i]
+
+                # convert global (Q,S) into local theta,phi
+                start_xy = tbl.posmodel.trans.QS_to_obsXY([self._start[0][i],self._start[1][i]])
+                targt_xy = tbl.posmodel.trans.QS_to_obsXY([self._targt[0][i],self._targt[1][i]])
+                start_shaft = tbl.posmodel.trans.obsXY_to_shaftTP(start_xy)
+                targt_shaft = tbl.posmodel.trans.obsXY_to_shaftTP(targt_xy)
+                start = tbl.posmodel.trans.shaftTP_to_obsTP(start_shaft)
+                targt = tbl.posmodel.trans.shaftTP_to_obsTP(targt_shaft)
+
+                # delta = finish - start
+                dtdp = [0,0]
+                dtdp = targt_obs - start_obs
+
+                # set deltas and pauses into move table
                 row = 0 # for the anti-collision, this would vary
-                tbl.set_move     (row, tbl.posmodel.T, dtdp_obs[0,i])
-                tbl.set_move     (row, tbl.posmodel.P, dtdp_obs[1,i])
+                tbl.set_move     (row, pc.T, dtdp[0][i])
+                tbl.set_move     (row, pc.P, dtdp[1][i])
                 tbl.set_prepause (row, 0.0)
                 tbl.set_postpause(row, 0,0)
 
-            i += 1
-
-        return move_tables
 
     def _schedule_with_anticollision(self):
         # gather the general envelopes and keep-out zones (see DESI-0899, same for all positioners)
@@ -95,17 +97,29 @@ class PosScheduler(object):
         # gather the kinematics calibration data
         R = [] # will store arm lengths for theta and phi
         tp0 = [] # will store the (theta,phi) permanent offsets (e.g., theta clocking angle of mounting, phi clocking angle of construction)
-        PQ0 = [] # will store the (P,Q) locations of the fiber positioners' centers
+        xy0 = [] # will store the (x,y) locations of the fiber positioners' centers
         t_range = [] # will store the (theta_min, theta_max) travel ranges
         p_range = [] # will store the (phi_min, phi_max) travel ranges
         for tbl in self.move_tables:
-            R.append(  [tbl.posmodel.state.kv['LENGTH_R1'], tbl.posmodel.state.kv['LENGTH_R2']])
-            tp0.append([tbl.posmodel.state.kv['POLYN_T0' ], tbl.posmodel.state.kv['POLYN_P0' ]])
-            PQ0.append([tbl.posmodel.state.kv['POLYN_Q0' ], tbl.posmodel.state.kv['POLYN_S0' ]]) # changing the P,Q to Q,S??
+            R.append(  [tbl.posmodel.state.read('LENGTH_R1'), tbl.posmodel.state.read('LENGTH_R2')])
+            tp0.append([tbl.posmodel.state.read('POLYN_T0' ), tbl.posmodel.state.read('POLYN_P0' )])
+            xy0.append([tbl.posmodel.state.read('POLYN_X0' ), tbl.posmodel.state.read('POLYN_Y0' )])
             t_range.append(tbl.posmodel.targetable_range_T)
             p_range.append(tbl.posmodel.targetable_range_P)
 
-        # anticollision algorithm goes here
+        # transform start points and targets to the flattened xy coordinate system
+        start_xy = [[0]*len(self._start) for i in range(2)]
+        targt_xy = [[0]*len(self._targt) for i in range(2)]
+        for i in range(len(self.move_tables)):
+            tbl = self.move_tables[i]
+            temp = tbl.posmodel.trans.QS_to_flatXY([self._start[0][i],self._start[1][i]])
+            start_xy[0][i] = temp[0]
+            start_xy[1][i] = temp[1]
+            temp = tbl.posmodel.trans.QS_to_flatXY([self._targt[0][i],self._targt[1][i]])
+            targt_xy[0][i] = temp[0]
+            targt_xy[1][i] = temp[1]
 
-        move_tables = self._schedule_without_anticollision() # placeholder to be replaced with real code
-        return move_tables
+        # anticollision algorithm goes here
+        # (to-do)
+
+        self._schedule_without_anticollision() # placeholder to be replaced with real code
