@@ -18,7 +18,7 @@ class PosModel(object):
         if not(state):
             self.state = PosState.PosState()
         self.state = state
-        self.trans = PosTransforms.PosTransforms(self.state)
+        self.trans = PosTransforms.PosTransforms(self)
 
         # axes
         self.axis = [None,None]
