@@ -62,7 +62,7 @@ class PosMoveTable(object):
         """
         if rowidx >= len(self.__rows):
             self.insert_new_row(rowidx)
-        self.__rows[rowidx] = prepause
+        self.__rows[rowidx]._data['prepause'] = prepause
 
     def set_postpause(self, rowidx, postpause):
         """Put or update a postpause into the table.
@@ -70,7 +70,7 @@ class PosMoveTable(object):
         """
         if rowidx >= len(self.__rows):
             self.insert_new_row(rowidx)
-        self.__rows[rowidx] = postpause
+        self.__rows[rowidx]._data['postpause'] = postpause
 
     # row manipulations
     def insert_new_row(self,index):
@@ -105,10 +105,10 @@ class PosMoveTable(object):
         table = []
         for row in self.__rows:
             # insert an extra pause-only row if necessary, since hardware commands only really have postpauses
-            if output_type == 'hardware' and row['prepause']:
+            if output_type == 'hardware' and row._data['prepause']:
                 table['motor_steps_T'].append(0)
                 table['motor_steps_P'].append(0)
-                table['postpause'].append(row['prepause'])
+                table['postpause'].append(row._data['prepause'])
 
             move_options = row._move_options.copy()
 
@@ -119,8 +119,8 @@ class PosMoveTable(object):
                 move_options['FINAL_CREEP_ON']      = False
 
             # use PosModel instance to get the real, quantized, calibrated values
-            true_move_T = self.posmodel.true_move(pc.T, row['dT_ideal'], move_options)
-            true_move_P = self.posmodel.true_move(pc.P, row['dP_ideal'], move_options)
+            true_move_T = self.posmodel.true_move(pc.T, row._data['dT_ideal'], move_options)
+            true_move_P = self.posmodel.true_move(pc.P, row._data['dP_ideal'], move_options)
 
             # fill in the output table according to type
             if output_type == 'scheduler':
@@ -128,14 +128,14 @@ class PosMoveTable(object):
                 table['dP'].extend(true_move_P['obs_distance'])
                 table['Tdot'].extend(true_move_T['obs_speed'])
                 table['Pdot'].extend(true_move_P['obs_speed'])
-                table['prepause'].extend(row['prepause'])
-                table['postpause'].extend(row['postpause'])
+                table['prepause'].extend(row._data['prepause'])
+                table['postpause'].extend(row._data['postpause'])
             if output_type == 'hardware':
                 table['motor_steps_T'].extend(true_move_T['motor_step'])
                 table['motor_steps_P'].extend(true_move_P['motor_step'])
                 table['speed_mode_T'].extend(true_move_T['speed_mode'])
                 table['speed_mode_P'].extend(true_move_P['speed_mode'])
-                for p in row['postpause']:
+                for p in row._data['postpause']:
                     table['postpause'].extend(round(p*1000)) # hardware postpause in integer milliseconds
             if output_type == 'cleanup':
                 table['dT'].extend(true_move_T['obs_distance'])
