@@ -12,8 +12,8 @@ m = PosArrayMaster.PosArrayMaster(posids,configs)
 # Initialization of communications
 # These commands are very specific to the hacked-together LegacyPositionerComm.
 #comm = LegacyPositionerComm.LegacyPositionerComm('COM5')
-comm.master = m
-m.comm = comm
+#comm.master = m
+#m.comm = comm
 
 # Demo script flags
 should_home = False
@@ -24,8 +24,8 @@ should_move_rel_dtdp = True
 # Moves
 if should_home:
     m.expert_request_schedule_execute_moves(posids, ['homing']*len(posids), 0, 0)
-    
-if should_move_QS_grid:    
+
+if should_move_QS_grid:
     posX = [3,  0, -3,  0] # target x in positioner local coordinates
     posY = [0,  3,  0, -3] # target y in positioner local coordinates
     Qtargs = []
@@ -37,7 +37,7 @@ if should_move_QS_grid:
         Qtargs.append(QStargs[0])
         Stargs.append(QStargs[1])
         m.request_schedule_execute_moves([posids[i]]*len(Qtargs), Qtargs, Stargs)
-    
+
 if should_move_abs_tp:
     T = [-90,  0, 90,   0]
     P = [ 90, 90, 90, 180]
@@ -53,4 +53,3 @@ if should_move_rel_dtdp:
         m.expert_request_moves([posids[i]]*len(dT), ['dtdp']*len(dT), dT, dP)
     m.schedule_moves()
     m.send_tables_and_execute_moves()
-    
