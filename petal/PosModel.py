@@ -1,10 +1,3 @@
-#############################
-# Classes: PosModel, Axis   #
-# Version: Python 3         #
-# Date: Dec. 9, 2015        #
-# Author: Joe Silber        #
-#############################
-
 import numpy as np
 import PosState
 import PosMoveTable
@@ -16,11 +9,11 @@ class PosModel(object):
     Takes in local (x,y) or (th,phi) targets, move speeds, converts
     to degrees of motor shaft rotation, speed, and type of move (such
     as cruise / creep / backlash / hardstop approach).
-    
+
     One instance of PosModel corresponds to one PosState to physical positioner.
     But we will consider refactoring to array-wise later on.
     """
-    
+
     def __init__(self, state=None):
         if not(state):
             self.state = PosState.PosState()
@@ -29,7 +22,7 @@ class PosModel(object):
 
         # axes
         self.axis = [None,None]
-        self.axis[pc.T] = Axis(self,pc.T) 
+        self.axis[pc.T] = Axis(self,pc.T)
         self.axis[pc.P] = Axis(self,pc.P)
 
         # internal motor/driver constants
@@ -38,15 +31,15 @@ class PosModel(object):
         self._stepsize_cruise      = 3.3    # deg
         self._motor_speed_cruise = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
         self._motor_speed_creep  = self._timer_update_rate * self._stepsize_creep / self.state.read('CREEP_PERIOD')  # deg/sec
-    
+
         # List of particular PosState parameters that modify internal details of how a move
         # gets divided into cruise / creep, antibacklash moves added, etc. What distinguishes
         # these parameters is that they specify particular *modes* of motion. They are not
         # calibration parameters or id #s or the like.
         self.default_move_options = {'BACKLASH_REMOVAL_ON'  : True,
-                                'FINAL_CREEP_ON'       : True,
-                                'ALLOW_EXCEED_LIMITS'  : False,
-                                'ONLY_CREEP'           : False}
+                                     'FINAL_CREEP_ON'       : True,
+                                     'ALLOW_EXCEED_LIMITS'  : False,
+                                     'ONLY_CREEP'           : False}
 
     @property
     def expected_current_position(self):
@@ -64,7 +57,6 @@ class PosModel(object):
             'motorP' ... float, deg, dependent variable, expected position of phi motor
         """
         shaftTP = [self.axis[pc.T].pos, self.axis[pc.P].pos]
-        r = [self.state.read('LENGTH_R1'), self.state.read('LENGTH_R2')]      
         d = {}
         d['shaftT'] = shaftTP[0]
         d['shaftP'] = shaftTP[1]
@@ -73,9 +65,9 @@ class PosModel(object):
         obsTP = self.trans.shaftTP_to_obsTP(shaftTP)
         d['obsT'] = obsTP[0]
         d['obsP'] = obsTP[1]
-        obsXY = self.trans.shaftTP_to_obsXY(shaftTP,r)
+        obsXY = self.trans.shaftTP_to_obsXY(shaftTP)
         d['x'] = obsXY[0]
-        d['y'] = obsXY[1]        
+        d['y'] = obsXY[1]
         QS = self.trans.obsXY_to_QS(obsXY)
         d['Q'] = QS[0]
         d['S'] = QS[1]
@@ -94,21 +86,31 @@ class PosModel(object):
                    pos['obsT'],deg, pos['obsP'],deg,
                    pos['motorT'],deg, pos['motorP'],deg)
         return s
-        
+
     @property
     def targetable_range_T(self):
-        """Returns a [1x2] array of theta_min, theta_max."""
-        return self.axis[pc.T].debounced_range()
-        
+        """Returns a [1x2] array of theta_min, theta_max, after subtracting buffer zones near the hardstops."""
+        return self.axis[pc.T].debounced_range
+
     @property
     def targetable_range_P(self):
-        """Returns a [1x2] array of phi_min, phi_max."""
-        return self.axis[pc.P].debounced_range()
+        """Returns a [1x2] array of phi_min, phi_max, after subtracting buffer zones near the hardstops."""
+        return self.axis[pc.P].debounced_range
+
+    @property
+    def full_range_T(self):
+        """Returns a [1x2] array of [theta_min, theta_max], from hardstop-to-hardstop."""
+        return self.axis[pc.T].full_range
+
+    @property
+    def full_range_P(self):
+        """Returns a [1x2] array of [phi_min, phi_max], from hardstop-to-hardstop."""
+        return self.axis[pc.P].full_range
 
     def true_move(self, axisid, distance, options=[]):
         """Input move distance on either the theta or phi axis, as seen by the
         observer, in degrees.
-        
+
         Outputs are quantized distance [deg], speed [deg/sec], integer number of
         motor steps, speed mode ['cruise' or 'creep'], and move time [sec]
 
@@ -142,9 +144,9 @@ class PosModel(object):
             final_move  = -np.sign(dist) * backlash_magnitude
             undershoot  = 0
             backup_move = 0
-            overshoot   = -final_move        
+            overshoot   = -final_move
         primary_move = dist + overshoot + undershoot
-        
+
         opt = {}
         move_data = {}
         opt['primary'] = options.copy()
@@ -163,7 +165,7 @@ class PosModel(object):
             move_data['obs_distance'][i] *= ccw_sign / gear_ratio
             move_data['obs_speed'][i]    *= ccw_sign / gear_ratio
         return move_data
-                
+
     def motor_true_move(self, axisid, distance, options):
         move_data = {'obs_distance' : [],
                      'obs_speed'    : [],
@@ -177,7 +179,7 @@ class PosModel(object):
             steps_cruise    = 0
             dist_cruisespin = 0
             net_dist_creep  = distance
-        else:                    
+        else:
             dist_creep      = np.sign(distance) * self.state.read('FINAL_CREEP_DIST') * options['FINAL_CREEP_ON'] # initial guess at how far to creep
             dist_cruise     = distance - dist_spinup - dist_creep                # initial guess at how far to cruise
             steps_cruise    = round(dist_cruise / self._stepsize_cruise)         # quantize cruise steps
@@ -198,7 +200,7 @@ class PosModel(object):
             move_data['speed_mode'].append('creep')
             move_data['move_time'].append(abs(steps_creep)*self._stepsize_creep / self._motor_speed_creep)
         return move_data
-    
+
     def postmove_cleanup(self, dT, dP):
         """Always perform this after positioner physical moves have been completed,
         to update the internal tracking of shaft positions and variables.
@@ -208,13 +210,13 @@ class PosModel(object):
         for axis in self.axis:
             exec(axis.postmove_cleanup_cmds)
             axis.postmove_cleanup_cmds = ''
-    
+
     def make_move_table(self, movecmd, val1, val2):
         """Generate a move table for a given move command string. Generally
         for expert or internal use only.
 
         Move command strings:
-        
+
           'pq'        ... move to absolute position (P,Q)
 
           'xy'        ... move to absolute position (x,y)
@@ -226,10 +228,10 @@ class PosModel(object):
           'dxdy'      ... move by a relative amount (delta x, delta y)
 
           'dtdp'      ... move by a relative amount (delta theta, delta phi
-          
+
           'home'      ... find the primary hardstops on both axes, then debounce off them
                               ... val1 and val2 are both ignored
-                              
+
           'seeklimit' ... find the argued hardstop, but do NOT debounce off it
                               ... sign of val1 or val2 says which direction to seek
                               ... finite magnitudes of val1 or val2 are ignored
@@ -237,22 +239,23 @@ class PosModel(object):
         """
         table = PosMoveTable.PosMoveTable(self)
         vals = [val1,val2]
-        r = [self.state.read('LENGTH_R1'),self.state.read('LENGTH_R2')]
-        shaft_range = [self.axis[pc.T].full_range, self.axis[pc.P].full_range]
         pos = self.expected_current_position
         start_tp = [pos['shaftT'],pos['shaftP']]
         if   movecmd == 'qs':
-            targt_tp = self.trans.QS_to_shaftTP(vals)
+            targt_xy = self.trans.QS_to_obsXY(qs)
+            targt_tp = self.trans.obsXY_to_shaftTP(targt_xy)
         elif movecmd == 'dqds':
-            start_PQ = self.trans.shaftTP_to_QS(start_tp)
-            targt_PQ = (np.array(start_PQ) + np.array(vals)).tolist()
-            targt_tp = self.trans.QS_to_shaftTP(targt_PQ)
+            start_xy = self.trans.shaftTP_to_obsXY(start_tp)
+            start_qs = self.trans.obsXY_to_QS(start_xy)
+            targt_qs = (np.array(start_PQ) + np.array(vals)).tolist()
+            targt_xy = self.trans.QS_to_obsXY(targt_qs)
+            targt_tp = self.trans.obsXY_to_shaftTP(targt_xy)
         elif movecmd == 'xy':
-            targt_tp = self.trans.obsXY_to_shaftTP(vals, r, shaft_range)
+            targt_tp = self.trans.obsXY_to_shaftTP(vals)
         elif movecmd == 'dxdy':
-            start_xy = self.trans.shaftTP_to_obsXY(start_tp, r)
+            start_xy = self.trans.shaftTP_to_obsXY(start_tp)
             targt_xy = (np.array(start_xy) + np.array(vals)).tolist()
-            targt_tp = self.trans.obsXY_to_shaftTP(targt_xy, r, shaft_range)
+            targt_tp = self.trans.obsXY_to_shaftTP(targt_xy)
         elif movecmd == 'tp':
             targt_tp = vals
         elif movecmd == 'dtdp':
@@ -274,18 +277,18 @@ class PosModel(object):
         else:
             print( 'move command ' + repr(movecmd) + ' not recognized')
             return []
-        
+
         delta_t = targt_tp[0] - start_tp[0]
         delta_p = targt_tp[1] - start_tp[1]
         table.set_move(0, pc.T, delta_t)
         table.set_move(0, pc.P, delta_p)
         return table
-  
+
 
 class Axis(object):
     """Handler for a motion axis. Provides move syntax and keeps tracks of position.
-    """    
-   
+    """
+
     def __init__(self, posmodel, axisid, pos=0, last_primary_hardstop_dir=0):
         self.posmodel = posmodel
         if not(axisid == pc.T or axisid == pc.P):
@@ -296,7 +299,7 @@ class Axis(object):
         self.pos = pos # Internally-tracked angular position of the axis. By definition pos = (motor shaft position) / (gear ratio).
 
     @property
-    def full_range(self):    
+    def full_range(self):
         """Calculated from physical range only, with no subtraction of debounce
         distance.
         Returns [1x2] array of [min,max]
@@ -315,7 +318,7 @@ class Axis(object):
         Returns [1x2] array of [min,max]
         """
         return (np.array(self.full_range) + np.array(self.hardstop_debounce)).tolist()
-           
+
     @property
     def maxpos(self):
         if self._last_primary_hardstop_dir >= 0:
@@ -360,8 +363,8 @@ class Axis(object):
             else:
                 return [+self.posmodel.state.read('SECONDARY_HARDSTOP_CLEARANCE_P'),
                         -self.posmodel.state.read('PRINCIPLE_HARDSTOP_CLEARANCE_P')]
-    
-    @property    
+
+    @property
     def backlash_clearance(self):
         """Minimum clearance distance required for backlash removal moves.
         Returns 1x2 array of [clearance_from_low_side_of_range, clearance_from_high_side].
@@ -372,14 +375,14 @@ class Axis(object):
             return [+self.posmodel.state.read('BACKLASH'),0]
         else:
             return [0,-self.posmodel.state.read('BACKLASH')]
-            
+
     @property
     def gear_ratio(self):
         if self.axisid == pc.T:
             return self.posmodel.state.read('GEAR_T')
         else:
             return self.posmodel.state.read('GEAR_P')
-        
+
     @property
     def ccw_sign(self):
         if self.axisid == pc.T:
@@ -393,7 +396,7 @@ class Axis(object):
             return self.posmodel.state.read('ANTIBACKLASH_FINAL_MOVE_DIR_T')
         else:
             return self.posmodel.state.read('ANTIBACKLASH_FINAL_MOVE_DIR_P')
-            
+
     @property
     def principle_hardstop_direction(self):
         """The "principle" hardstop is the one which is struck during homing.
@@ -403,13 +406,13 @@ class Axis(object):
             return self.posmodel.state.read('PRINCIPLE_HARDSTOP_DIR_T')
         else:
             return self.posmodel.state.read('PRINCIPLE_HARDSTOP_DIR_P')
-            
+
     @property
     def limit_seeking_search_distance(self):
         """A distance magnitude that guarantees hitting a hard limit in either direction.
         """
         return np.abs(np.diff(self.full_range)*self.posmodel.state.read('LIMIT_SEEK_EXCEED_RANGE_FACTOR'))
-        
+
     def truncate_to_limits(self, distance):
         """Return distance after first truncating it (if necessary) according to software limits.
         """
@@ -423,7 +426,7 @@ class Axis(object):
             elif target_pos < self.minpos:
                 new_distance = self.minpos - self.pos
                 distance = new_distance
-        return distance       
+        return distance
 
     def seek_and_set_limits_sequence(self):
         """Typical routine used in homing to find the max pos, min pos and
@@ -442,7 +445,7 @@ class Axis(object):
         else:
             print( 'bad direction ' + repr(direction))
         return table
-      
+
     def seek_one_limit_sequence(self, seek_distance):
         """Use to go hit a hardstop. For the distance argument, direction matters.
         The sequence is returned in a move table.
@@ -469,7 +472,7 @@ class Axis(object):
                 val1 = 0
                 val2 = dist
             table.extend(self.posmodel.make_move_table('dtdp',val1,val2))
-        self.posmodel.state.write('ALLOW_EXCEED_LIMITS',old_allow_exceed_limits) 
+        self.posmodel.state.write('ALLOW_EXCEED_LIMITS',old_allow_exceed_limits)
         self.posmodel.state.write('ONLY_CREEP',old_only_creep)
         return table
 
