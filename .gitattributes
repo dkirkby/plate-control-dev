@@ -8,6 +8,7 @@ petal/PosScheduler.py -text
 petal/PosState.py -text
 petal/PosTransforms.py -text
 petal/demo.py -text
+petal/petalcomm.py -text
 petal/pos_configs/configspec.ini -text
 petal/pos_configs/pos_1020.conf -text
 petal/pos_configs/pos_6M01.conf -text
