@@ -1,18 +1,18 @@
 * text=auto !eol
-petal/LegacyPositionerComm.py -text
-petal/PosArrayMaster.py -text
-petal/PosConstants.py -text
-petal/PosModel.py -text
-petal/PosMoveTable.py -text
-petal/PosScheduler.py -text
-petal/PosState.py -text
-petal/PosTransforms.py -text
 petal/demo.py -text
+petal/legacypositionercomm.py -text
 petal/petalcomm.py -text
 petal/pos_configs/configspec.ini -text
 petal/pos_configs/pos_1020.conf -text
 petal/pos_configs/pos_6M01.conf -text
 petal/pos_configs/pos_def.conf -text
+petal/posarraymaster.py -text
+petal/posconstants.py -text
+petal/posmodel.py -text
+petal/posmovetable.py -text
+petal/posscheduler.py -text
+petal/posstate.py -text
+petal/postransforms.py -text
 petalbox/docs/systec-readme.txt -text
 petalbox/drivers/systec-readme.txt -text
 petalbox/drivers/systec_can-V0.9.0.tar.bz2 -text
