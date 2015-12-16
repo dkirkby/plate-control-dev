@@ -200,29 +200,19 @@ class PosTransforms(object):
     # STATIC INTERNAL METHODS
     @staticmethod
     def R2S(r):
-        """Uses focal surface polynomials from DESI-0530 to convert from R to S.
-        (Lookup-table may be faster + simpler.)
-        INPUT:  R = sqrt(x^2+y^2)
-        OUTPUT: S
+        """Uses focal surface definition of DESI-0530 to convert R coordinate to S.
+        INPUT:  R, single value or list of values
+        OUTPUT: S, single value or list of values
         """
-        p = np.array(pc.R2Spoly)
-        p = p[::-1] #reverses list
-        S = np.polyval(p,r)
-        return S.tolist()
+        return np.array(pc.R2S_lookup(r)).tolist()
 
     @staticmethod
     def S2R(s):
-        """Uses focal surface polynomials from DESI-0530 and poly1d.roots to convert from S to R.
-        (Lookup-table may be faster + simpler.)
-        INPUT:  S
-        OUTPUT: R = sqrt(x^2+y^2)
+        """Uses focal surface definition of DESI-0530 to convert S coordinate to R.
+        INPUT:  R, single value or list of values
+        OUTPUT: S, single value or list of values
         """
-        p = np.array(pc.R2Spoly)
-        p = p[::-1] #reverses list
-        p = np.poly1d(p)
-        r = (p-np.array(s)).roots
-        R = r[-1]
-        return R
+        return np.array(pc.S2R_lookup(s)).tolist()
 
     @staticmethod
     def tp2xy(tp, r):
