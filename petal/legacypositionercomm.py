@@ -37,22 +37,24 @@ class LegacyPositionerComm(object):
                                   self.master.get(tbl['posid'],'CREEP_PERIOD'),
                                   self.master.get(tbl['posid'],'CURR_SPIN_UP_DOWN'),
                                   self.master.get(tbl['posid'],'CURR_CRUISE'),
+                                  self.master.get(tbl['posid'],'CURR_CREEP'),
                                   self.master.get(tbl['posid'],'CURR_HOLD'))
-            for i in range(tbl['nrows']):
+            n = tbl['nrows']
+            for i in range(n):
                 T = self.master.get(tbl['posid'],'MOTOR_ID_T')
                 P = self.master.get(tbl['posid'],'MOTOR_ID_P')
-                cruise_steps = [0,0]
-                creep_steps = [0,0]
+                cruise_steps = [[0]*n,[0]*n]
+                creep_steps = [[0]*n,[0]*n]
                 if tbl['speed_mode_T'][i] == 'cruise':
-                    cruise_steps[T] = tbl['motor_steps_T']
+                    cruise_steps[T][i] = tbl['motor_steps_T'][i]
                 elif tbl['speed_mode_T'][i] == 'creep':
-                    creep_steps[T] = tbl['motor_steps_T']
+                    creep_steps[T][i] = tbl['motor_steps_T'][i]
                 else:
                     print('bad speed_mode_T')
                 if tbl['speed_mode_P'][i] == 'cruise':
-                    cruise_steps[P] = tbl['motor_steps_P']
+                    cruise_steps[P][i] = tbl['motor_steps_P'][i]
                 elif tbl['speed_mode_P'][i] == 'creep':
-                    creep_steps[P] = tbl['motor_steps_P']
+                    creep_steps[P][i] = tbl['motor_steps_P'][i]
                 else:
                     print('bad speed_mode_P')
                 self.move_motors(self.master.get(tbl['posid'],'BUS_ID'),cruise_steps,creep_steps)
@@ -61,8 +63,8 @@ class LegacyPositionerComm(object):
                 time.sleep(tbl['post_pause'][i])
 
 # The items below are all specific to legacy firmware, and not for general future usage or copying.
-    def set_motor_params(self, busid, creep_period, curr_spin_up_down, curr_cruise, curr_creep, hold_current):
-        self.set_creep_parameters(busid, hold_current, should_bump_creep_current = 0)
+    def set_motor_params(self, busid, creep_period, curr_spin_up_down, curr_cruise, curr_creep, curr_hold):
+        self.set_creep_parameters(busid, curr_hold, should_bump_creep_current = 0)
         self.set_creep_periods(busid, creep_period)
         self.set_currents(busid, curr_spin_up_down, curr_cruise, curr_creep)
 
@@ -78,7 +80,7 @@ class LegacyPositionerComm(object):
         steps_creep_ccw = [0,0]
         steps_creep_cw = [0,0]
         for i in range(len(steps_creep)):
-            if steps_creep[i] > 0:
+            if steps_creep[i] > 0: # NOT ENOUGH DIMENSIONS HERE
                 steps_creep_ccw[i] = steps_creep[i]
             else:
                 steps_creep_cw[i] = -steps_creep[i]
@@ -225,12 +227,12 @@ class LegacyPositionerComm(object):
         if not(type(args) is str):
             args = numpy.matrix(args)
             args = numpy.array(args)  # use to have an array of 1*5 shape. If you just want a list 1*5 use a tolist
-        hexid = self._get_CAN_identifier(bus_id, cmd_num)
+        hexid = LegacyPositionerComm._get_CAN_identifier(bus_id, cmd_num)
 
         # argument byte construction
         hexbytes = []
         unspaced_bytes_str = ''
-        if self.isnumeric(args) and (1 in args.shape):
+        if LegacyPositionerComm.isnumeric(args) and (1 in args.shape):
 
             for i in range(0, args.size):
                 n_hex_digits = 2 * bytes_per_arg
@@ -243,7 +245,7 @@ class LegacyPositionerComm(object):
             unspaced_bytes_str.replace(' ', '0')  # replace whitespace by 0
         elif type(args) is str:
             unspaced_bytes_str = args
-        elif self.ischar(args) and args.shape[1] == 2:
+        elif LegacyPositionerComm.ischar(args) and args.shape[1] == 2:
             hexbytes = args
         elif args:
             warnings.warn('Bad arguments to send_cmd')
@@ -305,13 +307,13 @@ class LegacyPositionerComm(object):
         args[a] = curr_hold_after_creep  # motor 1 ccw
 
         # activation/desactivation of bumping to high final current during last phrase of creep
-        bits = [0, 0, 0, 0, 0, 0, 0, 0]
-        bits[2] = int(should_bump_creep_current)  # motor 0 cw
-        bits[3] = int(should_bump_creep_current)  # motor 0 ccw
-        bits[6] = int(should_bump_creep_current)  # motor 1 cw
-        bits[7] = int(should_bump_creep_current)  # motor 1 ccw
+        bits = 0
+        bits += should_bump_creep_current**2  # motor 0 cw
+        bits += should_bump_creep_current**3  # motor 0 ccw
+        bits += should_bump_creep_current**6  # motor 1 cw
+        bits += should_bump_creep_current**7  # motor 1 ccw
         a += 1
-        args[a] = int(string.join(numpy.array(map(str, bits)), ''), 2)
+        args[a] = bits
 
         self.send_cmd(bus_id, 'Set_Creep_Parameters', args)
 
@@ -435,7 +437,7 @@ class LawicellCANUSB(object):
         else:
             warnings.warn('Badly sized hexbytes array ')
         self.initCANUSB()
-        if self.print_all_CAN_msgs:
+        if self.print_all_can_msgs:
             print('Sending CAN frame :', msg)
         response = self.writeread(msg)
         self.closeCANUSB()

@@ -133,7 +133,7 @@ class PosArrayMaster(object):
             i += 1
         hw_tables = []
         for m in tbls:
-            hw_tables.append(m.for_hardware())
+            hw_tables.append(m.for_hardware)
         return hw_tables
 
     def postmove_cleanup(self):
@@ -158,6 +158,6 @@ class PosArrayMaster(object):
         if varname == '':
             return self.posmodels[i]
         else:
-            return self.posmodels[i].state.read[varname]
+            return self.posmodels[i].state.read(varname)
 
 
