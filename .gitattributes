@@ -10,7 +10,7 @@ petal/posarraymaster.py -text
 petal/posconstants.py -text
 petal/posmodel.py -text
 petal/posmovetable.py -text
-petal/posscheduler.py -text
+petal/posschedule.py -text
 petal/posstate.py -text
 petal/postransforms.py -text
 petalbox/docs/systec-readme.txt -text
