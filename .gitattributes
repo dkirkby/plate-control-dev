@@ -1,5 +1,6 @@
 * text=auto !eol
 petal/demo.py -text
+petal/focal_surface_lookup.csv -text
 petal/legacypositionercomm.py -text
 petal/petalcomm.py -text
 petal/pos_configs/configspec.ini -text
