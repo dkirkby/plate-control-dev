@@ -1,7 +1,7 @@
-import PosModel
-import PosSchedule
-import PosState
-import PetalComm
+import posmodel
+import posschedule
+import posstate
+import petalcomm
 
 class PosArrayMaster(object):
     """Maintains a list of instances of the Fiber Positioner software model
@@ -14,9 +14,9 @@ class PosArrayMaster(object):
         if len(configs) != len(posids):
             configs = ['DEFAULT']*len(posids)
         for i in range(len(posids)):
-            posstate = posstate.PosState(posids[i],configs[i])
-            posmodel = posmodel.PosModel(posstate)
-            self.posmodels.append(posmodel)
+            state = posstate.PosState(posids[i],configs[i])
+            model = posmodel.PosModel(state)
+            self.posmodels.append(model)
         self.posids = posids
         self.schedule = posschedule.PosSchedule()
         self.comm = petalcomm.PetalComm()
@@ -125,7 +125,7 @@ class PosArrayMaster(object):
             extend_list = []
             while j < len(tbls):
                 if tbls[i].posmodel.state.read('SERIAL_ID') == tbls[j].posmodel.state.read('SERIAL_ID'):
-                    extend_list.extend(tbls.pop(j))
+                    extend_list.append(tbls.pop(j))
                 else:
                     j += 1
             for e in extend_list:

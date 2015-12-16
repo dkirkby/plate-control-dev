@@ -1,5 +1,5 @@
-import PosModel
-import PosConstants as pc
+import posmodel
+import posconstants as pc
 import copy
 
 class PosMoveTable(object):
@@ -102,7 +102,6 @@ class PosMoveTable(object):
             print( 'bad table output type ' + output_type)
 
         i = 0
-        table = []
         for row in self.__rows:
             # insert an extra pause-only row if necessary, since hardware commands only really have postpauses
             if output_type == 'hardware' and row._data['prepause']:
@@ -122,21 +121,38 @@ class PosMoveTable(object):
             true_move_T = self.posmodel.true_move(pc.T, row._data['dT_ideal'], move_options)
             true_move_P = self.posmodel.true_move(pc.P, row._data['dP_ideal'], move_options)
 
+            # where one of the axes has fewer or no moves, pad it with blank no-motion default values
+            true_moves = [true_move_T,true_move_P]
+            if len(true_moves[0]['motor_step']) > len(true_moves[1]['motor_step']):
+                full = 0
+                pad = 1
+            elif len(true_moves[1]['motor_step']) > len(true_moves[0]['motor_step']):
+                full = 1
+                pad = 0
+            else:
+                full = 0
+                pad = 0
+            while pad != full and len(true_moves[pad]['motor_step']) < len(true_moves[full]['motor_step']):
+                true_moves[pad]['motor_step'].append(0)
+                true_moves[pad]['move_time'].append(0)
+                true_moves[pad]['obs_distance'].append(0)
+                true_moves[pad]['obs_speed'].append(0)
+                true_moves[pad]['speed_mode'].append('creep')
+
             # fill in the output table according to type
             if output_type == 'schedule':
                 table['dT'].extend(true_move_T['obs_distance'])
                 table['dP'].extend(true_move_P['obs_distance'])
                 table['Tdot'].extend(true_move_T['obs_speed'])
                 table['Pdot'].extend(true_move_P['obs_speed'])
-                table['prepause'].extend(row._data['prepause'])
-                table['postpause'].extend(row._data['postpause'])
+                table['prepause'].append(row._data['prepause'])
+                table['postpause'].append(row._data['postpause'])
             if output_type == 'hardware':
                 table['motor_steps_T'].extend(true_move_T['motor_step'])
                 table['motor_steps_P'].extend(true_move_P['motor_step'])
                 table['speed_mode_T'].extend(true_move_T['speed_mode'])
                 table['speed_mode_P'].extend(true_move_P['speed_mode'])
-                for p in row._data['postpause']:
-                    table['postpause'].extend(round(p*1000)) # hardware postpause in integer milliseconds
+                table['postpause'].append(round(row._data['postpause']*1000)) # hardware postpause in integer milliseconds
             if output_type == 'cleanup':
                 table['dT'].extend(true_move_T['obs_distance'])
                 table['dP'].extend(true_move_P['obs_distance'])
@@ -144,9 +160,12 @@ class PosMoveTable(object):
                 while true_move_T['move_time']: # while loop here, since there may be multiple submoves
                     time1 = true_move_T['move_time'].pop(-1)
                     time2 = true_move_P['move_time'].pop(-1)
-                    table['move_time'].extend(max([time1,time2]))
+                    table['move_time'].append(max(time1,time2))
         table['posid'] = self.posmodel.state.read('SERIAL_ID')
-        table['nrows'] = len(table['dT'])
+        if output_type == 'schedule' or output_type == 'cleanup':
+            table['nrows'] = len(table['dT'])
+        if output_type == 'hardware':
+            table['nrows'] = len(table['motor_steps_T'])
         return table
 
 

@@ -1,6 +1,6 @@
 import numpy as np
-import PosMoveTable
-import PosConstants as pc
+import posmovetable
+import posconstants as pc
 
 class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners

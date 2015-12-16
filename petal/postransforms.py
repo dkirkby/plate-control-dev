@@ -1,7 +1,6 @@
 import numpy as np
-import PosConstants as pc
-import PosModel
-from numpy.lib.scimath import sqrt as csqrt
+import posconstants as pc
+import posmodel
 
 class PosTransforms(object):
     """This class provides transformations between positioner coordinate systems. All
@@ -61,12 +60,16 @@ class PosTransforms(object):
         INPUT:  [2][N] array of [[x_values],[y_values]]
         RETURN: [2][N] array of [[x_values],[y_values]]
         """
-        x = np.array(xy[0])
-        y = np.array(xy[1])
+        x = np.array(pc.list_from_one_or_list(xy[0]))
+        y = np.array(pc.list_from_one_or_list(xy[1]))
         Xguess = x - self.poly('X')[-1]
         Yguess = y - self.poly('Y')[-1]
-        XY = [self.inverse_quadratic(self.poly('X'), x, Xguess), self.inverse_quadratic(self.poly('Y'), y, Yguess)]
-        return XY
+        X = [0]*x.size
+        Y = [0]*y.size
+        for i in range(x.size):
+            X[i] = self.inverse_poly(self.poly('X'), x[i], Xguess[i])
+            Y[i] = self.inverse_poly(self.poly('Y'), y[i], Yguess[i])
+        return [pc.list_from_one_or_list(X),pc.list_from_one_or_list(Y)]
 
     def obsXY_to_shaftTP(self, xy):
         """
@@ -116,12 +119,16 @@ class PosTransforms(object):
         shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
         INPUT:  [2][N] array of [[t_values],[p_values]]
         RETURN: [2][N] array of [[t_values],[p_values]]        """
-        t = np.array(tp[0])
-        p = np.array(tp[1])
+        t = np.array(pc.list_from_one_or_list(tp[0]))
+        p = np.array(pc.list_from_one_or_list(tp[1]))
         Tguess = t - self.poly('T')[-1]
         Pguess = p - self.poly('P')[-1]
-        TP = [self.inverse_quadratic(self.poly('T'), t, Tguess), self.inverse_quadratic(self.poly('P'), p, Pguess)]
-        return TP
+        T = [0]*t.size
+        P = [0]*p.size
+        for i in range(t.size):
+            T[i] = self.inverse_poly(self.poly('T'), t[i], Tguess[i])
+            P[i] = self.inverse_poly(self.poly('P'), p[i], Pguess[i])
+        return [pc.list_from_one_or_list(T),pc.list_from_one_or_list(P)]
 
     def obsXY_to_QS(self,xy):
         """
@@ -145,7 +152,7 @@ class PosTransforms(object):
         INPUT:  [2][N] array of [[q_values],[s_values]]
         RETURN: [2][N] array of [[x_values],[y_values]]
         """
-        Q = np.array(qs[0])
+        Q = pc.list_from_one_or_list(qs[0])
         R = self.S2R(qs[1])
         X = R * np.cos(np.deg2rad(Q))
         Y = R * np.sin(np.deg2rad(Q))
@@ -328,49 +335,16 @@ class PosTransforms(object):
         return A.tolist(), reachable.tolist()
 
     @staticmethod
-    def inverse_quadratic(p, y, xguess):
+    def inverse_poly(p, y, xguess):
         """inverter function for quadratic polynomial such that y = polyval(p,x)
-         INPUTS:
-         y       =  1xN array
-         xguess  =  1xN array
-         p       =  polynomial function to invert
-         """
-        p = np.array(p, dtype=float)
-        y = np.array(y, dtype=float)
-        if len(p) == 3:
-            a = p[0]
-            b = p[1]
-            c = p[2] - y
-        elif len(p) == 2:
-            a = 0
-            b = p[0]
-            c = p[1] - y
-        elif len(p) == 1:
-            a = 0
-            b = 0
-            c = p[0] - y
-        else:
-            print('bad polynomial input ' + repr(p))
-            return None
-        discriminant = csqrt(b**2 - 4*a*c)
-        if b >= 0:
-            x1 = (-b-discriminant)/(2*a)
-            x2 = (2*c)/(-b-discriminant)
-        else:
-            x1 =(2*c)/(-b-discriminant)
-            x2 =(-b-discriminant)/(2*a)
-        xtest = np.array([x1,x2])
-        xdist = (xtest - xguess)**2
-        xselect = np.argmin(xdist, axis=0)
-        x = np.zeros(np.shape(y))
-        a = np.where(xselect == 0)
-        x[np.where(xselect == 0)] = xtest[0, np.where(xselect == 0)]
-        x[np.where(xselect == 1)] = xtest[1, np.where(xselect == 1)]
-        # also handle any non-real results from the sqrt
-        nonreal = np.where(np.imag(discriminant))[0]
-        if not(len(nonreal) == 0):
-            x[nonreal] = PosTransforms.inverse_quadratic(p[1:], y[nonreal], xguess[nonreal]) #just throw away the fending quadratic term
-        return x.tolist()
+        single value calculated at a time only
+        """
+        P = p.copy()
+        P[-1] -= y
+        roots = np.roots(P)
+        xdist = (roots - xguess)**2
+        x = roots[np.argmin(xdist)]
+        return x
 
     @staticmethod
     def cart2pol(x,y):

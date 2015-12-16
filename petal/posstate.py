@@ -1,7 +1,6 @@
 import os
 import configobj
-import validate
-import PosConstants
+import posconstants
 
 class PosState(object):
     """State variables for the positioner are generally stored, accessed,
@@ -16,27 +15,19 @@ class PosState(object):
     Values are stored in a config file.
     """
     def __init__(self,pos_id=None,config_name='DEFAULT'):
-
-        #Set positioner ID. If blank, will use default (pos_def.conf)
-        if not(pos_id):
-            self.pos_id = 'def'
-        else:
-            self.pos_id = str(pos_id)
-
-        #Call the configuration file + validation file
         configpath = os.getcwd()+'/pos_configs/'
-        configfile = configpath+'pos_'+str(self.pos_id)+'.conf'
-        configspecfile = configpath+'/configspec.ini'
-        #configfile = os.environ.get('CONFPATH')+'configfile.conf'
-        self.config = configobj.ConfigObj(configfile,configspec=configspecfile,unrepr=True)
+        if pos_id:
+            self.pos_id = str(pos_id)
+            configfile = configpath+'pos_' + str(self.pos_id) + '.conf'
+            self.config = configobj.ConfigObj(configfile,unrepr=True)
+        else:
+            configfile = configpath + '_pos_template.conf'        # read in the template file
+            self.config = configobj.ConfigObj(configfile,unrepr=True)
+            self.config.filename = configpath + '_pos_xxxxx.conf'  # now change file name so won't later accidentally overwrite the template
+            self.config.initial_comment = ['test file, not associated with a particular positioner',''] # also strip out and replace header comments specific to the template file
+            self.pos_id = self.config[config_name]['SERIAL_ID']
         self.section = config_name
-
-        #Validate
-        validator = validate.Validator()
-        try:
-            self.results = self.config.validate(validator)
-        except:
-            print('Validation of file failed')
+        self.config.write()
 
     def read(self,arg):
         """
@@ -52,12 +43,8 @@ class PosState(object):
         """
         Change the values of the configuration file
         """
-        try:
-            self.config[self.section][arg] = val
-            return True
-        except:
-            print('Could not write to Config file')
-            return False
+        self.config[self.section][arg] = val
+        self.config.write()
 
     def log_config(self):
         pass

@@ -11,12 +11,12 @@ class LegacyPositionerComm(object):
     """Placeholder for PetalComm which interacts with legacy (circa mid-2015)
     fiber positioner driver (Lawicell CAN-USB via ascii command) and firmware
     (OpenLoopTest.c).
-    
+
     The functionality here will be completely (and much more cleanly) replaced
     by a new PetalComm module. In the interim, this module will allow testing
     other aspects of the positioner control software on real positioner hardware.
     """
-    
+
     def __init__(self, com_port):
         """com_port argument is a string, such as 'COM5'
         """
@@ -30,14 +30,14 @@ class LegacyPositionerComm(object):
 # The send_tables and execute_moves command are what interface to the non-legacy other aspects of the code.
     def send_tables(self,tables):
         self.tables = tables # in non-legacy future code, this is where tables get uploaded to positioners
-        
+
     def execute_moves(self):
         for tbl in self.tables:
             self.set_motor_params(self.master.get(tbl['posid'],'BUS_ID'),
                                   self.master.get(tbl['posid'],'CREEP_PERIOD'),
                                   self.master.get(tbl['posid'],'CURR_SPIN_UP_DOWN'),
                                   self.master.get(tbl['posid'],'CURR_CRUISE'),
-                                  self.master.get(tbl['posid'],'HOLD_CURRENT'))
+                                  self.master.get(tbl['posid'],'CURR_HOLD'))
             for i in range(tbl['nrows']):
                 T = self.master.get(tbl['posid'],'MOTOR_ID_T')
                 P = self.master.get(tbl['posid'],'MOTOR_ID_P')
@@ -58,31 +58,31 @@ class LegacyPositionerComm(object):
                 self.move_motors(self.master.get(tbl['posid'],'BUS_ID'),cruise_steps,creep_steps)
                 print('Moving ' + str(self.master.get(tbl['posid'],'BUS_ID')) + ' by  Tcruise:' + str(cruise_steps[T]) + '  Tcreep:' + str(creep_steps[T]) + '  Pcruise:' + str(cruise_steps[P]) + '  Pcreep:' + str(creep_steps[P]))
                 time.sleep(tbl['move_time'][i])
-                time.sleep(tbl['post_pause'][i])               
+                time.sleep(tbl['post_pause'][i])
 
-# The items below are all specific to legacy firmware, and not for general future usage or copying.        
+# The items below are all specific to legacy firmware, and not for general future usage or copying.
     def set_motor_params(self, busid, creep_period, curr_spin_up_down, curr_cruise, curr_creep, hold_current):
         self.set_creep_parameters(busid, hold_current, should_bump_creep_current = 0)
         self.set_creep_periods(busid, creep_period)
         self.set_currents(busid, curr_spin_up_down, curr_cruise, curr_creep)
-   
+
     def move_motors(self, bus_id, steps_cruise, steps_creep):
         """Inputs: bus_id       ... canbus integer id of the positioner to command
                    steps_cruise ... [1x2] cruise steps on motor0, motor1 axes, sign indicates direction
                    steps_creep  ... [1x2] creep steps on motor0, motor1 axes, sign indicates direction
-                   
+
         be sure to call set_motor_params appropriately at least once for the given positioner before any move_motors
         """
-        
+
         # break up creep steps by sign
-        steps_creep_ccw = [0,0]        
+        steps_creep_ccw = [0,0]
         steps_creep_cw = [0,0]
         for i in range(len(steps_creep)):
             if steps_creep[i] > 0:
                 steps_creep_ccw[i] = steps_creep[i]
             else:
                 steps_creep_cw[i] = -steps_creep[i]
-        
+
         # if desired number of steps is greater than driver argument allows, must request multiple consecutive moves
         temp_types = ['cruise', 'creep_ccw', 'creep_cw']
         temp_steps = numpy.array([steps_cruise.tolist(), steps_creep_ccw.tolist(), steps_creep_cw.tolist()])
@@ -97,7 +97,7 @@ class LegacyPositionerComm(object):
                 types.append([temp_types[i],temp_types[i]])
                 j += 1
         steps = numpy.array(steps)
-        
+
         # condense the list such that possible for the two motors to move in different directions simultaneously with each other
         for i in range(0, steps.shape[0] - 1):
             if steps[i][1] == 0 and steps[i + 1][0] == 0 and types[i][0] != types[i + 1][1]:
@@ -185,7 +185,7 @@ class LegacyPositionerComm(object):
         # return the total distance moved
         distance_moved = numpy.sum(split_distance_moved, axis=0)
         return distance_moved
-        
+
     def send_cmd(self, bus_id, cmd_name, args):
         """
         Constructs command line string and executes it. Typically don't
@@ -330,8 +330,8 @@ class LegacyPositionerComm(object):
         hexid = '{0:{width}{base}}'.format(int(identifier, base=2), base='X', width=8)  # base = X for uppercase Hexadecimal numbers
         hexid = hexid.replace(' ', '0')  # replace whitespace by 0
         return hexid
-        
-        
+
+
     def isnumeric(t):
         """
         look if there is number inside t
@@ -367,7 +367,7 @@ class LegacyPositionerComm(object):
             return True
         else:
             return False
-        
+
 class LawicellCANUSB(object):
     """ Class : LawicellCANUSB
     # -----------------------

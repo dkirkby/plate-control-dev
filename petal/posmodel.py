@@ -1,8 +1,8 @@
 import numpy as np
-import PosState
-import PosMoveTable
-import PosTransforms
-import PosConstants as pc
+import posstate
+import posmovetable
+import postransforms
+import posconstants as pc
 
 class PosModel(object):
     """Software model of the physical positioner hardware.
@@ -121,21 +121,21 @@ class PosModel(object):
         """
         if not(options):
             options = self.default_move_options
-        if axisid == pc.T:
-            shaftTP = self.trans.obsTP_to_shaftTP([distance,0])
-            dist = shaftTP[0]
-        elif axisid == pc.P:
-            shaftTP = self.trans.obsTP_to_shaftTP([0,distance])
-            dist = shaftTP[1]
-        else:
-            print( 'bad axisid ' + repr(axisid))
+        options = options.copy() # don't disturb the input
+        pos = self.expected_current_position
+        obs_start = [pos['obsT'],pos['obsP']]
+        obs_finish = obs_start.copy()
+        obs_finish[axisid] += distance
+        shaft_start = [pos['shaftT'],pos['shaftP']]
+        shaft_finish = self.trans.obsTP_to_shaftTP(obs_finish)
+        dist = shaft_finish[axisid][0] - shaft_start[axisid]
         if not(options['ALLOW_EXCEED_LIMITS']):
             dist = self.axis[axisid].truncate_to_limits(dist)
         gear_ratio = self.axis[axisid].gear_ratio
         ccw_sign = self.axis[axisid].ccw_sign
         dist *= gear_ratio
         dist *= ccw_sign
-        antibacklash_final_move_dir = ccw_sign * self.axis[axisid].antibacklash_final_move_dir()
+        antibacklash_final_move_dir = ccw_sign * self.axis[axisid].antibacklash_final_move_dir
         backlash_magnitude = gear_ratio * self.state.read('BACKLASH') * options['BACKLASH_REMOVAL_ON']
         if np.sign(dist) == antibacklash_final_move_dir:
             final_move  = np.sign(dist) * backlash_magnitude
@@ -182,7 +182,7 @@ class PosModel(object):
             dist_cruisespin = 0
             net_dist_creep  = distance
         else:
-            dist_creep      = np.sign(distance) * self.state.read('FINAL_CREEP_DIST') * options['FINAL_CREEP_ON'] # initial guess at how far to creep
+            dist_creep      = np.sign(distance) * self.state.read('NOM_FINAL_CREEP_DIST') * options['FINAL_CREEP_ON'] # initial guess at how far to creep
             dist_cruise     = distance - dist_spinup - dist_creep                # initial guess at how far to cruise
             steps_cruise    = round(dist_cruise / self._stepsize_cruise)         # quantize cruise steps
             dist_cruisespin = steps_cruise * self._stepsize_cruise + dist_spinup # actual distance covered while cruising
@@ -192,13 +192,13 @@ class PosModel(object):
         if steps_cruise:
             move_data['obs_distance'].append(dist_cruisespin)
             move_data['obs_speed'].append(self._motor_speed_cruise)
-            move_data['motor_step'].append(steps_cruise)
+            move_data['motor_step'].append(round(float(steps_cruise)))
             move_data['speed_mode'].append('cruise')
             move_data['move_time'].append((abs(steps_cruise)*self._stepsize_cruise + 4*self.state.read('SPINUPDOWN_DISTANCE')) / self._motor_speed_cruise)
         if steps_creep:
             move_data['obs_distance'].append(dist_creep)
             move_data['obs_speed'].append(self._motor_speed_creep)
-            move_data['motor_step'].append(steps_creep)
+            move_data['motor_step'].append(round(float(steps_creep)))
             move_data['speed_mode'].append('creep')
             move_data['move_time'].append(abs(steps_creep)*self._stepsize_creep / self._motor_speed_creep)
         return move_data

@@ -1,4 +1,5 @@
 import numpy as np
+import itertools
 
 """Constants used in the control of the Fiber Postioner """
 
@@ -17,6 +18,12 @@ gear_ratio['faulhaber'] = 256.0  		  # faulhaber "256:1", output rotation/motor 
 T = 0  # theta axis idx -- NOT the motor axis ID!!
 P = 1  # phi axis idx -- NOT the motor axis ID!!
 axis_labels = ('theta', 'phi')
+
+# Joe can't believe Python makes you type this many characters to do this...
+def list_from_one_or_list(one_item_or_list):
+    if not(isinstance(one_item_or_list,list)):
+        one_item_or_list = [one_item_or_list]
+    return one_item_or_list
 
 # enumeration of verbosity level to stdout
 not_verbose = 0
