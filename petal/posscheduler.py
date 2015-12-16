@@ -2,7 +2,7 @@ import numpy as np
 import PosMoveTable
 import PosConstants as pc
 
-class PosScheduler(object):
+class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners
     from starts to finishes. The move tables are instances of the PosMoveTable
     class.
@@ -19,10 +19,10 @@ class PosScheduler(object):
         self._is_forced = []
 
     def move_request(self, posmodel, Q, S):
-        """Adds a request to the scheduler for a given positioner to move to
+        """Adds a request to the schedule for a given positioner to move to
         the target position (Q,S).
         """
-        self.move_tables.append(PosMoveTable.PosMoveTable(posmodel))
+        self.move_tables.append(posmovetable.PosMoveTable(posmodel))
         self._targt.append([Q,S])
         self._is_forced_dtdp.append(False)
 

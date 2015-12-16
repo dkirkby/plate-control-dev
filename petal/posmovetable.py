@@ -16,18 +16,18 @@ class PosMoveTable(object):
 
     def __init__(self, posmodel=None):
         if not(posmodel):
-            posmodel = PosModel.PosModel()
-        self.posmodel = posmodel # the particular positioner this table applies to PosModel.PosModel(PosState(pos_id)). Must call an instance.
+            posmodel = posmodel.PosModel()
+        self.posmodel = posmodel # the particular positioner this table applies to
         self.__rows = []         # internal representation of the move data
 
     # getters
     @property
-    def for_scheduler(self):
+    def for_schedule(self):
         """Version of the table suitable for move scheduling.
         Distances are given at the output shafts, in degrees.
         Times are given in seconds.
         """
-        return self.__for_output_type('scheduler')
+        return self.__for_output_type('schedule')
 
     @property
     def for_hardware(self):
@@ -92,7 +92,7 @@ class PosMoveTable(object):
     # internal methods
     def __for_output_type(self,output_type):
         # define the columns that will be filled in
-        if output_type == 'scheduler':
+        if output_type == 'schedule':
             table = {'posid':'','nrows':0,'dT':[],'dP':[],'Tdot':[],'Pdot':[],'prepause':[],'move_time':[],'postpause':[]}
         elif output_type == 'hardware':
             table = {'posid':'','nrows':0,'motor_steps_T':[],'motor_steps_P':[],'speed_mode_T':[],'speed_mode_P':[],'move_time':[],'postpause':[]}
@@ -123,7 +123,7 @@ class PosMoveTable(object):
             true_move_P = self.posmodel.true_move(pc.P, row._data['dP_ideal'], move_options)
 
             # fill in the output table according to type
-            if output_type == 'scheduler':
+            if output_type == 'schedule':
                 table['dT'].extend(true_move_T['obs_distance'])
                 table['dP'].extend(true_move_P['obs_distance'])
                 table['Tdot'].extend(true_move_T['obs_speed'])
@@ -140,7 +140,7 @@ class PosMoveTable(object):
             if output_type == 'cleanup':
                 table['dT'].extend(true_move_T['obs_distance'])
                 table['dP'].extend(true_move_P['obs_distance'])
-            if output_type == 'scheduler' or output_type == 'hardware':
+            if output_type == 'schedule' or output_type == 'hardware':
                 while true_move_T['move_time']: # while loop here, since there may be multiple submoves
                     time1 = true_move_T['move_time'].pop(-1)
                     time2 = true_move_P['move_time'].pop(-1)
@@ -163,7 +163,7 @@ class PosMoveRow(object):
                       'move_time'    : 0,        # [sec] time it takes the move to execute
                       'postpause'    : 0}        # [sec] delay for this number of seconds after the move has completed
         if not(posmodel):
-            posmodel = PosModel.Posmodel()
+            posmodel = posmodel.Posmodel()
         self._move_options = posmodel.default_move_options
 
     def copy(self):

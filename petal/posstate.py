@@ -1,10 +1,3 @@
-#############################
-# Classes: PosState         #
-# Version: Python 3         #
-# Date: Dec. 9, 2015        #
-# Author: P. Fagrelius      #
-#############################
-
 import os
 import configobj
 import validate
@@ -15,7 +8,7 @@ class PosState(object):
     and queried through this class. The approach has been to put any
     parameters which may vary from positioner in this
     single object.
-    
+
     INPUTS: pos_id = SERIAL_ID of positioner
             config_name = section of the config file containing the particular value set to use
 
@@ -33,26 +26,26 @@ class PosState(object):
         #Call the configuration file + validation file
         configpath = os.getcwd()+'/pos_configs/'
         configfile = configpath+'pos_'+str(self.pos_id)+'.conf'
-        configspecfile = configpath+'/configspec.ini'     
+        configspecfile = configpath+'/configspec.ini'
         #configfile = os.environ.get('CONFPATH')+'configfile.conf'
         self.config = configobj.ConfigObj(configfile,configspec=configspecfile,unrepr=True)
         self.section = config_name
-        
+
         #Validate
         validator = validate.Validator()
         try:
             self.results = self.config.validate(validator)
         except:
-            print('Validation of file failed')        
-    
+            print('Validation of file failed')
+
     def read(self,arg):
         """
         Returns current values of state variables as an array
         """
         if arg == 'GEAR_T' or arg == 'GEAR_P':
             gear_name = self.config[self.section][arg]
-            return PosConstants.gear_ratio[gear_name]
-        else: 
+            return posconstants.gear_ratio[gear_name]
+        else:
             return self.config[self.section][arg]
 
     def write(self,arg,val):

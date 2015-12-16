@@ -7,11 +7,11 @@ import LegacyPositionerComm
 # Initialization
 posids = ['6M01']
 configs = ['DEFAULT']
-m = PosArrayMaster.PosArrayMaster(posids,configs)
+m = posarraymaster.PosArrayMaster(posids,configs)
 
 # Initialization of communications
 # These commands are very specific to the hacked-together LegacyPositionerComm.
-#comm = LegacyPositionerComm.LegacyPositionerComm('COM5')
+#comm = legacypositionercomm.LegacyPositionerComm('COM5')
 #comm.master = m
 #m.comm = comm
 

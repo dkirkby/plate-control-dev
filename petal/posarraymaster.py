@@ -1,7 +1,7 @@
 import PosModel
-import PosScheduler
+import PosSchedule
 import PosState
-#import PetalComm
+import PetalComm
 
 class PosArrayMaster(object):
     """Maintains a list of instances of the Fiber Positioner software model
@@ -14,12 +14,12 @@ class PosArrayMaster(object):
         if len(configs) != len(posids):
             configs = ['DEFAULT']*len(posids)
         for i in range(len(posids)):
-            posstate = PosState.PosState(posids[i],configs[i])
-            posmodel = PosModel.PosModel(posstate)
+            posstate = posstate.PosState(posids[i],configs[i])
+            posmodel = posmodel.PosModel(posstate)
             self.posmodels.append(posmodel)
         self.posids = posids
-        self.schedule = PosScheduler.PosScheduler()
-        #self.comm = PetalComm.PetalComm() # syntax? arguments?
+        self.schedule = posschedule.PosSchedule()
+        self.comm = petalcomm.PetalComm()
 
     def request_schedule_execute_moves(self, posids, Qtargs, Stargs, anticollision=True):
         """Convenience wrapper for the complete sequence to cause an array of
@@ -59,7 +59,7 @@ class PosArrayMaster(object):
 
     def request_moves(self, posids, Qtargs, Stargs):
         """Input a list of positioner ids and corresponding target positions to
-        the scheduler.
+        the schedule.
         """
         for i in range(len(posids)):
             j = self.posids.index(posids[i])
@@ -84,7 +84,7 @@ class PosArrayMaster(object):
         using the move request methods. Note the available flag to turn the
         anticollision algorithm on or off for the scheduling.
         """
-        anticollision = False # temporary, since algorithm is not yet implemented in PosScheduler
+        anticollision = False # temporary, since algorithm is not yet implemented in PosSchedule
         self.schedule.schedule_moves(anticollision)
 
     def hardware_ready_move_tables(self):
@@ -147,7 +147,7 @@ class PosArrayMaster(object):
         self.clear_schedule()
 
     def clear_schedule(self):
-        self.schedule = PosScheduler.PosScheduler()
+        self.schedule = posschedule.PosSchedule()
 
     def get(self,posid,varname=''):
         """Retrieve the state value identified by string varname, for positioner

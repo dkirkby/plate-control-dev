@@ -16,9 +16,9 @@ class PosModel(object):
 
     def __init__(self, state=None):
         if not(state):
-            self.state = PosState.PosState()
+            self.state = posstate.PosState()
         self.state = state
-        self.trans = PosTransforms.PosTransforms(self)
+        self.trans = postransforms.PosTransforms(self)
 
         # axes
         self.axis = [None,None]
@@ -29,8 +29,10 @@ class PosModel(object):
         self._timer_update_rate    = 18e3   # Hz
         self._stepsize_creep       = 0.1    # deg
         self._stepsize_cruise      = 3.3    # deg
-        self._motor_speed_cruise = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
-        self._motor_speed_creep  = self._timer_update_rate * self._stepsize_creep / self.state.read('CREEP_PERIOD')  # deg/sec
+        self._motor_speed_cruise   = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
+        self._motor_speed_creep    = self._timer_update_rate * self._stepsize_creep / self.state.read('CREEP_PERIOD')  # deg/sec
+        # FUTURE FIRMWARE VERSION WILL USE SPINUPDOWN_DISTANCE AS DEFINED BELOW
+        #self._spinupdown_distance  = sum(range(round(self._stepsize_cruise/self._stepsize_creep) + 1))*self._stepsize_creep * self.state.read('SPINUPDOWN_PERIOD')  # deg
 
         # List of particular PosState parameters that modify internal details of how a move
         # gets divided into cruise / creep, antibacklash moves added, etc. What distinguishes
@@ -237,7 +239,7 @@ class PosModel(object):
                               ... finite magnitudes of val1 or val2 are ignored
                               ... val1 == 0 or val2 == 0 says do NOT seek on that axis
         """
-        table = PosMoveTable.PosMoveTable(self)
+        table = posmovetable.PosMoveTable(self)
         vals = [val1,val2]
         pos = self.expected_current_position
         start_tp = [pos['shaftT'],pos['shaftP']]
@@ -450,7 +452,7 @@ class Axis(object):
         """Use to go hit a hardstop. For the distance argument, direction matters.
         The sequence is returned in a move table.
         """
-        table = PosMoveTable.PosMoveTable(self.posmodel)
+        table = posmovetable.PosMoveTable(self.posmodel)
         old_allow_exceed_limits = self.posmodel.state.read('ALLOW_EXCEED_LIMITS')
         self.posmodel.state.write('ALLOW_EXCEED_LIMITS',True)
         old_only_creep = self.posmodel.state.read('ONLY_CREEP')

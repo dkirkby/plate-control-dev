@@ -38,7 +38,7 @@ class PosTransforms(object):
 
     def __init__(self, posmodel=None):
         if not(posmodel):
-            posmodel = PosModel.PosModel()
+            posmodel = posmodel.PosModel()
         self.posmodel = posmodel
 
     # FUNDAMENTAL TRANSFORMATIONS
