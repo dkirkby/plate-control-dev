@@ -19,10 +19,10 @@ import string
 can_frame_fmt = "=IB3x8s"
 
 class PositionerMoveControl(object):
-	def __init__(self):
+	def __init__(self,canchan):
 
 		self.Gear_Ratio=337                          #gear ratio of Namiki motor
-		self.scan=socketcanf.SocketCAN('can0')
+		self.scan=socketcanf.SocketCAN(str(canchan).lower())
 		self.bitsum=0
 
 	#still needs to be redone
@@ -157,9 +157,10 @@ class PositionerMoveControl(object):
 
 if __name__ == '__main__':
 	
+	canchan=sys.argv[1]
 	pid1=1004   
 	 
-	pmc=PositionerMoveControl()
+	pmc=PositionerMoveControl(canchan)
 	
 	sleepytime=.2
 	
