@@ -6,8 +6,8 @@ petal/petalcomm.py -text
 petal/petsockcomm.py -text
 petal/pos_settings/_genl_settings_DEFAULT.conf -text
 petal/pos_settings/_unit_settings_DEFAULT.conf -text
-petal/pos_settings/pos_6M01.conf -text
-petal/pos_settings/pos_UM1020.conf -text
+petal/pos_settings/unit_6M01.conf -text
+petal/pos_settings/unit_UM1020.conf -text
 petal/posarraymaster.py -text
 petal/posconstants.py -text
 petal/posmodel.py -text
