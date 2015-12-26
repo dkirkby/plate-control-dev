@@ -291,14 +291,28 @@ class Axis(object):
     """Handler for a motion axis. Provides move syntax and keeps tracks of position.
     """
 
-    def __init__(self, posmodel, axisid, pos=0, last_primary_hardstop_dir=0):
+    def __init__(self, posmodel, axisid):
         self.posmodel = posmodel
         if not(axisid == pc.T or axisid == pc.P):
             print( 'warning: bad axis id ' + repr(axisid))
         self.axisid = axisid
         self.postmove_cleanup_cmds = ''
-        self._last_primary_hardstop_dir = last_primary_hardstop_dir  # 0, +1, -1, tells you which if any hardstop was last used to set travel limits
-        self.pos = pos # Internally-tracked angular position of the axis. By definition pos = (motor shaft position) / (gear ratio).
+
+    @property
+    def pos(self):
+        """Internally-tracked angular position of the axis. By definition pos = (motor shaft position) / (gear ratio).
+        """
+        if self.axisid == pc.T:
+            return self.posmodel.state.read('SHAFT_T')
+        else:
+            return self.posmodel.state.read('SHAFT_P')
+
+    @pos.setter
+    def pos(self,value):
+        if self.axisid == pc.T:
+            self.posmodel.state.write('SHAFT_T',value)
+        else:
+            self.posmodel.state.write('SHAFT_P',value)
 
     @property
     def full_range(self):
@@ -398,6 +412,20 @@ class Axis(object):
             return self.posmodel.state.read('ANTIBACKLASH_FINAL_MOVE_DIR_T')
         else:
             return self.posmodel.state.read('ANTIBACKLASH_FINAL_MOVE_DIR_P')
+
+    @property
+    def last_primary_hardstop_dir(self):
+        if self.axisid == pc.T:
+            return self.posmodel.state.read('LAST_PRIMARY_HARDSTOP_DIR_T')
+        else:
+            return self.posmodel.state.read('LAST_PRIMARY_HARDSTOP_DIR_P')
+
+    @last_primary_hardstop_dir.setter
+    def last_primary_hardstop_dir(self,value):
+        if self.axisid == pc.T:
+            self.posmodel.state.write('LAST_PRIMARY_HARDSTOP_DIR_T',value)
+        else:
+            self.posmodel.state.write('LAST_PRIMARY_HARDSTOP_DIR_P',value)
 
     @property
     def principle_hardstop_direction(self):
