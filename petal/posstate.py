@@ -24,15 +24,20 @@ class PosState(object):
         self.logs_directory = os.getcwd() + '/pos_logs/'
         if unit_id != None:
             self.unit_basename = 'unit_' + str(unit_id)
-            unit_filename = settings_directory + self.unit_basename + '.conf'
-            self.unit = configobj.ConfigObj(unit_filename,unrepr=True)
+            comment = 'Settings file for fiber positioner unit: ' + str(unit_id)
         else:
-            temp_filename = settings_directory + '_unit_settings_DEFAULT.conf'        # read in the template file
-            self.unit = configobj.ConfigObj(temp_filename,unrepr=True)
             self.unit_basename = 'unit_TEST'
-            self.unit.filename = settings_directory + self.unit_basename + '.conf'  # now change file name so won't later accidentally overwrite the template
-            self.unit.initial_comment = ['temporary test file, not associated with a particular positioner',''] # also strip out and replace header comments specific to the template file
+            comment = 'Temporary settings test file, not associated with a particular fiber positioner unit.'
+        unit_filename = settings_directory + self.unit_basename + '.conf'
+        if not(os.path.isfile(unit_filename)):
+            temp_filename = settings_directory + '_unit_settings_DEFAULT.conf' # read in the template file
+            self.unit = configobj.ConfigObj(temp_filename,unrepr=True)
+            self.unit.initial_comment = [comment,'']
+            self.unit.filename = unit_filename
+            self.unit['SERIAL_ID'] = str(unit_id)
             self.unit.write()
+        else:
+            self.unit = configobj.ConfigObj(unit_filename,unrepr=True)
         genl_filename = settings_directory + self.unit['GENERAL_SETTINGS_FILE']
         self.genl = configobj.ConfigObj(genl_filename,unrepr=True)
         all_logs = os.listdir(self.logs_directory)
