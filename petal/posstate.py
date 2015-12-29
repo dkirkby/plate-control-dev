@@ -21,8 +21,7 @@ class PosState(object):
 
     def __init__(self, unit_id=None):
         settings_directory = os.getcwd() + '/pos_settings/'
-        logs_directory = os.getcwd() + '/pos_logs/'
-        self.max_log_length = 5 # increase after debugging
+        self.logs_directory = os.getcwd() + '/pos_logs/'
         if unit_id != None:
             self.unit_basename = 'unit_' + str(unit_id)
             unit_filename = settings_directory + self.unit_basename + '.conf'
@@ -30,22 +29,23 @@ class PosState(object):
         else:
             temp_filename = settings_directory + '_unit_settings_DEFAULT.conf'        # read in the template file
             self.unit = configobj.ConfigObj(temp_filename,unrepr=True)
-            self.unit_basename = '_unit_settings_TEMP'
+            self.unit_basename = 'unit_TEST'
             self.unit.filename = settings_directory + self.unit_basename + '.conf'  # now change file name so won't later accidentally overwrite the template
             self.unit.initial_comment = ['temporary test file, not associated with a particular positioner',''] # also strip out and replace header comments specific to the template file
             self.unit.write()
-        genl_filename = settings_directory + self.unit['STATE']['GENERAL_SETTINGS_FILE']
+        genl_filename = settings_directory + self.unit['GENERAL_SETTINGS_FILE']
         self.genl = configobj.ConfigObj(genl_filename,unrepr=True)
-        all_logs = os.listdir(logs_directory)
-        self.unit_logs = [x for x in all_logs if self.unit_basename in x]
-        if self.unit_logs:
-            self.unit_logs.sort(reverse=True)
-            self.unit_latest_log = self.unit_logs[0]
-            #check if maxed out, if so add another fresh log (possibly include this in the log_unit method?)
+        all_logs = os.listdir(self.logs_directory)
+        unit_logs = [x for x in all_logs if self.unit_basename in x]
+        if unit_logs:
+            unit_logs.sort(reverse=True)
+            log_basename = os.path.splitext(unit_logs[0])[0]
         else:
-            #add another fresh log (possibly include this in the log_unit method?)
-            pass
-        self.log_unit(note='initialization')
+            log_basename = self.unit_basename + '_log_'
+        self.log_basename = PosState.increment_suffix(log_basename)
+        self.max_log_length = 1000 # number of rows in log before starting a new file
+        self.curr_log_length = 0
+        self.log_unit(note='initialization of software object that tracks the state variables')
 
     def read(self,key):
         """Returns current value for a given key.
@@ -83,11 +83,31 @@ class PosState(object):
         """All current unit parameters are written to the hardware unit's log file.
         """
         timestamp = datetime.datetime.now().strftime(pc.timestamp_format)
-        d['NOTE'] = note
-        # more to-do
-        #self.log_filename = os.path.splitext(self.unit.filename)[0] + '_log_' + somenumber + '.csv'
-        with open(self.log_filename, 'a', newline='') as csvfile: # kosher to make this append with 'a'?
-            writer = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-            if need_to_write_header: # make this real
-                writer.writerow(['TIMESTAMP'] + self.unit.keys() + ['NOTE'])
-            writer.writerow(timestamp + self.unit.values() + note)
+        if self.curr_log_length >= self.max_log_length:
+            self.log_basename = PosState.increment_suffix(self.log_basename)
+            self.curr_log_length = 0
+        log_path = self.logs_directory + self.log_basename + '.csv'
+        if not(os.path.isfile(log_path)): # checking whether need to start a new file
+            with open(log_path, 'w', newline='') as csvfile:
+                csv.writer(csvfile).writerow(['TIMESTAMP'] + self.unit.keys() + ['NOTE'])
+        with open(log_path, 'a', newline='') as csvfile: # now append a row of data
+            csv.writer(csvfile).writerow([timestamp] + self.unit.values() + [str(note)])
+        self.curr_log_length += 1
+
+    @staticmethod
+    def increment_suffix(s):
+        """Increments the numeric suffix at the end of s. This function was specifically written
+        to have a regular method for incrementing the suffix on log filenames.
+        """
+        separator = '_'
+        numformat = '%08i'
+        split = s.split(separator)
+        suffix = split[-1]
+        if suffix.isdigit():
+            suffix = numformat % (int(suffix) + 1)
+        else:
+            suffix = numformat % 0
+            if split[-1] != '':
+                split += ['']
+        split[-1] = suffix
+        return separator.join(split)
