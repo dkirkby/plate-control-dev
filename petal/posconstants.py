@@ -9,7 +9,7 @@ sqr_char_num = 178  # character number of 2 ^2 symbol
 deg_char = chr(deg_char_num)
 sqr_char = chr(sqr_char_num)
 rotmat2D = lambda angle: [np.cos(np.deg2rad(angle)), - np.sin(np.deg2rad(angle)), np.sin(np.deg2rad(angle)), np.cos(np.deg2rad(angle))]
-timestamp_format = 30  # ISO 8601 ' yyyymmddTHHMMSS'
+timestamp_format = '%Y-%m-%d %H:%M:%S.%f' # see strftime documentation
 
 gear_ratio = {}
 gear_ratio['namiki'] = (46.0/14.0+1)**4  # namiki    "337:1", output rotation/motor input
