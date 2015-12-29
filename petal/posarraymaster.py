@@ -14,7 +14,7 @@ class PosArrayMaster(object):
         if len(configs) != len(posids):
             configs = ['DEFAULT']*len(posids)
         for i in range(len(posids)):
-            state = posstate.PosState(posids[i],configs[i])
+            state = posstate.PosState(posids[i])
             model = posmodel.PosModel(state)
             self.posmodels.append(model)
         self.posids = posids
@@ -141,8 +141,7 @@ class PosArrayMaster(object):
         can be informed that the hardware move was done.
         """
         for m in self.schedule.move_tables:
-            cleanup_table = m.for_cleanup
-            m.posmodel.postmove_cleanup(cleanup_table['dT'],cleanup_table['dP'])
+            m.posmodel.postmove_cleanup(m.for_cleanup)
             print(m.posmodel.expected_current_position_str)
         self.clear_schedule()
 

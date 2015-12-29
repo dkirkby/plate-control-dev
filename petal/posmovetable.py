@@ -17,8 +17,9 @@ class PosMoveTable(object):
     def __init__(self, posmodel=None):
         if not(posmodel):
             posmodel = posmodel.PosModel()
-        self.posmodel = posmodel # the particular positioner this table applies to
-        self.__rows = []         # internal representation of the move data
+        self.posmodel = posmodel      # the particular positioner this table applies to
+        self.__rows = []              # internal representation of the move data
+        self.orig_cmd = {cmd:'','val1':None,'val2':None}  # the original command (when applicable) which generated this move table
 
     # getters
     @property
@@ -55,6 +56,13 @@ class PosMoveTable(object):
         for key in self.__rows[rowidx]._move_options.keys():
             self.__rows[rowidx]._move_options[key] = self.posmodel.state.read(key)  # snapshot the current state
         self.__rows[rowidx]._data[dist_label[axisid]] = distance
+
+    def store_orig_command(self, cmd_string, val1, val2):
+        """To keep a copy of the original move command with the move table.
+        """
+        self.movecmd['cmd']  = cmd_string
+        self.movecmd['val1'] = val1
+        self.movecmd['val2'] = val2
 
     def set_prepause(self, rowidx, prepause):
         """Put or update a prepause into the table.
@@ -97,7 +105,7 @@ class PosMoveTable(object):
         elif output_type == 'hardware':
             table = {'posid':'','nrows':0,'motor_steps_T':[],'motor_steps_P':[],'speed_mode_T':[],'speed_mode_P':[],'move_time':[],'postpause':[]}
         elif output_type == 'cleanup':
-            table = {'posid':'','nrows':0,'dT':[],'dP':[]}
+            table = {'posid':'','nrows':0,'dT':[],'dP':[],'cmd':'','cmd_val1':None,'cmd_val2':None}
         else:
             print( 'bad table output type ' + output_type)
 
@@ -166,6 +174,10 @@ class PosMoveTable(object):
             table['nrows'] = len(table['dT'])
         if output_type == 'hardware':
             table['nrows'] = len(table['motor_steps_T'])
+        if output_type == 'cleanup':
+            table['cmd']      = self.orig_cmd['cmd']
+            table['cmd_val1'] = self.orig_cmd['val1']
+            table['cmd_val2'] = self.orig_cmd['val2']
         return table
 
 

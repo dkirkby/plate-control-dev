@@ -203,15 +203,21 @@ class PosModel(object):
             move_data['move_time'].append(abs(steps_creep)*self._stepsize_creep / self._motor_speed_creep)
         return move_data
 
-    def postmove_cleanup(self, dT, dP):
+    def postmove_cleanup(self, cleanup_table, lognote=''):
         """Always perform this after positioner physical moves have been completed,
         to update the internal tracking of shaft positions and variables.
         """
-        self.axis[pc.T].pos += dT
-        self.axis[pc.P].pos += dP
+        for val in cleanup_table['dT']:
+            self.axis[pc.T].pos += val
+        for val in cleanup_table['dP']:
+            self.axis[pc.P].pos += val
         for axis in self.axis:
             exec(axis.postmove_cleanup_cmds)
             axis.postmove_cleanup_cmds = ''
+        self.state.write('LAST_MOVE_CMD',cleanup_table['cmd'])
+        self.state.write('LAST_MOVE_VAL1',cleanup_table['cmd_val1'])
+        self.state.write('LAST_MOVE_VAL2',cleanup_table['cmd_val2'])
+        self.state.log_unit(lognote)
 
     def make_move_table(self, movecmd, val1, val2):
         """Generate a move table for a given move command string. Generally
@@ -240,6 +246,7 @@ class PosModel(object):
                               ... val1 == 0 or val2 == 0 says do NOT seek on that axis
         """
         table = posmovetable.PosMoveTable(self)
+        table.store_orig_command(movecmd,val1,val2)
         vals = [val1,val2]
         pos = self.expected_current_position
         start_tp = [pos['shaftT'],pos['shaftP']]
@@ -465,11 +472,9 @@ class Axis(object):
         direction = np.sign(self.principle_hardstop_direction())
         table = self.seek_one_limit_sequence(direction * self.limit_seeking_search_distance())
         if direction > 0:
-            self.postmove_cleanup_cmds = ''
             self.postmove_cleanup_cmds += 'self.pos = self.maxpos\n'
             self.postmove_cleanup_cmds += 'self.last_primary_hardstop_dir = +1.0\n'
         elif direction < 0:
-            self.postmove_cleanup_cmds = ''
             self.postmove_cleanup_cmds += 'self.pos = self.minpos\n'
             self.postmove_cleanup_cmds += 'self.last_primary_hardstop_dir = -1.0\n'
         else:
