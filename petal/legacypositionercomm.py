@@ -100,22 +100,17 @@ class LegacyPositionerComm(object):
                         steps[i+1][j] -= sign * self.max_arguable_steps
                 i += 1
             i += 1
-        steps = numpy.array(steps)
-
-        # condense the list such that possible for the two motors to move in different directions simultaneously with each other
-        for i in range(0, steps.shape[0] - 1):
-            if steps[i][1] == 0 and steps[i + 1][0] == 0 and types[i][0] != types[i + 1][1]:
-                steps[i][1] = steps[i + 1][1]
-                steps[i + 1][1] = 0
-                types[i][1] = types[i + 1][1]
-            elif steps[i][1] == 0 and steps[i + 1][0] == 0 and types[i][1] != types[i + 1][0]:
-                steps[i][0] = steps[i + 1][0]
-                steps[i + 1][0] = 0
-                types[i][0] = types[i + 1][0]
 
         # clean up any all-zero rows
-        steps = numpy.array([nb for nb in steps.tolist() if nb != [0, 0]])
-        types = numpy.array([nb for nb in types if nb != [' ', ' ']])
+        i = 0
+        while i < len(steps):
+            if all(x == 0 for x in steps[i]):
+                steps.pop(i)
+                types.pop(i)
+            else:
+                i += 1
+
+        steps = numpy.array(steps)
 
         # loop thru the (possibly) multiple moves, executing them
         est_time = numpy.zeros(2)
