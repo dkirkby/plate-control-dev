@@ -58,7 +58,7 @@ class PosState(object):
         """
         if key in self.unit.keys():
             if key == 'GEAR_T' or key == 'GEAR_P':
-                return pc.gear_ratio[val]
+                return pc.gear_ratio[self.unit[key]]
             return self.unit[key]
         if key in self.genl.keys():
             return self.genl[key]

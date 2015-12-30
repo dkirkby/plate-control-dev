@@ -19,7 +19,7 @@ class PosMoveTable(object):
             posmodel = posmodel.PosModel()
         self.posmodel = posmodel      # the particular positioner this table applies to
         self.__rows = []              # internal representation of the move data
-        self.orig_cmd = {cmd:'','val1':None,'val2':None}  # the original command (when applicable) which generated this move table
+        self.orig_cmd = {'cmd':'','val1':None,'val2':None}  # the original command (when applicable) which generated this move table
 
     # getters
     @property
@@ -60,9 +60,9 @@ class PosMoveTable(object):
     def store_orig_command(self, cmd_string, val1, val2):
         """To keep a copy of the original move command with the move table.
         """
-        self.movecmd['cmd']  = cmd_string
-        self.movecmd['val1'] = val1
-        self.movecmd['val2'] = val2
+        self.orig_cmd['cmd']  = cmd_string
+        self.orig_cmd['val1'] = val1
+        self.orig_cmd['val2'] = val2
 
     def set_prepause(self, rowidx, prepause):
         """Put or update a prepause into the table.
@@ -111,11 +111,13 @@ class PosMoveTable(object):
 
         i = 0
         for row in self.__rows:
-            # insert an extra pause-only row if necessary, since hardware commands only really have postpauses
+            # for hardware type, insert an extra pause-only action if necessary, since hardware commands only really have postpauses
             if output_type == 'hardware' and row._data['prepause']:
-                table['motor_steps_T'].append(0)
-                table['motor_steps_P'].append(0)
-                table['postpause'].append(row._data['prepause'])
+                for key in ['motor_steps_T','motor_steps_P','move_time']:
+                    table[key].insert(0,0)
+                for key in ['speed_mode_T','speed_mode_P']:
+                    table[key].insert(0,'creep')
+                table['postpause'].insert(0,row._data['prepause'])
 
             move_options = row._move_options.copy()
 
@@ -140,12 +142,20 @@ class PosMoveTable(object):
             else:
                 full = 0
                 pad = 0
-            while pad != full and len(true_moves[pad]['motor_step']) < len(true_moves[full]['motor_step']):
-                true_moves[pad]['motor_step'].append(0)
-                true_moves[pad]['move_time'].append(0)
-                true_moves[pad]['obs_distance'].append(0)
-                true_moves[pad]['obs_speed'].append(0)
-                true_moves[pad]['speed_mode'].append('creep')
+            j = len(true_moves[pad]['motor_step'])
+            full_length = len(true_moves[full]['motor_step'])
+            while pad != full and j < full_length:
+                for key in ['motor_step','move_time','obs_distance','obs_speed']:
+                    true_moves[pad][key].append(0)
+                true_moves[pad]['speed_mode'].append(true_moves[full]['speed_mode'][j])
+                j = len(true_moves[pad]['motor_step'])
+
+            # pad in pauses where new submoves have been added
+            true_pauses = {'pre':[row._data['prepause']], 'post':[row._data['postpause']]}
+            while len(true_pauses['pre']) < full_length:
+                true_pauses['pre'].append(0)
+            while len(true_pauses['post']) < full_length:
+                true_pauses['post'].insert(0,0)
 
             # fill in the output table according to type
             if output_type == 'schedule':
@@ -153,14 +163,14 @@ class PosMoveTable(object):
                 table['dP'].extend(true_move_P['obs_distance'])
                 table['Tdot'].extend(true_move_T['obs_speed'])
                 table['Pdot'].extend(true_move_P['obs_speed'])
-                table['prepause'].append(row._data['prepause'])
-                table['postpause'].append(row._data['postpause'])
+                table['prepause'].extend(true_pauses['pre'])
+                table['postpause'].extend(true_pauses['post'])
             if output_type == 'hardware':
                 table['motor_steps_T'].extend(true_move_T['motor_step'])
                 table['motor_steps_P'].extend(true_move_P['motor_step'])
                 table['speed_mode_T'].extend(true_move_T['speed_mode'])
                 table['speed_mode_P'].extend(true_move_P['speed_mode'])
-                table['postpause'].append(round(row._data['postpause']*1000)) # hardware postpause in integer milliseconds
+                table['postpause'].extend([round(x*1000) for x in true_pauses['post']]) # hardware postpause in integer milliseconds
             if output_type == 'cleanup':
                 table['dT'].extend(true_move_T['obs_distance'])
                 table['dP'].extend(true_move_P['obs_distance'])

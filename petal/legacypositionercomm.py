@@ -40,25 +40,25 @@ class LegacyPositionerComm(object):
                                   self.master.get(tbl['posid'],'CURR_CREEP'),
                                   self.master.get(tbl['posid'],'CURR_HOLD'))
             n = tbl['nrows']
+            T = self.master.get(tbl['posid'],'MOTOR_ID_T')
+            P = self.master.get(tbl['posid'],'MOTOR_ID_P')
+            cruise_steps = [[0,0]]*n
+            creep_steps = [[0,0]]*n
             for i in range(n):
-                T = self.master.get(tbl['posid'],'MOTOR_ID_T')
-                P = self.master.get(tbl['posid'],'MOTOR_ID_P')
-                cruise_steps = [[0]*n,[0]*n]
-                creep_steps = [[0]*n,[0]*n]
                 if tbl['speed_mode_T'][i] == 'cruise':
-                    cruise_steps[T][i] = tbl['motor_steps_T'][i]
+                    cruise_steps[i][T] = tbl['motor_steps_T'][i]
                 elif tbl['speed_mode_T'][i] == 'creep':
-                    creep_steps[T][i] = tbl['motor_steps_T'][i]
+                    creep_steps[i][P] = tbl['motor_steps_T'][i]
                 else:
                     print('bad speed_mode_T')
                 if tbl['speed_mode_P'][i] == 'cruise':
-                    cruise_steps[P][i] = tbl['motor_steps_P'][i]
+                    cruise_steps[i][P] = tbl['motor_steps_P'][i]
                 elif tbl['speed_mode_P'][i] == 'creep':
-                    creep_steps[P][i] = tbl['motor_steps_P'][i]
+                    creep_steps[i][P] = tbl['motor_steps_P'][i]
                 else:
                     print('bad speed_mode_P')
-                self.move_motors(self.master.get(tbl['posid'],'BUS_ID'),cruise_steps,creep_steps)
-                print('Moving ' + str(self.master.get(tbl['posid'],'BUS_ID')) + ' by  Tcruise:' + str(cruise_steps[T]) + '  Tcreep:' + str(creep_steps[T]) + '  Pcruise:' + str(cruise_steps[P]) + '  Pcreep:' + str(creep_steps[P]))
+                self.move_motors(self.master.get(tbl['posid'],'BUS_ID'),cruise_steps[i],creep_steps[i])
+                print('Moving ' + str(self.master.get(tbl['posid'],'BUS_ID')) + ' by  Tcruise:' + str(cruise_steps[i][T]) + '  Tcreep:' + str(creep_steps[i][T]) + '  Pcruise:' + str(cruise_steps[i][P]) + '  Pcreep:' + str(creep_steps[i][P]))
                 time.sleep(tbl['move_time'][i])
                 time.sleep(tbl['post_pause'][i])
 
@@ -80,7 +80,7 @@ class LegacyPositionerComm(object):
         steps_creep_ccw = [0,0]
         steps_creep_cw = [0,0]
         for i in range(len(steps_creep)):
-            if steps_creep[i] > 0: # NOT ENOUGH DIMENSIONS HERE
+            if steps_creep[i] > 0:
                 steps_creep_ccw[i] = steps_creep[i]
             else:
                 steps_creep_cw[i] = -steps_creep[i]

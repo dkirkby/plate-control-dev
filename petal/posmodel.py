@@ -113,6 +113,10 @@ class PosModel(object):
         """Input move distance on either the theta or phi axis, as seen by the
         observer, in degrees.
 
+        The optional argument 'options' is a dictionary that can be used to specify
+        several flags that control particular modes of motor operation. See comments
+        on the parameter 'default_move_options' for more detail on this.
+
         Outputs are quantized distance [deg], speed [deg/sec], integer number of
         motor steps, speed mode ['cruise' or 'creep'], and move time [sec]
 
@@ -169,6 +173,9 @@ class PosModel(object):
         return move_data
 
     def motor_true_move(self, axisid, distance, options):
+        """Calculation of cruise, creep, spinup, and spindown details for a move of
+        an argued distance on the axis identified by axisid.
+        """
         move_data = {'obs_distance' : [],
                      'obs_speed'    : [],
                      'motor_step'   : [],
@@ -344,14 +351,14 @@ class Axis(object):
 
     @property
     def maxpos(self):
-        if self._last_primary_hardstop_dir >= 0:
+        if self.last_primary_hardstop_dir >= 0:
             return max(self.debounced_range)
         else:
             return self.minpos + np.diff(self.debounced_range)[0]
 
     @property
     def minpos(self):
-        if self._last_primary_hardstop_dir < 0:
+        if self.last_primary_hardstop_dir < 0:
             return min(self.debounced_range)
         else:
             return self.maxpos - np.diff(self.debounced_range)[0]

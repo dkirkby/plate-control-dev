@@ -11,7 +11,7 @@ m = posarraymaster.PosArrayMaster(posids,configs)
 
 # Initialization of communications
 # These commands are very specific to the hacked-together LegacyPositionerComm.
-comm = legacypositionercomm.LegacyPositionerComm('COM6')
+comm = legacypositionercomm.LegacyPositionerComm('COM5')
 comm.master = m
 m.comm = comm
 

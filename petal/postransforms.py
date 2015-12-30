@@ -194,9 +194,9 @@ class PosTransforms(object):
         OUTPUT: list of polynomial coefficients
         """
         if var == 'X':
-            return [self.posmodel.state.read('POLYN_X1'), self.posmodel.state.read('POLYN_X0')]
+            return [self.posmodel.state.read('POLYN_X0')]
         elif var == 'Y':
-            return [self.posmodel.state.read('POLYN_Y1'), self.posmodel.state.read('POLYN_Y0')]
+            return [self.posmodel.state.read('POLYN_Y0')]
         elif var == 'T':
             return [self.posmodel.state.read('POLYN_T2'), self.posmodel.state.read('POLYN_T1'), self.posmodel.state.read('POLYN_T0')]
         elif var == 'P':
