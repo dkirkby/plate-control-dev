@@ -86,18 +86,20 @@ class LegacyPositionerComm(object):
                 steps_creep_cw[i] = -steps_creep[i]
 
         # if desired number of steps is greater than driver argument allows, must request multiple consecutive moves
-        temp_types = ['cruise', 'creep_ccw', 'creep_cw']
-        temp_steps = numpy.array([steps_cruise.tolist(), steps_creep_ccw.tolist(), steps_creep_cw.tolist()])
-        types = []
-        steps =[]
-        j=0
-        for i in range ( len(temp_steps)):
-            while any(temp_steps[i]  != 0):
-                overlimit = temp_steps[i] > self.max_arguable_steps
-                steps.append((overlimit * self.max_arguable_steps + numpy.logical_not(overlimit) * temp_steps[i]).tolist())
-                temp_steps[i] -= numpy.array(steps[j])
-                types.append([temp_types[i],temp_types[i]])
-                j += 1
+        types = ['cruise', 'creep_ccw', 'creep_cw']
+        steps = [steps_cruise, steps_creep_ccw, steps_creep_cw]
+        i = 0
+        while i < len(steps):
+            while abs(steps[i][0]) > self.max_arguable_steps or abs(steps[i][1]) > self.max_arguable_steps:
+                steps.insert(i,[0,0])
+                types.insert(i,types[i])
+                for j in range(len(steps[i])):
+                    if abs(steps[i+1][j]) > self.max_arguable_steps:
+                        sign = numpy.sign(steps[i+1][j])
+                        steps[i][j] = sign * self.max_arguable_steps
+                        steps[i+1][j] -= sign * self.max_arguable_steps
+                i += 1
+            i += 1
         steps = numpy.array(steps)
 
         # condense the list such that possible for the two motors to move in different directions simultaneously with each other
