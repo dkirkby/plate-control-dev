@@ -256,7 +256,7 @@ class PosModel(object):
         self.state.write('LAST_MOVE_VAL2', separator.join(['{0:.6f}'.format(x) for x in cleanup_table['cmd_val2']]))
         self.state.log_unit(lognote)
 
-    def make_move_table(self, movecmd, val1, val2):
+    def make_move_table(self, movecmd, val1, val2, expected_prior_dTdP=[0,0]):
         """Generate a move table for a given move command string. Generally
         for expert or internal use only.
 
@@ -281,11 +281,15 @@ class PosModel(object):
                               ... sign of val1 or val2 says which direction to seek
                               ... finite magnitudes of val1 or val2 are ignored
                               ... val1 == 0 or val2 == 0 says do NOT seek on that axis
+
+        The optional argument 'expected_prior_dTdP' is used to account for expected
+        future shaft position changes. This is necessary for correct checking of
+        software travel limits, when a sequence of multiple moves is being planned out.
         """
         table = posmovetable.PosMoveTable(self)
         vals = [val1,val2]
         pos = self.expected_current_position
-        start_tp = [pos['shaftT'],pos['shaftP']]
+        start_tp = [pos['shaftT'] + expected_prior_dTdP[0], pos['shaftP'] + expected_prior_dTdP[1]]
         if   movecmd == 'qs':
             targt_xy = self.trans.QS_to_obsXY(qs)
             targt_tp = self.trans.obsXY_to_shaftTP(targt_xy)

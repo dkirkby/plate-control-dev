@@ -89,9 +89,9 @@ class LegacyPositionerComm(object):
         steps_creep_cw = [0,0]
         for i in range(len(steps_creep)):
             if steps_creep[i] > 0:
-                steps_creep_ccw[i] = steps_creep[i]
+                steps_creep_ccw[i] = abs(steps_creep[i])
             else:
-                steps_creep_cw[i] = -steps_creep[i]
+                steps_creep_cw[i] = abs(steps_creep[i])
 
         # if desired number of steps is greater than driver argument allows, must request multiple consecutive moves
         types = [['cruise','cruise'],['creep_ccw','creep_ccw'],['creep_cw','creep_cw']]
@@ -120,7 +120,7 @@ class LegacyPositionerComm(object):
 
         # loop thru the (possibly) multiple moves, executing them
         est_time = [0]*len(steps)
-        distance_moved = [[0,0]]*len(steps)
+        distance_moved = LegacyPositionerComm.zeros2d(len(steps),2)
         for i in range(len(steps)):
             # form bytes flagging which types of moves to execute
             bits = LegacyPositionerComm.zeros2d(2,8)

@@ -73,10 +73,14 @@ class PosArrayMaster(object):
         turned off for the entire schedule. This method is generally recommended
         only for expert usage.
         """
+        expected_prior_dTdP = [0,0]
         for i in range(len(posids)):
             j = self.posids.index(posids[i])
-            move_table = self.posmodels[j].make_move_table(movecmds[i], values1[i], values2[i])
+            move_table = self.posmodels[j].make_move_table(movecmds[i], values1[i], values2[i], expected_prior_dTdP)
             self.schedule.expert_move_request(move_table)
+            table_formatted = move_table.for_cleanup
+            expected_prior_dTdP[0] += sum(table_formatted['dT'])
+            expected_prior_dTdP[1] += sum(table_formatted['dP'])
 
     def schedule_moves(self,anticollision=True):
         """Generate the schedule of moves and submoves that get positioners

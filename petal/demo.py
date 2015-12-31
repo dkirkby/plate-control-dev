@@ -11,15 +11,15 @@ m = posarraymaster.PosArrayMaster(posids,configs)
 
 # Initialization of communications
 # These commands are very specific to the hacked-together LegacyPositionerComm.
-comm = legacypositionercomm.LegacyPositionerComm('COM5')
+comm = legacypositionercomm.LegacyPositionerComm('COM6')
 comm.master = m
 m.comm = comm
 
 # Demo script flags
 should_home = False
 should_move_QS_grid = False
-should_move_abs_tp = False
-should_move_rel_dtdp = True
+should_move_abs_tp = True
+should_move_rel_dtdp = False
 
 # Moves
 if should_home:
