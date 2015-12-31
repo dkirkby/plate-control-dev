@@ -31,9 +31,7 @@ class PosModel(object):
         self._stepsize_creep       = 0.1    # deg
         self._stepsize_cruise      = 3.3    # deg
         self._motor_speed_cruise   = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
-        self._motor_speed_creep    = self._timer_update_rate * self._stepsize_creep / self.state.read('CREEP_PERIOD')  # deg/sec
-        # FUTURE FIRMWARE VERSION WILL USE SPINUPDOWN_DISTANCE AS DEFINED BELOW
-        #self._spinupdown_distance  = sum(range(round(self._stepsize_cruise/self._stepsize_creep) + 1))*self._stepsize_creep * self.state.read('SPINUPDOWN_PERIOD')  # deg
+        self._legacy_spinupdown    = True   # flag to enable using old firmware's fixed spinupdown_distance
 
         # List of particular PosState parameters that modify internal details of how a move
         # gets divided into cruise / creep, antibacklash moves added, etc. What distinguishes
@@ -43,6 +41,19 @@ class PosModel(object):
                                      'FINAL_CREEP_ON'       : True,
                                      'ALLOW_EXCEED_LIMITS'  : False,
                                      'ONLY_CREEP'           : False}
+
+    @property
+    def _motor_speed_creep(self):
+        """Returns motor creep speed (which depends on the creep period) in deg/sec."""
+        return self._timer_update_rate * self._stepsize_creep / self.state.read('CREEP_PERIOD')  # deg/sec
+
+    @property
+    def _spinupdown_distance(self):
+        """Returns distance at the motor shaft in deg over which to spin up to cruise speed or down from cruise speed."""
+        if self._legacy_spinupdown:
+            return 628.2  # deg
+        else:
+            return sum(range(round(self._stepsize_cruise/self._stepsize_creep) + 1))*self._stepsize_creep * self.state.read('SPINUPDOWN_PERIOD')
 
     @property
     def expected_current_position(self):
@@ -200,7 +211,7 @@ class PosModel(object):
                      'motor_step'   : [],
                      'speed_mode'   : [],
                      'move_time'    : []}
-        dist_spinup = 2 * np.sign(distance) * self.state.read('SPINUPDOWN_DISTANCE')
+        dist_spinup = 2 * np.sign(distance) * self._spinupdown_distance
         if options['ONLY_CREEP'] or (abs(distance) <= (abs(dist_spinup) + self.state.read('NOM_FINAL_CREEP_DIST'))):
             dist_spinup     = 0
             dist_cruise     = 0
@@ -221,7 +232,7 @@ class PosModel(object):
             move_data['obs_speed'].append(self._motor_speed_cruise)
             move_data['motor_step'].append(round(float(steps_cruise))) # round() rather than int() to prevent flooring the value
             move_data['speed_mode'].append('cruise')
-            move_data['move_time'].append((abs(steps_cruise)*self._stepsize_cruise + 4*self.state.read('SPINUPDOWN_DISTANCE')) / self._motor_speed_cruise)
+            move_data['move_time'].append((abs(steps_cruise)*self._stepsize_cruise + 4*self._spinupdown_distance) / self._motor_speed_cruise)
         if steps_creep:
             move_data['obs_distance'].append(dist_creep)
             move_data['obs_speed'].append(self._motor_speed_creep)

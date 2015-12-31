@@ -25,15 +25,15 @@ class LegacyPositionerComm(object):
         self.max_arguable_steps = self.steps_arg_n_bytes ** 16 - 1  # how large of an 'n steps' argument can be sent to driver
         self.CAN_comm = LawicellCANUSB(com_port)  # object that communicates over CAN with hardware
         self.settings_hold_time = 0.05 # seconds to wait for commands to get sent to firmware
-        self.tables = []                                                          # very specific to this hacked-together legacy implementation
-        self.master = []                                                          # very specific to this hacked-together legacy implementation
-        typical_posmodel = posmodel.PosModel()                                    # very specific to this hacked-together legacy implementation
-        self.stepsize_cruise = typical_posmodel._stepsize_cruise                  # very specific to this hacked-together legacy implementation
-        self.speed_cruise = typical_posmodel._motor_speed_cruise                  # very specific to this hacked-together legacy implementation
-        self.spinup_distance = typical_posmodel.state.read('SPINUPDOWN_DISTANCE') # very specific to this hacked-together legacy implementation
-        self.stepsize_creep = typical_posmodel._stepsize_creep                    # very specific to this hacked-together legacy implementation
-        self.speed_creep = typical_posmodel._motor_speed_creep                    # very specific to this hacked-together legacy implementation
-        self.est_time_buffer = 0.1                                                # very specific to this hacked-together legacy implementation
+        self.tables = []                                              # very specific to this hacked-together legacy implementation
+        self.master = []                                              # very specific to this hacked-together legacy implementation
+        typical_posmodel = posmodel.PosModel()                        # very specific to this hacked-together legacy implementation
+        self.stepsize_cruise = typical_posmodel._stepsize_cruise      # very specific to this hacked-together legacy implementation
+        self.speed_cruise = typical_posmodel._motor_speed_cruise      # very specific to this hacked-together legacy implementation
+        self.spinup_distance = typical_posmodel._spinupdown_distance  # very specific to this hacked-together legacy implementation
+        self.stepsize_creep = typical_posmodel._stepsize_creep        # very specific to this hacked-together legacy implementation
+        self.speed_creep = typical_posmodel._motor_speed_creep        # very specific to this hacked-together legacy implementation
+        self.est_time_buffer = 0.1                                    # very specific to this hacked-together legacy implementation
 
 # The send_tables and execute_moves command are what interface to the non-legacy other aspects of the code.
     def send_tables(self,tables):
