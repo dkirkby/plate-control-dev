@@ -118,6 +118,19 @@ class LegacyPositionerComm(object):
             else:
                 i += 1
 
+        # merge rows where possible
+        i = 0
+        while i + 1 < len(steps):
+            for jset in [[0,1],[1,0]]:
+                if steps[i][jset[0]] == 0 and steps[i+1][jset[1]] == 0:
+                    steps[i][jset[0]] = steps[i+1][jset[0]]
+                    types[i][jset[0]] = types[i+1][jset[0]]
+                    steps.pop(i+1)
+                    types.pop(i+1)
+                    i -= 1
+                    break
+            i += 1
+
         # loop thru the (possibly) multiple moves, executing them
         est_time = [0]*len(steps)
         distance_moved = LegacyPositionerComm.zeros2d(len(steps),2)
