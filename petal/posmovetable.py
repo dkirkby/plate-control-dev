@@ -109,6 +109,7 @@ class PosMoveTable(object):
         else:
             print( 'bad table output type ' + output_type)
 
+        expected_prior_dTdP = [0,0]
         i = -1
         for row in self.__rows:
             i += 1
@@ -132,8 +133,10 @@ class PosMoveTable(object):
                     move_options[pc.P]['FINAL_CREEP_ON']      = False
 
             # use PosModel instance to get the real, quantized, calibrated values
-            true_move_T = self.posmodel.true_move(pc.T, row._data['dT_ideal'], move_options[pc.T])
-            true_move_P = self.posmodel.true_move(pc.P, row._data['dP_ideal'], move_options[pc.P])
+            true_move_T = self.posmodel.true_move(pc.T, row._data['dT_ideal'], move_options[pc.T], expected_prior_dTdP)
+            true_move_P = self.posmodel.true_move(pc.P, row._data['dP_ideal'], move_options[pc.P], expected_prior_dTdP)
+            expected_prior_dTdP[0] += sum(true_move_T['obs_distance'])
+            expected_prior_dTdP[1] += sum(true_move_P['obs_distance'])
 
             # where one of the axes has fewer or no moves, pad it with blank no-motion default values
             true_moves = [true_move_T,true_move_P]
@@ -162,9 +165,10 @@ class PosMoveTable(object):
                 true_pauses['post'].insert(0,0)
 
             # fill in the output table according to type
-            if output_type == 'schedule':
+            if output_type == 'schedule' or output_type == 'cleanup':
                 table['dT'].extend(true_move_T['obs_distance'])
                 table['dP'].extend(true_move_P['obs_distance'])
+            if output_type == 'schedule':
                 table['Tdot'].extend(true_move_T['obs_speed'])
                 table['Pdot'].extend(true_move_P['obs_speed'])
                 table['prepause'].extend(true_pauses['pre'])
@@ -175,9 +179,6 @@ class PosMoveTable(object):
                 table['speed_mode_T'].extend(true_move_T['speed_mode'])
                 table['speed_mode_P'].extend(true_move_P['speed_mode'])
                 table['postpause'].extend([round(x*1000) for x in true_pauses['post']]) # hardware postpause in integer milliseconds
-            if output_type == 'cleanup':
-                table['dT'].extend(true_move_T['obs_distance'])
-                table['dP'].extend(true_move_P['obs_distance'])
             if output_type == 'schedule' or output_type == 'hardware':
                 while true_move_T['move_time']: # while loop here, since there may be multiple submoves
                     time1 = true_move_T['move_time'].pop(-1)

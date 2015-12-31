@@ -110,7 +110,7 @@ class PosModel(object):
         """Returns a [1x2] array of [phi_min, phi_max], from hardstop-to-hardstop."""
         return self.axis[pc.P].full_range
 
-    def true_move(self, axisid, distance, options=[]):
+    def true_move(self, axisid, distance, options=[], expected_prior_dTdP=[0,0]):
         """Input move distance on either the theta or phi axis, as seen by the
         observer, in degrees.
 
@@ -123,19 +123,23 @@ class PosModel(object):
 
         The return values are formatted as a dictionary of lists. (This handles the
         case where if it's a "final" move, it really consists of multiple submoves.)
+
+        The optional argument 'expected_prior_dTdP' is used to account for expected
+        future shaft position changes. This is necessary for correct checking of
+        software travel limits, when a sequence of multiple moves is being planned out.
         """
         if not(options):
             options = self.default_move_options
         options = options.copy() # don't disturb the input
         pos = self.expected_current_position
-        obs_start = [pos['obsT'],pos['obsP']]
+        shaft_start = [pos['shaftT'] + expected_prior_dTdP[0], pos['shaftP'] + expected_prior_dTdP[1]]
+        obs_start = self.trans.shaftTP_to_obsTP(shaft_start)
         obs_finish = obs_start.copy()
         obs_finish[axisid] += distance
-        shaft_start = [pos['shaftT'],pos['shaftP']]
         shaft_finish = self.trans.obsTP_to_shaftTP(obs_finish)
         dist = shaft_finish[axisid][0] - shaft_start[axisid]
         if not(options['ALLOW_EXCEED_LIMITS']):
-            dist = self.axis[axisid].truncate_to_limits(dist)
+            dist = self.axis[axisid].truncate_to_limits(dist,shaft_start[axisid])
         gear_ratio = self.axis[axisid].gear_ratio
         ccw_sign = self.axis[axisid].ccw_sign
         dist *= gear_ratio
@@ -471,18 +475,22 @@ class Axis(object):
         """
         return np.abs(np.diff(self.full_range)*self.posmodel.state.read('LIMIT_SEEK_EXCEED_RANGE_FACTOR'))
 
-    def truncate_to_limits(self, distance):
+    def truncate_to_limits(self, distance, expected_pos=None):
         """Return distance after first truncating it (if necessary) according to software limits.
+        An expected starting position can optionally be argued. If None, then the internally-
+        tracked position is used as the starting point.
         """
         if not(self.posmodel.state.read('ALLOW_EXCEED_LIMITS')):
-            target_pos = self.pos + distance
+            if expected_pos == None:
+                expected_pos = self.pos
+            target_pos = expected_pos + distance
             if self.maxpos < self.minpos:
                 distance = 0
             elif target_pos > self.maxpos:
-                new_distance = self.maxpos - self.pos
+                new_distance = self.maxpos - expected_pos
                 distance = new_distance
             elif target_pos < self.minpos:
-                new_distance = self.minpos - self.pos
+                new_distance = self.minpos - expected_pos
                 distance = new_distance
         return distance
 
