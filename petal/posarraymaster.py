@@ -159,4 +159,13 @@ class PosArrayMaster(object):
         else:
             return self.posmodels[i].state.read(varname)
 
+    def setval(self,posid,varname,value,write_to_disk=None):
+        """Set the state value identified by string varname, for positioner unit
+        identified by id posid.
+        Note comments for posstate.write() method, which explain the optional
+        arguemtn 'write_to_disk'.
+        """
+        i = self.posids.index(posid)
+        self.posmodels[i].state.write(varname,value,write_to_disk)
+
 

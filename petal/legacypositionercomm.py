@@ -6,6 +6,7 @@ import serial
 import serial.tools.list_ports
 import warnings
 import string
+import posmodel
 
 class LegacyPositionerComm(object):
     """Placeholder for PetalComm which interacts with legacy (circa mid-2015)
@@ -24,8 +25,15 @@ class LegacyPositionerComm(object):
         self.max_arguable_steps = self.steps_arg_n_bytes ** 16 - 1  # how large of an 'n steps' argument can be sent to driver
         self.CAN_comm = LawicellCANUSB(com_port)  # object that communicates over CAN with hardware
         self.settings_hold_time = 0.05 # seconds to wait for commands to get sent to firmware
-        self.tables = [] # very specific to this hacked-together legacy implementation
-        self.master = [] # very specific to this hacked-together legacy implementation
+        self.tables = []                                                          # very specific to this hacked-together legacy implementation
+        self.master = []                                                          # very specific to this hacked-together legacy implementation
+        typical_posmodel = posmodel.PosModel()                                    # very specific to this hacked-together legacy implementation
+        self.stepsize_cruise = typical_posmodel._stepsize_cruise                  # very specific to this hacked-together legacy implementation
+        self.speed_cruise = typical_posmodel._motor_speed_cruise                  # very specific to this hacked-together legacy implementation
+        self.spinup_distance = typical_posmodel.state.read('SPINUPDOWN_DISTANCE') # very specific to this hacked-together legacy implementation
+        self.stepsize_creep = typical_posmodel._stepsize_creep                    # very specific to this hacked-together legacy implementation
+        self.speed_creep = typical_posmodel._motor_speed_creep                    # very specific to this hacked-together legacy implementation
+        self.est_time_buffer = 0.1                                                # very specific to this hacked-together legacy implementation
 
 # The send_tables and execute_moves command are what interface to the non-legacy other aspects of the code.
     def send_tables(self,tables):
@@ -42,13 +50,13 @@ class LegacyPositionerComm(object):
             n = tbl['nrows']
             T = self.master.get(tbl['posid'],'MOTOR_ID_T')
             P = self.master.get(tbl['posid'],'MOTOR_ID_P')
-            cruise_steps = [[0,0]]*n
-            creep_steps = [[0,0]]*n
+            cruise_steps = LegacyPositionerComm.zeros2d(n,2)
+            creep_steps  = LegacyPositionerComm.zeros2d(n,2)
             for i in range(n):
                 if tbl['speed_mode_T'][i] == 'cruise':
                     cruise_steps[i][T] = tbl['motor_steps_T'][i]
                 elif tbl['speed_mode_T'][i] == 'creep':
-                    creep_steps[i][P] = tbl['motor_steps_T'][i]
+                    creep_steps[i][T] = tbl['motor_steps_T'][i]
                 else:
                     print('bad speed_mode_T')
                 if tbl['speed_mode_P'][i] == 'cruise':
@@ -58,9 +66,9 @@ class LegacyPositionerComm(object):
                 else:
                     print('bad speed_mode_P')
                 self.move_motors(self.master.get(tbl['posid'],'BUS_ID'),cruise_steps[i],creep_steps[i])
-                print('Moving ' + str(self.master.get(tbl['posid'],'BUS_ID')) + ' by  Tcruise:' + str(cruise_steps[i][T]) + '  Tcreep:' + str(creep_steps[i][T]) + '  Pcruise:' + str(cruise_steps[i][P]) + '  Pcreep:' + str(creep_steps[i][P]))
-                time.sleep(tbl['move_time'][i])
-                time.sleep(tbl['post_pause'][i])
+                #print('Moving ' + str(self.master.get(tbl['posid'],'BUS_ID')) + ' by...  Tcruise:' + str(cruise_steps[i][T]) + '  Tcreep:' + str(creep_steps[i][T]) + '  Pcruise:' + str(cruise_steps[i][P]) + '  Pcreep:' + str(creep_steps[i][P]))
+                #time.sleep(tbl['move_time'][i])
+                #time.sleep(tbl['postpause'][i])
 
 # The items below are all specific to legacy firmware, and not for general future usage or copying.
     def set_motor_params(self, busid, creep_period, curr_spin_up_down, curr_cruise, curr_creep, curr_hold):
@@ -86,7 +94,7 @@ class LegacyPositionerComm(object):
                 steps_creep_cw[i] = -steps_creep[i]
 
         # if desired number of steps is greater than driver argument allows, must request multiple consecutive moves
-        types = ['cruise', 'creep_ccw', 'creep_cw']
+        types = [['cruise','cruise'],['creep_ccw','creep_ccw'],['creep_cw','creep_cw']]
         steps = [steps_cruise, steps_creep_ccw, steps_creep_cw]
         i = 0
         while i < len(steps):
@@ -110,21 +118,15 @@ class LegacyPositionerComm(object):
             else:
                 i += 1
 
-        steps = numpy.array(steps)
-
         # loop thru the (possibly) multiple moves, executing them
-        est_time = numpy.zeros(2)
-        #this_time = numpy.zeros([steps.shape[0], 1])
-        this_time = 0
-        this_split_distance_moved = numpy.zeros(steps.shape)
-        split_distance_moved = numpy.zeros(steps.shape)
-
-        for i in range(0, steps.shape[0]):
+        est_time = [0]*len(steps)
+        distance_moved = [[0,0]]*len(steps)
+        for i in range(len(steps)):
             # form bytes flagging which types of moves to execute
-            bits = numpy.zeros([2, 8]).tolist()
+            bits = LegacyPositionerComm.zeros2d(2,8)
             exec_bytes = ''
             strbits=''
-            for j in range(0, steps.shape[1]):
+            for j in range(len(steps[i])):
                 for n in range(0, 3):  # enable cw spin-up, cruise, spin-down
                     if steps[i][j] > 0 and types[i][j] == 'cruise':
                         bits[j][n] = 1
@@ -150,39 +152,41 @@ class LegacyPositionerComm(object):
             exec_bytes = exec_bytes.replace(' ','0')
 
             # send number of steps for the next move
-            cruise_amts = numpy.zeros([1, 4])
-            creep_amts = numpy.zeros([1, 4])
+            cruise_amts = [0]*4
+            creep_amts  = [0]*4
+            this_time = [0,0]
+            this_distance_moved = [0,0]
 
-            for j in range(0, steps.shape[1]):
-                if types[i, j] == 'cruise':
-                    cruise_amts = (numpy.array(cruise_amts) + numpy.array([abs(steps[i, 0]) * (j == 0), 0, abs(steps[i, 1]) * (j == 1), 0])).tolist()
-                    cruise_time = abs(steps[i, j]) * self.stepsize_cruise / self.speed_cruise
-                    this_time = cruise_time + (cruise_time != 0) * self.spinup_distance / self.speed_cruise
-                    this_split_distance_moved[i, j] = steps[i, j] * self.stepsize_cruise + numpy.sign(steps[i, j]) * 2 * self.spinup_distance
-                elif types[i, j] == 'creep_ccw':
-                    creep_amts = (numpy.array(creep_amts) + numpy.array(
-                        [abs(steps[i, 0]) * (j == 0), 0, abs(steps[i, 1]) * (j == 1), 0])).tolist()
-                    this_time = abs(steps[i, j]) * self.stepsize_creep / self.speed_creep()
-                    this_split_distance_moved[i, j] = -steps[i, j] * self.stepsize_creep
-                elif types[i, j] == 'creep_cw':
-                    creep_amts = (numpy.array(creep_amts) + numpy.array(
-                        [0, abs(steps[i, 0]) * (j == 0), 0, abs(steps[i, 1]) * (j == 1)])).tolist()
-                    this_time = abs(steps[i, j]) * self.stepsize_creep / self.speed_creep()
-                    this_split_distance_moved[i, j] = steps[i, j] * self.stepsize_creep
-
-                est_time[i] = numpy.maximum(est_time[i], this_time)
-                split_distance_moved[i, j] += this_split_distance_moved[i, j]
-            self.send_cmd('Set_Cruise_and_CW_Creep_Amounts', cruise_amts)
-            self.send_cmd('Set_CCW_Creep_and_CW_Creep_Amounts', creep_amts)
-
-            print('time: {0}   {1}  motor: {2}   {3}  motor1: {4}'.format(est_time[i],types[i, 0],split_distance_moved[i, 0],types[i, 1],split_distance_moved[i, 1]))
-            # send command to driver, and start timer for (assumed) completion
-            # (in future, preferable to have driver implement sending back a 'move complete' response)
-            self.send_cmd('Execute_Move', exec_bytes)
-            #time.sleep(est_time[i] + self.est_time_buffer) # WAIT FOR MOVE TO COMPLETE
+            for j in range(len(steps[i])):
+                if types[i][j] == 'cruise':
+                    J = j*2 # to put into correct places in the cruise_amts array
+                    cruise_amts[J] = abs(steps[i][j])
+                    cruise_time = abs(steps[i][j]) * self.stepsize_cruise / self.speed_cruise
+                    this_time[j] = cruise_time + (cruise_time != 0) * self.spinup_distance / self.speed_cruise
+                    this_distance_moved[j] = steps[i][j] * self.stepsize_cruise + numpy.sign(steps[i][j]) * 2 * self.spinup_distance
+                elif types[i][j] == 'creep_cw':
+                    J = j*2 # to put into correct places in the creep_amts array
+                    creep_amts[J] = abs(steps[i][j])
+                    this_time[j] = abs(steps[i][j]) * self.stepsize_creep / self.speed_creep
+                    this_distance_moved[j] = -steps[i][j] * self.stepsize_creep
+                elif types[i][j] == 'creep_ccw':
+                    J = j*2 + 1  # to put into correct places in the creep_amts array
+                    creep_amts[J] = abs(steps[i][j])
+                    this_time[j] = abs(steps[i][j]) * self.stepsize_creep / self.speed_creep
+                    this_distance_moved[j] = steps[i][j] * self.stepsize_creep
+                distance_moved[i][j] += this_distance_moved[j]
+                est_time[i] += max(this_time)
+            self.send_cmd(bus_id,'Set_Cruise_and_CW_Creep_Amounts', cruise_amts)
+            self.send_cmd(bus_id,'Set_CCW_Creep_and_CW_Creep_Amounts', creep_amts)
+            deg = '\u00b0'
+            print('time: {:.3f}   motor1: {:9s} {:8.1f}{}   motor0: {:9s} {:8.1f}{}'.format(est_time[i],types[i][1],distance_moved[i][1],deg,types[i][0],distance_moved[i][0],deg))
+            self.send_cmd(bus_id, 'Execute_Move', exec_bytes) # send command to driver, and start timer for (assumed) completion
+            #time.sleep(est_time[i] + self.est_time_buffer) # WAIT FOR MOVE TO COMPLETE (or may handle pausing at a higher level)
 
         # return the total distance moved
-        distance_moved = numpy.sum(split_distance_moved, axis=0)
+        total_distance = [0,0]
+        total_distance[0] = sum([distance_moved[k][0] for k in range(len(distance_moved))])
+        total_distance[1] = sum([distance_moved[k][1] for k in range(len(distance_moved))])
         return distance_moved
 
     def send_cmd(self, bus_id, cmd_name, args):
@@ -330,7 +334,7 @@ class LegacyPositionerComm(object):
         hexid = hexid.replace(' ', '0')  # replace whitespace by 0
         return hexid
 
-
+    @staticmethod
     def isnumeric(t):
         """
         look if there is number inside t
@@ -350,6 +354,7 @@ class LegacyPositionerComm(object):
         else:
             return False
 
+    @staticmethod
     def ischar(t):
         """
         look if there is only char inside t
@@ -366,6 +371,11 @@ class LegacyPositionerComm(object):
             return True
         else:
             return False
+
+    @staticmethod
+    def zeros2d(m,n):
+        """Returns an [m][n] dimensioned list of zeros."""
+        return [[0 for x in range(n)] for y in range(m)]
 
 class LawicellCANUSB(object):
     """ Class : LawicellCANUSB

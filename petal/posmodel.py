@@ -17,7 +17,8 @@ class PosModel(object):
     def __init__(self, state=None):
         if not(state):
             self.state = posstate.PosState()
-        self.state = state
+        else:
+            self.state = state
         self.trans = postransforms.PosTransforms(self)
 
         # axes
@@ -81,9 +82,9 @@ class PosModel(object):
         """
         deg = '\u00b0'
         mm = 'mm'
-        pos = self.expected_current_position()
-        s = 'P:{:7.3f}{}, Q:{:7.3f}{} | x:{:7.3f}{}, y:{:7.3f}{} | obsT:{:8.3f}{}, obsP:{:8.3f}{} | motorT:{:8.1f}{}, motorP:{:8.1f}{}'. \
-            format(pos['P'],mm, pos['Q'],deg,
+        pos = self.expected_current_position
+        s = 'Q:{:7.3f}{}, S:{:7.3f}{} | x:{:7.3f}{}, y:{:7.3f}{} | obsT:{:8.3f}{}, obsP:{:8.3f}{} | motorT:{:8.1f}{}, motorP:{:8.1f}{}'. \
+            format(pos['Q'],mm, pos['S'],deg,
                    pos['x'],mm, pos['y'],mm,
                    pos['obsT'],deg, pos['obsP'],deg,
                    pos['motorT'],deg, pos['motorP'],deg)
@@ -199,13 +200,13 @@ class PosModel(object):
         if steps_cruise:
             move_data['obs_distance'].append(dist_cruisespin)
             move_data['obs_speed'].append(self._motor_speed_cruise)
-            move_data['motor_step'].append(round(float(steps_cruise)))
+            move_data['motor_step'].append(round(float(steps_cruise))) # round() rather than int() to prevent flooring the value
             move_data['speed_mode'].append('cruise')
             move_data['move_time'].append((abs(steps_cruise)*self._stepsize_cruise + 4*self.state.read('SPINUPDOWN_DISTANCE')) / self._motor_speed_cruise)
         if steps_creep:
             move_data['obs_distance'].append(dist_creep)
             move_data['obs_speed'].append(self._motor_speed_creep)
-            move_data['motor_step'].append(round(float(steps_creep)))
+            move_data['motor_step'].append(round(float(steps_creep))) # round() rather than int() to prevent flooring the value
             move_data['speed_mode'].append('creep')
             move_data['move_time'].append(abs(steps_creep)*self._stepsize_creep / self._motor_speed_creep)
         return move_data
