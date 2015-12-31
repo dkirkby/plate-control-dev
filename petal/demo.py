@@ -19,7 +19,7 @@ m.comm = comm
 should_home = False
 should_move_QS_grid = False
 should_move_abs_tp = True
-should_move_rel_dtdp = False
+should_move_rel_dtdp = True
 
 # Moves
 if should_home:

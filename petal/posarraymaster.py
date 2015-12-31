@@ -14,7 +14,7 @@ class PosArrayMaster(object):
         if len(configs) != len(posids):
             configs = ['DEFAULT']*len(posids)
         for i in range(len(posids)):
-            state = posstate.PosState(posids[i])
+            state = posstate.PosState(posids[i],logging=True)
             model = posmodel.PosModel(state)
             self.posmodels.append(model)
         self.posids = posids

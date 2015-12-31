@@ -11,6 +11,7 @@ class PosState(object):
     single object.
 
     INPUTS: unit_id = SERIAL_ID of positioner
+            logging = boolean whether to enable logging state data to disk
 
     Notes:
         Default settings are used if no unit_id is supplied.
@@ -19,15 +20,16 @@ class PosState(object):
         unit) and general parameters (settings which apply uniformly to many units).
     """
 
-    def __init__(self, unit_id=None):
+    def __init__(self, unit_id=None, logging=False):
         settings_directory = os.getcwd() + '/pos_settings/'
         self.logs_directory = os.getcwd() + '/pos_logs/'
+        self.logging = logging
         if unit_id != None:
             self.unit_basename = 'unit_' + str(unit_id)
             comment = 'Settings file for fiber positioner unit: ' + str(unit_id)
         else:
-            self.unit_basename = 'unit_TEST'
-            comment = 'Temporary settings test file, not associated with a particular fiber positioner unit.'
+            self.unit_basename = 'unit_TEMP'
+            comment = 'Temporary settings file for software test purposes, not associated with a particular fiber positioner unit.'
         unit_filename = settings_directory + self.unit_basename + '.conf'
         if not(os.path.isfile(unit_filename)):
             temp_filename = settings_directory + '_unit_settings_DEFAULT.conf' # read in the template file
@@ -50,7 +52,10 @@ class PosState(object):
         self.log_basename = PosState.increment_suffix(log_basename)
         self.max_log_length = 1000 # number of rows in log before starting a new file
         self.curr_log_length = 0
-        self.log_unit(note='initialization of software object that tracks the state variables')
+        self.unit['LAST_MOVE_CMD'] = '(software initialization)'
+        self.unit['LAST_MOVE_VAL1'] = ''
+        self.unit['LAST_MOVE_VAL2'] = ''
+        self.log_unit()
 
     def read(self,key):
         """Returns current value for a given key.
@@ -87,19 +92,20 @@ class PosState(object):
     def log_unit(self,note=''):
         """All current unit parameters are written to the hardware unit's log file.
         """
-        timestamp = datetime.datetime.now().strftime(pc.timestamp_format)
-        if note == '':
-            note = ' ' # just to make csv file cell look blank in excel
-        if self.curr_log_length >= self.max_log_length:
-            self.log_basename = PosState.increment_suffix(self.log_basename)
-            self.curr_log_length = 0
-        log_path = self.logs_directory + self.log_basename + '.csv'
-        if not(os.path.isfile(log_path)): # checking whether need to start a new file
-            with open(log_path, 'w', newline='') as csvfile:
-                csv.writer(csvfile).writerow(['TIMESTAMP'] + self.unit.keys() + ['NOTE'])
-        with open(log_path, 'a', newline='') as csvfile: # now append a row of data
-            csv.writer(csvfile).writerow([timestamp] + self.unit.values() + [str(note)])
-        self.curr_log_length += 1
+        if self.logging:
+            timestamp = datetime.datetime.now().strftime(pc.timestamp_format)
+            if note == '':
+                note = ' ' # just to make csv file cell look blank in excel
+            if self.curr_log_length >= self.max_log_length:
+                self.log_basename = PosState.increment_suffix(self.log_basename)
+                self.curr_log_length = 0
+            log_path = self.logs_directory + self.log_basename + '.csv'
+            if not(os.path.isfile(log_path)): # checking whether need to start a new file
+                with open(log_path, 'w', newline='') as csvfile:
+                    csv.writer(csvfile).writerow(['TIMESTAMP'] + self.unit.keys() + ['NOTE'])
+            with open(log_path, 'a', newline='') as csvfile: # now append a row of data
+                csv.writer(csvfile).writerow([timestamp] + self.unit.values() + [str(note)])
+            self.curr_log_length += 1
 
     @staticmethod
     def increment_suffix(s):

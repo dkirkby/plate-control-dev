@@ -252,8 +252,8 @@ class PosModel(object):
             axis.postmove_cleanup_cmds = ''
         separator = '; '
         self.state.write('LAST_MOVE_CMD',  separator.join(cleanup_table['cmd']))
-        self.state.write('LAST_MOVE_VAL1', separator.join(['{0:.6f}'.format(x) for x in cleanup_table['cmd_val1']]))
-        self.state.write('LAST_MOVE_VAL2', separator.join(['{0:.6f}'.format(x) for x in cleanup_table['cmd_val2']]))
+        self.state.write('LAST_MOVE_VAL1', separator.join(['{0:.6g}'.format(x) for x in cleanup_table['cmd_val1']]))
+        self.state.write('LAST_MOVE_VAL2', separator.join(['{0:.6g}'.format(x) for x in cleanup_table['cmd_val2']]))
         self.state.log_unit(lognote)
 
     def make_move_table(self, movecmd, val1, val2, expected_prior_dTdP=[0,0]):
