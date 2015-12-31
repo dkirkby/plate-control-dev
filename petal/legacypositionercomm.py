@@ -161,8 +161,8 @@ class LegacyPositionerComm(object):
                 if types[i][j] == 'cruise':
                     J = j*2 # to put into correct places in the cruise_amts array
                     cruise_amts[J] = abs(steps[i][j])
-                    cruise_time = abs(steps[i][j]) * self.stepsize_cruise / self.speed_cruise
-                    this_time[j] = cruise_time + (cruise_time != 0) * self.spinup_distance / self.speed_cruise
+                    cruise_time = (abs(steps[i][j]) * self.stepsize_cruise) / self.speed_cruise
+                    this_time[j] = cruise_time + (steps[i][j] != 0) * 4 * self.spinup_distance / self.speed_cruise
                     this_distance_moved[j] = steps[i][j] * self.stepsize_cruise + numpy.sign(steps[i][j]) * 2 * self.spinup_distance
                 elif types[i][j] == 'creep_cw':
                     J = j*2 # to put into correct places in the creep_amts array
@@ -175,7 +175,7 @@ class LegacyPositionerComm(object):
                     this_time[j] = abs(steps[i][j]) * self.stepsize_creep / self.speed_creep
                     this_distance_moved[j] = steps[i][j] * self.stepsize_creep
                 distance_moved[i][j] += this_distance_moved[j]
-                est_time[i] += max(this_time)
+            est_time[i] += max(this_time)
             self.send_cmd(bus_id,'Set_Cruise_and_CW_Creep_Amounts', cruise_amts)
             self.send_cmd(bus_id,'Set_CCW_Creep_and_CW_Creep_Amounts', creep_amts)
             deg = '\u00b0'

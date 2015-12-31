@@ -19,7 +19,6 @@ class PosMoveTable(object):
             posmodel = posmodel.PosModel()
         self.posmodel = posmodel      # the particular positioner this table applies to
         self.__rows = []              # internal representation of the move data
-        self.orig_cmd = {'cmd':'','val1':None,'val2':None}  # the original command (when applicable) which generated this move table
 
     # getters
     @property
@@ -57,12 +56,12 @@ class PosMoveTable(object):
             self.__rows[rowidx]._move_options[key] = self.posmodel.state.read(key)  # snapshot the current state
         self.__rows[rowidx]._data[dist_label[axisid]] = distance
 
-    def store_orig_command(self, cmd_string, val1, val2):
+    def store_orig_command(self, rowidx, cmd_string, val1, val2):
         """To keep a copy of the original move command with the move table.
         """
-        self.orig_cmd['cmd']  = cmd_string
-        self.orig_cmd['val1'] = val1
-        self.orig_cmd['val2'] = val2
+        self.__rows[rowidx]._data['command'] = cmd_string
+        self.__rows[rowidx]._data['val1']    = val1
+        self.__rows[rowidx]._data['val2']    = val2
 
     def set_prepause(self, rowidx, prepause):
         """Put or update a prepause into the table.
@@ -105,7 +104,7 @@ class PosMoveTable(object):
         elif output_type == 'hardware':
             table = {'posid':'','nrows':0,'motor_steps_T':[],'motor_steps_P':[],'speed_mode_T':[],'speed_mode_P':[],'move_time':[],'postpause':[]}
         elif output_type == 'cleanup':
-            table = {'posid':'','nrows':0,'dT':[],'dP':[],'cmd':'','cmd_val1':None,'cmd_val2':None}
+            table = {'posid':'','nrows':0,'dT':[],'dP':[],'cmd':[],'cmd_val1':[],'cmd_val2':[]}
         else:
             print( 'bad table output type ' + output_type)
 
@@ -181,18 +180,18 @@ class PosMoveTable(object):
                 table['postpause'].extend([round(x*1000) for x in true_pauses['post']]) # hardware postpause in integer milliseconds
             if output_type == 'schedule' or output_type == 'hardware':
                 while true_move_T['move_time']: # while loop here, since there may be multiple submoves
-                    time1 = true_move_T['move_time'].pop(-1)
-                    time2 = true_move_P['move_time'].pop(-1)
+                    time1 = true_move_T['move_time'].pop(0)
+                    time2 = true_move_P['move_time'].pop(0)
                     table['move_time'].append(max(time1,time2))
+            if output_type == 'cleanup':
+                table['cmd'].append(row._data['command'])
+                table['cmd_val1'].append(row._data['val1'])
+                table['cmd_val2'].append(row._data['val2'])
         table['posid'] = self.posmodel.state.read('SERIAL_ID')
         if output_type == 'schedule' or output_type == 'cleanup':
             table['nrows'] = len(table['dT'])
         if output_type == 'hardware':
             table['nrows'] = len(table['motor_steps_T'])
-        if output_type == 'cleanup':
-            table['cmd']      = self.orig_cmd['cmd']
-            table['cmd_val1'] = self.orig_cmd['val1']
-            table['cmd_val2'] = self.orig_cmd['val2']
         return table
 
 
@@ -207,7 +206,10 @@ class PosMoveRow(object):
                       'dP_ideal'     : 0,        # [deg] ideal phi distance to move (as seen by external observer)
                       'prepause'     : 0,        # [sec] delay for this number of seconds before executing the move
                       'move_time'    : 0,        # [sec] time it takes the move to execute
-                      'postpause'    : 0}        # [sec] delay for this number of seconds after the move has completed
+                      'postpause'    : 0,        # [sec] delay for this number of seconds after the move has completed
+                      'command'      : '',       # [string] command corresponding to this row
+                      'val1'         : None,     # [-] command argument 1
+                      'val2'         : None}     # [-] command argument 2
         if not(posmodel):
             posmodel = posmodel.Posmodel()
         self._move_options = posmodel.default_move_options.copy()

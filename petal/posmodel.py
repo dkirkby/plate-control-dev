@@ -250,9 +250,10 @@ class PosModel(object):
         for axis in self.axis:
             exec(axis.postmove_cleanup_cmds)
             axis.postmove_cleanup_cmds = ''
-        self.state.write('LAST_MOVE_CMD',cleanup_table['cmd'])
-        self.state.write('LAST_MOVE_VAL1',cleanup_table['cmd_val1'])
-        self.state.write('LAST_MOVE_VAL2',cleanup_table['cmd_val2'])
+        separator = '; '
+        self.state.write('LAST_MOVE_CMD',  separator.join(cleanup_table['cmd']))
+        self.state.write('LAST_MOVE_VAL1', separator.join(['{0:.6f}'.format(x) for x in cleanup_table['cmd_val1']]))
+        self.state.write('LAST_MOVE_VAL2', separator.join(['{0:.6f}'.format(x) for x in cleanup_table['cmd_val2']]))
         self.state.log_unit(lognote)
 
     def make_move_table(self, movecmd, val1, val2):
@@ -282,7 +283,6 @@ class PosModel(object):
                               ... val1 == 0 or val2 == 0 says do NOT seek on that axis
         """
         table = posmovetable.PosMoveTable(self)
-        table.store_orig_command(movecmd,val1,val2)
         vals = [val1,val2]
         pos = self.expected_current_position
         start_tp = [pos['shaftT'],pos['shaftP']]
@@ -327,6 +327,7 @@ class PosModel(object):
         delta_p = targt_tp[1] - start_tp[1]
         table.set_move(0, pc.T, delta_t)
         table.set_move(0, pc.P, delta_p)
+        table.store_orig_command(0,movecmd,val1,val2)
         return table
 
 
