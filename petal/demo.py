@@ -11,7 +11,7 @@ m = posarraymaster.PosArrayMaster(posids,configs)
 
 # Initialization of communications
 # These commands are very specific to the hacked-together LegacyPositionerComm.
-comm = legacypositionercomm.LegacyPositionerComm('COM6')
+comm = legacypositionercomm.LegacyPositionerComm('COM5')
 comm.master = m
 m.comm = comm
 
@@ -47,8 +47,8 @@ if should_move_abs_tp:
     m.send_tables_and_execute_moves()
 
 if should_move_rel_dtdp:
-    dT = [90] #dT = [90,-90,  0,   0]
-    dP = [30] #dP = [ 0,  0, 20, -20]
+    dT = [-30, 30,   0,  0, -30, 30]
+    dP = [  0,  0, -30, 30, -30, 30]
     for i in range(len(posids)):
         m.expert_request_moves([posids[i]]*len(dT), ['dtdp']*len(dT), dT, dP)
     m.schedule_moves()

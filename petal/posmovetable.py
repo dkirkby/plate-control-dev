@@ -1,6 +1,6 @@
 import posmodel
 import posconstants as pc
-import copy
+import copy as copymodule
 
 class PosMoveTable(object):
     """A move table contains the information for a single positioner's move
@@ -109,8 +109,10 @@ class PosMoveTable(object):
         else:
             print( 'bad table output type ' + output_type)
 
-        i = 0
+        i = -1
         for row in self.__rows:
+            i += 1
+
             # for hardware type, insert an extra pause-only action if necessary, since hardware commands only really have postpauses
             if output_type == 'hardware' and row._data['prepause']:
                 for key in ['motor_steps_T','motor_steps_P','move_time']:
@@ -119,17 +121,19 @@ class PosMoveTable(object):
                     table[key].insert(0,'creep')
                 table['postpause'].insert(0,row._data['prepause'])
 
-            move_options = row._move_options.copy()
-
-            # only allow requesting final backlash / creep moves if it's really a final row
-            i += 1
-            if i != len(self.__rows):
-                move_options['BACKLASH_REMOVAL_ON'] = False
-                move_options['FINAL_CREEP_ON']      = False
+            # only allow requesting final backlash / creep moves if it's the last row in which that axis has a finite move argued
+            move_options = [row._move_options.copy(),row._move_options.copy()]
+            if i < len(self.__rows):
+                if any([r._data['dT_ideal'] for r in self.__rows[(i+1):]]):
+                    move_options[pc.T]['BACKLASH_REMOVAL_ON'] = False
+                    move_options[pc.T]['FINAL_CREEP_ON']      = False
+                if any([r._data['dP_ideal'] for r in self.__rows[(i+1):]]):
+                    move_options[pc.P]['BACKLASH_REMOVAL_ON'] = False
+                    move_options[pc.P]['FINAL_CREEP_ON']      = False
 
             # use PosModel instance to get the real, quantized, calibrated values
-            true_move_T = self.posmodel.true_move(pc.T, row._data['dT_ideal'], move_options)
-            true_move_P = self.posmodel.true_move(pc.P, row._data['dP_ideal'], move_options)
+            true_move_T = self.posmodel.true_move(pc.T, row._data['dT_ideal'], move_options[pc.T])
+            true_move_P = self.posmodel.true_move(pc.P, row._data['dP_ideal'], move_options[pc.P])
 
             # where one of the axes has fewer or no moves, pad it with blank no-motion default values
             true_moves = [true_move_T,true_move_P]
@@ -205,8 +209,8 @@ class PosMoveRow(object):
                       'postpause'    : 0}        # [sec] delay for this number of seconds after the move has completed
         if not(posmodel):
             posmodel = posmodel.Posmodel()
-        self._move_options = posmodel.default_move_options
+        self._move_options = posmodel.default_move_options.copy()
 
     def copy(self):
-        return copy.copy(self)
+        return copymodule.deepcopy(self)
 

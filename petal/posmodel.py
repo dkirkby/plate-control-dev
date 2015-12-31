@@ -156,17 +156,31 @@ class PosModel(object):
 
         opt = {}
         move_data = {}
+        options['CRUISE_SHY_OF_TARGET'] = False # usually false, except in the special case below
         opt['primary'] = options.copy()
         opt['backup']  = options.copy()
         opt['final']   = options.copy()
+        if final_move: # in this special case, don't need a creep move after the primary, since we will later do another final move anyway. however, still want to stay shy of the final target
+            opt['primary']['FINAL_CREEP_ON']       = False
+            opt['primary']['CRUISE_SHY_OF_TARGET'] = True
         opt['backup']['ONLY_CREEP'] = True
         opt['final'] ['ONLY_CREEP'] = True
+        i = 0
         for m in [[primary_move,opt['primary']], [backup_move,opt['backup']], [final_move,opt['final']]]:
-            true_move = self.motor_true_move(axisid, m[0], m[1])
-            for key in true_move.keys():
-                if not(key in move_data.keys()):
-                    move_data[key] = []
-                move_data[key].extend(true_move[key])
+            true_move = None
+            if i == 0:
+                true_move = self.motor_true_move(axisid, m[0], m[1])
+                dist_correction = m[0] - sum(true_move['obs_distance']) # note, it is intentional that this will only be used when there was already a plan to do a non-zero final_move
+            if i == 1 and m[0]:
+                true_move = self.motor_true_move(axisid, m[0], m[1])
+            if i == 2 and m[0]:
+                true_move = self.motor_true_move(axisid, m[0] + dist_correction, m[1])
+            if true_move:
+                for key in true_move.keys():
+                    if not(key in move_data.keys()):
+                        move_data[key] = []
+                    move_data[key].extend(true_move[key])
+            i += 1
         n_submoves = len(move_data['obs_distance'])
         for i in range(n_submoves):
             move_data['obs_distance'][i] *= ccw_sign / gear_ratio
@@ -190,11 +204,12 @@ class PosModel(object):
             dist_cruisespin = 0
             net_dist_creep  = distance
         else:
-            dist_creep      = np.sign(distance) * self.state.read('NOM_FINAL_CREEP_DIST') * options['FINAL_CREEP_ON'] # initial guess at how far to creep
-            dist_cruise     = distance - dist_spinup - dist_creep                # initial guess at how far to cruise
-            steps_cruise    = round(dist_cruise / self._stepsize_cruise)         # quantize cruise steps
-            dist_cruisespin = steps_cruise * self._stepsize_cruise + dist_spinup # actual distance covered while cruising
-            net_dist_creep  = distance - dist_cruisespin
+            dist_creep      = np.sign(distance) * self.state.read('NOM_FINAL_CREEP_DIST') * options['FINAL_CREEP_ON']      # initial guess at how far to creep
+            dist_shy        = np.sign(distance) * self.state.read('NOM_FINAL_CREEP_DIST') * options['CRUISE_SHY_OF_TARGET']  # when ya ain't creepin' this time but ya know you will real soon
+            dist_cruise     = distance - dist_spinup - dist_creep - dist_shy      # initial guess at how far to cruise
+            steps_cruise    = round(dist_cruise / self._stepsize_cruise)          # quantize cruise steps
+            dist_cruisespin = steps_cruise * self._stepsize_cruise + dist_spinup  # actual distance covered while cruising
+            net_dist_creep  = (distance - dist_cruisespin) * options['FINAL_CREEP_ON']
         steps_creep = round(net_dist_creep / self._stepsize_creep)
         dist_creep = steps_creep * self._stepsize_creep
         if steps_cruise:
@@ -215,10 +230,8 @@ class PosModel(object):
         """Always perform this after positioner physical moves have been completed,
         to update the internal tracking of shaft positions and variables.
         """
-        for val in cleanup_table['dT']:
-            self.axis[pc.T].pos += val
-        for val in cleanup_table['dP']:
-            self.axis[pc.P].pos += val
+        self.axis[pc.T].pos += sum(cleanup_table['dT'])
+        self.axis[pc.P].pos += sum(cleanup_table['dP'])
         for axis in self.axis:
             exec(axis.postmove_cleanup_cmds)
             axis.postmove_cleanup_cmds = ''
