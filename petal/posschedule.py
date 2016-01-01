@@ -65,8 +65,8 @@ class PosSchedule(object):
                 # convert global (Q,S) into local theta,phi
                 start_xy = tbl.posmodel.trans.QS_to_obsXY([self._start[0][i],self._start[1][i]])
                 targt_xy = tbl.posmodel.trans.QS_to_obsXY([self._targt[0][i],self._targt[1][i]])
-                start_shaft = tbl.posmodel.trans.obsXY_to_shaftTP(start_xy)
-                targt_shaft = tbl.posmodel.trans.obsXY_to_shaftTP(targt_xy)
+                (start_shaft,reachable) = tbl.posmodel.trans.obsXY_to_shaftTP(start_xy)
+                (targt_shaft,reachable) = tbl.posmodel.trans.obsXY_to_shaftTP(targt_xy)
                 start = tbl.posmodel.trans.shaftTP_to_obsTP(start_shaft)
                 targt = tbl.posmodel.trans.shaftTP_to_obsTP(targt_shaft)
 

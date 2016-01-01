@@ -148,7 +148,7 @@ class PosModel(object):
         obs_finish = obs_start.copy()
         obs_finish[axisid] += distance
         shaft_finish = self.trans.obsTP_to_shaftTP(obs_finish)
-        dist = shaft_finish[axisid][0] - shaft_start[axisid]
+        dist = shaft_finish[axisid] - shaft_start[axisid]
         if not(options['ALLOW_EXCEED_LIMITS']):
             dist = self.axis[axisid].truncate_to_limits(dist,shaft_start[axisid])
         gear_ratio = self.axis[axisid].gear_ratio
@@ -291,20 +291,20 @@ class PosModel(object):
         pos = self.expected_current_position
         start_tp = [pos['shaftT'] + expected_prior_dTdP[0], pos['shaftP'] + expected_prior_dTdP[1]]
         if   movecmd == 'qs':
-            targt_xy = self.trans.QS_to_obsXY(qs)
-            targt_tp = self.trans.obsXY_to_shaftTP(targt_xy)
+            targt_xy = self.trans.QS_to_obsXY(vals)
+            (targt_tp,reachable) = self.trans.obsXY_to_shaftTP(targt_xy)
         elif movecmd == 'dqds':
             start_xy = self.trans.shaftTP_to_obsXY(start_tp)
             start_qs = self.trans.obsXY_to_QS(start_xy)
             targt_qs = (np.array(start_PQ) + np.array(vals)).tolist()
             targt_xy = self.trans.QS_to_obsXY(targt_qs)
-            targt_tp = self.trans.obsXY_to_shaftTP(targt_xy)
+            (targt_tp,reachable) = self.trans.obsXY_to_shaftTP(targt_xy)
         elif movecmd == 'xy':
-            targt_tp = self.trans.obsXY_to_shaftTP(vals)
+            (targt_tp,reachable) = self.trans.obsXY_to_shaftTP(vals)
         elif movecmd == 'dxdy':
             start_xy = self.trans.shaftTP_to_obsXY(start_tp)
             targt_xy = (np.array(start_xy) + np.array(vals)).tolist()
-            targt_tp = self.trans.obsXY_to_shaftTP(targt_xy)
+            (targt_tp,reachable) = self.trans.obsXY_to_shaftTP(targt_xy)
         elif movecmd == 'tp':
             targt_tp = vals
         elif movecmd == 'dtdp':

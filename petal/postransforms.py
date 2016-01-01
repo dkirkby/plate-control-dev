@@ -45,23 +45,27 @@ class PosTransforms(object):
         """
         posXY   ... (x,y) local to fiber positioner, centered on theta axis, looking at fiber tip
         obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
-        INPUT:  [2][N] array of [[x_values],[y_values]]
-        RETURN: [2][N] array of [[x_values],[y_values]]
+        INPUT:  [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
+        RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         """
+        (xy, was_not_list) = PosTransforms.listify(xy)
         X = np.polyval(self.poly('X'), xy[0])
         Y = np.polyval(self.poly('Y'), xy[1])
         XY = np.array([X,Y]).tolist()
+        if was_not_list:
+            XY = PosTransforms.delistify(XY)
         return XY
 
     def obsXY_to_posXY(self, xy):
         """
         obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
         posXY   ... (x,y) local to fiber positioner, centered on theta axis, looking at fiber tip
-        INPUT:  [2][N] array of [[x_values],[y_values]]
-        RETURN: [2][N] array of [[x_values],[y_values]]
+        INPUT:  [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
+        RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         """
-        x = np.array(pc.list_from_one_or_list(xy[0]))
-        y = np.array(pc.list_from_one_or_list(xy[1]))
+        (xy, was_not_list) = PosTransforms.listify(xy)
+        x = np.array(xy[0])
+        y = np.array(xy[1])
         Xguess = x - self.poly('X')[-1]
         Yguess = y - self.poly('Y')[-1]
         X = [0]*x.size
@@ -69,58 +73,73 @@ class PosTransforms(object):
         for i in range(x.size):
             X[i] = self.inverse_poly(self.poly('X'), x[i], Xguess[i])
             Y[i] = self.inverse_poly(self.poly('Y'), y[i], Yguess[i])
-        return [pc.list_from_one_or_list(X),pc.list_from_one_or_list(Y)]
+        XY = [X,Y]
+        if was_not_list:
+            XY = PosTransforms.delistify(XY)
+        return XY
 
     def obsXY_to_shaftTP(self, xy):
         """
         obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
         shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
-        INPUT:  [2][N] array of [[x_values],[y_values]]
-        RETURN: [2][N] array of [[t_values],[p_values]]
+        INPUT:  [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
+        RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
                 [N]    array of [index_values]
         The output "reachable" is a list of all the indexes of the points that were able to be reached.
         """
+        (xy, was_not_list) = PosTransforms.listify(xy)
         r = [self.posmodel.state.read('LENGTH_R1'),self.posmodel.state.read('LENGTH_R2')]
         shaft_range = [self.posmodel.full_range_T, self.posmodel.full_range_P]
         XY = self.obsXY_to_posXY(xy)                    # adjust observer xy into the positioner system XY
         obs_range = self.shaftTP_to_obsTP(shaft_range)  # want range used in next line to be according to observer (since observer sees the physical phi = 0)
         (tp, reachable) = self.xy2tp(XY, r, obs_range)
         TP = self.obsTP_to_shaftTP(tp)                  # adjust angles back into shaft space
+        if was_not_list:
+            TP = PosTransforms.delistify(TP)
         return TP, reachable
 
     def shaftTP_to_obsXY(self, tp):
         """
         shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
         obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
-        INPUT:  [2][N] array of [[t_values],[p_values]]
-        RETURN: [2][N] array of [[x_values],[y_values]]
+        INPUT:  [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
+        RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         """
+        (tp, was_not_list) = PosTransforms.listify(tp)
         r = [self.posmodel.state.read('LENGTH_R1'),self.posmodel.state.read('LENGTH_R2')]
         TP = self.shaftTP_to_obsTP(tp)  # adjust shaft angles into observer space (since observer sees the physical phi = 0)
-        xy = self.tp2xy(TP, r)  # calculate xy in posXY space
+        xy = self.tp2xy(TP, r)          # calculate xy in posXY space
+        xy = xy.tolist()
         XY = self.posXY_to_obsXY(xy)  # adjust positionner XY into observer space
+        if was_not_list:
+            XY = PosTransforms.delistify(XY)
         return XY
 
     def shaftTP_to_obsTP(self, tp):
         """
         shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
         obsTP   ... (theta,phi) expected position of fiber tip, including offsets and calibrations
-        INPUT:  [2][N] array of [[t_values],[p_values]]
-        RETURN: [2][N] array of [[t_values],[p_values]]
+        INPUT:  [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
+        RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
         """
+        (tp, was_not_list) = PosTransforms.listify(tp)
         T = np.polyval(self.poly('T'), tp[0])
         P = np.polyval(self.poly('P'), tp[1])
         TP = np.array([T,P]).tolist()
+        if was_not_list:
+            TP = PosTransforms.delistify(TP)
         return TP
 
     def obsTP_to_shaftTP(self, tp):
         """
         obsTP   ... (theta,phi) expected position of fiber tip, including offsets and calibrations
         shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
-        INPUT:  [2][N] array of [[t_values],[p_values]]
-        RETURN: [2][N] array of [[t_values],[p_values]]        """
-        t = np.array(pc.list_from_one_or_list(tp[0]))
-        p = np.array(pc.list_from_one_or_list(tp[1]))
+        INPUT:  [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
+        RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
+        """
+        (tp, was_not_list) = PosTransforms.listify(tp)
+        t = np.array(tp[0])
+        p = np.array(tp[1])
         Tguess = t - self.poly('T')[-1]
         Pguess = p - self.poly('P')[-1]
         T = [0]*t.size
@@ -128,63 +147,78 @@ class PosTransforms(object):
         for i in range(t.size):
             T[i] = self.inverse_poly(self.poly('T'), t[i], Tguess[i])
             P[i] = self.inverse_poly(self.poly('P'), p[i], Pguess[i])
-        return [pc.list_from_one_or_list(T),pc.list_from_one_or_list(P)]
+        TP = [T,P]
+        if was_not_list:
+            TP = PosTransforms.delistify(TP)
+        return TP
 
     def obsXY_to_QS(self,xy):
         """
         obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
         QS      ... (q,s) global to focal plate, q is angle about the optical axis, s is path distance from optical axis, along the curved focal surface, within a plane that intersects the optical axis
-        INPUT:  [2][N] array of [[x_values],[y_values]]
-        RETURN: [2][N] array of [[q_values],[s_values]]
+        INPUT:  [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
+        RETURN: [2][N] array of [[q_values],[s_values]] or [2] array of [q_value,s_value]
         """
+        (xy, was_not_list) = PosTransforms.listify(xy)
         X = np.array(xy[0])
         Y = np.array(xy[1])
         Q = np.degrees(np.arctan2(Y,X))
         R = np.sqrt(X**2 + Y**2)
         S = self.R2S(R.tolist())
         QS = [Q.tolist(),S]
+        if was_not_list:
+            QS = PosTransforms.delistify(QS)
         return QS
 
     def QS_to_obsXY(self,qs):
         """
         QS      ... (q,s) global to focal plate, q is angle about the optical axis, s is path distance from optical axis, along the curved focal surface, within a plane that intersects the optical axis
         obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
-        INPUT:  [2][N] array of [[q_values],[s_values]]
-        RETURN: [2][N] array of [[x_values],[y_values]]
+        INPUT:  [2][N] array of [[q_values],[s_values]] or [2] array of [q_value,s_value]
+        RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         """
+        (qs, was_not_list) = PosTransforms.listify(qs)
         Q = pc.list_from_one_or_list(qs[0])
         R = self.S2R(qs[1])
         X = R * np.cos(np.deg2rad(Q))
         Y = R * np.sin(np.deg2rad(Q))
         XY = [X.tolist(),Y.tolist()]
+        if was_not_list:
+            XY = PosTransforms.delistify(XY)
         return XY
 
     def QS_to_flatXY(self,qs):
         """
         QS      ... (q,s) global to focal plate, q is angle about the optical axis, s is path distance from optical axis, along the curved focal surface, within a plane that intersects the optical axis
         flatXY  ... (x,y) global to focal plate, with focal plate slightly stretched out and flattened (used for anti-collision)
-        INPUT:  [2][N] array of [[q_values],[s_values]]
-        RETURN: [2][N] array of [[x_values],[y_values]]
+        INPUT:  [2][N] array of [[q_values],[s_values]] or [2] array of [q_value,s_value]
+        RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         """
+        (qs, was_not_list) = PosTransforms.listify(qs)
         Q = np.array(qs[0])
         S = np.array(qs[1])
         X = S * np.cos(np.deg2rad(Q))
         Y = S * np.sin(np.deg2rad(Q))
         XY = [X.tolist(),Y.tolist()]
+        if was_not_list:
+            XY = PosTransforms.delistify(XY)
         return XY
 
     def flatXY_to_QS(self,xy):
         """
         flatXY  ... (x,y) global to focal plate, with focal plate slightly stretched out and flattened (used for anti-collision)
         QS      ... (q,s) global to focal plate, q is angle about the optical axis, s is path distance from optical axis, along the curved focal surface, within a plane that intersects the optical axis
-        INPUT:  [2][N] array of [[x_values],[y_values]]
-        RETURN: [2][N] array of [[q_values],[s_values]]
+        INPUT:  [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
+        RETURN: [2][N] array of [[q_values],[s_values]] or [2] array of [q_value,s_value]
         """
+        (xy, was_not_list) = PosTransforms.listify(xy)
         X = np.array(xy[0])
         Y = np.array(xy[1])
         Q = np.degrees(np.arctan2(Y,X))
         S = np.sqrt(X**2 + Y**2)
         QS = [Q.tolist(),S.tolist()]
+        if was_not_list:
+            QS = PosTransforms.delistify(QS)
         return QS
 
     # CALIBRATION POLYNOMIAL GETTER
@@ -332,19 +366,24 @@ class PosTransforms(object):
             A[i,wsabove] = np.max(ranges[i])
 
         tp = A
-        return A.tolist(), reachable.tolist()
+        return tp.tolist(), reachable.tolist()
 
     @staticmethod
     def inverse_poly(p, y, xguess):
         """inverter function for quadratic polynomial such that y = polyval(p,x)
         single value calculated at a time only
         """
-        P = p.copy()
-        P[-1] -= y
-        roots = np.roots(P)
-        xdist = (roots - xguess)**2
-        x = roots[np.argmin(xdist)]
-        return x
+        if len(p) == 1:
+            return (y - p[0])
+        elif len(p) == 2:
+            return (y - p[0])/p[1]
+        else:
+            P = p.copy()
+            P[-1] -= y
+            roots = np.roots(P)
+            xdist = (roots - xguess)**2
+            x = roots[np.argmin(xdist)]
+            return x
 
     @staticmethod
     def cart2pol(x,y):
@@ -352,3 +391,27 @@ class PosTransforms(object):
         r = np.sqrt(x**2+y**2)
         theta = np.degrees(np.arctan2(y, x))
         return r, theta
+
+    @staticmethod
+    def listify(uv):
+        """turn [u,v] into [[u],[v]], if it isn't already"""
+        new_uv = []
+        was_not_list = False
+        for i in range(len(uv)):
+            if not(isinstance(uv[i],list)):
+                new_uv.append([uv[i]])
+                was_not_list = True
+            else:
+                new_uv.append(uv[i].copy())
+        return new_uv, was_not_list
+
+    @staticmethod
+    def delistify(uv):
+        """turn [[u],[v]] into [u,v]"""
+        new_uv = []
+        for i in range(len(uv)):
+            if isinstance(uv[i],list):
+                new_uv.extend(uv[i][:])
+            else:
+                new_uv.append(uv[i])
+        return new_uv
