@@ -152,6 +152,21 @@ class PosArrayMaster(object):
     def clear_schedule(self):
         self.schedule = posschedule.PosSchedule()
 
+    def expected_current_position(self,posid,varname=''):
+        """Retrieve the current position, for a positioner identied by posid, according
+        to the internal tracking of its posmodel object. Valid varnames are:
+            'Q', 'S', 'x', 'y', 'obsT', 'obsP', 'shaftT', 'shaftP', 'motorT', 'motorP'
+        See comments in posmodel.py for explanation of these values.
+        If no varname is specified, a dictionary containing all of them will be
+        returned.
+        """
+        i = self.posids.index(posid)
+        pos = self.posmodels[i].expected_current_position
+        if varname == '':
+            return pos
+        else:
+            return pos[varname]
+
     def get(self,posid,varname=''):
         """Retrieve the state value identified by string varname, for positioner
         identified by id posid. If no varname is specified, return the whole
