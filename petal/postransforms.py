@@ -48,12 +48,12 @@ class PosTransforms(object):
         INPUT:  [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         """
-        (xy, was_not_list) = PosTransforms.listify(xy)
+        (xy, was_not_list) = pc.listify(xy)
         X = np.polyval(self.poly('X'), xy[0])
         Y = np.polyval(self.poly('Y'), xy[1])
         XY = np.array([X,Y]).tolist()
         if was_not_list:
-            XY = PosTransforms.delistify(XY)
+            XY = pc.delistify(XY)
         return XY
 
     def obsXY_to_posXY(self, xy):
@@ -63,7 +63,7 @@ class PosTransforms(object):
         INPUT:  [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         """
-        (xy, was_not_list) = PosTransforms.listify(xy)
+        (xy, was_not_list) = pc.listify(xy)
         x = np.array(xy[0])
         y = np.array(xy[1])
         Xguess = x - self.poly('X')[-1]
@@ -75,7 +75,7 @@ class PosTransforms(object):
             Y[i] = self.inverse_poly(self.poly('Y'), y[i], Yguess[i])
         XY = [X,Y]
         if was_not_list:
-            XY = PosTransforms.delistify(XY)
+            XY = pc.delistify(XY)
         return XY
 
     def obsXY_to_shaftTP(self, xy):
@@ -87,7 +87,7 @@ class PosTransforms(object):
                 [N]    array of [index_values]
         The output "reachable" is a list of all the indexes of the points that were able to be reached.
         """
-        (xy, was_not_list) = PosTransforms.listify(xy)
+        (xy, was_not_list) = pc.listify(xy)
         r = [self.posmodel.state.read('LENGTH_R1'),self.posmodel.state.read('LENGTH_R2')]
         shaft_range = [self.posmodel.full_range_T, self.posmodel.full_range_P]
         XY = self.obsXY_to_posXY(xy)                    # adjust observer xy into the positioner system XY
@@ -95,7 +95,7 @@ class PosTransforms(object):
         (tp, reachable) = self.xy2tp(XY, r, obs_range)
         TP = self.obsTP_to_shaftTP(tp)                  # adjust angles back into shaft space
         if was_not_list:
-            TP = PosTransforms.delistify(TP)
+            TP = pc.delistify(TP)
         return TP, reachable
 
     def shaftTP_to_obsXY(self, tp):
@@ -105,14 +105,14 @@ class PosTransforms(object):
         INPUT:  [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
         RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         """
-        (tp, was_not_list) = PosTransforms.listify(tp)
+        (tp, was_not_list) = pc.listify(tp)
         r = [self.posmodel.state.read('LENGTH_R1'),self.posmodel.state.read('LENGTH_R2')]
         TP = self.shaftTP_to_obsTP(tp)  # adjust shaft angles into observer space (since observer sees the physical phi = 0)
         xy = self.tp2xy(TP, r)          # calculate xy in posXY space
         xy = xy.tolist()
         XY = self.posXY_to_obsXY(xy)  # adjust positionner XY into observer space
         if was_not_list:
-            XY = PosTransforms.delistify(XY)
+            XY = pc.delistify(XY)
         return XY
 
     def shaftTP_to_obsTP(self, tp):
@@ -122,12 +122,12 @@ class PosTransforms(object):
         INPUT:  [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
         RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
         """
-        (tp, was_not_list) = PosTransforms.listify(tp)
+        (tp, was_not_list) = pc.listify(tp)
         T = np.polyval(self.poly('T'), tp[0])
         P = np.polyval(self.poly('P'), tp[1])
         TP = np.array([T,P]).tolist()
         if was_not_list:
-            TP = PosTransforms.delistify(TP)
+            TP = pc.delistify(TP)
         return TP
 
     def obsTP_to_shaftTP(self, tp):
@@ -137,7 +137,7 @@ class PosTransforms(object):
         INPUT:  [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
         RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
         """
-        (tp, was_not_list) = PosTransforms.listify(tp)
+        (tp, was_not_list) = pc.listify(tp)
         t = np.array(tp[0])
         p = np.array(tp[1])
         Tguess = t - self.poly('T')[-1]
@@ -149,7 +149,7 @@ class PosTransforms(object):
             P[i] = self.inverse_poly(self.poly('P'), p[i], Pguess[i])
         TP = [T,P]
         if was_not_list:
-            TP = PosTransforms.delistify(TP)
+            TP = pc.delistify(TP)
         return TP
 
     def obsXY_to_QS(self,xy):
@@ -159,7 +159,7 @@ class PosTransforms(object):
         INPUT:  [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         RETURN: [2][N] array of [[q_values],[s_values]] or [2] array of [q_value,s_value]
         """
-        (xy, was_not_list) = PosTransforms.listify(xy)
+        (xy, was_not_list) = pc.listify(xy)
         X = np.array(xy[0])
         Y = np.array(xy[1])
         Q = np.degrees(np.arctan2(Y,X))
@@ -167,7 +167,7 @@ class PosTransforms(object):
         S = self.R2S(R.tolist())
         QS = [Q.tolist(),S]
         if was_not_list:
-            QS = PosTransforms.delistify(QS)
+            QS = pc.delistify(QS)
         return QS
 
     def QS_to_obsXY(self,qs):
@@ -177,14 +177,14 @@ class PosTransforms(object):
         INPUT:  [2][N] array of [[q_values],[s_values]] or [2] array of [q_value,s_value]
         RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         """
-        (qs, was_not_list) = PosTransforms.listify(qs)
-        Q = pc.list_from_one_or_list(qs[0])
+        (qs, was_not_list) = pc.listify(qs)
+        Q = qs[0]
         R = self.S2R(qs[1])
         X = R * np.cos(np.deg2rad(Q))
         Y = R * np.sin(np.deg2rad(Q))
         XY = [X.tolist(),Y.tolist()]
         if was_not_list:
-            XY = PosTransforms.delistify(XY)
+            XY = pc.delistify(XY)
         return XY
 
     def QS_to_flatXY(self,qs):
@@ -194,14 +194,14 @@ class PosTransforms(object):
         INPUT:  [2][N] array of [[q_values],[s_values]] or [2] array of [q_value,s_value]
         RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         """
-        (qs, was_not_list) = PosTransforms.listify(qs)
+        (qs, was_not_list) = pc.listify(qs)
         Q = np.array(qs[0])
         S = np.array(qs[1])
         X = S * np.cos(np.deg2rad(Q))
         Y = S * np.sin(np.deg2rad(Q))
         XY = [X.tolist(),Y.tolist()]
         if was_not_list:
-            XY = PosTransforms.delistify(XY)
+            XY = pc.delistify(XY)
         return XY
 
     def flatXY_to_QS(self,xy):
@@ -211,14 +211,14 @@ class PosTransforms(object):
         INPUT:  [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         RETURN: [2][N] array of [[q_values],[s_values]] or [2] array of [q_value,s_value]
         """
-        (xy, was_not_list) = PosTransforms.listify(xy)
+        (xy, was_not_list) = pc.listify(xy)
         X = np.array(xy[0])
         Y = np.array(xy[1])
         Q = np.degrees(np.arctan2(Y,X))
         S = np.sqrt(X**2 + Y**2)
         QS = [Q.tolist(),S.tolist()]
         if was_not_list:
-            QS = PosTransforms.delistify(QS)
+            QS = pc.delistify(QS)
         return QS
 
     # CALIBRATION POLYNOMIAL GETTER
@@ -391,27 +391,3 @@ class PosTransforms(object):
         r = np.sqrt(x**2+y**2)
         theta = np.degrees(np.arctan2(y, x))
         return r, theta
-
-    @staticmethod
-    def listify(uv):
-        """turn [u,v] into [[u],[v]], if it isn't already"""
-        new_uv = []
-        was_not_list = False
-        for i in range(len(uv)):
-            if not(isinstance(uv[i],list)):
-                new_uv.append([uv[i]])
-                was_not_list = True
-            else:
-                new_uv.append(uv[i].copy())
-        return new_uv, was_not_list
-
-    @staticmethod
-    def delistify(uv):
-        """turn [[u],[v]] into [u,v]"""
-        new_uv = []
-        for i in range(len(uv)):
-            if isinstance(uv[i],list):
-                new_uv.extend(uv[i][:])
-            else:
-                new_uv.append(uv[i])
-        return new_uv

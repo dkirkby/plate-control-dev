@@ -19,12 +19,6 @@ T = 0  # theta axis idx -- NOT the motor axis ID!!
 P = 1  # phi axis idx -- NOT the motor axis ID!!
 axis_labels = ('theta', 'phi')
 
-# Joe can't believe Python makes you type this many characters to do this...
-def list_from_one_or_list(one_item_or_list):
-    if not(isinstance(one_item_or_list,list)):
-        one_item_or_list = [one_item_or_list]
-    return one_item_or_list
-
 # enumeration of verbosity level to stdout
 not_verbose = 0
 verbose = 1
@@ -49,4 +43,27 @@ def R2S_lookup(R):
     return np.interp(R,R2S_lookup_data[:,0],R2S_lookup_data[:,2],left=float('nan'))
 def S2R_lookup(S):
     return np.interp(S,R2S_lookup_data[:,2],R2S_lookup_data[:,0],left=float('nan'))
+
+# convenience functions for handling mixes of [M][N] vs [M] dimension lists
+def listify(uv):
+    """turn [u,v] into [[u],[v]], if it isn't already"""
+    new_uv = []
+    was_not_list = False
+    for i in range(len(uv)):
+        if not(isinstance(uv[i],list)):
+            new_uv.append([uv[i]])
+            was_not_list = True
+        else:
+            new_uv.append(uv[i].copy())
+    return new_uv, was_not_list
+
+def delistify(uv):
+    """turn [[u],[v]] into [u,v]"""
+    new_uv = []
+    for i in range(len(uv)):
+        if isinstance(uv[i],list):
+            new_uv.extend(uv[i][:])
+        else:
+            new_uv.append(uv[i])
+    return new_uv
 
