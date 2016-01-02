@@ -2,6 +2,7 @@ import posmodel
 import posschedule
 import posstate
 import petalcomm
+import posconstants as pc
 
 class PosArrayMaster(object):
     """Maintains a list of instances of the Fiber Positioner software model
@@ -107,18 +108,14 @@ class PosArrayMaster(object):
             The fields have the following types and meanings:
 
                 posid         ... string                    ... identifies the positioner by 'SERIAL_ID'
-
                 nrows         ... unsigned integer          ... number of elements in each of the list fields (i.e. number of rows of the move table)
-
                 motor_steps_T or
                 motor_steps_P ... list of signed integers   ... number of motor steps to rotate
                                                                     ... motor_steps_X > 0 ... ccw rotation
                                                                     ... motor_steps_X < 0 ... cw rotation
                 speed_mode_T or
                 speed_mode_P  ... list of strings           ... 'cruise' or 'creep'
-
                 movetime      ... list of unsigned floats   ... estimated time the row's motion will take, in seconds, not including the postpause
-
                 postpause     ... list of unsigned integers ... pause time after the row's motion, in milliseconds, before executing the next row
 
         """
@@ -157,34 +154,97 @@ class PosArrayMaster(object):
         to the internal tracking of its posmodel object. Valid varnames are:
             'Q', 'S', 'x', 'y', 'obsT', 'obsP', 'shaftT', 'shaftP', 'motorT', 'motorP'
         See comments in posmodel.py for explanation of these values.
+
         If no varname is specified, a dictionary containing all of them will be
         returned.
+
+        If posid is a list of multiple positioner ids, then the return will be a
+        corresponding list of positions. The optional argument varname can be:
+            ... a list, of same length as posid
+            ... or just a single varname, which gets fetched uniformly for all posid
         """
-        i = self.posids.index(posid)
-        pos = self.posmodels[i].expected_current_position
-        if varname == '':
-            return pos
-        else:
-            return pos[varname]
+        (posid, was_not_list) = listify(posid)
+        (varname, temp) = listify(varname)
+        if len(varname) != len(posid):
+            varname = [varname[0]]*len(posid)
+        vals = []
+        for p in posid:
+            i = self.posids.index(p)
+            this_val = self.posmodels[i].expected_current_position
+            if varname[i] == '':
+                vals.append(this_val)
+            else:
+                vals.append(this_val[varname[i]])
+        if was_not_list:
+            vals = delistify(vals)
+        return vals
+
+    def expected_current_position_str(self,posid):
+        """One-line string summarizing current expected position of a positioner.
+
+        If posid is a list of multiple positioner ids, then the return will be a
+        corresponding list of strings.
+        """
+        (posid, was_not_list) = listify(posid)
+        strs = []
+        for p in posid:
+            i = self.posids.index(p)
+            strs.append(self.pos[i].expected_current_position_str)
+        if was_not_list:
+            strs = delistify(strs)
+        return strs
 
     def get(self,posid,varname=''):
         """Retrieve the state value identified by string varname, for positioner
-        identified by id posid. If no varname is specified, return the whole
-        posmodel.
+        identified by id posid.
+
+        If no varname is specified, return the whole posmodel.
+
+        If posid is a list of multiple positioner ids, then the return will be a
+        corresponding list of values. The optional argument varname can be:
+            ... a list, of same length as posid
+            ... or just a single varname, which gets fetched uniformly for all posid
         """
-        i = self.posids.index(posid)
-        if varname == '':
-            return self.posmodels[i]
-        else:
-            return self.posmodels[i].state.read(varname)
+        (posid, was_not_list) = listify(posid)
+        (varname, temp) = listify(varname)
+        if len(varname) != len(posid):
+            varname = [varname[0]]*len(posid)
+        vals = []
+        for p in posid:
+            i = self.posids.index(p)
+            if varname[i] == '':
+                vals.append(self.posmodels[i])
+            else:
+                vals.append(self.posmodels[i].state.read(varname[i]))
+        if was_not_list:
+            vals = delistify(vals)
+        return vals
 
     def setval(self,posid,varname,value,write_to_disk=None):
         """Set the state value identified by string varname, for positioner unit
         identified by id posid.
+
         Note comments for posstate.write() method, which explain the optional
-        arguemtn 'write_to_disk'.
+        argument 'write_to_disk'.
+
+        If posid is a list of multiple positioner ids, then this method can handle
+        setting multiple values. The other arguments can either:
+            ... also be lists, of same length as posid
+            ... or just a single value, which gets applied uniformly to all posid.
         """
-        i = self.posids.index(posid)
-        self.posmodels[i].state.write(varname,value,write_to_disk)
+        (posid,         temp) = listify(posid)
+        (varname,       temp) = listify(varname)
+        (value,         temp) = listify(value)
+        (write_to_disk, temp) = listify(write_to_disk)
+        n = len(posid)
+        if len(varname) != n:
+            varname = [varname[0]]*n
+        if len(value) != n:
+            value = [value[0]]*n
+        if len(write_to_disk) != n:
+            write_to_disk = [write_to_disk[0]]*n
+        for p in posid:
+            i = self.posids.index(p)
+            self.posmodels[i].state.write(varname[i],value[i],write_to_disk[i])
 
 
