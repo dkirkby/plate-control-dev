@@ -33,19 +33,34 @@ rotmat2D = lambda angle: [np.cos(np.deg2rad(angle)), - np.sin(np.deg2rad(angle))
 
 # Functions for handling mixes of [M][N] vs [M] dimension lists
 def listify(uv):
-    """turn [u,v] into [[u],[v]], if it isn't already"""
+    """Turn [u,v] into [[u],[v]], if it isn't already.
+    Turn uv into a list [uv] if it isn't already.
+    In the special case where uv is a single item list, it remains so in the return.
+    A boolean is returned saying whether the item was modified."""
+    if not(isinstance(uv,list)):
+        return [uv], True
+    if len(uv) == 1:
+        return uv, False
     new_uv = []
-    was_not_list = False
+    was_listified = False
     for i in range(len(uv)):
         if not(isinstance(uv[i],list)):
             new_uv.append([uv[i]])
-            was_not_list = True
+            was_listified = True
         else:
             new_uv.append(uv[i].copy())
-    return new_uv, was_not_list
+    return new_uv, was_listified
 
 def delistify(uv):
-    """turn [[u],[v]] into [u,v]"""
+    """Turn [[u],[v]] into [u,v], if it isn't already.
+    For a non-list, there is no modification.
+    For a list with one item only, the element inside is returned.
+    For a list with multiple items, the return is a flat list of multiple items.
+    """
+    if not(isinstance(uv,list)):
+        return uv
+    if len(uv) == 1:
+        return uv[0]
     new_uv = []
     for i in range(len(uv)):
         if isinstance(uv[i],list):
