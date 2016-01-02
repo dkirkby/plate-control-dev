@@ -7,8 +7,7 @@ import numpy as np
 
 # Initialization
 posids = ['6M01']
-configs = ['DEFAULT']
-m = posarraymaster.PosArrayMaster(posids,configs)
+m = posarraymaster.PosArrayMaster(posids)
 
 # Initialization of communications
 # These commands are very specific to the hacked-together LegacyPositionerComm.

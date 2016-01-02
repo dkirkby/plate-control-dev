@@ -10,10 +10,8 @@ class PosArrayMaster(object):
     group of positioners (e.g. on a Petal) is coordinated. In general, all
     move requests and scheduling is accomplished with PosArrayMaster.
     """
-    def __init__(self, posids, configs=[]):
+    def __init__(self, posids):
         self.posmodels = []
-        if len(configs) != len(posids):
-            configs = ['DEFAULT']*len(posids)
         for i in range(len(posids)):
             state = posstate.PosState(posids[i],logging=True)
             model = posmodel.PosModel(state)
@@ -149,11 +147,14 @@ class PosArrayMaster(object):
     def clear_schedule(self):
         self.schedule = posschedule.PosSchedule()
 
-    def expected_current_position(self,posid,varname=''):
+    def expected_current_position(self,posid=None,varname=''):
         """Retrieve the current position, for a positioner identied by posid, according
         to the internal tracking of its posmodel object. Valid varnames are:
             'Q', 'S', 'x', 'y', 'obsT', 'obsP', 'shaftT', 'shaftP', 'motorT', 'motorP'
         See comments in posmodel.py for explanation of these values.
+
+        If no posid is specified, then a single value, or list of all positioners' values is returned.
+        This can be used either with or without specifying a varname.
 
         If no varname is specified, a dictionary containing all of them will be
         returned.
@@ -163,8 +164,8 @@ class PosArrayMaster(object):
             ... a list, of same length as posid
             ... or just a single varname, which gets fetched uniformly for all posid
         """
-        (posid, was_not_list) = listify(posid)
-        (varname, temp) = listify(varname)
+        (posid, was_not_list) = self._posid_listify(posid)
+        (varname, temp) = pc.listify(varname)
         if len(varname) != len(posid):
             varname = [varname[0]]*len(posid)
         vals = []
@@ -176,37 +177,41 @@ class PosArrayMaster(object):
             else:
                 vals.append(this_val[varname[i]])
         if was_not_list:
-            vals = delistify(vals)
+            vals = pc.delistify(vals)
         return vals
 
-    def expected_current_position_str(self,posid):
+    def expected_current_position_str(self,posid=None):
         """One-line string summarizing current expected position of a positioner.
 
         If posid is a list of multiple positioner ids, then the return will be a
         corresponding list of strings.
+
+        If no posid is specified, a list of strings for all positioners is returned.
         """
-        (posid, was_not_list) = listify(posid)
+        (posid, was_not_list) = self._posid_listify(posid)
         strs = []
         for p in posid:
             i = self.posids.index(p)
             strs.append(self.pos[i].expected_current_position_str)
         if was_not_list:
-            strs = delistify(strs)
+            strs = pc.delistify(strs)
         return strs
 
-    def get(self,posid,varname=''):
+    def get(self,posid=None,varname=''):
         """Retrieve the state value identified by string varname, for positioner
         identified by id posid.
 
         If no varname is specified, return the whole posmodel.
+
+        If no posid is specified, a list of values for all positioners is returned.
 
         If posid is a list of multiple positioner ids, then the return will be a
         corresponding list of values. The optional argument varname can be:
             ... a list, of same length as posid
             ... or just a single varname, which gets fetched uniformly for all posid
         """
-        (posid, was_not_list) = listify(posid)
-        (varname, temp) = listify(varname)
+        (posid, was_not_list) = self._posid_listify(posid)
+        (varname, temp) = pc.listify(varname)
         if len(varname) != len(posid):
             varname = [varname[0]]*len(posid)
         vals = []
@@ -217,26 +222,31 @@ class PosArrayMaster(object):
             else:
                 vals.append(self.posmodels[i].state.read(varname[i]))
         if was_not_list:
-            vals = delistify(vals)
+            vals = pc.delistify(vals)
         return vals
 
-    def setval(self,posid,varname,value,write_to_disk=None):
+    def setval(self,posid=None,varname=None,value=None,write_to_disk=None):
         """Set the state value identified by string varname, for positioner unit
         identified by id posid.
 
         Note comments for posstate.write() method, which explain the optional
         argument 'write_to_disk'.
 
+        If no posid is specified, value is set for all positioners.
+
         If posid is a list of multiple positioner ids, then this method can handle
         setting multiple values. The other arguments can either:
             ... also be lists, of same length as posid
             ... or just a single value, which gets applied uniformly to all posid.
         """
-        (posid,         temp) = listify(posid)
-        (varname,       temp) = listify(varname)
-        (value,         temp) = listify(value)
-        (write_to_disk, temp) = listify(write_to_disk)
-        n = len(posid)
+        if varname == None or value == None:
+            print('either no varname or no value was specified to setval')
+            return
+        (posid, temp) = self._posid_listify(posid)
+        (varname, temp) = pc.listify(varname)
+        (value, temp) = pc.listify(value)
+        (write_to_disk, temp) = pc.listify(write_to_disk)
+        n = len(posid) # need some logic improvements here, to handle useful situations like "m.setval(varname=['SHAFT_T','SHAFT_P'],value=[0,180])" applying to all positioners
         if len(varname) != n:
             varname = [varname[0]]*n
         if len(value) != n:
@@ -247,4 +257,13 @@ class PosArrayMaster(object):
             i = self.posids.index(p)
             self.posmodels[i].state.write(varname[i],value[i],write_to_disk[i])
 
-
+    def _posid_listify(self,posid):
+        """Frequently-used wrapper for listify of posid. The additional functionality
+        here is the check for whether to auto-fill with all posids known to posarraymaster.
+        """
+        if posid == None:
+            posid = self.posids
+            was_not_list = (len(posid) == 1)
+        else:
+            (posid, was_not_list) = pc.listify(posid)
+        return posid, was_not_list
