@@ -165,12 +165,12 @@ class PosArrayMaster(object):
             ... or just a single varname, which gets fetched uniformly for all posid
         """
         (posid, was_not_list) = self._posid_listify(posid)
-        (varname, temp) = pc.listify(varname)
-        (posid, varname) = self._equalize_posid_and_var_lengths(posid,varname)
+        (varname, temp) = pc.listify(varname,keep_flat=True)
+        (posid, varname) = self._equalize_input_list_lengths(posid,varname)
         vals = []
-        for p in posid:
-            i = self.posids.index(p)
-            this_val = self.posmodels[i].expected_current_position
+        for i in range(len(posid)):
+            pidx = self.posids.index(posid[i])
+            this_val = self.posmodels[pidx].expected_current_position
             if varname[i] == '':
                 vals.append(this_val)
             else:
@@ -190,8 +190,8 @@ class PosArrayMaster(object):
         (posid, was_not_list) = self._posid_listify(posid)
         strs = []
         for p in posid:
-            i = self.posids.index(p)
-            strs.append(self.posmodels[i].expected_current_position_str)
+            pidx = self.posids.index(p)
+            strs.append(self.posmodels[pidx].expected_current_position_str)
         if was_not_list:
             strs = pc.delistify(strs)
         return strs
@@ -210,15 +210,15 @@ class PosArrayMaster(object):
             ... or just a single varname, which gets fetched uniformly for all posid
         """
         (posid, was_not_list) = self._posid_listify(posid)
-        (varname, temp) = pc.listify(varname)
-        (posid, varname) = self._equalize_posid_and_var_lengths(posid,varname)
+        (varname, temp) = pc.listify(varname,keep_flat=True)
+        (posid, varname) = self._equalize_input_list_lengths(posid,varname)
         vals = []
-        for p in posid:
-            i = self.posids.index(p)
+        for i in range(len(posid)):
+            pidx = self.posids.index(posid[i])
             if varname[i] == '':
-                vals.append(self.posmodels[i])
+                vals.append(self.posmodels[pidx])
             else:
-                vals.append(self.posmodels[i].state.read(varname[i]))
+                vals.append(self.posmodels[pidx].state.read(varname[i]))
         if was_not_list:
             vals = pc.delistify(vals)
         return vals
@@ -241,35 +241,15 @@ class PosArrayMaster(object):
         if varname == None or value == None:
             print('either no varname or no value was specified to setval')
             return
-        set_all_pos = (posid == None)
         (posid, temp) = self._posid_listify(posid)
-        (varname, temp) = pc.listify(varname)
-        (value, temp) = pc.listify(value)
-        if len(varname) != len(value) and not(len(varname) == 1 or len(value) == 1):
-            print('can''t set multi-element varnames and values lists whose lengths don''t match up, where neither one is a single element list')
-            return
-        if len(varname) == 1 and len(value) != 1 and len(value) != len(posid):
-            print('can''t set unmatching length list of values to posids')
-            return
-        if len(value) == 1 and len(varname) != 1 and len(varname) != len(posid):
-            print('can''t set unmatching length list of varnames to posids')
-        if len(posid) != len(varname) and len(varname) != len(value) and len(value) != len(posid):
-            print('can''t set multiple variables where none of posid, varname, and value match in length')
-            return
-        if len(varname) == 1:
-            varname = [varname[0]]*len(posid)
-        if len(value) == 1:
-            value = [value[0]]*len(posid)
-        iterate_over_variables = False
-        if len(posid) == 1:
-            iterate_over_variables = True
-        for p in posid:
-            i = self.posids.index(p)
-            if iterate_over_variables:
-                for j in varname:
-                    self.posmodels[i].state.write(varname[j],value[j],write_to_disk)
-            else:
-                self.posmodels[i].state.write(varname[i],value[i],write_to_disk)
+        (varname, temp) = pc.listify(varname,keep_flat=True)
+        (value, temp) = pc.listify(value,keep_flat=True)
+        (posid,varname) = self._equalize_input_list_lengths(posid,varname)
+        (posid,value)   = self._equalize_input_list_lengths(posid,value)
+        (posid,varname) = self._equalize_input_list_lengths(posid,varname) # repetition here handles the case where there was 1 posid element, 1 varname, but mulitplie elements in value
+        for i in range(len(posid)):
+            pidx = self.posids.index(posid[i])
+            self.posmodels[pidx].state.write(varname[i],value[i],write_to_disk)
 
     def _posid_listify(self,posid):
         """Internally-used wrapper method for listification of posid. The additional functionality
@@ -279,19 +259,19 @@ class PosArrayMaster(object):
             posid = self.posids
             was_not_list = (len(posid) == 1)
         else:
-            (posid, was_not_list) = pc.listify(posid)
+            (posid, was_not_list) = pc.listify(posid,keep_flat=True)
         return posid, was_not_list
 
-    def _equalize_posid_and_var_lengths(self,posid,var):
-        if len(posid) > 1 and len(varname) > 1 and not(len(posid) == len(var)):
-            print('can''t simultaneously get multiple var for a different number of multiple posid. try getting one var at a time, or else request whole objects')
+    def _equalize_input_list_lengths(self,var1,var2):
+        if not(isinstance(var1,list)) or not(isinstance(var2,list)):
+            print('both var1 and var2 must be lists, even if single-element')
             return None, None
-        if len(posid) != len(varname):
-            if len(varname) == 1:
-                varname = [varname]*len(posid)
-            elif len(posid) == 1:
-                posid = [posid]*len(varname)
+        if len(var1) != len(var2):
+            if len(var1) == 1:
+                var1 = var1*len(var2) # note here var1 is starting as a list
+            elif len(var2) == 1:
+                var2 = var2*len(var1) # note here var2 is starting as a list
             else:
-                print('either the posid or the var must be of length 1')
+                print('either the var1 or the var2 must be of length 1')
                 return None, None
-        return posid, varname
+        return var1, var2
