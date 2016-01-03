@@ -25,6 +25,7 @@ class LegacyPositionerComm(object):
         self.max_arguable_steps = self.steps_arg_n_bytes ** 16 - 1  # how large of an 'n steps' argument can be sent to driver
         self.CAN_comm = LawicellCANUSB(com_port)  # object that communicates over CAN with hardware
         self.settings_hold_time = 0.05 # seconds to wait for commands to get sent to firmware
+        self.send_cmd_off = False # controls whether to actually send commands out over hardware. useful when doing software debugging
         self.tables = []                                              # very specific to this hacked-together legacy implementation
         self.master = []                                              # very specific to this hacked-together legacy implementation
         typical_posmodel = posmodel.PosModel()                        # very specific to this hacked-together legacy implementation
@@ -272,7 +273,8 @@ class LegacyPositionerComm(object):
                 i += 1
 
         # send ths CAN message
-        self.CAN_comm.send_CAN_frame(hexid, hexbytes)
+        if not(self.send_cmd_off):
+            self.CAN_comm.send_CAN_frame(hexid, hexbytes)
         time.sleep(pause_after_send)
 
     def set_currents(self, bus_id, curr_spin_up_down, curr_cruise, curr_creep):
