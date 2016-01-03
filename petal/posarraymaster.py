@@ -147,34 +147,34 @@ class PosArrayMaster(object):
     def clear_schedule(self):
         self.schedule = posschedule.PosSchedule()
 
-    def expected_current_position(self,posid=None,varname=''):
+    def expected_current_position(self,posid=None,key=''):
         """Retrieve the current position, for a positioner identied by posid, according
-        to the internal tracking of its posmodel object. Valid varnames are:
+        to the internal tracking of its posmodel object. Valid keys are:
             'Q', 'S', 'x', 'y', 'obsT', 'obsP', 'shaftT', 'shaftP', 'motorT', 'motorP'
         See comments in posmodel.py for explanation of these values.
 
         If no posid is specified, then a single value, or list of all positioners' values is returned.
-        This can be used either with or without specifying a varname.
+        This can be used either with or without specifying a key.
 
-        If no varname is specified, a dictionary containing all of them will be
+        If no key is specified, a dictionary containing all of them will be
         returned.
 
         If posid is a list of multiple positioner ids, then the return will be a
-        corresponding list of positions. The optional argument varname can be:
+        corresponding list of positions. The optional argument key can be:
             ... a list, of same length as posid
-            ... or just a single varname, which gets fetched uniformly for all posid
+            ... or just a single key, which gets fetched uniformly for all posid
         """
         (posid, was_not_list) = self._posid_listify(posid)
-        (varname, temp) = pc.listify(varname,keep_flat=True)
-        (posid, varname) = self._equalize_input_list_lengths(posid,varname)
+        (key, temp) = pc.listify(key,keep_flat=True)
+        (posid, key) = self._equalize_input_list_lengths(posid,key)
         vals = []
         for i in range(len(posid)):
             pidx = self.posids.index(posid[i])
             this_val = self.posmodels[pidx].expected_current_position
-            if varname[i] == '':
+            if key[i] == '':
                 vals.append(this_val)
             else:
-                vals.append(this_val[varname[i]])
+                vals.append(this_val[key[i]])
         if was_not_list:
             vals = pc.delistify(vals)
         return vals
@@ -196,35 +196,35 @@ class PosArrayMaster(object):
             strs = pc.delistify(strs)
         return strs
 
-    def get(self,posid=None,varname=''):
-        """Retrieve the state value identified by string varname, for positioner
+    def get(self,posid=None,key=''):
+        """Retrieve the state value identified by string key, for positioner
         identified by id posid.
 
-        If no varname is specified, return the whole posmodel.
+        If no key is specified, return the whole posmodel.
 
         If no posid is specified, a list of values for all positioners is returned.
 
         If posid is a list of multiple positioner ids, then the return will be a
-        corresponding list of values. The optional argument varname can be:
+        corresponding list of values. The optional argument key can be:
             ... a list, of same length as posid
-            ... or just a single varname, which gets fetched uniformly for all posid
+            ... or just a single key, which gets fetched uniformly for all posid
         """
         (posid, was_not_list) = self._posid_listify(posid)
-        (varname, temp) = pc.listify(varname,keep_flat=True)
-        (posid, varname) = self._equalize_input_list_lengths(posid,varname)
+        (key, temp) = pc.listify(key,keep_flat=True)
+        (posid, key) = self._equalize_input_list_lengths(posid,key)
         vals = []
         for i in range(len(posid)):
             pidx = self.posids.index(posid[i])
-            if varname[i] == '':
+            if key[i] == '':
                 vals.append(self.posmodels[pidx])
             else:
-                vals.append(self.posmodels[pidx].state.read(varname[i]))
+                vals.append(self.posmodels[pidx].state.read(key[i]))
         if was_not_list:
             vals = pc.delistify(vals)
         return vals
 
-    def setval(self,posid=None,varname=None,value=None,write_to_disk=None):
-        """Set the state value identified by string varname, for positioner unit
+    def setval(self,posid=None,key=None,value=None,write_to_disk=None):
+        """Set the state value identified by string key, for positioner unit
         identified by id posid.
 
         Note comments for posstate.write() method, which explain the optional
@@ -238,18 +238,18 @@ class PosArrayMaster(object):
             ... or just a single value, which gets applied uniformly to all posid.
             ... (except write_to_disk, which is always just a single boolean value, not a list, and applies to all affected posid)
         """
-        if varname == None or value == None:
-            print('either no varname or no value was specified to setval')
+        if key == None or value == None:
+            print('either no key or no value was specified to setval')
             return
         (posid, temp) = self._posid_listify(posid)
-        (varname, temp) = pc.listify(varname,keep_flat=True)
+        (key,   temp) = pc.listify(key,keep_flat=True)
         (value, temp) = pc.listify(value,keep_flat=True)
-        (posid,varname) = self._equalize_input_list_lengths(posid,varname)
-        (posid,value)   = self._equalize_input_list_lengths(posid,value)
-        (posid,varname) = self._equalize_input_list_lengths(posid,varname) # repetition here handles the case where there was 1 posid element, 1 varname, but mulitplie elements in value
+        (posid, key)   = self._equalize_input_list_lengths(posid,key)
+        (posid, value) = self._equalize_input_list_lengths(posid,value)
+        (posid, key)   = self._equalize_input_list_lengths(posid,key) # repetition here handles the case where there was 1 posid element, 1 key, but mulitplie elements in value
         for i in range(len(posid)):
             pidx = self.posids.index(posid[i])
-            self.posmodels[pidx].state.write(varname[i],value[i],write_to_disk)
+            self.posmodels[pidx].state.write(key[i],value[i],write_to_disk)
 
     def _posid_listify(self,posid):
         """Internally-used wrapper method for listification of posid. The additional functionality

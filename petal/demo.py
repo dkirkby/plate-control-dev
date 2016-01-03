@@ -20,8 +20,8 @@ m.comm = comm
 should_home      = False
 should_move_qs   = False
 should_move_dqds = False
-should_move_xy   = False
-should_move_dxdy = True
+should_move_xy   = True
+should_move_dxdy = False
 should_move_tp   = False
 should_move_dtdp = False
 
