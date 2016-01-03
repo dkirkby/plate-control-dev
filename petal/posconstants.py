@@ -32,14 +32,16 @@ axis_labels = ('theta', 'phi')
 rotmat2D = lambda angle: [np.cos(np.deg2rad(angle)), - np.sin(np.deg2rad(angle)), np.sin(np.deg2rad(angle)), np.cos(np.deg2rad(angle))]
 
 # Functions for handling mixes of [M][N] vs [M] dimension lists
-def listify(uv):
+def listify(uv, keep_flat=False):
     """Turn [u,v] into [[u],[v]], if it isn't already.
     Turn uv into a list [uv] if it isn't already.
     In the special case where uv is a single item list, it remains so in the return.
-    A boolean is returned saying whether the item was modified."""
+    A boolean is returned saying whether the item was modified.
+    If optional argument 'flat' is true, then [u,v] remains [u,v].
+    """
     if not(isinstance(uv,list)):
         return [uv], True
-    if len(uv) == 1:
+    if len(uv) == 1 or keep_flat:
         return uv, False
     new_uv = []
     was_listified = False
