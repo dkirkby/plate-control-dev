@@ -2,6 +2,7 @@ import os
 import configobj
 import datetime
 import csv
+import pprint
 import posconstants as pc
 
 class PosState(object):
@@ -21,8 +22,8 @@ class PosState(object):
     """
 
     def __init__(self, unit_id=None, logging=False):
-        settings_directory = os.getcwd() + '/pos_settings/'
-        self.logs_directory = os.getcwd() + '/pos_logs/'
+        settings_directory = os.getcwd() + os.path.sep + 'pos_settings' + os.path.sep
+        self.logs_directory = os.getcwd() + os.path.sep + 'pos_logs' + os.path.sep
         self.logging = logging
         if unit_id != None:
             self.unit_basename = 'unit_' + str(unit_id)
@@ -56,6 +57,10 @@ class PosState(object):
         self.unit['LAST_MOVE_VAL1'] = ''
         self.unit['LAST_MOVE_VAL2'] = ''
         self.log_unit()
+
+    def __str__(self):
+        files = {'settings':self.unit.filename, 'log':self.log_path}
+        return pprint.pformat({'files':files, 'unit':self.unit, 'general':self.genl})
 
     def read(self,key):
         """Returns current value for a given key.
@@ -99,13 +104,18 @@ class PosState(object):
             if self.curr_log_length >= self.max_log_length:
                 self.log_basename = PosState.increment_suffix(self.log_basename)
                 self.curr_log_length = 0
-            log_path = self.logs_directory + self.log_basename + '.csv'
-            if not(os.path.isfile(log_path)): # checking whether need to start a new file
-                with open(log_path, 'w', newline='') as csvfile:
+            if not(os.path.isfile(self.log_path)): # checking whether need to start a new file
+                with open(self.log_path, 'w', newline='') as csvfile:
                     csv.writer(csvfile).writerow(['TIMESTAMP'] + self.unit.keys() + ['NOTE'])
-            with open(log_path, 'a', newline='') as csvfile: # now append a row of data
+            with open(self.log_path, 'a', newline='') as csvfile: # now append a row of data
                 csv.writer(csvfile).writerow([timestamp] + self.unit.values() + [str(note)])
             self.curr_log_length += 1
+
+    @property
+    def log_path(self):
+        """Convenience method for consistent formatting of file path to log file.
+        """
+        return self.logs_directory + self.log_basename + '.csv'
 
     @staticmethod
     def increment_suffix(s):
