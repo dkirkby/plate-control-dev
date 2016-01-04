@@ -298,8 +298,8 @@ class PosTransforms(object):
         inner = abs(r[0] - r[1])
         unreachable[hypot > outer] = True
         unreachable[hypot < inner] = True
-        inner += np.finfo(float).eps # slight contraction to avoid numeric divide-by-zero type of errors
-        outer -= np.finfo(float).eps # slight contraction to avoid numeric divide-by-zero type of errors
+        inner += np.finfo(float).eps*10 # slight contraction to avoid numeric divide-by-zero type of errors
+        outer -= np.finfo(float).eps*10 # slight contraction to avoid numeric divide-by-zero type of errors
         HYPOT = hypot
         HYPOT[hypot > outer] = outer
         HYPOT[hypot < inner] = inner

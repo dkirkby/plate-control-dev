@@ -74,8 +74,8 @@ class PosModel(object):
         d['x'] = obsXY[0]
         d['y'] = obsXY[1]
         QS = self.trans.obsXY_to_QS(obsXY)
-        d['Q'] = QS[0]
-        d['S'] = QS[1]
+        d['q'] = QS[0]
+        d['s'] = QS[1]
         return d
 
     @property
@@ -85,8 +85,8 @@ class PosModel(object):
         deg = '\u00b0'
         mm = 'mm'
         pos = self.expected_current_position
-        s = 'Q:{:7.3f}{}, S:{:7.3f}{} | x:{:7.3f}{}, y:{:7.3f}{} | obsT:{:8.3f}{}, obsP:{:8.3f}{} | motorT:{:8.1f}{}, motorP:{:8.1f}{}'. \
-            format(pos['Q'],mm, pos['S'],deg,
+        s = 'q:{:7.3f}{}, s:{:7.3f}{} | x:{:7.3f}{}, y:{:7.3f}{} | obsT:{:8.3f}{}, obsP:{:8.3f}{} | motorT:{:8.1f}{}, motorP:{:8.1f}{}'. \
+            format(pos['q'],mm, pos['s'],deg,
                    pos['x'],mm, pos['y'],mm,
                    pos['obsT'],deg, pos['obsP'],deg,
                    pos['motorT'],deg, pos['motorP'],deg)
@@ -149,6 +149,7 @@ class PosModel(object):
         """Calculation of cruise, creep, spinup, and spindown details for a move of
         an argued distance on the axis identified by axisid.
         """
+        move_data = {}
         dist_spinup = 2 * np.sign(distance) * self._spinupdown_distance  # distance over which accel / decel to and from cruise speed
         if not(allow_cruise) or abs(distance) <= (abs(dist_spinup) + self.state.read('MIN_DIST_AT_CRUISE_SPEED')):
             move_data['motor_step']   = round(distance / self._stepsize_creep)
@@ -175,7 +176,7 @@ class PosModel(object):
             exec(axis.postmove_cleanup_cmds)
             axis.postmove_cleanup_cmds = ''
         separator = '; '
-        self.state.write('LAST_MOVE_CMD',  separator.join(cleanup_table['cmd']))
+        self.state.write('LAST_MOVE_CMD',  separator.join(cleanup_table['command']))
         self.state.write('LAST_MOVE_VAL1', separator.join(['{0:.6g}'.format(x) for x in cleanup_table['cmd_val1']]))
         self.state.write('LAST_MOVE_VAL2', separator.join(['{0:.6g}'.format(x) for x in cleanup_table['cmd_val2']]))
         self.state.log_unit(lognote)

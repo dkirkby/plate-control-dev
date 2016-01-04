@@ -25,6 +25,7 @@ class PosSchedule(object):
         self.move_tables.append(posmovetable.PosMoveTable(posmodel))
         self._targt.append([Q,S])
         self._is_forced_dtdp.append(False)
+        self._merge_tables_for_each_pos()
 
     def expert_move_request(self, move_table):
         """Adds an externally-constructed move table to the schedule. The move
@@ -36,6 +37,7 @@ class PosSchedule(object):
         self.move_tables.append(move_table)
         self._targt.append([float('nan'),float('nan')])
         self._is_forced.append(True)
+        self._merge_tables_for_each_pos()
 
     def schedule_moves(self, anticollision=True):
         """Executes the scheduling algorithm upon the stored list of move requests.
@@ -55,22 +57,19 @@ class PosSchedule(object):
             self._schedule_without_anticollision()
         else:
             self._schedule_with_anticollision()
-        print(self.total_dist_traveled('6M01'))
-        self._merge_tables_for_each_pos()
-        print(self.total_dist_traveled('6M01'))
 
-    def total_dist_traveled(self,posid):
-        """Return the total distance a given positioner will travel in theta and phi
-        for the current schedule.
+    def total_dTdP(self, posid):
+        """Return as-scheduled total move distance for positioner identified by posid.
+        Returns [dT,dP].
         """
-        dT = 0
-        dP = 0
+        dTdP = [0,0]
+        self._merge_tables_for_each_pos()
         for tbl in self.move_tables:
             if tbl.posmodel.state.read('SERIAL_ID') == posid:
-                cleanup_table = tbl.for_cleanup
-                dT += sum(cleanup_table['dT'])
-                dP += sum(cleanup_table['dP'])
-        return {'dT':dT,'dP':dP}
+                postprocessed = tbl.for_cleanup
+                dTdP = [sum(postprocessed['dT']),sum(postprocessed['dP'])]
+                break
+        return dTdP
 
     # internal methods
     def _merge_tables_for_each_pos(self):

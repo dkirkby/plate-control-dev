@@ -30,6 +30,8 @@ should_move_dtdp = False
 # Moves
 if should_home:
     m.expert_request_schedule_execute_moves(posids, ['homing']*len(posids), 0, 0)
+else:
+    m.set(key=['SHAFT_T','SHAFT_P'],value=[0,180]) # faking having just homed
 
 # command formats below are for standard operation
 if should_move_qs:
@@ -60,14 +62,14 @@ if should_move_dqds:
 
 # command formats below are for 'expert' user
 if should_move_xy:
-    x = [1,-6,0]#[3, 0, -6,  0, 0]
-    y = [0,0,0]#[0, 3,  0, -6, 0]
+    x = [3, 0, -5,  0, -5.99, 6, 0]
+    y = [0, 3,  0, -5,     0, 0, 0]
     for posid in posids:
         m.expert_request_schedule_execute_moves([posid]*len(x), ['xy']*len(x), x, y)
 
 if should_move_dxdy:
-    dx = [ 3,  3, -12,  6, 0]
-    dy = [ 0,  0,   0, -6, 6]
+    dx = [ 2.5,  2.5, -10,  5, 0]
+    dy = [   0,    0,   0, -5, 5]
     for posid in posids:
         m.expert_request_moves([posid]*len(dx), ['dxdy']*len(dx), dx, dy)
     m.schedule_moves()

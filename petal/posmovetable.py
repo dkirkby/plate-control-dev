@@ -49,6 +49,12 @@ class PosMoveTable(object):
         """
         return self._for_output_type('cleanup')
 
+    @property
+    def full_table(self):
+        """Version of the table with all data.
+        """
+        return self._for_output_type('full')
+
     # setters
     def set_move(self, rowidx, axisid, distance):
         """Put or update a move distance into the table.
@@ -57,16 +63,14 @@ class PosMoveTable(object):
         dist_label = {pc.T:'dT_ideal', pc.P:'dP_ideal'}
         if rowidx >= len(self.rows):
             self.insert_new_row(rowidx)
-        for key in self.rows[rowidx]._move_options.keys():
-            self.rows[rowidx]._move_options[key] = self.posmodel.state.read(key)  # snapshot the current state
         self.rows[rowidx].data[dist_label[axisid]] = distance
 
     def store_orig_command(self, rowidx, cmd_string, val1, val2):
         """To keep a copy of the original move command with the move table.
         """
-        self.rows[rowidx].data['command'] = cmd_string
-        self.rows[rowidx].data['val1']    = val1
-        self.rows[rowidx].data['val2']    = val2
+        self.rows[rowidx].data['command']  = cmd_string
+        self.rows[rowidx].data['cmd_val1'] = val1
+        self.rows[rowidx].data['cmd_val2'] = val2
 
     def set_prepause(self, rowidx, prepause):
         """Put or update a prepause into the table.
@@ -114,104 +118,132 @@ class PosMoveTable(object):
         true_moves = [[],[]]
         new_moves = [[],[]]
         true_and_new = [[],[]]
+        has_moved = [False,False]
         for row in self.rows:
-            true_moves[pc.T] += self.posmodel.true_move(pc.T, row.data['dT_ideal'], self.allow_cruise, self.allow_exceed_limits, expected_prior_dTdP)
-            true_moves[pc.P] += self.posmodel.true_move(pc.P, row.data['dP_ideal'], self.allow_cruise, self.allow_exceed_limits, expected_prior_dTdP)
-            expected_prior_dTdP[pc.T] += true_moves[pc.T][-1]['obs_distance']
-            expected_prior_dTdP[pc.P] += true_moves[pc.P][-1]['obs_distance']
-        if self.should_antibacklash and any(expected_prior_dTdP):
+            ideal_dist = [row.data['dT_ideal'],row.data['dP_ideal']]
+            for i in [pc.T,pc.P]:
+                true_moves[i].append(self.posmodel.true_move(i, ideal_dist[i], self.allow_cruise, self.allow_exceed_limits, expected_prior_dTdP))
+                expected_prior_dTdP[i] += true_moves[i][-1]['obs_distance']
+                if true_moves[i][-1]['obs_distance']:
+                    has_moved[i] = True
+        if self.should_antibacklash and any(has_moved):
             backlash_dir = [self.posmodel.state.read('ANTIBACKLASH_FINAL_MOVE_DIR_T'), self.posmodel.state.read('ANTIBACKLASH_FINAL_MOVE_DIR_P')]
             backlash_mag = self.posmodel.state.read('BACKLASH')
             backlash = [0,0]
             for i in [pc.T,pc.P]:
-                backlash[i] = -backlash_dir[i] * backlash_mag * any(expected_prior_dTdP[i])
-                new_moves[i] += self.posmodel.true_move(i, backlash[i], self.allow_cruise, self.allow_exceed_limits, expected_prior_dTdP)
+                backlash[i] = -backlash_dir[i] * backlash_mag * has_moved[i]
+                new_moves[i].append(self.posmodel.true_move(i, backlash[i], self.allow_cruise, self.allow_exceed_limits, expected_prior_dTdP))
                 new_moves[i][-1]['command'] = '(auto backlash backup)'
-                new_moves[i][-1]['cmd_val'+str(i+1)] = backlash[i]
+                new_moves[i][-1]['cmd_val'] = backlash[i]
                 expected_prior_dTdP[i] += new_moves[i][-1]['obs_distance']
         if self.should_final_creep or any(backlash):
+            ideal_total = [0,0]
             ideal_total[pc.T] = sum([row.data['dT_ideal'] for row in self.rows])
             ideal_total[pc.P] = sum([row.data['dP_ideal'] for row in self.rows])
             err_dist = [0,0]
-            for i in [pc.T,pcP]:
+            for i in [pc.T,pc.P]:
                 err_dist[i] = ideal_total[i] - expected_prior_dTdP[i]
-                new_moves[i] += self.posmodel.true_move(i, err_dist[i], False, self.allow_exceed_limits, expected_prior_dTdP)
+                new_moves[i].append(self.posmodel.true_move(i, err_dist[i], False, self.allow_exceed_limits, expected_prior_dTdP))
                 new_moves[i][-1]['command'] = '(auto final creep)'
-                new_moves[i][-1]['cmd_val'+str(i+1)] = err_dist[i]
+                new_moves[i][-1]['cmd_val'] = err_dist[i]
                 expected_prior_dTdP[i] += new_moves[i][-1]['obs_distance']
         self.rows_extra = []
         for i in range(len(new_moves[0])):
-            self.rows_extra += PosMoveRow()
+            self.rows_extra.append(PosMoveRow())
             self.rows_extra[i].data = {'dT_ideal'  : new_moves[pc.T][i]['obs_distance'],
                                        'dP_ideal'  : new_moves[pc.P][i]['obs_distance'],
                                        'prepause'  : 0,
                                        'move_time' : max(new_moves[pc.T][i]['move_time'],new_moves[pc.P][i]['move_time']),
                                        'postpause' : 0,
-                                       'command'   : new_moves[pc.P][i]['command'],
-                                       'cmd_val1'  : new_moves[pc.P][i]['cmd_val1'],
-                                       'cmd_val2'  : new_moves[pc.P][i]['cmd_val1']}
+                                       'command'   : new_moves[pc.T][i]['command'],
+                                       'cmd_val1'  : new_moves[pc.T][i]['cmd_val'],
+                                       'cmd_val2'  : new_moves[pc.P][i]['cmd_val']}
         for i in [pc.T,pc.P]:
-            true_and_new[i] += true_moves[i]
-            true_and_new[i] += new_moves[i]
+            true_and_new[i].extend(true_moves[i])
+            true_and_new[i].extend(new_moves[i])
         return true_and_new
 
     def _for_output_type(self,output_type):
         # define the columns that will be filled in
+        table = {'posid':'','nrows':0,'dT':[],'dP':[],'motor_steps_T':[],'motor_steps_P':[],
+                 'Tdot':[],'Pdot':[],'speed_mode_T':[],'speed_mode_P':[],
+                 'prepause':[],'move_time':[],'postpause':[],
+                 'command':[],'cmd_val1':[],'cmd_val2':[]}
         if output_type == 'schedule':
-            table = {'posid':'','nrows':0,'dT':[],'dP':[],'Tdot':[],'Pdot':[],'prepause':[],'move_time':[],'postpause':[]}
+            remove_keys = ['motor_steps_T','motor_steps_P','speed_mode_T','speed_mode_P','command','cmd_val1','cmd_val2']
         elif output_type == 'hardware':
-            table = {'posid':'','nrows':0,'motor_steps_T':[],'motor_steps_P':[],'speed_mode_T':[],'speed_mode_P':[],'move_time':[],'postpause':[]}
+            remove_keys = ['dT','dP','Tdot','Pdot','prepause','command','cmd_val1','cmd_val2']
         elif output_type == 'cleanup':
-            table = {'posid':'','nrows':0,'dT':[],'dP':[],'cmd':[],'cmd_val1':[],'cmd_val2':[]}
+            remove_keys = ['motor_steps_T','motor_steps_P','speed_mode_T','speed_mode_P','Tdot','Pdot','prepause','postpause','move_time']
+        elif output_type == 'full':
+            remove_keys = []
         else:
             print( 'bad table output type ' + output_type)
 
         # calculate the true moves gather any new extra move rows
         true_moves = self._calculate_true_moves()
-        rows = [self.rows, self.rows_extra]
+        rows = self.rows.copy()
+        rows.extend(self.rows_extra)
 
         # format and populate the return tables
-        for i in range(len(true_moves)):
-            row = self.rows[i]
-
+        for i in range(len(rows)):
             # for hardware type, insert an extra pause-only action if necessary, since hardware commands only really have postpauses
-            if output_type == 'hardware' and row.data['prepause']:
+            if output_type == 'hardware' and rows[i].data['prepause']:
                 for key in ['motor_steps_T','motor_steps_P','move_time']:
                     table[key].insert(0,0)
                 for key in ['speed_mode_T','speed_mode_P']:
                     table[key].insert(0,'creep') # speed mode doesn't matter here
-                table['postpause'].insert(0,row.data['prepause'])
+                table['postpause'].insert(0,rows[i].data['prepause'])
 
-            # fill in the output table according to type
-            if output_type == 'schedule' or output_type == 'cleanup':
-                table['dT'].extend(true_moves[pc.T][i]['obs_distance'])
-                table['dP'].extend(true_moves[pc.P][i]['obs_distance'])
-            if output_type == 'schedule':
-                table['Tdot'].extend(true_moves[pc.T][i]['obs_speed'])
-                table['Pdot'].extend(true_moves[pc.P][i]['obs_speed'])
-                table['prepause'].extend(true_pauses['pre'])
-                table['postpause'].extend(true_pauses['post'])
-            if output_type == 'hardware':
-                table['motor_steps_T'].extend(true_moves[pc.T][i]['motor_step'])
-                table['motor_steps_P'].extend(true_moves[pc.P][i]['motor_step'])
-                table['speed_mode_T'].extend(true_moves[pc.T][i]['speed_mode'])
-                table['speed_mode_P'].extend(true_moves[pc.P][i]['speed_mode'])
-                table['postpause'].extend([round(x*1000) for x in true_pauses['post']]) # hardware postpause in integer milliseconds
-            if output_type == 'schedule' or output_type == 'hardware':
-                while true_moves[pc.T][i]['move_time']: # while loop here, since there may be multiple submoves
-                    time1 = true_moves[pc.T][i]['move_time'].pop(0)
-                    time2 = true_moves[pc.P][i]['move_time'].pop(0)
-                    table['move_time'].append(max(time1,time2))
-            if output_type == 'cleanup':
-                table['cmd'].append(row.data['command'])
-                table['cmd_val1'].append(row.data['val1'])
-                table['cmd_val2'].append(row.data['val2'])
+            table['dT'].append(true_moves[pc.T][i]['obs_distance'])
+            table['dP'].append(true_moves[pc.P][i]['obs_distance'])
+            table['Tdot'].append(true_moves[pc.T][i]['obs_speed'])
+            table['Pdot'].append(true_moves[pc.P][i]['obs_speed'])
+            table['prepause'].append(rows[i].data['prepause'])
+            table['postpause'].append(rows[i].data['postpause'])
+            table['motor_steps_T'].append(true_moves[pc.T][i]['motor_step'])
+            table['motor_steps_P'].append(true_moves[pc.P][i]['motor_step'])
+            table['postpause'].append(rows[i].data['postpause']*1000) # hardware postpause in integer milliseconds
+            time1 = true_moves[pc.T][i]['move_time']
+            time2 = true_moves[pc.P][i]['move_time']
+            table['move_time'].append(max(time1,time2))
+            table['command'].append(rows[i].data['command'])
+            table['cmd_val1'].append(rows[i].data['cmd_val1'])
+            table['cmd_val2'].append(rows[i].data['cmd_val2'])
+            table['speed_mode_T'].append(true_moves[pc.T][i]['speed_mode'])
+            table['speed_mode_P'].append(true_moves[pc.P][i]['speed_mode'])
         table['posid'] = self.posmodel.state.read('SERIAL_ID')
-        if output_type == 'schedule' or output_type == 'cleanup':
-            table['nrows'] = len(table['dT'])
-        if output_type == 'hardware':
-            table['nrows'] = len(table['motor_steps_T'])
-        return table
+        table['nrows'] = len(table['dT'])
+        table['stats'] = self._gather_stats(table)
+        restricted_table = table.copy()
+        for key in remove_keys:
+            restricted_table.pop(key)
+        return restricted_table
+
+    def _gather_stats(self,table):
+        stats = {'net_dT':[],'net_dP':[],'q':[],'s':[],'x':[],'y':[],'t':[],'p':[],
+                 'TOTAL_CRUISE_MOVES_T':0,'TOTAL_CRUISE_MOVES_P':0,'TOTAL_CREEP_MOVES_T':0,'TOTAL_CREEP_MOVES_P':0}
+        pos = self.posmodel.expected_current_position
+        for i in range(table['nrows']):
+            stats['net_dT'].append(table['dT'][i])
+            stats['net_dP'].append(table['dP'][i])
+            if i > 0:
+                stats['net_dT'][i] += stats['net_dT'][i-1]
+                stats['net_dP'][i] += stats['net_dP'][i-1]
+            stats['t'].append(pos['obsT'] + stats['net_dT'][i])
+            stats['p'].append(pos['obsP'] + stats['net_dP'][i])
+            stats['TOTAL_CRUISE_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'cruise')
+            stats['TOTAL_CRUISE_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'cruise')
+            stats['TOTAL_CREEP_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'creep')
+            stats['TOTAL_CREEP_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'creep')
+        shaftTP = self.posmodel.trans.shaftTP_to_obsTP([stats['t'],stats['p']])
+        obsXY = self.posmodel.trans.shaftTP_to_obsXY(shaftTP)
+        stats['x'] = obsXY[0]
+        stats['y'] = obsXY[1]
+        QS = self.posmodel.trans.obsXY_to_QS(obsXY)
+        stats['q'] = QS[0]
+        stats['s'] = QS[1]
+        return stats
 
 class PosMoveRow(object):
     """The general user does not directly use the internal values of a
