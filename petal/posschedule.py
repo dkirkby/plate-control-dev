@@ -55,8 +55,41 @@ class PosSchedule(object):
             self._schedule_without_anticollision()
         else:
             self._schedule_with_anticollision()
+        print(self.total_dist_traveled('6M01'))
+        self._merge_tables_for_each_pos()
+        print(self.total_dist_traveled('6M01'))
+
+    def total_dist_traveled(self,posid):
+        """Return the total distance a given positioner will travel in theta and phi
+        for the current schedule.
+        """
+        dT = 0
+        dP = 0
+        for tbl in self.move_tables:
+            if tbl.posmodel.state.read('SERIAL_ID') == posid:
+                cleanup_table = tbl.for_cleanup
+                dT += sum(cleanup_table['dT'])
+                dP += sum(cleanup_table['dP'])
+        return {'dT':dT,'dP':dP}
 
     # internal methods
+    def _merge_tables_for_each_pos(self):
+        """In each case where one positioner has multiple tables, they are merged in sequence
+        into a single table.
+        """
+        i = 0
+        while i < len(self.move_tables):
+            j = i + 1
+            extend_list = []
+            while j < len(self.move_tables):
+                if self.move_tables[i].posmodel.state.read('SERIAL_ID') == self.move_tables[j].posmodel.state.read('SERIAL_ID'):
+                    extend_list.append(self.move_tables.pop(j))
+                else:
+                    j += 1
+            for e in extend_list:
+                self.move_tables[i].extend(e)
+            i += 1
+
     def _schedule_without_anticollision(self):
         for i in range(len(self.move_tables)):
             if not(self._is_forced[i]):

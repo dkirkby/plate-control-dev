@@ -16,6 +16,8 @@ comm.send_cmd_off = True # used to speed up software debugging / not actually se
 comm.master = m
 m.comm = comm
 
+print(m.get('6M01').expected_current_position_str)
+
 # Demo script flags
 should_home      = False
 should_move_qs   = False
@@ -58,8 +60,8 @@ if should_move_dqds:
 
 # command formats below are for 'expert' user
 if should_move_xy:
-    x = [3, 0, -6,  0, 0]
-    y = [0, 3,  0, -6, 0]
+    x = [1,-6,0]#[3, 0, -6,  0, 0]
+    y = [0,0,0]#[0, 3,  0, -6, 0]
     for posid in posids:
         m.expert_request_schedule_execute_moves([posid]*len(x), ['xy']*len(x), x, y)
 

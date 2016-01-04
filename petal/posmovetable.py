@@ -136,6 +136,8 @@ class PosMoveTable(object):
             true_move_P = self.posmodel.true_move(pc.P, row._data['dP_ideal'], move_options[pc.P], expected_prior_dTdP)
             expected_prior_dTdP[0] += sum(true_move_T['obs_distance'])
             expected_prior_dTdP[1] += sum(true_move_P['obs_distance'])
+            print('expected_prior:')
+            print(expected_prior_dTdP)
 
             # where one of the axes has fewer or no moves, pad it with blank no-motion default values
             true_moves = [true_move_T,true_move_P]

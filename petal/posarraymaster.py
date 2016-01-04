@@ -72,14 +72,18 @@ class PosArrayMaster(object):
         turned off for the entire schedule. This method is generally recommended
         only for expert usage.
         """
-        expected_prior_dTdP = [0,0]
+        prior_moves = []
+        expected_prior_dTdP = [[0]*2 for x in range(len(posids))]
         for i in range(len(posids)):
             j = self.posids.index(posids[i])
-            move_table = self.posmodels[j].make_move_table(movecmds[i], values1[i], values2[i], expected_prior_dTdP)
+            if not(j in prior_moves):
+                expected_prior_dTdP[j] = [0,0]
+            move_table = self.posmodels[j].make_move_table(movecmds[i], values1[i], values2[i], expected_prior_dTdP[j])
             self.schedule.expert_move_request(move_table)
             table_formatted = move_table.for_cleanup
-            expected_prior_dTdP[0] += sum(table_formatted['dT'])
-            expected_prior_dTdP[1] += sum(table_formatted['dP'])
+            expected_prior_dTdP[j][0] += sum(table_formatted['dT'])
+            expected_prior_dTdP[j][1] += sum(table_formatted['dP'])
+            prior_moves.append(j)
 
     def schedule_moves(self,anticollision=True):
         """Generate the schedule of moves and submoves that get positioners
@@ -115,23 +119,9 @@ class PosArrayMaster(object):
                 speed_mode_P  ... list of strings           ... 'cruise' or 'creep'
                 movetime      ... list of unsigned floats   ... estimated time the row's motion will take, in seconds, not including the postpause
                 postpause     ... list of unsigned integers ... pause time after the row's motion, in milliseconds, before executing the next row
-
         """
-        tbls = self.schedule.move_tables
-        i = 0
-        while i < len(tbls):
-            j = i + 1
-            extend_list = []
-            while j < len(tbls):
-                if tbls[i].posmodel.state.read('SERIAL_ID') == tbls[j].posmodel.state.read('SERIAL_ID'):
-                    extend_list.append(tbls.pop(j))
-                else:
-                    j += 1
-            for e in extend_list:
-                tbls[i].extend(e)
-            i += 1
         hw_tables = []
-        for m in tbls:
+        for m in self.schedule.move_tables:
             hw_tables.append(m.for_hardware)
         return hw_tables
 
@@ -208,6 +198,15 @@ class PosArrayMaster(object):
         corresponding list of values. The optional argument key can be:
             ... a list, of same length as posid
             ... or just a single key, which gets fetched uniformly for all posid
+
+        Examples:
+            m = posarraymaster.PosArrayMaster(posids)
+            m.get('XXXXX','LENGTH_R1') # gets LENGTH_R1 value for positioner XXXXX
+            m.get('XXXXX',['SHAFT_T','SHAFT_P']) # gets these values for positioner XXXXX
+            m.get(['XXXXX','YYYYY'],'PETAL_ID') # gets PETAL_ID value for positioners XXXXX and YYYYY
+            m.get(['XXXXX','YYYYY'],['FINAL_CREEP_ON','DEVICE_ID']) # gets multiple different values on multiple different positioners
+            m.get(key=['SHAFT_T']) # gets this value for all positioners identified in posids
+            m.get() # gets all posmodel objects for all positioners identified in posids
         """
         (posid, was_not_list) = self._posid_listify(posid)
         (key, temp) = pc.listify(key,keep_flat=True)
@@ -223,7 +222,7 @@ class PosArrayMaster(object):
             vals = pc.delistify(vals)
         return vals
 
-    def setval(self,posid=None,key=None,value=None,write_to_disk=None):
+    def set(self,posid=None,key=None,value=None,write_to_disk=None):
         """Set the state value identified by string key, for positioner unit
         identified by id posid.
 
@@ -237,6 +236,13 @@ class PosArrayMaster(object):
             ... also be lists, of same length as posid
             ... or just a single value, which gets applied uniformly to all posid.
             ... (except write_to_disk, which is always just a single boolean value, not a list, and applies to all affected posid)
+
+        Examples:
+            m = posarraymaster.PosArrayMaster(posids)
+            m.set('XXXXX','LENGTH_R1',3.024) # sets LENGTH_R1 value for positioner XXXXX
+            m.set(['XXXXX','YYYYY'],'PETAL_ID',2) # sets PETAL_ID value for positioners XXXXX and YYYYY
+            m.set(['XXXXX','YYYYY'],['FINAL_CREEP_ON','DEVICE_ID'],[False,227]) # sets multiple different values on multiple different positioners
+            m.set(key=['SHAFT_T','SHAFT_P'],value=[0,180]) # sets these values for all positioners identified in posids
         """
         if key == None or value == None:
             print('either no key or no value was specified to setval')
@@ -263,6 +269,9 @@ class PosArrayMaster(object):
         return posid, was_not_list
 
     def _equalize_input_list_lengths(self,var1,var2):
+        """Internally-used in setter and getter methods, to consistently handle varying
+        lengths of key / value requests.
+        """
         if not(isinstance(var1,list)) or not(isinstance(var2,list)):
             print('both var1 and var2 must be lists, even if single-element')
             return None, None
