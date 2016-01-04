@@ -85,18 +85,18 @@ class PosTransforms(object):
         INPUT:  [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
                 [N]    array of [index_values]
-        The output "reachable" is a list of all the indexes of the points that were able to be reached.
+        The output "unreachable" is a list of all the indexes of the points that could not be physically reached.
         """
         (xy, was_not_list) = pc.listify(xy)
         r = [self.posmodel.state.read('LENGTH_R1'),self.posmodel.state.read('LENGTH_R2')]
         shaft_range = [self.posmodel.full_range_T, self.posmodel.full_range_P]
         XY = self.obsXY_to_posXY(xy)                    # adjust observer xy into the positioner system XY
         obs_range = self.shaftTP_to_obsTP(shaft_range)  # want range used in next line to be according to observer (since observer sees the physical phi = 0)
-        (tp, reachable) = self.xy2tp(XY, r, obs_range)
+        (tp, unreachable) = self.xy2tp(XY, r, obs_range)
         TP = self.obsTP_to_shaftTP(tp)                  # adjust angles back into shaft space
         if was_not_list:
             TP = pc.delistify(TP)
-        return TP, reachable
+        return TP, unreachable
 
     def shaftTP_to_obsXY(self, tp):
         """
@@ -272,101 +272,88 @@ class PosTransforms(object):
         return xy
 
     @staticmethod
-    def xy2tp(xy, r, ranges, *args):
+    def xy2tp(xy, r, ranges):
         """Converts XY coordinates into TP angles, where arm lengths
          associated with angles theta and phi are respectively r(1) and r(2).
 
-        INPUTS:   xy = 2xN array of (x,y) angles
-                   r = 1x2 array of arm lengths. r(1) = central arm, r(2) = eccentric arm
-              ranges = ranges max and min of theta and phi arms
-                args = int : new error limit
-        OUTPUTS:  tp = 2xN array of (theta,phi) coordinates
-           reachable = List of point reachable
+        INPUTS:   xy ... 2xN array of (x,y) coordinates
+                   r ... 1x2 array of arm lengths. r(1) = central arm, r(2) = eccentric arm
+              ranges ... 2x2 array of [[min(theta),max(theta)],[min(phi),max(phi)]
+        OUTPUTS:  tp ... 2xN array of (theta,phi) angles, unit degrees
+         unreachable ... list of indexes of all the points that could not be reached.
+                         (the corresponding tp value returned will be a closest approach to the unreachable point)
         """
-        rounds = 14
-        xy = np.array(xy, dtype=float)
-        r = np.array(r, dtype=float)
-        if len(xy) == 0:
-            tp =[]
-            reachable = []
-            return tp, reachable
+        theta_centralizing_err_tol = 1e-4 # within this much xy error allowance, adjust theta toward center of its range
+        n_theta_centralizing_iters = 3    # number of points to try when attempting to centralize theta
+        x = np.array(xy[0])
+        y = np.array(xy[1])
+        T = np.zeros(len(x))
+        P = np.zeros(len(x))
+        unreachable = np.array([False]*len(x))
 
-        x = xy[0]
-        y = xy[1]
-        a1_acos_arg = (x**2 + y**2 - (r[0]**2 +r[1]**2)) / (2 * r[0] *r[1])
-        prescision = np.where(np.absolute(a1_acos_arg) >= 1 - 1.11 * 10**(-14))
-        prescisionbis = np.where(a1_acos_arg-1 >= 10**(-6))
-        prescisiontris = np.where(a1_acos_arg+1 <= -10**(-6))
-        a1_acos_arg[prescision] = np.around(a1_acos_arg[prescision]/10**(-rounds))*10**(-rounds)#Round a1_acos_arg if it's close to 1 and above or close to -1 and below
-        a1_acos_arg[prescisionbis] = 1 #Round to 1 a1_acos_arg if it's close to 1 and below
-        a1_acos_arg[prescisiontris] = -1 #Round to -1 a1_acos_arg if it's close to -1 and above
-        A = np.zeros(np.shape(xy))
-        unreachable = np.zeros(np.shape(xy)[1])
-        temporeach = np.where(np.absolute(a1_acos_arg) < 1)
-        tempounreach = np.where(np.absolute(a1_acos_arg) > 1)
-        A[1,tempounreach] = np.arccos( a1_acos_arg[tempounreach] + 0j).real
-        unreachable[ tempounreach] = True
-        A[1, temporeach] = np.arccos(a1_acos_arg[temporeach])
-        hypot_temp = np.sqrt(x**2+y**2)
-        hypot_temp[np.where( hypot_temp < 10**(-rounds))] = 10**(-rounds)
-        a0_asin_arg = (r[1] / hypot_temp) * np.sin(A[1])
-        prescision = np.where(np.absolute(a0_asin_arg) >= 1 - 1.11 * 10**(-14))#
-        prescisionbis = np.where(a0_asin_arg-1 >= 10**(-6))
-        prescisiontris = np.where(a0_asin_arg+1 <= -10**(-6))
-        a0_asin_arg[prescision] = np.around(a0_asin_arg[prescision]/10**(-rounds))*10**(-rounds)#Round a0_asin_arg if it's close to 1 and above or close to -1 and below
-        a0_asin_arg[prescisionbis] = 1 #Round to 1 a0_asin_arg if it's close to 1 and below
-        a0_asin_arg[prescisiontris] = -1#Round to -1 a0_asin_arg if it's close to -1 and above
-        temporeach = np.where(np.absolute(a0_asin_arg) <= 1)
-        tempounreach = np.where(np.absolute(a0_asin_arg) > 1)
-        A[0,tempounreach] = np.arctan2(y[tempounreach], x[tempounreach]) - np.arcsin(a0_asin_arg[tempounreach] + 0j).real
-        unreachable[tempounreach] = True
-        reachable = 1 - unreachable
-        A[0, temporeach] = np.arctan2(y[temporeach], x[temporeach]) - np.arcsin(a0_asin_arg[temporeach])
+        # adjust targets within reachable annulus
+        hypot = (x**2 + y**2)**0.5
+        angle = np.arctan2(y,x)
+        outer = r[0] + r[1]
+        inner = abs(r[0] - r[1])
+        unreachable[hypot > outer] = True
+        unreachable[hypot < inner] = True
+        inner += np.finfo(float).eps # slight contraction to avoid numeric divide-by-zero type of errors
+        outer -= np.finfo(float).eps # slight contraction to avoid numeric divide-by-zero type of errors
+        HYPOT = hypot
+        HYPOT[hypot > outer] = outer
+        HYPOT[hypot < inner] = inner
+        X = HYPOT*np.cos(angle)
+        Y = HYPOT*np.sin(angle)
 
-        if len(args) == 0:
-            tol = 10**(-rounds)
-        else:
-            tol = args[0]
-
-        A = np.degrees(A)
-
-        xy_test = PosTransforms.tp2xy(A, r)
-        xy_test_err = np.sqrt(np.sum((xy_test-xy)**2, 0))
-        badtp = np.where(xy_test_err > tol)
-        if badtp[0].tolist() != []:
-            a = PosTransforms.xy2tp([(x[badtp]).tolist(), (y[badtp]).tolist()], r, ranges, tol*2)[0]
-            a  = np.array(a)
-            A[:,badtp] = a[:,np.newaxis]
-        below = np.zeros(np.shape(xy))
-        above = np.zeros(np.shape(xy))
-        still_below = np.zeros(np.shape(xy))
-        still_above = np.zeros(np.shape(xy))
+        # transfrom from cartesian XY to angles TP
+        arccos_arg = (X**2 + Y**2 - (r[0]**2 + r[1]**2)) / (2 * r[0] * r[1])
+        P = np.arccos(arccos_arg)
+        arcsin_arg = r[1] / HYPOT * np.sin(P)
+        outofrange = np.abs(arcsin_arg) > 1 # will round arcsin arguments to 1 or -1
+        arcsin_arg[outofrange] = np.sign(arcsin_arg[outofrange])
+        T = np.arctan2(Y,X) - np.arcsin(arcsin_arg)
+        T *= 180/np.pi
+        P *= 180/np.pi
 
         # wrap angles into travel ranges
-        for i in [1, 0]:
-            if i == 1 and np.any(np.where(unreachable != 0)):
-                # mitigate unreachable error distance by adjusting central axis
-                unreach = np.where(unreachable == True )
-                x_unreachable = r[0] * np.cos(np.deg2rad(A[0,unreach])) + r[1] * np.cos(np.deg2rad(A[0, unreach]+ A[1,unreach]))
-                y_unreachable = r[0] * np.sin(np.deg2rad(A[0,unreach])) + r[1] * np.sin(np.deg2rad(A[0, unreach]+ A[1,unreach]))
-                erra1r = np.array(PosTransforms.cart2pol(x_unreachable[0], y_unreachable[0])) - np.array(PosTransforms.cart2pol(x[unreach], y[unreach]))
-                A[:,unreach] = A[:, unreach] - erra1r[:,np.newaxis]
+        TP = np.array([T,P])
+        for i in range(len(TP)):
+            range_min = min(ranges[i])
+            range_max = max(ranges[i])
+            below = np.where(TP[i] < range_min)
+            TP[i,below] += np.floor((range_max - TP[i,below])/360)*360  # try +360 phase wrap
+            still_below = np.where(TP[i] < range_min)
+            TP[i,still_below] = range_min
+            unreachable[still_below] = True
+            above = np.where(TP[i] > range_max)
+            TP[i,above] -= np.floor((TP[i,above] - range_min)/360)*360  # try -360 phase wrap
+            still_above = np.where(TP[i] > range_max)
+            TP[i,still_above] = range_max
+            unreachable[still_above] = True
 
-            below[i] = A[i] < np.min(ranges[i])
-            wbelow = np.where(below[i] == True)
-            A[i,wbelow] += 360 * np.floor((np.max(ranges[i])-A[i,wbelow]) / 360)
-            still_below[i] = A[i] < np.min(ranges[i])
-            wsbelow = np.where (still_below[i] == True)
-            A[i,wsbelow] = np.min(ranges[i])
-            above[i] = A[i] > np.max(ranges[i])
-            wabove = np.where (above[i] == True)
-            A[i,wabove] -= 360 * np.floor((A[i,wabove]-np.min(ranges[i])) / 360)
-            still_above[i] = A[i] > np.max(ranges[i])
-            wsabove = np.where (still_above[i] == True)
-            A[i,wsabove] = np.max(ranges[i])
+        # centralize theta
+        T_ctr = np.mean(ranges[0])
+        T_best = TP[0].copy()
+        for i in range(len(TP[0])):
+            T_try = np.linspace(TP[0][i],T_ctr,n_theta_centralizing_iters,True).tolist()
+            P_try = [TP[1][i]]*len(T_try)
+            xy_try = PosTransforms.tp2xy([T_try,P_try],r)
+            x_err = np.array(xy_try[0]) - X[i]
+            y_err = np.array(xy_try[1]) - Y[i]
+            xy_err = (x_err**2 + y_err**2)**0.5
+            sort = np.argsort(xy_err)
+            xy_err = xy_err[sort]
+            for j in range(len(xy_err)-1,0,-1):
+                if xy_err[j] <= theta_centralizing_err_tol:
+                    T_best[i] = T_try[sort[j]]
+                    break
+        TP[0] = T_best
 
-        tp = A
-        return tp.tolist(), reachable.tolist()
+        # return
+        tp = TP.tolist()
+        unreachable = np.where(unreachable)[0].tolist()
+        return tp, unreachable
 
     @staticmethod
     def inverse_poly(p, y, xguess):
@@ -384,10 +371,3 @@ class PosTransforms(object):
             xdist = (roots - xguess)**2
             x = roots[np.argmin(xdist)]
             return x
-
-    @staticmethod
-    def cart2pol(x,y):
-        """transform cartesian coordinates to polar coordinates"""
-        r = np.sqrt(x**2+y**2)
-        theta = np.degrees(np.arctan2(y, x))
-        return r, theta
