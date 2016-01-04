@@ -112,22 +112,18 @@ class PosModel(object):
         """Returns a [1x2] array of [phi_min, phi_max], from hardstop-to-hardstop."""
         return self.axis[pc.P].full_range
 
-    def true_move(self, axisid, distance, flags, expected_prior_dTdP=[0,0]):
+    def true_move(self, axisid, distance, allow_cruise, allow_exceed_limits, expected_prior_dTdP=[0,0]):
         """Input move distance on either the theta or phi axis, as seen by the
         observer, in degrees.
 
-        flags argument is a dictionary with booleans for:
-            'allow_cruise'
-            'creep_after_cruise'
-            'allow_exceed_limits'
+        The return values are formatted as a dictionary, with keys:
+            'motor_step'   ... integer number of motor steps, signed according to direction
+            'move_time'    ... total time the move takes [sec]
+            'obs_distance' ... quantized distance of travel [deg], signed according to direction
+            'obs_speed'    ... approximate speed of travel [deg/sec]. unsigned. note 'move_time' is preferred for precision timing calculations
+            'speed_mode'   ... 'cruise' or 'creep'
 
-        Outputs are quantized distance [deg], speed [deg/sec], integer number of
-        motor steps, speed mode ['cruise' or 'creep'], and move time [sec]
-
-        The return values are formatted as a dictionary of lists. (This handles the
-        case where if it's a "final" move, it really consists of multiple submoves.)
-
-        The optional argument 'expected_prior_dTdP' is used to account for expected
+        The argument 'expected_prior_dTdP' is used to account for expected
         future shaft position changes. This is necessary for correct checking of
         software travel limits, when a sequence of multiple moves is being planned out.
         """
@@ -138,96 +134,35 @@ class PosModel(object):
         obs_finish[axisid] += distance
         shaft_finish = self.trans.obsTP_to_shaftTP(obs_finish)
         dist = shaft_finish[axisid] - shaft_start[axisid]
-        if not(flags['allow_exceed_limits']):
+        if not(allow_exceed_limits):
             dist = self.axis[axisid].truncate_to_limits(dist,shaft_start[axisid])
         gear_ratio = self.axis[axisid].gear_ratio
         ccw_sign = self.axis[axisid].ccw_sign
         dist *= gear_ratio
         dist *= ccw_sign
-        antibacklash_final_move_dir = ccw_sign * self.axis[axisid].antibacklash_final_move_dir
-        backlash_magnitude = gear_ratio * self.state.read('BACKLASH') * flags['creep_after_cruise']
-        if np.sign(dist) == antibacklash_final_move_dir:
-            final_move  = np.sign(dist) * backlash_magnitude
-            undershoot  = -final_move * self.state.read('BACKLASH_REMOVAL_BACKUP_FRACTION')
-            backup_move = -(final_move + undershoot)
-            overshoot   = 0;
-        else:
-            final_move  = -np.sign(dist) * backlash_magnitude
-            undershoot  = 0
-            backup_move = 0
-            overshoot   = -final_move
-        primary_move = dist + overshoot + undershoot
-
-        opt = {}
-        move_data = {}
-        options['CRUISE_SHY_OF_TARGET'] = False # usually false, except in the special case below
-        opt['primary'] = options.copy()
-        opt['backup']  = options.copy()
-        opt['final']   = options.copy()
-        if final_move: # in this special case, don't need a creep move after the primary, since we will later do another final move anyway. however, still want to stay shy of the final target
-            opt['primary']['FINAL_CREEP_ON']       = False
-            opt['primary']['CRUISE_SHY_OF_TARGET'] = True
-        opt['backup']['ONLY_CREEP'] = True
-        opt['final'] ['ONLY_CREEP'] = True
-        i = 0
-        for m in [[primary_move,opt['primary']], [backup_move,opt['backup']], [final_move,opt['final']]]:
-            true_move = None
-            if i == 0:
-                true_move = self.motor_true_move(axisid, m[0], m[1])
-                dist_correction = m[0] - sum(true_move['obs_distance']) # note, it is intentional that this will only be used when there was already a plan to do a non-zero final_move
-            if i == 1 and m[0]:
-                true_move = self.motor_true_move(axisid, m[0], m[1])
-            if i == 2 and m[0]:
-                true_move = self.motor_true_move(axisid, m[0] + dist_correction, m[1])
-            if true_move:
-                for key in true_move.keys():
-                    if not(key in move_data.keys()):
-                        move_data[key] = []
-                    move_data[key].extend(true_move[key])
-            i += 1
-        n_submoves = len(move_data['obs_distance'])
-        for i in range(n_submoves):
-            move_data['obs_distance'][i] *= ccw_sign / gear_ratio
-            move_data['obs_speed'][i]    *= ccw_sign / gear_ratio
+        move_data = self.motor_true_move(axisid, dist, allow_cruise)
+        move_data['obs_distance'] *= ccw_sign / gear_ratio
+        move_data['obs_speed']    *= ccw_sign / gear_ratio
         return move_data
 
-    def motor_true_move(self, axisid, distance, options):
+    def motor_true_move(self, axisid, distance, allow_cruise):
         """Calculation of cruise, creep, spinup, and spindown details for a move of
         an argued distance on the axis identified by axisid.
         """
-        move_data = {'obs_distance' : [],
-                     'obs_speed'    : [],
-                     'motor_step'   : [],
-                     'speed_mode'   : [],
-                     'move_time'    : []}
-        dist_spinup = 2 * np.sign(distance) * self._spinupdown_distance
-        if options['ONLY_CREEP'] or (abs(distance) <= (abs(dist_spinup) + self.state.read('NOM_FINAL_CREEP_DIST'))):
-            dist_spinup     = 0
-            dist_cruise     = 0
-            steps_cruise    = 0
-            dist_cruisespin = 0
-            net_dist_creep  = distance
+        dist_spinup = 2 * np.sign(distance) * self._spinupdown_distance  # distance over which accel / decel to and from cruise speed
+        if not(allow_cruise) or abs(distance) <= (abs(dist_spinup) + self.state.read('MIN_DIST_AT_CRUISE_SPEED')):
+            move_data['motor_step']   = round(distance / self._stepsize_creep)
+            move_data['obs_distance'] = move_data['motor_step'] * self._stepsize_creep
+            move_data['speed_mode']   = 'creep'
+            move_data['obs_speed']    = self._motor_speed_creep
+            move_data['move_time']    = abs(move_data['obs_distance']) / move_data['obs_speed']
         else:
-            dist_creep      = np.sign(distance) * self.state.read('NOM_FINAL_CREEP_DIST') * options['FINAL_CREEP_ON']      # initial guess at how far to creep
-            dist_shy        = np.sign(distance) * self.state.read('NOM_FINAL_CREEP_DIST') * options['CRUISE_SHY_OF_TARGET']  # when ya ain't creepin' this time but ya know you will real soon
-            dist_cruise     = distance - dist_spinup - dist_creep - dist_shy      # initial guess at how far to cruise
-            steps_cruise    = round(dist_cruise / self._stepsize_cruise)          # quantize cruise steps
-            dist_cruisespin = steps_cruise * self._stepsize_cruise + dist_spinup  # actual distance covered while cruising
-            net_dist_creep  = (distance - dist_cruisespin) * options['FINAL_CREEP_ON']
-        steps_creep = round(net_dist_creep / self._stepsize_creep)
-        dist_creep = steps_creep * self._stepsize_creep
-        if steps_cruise:
-            move_data['obs_distance'].append(dist_cruisespin)
-            move_data['obs_speed'].append(self._motor_speed_cruise)
-            move_data['motor_step'].append(round(float(steps_cruise))) # round() rather than int() to prevent flooring the value
-            move_data['speed_mode'].append('cruise')
-            move_data['move_time'].append((abs(steps_cruise)*self._stepsize_cruise + 4*self._spinupdown_distance) / self._motor_speed_cruise)
-        if steps_creep:
-            move_data['obs_distance'].append(dist_creep)
-            move_data['obs_speed'].append(self._motor_speed_creep)
-            move_data['motor_step'].append(round(float(steps_creep))) # round() rather than int() to prevent flooring the value
-            move_data['speed_mode'].append('creep')
-            move_data['move_time'].append(abs(steps_creep)*self._stepsize_creep / self._motor_speed_creep)
+            dist_cruise = distance - dist_spinup
+            move_data['motor_step']   = round(dist_cruise / self._stepsize_cruise)
+            move_data['obs_distance'] = move_data['motor_step'] * self._stepsize_cruise + dist_spinup
+            move_data['speed_mode']   = 'cruise'
+            move_data['obs_speed']    = self._motor_speed_cruise
+            move_data['move_time']    = (abs(move_data['motor_step'])*self._stepsize_cruise + 4*self._spinupdown_distance) / move_data['obs_speed']
         return move_data
 
     def postmove_cleanup(self, cleanup_table, lognote=''):
@@ -306,11 +241,8 @@ class PosModel(object):
             search_dist = []
             search_dist[pc.T] = np.sign(val1)*self.axis[pc.T].limit_seeking_search_distance()
             search_dist[pc.P] = np.sign(val2)*self.axis[pc.P].limit_seeking_search_distance()
-            old_SHOULD_DEBOUNCE_HARDSTOPS = self.state.read('SHOULD_DEBOUNCE_HARDSTOPS')
-            self.state.write('SHOULD_DEBOUNCE_HARDSTOPS',0)
             for i in [pc.T,pc.P]:
-                table.extend(self.axis[i].seek_one_limit_sequence(search_dist[i]))
-            self.state.write('SHOULD_DEBOUNCE_HARDSTOPS',old_SHOULD_DEBOUNCE_HARDSTOPS)
+                table.extend(self.axis[i].seek_one_limit_sequence(search_dist[i], should_debounce_hardstops=False))
             return table
         else:
             print( 'move command ' + repr(movecmd) + ' not recognized')
@@ -503,7 +435,7 @@ class Axis(object):
         primary hardstop. The sequence is returned in a move table.
         """
         direction = np.sign(self.principle_hardstop_direction())
-        table = self.seek_one_limit_sequence(direction * self.limit_seeking_search_distance())
+        table = self.seek_one_limit_sequence(direction * self.limit_seeking_search_distance(), should_debounce_hardstops=True)
         if direction > 0:
             self.postmove_cleanup_cmds += 'self.pos = self.maxpos\n'
             self.postmove_cleanup_cmds += 'self.last_primary_hardstop_dir = +1.0\n'
@@ -514,18 +446,17 @@ class Axis(object):
             print( 'bad direction ' + repr(direction))
         return table
 
-    def seek_one_limit_sequence(self, seek_distance):
+    def seek_one_limit_sequence(self, seek_distance, should_debounce_hardstops):
         """Use to go hit a hardstop. For the distance argument, direction matters.
         The sequence is returned in a move table.
         """
         table = posmovetable.PosMoveTable(self.posmodel)
-        old_allow_exceed_limits = self.posmodel.state.read('ALLOW_EXCEED_LIMITS')
-        self.posmodel.state.write('ALLOW_EXCEED_LIMITS',True)
-        old_only_creep = self.posmodel.state.read('ONLY_CREEP')
-        if self.posmodel.state.read('CREEP_TO_LIMITS'):
-            self.posmodel.state.write('ONLY_CREEP',True)
+        table.should_antibacklash = False
+        table.should_final_creep  = False
+        table.allow_exceed_limits = True
+        table.allow_cruise        = not(self.posmodel.state.read('CREEP_TO_LIMITS'))
         both_debounce_vals = self.hardstop_debounce
-        if self.posmodel.state.read('SHOULD_DEBOUNCE_HARDSTOPS'):
+        if should_debounce_hardstops:
             if seek_distance < 0:
                 debounce_distance = both_debounce_vals[0]
             else:
@@ -540,7 +471,5 @@ class Axis(object):
                 val1 = 0
                 val2 = dist
             table.extend(self.posmodel.make_move_table('dtdp',val1,val2))
-        self.posmodel.state.write('ALLOW_EXCEED_LIMITS',old_allow_exceed_limits)
-        self.posmodel.state.write('ONLY_CREEP',old_only_creep)
         return table
 
