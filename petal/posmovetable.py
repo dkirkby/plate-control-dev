@@ -17,8 +17,9 @@ class PosMoveTable(object):
     def __init__(self, posmodel=None):
         if not(posmodel):
             posmodel = posmodel.PosModel()
-        self.posmodel = posmodel      # the particular positioner this table applies to
-        self.__rows = []              # internal representation of the move data
+        self.posmodel = posmodel         # the particular positioner this table applies to
+        self.rows = []                   # internal representation of the move data
+        self.should_final_creep = True
 
     # getters
     @property
@@ -27,7 +28,7 @@ class PosMoveTable(object):
         Distances are given at the output shafts, in degrees.
         Times are given in seconds.
         """
-        return self.__for_output_type('schedule')
+        return self._for_output_type('schedule')
 
     @property
     def for_hardware(self):
@@ -35,14 +36,14 @@ class PosMoveTable(object):
         Distances are given at the motor shafts, in discrete steps.
         Times are given in milliseconds.
         """
-        return self.__for_output_type('hardware')
+        return self._for_output_type('hardware')
 
     @property
     def for_cleanup(self):
         """Version of the table suitable for updating the software internal
         position tracking after the physical move has been performed.
         """
-        return self.__for_output_type('cleanup')
+        return self._for_output_type('cleanup')
 
     # setters
     def set_move(self, rowidx, axisid, distance):
@@ -50,54 +51,54 @@ class PosMoveTable(object):
         If row index does not exist yet, then it will be added, and any blank filler rows will be generated in-between.
         """
         dist_label = {pc.T:'dT_ideal', pc.P:'dP_ideal'}
-        if rowidx >= len(self.__rows):
+        if rowidx >= len(self.rows):
             self.insert_new_row(rowidx)
-        for key in self.__rows[rowidx]._move_options.keys():
-            self.__rows[rowidx]._move_options[key] = self.posmodel.state.read(key)  # snapshot the current state
-        self.__rows[rowidx]._data[dist_label[axisid]] = distance
+        for key in self.rows[rowidx]._move_options.keys():
+            self.rows[rowidx]._move_options[key] = self.posmodel.state.read(key)  # snapshot the current state
+        self.rows[rowidx].data[dist_label[axisid]] = distance
 
     def store_orig_command(self, rowidx, cmd_string, val1, val2):
         """To keep a copy of the original move command with the move table.
         """
-        self.__rows[rowidx]._data['command'] = cmd_string
-        self.__rows[rowidx]._data['val1']    = val1
-        self.__rows[rowidx]._data['val2']    = val2
+        self.rows[rowidx].data['command'] = cmd_string
+        self.rows[rowidx].data['val1']    = val1
+        self.rows[rowidx].data['val2']    = val2
 
     def set_prepause(self, rowidx, prepause):
         """Put or update a prepause into the table.
         If row index does not exist yet, then it will be added, and any blank filler rows will be generated in-between.
         """
-        if rowidx >= len(self.__rows):
+        if rowidx >= len(self.rows):
             self.insert_new_row(rowidx)
-        self.__rows[rowidx]._data['prepause'] = prepause
+        self.rows[rowidx].data['prepause'] = prepause
 
     def set_postpause(self, rowidx, postpause):
         """Put or update a postpause into the table.
         If row index does not exist yet, then it will be added, and any blank filler rows will be generated in-between.
         """
-        if rowidx >= len(self.__rows):
+        if rowidx >= len(self.rows):
             self.insert_new_row(rowidx)
-        self.__rows[rowidx]._data['postpause'] = postpause
+        self.rows[rowidx].data['postpause'] = postpause
 
     # row manipulations
     def insert_new_row(self,index):
         newrow = PosMoveRow(self.posmodel)
-        self.__rows.insert(index,newrow)
-        if index > len(self.__rows):
+        self.rows.insert(index,newrow)
+        if index > len(self.rows):
             self.insert_new_row(index) # to fill in any blanks up to index
 
     def append_new_row(self):
-        self.insert_new_row(len(self.__rows))
+        self.insert_new_row(len(self.rows))
 
     def delete_row(self,index):
-        del self.__rows[index]
+        del self.rows[index]
 
     def extend(self, other_move_table):
-        for otherrow in other_move_table.__rows:
-            self.__rows.append(otherrow.copy())
+        for otherrow in other_move_table.rows:
+            self.rows.append(otherrow.copy())
 
     # internal methods
-    def __for_output_type(self,output_type):
+    def _for_output_type(self,output_type):
         # define the columns that will be filled in
         if output_type == 'schedule':
             table = {'posid':'','nrows':0,'dT':[],'dP':[],'Tdot':[],'Pdot':[],'prepause':[],'move_time':[],'postpause':[]}
@@ -110,30 +111,29 @@ class PosMoveTable(object):
 
         expected_prior_dTdP = [0,0]
         i = -1
-        for row in self.__rows:
+        for row in self.rows:
             i += 1
 
             # for hardware type, insert an extra pause-only action if necessary, since hardware commands only really have postpauses
-            if output_type == 'hardware' and row._data['prepause']:
+            if output_type == 'hardware' and row.data['prepause']:
                 for key in ['motor_steps_T','motor_steps_P','move_time']:
                     table[key].insert(0,0)
                 for key in ['speed_mode_T','speed_mode_P']:
-                    table[key].insert(0,'creep')
-                table['postpause'].insert(0,row._data['prepause'])
+                    table[key].insert(0,'creep') # speed mode doesn't matter here
+                table['postpause'].insert(0,row.data['prepause'])
 
-            # only allow requesting final backlash / creep moves if it's the last row in which that axis has a finite move argued
-            move_options = [row._move_options.copy(),row._move_options.copy()]
-            if i < len(self.__rows):
-                if any([r._data['dT_ideal'] for r in self.__rows[(i+1):]]):
-                    move_options[pc.T]['BACKLASH_REMOVAL_ON'] = False
-                    move_options[pc.T]['FINAL_CREEP_ON']      = False
-                if any([r._data['dP_ideal'] for r in self.__rows[(i+1):]]):
-                    move_options[pc.P]['BACKLASH_REMOVAL_ON'] = False
-                    move_options[pc.P]['FINAL_CREEP_ON']      = False
+            # set move flags
+            self._set_creep_after_cruise_flags()
+            flags_T = {'allow_cruise':        row.data['allow_cruise'],
+                       'creep_after_cruise':  row.data['creep_after_cruise_T'],
+                        'allow_exceed_limits': row.data['allow_exceed_limits']}
+            flags_P = {'allow_cruise':        row.data['allow_cruise'],
+                        'creep_after_cruise':  row.data['creep_after_cruise_P'],
+                        'allow_exceed_limits': row.data['allow_exceed_limits']}
 
             # use PosModel instance to get the real, quantized, calibrated values
-            true_move_T = self.posmodel.true_move(pc.T, row._data['dT_ideal'], move_options[pc.T], expected_prior_dTdP)
-            true_move_P = self.posmodel.true_move(pc.P, row._data['dP_ideal'], move_options[pc.P], expected_prior_dTdP)
+            (true_move_T,extra_moves) = self.posmodel.true_move(pc.T, row.data['dT_ideal'], flags_T, expected_prior_dTdP)
+            (true_move_P,extra_moves) = self.posmodel.true_move(pc.P, row.data['dP_ideal'], flags_P, expected_prior_dTdP)
             expected_prior_dTdP[0] += sum(true_move_T['obs_distance'])
             expected_prior_dTdP[1] += sum(true_move_P['obs_distance'])
             print('expected_prior:')
@@ -159,7 +159,7 @@ class PosMoveTable(object):
                 j = len(true_moves[pad]['motor_step'])
 
             # pad in pauses where new submoves have been added
-            true_pauses = {'pre':[row._data['prepause']], 'post':[row._data['postpause']]}
+            true_pauses = {'pre':[row.data['prepause']], 'post':[row.data['postpause']]}
             while len(true_pauses['pre']) < full_length:
                 true_pauses['pre'].append(0)
             while len(true_pauses['post']) < full_length:
@@ -186,9 +186,9 @@ class PosMoveTable(object):
                     time2 = true_move_P['move_time'].pop(0)
                     table['move_time'].append(max(time1,time2))
             if output_type == 'cleanup':
-                table['cmd'].append(row._data['command'])
-                table['cmd_val1'].append(row._data['val1'])
-                table['cmd_val2'].append(row._data['val2'])
+                table['cmd'].append(row.data['command'])
+                table['cmd_val1'].append(row.data['val1'])
+                table['cmd_val2'].append(row.data['val2'])
         table['posid'] = self.posmodel.state.read('SERIAL_ID')
         if output_type == 'schedule' or output_type == 'cleanup':
             table['nrows'] = len(table['dT'])
@@ -196,6 +196,18 @@ class PosMoveTable(object):
             table['nrows'] = len(table['motor_steps_T'])
         return table
 
+    def _set_creep_after_cruise_flags(self):
+        for row in self.rows():
+            row.data['creep_after_cruise_T'] = False
+            row.data['creep_after_cruise_P'] = False
+        for row in reversed(self.rows):
+            if row.data['allow_cruise'] and row.data['dT_ideal'] and self.should_final_creep:
+                row.data['creep_after_cruise_T'] = True
+                break
+        for row in reversed(self.rows):
+            if row.data['allow_cruise'] and row.data['dP_ideal'] and self.should_final_creep:
+                row.data['creep_after_cruise_P'] = True
+                break
 
 class PosMoveRow(object):
     """The general user does not directly use the internal values of a
@@ -204,17 +216,19 @@ class PosMoveRow(object):
     """
 
     def __init__(self,posmodel=None):
-        self._data = {'dT_ideal'     : 0,        # [deg] ideal theta distance to move (as seen by external observer)
-                      'dP_ideal'     : 0,        # [deg] ideal phi distance to move (as seen by external observer)
-                      'prepause'     : 0,        # [sec] delay for this number of seconds before executing the move
-                      'move_time'    : 0,        # [sec] time it takes the move to execute
-                      'postpause'    : 0,        # [sec] delay for this number of seconds after the move has completed
-                      'command'      : '',       # [string] command corresponding to this row
-                      'val1'         : None,     # [-] command argument 1
-                      'val2'         : None}     # [-] command argument 2
-        if not(posmodel):
-            posmodel = posmodel.Posmodel()
-        self._move_options = posmodel.default_move_options.copy()
+        self.data = {'dT_ideal'             : 0,        # [deg] ideal theta distance to move (as seen by external observer)
+                     'dP_ideal'             : 0,        # [deg] ideal phi distance to move (as seen by external observer)
+                     'prepause'             : 0,        # [sec] delay for this number of seconds before executing the move
+                     'move_time'            : 0,        # [sec] time it takes the move to execute
+                     'postpause'            : 0,        # [sec] delay for this number of seconds after the move has completed
+                     'command'              : '',       # [string] command corresponding to this row
+                     'cmd_val1'             : None,     # [-] command argument 1
+                     'cmd_val2'             : None,     # [-] command argument 2
+                     'cruise'         : True,     # [bool] whether any cruising allowed for this row
+                     'creep_after_cruise_T' : False,    # [bool] whether to do a set of final fine creep moves for this row after cruising (if there is cruising)
+                     'creep_after_cruise_P' : False,
+                     'allow_exceed_limits'  : False,    # [bool] whether to allow moves greater than the software limits (i.e. for hardstop-finding)
+                     'is_final_creep_row'   : False}
 
     def copy(self):
         return copymodule.deepcopy(self)

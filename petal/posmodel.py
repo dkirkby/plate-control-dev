@@ -33,15 +33,6 @@ class PosModel(object):
         self._motor_speed_cruise   = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
         self._legacy_spinupdown    = True   # flag to enable using old firmware's fixed spinupdown_distance
 
-        # List of particular PosState parameters that modify internal details of how a move
-        # gets divided into cruise / creep, antibacklash moves added, etc. What distinguishes
-        # these parameters is that they specify particular *modes* of motion. They are not
-        # calibration parameters or id #s or the like.
-        self.default_move_options = {'BACKLASH_REMOVAL_ON'  : True,
-                                     'FINAL_CREEP_ON'       : True,
-                                     'ALLOW_EXCEED_LIMITS'  : False,
-                                     'ONLY_CREEP'           : False}
-
     @property
     def _motor_speed_creep(self):
         """Returns motor creep speed (which depends on the creep period) in deg/sec."""
@@ -121,13 +112,14 @@ class PosModel(object):
         """Returns a [1x2] array of [phi_min, phi_max], from hardstop-to-hardstop."""
         return self.axis[pc.P].full_range
 
-    def true_move(self, axisid, distance, options=[], expected_prior_dTdP=[0,0]):
+    def true_move(self, axisid, distance, flags, expected_prior_dTdP=[0,0]):
         """Input move distance on either the theta or phi axis, as seen by the
         observer, in degrees.
 
-        The optional argument 'options' is a dictionary that can be used to specify
-        several flags that control particular modes of motor operation. See comments
-        on the parameter 'default_move_options' for more detail on this.
+        flags argument is a dictionary with booleans for:
+            'allow_cruise'
+            'creep_after_cruise'
+            'allow_exceed_limits'
 
         Outputs are quantized distance [deg], speed [deg/sec], integer number of
         motor steps, speed mode ['cruise' or 'creep'], and move time [sec]
@@ -139,9 +131,6 @@ class PosModel(object):
         future shaft position changes. This is necessary for correct checking of
         software travel limits, when a sequence of multiple moves is being planned out.
         """
-        if not(options):
-            options = self.default_move_options
-        options = options.copy() # don't disturb the input
         pos = self.expected_current_position
         shaft_start = [pos['shaftT'] + expected_prior_dTdP[0], pos['shaftP'] + expected_prior_dTdP[1]]
         obs_start = self.trans.shaftTP_to_obsTP(shaft_start)
@@ -149,14 +138,14 @@ class PosModel(object):
         obs_finish[axisid] += distance
         shaft_finish = self.trans.obsTP_to_shaftTP(obs_finish)
         dist = shaft_finish[axisid] - shaft_start[axisid]
-        if not(options['ALLOW_EXCEED_LIMITS']):
+        if not(flags['allow_exceed_limits']):
             dist = self.axis[axisid].truncate_to_limits(dist,shaft_start[axisid])
         gear_ratio = self.axis[axisid].gear_ratio
         ccw_sign = self.axis[axisid].ccw_sign
         dist *= gear_ratio
         dist *= ccw_sign
         antibacklash_final_move_dir = ccw_sign * self.axis[axisid].antibacklash_final_move_dir
-        backlash_magnitude = gear_ratio * self.state.read('BACKLASH') * options['BACKLASH_REMOVAL_ON']
+        backlash_magnitude = gear_ratio * self.state.read('BACKLASH') * flags['creep_after_cruise']
         if np.sign(dist) == antibacklash_final_move_dir:
             final_move  = np.sign(dist) * backlash_magnitude
             undershoot  = -final_move * self.state.read('BACKLASH_REMOVAL_BACKUP_FRACTION')
@@ -491,23 +480,22 @@ class Axis(object):
         """
         return np.abs(np.diff(self.full_range)*self.posmodel.state.read('LIMIT_SEEK_EXCEED_RANGE_FACTOR'))
 
-    def truncate_to_limits(self, distance, expected_pos=None):
-        """Return distance after first truncating it (if necessary) according to software limits.
+    def truncate_to_limits(self, distance, start_pos=None):
+        """Return distance after truncating it (if necessary) to the software limits.
         An expected starting position can optionally be argued. If None, then the internally-
         tracked position is used as the starting point.
         """
-        if not(self.posmodel.state.read('ALLOW_EXCEED_LIMITS')):
-            if expected_pos == None:
-                expected_pos = self.pos
-            target_pos = expected_pos + distance
-            if self.maxpos < self.minpos:
-                distance = 0
-            elif target_pos > self.maxpos:
-                new_distance = self.maxpos - expected_pos
-                distance = new_distance
-            elif target_pos < self.minpos:
-                new_distance = self.minpos - expected_pos
-                distance = new_distance
+        if start_pos == None:
+            start_pos = self.pos
+        target_pos = start_pos + distance
+        if self.maxpos < self.minpos:
+            distance = 0
+        elif target_pos > self.maxpos:
+            new_distance = self.maxpos - start_pos
+            distance = new_distance
+        elif target_pos < self.minpos:
+            new_distance = self.minpos - start_pos
+            distance = new_distance
         return distance
 
     def seek_and_set_limits_sequence(self):
