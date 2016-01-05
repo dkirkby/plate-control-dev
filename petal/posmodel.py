@@ -170,8 +170,8 @@ class PosModel(object):
         """Always perform this after positioner physical moves have been completed,
         to update the internal tracking of shaft positions and variables.
         """
-        self.axis[pc.T].pos += sum(cleanup_table['dT'])
-        self.axis[pc.P].pos += sum(cleanup_table['dP'])
+        self.state.write('SHAFT_T', self.state.read('SHAFT_T') + cleanup_table['stats']['net_dT'][-1])
+        self.state.write('SHAFT_P', self.state.read('SHAFT_P') + cleanup_table['stats']['net_dP'][-1])
         for axis in self.axis:
             exec(axis.postmove_cleanup_cmds)
             axis.postmove_cleanup_cmds = ''
@@ -179,6 +179,11 @@ class PosModel(object):
         self.state.write('LAST_MOVE_CMD',  separator.join(cleanup_table['command']))
         self.state.write('LAST_MOVE_VAL1', separator.join(['{0:.6g}'.format(x) for x in cleanup_table['cmd_val1']]))
         self.state.write('LAST_MOVE_VAL2', separator.join(['{0:.6g}'.format(x) for x in cleanup_table['cmd_val2']]))
+        self.state.write('TOTAL_CRUISE_MOVES_T', self.state.read('TOTAL_CRUISE_MOVES_T') + cleanup_table['stats']['TOTAL_CRUISE_MOVES_T'])
+        self.state.write('TOTAL_CRUISE_MOVES_P', self.state.read('TOTAL_CRUISE_MOVES_P') + cleanup_table['stats']['TOTAL_CRUISE_MOVES_P'])
+        self.state.write('TOTAL_CREEP_MOVES_T', self.state.read('TOTAL_CREEP_MOVES_T') + cleanup_table['stats']['TOTAL_CREEP_MOVES_T'])
+        self.state.write('TOTAL_CREEP_MOVES_P', self.state.read('TOTAL_CREEP_MOVES_P') + cleanup_table['stats']['TOTAL_CREEP_MOVES_P'])
+        self.state.write('TOTAL_MOVE_SEQUENCES', self.state.read('TOTAL_MOVE_SEQUENCES') + 1)
         self.state.log_unit(lognote)
 
     def make_move_table(self, movecmd, val1, val2, expected_prior_dTdP=[0,0]):
@@ -398,6 +403,20 @@ class Axis(object):
             self.posmodel.state.write('LAST_PRIMARY_HARDSTOP_DIR_P',value)
 
     @property
+    def total_limit_seeks(self):
+        if self.axisid == pc.T:
+            return self.posmodel.state.read('TOTAL_LIMIT_SEEKS_T')
+        else:
+            return self.posmodel.state.read('TOTAL_LIMIT_SEEKS_P')
+
+    @total_limit_seeks.setter
+    def total_limit_seeks(self,value):
+        if self.axisid == pc.T:
+            self.posmodel.state.write('TOTAL_LIMIT_SEEKS_T',value)
+        else:
+            self.posmodel.state.write('TOTAL_LIMIT_SEEKS_P',value)
+
+    @property
     def principle_hardstop_direction(self):
         """The "principle" hardstop is the one which is struck during homing.
         (The "secondary" hardstop is only struck when finding the total available travel range.)
@@ -445,6 +464,7 @@ class Axis(object):
             self.postmove_cleanup_cmds += 'self.last_primary_hardstop_dir = -1.0\n'
         else:
             print( 'bad direction ' + repr(direction))
+        self.postmove_cleanup_cmds += 'self.total_limit_seeks += 1\n'
         return table
 
     def seek_one_limit_sequence(self, seek_distance, should_debounce_hardstops):
