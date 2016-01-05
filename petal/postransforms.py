@@ -301,8 +301,8 @@ class PosTransforms(object):
         inner += np.finfo(float).eps*10 # slight contraction to avoid numeric divide-by-zero type of errors
         outer -= np.finfo(float).eps*10 # slight contraction to avoid numeric divide-by-zero type of errors
         HYPOT = hypot
-        HYPOT[hypot > outer] = outer
-        HYPOT[hypot < inner] = inner
+        HYPOT[hypot >= outer] = outer
+        HYPOT[hypot <= inner] = inner
         X = HYPOT*np.cos(angle)
         Y = HYPOT*np.sin(angle)
 

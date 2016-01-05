@@ -62,8 +62,8 @@ if should_move_dqds:
 
 # command formats below are for 'expert' user
 if should_move_xy:
-    x = [3, 0, -5,  0, -5.99, 6, 0]
-    y = [0, 3,  0, -5,     0, 0, 0]
+    x = [3, 0, -5,  0, -5.99, 6, 0, 0]
+    y = [0, 3,  0, -5,     0, 0, 8, 0]
     for posid in posids:
         m.expert_request_schedule_execute_moves([posid]*len(x), ['xy']*len(x), x, y)
 
