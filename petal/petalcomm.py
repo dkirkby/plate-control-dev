@@ -27,13 +27,16 @@ def execute_moves_soft_sync(self):
     pass
 
 def set_pos_constants(self, posids, settings):
-    """Sets positioners identified by ids in the list posids to corresponding
-    settings in the (dictionary? list of dicts?) settings.
+    """Send settings over ethernet to the petal controller, where they are
+    sent over CAN to the positioners identified the list 'posids', with the setting
+    values in the corresponding (dictionary? list of dicts?) 'settings'.
     """
     pass
 
 def set_fiducials(self, ids, percent_duty, duty_period):
-    """Sets the fiducials identified by the list ids to the corresponding duty cycles.
+    """Send settings over ethernet to the petal controller, where they are
+    sent over CAN to the fiducials. Sets the fiducials identified by the list ids
+    to the corresponding duty values.
         ids          ... list of fiducial ids
         percent_duty ... list of values, 0-100, 0 means off
         duty_period  ... list of values, ms, time between duty cycles
