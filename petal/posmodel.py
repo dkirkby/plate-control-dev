@@ -50,12 +50,12 @@ class PosModel(object):
     def expected_current_position(self):
         """Returns a dictionary of the current expected position in the various coordinate systems.
         The keys are:
-            'Q'      ... float, deg, dependent variable, expected global Q position
-            'S'      ... float, mm,  dependent variable, expected global S position
+            'q'      ... float, deg, dependent variable, expected global Q position
+            's'      ... float, mm,  dependent variable, expected global S position
             'x'      ... float, mm,  dependent variable, expected global x position
             'y'      ... float, mm,  dependent variable, expected global y position
-            'obsT'   ... float, deg, dependent variable, expected position of theta axis, as seen by an external observer (includes offsets, calibrations)
-            'obsP'   ... float, deg, dependent variable, expected position of phi axis, as seen by an external observer (includes offsets, calibrations)
+            'obsT'   ... float, deg, dependent variable, expected position of theta axis, including offsets as seen by an external observer
+            'obsP'   ... float, deg, dependent variable, expected position of phi axis, including offsets as seen by an external observer
             'shaftT' ... float, deg, independent variable, the internally-tracked expected position of the theta shaft at the output of the gearbox
             'shaftP' ... float, deg, independent variable, the internally-tracked expected position of the phi shaft at the output of the gearbox
             'motorT' ... float, deg, dependent variable, expected position of theta motor
@@ -65,8 +65,8 @@ class PosModel(object):
         d = {}
         d['shaftT'] = shaftTP[0]
         d['shaftP'] = shaftTP[1]
-        d['motorT'] = d['shaftT'] * self.axis[pc.T].gear_ratio
-        d['motorP'] = d['shaftP'] * self.axis[pc.P].gear_ratio
+        d['motorT'] = self.axis[pc.T].shaft_to_motor(d['shaftT'])
+        d['motorP'] = self.axis[pc.P].shaft_to_motor(d['shaftP'])
         obsTP = self.trans.shaftTP_to_obsTP(shaftTP)
         d['obsT'] = obsTP[0]
         d['obsP'] = obsTP[1]
@@ -119,8 +119,8 @@ class PosModel(object):
         The return values are formatted as a dictionary, with keys:
             'motor_step'   ... integer number of motor steps, signed according to direction
             'move_time'    ... total time the move takes [sec]
-            'obs_distance' ... quantized distance of travel [deg], signed according to direction
-            'obs_speed'    ... approximate speed of travel [deg/sec]. unsigned. note 'move_time' is preferred for precision timing calculations
+            'distance'     ... quantized distance of travel [deg], signed according to direction
+            'speed'        ... approximate speed of travel [deg/sec]. unsigned. note 'move_time' is preferred for precision timing calculations
             'speed_mode'   ... 'cruise' or 'creep'
 
         The argument 'expected_prior_dTdP' is used to account for expected
@@ -129,20 +129,12 @@ class PosModel(object):
         """
         pos = self.expected_current_position
         shaft_start = [pos['shaftT'] + expected_prior_dTdP[0], pos['shaftP'] + expected_prior_dTdP[1]]
-        obs_start = self.trans.shaftTP_to_obsTP(shaft_start)
-        obs_finish = obs_start.copy()
-        obs_finish[axisid] += distance
-        shaft_finish = self.trans.obsTP_to_shaftTP(obs_finish)
-        dist = shaft_finish[axisid] - shaft_start[axisid]
         if not(allow_exceed_limits):
-            dist = self.axis[axisid].truncate_to_limits(dist,shaft_start[axisid])
-        gear_ratio = self.axis[axisid].gear_ratio
-        ccw_sign = self.axis[axisid].ccw_sign
-        dist *= gear_ratio
-        dist *= ccw_sign
-        move_data = self.motor_true_move(axisid, dist, allow_cruise)
-        move_data['obs_distance'] *= ccw_sign / gear_ratio
-        move_data['obs_speed']    *= ccw_sign / gear_ratio
+            distance = self.axis[axisid].truncate_to_limits(distance,shaft_start[axisid])
+        motor_dist = self.axis[axisid].shaft_to_motor(distance)
+        move_data = self.motor_true_move(axisid, motor_dist, allow_cruise)
+        move_data['distance'] = self.axis[axisid].motor_to_shaft['distance']
+        move_data['speed']    = self.axis[axisid].motor_to_shaft['speed']
         return move_data
 
     def motor_true_move(self, axisid, distance, allow_cruise):
@@ -153,17 +145,17 @@ class PosModel(object):
         dist_spinup = 2 * np.sign(distance) * self._spinupdown_distance  # distance over which accel / decel to and from cruise speed
         if not(allow_cruise) or abs(distance) <= (abs(dist_spinup) + self.state.read('MIN_DIST_AT_CRUISE_SPEED')):
             move_data['motor_step']   = round(distance / self._stepsize_creep)
-            move_data['obs_distance'] = move_data['motor_step'] * self._stepsize_creep
+            move_data['distance']     = move_data['motor_step'] * self._stepsize_creep
             move_data['speed_mode']   = 'creep'
-            move_data['obs_speed']    = self._motor_speed_creep
-            move_data['move_time']    = abs(move_data['obs_distance']) / move_data['obs_speed']
+            move_data['speed']        = self._motor_speed_creep
+            move_data['move_time']    = abs(move_data['distance']) / move_data['speed']
         else:
             dist_cruise = distance - dist_spinup
             move_data['motor_step']   = round(dist_cruise / self._stepsize_cruise)
-            move_data['obs_distance'] = move_data['motor_step'] * self._stepsize_cruise + dist_spinup
+            move_data['distance']     = move_data['motor_step'] * self._stepsize_cruise + dist_spinup
             move_data['speed_mode']   = 'cruise'
-            move_data['obs_speed']    = self._motor_speed_cruise
-            move_data['move_time']    = (abs(move_data['motor_step'])*self._stepsize_cruise + 4*self._spinupdown_distance) / move_data['obs_speed']
+            move_data['speed']        = self._motor_speed_cruise
+            move_data['move_time']    = (abs(move_data['motor_step'])*self._stepsize_cruise + 4*self._spinupdown_distance) / move_data['speed']
         return move_data
 
     def postmove_cleanup(self, cleanup_table, lognote=''):
@@ -368,18 +360,18 @@ class Axis(object):
             return [0,-self.posmodel.state.read('BACKLASH')]
 
     @property
-    def gear_ratio(self):
+    def motor_calib_properties(self):
+        """Return properties for motor calibration.
+        """
         if self.axisid == pc.T:
-            return self.posmodel.state.read('GEAR_T')
+            prop['gear_ratio'] = pc.gear_ratio[posmodel.state.read('GEAR_TYPE_T')]
+            prop['gear_calib'] = self.posmodel.state.read('GEAR_CALIB_T')
+            prop['ccw_sign'] = self.posmodel.state.read('MOTOR_CCW_DIR_T')
         else:
-            return self.posmodel.state.read('GEAR_P')
-
-    @property
-    def ccw_sign(self):
-        if self.axisid == pc.T:
-            return self.posmodel.state.read('MOTOR_CCW_DIR_T')
-        else:
-            return self.posmodel.state.read('MOTOR_CCW_DIR_P')
+            prop['gear_ratio'] = pc.gear_ratio[posmodel.state.read('GEAR_TYPE_P')]
+            prop['gear_calib'] = self.posmodel.state.read('GEAR_CALIB_P')
+            prop['ccw_sign'] = self.posmodel.state.read('MOTOR_CCW_DIR_P')
+        return prop
 
     @property
     def antibacklash_final_move_dir(self):
@@ -431,6 +423,18 @@ class Axis(object):
         """A distance magnitude that guarantees hitting a hard limit in either direction.
         """
         return np.abs(np.diff(self.full_range)*self.posmodel.state.read('LIMIT_SEEK_EXCEED_RANGE_FACTOR'))
+
+    def motor_to_shaft(self,distance):
+        """Convert a distance in motor angle to shaft angle at the gearbox output.
+        """
+        p = self.motor_calib_properties
+        return distance * prop['ccw_sign'] / (p['gear_ratio'] * p['gear_calib'])
+
+    def shaft_to_motor(self,distance):
+        """Convert a distance in shaft angle to motor angle at the gearbox output.
+        """
+        p = self.motor_calib_properties
+        return distance * prop['ccw_sign'] * (p['gear_ratio'] * p['gear_calib'])
 
     def truncate_to_limits(self, distance, start_pos=None):
         """Return distance after truncating it (if necessary) to the software limits.

@@ -43,7 +43,7 @@ class PosMoveTable(object):
         return self._for_output_type('hardware')
 
     @property
-    def for_cleanup(self):
+    def for_software(self):
         """Version of the table suitable for updating the software internal
         position tracking after the physical move has been performed.
         """
@@ -123,8 +123,8 @@ class PosMoveTable(object):
             ideal_dist = [row.data['dT_ideal'],row.data['dP_ideal']]
             for i in [pc.T,pc.P]:
                 true_moves[i].append(self.posmodel.true_move(i, ideal_dist[i], self.allow_cruise, self.allow_exceed_limits, expected_prior_dTdP))
-                expected_prior_dTdP[i] += true_moves[i][-1]['obs_distance']
-                if true_moves[i][-1]['obs_distance']:
+                expected_prior_dTdP[i] += true_moves[i][-1]['distance']
+                if true_moves[i][-1]['distance']:
                     has_moved[i] = True
         if self.should_antibacklash and any(has_moved):
             backlash_dir = [self.posmodel.state.read('ANTIBACKLASH_FINAL_MOVE_DIR_T'), self.posmodel.state.read('ANTIBACKLASH_FINAL_MOVE_DIR_P')]
@@ -136,7 +136,7 @@ class PosMoveTable(object):
                 new_moves[i].append(self.posmodel.true_move(i, backlash[i], self.allow_cruise, allow_exceed_limits=True, expected_prior_dTdP=expected_prior_dTdP))
                 new_moves[i][-1]['command'] = '(auto backlash backup)'
                 new_moves[i][-1]['cmd_val'] = backlash[i]
-                expected_prior_dTdP[i] += new_moves[i][-1]['obs_distance']
+                expected_prior_dTdP[i] += new_moves[i][-1]['distance']
         if self.should_final_creep or any(backlash):
             ideal_total = [0,0]
             ideal_total[pc.T] = sum([row.data['dT_ideal'] for row in self.rows])
@@ -148,12 +148,12 @@ class PosMoveTable(object):
                 new_moves[i].append(self.posmodel.true_move(i, err_dist[i], allow_cruise=False, allow_exceed_limits=True, expected_prior_dTdP=expected_prior_dTdP))
                 new_moves[i][-1]['command'] = '(auto final creep)'
                 new_moves[i][-1]['cmd_val'] = err_dist[i]
-                expected_prior_dTdP[i] += new_moves[i][-1]['obs_distance']
+                expected_prior_dTdP[i] += new_moves[i][-1]['distance']
         self.rows_extra = []
         for i in range(len(new_moves[0])):
             self.rows_extra.append(PosMoveRow())
-            self.rows_extra[i].data = {'dT_ideal'  : new_moves[pc.T][i]['obs_distance'],
-                                       'dP_ideal'  : new_moves[pc.P][i]['obs_distance'],
+            self.rows_extra[i].data = {'dT_ideal'  : new_moves[pc.T][i]['distance'],
+                                       'dP_ideal'  : new_moves[pc.P][i]['distance'],
                                        'prepause'  : 0,
                                        'move_time' : max(new_moves[pc.T][i]['move_time'],new_moves[pc.P][i]['move_time']),
                                        'postpause' : 0,
@@ -196,11 +196,10 @@ class PosMoveTable(object):
                 for key in ['speed_mode_T','speed_mode_P']:
                     table[key].insert(0,'creep') # speed mode doesn't matter here
                 table['postpause'].insert(0,rows[i].data['prepause'])
-
-            table['dT'].append(true_moves[pc.T][i]['obs_distance'])
-            table['dP'].append(true_moves[pc.P][i]['obs_distance'])
-            table['Tdot'].append(true_moves[pc.T][i]['obs_speed'])
-            table['Pdot'].append(true_moves[pc.P][i]['obs_speed'])
+            table['dT'].append(true_moves[pc.T][i]['distance'])
+            table['dP'].append(true_moves[pc.P][i]['distance'])
+            table['Tdot'].append(true_moves[pc.T][i]['speed'])
+            table['Pdot'].append(true_moves[pc.P][i]['speed'])
             table['prepause'].append(rows[i].data['prepause'])
             table['postpause'].append(rows[i].data['postpause'])
             table['motor_steps_T'].append(true_moves[pc.T][i]['motor_step'])

@@ -16,7 +16,7 @@ class PosTransforms(object):
         posXY   ... (x,y) local to fiber positioner, centered on theta axis, looking at fiber tip
         obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
         shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
-        obsTP   ... (theta,phi) expected position of fiber tip, including offsets and calibrations
+        obsTP   ... (theta,phi) expected position of fiber tip including offsets
         QS      ... (q,s) global to focal plate, q is angle about the optical axis, s is path distance from optical axis, along the curved focal surface, within a plane that intersects the optical axis
         flatXY  ... (x,y) global to focal plate, with focal plate slightly stretched out and flattened (used for anti-collision)
 
@@ -27,6 +27,10 @@ class PosTransforms(object):
         shaftTP <--> obsTP
         obsXY   <--> QS
         QS      <--> flatXY
+
+    Additionally, some composite transformations are provided for convenience:
+
+        shaftTP <--> flatXY
 
     These can be chained together in any order to convert among the various coordinate systems.
 
@@ -49,8 +53,8 @@ class PosTransforms(object):
         RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         """
         (xy, was_not_list) = pc.listify(xy)
-        X = np.polyval(self.poly('X'), xy[0])
-        Y = np.polyval(self.poly('Y'), xy[1])
+        X = np.array(xy[0]) + self.posmodel.state.read('OFFSET_X')
+        Y = np.array(xy[1]) + self.posmodel.state.read('OFFSET_Y')
         XY = np.array([X,Y]).tolist()
         if was_not_list:
             XY = pc.delistify(XY)
@@ -64,16 +68,9 @@ class PosTransforms(object):
         RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         """
         (xy, was_not_list) = pc.listify(xy)
-        x = np.array(xy[0])
-        y = np.array(xy[1])
-        Xguess = x - self.poly('X')[-1]
-        Yguess = y - self.poly('Y')[-1]
-        X = [0]*x.size
-        Y = [0]*y.size
-        for i in range(x.size):
-            X[i] = self.inverse_poly(self.poly('X'), x[i], Xguess[i])
-            Y[i] = self.inverse_poly(self.poly('Y'), y[i], Yguess[i])
-        XY = [X,Y]
+        X = np.array(xy[0]) - self.posmodel.state.read('OFFSET_X')
+        Y = np.array(xy[1]) - self.posmodel.state.read('OFFSET_Y')
+        XY = np.array([X,Y]).tolist()
         if was_not_list:
             XY = pc.delistify(XY)
         return XY
@@ -123,8 +120,8 @@ class PosTransforms(object):
         RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
         """
         (tp, was_not_list) = pc.listify(tp)
-        T = np.polyval(self.poly('T'), tp[0])
-        P = np.polyval(self.poly('P'), tp[1])
+        T = np.array(tp[0]) + self.posmodel.state.read('OFFSET_T')
+        P = np.array(tp[1]) + self.posmodel.state.read('OFFSET_P')
         TP = np.array([T,P]).tolist()
         if was_not_list:
             TP = pc.delistify(TP)
@@ -138,16 +135,9 @@ class PosTransforms(object):
         RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
         """
         (tp, was_not_list) = pc.listify(tp)
-        t = np.array(tp[0])
-        p = np.array(tp[1])
-        Tguess = t - self.poly('T')[-1]
-        Pguess = p - self.poly('P')[-1]
-        T = [0]*t.size
-        P = [0]*p.size
-        for i in range(t.size):
-            T[i] = self.inverse_poly(self.poly('T'), t[i], Tguess[i])
-            P[i] = self.inverse_poly(self.poly('P'), p[i], Pguess[i])
-        TP = [T,P]
+        T = np.array(tp[0]) - self.posmodel.state.read('OFFSET_T')
+        P = np.array(tp[1]) - self.posmodel.state.read('OFFSET_P')
+        TP = np.array([T,P]).tolist()
         if was_not_list:
             TP = pc.delistify(TP)
         return TP
@@ -221,22 +211,18 @@ class PosTransforms(object):
             QS = pc.delistify(QS)
         return QS
 
-    # CALIBRATION POLYNOMIAL GETTER
-    def poly(self,var):
-        """Get polynomial calibraton coefficients.
-        INPUT:  'X','Y','T','P' indicates which dimension to get the polynomial of
-        OUTPUT: list of polynomial coefficients
-        """
-        if var == 'X':
-            return [1, self.posmodel.state.read('POLYN_X0')]
-        elif var == 'Y':
-            return [1, self.posmodel.state.read('POLYN_Y0')]
-        elif var == 'T':
-            return [self.posmodel.state.read('POLYN_T2'), self.posmodel.state.read('POLYN_T1'), self.posmodel.state.read('POLYN_T0')]
-        elif var == 'P':
-            return [self.posmodel.state.read('POLYN_P2'), self.posmodel.state.read('POLYN_P1'), self.posmodel.state.read('POLYN_P0')]
-        else:
-            print('bad var ' + str(var))
+    # COMPOSITE TRANSFORMATIONS
+    def shaftTP_to_flatXY(self,tp):
+        obsXY = self.shaftTP_to_obsXY(tp)
+        qs = self.obsXY_to_QS(obsXY)
+        xy = self.QS_to_flatXY(qs)
+        return xy
+
+    def flatXY_to_shaftTP(self,xy):
+        qs = self.flatXY_to_QS(xy)
+        obsXY = self.QS_to_obsXY(qs)
+        (tp,reachable) = self.obsXY_to_shaftTP(obsXY)
+        return tp, reachable
 
     # STATIC INTERNAL METHODS
     @staticmethod
@@ -354,20 +340,3 @@ class PosTransforms(object):
         tp = TP.tolist()
         unreachable = np.where(unreachable)[0].tolist()
         return tp, unreachable
-
-    @staticmethod
-    def inverse_poly(p, y, xguess):
-        """inverter function for quadratic polynomial such that y = polyval(p,x)
-        single value calculated at a time only
-        """
-        if len(p) == 1:
-            return (y - p[0])
-        elif len(p) == 2:
-            return (y - p[1])/p[0]
-        else:
-            P = p.copy()
-            P[-1] -= y
-            roots = np.roots(P)
-            xdist = (roots - xguess)**2
-            x = roots[np.argmin(xdist)]
-            return x
