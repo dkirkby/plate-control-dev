@@ -22,9 +22,9 @@ class PosTransforms(object):
 
     The fundamental transformations provided are:
 
+        obsTP   <--> shaftTP
+        shaftTP <--> posXY
         posXY   <--> obsXY
-        obsXY   <--> shaftTP
-        shaftTP <--> obsTP
         obsXY   <--> QS
         QS      <--> flatXY
 
@@ -45,6 +45,71 @@ class PosTransforms(object):
         self.posmodel = posmodel
 
     # FUNDAMENTAL TRANSFORMATIONS
+    def obsTP_to_shaftTP(self, tp):
+        """
+        obsTP   ... (theta,phi) expected position of fiber tip, including offsets and calibrations
+        shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
+        INPUT:  [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
+        RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
+        """
+        (tp, was_not_list) = pc.listify(tp)
+        T = np.array(tp[0]) - self.posmodel.state.read('OFFSET_T')
+        P = np.array(tp[1]) - self.posmodel.state.read('OFFSET_P')
+        TP = np.array([T,P]).tolist()
+        if was_not_list:
+            TP = pc.delistify(TP)
+        return TP
+
+    def shaftTP_to_obsTP(self, tp):
+        """
+        shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
+        obsTP   ... (theta,phi) expected position of fiber tip, including offsets and calibrations
+        INPUT:  [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
+        RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
+        """
+        (tp, was_not_list) = pc.listify(tp)
+        T = np.array(tp[0]) + self.posmodel.state.read('OFFSET_T')
+        P = np.array(tp[1]) + self.posmodel.state.read('OFFSET_P')
+        TP = np.array([T,P]).tolist()
+        if was_not_list:
+            TP = pc.delistify(TP)
+        return TP
+
+    def shaftTP_to_posXY(self, tp):
+        """
+        shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
+        obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
+        INPUT:  [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
+        RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
+        """
+        (tp, was_not_list) = pc.listify(tp)
+        r = [self.posmodel.state.read('LENGTH_R1'),self.posmodel.state.read('LENGTH_R2')]
+        TP = self.shaftTP_to_obsTP(tp)  # adjust shaft angles into observer space (since observer sees the physical phi = 0)
+        xy = self.tp2xy(TP, r)          # calculate xy in posXY space
+        xy = xy.tolist()
+        if was_not_list:
+            xy = pc.delistify(xy)
+        return xy
+
+    def posXY_to_shaftTP(self, xy):
+        """
+        obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
+        shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
+        INPUT:  [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
+        RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
+                [N]    array of [index_values]
+        The output "unreachable" is a list of all the indexes of the points that could not be physically reached.
+        """
+        (xy, was_not_list) = pc.listify(xy)
+        r = [self.posmodel.state.read('LENGTH_R1'),self.posmodel.state.read('LENGTH_R2')]
+        shaft_range = [self.posmodel.full_range_T, self.posmodel.full_range_P]
+        obs_range = self.shaftTP_to_obsTP(shaft_range)  # want range used in next line to be according to observer (since observer sees the physical phi = 0)
+        (tp, unreachable) = self.xy2tp(xy, r, obs_range)
+        TP = self.obsTP_to_shaftTP(tp)                  # adjust angles back into shaft space
+        if was_not_list:
+            TP = pc.delistify(TP)
+        return TP, unreachable
+
     def posXY_to_obsXY(self, xy):
         """
         posXY   ... (x,y) local to fiber positioner, centered on theta axis, looking at fiber tip
@@ -74,73 +139,6 @@ class PosTransforms(object):
         if was_not_list:
             XY = pc.delistify(XY)
         return XY
-
-    def obsXY_to_shaftTP(self, xy):
-        """
-        obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
-        shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
-        INPUT:  [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
-        RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
-                [N]    array of [index_values]
-        The output "unreachable" is a list of all the indexes of the points that could not be physically reached.
-        """
-        (xy, was_not_list) = pc.listify(xy)
-        r = [self.posmodel.state.read('LENGTH_R1'),self.posmodel.state.read('LENGTH_R2')]
-        shaft_range = [self.posmodel.full_range_T, self.posmodel.full_range_P]
-        XY = self.obsXY_to_posXY(xy)                    # adjust observer xy into the positioner system XY
-        obs_range = self.shaftTP_to_obsTP(shaft_range)  # want range used in next line to be according to observer (since observer sees the physical phi = 0)
-        (tp, unreachable) = self.xy2tp(XY, r, obs_range)
-        TP = self.obsTP_to_shaftTP(tp)                  # adjust angles back into shaft space
-        if was_not_list:
-            TP = pc.delistify(TP)
-        return TP, unreachable
-
-    def shaftTP_to_obsXY(self, tp):
-        """
-        shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
-        obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
-        INPUT:  [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
-        RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
-        """
-        (tp, was_not_list) = pc.listify(tp)
-        r = [self.posmodel.state.read('LENGTH_R1'),self.posmodel.state.read('LENGTH_R2')]
-        TP = self.shaftTP_to_obsTP(tp)  # adjust shaft angles into observer space (since observer sees the physical phi = 0)
-        xy = self.tp2xy(TP, r)          # calculate xy in posXY space
-        xy = xy.tolist()
-        XY = self.posXY_to_obsXY(xy)  # adjust positionner XY into observer space
-        if was_not_list:
-            XY = pc.delistify(XY)
-        return XY
-
-    def shaftTP_to_obsTP(self, tp):
-        """
-        shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
-        obsTP   ... (theta,phi) expected position of fiber tip, including offsets and calibrations
-        INPUT:  [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
-        RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
-        """
-        (tp, was_not_list) = pc.listify(tp)
-        T = np.array(tp[0]) + self.posmodel.state.read('OFFSET_T')
-        P = np.array(tp[1]) + self.posmodel.state.read('OFFSET_P')
-        TP = np.array([T,P]).tolist()
-        if was_not_list:
-            TP = pc.delistify(TP)
-        return TP
-
-    def obsTP_to_shaftTP(self, tp):
-        """
-        obsTP   ... (theta,phi) expected position of fiber tip, including offsets and calibrations
-        shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
-        INPUT:  [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
-        RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
-        """
-        (tp, was_not_list) = pc.listify(tp)
-        T = np.array(tp[0]) - self.posmodel.state.read('OFFSET_T')
-        P = np.array(tp[1]) - self.posmodel.state.read('OFFSET_P')
-        TP = np.array([T,P]).tolist()
-        if was_not_list:
-            TP = pc.delistify(TP)
-        return TP
 
     def obsXY_to_QS(self,xy):
         """
@@ -223,6 +221,34 @@ class PosTransforms(object):
         obsXY = self.QS_to_obsXY(qs)
         (tp,reachable) = self.obsXY_to_shaftTP(obsXY)
         return tp, reachable
+
+    # DIFFERENCE METHODS
+    def delta_posXY(self, xy0, xy1, range_limited=True):
+        (xy, was_not_list) = pc.listify(xy)
+        if not(range_limited):
+            dxdy = (np.array(xy1) - np.array(xy0)).tolist()
+        else:
+            self.obsXY_to_shaftTP
+        if was_not_list:
+            dxdy = pc.delistify(dxdy)
+        return dxdy
+
+    def delta_obsXY(self, xy0, xy1, range_limited=True):
+        posXY0 = self.obsXY_to_posXY(xy0)
+        posXY1 = self.obsXY_to_posXY(xy1)
+        return self.delta_posXY(posXY0,posXY1,range_limited)
+
+    def delta_shaftTP(self, xy0, xy1, range_limited=True):
+        pass
+
+    def delta_obsTP(self, xy0, xy1, range_limited=True):
+        pass
+
+    def delta_QS(self, xy0, xy1, range_limited=True):
+        pass
+
+    def delta_flatXY(self, xy0, xy1, range_limited=True):
+        pass
 
     # STATIC INTERNAL METHODS
     @staticmethod
