@@ -34,6 +34,19 @@ class PosTransforms(object):
 
     These can be chained together in any order to convert among the various coordinate systems.
 
+    #####
+    REALLY IT'S ABOUT CLOSEST ANGLE WRAPPING, AND CROSSING THE +/-180 ON THETA... UPDATE COMMENTS TO MATCH.
+    Simple vector addition and subtraction do not work in all cases, when one is dealing with the shaft
+    angles theta and phi. This is because of the physical range limitations on the theta and phi axes,
+    which are imposed by the hardstops on the fiber positioner.
+
+    Therefore special methods are provided for performing addition and subtraction operations
+    between two points, where one wants to do operations that are conceptually like "tp1 = tp0 + dtdp"
+    or "dtdp = tp1 - tp0". In both cases, the key point is that there must be special angle wrapping
+    logic to handle the cases where the distance dtdp (when naively calculated) would physically go
+    through a hardstop.
+    #####
+
     Note in practice that the coordinate S is similar, but not identical, to the radial distance
     R from the optical axis. This similarity is because the DESI focal plate curvature is gentle.
     See DESI-0530 for detail on the (Q,S) coordinate system.
@@ -43,6 +56,24 @@ class PosTransforms(object):
         if not(posmodel):
             posmodel = posmodel.PosModel()
         self.posmodel = posmodel
+
+    # SHAFT RANGES
+    def shaft_ranges(self, range_limits):
+        """Returns a set of range limits for the theta and phi axes. The argument
+        range_limits is a string:
+            ... 'full_range' means from hardstop-to-hardstop
+            ... 'targetable' restricts range by excluding the debounce and backlash clearance zones near the hardstops
+            ... 'exact' means theta range of [-179.999999999,180] and phi range of [0,180]
+        """
+        if range_limits == 'full_range':
+            return [self.posmodel.full_range_T, self.posmodel.full_range_P]
+        elif range_limits == 'targetable':
+            return [self.posmodel.targetable_range_T, self.posmodel.targetable_range_P]
+        elif range_limits == 'exact':
+            return [[-179.999999999,180],[0,180]]
+        else:
+            print('bad range_limits argument "' + str(range_limits) + '"')
+            return None
 
     # FUNDAMENTAL TRANSFORMATIONS
     def obsTP_to_shaftTP(self, tp):
@@ -91,19 +122,20 @@ class PosTransforms(object):
             xy = pc.delistify(xy)
         return xy
 
-    def posXY_to_shaftTP(self, xy):
+    def posXY_to_shaftTP(self, xy, range_limits='full_range'):
         """
         obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
         shaftTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
         INPUT:  [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
+                range_limits (optional) string, see shaft_ranges method
         RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
                 [N]    array of [index_values]
         The output "unreachable" is a list of all the indexes of the points that could not be physically reached.
         """
         (xy, was_not_list) = pc.listify(xy)
         r = [self.posmodel.state.read('LENGTH_R1'),self.posmodel.state.read('LENGTH_R2')]
-        shaft_range = [self.posmodel.full_range_T, self.posmodel.full_range_P]
-        obs_range = self.shaftTP_to_obsTP(shaft_range)  # want range used in next line to be according to observer (since observer sees the physical phi = 0)
+        shaft_ranges = self.shaft_ranges(range_limits)
+        obs_range = self.shaftTP_to_obsTP(shaft_ranges)  # want range used in next line to be according to observer (since observer sees the physical phi = 0)
         (tp, unreachable) = self.xy2tp(xy, r, obs_range)
         TP = self.obsTP_to_shaftTP(tp)                  # adjust angles back into shaft space
         if was_not_list:
@@ -223,31 +255,70 @@ class PosTransforms(object):
         return tp, reachable
 
     # DIFFERENCE METHODS
-    def delta_posXY(self, xy0, xy1, range_limited=True):
-        (xy, was_not_list) = pc.listify(xy)
-        if not(range_limited):
-            dxdy = (np.array(xy1) - np.array(xy0)).tolist()
-        else:
-            self.obsXY_to_shaftTP
-        if was_not_list:
-            dxdy = pc.delistify(dxdy)
-        return dxdy
+    def delta_posXY(self, xy1, xy0):
+        """Returns dxdy corresponding to xy1 - xy0.
+        """
+        return PosTransforms._simple_delta(xy1,xy0)
 
-    def delta_obsXY(self, xy0, xy1, range_limited=True):
-        posXY0 = self.obsXY_to_posXY(xy0)
-        posXY1 = self.obsXY_to_posXY(xy1)
-        return self.delta_posXY(posXY0,posXY1,range_limited)
+    def delta_obsXY(self, xy1, xy0):
+        """Returns dxdy corresponding to xy1 - xy0.
+        """
+        return PosTransforms._simple_delta(xy1,xy0)
 
-    def delta_shaftTP(self, xy0, xy1, range_limited=True):
+    def delta_shaftTP(self, tp1, tp0, range_limits='full'):
+        """Returns dtdp corresponding to tp1 - tp0.
+        The range_limits option can be any of the values for the shaft_ranges
+        method, or 'none'. If 'none', then the returned delta is a simple subtraction
+        with no special checks for angle-wrapping across positioner's theta = +/-180 deg.
+        """
+        dtdp = PosTransforms._simple_delta(tp1,tp0)
+        if range_limits != 'none':
+            (dtdp, was_not_list) = pc.listify(dtdp)
+            dt = np.array(dtdp[pc.T])
+            wrapped_dt = dt - 360*np.sign(dt)
+            wrapped_t = p.array(tp0) + wrapped_dt
+            t_range = self.shaft_ranges(range_limits)[pc.T]
+            if min(t_range) <= wrapped_t and wrapped_t <= max(t_range) and abs(wrapped_t) <= abs(dt):
+                dtdp[pc.T] = dt.tolist()
+            if was_not_list:
+                dtdp = pc.delistify(dtdp)
+        return dtdp
+
+    def delta_obsTP(self, tp1, tp0, range_limits='full'):
+        """Returns dtdp corresponding to tp1 - tp0.
+        The range_limits option can be any of the values for the shaft_ranges
+        method, or 'none'. If 'none', then the returned delta is a simple subtraction
+        with no special checks for angle-wrapping across positioner's theta = +/-180 deg.
+        """
+        TP0 = self.obsTP_to_shaftTP(tp0)
+        TP1 = self.obsTP_to_shaftTP(tp1)
+        return delta_shaftTP(TP1,TP0,range_limits)
+
+    def delta_QS(self, qs1, qs0):
+        """Returns dxdy corresponding to qs1 - qs0.
+        """
+        return PosTransforms._simple_delta(qs1,qs0)
+
+    def delta_flatXY(self, xy0, xy1):
+        return PosTransforms._simple_delta(xy1,xy0)
+
+    # ADDITION METHODS
+    def addto_posXY(self, xy, dxdy, range_limited=True):
         pass
 
-    def delta_obsTP(self, xy0, xy1, range_limited=True):
+    def addto_obsXY(self, xy, dxdy, range_limited=True):
         pass
 
-    def delta_QS(self, xy0, xy1, range_limited=True):
+    def addto_shaftTP(self, tp, dtdp, range_limited=True):
         pass
 
-    def delta_flatXY(self, xy0, xy1, range_limited=True):
+    def addto_obsTP(self, tp, dtdp, range_limited=True):
+        pass
+
+    def addto_QS(self, qs, dqds, range_limited=True):
+        pass
+
+    def addto_flatXY(self, xy, dxdy, range_limited=True):
         pass
 
     # STATIC INTERNAL METHODS
@@ -366,3 +437,14 @@ class PosTransforms(object):
         tp = TP.tolist()
         unreachable = np.where(unreachable)[0].tolist()
         return tp, unreachable
+
+    @staticmethod
+    def _simple_delta(uv1,uv0):
+        """Generic vector difference uv1 - uv0.
+        """
+        (uv0, was_not_list0) = pc.listify(uv0)
+        (uv1, was_not_list1) = pc.listify(uv1)
+        dudv = (np.array(uv1) - np.array(uv0)).tolist()
+        if was_not_list0 or was_not_list1:
+            dudv = pc.delistify(dudv)
+        return dudv
