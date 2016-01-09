@@ -17,67 +17,65 @@ class PosArrayMaster(object):
             model = posmodel.PosModel(state)
             self.posmodels.append(model)
         self.posids = posids
-        self.schedule = posschedule.PosSchedule()
+        self.schedule = posschedule.PosSchedule(self)
         self.comm = petalcomm.PetalComm()
 
-    def request_schedule_execute_moves(self, posids, Qtargs, Stargs, anticollision=True):
-        """Convenience wrapper for the complete sequence to cause an array of
-        positioners to go to targets (Qtargs, Stargs).
+    def request_targets(self, pos, commands, vals1, vals2):
+        """Input a list of positioners and corresponding move targets to the schedule.
+        This method is for requests to perform complete repositioning sequence to get
+        to the targets.
 
-        The sequence of calls is executed directly in order, from request through
-        scheduling to executing the move and post-move cleanup. In practice, with
-        multiple petals and significant anti-collision algorithm processing time
-        and communication overhead time, it is anticipated that a simple call like
-        this will not be sufficiently multi-threaded, and furthermore that scheduling
-        may need to have been accomplished separately ahead of time. However, this
-        method gives the basic sequence of events that need to occur, and it should
-        be of value for testing and for scenarios where moves should be immediately
-        executed.
+            - Anticollision is enabled.
+            - Only one requested target per positioner.
+            - Theta angles are wrapped across +/-180 deg
+            - Contact of hard limits is prevented.
+
+        INPUTS:
+            pos     ... list of positioner ids or posmodel instances
+            command ... corresponding list of move command strings, each element is 'qs', 'dqds', 'xy', 'dxdy', 'tp', or 'dtdp'
+            val1    ... corresponding list of first move arguments, each element is the value for q, dq, x, dx, t, or dt
+            val2    ... corresponding list of second move arguments, each element is the value for s, ds, y, dy, p, or dp
         """
-        self.request_moves(posids, Qtargs, Stargs)
-        self.schedule_moves(anticollision)
-        self.send_tables_and_execute_moves()
+        [pos, commands, vals1, vals2] = [list(arg) for arg in [pos, commands, vals1, vals2] if not(isinstance(arg,list))]
+        for i in range(len(pos)):
+            pos = self.get_model_for_pos(pos)
+            if self.schedule.already_requested(pos):
+                print('Positioner ' + str(pos.posid) + ' already has a target scheduled. Extra target request ' + str(commands[i]) + '(' + str(vals1[i]) + ',' + str(vals2[i]) + ') ignored')
+            else:
+                self.schedule.request_target(pos, commands[i], vals1[i], vals2[i])
 
-    def expert_request_schedule_execute_moves(self, posids, movecmds, values1, values2):
-        """Convenience wrapper for the complete sequence to cause an array of
-        positioners to move in expert mode (with no anti-collision).
+    def request_direct_dtdp(self, pos, dt, dp):
+        """Input a list of positioners and corresponding move targets to the schedule.
+        This method is for direct requests of rotations by the theta and phi shafts.
+        This method is generally recommended only for expert usage.
 
-        The sequence of calls is executed directly in order, from request through
-        scheduling to executing the move and post-move cleanup. See similar comments
-        in the method "request_schedule_execute_moves", regarding usage of this
-        simplistic method.
+            - Anticollision is disabled.
+            - Multiple moves allowed per positioner.
+            - Theta angles are not wrapped across +/-180 deg
+            - Contact of hard limits is allowed.
+
+        INPUTS:
+            pos ... list of positioner ids or posmodel instances
+            dt  ... corresponding list of delta theta values
+            dp  ... corresponding list of delta phi values
         """
-        self.expert_request_moves(posids, movecmds, values1, values2)
-        self.schedule_moves(anticollision=False)
-        self.send_tables_and_execute_moves()
+        [pos, dt, dp] = [list(arg) for arg in [pos, dt, dp] if not(isinstance(arg,list))]
+        expected_prior_dtdp = [[0]*2 for x in range(len(self.posmodels))]
+        for i in range(len(pos)):
+            pos = self.get_model_for_pos(pos)
+            j = self.posmodels.index(pos)
+            expected_prior_dtdp[j] = self.schedule.total_dtdp(pos)
 
-    def send_tables_and_execute_moves(self):
-        self.comm.send_tables(self.hardware_ready_move_tables()) # return values? threaded with pyro somehow?
-        self.comm.execute_moves() # return values? threaded with pyro somehow?
-        self.postmove_cleanup()
+            # alter for dtdp??
+            move_table = pos.make_move_table(movecmds[i], values1[i], values2[i], expected_prior_dTdP[j])
 
-    def request_moves(self, posids, Qtargs, Stargs):
-        """Input a list of positioner ids and corresponding target positions to
-        the schedule.
-        """
-        for i in range(len(posids)):
-            j = self.posids.index(posids[i])
-            self.schedule.move_request(self.posmodels[j], Qtargs[i], Stargs[i])
+            self.schedule.expert_add_table(move_table)
 
-    def expert_request_moves(self, posids, movecmds, values1, values2):
-        """Input a list to the scheduler of positioner ids and corresponding
-        move command strings and argument value pairs.
+    def request_limit_seek(self, pos, dir):
+        pass
 
-        Usage of this method by design forces anticollision calculations to be
-        turned off for the entire schedule. This method is generally recommended
-        only for expert usage.
-        """
-        expected_prior_dTdP = [[0]*2 for x in range(len(self.posids))]
-        for i in range(len(posids)):
-            j = self.posids.index(posids[i])
-            expected_prior_dTdP[j] = self.schedule.total_dTdP(posids[i])
-            move_table = self.posmodels[j].make_move_table(movecmds[i], values1[i], values2[i], expected_prior_dTdP[j])
-            self.schedule.expert_move_request(move_table)
+    def request_homing(self, pos):
+        pass
 
     def schedule_moves(self,anticollision=True):
         """Generate the schedule of moves and submoves that get positioners
@@ -87,6 +85,11 @@ class PosArrayMaster(object):
         """
         anticollision = False # temporary, since algorithm is not yet implemented in PosSchedule
         self.schedule.schedule_moves(anticollision)
+
+    def send_tables_and_execute_moves(self):
+        self.comm.send_tables(self.hardware_ready_move_tables()) # return values? threaded with pyro somehow?
+        self.comm.execute_moves() # return values? threaded with pyro somehow?
+        self.postmove_cleanup()
 
     def hardware_ready_move_tables(self):
         """Strips out information that isn't necessary to send to petalbox, and
@@ -242,17 +245,27 @@ class PosArrayMaster(object):
         if key == None or value == None:
             print('either no key or no value was specified to setval')
             return
-        (posid, temp) = self._posid_listify(posid)
+        (posid, temp) = self._posid_listify_and_fill(posid)
         (key,   temp) = pc.listify(key,keep_flat=True)
         (value, temp) = pc.listify(value,keep_flat=True)
         (posid, key)   = self._equalize_input_list_lengths(posid,key)
         (posid, value) = self._equalize_input_list_lengths(posid,value)
         (posid, key)   = self._equalize_input_list_lengths(posid,key) # repetition here handles the case where there was 1 posid element, 1 key, but mulitplie elements in value
         for i in range(len(posid)):
-            pidx = self.posids.index(posid[i])
+
             self.posmodels[pidx].state.write(key[i],value[i],write_to_disk)
 
-    def _posid_listify(self,posid):
+    def get_model_for_pos(self, pos):
+        """Returns the posmodel object corresponding to a posid, or if the argument
+        is a posmodel, just returns itself.
+        """
+        if isinstance(pos, posmodel.Posmodel):
+            return pos
+        else:
+            pidx = self.posids.index(pos)
+            return self.posmodels[pidx]
+
+    def _posid_listify_and_fill(self,posid):
         """Internally-used wrapper method for listification of posid. The additional functionality
         here is the check for whether to auto-fill with all posids known to posarraymaster.
         """

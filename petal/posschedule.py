@@ -1,5 +1,6 @@
 import numpy as np
 import posmovetable
+import posarraymaster
 import posconstants as pc
 
 class PosSchedule(object):
@@ -12,86 +13,57 @@ class PosSchedule(object):
     the one which merges any such tables in sequence, before sending off to the hardware.
     """
 
-    def __init__(self):
+    def __init__(self, posarray):
+        if isinstance(posarray, posarraymaster.PosArrayMaster):
+            self.posarray = posarray
+        else:
+            print('bad posarray')
         self.move_tables = []
         self.requests = []
 
-    def request_target(self, pos, uvtype, u, v):
-        """Adds a request to the schedule for a given positioner to move to
-        the target position (u,v) in the coordinate system cs. A schedule can
-        only contain one target request per positioner at a time.
+    def request_target(self, pos, uv_type, u, v):
+        """Adds a request to the schedule for a given positioner to move to the
+        target position (u,v) or by the target distance (du,dv) in the coordinate
+        system indicated by uv_type.
+
                 pos ... posid or posmodel
             uv_type ... string, 'qs', 'xy', 'dqds', or 'dxdy'
                   u ... float, value of q, x, dq, or dx
                   v ... float, value of s, y, ds, or dy
+
+        A schedule can only contain one target request per positioner at a time.
         """
-        posmodel = get_model_for_pos(pos)
-        already_requested = [p['posmodel'] for p in self.requests]
-        if posmodel in already_requested:
+        uv_type = uv_type.lower()
+        pos = self.posarray.get_model_for_pos(pos)
+        if self.already_requested(pos):
             print('cannot request more than one target per positioner in a given schedule')
             return
-        current_position = posmodel.expected_current_position
+        current_position = pos.expected_current_position
         if uv_type == 'qs' or uv_type == 'dqds':
             start_uv = [current_position['Q'],current_position['S']]
-            start_flatxy = posmodel.trans.QS_to_flatXY(start_uv)
+            start_flatxy = pos.trans.QS_to_flatXY(start_uv)
         elif uv_type == 'xy' or uv_type == 'dxdy':
             start_uv = [current_position['obsX'],current_position['obsY']]
-            start_flatxy = posmodel.trans.obsXY_to_flatXY(start_uv)
+            start_flatxy = pos.trans.obsXY_to_flatXY(start_uv)
         else:
             print('bad uv_type for target request')
             return
         if uv_type == 'qs':
-            targt_flatxy = posmodel.trans.QS_to_flatXY([u,v])
+            targt_flatxy = pos.trans.QS_to_flatXY([u,v])
         elif uv_type == 'xy':
-            dudv = posmodel.trans.delta_obsXY([u,v],start_uv)
-
+            targt_flatxy = pos.trans.obsXY_to_flatXY([u,v])
         elif uv_type == 'dqds':
-
+            targt_uv = pos.trans.addto_QS(start_uv,[u,v])
+            targt_flatxy = pos.trans.QS_to_flatXY(targt_uv)
         elif uv_type == 'dxdy':
-
-        else:
-
-            return
-        partial_abs_request = {'posmodel':posmodel, 'command':coordsys, 'cmd_val1':u, 'cmd_val2':v}
-        self.request_delta(pos,coordsys,dudv[0],dudv[1],partial_abs_request,start_uv)
-
-    def request_delta(self, pos, coordsys, du, dv, start_upartial_abs_request=None,start_uv=None):
-        """Adds a request to the schedule for a given positioner to move to
-        the target a distance (du,dv) away in the coordinate system cs. A schedule
-        can only contain one request per positioner at a time.
-                pos ... posid or posmodel
-           coordsys ... string, 'qs' or 'xy'
-                 du ... float, dq value or dx value
-                 dv ... float, ds value or dy value
-        """
-
-
-        if not(known_start_uv):
-            current_position = posmodel.expected_current_position
-            if coordsys == 'qs':
-                start_uv = [current_position['Q'],current_position['S']]
-            elif coordsys == 'xy':
-                start_uv = [current_position['obsX'],current_position['obsY']]
-        if coordsys == 'qs':
-            targt_uv = posmodel.trans.addto_QS(start_uv,[du,dv])
-            start_flatxy = posmodel.trans.QS_to_flatXY(start_xy)
-            targt_flatxy = posmodel.trans.QS_to_flatXY(start_xy)
-            command = 'dqds'
-        elif coordsys == 'xy':
-            start_xy =
-            targt_xy = posmodel.trans.addto_obsXY(start_xy,[du,dv])
-            start_flatxy = posmodel.trans.obsXY_to_flatXY(start_xy)
-            targt_flatxy = posmodel.trans.obsXY_to_flatXY(start_xy)
-            command = 'dxdy'
-        else:
-            print('bad coordinate system for move request')
-            return
-        if partial_abs_request:
-            new_request = partial_abs_request
-        else:
-            new_request = {'posmodel':posmodel, 'command':command, 'cmd_val1':du, 'cmd_val2':dv}
-        new_request['start_flatxy'] = start_flatxy
-        new_request['targt_flatxy'] = targt_flatxy
+            targt_uv = pos.trans.addto_obsXY(start_uv,[u,v])
+            targt_flatxy = pos.trans.obsXY_to_flatXY(targt_uv)
+        new_request = {'start_flatxy' : start_flatxy,
+                       'targt_flatxy' : targt_flatxy,
+                           'posmodel' : pos,
+                            'command' : uv_type,
+                           'cmd_val1' : u,
+                           'cmd_val2' : v}
         self.requests.append(new_request)
 
     def expert_add_table(self, move_table):
@@ -106,12 +78,13 @@ class PosSchedule(object):
     def schedule_moves(self, anticollision=True):
         """Executes the scheduling algorithm upon the stored list of move requests.
 
-        A single move table is generated for each positioner that has at least one
-        request. These are stored in the move_tables list. If anticollision is true,
-        then the algorithm is run when generating the move tables.
+        A single move table is generated for each positioner that has a request
+        registered. The resulting tables are stored in the move_tables list. If the
+        anticollision argument is true, then the anticollision algorithm is run when
+        generating the move tables.
 
         If there were ANY pre-existing move tables in the list, then ALL the target
-        requests are ignored.
+        requests are ignored, and the anticollision algorithm is NOT performed.
         """
         if self.move_tables:
             return
@@ -120,27 +93,27 @@ class PosSchedule(object):
         else:
             self.move_tables = self._schedule_with_anticollision()
 
-    def total_dTdP(self, posid):
-        #NEEDED?
+    def total_dtdp(self, pos):
         """Return as-scheduled total move distance for positioner identified by posid.
-        Returns [dT,dP].
+        Returns [dt,dp].
         """
-        dTdP = [0,0]
+        pos = self.posarray.get_model_for_pos(pos)
+        dtdp = [0,0]
         for tbl in self.move_tables:
-            if tbl.posmodel.state.read('SERIAL_ID') == posid:
-                postprocessed = tbl.for_cleanup
-                dTdP = [sum(postprocessed['dT']),sum(postprocessed['dP'])]
+            if tbl.posmodel == pos:
+                postprocessed = tbl.full_table
+                dtdp = [postprocessed['stats']['net_dT'][-1], postprocessed['stats']['net_dP'][-1]]
                 break
-        return dTdP
+        return dtdp
 
-    def get_model_for_pos(self, pos):
-        """Returns the posmodel object corresponding to a posid, or if the argument
-        is a posmodel, just returns itself.
+    def already_requested(self, pos):
+        """Returns boolean whether a request has already been registered in the
+        schedule for the argued positioner.
         """
-        if isinstance(pos, posmodel.Posmodel):
-            return pos.posid
-        else:
-            return pos
+        posmodel = self.posarray.get_model_for_pos(pos)
+        already_requested_list = [p['posmodel'] for p in self.requests]
+        was_already_requested = posmodel in already_requested_list
+        return was_already_requested
 
     # internal methods
     def _merge_tables_for_each_pos(self):
@@ -166,15 +139,12 @@ class PosSchedule(object):
             table = posmovetable.PosMoveTable(posmodel)
             (start_shaft,reachable) = posmodel.trans.flatXY_to_shaftTP(req['start_flatxy'])
             (targt_shaft,reachable) = posmodel.trans.flatXY_to_shaftTP(req['targt_flatxy'])
-            dtdp = [0,0]
-            dtdp[0] = targt_shaft[0] - start_shaft[0]
-            dtdp[1] = targt_shaft[1] - start_shaft[1]
-            row = 0
-            table.set_move(row, pc.T, dtdp[0][i])
-            table.set_move(row, pc.P, dtdp[1][i])
-            table.set_prepause (row, 0.0)
-            table.set_postpause(row, 0.0)
-            table.store_orig_command
+            dtdp = posmodel.trans.delta_shaftTP(targt_shaft, start_shaft, range_wrap_limits='targetable')
+            table.set_move(0, pc.T, dtdp[0])
+            table.set_move(0, pc.P, dtdp[1])
+            table.set_prepause (0, 0.0)
+            table.set_postpause(0, 0.0)
+            table.store_orig_command(0, req['command'], req['cmd_val1'], req['cmd_val2'])
             self.move_tables.append(table)
 
     def _schedule_with_anticollision(self):
