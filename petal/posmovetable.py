@@ -222,7 +222,7 @@ class PosMoveTable(object):
         return restricted_table
 
     def _gather_stats(self,table):
-        stats = {'net_dT':[],'net_dP':[],'q':[],'s':[],'x':[],'y':[],'t':[],'p':[],
+        stats = {'net_dT':[],'net_dP':[],'Q':[],'S':[],'obsX':[],'obsY':[],'obsT':[],'obsP':[],
                  'TOTAL_CRUISE_MOVES_T':0,'TOTAL_CRUISE_MOVES_P':0,'TOTAL_CREEP_MOVES_T':0,'TOTAL_CREEP_MOVES_P':0}
         pos = self.posmodel.expected_current_position
         for i in range(table['nrows']):
@@ -231,19 +231,19 @@ class PosMoveTable(object):
             if i > 0:
                 stats['net_dT'][i] += stats['net_dT'][i-1]
                 stats['net_dP'][i] += stats['net_dP'][i-1]
-            stats['t'].append(pos['obsT'] + stats['net_dT'][i])
-            stats['p'].append(pos['obsP'] + stats['net_dP'][i])
+            stats['obsT'].append(pos['obsT'] + stats['net_dT'][i])
+            stats['obsP'].append(pos['obsP'] + stats['net_dP'][i])
             stats['TOTAL_CRUISE_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'cruise' and table['dT'] != 0)
             stats['TOTAL_CRUISE_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'cruise' and table['dP'] != 0)
             stats['TOTAL_CREEP_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'creep' and table['dT'] != 0)
             stats['TOTAL_CREEP_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'creep' and table['dP'] != 0)
         shaftTP = self.posmodel.trans.shaftTP_to_obsTP([stats['t'],stats['p']])
         obsXY = self.posmodel.trans.shaftTP_to_obsXY(shaftTP)
-        stats['x'] = obsXY[0]
-        stats['y'] = obsXY[1]
+        stats['obsX'] = obsXY[0]
+        stats['obsY'] = obsXY[1]
         QS = self.posmodel.trans.obsXY_to_QS(obsXY)
-        stats['q'] = QS[0]
-        stats['s'] = QS[1]
+        stats['Q'] = QS[0]
+        stats['S'] = QS[1]
         return stats
 
 class PosMoveRow(object):

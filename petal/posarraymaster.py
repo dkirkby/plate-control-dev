@@ -135,7 +135,7 @@ class PosArrayMaster(object):
     def expected_current_position(self,posid=None,key=''):
         """Retrieve the current position, for a positioner identied by posid, according
         to the internal tracking of its posmodel object. Valid keys are:
-            'Q', 'S', 'x', 'y', 'obsT', 'obsP', 'shaftT', 'shaftP', 'motorT', 'motorP'
+            'Q', 'S', 'obsX', 'obsY', 'obsT', 'obsP', 'shaftT', 'shaftP', 'motorT', 'motorP'
         See comments in posmodel.py for explanation of these values.
 
         If no posid is specified, then a single value, or list of all positioners' values is returned.

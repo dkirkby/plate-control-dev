@@ -16,31 +16,46 @@ class PosSchedule(object):
         self.move_tables = []
         self.requests = []
 
-    def request_target(self, pos, coordsys, u, v):
+    def request_target(self, pos, uvtype, u, v):
         """Adds a request to the schedule for a given positioner to move to
         the target position (u,v) in the coordinate system cs. A schedule can
         only contain one target request per positioner at a time.
                 pos ... posid or posmodel
-           coordsys ... string, 'qs' or 'xy'
-                  u ... float, q value or x value
-                  v ... float, s value or y value
+            uv_type ... string, 'qs', 'xy', 'dqds', or 'dxdy'
+                  u ... float, value of q, x, dq, or dx
+                  v ... float, value of s, y, ds, or dy
         """
         posmodel = get_model_for_pos(pos)
-        current_position = posmodel.expected_current_position
-        start_qs = [current_position['q'],current_position['s']]
-        if coordsys == 'qs':
-            targt_qs = [u,v]
-        elif coordsys == 'xy':
-            targt_qs = posmodel.trans.obsXY_to_QS([u,v])
-        else:
-            print('bad coordinate system for move request')
+        already_requested = [p['posmodel'] for p in self.requests]
+        if posmodel in already_requested:
+            print('cannot request more than one target per positioner in a given schedule')
             return
-        dq = targt_qs[0] - start_qs[0]
-        ds = targt_qs[1] - start_qs[1]
-        partial_abs_request = {'posmodel':posmodel, 'command':coordsys, 'cmd_val1':u, 'cmd_val2':v}
-        self.request_delta(pos,coordsys,dq,ds,partial_abs_request)
+        current_position = posmodel.expected_current_position
+        if uv_type == 'qs' or uv_type == 'dqds':
+            start_uv = [current_position['Q'],current_position['S']]
+            start_flatxy = posmodel.trans.QS_to_flatXY(start_uv)
+        elif uv_type == 'xy' or uv_type == 'dxdy':
+            start_uv = [current_position['obsX'],current_position['obsY']]
+            start_flatxy = posmodel.trans.obsXY_to_flatXY(start_uv)
+        else:
+            print('bad uv_type for target request')
+            return
+        if uv_type == 'qs':
+            targt_flatxy = posmodel.trans.QS_to_flatXY([u,v])
+        elif uv_type == 'xy':
+            dudv = posmodel.trans.delta_obsXY([u,v],start_uv)
 
-    def request_delta(self, pos, coordsys, du, dv, partial_abs_request=None):
+        elif uv_type == 'dqds':
+
+        elif uv_type == 'dxdy':
+
+        else:
+
+            return
+        partial_abs_request = {'posmodel':posmodel, 'command':coordsys, 'cmd_val1':u, 'cmd_val2':v}
+        self.request_delta(pos,coordsys,dudv[0],dudv[1],partial_abs_request,start_uv)
+
+    def request_delta(self, pos, coordsys, du, dv, start_upartial_abs_request=None,start_uv=None):
         """Adds a request to the schedule for a given positioner to move to
         the target a distance (du,dv) away in the coordinate system cs. A schedule
         can only contain one request per positioner at a time.
@@ -49,27 +64,28 @@ class PosSchedule(object):
                  du ... float, dq value or dx value
                  dv ... float, ds value or dy value
         """
-        already_requested = [p['posmodel'] for p in self.requests]
-        posmodel = get_model_for_pos(pos)
-        if posmodel in already_requested:
-            print('cannot request more than one target per positioner in a given schedule')
-            return
-        current_position = posmodel.expected_current_position
+
+
+        if not(known_start_uv):
+            current_position = posmodel.expected_current_position
+            if coordsys == 'qs':
+                start_uv = [current_position['Q'],current_position['S']]
+            elif coordsys == 'xy':
+                start_uv = [current_position['obsX'],current_position['obsY']]
         if coordsys == 'qs':
-            start_qs = [current_position['q'],current_position['s']]
-            targt_qs = [start_qs[0] + du, start_qs[1] + dv]
+            targt_uv = posmodel.trans.addto_QS(start_uv,[du,dv])
+            start_flatxy = posmodel.trans.QS_to_flatXY(start_xy)
+            targt_flatxy = posmodel.trans.QS_to_flatXY(start_xy)
             command = 'dqds'
         elif coordsys == 'xy':
-            start_xy = [current_position['x'],current_position['y']]
-            targt_xy = [start_xy[0] + du, start_xy[1] + dv]
-            start_qs = posmodel.trans.obsXY_to_QS(start_xy)
-            targt_qs = posmodel.trans.obsXY_to_QS(targt_xy)
+            start_xy =
+            targt_xy = posmodel.trans.addto_obsXY(start_xy,[du,dv])
+            start_flatxy = posmodel.trans.obsXY_to_flatXY(start_xy)
+            targt_flatxy = posmodel.trans.obsXY_to_flatXY(start_xy)
             command = 'dxdy'
         else:
             print('bad coordinate system for move request')
             return
-        start_flatxy = posmodel.trans.QS_to_flatXY(start_qs)
-        targt_flatxy = posmodel.trans.QS_to_flatXY(targt_qs)
         if partial_abs_request:
             new_request = partial_abs_request
         else:

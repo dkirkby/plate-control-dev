@@ -33,6 +33,7 @@ class PosTransforms(object):
         shaftTP <--> obsXY
         shaftTP <--> QS
         shaftTP <--> flatXY
+        obsXY   <--> flatXY
 
     These can be chained together in any order to convert among the various coordinate systems.
 
@@ -279,6 +280,18 @@ class PosTransforms(object):
         qs = self.flatXY_to_QS(xy)
         (tp,unreachable) = self.QS_to_shaftTP(qs)
         return tp, unreachable
+
+    def obsXY_to_flatXY(self,xy):
+        """Composite transformation, performs obsXY --> QS --> flatXY."""
+        qs = self.obsXY_to_QS(xy)
+        flatXY = self.QS_to_flatXY(qs)
+        return xy
+
+    def flatXY_to_obsXY(self,xy):
+        """Composite transformation, performs flatXY --> QS --> obsXY."""
+        qs = self.flatXY_to_QS(xy)
+        obsXY = self.QS_to_obsXY(qs)
+        return obsXY
 
     # DIFFERENCE METHODS
     def delta_posXY(self, xy1, xy0):

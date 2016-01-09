@@ -50,10 +50,10 @@ class PosModel(object):
     def expected_current_position(self):
         """Returns a dictionary of the current expected position in the various coordinate systems.
         The keys are:
-            'q'      ... float, deg, dependent variable, expected global Q position
-            's'      ... float, mm,  dependent variable, expected global S position
-            'x'      ... float, mm,  dependent variable, expected global x position
-            'y'      ... float, mm,  dependent variable, expected global y position
+            'Q'      ... float, deg, dependent variable, expected global Q position
+            'S'      ... float, mm,  dependent variable, expected global S position
+            'obsX'   ... float, mm,  dependent variable, expected global x position
+            'obsY'   ... float, mm,  dependent variable, expected global y position
             'obsT'   ... float, deg, dependent variable, expected position of theta axis, including offsets as seen by an external observer
             'obsP'   ... float, deg, dependent variable, expected position of phi axis, including offsets as seen by an external observer
             'shaftT' ... float, deg, independent variable, the internally-tracked expected position of the theta shaft at the output of the gearbox
@@ -71,11 +71,11 @@ class PosModel(object):
         d['obsT'] = obsTP[0]
         d['obsP'] = obsTP[1]
         obsXY = self.trans.shaftTP_to_obsXY(shaftTP)
-        d['x'] = obsXY[0]
-        d['y'] = obsXY[1]
+        d['obsX'] = obsXY[0]
+        d['obsY'] = obsXY[1]
         QS = self.trans.obsXY_to_QS(obsXY)
-        d['q'] = QS[0]
-        d['s'] = QS[1]
+        d['Q'] = QS[0]
+        d['S'] = QS[1]
         return d
 
     @property
@@ -85,9 +85,9 @@ class PosModel(object):
         deg = '\u00b0'
         mm = 'mm'
         pos = self.expected_current_position
-        s = 'q:{:7.3f}{}, s:{:7.3f}{} | x:{:7.3f}{}, y:{:7.3f}{} | obsT:{:8.3f}{}, obsP:{:8.3f}{} | motorT:{:8.1f}{}, motorP:{:8.1f}{}'. \
-            format(pos['q'],mm, pos['s'],deg,
-                   pos['x'],mm, pos['y'],mm,
+        s = 'Q:{:7.3f}{}, S:{:7.3f}{} | obsX:{:7.3f}{}, obsY:{:7.3f}{} | obsT:{:8.3f}{}, obsP:{:8.3f}{} | motorT:{:8.1f}{}, motorP:{:8.1f}{}'. \
+            format(pos['Q'],mm, pos['S'],deg,
+                   pos['obsX'],mm, pos['obsY'],mm,
                    pos['obsT'],deg, pos['obsP'],deg,
                    pos['motorT'],deg, pos['motorP'],deg)
         return s
@@ -128,7 +128,7 @@ class PosModel(object):
         software travel limits, when a sequence of multiple moves is being planned out.
         """
         pos = self.expected_current_position
-        shaft_start = [pos['shaftT'] + expected_prior_dTdP[0], pos['shaftP'] + expected_prior_dTdP[1]]
+        shaft_start = self.trans.addto_shaftTP([pos['shaftT'],pos['shaftP']], expected_prior_dTdP, range_wrap_limits='none') # since expected_prior_dTdP is just tracking already-existing commands, do not perform range wrapping on it
         if not(allow_exceed_limits):
             distance = self.axis[axisid].truncate_to_limits(distance,shaft_start[axisid])
         motor_dist = self.axis[axisid].shaft_to_motor(distance)
@@ -211,26 +211,25 @@ class PosModel(object):
         table = posmovetable.PosMoveTable(self)
         vals = [val1,val2]
         pos = self.expected_current_position
-        start_tp = [pos['shaftT'] + expected_prior_dTdP[0], pos['shaftP'] + expected_prior_dTdP[1]]
+        start_tp = self.trans.addto_shaftTP([pos['shaftT'],pos['shaftP']], expected_prior_dTdP, range_wrap_limits='none') # since expected_prior_dTdP is just tracking already-existing commands, do not perform range wrapping on it
+        range_wrap_limits = 'targetable'
         if   movecmd == 'qs':
-            targt_xy = self.trans.QS_to_obsXY(vals)
-            (targt_tp,unreachable) = self.trans.obsXY_to_shaftTP(targt_xy)
+            (targt_tp,unreachable) = self.trans.QS_to_shaftTP(vals)
         elif movecmd == 'dqds':
-            start_xy = self.trans.shaftTP_to_obsXY(start_tp)
-            start_qs = self.trans.obsXY_to_QS(start_xy)
-            targt_qs = (np.array(start_PQ) + np.array(vals)).tolist()
-            targt_xy = self.trans.QS_to_obsXY(targt_qs)
-            (targt_tp,unreachable) = self.trans.obsXY_to_shaftTP(targt_xy)
+            start_qs = self.trans.shaftTP_to_QS(start_tp)
+            targt_qs = self.trans.addto_QS(start_qs,vals)
+            (targt_tp,unreachable) = self.trans.QS_to_shaftTP(vals)
         elif movecmd == 'xy':
             (targt_tp,unreachable) = self.trans.obsXY_to_shaftTP(vals)
         elif movecmd == 'dxdy':
             start_xy = self.trans.shaftTP_to_obsXY(start_tp)
-            targt_xy = (np.array(start_xy) + np.array(vals)).tolist()
+            targt_xy = self.trans.addto_obsXY(start_xy,vals)
             (targt_tp,unreachable) = self.trans.obsXY_to_shaftTP(targt_xy)
         elif movecmd == 'tp':
             targt_tp = vals
         elif movecmd == 'dtdp':
-            targt_tp = (np.array(start_tp) + np.array(vals)).tolist()
+            range_wrap_limits = 'none'
+            targt_tp = self.trans.addto_shaftTP(start_tp,vals,range_wrap_limits)
         elif movecmd == 'home':
             for a in self.axis:
                 table.extend(a.seek_and_set_limits_sequence())
@@ -246,10 +245,9 @@ class PosModel(object):
             print( 'move command ' + repr(movecmd) + ' not recognized')
             return []
 
-        delta_t = targt_tp[0] - start_tp[0]
-        delta_p = targt_tp[1] - start_tp[1]
-        table.set_move(0, pc.T, delta_t)
-        table.set_move(0, pc.P, delta_p)
+        dtdp = self.trans.delta_shaftTP(targt_tp,start_tp,range_wrap_limits)
+        table.set_move(0, pc.T, dtdp[0])
+        table.set_move(0, pc.P, dtdp[1])
         table.store_orig_command(0,movecmd,val1,val2)
         return table
 
