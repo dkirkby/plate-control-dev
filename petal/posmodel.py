@@ -267,7 +267,7 @@ class Axis(object):
 
     @property
     def pos(self):
-        """Internally-tracked angular position of the axis. By definition pos = (motor shaft position) / (gear ratio).
+        """Internally-tracked angular position of the axis, at the output of the gear.
         """
         if self.axisid == pc.T:
             return self.posmodel.state.read('SHAFT_T')
@@ -288,11 +288,11 @@ class Axis(object):
         Returns [1x2] array of [min,max]
         """
         if self.axisid == pc.T:
-            targetable_range = abs(self.posmodel.state.read('PHYSICAL_RANGE_T'))
-            return [-0.50*targetable_range, 0.50*targetable_range]  # split theta range such that 0 is essentially in the middle
+            r = abs(self.posmodel.state.read('PHYSICAL_RANGE_T'))
+            return [-0.50*r, 0.50*r]  # split theta range such that 0 is essentially in the middle
         else:
-            targetable_range = abs(self.posmodel.state.read('PHYSICAL_RANGE_P'))
-            return [-0.01*targetable_range, 0.99*targetable_range]  # split phi range such that 0 is essentially at the minimum
+            r = abs(self.posmodel.state.read('PHYSICAL_RANGE_P'))
+            return [-0.01*r, 0.99*r]  # split phi range such that 0 is essentially at the minimum
 
     @property
     def debounced_range(self):
