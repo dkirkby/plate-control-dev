@@ -28,8 +28,10 @@ class PosTransforms(object):
         obsXY   <--> QS
         QS      <--> flatXY
 
-    Additionally, some composite transformations are provided for convenience:
+    Additionally, some composite transformations are provided for convenience of syntax:
 
+        shaftTP <--> obsXY
+        shaftTP <--> QS
         shaftTP <--> flatXY
 
     These can be chained together in any order to convert among the various coordinate systems.
@@ -242,19 +244,41 @@ class PosTransforms(object):
         return QS
 
     # COMPOSITE TRANSFORMATIONS
+    def shaftTP_to_obsXY(self,tp):
+        """Composite transformation, performs shaftTP --> posXY --> obsXY."""
+        posXY = self.shaftTP_to_posXY(tp)
+        obsXY = self.posXY_to_obsXY(posXY)
+        return obsXY
+
+    def obsXY_to_shaftTP(self,xy):
+        """Composite transformation, performs obsXY --> posXY --> shaftTP."""
+        posXY = self.obsXY_to_posXY(xy)
+        (tp,unreachable) = self.posXY_to_shaftTP(posXY)
+        return tp, unreachable
+
+    def shaftTP_to_QS(self,tp):
+        """Composite transformation, performs shaftTP --> posXY --> obsXY --> QS."""
+        xy = self.shaftTP_to_obsXY(tp)
+        qs = self.obsXY_to_QS(xy)
+        return qs
+
+    def QS_to_shaftTP(self,qs):
+        """Composite transformation, performs QS --> obsXY --> posXY --> shaftTP."""
+        xy = self.QS_to_obsXY(qs)
+        (tp,unreachable) = self.obsXY_to_shaftTP(xy)
+        return tp, unreachable
+
     def shaftTP_to_flatXY(self,tp):
-        """Performs shaftTP --> obsXY --> QS --> flatXY."""
-        obsXY = self.shaftTP_to_obsXY(tp)
-        qs = self.obsXY_to_QS(obsXY)
+        """Composite transformation, performs shaftTP --> posXY --> obsXY --> QS --> flatXY."""
+        qs = self.shaftTP_to_QS(tp)
         xy = self.QS_to_flatXY(qs)
         return xy
 
     def flatXY_to_shaftTP(self,xy):
-        """Performs flatXY --> QS --> obsXY --> shaftTP."""
+        """Composite transformation, performs flatXY --> QS --> obsXY --> posXY --> shaftTP."""
         qs = self.flatXY_to_QS(xy)
-        obsXY = self.QS_to_obsXY(qs)
-        (tp,reachable) = self.obsXY_to_shaftTP(obsXY)
-        return tp, reachable
+        (tp,unreachable) = self.QS_to_shaftTP(qs)
+        return tp, unreachable
 
     # DIFFERENCE METHODS
     def delta_posXY(self, xy1, xy0):
