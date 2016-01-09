@@ -34,18 +34,18 @@ class PosTransforms(object):
 
     These can be chained together in any order to convert among the various coordinate systems.
 
-    #####
-    REALLY IT'S ABOUT CLOSEST ANGLE WRAPPING, AND CROSSING THE +/-180 ON THETA... UPDATE COMMENTS TO MATCH.
-    Simple vector addition and subtraction do not work in all cases, when one is dealing with the shaft
-    angles theta and phi. This is because of the physical range limitations on the theta and phi axes,
-    which are imposed by the hardstops on the fiber positioner.
-
+    The theta axis has a physical travel range wider than +/-180 degrees. Simple vector addition
+    and subtraction is not sufficient when delta values cross the theta hardstop near +/-180.
     Therefore special methods are provided for performing addition and subtraction operations
-    between two points, where one wants to do operations that are conceptually like "tp1 = tp0 + dtdp"
-    or "dtdp = tp1 - tp0". In both cases, the key point is that there must be special angle wrapping
-    logic to handle the cases where the distance dtdp (when naively calculated) would physically go
-    through a hardstop.
-    #####
+    between two points, with angle-wrapping logic included.
+
+        delta_shaftTP  ... is like dtdp = tp1 - tp0
+        delta_obsTP
+        addto_shaftTP  ... is like tp1 = tp0 + dtdtp
+        addto_obsTP
+
+    To round out the syntax, similar delta_ and addto_ methods are provided for the other
+    coordinate systems. These are convenicence methods to do the vector subtraction or addition.
 
     Note in practice that the coordinate S is similar, but not identical, to the radial distance
     R from the optical axis. This similarity is because the DESI focal plate curvature is gentle.
@@ -243,12 +243,14 @@ class PosTransforms(object):
 
     # COMPOSITE TRANSFORMATIONS
     def shaftTP_to_flatXY(self,tp):
+        """Performs shaftTP --> obsXY --> QS --> flatXY."""
         obsXY = self.shaftTP_to_obsXY(tp)
         qs = self.obsXY_to_QS(obsXY)
         xy = self.QS_to_flatXY(qs)
         return xy
 
     def flatXY_to_shaftTP(self,xy):
+        """Performs flatXY --> QS --> obsXY --> shaftTP."""
         qs = self.flatXY_to_QS(xy)
         obsXY = self.QS_to_obsXY(qs)
         (tp,reachable) = self.obsXY_to_shaftTP(obsXY)
@@ -256,70 +258,94 @@ class PosTransforms(object):
 
     # DIFFERENCE METHODS
     def delta_posXY(self, xy1, xy0):
-        """Returns dxdy corresponding to xy1 - xy0.
-        """
-        return PosTransforms._simple_delta(xy1,xy0)
+        """Returns dxdy corresponding to xy1 - xy0."""
+        return PosTransforms.vector_delta(xy1,xy0)
 
     def delta_obsXY(self, xy1, xy0):
-        """Returns dxdy corresponding to xy1 - xy0.
-        """
-        return PosTransforms._simple_delta(xy1,xy0)
+        """Returns dxdy corresponding to xy1 - xy0."""
+        return PosTransforms.vector_delta(xy1,xy0)
 
-    def delta_shaftTP(self, tp1, tp0, range_limits='full'):
+    def delta_shaftTP(self, tp1, tp0, range_wrap_limits='full'):
         """Returns dtdp corresponding to tp1 - tp0.
-        The range_limits option can be any of the values for the shaft_ranges
-        method, or 'none'. If 'none', then the returned delta is a simple subtraction
+        The range_wrap_limits option can be any of the values for the shaft_ranges
+        method, or 'none'. If 'none', then the returned delta is a simple vector subtraction
         with no special checks for angle-wrapping across positioner's theta = +/-180 deg.
         """
-        dtdp = PosTransforms._simple_delta(tp1,tp0)
+        dtdp = PosTransforms.vector_delta(tp1,tp0)
         if range_limits != 'none':
-            (dtdp, was_not_list) = pc.listify(dtdp)
-            dt = np.array(dtdp[pc.T])
-            wrapped_dt = dt - 360*np.sign(dt)
-            wrapped_t = p.array(tp0) + wrapped_dt
-            t_range = self.shaft_ranges(range_limits)[pc.T]
-            if min(t_range) <= wrapped_t and wrapped_t <= max(t_range) and abs(wrapped_t) <= abs(dt):
-                dtdp[pc.T] = dt.tolist()
-            if was_not_list:
-                dtdp = pc.delistify(dtdp)
+            dtdp = self.wrap_theta(tp0,dtdp,range_wrap_limits)
         return dtdp
 
-    def delta_obsTP(self, tp1, tp0, range_limits='full'):
+    def delta_obsTP(self, tp1, tp0, range_wrap_limits='full'):
         """Returns dtdp corresponding to tp1 - tp0.
-        The range_limits option can be any of the values for the shaft_ranges
-        method, or 'none'. If 'none', then the returned delta is a simple subtraction
+        The range_wrap_limits option can be any of the values for the shaft_ranges
+        method, or 'none'. If 'none', then the returned delta is a simple vector subtraction
         with no special checks for angle-wrapping across positioner's theta = +/-180 deg.
         """
         TP0 = self.obsTP_to_shaftTP(tp0)
         TP1 = self.obsTP_to_shaftTP(tp1)
-        return delta_shaftTP(TP1,TP0,range_limits)
+        return self.delta_shaftTP(TP1,TP0,range_wrap_limits)
 
     def delta_QS(self, qs1, qs0):
-        """Returns dxdy corresponding to qs1 - qs0.
-        """
-        return PosTransforms._simple_delta(qs1,qs0)
+        """Returns dqds corresponding to qs1 - qs0."""
+        return PosTransforms.vector_delta(qs1,qs0)
 
     def delta_flatXY(self, xy0, xy1):
-        return PosTransforms._simple_delta(xy1,xy0)
+        """Returns dxdy corresponding to xy1 - xy0."""
+        return PosTransforms.vector_delta(xy1,xy0)
 
     # ADDITION METHODS
-    def addto_posXY(self, xy, dxdy, range_limited=True):
-        pass
+    def addto_posXY(self, xy0, dxdy):
+        """Returns xy corresponding to xy0 + dxdy."""
+        return PosTransforms.vector_add(xy0,dxdy)
 
-    def addto_obsXY(self, xy, dxdy, range_limited=True):
-        pass
+    def addto_obsXY(self, xy0, dxdy):
+        """Returns xy corresponding to xy0 + dxdy."""
+        return PosTransforms.vector_add(xy0,dxdy)
 
-    def addto_shaftTP(self, tp, dtdp, range_limited=True):
-        pass
+    def addto_shaftTP(self, tp0, dtdp, range_wrap_limits='full'):
+        """Returns tp corresponding to tp0 + dtdp.
+        The range_wrap_limits option can be any of the values for the shaft_ranges
+        method, or 'none'. If 'none', then the returned point is a simple vector addition
+        with no special checks for angle-wrapping across positioner's theta = +/-180 deg.
+        """
+        if range_limits != 'none':
+            dtdp = self.wrap_theta(tp0,dtdp,range_wrap_limits)
+        return PosTransforms.vector_add(tp0,dtdp)
 
-    def addto_obsTP(self, tp, dtdp, range_limited=True):
-        pass
+    def addto_obsTP(self, tp0, dtdp, range_wrap_limits='full'):
+        """Returns tp corresponding to tp0 + dtdp.
+        The range_wrap_limits option can be any of the values for the shaft_ranges
+        method, or 'none'. If 'none', then the returned point is a simple vector addition
+        with no special checks for angle-wrapping across positioner's theta = +/-180 deg.
+        """
+        TP0 = self.obsTP_to_shaftTP(tp0)
+        return self.addto_shaftTP(TP0,dtdp,range_wrap_limits)
 
-    def addto_QS(self, qs, dqds, range_limited=True):
-        pass
+    def addto_QS(self, qs0, dqds):
+        """Returns qs corresponding to qs0 + dqds."""
+        return PosTransforms.vector_add(qs0,dqds)
 
-    def addto_flatXY(self, xy, dxdy, range_limited=True):
-        pass
+    def addto_flatXY(self, xy0, dxdy):
+        """Returns xy corresponding to xy0 + dxdy."""
+        return PosTransforms.vector_add(xy0,dxdy)
+
+    # INTERNAL METHODS
+    def wrap_theta(self,tp0,dtdp,range_wrap_limits='full'):
+        """Returns a modified dtdp after appropriately wrapping the delta theta
+        to not cross a physical hardstop. The range_wrap_limits option can be any
+        of the values for the shaft_ranges method.
+        """
+        (dtdp, was_not_list) = pc.listify(dtdp)
+        dt = np.array(dtdp[pc.T])
+        wrapped_dt = dt - 360*np.sign(dt)
+        wrapped_t = p.array(tp0) + wrapped_dt
+        t_range = self.shaft_ranges(range_wrap_limits)[pc.T]
+        if min(t_range) <= wrapped_t and wrapped_t <= max(t_range) and abs(wrapped_t) <= abs(dt):
+            dtdp[pc.T] = dt.tolist()
+        if was_not_list:
+            dtdp = pc.delistify(dtdp)
+        return dtdp
 
     # STATIC INTERNAL METHODS
     @staticmethod
@@ -439,12 +465,16 @@ class PosTransforms(object):
         return tp, unreachable
 
     @staticmethod
-    def _simple_delta(uv1,uv0):
-        """Generic vector difference uv1 - uv0.
-        """
+    def vector_delta(uv1,uv0):
+        """Generic vector difference uv1 - uv0."""
+        return PosTransforms.vector_add(uv1,-uv0)
+
+    @staticmethod
+    def vector_add(uv0,uv1):
+        """Generic vector addition uv0 + uv1."""
         (uv0, was_not_list0) = pc.listify(uv0)
         (uv1, was_not_list1) = pc.listify(uv1)
-        dudv = (np.array(uv1) - np.array(uv0)).tolist()
+        uv2 = (np.array(uv0) + np.array(uv1)).tolist()
         if was_not_list0 or was_not_list1:
-            dudv = pc.delistify(dudv)
-        return dudv
+            uv2 = pc.delistify(uv2)
+        return uv2
