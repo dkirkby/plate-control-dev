@@ -57,8 +57,8 @@ class PosModel(object):
         The keys are:
             'Q'     ... float, deg, dependent variable, expected global Q position
             'S'     ... float, mm,  dependent variable, expected global S position
-            'flatX' ... float, mm, dependent variable, expected global x in a flattened-out system
-            'flatY' ... float, mm, dependent variable, expected global y in a flattened-out system
+            'flatX' ... float, mm, dependent variable, expected global x in a system where focal surface curvature is flattened out to an approximate plane
+            'flatY' ... float, mm, dependent variable, expected global y in a system where focal surface curvature is flattened out to an approximate plane
             'obsX'  ... float, mm,  dependent variable, expected global x position
             'obsY'  ... float, mm,  dependent variable, expected global y position
             'posX'  ... float, mm,  dependent variable, expected local x position
