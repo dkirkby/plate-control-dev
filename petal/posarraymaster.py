@@ -49,7 +49,7 @@ class PosArrayMaster(object):
             else:
                 self.schedule.request_target(posmodel, commands[i], vals1[i], vals2[i])
 
-    def request_direct_dtdp(self, pos, dt, dp):
+    def request_direct_dtdp(self, pos, dt, dp, cmd_prefix=''):
         """Input a list of positioners and corresponding move targets to the schedule.
         This method is for direct requests of rotations by the theta and phi shafts.
         This method is generally recommended only for expert usage.
@@ -63,6 +63,8 @@ class PosArrayMaster(object):
             pos ... list of positioner ids or posmodel instances
             dt  ... corresponding list of delta theta values
             dp  ... corresponding list of delta phi values
+
+        The optional argument cmd_prefix allows adding a descriptive string to the log.
         """
         pos = pc.listify(pos,True)[0]
         dt = pc.listify(dt,True)[0]
@@ -72,12 +74,13 @@ class PosArrayMaster(object):
             table = posmovetable.PosMoveTable(posmodel)
             table.set_move(0, pc.T, dt[i])
             table.set_move(0, pc.P, dp[i])
-            table.store_orig_command(0,'direct_dtdp',dt[i],dp[i])
+            table.store_orig_command(0,cmd_prefix + 'direct_dtdp',dt[i],dp[i])
             table.allow_exceed_limits = True
             self.schedule.add_table(table)
 
     def request_limit_seek(self, pos, axisid, direction, anticollision=True, cmd_prefix=''):
         """Request hardstop seeking sequence for positioners in list pos.
+        The optional argument cmd_prefix allows adding a descriptive string to the log.
         """
         pos = pc.listify(pos,True)[0]
         posmodels = []
@@ -134,7 +137,7 @@ class PosArrayMaster(object):
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + '.maxpos\n'
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = +1.0\n'
                 p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.total_limit_seeks += 1\n'
-            self.request_direct_dtdp(p, hardstop_debounce[pc.T], hardstop_debounce[pc.P])
+            self.request_direct_dtdp(p, hardstop_debounce[pc.T], hardstop_debounce[pc.P], cmd_prefix='debounce ')
 
     def schedule_moves(self,anticollision=True):
         """Generate the schedule of moves and submoves that get positioners
