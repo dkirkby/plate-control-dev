@@ -133,7 +133,15 @@ class PosArrayMaster(object):
         anticollision = False # temporary, since algorithm is not yet implemented in PosSchedule
         self.schedule.schedule_moves(anticollision)
 
-    def send_tables_and_execute_moves(self):
+    def schedule_send_and_execute_moves(self):
+        """Convenience wrapper to schedule, send, execute, and cleanup.
+        """
+        self.schedule_moves()
+        self.send_and_execute_moves()
+
+    def send_and_execute_moves(self):
+        """Convenience wrapper to send, execute, and cleanup.
+        """
         self.comm.send_tables(self.hardware_ready_move_tables()) # return values? threaded with pyro somehow?
         self.comm.execute_moves() # return values? threaded with pyro somehow?
         self.postmove_cleanup()
