@@ -39,31 +39,15 @@ class PosSchedule(object):
             print('cannot request more than one target per positioner in a given schedule')
             return
         current_position = posmodel.expected_current_position
-        if uv_type == 'qs' or uv_type == 'dqds':
-
-        elif uv_type == 'obsXY':
-
-        elif uv_type == 'posXY' or uv_type == 'dxdy':
-            start_uv = [current_position['posX'],current_position['posY']]
-            start_posTP = posmodel.trans.posXY_to_posTP(start_uv)
-        elif uv_type == 'obsTP':
-            start_uv = [current_position['obsT'],current_position['obsP']]
-            start_flatxy = posmodel.trans.obsTP_to_flatXY(start_uv)
-        elif uv_type == 'posTP' or uv_type == 'dtdp':
-            start_uv = [current_position['posT'],current_position['posP']]
-            start_posTP = start_uv
-
+        start_posTP = [current_position['posT'],current_position['posP']]
         if uv_type == 'qs':
-            start_posTP = posmodel.trans.QS_to_posTP([current_position['Q'],current_position['S']])
-            targt_posTP = posmodel.trans.QS_to_posTP([u,v])
+            (targt_posTP,unreachable) = posmodel.trans.QS_to_posTP([u,v])
         elif uv_type == 'obsXY':
-            start_uv = [current_position['obsX'],current_position['obsY']]
-            start_flatxy = posmodel.trans.obsXY_to_flatXY(start_uv)
-            targt_flatxy = posmodel.trans.obsXY_to_flatXY([u,v])
+            (targt_posTP,unreachable) = posmodel.trans.obsXY_to_posTP([u,v])
         elif uv_type == 'posXY':
             (targt_posTP,unreachable) = posmodel.trans.posXY_to_posTP([u,v])
         elif uv_type == 'obsTP':
-            targt_flatxy = posmodel.trans.obsTP_to_flatXY([u,v])
+            targt_posTP = posmodel.trans.obsTP_to_posTP([u,v])
         elif uv_type == 'posTP':
             targt_posTP = [u,v]
         elif uv_type == 'dqds':
@@ -72,20 +56,21 @@ class PosSchedule(object):
             start_posTP = posmodel.trans.QS_to_posTP(start_uv)
             targt_posTP = posmodel.trans.QS_to_posTP(targt_uv)
         elif uv_type == 'dxdy':
-            targt_uv = posmodel.trans.addto_obsXY(start_uv,[u,v])
-            targt_flatxy = posmodel.trans.obsXY_to_flatXY(targt_uv)
+            start_uv = [current_position['posX'],current_position['posY']]
+            targt_uv = posmodel.trans.addto_posXY(start_uv,[u,v])
+            start_posTP = posmodel.trans.posXY_to_posTP(start_uv)
+            targt_posTP = posmodel.trans.posXY_to_posTP(targt_uv)
         elif uv_type == 'dtdp':
-            targt_uv = posmodel.trans.addto_posTP(start_uv,[u,v])
-            targt_flatxy = posmodel.trans.obsTP_to_flatXY(targt_uv)
+            targt_posTP = posmodel.trans.addto_posTP(start_posTP,[u,v],range_wrap_limits='none')
         else:
             print('bad uv_type "' + str(uv_type) + '" for target request')
             return
-        new_request = {'start_flatxy' : start_flatxy,
-                       'targt_flatxy' : targt_flatxy,
-                           'posmodel' : posmodel,
-                            'command' : uv_type,
-                           'cmd_val1' : u,
-                           'cmd_val2' : v}
+        new_request = {'start_posTP' : start_posTP,
+                       'targt_posTP' : targt_posTP,
+                          'posmodel' : posmodel,
+                           'command' : uv_type,
+                          'cmd_val1' : u,
+                          'cmd_val2' : v}
         self.requests.append(new_request)
 
     def add_table(self, move_table):
@@ -171,9 +156,7 @@ class PosSchedule(object):
             req = self.requests.pop(0)
             posmodel = req['posmodel']
             table = posmovetable.PosMoveTable(posmodel)
-            (start,reachable) = posmodel.trans.flatXY_to_posTP(req['start_flatxy'])
-            (targt,reachable) = posmodel.trans.flatXY_to_posTP(req['targt_flatxy'])
-            dtdp = posmodel.trans.delta_posTP(targt, start, range_wrap_limits='targetable')
+            dtdp = posmodel.trans.delta_posTP(req['targt_posTP'], req['start_posTP'], range_wrap_limits='targetable')
             table.set_move(0, pc.T, dtdp[0])
             table.set_move(0, pc.P, dtdp[1])
             table.set_prepause (0, 0.0)
