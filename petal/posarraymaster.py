@@ -72,6 +72,8 @@ class PosArrayMaster(object):
             self.schedule.add_table(table)
 
     def request_limit_seek(self, pos, axisid, direction, anticollision=True, cmd_prefix=''):
+        """Request hardstop seeking sequence for positioners in list pos.
+        """
         if not(isinstance(pos,list)):
             pos = list(pos)
         if anticollision:
@@ -97,12 +99,12 @@ class PosArrayMaster(object):
             self.schedule.add_table(table)
 
     def request_homing(self, pos):
-        """Request homing sequence to find the primary hardstop and set values for the
-        max position and min position.
+        """Request homing sequence for positioners in list pos to find the primary hardstop
+        and set values for the max position and min position.
         """
         hardstop_debounce = [0,0]
         dir = [0,0]
-        dir[pc.P] = +1
+        dir[pc.P] = +1 # force this, because anticollision logic depends on it
         for p in pos:
             self.request_limit_seek(pc.P, direction=dir[pc.P], anticollision=True,cmd_prefix='homing P ')
         self.schedule_moves(anticollision=True)
@@ -136,6 +138,18 @@ class PosArrayMaster(object):
         self.comm.execute_moves() # return values? threaded with pyro somehow?
         self.postmove_cleanup()
 
+    def postmove_cleanup(self):
+        """Always call this after performing a set of moves, so that PosModel instances
+        can be informed that the hardware move was done.
+        """
+        for m in self.schedule.move_tables:
+            m.posmodel.postmove_cleanup(m.for_cleanup)
+            print(m.posmodel.expected_current_position_str)
+        self.clear_schedule()
+
+    def clear_schedule(self):
+        self.schedule = posschedule.PosSchedule()
+
     def hardware_ready_move_tables(self):
         """Strips out information that isn't necessary to send to petalbox, and
         formats for sending. Any cases of multiple tables for one positioner are
@@ -167,18 +181,6 @@ class PosArrayMaster(object):
             hw_tbl = m.for_hardware
             hw_tables.append(hw_tbl)
         return hw_tables
-
-    def postmove_cleanup(self):
-        """Always call this after performing a set of moves, so that PosModel instances
-        can be informed that the hardware move was done.
-        """
-        for m in self.schedule.move_tables:
-            m.posmodel.postmove_cleanup(m.for_cleanup)
-            print(m.posmodel.expected_current_position_str)
-        self.clear_schedule()
-
-    def clear_schedule(self):
-        self.schedule = posschedule.PosSchedule()
 
     def expected_current_position(self,posid=None,key=''):
         """Retrieve the current position, for a positioner identied by posid, according
