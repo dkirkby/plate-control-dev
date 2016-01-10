@@ -34,7 +34,7 @@ class PosArrayMaster(object):
 
         INPUTS:
             pos     ... list of positioner ids or posmodel instances
-            command ... corresponding list of move command strings, each element is 'qs', 'dqds', 'xy', 'dxdy', 'tp', or 'dtdp'
+            command ... corresponding list of move command strings, each element is 'QS', 'dQdS', 'obsXY', 'posXY', 'dXdY', 'obsTP', 'posTP' or 'dTdP'
             val1    ... corresponding list of first move arguments, each element is the value for q, dq, x, dx, t, or dt
             val2    ... corresponding list of second move arguments, each element is the value for s, ds, y, dy, p, or dp
         """
@@ -80,6 +80,9 @@ class PosArrayMaster(object):
         """Request hardstop seeking sequence for positioners in list pos.
         """
         pos = pc.listify(pos,True)[0]
+        posmodels = []
+        for p in pos:
+            posmodels.append(self.get_model_for_pos(p))
         if anticollision:
             if axisid == pc.P and direction == -1:
                 # calculate thetas where extended phis do not interfere
@@ -88,8 +91,8 @@ class PosArrayMaster(object):
             else:
                 # request anticollision-safe moves to current thetas and all phis within Eo
                 pass
-        search_dist = np.sign(direction)*pos.axis[axisid].limit_seeking_search_distance
-        for p in pos:
+        for p in posmodels:
+            search_dist = np.sign(direction)*p.axis[axisid].limit_seeking_search_distance
             table = posmovetable.PosMoveTable(p)
             table.should_antibacklash = False
             table.should_final_creep  = False
@@ -107,26 +110,30 @@ class PosArrayMaster(object):
         and set values for the max position and min position.
         """
         pos = pc.listify(pos,True)[0]
+        posmodels = []
+        for p in pos:
+            posmodels.append(self.get_model_for_pos(p))
         hardstop_debounce = [0,0]
         dir = [0,0]
         dir[pc.P] = +1 # force this, because anticollision logic depends on it
-        for p in pos:
-            self.request_limit_seek(pc.P, direction=dir[pc.P], anticollision=True,cmd_prefix='homing P ')
+        for p in posmodels:
+            self.request_limit_seek(p, pc.P, dir[pc.P], anticollision=True, cmd_prefix='homing P ')
         self.schedule_moves(anticollision=True)
         retraction_time = self.schedule.total_scheduled_time()
-        for p in pos:
+        for p in posmodels:
             dir[pc.T] = p.axis[pc.T].principle_hardstop_direction
-            self.request_limit_seek(pc.T, direction=dir[pc.T], anticollision=False, cmd_prefix='homing T ')
+            self.request_limit_seek(p, pc.T, dir[pc.T], anticollision=False, cmd_prefix='homing T ')
             for i in [pc.T,pc.P]:
+                axis_cmd_prefix = 'self.axis[' + repr(i) + ']'
                 if dir[i] < 0:
                     hardstop_debounce[i] = p.axis[i].hardstop_debounce[0]
-                    p.axis[i].postmove_cleanup_cmds += 'self.pos = self.minpos\n'
-                    p.axis[i].postmove_cleanup_cmds += 'self.last_primary_hardstop_dir = -1.0\n'
+                    p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + '.minpos\n'
+                    p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = -1.0\n'
                 else:
                     hardstop_debounce[i] = p.axis[i].hardstop_debounce[1]
-                    p.axis[i].postmove_cleanup_cmds += 'self.pos = self.maxpos\n'
-                    p.axis[i].postmove_cleanup_cmds += 'self.last_primary_hardstop_dir = +1.0\n'
-                p.axis[i].postmove_cleanup_cmds += 'self.total_limit_seeks += 1\n'
+                    p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + '.maxpos\n'
+                    p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = +1.0\n'
+                p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.total_limit_seeks += 1\n'
             self.request_direct_dtdp(p, hardstop_debounce[pc.T], hardstop_debounce[pc.P])
 
     def schedule_moves(self,anticollision=True):
@@ -194,55 +201,6 @@ class PosArrayMaster(object):
             hw_tbl = m.for_hardware
             hw_tables.append(hw_tbl)
         return hw_tables
-
-    def expected_current_position(self,posid=None,key=''):
-        """Retrieve the current position, for a positioner identied by posid, according
-        to the internal tracking of its posmodel object. Valid keys are:
-            'Q', 'S', 'obsX', 'obsY', 'obsT', 'obsP', 'shaftT', 'shaftP', 'motorT', 'motorP'
-        See comments in posmodel.py for explanation of these values.
-
-        If no posid is specified, then a single value, or list of all positioners' values is returned.
-        This can be used either with or without specifying a key.
-
-        If no key is specified, a dictionary containing all of them will be
-        returned.
-
-        If posid is a list of multiple positioner ids, then the return will be a
-        corresponding list of positions. The optional argument key can be:
-            ... a list, of same length as posid
-            ... or just a single key, which gets fetched uniformly for all posid
-        """
-        (posid, was_not_list) = self._posid_listify_and_fill(posid)
-        (key, temp) = pc.listify(key,keep_flat=True)
-        (posid, key) = self._equalize_input_list_lengths(posid,key)
-        vals = []
-        for i in range(len(posid)):
-            pidx = self.posids.index(posid[i])
-            this_val = self.posmodels[pidx].expected_current_position
-            if key[i] == '':
-                vals.append(this_val)
-            else:
-                vals.append(this_val[key[i]])
-        if was_not_list:
-            vals = pc.delistify(vals)
-        return vals
-
-    def expected_current_position_str(self,posid=None):
-        """One-line string summarizing current expected position of a positioner.
-
-        If posid is a list of multiple positioner ids, then the return will be a
-        corresponding list of strings.
-
-        If no posid is specified, a list of strings for all positioners is returned.
-        """
-        (posid, was_not_list) = self._posid_listify_and_fill(posid)
-        strs = []
-        for p in posid:
-            pidx = self.posids.index(p)
-            strs.append(self.posmodels[pidx].expected_current_position_str)
-        if was_not_list:
-            strs = pc.delistify(strs)
-        return strs
 
     def get(self,posid=None,key=''):
         """Retrieve the state value identified by string key, for positioner
@@ -324,6 +282,55 @@ class PosArrayMaster(object):
         else:
             pidx = self.posids.index(pos)
             return self.posmodels[pidx]
+
+    def expected_current_position(self,posid=None,key=''):
+        """Retrieve the current position, for a positioner identied by posid, according
+        to the internal tracking of its posmodel object. Valid keys are:
+            'Q', 'S', 'obsX', 'obsY', 'obsT', 'obsP', 'shaftT', 'shaftP', 'motorT', 'motorP'
+        See comments in posmodel.py for explanation of these values.
+
+        If no posid is specified, then a single value, or list of all positioners' values is returned.
+        This can be used either with or without specifying a key.
+
+        If no key is specified, a dictionary containing all of them will be
+        returned.
+
+        If posid is a list of multiple positioner ids, then the return will be a
+        corresponding list of positions. The optional argument key can be:
+            ... a list, of same length as posid
+            ... or just a single key, which gets fetched uniformly for all posid
+        """
+        (posid, was_not_list) = self._posid_listify_and_fill(posid)
+        (key, temp) = pc.listify(key,keep_flat=True)
+        (posid, key) = self._equalize_input_list_lengths(posid,key)
+        vals = []
+        for i in range(len(posid)):
+            pidx = self.posids.index(posid[i])
+            this_val = self.posmodels[pidx].expected_current_position
+            if key[i] == '':
+                vals.append(this_val)
+            else:
+                vals.append(this_val[key[i]])
+        if was_not_list:
+            vals = pc.delistify(vals)
+        return vals
+
+    def expected_current_position_str(self,posid=None):
+        """One-line string summarizing current expected position of a positioner.
+
+        If posid is a list of multiple positioner ids, then the return will be a
+        corresponding list of strings.
+
+        If no posid is specified, a list of strings for all positioners is returned.
+        """
+        (posid, was_not_list) = self._posid_listify_and_fill(posid)
+        strs = []
+        for p in posid:
+            pidx = self.posids.index(p)
+            strs.append(self.posmodels[pidx].expected_current_position_str)
+        if was_not_list:
+            strs = pc.delistify(strs)
+        return strs
 
     def _posid_listify_and_fill(self,posid):
         """Internally-used wrapper method for listification of posid. The additional functionality

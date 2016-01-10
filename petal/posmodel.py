@@ -97,17 +97,15 @@ class PosModel(object):
     def expected_current_position_str(self):
         """One-line string summarizing current expected position.
         """
-        deg = '\u00b0'
-        mm = 'mm'
         pos = self.expected_current_position
-        s = 'Q:{:8.3f}{}, S:{:8.3f}{} | flatX:{:8.3f}{}, flatY:{:8.3f}{} | obsX:{:8.3f}{}, obsY:{:8.3f}{} | posX:{:8.3f}{}, posY:{:8.3f}{} | obsT:{:8.3f}{}, obsP:{:8.3f}{} | posT:{8.3f}{}, posP:{8.3f}{} | motT:{:8.1f}{}, motP:{:8.1f}{}'. \
-            format(pos['Q'],mm, pos['S'],deg,
-                   pos['flatX'],mm, pos['flatY'],mm,
-                   pos['obsX'],mm, pos['obsY'],mm,
-                   pos['posX'],mm, pos['posY'],mm,
-                   pos['obsT'],deg, pos['obsP'],deg,
-                   pos['posT'],deg, pos['posP'],deg,
-                   pos['motT'],deg, pos['motP'],deg)
+        s = 'Q:{:8.3f}{}, S:{:8.3f}{} | flatX:{:8.3f}{}, flatY:{:8.3f}{} | obsX:{:8.3f}{}, obsY:{:8.3f}{} | posX:{:8.3f}{}, posY:{:8.3f}{} | obsT:{:8.3f}{}, obsP:{:8.3f}{} | posT:{:8.3f}{}, posP:{:8.3f}{} | motT:{:8.1f}{}, motP:{:8.1f}{}'. \
+            format(pos['Q'],     pc.deg, pos['S'],     pc.mm,
+                   pos['flatX'], pc.mm,  pos['flatY'], pc.mm,
+                   pos['obsX'],  pc.mm,  pos['obsY'],  pc.mm,
+                   pos['posX'],  pc.mm,  pos['posY'],  pc.mm,
+                   pos['obsT'],  pc.deg, pos['obsP'],  pc.deg,
+                   pos['posT'],  pc.deg, pos['posP'],  pc.deg,
+                   pos['motT'],  pc.deg, pos['motP'],  pc.deg)
         return s
 
     @property
@@ -366,7 +364,7 @@ class Axis(object):
     def limit_seeking_search_distance(self):
         """A distance magnitude that guarantees hitting a hard limit in either direction.
         """
-        return np.abs(np.diff(self.full_range)*self.posmodel.state.read('LIMIT_SEEK_EXCEED_RANGE_FACTOR'))
+        return np.abs(np.diff(self.full_range)*self.posmodel.state.read('LIMIT_SEEK_EXCEED_RANGE_FACTOR'))[0]
 
     def motor_to_shaft(self,distance):
         """Convert a distance in motor angle to shaft angle at the gearbox output.

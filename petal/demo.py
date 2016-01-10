@@ -12,15 +12,16 @@ m = posarraymaster.PosArrayMaster(posids)
 
 # initialization of communications
 # these commands are very specific to the hacked-together LegacyPositionerComm
-comm = legacypositionercomm.LegacyPositionerComm('COM5')
+comm = legacypositionercomm.LegacyPositionerComm('COM6')
 comm.send_cmd_off = True # used to speed up software debugging / not actually send commands out over hardware
 comm.master = m
 m.comm = comm
 
+print('INITIAL POSITION')
 print(m.get('6M01').expected_current_position_str)
 
 # demo script flags
-should_home        = False
+should_home        = True
 should_direct_dtdp = False
 should_move_qs     = False
 should_move_dqds   = False
@@ -31,58 +32,86 @@ should_move_dtdp   = True
 
 # run the various move types
 if should_home:
+    print('\nMOVE: homing')
     m.request_homing(posids)
     m.schedule_send_and_execute_moves()
 else:
-    m.set(key=['POS_T','POS_P'],value=[0,180]) # faking having just homed
+    m.set(key=['POS_T','POS_P'],value=[-180,180]) # faking having just homed
 
 # this is an 'expert' use function, which instructs the theta and phis axes to go some distances with no regard for anticollision or hardstops
 if should_direct_dtdp:
-    dt = [ 90, -180, 90]
-    dp = [-60,    0, 60]
+    dt = [ 270, -180, -90]
+    dp = [ -60,    0,  60]
     for i in range(len(dt)):
-        m.request_direct_dtdp(posids, dt[i], dp[i])
-        m.schedule_send_and_execute_moves
+        val1 = dt[i]
+        val2 = dp[i]
+        print('\nMOVE: direct dtdp (' + str(val1) + ',' + str(val2) + ')')
+        m.request_direct_dtdp(posids, val1, val2)
+        m.schedule_send_and_execute_moves()
 
 # the remainder below are for general usage
 if should_move_qs:
     Q = [0, 90, -90, 0]
     S = [3,  3,   3, 0]
+    command = 'QS'
     for i in range(len(Q)):
-        m.request_targets(posids, ['qs']*n, [Q[i]]*n, [S[i]]*n)
+        val1 = Q[i]
+        val2 = S[i]
+        print('\nMOVE: ' + command + ' (' + str(val1) + ',' + str(val2) + ')')
+        m.request_targets(posids, [command]*n, [val1]*n, [val2]*n)
         m.schedule_send_and_execute_moves()
 
 if should_move_dqds:
     dq = [ 0,  90, -180, 90]
     ds = [ 3,  -3,    6,  6]
+    command = 'dQdS'
     for i in range(len(dq)):
-        m.request_targets(posids, ['dqds']*n, [dq[i]]*n, [ds[i]]*n)
+        val1 = dq[i]
+        val2 = ds[i]
+        print('\nMOVE: ' + command + ' (' + str(val1) + ',' + str(val2) + ')')
+        m.request_targets(posids, [command]*n, [val1]*n, [val2]*n)
         m.schedule_send_and_execute_moves()
 
 if should_move_xy:
-    x = [3, 0, -5,  0, -5.99, 6, 0, 0]
-    y = [0, 3,  0, -5,     0, 0, 8, 0]
+    x = [2.5,   0, -5,  0, -5.99, 6, 0, 0]
+    y = [  0, 2.5,  0, -5,     0, 0, 8, 0]
+    command = 'posXY'
     for i in range(len(x)):
-        m.request_targets(posids, ['xy']*n, [x[i]]*n, [y[i]]*n)
+        val1 = x[i]
+        val2 = y[i]
+        print('\nMOVE: ' + command + ' (' + str(val1) + ',' + str(val2) + ')')
+        m.request_targets(posids, [command]*n, [val1]*n, [val2]*n)
         m.schedule_send_and_execute_moves()
 
 if should_move_dxdy:
     dx = [ 2.5,  2.5, -10,  5, 0]
     dy = [   0,    0,   0, -5, 5]
+    command = 'dXdY'
     for i in range(len(dx)):
-        m.request_targets(posids, ['dxdy']*n, [dx[i]]*n, [dy[i]]*n)
+        val1 = dx[i]
+        val2 = dy[i]
+        print('\nMOVE: ' + command + ' (' + str(val1) + ',' + str(val2) + ')')
+        m.request_targets(posids, [command]*n, [val1]*n, [val2]*n)
         m.schedule_send_and_execute_moves()
 
 if should_move_tp:
     t = [-90,  0, 90,   0]
     p = [ 90, 90, 90, 180]
+    command = 'posTP'
     for i in range(len(t)):
-        m.request_targets(posids, ['tp']*n, [t[i]]*n, [p[i]]*n)
+        val1 = t[i]
+        val2 = p[i]
+        print('\nMOVE: ' + command + ' (' + str(val1) + ',' + str(val2) + ')')
+        m.request_targets(posids, [command]*n, [val1]*n, [val2]*n)
         m.schedule_send_and_execute_moves()
 
 if should_move_dtdp:
-    dt = [-30, 30,   0,  0, -30, 30]
-    dp = [  0,  0, -30, 30, -30, 30]
+    dt = [ 210, -30,   0,  0, -30, -150]
+    dp = [   0,   0, -30, 30, -30, 30]
+    command = 'dTdP'
     for i in range(len(dt)):
-        m.request_targets(posids, ['dtdp']*n, [dt[i]]*n, [dp[i]]*n)
+        val1 = dt[i]
+        val2 = dp[i]
+        print('\nMOVE: ' + command + ' (' + str(val1) + ',' + str(val2) + ')')
+        m.request_targets(posids, [command]*n, [val1]*n, [val2]*n)
         m.schedule_send_and_execute_moves()

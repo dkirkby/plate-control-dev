@@ -13,17 +13,13 @@ def S2R_lookup(S):
     return np.interp(S,R2S_lookup_data[:,2],R2S_lookup_data[:,0],left=float('nan'))
 
 # Constants
-# (some of these may be ancient and no longer needed!)
-angle_unit = 'deg'  # unless otherwise specified, assume all angles expressed in this unit
-deg_char_num = 176  # character number of degree symbol
-sqr_char_num = 178  # character number of 2 ^2 symbol
-deg_char = chr(deg_char_num)
-sqr_char = chr(sqr_char_num)
+deg = '\u00b0'
+mm = 'mm'
 timestamp_format = '%Y-%m-%d %H:%M:%S.%f' # see strftime documentation
 gear_ratio = {}
 gear_ratio['namiki'] = (46.0/14.0+1)**4  # namiki    "337:1", output rotation/motor input
 gear_ratio['maxon'] = 4100625.0/14641.0  # maxon     "280:1", output rotation/motor input
-gear_ratio['faulhaber'] = 256.0  		  # faulhaber "256:1", output rotation/motor input
+gear_ratio['faulhaber'] = 256.0  		 # faulhaber "256:1", output rotation/motor input
 T = 0  # theta axis idx -- NOT the motor axis ID!!
 P = 1  # phi axis idx -- NOT the motor axis ID!!
 axis_labels = ('theta', 'phi')

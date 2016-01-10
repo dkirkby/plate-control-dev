@@ -27,20 +27,19 @@ class PosSchedule(object):
         system indicated by uv_type.
 
                 pos ... posid or posmodel
-            uv_type ... string, 'qs', 'dqds', 'obsXY', 'posXY', 'dxdy', 'obsTP', 'posTP' or 'dtdp'
+            uv_type ... string, 'QS', 'dQdS', 'obsXY', 'posXY', 'dXdY', 'obsTP', 'posTP' or 'dTdP'
                   u ... float, value of q, dq, x, dx, t, or dt
                   v ... float, value of s, ds, y, dy, p, or dp
 
         A schedule can only contain one target request per positioner at a time.
         """
-        uv_type = uv_type.lower()
         posmodel = self.posarray.get_model_for_pos(pos)
         if self.already_requested(posmodel):
             print('cannot request more than one target per positioner in a given schedule')
             return
         current_position = posmodel.expected_current_position
         start_posTP = [current_position['posT'],current_position['posP']]
-        if uv_type == 'qs':
+        if uv_type == 'QS':
             (targt_posTP,unreachable) = posmodel.trans.QS_to_posTP([u,v])
         elif uv_type == 'obsXY':
             (targt_posTP,unreachable) = posmodel.trans.obsXY_to_posTP([u,v])
@@ -50,17 +49,15 @@ class PosSchedule(object):
             targt_posTP = posmodel.trans.obsTP_to_posTP([u,v])
         elif uv_type == 'posTP':
             targt_posTP = [u,v]
-        elif uv_type == 'dqds':
+        elif uv_type == 'dQdS':
             start_uv = [current_position['Q'],current_position['S']]
             targt_uv = posmodel.trans.addto_QS(start_uv,[u,v])
-            start_posTP = posmodel.trans.QS_to_posTP(start_uv)
-            targt_posTP = posmodel.trans.QS_to_posTP(targt_uv)
-        elif uv_type == 'dxdy':
+            (targt_posTP,unreachable) = posmodel.trans.QS_to_posTP(targt_uv)
+        elif uv_type == 'dXdY':
             start_uv = [current_position['posX'],current_position['posY']]
             targt_uv = posmodel.trans.addto_posXY(start_uv,[u,v])
-            start_posTP = posmodel.trans.posXY_to_posTP(start_uv)
-            targt_posTP = posmodel.trans.posXY_to_posTP(targt_uv)
-        elif uv_type == 'dtdp':
+            (targt_posTP,unreachable) = posmodel.trans.posXY_to_posTP(targt_uv)
+        elif uv_type == 'dTdP':
             targt_posTP = posmodel.trans.addto_posTP(start_posTP,[u,v],range_wrap_limits='none')
         else:
             print('bad uv_type "' + str(uv_type) + '" for target request')

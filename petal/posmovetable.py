@@ -115,6 +115,7 @@ class PosMoveTable(object):
         Anti-backlash and final creep moves are added as necessary.
         """
         expected_prior_dTdP = [0,0]
+        backlash = [0,0]
         true_moves = [[],[]]
         new_moves = [[],[]]
         true_and_new = [[],[]]
@@ -129,7 +130,6 @@ class PosMoveTable(object):
         if self.should_antibacklash and any(has_moved):
             backlash_dir = [self.posmodel.state.read('ANTIBACKLASH_FINAL_MOVE_DIR_T'), self.posmodel.state.read('ANTIBACKLASH_FINAL_MOVE_DIR_P')]
             backlash_mag = self.posmodel.state.read('BACKLASH')
-            backlash = [0,0]
             for i in [pc.T,pc.P]:
                 backlash[i] = -backlash_dir[i] * backlash_mag * has_moved[i]
                  # note backlash allow_exceed_limits=True, with assumption that these limits the debounced_range, which already accounts for backlash (see Axis class implementation)
@@ -222,7 +222,7 @@ class PosMoveTable(object):
         return restricted_table
 
     def _gather_stats(self,table):
-        stats = {'net_time':[],'net_dT':[],'net_dP':[],'Q':[],'S':[],'obsX':[],'obsY':[],'obsT':[],'obsP':[],
+        stats = {'net_time':[],'net_dT':[],'net_dP':[],'Q':[],'S':[],'obsX':[],'obsY':[],'posX':[],'posY':[],'obsT':[],'obsP':[],'posT':[],'posP':[],
                  'TOTAL_CRUISE_MOVES_T':0,'TOTAL_CRUISE_MOVES_P':0,'TOTAL_CREEP_MOVES_T':0,'TOTAL_CREEP_MOVES_P':0}
         pos = self.posmodel.expected_current_position
         for i in range(table['nrows']):
@@ -233,14 +233,20 @@ class PosMoveTable(object):
                 stats['net_time'][i] += stats['net_time'][i-1]
                 stats['net_dT'][i] += stats['net_dT'][i-1]
                 stats['net_dP'][i] += stats['net_dP'][i-1]
-            stats['obsT'].append(pos['obsT'] + stats['net_dT'][i])
-            stats['obsP'].append(pos['obsP'] + stats['net_dP'][i])
+            stats['posT'].append(pos['posT'] + stats['net_dT'][i])
+            stats['posP'].append(pos['posP'] + stats['net_dP'][i])
             stats['TOTAL_CRUISE_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'cruise' and table['dT'] != 0)
             stats['TOTAL_CRUISE_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'cruise' and table['dP'] != 0)
             stats['TOTAL_CREEP_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'creep' and table['dT'] != 0)
             stats['TOTAL_CREEP_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'creep' and table['dP'] != 0)
-        posTP = self.posmodel.trans.obsTP_to_posTP([stats['obsT'],stats['obsP']])
-        obsXY = self.posmodel.trans.posTP_to_obsXY(posTP)
+        posTP = [stats['posT'],stats['posP']]
+        obsTP = self.posmodel.trans.posTP_to_obsTP(posTP)
+        stats['obsT'] = obsTP[0]
+        stats['obsP'] = obsTP[1]
+        posXY = self.posmodel.trans.posTP_to_posXY(posTP)
+        stats['posX'] = posXY[0]
+        stats['posY'] = posXY[1]
+        obsXY = self.posmodel.trans.posXY_to_obsXY(posXY)
         stats['obsX'] = obsXY[0]
         stats['obsY'] = obsXY[1]
         QS = self.posmodel.trans.obsXY_to_QS(obsXY)
