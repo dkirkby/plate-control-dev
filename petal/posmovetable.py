@@ -222,13 +222,15 @@ class PosMoveTable(object):
         return restricted_table
 
     def _gather_stats(self,table):
-        stats = {'net_dT':[],'net_dP':[],'Q':[],'S':[],'obsX':[],'obsY':[],'obsT':[],'obsP':[],
+        stats = {'net_time':[],'net_dT':[],'net_dP':[],'Q':[],'S':[],'obsX':[],'obsY':[],'obsT':[],'obsP':[],
                  'TOTAL_CRUISE_MOVES_T':0,'TOTAL_CRUISE_MOVES_P':0,'TOTAL_CREEP_MOVES_T':0,'TOTAL_CREEP_MOVES_P':0}
         pos = self.posmodel.expected_current_position
         for i in range(table['nrows']):
+            stats['net_time'].append(table['move_time'][i] + table['prepause'][i] + table['postpause'][i])
             stats['net_dT'].append(table['dT'][i])
             stats['net_dP'].append(table['dP'][i])
             if i > 0:
+                stats['net_time'][i] += stats['net_time'][i-1]
                 stats['net_dT'][i] += stats['net_dT'][i-1]
                 stats['net_dP'][i] += stats['net_dP'][i-1]
             stats['obsT'].append(pos['obsT'] + stats['net_dT'][i])

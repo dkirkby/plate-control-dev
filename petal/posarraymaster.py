@@ -1,8 +1,10 @@
 import posmodel
 import posschedule
+import posmovetable
 import posstate
 import petalcomm
 import posconstants as pc
+import numpy as np
 
 class PosArrayMaster(object):
     """Maintains a list of instances of the Fiber Positioner software model
@@ -12,8 +14,8 @@ class PosArrayMaster(object):
     """
     def __init__(self, posids):
         self.posmodels = []
-        for i in range(len(posids)):
-            state = posstate.PosState(posids[i],logging=True)
+        for posid in posids:
+            state = posstate.PosState(posid,logging=True)
             model = posmodel.PosModel(state)
             self.posmodels.append(model)
         self.posids = posids
@@ -38,9 +40,9 @@ class PosArrayMaster(object):
         """
         [pos, commands, vals1, vals2] = [list(arg) for arg in [pos, commands, vals1, vals2] if not(isinstance(arg,list))]
         for i in range(len(pos)):
-            pos = self.get_model_for_pos(pos)
-            if self.schedule.already_requested(pos):
-                print('Positioner ' + str(pos.posid) + ' already has a target scheduled. Extra target request ' + str(commands[i]) + '(' + str(vals1[i]) + ',' + str(vals2[i]) + ') ignored')
+            pos[i] = self.get_model_for_pos(pos[i])
+            if self.schedule.already_requested(pos[i]):
+                print('Positioner ' + str(pos[i].posid) + ' already has a target scheduled. Extra target request ' + str(commands[i]) + '(' + str(vals1[i]) + ',' + str(vals2[i]) + ') ignored')
             else:
                 self.schedule.request_target(pos, commands[i], vals1[i], vals2[i])
 
@@ -61,24 +63,15 @@ class PosArrayMaster(object):
         """
         [pos, dt, dp] = [list(arg) for arg in [pos, dt, dp] if not(isinstance(arg,list))]
         for i in range(len(pos)):
-            pos = self.get_model_for_pos(pos)
-            table = posmovetable.PosMoveTable(pos)
+            pos[i] = self.get_model_for_pos(pos[i])
+            table = posmovetable.PosMoveTable(pos[i])
             table.set_move(0, pc.T, dt[i])
             table.set_move(0, pc.P, dp[i])
             table.store_orig_command(0,'direct_dtdp',dt[i],dp[i])
             table.allow_exceed_limits = True
             self.schedule.add_table(table)
 
-    def request_limit_seek(self, pos, axisid, direction, anticollision=True):
-        """Direction and axisid here would be single values, applied uniformly to all positioners in pos."""
-        """logic similar to...
-            search_dist = []
-            search_dist[pc.T] = np.sign(val1)*self.axis[pc.T].limit_seeking_search_distance()
-            search_dist[pc.P] = np.sign(val2)*self.axis[pc.P].limit_seeking_search_distance()
-            for i in [pc.T,pc.P]:
-                table.extend(self.axis[i].seek_one_limit_sequence(search_dist[i], should_debounce_hardstops=False))
-            return table
-        """
+    def request_limit_seek(self, pos, axisid, direction, anticollision=True, cmd_prefix=''):
         if not(isinstance(pos,list)):
             pos = list(pos)
         if anticollision:
@@ -89,15 +82,45 @@ class PosArrayMaster(object):
             else:
                 # request anticollision-safe moves to current thetas and all phis within Eo
                 pass
-        # now do the limit seek on whatever axis in whatever direction
+        search_dist = np.sign(direction)*pos.axis[axisid].limit_seeking_search_distance
+        for p in pos:
+            table = posmovetable.PosMoveTable(p)
+            table.should_antibacklash = False
+            table.should_final_creep  = False
+            table.allow_exceed_limits = True
+            table.allow_cruise = not(p.state.read('CREEP_TO_LIMITS'))
+            dist = [0,0]
+            dist[axisid] = search_dist
+            table.set_move(0,pc.T,dist[0])
+            table.set_move(0,pc.P,dist[1])
+            table.store_orig_command(0,cmd_prefix + 'limit seek',direction*(axisid == pc.T),direction*(axisid == pc.P))
+            self.schedule.add_table(table)
 
     def request_homing(self, pos):
-        """logic similar to...
-            for a in self.axis:
-                table.extend(a.seek_and_set_limits_sequence())
-            return table
+        """Request homing sequence to find the primary hardstop and set values for the
+        max position and min position.
         """
-        pass
+        hardstop_debounce = [0,0]
+        dir = [0,0]
+        dir[pc.P] = +1
+        for p in pos:
+            self.request_limit_seek(pc.P, direction=dir[pc.P], anticollision=True,cmd_prefix='homing P ')
+        self.schedule_moves(anticollision=True)
+        retraction_time = self.schedule.total_scheduled_time()
+        for p in pos:
+            dir[pc.T] = p.axis[pc.T].principle_hardstop_direction
+            self.request_limit_seek(pc.T, direction=dir[pc.T], anticollision=False, cmd_prefix='homing T ')
+            for i in [pc.T,pc.P]:
+                if dir[i] < 0:
+                    hardstop_debounce[i] = p.axis[i].hardstop_debounce[0]
+                    p.axis[i].postmove_cleanup_cmds += 'self.pos = self.minpos\n'
+                    p.axis[i].postmove_cleanup_cmds += 'self.last_primary_hardstop_dir = -1.0\n'
+                else:
+                    hardstop_debounce[i] = p.axis[i].hardstop_debounce[1]
+                    p.axis[i].postmove_cleanup_cmds += 'self.pos = self.maxpos\n'
+                    p.axis[i].postmove_cleanup_cmds += 'self.last_primary_hardstop_dir = +1.0\n'
+                p.axis[i].postmove_cleanup_cmds += 'self.total_limit_seeks += 1\n'
+            self.request_direct_dtdp(p, hardstop_debounce[pc.T], hardstop_debounce[pc.P])
 
     def schedule_moves(self,anticollision=True):
         """Generate the schedule of moves and submoves that get positioners

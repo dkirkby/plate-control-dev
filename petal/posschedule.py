@@ -94,7 +94,7 @@ class PosSchedule(object):
             self.move_tables = self._schedule_with_anticollision()
 
     def total_dtdp(self, pos):
-        """Return as-scheduled total move distance for positioner identified by posid.
+        """Return as-scheduled total move distance for positioner identified by pos.
         Returns [dt,dp].
         """
         pos = self.posarray.get_model_for_pos(pos)
@@ -105,6 +105,17 @@ class PosSchedule(object):
                 dtdp = [postprocessed['stats']['net_dT'][-1], postprocessed['stats']['net_dP'][-1]]
                 break
         return dtdp
+
+    def total_scheduled_time(self):
+        """Return as-scheduled total time for all moves and pauses to complete for
+        all positioners.
+        """
+        time = 0
+        for tbl in self.move_tables:
+            postprocessed = tbl.full_table
+            tbl_time = postprocessed['stats']['net_time'][-1]
+            if tbl_time > time:
+                time = tbl_time
 
     def already_requested(self, pos):
         """Returns boolean whether a request has already been registered in the
