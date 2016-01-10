@@ -60,21 +60,43 @@ class PosArrayMaster(object):
             dp  ... corresponding list of delta phi values
         """
         [pos, dt, dp] = [list(arg) for arg in [pos, dt, dp] if not(isinstance(arg,list))]
-        expected_prior_dtdp = [[0]*2 for x in range(len(self.posmodels))]
         for i in range(len(pos)):
             pos = self.get_model_for_pos(pos)
-            j = self.posmodels.index(pos)
-            expected_prior_dtdp[j] = self.schedule.total_dtdp(pos)
+            table = posmovetable.PosMoveTable(pos)
+            table.set_move(0, pc.T, dt[i])
+            table.set_move(0, pc.P, dp[i])
+            table.store_orig_command(0,'direct_dtdp',dt[i],dp[i])
+            table.allow_exceed_limits = True
+            self.schedule.add_table(table)
 
-            # alter for dtdp??
-            move_table = pos.make_move_table(movecmds[i], values1[i], values2[i], expected_prior_dTdP[j])
-
-            self.schedule.expert_add_table(move_table)
-
-    def request_limit_seek(self, pos, dir):
-        pass
+    def request_limit_seek(self, pos, axisid, direction, anticollision=True):
+        """Direction and axisid here would be single values, applied uniformly to all positioners in pos."""
+        """logic similar to...
+            search_dist = []
+            search_dist[pc.T] = np.sign(val1)*self.axis[pc.T].limit_seeking_search_distance()
+            search_dist[pc.P] = np.sign(val2)*self.axis[pc.P].limit_seeking_search_distance()
+            for i in [pc.T,pc.P]:
+                table.extend(self.axis[i].seek_one_limit_sequence(search_dist[i], should_debounce_hardstops=False))
+            return table
+        """
+        if not(isinstance(pos,list)):
+            pos = list(pos)
+        if anticollision:
+            if axisid == pc.P and direction == -1:
+                # calculate thetas where extended phis do not interfere
+                # request anticollision-safe moves to these thetas and phi = 0
+                pass
+            else:
+                # request anticollision-safe moves to current thetas and all phis within Eo
+                pass
+        # now do the limit seek on whatever axis in whatever direction
 
     def request_homing(self, pos):
+        """logic similar to...
+            for a in self.axis:
+                table.extend(a.seek_and_set_limits_sequence())
+            return table
+        """
         pass
 
     def schedule_moves(self,anticollision=True):

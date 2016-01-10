@@ -66,7 +66,7 @@ class PosSchedule(object):
                            'cmd_val2' : v}
         self.requests.append(new_request)
 
-    def expert_add_table(self, move_table):
+    def add_table(self, move_table):
         """Adds an externally-constructed move table to the schedule. If there
         is ANY such table in a given schedule, then the anti-collision algorithm
         will NOT be used. Generally, this method should only be used for internal
