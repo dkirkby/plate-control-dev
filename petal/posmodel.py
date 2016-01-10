@@ -47,35 +47,50 @@ class PosModel(object):
             return sum(range(round(self._stepsize_cruise/self._stepsize_creep) + 1))*self._stepsize_creep * self.state.read('SPINUPDOWN_PERIOD')
 
     @property
+    def posid(self):
+        """Returns the positioner id string."""
+        return self.state.read('SERIAL_ID')
+
+    @property
     def expected_current_position(self):
         """Returns a dictionary of the current expected position in the various coordinate systems.
         The keys are:
-            'Q'      ... float, deg, dependent variable, expected global Q position
-            'S'      ... float, mm,  dependent variable, expected global S position
-            'obsX'   ... float, mm,  dependent variable, expected global x position
-            'obsY'   ... float, mm,  dependent variable, expected global y position
-            'obsT'   ... float, deg, dependent variable, expected position of theta axis, including offsets as seen by an external observer
-            'obsP'   ... float, deg, dependent variable, expected position of phi axis, including offsets as seen by an external observer
-            'shaftT' ... float, deg, independent variable, the internally-tracked expected position of the theta shaft at the output of the gearbox
-            'shaftP' ... float, deg, independent variable, the internally-tracked expected position of the phi shaft at the output of the gearbox
-            'motorT' ... float, deg, dependent variable, expected position of theta motor
-            'motorP' ... float, deg, dependent variable, expected position of phi motor
+            'Q'     ... float, deg, dependent variable, expected global Q position
+            'S'     ... float, mm,  dependent variable, expected global S position
+            'flatX' ... float, mm, dependent variable, expected global x in a flattened-out system
+            'flatY' ... float, mm, dependent variable, expected global y in a flattened-out system
+            'obsX'  ... float, mm,  dependent variable, expected global x position
+            'obsY'  ... float, mm,  dependent variable, expected global y position
+            'posX'  ... float, mm,  dependent variable, expected local x position
+            'posY'  ... float, mm,  dependent variable, expected local y position
+            'obsT'  ... float, deg, dependent variable, expected position of theta axis, including offsets as seen by an external observer
+            'obsP'  ... float, deg, dependent variable, expected position of phi axis, including offsets as seen by an external observer
+            'posT'  ... float, deg, independent variable, the internally-tracked expected position of the theta shaft at the output of the gearbox
+            'posP'  ... float, deg, independent variable, the internally-tracked expected position of the phi shaft at the output of the gearbox
+            'motT'  ... float, deg, dependent variable, expected position of theta motor
+            'motP'  ... float, deg, dependent variable, expected position of phi motor
         """
-        shaftTP = [self.axis[pc.T].pos, self.axis[pc.P].pos]
+        posTP = [self.axis[pc.T].pos, self.axis[pc.P].pos]
         d = {}
-        d['shaftT'] = shaftTP[0]
-        d['shaftP'] = shaftTP[1]
-        d['motorT'] = self.axis[pc.T].shaft_to_motor(d['shaftT'])
-        d['motorP'] = self.axis[pc.P].shaft_to_motor(d['shaftP'])
-        obsTP = self.trans.shaftTP_to_obsTP(shaftTP)
+        d['posT'] = posTP[0]
+        d['posP'] = posTP[1]
+        d['motT'] = self.axis[pc.T].shaft_to_motor(d['posT'])
+        d['motP'] = self.axis[pc.P].shaft_to_motor(d['posP'])
+        obsTP = self.trans.posTP_to_obsTP(posTP)
         d['obsT'] = obsTP[0]
         d['obsP'] = obsTP[1]
-        obsXY = self.trans.shaftTP_to_obsXY(shaftTP)
+        posXY = self.trans.posTP_to_posXY(posTP)
+        d['posX'] = posXY[0]
+        d['posY'] = posXY[1]
+        obsXY = self.trans.posXY_to_obsXY(posXY)
         d['obsX'] = obsXY[0]
         d['obsY'] = obsXY[1]
         QS = self.trans.obsXY_to_QS(obsXY)
         d['Q'] = QS[0]
         d['S'] = QS[1]
+        flatXY = self.trans.QS_to_flatXY(QS)
+        d['flatX'] = flatXY[0]
+        d['flatY'] = flatXY[1]
         return d
 
     @property
@@ -85,11 +100,14 @@ class PosModel(object):
         deg = '\u00b0'
         mm = 'mm'
         pos = self.expected_current_position
-        s = 'Q:{:7.3f}{}, S:{:7.3f}{} | obsX:{:7.3f}{}, obsY:{:7.3f}{} | obsT:{:8.3f}{}, obsP:{:8.3f}{} | motorT:{:8.1f}{}, motorP:{:8.1f}{}'. \
+        s = 'Q:{:8.3f}{}, S:{:8.3f}{} | flatX:{:8.3f}{}, flatY:{:8.3f}{} | obsX:{:8.3f}{}, obsY:{:8.3f}{} | posX:{:8.3f}{}, posY:{:8.3f}{} | obsT:{:8.3f}{}, obsP:{:8.3f}{} | posT:{8.3f}{}, posP:{8.3f}{} | motT:{:8.1f}{}, motP:{:8.1f}{}'. \
             format(pos['Q'],mm, pos['S'],deg,
+                   pos['flatX'],mm, pos['flatY'],mm,
                    pos['obsX'],mm, pos['obsY'],mm,
+                   pos['posX'],mm, pos['posY'],mm,
                    pos['obsT'],deg, pos['obsP'],deg,
-                   pos['motorT'],deg, pos['motorP'],deg)
+                   pos['posT'],deg, pos['posP'],deg,
+                   pos['motT'],deg, pos['motP'],deg)
         return s
 
     @property
@@ -128,13 +146,13 @@ class PosModel(object):
         software travel limits, when a sequence of multiple moves is being planned out.
         """
         pos = self.expected_current_position
-        shaft_start = self.trans.addto_shaftTP([pos['shaftT'],pos['shaftP']], expected_prior_dTdP, range_wrap_limits='none') # since expected_prior_dTdP is just tracking already-existing commands, do not perform range wrapping on it
+        start = self.trans.addto_posTP([pos['posT'],pos['posP']], expected_prior_dTdP, range_wrap_limits='none') # since expected_prior_dTdP is just tracking already-existing commands, do not perform range wrapping on it
         if not(allow_exceed_limits):
-            distance = self.axis[axisid].truncate_to_limits(distance,shaft_start[axisid])
+            distance = self.axis[axisid].truncate_to_limits(distance,start[axisid])
         motor_dist = self.axis[axisid].shaft_to_motor(distance)
         move_data = self.motor_true_move(axisid, motor_dist, allow_cruise)
-        move_data['distance'] = self.axis[axisid].motor_to_shaft['distance']
-        move_data['speed']    = self.axis[axisid].motor_to_shaft['speed']
+        move_data['distance'] = self.axis[axisid].motor_to_shaft(move_data['distance'])
+        move_data['speed']    = self.axis[axisid].motor_to_shaft(move_data['speed'])
         return move_data
 
     def motor_true_move(self, axisid, distance, allow_cruise):
@@ -162,8 +180,8 @@ class PosModel(object):
         """Always perform this after positioner physical moves have been completed,
         to update the internal tracking of shaft positions and variables.
         """
-        self.state.write('SHAFT_T', self.state.read('SHAFT_T') + cleanup_table['stats']['net_dT'][-1])
-        self.state.write('SHAFT_P', self.state.read('SHAFT_P') + cleanup_table['stats']['net_dP'][-1])
+        self.state.write('POS_T', self.state.read('POS_T') + cleanup_table['stats']['net_dT'][-1])
+        self.state.write('POS_P', self.state.read('POS_P') + cleanup_table['stats']['net_dP'][-1])
         for axis in self.axis:
             exec(axis.postmove_cleanup_cmds)
             axis.postmove_cleanup_cmds = ''
@@ -195,16 +213,16 @@ class Axis(object):
         """Internally-tracked angular position of the axis, at the output of the gear.
         """
         if self.axisid == pc.T:
-            return self.posmodel.state.read('SHAFT_T')
+            return self.posmodel.state.read('POS_T')
         else:
-            return self.posmodel.state.read('SHAFT_P')
+            return self.posmodel.state.read('POS_P')
 
     @pos.setter
     def pos(self,value):
         if self.axisid == pc.T:
-            self.posmodel.state.write('SHAFT_T',value)
+            self.posmodel.state.write('POS_T',value)
         else:
-            self.posmodel.state.write('SHAFT_P',value)
+            self.posmodel.state.write('POS_P',value)
 
     @property
     def full_range(self):
@@ -288,12 +306,13 @@ class Axis(object):
     def motor_calib_properties(self):
         """Return properties for motor calibration.
         """
+        prop = {}
         if self.axisid == pc.T:
-            prop['gear_ratio'] = pc.gear_ratio[posmodel.state.read('GEAR_TYPE_T')]
+            prop['gear_ratio'] = pc.gear_ratio[self.posmodel.state.read('GEAR_TYPE_T')]
             prop['gear_calib'] = self.posmodel.state.read('GEAR_CALIB_T')
             prop['ccw_sign'] = self.posmodel.state.read('MOTOR_CCW_DIR_T')
         else:
-            prop['gear_ratio'] = pc.gear_ratio[posmodel.state.read('GEAR_TYPE_P')]
+            prop['gear_ratio'] = pc.gear_ratio[self.posmodel.state.read('GEAR_TYPE_P')]
             prop['gear_calib'] = self.posmodel.state.read('GEAR_CALIB_P')
             prop['ccw_sign'] = self.posmodel.state.read('MOTOR_CCW_DIR_P')
         return prop
@@ -353,13 +372,13 @@ class Axis(object):
         """Convert a distance in motor angle to shaft angle at the gearbox output.
         """
         p = self.motor_calib_properties
-        return distance * prop['ccw_sign'] / (p['gear_ratio'] * p['gear_calib'])
+        return distance * p['ccw_sign'] / (p['gear_ratio'] * p['gear_calib'])
 
     def shaft_to_motor(self,distance):
         """Convert a distance in shaft angle to motor angle at the gearbox output.
         """
         p = self.motor_calib_properties
-        return distance * prop['ccw_sign'] * (p['gear_ratio'] * p['gear_calib'])
+        return distance * p['ccw_sign'] * (p['gear_ratio'] * p['gear_calib'])
 
     def truncate_to_limits(self, distance, start_pos=None):
         """Return distance after truncating it (if necessary) to the software limits.

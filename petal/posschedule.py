@@ -27,40 +27,62 @@ class PosSchedule(object):
         system indicated by uv_type.
 
                 pos ... posid or posmodel
-            uv_type ... string, 'qs', 'xy', 'dqds', or 'dxdy'
-                  u ... float, value of q, x, dq, or dx
-                  v ... float, value of s, y, ds, or dy
+            uv_type ... string, 'qs', 'dqds', 'obsXY', 'posXY', 'dxdy', 'obsTP', 'posTP' or 'dtdp'
+                  u ... float, value of q, dq, x, dx, t, or dt
+                  v ... float, value of s, ds, y, dy, p, or dp
 
         A schedule can only contain one target request per positioner at a time.
         """
         uv_type = uv_type.lower()
-        pos = self.posarray.get_model_for_pos(pos)
-        if self.already_requested(pos):
+        posmodel = self.posarray.get_model_for_pos(pos)
+        if self.already_requested(posmodel):
             print('cannot request more than one target per positioner in a given schedule')
             return
-        current_position = pos.expected_current_position
+        current_position = posmodel.expected_current_position
         if uv_type == 'qs' or uv_type == 'dqds':
-            start_uv = [current_position['Q'],current_position['S']]
-            start_flatxy = pos.trans.QS_to_flatXY(start_uv)
-        elif uv_type == 'xy' or uv_type == 'dxdy':
-            start_uv = [current_position['obsX'],current_position['obsY']]
-            start_flatxy = pos.trans.obsXY_to_flatXY(start_uv)
-        else:
-            print('bad uv_type for target request')
-            return
+
+        elif uv_type == 'obsXY':
+
+        elif uv_type == 'posXY' or uv_type == 'dxdy':
+            start_uv = [current_position['posX'],current_position['posY']]
+            start_posTP = posmodel.trans.posXY_to_posTP(start_uv)
+        elif uv_type == 'obsTP':
+            start_uv = [current_position['obsT'],current_position['obsP']]
+            start_flatxy = posmodel.trans.obsTP_to_flatXY(start_uv)
+        elif uv_type == 'posTP' or uv_type == 'dtdp':
+            start_uv = [current_position['posT'],current_position['posP']]
+            start_posTP = start_uv
+
         if uv_type == 'qs':
-            targt_flatxy = pos.trans.QS_to_flatXY([u,v])
-        elif uv_type == 'xy':
-            targt_flatxy = pos.trans.obsXY_to_flatXY([u,v])
+            start_posTP = posmodel.trans.QS_to_posTP([current_position['Q'],current_position['S']])
+            targt_posTP = posmodel.trans.QS_to_posTP([u,v])
+        elif uv_type == 'obsXY':
+            start_uv = [current_position['obsX'],current_position['obsY']]
+            start_flatxy = posmodel.trans.obsXY_to_flatXY(start_uv)
+            targt_flatxy = posmodel.trans.obsXY_to_flatXY([u,v])
+        elif uv_type == 'posXY':
+            (targt_posTP,unreachable) = posmodel.trans.posXY_to_posTP([u,v])
+        elif uv_type == 'obsTP':
+            targt_flatxy = posmodel.trans.obsTP_to_flatXY([u,v])
+        elif uv_type == 'posTP':
+            targt_posTP = [u,v]
         elif uv_type == 'dqds':
-            targt_uv = pos.trans.addto_QS(start_uv,[u,v])
-            targt_flatxy = pos.trans.QS_to_flatXY(targt_uv)
+            start_uv = [current_position['Q'],current_position['S']]
+            targt_uv = posmodel.trans.addto_QS(start_uv,[u,v])
+            start_posTP = posmodel.trans.QS_to_posTP(start_uv)
+            targt_posTP = posmodel.trans.QS_to_posTP(targt_uv)
         elif uv_type == 'dxdy':
-            targt_uv = pos.trans.addto_obsXY(start_uv,[u,v])
-            targt_flatxy = pos.trans.obsXY_to_flatXY(targt_uv)
+            targt_uv = posmodel.trans.addto_obsXY(start_uv,[u,v])
+            targt_flatxy = posmodel.trans.obsXY_to_flatXY(targt_uv)
+        elif uv_type == 'dtdp':
+            targt_uv = posmodel.trans.addto_posTP(start_uv,[u,v])
+            targt_flatxy = posmodel.trans.obsTP_to_flatXY(targt_uv)
+        else:
+            print('bad uv_type "' + str(uv_type) + '" for target request')
+            return
         new_request = {'start_flatxy' : start_flatxy,
                        'targt_flatxy' : targt_flatxy,
-                           'posmodel' : pos,
+                           'posmodel' : posmodel,
                             'command' : uv_type,
                            'cmd_val1' : u,
                            'cmd_val2' : v}
@@ -89,18 +111,18 @@ class PosSchedule(object):
         if self.move_tables:
             return
         elif anticollision:
-            self.move_tables = self._schedule_without_anticollision()
+            self._schedule_with_anticollision()
         else:
-            self.move_tables = self._schedule_with_anticollision()
+            self._schedule_without_anticollision()
 
     def total_dtdp(self, pos):
         """Return as-scheduled total move distance for positioner identified by pos.
         Returns [dt,dp].
         """
-        pos = self.posarray.get_model_for_pos(pos)
+        posmodel = self.posarray.get_model_for_pos(pos)
         dtdp = [0,0]
         for tbl in self.move_tables:
-            if tbl.posmodel == pos:
+            if tbl.posmodel == posmodel:
                 postprocessed = tbl.full_table
                 dtdp = [postprocessed['stats']['net_dT'][-1], postprocessed['stats']['net_dP'][-1]]
                 break
@@ -136,7 +158,7 @@ class PosSchedule(object):
             j = i + 1
             extend_list = []
             while j < len(self.move_tables):
-                if self.move_tables[i].posmodel.state.read('SERIAL_ID') == self.move_tables[j].posmodel.state.read('SERIAL_ID'):
+                if self.move_tables[i].posmodel.posid == self.move_tables[j].posmodel.posid:
                     extend_list.append(self.move_tables.pop(j))
                 else:
                     j += 1
@@ -145,12 +167,13 @@ class PosSchedule(object):
             i += 1
 
     def _schedule_without_anticollision(self):
-        for req in self.requests:
+        while(self.requests):
+            req = self.requests.pop(0)
             posmodel = req['posmodel']
             table = posmovetable.PosMoveTable(posmodel)
-            (start_shaft,reachable) = posmodel.trans.flatXY_to_shaftTP(req['start_flatxy'])
-            (targt_shaft,reachable) = posmodel.trans.flatXY_to_shaftTP(req['targt_flatxy'])
-            dtdp = posmodel.trans.delta_shaftTP(targt_shaft, start_shaft, range_wrap_limits='targetable')
+            (start,reachable) = posmodel.trans.flatXY_to_posTP(req['start_flatxy'])
+            (targt,reachable) = posmodel.trans.flatXY_to_posTP(req['targt_flatxy'])
+            dtdp = posmodel.trans.delta_posTP(targt, start, range_wrap_limits='targetable')
             table.set_move(0, pc.T, dtdp[0])
             table.set_move(0, pc.P, dtdp[1])
             table.set_prepause (0, 0.0)

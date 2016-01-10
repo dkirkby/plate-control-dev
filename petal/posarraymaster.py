@@ -38,13 +38,16 @@ class PosArrayMaster(object):
             val1    ... corresponding list of first move arguments, each element is the value for q, dq, x, dx, t, or dt
             val2    ... corresponding list of second move arguments, each element is the value for s, ds, y, dy, p, or dp
         """
-        [pos, commands, vals1, vals2] = [list(arg) for arg in [pos, commands, vals1, vals2] if not(isinstance(arg,list))]
+        pos = pc.listify(pos,True)[0]
+        commands = pc.listify(commands,True)[0]
+        vals1 = pc.listify(vals1,True)[0]
+        vals2 = pc.listify(vals2,True)[0]
         for i in range(len(pos)):
-            pos[i] = self.get_model_for_pos(pos[i])
-            if self.schedule.already_requested(pos[i]):
-                print('Positioner ' + str(pos[i].posid) + ' already has a target scheduled. Extra target request ' + str(commands[i]) + '(' + str(vals1[i]) + ',' + str(vals2[i]) + ') ignored')
+            posmodel = self.get_model_for_pos(pos[i])
+            if self.schedule.already_requested(posmodel):
+                print('Positioner ' + str(posmodel.posid) + ' already has a target scheduled. Extra target request ' + str(commands[i]) + '(' + str(vals1[i]) + ',' + str(vals2[i]) + ') ignored')
             else:
-                self.schedule.request_target(pos, commands[i], vals1[i], vals2[i])
+                self.schedule.request_target(posmodel, commands[i], vals1[i], vals2[i])
 
     def request_direct_dtdp(self, pos, dt, dp):
         """Input a list of positioners and corresponding move targets to the schedule.
@@ -61,10 +64,12 @@ class PosArrayMaster(object):
             dt  ... corresponding list of delta theta values
             dp  ... corresponding list of delta phi values
         """
-        [pos, dt, dp] = [list(arg) for arg in [pos, dt, dp] if not(isinstance(arg,list))]
+        pos = pc.listify(pos,True)[0]
+        dt = pc.listify(dt,True)[0]
+        dp = pc.listify(dp,True)[0]
         for i in range(len(pos)):
-            pos[i] = self.get_model_for_pos(pos[i])
-            table = posmovetable.PosMoveTable(pos[i])
+            posmodel = self.get_model_for_pos(pos[i])
+            table = posmovetable.PosMoveTable(posmodel)
             table.set_move(0, pc.T, dt[i])
             table.set_move(0, pc.P, dp[i])
             table.store_orig_command(0,'direct_dtdp',dt[i],dp[i])
@@ -74,8 +79,7 @@ class PosArrayMaster(object):
     def request_limit_seek(self, pos, axisid, direction, anticollision=True, cmd_prefix=''):
         """Request hardstop seeking sequence for positioners in list pos.
         """
-        if not(isinstance(pos,list)):
-            pos = list(pos)
+        pos = pc.listify(pos,True)[0]
         if anticollision:
             if axisid == pc.P and direction == -1:
                 # calculate thetas where extended phis do not interfere
@@ -102,6 +106,7 @@ class PosArrayMaster(object):
         """Request homing sequence for positioners in list pos to find the primary hardstop
         and set values for the max position and min position.
         """
+        pos = pc.listify(pos,True)[0]
         hardstop_debounce = [0,0]
         dir = [0,0]
         dir[pc.P] = +1 # force this, because anticollision logic depends on it
@@ -156,7 +161,7 @@ class PosArrayMaster(object):
         self.clear_schedule()
 
     def clear_schedule(self):
-        self.schedule = posschedule.PosSchedule()
+        self.schedule = posschedule.PosSchedule(self)
 
     def hardware_ready_move_tables(self):
         """Strips out information that isn't necessary to send to petalbox, and
@@ -207,7 +212,7 @@ class PosArrayMaster(object):
             ... a list, of same length as posid
             ... or just a single key, which gets fetched uniformly for all posid
         """
-        (posid, was_not_list) = self._posid_listify(posid)
+        (posid, was_not_list) = self._posid_listify_and_fill(posid)
         (key, temp) = pc.listify(key,keep_flat=True)
         (posid, key) = self._equalize_input_list_lengths(posid,key)
         vals = []
@@ -230,7 +235,7 @@ class PosArrayMaster(object):
 
         If no posid is specified, a list of strings for all positioners is returned.
         """
-        (posid, was_not_list) = self._posid_listify(posid)
+        (posid, was_not_list) = self._posid_listify_and_fill(posid)
         strs = []
         for p in posid:
             pidx = self.posids.index(p)
@@ -255,13 +260,13 @@ class PosArrayMaster(object):
         Examples:
             m = posarraymaster.PosArrayMaster(posids)
             m.get('XXXXX','LENGTH_R1') # gets LENGTH_R1 value for positioner XXXXX
-            m.get('XXXXX',['SHAFT_T','SHAFT_P']) # gets these values for positioner XXXXX
+            m.get('XXXXX',['POS_T','POS_P']) # gets these values for positioner XXXXX
             m.get(['XXXXX','YYYYY'],'PETAL_ID') # gets PETAL_ID value for positioners XXXXX and YYYYY
             m.get(['XXXXX','YYYYY'],['FINAL_CREEP_ON','DEVICE_ID']) # gets multiple different values on multiple different positioners
-            m.get(key=['SHAFT_T']) # gets this value for all positioners identified in posids
+            m.get(key=['POS_T']) # gets this value for all positioners identified in posids
             m.get() # gets all posmodel objects for all positioners identified in posids
         """
-        (posid, was_not_list) = self._posid_listify(posid)
+        (posid, was_not_list) = self._posid_listify_and_fill(posid)
         (key, temp) = pc.listify(key,keep_flat=True)
         (posid, key) = self._equalize_input_list_lengths(posid,key)
         vals = []
@@ -295,7 +300,7 @@ class PosArrayMaster(object):
             m.set('XXXXX','LENGTH_R1',3.024) # sets LENGTH_R1 value for positioner XXXXX
             m.set(['XXXXX','YYYYY'],'PETAL_ID',2) # sets PETAL_ID value for positioners XXXXX and YYYYY
             m.set(['XXXXX','YYYYY'],['FINAL_CREEP_ON','DEVICE_ID'],[False,227]) # sets multiple different values on multiple different positioners
-            m.set(key=['SHAFT_T','SHAFT_P'],value=[0,180]) # sets these values for all positioners identified in posids
+            m.set(key=['POS_T','POS_P'],value=[0,180]) # sets these values for all positioners identified in posids
         """
         if key == None or value == None:
             print('either no key or no value was specified to setval')
@@ -307,14 +312,14 @@ class PosArrayMaster(object):
         (posid, value) = self._equalize_input_list_lengths(posid,value)
         (posid, key)   = self._equalize_input_list_lengths(posid,key) # repetition here handles the case where there was 1 posid element, 1 key, but mulitplie elements in value
         for i in range(len(posid)):
-
-            self.posmodels[pidx].state.write(key[i],value[i],write_to_disk)
+            p = self.get_model_for_pos(posid[i])
+            p.state.write(key[i],value[i],write_to_disk)
 
     def get_model_for_pos(self, pos):
         """Returns the posmodel object corresponding to a posid, or if the argument
         is a posmodel, just returns itself.
         """
-        if isinstance(pos, posmodel.Posmodel):
+        if isinstance(pos, posmodel.PosModel):
             return pos
         else:
             pidx = self.posids.index(pos)

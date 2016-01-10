@@ -43,7 +43,7 @@ class PosMoveTable(object):
         return self._for_output_type('hardware')
 
     @property
-    def for_software(self):
+    def for_cleanup(self):
         """Version of the table suitable for updating the software internal
         position tracking after the physical move has been performed.
         """
@@ -213,7 +213,7 @@ class PosMoveTable(object):
             table['cmd_val2'].append(rows[i].data['cmd_val2'])
             table['speed_mode_T'].append(true_moves[pc.T][i]['speed_mode'])
             table['speed_mode_P'].append(true_moves[pc.P][i]['speed_mode'])
-        table['posid'] = self.posmodel.state.read('SERIAL_ID')
+        table['posid'] = self.posmodel.posid
         table['nrows'] = len(table['dT'])
         table['stats'] = self._gather_stats(table)
         restricted_table = table.copy()
@@ -239,8 +239,8 @@ class PosMoveTable(object):
             stats['TOTAL_CRUISE_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'cruise' and table['dP'] != 0)
             stats['TOTAL_CREEP_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'creep' and table['dT'] != 0)
             stats['TOTAL_CREEP_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'creep' and table['dP'] != 0)
-        shaftTP = self.posmodel.trans.shaftTP_to_obsTP([stats['t'],stats['p']])
-        obsXY = self.posmodel.trans.shaftTP_to_obsXY(shaftTP)
+        posTP = self.posmodel.trans.obsTP_to_posTP([stats['obsT'],stats['obsP']])
+        obsXY = self.posmodel.trans.posTP_to_obsXY(posTP)
         stats['obsX'] = obsXY[0]
         stats['obsY'] = obsXY[1]
         QS = self.posmodel.trans.obsXY_to_QS(obsXY)
