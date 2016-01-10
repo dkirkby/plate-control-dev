@@ -152,7 +152,7 @@ class PosArrayMaster(object):
         """
         for m in self.schedule.move_tables:
             m.posmodel.postmove_cleanup(m.for_cleanup)
-            print(m.posmodel.expected_current_position_str)
+        print(self.expected_current_position_str())
         self.clear_schedule()
 
     def clear_schedule(self):
