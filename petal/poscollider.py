@@ -9,19 +9,41 @@ class PosCollider(object):
     See DESI-0899 for geometry specifications, illustrations, and kinematics.
     """
     def __init__(self):
-        self.timestep = 0.1 # [sec] time increment for collision checking
-        self.posgeoms = []
+        self.timestep = 0.1 # [sec] time increment for collision checking (put in config file?)
+        self.posmodels = []
+        self.R1 = []
+        self.R2 = []
+        self.xy0 = []
+        self.tp0 = []
+        self.tp_ranges = []
+        self.Eo = 9.xxx
+        self.Ei = 6.xxx
+        self.keepoutP = PosPoly([])
+        self.keepoutT = PosPoly([])
+        self.fixed_keepouts = [] # for GFA, petal edge, and any other fixed keepout locations
 
     def add_positioner(self, posmodel):
         """Add a positioner to the collider.
         """
-        self.posgeoms.append(PosGeom(posmodel))
+        #xxx self.posgeoms.append(PosGeom(posmodel))
 
     def refresh_geometry_configs(self):
-        """Update positioner geometry to latest values from config files.
+        """Reads latest versions of all configuration file offset, range, and
+        polygon definitions, and updates the positioner geometries accordingly.
         """
         for p in posgeoms:
-            p.refresh_from_config()
+            # loopify
+            keepoutP_points = [self.posmodel.state.read('KEEPOUT_PHI_X'),   self.posmodel.state.read('KEEPOUT_PHI_Y')]
+            keepoutT_points = [self.posmodel.state.read('KEEPOUT_THETA_X'), self.posmodel.state.read('KEEPOUT_THETA_Y')]
+            keepoutP_start_idx = self.posmodel.state.read('KEEPOUT_PHI_PT0')
+            keepoutT_start_idx = self.posmodel.state.read('KEEPOUT_THETA_PT0')
+            self.keepoutP = PosPoly(keepoutP_points, keepoutP_start_idx)
+            self.keepoutT = PosPoly(keepoutT_points, keepoutT_start_idx)
+            self.R1 = self.posmodel.state.read('LENGTH_R1')
+            self.R2 = self.posmodel.state.read('LENGTH_R2')
+            self.xy0 = np.array([self.posmodel.state.read('OFFSET_X'), self.posmodel.state.read('OFFSET_Y')])
+            self.tp0 = np.array([self.posmodel.state.read('OFFSET_T'), self.posmodel.state.read('OFFSET_P')])
+            self.tp_ranges = np.array(posmodel.trans.shaft_ranges('targetable'))
 
     def collision_between(self):
         """Searches for collisions in time and space between two polygon geometries
@@ -29,41 +51,10 @@ class PosCollider(object):
         """
         pass
 
-class PosGeom(object):
-    """Represents the mechancial geometry for a single positioner.
-    """
-    def __init__(self, posmodel):
-        self.posmodel = posmodel
-        self.keepoutP = PosPoly([])
-        self.keepoutT = PosPoly([])
-        self.R1 = 3.0
-        self.R2 = 3.0
-        self.xy0 = np.array([0,0])
-        self.tp0 = np.array([0,0])
-        self.tp_ranges = np.array([[-np.pi,np.pi],[0,np.pi]])
-        self.refresh_from_config()
-
-    def refresh_from_config(self):
-        """Reads latest versions of all configuration file offset, range, and
-        polygon definitions, and updates the positioner geometries accordingly.
-        """
-        keepoutP_points = [self.posmodel.state.read('KEEPOUT_PHI_X'),   self.posmodel.state.read('KEEPOUT_PHI_Y')]
-        keepoutT_points = [self.posmodel.state.read('KEEPOUT_THETA_X'), self.posmodel.state.read('KEEPOUT_THETA_Y')]
-        keepoutP_start_idx = self.posmodel.state.read('KEEPOUT_PHI_PT0')
-        keepoutT_start_idx = self.posmodel.state.read('KEEPOUT_THETA_PT0')
-        self.keepoutP = PosPoly(keepoutP_points, keepoutP_start_idx)
-        self.keepoutT = PosPoly(keepoutT_points, keepoutT_start_idx)
-        self.R1 = self.posmodel.state.read('LENGTH_R1')
-        self.R2 = self.posmodel.state.read('LENGTH_R2')
-        self.xy0 = np.array([self.posmodel.state.read('OFFSET_X'), self.posmodel.state.read('OFFSET_Y')])
-        self.tp0 = np.array([self.posmodel.state.read('OFFSET_T'), self.posmodel.state.read('OFFSET_P')])
-        self.tp_ranges = np.array(posmodel.trans.shaft_ranges('targetable'))
-
 class PosPoly(object):
     """Represents a polygonal envelope definition for a mechanical component of
     the fiber positioner.
     """
-
     def __init__(self, points, point0_index=0):
         points = np.array(points)
         self.points = np.append(points[:,np.arange(point0_index,len(points[0]))], points[:,np.arange(0,point0_index+1)], axis=1)
