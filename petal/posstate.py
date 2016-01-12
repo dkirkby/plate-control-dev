@@ -22,8 +22,6 @@ class PosState(object):
     """
 
     def __init__(self, unit_id=None, logging=False):
-        settings_directory = os.getcwd() + os.path.sep + 'pos_settings' + os.path.sep
-        self.logs_directory = os.getcwd() + os.path.sep + 'pos_logs' + os.path.sep
         self.logging = logging
         if unit_id != None:
             self.unit_basename = 'unit_' + str(unit_id)
@@ -31,9 +29,9 @@ class PosState(object):
         else:
             self.unit_basename = 'unit_TEMP'
             comment = 'Temporary settings file for software test purposes, not associated with a particular fiber positioner unit.'
-        unit_filename = settings_directory + self.unit_basename + '.conf'
+        unit_filename = pc.settings_directory + self.unit_basename + '.conf'
         if not(os.path.isfile(unit_filename)):
-            temp_filename = settings_directory + '_unit_settings_DEFAULT.conf' # read in the template file
+            temp_filename = pc.settings_directory + '_unit_settings_DEFAULT.conf' # read in the template file
             self.unit = configobj.ConfigObj(temp_filename,unrepr=True)
             self.unit.initial_comment = [comment,'']
             self.unit.filename = unit_filename
@@ -41,9 +39,9 @@ class PosState(object):
             self.unit.write()
         else:
             self.unit = configobj.ConfigObj(unit_filename,unrepr=True)
-        genl_filename = settings_directory + self.unit['GENERAL_SETTINGS_FILE']
+        genl_filename = pc.settings_directory + self.unit['GENERAL_SETTINGS_FILE']
         self.genl = configobj.ConfigObj(genl_filename,unrepr=True)
-        all_logs = os.listdir(self.logs_directory)
+        all_logs = os.listdir(pc.logs_directory)
         unit_logs = [x for x in all_logs if self.unit_basename in x]
         if unit_logs:
             unit_logs.sort(reverse=True)
@@ -115,7 +113,7 @@ class PosState(object):
     def log_path(self):
         """Convenience method for consistent formatting of file path to log file.
         """
-        return self.logs_directory + self.log_basename + '.csv'
+        return pc.logs_directory + self.log_basename + '.csv'
 
     @staticmethod
     def increment_suffix(s):

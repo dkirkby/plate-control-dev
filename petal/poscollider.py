@@ -9,7 +9,7 @@ class PosCollider(object):
     See DESI-0899 for geometry specifications, illustrations, and kinematics.
     """
     def __init__(self):
-        # load up a configobj from _collision_settings_DEFAULT.conf
+        # load up a configobj from _collision_settings_DEFAULT.conf, in pc.settings_directory
         self.timestep = 0.1 # [sec] time increment for collision checking (put in config file?)
         self.posmodels = []
         self.R1 = []
