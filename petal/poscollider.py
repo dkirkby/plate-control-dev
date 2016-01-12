@@ -9,6 +9,7 @@ class PosCollider(object):
     See DESI-0899 for geometry specifications, illustrations, and kinematics.
     """
     def __init__(self):
+        # load up a configobj from _collision_settings_DEFAULT.conf
         self.timestep = 0.1 # [sec] time increment for collision checking (put in config file?)
         self.posmodels = []
         self.R1 = []
@@ -16,8 +17,8 @@ class PosCollider(object):
         self.xy0 = []
         self.tp0 = []
         self.tp_ranges = []
-        self.Eo = 9.xxx
-        self.Ei = 6.xxx
+        self.Eo = 9.990
+        self.Ei = 6.800
         self.keepoutP = PosPoly([])
         self.keepoutT = PosPoly([])
         self.fixed_keepouts = [] # for GFA, petal edge, and any other fixed keepout locations
