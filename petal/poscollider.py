@@ -17,12 +17,16 @@ class PosCollider(object):
         filename = pc.settings_directory + configfile
         self.config = configobj.ConfigObj(filename,unrepr=True)
         self.posmodels = []
+        self.pos_neighbor_idxs = []
+        self.fixed_neighbor_idxs = []
         self.load_config_data()
 
     def add_positioners(self, posmodels):
-        """Add a positioner to the collider.
+        """Add a positioner to the collider object.
         """
         self.posmodels.append(posmodels)
+        self.pos_neighbor_idxs.append([]*length(posmodels))
+        self.fixed_neighbor_idxs.append([]*length(posmodels))
         self.load_config_data()
 
     def load_config_data(self):
@@ -30,30 +34,42 @@ class PosCollider(object):
         polygon definitions, and updates stored values accordingly.
         """
         self.timestep = self.config['TIMESTEP']
-        self.Eo = self.config['ENVELOPE_EO']
-        self.Ei = self.config['ENVELOPE_EI']
-        self.Ee = self.config['ENVELOPE_EE']
         self._load_keepouts()
-        self._load_posparams()
+        self._load_positioner_params()
+        self._load_circle_envelopes()
         for p in self.posmodels:
             self._identify_neighbors(p)
 
-    def collision_between(self):
+    def spacetime_collision_between(self):
         """Searches for collisions in time and space between two polygon geometries
         which are rotating according to argued move tables.
         """
         pass
 
+    def spatial_collision_between(self, p1, p2):
+        """Searches for collisions in space between two polygon geometries, p1 and
+        p2, which are PosPoly objects. Returns a bool, where true indicates a
+        collision.
+        """
+        pts1 = p1.points
+        pts2 = p2.points
+        if not(self._bounding_boxes_collide(pts1,pts2)):
+            return False
+        else:
+            return self._polygons_collide(pts1,pts2)
+
     def _load_keepouts(self):
+        """Read latest versions of all keepout geometries."""
         self.keepout_P = PosPoly(self.config['KEEPOUT_PHI'], self.config['KEEPOUT_PHI_PT0'])
         self.keepout_T = PosPoly(self.config['KEEPOUT_THETA'], self.config['KEEPOUT_THETA_PT0'])
         self.keepout_PTL = PosPoly(self.config['KEEPOUT_PTL'], self.config['KEEPOUT_PTL_PT0'])
-        GFA_temp = PosPoly(self.config['KEEPOUT_GFA'], self.config['KEEPOUT_GFA_PT0'])
-        GFA_temp = GFA_temp.rotated(self.config['KEEPOUT_GFA_ROT'])
-        GFA_temp = GFA_temp.translated(self.config['KEEPOUT_GFA_X0'],self.config['KEEPOUT_GFA_X0'])
-        self.keepout_GFA = PosPoly(GFA_temp)
+        self.keepout_GFA = PosPoly(self.config['KEEPOUT_GFA'], self.config['KEEPOUT_GFA_PT0'])
+        self.keepout_GFA = self.keepout_GFA.rotated(self.config['KEEPOUT_GFA_ROT'])
+        self.keepout_GFA = self.keepout_GFA.translated(self.config['KEEPOUT_GFA_X0'],self.config['KEEPOUT_GFA_Y0'])
+        self.fixed_neighbor_keepouts = [self.keepout_PTL, self.keepout_GFA]
 
-    def _load_posparams(self):
+    def _load_positioner_params(self):
+        """Read latest versions of all positioner parameters."""
         n = len(self.posmodels)
         self.R1 = np.zeros(n)
         self.R2 = np.zeros(n)
@@ -67,9 +83,101 @@ class PosCollider(object):
             self.tp0[:,i] = np.array([self.posmodels[i].state.read('OFFSET_T'), self.posmodels[i].state.read('OFFSET_P')])
             self.tp_ranges[i] = np.array(self.posmodels[i].trans.shaft_ranges('targetable'))
 
+    def _load_circle_envelopes(self):
+        """Read latest versions of all circular envelopes, including outer clear rotation
+        envelope (Eo), inner clear rotation envelope (Ei) and extended-phi clear rotation
+        envelope (Ee).
+        """
+        self.Eo = self.config['ENVELOPE_EO']  # outer clear rotation envelope
+        self.Ei = self.config['ENVELOPE_EI']  # inner clear rotation envelope
+        self.Ee = self._max_extent * 2        # extended-phi clear rotation envelope
+        self.Eo_poly = PosPoly(circle_poly_points(self.Eo, self.config['RESOLUTION_EO']))
+        self.Ei_poly = PosPoly(circle_poly_points(self.Ei, self.config['RESOLUTION_EI']))
+        self.Ee_poly = PosPoly(circle_poly_points(self.Ee, self.config['RESOLUTION_EE']))
+        self.Eo_polys = []
+        self.Ei_polys = []
+        self.Ee_polys = []
+        for i in range(len(self.posmodels)):
+            x = self.xy0[0,i]
+            y = self.xy0[1,i]
+            self.Eo_polys.append(self.Eo_poly.translated(x,y))
+            self.Ei_polys.append(self.Ei_poly.translated(x,y))
+            self.Ee_polys.append(self.Ee_poly.translated(x,y))
+        self.ferrule_diam = self.config['FERRULE_DIAM']
+        self.ferrule_poly = PosPoly(circle_poly_points(self.ferrule_diam, self.config['FERRULE_RESLN']))
+
     def _identify_neighbors(self, posmodel):
-        self.pos_neighbors = []
-        self.fixed_neighbors = []
+        """Find all neighbors which can possibly collide with a given posmodel."""
+        p1 = self.posmodels.index(posmodel)
+        Ee1 = self.Ee_poly.translated(xy0[0,p1], xy0[1,p1])
+        for p2 in range(len(self.posmodels)):
+            Ee2 = self.Ee_poly.translated(xy0[0,p2], xy0[1,p2])
+            if not(p1 == p2) and spatial_collision_between(Ee1,Ee2):
+                self.pos_neighbor_idxs[p1].append(p2)
+        for p2 in range(len(self.fixed_neighbor_keepouts)):
+            if spatial_collision_between(Ee1,self.fixed_neighbor_keepouts[p2]):
+                self.fixed_neighbor_idxs[p1].append(p2)
+
+    def _max_extent(self):
+        """Calculation of max radius of keepout for a positioner with fully-extended phi arm."""
+        extended_phi = self.keepout_P.translated(np.max(self.R1),0) # assumption here that phi arm polygon defined at 0 deg angle
+        return max(np.sqrt(np.sum(extended_phi**2, axis=0)))
+
+    @staticmethod
+    def _bounding_boxes_collide(pts2,pts2):
+        """Check whether the rectangular bounding boxes of two polygons collide.
+        pts1 and pts2 are 2xN numpy arrays of the polygon (x,y) vertices (closed polygon).
+        Returns True if the bounding boxes collide, False if they do not. Intended as
+        a fast check, to enhance speed of other collision detection functions.
+        """
+        if   np.max(pts1[0]) < np.min(pts2[0]):
+            return False
+        elif np.max(pts1[1]) < np.min(pts2[1]):
+            return False
+        elif np.max(pts2[0]) < np.min(pts1[0]):
+            return False
+        elif np.max(pts2[1]) < np.min(pts1[1]):
+            return False
+        else:
+            return True
+
+    @staticmethod
+    def _polygons_collide(pts1,pts2):
+        """Check whether two closed polygons collide.
+        pts1 and pts2 are 2xN numpy arrays of the polygon (x,y) vertices (closed polygon).
+        Returns true if the polygons intersect, False if they do not.
+        The algorithm is by detecting intersection of line segments, therefore the case of
+        a small polygon completely enclosed by a larger polygon will return False. Not checking
+        for this condition admittedly breaks some conceptual logic, but this case is not
+        anticipated to occur given the DESI petal geometry, and speed is at a premium.
+        """
+        for i in range(len(pts1[:-1])):
+            A1 = np.array([pts1[0,i],   pts1[1,i]])
+            A2 = np.array([pts1[0,i+1], pts1[1,i+1]])
+            for j in range(len(pts2[:-1])):
+                B1 = np.array([pts2[0,j],   pts2[1,j]])
+                B2 = np.array([pts2[0,j+1], pts2[1,j+1]])
+                if self._segments_intersect(A1,A2,B1,B2):
+                    return True
+        return False
+
+    @staticmethod
+    def _segments_intersect(A1,A2,B1,B2):
+        """Checks whether two 2d line segments intersect. The endpoints for segments
+        A and B are each a pair of (x,y) coordinates.
+        """
+        dx_A = A2[0] - A1[0]
+        dy_A = A2[1] - A1[1]
+        dx_B = B2[0] - B1[0]
+        dy_B = B2[1] - B1[1]
+        delta = dx_B * dy_A - dy_B * dx_A
+        if delta == 0:
+            return False  # parallel segments
+        s = (dx_A * (B1[1] - A1[1]) + dy_A * (A1[0] - B1[0])) / delta
+        t = (dx_B * (A1[1] - B1[1]) + dy_B * (B1[0] - A1[0])) / (-delta)
+        return (0 <= s <= 1) and (0 <= t <= 1)
+
+
 
 class PosPoly(object):
     """Represents a polygonal envelope definition for a mechanical component of
@@ -79,17 +187,38 @@ class PosPoly(object):
         points = np.array(points)
         self.points = np.append(points[:,np.arange(point0_index,len(points[0]))], points[:,np.arange(0,point0_index+1)], axis=1)
 
-    def rotated(self, angle):
-        """Returns the polygon rotated by angle (unit degrees)."""
-        return np.dot(rotmat2D_deg(angle), self.points)
+    def rotated(self, angle, getobject=False):
+        """Returns a copy of the polygon object, with points rotated by angle (unit degrees)."""
+        return PosPoly(np.dot(rotmat2D_deg(angle), self.points))
 
     def translated(self, x, y):
-        """Returns the polygon translaged by distance (x,y)."""
-        return self.points + np.array([[x],[y]])
+        """Returns a copy of the polygon object, with points translated by distance (x,y)."""
+        return PosPoly(self.points + np.array([[x],[y]]))
 
 # 2D rotation matrix constructors
+@staticmethod
 def rotmat2D_rad(angle):
+    """Return the 2d rotation matrix for an angle given in radians."""
     return np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
 
+@staticmethod
 def rotmat2D_deg(angle):
+    """Return the 2d rotation matrix for an angle given in degrees."""
     return rotmat2D_rad(np.deg2rad(angle))
+
+@staticmethod
+def circle_poly_points(diameter, npts, outside=True):
+    """Constuct a polygon approximating a circle of a given diameter, with a
+    given number of points. The polygon's segments are tangent to the circle if
+    the optional argument 'outside' is true. If 'outside' is false, then the
+    segment points lie on the circle.
+    """
+    alpha = np.linspace(0, 2 * np.pi, npts + 1)[0:-1]
+    if outside:
+        half_angle = alpha[0]/2
+        points_radius = diameter/2 / np.cos(half_angle)
+    else:
+        points_radius = diameter/2
+    x = points_radius * np.cos(alpha)
+    y = points_radius * np.sin(alpha)
+    return np.array([x,y])
