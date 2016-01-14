@@ -49,7 +49,7 @@ class PosArrayMaster(object):
             else:
                 self.schedule.request_target(posmodel, commands[i], vals1[i], vals2[i])
 
-    def request_direct_dtdp(self, pos, dt, dp, cmd_prefix=''):
+    def request_direct_dtdp(self, pos, dt, dp, cmd_prefix='', override_prev_settings=True):
         """Input a list of positioners and corresponding move targets to the schedule.
         This method is for direct requests of rotations by the theta and phi shafts.
         This method is generally recommended only for expert usage.

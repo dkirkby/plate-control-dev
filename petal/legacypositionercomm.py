@@ -67,9 +67,8 @@ class LegacyPositionerComm(object):
                 else:
                     print('bad speed_mode_P')
                 self.move_motors(self.master.get(tbl['posid'],'BUS_ID'),cruise_steps[i],creep_steps[i])
-                #print('Moving ' + str(self.master.get(tbl['posid'],'BUS_ID')) + ' by...  Tcruise:' + str(cruise_steps[i][T]) + '  Tcreep:' + str(creep_steps[i][T]) + '  Pcruise:' + str(cruise_steps[i][P]) + '  Pcreep:' + str(creep_steps[i][P]))
-                #time.sleep(tbl['move_time'][i])
-                #time.sleep(tbl['postpause'][i])
+                if not(self.send_cmd_off):
+                    time.sleep(tbl['postpause'][i])
 
 # The items below are all specific to legacy firmware, and not for general future usage or copying.
     def set_motor_params(self, busid, creep_period, curr_spin_up_down, curr_cruise, curr_creep, curr_hold):
@@ -178,12 +177,12 @@ class LegacyPositionerComm(object):
                     cruise_time = (abs(steps[i][j]) * self.stepsize_cruise) / self.speed_cruise
                     this_time[j] = cruise_time + (steps[i][j] != 0) * 4 * self.spinup_distance / self.speed_cruise
                     this_distance_moved[j] = steps[i][j] * self.stepsize_cruise + numpy.sign(steps[i][j]) * 2 * self.spinup_distance
-                elif types[i][j] == 'creep_cw':
+                elif types[i][j] == 'creep_ccw':
                     J = j*2 # to put into correct places in the creep_amts array
                     creep_amts[J] = abs(steps[i][j])
                     this_time[j] = abs(steps[i][j]) * self.stepsize_creep / self.speed_creep
                     this_distance_moved[j] = -steps[i][j] * self.stepsize_creep
-                elif types[i][j] == 'creep_ccw':
+                elif types[i][j] == 'creep_cw':
                     J = j*2 + 1  # to put into correct places in the creep_amts array
                     creep_amts[J] = abs(steps[i][j])
                     this_time[j] = abs(steps[i][j]) * self.stepsize_creep / self.speed_creep
@@ -195,7 +194,9 @@ class LegacyPositionerComm(object):
             deg = '\u00b0'
             print('time: {:.3f}   motor1: {:9s} {:8.1f}{}   motor0: {:9s} {:8.1f}{}'.format(est_time[i],types[i][1],distance_moved[i][1],deg,types[i][0],distance_moved[i][0],deg))
             self.send_cmd(bus_id, 'Execute_Move', exec_bytes) # send command to driver, and start timer for (assumed) completion
-            #time.sleep(est_time[i] + self.est_time_buffer) # WAIT FOR MOVE TO COMPLETE (or may handle pausing at a higher level)
+            if not(self.send_cmd_off):
+                time.sleep(est_time[i])
+                time.sleep(self.est_time_buffer)
 
         # return the total distance moved
         total_distance = [0,0]
@@ -404,7 +405,7 @@ class LawicellCANUSB(object):
     # This class is based on a brief interface manual ( describing ASCII
     # format of CAN commands ) posted by the cale vendor. See www.canusb.com
     """
-    read_timeout = 0.15  # sec
+    read_timeout = 10  # sec
     read_poll_period = 0.001  # sec
     CAN_speed = 'S6'  # currently motor driver board requires 'S6'; Lawicell allows 'S0' thru 'S8' = [ 10,20,50,100,125,250,500,800,1000] Kbit
 
@@ -425,6 +426,7 @@ class LawicellCANUSB(object):
             self.read()  # clear out any bytes in the serial port buffer
         else:
             warnings.warn('Bad response when doing version check.')
+        self.read_status_flags() # for debugging purposes, break here
 
 
     def send_CAN_frame(self, hexid, hexbytes):
@@ -466,31 +468,38 @@ class LawicellCANUSB(object):
         return response
 
     def read_status_flags(self):
-        # 1. CAN receive FIFO queue full
-        # 2. CAN transmit FIFO queue full
-        # 3. Error warning (EI)
-        # 4. Data overrun (DOI)
-        # 5. not used
-        # 6. Error passive (EPI)
-        # 7. Arbitration lost (ALI)
-        # 8. Bus error (BEI)
+        nbits = 8
+        descriptions = ['']*nbits
+        descriptions[0] = 'CAN receive FIFO queue full'
+        descriptions[1] = 'CAN transmit FIFO queue full'
+        descriptions[2] = 'Error warning (EI)'
+        descriptions[3] = 'Data overrun (DOI)'
+        descriptions[4] = 'not used'
+        descriptions[5] = 'Error passive (EPI)'
+        descriptions[6] = 'Arbitration lost (ALI)'
+        descriptions[7] = 'Bus error (BEI)'
         self.initCANUSB()
         response = self.writeread('F')
         self.closeCANUSB()
-        bool1 = []
+        boolean = []
+        description = []
 
-        if str(response[0]) == 'F':
-            d = [int(response[0], 16), int(response[1], 16)]
-            b = ['{0:b}'.format(d[0]), '{0:b}'.format(d[1])]
-            for i in range(1, len(b)):
-                if b[i] == 1:
-                    bool1[i] = 1
-        return bool
+        if chr(response[0]) == 'F':
+            b = bin(response[2])[2:].zfill(nbits)
+            i = 0
+            for flag in b:
+                if flag == '0':
+                    boolean.append(False)
+                else:
+                    boolean.append(True)
+                    description.append(descriptions[i])
+                i += 1
+        return boolean, description
 
     def writeread(self, str1):
-        self.write(str1)
+        self.write(str1 + '\r')
         ticstart = time.clock()
-        while (time.clock() - ticstart) <= self.read_timeout: # TODO : try to figure out how to know that the positionner has already done the mvt
+        while not(self.port.inWaiting()) and (time.clock() - ticstart) <= self.read_timeout:
             time.sleep(self.read_poll_period)
         response = self.read()
         return response
@@ -507,13 +516,12 @@ class LawicellCANUSB(object):
         response = ''
         if nbytes > 0:
             response = self.port.read(nbytes)
-            if len(response) > 1:
-                response = response[0]
-        if response:
-            if ord(response) == 13:  # ascii carriage return
-                response = ' '
-            if ord(response) == 7:  # ascii bell
-                response = ' '
+            response_last_char = response[-1]
+        if response and len(response) > 1:
+            if response_last_char == 13:  # ascii carriage return
+                response = response[:-1]
+            if response_last_char == 7:  # ascii bell
+                response = response[:-1]
                 print('CANUSB returned error 7 \n')
         return response
 

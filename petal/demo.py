@@ -12,8 +12,8 @@ m = posarraymaster.PosArrayMaster(posids)
 
 # initialization of communications
 # these commands are very specific to the hacked-together LegacyPositionerComm
-comm = legacypositionercomm.LegacyPositionerComm('COM6')
-comm.send_cmd_off = True # used to speed up software debugging / not actually send commands out over hardware
+comm = legacypositionercomm.LegacyPositionerComm('COM7')
+comm.send_cmd_off = False # used to speed up software debugging / not actually send commands out over hardware
 comm.master = m
 m.comm = comm
 
@@ -33,6 +33,7 @@ should_move_dtdp   = True
 # run the various move types
 if should_home:
     print('\nMOVE: homing')
+    m.set(key='CREEP_TO_LIMITS',value=True)
     m.request_homing(posids)
     m.schedule_send_and_execute_moves()
 else:

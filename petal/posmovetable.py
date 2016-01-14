@@ -100,14 +100,12 @@ class PosMoveTable(object):
 
     def extend(self, other_move_table):
         """Extend one move table with another.
-        Flags for antibacklash and creep settings are inherited from other_move_table.
+        Flags for antibacklash, creep, and limits remain the same as self, so if
+        you want other_move_table to override these flags, this must be explicitly
+        done separately.
         """
         for otherrow in other_move_table.rows:
             self.rows.append(otherrow.copy())
-        self.should_antibacklash = other_move_table.should_antibacklash
-        self.should_final_creep  = other_move_table.should_final_creep
-        self.allow_exceed_limits = other_move_table.allow_exceed_limits
-        self.allow_cruise        = other_move_table.allow_cruise
 
     # internal methods
     def _calculate_true_moves(self):
