@@ -2,6 +2,19 @@ import numpy as np
 import posconstants as pc
 import postransforms
 import configobj
+import enum
+
+class case(enum.Enum):
+    """Enumeration of collision cases. The I, II, and III cases are described in
+    detail in DESI-0899. Type I is specifically enumerated equal to zero, so that
+    the "no collision" case can be tersely checked.
+    """
+    I    = 0  # no collision
+    II   = 1  # phi arm against neighboring phi arm
+    IIIA = 2  # phi arm of positioner 'A' against neighbor 'B' central body
+    IIIB = 3  # phi arm of positioner 'B' against neighbor 'A' central body
+    GFA  = 4  # phi arm against the GFA fixed keepout envelope
+    PTL  = 5  # phi arm against the Petal edge keepout envelope
 
 class PosCollider(object):
     """PosCollider contains geometry definitions for mechanical components of the
@@ -18,15 +31,16 @@ class PosCollider(object):
         self.config = configobj.ConfigObj(filename,unrepr=True)
         self.posmodels = []
         self.pos_neighbor_idxs = []
-        self.fixed_neighbor_idxs = []
+        self.fixed_neighbor_cases = []
         self.load_config_data()
 
     def add_positioners(self, posmodels):
-        """Add a positioner to the collider object.
+        """Add a positioner or multiple positioners to the collider object.
         """
-        self.posmodels.append(posmodels)
-        self.pos_neighbor_idxs.append([]*length(posmodels))
-        self.fixed_neighbor_idxs.append([]*length(posmodels))
+        (pm, was_not_list) = pc.listify(posmodels, keep_flat=True)
+        self.posmodels.extend(pm)
+        self.pos_neighbor_idxs.extend([[]]*length(pm))
+        self.fixed_neighbor_cases.extend([[]]*length(pm))
         self.load_config_data()
 
     def load_config_data(self):
@@ -40,19 +54,130 @@ class PosCollider(object):
         for p in self.posmodels:
             self._identify_neighbors(p)
 
-    def spacetime_collision_between(self):
-        """Searches for collisions in time and space between two polygon geometries
-        which are rotating according to argued move tables.
+    def pos_pos_collision(self):
+        """Searches for collisions in time and space between two positioners
+        which are rotating according to the argued tables.
+
+            p1, p2          ...  element indices for the two positioners corresponding to the list self.posmodels
+            table1, table2  ...  dictionaries as described below
+
+        When comparing a positioner to a fixed geometry, p1 indexes into
+        geometry, and no argument should be given for table2.
+
+        The input table dictionaries must contain the following fields:
+
+            'nrows'     : number of rows in the lists below (all must be the same length)
+            'dT'        : list of theta rotation distances in degrees
+            'dP'        : list of phi rotation distances in degrees
+            'Tdot'      : list of theta rotation speeds in deg/sec
+            'Pdot'      : list of phi rotation speeds in deg/sec
+            'prepause'  : list of prepause (before the rotations begin) values in seconds
+            'move_time' : list of durations of rotations in seconds, approximately equals max(dT/Tdot,dP/Pdot), but calculated more exactly for the physical hardware
+            'prepause'  : list of postpause (after the rotations end) values in seconds
+
+        The first row of 'dT' and 'dP' should be the initial (theta,phi) position.
         """
         pass
 
-    def spatial_collision_between(self, p1, p2):
+    def pos_fixed_collision(self):
+        pass
+
+    def spacetime_collision_between(self, p1, p2, table1, table2=None):
+
+        pass
+
+    def spatial_collision_between_positioners(self, idxA, idxB, obsTP_A, obsTP_B):
+        """Searches for collisions in space between two fiber positioners.
+
+            idxA, idxB        ...  indices of the positioners in the list self.posmodels
+            obsTP_A, obsTP_B  ...  (theta,phi) positions of the axes for positioners 1 and 2
+
+        obsTP_A and obsTP_B are in the (obsT,obsP) coordinate system, as defined in
+        PosTransforms.
+
+        The return is an enumeration of type "case", indicating what kind of collision
+        was first detected, if any.
+        """
+        if obsTP_A[1] >= self.Eo_phi and obsTP_B[1] >= self.Eo_phi:
+            return case.I
+        elif obsTP_A[1] < self.Eo_phi and obsTP_B[1] >= self.Ei_phi: # check case IIIA
+            if self._case_III_collision(idxA, idxB, obsTP_A, obsTP_B[0]):
+                return case.IIIA
+            else:
+                return case.I
+        elif obsTP_B[1] < self.Eo_phi and obsTP_A[1] >= self.Ei_phi: # check case IIIB
+            if self._case_III_collision(idxB, idxA, obsTP_B, obsTP_A[0]):
+                return case.IIIB
+            else:
+                return case.I
+        else: # check cases II and III
+            if self._case_III_collision(idxA, idxB, obsTP_A, obsTP_B[0]):
+                return case.IIIA
+            elif self._case_III_collision(idxB, idxA, obsTP_B, obsTP_A[0]):
+                return case.IIIB
+            elif self._case_II_collision(idx1, idx2, obsTP_A, obsTP_B):
+                return case.II
+            else:
+                return case.I
+
+    def spatial_collision_between_pos_and_fixed(self, idx, obsTP):
+        """Searches for collisions in space between a fiber positioner and all
+        fixed keepout envelopes.
+
+            idx         ...  index of the positioner in the list self.posmodels
+            obsTP       ...  (theta,phi) position of the axes of the positioner
+
+        obsTP is in the (obsT,obsP) coordinate system, as defined in
+        PosTransforms.
+
+        The return is an enumeration of type "case", indicating what kind of collision
+        was first detected, if any.
+        """
+        if self.fixed_neighbor_cases[idx]:
+            poly1 = self.place_phi_arm(idx,obsTP)
+            for fixed_case in self.fixed_neighbor_cases[idx]:
+                poly2 = self.fixed_neighbor_keepouts[fixed_case]
+                if self._spatial_collision_between_polygons(poly1,poly2):
+                    return fixed_case
+        return case.I
+
+    def place_phi_arm(self, idx, obsTP):
+        """Rotates and translates the phi arm to position defined by the positioner's
+        xy0 and the argued obsTP (theta,phi) angles.
+        """
+        poly = self.keepout_P.rotated(obsTP[1])
+        poly = poly.translated(self.R1[idx], 0)
+        poly = poly.rotated(obsTP[0])
+        poly = poly.translated(self.xy0[0,idx], self.xy0[1,idx])
+        return poly
+
+    def place_central_body(self, idx, obsT):
+        """Rotates and translates the central body of positioner identified by idx
+        to it's xy0 and the argued obsT theta angle.
+        """
+        poly = self.keepout_T.rotated(obsT)
+        poly = poly.translated(self.xy0[0,idx], self.xy0[1,idx])
+        return poly
+
+    def _case_II_collision(idx1, idx2, tp1, tp2):
+        """Search for case II collision, positioner 1 arm against positioner 2 arm."""
+        poly1 = self.place_phi_arm(idx1, tp1)
+        poly2 = self.place_phi_arm(idx2, tp2)
+        return self._spatial_collision_between_polygons(poly1,poly2)
+
+    def _case_III_collision(idx1, idx2, tp1, t2):
+        """Search for case III collision, positioner 1 arm against positioner 2 central body."""
+        poly1 = self.place_phi_arm(idx1, tp1)
+        poly2 = self.place_central_body(idx2, t2)
+        return self._spatial_collision_between_polygons(poly1,poly2)
+
+    def _spatial_collision_between_polygons(self, poly1, poly2):
         """Searches for collisions in space between two polygon geometries, p1 and
         p2, which are PosPoly objects. Returns a bool, where true indicates a
         collision.
         """
-        pts1 = p1.points
-        pts2 = p2.points
+        pts1 = poly1.points
+        pts2 = poly2.points
         if not(self._bounding_boxes_collide(pts1,pts2)):
             return False
         else:
@@ -66,7 +191,7 @@ class PosCollider(object):
         self.keepout_GFA = PosPoly(self.config['KEEPOUT_GFA'], self.config['KEEPOUT_GFA_PT0'])
         self.keepout_GFA = self.keepout_GFA.rotated(self.config['KEEPOUT_GFA_ROT'])
         self.keepout_GFA = self.keepout_GFA.translated(self.config['KEEPOUT_GFA_X0'],self.config['KEEPOUT_GFA_Y0'])
-        self.fixed_neighbor_keepouts = [self.keepout_PTL, self.keepout_GFA]
+        self.fixed_neighbor_keepouts = {case.PTL : self.keepout_PTL, case.GFA : self.keepout_GFA}
 
     def _load_positioner_params(self):
         """Read latest versions of all positioner parameters."""
@@ -88,6 +213,8 @@ class PosCollider(object):
         envelope (Eo), inner clear rotation envelope (Ei) and extended-phi clear rotation
         envelope (Ee).
         """
+        self.Eo_phi = self.config['PHI_EO']   # angle above which phi is guaranteed to be within envelope Eo
+        self.Ei_phi = self.config['PHI_EI']   # angle above which phi is guaranteed to be within envelope Ei
         self.Eo = self.config['ENVELOPE_EO']  # outer clear rotation envelope
         self.Ei = self.config['ENVELOPE_EI']  # inner clear rotation envelope
         self.Ee = self._max_extent * 2        # extended-phi clear rotation envelope
@@ -114,9 +241,9 @@ class PosCollider(object):
             Ee2 = self.Ee_poly.translated(xy0[0,p2], xy0[1,p2])
             if not(p1 == p2) and spatial_collision_between(Ee1,Ee2):
                 self.pos_neighbor_idxs[p1].append(p2)
-        for p2 in range(len(self.fixed_neighbor_keepouts)):
+        for p2 in self.fixed_neighbor_keepouts.keys():
             if spatial_collision_between(Ee1,self.fixed_neighbor_keepouts[p2]):
-                self.fixed_neighbor_idxs[p1].append(p2)
+                self.fixed_neighbor_cases[p1].append(p2)
 
     def _max_extent(self):
         """Calculation of max radius of keepout for a positioner with fully-extended phi arm."""
