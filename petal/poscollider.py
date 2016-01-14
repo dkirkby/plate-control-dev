@@ -1,5 +1,7 @@
 import numpy as np
+import posconstants as pc
 import postransforms
+import configobj
 
 class PosCollider(object):
     """PosCollider contains geometry definitions for mechanical components of the
@@ -8,49 +10,66 @@ class PosCollider(object):
 
     See DESI-0899 for geometry specifications, illustrations, and kinematics.
     """
-    def __init__(self):
+    def __init__(self, configfile=''):
         # load up a configobj from _collision_settings_DEFAULT.conf, in pc.settings_directory
-        self.timestep = 0.1 # [sec] time increment for collision checking (put in config file?)
+        if not(configfile):
+            configfile = '_collision_settings_DEFAULT.conf'
+        filename = pc.settings_directory + configfile
+        self.config = configobj.ConfigObj(filename,unrepr=True)
         self.posmodels = []
-        self.R1 = []
-        self.R2 = []
-        self.xy0 = []
-        self.tp0 = []
-        self.tp_ranges = []
-        self.Eo = 9.990
-        self.Ei = 6.800
-        self.keepoutP = PosPoly([])
-        self.keepoutT = PosPoly([])
-        self.fixed_keepouts = [] # for GFA, petal edge, and any other fixed keepout locations
+        self.load_config_data()
 
-    def add_positioner(self, posmodel):
+    def add_positioners(self, posmodels):
         """Add a positioner to the collider.
         """
-        #xxx self.posgeoms.append(PosGeom(posmodel))
+        self.posmodels.append(posmodels)
+        self.load_config_data()
 
-    def refresh_geometry_configs(self):
+    def load_config_data(self):
         """Reads latest versions of all configuration file offset, range, and
-        polygon definitions, and updates the positioner geometries accordingly.
+        polygon definitions, and updates stored values accordingly.
         """
-        for p in posgeoms:
-            # loopify
-            keepoutP_points = [self.posmodel.state.read('KEEPOUT_PHI_X'),   self.posmodel.state.read('KEEPOUT_PHI_Y')]
-            keepoutT_points = [self.posmodel.state.read('KEEPOUT_THETA_X'), self.posmodel.state.read('KEEPOUT_THETA_Y')]
-            keepoutP_start_idx = self.posmodel.state.read('KEEPOUT_PHI_PT0')
-            keepoutT_start_idx = self.posmodel.state.read('KEEPOUT_THETA_PT0')
-            self.keepoutP = PosPoly(keepoutP_points, keepoutP_start_idx)
-            self.keepoutT = PosPoly(keepoutT_points, keepoutT_start_idx)
-            self.R1 = self.posmodel.state.read('LENGTH_R1')
-            self.R2 = self.posmodel.state.read('LENGTH_R2')
-            self.xy0 = np.array([self.posmodel.state.read('OFFSET_X'), self.posmodel.state.read('OFFSET_Y')])
-            self.tp0 = np.array([self.posmodel.state.read('OFFSET_T'), self.posmodel.state.read('OFFSET_P')])
-            self.tp_ranges = np.array(posmodel.trans.shaft_ranges('targetable'))
+        self.timestep = self.config['TIMESTEP']
+        self.Eo = self.config['ENVELOPE_EO']
+        self.Ei = self.config['ENVELOPE_EI']
+        self.Ee = self.config['ENVELOPE_EE']
+        self._load_keepouts()
+        self._load_posparams()
+        for p in self.posmodels:
+            self._identify_neighbors(p)
 
     def collision_between(self):
         """Searches for collisions in time and space between two polygon geometries
         which are rotating according to argued move tables.
         """
         pass
+
+    def _load_keepouts(self):
+        self.keepout_P = PosPoly(self.config['KEEPOUT_PHI'], self.config['KEEPOUT_PHI_PT0'])
+        self.keepout_T = PosPoly(self.config['KEEPOUT_THETA'], self.config['KEEPOUT_THETA_PT0'])
+        self.keepout_PTL = PosPoly(self.config['KEEPOUT_PTL'], self.config['KEEPOUT_PTL_PT0'])
+        GFA_temp = PosPoly(self.config['KEEPOUT_GFA'], self.config['KEEPOUT_GFA_PT0'])
+        GFA_temp = GFA_temp.rotated(self.config['KEEPOUT_GFA_ROT'])
+        GFA_temp = GFA_temp.translated(self.config['KEEPOUT_GFA_X0'],self.config['KEEPOUT_GFA_X0'])
+        self.keepout_GFA = PosPoly(GFA_temp)
+
+    def _load_posparams(self):
+        n = len(self.posmodels)
+        self.R1 = np.zeros(n)
+        self.R2 = np.zeros(n)
+        self.xy0 = np.zeros((2,n))
+        self.tp0 = np.zeros((2,n))
+        self.tp_ranges = [[]]*n
+        for i in range(len(self.posmodels)):
+            self.R1[i] = self.posmodels[i].state.read('LENGTH_R1')
+            self.R2[i] = self.posmodels[i].state.read('LENGTH_R2')
+            self.xy0[:,i] = np.array([self.posmodels[i].state.read('OFFSET_X'), self.posmodels[i].state.read('OFFSET_Y')])
+            self.tp0[:,i] = np.array([self.posmodels[i].state.read('OFFSET_T'), self.posmodels[i].state.read('OFFSET_P')])
+            self.tp_ranges[i] = np.array(self.posmodels[i].trans.shaft_ranges('targetable'))
+
+    def _identify_neighbors(self, posmodel):
+        self.pos_neighbors = []
+        self.fixed_neighbors = []
 
 class PosPoly(object):
     """Represents a polygonal envelope definition for a mechanical component of
