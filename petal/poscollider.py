@@ -54,15 +54,13 @@ class PosCollider(object):
         for p in self.posmodels:
             self._identify_neighbors(p)
 
-    def pos_pos_collision(self):
+    def spacetime_collision_between_positioners(self, idxA, idxB, init_obsTP_A, init_obsTP_B, tableA, tableB):
         """Searches for collisions in time and space between two positioners
         which are rotating according to the argued tables.
 
-            p1, p2          ...  element indices for the two positioners corresponding to the list self.posmodels
-            table1, table2  ...  dictionaries as described below
-
-        When comparing a positioner to a fixed geometry, p1 indexes into
-        geometry, and no argument should be given for table2.
+            idxA, idxB                  ...  indices of the positioners in the list self.posmodels
+            init_obsTP_A, init_obsTP_B  ...  starting (theta,phi) positions, in the obsTP coordinate systems
+            tableA, tableB              ...  dictionaries defining rotation schedules as described below
 
         The input table dictionaries must contain the following fields:
 
@@ -75,16 +73,60 @@ class PosCollider(object):
             'move_time' : list of durations of rotations in seconds, approximately equals max(dT/Tdot,dP/Pdot), but calculated more exactly for the physical hardware
             'prepause'  : list of postpause (after the rotations end) values in seconds
 
-        The first row of 'dT' and 'dP' should be the initial (theta,phi) position.
+        The return is an enumeration of type "case", indicating what kind of collision
+        was first detected, if any. Also returns the time at which the collision occurred
+        (if any). If there was no collision, the time returned is inf.
         """
-        pass
+        time_start = 0
+        time_end = 0
+        tables = [tableA, tableB]
+        TPnow = [init_obsTP_A, init_obsTP_B]
+        for table in tables:
+            table['start_prepause'] = [time_start]
+            table['start_move'] = []
+            table['start_postpause'] = []
+            for row in range(table['nrows']):
+                table['start_move'].append(table['start_prepause'][row] + table['prepause'][row])
+                table['start_postpause'].append(table['start_move'][row] + table['move_time'][row])
+                time_end_temp = table['start_postpause'][row] + table['postpause'][row]
+                if row < table['nrows'] - 1:
+                   table['start_prepause'].append(time_end_temp)
+            time_end = np.max(time_end, time_end_temp)
+        time_domain = np.linspace(time_start, time_end, np.round(time_end/self.timestep) + 1)
+        rows = [0,0]
+        stage = ['prepause','prepause']
+        stage_now = [0,0]
+        stage_start = [0,0]
+        for now in time_domain:
+            for i in range(len(tables)):
+                if stage[i] == 'prepause' and now >= tables[i]['start_move'][rows[i]]:
+                    stage[i] = 'move'
+                if stage[i] == 'move' and now >= tables[i]['start_postpause'][rows[i]]:
+                    stage[i] = 'postpause'
+                if stage[i] == 'postpause' and i < len(rows) - 1:
+                    if now >= tables[i]['start_prepause'][rows[i]+1]:
+                        stage[i] = 'prepause'
+                        rows[i] += 1
+                stage_start[i] = tables[i]['start_' + stage[i]][rows[i]]
+                stage_now[i] = now - stage_start[i]
+                if stage[i] == 'move':
+                    TPnow[i][0] = np.min(stage_now[i] * tables[i]['Tdot'][rows[i]], tables[i]['dT'][rows[i]])
+                    TPnow[i][1] = np.min(stage_now[i] * tables[i]['Pdot'][rows[i]], tables[i]['dP'][rows[i]])
+            collision_case = self.spatial_collision_between_positioners(idxA, idxB, TPnow[0], TPnow[1])
+            if collision_case:
+                return collision_case, now
+        return case.I, now
 
-    def pos_fixed_collision(self):
-        pass
+    def spacetime_collision_with_fixed(self, idx, init_obsTP, table):
+        time_start = 0
+        time_end = 0
+        TPnow = init_obsTP
 
-    def spacetime_collision_between(self, p1, p2, table1, table2=None):
 
-        pass
+            collision_case = self.spatial_collision_with_fixed(idx, TPnow)
+            if collision_case:
+                return collision_case, now
+        return case.I, now
 
     def spatial_collision_between_positioners(self, idxA, idxB, obsTP_A, obsTP_B):
         """Searches for collisions in space between two fiber positioners.
@@ -120,7 +162,7 @@ class PosCollider(object):
             else:
                 return case.I
 
-    def spatial_collision_between_pos_and_fixed(self, idx, obsTP):
+    def spatial_collision_with_fixed(self, idx, obsTP):
         """Searches for collisions in space between a fiber positioner and all
         fixed keepout envelopes.
 
