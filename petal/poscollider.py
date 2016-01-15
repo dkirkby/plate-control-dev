@@ -54,13 +54,27 @@ class PosCollider(object):
         for p in self.posmodels:
             self._identify_neighbors(p)
 
-    def spacetime_collision_between_positioners(self, idxA, idxB, init_obsTP_A, init_obsTP_B, tableA, tableB):
+    def spactime_collision_between_positioners(self, idxA, init_obsTP_A, tableA, idxB, init_obsTP_B, tableB):
+        """Wrapper for spacetime_collision method, specifically for checking two positioners
+        against each other."""
+        return self.spacetime_collision(self, idxA, init_obsTP_A, tableA, idxB, init_obsTP_B, tableB)
+
+    def spactime_collision_with_fixed(self, idx, init_obsTP, table):
+        """Wrapper for spacetime_collision method, specifically for checking one positioner
+        against the fixed keepouts.
+        """
+        return self.spacetime_collision(self, idx, init_obsTP, table)
+
+    def spacetime_collision(self, idxA, init_obsTP_A, tableA, idxB=None, init_obsTP_B=None, tableB=None):
         """Searches for collisions in time and space between two positioners
         which are rotating according to the argued tables.
 
             idxA, idxB                  ...  indices of the positioners in the list self.posmodels
             init_obsTP_A, init_obsTP_B  ...  starting (theta,phi) positions, in the obsTP coordinate systems
             tableA, tableB              ...  dictionaries defining rotation schedules as described below
+
+        If no arguments are provided for the "B" positioner (i.e. no args for idxB, init_obsTP_B, tableB)
+        then the method checks the "A" positioner against the fixed keepout envelopes.
 
         The input table dictionaries must contain the following fields:
 
@@ -79,8 +93,9 @@ class PosCollider(object):
         """
         time_start = 0
         time_end = 0
-        tables = [tableA, tableB]
-        TPnow = [init_obsTP_A, init_obsTP_B]
+        pospos = True if idxB else False # whether this is checking collisions between two positioners (or if false, between one positioner and fixed keepouts)
+        tables = [tableA,tableB] if pospos else [tableA]
+        TPnow = [init_obsTP_A,init_obsTP_B] if pospos else [init_obsTP_A]
         for table in tables:
             table['start_prepause'] = [time_start]
             table['start_move'] = []
@@ -93,10 +108,10 @@ class PosCollider(object):
                    table['start_prepause'].append(time_end_temp)
             time_end = np.max(time_end, time_end_temp)
         time_domain = np.linspace(time_start, time_end, np.round(time_end/self.timestep) + 1)
-        rows = [0,0]
-        stage = ['prepause','prepause']
-        stage_now = [0,0]
-        stage_start = [0,0]
+        rows = [0]*2 if pospos else [0]
+        stage = ['prepause']*2 if pospos else ['prepause']
+        stage_now = [0]*2 if pospos else [0]
+        stage_start = [0]*2 if pospos else [0]
         for now in time_domain:
             for i in range(len(tables)):
                 if stage[i] == 'prepause' and now >= tables[i]['start_move'][rows[i]]:
@@ -112,18 +127,10 @@ class PosCollider(object):
                 if stage[i] == 'move':
                     TPnow[i][0] = np.min(stage_now[i] * tables[i]['Tdot'][rows[i]], tables[i]['dT'][rows[i]])
                     TPnow[i][1] = np.min(stage_now[i] * tables[i]['Pdot'][rows[i]], tables[i]['dP'][rows[i]])
-            collision_case = self.spatial_collision_between_positioners(idxA, idxB, TPnow[0], TPnow[1])
-            if collision_case:
-                return collision_case, now
-        return case.I, now
-
-    def spacetime_collision_with_fixed(self, idx, init_obsTP, table):
-        time_start = 0
-        time_end = 0
-        TPnow = init_obsTP
-
-
-            collision_case = self.spatial_collision_with_fixed(idx, TPnow)
+            if pospos:
+                collision_case = self.spatial_collision_between_positioners(idxA, idxB, TPnow[0], TPnow[1])
+            else:
+                collision_case = self.spatial_collision_with_fixed(idxA, TPnow[0])
             if collision_case:
                 return collision_case, now
         return case.I, now
