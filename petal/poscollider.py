@@ -354,7 +354,6 @@ class PosCollider(object):
         return (0 <= s <= 1) and (0 <= t <= 1)
 
 
-
 class PosPoly(object):
     """Represents a polygonal envelope definition for a mechanical component of
     the fiber positioner.
@@ -370,6 +369,78 @@ class PosPoly(object):
     def translated(self, x, y):
         """Returns a copy of the polygon object, with points translated by distance (x,y)."""
         return PosPoly(self.points + np.array([[x],[y]]))
+
+
+class PosPlot(object):
+    """Handles plotting visualizations for array of positioners.
+    """
+    def __init__(self, fignum=0):
+        self.fig = plt.figure(fignum)
+        self.ax = plt.axes()
+        self.item_prototype = {'index'     : 0,            # identify particular item
+                               'prop_name' : '',           # item's property set
+                               'polygon'   : PosPoly([])}  # item's geometry
+        self.items = []
+        self.properties = [{'prop_name' : 'ferrule',
+                            'linestyle' : '-',
+                            'linewidth' : 1,
+                            'linecolor' : 'blue',
+                            'fillcolor' : '0.3'},
+
+                           {'prop_name' : 'phi arm',
+                            'linestyle' : '-',
+                            'linewidth' : 1,
+                            'linecolor' : 'blue',
+                            'fillcolor' : '0.3'},
+
+                           {'prop_name' : 'central body',
+                            'linestyle' : '-',
+                            'linewidth' : 1,
+                            'linecolor' : 'blue',
+                            'fillcolor' : '0.3'},
+
+                           {'prop_name' : 'collision',
+                            'linestyle' : '-',
+                            'linewidth' : 2,
+                            'linecolor' : 'red',
+                            'fillcolor' : '0.6'},
+
+                           {'prop_name' : 'line at 180',
+                            'linestyle' : '-.',
+                            'linewidth' : 1,
+                            'linecolor' : '0.5',
+                            'fillcolor' : 'none'},
+
+                           {'prop_name' : 'Eo',
+                            'linestyle' : '--',
+                            'linewidth' : 1,
+                            'linecolor' : '0.3',
+                            'fillcolor' : 'none'},
+
+                           {'prop_name' : 'Ei',
+                            'linestyle' : '--',
+                            'linewidth' : 1,
+                            'linecolor' : '0.3',
+                            'fillcolor' : 'none'},
+
+                           {'prop_name' : 'petal',
+                            'linestyle' : '-',
+                            'linewidth' : 1,
+                            'linecolor' : '0.7',
+                            'fillcolor' : 'white'},
+
+                           {'prop_name' : 'GFA',
+                            'linestyle' : '-',
+                            'linewidth' : 1,
+                            'linecolor' : '0.7',
+                            'fillcolor' : 'white'},
+
+                           {'prop_name' : '',
+                            'linestyle' : '-',
+                            'linewidth' : 1,
+                            'linecolor' : 'black',
+                            'fillcolor' : 'white'}]
+
 
 # 2D rotation matrix constructors
 @staticmethod
