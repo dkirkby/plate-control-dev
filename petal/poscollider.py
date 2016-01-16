@@ -56,25 +56,21 @@ class PosCollider(object):
         for p in self.posmodels:
             self._identify_neighbors(p)
 
-    def animate(self, TP, collision_time, collision_case):
+    def animate(self, sweeps):
         """describe...
-            time ... 1d array of real times corresponding to each position value
-            TP   ...  3d array of: [positioners][axis T or P][position values]
+            sweeps ... list of PosSweep instances describing positioners' real-time moves
         """
-        for i in range(len(TP)):
-            for t in tp[i][0]:
-                poly_t = self.place_central_body(i,t)
-                self.plotter.set_theta(i,)
-            for p in tp[i][1]:
-                poly_p = self.place_phi_arm(i,p)
-                poly_f = self.place_ferrule(i,p)
-
-
-
-
-
-
-
+        self.plotter.clear()
+        # get max time of all sweeps
+        # set that number of time indexes for the plotter
+        for s in sweeps:
+            for t in s.time:
+                # place the theta polygon
+                # place the phi polygon
+                # place the ferrule polygon
+                # if collision, set the appropriate properties, for that collision type
+                pass
+        # tell the plotter to plot, etc
 
     def spactime_collision_between_positioners(self, idxA, init_obsTP_A, tableA, idxB, init_obsTP_B, tableB):
         """Wrapper for spacetime_collision method, specifically for checking two positioners
@@ -110,17 +106,18 @@ class PosCollider(object):
             'move_time' : list of durations of rotations in seconds, approximately equals max(dT/Tdot,dP/Pdot), but calculated more exactly for the physical hardware
             'prepause'  : list of postpause (after the rotations end) values in seconds
 
-        The returns are:
-            collision_case ... enumeration of type "case", indicating what kind of collision was first detected, if any
-            collision_time ... time at which collision occurred. if no collision, the time returned is inf
-            time_history   ... 1d array of real time at which each TP history position value occurred
-            TP_history     ... 3d array of: [pos A or B][axis T or P][position values]
+        The returns are instances of PosSweep, containing the theta and phi rotations
+        in real time, and when if any collision, and the collision type.
         """
         time_start = 0
         time_end = 0
         pospos = True if idxB else False # whether this is checking collisions between two positioners (or if false, between one positioner and fixed keepouts)
-        tables = [tableA,tableB] if pospos else [tableA]
-        TPnow = [init_obsTP_A,init_obsTP_B] if pospos else [init_obsTP_A]
+        if pospos:
+            tables = [tableA,tableB]
+            sweeps = [PosSweep(), PosSweep()]
+        else:
+            tables = [tableA]
+            sweeps = [PosSweep()]
         for table in tables:
             table['start_prepause'] = [time_start]
             table['start_move'] = []
@@ -132,13 +129,13 @@ class PosCollider(object):
                 if row < table['nrows'] - 1:
                    table['start_prepause'].append(time_end_temp)
             time_end = np.max(time_end, time_end_temp)
-        time_domain = np.linspace(time_start, time_end, np.round(time_end/self.timestep) + 1)
+        time_domain = np.arange(time_start, time_end, self.timestep)
+        if ((time_end - time_start) / self.timestep) % 1:
+            time_domain = np.append(time_domain, time_end)
         rows = [0]*2 if pospos else [0]
         stage = ['prepause']*2 if pospos else ['prepause']
         stage_now = [0]*2 if pospos else [0]
         stage_start = [0]*2 if pospos else [0]
-        TP_history = TPnow
-        time_history = [time_start]
         for now in time_domain:
             for i in range(len(tables)):
                 if stage[i] == 'prepause' and now >= tables[i]['start_move'][rows[i]]:
@@ -152,18 +149,19 @@ class PosCollider(object):
                 stage_start[i] = tables[i]['start_' + stage[i]][rows[i]]
                 stage_now[i] = now - stage_start[i]
                 if stage[i] == 'move':
-                    TPnow[i][0] = np.min(stage_now[i] * tables[i]['Tdot'][rows[i]], tables[i]['dT'][rows[i]])
-                    TPnow[i][1] = np.min(stage_now[i] * tables[i]['Pdot'][rows[i]], tables[i]['dP'][rows[i]])
-                TP_history[i][0].extend(TPnow[i][0])
-                TP_history[i][1].extend(TPnow[i][1])
-                time_history.extend(now)
+                    sweeps[i].tp[pc.T].append(np.min(stage_now[i] * tables[i]['Tdot'][rows[i]], tables[i]['dT'][rows[i]]))
+                    sweeps[i].tp[pc.P].append(np.min(stage_now[i] * tables[i]['Pdot'][rows[i]], tables[i]['dP'][rows[i]]))
+                    sweeps[i].time.append(now)
             if pospos:
-                collision_case = self.spatial_collision_between_positioners(idxA, idxB, TPnow[0], TPnow[1])
+                collision_case = self.spatial_collision_between_positioners(idxA, idxB, sweeps[0].tp[:,-1], sweeps[1].tp[:,-1])
             else:
-                collision_case = self.spatial_collision_with_fixed(idxA, TPnow[0])
+                collision_case = self.spatial_collision_with_fixed(idxA, sweeps[0].tp[:,-1])
+            for s in sweeps:
+                s.collision_case = collision_case
+                s.collision_time = now
             if collision_case and return_on_collision:
-                return collision_case, now, time_history, TP_history
-        return case.I, inf, time_history, TP_history
+                break
+        return sweeps if len(sweeps) > 1 else sweeps[0]
 
     def spatial_collision_between_positioners(self, idxA, idxB, obsTP_A, obsTP_B):
         """Searches for collisions in space between two fiber positioners.
@@ -261,18 +259,6 @@ class PosCollider(object):
         poly2 = self.place_central_body(idx2, t2)
         return self._spatial_collision_between_polygons(poly1,poly2)
 
-    def _spatial_collision_between_polygons(self, poly1, poly2):
-        """Searches for collisions in space between two polygon geometries, p1 and
-        p2, which are PosPoly objects. Returns a bool, where true indicates a
-        collision.
-        """
-        pts1 = poly1.points
-        pts2 = poly2.points
-        if not(self._bounding_boxes_collide(pts1,pts2)):
-            return False
-        else:
-            return self._polygons_collide(pts1,pts2)
-
     def _load_keepouts(self):
         """Read latest versions of all keepout geometries."""
         self.keepout_P = PosPoly(self.config['KEEPOUT_PHI'], self.config['KEEPOUT_PHI_PT0'])
@@ -308,9 +294,9 @@ class PosCollider(object):
         self.Eo = self.config['ENVELOPE_EO']  # outer clear rotation envelope
         self.Ei = self.config['ENVELOPE_EI']  # inner clear rotation envelope
         self.Ee = self._max_extent * 2        # extended-phi clear rotation envelope
-        self.Eo_poly = PosPoly(circle_poly_points(self.Eo, self.config['RESOLUTION_EO']))
-        self.Ei_poly = PosPoly(circle_poly_points(self.Ei, self.config['RESOLUTION_EI']))
-        self.Ee_poly = PosPoly(circle_poly_points(self.Ee, self.config['RESOLUTION_EE']))
+        self.Eo_poly = PosPoly(self._circle_poly_points(self.Eo, self.config['RESOLUTION_EO']))
+        self.Ei_poly = PosPoly(self._circle_poly_points(self.Ei, self.config['RESOLUTION_EI']))
+        self.Ee_poly = PosPoly(self._circle_poly_points(self.Ee, self.config['RESOLUTION_EE']))
         self.Eo_polys = []
         self.Ei_polys = []
         self.Ee_polys = []
@@ -321,7 +307,7 @@ class PosCollider(object):
             self.Ei_polys.append(self.Ei_poly.translated(x,y))
             self.Ee_polys.append(self.Ee_poly.translated(x,y))
         self.ferrule_diam = self.config['FERRULE_DIAM']
-        self.ferrule_poly = PosPoly(circle_poly_points(self.ferrule_diam, self.config['FERRULE_RESLN']))
+        self.ferrule_poly = PosPoly(self._circle_poly_points(self.ferrule_diam, self.config['FERRULE_RESLN']))
 
     def _identify_neighbors(self, posmodel):
         """Find all neighbors which can possibly collide with a given posmodel."""
@@ -339,6 +325,61 @@ class PosCollider(object):
         """Calculation of max radius of keepout for a positioner with fully-extended phi arm."""
         extended_phi = self.keepout_P.translated(np.max(self.R1),0) # assumption here that phi arm polygon defined at 0 deg angle
         return max(np.sqrt(np.sum(extended_phi**2, axis=0)))
+
+    @staticmethod
+    def _circle_poly_points(diameter, npts, outside=True):
+        """Constuct a polygon approximating a circle of a given diameter, with a
+        given number of points. The polygon's segments are tangent to the circle if
+        the optional argument 'outside' is true. If 'outside' is false, then the
+        segment points lie on the circle.
+        """
+        alpha = np.linspace(0, 2 * np.pi, npts + 1)[0:-1]
+        if outside:
+            half_angle = alpha[0]/2
+            points_radius = diameter/2 / np.cos(half_angle)
+        else:
+            points_radius = diameter/2
+        x = points_radius * np.cos(alpha)
+        y = points_radius * np.sin(alpha)
+        return np.array([x,y])
+
+
+class PosSweep(object):
+    """Contains a real-time description of the sweep of positioner mechanical
+    geometries through space.
+    """
+    def __init__(self):
+        time = []                 # real time at which each TP position value occurs
+        tp   = []                 # theta,phi angles corresponding to time
+        collision_case = case.I   # enumeration of type "case", indicating what kind of collision first detected, if any
+        collision_time = inf      # time at which collision occurs. if no collision, the time is inf
+
+
+class PosPoly(object):
+    """Represents a collidable polygonal envelope definition for a mechanical component
+    of the fiber positioner.
+    """
+    def __init__(self, points, point0_index=0):
+        points = np.array(points)
+        self.points = np.append(points[:,np.arange(point0_index,len(points[0]))], points[:,np.arange(0,point0_index+1)], axis=1)
+
+    def rotated(self, angle, getobject=False):
+        """Returns a copy of the polygon object, with points rotated by angle (unit degrees)."""
+        return PosPoly(np.dot(self._rotmat2D_deg(angle), self.points))
+
+    def translated(self, x, y):
+        """Returns a copy of the polygon object, with points translated by distance (x,y)."""
+        return PosPoly(self.points + np.array([[x],[y]]))
+
+    def collides_with(self, other):
+        """Searches for collisions in space between this polygon and
+        another PosPoly object. Returns a bool, where true indicates a
+        collision.
+        """
+        if not(self._bounding_boxes_collide(self.points,other.points)):
+            return False
+        else:
+            return self._polygons_collide(self.points,other.points)
 
     @staticmethod
     def _bounding_boxes_collide(pts2,pts2):
@@ -394,22 +435,15 @@ class PosCollider(object):
         t = (dx_B * (A1[1] - B1[1]) + dy_B * (B1[0] - A1[0])) / (-delta)
         return (0 <= s <= 1) and (0 <= t <= 1)
 
+    @staticmethod
+    def _rotmat2D_rad(angle):
+        """Return the 2d rotation matrix for an angle given in radians."""
+        return np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
 
-class PosPoly(object):
-    """Represents a polygonal envelope definition for a mechanical component of
-    the fiber positioner.
-    """
-    def __init__(self, points, point0_index=0):
-        points = np.array(points)
-        self.points = np.append(points[:,np.arange(point0_index,len(points[0]))], points[:,np.arange(0,point0_index+1)], axis=1)
-
-    def rotated(self, angle, getobject=False):
-        """Returns a copy of the polygon object, with points rotated by angle (unit degrees)."""
-        return PosPoly(np.dot(rotmat2D_deg(angle), self.points))
-
-    def translated(self, x, y):
-        """Returns a copy of the polygon object, with points translated by distance (x,y)."""
-        return PosPoly(self.points + np.array([[x],[y]]))
+    @staticmethod
+    def _rotmat2D_deg(angle):
+        """Return the 2d rotation matrix for an angle given in degrees."""
+        return rotmat2D_rad(np.deg2rad(angle))
 
 
 class PosPlot(object):
@@ -487,48 +521,20 @@ class PosPlot(object):
                             'linecolor' : 'black',
                             'fillcolor' : 'white'}]
 
-    def set_phi(self, item_idx, real_time, angle, iscollision):
-        self.ferrules[item_idx][real_time] =
-        self.phi_arms[item_idx]
-
-    def set_theta(self, item_idx, time_idx, angle, iscollsion):
+    def set_phi(self, item_idx, time_idx, is_collision):
         pass
 
-    def set_fixed(self, item_idx, polygon, prop_name):
+    def set_theta(self, item_idx, time_idx, is_collision):
+        pass
+
+    def set_fixed(self, item_idx, polygon, prop_name, is_collision):
         pass
 
     def update(self):
+        # go to next timestep
         # set plot data to axes
         pass
 
     def plot(self):
         self.update()
         plt.show(block=False)
-
-# 2D rotation matrix constructors
-@staticmethod
-def rotmat2D_rad(angle):
-    """Return the 2d rotation matrix for an angle given in radians."""
-    return np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
-
-@staticmethod
-def rotmat2D_deg(angle):
-    """Return the 2d rotation matrix for an angle given in degrees."""
-    return rotmat2D_rad(np.deg2rad(angle))
-
-@staticmethod
-def circle_poly_points(diameter, npts, outside=True):
-    """Constuct a polygon approximating a circle of a given diameter, with a
-    given number of points. The polygon's segments are tangent to the circle if
-    the optional argument 'outside' is true. If 'outside' is false, then the
-    segment points lie on the circle.
-    """
-    alpha = np.linspace(0, 2 * np.pi, npts + 1)[0:-1]
-    if outside:
-        half_angle = alpha[0]/2
-        points_radius = diameter/2 / np.cos(half_angle)
-    else:
-        points_radius = diameter/2
-    x = points_radius * np.cos(alpha)
-    y = points_radius * np.sin(alpha)
-    return np.array([x,y])
