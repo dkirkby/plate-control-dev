@@ -33,6 +33,8 @@ class PosCollider(object):
         self.pos_neighbor_idxs = []
         self.fixed_neighbor_cases = []
         self.load_config_data()
+        self.plotting_on = True
+        self.plotter = PosPlot(self)
 
     def add_positioners(self, posmodels):
         """Add a positioner or multiple positioners to the collider object.
@@ -54,6 +56,26 @@ class PosCollider(object):
         for p in self.posmodels:
             self._identify_neighbors(p)
 
+    def animate(self, TP, collision_time, collision_case):
+        """describe...
+            time ... 1d array of real times corresponding to each position value
+            TP   ...  3d array of: [positioners][axis T or P][position values]
+        """
+        for i in range(len(TP)):
+            for t in tp[i][0]:
+                poly_t = self.place_central_body(i,t)
+                self.plotter.set_theta(i,)
+            for p in tp[i][1]:
+                poly_p = self.place_phi_arm(i,p)
+                poly_f = self.place_ferrule(i,p)
+
+
+
+
+
+
+
+
     def spactime_collision_between_positioners(self, idxA, init_obsTP_A, tableA, idxB, init_obsTP_B, tableB):
         """Wrapper for spacetime_collision method, specifically for checking two positioners
         against each other."""
@@ -65,13 +87,14 @@ class PosCollider(object):
         """
         return self.spacetime_collision(self, idx, init_obsTP, table)
 
-    def spacetime_collision(self, idxA, init_obsTP_A, tableA, idxB=None, init_obsTP_B=None, tableB=None):
+    def spacetime_collision(self, idxA, init_obsTP_A, tableA, idxB=None, init_obsTP_B=None, tableB=None, return_on_collision=True):
         """Searches for collisions in time and space between two positioners
         which are rotating according to the argued tables.
 
             idxA, idxB                  ...  indices of the positioners in the list self.posmodels
             init_obsTP_A, init_obsTP_B  ...  starting (theta,phi) positions, in the obsTP coordinate systems
             tableA, tableB              ...  dictionaries defining rotation schedules as described below
+            return_on_collision         ...  whether to return immediately as soon as any collision is identified
 
         If no arguments are provided for the "B" positioner (i.e. no args for idxB, init_obsTP_B, tableB)
         then the method checks the "A" positioner against the fixed keepout envelopes.
@@ -87,9 +110,11 @@ class PosCollider(object):
             'move_time' : list of durations of rotations in seconds, approximately equals max(dT/Tdot,dP/Pdot), but calculated more exactly for the physical hardware
             'prepause'  : list of postpause (after the rotations end) values in seconds
 
-        The return is an enumeration of type "case", indicating what kind of collision
-        was first detected, if any. Also returns the time at which the collision occurred
-        (if any). If there was no collision, the time returned is inf.
+        The returns are:
+            collision_case ... enumeration of type "case", indicating what kind of collision was first detected, if any
+            collision_time ... time at which collision occurred. if no collision, the time returned is inf
+            time_history   ... 1d array of real time at which each TP history position value occurred
+            TP_history     ... 3d array of: [pos A or B][axis T or P][position values]
         """
         time_start = 0
         time_end = 0
@@ -112,6 +137,8 @@ class PosCollider(object):
         stage = ['prepause']*2 if pospos else ['prepause']
         stage_now = [0]*2 if pospos else [0]
         stage_start = [0]*2 if pospos else [0]
+        TP_history = TPnow
+        time_history = [time_start]
         for now in time_domain:
             for i in range(len(tables)):
                 if stage[i] == 'prepause' and now >= tables[i]['start_move'][rows[i]]:
@@ -127,13 +154,16 @@ class PosCollider(object):
                 if stage[i] == 'move':
                     TPnow[i][0] = np.min(stage_now[i] * tables[i]['Tdot'][rows[i]], tables[i]['dT'][rows[i]])
                     TPnow[i][1] = np.min(stage_now[i] * tables[i]['Pdot'][rows[i]], tables[i]['dP'][rows[i]])
+                TP_history[i][0].extend(TPnow[i][0])
+                TP_history[i][1].extend(TPnow[i][1])
+                time_history.extend(now)
             if pospos:
                 collision_case = self.spatial_collision_between_positioners(idxA, idxB, TPnow[0], TPnow[1])
             else:
                 collision_case = self.spatial_collision_with_fixed(idxA, TPnow[0])
-            if collision_case:
-                return collision_case, now
-        return case.I, now
+            if collision_case and return_on_collision:
+                return collision_case, now, time_history, TP_history
+        return case.I, inf, time_history, TP_history
 
     def spatial_collision_between_positioners(self, idxA, idxB, obsTP_A, obsTP_B):
         """Searches for collisions in space between two fiber positioners.
@@ -205,6 +235,17 @@ class PosCollider(object):
         to it's xy0 and the argued obsT theta angle.
         """
         poly = self.keepout_T.rotated(obsT)
+        poly = poly.translated(self.xy0[0,idx], self.xy0[1,idx])
+        return poly
+
+    def place_ferrule(self, idx, obsTP):
+        """Rotates and translates the ferrule to position defined by the positioner's
+        xy0 and the argued obsTP (theta,phi) angles.
+        """
+        poly = self.ferrule_poly.translated(self.R2[idx], 0)
+        poly = poly.rotated(obsTP[1])
+        poly = poly.translated(self.R1[idx],0)
+        poly = poly.rotated(obsTP[0])
         poly = poly.translated(self.xy0[0,idx], self.xy0[1,idx])
         return poly
 
@@ -374,13 +415,18 @@ class PosPoly(object):
 class PosPlot(object):
     """Handles plotting visualizations for array of positioners.
     """
-    def __init__(self, fignum=0):
+    def __init__(self, collider=None, fignum=0):
+        if not(collider):
+            self.collider = PosCollider()
+        else:
+            self.collider = collider
         self.fig = plt.figure(fignum)
         self.ax = plt.axes()
-        self.item_prototype = {'index'     : 0,            # identify particular item
-                               'prop_name' : '',           # item's property set
-                               'polygon'   : PosPoly([])}  # item's geometry
-        self.items = []
+        self.ferrules    = [None]*npos
+        self.phi_arms    = [None]*npos
+        self.ctr_bodies  = [None]*npos
+        self.collisions  = [None]*npos
+        self.fixed_items = []
         self.properties = [{'prop_name' : 'ferrule',
                             'linestyle' : '-',
                             'linewidth' : 1,
@@ -441,6 +487,23 @@ class PosPlot(object):
                             'linecolor' : 'black',
                             'fillcolor' : 'white'}]
 
+    def set_phi(self, item_idx, real_time, angle, iscollision):
+        self.ferrules[item_idx][real_time] =
+        self.phi_arms[item_idx]
+
+    def set_theta(self, item_idx, time_idx, angle, iscollsion):
+        pass
+
+    def set_fixed(self, item_idx, polygon, prop_name):
+        pass
+
+    def update(self):
+        # set plot data to axes
+        pass
+
+    def plot(self):
+        self.update()
+        plt.show(block=False)
 
 # 2D rotation matrix constructors
 @staticmethod
