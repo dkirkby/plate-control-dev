@@ -276,7 +276,7 @@ class LegacyPositionerComm(object):
         # send ths CAN message
         if not(self.send_cmd_off):
             self.CAN_comm.send_CAN_frame(hexid, hexbytes)
-        time.sleep(pause_after_send)
+            time.sleep(pause_after_send)
 
     def set_currents(self, bus_id, curr_spin_up_down, curr_cruise, curr_creep):
         args = [[], [], [], [], [], [], [], []]
