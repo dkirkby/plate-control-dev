@@ -214,7 +214,7 @@ class PosCollider(object):
             poly1 = self.place_phi_arm(idx,obsTP)
             for fixed_case in self.fixed_neighbor_cases[idx]:
                 poly2 = self.fixed_neighbor_keepouts[fixed_case]
-                if self._spatial_collision_between_polygons(poly1,poly2):
+                if poly1.collides_with(poly2):
                     return fixed_case
         return case.I
 
@@ -251,13 +251,13 @@ class PosCollider(object):
         """Search for case II collision, positioner 1 arm against positioner 2 arm."""
         poly1 = self.place_phi_arm(idx1, tp1)
         poly2 = self.place_phi_arm(idx2, tp2)
-        return self._spatial_collision_between_polygons(poly1,poly2)
+        return poly1.collides_with(poly2)
 
     def _case_III_collision(idx1, idx2, tp1, t2):
         """Search for case III collision, positioner 1 arm against positioner 2 central body."""
         poly1 = self.place_phi_arm(idx1, tp1)
         poly2 = self.place_central_body(idx2, t2)
-        return self._spatial_collision_between_polygons(poly1,poly2)
+        return poly1.collides_with(poly2)
 
     def _load_keepouts(self):
         """Read latest versions of all keepout geometries."""
@@ -359,30 +359,32 @@ class PosPoly(object):
     """Represents a collidable polygonal envelope definition for a mechanical component
     of the fiber positioner.
     """
-    def __init__(self, points, point0_index=0):
+    def __init__(self, points, point0_index=0, close_polygon=True):
         points = np.array(points)
-        self.points = np.append(points[:,np.arange(point0_index,len(points[0]))], points[:,np.arange(0,point0_index+1)], axis=1)
+        head = points[:,np.arange(point0_index,len(points[0]))]
+        tail = points[:,np.arange(0,point0_index+1*close_polygon)]
+        self.points = np.append(head, tail, axis=1)
 
     def rotated(self, angle, getobject=False):
         """Returns a copy of the polygon object, with points rotated by angle (unit degrees)."""
-        return PosPoly(np.dot(self._rotmat2D_deg(angle), self.points))
+        return PosPoly(np.dot(PosPoly._rotmat2D_deg(angle), self.points), point0_index=0, close_polygon=False)
 
     def translated(self, x, y):
         """Returns a copy of the polygon object, with points translated by distance (x,y)."""
-        return PosPoly(self.points + np.array([[x],[y]]))
+        return PosPoly(self.points + np.array([[x],[y]]), point0_index=0, close_polygon=False)
 
     def collides_with(self, other):
         """Searches for collisions in space between this polygon and
         another PosPoly object. Returns a bool, where true indicates a
         collision.
         """
-        if not(self._bounding_boxes_collide(self.points,other.points)):
-            return False
+        if PosPoly._bounding_boxes_collide(self.points,other.points):
+            return PosPoly._polygons_collide(self.points,other.points)
         else:
-            return self._polygons_collide(self.points,other.points)
+            return False
 
     @staticmethod
-    def _bounding_boxes_collide(pts2,pts2):
+    def _bounding_boxes_collide(pts1,pts2):
         """Check whether the rectangular bounding boxes of two polygons collide.
         pts1 and pts2 are 2xN numpy arrays of the polygon (x,y) vertices (closed polygon).
         Returns True if the bounding boxes collide, False if they do not. Intended as
@@ -415,7 +417,7 @@ class PosPoly(object):
             for j in range(len(pts2[:-1])):
                 B1 = np.array([pts2[0,j],   pts2[1,j]])
                 B2 = np.array([pts2[0,j+1], pts2[1,j+1]])
-                if self._segments_intersect(A1,A2,B1,B2):
+                if PosPoly._segments_intersect(A1,A2,B1,B2):
                     return True
         return False
 
@@ -443,7 +445,7 @@ class PosPoly(object):
     @staticmethod
     def _rotmat2D_deg(angle):
         """Return the 2d rotation matrix for an angle given in degrees."""
-        return rotmat2D_rad(np.deg2rad(angle))
+        return PosPoly._rotmat2D_rad(np.deg2rad(angle))
 
 
 class PosPlot(object):
