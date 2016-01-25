@@ -2,11 +2,15 @@
  * Name:    Open_Loop_Test.c
  * Purpose: Generate R-Theta Positioner Waveforms in MCBSTM32E
  * Author:  hdh 
+ 
+ *1.0			2015-1-25 		Reformatted move setup commands and data retrieval commands.  Added on-chip silicon id read-out command, variable acceleration (Spin Period),and the ability to set
+ *											CAN address by writing it to flash with CAN commands (after verifying silicon id).  Added a second CAN filter so that all positioners can always respond to CAN messages 
+ *											sent to this common address (20,000/0x4E20).  Added fiducial functionality.  Data request commands are now all separate commands.  (igershko)
  *
  *0.19	  2015-09-28		Added sync functionality  -- multiple CAN commands can be uploaded and are executed when a sync signal is received. 
  *											Changed CAN message filter and command decoding to expand the command type space 
  *											(from being the 4 LS bits to the 8 LS bits of the CAN message IDENTIFIER).  Added function for transmitting 
- *											CAN messages.    
+ *											CAN messages.  (igershko)  
  *
  *0.18a		2014-08-27		Changed heartbeat flash from PA4 to PA6 because that LED is connected on the Michigan board
  *
@@ -205,6 +209,8 @@ to Flags_0 and Flags_1 and then the motor(s) will begin rotation
 #include "CAN.h"                                  // STM32 CAN adaption layer
 #include "ADC.h"
 #include "STM32F103_Registers.h"   								// My file with register location defines
+#include "FlashOS.H"
+    
 
  //  Left from Keil's CAN example  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 volatile uint32_t msTicks;                        /* counts 1ms timeTicks     */
@@ -213,6 +219,9 @@ volatile uint32_t msTicks;                        /* counts 1ms timeTicks     */
 /*******************************************************
  * 		     Global Variables
  *******************************************************/
+
+#define M16(adr) (*((vu16 *) (adr)))
+ 
 #define REVMTR0 1								//  '0' for normal motor 0 operation;  '1' to reverse the direction of motor 0 operation
 #define REVMTR1 1								//  '0' for normal motor 1 operation;  '1' to reverse the direction of motor 1 operation
 
@@ -222,25 +231,26 @@ unsigned int DEL0B = 2400 / (1+REVMTR0);  //  control the direction of the motor
 unsigned int DEL1A = 1200 * (1+REVMTR1);
 unsigned int DEL1B = 2400 / (1+REVMTR1);
  
-#define POSITIONER_NR 1004      //  This is the positioner number which is unique for each positioner and is
-																//  bits 4 thru 16 of the ID of each CAN message (so a given message goes to only one actuator)
+
 #define Offset_0 0							//  These are two offsets which are measured and recorded for each positioner 
 #define Offset_1 0							//  which specify the phase of the rotors when they are nominally up against the hard stops
 
 #define TIMDIV 4000							//  Timer Divide number. This is the number that Timers TIM1 and TIM8 divide by.  So interrupt rate is 
 																//	72,000,000/TIMDIV = 18,000 Hz, and the period is 1/18,000 = .0000555555555 seconds
-#define FIRMWARE_VR   19
+#define FIRMWARE_VR   10
  
-int LED_Clock = 0;					 		// output this to PA4;  used to blink LED
-int temp = 0;
-int ctr=6;
+int LED_Clock = 0;					 		// output this to PA4;  used to blink LED			
 int done=0;
-int legacy_mode=0;
+int set_can_id=0;
+int stack_size=100;							// variable for keeping track of movetable size
 
+
+CAN_msg CAN_Com_Stack[100];			// storage structure of movetable commands
 
 unsigned int count = 0;					//  Counts the number of times the Timer ISR has been executed so as to control the creep rate	
 
 unsigned int post_pause=0;
+unsigned int period=0;					//	Length of time during which fiducials remain on after receiving sync signal
 
 unsigned char Flags_0 = 0;			//	One flag for each motor specifies which rotation elements are pending or in process  
 																//  Bit 7(MSB):  CW Spin_Up of Motor 0 Pending or in process
@@ -274,9 +284,11 @@ unsigned char Flag_Status_0=0;	//  Keep track of whether flags need to be set fo
 unsigned char Flag_Status_1=0;
 
 unsigned char run_test_seq=0;		//  Flag set for sending test patterns to theta/phi pads for testing positioner board (prior to installing motors)
+unsigned char device_type=0;
 																
 unsigned int Theta_0 = Offset_0;//  Phase of rotor of motor 0 in 0.1 degree steps --  takes interger values between 0 and 3600
 unsigned int Theta_1 = Offset_1;//  Phase of rotor of motor 1
+float duty_cycle=0;
 
 char Bump_CW_Creep_Mtr_0 = 1;		//  If this flag is set, the corresponding creep current is increased to 1.0 for the last 90 deg of motor rotation
 char Bump_CCW_Creep_Mtr_0 = 0;	//
@@ -299,6 +311,7 @@ MTR_1 Phase C  --  PC8			TIM8_CH3			Tau1_3
 									 PB8 and PB9 are used by the CAN interface and are usually high				   
 ----------------------------------------------------------------------------------------------------- */
 
+unsigned int pos_id=65535;								//  This is the can address that all positioners will initially have
 unsigned int Spin_Ptr_0 = 0;							//  Pointer into Spin_Up table for motor 0
 unsigned int Spin_Ptr_1 = 0;							//  Pointer into Spin_Up table for motor 1
 unsigned int CruiseStepsToGo_0 = 3000;		//  Number of remaining 30 degree steps left in a cruise for motor 0
@@ -318,11 +331,14 @@ unsigned int CreepPeriod_1 = 2;				//  The creep has a basic rotation rate of 0.
 unsigned int count_0 = 0;							//  Creep count for motor 0  --  this keeps track of how many times it's gone through the interrupt without incrementing the motor
 unsigned int count_1 = 0;							//  Creep count for motor 1  --  same as above but for motor 1
 unsigned int data=0;
+unsigned int data_upper=0;
 unsigned int bit_sum=0;								//Received move table bit sum
 unsigned int bit_sum_match=0;					//Flag indicating if sent bit sum and received bit sum match
 
 unsigned int move_table_status=0;
-unsigned int Spin_Steps;
+unsigned int Spin_Period=12;
+unsigned int spin_count_0=0;
+unsigned int spin_count_1=0;
 
 // The following currents set the motor current in units of full stall current, so 1 corresponds to 100% or fully on, i.e. about 200 mA
 
@@ -330,7 +346,7 @@ float CruiseCurrent_0 = .75;					//  Value of current used along with the desire
 float SpinUpCurrent_0 = 1;						//  Tau's for motors.  CruiseCurrent = 4 makes the voltages on the motor coils 
 float SpinDownCurrent_0 = 1;					//  swing from 0 to full motor voltage, i.e. it makes Tau go to 4,000 at the peak
 
-float CreepCurrent_0 = .3;					//  Current for CW Creep for Motor 0  (i.e. forward)
+float CreepCurrent_0 = .3;						//  Current for CW Creep for Motor 0  (i.e. forward)
 float CW_OpCreepCur_0 = 0;						//  This is the current used during a CW creep operation.  It is set to CreepCurrent_0
 																			//  at the beginning of a move, and then if the flag Bump_CW_Creep_Mtr_0 is set, it is bumped up to 1.0
 																			//  for the last 90 degrees of the creep to get as close to the target as possible
@@ -344,12 +360,12 @@ float CruiseCurrent_1 = .75;					//  Current when cruising
 float SpinUpCurrent_1 = 1;						//  Current when Spinning Up
 float SpinDownCurrent_1 = 1;					//  Current when Spinning Down
 
-float CreepCurrent_1 = .3;					//  Current for CW Creep for Motor 1  (i.e. forward)
+float CreepCurrent_1 = .3;						//  Current for CW Creep for Motor 1  (i.e. forward)
 float CW_OpCreepCur_1 = 0;						//  See comments for CW_OpCreepCur_0 above
 
 float CCW_OpCreepCur_1 = 0;						//
 
-float M0_Drop_Cur = .05;						//  Following a creep, the motor current is dropped to this value
+float M0_Drop_Cur = .05;							//  Following a creep, the motor current is dropped to this value
 float M1_Drop_Cur = .05;
 
 
@@ -387,17 +403,10 @@ static unsigned short CosTable[6144]=
  683, 	 685, 	 688, 	 691, 	 693, 	 696, 	 698, 	 701, 	 704, 	 706, 	 709, 	 712, 	 714, 	 717, 	 720, 	 722, 	 725, 	 728, 	 731, 	 733, 	 736, 	739, 	741, 	744, 	747, 	750, 	752, 	755, 	758, 	760, 	763, 	766, 	769, 	771, 	774, 	777, 	780, 	782, 	785, 	788, 	791, 	794, 	796, 	799, 	802, 	805, 	808, 	810, 	813, 	816, 	819, 	822, 	824, 	827, 	830, 	833, 	836, 	839, 	841, 	844, 	847, 	850, 	853, 	856, 	859, 	861, 	864, 	867, 	870, 	873, 	876, 	879, 	882, 	885, 	887, 	890, 	893, 	896, 	899, 	902, 	905, 	908, 	911, 	914, 	917, 	920, 	922, 	925, 	928, 	931, 	934, 	937, 	940, 	943, 	946, 	949, 	952, 	955, 	958, 	961, 	964, 	967, 	970, 	973, 	976, 	979, 	982, 	985, 	988, 	991, 	994, 	997, 	1000, 	1003, 	1006, 	1009, 	1012, 	1015, 	1018, 	1021, 	1024, 	1027, 	1030, 	1033, 	1036, 	1040, 	1043, 	1046, 	1049, 	1052, 	1055, 	1058, 	1061, 	1064, 	1067, 	1070, 	1073, 	1077, 	1080, 	1083, 	1086, 	1089, 	1092, 	1095, 	1098, 	1101, 	1104, 	1108, 	1111, 	1114, 	1117, 	1120, 	1123, 	1126, 	1130, 	1133, 	1136, 	1139, 	1142, 	1145, 	1148, 	1152, 	1155, 	1158, 	1161, 	1164, 	1167, 	1171, 	1174, 	1177, 	1180, 	1183, 	1187, 	1190, 	1193, 	1196, 	1199, 	1203, 	1206, 	1209, 	1212, 	1215, 	1219, 	1222, 	1225, 	1228, 	1231, 	1235, 	1238, 	1241, 	1244, 	1248, 	1251, 	1254, 	1257, 	1261, 	1264, 	1267, 	1270, 	1273, 	1277, 	1280, 	1283, 	1287, 	1290, 	1293, 	1296, 	1300, 	1303, 	1306, 	1309, 	1313, 	1316, 	1319, 	1323, 	1326, 	1329, 	1332, 	1336, 	1339, 	1342, 	1346, 	1349, 	1352, 	1355, 	1359, 	1362, 	1365, 	1369, 	1372, 	1375, 	1379, 	1382, 	1385, 	1389, 	1392, 	1395, 	1399, 	1402, 	1405, 	1409, 	1412, 	1415, 	1419, 	1422, 	1425, 	1429, 	1432, 	1435, 	1439, 	1442, 	1445, 	1449, 	1452, 	1455, 	1459
 };
 
-//  Spin Up and Down table  ---  To regenerate this table, see the file Spinup_Calc.xls
-static unsigned int DeltaPhase[378] =
+//  Spin Up and Down table  ---  Spin_Period determines how many times each displacement is repeated
+static unsigned int DeltaPhase[34] =
 {
-0, 	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	2,	2,	2,	2,	2,	2,	2,	2,	2,	2,	2,	3,	3,	3,	3,	3,	3,	3,	3,	3,	3,	3,	3,	4,	4,	4,	4,	4,	4,	4,	4,	4,
-4,	4,	5,	5,	5,	5,	5,	5,	5,	5,	5,	5,	5,	6,	6,	6,	6,	6,	6,	6,	6,	6,	6,	6,	6,	7,	7,	7,	7,	7,	7,	7,	7,	7,	7,	7,	8,	8,	8,	8,	8,	8,	8,	8,	8,	8,	8,	9,	9,	9,
-9,	9,	9,	9,	9,	9,	9,	9,	10,	10,	10,	10,	10,	10,	10,	10,	10,	10,	10,	10,	11,	11,	11,	11,	11,	11,	11,	11,	11,	11,	11,	12,	12,	12,	12,	12,	12,	12,	12,	12,	12,	12,	13,	13,	13,	13,	13,	13,	13,	13,
-13,	13,	13,	13,	14,	14,	14,	14,	14,	14,	14,	14,	14,	14,	14,	15,	15,	15,	15,	15,	15,	15,	15,	15,	15,	15,	16,	16,	16,	16,	16,	16,	16,	16,	16,	16,	16,	16,	17,	17,	17,	17,	17,	17,	17,	17,	17,	17,	17,	18,
-18,	18,	18,	18,	18,	18,	18,	18,	18,	18,	19,	19,	19,	19,	19,	19,	19,	19,	19,	19,	19,	19,	20,	20,	20,	20,	20,	20,	20,	20,	20,	20,	20,	21,	21,	21,	21,	21,	21,	21,	21,	21,	21,	21,	22,	22,	22,	22,	22,	22,
-22,	22,	22,	22,	22,	23,	23,	23,	23,	23,	23,	23,	23,	23,	23,	23,	23,	24,	24,	24,	24,	24,	24,	24,	24,	24,	24,	24,	25,	25,	25,	25,	25,	25,	25,	25,	25,	25,	25,	26,	26,	26,	26,	26,	26,	26,	26,	26,	26,	26,
-26,	27,	27,	27,	27,	27,	27,	27,	27,	27,	27,	27,	28,	28,	28,	28,	28,	28,	28,	28,	28,	28,	28,	29,	29,	29,	29,	29,	29,	29,	29,	29,	29,	29,	29,	30,	30,	30,	30,	30,	30,	30,	30,	30,	30,	30,	31,	31,	31,	31,
-31,	31,	31,	31,	31,	31,	31,	32,	32,	32,	32,	32,	32,	32,	32,	32,	32,	32,	32,	33,	33,	33,	33,	33,	33,	33,	33,	33																						
+0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33																		
 };
 
  //  Left from Keil's CAN example  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>	
@@ -440,8 +449,6 @@ void can_Init (void)
 }		
 //  End of stuff left from Keil's CAN example  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-
-
 void flash_PA6(int leng)
 {
 	unsigned long *ptr;
@@ -475,233 +482,80 @@ void switch_PA4(int led_state)
 	}
 }
 
-int readsync_PB2()															//Read sync signal and return its value, returns 1 when button pressed 
+int readsync_PB2()															//Read sync signal and return its value, returns 1 when sync goes low
 {
-	
 	int status=0;
+	GPIOB ->ODR |= 0x0004;
 	
-	if((GPIOB->IDR & 0x0004) != 0)
+	if((GPIOB->IDR & 0x0004) == 0)
 	{
 		status = 1;
 	}
 	else
 	{
 		status = 0;
-	}
-	
+	}	
 	return status;														
 }
 
-void send_CANmsg(int can_add, int select, int data){					//Function for sending CAN messages from positioner
-		int i;
-		can_Init();																		//Not sure if this needs to be called again
-		CAN_TxMsg.id=can_add;
-		for(i=0; i<8; i++) CAN_TxMsg.data[i]=0;				//Zero out data field in message to be transmitted
+void send_CANmsg(int can_add, int length, int data_lower, int data_upper){					//Function for sending CAN messages from positioner
+	int i;
+	can_Init();																								//Not sure if this needs to be called again
+	CAN_TxMsg.id=can_add;
+	for(i=0; i<8; i++) CAN_TxMsg.data[i]=0;										//Zero out data field in message to be transmitted
+	
+	CAN_TxMsg.len=length;
+	CAN_TxMsg.format = EXTENDED_FORMAT;
+	CAN_TxMsg.type = DATA_FRAME;
+	
+	Delay (100);													    				//  Delay for 100 ms
+	if(CAN_TxRdy){
 		
-		CAN_TxMsg.len=5;
-		CAN_TxMsg.format = EXTENDED_FORMAT;
-		CAN_TxMsg.type = DATA_FRAME;
-		
-		
+	CAN_TxRdy=0;																			//reset CAN_TxRdy	
 
-		Delay (100);													    		//  Delay for 100 ms
-		if(CAN_TxRdy){
-			
-		CAN_TxRdy=0;																	//reset CAN_TxRdy
-			
-		CAN_TxMsg.data[0] = select;
-		CAN_TxMsg.data[4] = data & 0x000000FF;
-		CAN_TxMsg.data[3] = (data >> 8) & 0x000000FF;
-		CAN_TxMsg.data[2] = (data >> 16)& 0x000000FF;
-		CAN_TxMsg.data[1] = (data >> 24) & 0x000000FF;
+	CAN_TxMsg.data[0] = data_lower & 0x000000FF;
+	CAN_TxMsg.data[1] = (data_lower >> 8) & 0x000000FF;
+	CAN_TxMsg.data[2] = (data_lower >> 16)& 0x000000FF;
+	CAN_TxMsg.data[3] = (data_lower >> 24) & 0x000000FF;
+	CAN_TxMsg.data[4] = data_upper & 0x000000FF;
+	CAN_TxMsg.data[5] = (data_upper >> 8) & 0x000000FF;
+	CAN_TxMsg.data[6] = (data_upper >> 16)	& 0x000000FF;
+	CAN_TxMsg.data[7] = (data_upper >> 24) & 0x000000FF;	
+	
+	CAN_wrMsg(&CAN_TxMsg);								  					//Transmit message
 		
-		CAN_wrMsg(&CAN_TxMsg);								  			//Transmit message
-			
-		Delay(100);														  			
-		CAN_TxRdy=1;
-			
-		} //end if(CAN_TxRdy)
+	Delay(100);														  			
+	CAN_TxRdy=1;		
+	} //end if(CAN_TxRdy)
 }
 
-void run_in_legacy_mode(){
+
+void flash_write(unsigned short pos_id){
 	unsigned long *ptr;
-	int i = 0;
+	unsigned short val=pos_id;
+	ptr= (unsigned long *) 0x0801E800;
 
-	
-	// Cancel whatever filter they have set up, and set up one which accepts only the positioner with ID = POSITIONER_NR but with any type code
-// First deactivate their filter(s)
-	ptr = (unsigned long *) CAN_FMR;		//  The FINIT bit has to be set = '1' to allow change of CAN_FA1R
-	*ptr |= 0x00000001;									//  (This is the FINIT bit)
-	ptr = (unsigned long *) CAN_FA1R;		//  Point to the register which selects which filters are active
-	*ptr &= 0xFFFFC000;									//  This should disable all 14 filters
-	ptr = (unsigned long *) CAN_FMR;		//  Now put the FINIT bit low again to activate the chosen filters (which is none of them)
-	*ptr &=0xFFFFFFFE;
-// Now set up a filter which accepts only CAN messages with ID = POSITIONER_NR
-	ptr = (unsigned long *) CAN_FMR;		//  
-	*ptr |= 0x00000001;									//  The FINIT bit has to be set = '1' to allow change of CAN_FA1R
-	ptr = (unsigned long *) CAN_FA1R;		//  Point to the register which selects which filters are active
-	*ptr |= 0x00000001;									//  Enable filter 0
-	ptr = (unsigned long *) CAN_FFA1R;	//  Assign Filter 0 to FIFO 0 (i.e. messages which get thru this filter will end up in FIFO 0 as opposed to FIFO 1)
-	*ptr &= 0xFFFFFFFE;									// Set FFA0 to '0'
-	ptr = (unsigned long *) CAN_FS1R;		// Set Filter 0 to be a single 32 bit scale configuration//
-	*ptr |= 0x00000001;									// Set FSC0 to '1'
-	ptr = (unsigned long *) CAN_FM1R;		// Set Filter 0 for Identifier Mask Mode//
-	*ptr &= 0xFFFFFFFE;									// Set FBM0 to '0'
-	
-//  Set up the filter Identifier and Mask  (see p.640 and 668 among others)
-	i = POSITIONER_NR;
-	ptr = (unsigned long *) CAN_F0R1;		// Set up filter 0 as a mask which accepts only the positioner specified by POSITIONER_NR
-	*ptr = (i << 7) + 4;								// This is the IDENTIFIER we are looking to accept (the 4 is to set IDE)  (see p.640, 662, 668 for the structure of this)
-	
-	ptr = (unsigned long *) CAN_F0R2;		// This is the MASK.  
-	*ptr = 0xFFFFFF86;									// Mask bit of '0' accepts either 1 or 0 in that bit; we have 1's for the Positioner ID and for IDE and RTR
-	
-	ptr = (unsigned long *) CAN_FMR;		// Finally activiate the filters again
-	*ptr &=0xFFFFFFFE;									// Put the FINIT bit low again to activate Filter 0
-	
-	while (legacy_mode)
-	{
-		int command = 0;										//  This is a number between 0 and 15 which defines the command sent in the CAN message
-																				//  It is the LS 4 bits of the IDENTIFIER
-	
-    Delay (10);                  	 		  //  delay for 10ms 
-    if (CAN_RxRdy)											//  I.e. a CAN message received interrupt has occurred
-		{
-      CAN_RxRdy = 0;
-			
-			flash_PA6(50);										//  Flash PA6 for 50 msec when a CAN message is recognized
-			
-			command = CAN_RxMsg.id &= 0xF;		//  The command type is the 4 LSB's of the CAN message IDENTIFIER
-			switch(command)										//  The switch runs the program selected by command
-			{		
-				case 2:													//  Set_Currents (Sets 8 current parameters)	
-					SpinUpCurrent_0   = (float) CAN_RxMsg.data[0]/100;
-					SpinDownCurrent_0 = SpinUpCurrent_0;
-					CruiseCurrent_0   = (float) CAN_RxMsg.data[1]/100;
-					CreepCurrent_0    = (float) CAN_RxMsg.data[2]/100;
-					//CreepCurrent_0 = (float) CAN_RxMsg.data[3]/100;
-					SpinUpCurrent_1   = (float) CAN_RxMsg.data[4]/100;
-					SpinDownCurrent_1 = SpinUpCurrent_1;
-					CruiseCurrent_1   = (float) CAN_RxMsg.data[5]/100;
-					CreepCurrent_1    = (float) CAN_RxMsg.data[6]/100;
-					//CCW_CreepCurrent_1 = (float) CAN_RxMsg.data[7]/100;
-					break;
-					
-				case 3:													//  Creep_Period (Sets 4 parameters which use 2 bytes each)	
-					CreepPeriod_0    = (CAN_RxMsg.data[0] * 256) + CAN_RxMsg.data[1];
-					//CCW_CreepPeriod_0 = (CAN_RxMsg.data[2] * 256) + CAN_RxMsg.data[3];
-					CreepPeriod_1    = (CAN_RxMsg.data[4] * 256) + CAN_RxMsg.data[5];
-					//CCW_CreepPeriod_1 = (CAN_RxMsg.data[6] * 256) + CAN_RxMsg.data[7];
-					break;
-					
-				case 4:													//  Sets 4 values of final current following the creep, and also 4 flags which specify whether the motor
-																				//  current is bumped up to 1.0 for the last 90 degrees of the creep
-					M0_Drop_Cur   			= (float) CAN_RxMsg.data[0]/100;
-					//M0CCW_Drop_Cur   			= (float) CAN_RxMsg.data[1]/100;
-					M1_Drop_Cur    			= (float) CAN_RxMsg.data[2]/100;
-					//M1CCW_Drop_Cur 				= (float) CAN_RxMsg.data[3]/100;
-				
-					if(CAN_RxMsg.data[4] & 32)   Bump_CW_Creep_Mtr_0 = 1;
-					else  Bump_CW_Creep_Mtr_0 = 0;	
-					if(CAN_RxMsg.data[4] & 16)   Bump_CCW_Creep_Mtr_0 = 1;
-					else  Bump_CCW_Creep_Mtr_0 = 0;	
-					if(CAN_RxMsg.data[4] & 2)   Bump_CW_Creep_Mtr_1 = 1;
-					else  Bump_CW_Creep_Mtr_1 = 0;	
-					if(CAN_RxMsg.data[4] & 1)   Bump_CCW_Creep_Mtr_1 = 1;
-					else  Bump_CCW_Creep_Mtr_1 = 0;	
-					break;				
-				
-				case 5:													//  Set_Cruise_and_CW_Creep_Amounts (Sets 4 parameters which use 2 bytes each)	
-					CruiseStepsToGo_0    =(CAN_RxMsg.data[0] * 256) + CAN_RxMsg.data[1];	// Specified Motor 0 Cruise Rotation in units of 3.3 degrees
-					CW_CreepStepsToGo_0  =(CAN_RxMsg.data[2] * 256) + CAN_RxMsg.data[3];	// Specified Motor 0 CW Creep Rotation in units of 3.3 degrees
-					CruiseStepsToGo_1    =(CAN_RxMsg.data[4] * 256) + CAN_RxMsg.data[5];	// Specified Motor 1 Cruise Rotation in units of 0.1 degrees
-					CW_CreepStepsToGo_1  =(CAN_RxMsg.data[6] * 256) + CAN_RxMsg.data[7];	// Specified Motor 1 CW Creep Rotation in units of 0.1 degrees
-					break;		
-				
-				case 6:													//  Set_CCW_and_CW_Creep_Amounts (Sets 4 parameters which use 2 bytes each)	
-					CCW_CreepStepsToGo_0 =(CAN_RxMsg.data[0] * 256) + CAN_RxMsg.data[1];	// Specified Motor 0 CCW Creep Rotation in units of 3.3 degrees
-					CW_CreepStepsToGo_0  =(CAN_RxMsg.data[2] * 256) + CAN_RxMsg.data[3];	// Specified Motor 0 CW Creep Rotation in units of 3.3 degrees
-					CCW_CreepStepsToGo_1 =(CAN_RxMsg.data[4] * 256) + CAN_RxMsg.data[5];	// Specified Motor 1 CCW Creep Rotation in units of 0.1 degrees
-					CW_CreepStepsToGo_1  =(CAN_RxMsg.data[6] * 256) + CAN_RxMsg.data[7];	// Specified Motor 1 CW Creep Rotation in units of 0.1 degrees
-					break;			
-			
-				
-				case 7:													//  Uses the two bytes from this command to set the shadow flags, then starts the positioner motion
-					Sh_Fl_0 = CAN_RxMsg.data[0];
-					Sh_Fl_1 = CAN_RxMsg.data[1];
-				
-					if(CruiseStepsToGo_0 == 0)				Sh_Fl_0 &= 0xB7;		//  This fixes the hang-up which occurred if a Start command was sent with the 
-					if(CW_CreepStepsToGo_0 == 0)			Sh_Fl_0 &= 0xFE;		//  corresponding cruise or creep steps set to zero.  And it does it without adding
-					if(CCW_CreepStepsToGo_0 == 0)			Sh_Fl_0 &= 0xFD;		//  anything to the timer ISR.				
-					if(CruiseStepsToGo_1 == 0)				Sh_Fl_1 &= 0xB7;
-					if(CW_CreepStepsToGo_1 == 0)			Sh_Fl_1 &= 0xFE;
-					if(CCW_CreepStepsToGo_1 == 0)			Sh_Fl_1 &= 0xFD;
-	
-					Set_Flags = 1;								//  Start
-					break;	
-				
-				case 8:													//  This is used to test that the board can receive CAN messages
-					flash_PA6(150);
-					Delay(500);
-					flash_PA6(150);
-					Delay(500);
-					flash_PA6(150);
-					Delay(500);
-					flash_PA6(150);
-					Delay(500);
-					flash_PA6(150);
-					Delay(500);
-					flash_PA6(150);
-					Delay(500);
-					flash_PA6(150);				
-					break;						
+	//1) Initialize
 
-				case 9:
-					flash_PA6(50);
-					Delay(250);
-					flash_PA6(50);
-					Delay(250);
-					flash_PA6(50);
-					break;
-				
-				case 10:
-					legacy_mode=!legacy_mode;
-					
-					
-					// First deactivate old filter(s)
-					ptr = (unsigned long *) CAN_FMR;		//  The FINIT bit has to be set = '1' to allow change of CAN_FA1R
-					*ptr |= 0x00000001;									//  (This is the FINIT bit)
-					ptr = (unsigned long *) CAN_FA1R;		//  Point to the register which selects which filters are active
-					*ptr &= 0xFFFFC000;									//  This should disable all 14 filters
-					ptr = (unsigned long *) CAN_FMR;		//  Now put the FINIT bit low again to activate the chosen filters (which is none of them)
-					*ptr &=0xFFFFFFFE;
-					// Now set up a filter which accepts only CAN messages with ID = POSITIONER_NR
-					ptr = (unsigned long *) CAN_FMR;		//  
-					*ptr |= 0x00000001;									//  The FINIT bit has to be set = '1' to allow change of CAN_FA1R
-					ptr = (unsigned long *) CAN_FA1R;		//  Point to the register which selects which filters are active
-					*ptr |= 0x00000001;									//  Enable filter 0
-					ptr = (unsigned long *) CAN_FFA1R;	//  Assign Filter 0 to FIFO 0 (i.e. messages which get thru this filter will end up in FIFO 0 as opposed to FIFO 1)
-					*ptr &= 0xFFFFFFFE;									// Set FFA0 to '0'
-					ptr = (unsigned long *) CAN_FS1R;		// Set Filter 0 to be a single 32 bit scale configuration//
-					*ptr |= 0x00000001;									// Set FSC0 to '1'
-					ptr = (unsigned long *) CAN_FM1R;		// Set Filter 0 for Identifier Mask Mode//
-					*ptr &= 0xFFFFFFFE;									// Set FBM0 to '0'
-	
-					//  Set up the filter Identifier and Mask  (see p.640 and 668 among others)
-					i = POSITIONER_NR;
-					ptr = (unsigned long *) CAN_F0R1;		// Set up filter 0 as a mask which accepts only the positioner specified by POSITIONER_NR
-					*ptr = (i << 11) + 4;								// This is the IDENTIFIER we are looking to accept (the 4 is to set IDE)  (see p.640, 662, 668 for the structure of this)
-	
-					ptr = (unsigned long *) CAN_F0R2;		// This is the MASK.  
-					*ptr = 0xFFFFF806;									// Mask bit of '0' accepts either 1 or 0 in that bit; we have 1's for the Positioner ID and for IDE and RTR
-	
-					ptr = (unsigned long *) CAN_FMR;		// Finally activiate the filters again
-					*ptr &=0xFFFFFFFE;									// Put the FINIT bit low again to activate Filter 0
-				break;
-				
-			}					
-    }//if
-  }//while
+	// Unlock Flash  
+	while(FLASH->SR  & 0x00000001);
+
+	if(FLASH_CR_LOCK){  
+		FLASH->KEYR = 0x45670123;
+		FLASH->KEYR = 0xCDEF89AB; 
+	}
+	//2) Erase
+	FLASH->CR  |=  0x00000002;                   	// Page Erase Enabled 
+	FLASH->AR   =  0x0801E800;                   	// Page Address
+	FLASH->CR  |=  0x00000040;                   	// Start Erase	
+	while (FLASH->SR  & 0x00000001);							// Check busy flag
+	FLASH->CR  &= ~0x00000002;   									// Page Erase Disable
+		
+	//3) Program
+	FLASH->CR  |=  0x00000001;                  	// Programming Enabled
+	M16(ptr) = val;      													// Program Half Word
+	while (FLASH->SR  & 0x00000001);							// Check busy flag
+	FLASH->CR  &= ~0x00000001;                  	// Programming Disabled	
 }
 
 void Drop_Mtr_Cur_0(float Current)							//  This drops the current of motor 0 down to a specified value by writing
@@ -714,6 +568,7 @@ void Drop_Mtr_Cur_0(float Current)							//  This drops the current of motor 0 d
 	ptr = (unsigned long *) TIM1_CCR3;						//  
 	*ptr = Current * CosTable[Theta_0 + DEL0B];
 }
+
 void Drop_Mtr_Cur_1(float Current)							//  This drops the current of motor 1 down to a specified value by writing
 {																								//  directly to the relevant compare registers,  i.e. it does not change 
 	unsigned long *ptr;														//  any of the parameters set by the Set_Currents command
@@ -734,12 +589,13 @@ void Drop_Mtr_Cur_1(float Current)							//  This drops the current of motor 1 d
  //  of the period when the update occurs.  Each is set low later in the 50 u-sec period to correspond to
  //  the proper PWM time so as to adjust the current in that phase to the required value
 void TIM1_UP_IRQHandler(void) 
-{									
+{				
+	
 	unsigned long *ptr;	
 	ptr = (unsigned long *) GPIOA_ODR;							//	Makes a positive going sync pulse on PA7 at the start of the ISR execution
 	*ptr |= 0x00000080;															//  Set this low at the end of the ISR so we can see on an oscilloscope
 																									//  how long the ISR takes.  There is also an LED connected to this
-	
+
 	LED_Clock    += 1;															//  This flashes the PA6 LED for 50/18,000 sec every 7,200/18,000 seconds to  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 	if(LED_Clock == 1) *ptr |= 0x0040;							//  show that the processor is running and doing the ISR
 	if(LED_Clock == 50)   *ptr &= 0xFFBF;						//	Set it low again
@@ -747,6 +603,7 @@ void TIM1_UP_IRQHandler(void)
 	
 	ptr = (unsigned long *) TIM1_SR;								//  This clears the interrupt request so it doesn't keep repeating the ISR
 	*ptr &= 0xFFFFFFFE;															//  This is necessary!  Why does 0.03 work? (It actually didn't!)
+	
 	
 	if(run_test_seq){
 		ptr = (unsigned long *) TIM1_CCR4;							//  Set ptr to point at the register for Motor_0 Phase 1
@@ -764,6 +621,24 @@ void TIM1_UP_IRQHandler(void)
 		ptr = (unsigned long *) TIM8_CCR3;							//  Set ptr to point at the register for Motor_1 Phase 3
 		*ptr = 3000;//  The calculated on time for Motor_1 Phase 3 is written to the compare register for TIM8 channel 3	
 	}
+			
+	if(device_type){// if fiducial
+		
+		ptr = (unsigned long *) TIM1_CCR4;							//  Set ptr to point at the register for Motor_0 Phase 1
+
+		*ptr = 4000*duty_cycle;			//  The calculated on time for Motor_0 Phase 1 is written to the compare register for TIM1 channel 4
+		ptr = (unsigned long *) TIM1_CCR2;							//  Set ptr to point at the register for Motor_0 Phase 2
+		*ptr = 4000*duty_cycle;  		//The calculated on time for Motor_0 Phase 2 is written to the compare register for TIM1 channel 2	
+		ptr = (unsigned long *) TIM1_CCR3;							//  Set ptr to point at the register for Motor_0 Phase 3
+		*ptr = 4000*duty_cycle;//  The calculated on time for Motor_0 Phase 3 is written to the compare register for TIM1 channel 3		
+		
+		ptr = (unsigned long *) TIM8_CCR1;							//  Set ptr to point at the register for Motor_1 Phase 1
+		*ptr = 4000*duty_cycle;			//	The calculated on time for Motor_1 Phase 1 is written to the compare register for TIM8 channel 1		
+		ptr = (unsigned long *) TIM8_CCR2;							//  Set ptr to point at the register for Motor_1 Phase 2
+		*ptr = 4000*duty_cycle;//  The calculated on time for Motor_1 Phase 2 is written to the compare register for TIM8 channel 2	
+		ptr = (unsigned long *) TIM8_CCR3;							//  Set ptr to point at the register for Motor_1 Phase 3
+		*ptr = 4000*duty_cycle;//  The calculated on time for Motor_1 Phase 3 is written to the compare register for TIM8 channel 3	
+	}
 	
 	
 //  Do motor 0 first:    *************************************************************************************************************************
@@ -773,19 +648,21 @@ void TIM1_UP_IRQHandler(void)
 		Theta_0 += DeltaPhase[Spin_Ptr_0];							//  Advance the motor phase by the amount read from the Spinup Table
 		if(Theta_0 >= 3600)   Theta_0 -= 3600;					//  Check for roll over	
 		ptr = (unsigned long *) TIM1_CCR4;							//  Set ptr to point at the register for Motor_0 Phase 1
-// Note!!! These TIMx_CCRx registers determine the rotor phase and current drawn by each motor. So standby current is set by where they are left.
+		// Note!!! These TIMx_CCRx registers determine the rotor phase and current drawn by each motor. So standby current is set by where they are left.
 		*ptr = SpinUpCurrent_0 * CosTable[Theta_0];			//  The calculated on time for Motor_0 Phase 1 is written to the compare register for TIM1 channel 4
 		ptr = (unsigned long *) TIM1_CCR2;							//  Set ptr to point at the register for Motor_0 Phase 2
 		*ptr = SpinUpCurrent_0 * CosTable[Theta_0+DEL0A];//  The calculated on time for Motor_0 Phase 2 is written to the compare register for TIM1 channel 2	
 		ptr = (unsigned long *) TIM1_CCR3;							//  Set ptr to point at the register for Motor_0 Phase 3
-		*ptr = SpinUpCurrent_0 * CosTable[Theta_0+DEL0B];//  The calculated on time for Motor_0 Phase 3 is written to the compare register for TIM1 channel 3			
-		Spin_Ptr_0 += 1;																//  Advance to the next Spin Up Delta Phase
-		if(Spin_Ptr_0 >= 378)  Flags_0 &= 0x7F;					//  Done with Spin Up so clear flag; Next do Cruise
+		*ptr = SpinUpCurrent_0 * CosTable[Theta_0+DEL0B];//  The calculated on time for Motor_0 Phase 3 is written to the compare register for TIM1 channel 3
+		
+		spin_count_0++;
+		if(spin_count_0 >= Spin_Period) spin_count_0 = 0, Spin_Ptr_0 += 1;		//  Advance to the next Spin Up Delta Phase
+	
+		if(Spin_Ptr_0 >= 34)  Flags_0 &= 0x7F, spin_count_0=0, Spin_Ptr_0=33; 								//  Done with Spin Up so clear flag; Next do Cruise
 	}																									//  Leave Spin Pointer at 378 because we will use it to spin down
 	
 	else if((Flags_0 & 64)&&(CruiseStepsToGo_0 > 0))	//  Means there is a CW Cruise pending or in process 
-	{	
-		
+	{		
 		Theta_0 += 33;																	//  Rotate 3.3 deg with each step for 9,900 RPM spin rate at cruise
 		if(Theta_0 >= 3600)   Theta_0 -= 3600;					//  Check for roll over
 		ptr = (unsigned long *) TIM1_CCR4;							//  
@@ -801,7 +678,9 @@ void TIM1_UP_IRQHandler(void)
 	else if(Flags_0 & 32)														//  Means there is a CW Spin Down pending or in process
 	{	
 		
-		Spin_Ptr_0 -= 1;															//  Drop back to the next Spin Down Delta Phase			
+		if(spin_count_0 >= Spin_Period) spin_count_0=0, Spin_Ptr_0 -= 1;
+		spin_count_0++;
+		
 		Theta_0 += DeltaPhase[Spin_Ptr_0];						//  Advance the motor phase by the amount read from table
 		if(Theta_0 >= 3600)   Theta_0 -= 3600;				//  Check for roll over
 		ptr = (unsigned long *) TIM1_CCR4;						//  
@@ -810,16 +689,19 @@ void TIM1_UP_IRQHandler(void)
 		*ptr = SpinDownCurrent_0 * CosTable[Theta_0 + DEL0A];		
 		ptr = (unsigned long *) TIM1_CCR3;						//  
 		*ptr = SpinDownCurrent_0 * CosTable[Theta_0 + DEL0B];
-		if(Spin_Ptr_0 == 0)														//  
+		
+		if(Spin_Ptr_0 == 0 && (spin_count_0 >= Spin_Period))														 
 		{			
 			Flags_0 &= 0x1F;														//  Done with Spin Down so clear flag; Next will do	Creep
+			spin_count_0=0;
 			Drop_Mtr_Cur_0(0.05);												//	Drop current down to 5% of stall  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+			
 		}	
 	}
 		
 	else if(Flags_0 & 16)														//  Means there is a CCW Spin Up pending or in process
 	{	
-	
+		
 		Theta_0 -= DeltaPhase[Spin_Ptr_0];						//  Rotate the motor phase backward by the amount read from table
 		if(Theta_0 >= 3600)   Theta_0 += 3600;				//  Check for roll under  (Theta_0 is an unsigned int)
 		ptr = (unsigned long *) TIM1_CCR4;						//  
@@ -828,8 +710,12 @@ void TIM1_UP_IRQHandler(void)
 		*ptr = SpinUpCurrent_0 * CosTable[Theta_0 + DEL0A];		
 		ptr = (unsigned long *) TIM1_CCR3;						//  
 		*ptr = SpinUpCurrent_0 * CosTable[Theta_0 + DEL0B];
-		Spin_Ptr_0 += 1;
-		if(Spin_Ptr_0 >= 378)  Flags_0 &= 0x0F;				//  Done with Spin Up so clear flag; Next will do Cruise					
+		
+		spin_count_0++;
+		if(spin_count_0 >= Spin_Period) spin_count_0 = 0, Spin_Ptr_0 += 1;		//  Advance to the next Spin Up Delta Phase
+	
+		if(Spin_Ptr_0 >= 34)  Flags_0 &= 0x0F, spin_count_0=0, Spin_Ptr_0=33; 								//  Done with Spin Up so clear flag; Next do Cruise		
+		
 	}	
 	
 	else if((Flags_0 & 8)&&(CruiseStepsToGo_0 > 0))	//  Means there is a CCW Cruise pending or in process 
@@ -845,12 +731,16 @@ void TIM1_UP_IRQHandler(void)
 		*ptr = CruiseCurrent_0 * CosTable[Theta_0 + DEL0B];
 		CruiseStepsToGo_0 -= 1;												//  Finished this step, so decrement number of remaining steps
 		if(CruiseStepsToGo_0 == 0)  Flags_0 &= 0x07;	//  Done with Spin Up so clear flag; Next will do Spin Down
+	
 	}
 	
 	else if(Flags_0 & 4)														//  Means there is a CCW Spin Down pending or in process
 	{	
 	
-		Spin_Ptr_0 -= 1;															//  Drop back to the next Spin Down Delta Phase
+	  if(spin_count_0 >= Spin_Period) spin_count_0=0, Spin_Ptr_0 -= 1;
+		
+		spin_count_0++;
+				
 		Theta_0 -= DeltaPhase[Spin_Ptr_0];						//  Rotate the motor phase backward by the amount read from table
 		if(Theta_0 > 3600)   Theta_0 += 3600;					//  Check for roll under
 		ptr = (unsigned long *) TIM1_CCR4;						//  
@@ -859,11 +749,15 @@ void TIM1_UP_IRQHandler(void)
 		*ptr = SpinDownCurrent_0 * CosTable[Theta_0 + DEL0A];		
 		ptr = (unsigned long *) TIM1_CCR3;						//  
 		*ptr = SpinDownCurrent_0 * CosTable[Theta_0 + DEL0B];
-		if(Spin_Ptr_0 == 0)  
+		
+		
+		if(Spin_Ptr_0 == 0 && ((spin_count_0) >= Spin_Period))  
 		{
 			Flags_0 &= 0x03;														//  Done with Spin Down so clear flag; Next will do	Creep against stop
+			spin_count_0 = 0;
 			Drop_Mtr_Cur_0(0.05);												//	Drop current down to 5% of stall  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-		}		
+		}	
+		
 	}
 	
 	else if((Flags_0 & 2)&&(CCW_CreepStepsToGo_0 > 0))//  Means there is a CCW Low Current creep up (against the stop) pending or in process
@@ -924,6 +818,7 @@ void TIM1_UP_IRQHandler(void)
 //  Now do motor 1:  *******************************************************************************************************************************************
 	if(Flags_1 & 128)																	//  MSB high means there is a CW Spin Up pending or in process
 	{
+	
 		Theta_1 += DeltaPhase[Spin_Ptr_1];							//  Advance the motor phase by the amount read from table
 		if(Theta_1 >= 3600)   Theta_1 -= 3600;					//  Check for roll over
 		ptr = (unsigned long *) TIM8_CCR1;							//  Set ptr to point at the register for Motor_1 Phase 1
@@ -931,9 +826,13 @@ void TIM1_UP_IRQHandler(void)
 		ptr = (unsigned long *) TIM8_CCR2;							//  Set ptr to point at the register for Motor_1 Phase 2
 		*ptr = SpinUpCurrent_1 * CosTable[Theta_1+DEL1A];//  The calculated on time for Motor_1 Phase 2 is written to the compare register for TIM8 channel 2	
 		ptr = (unsigned long *) TIM8_CCR3;							//  Set ptr to point at the register for Motor_1 Phase 3
-		*ptr = SpinUpCurrent_1 * CosTable[Theta_1+DEL1B];//  The calculated on time for Motor_1 Phase 3 is written to the compare register for TIM8 channel 3	
-		Spin_Ptr_1 += 1;																//  Advance to the next Spin Up Delta Phase
-		if(Spin_Ptr_1 >= 378)  Flags_1 &= 0x7F;					//  Done with Spin Up so clear flag; Next will do Cruise
+		*ptr = SpinUpCurrent_1 * CosTable[Theta_1+DEL1B];//  The calculated on time for Motor_1 Phase 3 is written to the compare register for TIM8 channel 3
+		
+		spin_count_1++;
+		if(spin_count_1 >= Spin_Period) spin_count_1 = 0, Spin_Ptr_1 += 1;		//  Advance to the next Spin Up Delta Phase
+	
+		if(Spin_Ptr_1 >= 34)  Flags_1 &= 0x7F, spin_count_1=0, Spin_Ptr_1=33; 								//  Done with Spin Up so clear flag; Next do Cruise
+		
 	}
 	
 	else if((Flags_1 & 64)&&(CruiseStepsToGo_1 > 0))	//  Means there is a CW Cruise pending or in process
@@ -952,7 +851,8 @@ void TIM1_UP_IRQHandler(void)
 	
 	else if(Flags_1 & 32)														//  Means there is a CW Spin Down pending or in process
 	{	
-		Spin_Ptr_1 -= 1;															//  Drop back to the next Spin Down Delta Phase
+		if(spin_count_1 >= Spin_Period) spin_count_1=0, Spin_Ptr_1 -= 1;
+		spin_count_1++;
 	
 		Theta_1 += DeltaPhase[Spin_Ptr_1];						//  Advance the motor phase by the amount read from table
 		if(Theta_1 >= 3600)   Theta_1 -= 3600;				//  Check for roll over
@@ -962,15 +862,17 @@ void TIM1_UP_IRQHandler(void)
 		*ptr = SpinDownCurrent_1 * CosTable[Theta_1 + DEL1A];	
 		ptr = (unsigned long *) TIM8_CCR3;						//  This is the compare register for TIM8 channel 3
 		*ptr = SpinDownCurrent_1 * CosTable[Theta_1 + DEL1B];	
-		if(Spin_Ptr_1 == 0)														//  Done with Spin Down so clear flag; Next will do	Creep
+		if(Spin_Ptr_1 == 0 	&& (spin_count_1 >= Spin_Period))						//  Done with Spin Down so clear flag; Next will do	Creep
 		{			
 			Flags_1 &= 0x1F;
+			spin_count_1=0;
 			Drop_Mtr_Cur_1(0.05);												//	Drop current down to 5% of stall  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 		}			
 	}
 		
 	else if(Flags_1 & 16)														//  Means there is a CCW Spin Up pending or in process
 	{	
+
 		Theta_1 -= DeltaPhase[Spin_Ptr_1];						//  Rotate the motor phase backward by the amount read from table
 		if(Theta_1 > 3600)   Theta_1 += 3600;					//  Check for roll under
 		ptr = (unsigned long *) TIM8_CCR1;						//  This is the compare register for TIM8 channel 1
@@ -979,11 +881,14 @@ void TIM1_UP_IRQHandler(void)
 		*ptr = SpinUpCurrent_1 * CosTable[Theta_1 + DEL1A];	
 		ptr = (unsigned long *) TIM8_CCR3;						//  This is the compare register for TIM8 channel 3
 		*ptr = SpinUpCurrent_1 * CosTable[Theta_1 + DEL1B];	
-		Spin_Ptr_1 += 1;
-		if(Spin_Ptr_1 >= 378)  Flags_1 &= 0x0F;				//  Done with Spin Up so clear flag; Next will do Cruise
+		
+		spin_count_1++;
+		if(spin_count_1 >= Spin_Period) spin_count_1 = 0, Spin_Ptr_1 += 1;		//  Advance to the next Spin Up Delta Phase
+	
+		if(Spin_Ptr_1 >= 34)  Flags_1 &= 0x0F, spin_count_1=0, Spin_Ptr_1=33; 								//  Done with Spin Up so clear flag; Next do Cruise				
 	}	
 	
-	else if((Flags_1 & 8)&&(CruiseStepsToGo_1 > 0))														//  Means there is a CCW Cruise pending or in process
+	else if((Flags_1 & 8)&&(CruiseStepsToGo_1 > 0))													//  Means there is a CCW Cruise pending or in process
 	{	
 		Theta_1 -= 33;																//  Rotate 3.3 deg backward with each step
 		if(Theta_1 > 3600)   Theta_1 += 3600;					//  Check for roll under
@@ -999,8 +904,9 @@ void TIM1_UP_IRQHandler(void)
 	
 	else if(Flags_1 & 4)														//  Means there is a CCW Spin Down pending or in process
 	{	
-		Spin_Ptr_1 -= 1;															//  Drop back to the next Spin Down Delta Phase
-	
+		if(spin_count_1 >= Spin_Period) spin_count_1 = 0, Spin_Ptr_1 -= 1;
+		spin_count_1++;
+
 		Theta_1 -= DeltaPhase[Spin_Ptr_1];						//  Rotate the motor phase backward by the amount read from table
 		if(Theta_1 > 3600)   Theta_1 += 3600;					//  Check for roll under
 		ptr = (unsigned long *) TIM8_CCR1;						//  This is the compare register for TIM8 channel 1
@@ -1009,9 +915,11 @@ void TIM1_UP_IRQHandler(void)
 		*ptr = SpinDownCurrent_1 * CosTable[Theta_1 + DEL1A];	
 		ptr = (unsigned long *) TIM8_CCR3;						//  This is the compare register for TIM8 channel 3
 		*ptr = SpinDownCurrent_1 * CosTable[Theta_1 + DEL1B];	
-		if(Spin_Ptr_1 == 0)
+		
+		if(Spin_Ptr_1 == 0 && (spin_count_1 >= Spin_Period)) 
 		{
-			Flags_1 &= 0x03;														//  Done with Spin Down so clear flag; Next will do	Creep		
+			Flags_1 &= 0x03;														//  Done with Spin Down so clear flag; Next will do	Creep	
+			spin_count_1=0;
 			Drop_Mtr_Cur_1(0.05);												//	Drop current down to 5% of stall  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 		}		
 	}
@@ -1064,75 +972,47 @@ void TIM1_UP_IRQHandler(void)
 			if(CW_CreepStepsToGo_1 == 0)
 			{
 				Flags_1 &= 0x00;														//  Done with Creep; clear flag; Done with this motor rotation
-				Drop_Mtr_Cur_1(M1_Drop_Cur);							//  Set motor current to a low holding value
+				Drop_Mtr_Cur_1(M1_Drop_Cur);								//  Set motor current to a low holding value
 			}
 		}
 		++count_1;		
 	}
 	if(Set_Flags)																			//  This is to insure that an interrupt doesn't occur when the flags
-	{																									//  are only partially set up
-		
-		
-		//Set_Flags = 0;
-		
-		CW_OpCreepCur_0 = CreepCurrent_0;						//  Set the creep current to the commanded value.  This was set to 1
+	{																									//  are only partially set up	
+		Set_Flags = 0;		
+		CW_OpCreepCur_0 = CreepCurrent_0;								//  Set the creep current to the commanded value.  This was set to 1
 																										//  for the last 90 degrees of the last creep
-		CW_OpCreepCur_1 = CreepCurrent_1;						//  Set the creep current to the commanded value
+		CW_OpCreepCur_1 = CreepCurrent_1;								//  Set the creep current to the commanded value
 		
-		CCW_OpCreepCur_0 = CreepCurrent_0;					//   
-		CCW_OpCreepCur_1 = CreepCurrent_1;					//  
+		CCW_OpCreepCur_0 = CreepCurrent_0;							//   
+		CCW_OpCreepCur_1 = CreepCurrent_1;							//  
 
 		Flags_0 = Sh_Fl_0;
 		Flags_1 = Sh_Fl_1;
 		Sh_Fl_0 = 0;																		//  So it doesn't repeat the same thing the next time
 		Sh_Fl_1 = 0;
-		
 		Set_Flags = 0;
-		
 	}
 	
-		if(Set_Flags_0)																			//  This is to insure that an interrupt doesn't occur when the flags
-	{																									//  are only partially set up
-		
-		
-		Set_Flags_0 = 0;
-		
-		CW_OpCreepCur_0 = CreepCurrent_0;						//  Set the creep current to the commanded value.  This was set to 1
+		if(Set_Flags_0)																	//  This is to insure that an interrupt doesn't occur when the flags
+	{																									//  are only partially set up		
+		Set_Flags_0 = 0;	
+		CW_OpCreepCur_0 = CreepCurrent_0;								//  Set the creep current to the commanded value.  This was set to 1
 																										//  for the last 90 degrees of the last creep
-		//CW_OpCreepCur_1 = CreepCurrent_1;						//  Set the creep current to the commanded value
-		
-		CCW_OpCreepCur_0 = CreepCurrent_0;					//   
-		//CCW_OpCreepCur_1 = CreepCurrent_1;					//  
-
+		CCW_OpCreepCur_0 = CreepCurrent_0;							//   		
 		Flags_0 = Sh_Fl_0;
-		//Flags_1 = Sh_Fl_1;
 		Sh_Fl_0 = 0;																		//  So it doesn't repeat the same thing the next time
-		//Sh_Fl_1 = 0;
-		
 		
 	}
 	
-	if(Set_Flags_1)																			//  This is to insure that an interrupt doesn't occur when the flags
-	{																									//  are only partially set up
-		
-		
-		Set_Flags_1 = 0;
-		
-		//CW_OpCreepCur_0 = CreepCurrent_0;						//  Set the creep current to the commanded value.  This was set to 1
-																										//  for the last 90 degrees of the last creep
-		CW_OpCreepCur_1 = CreepCurrent_1;						//  Set the creep current to the commanded value
-		
-		//CCW_OpCreepCur_0 = CreepCurrent_0;					//   
-		CCW_OpCreepCur_1 = CreepCurrent_1;					//  
-
-		//Flags_0 = Sh_Fl_0;
+	if(Set_Flags_1)																		//  This is to insure that an interrupt doesn't occur when the flags
+	{																									//  are only partially set up	
+		Set_Flags_1 = 0;	
+		CW_OpCreepCur_1 = CreepCurrent_1;								//  Set the creep current to the commanded value
+		CCW_OpCreepCur_1 = CreepCurrent_1;							//  	
 		Flags_1 = Sh_Fl_1;
-		//Sh_Fl_0 = 0;																		//  So it doesn't repeat the same thing the next time
-		Sh_Fl_1 = 0;
-		
-		
+		Sh_Fl_1 = 0;			
 	}
-	
 	
 	ptr = (unsigned long *) GPIOA_ODR;								//	Set PA7 low again so can see the end of the ISR on oscilloscope
 	*ptr &= 0xFFFFFF7F;																//	
@@ -1187,18 +1067,18 @@ void Set_Up_Standard_GPIO(void)									//  Sets up the GPIO ports which are use
 
 void Set_Up_Alt_GPIO(void)											//  Set up the Alternate GPIO Functions:
 {																								//  See RM0008 Rev. 14 starting on page 166
-		unsigned long *ptr;
-		ptr = (unsigned long *) GPIOA_CRH;
-		*ptr &= 0xFFFF0000;													//  Sets 'alternative functions' for PA8, PA9, PA10 and PA11 (non-remapped outputs for TIM1 CH's)
-		*ptr |= 0x00009999;													//  '9' gives the alternative function with 10Mhz outputs  (probably can use 'A' which gives max
-																								//  speed of 2 Mhz and takes less power)
-		ptr = (unsigned long *) GPIOC_CRL;
-		*ptr &= 0x00FFFFFF;													//  Sets 'alternative functions' for PC6 and PC7 (non-remapped TIM8 CH1 & CH2)
-		*ptr |= 0x99000000;
+	unsigned long *ptr;
+	ptr = (unsigned long *) GPIOA_CRH;
+	*ptr &= 0xFFFF0000;													//  Sets 'alternative functions' for PA8, PA9, PA10 and PA11 (non-remapped outputs for TIM1 CH's)
+	*ptr |= 0x00009999;													//  '9' gives the alternative function with 10Mhz outputs  (probably can use 'A' which gives max
+																							//  speed of 2 Mhz and takes less power)
+	ptr = (unsigned long *) GPIOC_CRL;
+	*ptr &= 0x00FFFFFF;													//  Sets 'alternative functions' for PC6 and PC7 (non-remapped TIM8 CH1 & CH2)
+	*ptr |= 0x99000000;
 
-		ptr = (unsigned long *) GPIOC_CRH;
-		*ptr &= 0xFFFFFF00;													//  Sets 'alternative functions' for PC8 and PC9 (non-remapped TIM8 CH3 & CH4)
-		*ptr |= 0x00000099;
+	ptr = (unsigned long *) GPIOC_CRH;
+	*ptr &= 0xFFFFFF00;													//  Sets 'alternative functions' for PC8 and PC9 (non-remapped TIM8 CH3 & CH4)
+	*ptr |= 0x00000099;
 }	
 
 void Set_Up_Timer_Regs(void)										//  Set up the timer control registers
@@ -1249,15 +1129,156 @@ void Set_Up_Timer_Regs(void)										//  Set up the timer control registers
 		ptr = (unsigned long *) TIM8_BDTR;
 		*ptr = 0XC000;
 }
+
+void Set_Up_CAN_Filters(void)
+{
+	unsigned long *ptr;
+	unsigned short i = 0;
+	
+	// Cancel whatever filter they have set up, and set up one which accepts only the positioner with ID = pos_id but with any type code
+// First deactivate their filter(s)
+	ptr = (unsigned long *) CAN_FMR;		//  The FINIT bit has to be set = '1' to allow change of CAN_FA1R
+	*ptr |= 0x00000001;									//  (This is the FINIT bit)
+	ptr = (unsigned long *) CAN_FA1R;		//  Point to the register which selects which filters are active
+	*ptr &= 0xFFFFC000;									//  This should disable all 14 filters
+	ptr = (unsigned long *) CAN_FMR;		//  Now put the FINIT bit low again to activate the chosen filters (which is none of them)
+	*ptr &=0xFFFFFFFE;
+// Now set up a filter which accepts only CAN messages with ID = pos_id
+	ptr = (unsigned long *) CAN_FMR;		//  
+	*ptr |= 0x00000001;									//  The FINIT bit has to be set = '1' to allow change of CAN_FA1R
+	ptr = (unsigned long *) CAN_FA1R;		//  Point to the register which selects which filters are active
+	*ptr |= 0x00000003;									//  Enable filter 0 & 1
+	ptr = (unsigned long *) CAN_FFA1R;	//  Assign Filter 0 to FIFO 0 (i.e. messages which get thru this filter will end up in FIFO 0 as opposed to FIFO 1)
+	*ptr &= 0xFFFFFFFC;									// Set FFA0 to '0', Set FFA1 '0'
+	ptr = (unsigned long *) CAN_FS1R;		// Set Filter 0 to be a single 32 bit scale configuration//
+	*ptr |= 0x00000003;									// Set FSC0 to '1', Set FSC1 to '1'
+	ptr = (unsigned long *) CAN_FM1R;		// Set Filter 0 for Identifier Mask Mode//
+	*ptr &= 0xFFFFFFFC;									// Set FBM0 to '0', Set FBM1 to '0'
+	
+//  Set up the filter Identifier and Mask  (see p.640 and 668 among others)
+	ptr = (unsigned long *) 0x0801E800;	// Set to address of page 61 in flash
+	i=*ptr;
+	i=(unsigned short) i;
+	pos_id=i;
+	
+	ptr = (unsigned long *) CAN_F0R1;		// Set up filter 0 as a mask which accepts only the positioner specified by pos_id
+	*ptr = (i << 11) + 4;								// This is the IDENTIFIER we are looking to accept (the 4 is to set IDE)  (see p.640, 662, 668 for the structure of this)
+	
+	ptr = (unsigned long *) CAN_F0R2;		// This is the MASK.  
+	*ptr = 0xFFFFF806;									// Mask bit of '0' accepts either 1 or 0 in that bit; we have 1's for the Positioner ID and for IDE and RTR
+	
+	i=20000;
+	ptr = (unsigned long *) CAN_F1R1;		// Set up filter 0 as a mask which accepts only the positioner specified by pos_id
+	*ptr = (i << 11) + 4;								// This is the IDENTIFIER we are looking to accept (the 4 is to set IDE)  (see p.640, 662, 668 for the structure of this)
+	
+	ptr = (unsigned long *) CAN_F1R2;		// This is the MASK.  
+	*ptr = 0xFFFFF806;									// Mask bit of '0' accepts either 1 or 0 in that bit; we have 1's for the Positioner ID and for IDE and RTR
+	
+	ptr = (unsigned long *) CAN_FMR;		// Finally activiate the filters again
+	*ptr &=0xFFFFFFFC;									// Put the FINIT bit low again to activate Filter 0
+}
  
+unsigned long Get_UID_Lower(void){
+	
+	unsigned long *ptr;
+	unsigned long uid = 0x00000000;
+
+	ptr = (unsigned long *) 0x1FFFF7E8;		
+	data =*ptr;			
+	data=(unsigned char) data;
+	data_upper = (data >> 4) & 0x0F;
+	if(data_upper == 3) data_upper=0;
+	else if(data_upper == 4) data_upper=1;
+	else data_upper=2;
+	uid |= (data & 0x0F);
+	uid |= (data_upper << 4);
+
+	ptr = (unsigned long *) 0x1FFFF7EC;		
+	data =*ptr;			
+	data=(unsigned char) data;
+	data_upper = (data >> 4) & 0x0F;
+	if(data_upper == 3) data_upper=0;
+	else if(data_upper == 4) data_upper=1;
+	else data_upper=2;
+	uid |= ((data & 0x0F)<<6);
+	uid |= (data_upper << 10);
+			
+	ptr = (unsigned long *) 0x1FFFF7ED;		
+	data =*ptr;			
+	data=(unsigned char) data;
+	data_upper = (data >> 4) & 0x0F;
+	if(data_upper == 3) data_upper=0;
+	else if(data_upper == 4) data_upper=1;
+	else data_upper=2;
+	uid |= (data & 0x0F) << 12;
+	uid |= (data_upper << 16);
+	
+	ptr = (unsigned long *) 0x1FFFF7EE;		
+	data =*ptr;			
+	data=(unsigned char) data;
+	data_upper = (data >> 4) & 0x0F;
+	if(data_upper == 3) data_upper=0;
+	else if(data_upper == 4) data_upper=1;
+	else data_upper=2;
+	uid |= (data & 0x0F) << 18;
+	uid |= (data_upper << 22);
+
+	ptr = (unsigned long *) 0x1FFFF7EF;		
+	data =*ptr;			
+	data=(unsigned char) data;
+	data_upper = (data >> 4) & 0x0F;
+	if(data_upper == 3) data_upper=0;
+	else if(data_upper == 4) data_upper=1;
+	else data_upper=2;
+	uid |= (data & 0x0F) << 24;
+	uid |= (data_upper << 28);					
+	return(uid);
+}	
+	
+unsigned long Get_UID_Upper(unsigned long uid, int send){
+	
+	unsigned long *ptr;
+	unsigned long uid_upper = 0x00000000;
+
+	ptr = (unsigned long *) 0x1FFFF7F0;		
+	data =*ptr;			
+	data=(unsigned char) data;
+	uid_upper |= data;
+	
+	ptr = (unsigned long *) 0x1FFFF7F1;		
+	data =*ptr;			
+	data=(unsigned char) data;
+	uid_upper |= (data << 8);
+
+	ptr = (unsigned long *) 0x1FFFF7F2;		
+	data =*ptr;			
+	data=(unsigned char) data;
+	uid_upper |= (data << 16);
+
+	ptr = (unsigned long *) 0x1FFFF7F3;		
+	data =*ptr;			
+	data=(unsigned char) data;
+	data_upper = (data >> 4) & 0x0F;
+	if(data_upper == 3) data_upper=0;
+	else if(data_upper == 4) data_upper=1;
+	else data_upper=2;
+	uid_upper |= ((data & 0x0F) << 24);
+	uid_upper |= (data_upper << 28);
+	
+	if(send) send_CANmsg(pos_id, 8, uid, uid_upper);		
+	return(uid_upper);
+}
+
 /*----------------------------------------------------------------------------
   MAIN function
  *----------------------------------------------------------------------------*/
 int main (void)
-{
-	
+{	
 	unsigned long *ptr;
-	int i = 0;
+	unsigned short i = 0;
+	
+	unsigned long uid;
+	unsigned long uid_upper;
 	
 	ptr = (unsigned long *) RCC_APB2ENR;  				// Turn on clocks to AFIOEN (bit0), IOPA (bit2),
 	*ptr |= 0x0000AF3D;									  				// IOPB (bit3), IOPC (bit4), IOPD (bit5), IOPG (bit8),  TIM1 (bit11),  and TIM8 (bit13).
@@ -1271,72 +1292,37 @@ int main (void)
   SysTick_Config(SystemCoreClock / 1000);       // SysTick 1 msec IRQ       
   can_Init ();                                  // initialize CAN interface 
 //  Left from Keil's CAN example  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-// Cancel whatever filter they have set up, and set up one which accepts only the positioner with ID = POSITIONER_NR but with any type code
-// First deactivate their filter(s)
-	ptr = (unsigned long *) CAN_FMR;		//  The FINIT bit has to be set = '1' to allow change of CAN_FA1R
-	*ptr |= 0x00000001;									//  (This is the FINIT bit)
-	ptr = (unsigned long *) CAN_FA1R;		//  Point to the register which selects which filters are active
-	*ptr &= 0xFFFFC000;									//  This should disable all 14 filters
-	ptr = (unsigned long *) CAN_FMR;		//  Now put the FINIT bit low again to activate the chosen filters (which is none of them)
-	*ptr &=0xFFFFFFFE;
-// Now set up a filter which accepts only CAN messages with ID = POSITIONER_NR
-	ptr = (unsigned long *) CAN_FMR;		//  
-	*ptr |= 0x00000001;									//  The FINIT bit has to be set = '1' to allow change of CAN_FA1R
-	ptr = (unsigned long *) CAN_FA1R;		//  Point to the register which selects which filters are active
-	*ptr |= 0x00000001;									//  Enable filter 0
-	ptr = (unsigned long *) CAN_FFA1R;	//  Assign Filter 0 to FIFO 0 (i.e. messages which get thru this filter will end up in FIFO 0 as opposed to FIFO 1)
-	*ptr &= 0xFFFFFFFE;									// Set FFA0 to '0'
-	ptr = (unsigned long *) CAN_FS1R;		// Set Filter 0 to be a single 32 bit scale configuration//
-	*ptr |= 0x00000001;									// Set FSC0 to '1'
-	ptr = (unsigned long *) CAN_FM1R;		// Set Filter 0 for Identifier Mask Mode//
-	*ptr &= 0xFFFFFFFE;									// Set FBM0 to '0'
 	
-//  Set up the filter Identifier and Mask  (see p.640 and 668 among others)
-	i = POSITIONER_NR;
-	ptr = (unsigned long *) CAN_F0R1;		// Set up filter 0 as a mask which accepts only the positioner specified by POSITIONER_NR
-	*ptr = (i << 11) + 4;								// This is the IDENTIFIER we are looking to accept (the 4 is to set IDE)  (see p.640, 662, 668 for the structure of this)
+	Set_Up_CAN_Filters();
 	
-	ptr = (unsigned long *) CAN_F0R2;		// This is the MASK.  
-	*ptr = 0xFFFFF806;									// Mask bit of '0' accepts either 1 or 0 in that bit; we have 1's for the Positioner ID and for IDE and RTR
-	
-	ptr = (unsigned long *) CAN_FMR;		// Finally activiate the filters again
-	*ptr &=0xFFFFFFFE;									// Put the FINIT bit low again to activate Filter 0
-
 //	Set_Up_EXTI_Regs();   											//	These are currently used only for the demonstration/test sequences
 	Set_Up_Alt_GPIO();														//  Set up the Alternate GPIO Functions (Note that we are not doing any of the remapping shown on page 177)
 	Set_Up_Timer_Regs();													//  Set up the timer control registers
 	Set_Initial_Taus();														//  This sets the PWM outputs to the initial offset phase
 																								//  Enable Needed Interrupts
 	NVIC_EnableIRQ(TIM1_UP_IRQn); 								//  TIM1_UP_IRQn is the interrupt number which is 25;  for TIM8_up_IRQn  it's 44
-
+	
+	readsync_PB2();																//  To prevent initialization glitch
 //  Now sit and wait for a Timer Update interrupt, an EXTIx interrupt, or a CAN interrupt
 	while (1)
-	{
-		
-		if(legacy_mode) run_in_legacy_mode();
-		
-		else if(!legacy_mode){
-			
-			
+	{			
 		int command = 0;										//  This is a number between 0 and 255 which defines the command sent in the CAN message
 																				//  It is the LS 8 bits of the IDENTIFIER
+		unsigned long data_rcv;
+		unsigned long data_upper_rcv;
+	
 		int type = 0;
-		
 		int execute_now=0;									//This will be set in the code whenever we want to execute a command right away rather than waiting for a sync signal
 		int execute_code=0;									//This is defined by the CAN messages, as they are received, and specifies if a command is part of a move table, a single command or the last command of a move table
 		
-		
-		int stack_size=10;									//Max size of CAN message array (number of commands to upload before executing via sync)		
-		CAN_msg CAN_Com_Stack[10];
-				
+																				//Max size of CAN message array (number of commands to upload before executing via sync)	
     Delay (0);                  	 		   
 		if (!done){
 			bit_sum=0;
 		for(i=0; i < stack_size; i++){
 			while(!CAN_RxRdy);								//  I.e. a CAN message received interrupt has occurred
 				CAN_RxRdy = 0;
-			  execute_now=0;
+			  execute_now = 0;
 			
 				flash_PA6(50);									//  Flash PA6 for 50 msec when a CAN message is recognized
 			
@@ -1344,10 +1330,8 @@ int main (void)
 			
 				command = CAN_Com_Stack[i].id &= 0xFF;
 			 
-				if(command == 4){						//If command is 4 (move table command)
-				 		
-				execute_code = (CAN_Com_Stack[i].data[0] >> 4) & 0x3;
-					
+			if(command == 4){						//If command is 4 (move table command)	 		
+				execute_code = (CAN_Com_Stack[i].data[0] >> 4) & 0x3;				
 				switch(execute_code)
 				{				
 					case 0:											//single command, don't wait for sync just execute immediately
@@ -1360,7 +1344,7 @@ int main (void)
 					case 1:											//command is part of move table, but not last command --- keep filling move table
 							
 							bit_sum = bit_sum + (CAN_Com_Stack[i].data[0] + 65536*CAN_Com_Stack[i].data[1] + 256*CAN_Com_Stack[i].data[2] + CAN_Com_Stack[i].data[3] + 256*CAN_Com_Stack[i].data[4] + CAN_Com_Stack[i].data[5] + command);
-							send_CANmsg(1000, 1, 65536*CAN_Com_Stack[i].data[1] + 256*CAN_Com_Stack[i].data[2] + CAN_Com_Stack[i].data[3] );
+							
 						break;
 					
 					case 2:											//command is last command of move table, finished filling move table -- begin waiting for sync					
@@ -1368,64 +1352,66 @@ int main (void)
 							stack_size = i+1;				//all commands that have been uploaded will now be executed
 							bit_sum = bit_sum + (CAN_Com_Stack[i].data[0] + 65536*CAN_Com_Stack[i].data[1] + 256*CAN_Com_Stack[i].data[2] + CAN_Com_Stack[i].data[3] + 256*CAN_Com_Stack[i].data[4] + CAN_Com_Stack[i].data[5] + command);
 							i=stack_size;	
-							send_CANmsg(2, 2, 65536*CAN_Com_Stack[i].data[1] + 256*CAN_Com_Stack[i].data[2] + CAN_Com_Stack[i].data[3] );
-					
+									
 						break;
 				}//end switch
 			}// end if command 4
+				
+			else if(command == 16){		//set up fiducial command as synchronized
+				i=stack_size;
+				stack_size=1;
+				bit_sum_match=1;					
+			}
 			
-			else{														//data request or testing command, these will be executed immediately rather than as part of a move table
-					
+			else{														//data request or testing command, these will be executed immediately rather than as part of a move table				
 				execute_now=1;
 				i=stack_size;
 				stack_size=1;
-				bit_sum_match=1;
-				
+				bit_sum_match=1;			
 			}//end else
 			}// end for loop
 			done=1;
 		}// end if !done
 		
-		if(CAN_RxRdy && done){
-			//for executing move table on command or checking move table status, will be accessed when positioner is waiting for sync
+		if(CAN_RxRdy && done){//for executing move table on command or checking move table status, will be accessed when positioner is waiting for sync
 			CAN_RxRdy=0;
 			command=CAN_RxMsg.id &= 0xFF;
-			if (command == 8) execute_now = 1;
-			else if ((command == 8) && (CAN_RxMsg.data[0] == 4)){		//if movement status, respond with movement status = not moving
-				send_CANmsg(POSITIONER_NR, 4, 0);	
+			if (command == 7) execute_now = 1;  //if execute movetable command has been sent, set execute_now flag and begin execution without waiting for sync
+			
+			else if (command == 13){		//if movement status, respond with movement status (0 = not moving, 1= moving)
+				data=0;
+				if((Flags_0) || (Flags_1))	data=1;
+				if(Set_Flags || Set_Flags_0 || Set_Flags_1) data=1;;
+				send_CANmsg(pos_id, 1, data,0);		
 			}
-			else if(command == 9){ 
+			
+			else if(command == 8){ //check bitsum match, if no match will reset move table
 				data = (CAN_RxMsg.data[0] * 16777216) + (CAN_RxMsg.data[1] * 65536) + (CAN_RxMsg.data[2] * 256) + CAN_RxMsg.data[3];  //received bit sum
-	
 				if(data == bit_sum){
 					type=1;								//move table received, bitsum match
 					bit_sum_match=1;
-				}
-				
+				}	
 				else{
 					type=2;								//move table received, bitsum mismatch
 					done=0;								//reset previously received move table, positioner will now be ready to accept new commands rather than waiting for sync
-				}
-									
-				send_CANmsg(data, type, bit_sum);				//positioner status sent back, with computed bitsum 
+				}							
+				send_CANmsg(pos_id, 5, bit_sum, type);				//positioner status sent back, with computed bitsum 
 				bit_sum=0;							//reset bit sum
-			}//else if command 12
+			}//else if check bitsum match
 		}
-		
+			
 			if(done && (readsync_PB2() || execute_now) && bit_sum_match){			//if done filling move table as specified by CAN commands and either sync signal or immediate execution flag has been set
+			
 			execute_now=0;
 			bit_sum_match=0;								//reset bit_sum_match
 				
 			for(i=0; i<stack_size; i++){		//loop that executes the commands in the move table		
 			flash_PA6(50);
-				
-				
+					
 			command = CAN_Com_Stack[i].id &= 0xFF;	//  The command type is the 8 LSB's of the CAN message IDENTIFIER
 			switch(command)													//  The switch runs the program selected by command
-			{		
-				
-				case 2:																//  set_currents (Sets 8 current parameters)	
-					
+			{				
+				case 2:																//  set_currents (Sets 8 current parameters)		
 					SpinUpCurrent_0   = (float) CAN_Com_Stack[i].data[0]/100;
 					SpinDownCurrent_0 = SpinUpCurrent_0;
 					CruiseCurrent_0   = (float) CAN_Com_Stack[i].data[1]/100;
@@ -1439,23 +1425,17 @@ int main (void)
 					M1_Drop_Cur = (float) CAN_Com_Stack[i].data[7]/100;
 					break;
 					
-				case 3:															//  set_periods (Sets 4 parameters which use 2 bytes each)	
-					
-					CreepPeriod_0  = (CAN_Com_Stack[i].data[0] * 256) + CAN_RxMsg.data[1];
-					CreepPeriod_1 = (CAN_Com_Stack[i].data[2] * 256) + CAN_RxMsg.data[3];
-					Spin_Steps = (CAN_Com_Stack[i].data[4] * 256) + CAN_RxMsg.data[5];
-				
+				case 3:															//  set_periods (Sets 4 parameters which use 2 bytes each)			
+					CreepPeriod_0  = CAN_Com_Stack[i].data[0];
+					CreepPeriod_1 = CAN_Com_Stack[i].data[1];
+					Spin_Period = CAN_Com_Stack[i].data[2];			
 					break;
-					
-				
+							
 				case 4:																//  set_move_amounts 
 																							//  CW_CreepStepsToGo, CCW_CreepStepsToGo, and CruiseStepsToGo amounts are set individually for motor 0 and motor 1.
-																							//  Arguments are:  execute code, select flags, 4 bytes of data that represent the selected amount.
-				
-					
+																							//  Arguments are:  execute code, select flags, 4 bytes of data that represent the selected amount.			
 					type = CAN_Com_Stack[i].data[0] & 0xF;
 					execute_code = (CAN_Com_Stack[i].data[0] >> 4) & 0x3;
-					send_CANmsg(POSITIONER_NR, type, execute_code);										//For testing purposes
 					if(type == 4){											//if axis is 1, mode=creep, and direction = CW,0
 							CW_CreepStepsToGo_1= (CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
 							data=CW_CreepStepsToGo_1;
@@ -1464,8 +1444,7 @@ int main (void)
 									
 							//flags for M1 creep CW
 							Flag_Status_1=1;
-							Sh_Fl_1=1;
-							
+							Sh_Fl_1=1;					
 					}
 									
 					else if (type == 5){ 								//if axis 1, mode=creep, direction = CCW,1
@@ -1475,8 +1454,7 @@ int main (void)
 											
 							//flags for M1 Creep CCW
 							Flag_Status_1=1;
-							Sh_Fl_1=2;
-						
+							Sh_Fl_1=2;			
 					}
 					
 					else if(type == 6){									//if axis is 1, mode=cruise, CW
@@ -1487,8 +1465,7 @@ int main (void)
 						
 							//flags for M1 cruise CW
 							Flag_Status_1=1;
-							Sh_Fl_1=224;
-									
+							Sh_Fl_1=224;							
 					}
 					
 					else if(type == 7){								//if axis is 1, mode=cruise, CCW
@@ -1499,10 +1476,8 @@ int main (void)
 						
 							//flags for M1 cruise CCW
 							Flag_Status_1=1;
-							Sh_Fl_1=28;
-											
-					}
-					
+							Sh_Fl_1=28;								
+					}				
 					
 					else if(type == 0){									//if axis is 0, mode=creep, and direction = CW,0
 							CW_CreepStepsToGo_0=(CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
@@ -1512,8 +1487,7 @@ int main (void)
 						
 							//flags for M0 creep CW
 							Flag_Status_0=1;
-							Sh_Fl_0=1;
-						  
+							Sh_Fl_0=1;	  
 					}					
 					
 					else if (type == 1){ 								//if axis 0, mode=creep, direction = CCW,1
@@ -1524,8 +1498,7 @@ int main (void)
 						
 							//flags for M0 creep CCW
 							Flag_Status_0=1;
-							Sh_Fl_0=2;
-							
+							Sh_Fl_0=2;						
 					}
 					
 					else if(type == 2){								//if axis is 0, mode=cruise
@@ -1536,8 +1509,7 @@ int main (void)
 						
 							//flags for M0 cruise CW
 							Flag_Status_0=1;
-							Sh_Fl_0=224;
-													
+							Sh_Fl_0=224;											
 					}				
 					
 					else if(type == 3){								//if axis is 0, mode=cruise
@@ -1548,11 +1520,11 @@ int main (void)
 						
 							//flags for M0 cruise CCW
 							Flag_Status_0=1;
-							Sh_Fl_0=28;
-													
+							Sh_Fl_0=28;							
 					}		
 
-					else if(type == 8){
+					else if(type == 8){							//if just a pause is desired
+							post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
 							Delay(post_pause);
 							post_pause=0;
 					}	
@@ -1564,122 +1536,190 @@ int main (void)
 							if(CCW_CreepStepsToGo_0 == 0)			Sh_Fl_0 &= 0xFD;		//  anything to the timer ISR.				
 							if(CruiseStepsToGo_1 == 0)				Sh_Fl_1 &= 0xB7;
 							if(CW_CreepStepsToGo_1 == 0)			Sh_Fl_1 &= 0xFE;
-							if(CCW_CreepStepsToGo_1 == 0)			Sh_Fl_1 &= 0xFD;
-						
+							if(CCW_CreepStepsToGo_1 == 0)			Sh_Fl_1 &= 0xFD;				
 						
 							if(Flag_Status_0 && Flag_Status_1) Set_Flags=1;
 						  else if(Flag_Status_0 && !Flag_Status_1) Set_Flags_0=1;
 							else if(!Flag_Status_0 && Flag_Status_1) Set_Flags_1=1;
 						
-							Flag_Status_0 = Flag_Status_1 = 0;		
-						
+							Flag_Status_0 = Flag_Status_1 = 0;						
 					}
 					
-					else if(execute_code == 0 || execute_code == 2){
+					else if((execute_code == 0 || execute_code == 2) && (type != 8)){
 							if(CruiseStepsToGo_0 == 0)				Sh_Fl_0 &= 0xB7;		//  This fixes the hang-up which occurred if a Start command was sent with the 
 							if(CW_CreepStepsToGo_0 == 0)			Sh_Fl_0 &= 0xFE;		//  corresponding cruise or creep steps set to zero.  And it does it without adding
 							if(CCW_CreepStepsToGo_0 == 0)			Sh_Fl_0 &= 0xFD;		//  anything to the timer ISR.				
 							if(CruiseStepsToGo_1 == 0)				Sh_Fl_1 &= 0xB7;
 							if(CW_CreepStepsToGo_1 == 0)			Sh_Fl_1 &= 0xFE;
 							if(CCW_CreepStepsToGo_1 == 0)			Sh_Fl_1 &= 0xFD;
-						
-						
+										
 						  //Set_Flags for single command or last command in move table even if post_pause is 0
 							if(Flag_Status_0 && Flag_Status_1) Set_Flags=1;
 							else if(Flag_Status_0 && !Flag_Status_1) Set_Flags_0=1;
 							else if(!Flag_Status_0 && Flag_Status_1) Set_Flags_1=1;
 							
-							Flag_Status_0 = Flag_Status_1 = 0;	
-							send_CANmsg(Sh_Fl_1, Set_Flags_0, Set_Flags_1);										//For testing purposes
-						
+							Flag_Status_0 = Flag_Status_1 = 0;				
 					}
 					
-					Delay(post_pause);  																			//Wait specified time before executing next command
-					
-					send_CANmsg(POSITIONER_NR, type, data);										//For testing purposes
-					
-					break;		
-		
-					
-				case 5:													//  get_data
-						type=CAN_Com_Stack[i].data[0];
-						if(type == 1){//Temperature
-								ADC_Init();
-								ADC_StartCnv();
-							  Delay(10);
-							  ADC_StopCnv();
-							  data=ADC_GetCnv();					
-						}
+					Delay(post_pause);  																			//Wait specified time before executing next command	
 						
-						else if(type == 2){//CAN Id
-							data = POSITIONER_NR;
-						}
-						
-						else if(type == 3){//Firmware Version
-							data = FIRMWARE_VR;
-						}
-						
-						else if(type == 4){//Movement Status 
-								data=0;				 //not moving if this command is called from here
-						}
-						
-						else if(type == 5){//Current Monitor 1
-						
-						}
-						
-						else if(type == 6){//Current Monitor 2 
-							
-						}
-						
-						send_CANmsg(POSITIONER_NR, type, data);
-						
-					break;						
+					break;					
 
-				case 6:													//set_reset_leds
+				case 5:															//set_reset_leds
 					type=CAN_Com_Stack[i].data[0];
-					switch_PA4(type);
-					
+					switch_PA4(type);		
 					break;
 				
-				case 7:												//run_test_sequence
-					run_test_seq = !run_test_seq;							//set or reset flag for sending test patterns to motor pads, will be executed in interrupt handler
-				
-				
+				case 6:															//run_test_sequence
+					run_test_seq = !run_test_seq;			//set or reset flag for sending test patterns to motor pads, will be executed in interrupt handler		
 					break;
 				
-				case 8:												//execute_move_table
-					execute_now=1;
-					
+				case 7:															//execute_move_table
+					execute_now=1;				
 					break;
 				
-				case 9:												//get_move_table_status
-					
+				case 8:															//get_move_table_status		
 					data = bit_sum;
-					type = 3;											//ready for new move table
-					
-					send_CANmsg(POSITIONER_NR, type, data);
+					type = 3;													//ready for new move table			
+					send_CANmsg(pos_id, 5, data, type);				
+					break;
+				
+				//DATA COMMANDS
+				case 9:  //get_temperature
+					ADC_Init();
+					ADC_StartCnv();
+					Delay(10);
+					ADC_StopCnv();
+					data=ADC_GetCnv();
+					send_CANmsg(pos_id, 2, data,0);
+					break;
+				
+				case 10:	//get CAN_address
+					data = pos_id;
+					send_CANmsg(pos_id, 2, data,0);
+					break;
+				
+				case 11:  //get Firmware Version
+					data=FIRMWARE_VR;
+					send_CANmsg(pos_id, 1, data,0);
+					break;
+				
+				case 12:  //get device type (fiducial-1 or positioner-0)
+					data=device_type;	
+					send_CANmsg(pos_id, 1, data,0);
+					break;
+				
+				case 13:  //get movement status
+					data=0;
+					if((Flags_0) || (Flags_1))	data=1;
+					if(Set_Flags || Set_Flags_0 || Set_Flags_1) data=1;
+					send_CANmsg(pos_id, 1, data,0);
+					break;
+				
+				case 14:  //get Current Monitor 1 Value
 					
 					break;
 				
-				case 10:
-					
-					legacy_mode=!legacy_mode;
+				case 15:  //get Current Monitor 2 Value
 				
 					break;
-			
-		
+				
+				//FIDUCIAL SETTING	
+				case 16:  //set device as fiducial and set duty cycle	
+					device_type=CAN_Com_Stack[i].data[0];
+					if(device_type){
+						duty_cycle= (float) (256*CAN_Com_Stack[i].data[1]+CAN_Com_Stack[i].data[2])/65536;
+						period = (256*CAN_Com_Stack[i].data[3]+CAN_Com_Stack[i].data[4])*1000;
+						Delay(period);
+						duty_cycle= (float) 0;			//turn fiducial off
+					}
 					
-			}	// end switch
-		
+					break;	
+					
+				//SILICON ID AND FLASH COMMANDS
+				case 17:		//read silicon id lower
+					ptr = (unsigned long *) 0x1FFFF7E8;		
+					data =*ptr;				
+					
+					ptr = (unsigned long *) 0x1FFFF7EC;		
+					data_upper =*ptr;				
+					send_CANmsg(pos_id,8, data, data_upper);
+					break;
+					
+				case 18:  //read silicon id upper
+					ptr = (unsigned long *) 0x1FFFF7F0;		
+					data =*ptr;				
+					send_CANmsg(pos_id, 4, data,0);
+					break;
+				
+				case 19:  //read silicon id shortened
+					uid = Get_UID_Lower();
+					Get_UID_Upper(uid, 1);	
+					break;
+				
+				case 20:	//write CAN_address to flash if previously sent unique id command has set the set_can_id flag
+					if(set_can_id){ // if set_can_id flag was set by previously sent unique id check command
+						pos_id  = 256*CAN_Com_Stack[i].data[0] + CAN_Com_Stack[i].data[1];
+						flash_write(pos_id);
+					}
+					set_can_id=0;
+					Set_Up_CAN_Filters();  //Set up CAN address to be the one that we just wrote to flash
+					break;
+				
+				case 21:		//read memory location where CAN address has been stored
+					ptr=(unsigned long *) 0x0801E800;
+					data=*ptr;
+					data=(unsigned short) data;
+					send_CANmsg(pos_id, 2, data,0);
+					break;	
 
+				case 22:  //check unique id (lower) and set flag for writing to flash
+					ptr = (unsigned long *) 0x1FFFF7E8;		
+					data =*ptr;				
+				
+					ptr = (unsigned long *) 0x1FFFF7EC;		
+					data_upper = *ptr;		
+					
+					//lower 32 bits of received via CAN
+					data_rcv = (CAN_Com_Stack[i].data[4]*16777216) + (CAN_Com_Stack[i].data[5] * 65536) + (CAN_Com_Stack[i].data[6] * 256) + CAN_Com_Stack[i].data[7];
+					
+					//upper 32 bits received via CAN
+					data_upper_rcv = (CAN_Com_Stack[i].data[0]*16777216) + (CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
+					if(data==data_rcv && data_upper==data_upper_rcv) set_can_id=1;				
+					break;
+				
+				case 23:  //check unique id (lower) and set flag for writing to flash
+					ptr = (unsigned long *) 0x1FFFF7F0;		
+					data =*ptr;
+				
+					data_rcv = (CAN_Com_Stack[i].data[0]*16777216) + (CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
+					
+					if(data==data_rcv && set_can_id==1) set_can_id=1;
+					else set_can_id=0;
+					break;
+				
+				case 24:  //check unique id (shortened)
+					//lower 32 bits of received via CAN
+					uid = Get_UID_Lower();
+					uid_upper = Get_UID_Upper(uid, 0);
+				
+					data_rcv = (CAN_Com_Stack[i].data[4]*16777216) + (CAN_Com_Stack[i].data[5] * 65536) + (CAN_Com_Stack[i].data[6] * 256) + CAN_Com_Stack[i].data[7];
+					
+					//upper 32 bits received via CAN
+					data_upper_rcv = (CAN_Com_Stack[i].data[0]*16777216) + (CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
+				
+					if(uid==data_rcv && uid_upper==data_upper_rcv) set_can_id=1;
+					break;
+				
+				case 25: //firmware_cmd(code,data)?
+					
+					break;
+						
+			}	// end switch
 		} // end for execution loop
 			done=0;
-			
-		}//end if done/ readsync
-			
-	
-	}//end if !legacy_mode
-  }	//end while	
-		
+			stack_size=100;
+		}//end if done/readsync		
+  }	//end while			
 } // end main
 
