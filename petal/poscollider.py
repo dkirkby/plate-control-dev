@@ -411,10 +411,10 @@ class PosPoly(object):
         for this condition admittedly breaks some conceptual logic, but this case is not
         anticipated to occur given the DESI petal geometry, and speed is at a premium.
         """
-        for i in range(len(pts1[:-1])):
+        for i in range(len(pts1[0][:-1])):
             A1 = np.array([pts1[0,i],   pts1[1,i]])
             A2 = np.array([pts1[0,i+1], pts1[1,i+1]])
-            for j in range(len(pts2[:-1])):
+            for j in range(len(pts2[0][:-1])):
                 B1 = np.array([pts2[0,j],   pts2[1,j]])
                 B2 = np.array([pts2[0,j+1], pts2[1,j+1]])
                 if PosPoly._segments_intersect(A1,A2,B1,B2):
@@ -446,97 +446,3 @@ class PosPoly(object):
     def _rotmat2D_deg(angle):
         """Return the 2d rotation matrix for an angle given in degrees."""
         return PosPoly._rotmat2D_rad(np.deg2rad(angle))
-
-
-class PosPlot(object):
-    """Handles plotting visualizations for array of positioners.
-    """
-    def __init__(self, collider=None, fignum=0):
-        if not(collider):
-            self.collider = PosCollider()
-        else:
-            self.collider = collider
-        self.fig = plt.figure(fignum)
-        self.ax = plt.axes()
-        self.ferrules    = [None]*npos
-        self.phi_arms    = [None]*npos
-        self.ctr_bodies  = [None]*npos
-        self.collisions  = [None]*npos
-        self.fixed_items = []
-        self.properties = [{'prop_name' : 'ferrule',
-                            'linestyle' : '-',
-                            'linewidth' : 1,
-                            'linecolor' : 'blue',
-                            'fillcolor' : '0.3'},
-
-                           {'prop_name' : 'phi arm',
-                            'linestyle' : '-',
-                            'linewidth' : 1,
-                            'linecolor' : 'blue',
-                            'fillcolor' : '0.3'},
-
-                           {'prop_name' : 'central body',
-                            'linestyle' : '-',
-                            'linewidth' : 1,
-                            'linecolor' : 'blue',
-                            'fillcolor' : '0.3'},
-
-                           {'prop_name' : 'collision',
-                            'linestyle' : '-',
-                            'linewidth' : 2,
-                            'linecolor' : 'red',
-                            'fillcolor' : '0.6'},
-
-                           {'prop_name' : 'line at 180',
-                            'linestyle' : '-.',
-                            'linewidth' : 1,
-                            'linecolor' : '0.5',
-                            'fillcolor' : 'none'},
-
-                           {'prop_name' : 'Eo',
-                            'linestyle' : '--',
-                            'linewidth' : 1,
-                            'linecolor' : '0.3',
-                            'fillcolor' : 'none'},
-
-                           {'prop_name' : 'Ei',
-                            'linestyle' : '--',
-                            'linewidth' : 1,
-                            'linecolor' : '0.3',
-                            'fillcolor' : 'none'},
-
-                           {'prop_name' : 'petal',
-                            'linestyle' : '-',
-                            'linewidth' : 1,
-                            'linecolor' : '0.7',
-                            'fillcolor' : 'white'},
-
-                           {'prop_name' : 'GFA',
-                            'linestyle' : '-',
-                            'linewidth' : 1,
-                            'linecolor' : '0.7',
-                            'fillcolor' : 'white'},
-
-                           {'prop_name' : '',
-                            'linestyle' : '-',
-                            'linewidth' : 1,
-                            'linecolor' : 'black',
-                            'fillcolor' : 'white'}]
-
-    def set_phi(self, item_idx, time_idx, is_collision):
-        pass
-
-    def set_theta(self, item_idx, time_idx, is_collision):
-        pass
-
-    def set_fixed(self, item_idx, polygon, prop_name, is_collision):
-        pass
-
-    def update(self):
-        # go to next timestep
-        # set plot data to axes
-        pass
-
-    def plot(self):
-        self.update()
-        plt.show(block=False)
