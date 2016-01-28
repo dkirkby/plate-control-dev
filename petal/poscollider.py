@@ -33,7 +33,7 @@ class PosCollider(object):
         self.fixed_neighbor_cases = []
         self.load_config_data()
         self.plotting_on = True
-        self.plotter = PosPlot(fignum=0)
+        self.plotter = PosPlot(fignum=0, timestep=self.timestep)
 
     def add_positioners(self, posmodels):
         """Add a positioner or multiple positioners to the collider object.
