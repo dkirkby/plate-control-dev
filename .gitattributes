@@ -14,6 +14,7 @@ petal/poscollider.py -text
 petal/posconstants.py -text
 petal/posmodel.py -text
 petal/posmovetable.py -text
+petal/posplot.py -text
 petal/posschedule.py -text
 petal/posstate.py -text
 petal/postransforms.py -text
