@@ -1,98 +1,115 @@
-import poscollider
 import numpy as np
+from matplotlib import pyplot as plt
+from matplotlib import animation
+from poscollider import case
 
 class PosPlot(object):
     """Handles plotting animated visualizations for array of positioners.
     """
-    def __init__(self, collider=None, fignum=0):
-        if not(collider):
-            self.collider = PosCollider()
-        else:
-            self.collider = collider
+    def __init__(self, fignum=0):
+        self.fignum = fignum
         self.fig = plt.figure(fignum)
         self.ax = plt.axes()
-        self.poly = [] # list of arrays of polygon points, i.e. each element contains a 2xN polygon coordinates array
-        self.time = [] # list of time values, one element per poly, identifies when the poly is applied, duplicate times allowed
-        self.prop = [] # list of dictionaries, one element per poly, identifies properties of the poly
-        self.properties = [{'prop_name' : 'ferrule',
-                            'linestyle' : '-',
+        self.items = {} # keys shall identify the individual items that get drawn, i.e. 'ferrule 321', 'phi arm 42', 'GFA', etc
+                        # values are sub-dictionaries, with the entries:
+                        # {'time'  : [], # list of time values at which an update or change is to be applied
+                        #  'poly'  : [], # list of arrays of polygon points (each is 2xN), defining the item polygon to draw at that time
+                        #  'style' : [], # list of dictionaries, defining the plotting style to draw the polygon at that time
+                        #  'collision_time' : np.inf} # time at which collision occurs. if no collision, the time is inf
+        self.styles = {'ferrule':
+                           {'linestyle' : '-',
                             'linewidth' : 1,
                             'linecolor' : 'blue',
                             'fillcolor' : '0.3'},
 
-                           {'prop_name' : 'phi arm',
-                            'linestyle' : '-',
+                       'phi arm':
+                           {'linestyle' : '-',
                             'linewidth' : 1,
                             'linecolor' : 'blue',
                             'fillcolor' : '0.3'},
 
-                           {'prop_name' : 'central body',
-                            'linestyle' : '-',
+                       'central body':
+                           {'linestyle' : '-',
                             'linewidth' : 1,
                             'linecolor' : 'blue',
                             'fillcolor' : '0.3'},
 
-                           {'prop_name' : 'collision',
-                            'linestyle' : '-',
+                       'collision':
+                           {'linestyle' : '-',
                             'linewidth' : 2,
                             'linecolor' : 'red',
                             'fillcolor' : '0.6'},
 
-                           {'prop_name' : 'line at 180',
-                            'linestyle' : '-.',
+                       'line at 180':
+                           {'linestyle' : '-.',
                             'linewidth' : 1,
                             'linecolor' : '0.5',
                             'fillcolor' : 'none'},
 
-                           {'prop_name' : 'Eo',
-                            'linestyle' : '--',
+                       'Eo':
+                           {'linestyle' : '--',
                             'linewidth' : 1,
                             'linecolor' : '0.3',
                             'fillcolor' : 'none'},
 
-                           {'prop_name' : 'Ei',
-                            'linestyle' : '--',
+                       'Ei':
+                           {'linestyle' : '--',
                             'linewidth' : 1,
                             'linecolor' : '0.3',
                             'fillcolor' : 'none'},
 
-                           {'prop_name' : 'petal',
-                            'linestyle' : '-',
+                       'Ee':
+                           {'linestyle' : '--',
+                            'linewidth' : 1,
+                            'linecolor' : '0.1',
+                            'fillcolor' : 'none'},
+
+                       'PTL':
+                           {'linestyle' : '-',
                             'linewidth' : 1,
                             'linecolor' : '0.7',
                             'fillcolor' : 'white'},
 
-                           {'prop_name' : 'GFA',
-                            'linestyle' : '-',
+                       'GFA':
+                           {'linestyle' : '-',
                             'linewidth' : 1,
                             'linecolor' : '0.7',
-                            'fillcolor' : 'white'},
+                            'fillcolor' : 'white'}
+                       }
 
-                           {'prop_name' : '',
-                            'linestyle' : '-',
-                            'linewidth' : 1,
-                            'linecolor' : 'black',
-                            'fillcolor' : 'white'}]
+    def clear(self):
+        self = PosPlot(self.fignum)
 
-
-
-    def add_polygon_update(self, item_str, time, polygon_points, collision_case):
-        if len(self.time) == 0 or time >= max(self.time):
-            idx = len(self.time)
-        elif time < min(self.time):
-            idx = 0
+    def add_or_change_item(self, item_str, item_idx, time, polygon_points, collision_case=case.I):
+        key = str(item_str) + ' ' + str(item_idx)
+        if key not in self.items.keys():
+            item = {'time':[], 'poly':[], 'style':[], 'collision_time':np.inf}
         else:
-            idx = [i for i in range(len(self.time)) if self.time[i] > time][0] - 1
-        self.time.insert(idx, time)
-        self.poly.insert(idx, polygon_points)
-        if collision_case == case.I:
-            prop = self.get_prop(item_str)
+            item = self.items[key]
+        if time in item['time']:
+            idx = item['time'].index(time)
+            replace_existing_timestep = True
         else:
-            prop = self.get_prop('collision')
-        self.prop.insert(idx, prop)
-
-    def get_prop(self, name):
-        return [DICT for DICT in self.properties if DICT['name'] == name][0]
+            replace_existing_timestep = False
+            if len(item['time']) == 0 or time >= max(item['time']):
+                idx = len(item['time'])
+            elif time < min(item['time']):
+                idx = 0
+            else:
+                idx = [i for i in range(len(item['time'])) if item['time'][i] > time][0] - 1
+        if collision_case == case.I and time < item['collision_time']:
+            style = self.styles[item_str]
+        else:
+            style = self.styles['collision']
+            item['collision_time'] = min(time, item['collision_time'])
+        if replace_existing_timestep:
+            item['poly'][idx] = polygon_points
+            item['style'][idx] = style
+        else:
+            item['time'].insert(idx, time)
+            item['poly'].insert(idx, polygon_points)
+            item['style'].insert(idx, style)
+        self.items[key] = item
 
     def update(self):
         # go to next timestep

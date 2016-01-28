@@ -33,7 +33,7 @@ class PosCollider(object):
         self.fixed_neighbor_cases = []
         self.load_config_data()
         self.plotting_on = True
-        self.plotter = PosPlot(self)
+        self.plotter = PosPlot(fignum=0)
 
     def add_positioners(self, posmodels):
         """Add a positioner or multiple positioners to the collider object.
@@ -55,23 +55,29 @@ class PosCollider(object):
         for p in self.posmodels:
             self._identify_neighbors(p)
 
-    def animate(self, sweeps):
-        """describe...
+    def set_animation(self, sweeps):
+        """Sets up an animation in the plotter of positioners moving about the petal.
             sweeps ... list of PosSweep instances describing positioners' real-time moves
         """
         self.plotter.clear()
+        all_times = [s.time for s in sweeps]
+        global_start = np.min([np.min(t) for t in all_times])
+        self.plotter.add_or_change_item('GFA', '', global_start, self.keepout_GFA.points)
+        self.plotter.add_or_change_item('PTL', '', global_start, self.keepout_PTL.points)
+        for i in range(len(self.posmodels)):
+            self.plotter.add_or_change_item('Eo', i, global_start, self.Eo_polys[i].points)
+            self.plotter.add_or_change_item('Ei', i, global_start, self.Ei_polys[i].points)
+            self.plotter.add_or_change_item('Ee', i, global_start, self.Ee_polys[i].points)
+            self.plotter.add_or_change_item('line at 180', i, global_start, self.line180_polys[i].points)
         for s in sweeps:
-            collision_case = case.I
             for i in range(len(s.time)):
-                if s.time[i] >= s.collision_time:
-                    collision_case = s.collision_case
-                self.plotter.add_polygon_update('central body', s.time[i], self.place_central_body(s.posidx, s.tp[0,i]).points, collision_case)
-                self.plotter.add_polygon_update('phi arm',      s.time[i], self.place_phi_arm(s.posidx, s.tp[:,i]).points,      collision_case)
-                self.plotter.add_polygon_update('ferrule',      s.time[i], self.place_ferrule(s.posidx, s.tp[:,i]).points,      collision_case)
-                if collision_case == case.GFA:
-                    self.plotter.add_polygon_update('GFA', s.time[i],  self.keepout_GFA.points, collision_case)
-                elif collision_case == case.PTL:
-                    self.plotter.add_polygon_update('petal', s.time[i], self.keepout_PTL.points, collision_case)
+                self.plotter.add_or_change_item('central body', s.posidx, s.time[i], self.place_central_body(s.posidx, s.tp[0,i]).points, s.collision_case)
+                self.plotter.add_or_change_item('phi arm',      s.posidx, s.time[i], self.place_phi_arm(s.posidx, s.tp[:,i]).points,      s.collision_case)
+                self.plotter.add_or_change_item('ferrule',      s.posidx, s.time[i], self.place_ferrule(s.posidx, s.tp[:,i]).points,      s.collision_case)
+                if s.collision_case == case.GFA:
+                    self.plotter.add_or_change_item('GFA', '', s.time[i], self.keepout_GFA.points, case.GFA)
+                elif s.collision_case == case.PTL:
+                    self.plotter.add_or_change_item('PTL', '', s.time[i], self.keepout_PTL.points, case.PTL)
         # tell the plotter to plot, etc
 
     def spactime_collision_between_positioners(self, idxA, init_obsTP_A, tableA, idxB, init_obsTP_B, tableB):
@@ -296,18 +302,21 @@ class PosCollider(object):
         self.Eo = self.config['ENVELOPE_EO']  # outer clear rotation envelope
         self.Ei = self.config['ENVELOPE_EI']  # inner clear rotation envelope
         self.Ee = self._max_extent * 2        # extended-phi clear rotation envelope
-        self.Eo_poly = PosPoly(self._circle_poly_points(self.Eo, self.config['RESOLUTION_EO']))
-        self.Ei_poly = PosPoly(self._circle_poly_points(self.Ei, self.config['RESOLUTION_EI']))
-        self.Ee_poly = PosPoly(self._circle_poly_points(self.Ee, self.config['RESOLUTION_EE']))
+        Eo_poly = PosPoly(self._circle_poly_points(self.Eo, self.config['RESOLUTION_EO']))
+        Ei_poly = PosPoly(self._circle_poly_points(self.Ei, self.config['RESOLUTION_EI']))
+        Ee_poly = PosPoly(self._circle_poly_points(self.Ee, self.config['RESOLUTION_EE']))
+        line180_poly = PosPoly([[0,0],[-self._max_extent,0]])
         self.Eo_polys = []
         self.Ei_polys = []
         self.Ee_polys = []
+        self.line180_polys = []
         for i in range(len(self.posmodels)):
             x = self.xy0[0,i]
             y = self.xy0[1,i]
-            self.Eo_polys.append(self.Eo_poly.translated(x,y))
-            self.Ei_polys.append(self.Ei_poly.translated(x,y))
-            self.Ee_polys.append(self.Ee_poly.translated(x,y))
+            self.Eo_polys.append(Eo_poly.translated(x,y))
+            self.Ei_polys.append(Ei_poly.translated(x,y))
+            self.Ee_polys.append(Ee_poly.translated(x,y))
+            self.line180_polys.append(line180_poly.rotated(self.tp0[0,i]).translated(x,y))
         self.ferrule_diam = self.config['FERRULE_DIAM']
         self.ferrule_poly = PosPoly(self._circle_poly_points(self.ferrule_diam, self.config['FERRULE_RESLN']))
 
