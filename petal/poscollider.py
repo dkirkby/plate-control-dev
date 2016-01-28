@@ -6,8 +6,7 @@ import enum
 
 class case(enum.Enum):
     """Enumeration of collision cases. The I, II, and III cases are described in
-    detail in DESI-0899. Type I is specifically enumerated equal to zero, so that
-    the "no collision" case can be tersely checked.
+    detail in DESI-0899.
     """
     I    = 0  # no collision
     II   = 1  # phi arm against neighboring phi arm
@@ -61,15 +60,18 @@ class PosCollider(object):
             sweeps ... list of PosSweep instances describing positioners' real-time moves
         """
         self.plotter.clear()
-        # get max time of all sweeps
-        # set that number of time indexes for the plotter
         for s in sweeps:
-            for t in s.time:
-                # place the theta polygon
-                # place the phi polygon
-                # place the ferrule polygon
-                # if collision, set the appropriate properties, for that collision type
-                pass
+            collision_case = case.I
+            for i in range(len(s.time)):
+                if s.time[i] >= s.collision_time:
+                    collision_case = s.collision_case
+                self.plotter.add_polygon_update('central body', s.time[i], self.place_central_body(s.posidx, s.tp[0,i]).points, collision_case)
+                self.plotter.add_polygon_update('phi arm',      s.time[i], self.place_phi_arm(s.posidx, s.tp[:,i]).points,      collision_case)
+                self.plotter.add_polygon_update('ferrule',      s.time[i], self.place_ferrule(s.posidx, s.tp[:,i]).points,      collision_case)
+                if collision_case == case.GFA:
+                    self.plotter.add_polygon_update('GFA', s.time[i],  self.keepout_GFA.points, collision_case)
+                elif collision_case == case.PTL:
+                    self.plotter.add_polygon_update('petal', s.time[i], self.keepout_PTL.points, collision_case)
         # tell the plotter to plot, etc
 
     def spactime_collision_between_positioners(self, idxA, init_obsTP_A, tableA, idxB, init_obsTP_B, tableB):
@@ -114,10 +116,10 @@ class PosCollider(object):
         pospos = True if idxB else False # whether this is checking collisions between two positioners (or if false, between one positioner and fixed keepouts)
         if pospos:
             tables = [tableA,tableB]
-            sweeps = [PosSweep(), PosSweep()]
+            sweeps = [PosSweep(idxA), PosSweep(idxB)]
         else:
             tables = [tableA]
-            sweeps = [PosSweep()]
+            sweeps = [PosSweep(idxA)]
         for table in tables:
             table['start_prepause'] = [time_start]
             table['start_move'] = []
@@ -348,11 +350,12 @@ class PosSweep(object):
     """Contains a real-time description of the sweep of positioner mechanical
     geometries through space.
     """
-    def __init__(self):
-        time = []                 # real time at which each TP position value occurs
-        tp   = []                 # theta,phi angles corresponding to time
-        collision_case = case.I   # enumeration of type "case", indicating what kind of collision first detected, if any
-        collision_time = inf      # time at which collision occurs. if no collision, the time is inf
+    def __init__(self, posidx=None):
+        self.posidx = posidx           # index identifying the positioner
+        self.time = []                 # real time at which each TP position value occurs
+        self.tp   = []                 # theta,phi angles corresponding to time
+        self.collision_case = case.I   # enumeration of type "case", indicating what kind of collision first detected, if any
+        self.collision_time = inf      # time at which collision occurs. if no collision, the time is inf
 
 
 class PosPoly(object):

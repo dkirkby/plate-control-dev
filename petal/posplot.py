@@ -1,4 +1,5 @@
 import poscollider
+import numpy as np
 
 class PosPlot(object):
     """Handles plotting animated visualizations for array of positioners.
@@ -10,11 +11,9 @@ class PosPlot(object):
             self.collider = collider
         self.fig = plt.figure(fignum)
         self.ax = plt.axes()
-        self.ferrules    = [None]*npos
-        self.phi_arms    = [None]*npos
-        self.ctr_bodies  = [None]*npos
-        self.collisions  = [None]*npos
-        self.fixed_items = []
+        self.poly = [] # list of arrays of polygon points, i.e. each element contains a 2xN polygon coordinates array
+        self.time = [] # list of time values, one element per poly, identifies when the poly is applied, duplicate times allowed
+        self.prop = [] # list of dictionaries, one element per poly, identifies properties of the poly
         self.properties = [{'prop_name' : 'ferrule',
                             'linestyle' : '-',
                             'linewidth' : 1,
@@ -75,14 +74,25 @@ class PosPlot(object):
                             'linecolor' : 'black',
                             'fillcolor' : 'white'}]
 
-    def set_phi(self, item_idx, time_idx, is_collision):
-        pass
 
-    def set_theta(self, item_idx, time_idx, is_collision):
-        pass
 
-    def set_fixed(self, item_idx, polygon, prop_name, is_collision):
-        pass
+    def add_polygon_update(self, item_str, time, polygon_points, collision_case):
+        if len(self.time) == 0 or time >= max(self.time):
+            idx = len(self.time)
+        elif time < min(self.time):
+            idx = 0
+        else:
+            idx = [i for i in range(len(self.time)) if self.time[i] > time][0] - 1
+        self.time.insert(idx, time)
+        self.poly.insert(idx, polygon_points)
+        if collision_case == case.I:
+            prop = self.get_prop(item_str)
+        else:
+            prop = self.get_prop('collision')
+        self.prop.insert(idx, prop)
+
+    def get_prop(self, name):
+        return [DICT for DICT in self.properties if DICT['name'] == name][0]
 
     def update(self):
         # go to next timestep
