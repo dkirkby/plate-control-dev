@@ -1,7 +1,7 @@
 import numpy as np
+import posconstants as pc
 from matplotlib import pyplot as plt
 from matplotlib import animation
-from poscollider import case
 
 class PosPlot(object):
     """Handles plotting animated visualizations for array of positioners.
@@ -81,7 +81,7 @@ class PosPlot(object):
     def clear(self):
         self = PosPlot(self.fignum, self.timestep)
 
-    def add_or_change_item(self, item_str, item_idx, time, polygon_points, collision_case=case.I):
+    def add_or_change_item(self, item_str, item_idx, time, polygon_points, collision_case=pc.case.I):
         """Add a polygonal item at a particular time to the animation data.
         """
         key = str(item_str) + ' ' + str(item_idx)
@@ -103,7 +103,7 @@ class PosPlot(object):
                     if item['time'][i] > time:
                         idx = i - 1  # this is where the new timestep data will get inserted
                         break
-        if collision_case == case.I and time < item['collision_time']:
+        if collision_case == pc.case.I and time < item['collision_time']:
             style = self.styles[item_str]
         else:
             style = self.styles['collision']

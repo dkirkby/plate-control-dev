@@ -1,19 +1,9 @@
 import numpy as np
 import posconstants as pc
 import postransforms
+import posplot
 import configobj
-import enum
 
-class case(enum.Enum):
-    """Enumeration of collision cases. The I, II, and III cases are described in
-    detail in DESI-0899.
-    """
-    I    = 0  # no collision
-    II   = 1  # phi arm against neighboring phi arm
-    IIIA = 2  # phi arm of positioner 'A' against neighbor 'B' central body
-    IIIB = 3  # phi arm of positioner 'B' against neighbor 'A' central body
-    GFA  = 4  # phi arm against the GFA fixed keepout envelope
-    PTL  = 5  # phi arm against the Petal edge keepout envelope
 
 class PosCollider(object):
     """PosCollider contains geometry definitions for mechanical components of the
@@ -31,17 +21,17 @@ class PosCollider(object):
         self.posmodels = []
         self.pos_neighbor_idxs = []
         self.fixed_neighbor_cases = []
-        self.load_config_data()
         self.plotting_on = True
-        self.plotter = PosPlot(fignum=0, timestep=self.timestep)
+        self.timestep = self.config['TIMESTEP']
+        self.plotter = posplot.PosPlot(fignum=0, timestep=self.timestep)
 
     def add_positioners(self, posmodels):
         """Add a positioner or multiple positioners to the collider object.
         """
         (pm, was_not_list) = pc.listify(posmodels, keep_flat=True)
         self.posmodels.extend(pm)
-        self.pos_neighbor_idxs.extend([[]]*length(pm))
-        self.fixed_neighbor_cases.extend([[]]*length(pm))
+        self.pos_neighbor_idxs.extend([[] for i in range(len(pm))])
+        self.fixed_neighbor_cases.extend([[] for i in range(len(pm))])
         self.load_config_data()
 
     def load_config_data(self):
@@ -74,10 +64,10 @@ class PosCollider(object):
                 self.plotter.add_or_change_item('central body', s.posidx, s.time[i], self.place_central_body(s.posidx, s.tp[0,i]).points, s.collision_case)
                 self.plotter.add_or_change_item('phi arm',      s.posidx, s.time[i], self.place_phi_arm(s.posidx, s.tp[:,i]).points,      s.collision_case)
                 self.plotter.add_or_change_item('ferrule',      s.posidx, s.time[i], self.place_ferrule(s.posidx, s.tp[:,i]).points,      s.collision_case)
-                if s.collision_case == case.GFA:
-                    self.plotter.add_or_change_item('GFA', '', s.time[i], self.keepout_GFA.points, case.GFA)
-                elif s.collision_case == case.PTL:
-                    self.plotter.add_or_change_item('PTL', '', s.time[i], self.keepout_PTL.points, case.PTL)
+                if s.collision_case == pc.case.GFA:
+                    self.plotter.add_or_change_item('GFA', '', s.time[i], self.keepout_GFA.points, pc.case.GFA)
+                elif s.collision_case == pc.case.PTL:
+                    self.plotter.add_or_change_item('PTL', '', s.time[i], self.keepout_PTL.points, pc.case.PTL)
         # tell the plotter to plot, etc
 
     def spactime_collision_between_positioners(self, idxA, init_obsTP_A, tableA, idxB, init_obsTP_B, tableB):
@@ -184,26 +174,26 @@ class PosCollider(object):
         was first detected, if any.
         """
         if obsTP_A[1] >= self.Eo_phi and obsTP_B[1] >= self.Eo_phi:
-            return case.I
+            return pc.case.I
         elif obsTP_A[1] < self.Eo_phi and obsTP_B[1] >= self.Ei_phi: # check case IIIA
             if self._case_III_collision(idxA, idxB, obsTP_A, obsTP_B[0]):
-                return case.IIIA
+                return pc.case.IIIA
             else:
-                return case.I
+                return pc.case.I
         elif obsTP_B[1] < self.Eo_phi and obsTP_A[1] >= self.Ei_phi: # check case IIIB
             if self._case_III_collision(idxB, idxA, obsTP_B, obsTP_A[0]):
-                return case.IIIB
+                return pc.case.IIIB
             else:
-                return case.I
+                return pc.case.I
         else: # check cases II and III
             if self._case_III_collision(idxA, idxB, obsTP_A, obsTP_B[0]):
-                return case.IIIA
+                return pc.case.IIIA
             elif self._case_III_collision(idxB, idxA, obsTP_B, obsTP_A[0]):
-                return case.IIIB
+                return pc.case.IIIB
             elif self._case_II_collision(idx1, idx2, obsTP_A, obsTP_B):
-                return case.II
+                return pc.case.II
             else:
-                return case.I
+                return pc.case.I
 
     def spatial_collision_with_fixed(self, idx, obsTP):
         """Searches for collisions in space between a fiber positioner and all
@@ -224,7 +214,7 @@ class PosCollider(object):
                 poly2 = self.fixed_neighbor_keepouts[fixed_case]
                 if poly1.collides_with(poly2):
                     return fixed_case
-        return case.I
+        return pc.case.I
 
     def place_phi_arm(self, idx, obsTP):
         """Rotates and translates the phi arm to position defined by the positioner's
@@ -275,7 +265,7 @@ class PosCollider(object):
         self.keepout_GFA = PosPoly(self.config['KEEPOUT_GFA'], self.config['KEEPOUT_GFA_PT0'])
         self.keepout_GFA = self.keepout_GFA.rotated(self.config['KEEPOUT_GFA_ROT'])
         self.keepout_GFA = self.keepout_GFA.translated(self.config['KEEPOUT_GFA_X0'],self.config['KEEPOUT_GFA_Y0'])
-        self.fixed_neighbor_keepouts = {case.PTL : self.keepout_PTL, case.GFA : self.keepout_GFA}
+        self.fixed_neighbor_keepouts = {pc.case.PTL : self.keepout_PTL, pc.case.GFA : self.keepout_GFA}
 
     def _load_positioner_params(self):
         """Read latest versions of all positioner parameters."""
@@ -284,7 +274,7 @@ class PosCollider(object):
         self.R2 = np.zeros(n)
         self.xy0 = np.zeros((2,n))
         self.tp0 = np.zeros((2,n))
-        self.tp_ranges = [[]]*n
+        self.tp_ranges = [[] for i in range(n)]
         for i in range(len(self.posmodels)):
             self.R1[i] = self.posmodels[i].state.read('LENGTH_R1')
             self.R2[i] = self.posmodels[i].state.read('LENGTH_R2')
@@ -301,11 +291,11 @@ class PosCollider(object):
         self.Ei_phi = self.config['PHI_EI']   # angle above which phi is guaranteed to be within envelope Ei
         self.Eo = self.config['ENVELOPE_EO']  # outer clear rotation envelope
         self.Ei = self.config['ENVELOPE_EI']  # inner clear rotation envelope
-        self.Ee = self._max_extent * 2        # extended-phi clear rotation envelope
-        Eo_poly = PosPoly(self._circle_poly_points(self.Eo, self.config['RESOLUTION_EO']))
-        Ei_poly = PosPoly(self._circle_poly_points(self.Ei, self.config['RESOLUTION_EI']))
-        Ee_poly = PosPoly(self._circle_poly_points(self.Ee, self.config['RESOLUTION_EE']))
-        line180_poly = PosPoly([[0,0],[-self._max_extent,0]])
+        self.Ee = self._max_extent() * 2        # extended-phi clear rotation envelope
+        self.Eo_poly = PosPoly(self._circle_poly_points(self.Eo, self.config['RESOLUTION_EO']))
+        self.Ei_poly = PosPoly(self._circle_poly_points(self.Ei, self.config['RESOLUTION_EI']))
+        self.Ee_poly = PosPoly(self._circle_poly_points(self.Ee, self.config['RESOLUTION_EE']))
+        self.line180_poly = PosPoly([[0,0],[-self._max_extent(),0]],close_polygon=False)
         self.Eo_polys = []
         self.Ei_polys = []
         self.Ee_polys = []
@@ -313,29 +303,29 @@ class PosCollider(object):
         for i in range(len(self.posmodels)):
             x = self.xy0[0,i]
             y = self.xy0[1,i]
-            self.Eo_polys.append(Eo_poly.translated(x,y))
-            self.Ei_polys.append(Ei_poly.translated(x,y))
-            self.Ee_polys.append(Ee_poly.translated(x,y))
-            self.line180_polys.append(line180_poly.rotated(self.tp0[0,i]).translated(x,y))
+            self.Eo_polys.append(self.Eo_poly.translated(x,y))
+            self.Ei_polys.append(self.Ei_poly.translated(x,y))
+            self.Ee_polys.append(self.Ee_poly.translated(x,y))
+            self.line180_polys.append(self.line180_poly.rotated(self.tp0[0,i]).translated(x,y))
         self.ferrule_diam = self.config['FERRULE_DIAM']
         self.ferrule_poly = PosPoly(self._circle_poly_points(self.ferrule_diam, self.config['FERRULE_RESLN']))
 
     def _identify_neighbors(self, posmodel):
         """Find all neighbors which can possibly collide with a given posmodel."""
         p1 = self.posmodels.index(posmodel)
-        Ee1 = self.Ee_poly.translated(xy0[0,p1], xy0[1,p1])
+        Ee1 = self.Ee_poly.translated(self.xy0[0,p1], self.xy0[1,p1])
         for p2 in range(len(self.posmodels)):
-            Ee2 = self.Ee_poly.translated(xy0[0,p2], xy0[1,p2])
-            if not(p1 == p2) and spatial_collision_between(Ee1,Ee2):
+            Ee2 = self.Ee_poly.translated(self.xy0[0,p2], self.xy0[1,p2])
+            if not(p1 == p2) and Ee1.collides_with(Ee2):
                 self.pos_neighbor_idxs[p1].append(p2)
         for p2 in self.fixed_neighbor_keepouts.keys():
-            if spatial_collision_between(Ee1,self.fixed_neighbor_keepouts[p2]):
+            if Ee1.collides_with(self.fixed_neighbor_keepouts[p2]):
                 self.fixed_neighbor_cases[p1].append(p2)
 
     def _max_extent(self):
         """Calculation of max radius of keepout for a positioner with fully-extended phi arm."""
         extended_phi = self.keepout_P.translated(np.max(self.R1),0) # assumption here that phi arm polygon defined at 0 deg angle
-        return max(np.sqrt(np.sum(extended_phi**2, axis=0)))
+        return max(np.sqrt(np.sum(extended_phi.points**2, axis=0)))
 
     @staticmethod
     def _circle_poly_points(diameter, npts, outside=True):
@@ -363,7 +353,7 @@ class PosSweep(object):
         self.posidx = posidx           # index identifying the positioner
         self.time = []                 # real time at which each TP position value occurs
         self.tp   = []                 # theta,phi angles corresponding to time
-        self.collision_case = case.I   # enumeration of type "case", indicating what kind of collision first detected, if any
+        self.collision_case = pc.case.I   # enumeration of type "case", indicating what kind of collision first detected, if any
         self.collision_time = inf      # time at which collision occurs. if no collision, the time is inf
 
 
