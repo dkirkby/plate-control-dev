@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import itertools
+import enum
 
 """Constants and convenience methods used in the control of the Fiber Postioner.
 """
@@ -28,6 +29,18 @@ gear_ratio['faulhaber'] = 256.0  		 # faulhaber "256:1", output rotation/motor i
 T = 0  # theta axis idx -- NOT the motor axis ID!!
 P = 1  # phi axis idx -- NOT the motor axis ID!!
 axis_labels = ('theta', 'phi')
+
+# Types
+class case(enum.Enum):
+    """Enumeration of collision cases. The I, II, and III cases are described in
+    detail in DESI-0899.
+    """
+    I    = 0  # no collision
+    II   = 1  # phi arm against neighboring phi arm
+    IIIA = 2  # phi arm of positioner 'A' against neighbor 'B' central body
+    IIIB = 3  # phi arm of positioner 'B' against neighbor 'A' central body
+    GFA  = 4  # phi arm against the GFA fixed keepout envelope
+    PTL  = 5  # phi arm against the Petal edge keepout envelope
 
 # Convenience methods
 rotmat2D = lambda angle: [np.cos(np.deg2rad(angle)), - np.sin(np.deg2rad(angle)), np.sin(np.deg2rad(angle)), np.cos(np.deg2rad(angle))]
