@@ -45,8 +45,8 @@ class PosCollider(object):
         for p in self.posmodels:
             self._identify_neighbors(p)
 
-    def set_animation(self, sweeps):
-        """Sets up an animation in the plotter of positioners moving about the petal.
+    def animate(self, sweeps):
+        """Makes an animation of positioners moving about the petal.
             sweeps ... list of PosSweep instances describing positioners' real-time moves
         """
         self.plotter.clear()
@@ -68,18 +68,18 @@ class PosCollider(object):
                     self.plotter.add_or_change_item('GFA', '', s.time[i], self.keepout_GFA.points, pc.case.GFA)
                 elif s.collision_case == pc.case.PTL:
                     self.plotter.add_or_change_item('PTL', '', s.time[i], self.keepout_PTL.points, pc.case.PTL)
-        # tell the plotter to plot, etc
+        self.plotter.animate()
 
     def spactime_collision_between_positioners(self, idxA, init_obsTP_A, tableA, idxB, init_obsTP_B, tableB):
         """Wrapper for spacetime_collision method, specifically for checking two positioners
         against each other."""
-        return self.spacetime_collision(self, idxA, init_obsTP_A, tableA, idxB, init_obsTP_B, tableB)
+        return self.spacetime_collision(idxA, init_obsTP_A, tableA, idxB, init_obsTP_B, tableB)
 
     def spactime_collision_with_fixed(self, idx, init_obsTP, table):
         """Wrapper for spacetime_collision method, specifically for checking one positioner
         against the fixed keepouts.
         """
-        return self.spacetime_collision(self, idx, init_obsTP, table)
+        return self.spacetime_collision(idx, init_obsTP, table)
 
     def spacetime_collision(self, idxA, init_obsTP_A, tableA, idxB=None, init_obsTP_B=None, tableB=None, return_on_collision=True):
         """Searches for collisions in time and space between two positioners
@@ -104,7 +104,7 @@ class PosCollider(object):
             'move_time' : list of durations of rotations in seconds, approximately equals max(dT/Tdot,dP/Pdot), but calculated more exactly for the physical hardware
             'prepause'  : list of postpause (after the rotations end) values in seconds
 
-        The returns are instances of PosSweep, containing the theta and phi rotations
+        The return is a list of instances of PosSweep, containing the theta and phi rotations
         in real time, and when if any collision, and the collision type.
         """
         time_start = 0
@@ -126,7 +126,7 @@ class PosCollider(object):
                 time_end_temp = table['start_postpause'][row] + table['postpause'][row]
                 if row < table['nrows'] - 1:
                    table['start_prepause'].append(time_end_temp)
-            time_end = np.max(time_end, time_end_temp)
+            time_end = np.max([time_end, time_end_temp])
         time_domain = np.arange(time_start, time_end, self.timestep)
         if ((time_end - time_start) / self.timestep) % 1:
             time_domain = np.append(time_domain, time_end)
@@ -147,19 +147,21 @@ class PosCollider(object):
                 stage_start[i] = tables[i]['start_' + stage[i]][rows[i]]
                 stage_now[i] = now - stage_start[i]
                 if stage[i] == 'move':
-                    sweeps[i].tp[pc.T].append(np.min(stage_now[i] * tables[i]['Tdot'][rows[i]], tables[i]['dT'][rows[i]]))
-                    sweeps[i].tp[pc.P].append(np.min(stage_now[i] * tables[i]['Pdot'][rows[i]], tables[i]['dP'][rows[i]]))
-                    sweeps[i].time.append(now)
+                    moveT = np.min([stage_now[i] * tables[i]['Tdot'][rows[i]], tables[i]['dT'][rows[i]]])
+                    moveP = np.min([stage_now[i] * tables[i]['Pdot'][rows[i]], tables[i]['dP'][rows[i]]])
+                    sweeps[i].tp = np.append(sweeps[i].tp, [[moveT],[moveP]], axis=1)
+                    sweeps[i].time = np.append(sweeps[i].time, now)
             if pospos:
                 collision_case = self.spatial_collision_between_positioners(idxA, idxB, sweeps[0].tp[:,-1], sweeps[1].tp[:,-1])
             else:
                 collision_case = self.spatial_collision_with_fixed(idxA, sweeps[0].tp[:,-1])
-            for s in sweeps:
-                s.collision_case = collision_case
-                s.collision_time = now
-            if collision_case and return_on_collision:
-                break
-        return sweeps if len(sweeps) > 1 else sweeps[0]
+            if collision_case != pc.case.I:
+                for s in sweeps:
+                    s.collision_case = collision_case
+                    s.collision_time = now
+                if return_on_collision:
+                    break
+        return sweeps
 
     def spatial_collision_between_positioners(self, idxA, idxB, obsTP_A, obsTP_B):
         """Searches for collisions in space between two fiber positioners.
@@ -190,7 +192,7 @@ class PosCollider(object):
                 return pc.case.IIIA
             elif self._case_III_collision(idxB, idxA, obsTP_B, obsTP_A[0]):
                 return pc.case.IIIB
-            elif self._case_II_collision(idx1, idx2, obsTP_A, obsTP_B):
+            elif self._case_II_collision(idxA, idxB, obsTP_A, obsTP_B):
                 return pc.case.II
             else:
                 return pc.case.I
@@ -245,13 +247,13 @@ class PosCollider(object):
         poly = poly.translated(self.xy0[0,idx], self.xy0[1,idx])
         return poly
 
-    def _case_II_collision(idx1, idx2, tp1, tp2):
+    def _case_II_collision(self, idx1, idx2, tp1, tp2):
         """Search for case II collision, positioner 1 arm against positioner 2 arm."""
         poly1 = self.place_phi_arm(idx1, tp1)
         poly2 = self.place_phi_arm(idx2, tp2)
         return poly1.collides_with(poly2)
 
-    def _case_III_collision(idx1, idx2, tp1, t2):
+    def _case_III_collision(self, idx1, idx2, tp1, t2):
         """Search for case III collision, positioner 1 arm against positioner 2 central body."""
         poly1 = self.place_phi_arm(idx1, tp1)
         poly2 = self.place_central_body(idx2, t2)
@@ -350,11 +352,11 @@ class PosSweep(object):
     geometries through space.
     """
     def __init__(self, posidx=None):
-        self.posidx = posidx           # index identifying the positioner
-        self.time = []                 # real time at which each TP position value occurs
-        self.tp   = []                 # theta,phi angles corresponding to time
+        self.posidx = posidx              # index identifying the positioner
+        self.time = np.array([])          # real time at which each TP position value occurs
+        self.tp   = np.array([[],[]])     # theta,phi angles corresponding to time
         self.collision_case = pc.case.I   # enumeration of type "case", indicating what kind of collision first detected, if any
-        self.collision_time = inf      # time at which collision occurs. if no collision, the time is inf
+        self.collision_time = np.inf      # time at which collision occurs. if no collision, the time is inf
 
 
 class PosPoly(object):

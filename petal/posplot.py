@@ -121,40 +121,43 @@ class PosPlot(object):
         """Sets up the animation, using the data that has been already entered via the
         add_or_change_item method.
         """
-        self.last_frame = 0
-        self.all_times = np.unique([item['time'] for item in self.items])
+        temp = np.array([])
+        for item in self.items.values():
+            temp = np.append(temp, item['time'])
+        self.all_times = np.unique(temp)
         patches = []
-        for item in self.items:
+        i = 0
+        for item in self.items.values():
             patch = self.get_patch(item,0)
             patches.append(self.ax.add_patch(patch))
+            item['last_patch_update'] = -1
+            item['patch_idx'] = i
+            i += 1
         return patches
 
-    def anim_frame_update(self):
+    def anim_frame_update(self, time):
         """Sequentially update the animation to the next frame.
         """
-        frame = self.last_frame + 1
-        time = self.all_times[frame]
-        for i in range(len(self.items)):
-            item = self.items[i]
-            if len(item['time']) > 0 and time >= item['time'][0]:
-                patches[i] = self.get_patch(item,0)
-                item['time'].pop(0)
-                item['poly'].pop(0)
-                item['style'].pop(0)
-        self.last_frame = frame
+        for item in self.items.values():
+            if item['last_patch_update'] <= len(item['time']) and time >= item['time'][item['last_patch_update']]:
+                this_patch_update = last_patch_update + 1
+                patches[item['patch_idx']] = self.get_patch(item, this_patch_update)
+                item['last_patch_update'] = this_patch_update
         return patches
 
     def animate(self):
-        anim = animation.FuncAnimation(figure=self.fig, func=self.anim_frame_update, init_func=self.anim_init,
-                                       frames=len(self.all_times), interval=1000*self.timestep, blit=True)
+        self.anim_init()
+        n_frames = int(np.round(max(self.all_times)/self.timestep))
+        anim = animation.FuncAnimation(fig=self.fig, func=self.anim_frame_update, init_func=self.anim_init,
+                                       frames=n_frames, interval=1000*self.timestep, blit=True)
         anim.save('some_filename.mp4', fps=1/self.timestep)
         plt.show(block=False)
 
 
     @staticmethod
     def get_patch(item,index):
-        patch = plt.Polygon(item['poly'][index].transpose().tolist(),
-                            linestyle=item['style'][index]['linestyle'],
-                            linewidth=item['style'][index]['linewidth'],
-                            edgecolor=item['style'][index]['edgecolor'],
-                            facecolor=item['style'][index]['facecolor'])
+        return plt.Polygon(item['poly'][index].transpose().tolist(),
+                           linestyle=item['style'][index]['linestyle'],
+                           linewidth=item['style'][index]['linewidth'],
+                           edgecolor=item['style'][index]['edgecolor'],
+                           facecolor=item['style'][index]['facecolor'])

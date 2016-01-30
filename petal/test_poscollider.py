@@ -47,5 +47,33 @@ config['KEEPOUT_GFA_X0'] = maxX + 100
 config['KEEPOUT_GFA_Y0'] = maxY + 100
 config['KEEPOUT_GFA_ROT'] = 0
 config.write()
+
+# set up a collider and put in some synthetic move tables
 collider = poscollider.PosCollider(filename)
 collider.add_positioners(posmodels)
+tables =  [[] for i in range(len(collider.posmodels))]
+for i in range(len(collider.posmodels)):
+    dT = [180, -360, 270, -90,   0,   0,  0,    0]
+    dP = [  0,    0,   0,   0, 180, -90, 45, -135]
+    nrows = len(dT)
+    Tdot = [180 for i in range(nrows)]
+    Pdot = [180 for i in range(nrows)]
+    prepause = [0 for i in range(nrows)]
+    postpause = [0 for i in range(nrows)]
+    prepause[1] = 0.5
+    postpause[1] = 0.5
+    move_time = [max(dT[i]/Tdot[i],dP[i]/Pdot[i]) for i in range(nrows)]
+    tables[i] = {'nrows':nrows, 'dT':dT, 'dP':dP, 'Tdot':Tdot, 'Pdot':Pdot, 'prepause':prepause, 'move_time':move_time, 'postpause':postpause}
+
+# calculate the collision sweeps
+sweeps = [[] for i in range(len(collider.posmodels))]
+for i in range(len(collider.pos_neighbor_idxs)):
+    earliest_collision = np.inf
+    colliding_neighbor = None
+    for j in collider.pos_neighbor_idxs[i]:
+        these_sweeps = collider.spactime_collision_between_positioners(i, collider.tp0[:,i], tables[i], j, collider.tp0[:,j], tables[j])
+        if colliding_neighbor == None or these_sweeps[0].collision_time < earliest_collision:
+            sweeps[i] = these_sweeps[0]
+
+# animate
+collider.animate(sweeps)
