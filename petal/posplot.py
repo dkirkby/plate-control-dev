@@ -88,7 +88,7 @@ class PosPlot(object):
         """
         key = str(item_str) + ' ' + str(item_idx)
         if key not in self.items.keys():
-            item = {'time':[], 'poly':[], 'style':[], 'collision_time':np.inf}
+            item = {'time':[], 'poly':[], 'style':[], 'collision_time':collision_time}
         else:
             item = self.items[key]
         if time in item['time']:
@@ -105,7 +105,7 @@ class PosPlot(object):
                     if item['time'][i] > time:
                         idx = i - 1  # this is where the new timestep data will get inserted
                         break
-        if time < item['collision_time']:
+        if time < collision_time:
             style = self.styles[item_str]
         else:
             style = self.styles['collision']

@@ -85,14 +85,13 @@ class PosCollider(object):
         """
         return self.spacetime_collision(idx, init_obsTP, table)
 
-    def spacetime_collision(self, idxA, init_obsTP_A, tableA, idxB=None, init_obsTP_B=None, tableB=None, return_on_collision=True):
+    def spacetime_collision(self, idxA, init_obsTP_A, tableA, idxB=None, init_obsTP_B=None, tableB=None):
         """Searches for collisions in time and space between two positioners
         which are rotating according to the argued tables.
 
             idxA, idxB                  ...  indices of the positioners in the list self.posmodels
             init_obsTP_A, init_obsTP_B  ...  starting (theta,phi) positions, in the obsTP coordinate systems
             tableA, tableB              ...  dictionaries defining rotation schedules as described below
-            return_on_collision         ...  whether to return immediately as soon as any collision is identified
 
         If no arguments are provided for the "B" positioner (i.e. no args for idxB, init_obsTP_B, tableB)
         then the method checks the "A" positioner against the fixed keepout envelopes.
@@ -163,12 +162,7 @@ class PosCollider(object):
                 for s in sweeps:
                     s.collision_case = collision_case
                     s.collision_time = now
-                    time_fill = time_domain[time_domain > now]
-                    s.time = np.append(s.time, time_fill)
-                    t_fill = np.ones_like(time_fill) * s.tp[0,-1]
-                    p_fill = np.ones_like(time_fill) * s.tp[1,-1]
-                    s.tp = np.append(s.tp, [t_fill,p_fill], axis=1)
-                    break
+                break
         return sweeps
 
     def spatial_collision_between_positioners(self, idxA, idxB, obsTP_A, obsTP_B):
