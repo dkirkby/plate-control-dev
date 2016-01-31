@@ -19,7 +19,8 @@ class PosCollider(object):
         filename = pc.settings_directory + configfile
         self.config = configobj.ConfigObj(filename,unrepr=True)
         self.posmodels = []
-        self.pos_neighbor_idxs = []
+        self.pos_neighbor_idxs = [] # indexes of all the positioners surround a given positioner
+        self.collidable_relations = {'A':[],'B':[],'B_is_fixed':[]} # every unique pair of geometry that can collide
         self.fixed_neighbor_cases = []
         self.plotting_on = True
         self.timestep = self.config['TIMESTEP']
@@ -44,6 +45,7 @@ class PosCollider(object):
         self._load_circle_envelopes()
         for p in self.posmodels:
             self._identify_neighbors(p)
+        self._update_collidable_relations()
 
     def animate(self, sweeps):
         """Makes an animation of positioners moving about the petal.
@@ -297,7 +299,7 @@ class PosCollider(object):
         self.Eo_poly = PosPoly(self._circle_poly_points(self.Eo, self.config['RESOLUTION_EO']))
         self.Ei_poly = PosPoly(self._circle_poly_points(self.Ei, self.config['RESOLUTION_EI']))
         self.Ee_poly = PosPoly(self._circle_poly_points(self.Ee, self.config['RESOLUTION_EE']))
-        self.line180_poly = PosPoly([[0,0],[-self._max_extent(),0]],close_polygon=False)
+        self.line180_poly = PosPoly([[0,0],[-self.Eo/2,0]],close_polygon=False)
         self.Eo_polys = []
         self.Ei_polys = []
         self.Ee_polys = []
@@ -323,6 +325,32 @@ class PosCollider(object):
         for p2 in self.fixed_neighbor_keepouts.keys():
             if Ee1.collides_with(self.fixed_neighbor_keepouts[p2]):
                 self.fixed_neighbor_cases[p1].append(p2)
+
+    def _update_collidable_relations(self):
+        """Update the list of all possible collisions."""
+        A = []
+        B = []
+        B_is_fixed = []
+        for i in range(len(self.pos_neighbor_idxs)):
+            for j in self.pos_neighbor_idxs[i]:
+                if i in A and j in B and A.index(i) == B.index(j):
+                    pass
+                elif j in A and i in B and A.index(j) == B.index(i):
+                    pass
+                else:
+                    A.append(i)
+                    B.append(j)
+                    B_is_fixed.append(False)
+        i = 0
+        for cases in self.fixed_neighbor_cases:
+            for case in cases:
+                A.append(i)
+                B.append(case)
+                B_is_fixed.append(True)
+            i += 1
+        self.collidable_relations['A'] = A
+        self.collidable_relations['B'] = B
+        self.collidable_relations['B_is_fixed'] = B_is_fixed
 
     def _max_extent(self):
         """Calculation of max radius of keepout for a positioner with fully-extended phi arm."""

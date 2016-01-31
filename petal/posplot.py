@@ -10,7 +10,7 @@ class PosPlot(object):
     """
     def __init__(self, fignum=0, timestep=0.1):
         self.fignum = fignum
-        self.fig = plt.figure(fignum)
+        self.fig = plt.figure(fignum, figsize=(16,12))
         self.ax = plt.axes()
         self.timestep = timestep # frame interval for animations
         self.items = {} # keys shall identify the individual items that get drawn, i.e. 'ferrule 321', 'phi arm 42', 'GFA', etc
@@ -21,63 +21,63 @@ class PosPlot(object):
                         #  'collision_time' : np.inf} # time at which collision occurs. if no collision, the time is inf
         self.styles = {'ferrule':
                            {'linestyle' : '-',
-                            'linewidth' : 1,
+                            'linewidth' : 2,
                             'edgecolor' : 'blue',
-                            'facecolor' : '0.3'},
+                            'facecolor' : 'none'},
 
                        'phi arm':
                            {'linestyle' : '-',
-                            'linewidth' : 1,
+                            'linewidth' : 2,
                             'edgecolor' : 'blue',
-                            'facecolor' : '0.3'},
+                            'facecolor' : 'none'},
 
                        'central body':
                            {'linestyle' : '-',
-                            'linewidth' : 1,
+                            'linewidth' : 2,
                             'edgecolor' : 'blue',
-                            'facecolor' : '0.3'},
+                            'facecolor' : 'none'},
 
                        'collision':
                            {'linestyle' : '-',
                             'linewidth' : 2,
                             'edgecolor' : 'red',
-                            'facecolor' : '0.6'},
+                            'facecolor' : 'none'},
 
                        'line at 180':
                            {'linestyle' : '-.',
+                            'linewidth' : 2,
+                            'edgecolor' : '0.6',
+                            'facecolor' : 'none'},
+
+                       'Eo':
+                           {'linestyle' : '-',
+                            'linewidth' : 0.5,
+                            'edgecolor' : '0.9',
+                            'facecolor' : 'none'},
+
+                       'Ei':
+                           {'linestyle' : '-',
+                            'linewidth' : 0.5,
+                            'edgecolor' : '0.9',
+                            'facecolor' : 'none'},
+
+                       'Ee':
+                           {'linestyle' : '-',
+                            'linewidth' : 0.5,
+                            'edgecolor' : '0.9',
+                            'facecolor' : 'none'},
+
+                       'PTL':
+                           {'linestyle' : '--',
                             'linewidth' : 1,
                             'edgecolor' : '0.5',
                             'facecolor' : 'none'},
 
-                       'Eo':
-                           {'linestyle' : '--',
-                            'linewidth' : 1,
-                            'edgecolor' : '0.3',
-                            'facecolor' : 'none'},
-
-                       'Ei':
-                           {'linestyle' : '--',
-                            'linewidth' : 1,
-                            'edgecolor' : '0.3',
-                            'facecolor' : 'none'},
-
-                       'Ee':
-                           {'linestyle' : '--',
-                            'linewidth' : 1,
-                            'edgecolor' : '0.1',
-                            'facecolor' : 'none'},
-
-                       'PTL':
-                           {'linestyle' : '-',
-                            'linewidth' : 1,
-                            'edgecolor' : '0.7',
-                            'facecolor' : 'white'},
-
                        'GFA':
-                           {'linestyle' : '-',
+                           {'linestyle' : '--',
                             'linewidth' : 1,
-                            'edgecolor' : '0.7',
-                            'facecolor' : 'white'}
+                            'edgecolor' : '0.5',
+                            'facecolor' : 'none'}
                        }
 
     def clear(self):
@@ -105,7 +105,7 @@ class PosPlot(object):
                     if item['time'][i] > time:
                         idx = i - 1  # this is where the new timestep data will get inserted
                         break
-        if collision_case == pc.case.I and time < item['collision_time']:
+        if collision_case == pc.case.I or time < item['collision_time']:
             style = self.styles[item_str]
         else:
             style = self.styles['collision']
@@ -160,7 +160,7 @@ class PosPlot(object):
     def animate(self):
         self.anim_init()
         n_frames = int(np.round(max(self.all_times)/self.timestep))
-        anim = animation.FuncAnimation(fig=self.fig, func=self.anim_frame_update, init_func=self.anim_init,
+        anim = animation.FuncAnimation(fig=self.fig, func=self.anim_frame_update,
                                        frames=n_frames, interval=1000*self.timestep, blit=True, repeat=False)
         #writer = animation.FFMpegWriter()
         #anim.save('some_filename.mp4', fps=1/self.timestep, writer=writer)
