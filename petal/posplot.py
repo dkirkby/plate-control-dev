@@ -1,7 +1,7 @@
 import numpy as np
 import posconstants as pc
-from matplotlib import pyplot as plt
-from matplotlib import animation
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import os
 plt.rcParams['animation.ffmpeg_path'] = os.getcwd()
 
@@ -128,10 +128,20 @@ class PosPlot(object):
             temp = np.append(temp, item['time'])
         self.all_times = np.unique(temp)
         self.patches = []
+        xmin = np.inf
+        xmax = -np.inf
+        ymin = np.inf
+        ymax = -np.inf
         i = 0
         for item in self.items.values():
             patch = self.get_patch(item,0)
             self.patches.append(self.ax.add_patch(patch))
+            xmin = min(xmin,min(item['poly'][0][0]))
+            xmax = max(xmax,max(item['poly'][0][0]))
+            ymin = min(ymin,min(item['poly'][0][1]))
+            ymax = max(ymax,max(item['poly'][0][1]))
+            plt.xlim(xmin=xmin,xmax=xmax)
+            plt.ylim(ymin=ymin,ymax=ymax)
             item['last_patch_update'] = -1
             item['patch_idx'] = i
             i += 1
@@ -141,19 +151,20 @@ class PosPlot(object):
         """Sequentially update the animation to the next frame.
         """
         for item in self.items.values():
-            if item['last_patch_update'] <= len(item['time']) and time >= item['time'][item['last_patch_update']]:
-                this_patch_update = item['last_patch_update'] + 1
-                self.patches[item['patch_idx']] = self.get_patch(item, this_patch_update)
+            this_patch_update = item['last_patch_update'] + 1
+            if this_patch_update < len(item['time']) and time >= item['time'][item['last_patch_update']]:
+                self.set_patch(self.patches[item['patch_idx']], item, this_patch_update)
                 item['last_patch_update'] = this_patch_update
         return self.patches
 
     def animate(self):
         self.anim_init()
         n_frames = int(np.round(max(self.all_times)/self.timestep))
-        anim = animation.FuncAnimation(fig=self.fig, func=self.anim_frame_update, init_func=self.anim_init, frames=n_frames, interval=1000*self.timestep, blit=True)
-        writer = animation.FFMpegWriter()
-        anim.save('some_filename.mp4', fps=1/self.timestep, writer=writer)
-        plt.show(block=False)
+        anim = animation.FuncAnimation(fig=self.fig, func=self.anim_frame_update, init_func=self.anim_init,
+                                       frames=n_frames, interval=1000*self.timestep, blit=True, repeat=False)
+        #writer = animation.FFMpegWriter()
+        #anim.save('some_filename.mp4', fps=1/self.timestep, writer=writer)
+        plt.show()
 
 
     @staticmethod
@@ -163,3 +174,12 @@ class PosPlot(object):
                            linewidth=item['style'][index]['linewidth'],
                            edgecolor=item['style'][index]['edgecolor'],
                            facecolor=item['style'][index]['facecolor'])
+
+    @staticmethod
+    def set_patch(patch,item,index):
+        patch.set_xy(item['poly'][index].transpose().tolist())
+        patch.set_linestyle(item['style'][index]['linestyle'])
+        patch.set_linewidth(item['style'][index]['linewidth'])
+        patch.set_edgecolor(item['style'][index]['edgecolor'])
+        patch.set_facecolor(item['style'][index]['facecolor'])
+
