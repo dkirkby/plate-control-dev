@@ -113,7 +113,6 @@ class PosCollider(object):
         in real time, and when if any collision, and the collision type.
         """
         time_start = 0
-        time_end = 0
         pospos = True if idxB else False # whether this is checking collisions between two positioners (or if false, between one positioner and fixed keepouts)
         if pospos:
             tables = [tableA,tableB]
@@ -121,66 +120,69 @@ class PosCollider(object):
         else:
             tables = [tableA]
             sweeps = [PosSweep(idxA)]
-        for table in tables:
-            table['start_prepause'] = [time_start]
-            table['start_move'] = []
-            table['start_postpause'] = []
-            for row in range(table['nrows']):
-                table['start_move'].append(table['start_prepause'][row] + table['prepause'][row])
-                table['start_postpause'].append(table['start_move'][row] + table['move_time'][row])
-                time_end_temp = table['start_postpause'][row] + table['postpause'][row]
-                if row < table['nrows'] - 1:
-                   table['start_prepause'].append(time_end_temp)
-            time_end = np.max([time_end, time_end_temp])
-        time_domain = np.arange(time_start, time_end, self.timestep)
-        if ((time_end - time_start) / self.timestep) % 1:
-            time_domain = np.append(time_domain, time_end)
+        for i in range(len(sweeps)):
+            sweeps[i].tp = np.array([[tables[i]['Tstart']],[tables[i]['Pstart']]])
+            sweeps[i].time = time_start
         row = [0]*2 if pospos else [0]
         stage = ['prepause']*2 if pospos else ['prepause']
         stage_dT_remaining = [0]*2 if pospos else [0]
         stage_dP_remaining = [0]*2 if pospos else [0]
-        for i in range(len(sweeps)):
-            sweeps[i].tp = np.array([[tables[i]['Tstart']],[tables[i]['Pstart']]])
-            sweeps[i].time = time_start
-        for now in time_domain:
-            if now > 0.9:
-                pass
+        postpause_adjustment = [0]*2 if pospos else [0]
+        complete = [False]*2 if pospos else [False]
+        now = time_start
+        stage_start = [now]*2 if pospos else [now]
+        while not all(complete):
             check_collision_this_loop = False
             for i in range(len(tables)):
-                if stage[i] == 'prepause' and now >= tables[i]['start_move'][row[i]]:
+                if stage[i] == 'prepause' and now >= stage_start[i] + tables[i]['prepause'][row[i]]:
                     stage[i] = 'move'
                     stage_dT_remaining[i] = tables[i]['dT'][row[i]]
                     stage_dP_remaining[i] = tables[i]['dP'][row[i]]
-                if stage[i] == 'move' and now >= tables[i]['start_postpause'][row[i]]:
-                    stage[i] = 'postpause'
-                if stage[i] == 'postpause':
-                    next_row = row[i] + 1
-                    at_end_of_table = next_row >= tables[i]['nrows']
-                    if not(at_end_of_table) and now >= tables[i]['start_prepause'][next_row]:
-                        stage[i] = 'prepause'
-                        row[i] = next_row
+                    stage_start[i] = now
                 if stage[i] == 'move':
-                    step_T = np.sign(stage_dT_remaining[i]) * self.timestep * tables[i]['Tdot'][row[i]]
-                    step_P = np.sign(stage_dP_remaining[i]) * self.timestep * tables[i]['Pdot'][row[i]]
-                    delta_T = step_T if abs(stage_dT_remaining[i]) > abs(step_T) else stage_dT_remaining[i]
-                    delta_P = step_P if abs(stage_dP_remaining[i]) > abs(step_P) else stage_dP_remaining[i]
-                    T_after_step = delta_T + sweeps[i].tp[0,-1]
-                    P_after_step = delta_P + sweeps[i].tp[1,-1]
-                    sweeps[i].tp = np.append(sweeps[i].tp, [[T_after_step],[P_after_step]], axis=1)
-                    sweeps[i].time = np.append(sweeps[i].time, now + self.timestep)
-                    stage_dT_remaining[i] -= delta_T
-                    stage_dP_remaining[i] -= delta_P
-                    check_collision_this_loop = True
+                    if not(stage_dT_remaining[i]) and not(stage_dP_remaining[i]):
+                        stage[i] = 'postpause'
+                        stage_start[i] = now
+                    else:
+                        speed[0] = tables[i]['Tdot'][row[i]]
+                        speed[1] = tables[i]['Pdot'][row[i]]
+                        for ax in [pc.T,pc.P]:
+                            one_step[ax] = np.sign(stage_dist_remaining[i][ax]) * self.timestep * speed[ax]
+                            if abs(stage_dist_remaining[i][ax]) > abs(one_step[ax]):
+                                delta[ax] = one_step[ax]
+                            else:
+                                delta[ax] = stage_dist_remaining[i][ax]
+                                temp_adjust = -(abs(one_step[ax]) - abs(delta[ax])) / speed[ax] # compensate for shorter time it takes to do a partial step
+                                postpause_adjustment[i] = min(temp_adjust, postpause_adjustment[i])
+
+
+                        T_after_step = delta_T + sweeps[i].tp[0,-1]
+                        P_after_step = delta_P + sweeps[i].tp[1,-1]
+                        sweeps[i].tp = np.append(sweeps[i].tp, [[T_after_step],[P_after_step]], axis=1)
+                        sweeps[i].time = np.append(sweeps[i].time, now + self.timestep)
+                        stage_dT_remaining[i] -= delta_T
+                        stage_dP_remaining[i] -= delta_P
+                        check_collision_this_loop = True
+                if stage[i] == 'postpause' and now >= stage_start[i] + postpause_adjustment[i] + tables[i]['postpause'][row[i]]:
+                    next_row = row[i] + 1
+                    postpause_adjustment[i] = 0
+                    if next_row < tables[i]['nrows']:
+                        stage[i] = 'prepause'
+                        stage_start[i] = now
+                        row[i] = next_row
+                    else:
+                        complete[i] = True
             if check_collision_this_loop:
                 if pospos:
                     collision_case = self.spatial_collision_between_positioners(idxA, idxB, sweeps[0].tp[:,-1], sweeps[1].tp[:,-1])
                 else:
                     collision_case = self.spatial_collision_with_fixed(idxA, sweeps[0].tp[:,-1])
                 if collision_case != pc.case.I:
-                    for s in sweeps:
-                        s.collision_case = collision_case
-                        s.collision_time = now
-                    break
+                    for i in range(len(sweeps)):
+                        sweeps[i].collision_case = collision_case
+                        sweeps[i].collision_time = sweeps[0].time[-1]
+                        complete[i] = True
+            now += self.timestep
         return sweeps
 
     def spatial_collision_between_positioners(self, idxA, idxB, obsTP_A, obsTP_B):

@@ -6,6 +6,9 @@ import enum
 """Constants and convenience methods used in the control of the Fiber Postioner.
 """
 
+# Interpreter settings
+np.set_printoptions(suppress=True) # suppress auto-scientific notation when printing np arrays
+
 # File location directories
 settings_directory = os.getcwd() + os.path.sep + 'pos_settings' + os.path.sep
 logs_directory = os.getcwd() + os.path.sep + 'pos_logs' + os.path.sep
