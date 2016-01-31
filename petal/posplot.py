@@ -2,16 +2,14 @@ import numpy as np
 import posconstants as pc
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-import os
-plt.rcParams['animation.ffmpeg_path'] = os.getcwd()
 
 class PosPlot(object):
     """Handles plotting animated visualizations for array of positioners.
     """
     def __init__(self, fignum=0, timestep=0.1):
+        self.live_animate = True # whether to plot the animation live
+        self.write_movie_file = True # whether to write out a movie file of animation
         self.fignum = fignum
-        self.fig = plt.figure(fignum, figsize=(16,12))
-        self.ax = plt.axes()
         self.timestep = timestep # frame interval for animations
         self.items = {} # keys shall identify the individual items that get drawn, i.e. 'ferrule 321', 'phi arm 42', 'GFA', etc
                         # values are sub-dictionaries, with the entries:
@@ -123,6 +121,8 @@ class PosPlot(object):
         """Sets up the animation, using the data that has been already entered via the
         add_or_change_item method.
         """
+        self.anim_fig = plt.figure(self.fignum, figsize=(16,12))
+        self.anim_ax = plt.axes()
         temp = np.array([])
         for item in self.items.values():
             temp = np.append(temp, item['time'])
@@ -135,7 +135,7 @@ class PosPlot(object):
         i = 0
         for item in self.items.values():
             patch = self.get_patch(item,0)
-            self.patches.append(self.ax.add_patch(patch))
+            self.patches.append(self.anim_ax.add_patch(patch))
             xmin = min(xmin,min(item['poly'][0][0]))
             xmax = max(xmax,max(item['poly'][0][0]))
             ymin = min(ymin,min(item['poly'][0][1]))
@@ -145,7 +145,6 @@ class PosPlot(object):
             item['last_patch_update'] = -1
             item['patch_idx'] = i
             i += 1
-        return self.patches
 
     def anim_frame_update(self, time):
         """Sequentially update the animation to the next frame.
@@ -155,17 +154,36 @@ class PosPlot(object):
             if this_patch_update < len(item['time']) and time >= item['time'][item['last_patch_update']]:
                 self.set_patch(self.patches[item['patch_idx']], item, this_patch_update)
                 item['last_patch_update'] = this_patch_update
-        return self.patches
 
     def animate(self):
         self.anim_init()
-        n_frames = int(np.round(max(self.all_times)/self.timestep))
-        anim = animation.FuncAnimation(fig=self.fig, func=self.anim_frame_update,
-                                       frames=n_frames, interval=1000*self.timestep, blit=True, repeat=False)
-        #writer = animation.FFMpegWriter()
-        #anim.save('some_filename.mp4', fps=1/self.timestep, writer=writer)
-        plt.show()
-
+        plt.ion()
+        start_end_still_time = 0.5
+        if self.write_movie_file:
+            fps = 1/self.timestep
+            metadata = dict(title='', artist='',comment='')
+            filename = 'something.mp4'
+            dpi = 75
+            writer = animation.FFMpegWriter(fps=fps, metadata=metadata)
+            writer.setup(fig=self.anim_fig, outfile=filename, dpi=dpi)
+            for i in range(round(start_end_still_time/self.timestep)):
+                writer.grab_frame()
+        if self.live_animate:
+            plt.pause(start_end_still_time)
+        frame_times = np.arange(min(self.all_times), max(self.all_times)+self.timestep/2, self.timestep) # extra half-timestep on max ensures inclusion of max val in range
+        for time in frame_times:
+            self.anim_frame_update(time)
+            if self.write_movie_file:
+                writer.grab_frame()
+            if self.live_animate:
+                plt.pause(self.timestep)
+        if self.write_movie_file:
+            for i in range(round(start_end_still_time/self.timestep)):
+                writer.grab_frame()
+            writer.finish()
+        if self.live_animate:
+            plt.pause(start_end_still_time)
+        plt.close()
 
     @staticmethod
     def get_patch(item,index):
@@ -182,4 +200,3 @@ class PosPlot(object):
         patch.set_linewidth(item['style'][index]['linewidth'])
         patch.set_edgecolor(item['style'][index]['edgecolor'])
         patch.set_facecolor(item['style'][index]['facecolor'])
-
