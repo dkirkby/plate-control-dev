@@ -5,6 +5,11 @@ import matplotlib.animation as animation
 
 class PosPlot(object):
     """Handles plotting animated visualizations for array of positioners.
+
+    Saving movie files of animations is implemented. Must have ffmpeg to write the
+    movie. For Windows machines, download a static binary of ffmpeg, and copy just
+    the executable file 'ffmpeg.exe' into the working directory. As of 2016-01-31,
+    binaries of ffmpeg are available at: http://ffmpeg.zeranoe.com/builds
     """
     def __init__(self, fignum=0, timestep=0.1):
         self.live_animate = True # whether to plot the animation live
