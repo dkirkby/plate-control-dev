@@ -99,6 +99,8 @@ class PosCollider(object):
         The input table dictionaries must contain the following fields:
 
             'nrows'     : number of rows in the lists below (all must be the same length)
+            'Tstart'    : beginning theta position
+            'Pstart'    : beginning phi position
             'dT'        : list of theta rotation distances in degrees
             'dP'        : list of phi rotation distances in degrees
             'Tdot'      : list of theta rotation speeds in deg/sec
@@ -133,36 +135,52 @@ class PosCollider(object):
         time_domain = np.arange(time_start, time_end, self.timestep)
         if ((time_end - time_start) / self.timestep) % 1:
             time_domain = np.append(time_domain, time_end)
-        rows = [0]*2 if pospos else [0]
+        row = [0]*2 if pospos else [0]
         stage = ['prepause']*2 if pospos else ['prepause']
-        stage_now = [0]*2 if pospos else [0]
-        stage_start = [0]*2 if pospos else [0]
+        stage_dT_remaining = [0]*2 if pospos else [0]
+        stage_dP_remaining = [0]*2 if pospos else [0]
+        for i in range(len(sweeps)):
+            sweeps[i].tp = np.array([[tables[i]['Tstart']],[tables[i]['Pstart']]])
+            sweeps[i].time = time_start
         for now in time_domain:
+            if now > 0.9:
+                pass
+            check_collision_this_loop = False
             for i in range(len(tables)):
-                if stage[i] == 'prepause' and now >= tables[i]['start_move'][rows[i]]:
+                if stage[i] == 'prepause' and now >= tables[i]['start_move'][row[i]]:
                     stage[i] = 'move'
-                if stage[i] == 'move' and now >= tables[i]['start_postpause'][rows[i]]:
+                    stage_dT_remaining[i] = tables[i]['dT'][row[i]]
+                    stage_dP_remaining[i] = tables[i]['dP'][row[i]]
+                if stage[i] == 'move' and now >= tables[i]['start_postpause'][row[i]]:
                     stage[i] = 'postpause'
-                if stage[i] == 'postpause' and i < len(rows) - 1:
-                    if now >= tables[i]['start_prepause'][rows[i]+1]:
+                if stage[i] == 'postpause':
+                    next_row = row[i] + 1
+                    at_end_of_table = next_row >= tables[i]['nrows']
+                    if not(at_end_of_table) and now >= tables[i]['start_prepause'][next_row]:
                         stage[i] = 'prepause'
-                        rows[i] += 1
-                stage_start[i] = tables[i]['start_' + stage[i]][rows[i]]
-                stage_now[i] = now - stage_start[i]
+                        row[i] = next_row
                 if stage[i] == 'move':
-                    moveT = np.min([stage_now[i] * tables[i]['Tdot'][rows[i]], tables[i]['dT'][rows[i]]])
-                    moveP = np.min([stage_now[i] * tables[i]['Pdot'][rows[i]], tables[i]['dP'][rows[i]]])
-                    sweeps[i].tp = np.append(sweeps[i].tp, [[moveT],[moveP]], axis=1)
-                    sweeps[i].time = np.append(sweeps[i].time, now)
-            if pospos:
-                collision_case = self.spatial_collision_between_positioners(idxA, idxB, sweeps[0].tp[:,-1], sweeps[1].tp[:,-1])
-            else:
-                collision_case = self.spatial_collision_with_fixed(idxA, sweeps[0].tp[:,-1])
-            if collision_case != pc.case.I:
-                for s in sweeps:
-                    s.collision_case = collision_case
-                    s.collision_time = now
-                break
+                    step_T = np.sign(stage_dT_remaining[i]) * self.timestep * tables[i]['Tdot'][row[i]]
+                    step_P = np.sign(stage_dP_remaining[i]) * self.timestep * tables[i]['Pdot'][row[i]]
+                    delta_T = step_T if abs(stage_dT_remaining[i]) > abs(step_T) else stage_dT_remaining[i]
+                    delta_P = step_P if abs(stage_dP_remaining[i]) > abs(step_P) else stage_dP_remaining[i]
+                    T_after_step = delta_T + sweeps[i].tp[0,-1]
+                    P_after_step = delta_P + sweeps[i].tp[1,-1]
+                    sweeps[i].tp = np.append(sweeps[i].tp, [[T_after_step],[P_after_step]], axis=1)
+                    sweeps[i].time = np.append(sweeps[i].time, now + self.timestep)
+                    stage_dT_remaining[i] -= delta_T
+                    stage_dP_remaining[i] -= delta_P
+                    check_collision_this_loop = True
+            if check_collision_this_loop:
+                if pospos:
+                    collision_case = self.spatial_collision_between_positioners(idxA, idxB, sweeps[0].tp[:,-1], sweeps[1].tp[:,-1])
+                else:
+                    collision_case = self.spatial_collision_with_fixed(idxA, sweeps[0].tp[:,-1])
+                if collision_case != pc.case.I:
+                    for s in sweeps:
+                        s.collision_case = collision_case
+                        s.collision_time = now
+                    break
         return sweeps
 
     def spatial_collision_between_positioners(self, idxA, idxB, obsTP_A, obsTP_B):

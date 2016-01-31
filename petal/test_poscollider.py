@@ -53,8 +53,10 @@ collider = poscollider.PosCollider(filename)
 collider.add_positioners(posmodels)
 tables =  [[] for i in range(len(collider.posmodels))]
 for i in range(len(collider.posmodels)):
-    dT = [180, -360, 270, -90,   0,   0,  0,    0]
-    dP = [  0,    0,   0,   0, 180, -90, 45, -135]
+    Tstart = 0
+    Pstart = 180
+    dT = [180, -360, 270, -90,   0,   0,   0,   0]
+    dP = [  0,    0,   0,   0, -180, 90, -45, 135]
     nrows = len(dT)
     Tdot = [180 for i in range(nrows)]
     Pdot = [180 for i in range(nrows)]
@@ -63,7 +65,7 @@ for i in range(len(collider.posmodels)):
     prepause[1] = 0.5
     postpause[1] = 0.5
     move_time = [max(dT[i]/Tdot[i],dP[i]/Pdot[i]) for i in range(nrows)]
-    tables[i] = {'nrows':nrows, 'dT':dT, 'dP':dP, 'Tdot':Tdot, 'Pdot':Pdot, 'prepause':prepause, 'move_time':move_time, 'postpause':postpause}
+    tables[i] = {'nrows':nrows, 'Tstart':Tstart, 'Pstart':Pstart, 'dT':dT, 'dP':dP, 'Tdot':Tdot, 'Pdot':Pdot, 'prepause':prepause, 'move_time':move_time, 'postpause':postpause}
 
 # calculate the move sweeps, checking for collisions
 sweeps = [[] for i in range(len(collider.posmodels))]
