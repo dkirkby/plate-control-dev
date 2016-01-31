@@ -63,13 +63,15 @@ class PosCollider(object):
             self.plotter.add_or_change_item('line at 180', i, global_start, self.line180_polys[i].points)
         for s in sweeps:
             for i in range(len(s.time)):
-                self.plotter.add_or_change_item('central body', s.posidx, s.time[i], self.place_central_body(s.posidx, s.tp[0,i]).points, s.collision_case)
-                self.plotter.add_or_change_item('phi arm',      s.posidx, s.time[i], self.place_phi_arm(s.posidx, s.tp[:,i]).points,      s.collision_case)
-                self.plotter.add_or_change_item('ferrule',      s.posidx, s.time[i], self.place_ferrule(s.posidx, s.tp[:,i]).points,      s.collision_case)
+                if s.collision_case != pc.case.I:
+                    pass
+                self.plotter.add_or_change_item('central body', s.posidx, s.time[i], self.place_central_body(s.posidx, s.tp[0,i]).points, s.collision_time)
+                self.plotter.add_or_change_item('phi arm',      s.posidx, s.time[i], self.place_phi_arm(s.posidx, s.tp[:,i]).points,      s.collision_time)
+                self.plotter.add_or_change_item('ferrule',      s.posidx, s.time[i], self.place_ferrule(s.posidx, s.tp[:,i]).points,      s.collision_time)
                 if s.collision_case == pc.case.GFA:
-                    self.plotter.add_or_change_item('GFA', '', s.time[i], self.keepout_GFA.points, pc.case.GFA)
+                    self.plotter.add_or_change_item('GFA', '', s.time[i], self.keepout_GFA.points, s.collision_time)
                 elif s.collision_case == pc.case.PTL:
-                    self.plotter.add_or_change_item('PTL', '', s.time[i], self.keepout_PTL.points, pc.case.PTL)
+                    self.plotter.add_or_change_item('PTL', '', s.time[i], self.keepout_PTL.points, s.collision_time)
         self.plotter.animate()
 
     def spactime_collision_between_positioners(self, idxA, init_obsTP_A, tableA, idxB, init_obsTP_B, tableB):
@@ -161,7 +163,11 @@ class PosCollider(object):
                 for s in sweeps:
                     s.collision_case = collision_case
                     s.collision_time = now
-                if return_on_collision:
+                    time_fill = time_domain[time_domain > now]
+                    s.time = np.append(s.time, time_fill)
+                    t_fill = np.ones_like(time_fill) * s.tp[0,-1]
+                    p_fill = np.ones_like(time_fill) * s.tp[1,-1]
+                    s.tp = np.append(s.tp, [t_fill,p_fill], axis=1)
                     break
         return sweeps
 

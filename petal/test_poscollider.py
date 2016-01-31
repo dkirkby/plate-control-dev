@@ -43,8 +43,8 @@ maxX = max(xy0[0])+pitch/2
 minY = min(xy0[1])-pitch/2
 maxY = max(xy0[1])+pitch/2
 config['KEEPOUT_PTL'] = [[minX,maxX,maxX,minX],[minY,minY,maxY,maxY]]
-config['KEEPOUT_GFA_X0'] = maxX + 100
-config['KEEPOUT_GFA_Y0'] = maxY + 100
+config['KEEPOUT_GFA_X0'] = maxX + 40
+config['KEEPOUT_GFA_Y0'] = maxY + 40
 config['KEEPOUT_GFA_ROT'] = 0
 config.write()
 
@@ -65,15 +65,22 @@ for i in range(len(collider.posmodels)):
     move_time = [max(dT[i]/Tdot[i],dP[i]/Pdot[i]) for i in range(nrows)]
     tables[i] = {'nrows':nrows, 'dT':dT, 'dP':dP, 'Tdot':Tdot, 'Pdot':Pdot, 'prepause':prepause, 'move_time':move_time, 'postpause':postpause}
 
-# calculate the collision sweeps
+# calculate the move sweeps, checking for collisions
 sweeps = [[] for i in range(len(collider.posmodels))]
-for i in range(len(collider.pos_neighbor_idxs)):
-    earliest_collision = np.inf
-    colliding_neighbor = None
-    for j in collider.pos_neighbor_idxs[i]:
-        these_sweeps = collider.spactime_collision_between_positioners(i, collider.tp0[:,i], tables[i], j, collider.tp0[:,j], tables[j])
-        if colliding_neighbor == None or these_sweeps[0].collision_time < earliest_collision:
-            sweeps[i] = these_sweeps[0]
+earliest_collision = [np.inf for i in range(len(collider.posmodels))]
+for k in range(len(collider.collidable_relations['A'])):
+    A = collider.collidable_relations['A'][k]
+    B = collider.collidable_relations['B'][k]
+    B_is_fixed = collider.collidable_relations['B_is_fixed'][k]
+    if B_is_fixed and A in range(len(tables)): # might want to replace 2nd test here with one where we look in tables for a specific positioner index
+        these_sweeps = collider.spactime_collision_with_fixed(A, collider.tp0[:,A], tables[A])
+    elif A in range(len(tables)) and B in range(len(tables)): # again, might want to look for specific indexes identifying which tables go with which positioners
+        these_sweeps = collider.spactime_collision_between_positioners(A, collider.tp0[:,A], tables[A], B, collider.tp0[:,B], tables[B])
+    for i in range(len(these_sweeps)):
+        AorB = A if i == 0 else B
+        if these_sweeps[i].collision_time <= earliest_collision[AorB]:
+            sweeps[AorB] = these_sweeps[i]
+            earliest_collision[AorB] = these_sweeps[i].collision_time
 
 # animate
 collider.animate(sweeps)
