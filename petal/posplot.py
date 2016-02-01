@@ -168,7 +168,7 @@ class PosPlot(object):
             metadata = dict(title='', artist='',comment='')
             filename = 'something.mp4'
             dpi = 75
-            writer = animation.FFMpegWriter(fps=fps, metadata=metadata)
+            writer = animation.FFMpegWriter(fps=fps, metadata=metadata, bitrate=3000)
             writer.setup(fig=self.anim_fig, outfile=filename, dpi=dpi)
             for i in range(round(start_end_still_time/self.timestep)):
                 writer.grab_frame()
