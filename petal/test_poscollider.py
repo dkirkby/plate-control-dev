@@ -64,8 +64,8 @@ for i in range(len(collider.posmodels)):
     postpause = [0 for i in range(nrows)]
     prepause[1] = 0.5
     postpause[1] = 0.5
-    move_time = [max(dT[i]/Tdot[i],dP[i]/Pdot[i]) for i in range(nrows)]
-    tables[i] = {'nrows':nrows, 'Tstart':Tstart, 'Pstart':Pstart, 'dT':dT, 'dP':dP, 'Tdot':Tdot, 'Pdot':Pdot, 'prepause':prepause, 'move_time':move_time, 'postpause':postpause}
+    move_time = [max(abs(dT[i]/Tdot[i]), abs(dP[i]/Pdot[i])) for i in range(nrows)]
+    tables[i] = {'nrows':nrows, 'dT':dT, 'dP':dP, 'Tdot':Tdot, 'Pdot':Pdot, 'prepause':prepause, 'move_time':move_time, 'postpause':postpause}
 
 # calculate the move sweeps, checking for collisions
 sweeps = [[] for i in range(len(collider.posmodels))]
@@ -75,9 +75,9 @@ for k in range(len(collider.collidable_relations['A'])):
     B = collider.collidable_relations['B'][k]
     B_is_fixed = collider.collidable_relations['B_is_fixed'][k]
     if B_is_fixed and A in range(len(tables)): # might want to replace 2nd test here with one where we look in tables for a specific positioner index
-        these_sweeps = collider.spactime_collision_with_fixed(A, collider.tp0[:,A], tables[A])
+        these_sweeps = collider.spactime_collision_with_fixed(A, [Tstart,Pstart], tables[A])
     elif A in range(len(tables)) and B in range(len(tables)): # again, might want to look for specific indexes identifying which tables go with which positioners
-        these_sweeps = collider.spactime_collision_between_positioners(A, collider.tp0[:,A], tables[A], B, collider.tp0[:,B], tables[B])
+        these_sweeps = collider.spactime_collision_between_positioners(A, [Tstart,Pstart], tables[A], B, [Tstart,Pstart], tables[B])
     for i in range(len(these_sweeps)):
         AorB = A if i == 0 else B
         if these_sweeps[i].collision_time <= earliest_collision[AorB]:
