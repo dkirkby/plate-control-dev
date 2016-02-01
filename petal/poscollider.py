@@ -99,8 +99,6 @@ class PosCollider(object):
         The input table dictionaries must contain the following fields:
 
             'nrows'     : number of rows in the lists below (all must be the same length)
-            'Tstart'    : beginning theta position
-            'Pstart'    : beginning phi position
             'dT'        : list of theta rotation distances in degrees
             'dP'        : list of phi rotation distances in degrees
             'Tdot'      : list of theta rotation speeds in deg/sec
@@ -112,77 +110,33 @@ class PosCollider(object):
         The return is a list of instances of PosSweep, containing the theta and phi rotations
         in real time, and when if any collision, and the collision type.
         """
-        time_start = 0
         pospos = True if idxB else False # whether this is checking collisions between two positioners (or if false, between one positioner and fixed keepouts)
-        if pospos:
-            tables = [tableA,tableB]
-            sweeps = [PosSweep(idxA), PosSweep(idxB)]
-        else:
-            tables = [tableA]
-            sweeps = [PosSweep(idxA)]
-        for i in range(len(sweeps)):
-            sweeps[i].tp = np.array([[tables[i]['Tstart']],[tables[i]['Pstart']]])
-            sweeps[i].time = time_start
-        row = [0]*2 if pospos else [0]
-        stage = ['prepause']*2 if pospos else ['prepause']
-        stage_dT_remaining = [0]*2 if pospos else [0]
-        stage_dP_remaining = [0]*2 if pospos else [0]
-        postpause_adjustment = [0]*2 if pospos else [0]
-        complete = [False]*2 if pospos else [False]
-        now = time_start
-        stage_start = [now]*2 if pospos else [now]
-        while not all(complete):
-            check_collision_this_loop = False
-            for i in range(len(tables)):
-                if stage[i] == 'prepause' and now >= stage_start[i] + tables[i]['prepause'][row[i]]:
-                    stage[i] = 'move'
-                    stage_dT_remaining[i] = tables[i]['dT'][row[i]]
-                    stage_dP_remaining[i] = tables[i]['dP'][row[i]]
-                    stage_start[i] = now
-                if stage[i] == 'move':
-                    if not(stage_dT_remaining[i]) and not(stage_dP_remaining[i]):
-                        stage[i] = 'postpause'
-                        stage_start[i] = now
-                    else:
-                        speed[0] = tables[i]['Tdot'][row[i]]
-                        speed[1] = tables[i]['Pdot'][row[i]]
-                        for ax in [pc.T,pc.P]:
-                            one_step[ax] = np.sign(stage_dist_remaining[i][ax]) * self.timestep * speed[ax]
-                            if abs(stage_dist_remaining[i][ax]) > abs(one_step[ax]):
-                                delta[ax] = one_step[ax]
-                            else:
-                                delta[ax] = stage_dist_remaining[i][ax]
-                                temp_adjust = -(abs(one_step[ax]) - abs(delta[ax])) / speed[ax] # compensate for shorter time it takes to do a partial step
-                                postpause_adjustment[i] = min(temp_adjust, postpause_adjustment[i])
-
-
-                        T_after_step = delta_T + sweeps[i].tp[0,-1]
-                        P_after_step = delta_P + sweeps[i].tp[1,-1]
-                        sweeps[i].tp = np.append(sweeps[i].tp, [[T_after_step],[P_after_step]], axis=1)
-                        sweeps[i].time = np.append(sweeps[i].time, now + self.timestep)
-                        stage_dT_remaining[i] -= delta_T
-                        stage_dP_remaining[i] -= delta_P
-                        check_collision_this_loop = True
-                if stage[i] == 'postpause' and now >= stage_start[i] + postpause_adjustment[i] + tables[i]['postpause'][row[i]]:
-                    next_row = row[i] + 1
-                    postpause_adjustment[i] = 0
-                    if next_row < tables[i]['nrows']:
-                        stage[i] = 'prepause'
-                        stage_start[i] = now
-                        row[i] = next_row
-                    else:
-                        complete[i] = True
-            if check_collision_this_loop:
+        init_obsTPs = [init_obsTP_A,init_obsTP_B] if pospos else [init_obsTP_A]
+        tables = [tableA,tableB] if pospos else [tableA]
+        sweeps = [PosSweep(idxA),PosSweep(idxB)] if pospos else [PosSweep(idxA)]
+        steps_remaining = [0]*2 if pospos else [0]
+        for i in range(len(tables)):
+            sweeps[i].fill_exact(init_obsTPs[i], tables[i])
+            sweeps[i].quantize()
+            steps_remaining[i] = len(sweeps[i].time)
+        step = [0]*2 if pospos else [0]
+        check_collision_this_loop = [False]*2 if pospos else [False]
+        while any(steps_remaining):
+            for i in range(len(sweeps)):
+                if steps_remaining[i]:
+                    check_collision_this_loop[i] = any(sweeps[i].tp[:,step[i]])
+                    steps_remaining[i] -= 1
+                    step[i] += 1
+            if any(check_collision_this_loop):
                 if pospos:
-                    collision_case = self.spatial_collision_between_positioners(idxA, idxB, sweeps[0].tp[:,-1], sweeps[1].tp[:,-1])
+                    collision_case = self.spatial_collision_between_positioners(idxA, idxB, sweeps[0].tp[:,step[0]], sweeps[1].tp[:,step[1]])
                 else:
-                    collision_case = self.spatial_collision_with_fixed(idxA, sweeps[0].tp[:,-1])
+                    collision_case = self.spatial_collision_with_fixed(idxA, sweeps[0].tp[:,step[0]])
                 if collision_case != pc.case.I:
                     for i in range(len(sweeps)):
                         sweeps[i].collision_case = collision_case
-                        sweeps[i].collision_time = sweeps[0].time[-1]
-                        complete[i] = True
-            now += self.timestep
+                        sweeps[i].collision_time = sweeps[i].time[step[i]]
+                        steps_remaining[i] = False
         return sweeps
 
     def spatial_collision_between_positioners(self, idxA, idxB, obsTP_A, obsTP_B):
@@ -400,11 +354,56 @@ class PosSweep(object):
     geometries through space.
     """
     def __init__(self, posidx=None):
-        self.posidx = posidx              # index identifying the positioner
-        self.time = np.array([])          # real time at which each TP position value occurs
-        self.tp   = np.array([[],[]])     # theta,phi angles corresponding to time
+        self.posidx  = posidx             # index identifying the positioner
+        self.time    = np.array([])       # real time at which each TP position value occurs
+        self.tp      = np.array([[],[]])  # theta,phi angles corresponding to time
         self.collision_case = pc.case.I   # enumeration of type "case", indicating what kind of collision first detected, if any
         self.collision_time = np.inf      # time at which collision occurs. if no collision, the time is inf
+
+    def fill_exact(self, init_obsTP, table, start_time=0):
+        """Fills in a sweep object based on the input table. Time and position
+        are handled continuously and exactly (i.e. not yet quantized).
+        """
+        time = []
+        tp = [[],[]]
+        time.append(start_time)
+        tp[0].append(init_obsTP[0])
+        tp[1].append(init_obsTP[1])
+        for i in range(0,table['nrows']):
+            if table['prepause'][i]:
+                time.append(table['prepause'][i] + time[-1])
+                tp[0].append(tp[0][-1])
+                tp[1].append(tp[1][-1])
+            if table['move_time'][i]:
+                time.append(table['move_time'][i] + time[-1])
+                tp[0].append(table['dT'][i] + tp[0][-1])
+                tp[1].append(table['dP'][i] + tp[1][-1])
+            if table['postpause'][i]:
+                time.append(table['postpause'][i] + time[-1])
+                tp[0].append(tp[0][-1])
+                tp[1].append(tp[1][-1])
+        self.time = np.array(time)
+        self.tp = np.array(tp)
+
+    def quantize(self):
+        """Converts itself from exact, continuous time to quantized, discrete time.
+        The result has approximate intermediate (theta,phi) positions and speeds,
+        all as a function of discrete time. The quantization is according to the
+        parameter 'timestep'.
+        """
+        discrete_time = [self.time[0]]
+        discrete_position = np.array([[self.tp[pc.T,0]],[self.tp[pc.P,0]]])
+        for i in range(1,len(self.time)):
+            this_discrete_time = np.arange(discrete_time[-1], self.time[i], self.timestep)
+            for ax in [pc.T,pc.P]:
+                exact_speed = (self.tp[ax,i] - self.tp[ax,i-1]) / (self.time[i] - self.time[i-1])
+                discrete_step = exact_speed * self.timestep
+                this_discrete_position = discrete_position[ax,-1] + this_discrete_time * discrete_step
+                this_discrete_position[-1] = self.tp[ax,i] # force the final step to end at the right place (thus slightly changing the effective speed of the final step)
+                discrete_position[ax] = np.append(discrete_position[ax], this_discrete_position)
+            discrete_time = np.append(discrete_time, this_discrete_time)
+        self.time = discrete_time
+        self.tp = discrete_position
 
 
 class PosPoly(object):
