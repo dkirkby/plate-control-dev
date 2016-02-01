@@ -145,20 +145,19 @@ class PosPlot(object):
             xmax = max(xmax,max(item['poly'][0][0]))
             ymin = min(ymin,min(item['poly'][0][1]))
             ymax = max(ymax,max(item['poly'][0][1]))
-            plt.xlim(xmin=xmin,xmax=xmax)
-            plt.ylim(ymin=ymin,ymax=ymax)
-            item['last_patch_update'] = -1
             item['patch_idx'] = i
+            item['last_frame'] = self.all_times.tolist().index(item['time'][-1])
             i += 1
+        plt.xlim(xmin=xmin,xmax=xmax)
+        plt.ylim(ymin=ymin,ymax=ymax)
 
-    def anim_frame_update(self, time):
+    def anim_frame_update(self, frame):
         """Sequentially update the animation to the next frame.
         """
         for item in self.items.values():
-            this_patch_update = item['last_patch_update'] + 1
-            if this_patch_update < len(item['time']) and time >= item['time'][item['last_patch_update']]:
-                self.set_patch(self.patches[item['patch_idx']], item, this_patch_update)
-                item['last_patch_update'] = this_patch_update
+            i = item['patch_idx']
+            if frame <= item['last_frame']:
+                self.set_patch(self.patches[i], item, frame)
 
     def animate(self):
         self.anim_init()
@@ -176,8 +175,8 @@ class PosPlot(object):
         if self.live_animate:
             plt.pause(start_end_still_time)
         frame_times = np.arange(min(self.all_times), max(self.all_times)+self.timestep/2, self.timestep) # extra half-timestep on max ensures inclusion of max val in range
-        for time in frame_times:
-            self.anim_frame_update(time)
+        for frame in range(len(frame_times)):
+            self.anim_frame_update(frame)
             if self.write_movie_file:
                 writer.grab_frame()
             if self.live_animate:
