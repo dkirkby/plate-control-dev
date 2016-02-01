@@ -1,7 +1,6 @@
 import numpy as np
 import posconstants as pc
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 
 class PosPlot(object):
     """Handles plotting animated visualizations for array of positioners.
@@ -13,7 +12,11 @@ class PosPlot(object):
     """
     def __init__(self, fignum=0, timestep=0.1):
         self.live_animate = True # whether to plot the animation live
-        self.write_movie_file = True # whether to write out a movie file of animation
+        self.save_movie = True # whether to write out a movie file of animation
+        self.save_dir = os.path.join(os.getcwd(),'anim') # where to save the movie file
+        self.framefile_prefix = 'frame'
+        self.framefile_extension = '.png'
+        self.n_framefile_digits = 5
         self.fignum = fignum
         self.timestep = timestep # frame interval for animations
         self.items = {} # keys shall identify the individual items that get drawn, i.e. 'ferrule 321', 'phi arm 42', 'GFA', etc
@@ -163,31 +166,37 @@ class PosPlot(object):
         self.anim_init()
         plt.ion()
         start_end_still_time = 0.5
-        if self.write_movie_file:
+        if self.save_movie:
             fps = 1/self.timestep
-            metadata = dict(title='', artist='',comment='')
-            filename = 'something.mp4'
-            dpi = 75
-            writer = animation.FFMpegWriter(fps=fps, metadata=metadata, bitrate=3000)
-            writer.setup(fig=self.anim_fig, outfile=filename, dpi=dpi)
+
+
             for i in range(round(start_end_still_time/self.timestep)):
-                writer.grab_frame()
+                self.grab_frame()
         if self.live_animate:
             plt.pause(start_end_still_time)
         frame_times = np.arange(min(self.all_times), max(self.all_times)+self.timestep/2, self.timestep) # extra half-timestep on max ensures inclusion of max val in range
         for frame in range(len(frame_times)):
             self.anim_frame_update(frame)
-            if self.write_movie_file:
+            if self.save_movie:
                 writer.grab_frame()
             if self.live_animate:
                 plt.pause(self.timestep)
-        if self.write_movie_file:
+        if self.save_movie:
             for i in range(round(start_end_still_time/self.timestep)):
                 writer.grab_frame()
             writer.finish()
         if self.live_animate:
             plt.pause(start_end_still_time)
         plt.close()
+        if self.save_movie:
+
+            quality = 1
+            codec = 'mpeg4'
+            input_file = self.get_frame_path()
+            output_file = os.path.join(self.save_dir,'anim.mp4')
+            ffmpeg_cmd = 'ffmpeg' + ' -y ' + ' -r ' + str(fps) + ' -i ' + input_file + ' -q:v ' + str(quality) + ' -vcodec ' + codec + ' ' + output_file
+            print(ffmpeg_cmd)
+            os.system(ffmpeg_cmd)
 
     @staticmethod
     def get_patch(item,index):
@@ -204,3 +213,11 @@ class PosPlot(object):
         patch.set_linewidth(item['style'][index]['linewidth'])
         patch.set_edgecolor(item['style'][index]['edgecolor'])
         patch.set_facecolor(item['style'][index]['facecolor'])
+
+    @staticmethod
+    def grab_frame(self, frame_number)
+        plt.savefig()
+
+    @staticmethod
+    def get_frame_path(self, frame_number):
+        return os.path.join(self.save_dir, self.framefile_prefix + '%' + str(frame_number).zfill(self.n_framefile_digits) + 'd' + self.framefile_extension)
