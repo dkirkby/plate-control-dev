@@ -136,10 +136,13 @@ class PosCollider(object):
                         sweeps[i].collision_case = collision_case
                         sweeps[i].collision_time = sweeps[i].time[step[i]]
                         steps_remaining[i] = 0 # halt the sweep here
+                        trunc = step[i]+1
+                        sweeps[i].time = sweeps[i].time[:trunc]
+                        sweeps[i].tp = sweeps[i].tp[:,:trunc]
+                        sweeps[i].tp_dot = sweeps[i].tp_dot[:,:trunc]
+            steps_remaining = [max(0,s-1) for s in steps_remaining]
             for i in range(len(sweeps)):
-                if steps_remaining[i]:
-                    steps_remaining[i] -= 1
-                    step[i] += 1
+                step[i] += 1 if steps_remaining[i] else 0
         return sweeps
 
     def spatial_collision_between_positioners(self, idxA, idxB, obsTP_A, obsTP_B):

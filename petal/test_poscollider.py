@@ -65,6 +65,13 @@ for i in range(len(collider.posmodels)):
     postpause = [0 for i in range(nrows)]
     prepause[1] = 0.5
     postpause[1] = 0.5
+    if i == 6:
+        dP[0] = -180
+    if i == 7:
+        dP[0] = -180
+        dT[1] = 0
+        dT[2] = -90
+
     move_time = [max(abs(dT[i]/Tdot[i]), abs(dP[i]/Pdot[i])) for i in range(nrows)]
     tables[i] = {'nrows':nrows, 'dT':dT, 'dP':dP, 'Tdot':Tdot, 'Pdot':Pdot, 'prepause':prepause, 'move_time':move_time, 'postpause':postpause}
 
