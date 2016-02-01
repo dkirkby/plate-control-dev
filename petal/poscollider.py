@@ -117,17 +117,16 @@ class PosCollider(object):
         steps_remaining = [0]*2 if pospos else [0]
         for i in range(len(tables)):
             sweeps[i].fill_exact(init_obsTPs[i], tables[i])
-            sweeps[i].quantize()
+            sweeps[i].quantize(self.timestep)
             steps_remaining[i] = len(sweeps[i].time)
         step = [0]*2 if pospos else [0]
         check_collision_this_loop = [False]*2 if pospos else [False]
         while any(steps_remaining):
+            check_collision_this_loop = False
             for i in range(len(sweeps)):
-                if steps_remaining[i]:
-                    check_collision_this_loop[i] = any(sweeps[i].tp[:,step[i]])
-                    steps_remaining[i] -= 1
-                    step[i] += 1
-            if any(check_collision_this_loop):
+                if any(sweeps[i].tp_dot[:,step[i]]) or step[i] == 0:
+                    check_collision_this_loop = True
+            if check_collision_this_loop:
                 if pospos:
                     collision_case = self.spatial_collision_between_positioners(idxA, idxB, sweeps[0].tp[:,step[0]], sweeps[1].tp[:,step[1]])
                 else:
@@ -136,7 +135,11 @@ class PosCollider(object):
                     for i in range(len(sweeps)):
                         sweeps[i].collision_case = collision_case
                         sweeps[i].collision_time = sweeps[i].time[step[i]]
-                        steps_remaining[i] = False
+                        steps_remaining[i] = 0 # halt the sweep here
+            for i in range(len(sweeps)):
+                if steps_remaining[i]:
+                    steps_remaining[i] -= 1
+                    step[i] += 1
         return sweeps
 
     def spatial_collision_between_positioners(self, idxA, idxB, obsTP_A, obsTP_B):
@@ -356,7 +359,8 @@ class PosSweep(object):
     def __init__(self, posidx=None):
         self.posidx  = posidx             # index identifying the positioner
         self.time    = np.array([])       # real time at which each TP position value occurs
-        self.tp      = np.array([[],[]])  # theta,phi angles corresponding to time
+        self.tp      = np.array([[],[]])  # theta,phi angles as function of time (sign indicates direction)
+        self.tp_dot  = np.array([[],[]])  # theta,phi rotation speeds as function of time (sign indicates direction)
         self.collision_case = pc.case.I   # enumeration of type "case", indicating what kind of collision first detected, if any
         self.collision_time = np.inf      # time at which collision occurs. if no collision, the time is inf
 
@@ -364,28 +368,34 @@ class PosSweep(object):
         """Fills in a sweep object based on the input table. Time and position
         are handled continuously and exactly (i.e. not yet quantized).
         """
-        time = []
-        tp = [[],[]]
-        time.append(start_time)
-        tp[0].append(init_obsTP[0])
-        tp[1].append(init_obsTP[1])
+        time = [start_time]
+        tp = [[init_obsTP[0]],[init_obsTP[1]]]
+        tp_dot = [[0],[0]]
         for i in range(0,table['nrows']):
             if table['prepause'][i]:
                 time.append(table['prepause'][i] + time[-1])
                 tp[0].append(tp[0][-1])
                 tp[1].append(tp[1][-1])
+                tp_dot[0].append(0)
+                tp_dot[1].append(0)
             if table['move_time'][i]:
                 time.append(table['move_time'][i] + time[-1])
                 tp[0].append(table['dT'][i] + tp[0][-1])
                 tp[1].append(table['dP'][i] + tp[1][-1])
+                tp_dot[0].append(np.sign(table['dT'][i]) * abs(table['Tdot'][i]))
+                tp_dot[1].append(np.sign(table['dP'][i]) * abs(table['Pdot'][i]))
             if table['postpause'][i]:
                 time.append(table['postpause'][i] + time[-1])
                 tp[0].append(tp[0][-1])
                 tp[1].append(tp[1][-1])
+                tp_dot[0].append(0)
+                tp_dot[1].append(0)
         self.time = np.array(time)
         self.tp = np.array(tp)
+        self.tp_dot = np.array(tp_dot)
 
-    def quantize(self):
+
+    def quantize(self, timestep):
         """Converts itself from exact, continuous time to quantized, discrete time.
         The result has approximate intermediate (theta,phi) positions and speeds,
         all as a function of discrete time. The quantization is according to the
@@ -393,17 +403,22 @@ class PosSweep(object):
         """
         discrete_time = [self.time[0]]
         discrete_position = np.array([[self.tp[pc.T,0]],[self.tp[pc.P,0]]])
+        speed = np.array([[self.tp_dot[pc.T,0]],[self.tp_dot[pc.P,0]]])
         for i in range(1,len(self.time)):
-            this_discrete_time = np.arange(discrete_time[-1], self.time[i], self.timestep)
+            this_discrete_time = np.arange(discrete_time[-1], self.time[i], timestep) + timestep # additional timestep shifts times such that they correspond to when steps are finished, rather than when they're started
+            this_discrete_position = [[],[]]
+            this_speed = [[],[]]
             for ax in [pc.T,pc.P]:
-                exact_speed = (self.tp[ax,i] - self.tp[ax,i-1]) / (self.time[i] - self.time[i-1])
-                discrete_step = exact_speed * self.timestep
-                this_discrete_position = discrete_position[ax,-1] + this_discrete_time * discrete_step
-                this_discrete_position[-1] = self.tp[ax,i] # force the final step to end at the right place (thus slightly changing the effective speed of the final step)
-                discrete_position[ax] = np.append(discrete_position[ax], this_discrete_position)
+                discrete_step = self.tp_dot[ax,i] * timestep
+                this_discrete_position[ax] = discrete_position[ax,-1] + np.arange(1,len(this_discrete_time)+1)*discrete_step
+                this_discrete_position[ax][-1] = self.tp[ax,i] # force the final step to end at the right place (thus slightly changing the effective speed of the final step)
+                this_speed[ax] = self.tp_dot[ax,i]*np.ones_like(this_discrete_time) # for book keeping
+            discrete_position = np.append(discrete_position, this_discrete_position, axis=1)
             discrete_time = np.append(discrete_time, this_discrete_time)
+            speed = np.append(speed, this_speed, axis=1)
         self.time = discrete_time
         self.tp = discrete_position
+        self.tp_dot = speed
 
 
 class PosPoly(object):
