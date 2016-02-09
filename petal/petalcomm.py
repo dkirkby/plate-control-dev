@@ -4,7 +4,7 @@ class PetalComm(object):
     """
 
 def __init(self):
-    pass
+    self.no_dos = True # boolean to enable talking straight over TCP/IP to petalbox without needing a DOS running
 
 def send_tables(self, move_tables):
     """Sends move tables for positioners over ethernet to the petal controller,
