@@ -163,30 +163,7 @@ class PosSchedule(object):
 
     def _schedule_with_anticollision(self):
         """
-        # gather the general envelopes and keep-out zones (see DESI-0899, same for all positioners)
-        Ei = 6.800 # [mm] inner clear rotation envelope
-        Eo = 9.990 # [mm] outer clear rotation envelope
-        P2 = [] # (to-do) polygonal type II keepout zone
-        P3 = [] # (to-do) polygonal type III keepout zone
-
-        # gather the location-specific keep-out zones (varies by positioner)
-        P4 = [] # will store a list of additional polygonal keepout zones due to nearby hardware (GFA), or petal seam, or dead neighbor positioner. if none, that entry is an empty list, so length still matches the # of move_tables
-        for tbl in self.move_tables:
-            P4.append([]) # (to-do)
-
-        # gather the kinematics calibration data
-        R = [] # will store arm lengths for theta and phi
-        tp0 = [] # will store the (theta,phi) permanent offsets (e.g., theta clocking angle of mounting, phi clocking angle of construction)
-        xy0 = [] # will store the (x,y) locations of the fiber positioners' centers
-        t_range = [] # will store the (theta_min, theta_max) travel ranges
-        p_range = [] # will store the (phi_min, phi_max) travel ranges
-        for tbl in self.move_tables:
-            R.append(  [tbl.posmodel.state.read('LENGTH_R1'), tbl.posmodel.state.read('LENGTH_R2')])
-            tp0.append([tbl.posmodel.state.read('POLYN_T0' ), tbl.posmodel.state.read('POLYN_P0' )])
-            xy0.append([tbl.posmodel.state.read('POLYN_X0' ), tbl.posmodel.state.read('POLYN_Y0' )])
-            t_range.append(tbl.posmodel.targetable_range_T)
-            p_range.append(tbl.posmodel.targetable_range_P)
-
+        # use poscollider module for gathering calibration data, detecting collisions, and making animations
         # anticollision algorithm goes here
         # (to-do)
         """
