@@ -23,7 +23,6 @@ import platform
 import threading
 import posfidcan
 
-
 class PetalController(Application):
 	commands = [ 'send_tables',
 				'execute_sync', 'set_device', 'get_fid_status', 'get_device_status', 'set_fiducials',  'set_led']
@@ -191,12 +190,7 @@ class PetalController(Application):
 		pass
 
 
- 
 
-
-
-
-	
 	def main(self):
 		while not self.shutdown_event.is_set():
 			# Periodically poll controller and update shared variable
@@ -239,9 +233,10 @@ class PositionerMoveControl(object):
 		self.pfcan=posfidcan.PosFidCAN('can2')
 
 
-	def set_reset_leds(self, pos_id, select):
-		
-		self.pfcan.send_command(pos_id,6, str(select).zfill(2))
+	def set_reset_leds(self, pos_id, state):
+		onoff={'on':1,'off':0}
+		select =onoff[state]		
+		self.pfcan.send_command(pos_id,5, str(select).zfill(2))
 
 
 if (__name__ == '__main__'):
