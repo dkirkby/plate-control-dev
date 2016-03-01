@@ -12,7 +12,7 @@ import struct
 import string
 import time
 
-class SocketCAN(object):
+class PosFidCAN(object):
 	"""Class for communicating with the DESI fiber positioner control (FPC) electronics
 		through Systec module via SocketCAN.
 	"""
