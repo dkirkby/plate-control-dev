@@ -134,26 +134,30 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not send move tables. Exception: %s' % str(e)
 	
-    def execute_moves_hard_sync(self):
+    def execute_sync(self, mode):
         """
         Send the command to synchronously begin move sequences to all positioners
-        on the petal simultaneously. Uses the hardware sync pin as the start signal.
+        on the petal simultaneously.
+        mode can be either hard or soft
         """
+        if str(mode).lower() not in ['hard','soft']:
+            return 'FAILED: Invalid value for mode argument'
         try:
-            return self._call_device('execute_moves_hard_sync')
+            return self._call_device('execute_sync', str(mode).lower())
         except Exception as e:
-            return 'FAILED: Can not execute move (hard sync). Exception: %s' % str(e)
-	
-    def execute_moves_soft_sync(self):
+            return 'FAILED: Can not execute sync command. Exception: %s' % str(e)
+
+    def send_move_execute(self, pos_id, direction, mode, motor, angle):
         """
-        Send the command to synchronously begin move sequences to all positioners,
-        using CAN command as the start signal.
+        Low level test command to move a single positioner
         """
+        # add parameter checking
         try:
-            return self._call_device('execute_moves_soft_sync')
+            # Michael's code expects motor as a string
+            return self._call_device('send_move_execute', pos_id, direction, mode, str(motor), angle)
         except Exception as e:
-            return 'FAILED: Can not execute move (soft sync). Exception: %s' % str(e)
-	
+            return 'FAILED: Can not execute send_move_excute command. Exception: %s' % str(e)
+
     def set_pos_constants(self, posids, settings):
         """
         Send settings over ethernet to the petal controller, where they are
