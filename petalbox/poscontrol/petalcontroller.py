@@ -133,6 +133,7 @@ class PetalController(Application):
 		"""Send the command to set positioner LED ON or OFF
 
 		""" 
+		print('set_led:'+str(state)+str(pos_id))
 		if not isinstance(pos_id,int):
 			rstring = 'set_led: Invalid pos_id arguments.'
 			self.error(rstring)
@@ -141,7 +142,7 @@ class PetalController(Application):
 			rstring = 'execute_sync: Invalid LED state arguments.'
 			self.error(rstring)
 			return 'FAILED: ' + rstring
-			self.pmc.set_led(pos_id,state.lower())
+		self.pmc.set_led(pos_id,state.lower())
 
 		return self.SUCCESS  
 
