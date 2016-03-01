@@ -26,7 +26,7 @@ import posfidcan
 
 class PetalController(Application):
 	commands = ['configure', 'get', 'set', 'send_tables',
-				'execute_moves_hard_sync', 'set_device', 'get_fid_status', 'get_device_status', 'set_fiducials',  'set_led']
+				'execute_sync', 'set_device', 'get_fid_status', 'get_device_status', 'set_fiducials',  'set_led']
 	defaults = {'some_canbus_stuff' : 10.0,
 				'hardware' : 'simulator',
 				}
@@ -167,7 +167,6 @@ class PetalController(Application):
 #        move_tables format.
 #   """
 		pass
-
 
 
 	def execute_sync(self,mode='hard'):
