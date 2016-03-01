@@ -25,7 +25,7 @@ import posfidcan
 
 
 class PetalController(Application):
-	commands = ['configure', 'get', 'set', 'send_tables',
+	commands = [ 'send_tables',
 				'execute_sync', 'set_device', 'get_fid_status', 'get_device_status', 'set_fiducials',  'set_led']
 	defaults = {'some_canbus_stuff' : 10.0,
 				'hardware' : 'simulator',
@@ -49,7 +49,7 @@ class PetalController(Application):
 		self.hardware = self.config['hardware']
 		
 		# Setup data structure for LED information 
-		self.led_info = {'port': self.config['serial_port'],'channel' : 1, 'max_current': self.max_current, 'current' : 0.0, 'state' : 'OFF'}
+#		self.led_info = {'port': self.config['serial_port'],'channel' : 1, 'max_current': self.max_current, 'current' : 0.0, 'state' : 'OFF'}
 		self.controller = None
 
 		# Setup application to be discovered by others
@@ -69,66 +69,7 @@ class PetalController(Application):
 		self.info('_setup_discovery: Done')
 
 	# PML functions (functions that can be accessed remotely)
-	def configure(self, constants = None):
-		"""Configure Simple Device application"""
-		self.info('Configuring using constants %s' % repr(constants))
-		
-		# Do something like connect to your hardware, call a driver init function etc
-		try:
-			self.controller = MightexLED(port = '/dev/tty.usbserial-AH00N5LG')
-			#self.controller = LedSimulator(port='usb0')
-		except Exception as e:
-			self.error('configure: Exception connecting to LED controller: %s' % str(e))
-			return self.FAILED
-		
-		self.led_info = self.controller.status()
-		# and write this information to the shared variable
-		self.ledSV.write(self.led_info)
-		# update status and we are configured
-		self.statusSV.write('READY')
-		self.debug('configure: connected: %s, core connected: %s, sve connected: %s' % (self.connected, self.core_connected
-, self.sve_connected))
-		return self.SUCCESS
 
-	def get(self, params):
-		""" Retrieve parameters dynamically.
-			Options include:
-			status, led, hardware
-		"""
-		if params.lower() == 'status':
-			return self.statusSV._value
-		elif params.lower() == 'led':
-			if not self.controller:
-				return 'FAILED: No LED controller connected'
-			self.led_info.update(self.controller.status())
-			return self.led_info
-		elif params.lower() == 'hardware':
-			return self.hardware
-		else:
-			return 'Invalid parameter for get command: %s' % params
-		
-	def set(self, *args, **params):
-		""" Set parameters dynamically.
-			Options include:
-			led, current
-		""" 
-		if not self.controller:
-			return 'FAILED: LED controller is not connected'
-		if 'led' in params:
-			if params['led'] in ['ON', 'on', True]:
-				return self.controller.turn_on()
-			elif params['led'] in ['OFF', 'off', False]:
-				return self.controller.turn_off()
-			else:
-				return 'FAILED: invalid parameter'
-		elif 'current' in params:
-			try:
-				i = float(params['current'])
-			except:
-				return 'Invalid value for current'
-			return self.controller.set(current=i)
-		else:
-			return 'Failed: incorrect parameter for set command.'
 
 	def set_fiducials(self, *args, **kwargs):
 		"""
