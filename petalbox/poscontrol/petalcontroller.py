@@ -142,7 +142,7 @@ class PetalController(Application):
 			rstring = 'execute_sync: Invalid LED state arguments.'
 			self.error(rstring)
 			return 'FAILED: ' + rstring
-		self.pmc.set_led(pos_id,state.lower())
+		self.pmc.set_reset_leds(pos_id,state.lower())
 
 		return self.SUCCESS  
 
