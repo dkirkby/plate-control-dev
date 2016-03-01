@@ -58,7 +58,7 @@ class PetalController(Application):
 		# Update status and initialization is done ...
 		self.statusSV.write('INITIALIZED')
 		# ... unless we want to configure us ourselves
-		retcode = self.configure('constants = DEFAULT')
+		#retcode = self.configure('constants = DEFAULT')
 		self.info('Initialized')
 		self.pmc=PositionerMoveControl()
 
