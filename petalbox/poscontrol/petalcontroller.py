@@ -23,6 +23,7 @@ from DOSlib.application import Application
 import time
 import threading
 import posfidcan
+import sys
 
 def set_bit(value, bit):
     return value | (1<<bit)
@@ -36,13 +37,11 @@ class PetalController(Application):
     """
    
     # List of remotely accessible commands
-    commands = ['send_tables',
-                'execute_sync', 
+    comands = ['set_led',
                 'set_device', 
                 'get_fid_status', 
                 'get_device_status', 
                 'set_fiducials',  
-                'set_led',
                 'configure',
                 'get_positioner_map',
                 'send_move_execute'
@@ -128,24 +127,24 @@ class PetalController(Application):
         pause=0
         select=0
         if direction.lower() in ['cw','ccw']:
-            if mode.lower()=='cw'
-                select=set_bit(0)     
+            if direction.lower()=='cw':
+                select=set_bit(select,0)     
         else:
             rstring = 'send_move_execute: Invalid arguments.'
             self.error(rstring)
             return 'FAILED: ' + rstring
 
         if mode.lower() in ['creep','cruise']:
-            if mode.lower()=='cruise'
-                select=set_bit(1)     
+            if mode.lower()=='cruise':
+                select=set_bit(select,1)     
         else:
             rstring = 'send_move_execute: Invalid arguments.'
             self.error(rstring)
             return 'FAILED: ' + rstring
 
         if motor in ['0','1']:
-            if motor=='1'
-                select=set_bit(2)     
+            if motor=='1':
+                select=set_bit(select,2)     
         else:
             rstring = 'send_move_execute: Invalid arguments.'
             self.error(rstring)
@@ -153,9 +152,9 @@ class PetalController(Application):
 
         select_flags=select  #2  # CW cruise
         
-        retcode=self.pmc.load_rows(12, ex_code, select_flags, angle, pause, readback=True):
+        retcode=self.pmc.load_rows(12, ex_code, select_flags, angle, pause, readback=True)
 
-        print('send_tables: %s' % repr(move_tables))
+#        print('send_tables: %s' % repr(move_tables))
         return self.SUCCESS
 
     def execute_sync(self, mode='hard'):
@@ -323,14 +322,14 @@ class PositionerMoveControl(object):
 
             try:
             
-                print('Data sent is: %s (in hex)'%(str(ex_code + select_flags + amount + pause)))
-                self.scan.send_command(pid,4, str(ex_code + select_flags  + amount + pause))
+                print('Data sent is: %s (in hex)'%(str(ex_code + select + amount + pause)))
+                self.pfcan.send_command(pos_id,4, str(ex_code + select  + amount + pause))
                 
 
                 if(ex_code=='1'):   
                     
-                    print(str(hex(int(ex_code + select_flags,16) + int(amount,16) + int(pause,16) + 4).replace('0x','').zfill(8)))                                      
-                    self.bitsum += int(ex_code + select_flags,16) + int(amount,16) + int(pause,16) + 4
+                    print(str(hex(int(ex_code + select,16) + int(amount,16) + int(pause,16) + 4).replace('0x','').zfill(8)))                                      
+                    self.bitsum += int(ex_code + select,16) + int(amount,16) + int(pause,16) + 4
                     print('Bitsum =', self.bitsum)
 
                 return 0
@@ -343,14 +342,18 @@ class PositionerMoveControl(object):
             #Send both last command and bitsum, reset bitsum for next move table    
         
             try:
-            
-                print('Data sent is: %s (in hex)'%(str(ex_code + select_flags + amount + pause)))
+                print('we got here!')
+                print('excode',ex_code)
+                print('selectflags',select)
+                print('amaunt',amount)
+                print('pause',pause)	            
+                print('Data sent is: %s (in hex)'%(str(ex_code + select + amount + pause)))
 
-                self.scan.send_command(pid,4, str(ex_code + select_flags  + amount + pause))
-                self.bitsum += int(ex_code + select_flags,16) + int(amount,16) + int(pause,16) + 4
+                self.pfcan.send_command(pos_id,4, str(ex_code + select + amount + pause))
+                self.bitsum += int(ex_code + select,16) + int(amount,16) + int(pause,16) + 4
                 print('Bitsum =', self.bitsum)
                 
-                self.scan.send_command(pid,9, str(hex(self.bitsum).replace('0x','').zfill(8)))
+                self.pfcan.send_command(pos_id,9, str(hex(self.bitsum).replace('0x','').zfill(8)))
                 self.bitsum=0
                 
                 return 0
