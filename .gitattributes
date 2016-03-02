@@ -28,6 +28,7 @@ petalbox/hwlib/dlptemp.py -text
 petalbox/poscontrol/dotprofile -text
 petalbox/poscontrol/mvtest.py -text
 petalbox/poscontrol/pboxsock.py -text
+petalbox/poscontrol/petalcontroller.ini -text
 petalbox/poscontrol/petalcontroller.py -text
 petalbox/poscontrol/posfidcan.py -text
 petalbox/posfirmware/fipos_fw_1.0.c -text
