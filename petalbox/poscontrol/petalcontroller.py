@@ -49,7 +49,7 @@ class PetalController(Application):
 
     # Default configuration (can be overwritten by command line or config file)
     defaults = {'default_petal_id' : 1,
-                'hardware' : 'beaglebone',
+                'controller_type' : 'HARDWARE',
                 }
 
     def init(self):
@@ -63,7 +63,7 @@ class PetalController(Application):
             self.default_petal_id = int(self.config['default_petal_id'])
         except:
             self.default_petal_id = self.default['default_petal_id']
-        self.hardware = self.config['hardware']
+        self.controller_type = self.config['controller_type']
 		
         # Bring in the Positioner Move object
         self.pmc=PositionerMoveControl()
