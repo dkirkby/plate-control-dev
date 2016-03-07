@@ -190,12 +190,14 @@ class PosArrayMaster(object):
 
                 posid         ... string                    ... identifies the positioner by 'SERIAL_ID'
                 nrows         ... unsigned integer          ... number of elements in each of the list fields (i.e. number of rows of the move table)
-                motor_steps_T or
-                motor_steps_P ... list of signed integers   ... number of motor steps to rotate
-                                                                    ... motor_steps_X > 0 ... ccw rotation
-                                                                    ... motor_steps_X < 0 ... cw rotation
-                speed_mode_T or
-                speed_mode_P  ... list of strings           ... 'cruise' or 'creep'
+                motor_steps_T ... list of signed integers   ... number of motor steps to rotate on theta axis
+                                                                    ... motor_steps_T > 0 ... ccw rotation
+                                                                    ... motor_steps_T < 0 ... cw rotation
+                motor_steps_P ... list of signed integers   ... number of motor steps to rotate on phi axis
+                                                                    ... motor_steps_T > 0 ... ccw rotation
+                                                                    ... motor_steps_T < 0 ... cw rotation
+                speed_mode_T  ... list of strings           ... 'cruise' or 'creep' on theta axis
+                speed_mode_P  ... list of strings           ... 'cruise' or 'creep' on phi axis
                 movetime      ... list of unsigned floats   ... estimated time the row's motion will take, in seconds, not including the postpause
                 postpause     ... list of unsigned integers ... pause time after the row's motion, in milliseconds, before executing the next row
         """
