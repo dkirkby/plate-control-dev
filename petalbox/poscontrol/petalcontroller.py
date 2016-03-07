@@ -44,7 +44,8 @@ class PetalController(Application):
                 'set_fiducials',  
                 'configure',
                 'get_positioner_map',
-                'send_move_execute'
+                'send_move_execute',
+                'send_table'
                 ]
 
     # Default configuration (can be overwritten by command line or config file)
@@ -103,12 +104,34 @@ class PetalController(Application):
             print('ID: %s, Percent %s, Period %s' % (ids[id],percent_duty[id],duty_period[id]))
         return self.SUCCESS
     
-    def send_tables(self, move_tables):
+    def send_table(self, move_table):
         """
-        Sends move tables for positioners over ethernet to the petal controller,
-        where they are then sent over CAN to the positioners. See method
-        "hardware_ready_move_tables" in class PosArrayMaster for definition of the
-        move_tables format.
+        Sends move table for positioners over CAN to the positioners. 
+        See method "hardware_ready_move_tables" in class PosArrayMaster for definition of the
+        move_tables format. 
+
+        The definition below was copied over from "hardware_ready_move_tables" for local reference.
+
+        Move table format:
+            List of dictionaries.
+
+            Each dictionary is the move table for one positioner.
+
+            The dictionary has the following fields:
+                {'posid':'','nrows':0,'motor_steps_T':[],'motor_steps_P':[],'speed_mode_T':[],'speed_mode_P':[],'move_time':[],'postpause':[]}
+
+            The fields have the following types and meanings:
+
+                posid         ... string                    ... identifies the positioner by 'SERIAL_ID'
+                nrows         ... unsigned integer          ... number of elements in each of the list fields (i.e. number of rows of the move table)
+                motor_steps_T or
+                motor_steps_P ... list of signed integers   ... number of motor steps to rotate
+                                                                    ... motor_steps_X > 0 ... ccw rotation
+                                                                    ... motor_steps_X < 0 ... cw rotation
+                speed_mode_T or
+                speed_mode_P  ... list of strings           ... 'cruise' or 'creep'
+                movetime      ... list of unsigned floats   ... estimated time the row's motion will take, in seconds, not including the postpause
+                postpause     ... list of unsigned integers ... pause time after the row's motion, in milliseconds, before executing the next row
         """
         print('send_tables: %s' % repr(move_tables))
         return self.SUCCESS
@@ -250,13 +273,23 @@ class PositionerMoveControl(object):
         self.pfcan=posfidcan.PosFidCAN('can2')
         self.Gear_Ratio=337 # needs to be fixed - correct value is in Joe's Matlab code
         self.bitsum=0
-        self.cmd={} # container for the command numbers 'led_cmd':5  etc.
+        self.cmd={led:5} # container for the command numbers 'led_cmd':5  etc.
 
 
 
     def set_reset_leds(self, pos_id, state):
-        onoff={'on':1,'off':0}
-        select =onoff[state]
+        
+        """
+            Constructs the command to set the status of the test LED on the positioner board.
+            Note: The LED will not be installed on production boards and this method will depreciate. 
+        
+            state:  'on': turns LED ON
+                    'off': turns LED OFF
+
+        """
+
+        #onoff={'on':1,'off':0}
+        select ={'on':1,'off':0}[state]
         try:        
             self.pfcan.send_command(pos_id,5, str(select).zfill(2))
             return False
@@ -265,7 +298,9 @@ class PositionerMoveControl(object):
 
 
     def set_currents(self,pos_id, spin_current_m0, cruise_current_m0, creep_current_m0, hold_current_m0, spin_current_m1, cruise_current_m1, creep_current_m1, hold_current_m1):
-       
+        """
+            Needs definitions of arguments.
+        """   
         spin_current_m0 = str(hex(spin_current_m0).replace('0x','')).zfill(2)
         cruise_current_m0 = str(hex(cruise_current_m0).replace('0x','')).zfill(2)
         creep_current_m0 = str(hex(creep_current_m0).replace('0x','')).zfill(2)
@@ -284,7 +319,9 @@ class PositionerMoveControl(object):
 
 
     def set_periods(self,pos_id, creep_period_m0, creep_period_m1, spin_steps):
-           
+        """
+            Needs definitions of arguments.
+        """      
         creep_period_m0=str(creep_period_m0).zfill(2)
         creep_period_m1=str(creep_period_m1).zfill(2)
         spin_steps=str(hex(spin_steps).replace('0x','')).zfill(4)
