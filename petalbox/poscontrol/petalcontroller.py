@@ -3,7 +3,7 @@
 """
    DOS device application to control the DESI positioner petal
    Features:
-     scan canbus and build pos_id map  (tpd)
+     scan canbus and build posid map  (tpd)
      implement the functions from petalcomm.py
 
    Commands:
@@ -71,12 +71,14 @@ class PetalController(Application):
 
         self.status = 'INITIALIZED'
         self.info('Initialized')
-        # call configure to setup the pos_id map
+        # call configure to setup the posid map
         retcode = self.configure('constants = DEFAULT')
+        self.verbose=True
+
     def configure(self, constants = 'DEFAULT'):
         """
         configure petal controller,
-        scan canbus to setup pos_id map
+        scan canbus to setup posid map
         """
         print('configuring...')
         self.status = 'READY'
@@ -104,9 +106,9 @@ class PetalController(Application):
             print('ID: %s, Percent %s, Period %s' % (ids[id],percent_duty[id],duty_period[id]))
         return self.SUCCESS
     
-    def send_table(self, move_table):
+    def send_tables(self, move_tables):
         """
-        Sends move table for positioners over CAN to the positioners. 
+        Sends move table over CAN to the positioners. 
         See method "hardware_ready_move_tables" in class PosArrayMaster for definition of the
         move_tables format. 
 
@@ -133,52 +135,69 @@ class PetalController(Application):
                 movetime      ... list of unsigned floats   ... estimated time the row's motion will take, in seconds, not including the postpause
                 postpause     ... list of unsigned integers ... pause time after the row's motion, in milliseconds, before executing the next row
         """
-        print('send_tables: %s' % repr(move_tables))
+     
+        # here we need to assemble list of rows and then loop calls to load_rows
+        # def load_rows(self, posid, ex_code, mode_select, angle, pause):
+
+        for table in move_tables:  # each table is a dictionary
+            nrows=table['nrows']
+            for row in range(nrows)
+                motor_steps_T=table['motor_steps_T'][row]
+                motor_steps_P=table['motor_steps_P'][row]
+                speed_mode_T=table['speed_mode_T'][row]
+                speed_mode_P=table['speed_mode_P'][row]
+                post_pause=table['postpause'][row]    
+                if not load_table_rows(posid,'theta',motor_steps_T,speed_mode_T,post_pause):
+                    if self.verbose: print('send_tables: Error')
+                    return self.FAILED
+                if not load_table_rows(posid,'phi',motor_steps_P,speed_mode_P,post_pause):
+                    if self.verbose: print('send_tables: Error')
+                    return self.FAILED
+
+        if self.verbose: print('send_tables: %s' % repr(move_tables))
         return self.SUCCESS
 
 
-    def send_move_execute(self, pos_id, direction, mode, motor, angle ):
+    def send_move_execute(self, posid, direction, move_mode, motor, angle ):
         """
-        Sends single move and executes.
-        arguments:
-            direction: cw, ccw
-            mode: cruise, creep
-            motor: theta, phi   (1,0)
-            angle: angle (in degrees)
-        """
-        ex_code=0 # single command
-        pause=0
-        select=0
-        if direction.lower() in ['cw','ccw']:
-            if direction.lower()=='cw':
-                select=set_bit(select,0)     
-        else:
-            rstring = 'send_move_execute: Invalid arguments.'
-            self.error(rstring)
-            return 'FAILED: ' + rstring
-
-        if mode.lower() in ['creep','cruise']:
-            if mode.lower()=='cruise':
-                select=set_bit(select,1)     
-        else:
-            rstring = 'send_move_execute: Invalid arguments.'
-            self.error(rstring)
-            return 'FAILED: ' + rstring
-
-        if motor in ['0','1']:
-            if motor=='1':
-                select=set_bit(select,2)     
-        else:
-            rstring = 'send_move_execute: Invalid arguments.'
-            self.error(rstring)
-            return 'FAILED: ' + rstring
-
-        select_flags=select  #2  # CW cruise
+        Sends single move and executes. This function is usually used from console.
         
-        retcode=self.pmc.load_rows(12, ex_code, select_flags, angle, pause, readback=True)
+        INPUTS
+            direction: string, 'cw', 'ccw'
+            move_mode: string, 'cruise', 'creep'
+            motor: string,'theta', 'phi'
+            angle: float, angle (in degrees) # question: what happens if direction and angle are opposite?
+        """
+        xcode='0' # single command
+        pause=0
 
-#        print('send_tables: %s' % repr(move_tables))
+
+        # make sure the passed arguments are valid 
+        direction=direction.lower()
+        if direction not in ['cw','ccw']:
+            rstring = 'send_move_execute: Invalid arguments.'
+            self.error(rstring)
+            return 'FAILED: ' + rstring
+
+        move_mode=move_mode.lower()    
+        if move_mode not in ['creep','cruise','pause']:
+            rstring = 'send_move_execute: Invalid arguments.'
+            self.error(rstring)
+            return 'FAILED: ' + rstring
+        
+        motor=motor.lower() 
+        if motor not in ['theta','phi']:
+            rstring = 'send_move_execute: Invalid arguments.'
+            self.error(rstring)
+            return 'FAILED: ' + rstring
+
+        mode=(direction,move_mode,motor)
+   
+        retcode=self.pmc.load_rows_angle(posid, xcode, mode, angle, pause)
+
         return self.SUCCESS
+
+
 
     def execute_sync(self, mode='hard'):
         """
@@ -199,12 +218,12 @@ class PetalController(Application):
 
         return self.SUCCESS   
 
-    def set_led(self, pos_id, state):
+    def set_led(self, posid, state):
         """
         Send the command to set positioner LED ON or OFF
         """ 
-        if not isinstance(pos_id,int):
-            rstring = 'set_led: Invalid pos_id arguments.'
+        if not isinstance(posid,int):
+            rstring = 'set_led: Invalid posid arguments.'
             self.error(rstring)
             return 'FAILED: ' + rstring
         if state.lower() not in ['on','off']:
@@ -213,7 +232,7 @@ class PetalController(Application):
             return 'FAILED: ' + rstring
         # call canbus function
 
-        retcode = self.pmc.set_reset_leds(pos_id,state.lower())
+        retcode = self.pmc.set_reset_leds(posid,state.lower())
         # do anything with retcode?
         if retcode:
             return self.SUCCESS  
@@ -228,12 +247,12 @@ class PetalController(Application):
         print('set_pos_constants: ids = %s, settings = %s' % (repr(posids), repr(settings)))
         return self.SUCCESS
 
-    def set_device(self, pos_id, attributes):
+    def set_device(self, posid, attributes):
         """
         Set a value on a device other than positioners or fiducials. This includes
 		fans, power supplies, and sensor
         """
-        print('set_device: ', repr(pos_id), repr(attributes))
+        print('set_device: ', repr(posid), repr(attributes))
         return self.SUCCESS
 
     def get_pos_status(self):
@@ -268,16 +287,20 @@ class PetalController(Application):
 
 class PositionerMoveControl(object):
     can_frame_fmt = "=IB3x8s"
+    gear_ratio = {}
+    gear_ratio['namiki'] = (46.0/14.0+1)**4  # namiki    "337:1", output rotation/motor input
+    gear_ratio['maxon'] = 4100625.0/14641.0  # maxon     "280:1", output rotation/motor input
+    gear_ratio['faulhaber'] = 256.0          # faulhaber "256:1", output rotation/motor input
+
     def __init__(self):
                         
         self.pfcan=posfidcan.PosFidCAN('can2')
-        self.Gear_Ratio=337 # needs to be fixed - correct value is in Joe's Matlab code
+        self.Gear_Ratio=gear_ratio['namiki']
         self.bitsum=0
         self.cmd={led:5} # container for the command numbers 'led_cmd':5  etc.
 
 
-
-    def set_reset_leds(self, pos_id, state):
+    def set_reset_leds(self, posid, state):
         
         """
             Constructs the command to set the status of the test LED on the positioner board.
@@ -291,15 +314,15 @@ class PositionerMoveControl(object):
         #onoff={'on':1,'off':0}
         select ={'on':1,'off':0}[state]
         try:        
-            self.pfcan.send_command(pos_id,5, str(select).zfill(2))
-            return False
+            self.pfcan.send_command(posid,5, str(select).zfill(2))
+            return True
         except:
-            return True   
+            return False   
 
 
-    def set_currents(self,pos_id, spin_current_m0, cruise_current_m0, creep_current_m0, hold_current_m0, spin_current_m1, cruise_current_m1, creep_current_m1, hold_current_m1):
+    def set_currents(self,posid, spin_current_m0, cruise_current_m0, creep_current_m0, hold_current_m0, spin_current_m1, cruise_current_m1, creep_current_m1, hold_current_m1):
         """
-            Needs definitions of arguments.
+            Sets the currents for motor 0 and motor 1.
         """   
         spin_current_m0 = str(hex(spin_current_m0).replace('0x','')).zfill(2)
         cruise_current_m0 = str(hex(cruise_current_m0).replace('0x','')).zfill(2)
@@ -312,13 +335,13 @@ class PositionerMoveControl(object):
         hold_current_m1 = str(hex(hold_current_m1).replace('0x','')).zfill(2)           
     
         try:
-            self.pfcan.send_command(pos_id,2,spin_current_m0 + cruise_current_m0 + creep_current_m0 + hold_current_m0 + spin_current_m1 + cruise_current_m1 + creep_current_m1 + hold_current_m1)
+            self.pfcan.send_command(posid,2,spin_current_m0 + cruise_current_m0 + creep_current_m0 + hold_current_m0 + spin_current_m1 + cruise_current_m1 + creep_current_m1 + hold_current_m1)
             return 0
         except:
             return 1   
 
 
-    def set_periods(self,pos_id, creep_period_m0, creep_period_m1, spin_steps):
+    def set_periods(self,posid, creep_period_m0, creep_period_m1, spin_steps):
         """
             Needs definitions of arguments.
         """      
@@ -335,38 +358,106 @@ class PositionerMoveControl(object):
             print ("Sending command 3 failed")
             return 1  
 
+    def load_table_rows(posid,motor,motor_steps,speed_mode,post_pause):
+        """
+            Wrapper that will call load_rows
 
-    def load_rows(self,pos_id, ex_code,select,amount,pause,readback=True):
+            INPUTS
+                posid: integer, CAN address (also sometimes called CAN ID)
+                motor: string, 'theta' or 'phi'
+                motor_steps:  
+                speed_mode:
+                post_pause:
+
+                
+        """            
+
+    def load_rows_angle(self, posid, xcode, mode, angle, pause):
+        """ 
+            Provides a wrapper to call load_rows with an angle instead with motor steps.
+            This is handy for console commands'
+            INPUTS
+                posid: CAN ID
+                xcode: string, execution code('0': immediate, '1': store row as part of move table, '2': last row)
+                mode: tupel of strings, ('cc' or 'ccw', 'cruise' or 'creep' or 'pause', 'theata' or 'phi')
+                angle: float (degree)
+                pause: integer (milliseconds)
+        """
         
-        ex_code=str(ex_code)    # 0,1,2 -   0: happens immediately
-                                #           1: command in movetable
-                                #           2: last command, i.e end of move table
-        #select_flags=str(select_flags)      # 
-        pause = str(hex(pause).replace('0x','')).zfill(4)
+        speed_mode=mode[1]
+
+        if speed_mode == 'creep':   #== 0 or select[select_flags] == 4 or select[select_flags] == 1 or select[select_flags] == 5):
+            motor_steps = nint(angle*self.Gear_Ratio/.1)
+        if speed_mode == 'cruise':
+            motor_steps = nint(angle*self.Gear_Ratio/3.3)      
+        load_rows(posid, xcode, mode, motor_steps, pause)    
+
+
+    def load_rows(self, posid, ex_code, mode, motor_steps, pause):
+        """
+            Sends rows (row = single CAN command) over CAN bus; calculates checksum and sends command including
+            calculated checksum to firmware.
+
+            INPUTS
+                posid: integer, CAN address (also sometimes called CAN ID)
+                excode: string, specifies how to process each row of move table (0,1,2)
+                                '0': command is executed immediately, i.e. not stored as part of move table on microcontrolelr
+                                '1': any command in movetable which is not the last one
+                                '2': last command, i.e end of move table
+                mode: tuple, specifies mode of motion (ccw or cw, cruise or creep) and motor (theta = motor 1, phi = motor 0)               
+                        example select =(cw,creep,theta)
+                        cw_cruise_0 = 2, ccw_cruise_0 = 3, cw_cruise_1 = 6, 
+                        ccw_cruise_1 = 7, cw_creep_0 = 0, ccw_creep_0 = 1,
+                        cw_creep_1 = 4,  ccw_creep_1 = 5, pause_only = 8)
+                motor_steps: positive integer
+                pause: integer, time to pause after current command (i.e. before next command is executed) in milliseconds   
+        """
+        
+        xcode=str(xcode)
+        if xcode not in ['0','1','2']
+            print ("Invalid argument for xcode!")
+            return 1
+
+        # TBD: error check select tuple
+        
+        # TBD: error check motor_steps
+
+        # TBD: error check pause, make sure it is positive integer
+
+        s_pause = str(hex(pause).replace('0x','')).zfill(4)  # converts pause into hex string
 
         #select=dict(cw_cruise_0 = 2, ccw_cruise_0 = 3, cw_cruise_1 = 6, ccw_cruise_1 = 7, cw_creep_0 = 0, ccw_creep_0 = 1, cw_creep_1 = 4,  ccw_creep_1 = 5, pause_only = 8)
-        
-        if select in [0,4,1,5]:   #== 0 or select[select_flags] == 4 or select[select_flags] == 1 or select[select_flags] == 5):
-            amount=amount*self.Gear_Ratio/.1
-        else:
-            amount=amount*self.Gear_Ratio/3.3
-            
-        
-        amount=str(hex(int(amount)).replace('0x','').zfill(6))
+                
+        s_motor_steps=str(hex(int(motor_steps)).replace('0x','').zfill(6)) # convert to hex string
+
+  
         #elect_flags=str(select[select_flags])
         select=str(select)
-        if ex_code in ['1','2']:       
 
+        select=0
+        if mode[1] == 'pause_only'
+            select=8
+        else:
+            if mode[0] == 'ccw':
+                select=set_bit(select,0)
+            if mode[1] == 'cruise':
+                select=set_bit(select,1)    
+            if mode[2] == 'theta':
+                select=set_bit(select,2)
+        s_select=str(select)        
+
+
+        if xcode in ['1','2']:
             try:
-            
-                print('Data sent is: %s (in hex)'%(str(ex_code + select + amount + pause)))
-                self.pfcan.send_command(pos_id,4, str(ex_code + select  + amount + pause))
+                hexdata=str(xcode + s_select + s_motor_steps + s_pause)            
+                print('Data sent is: %s (in hex)'%(hexdata))
                 
-
-                if(ex_code=='1'):   
-                    
-                    print(str(hex(int(ex_code + select,16) + int(amount,16) + int(pause,16) + 4).replace('0x','').zfill(8)))                                      
-                    self.bitsum += int(ex_code + select,16) + int(amount,16) + int(pause,16) + 4
+                self.pfcan.send_command(posid, 4, hexdata)                
+ 
+                if xcode == '1':   
+                    data=int(xcode + s_select,16) + int(s_motor_steps,16) + int(s_pause,16) + 4
+                    print(str(hex(data).replace('0x','').zfill(8)))                                      
+                    self.bitsum += data
                     print('Bitsum =', self.bitsum)
 
                 return 0
@@ -379,18 +470,13 @@ class PositionerMoveControl(object):
             #Send both last command and bitsum, reset bitsum for next move table    
         
             try:
-                print('we got here!')
-                print('excode',ex_code)
-                print('selectflags',select)
-                print('amaunt',amount)
-                print('pause',pause)	            
-                print('Data sent is: %s (in hex)'%(str(ex_code + select + amount + pause)))
-
-                self.pfcan.send_command(pos_id,4, str(ex_code + select + amount + pause))
-                self.bitsum += int(ex_code + select,16) + int(amount,16) + int(pause,16) + 4
-                print('Bitsum =', self.bitsum)
-                
-                self.pfcan.send_command(pos_id,9, str(hex(self.bitsum).replace('0x','').zfill(8)))
+	            hexdata=str(xcode + s_select + s_motor_steps + s_pause)
+                print('Data sent is: %s (in hex)'%(hexdata))
+                self.pfcan.send_command(posid, 4, hexdata)
+                data=int(xcode + s_select,16) + int(s_motor_steps,16) + int(s_pause,16) + 4
+                self.bitsum += data
+                print('Bitsum =', self.bitsum)                
+                self.pfcan.send_command(posid,9, str(hex(self.bitsum).replace('0x','').zfill(8)))
                 self.bitsum=0
                 
                 return 0
