@@ -436,7 +436,7 @@ class PositionerMoveControl(object):
 			
 		"""            
  
-		mode = ('cw', None, None) #construct tuple
+		mode=['cw',None,None]
 		if motor_steps == 0:
 			mode[0] = 'pause_only'
 		else:
@@ -444,6 +444,7 @@ class PositionerMoveControl(object):
 				mode[0] = 'ccw'
 		mode[1] = speed_mode
 		mode[2] = motor
+		mode=(mode[0],mode[1],mode[2])
    
 		try:
 			self.load_rows(canbus, posid, xcode, mode, motor_steps , post_pause)
