@@ -26,6 +26,7 @@ from DOSlib.application import Application
 import time
 import threading
 import posfidcan
+import configobj
 import sys
 
 
@@ -76,6 +77,7 @@ class PetalController(Application):
 		self.controller_type = self.config['controller_type']
 		
 		# Bring in the Positioner Move object
+
 		self.pmc=PositionerMoveControl()
 
 		self.status = 'INITIALIZED'
@@ -317,14 +319,29 @@ class PositionerMoveControl(object):
 			canlist: list of canbuses (strings). Example: canlist=['can0','can2']
 	"""
 
-	def __init__(self,canlist):
+	def __init__(self):
 		self.__can_frame_fmt = "=IB3x8s"
+		canlist=self.get_CAN_config()
 		self.pfcan={}
 		for canbus in canlist:
 			self.pfcan[canbus]=posfidcan.PosFidCAN(canbus)
 		self.Gear_Ratio=(46.0/14.0+1)**4 # gear_ratio for Namiki motors
 		self.bitsum=0
 		self.cmd={'led':5} # container for the command numbers 'led_cmd':5  etc.
+
+
+	def get_CAN_config(self):
+		"""
+			Reads a list of can buses from the petalcontroller.config file. The file is expected to be
+			in the same directory as petalcontroller.py
+		"""
+		try:
+			cconfig=ConfigObj('petalcontroller.conf')
+			canlist= cconfig['CAN']['canlist']
+			return canlist
+		except:
+			print "Error reading CAN configuration file"
+			return 'FAILED'
 
 
 	def set_reset_leds(self, canbus, posid, state):
