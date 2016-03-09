@@ -468,7 +468,7 @@ class PositionerMoveControl(object):
 			motor_steps = nint(angle*self.Gear_Ratio/.1)
 		if speed_mode == 'cruise':
 			motor_steps = nint(angle*self.Gear_Ratio/3.3)      
-		self.load_rows(posid, xcode, mode, motor_steps, pause)    
+		self.load_rows(canbus, posid, xcode, mode, motor_steps, pause)    
 
 
 	def load_rows(self, canbus, posid, xcode, mode, motor_steps, pause):
