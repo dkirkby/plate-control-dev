@@ -344,7 +344,7 @@ class PositionerMoveControl(object):
 		if para == 'canlist':
 			try:
 				cconfig=ConfigObj('petalcontroller.conf')
-				canlist= cconfig['CAN'][role]['canlist']
+				canlist= cconfig['CAN'][self.role]['canlist']
 				del cconfig
 				return canlist
 			except:
