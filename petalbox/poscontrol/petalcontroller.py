@@ -15,10 +15,10 @@
    none
 
    Version History
-   2/29/2016    MS, KH		Initial version
-   1/30/2016    MS, KH     	set_led (test) function added
-   3/07/2016	MS, IG 	 	added send_tables
-   3/08/2016	MS, IG 	 	rewrote load_rows; added load_rows_angle, load_table_rows
+   2/29/2016    MS, KH      Initial version
+   1/30/2016    MS, KH      set_led (test) function added
+   3/07/2016    MS, IG      added send_tables
+   3/08/2016    MS, IG      rewrote load_rows; added load_rows_angle, load_table_rows
 
 """
 
@@ -33,7 +33,7 @@ def set_bit(value, bit):
 	return value | (1<<bit)
 
 def nint(value):
-    return int(round(value))
+	return int(round(value))
 
 
 
@@ -204,15 +204,14 @@ class PetalController(Application):
 			self.error(rstring)
 			return 'FAILED: ' + rstring
 		
-		motor=motor.lower() 
+		motor=motor.lower()
 		if motor not in ['theta','phi']:
 			rstring = 'send_move_execute: Invalid arguments.'
 			self.error(rstring)
 			return 'FAILED: ' + rstring
 
 		mode=(direction,move_mode,motor)
-   
-   		canbus = self.__getcanbus(posid)
+		canbus = self.__getcanbus(posid)
 
 		retcode=self.pmc.load_rows_angle(canbus, posid, xcode, mode, angle, pause)
 
@@ -337,7 +336,7 @@ class PositionerMoveControl(object):
 			state:  'on': turns LED ON
 					'off': turns LED OFF
 			INPUTS
-				canbus: string, can bus (example 'can2')		
+				canbus: string, can bus (example 'can2')        
 
 
 		"""
