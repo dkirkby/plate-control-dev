@@ -340,7 +340,7 @@ class PositionerMoveControl(object):
 			canlist= cconfig['CAN']['canlist']
 			return canlist
 		except:
-			print "Error reading CAN configuration file"
+			print ("Error reading CAN configuration file")
 			return 'FAILED'
 
 
