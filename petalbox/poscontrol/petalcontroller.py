@@ -78,7 +78,7 @@ class PetalController(Application):
 		
 		# Bring in the Positioner Move object
 
-		self.pmc=PositionerMoveControl()
+		self.pmc=PositionerMoveControl(self.role)
 
 		self.status = 'INITIALIZED'
 		self.info('Initialized')
@@ -319,7 +319,8 @@ class PositionerMoveControl(object):
 			canlist: list of canbuses (strings). Example: canlist=['can0','can2']
 	"""
 
-	def __init__(self):
+	def __init__(self,role):
+		self.role=role
 		self.__can_frame_fmt = "=IB3x8s"
 		canlist=self.get_canconfig('canlist')
 		self.pfcan={}
@@ -339,19 +340,11 @@ class PositionerMoveControl(object):
 
 		if para not in ['canlist']:
 			return 'FAILED'
-		try:
-			cconfig=ConfigObj('petalcontroller.ini')		
-			role=cconfig['role']
-			del cconfig
-			return role
-		except:
-			print ("Error reading petalcontroller.ini file")
-			return 'FAILED'
 		
 		if para == 'canlist':
 			try:
 				cconfig=ConfigObj('petalcontroller.conf')
-				canlist= cconfig['CAN']['canlist']
+				canlist= cconfig['CAN'][role]['canlist']
 				del cconfig
 				return canlist
 			except:
