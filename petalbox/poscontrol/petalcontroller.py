@@ -321,7 +321,7 @@ class PositionerMoveControl(object):
 
 	def __init__(self):
 		self.__can_frame_fmt = "=IB3x8s"
-		canlist=self.get_CAN_config()
+		canlist=self.get_canconfig('canlist')
 		self.pfcan={}
 		for canbus in canlist:
 			self.pfcan[canbus]=posfidcan.PosFidCAN(canbus)
@@ -330,18 +330,35 @@ class PositionerMoveControl(object):
 		self.cmd={'led':5} # container for the command numbers 'led_cmd':5  etc.
 
 
-	def get_CAN_config(self):
+	def get_canconfig(self,para):
 		"""
 			Reads a list of can buses from the petalcontroller.config file. The file is expected to be
 			in the same directory as petalcontroller.py
 		"""
-		try:
-			cconfig=ConfigObj('petalcontroller.conf')
-			canlist= cconfig['CAN']['canlist']
-			return canlist
-		except:
-			print ("Error reading CAN configuration file")
+
+		if para not in ['canlist']:
 			return 'FAILED'
+		try:
+			cconfig=ConfigObj('petalcontroller.ini')		
+			role=cconfig['role']
+			del cconfig
+			return role
+		except:
+			print ("Error reading petalcontroller.ini file")
+			return 'FAILED'
+		
+		if para == 'canlist':
+			try:
+				cconfig=ConfigObj('petalcontroller.conf')
+				canlist= cconfig['CAN']['canlist']
+				del cconfig
+				return canlist
+			except:
+				print ("Error reading petalcontroller.conf file")
+				return 'FAILED'
+
+
+
 
 
 	def set_reset_leds(self, canbus, posid, state):
