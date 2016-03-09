@@ -52,7 +52,7 @@ class PetalController(Application):
 				'set_fiducials',  
 				'configure',
 				'get_positioner_map',
-				'send_move_execute',
+				'move',
 				'send_table'
 				]
 
@@ -179,7 +179,7 @@ class PetalController(Application):
 		return self.SUCCESS
 
 
-	def send_move_execute(self, posid, direction, move_mode, motor, angle ):
+	def move(self, posid, direction, move_mode, motor, angle ):
 		"""
 		Sends single move and executes. This function is usually used from console.
 		
@@ -192,22 +192,24 @@ class PetalController(Application):
 		xcode='0' # single command
 		pause=0
 
+		print(posid,direction.move_mode,motor,angle)
+
 		# make sure the passed arguments are valid 
 		direction=direction.lower()
 		if direction not in ['cw','ccw']:
-			rstring = 'send_move_execute: Invalid arguments.'
+			rstring = 'move: Invalid arguments.'
 			self.error(rstring)
 			return 'FAILED: ' + rstring
 
 		move_mode=move_mode.lower()    
 		if move_mode not in ['creep','cruise','pause']:
-			rstring = 'send_move_execute: Invalid arguments.'
+			rstring = 'move: Invalid arguments.'
 			self.error(rstring)
 			return 'FAILED: ' + rstring
 		
 		motor=motor.lower()
 		if motor not in ['theta','phi']:
-			rstring = 'send_move_execute: Invalid arguments.'
+			rstring = 'move: Invalid arguments.'
 			self.error(rstring)
 			return 'FAILED: ' + rstring
 
