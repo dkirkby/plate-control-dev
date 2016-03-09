@@ -324,6 +324,7 @@ class PositionerMoveControl(object):
 		canlist=self.get_canconfig('canlist')
 		self.pfcan={}
 		for canbus in canlist:
+			print("canbus: "+canbus)
 			self.pfcan[canbus]=posfidcan.PosFidCAN(canbus)
 		self.Gear_Ratio=(46.0/14.0+1)**4 # gear_ratio for Namiki motors
 		self.bitsum=0
