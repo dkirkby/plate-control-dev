@@ -296,7 +296,7 @@ class PetalController(Application):
 		"""
 		return self.status
 	
-	def main(self):can
+	def main(self):
 		while not self.shutdown_event.is_set():
 			# Nothing to do
 			time.sleep(1)
