@@ -192,7 +192,7 @@ class PetalController(Application):
 		xcode='0' # single command
 		pause=0
 
-		print(posid,direction.move_mode,motor,angle)
+		print(posid,direction,move_mode,motor,angle)
 
 		# make sure the passed arguments are valid 
 		direction=direction.lower()
