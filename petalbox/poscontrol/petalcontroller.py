@@ -156,7 +156,7 @@ class PetalController(Application):
 		# here we need to assemble list of rows and then loop calls to load_rows
 		# def load_rows(self, posid, ex_code, mode_select, angle, pause):
 		for table in move_tables:  # each table is a dictionary
-			posid=table['posid']
+			posid=int(table['posid'])
 			canbus=self.__get_canbus(posid)
 			nrows=table['nrows']
 			xcode = '1'   #for each table, xcode starts as 1
