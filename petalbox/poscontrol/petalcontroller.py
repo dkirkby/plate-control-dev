@@ -165,7 +165,8 @@ class PetalController(Application):
 				motor_steps_P=table['motor_steps_P'][row]
 				speed_mode_T=table['speed_mode_T'][row]
 				speed_mode_P=table['speed_mode_P'][row]
-				post_pause=table['postpause'][row]    
+				post_pause=table['postpause'][row]  
+				print("send_tables:",  canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause)
 				if not self.pmc.load_table_rows(canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause):
 					if self.verbose: print('send_tables: Error')
 					return self.FAILED
@@ -175,7 +176,7 @@ class PetalController(Application):
 					if self.verbose: print('send_tables: Error')
 					return self.FAILED
 
-		if self.verbose: print('send_tables: %s' % repr(move_tables))
+		#if self.verbose: print('send_tables: %s' % repr(move_tables))
 		return self.SUCCESS
 
 
@@ -528,6 +529,7 @@ class PositionerMoveControl(object):
 		try:
 			hexdata=str(xcode + s_select + s_motor_steps + s_pause)            
 			print('Data sent is: %s (in hex)'%(hexdata))
+			print(canbus,posid) 
 			self.pfcan[canbus].send_command(posid, 4, hexdata)  
 		except:
 			print ("Sending command 4 failed")
