@@ -26,7 +26,7 @@ from DOSlib.application import Application
 import time
 import threading
 import posfidcan
-import configobj
+from configobj import ConfigObj
 import sys
 
 
