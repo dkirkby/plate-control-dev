@@ -36,8 +36,6 @@ def set_bit(value, bit):
 def nint(value):
 	return int(round(value))
 
-
-
 class PetalController(Application):
 	"""
 	PetalController inherits the DOS (device/application) framework
@@ -100,7 +98,7 @@ class PetalController(Application):
 
 	def __get_canbus(self, posid):
 		"""
-			Maps the positioner ID to a canbus
+		Maps the positioner ID to a canbus
 		"""
 
 		return 'can2'
@@ -157,21 +155,23 @@ class PetalController(Application):
 	 
 		# here we need to assemble list of rows and then loop calls to load_rows
 		# def load_rows(self, posid, ex_code, mode_select, angle, pause):
-
 		for table in move_tables:  # each table is a dictionary
 			posid=table['posid']
 			canbus=__get_canbus(posid)
 			nrows=table['nrows']
+			xcode = '1'   #for each table, xcode starts as 1
 			for row in range(nrows):
 				motor_steps_T=table['motor_steps_T'][row]
 				motor_steps_P=table['motor_steps_P'][row]
 				speed_mode_T=table['speed_mode_T'][row]
 				speed_mode_P=table['speed_mode_P'][row]
 				post_pause=table['postpause'][row]    
-				if not load_table_rows(canbus, posid,'theta',motor_steps_T,speed_mode_T,post_pause):
+				if not self.pmc.load_table_rows(canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause):
 					if self.verbose: print('send_tables: Error')
 					return self.FAILED
-				if not load_table_rows(canbus, posid,'phi',motor_steps_P,speed_mode_P,post_pause):
+				if row == (nrows - 1):  #last row in move table, xcode = 2
+					xcode='2'
+				if not self.pmc.load_table_rows(canbus, posid,xcode,'phi',motor_steps_P,speed_mode_P,post_pause):
 					if self.verbose: print('send_tables: Error')
 					return self.FAILED
 
@@ -191,7 +191,6 @@ class PetalController(Application):
 		"""
 		xcode='0' # single command
 		pause=0
-
 
 		# make sure the passed arguments are valid 
 		direction=direction.lower()
@@ -218,8 +217,6 @@ class PetalController(Application):
 		retcode=self.pmc.load_rows_angle(canbus, posid, xcode, mode, angle, pause)
 
 		return self.SUCCESS
-
-
 
 	def execute_sync(self, mode='hard'):
 		"""
@@ -424,7 +421,7 @@ class PositionerMoveControl(object):
 			print ("Sending command 3 failed")
 			return 1  
 
-	def load_table_rows(self, canbus, posid, motor, motor_steps, speed_mode, post_pause):
+	def load_table_rows(self, canbus, posid, xcode, motor, motor_steps, speed_mode, post_pause):
 		"""
 			Wrapper that will call load_rows
 
@@ -434,9 +431,24 @@ class PositionerMoveControl(object):
 				motor_steps:  
 				speed_mode:
 				post_pause:
-
-				
+			
 		"""            
+ 
+		mode = ('cw', None, None) #construct tuple
+		if motor_steps == 0:
+			mode[0] = 'pause_only'
+		else:
+			if motor_steps < 0 :
+				mode[0] = 'ccw'
+		mode[1] = speed_mode
+		mode[2] = motor
+   
+		try:
+			self.load_rows(canbus, posid, xcode, mode, motor_steps , post_pause)
+			return  0
+		except:
+			print("Error loading table row!")
+			return 1
 
 	def load_rows_angle(self, canbus, posid, xcode, mode, angle, pause):
 		""" 
