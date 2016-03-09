@@ -167,7 +167,7 @@ class PetalController(Application):
 				speed_mode_P=table['speed_mode_P'][row]
 				post_pause=table['postpause'][row]  
 				print("send_tables:",  canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause)
-				if not self.pmc.load_table_rows(canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause):
+				if self.pmc.load_table_rows(canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause):
 					if self.verbose: print('send_tables: Error')
 					return self.FAILED
 				if row == (nrows - 1):  #last row in move table, xcode = 2
