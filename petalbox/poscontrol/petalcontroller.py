@@ -213,7 +213,7 @@ class PetalController(Application):
 			return 'FAILED: ' + rstring
 
 		mode=(direction,move_mode,motor)
-		canbus = self.__getcanbus(posid)
+		canbus = self.__get_canbus(posid)
 
 		retcode=self.pmc.load_rows_angle(canbus, posid, xcode, mode, angle, pause)
 
@@ -253,7 +253,7 @@ class PetalController(Application):
 			self.error(rstring)
 			return 'FAILED: ' + rstring
 		# call canbus function
-		canbus = self.__getcanbus(posid)
+		canbus = self.__get_canbus(posid)
 		retcode = self.pmc.set_reset_leds(canbus, posid, state.lower())
 		# do anything with retcode?
 		if retcode:
