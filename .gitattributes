@@ -2,6 +2,7 @@
 petal/demo.py -text
 petal/focal_surface_lookup.csv -text
 petal/legacypositionercomm.py -text
+petal/movetablescr.py -text
 petal/petalcomm.py -text
 petal/petalcomm_dos.py -text
 petal/petsockcomm.py -text
