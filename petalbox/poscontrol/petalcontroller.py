@@ -443,6 +443,7 @@ class PositionerMoveControl(object):
 		else:
 			if motor_steps < 0 :
 				mode[0] = 'ccw'
+				motor_steps = abs(motor_steps)
 		mode[1] = speed_mode
 		mode[2] = motor
 		mode=(mode[0],mode[1],mode[2])
