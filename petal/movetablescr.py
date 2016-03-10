@@ -52,7 +52,7 @@ def calc_steps(verbose,angle = [90, 90, 90], speed_mode = ['cruise', 'creep', 'c
 
 def get_tables(verbose=True):
 	#Positioner 1
-	posid = str(20000)
+	posid = str(12)
 	nrows = 3
 
 	angle_T = [90, 0, -90]
@@ -65,7 +65,7 @@ def get_tables(verbose=True):
 
 
 	move_time = [2, 2, 2]
-	postpause = [1, 1, 1]
+	postpause = [2, 2, 2]
 
 
 	pos1 = {'posid': posid,'nrows': nrows,'motor_steps_T':motor_steps_T,'motor_steps_P':motor_steps_P,'speed_mode_T':speed_mode_T,'speed_mode_P': speed_mode_P,'move_time':move_time,'postpause':postpause}
