@@ -172,7 +172,7 @@ class PetalController(Application):
 					return self.FAILED
 				if row == (nrows - 1):  #last row in move table, xcode = 2
 					xcode='2'
-				if not self.pmc.load_table_rows(canbus, posid,xcode,'phi',motor_steps_P,speed_mode_P,post_pause):
+				if self.pmc.load_table_rows(canbus, posid,xcode,'phi',motor_steps_P,speed_mode_P,post_pause):
 					if self.verbose: print('send_tables: Error')
 					return self.FAILED
 
