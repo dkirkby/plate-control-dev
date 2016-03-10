@@ -238,7 +238,7 @@ class PetalController(Application):
 			print ("This functionality is not yet implemented")
 			pass
 		if mode == 'soft':
-			self.send_soft_sync(self, 'can2', 12)
+			self.pmc.send_soft_sync(self, 'can2', 12)
 			pass
 
 		return self.SUCCESS   
