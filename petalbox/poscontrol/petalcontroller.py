@@ -53,7 +53,8 @@ class PetalController(Application):
 				'configure',
 				'get_positioner_map',
 				'move',
-				'send_table'
+				'execute_sync'
+				'send_tables'
 				]
 
 	# Default configuration (can be overwritten by command line or config file)
@@ -234,8 +235,10 @@ class PetalController(Application):
 			self.error(rstring)
 			return 'FAILED: ' + rstring
 		if mode == 'hard':
+			print ("This functionality is not yet implemented")
 			pass
 		if mode == 'soft':
+			self.send_soft_sync(self, 'can2', 12)
 			pass
 
 		return self.SUCCESS   
@@ -351,10 +354,6 @@ class PositionerMoveControl(object):
 				print ("Error reading petalcontroller.conf file")
 				return 'FAILED'
 
-
-
-
-
 	def set_reset_leds(self, canbus, posid, state):
 		
 		"""
@@ -365,8 +364,6 @@ class PositionerMoveControl(object):
 					'off': turns LED OFF
 			INPUTS
 				canbus: string, can bus (example 'can2')        
-
-
 		"""
 
 		#onoff={'on':1,'off':0}
@@ -376,6 +373,19 @@ class PositionerMoveControl(object):
 			return True
 		except:
 			return False   
+
+
+	def send_soft_sync(self, canbus, posid):
+		
+		"""
+		Signals the positionrs to start execution of move tables.	      
+		"""
+
+		try:        
+			self.pfcan[canbus].send_command(posid,5, '')
+			return True
+		except:
+			return False  		
 
 
 	def set_currents(self,canbus, posid, P_currents, T_currents):
@@ -392,20 +402,17 @@ class PositionerMoveControl(object):
 		hold_current_m0 = str(hex(hold_current_m0).replace('0x','')).zfill(2)   
 		m0_currents = spin_current_m0 + cruise_current_m0 + creep_current_m0 + hold_current_m0
 
-
 		spin_current_m1 = str(hex(spin_current_m1).replace('0x','')).zfill(2)
 		cruise_current_m1 = str(hex(cruise_current_m1).replace('0x','')).zfill(2)
 		creep_current_m1 = str(hex(creep_current_m1).replace('0x','')).zfill(2)
 		hold_0current_m1 = str(hex(hold_current_m1).replace('0x','')).zfill(2)           
 		m1_currents = spin_current_m1 + cruise_current_m1 + creep_current_m1 + hold_current_m1
 
-
 		try:
 			self.pfcan[canbus].send_command(posid,2,m0_currents + m1_currents)
 			return 0
 		except:
 			return 1   
-
 
 	def set_periods(self, canbus, posid, creep_period_m0, creep_period_m1, spin_steps):
 		"""
@@ -496,6 +503,8 @@ class PositionerMoveControl(object):
 				pause: integer, time to pause after current command (i.e. before next command is executed) in milliseconds   
 		"""
 		
+		print ("load_rows: canbus,posid,xcode,mode,motor_steps,pause",canbus, posid, xcode, mode, motor_steps, pause)
+
 		xcode=str(xcode)
 		if xcode not in ['0','1','2']:
 			print ("Invalid argument for xcode!")
@@ -536,7 +545,6 @@ class PositionerMoveControl(object):
 			print ("Sending command 4 failed")
 			return 1
 
-
 		if xcode == '1': #in ['1','2']:
 			data=int(xcode + s_select,16) + int(s_motor_steps,16) + int(s_pause,16) + 4
 			print(str(hex(data).replace('0x','').zfill(8)))                                      
@@ -550,7 +558,7 @@ class PositionerMoveControl(object):
 				data=int(xcode + s_select,16) + int(s_motor_steps,16) + int(s_pause,16) + 4
 				self.bitsum += data
 				print('Bitsum =', self.bitsum)                
-				self.pfcan[canbus].send_command(posid,9, str(hex(self.bitsum).replace('0x','').zfill(8)))
+				self.pfcan[canbus].send_command(posid, 9, str(hex(self.bitsum).replace('0x','').zfill(8)))
 				self.bitsum=0
 				return 0
 	
