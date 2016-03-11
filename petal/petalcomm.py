@@ -267,3 +267,21 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not get status from device. Exception: %s' % str(e)
 
+    def get_sids(self,canbus):
+        """
+        Returns a list of silicon IDs on CANbus <canbus>.
+        """
+        try:
+            return self._call_device('get_sids',canbus)
+        except Exception as e:
+            return 'FAILED: Can not get silicon IDs. Exception: %s' % str(e)
+
+    def set_posid(self,canbus, sid, new_posid):
+        """
+        Sets the positioner ID (= CAN address) for positioner identified by sid to new_posid.
+        """
+        try:
+            return self._call_device('set_posid',canbus, sid, new_posid)
+        except Exception as e:
+            return 'FAILED: Can not set posID. Exception: %s' % str(e)
+            
