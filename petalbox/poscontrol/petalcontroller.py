@@ -45,17 +45,18 @@ class PetalController(Application):
 	"""
    
 	# List of remotely accessible commands
-	comands = ['set_led',
-				'set_device', 
+	commands = ['set_led',				# implemented - usefull for testing (of rev 2 positioner boards)
+				'set_device',			 
 				'get_fid_status', 
 				'get_device_status', 
 				'set_fiducials',  
 				'configure',
 				'get_positioner_map',
-				'move',
-				'execute_sync'
-				'send_tables'
-				]
+				'move',					# implemented - usefull for testing 
+				'execute_sync',			# implemented
+				'send_tables',			# implemented
+				'set_posid',
+				'get_sids']
 
 	# Default configuration (can be overwritten by command line or config file)
 	defaults = {'default_petal_id' : 1,
@@ -95,7 +96,6 @@ class PetalController(Application):
 		return self.SUCCESS
 	
 # PML functions (functions that can be accessed remotely)
-
 
 	def __get_canbus(self, posid):
 		"""
@@ -333,7 +333,7 @@ class PositionerMoveControl(object):
 		self.Gear_Ratio=(46.0/14.0+1)**4 # gear_ratio for Namiki motors
 		self.bitsum=0
 		self.cmd={'led':5} # container for the command numbers 'led_cmd':5  etc.
-
+		self.posid_all=20000
 
 	def get_canconfig(self,para):
 		"""
@@ -353,6 +353,30 @@ class PositionerMoveControl(object):
 			except:
 				print ("Error reading petalcontroller.conf file")
 				return 'FAILED'
+
+
+	def get_sids(self, canbus):
+		"""
+			Reads and returns silicon ID from microcontroller. 
+		"""	
+		posid=self.posid_all
+		try:        
+			sids=self.pfcan[canbus].send_command(posid,19, '')
+			print (">>>sids: ",sids)
+			return True
+		except:
+			return False   
+
+	def set_posid(self, canbus, sid):
+		"""
+			Sets the positioner ID (CAN address). 
+		"""	
+		try:        
+			self.pfcan[canbus].send_command(posid,19, '')
+			return True
+		except:
+			return False  		
+
 
 	def set_reset_leds(self, canbus, posid, state):
 		
@@ -560,8 +584,7 @@ class PositionerMoveControl(object):
 				#print('Bitsum =', self.bitsum)                
 				self.pfcan[canbus].send_command(posid, 8, str(hex(self.bitsum).replace('0x','').zfill(8)))
 				self.bitsum=0
-				return 0
-	
+				return 0	
 			except:
 				print ("Sending command 9 failed")
 				return 1
