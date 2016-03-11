@@ -28,7 +28,6 @@ petalbox/drivers/systec_can-V0.9.0.tar.bz2 -text
 petalbox/hwlib/dlptemp.py -text
 petalbox/poscontrol/dotprofile -text
 petalbox/poscontrol/mvtest.py -text
-petalbox/poscontrol/pboxsock.py -text
 petalbox/poscontrol/petalcontroller.conf -text
 petalbox/poscontrol/petalcontroller.ini.default -text
 petalbox/poscontrol/petalcontroller.py -text
