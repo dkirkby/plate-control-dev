@@ -67,8 +67,10 @@ def get_tables(verbose=True):
 	move_time = [2, 2, 2]
 	postpause = [2, 2, 2]
 
-
-	pos1 = {'posid': posid,'nrows': nrows,'motor_steps_T':motor_steps_T,'motor_steps_P':motor_steps_P,'speed_mode_T':speed_mode_T,'speed_mode_P': speed_mode_P,'move_time':move_time,'postpause':postpause}
+	posid1='12'
+	posid2='20000'
+	pos1 = {'posid': posid1,'nrows': nrows,'motor_steps_T':motor_steps_T,'motor_steps_P':motor_steps_P,'speed_mode_T':speed_mode_T,'speed_mode_P': speed_mode_P,'move_time':move_time,'postpause':postpause}
+	pos2 = {'posid': posid2,'nrows': nrows,'motor_steps_T':motor_steps_T,'motor_steps_P':motor_steps_P,'speed_mode_T':speed_mode_T,'speed_mode_P': speed_mode_P,'move_time':move_time,'postpause':postpause}
 	#Positioner 1
 	
 	pos2 = pos1.copy()
