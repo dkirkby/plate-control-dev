@@ -104,6 +104,32 @@ class PetalController(Application):
 
 		return 'can2'
 
+
+	def get_sids(self, canbus):
+		"""
+		Send the command to get silicon IDs
+		""" 
+		retcode = self.pmc.get_sids(canbus)
+
+		if retcode:
+			return self.SUCCESS  
+		else:
+			return self.FAILED	
+
+	def set_posid(self, canbus, sid, new_posid):
+		"""
+		Send the command to set positioner ID based on silicon IDs
+		""" 
+		retcode = self.pmc.set_posid(canbus,sid,posid)
+
+		if retcode:
+			return self.SUCCESS  
+		else:
+			return self.FAILED		
+
+
+
+
 	def set_fiducials(self, ids, percent_duty, duty_period):
 		"""
 		Set the ficucial power levels and period
@@ -367,11 +393,12 @@ class PositionerMoveControl(object):
 		except:
 			return False   
 
-	def set_posid(self, canbus, sid):
+	def set_posid(self, canbus, sid, new_posid):
 		"""
 			Sets the positioner ID (CAN address). 
 		"""	
-		try:        
+		try:
+			self.pfcan[canbus].send_command(posid,19, '')        
 			self.pfcan[canbus].send_command(posid,19, '')
 			return True
 		except:
