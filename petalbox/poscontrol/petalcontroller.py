@@ -558,7 +558,7 @@ class PositionerMoveControl(object):
 				data=int(xcode + s_select,16) + int(s_motor_steps,16) + int(s_pause,16) + 4
 				self.bitsum += data
 				#print('Bitsum =', self.bitsum)                
-				self.pfcan[canbus].send_command(posid, 9, str(hex(self.bitsum).replace('0x','').zfill(8)))
+				self.pfcan[canbus].send_command(posid, 8, str(hex(self.bitsum).replace('0x','').zfill(8)))
 				self.bitsum=0
 				return 0
 	
