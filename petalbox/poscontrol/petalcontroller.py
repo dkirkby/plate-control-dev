@@ -382,7 +382,7 @@ class PositionerMoveControl(object):
 		"""
 
 		try:        
-			self.pfcan[canbus].send_command(posid,5, '')
+			self.pfcan[canbus].send_command(posid,7, '')
 			return True
 		except:
 			return False  		
@@ -535,7 +535,7 @@ class PositionerMoveControl(object):
 				select=set_bit(select,2)
 		s_select=str(select)  
 
-
+		# this is send for xcode 0,1,2 i.e. always
 		try:
 			hexdata=str(xcode + s_select + s_motor_steps + s_pause)            
 			print('Data sent is: %s (in hex)'%(hexdata))
@@ -545,19 +545,19 @@ class PositionerMoveControl(object):
 			print ("Sending command 4 failed")
 			return 1
 
-		if xcode == '1': #in ['1','2']:
-			data=int(xcode + s_select,16) + int(s_motor_steps,16) + int(s_pause,16) + 4
-			print(str(hex(data).replace('0x','').zfill(8)))                                      
+		if xcode == '1': # increment bitsum if xcode=1 
+			data=int(xcode + s_select,16) + int(s_motor_steps,16) + int(s_pause,16) + 4                             
 			self.bitsum += data
-			print('Bitsum =', self.bitsum)
+			#print(str(hex(data).replace('0x','').zfill(8)))
+			#print('Bitsum =', self.bitsum)
 			return 0
 
-		if xcode == '0': #else:
+		if xcode == '2': #else:
 		#Send both last command and bitsum, reset bitsum for next move table    
 			try:
 				data=int(xcode + s_select,16) + int(s_motor_steps,16) + int(s_pause,16) + 4
 				self.bitsum += data
-				print('Bitsum =', self.bitsum)                
+				#print('Bitsum =', self.bitsum)                
 				self.pfcan[canbus].send_command(posid, 9, str(hex(self.bitsum).replace('0x','').zfill(8)))
 				self.bitsum=0
 				return 0
@@ -566,13 +566,8 @@ class PositionerMoveControl(object):
 				print ("Sending command 9 failed")
 				return 1
 
-		if xcode == '2':
+		if xcode == '0':
 			return 0
-
-
-
-
-
 
 ######################################
 
