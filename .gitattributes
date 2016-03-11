@@ -32,4 +32,3 @@ petalbox/poscontrol/petalcontroller.conf -text
 petalbox/poscontrol/petalcontroller.ini.default -text
 petalbox/poscontrol/petalcontroller.py -text
 petalbox/poscontrol/posfidcan.py -text
-petalbox/posfirmware/fipos_fw_1.0.c -text
