@@ -73,7 +73,7 @@ def get_tables(verbose=True):
 	pos2 = {'posid': posid2,'nrows': nrows,'motor_steps_T':motor_steps_T,'motor_steps_P':motor_steps_P,'speed_mode_T':speed_mode_T,'speed_mode_P': speed_mode_P,'move_time':move_time,'postpause':postpause}
 	#Positioner 1
 	
-	pos2 = pos1.copy()
+	#pos2 = pos1.copy()
 	mtables = [pos1, pos2]
 
 	return(mtables)
