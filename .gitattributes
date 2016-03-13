@@ -21,7 +21,6 @@ petal/posschedule.py -text
 petal/posstate.py -text
 petal/postransforms.py -text
 petal/test_poscollider.py -text
-petalbox/docs/FW_1.0_DESC.docx -text
 petalbox/docs/systec-readme.txt -text
 petalbox/drivers/systec-readme.txt -text
 petalbox/drivers/systec_can-V0.9.0.tar.bz2 -text
