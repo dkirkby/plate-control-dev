@@ -72,6 +72,6 @@ def get_tables(verbose=True):
 	mtables=[]
 	for posid in range(11,16):
 		pos=str(posid)
-		mtables.append({'posid': pos,'nrows': nrows,'motor_steps_T':motor_steps_T,'motor_steps_P':motor_steps_P,'speed_mode_T':speed_mode_T,'speed_mode_P': speed_mode_P,'move_time':move_time,'postpause':postpause})
+		mtables.append({'posid': pos,'nrows': nrows,'motor_steps_T':motor_steps_T,'motor_steps_P':motor_steps_P,'speed_mode_T':speed_mode_T,'speed_mode_P': speed_mode_P,'movetime':move_time,'postpause':postpause})
 
 	return(mtables)
