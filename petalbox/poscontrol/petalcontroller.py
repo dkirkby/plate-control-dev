@@ -104,6 +104,8 @@ class PetalController(Application):
 
 		return 'can2'
 
+	def get_positioner_map(self):
+		pass
 
 	def get_sids(self, canbus):
 		"""
