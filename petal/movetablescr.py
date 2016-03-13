@@ -64,8 +64,8 @@ def get_tables(verbose=True):
 	motor_steps_P = calc_steps(verbose,angle_P, speed_mode_P)
 
 
-	move_time = [2, 2, 2,2,2,2,2]
-	postpause = [2, 2, 2,2,2,2,2]
+	move_time = [1, 1, 1, 1, 1, 1, 1] # in seconds
+	postpause = [200, 200, 200, 200, 200, 200, 200] # in milliseconds
 
 #	posid1='12'
 #	posid2='20000'
