@@ -398,7 +398,7 @@ class PositionerMoveControl(object):
 			Sets the positioner ID (CAN address). 
 		"""	
 		try:
-			self.pfcan[canbus].send_command(posid,19, '')        
+			self.pfcan[canbus].send_command(posid,24, '')        
 			self.pfcan[canbus].send_command(posid,19, '')
 			return True
 		except:
