@@ -222,7 +222,7 @@ class PetalController(Application):
 		xcode='0' # single command
 		pause=0
 
-		print(posid,direction,move_mode,motor,angle)
+		if self.verbose: print(posid,direction,move_mode,motor,angle)
 
 		# make sure the passed arguments are valid 
 		direction=direction.lower()
@@ -593,7 +593,7 @@ class PositionerMoveControl(object):
 		try:
 			hexdata=str(xcode + s_select + s_motor_steps + s_pause)            
 			if self.verbose: print('Data sent is: %s (in hex)'%(hexdata))
-			print(canbus,posid) 
+			if self.verbose: print(canbus,posid) 
 			self.pfcan[canbus].send_command(posid, 4, hexdata)  
 		except:
 			print ("Sending command 4 failed")
