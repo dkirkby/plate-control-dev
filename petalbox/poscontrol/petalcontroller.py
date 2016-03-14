@@ -84,7 +84,7 @@ class PetalController(Application):
 		self.info('Initialized')
 		# call configure to setup the posid map
 		retcode = self.configure('constants = DEFAULT')
-		self.verbose=True
+		self.verbose=False
 
 	def configure(self, constants = 'DEFAULT'):
 		"""
