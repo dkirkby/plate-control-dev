@@ -195,7 +195,7 @@ class PetalController(Application):
 				speed_mode_T=table['speed_mode_T'][row]
 				speed_mode_P=table['speed_mode_P'][row]
 				post_pause=table['postpause'][row] + (table['movetime'][row])*1000 
-				print("send_tables:",  canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause)
+				if self.verbose: print("send_tables:",  canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause)
 				if self.pmc.load_table_rows(canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause):
 					if self.verbose: print('send_tables: Error')
 					return self.FAILED
@@ -351,12 +351,13 @@ class PositionerMoveControl(object):
 	"""
 
 	def __init__(self,role):
+		self.verbose=False
 		self.role=role
 		self.__can_frame_fmt = "=IB3x8s"
 		canlist=self.get_canconfig('canlist')
 		self.pfcan={}
 		for canbus in canlist:
-			print("canbus: "+canbus)
+			if self.verbose: print("canbus: "+canbus)
 			self.pfcan[canbus]=posfidcan.PosFidCAN(canbus)
 		self.Gear_Ratio=(46.0/14.0+1)**4 # gear_ratio for Namiki motors
 		self.bitsum=0
@@ -390,7 +391,7 @@ class PositionerMoveControl(object):
 		posid=self.posid_all
 		try:        
 			sids=self.pfcan[canbus].send_command(posid,19, '')
-			print (">>>sids: ",sids)
+			if self.verbose: print (">>>sids: ",sids)
 			return True
 		except:
 			return False   
@@ -475,7 +476,7 @@ class PositionerMoveControl(object):
 		creep_period_m1=str(creep_period_m1).zfill(2)
 		spin_steps=str(hex(spin_steps).replace('0x','')).zfill(4)
 		
-		print("Data sent: %s" % creep_period_m0+creep_period_m1+spin_steps)
+		if self.verbose: print("Data sent: %s" % creep_period_m0+creep_period_m1+spin_steps)
 		try:
 			self.pfcan[canbus].send_command(pid,3,creep_period_m0 + creep_period_m1 + spin_steps)
 			return 0
@@ -556,7 +557,7 @@ class PositionerMoveControl(object):
 				pause: integer, time to pause after current command (i.e. before next command is executed) in milliseconds   
 		"""
 		
-		print ("load_rows: canbus,posid,xcode,mode,motor_steps,pause",canbus, posid, xcode, mode, motor_steps, pause)
+		if self.verbose: print ("load_rows: canbus,posid,xcode,mode,motor_steps,pause",canbus, posid, xcode, mode, motor_steps, pause)
 
 		xcode=str(xcode)
 		if xcode not in ['0','1','2']:
@@ -591,7 +592,7 @@ class PositionerMoveControl(object):
 		# this is send for xcode 0,1,2 i.e. always
 		try:
 			hexdata=str(xcode + s_select + s_motor_steps + s_pause)            
-			print('Data sent is: %s (in hex)'%(hexdata))
+			if self.verbose: print('Data sent is: %s (in hex)'%(hexdata))
 			print(canbus,posid) 
 			self.pfcan[canbus].send_command(posid, 4, hexdata)  
 		except:
