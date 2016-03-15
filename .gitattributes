@@ -31,6 +31,7 @@ petalbox/poscontrol/petalcontroller.conf -text
 petalbox/poscontrol/petalcontroller.ini.default -text
 petalbox/poscontrol/petalcontroller.py -text
 petalbox/poscontrol/posfidcan.py -text
+posfirmware/develop/fipos_fw_2.0dev.c -text
 posfirmware/develop/fipos_fw_2.0dev.c.c -text
 posfirmware/docs/FW_1.0_DESC.docx -text svneol=unset#application/zip
 posfirmware/release/fipos_fw_1.0.c -text
