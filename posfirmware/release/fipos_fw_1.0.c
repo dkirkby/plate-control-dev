@@ -339,6 +339,7 @@ unsigned int move_table_status=0;
 unsigned int Spin_Period=12;
 unsigned int spin_count_0=0;
 unsigned int spin_count_1=0;
+unsigned int legacy_test_mode = 0;
 
 // The following currents set the motor current in units of full stall current, so 1 corresponds to 100% or fully on, i.e. about 200 mA
 
@@ -945,7 +946,7 @@ void TIM1_UP_IRQHandler(void)
 			if(CCW_CreepStepsToGo_1 == 0)
 			{
 				Flags_1 &= 0x1;															//  Done with Find Stop so clear flag; Done with this motor rotation
-				Drop_Mtr_Cur_1(M1_Drop_Cur);							//  Set motor current to a low holding value
+				Drop_Mtr_Cur_1(M1_Drop_Cur);								//  Set motor current to a low holding value
 			}
 		}
 		++count_1;		
@@ -1324,13 +1325,13 @@ int main (void)
 				CAN_RxRdy = 0;
 			  execute_now = 0;
 			
-				flash_PA6(50);									//  Flash PA6 for 50 msec when a CAN message is recognized
+				//flash_PA6(50);									//  Flash PA6 for 50 msec when a CAN message is recognized
 			
 				CAN_Com_Stack[i] = CAN_RxMsg;
 			
 				command = CAN_Com_Stack[i].id &= 0xFF;
 			 
-			if(command == 4){						//If command is 4 (move table command)	 		
+			if(command == 4  && !legacy_test_mode){						//If command is 4 (move table command)	 		
 				execute_code = (CAN_Com_Stack[i].data[0] >> 4) & 0x3;				
 				switch(execute_code)
 				{				
@@ -1357,7 +1358,7 @@ int main (void)
 				}//end switch
 			}// end if command 4
 				
-			else if(command == 16){		//set up fiducial command as synchronized
+			else if(command == 16 && !legacy_test_mode){		//set up fiducial command as synchronized
 				i=stack_size;
 				stack_size=1;
 				bit_sum_match=1;					
@@ -1406,176 +1407,245 @@ int main (void)
 			bit_sum_match=0;								//reset bit_sum_match
 				
 			for(i=0; i<stack_size; i++){		//loop that executes the commands in the move table		
-			flash_PA6(50);
+			//flash_PA6(50);
 					
 			command = CAN_Com_Stack[i].id &= 0xFF;	//  The command type is the 8 LSB's of the CAN message IDENTIFIER
 			switch(command)													//  The switch runs the program selected by command
 			{				
 				case 2:																//  set_currents (Sets 8 current parameters)		
-					SpinUpCurrent_0   = (float) CAN_Com_Stack[i].data[0]/100;
-					SpinDownCurrent_0 = SpinUpCurrent_0;
-					CruiseCurrent_0   = (float) CAN_Com_Stack[i].data[1]/100;
-					CreepCurrent_0    = (float) CAN_Com_Stack[i].data[2]/100;
-					M0_Drop_Cur = (float)  CAN_Com_Stack[i].data[3]/100;
+					if(!legacy_test_mode){
+						SpinUpCurrent_0   = (float) CAN_Com_Stack[i].data[0]/100;
+						SpinDownCurrent_0 = SpinUpCurrent_0;
+						CruiseCurrent_0   = (float) CAN_Com_Stack[i].data[1]/100;
+						CreepCurrent_0    = (float) CAN_Com_Stack[i].data[2]/100;
+						M0_Drop_Cur = (float)  CAN_Com_Stack[i].data[3]/100;
 				
-					SpinUpCurrent_1   = (float) CAN_Com_Stack[i].data[4]/100;
-					SpinDownCurrent_1 = SpinUpCurrent_1;
-					CruiseCurrent_1   = (float) CAN_Com_Stack[i].data[5]/100;
-					CreepCurrent_1    = (float) CAN_Com_Stack[i].data[6]/100;
-					M1_Drop_Cur = (float) CAN_Com_Stack[i].data[7]/100;
+						SpinUpCurrent_1   = (float) CAN_Com_Stack[i].data[4]/100;
+						SpinDownCurrent_1 = SpinUpCurrent_1;
+						CruiseCurrent_1   = (float) CAN_Com_Stack[i].data[5]/100;
+						CreepCurrent_1    = (float) CAN_Com_Stack[i].data[6]/100;
+						M1_Drop_Cur = (float) CAN_Com_Stack[i].data[7]/100;
+					}
+					else{
+						SpinUpCurrent_0   = (float) CAN_Com_Stack[i].data[0]/100;
+						SpinDownCurrent_0 = SpinUpCurrent_0;
+						CruiseCurrent_0   = (float) CAN_Com_Stack[i].data[1]/100;
+						CreepCurrent_0    = (float) CAN_Com_Stack[i].data[2]/100;
+						//CCW_CreepCurrent_0 = (float) CAN_Com_Stack[i].data[3]/100;
+						SpinUpCurrent_1   = (float) CAN_Com_Stack[i].data[4]/100;
+						SpinDownCurrent_1 = SpinUpCurrent_1;
+						CruiseCurrent_1   = (float) CAN_Com_Stack[i].data[5]/100;
+						CreepCurrent_1    = (float) CAN_Com_Stack[i].data[6]/100;
+						//CCW_CreepCurrent_1 = (float) CAN_Com_Stack[i].data[7]/100;
+					}
 					break;
 					
-				case 3:															//  set_periods (Sets 4 parameters which use 2 bytes each)			
-					CreepPeriod_0  = CAN_Com_Stack[i].data[0];
-					CreepPeriod_1 = CAN_Com_Stack[i].data[1];
-					Spin_Period = CAN_Com_Stack[i].data[2];			
+				case 3:															//  set_periods (Sets 4 parameters which use 2 bytes each)
+					if(!legacy_test_mode){
+						CreepPeriod_0  = CAN_Com_Stack[i].data[0];
+						CreepPeriod_1 = CAN_Com_Stack[i].data[1];
+						Spin_Period = CAN_Com_Stack[i].data[2];
+				  }
+					else{
+						CreepPeriod_0    = (CAN_Com_Stack[i].data[0] * 256) + CAN_Com_Stack[i].data[1];
+						//CCW_CreepPeriod_0 = (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
+						CreepPeriod_1    = (CAN_Com_Stack[i].data[4] * 256) + CAN_Com_Stack[i].data[5];
+						//CCW_CreepPeriod_1 = (CAN_Com_Stack[i].data[6] * 256) + CAN_Com_Stack[i].data[7];
+					}
 					break;
 							
 				case 4:																//  set_move_amounts 
 																							//  CW_CreepStepsToGo, CCW_CreepStepsToGo, and CruiseStepsToGo amounts are set individually for motor 0 and motor 1.
-																							//  Arguments are:  execute code, select flags, 4 bytes of data that represent the selected amount.			
-					type = CAN_Com_Stack[i].data[0] & 0xF;
-					execute_code = (CAN_Com_Stack[i].data[0] >> 4) & 0x3;
-					if(type == 4){											//if axis is 1, mode=creep, and direction = CW,0
-							CW_CreepStepsToGo_1= (CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
-							data=CW_CreepStepsToGo_1;
-							type=4;
-							post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
+																							//  Arguments are:  execute code, select flags, 4 bytes of data that represent the selected amount.	
+					if(!legacy_test_mode){
+						type = CAN_Com_Stack[i].data[0] & 0xF;
+						execute_code = (CAN_Com_Stack[i].data[0] >> 4) & 0x3;
+						if(type == 4){											//if axis is 1, mode=creep, and direction = CW,0
+								CW_CreepStepsToGo_1= (CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
+								data=CW_CreepStepsToGo_1;
+								type=4;
+								post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
 									
-							//flags for M1 creep CW
-							Flag_Status_1=1;
-							Sh_Fl_1=1;					
-					}
+								//flags for M1 creep CW
+								Flag_Status_1=1;
+								Sh_Fl_1=1;					
+						}
 									
-					else if (type == 5){ 								//if axis 1, mode=creep, direction = CCW,1
-							CCW_CreepStepsToGo_1=(CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
-							data=CCW_CreepStepsToGo_1;
-							post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
+						else if (type == 5){ 								//if axis 1, mode=creep, direction = CCW,1
+								CCW_CreepStepsToGo_1=(CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
+								data=CCW_CreepStepsToGo_1;
+								post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
 											
-							//flags for M1 Creep CCW
-							Flag_Status_1=1;
-							Sh_Fl_1=2;			
-					}
+								//flags for M1 Creep CCW
+								Flag_Status_1=1;
+								Sh_Fl_1=2;			
+						}
 					
-					else if(type == 6){									//if axis is 1, mode=cruise, CW
-							CruiseStepsToGo_1=(CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
-							data=CruiseStepsToGo_1;
-							type=6;
-							post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
+						else if(type == 6){									//if axis is 1, mode=cruise, CW
+								CruiseStepsToGo_1=(CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
+								data=CruiseStepsToGo_1;
+								type=6;
+								post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
 						
-							//flags for M1 cruise CW
-							Flag_Status_1=1;
-							Sh_Fl_1=224;							
-					}
+								//flags for M1 cruise CW
+								Flag_Status_1=1;
+								Sh_Fl_1=224;							
+						}
 					
-					else if(type == 7){								//if axis is 1, mode=cruise, CCW
-							CruiseStepsToGo_1=(CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
-							data=CruiseStepsToGo_1;
-							type=6;
-							post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
+						else if(type == 7){								//if axis is 1, mode=cruise, CCW
+								CruiseStepsToGo_1=(CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
+								data=CruiseStepsToGo_1;
+								type=6;
+								post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
 						
-							//flags for M1 cruise CCW
-							Flag_Status_1=1;
-							Sh_Fl_1=28;								
-					}				
+								//flags for M1 cruise CCW
+								Flag_Status_1=1;
+								Sh_Fl_1=28;								
+						}				
 					
-					else if(type == 0){									//if axis is 0, mode=creep, and direction = CW,0
-							CW_CreepStepsToGo_0=(CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
-							data=CW_CreepStepsToGo_0;
-							type=0;
-							post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
+						else if(type == 0){									//if axis is 0, mode=creep, and direction = CW,0
+								CW_CreepStepsToGo_0=(CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
+								data=CW_CreepStepsToGo_0;
+								type=0;
+								post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
 						
-							//flags for M0 creep CW
-							Flag_Status_0=1;
-							Sh_Fl_0=1;	  
-					}					
+								//flags for M0 creep CW
+								Flag_Status_0=1;
+								Sh_Fl_0=1;	  
+						}					
 					
-					else if (type == 1){ 								//if axis 0, mode=creep, direction = CCW,1
-							CCW_CreepStepsToGo_0=(CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
-							data=CCW_CreepStepsToGo_0;
-							type=1;
-							post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
+						else if (type == 1){ 								//if axis 0, mode=creep, direction = CCW,1
+								CCW_CreepStepsToGo_0=(CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
+								data=CCW_CreepStepsToGo_0;
+								type=1;
+								post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
 						
-							//flags for M0 creep CCW
-							Flag_Status_0=1;
-							Sh_Fl_0=2;						
-					}
+								//flags for M0 creep CCW
+								Flag_Status_0=1;
+								Sh_Fl_0=2;						
+						}
 					
-					else if(type == 2){								//if axis is 0, mode=cruise
-							CruiseStepsToGo_0=(CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
-							data=CruiseStepsToGo_0;
-							type=2;
-							post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
+						else if(type == 2){								//if axis is 0, mode=cruise
+								CruiseStepsToGo_0=(CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
+								data=CruiseStepsToGo_0;
+								type=2;
+								post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
 						
-							//flags for M0 cruise CW
-							Flag_Status_0=1;
-							Sh_Fl_0=224;											
-					}				
+								//flags for M0 cruise CW
+								Flag_Status_0=1;
+								Sh_Fl_0=224;											
+						}				
 					
-					else if(type == 3){								//if axis is 0, mode=cruise
-							CruiseStepsToGo_0=(CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
-							data=CruiseStepsToGo_0;
-							type=2;
-							post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
+						else if(type == 3){								//if axis is 0, mode=cruise
+								CruiseStepsToGo_0=(CAN_Com_Stack[i].data[1] * 65536) + (CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];
+								data=CruiseStepsToGo_0;
+								type=2;
+								post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
 						
-							//flags for M0 cruise CCW
-							Flag_Status_0=1;
-							Sh_Fl_0=28;							
-					}		
+								//flags for M0 cruise CCW
+								Flag_Status_0=1;
+								Sh_Fl_0=28;							
+						}		
 
-					else if(type == 8){							//if just a pause is desired
-							post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
-							Delay(post_pause);
-							post_pause=0;
-					}	
+						else if(type == 8){							//if just a pause is desired
+								post_pause = CAN_Com_Stack[i].data[4]*256 + CAN_Com_Stack[i].data[5];
+								Delay(post_pause);
+								post_pause=0;
+						}	
 					
-					//Set flags now unless next command needs to be set up first.
-					if(post_pause != 0){
-							if(CruiseStepsToGo_0 == 0)				Sh_Fl_0 &= 0xB7;		//  This fixes the hang-up which occurred if a Start command was sent with the 
-							if(CW_CreepStepsToGo_0 == 0)			Sh_Fl_0 &= 0xFE;		//  corresponding cruise or creep steps set to zero.  And it does it without adding
-							if(CCW_CreepStepsToGo_0 == 0)			Sh_Fl_0 &= 0xFD;		//  anything to the timer ISR.				
-							if(CruiseStepsToGo_1 == 0)				Sh_Fl_1 &= 0xB7;
-							if(CW_CreepStepsToGo_1 == 0)			Sh_Fl_1 &= 0xFE;
-							if(CCW_CreepStepsToGo_1 == 0)			Sh_Fl_1 &= 0xFD;				
+						//Set flags now unless next command needs to be set up first.
+						if(post_pause != 0){
+								if(CruiseStepsToGo_0 == 0)				Sh_Fl_0 &= 0xB7;		//  This fixes the hang-up which occurred if a Start command was sent with the 
+								if(CW_CreepStepsToGo_0 == 0)			Sh_Fl_0 &= 0xFE;		//  corresponding cruise or creep steps set to zero.  And it does it without adding
+								if(CCW_CreepStepsToGo_0 == 0)			Sh_Fl_0 &= 0xFD;		//  anything to the timer ISR.				
+								if(CruiseStepsToGo_1 == 0)				Sh_Fl_1 &= 0xB7;
+								if(CW_CreepStepsToGo_1 == 0)			Sh_Fl_1 &= 0xFE;
+								if(CCW_CreepStepsToGo_1 == 0)			Sh_Fl_1 &= 0xFD;				
 						
-							if(Flag_Status_0 && Flag_Status_1) Set_Flags=1;
-						  else if(Flag_Status_0 && !Flag_Status_1) Set_Flags_0=1;
-							else if(!Flag_Status_0 && Flag_Status_1) Set_Flags_1=1;
+								if(Flag_Status_0 && Flag_Status_1) Set_Flags=1;
+								else if(Flag_Status_0 && !Flag_Status_1) Set_Flags_0=1;
+								else if(!Flag_Status_0 && Flag_Status_1) Set_Flags_1=1;
 						
-							Flag_Status_0 = Flag_Status_1 = 0;						
+								Flag_Status_0 = Flag_Status_1 = 0;						
+						}
+					
+						else if((execute_code == 0 || execute_code == 2) && (type != 8)){
+								if(CruiseStepsToGo_0 == 0)				Sh_Fl_0 &= 0xB7;		//  This fixes the hang-up which occurred if a Start command was sent with the 
+								if(CW_CreepStepsToGo_0 == 0)			Sh_Fl_0 &= 0xFE;		//  corresponding cruise or creep steps set to zero.  And it does it without adding
+								if(CCW_CreepStepsToGo_0 == 0)			Sh_Fl_0 &= 0xFD;		//  anything to the timer ISR.				
+								if(CruiseStepsToGo_1 == 0)				Sh_Fl_1 &= 0xB7;
+								if(CW_CreepStepsToGo_1 == 0)			Sh_Fl_1 &= 0xFE;
+								if(CCW_CreepStepsToGo_1 == 0)			Sh_Fl_1 &= 0xFD;
+										
+								//Set_Flags for single command or last command in move table even if post_pause is 0
+								if(Flag_Status_0 && Flag_Status_1) Set_Flags=1;
+								else if(Flag_Status_0 && !Flag_Status_1) Set_Flags_0=1;
+								else if(!Flag_Status_0 && Flag_Status_1) Set_Flags_1=1;
+							
+								Flag_Status_0 = Flag_Status_1 = 0;				
+						}
+					
+						Delay(post_pause);  																			//Wait specified time before executing next command	
 					}
-					
-					else if((execute_code == 0 || execute_code == 2) && (type != 8)){
+					else{
+						//M0CW_Drop_Cur   			= (float) CAN_Com_Stack[i].data[0]/100;
+						//M0CCW_Drop_Cur   			= (float) CAN_Com_Stack[i].data[1]/100;
+						//M1CW_Drop_Cur    			= (float) CAN_Com_Stack[i].data[2]/100;
+						//M1CCW_Drop_Cur 				= (float) CAN_Com_Stack[i].data[3]/100;
+				
+						if(CAN_Com_Stack[i].data[4] & 32)   Bump_CW_Creep_Mtr_0 = 1;
+						else  Bump_CW_Creep_Mtr_0 = 0;	
+						if(CAN_Com_Stack[i].data[4] & 16)   Bump_CCW_Creep_Mtr_0 = 1;
+						else  Bump_CCW_Creep_Mtr_0 = 0;	
+						if(CAN_Com_Stack[i].data[4] & 2)   Bump_CW_Creep_Mtr_1 = 1;
+						else  Bump_CW_Creep_Mtr_1 = 0;	
+						if(CAN_Com_Stack[i].data[4] & 1)   Bump_CCW_Creep_Mtr_1 = 1;
+						else  Bump_CCW_Creep_Mtr_1 = 0;	
+					}
+					break;					
+
+				case 5:															//set_reset_leds
+					if(!legacy_test_mode){
+						type=CAN_Com_Stack[i].data[0];
+						switch_PA4(type);		
+					}
+					else{
+							CruiseStepsToGo_0    =(CAN_Com_Stack[i].data[0] * 256) + CAN_Com_Stack[i].data[1];	// Specified Motor 0 Cruise Rotation in units of 3.3 degrees
+							CW_CreepStepsToGo_0  =(CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];	// Specified Motor 0 CW Creep Rotation in units of 3.3 degrees
+							CruiseStepsToGo_1    =(CAN_Com_Stack[i].data[4] * 256) + CAN_Com_Stack[i].data[5];	// Specified Motor 1 Cruise Rotation in units of 0.1 degrees
+							CW_CreepStepsToGo_1  =(CAN_Com_Stack[i].data[6] * 256) + CAN_Com_Stack[i].data[7];	// Specified Motor 1 CW Creep Rotation in units of 0.1 degrees
+					}
+					break;
+				
+				case 6:															//run_test_sequence
+					if(!legacy_test_mode){
+						run_test_seq = !run_test_seq;			//set or reset flag for sending test patterns to motor pads, will be executed in interrupt handler		
+					}
+					else{
+							CCW_CreepStepsToGo_0 =(CAN_Com_Stack[i].data[0] * 256) + CAN_Com_Stack[i].data[1];	// Specified Motor 0 CCW Creep Rotation in units of 3.3 degrees
+							CW_CreepStepsToGo_0  =(CAN_Com_Stack[i].data[2] * 256) + CAN_Com_Stack[i].data[3];	// Specified Motor 0 CW Creep Rotation in units of 3.3 degrees
+							CCW_CreepStepsToGo_1 =(CAN_Com_Stack[i].data[4] * 256) + CAN_Com_Stack[i].data[5];	// Specified Motor 1 CCW Creep Rotation in units of 0.1 degrees
+							CW_CreepStepsToGo_1  =(CAN_Com_Stack[i].data[6] * 256) + CAN_Com_Stack[i].data[7];	// Specified Motor 1 CW Creep Rotation in units of 0.1 degrees
+					}
+					break;
+				
+				case 7:															//execute_move_table
+					if(!legacy_test_mode){
+						execute_now=1;
+					}
+					else{
+							Sh_Fl_0 = CAN_Com_Stack[i].data[0];
+							Sh_Fl_1 = CAN_Com_Stack[i].data[1];
+				
 							if(CruiseStepsToGo_0 == 0)				Sh_Fl_0 &= 0xB7;		//  This fixes the hang-up which occurred if a Start command was sent with the 
 							if(CW_CreepStepsToGo_0 == 0)			Sh_Fl_0 &= 0xFE;		//  corresponding cruise or creep steps set to zero.  And it does it without adding
 							if(CCW_CreepStepsToGo_0 == 0)			Sh_Fl_0 &= 0xFD;		//  anything to the timer ISR.				
 							if(CruiseStepsToGo_1 == 0)				Sh_Fl_1 &= 0xB7;
 							if(CW_CreepStepsToGo_1 == 0)			Sh_Fl_1 &= 0xFE;
 							if(CCW_CreepStepsToGo_1 == 0)			Sh_Fl_1 &= 0xFD;
-										
-						  //Set_Flags for single command or last command in move table even if post_pause is 0
-							if(Flag_Status_0 && Flag_Status_1) Set_Flags=1;
-							else if(Flag_Status_0 && !Flag_Status_1) Set_Flags_0=1;
-							else if(!Flag_Status_0 && Flag_Status_1) Set_Flags_1=1;
-							
-							Flag_Status_0 = Flag_Status_1 = 0;				
+	
+							Set_Flags = 1;								//  Start
 					}
-					
-					Delay(post_pause);  																			//Wait specified time before executing next command	
-						
-					break;					
-
-				case 5:															//set_reset_leds
-					type=CAN_Com_Stack[i].data[0];
-					switch_PA4(type);		
-					break;
-				
-				case 6:															//run_test_sequence
-					run_test_seq = !run_test_seq;			//set or reset flag for sending test patterns to motor pads, will be executed in interrupt handler		
-					break;
-				
-				case 7:															//execute_move_table
-					execute_now=1;				
 					break;
 				
 				case 8:															//get_move_table_status		
@@ -1711,7 +1781,10 @@ int main (void)
 					if(uid==data_rcv && uid_upper==data_upper_rcv) set_can_id=1;
 					break;
 				
-				case 25: //firmware_cmd(code,data)?
+				case 25: //legacy_test_mode, 1 = legacy_test_mode, 0 = normal operation
+					legacy_test_mode = CAN_Com_Stack[i].data[0];
+								
+				case 26: //firmware_cmd(code,data)?
 					
 					break;
 						
