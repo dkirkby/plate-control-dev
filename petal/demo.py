@@ -1,24 +1,20 @@
 import posarraymaster
 import legacypositionercomm
+import petalcomm as pc
 import numpy as np
 
 """Demonstrator script for initializing / moving positioner.
 """
 
 # initialization
-posids = ['6M01']
+posids = ['UM00013']
+petal_id=1
+#
 n = len(posids)
-m = posarraymaster.PosArrayMaster(posids)
-
-# initialization of communications
-# these commands are very specific to the hacked-together LegacyPositionerComm
-comm = legacypositionercomm.LegacyPositionerComm('COM7')
-comm.send_cmd_off = False # used to speed up software debugging / not actually send commands out over hardware
-comm.master = m
-m.comm = comm
+m = posarraymaster.PosArrayMaster(posids,petal_id)
 
 print('INITIAL POSITION')
-print(m.get('6M01').expected_current_position_str)
+print(m.get('UM00013').expected_current_position_str)
 
 # demo script flags
 should_home        = True
