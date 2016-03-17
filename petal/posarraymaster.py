@@ -158,7 +158,7 @@ class PosArrayMaster(object):
         """Convenience wrapper to send, execute, and cleanup.
         """
         self.comm.send_tables(self.hardware_ready_move_tables()) # return values? threaded with pyro somehow?
-        self.comm.execute_moves() # return values? threaded with pyro somehow?
+        self.comm.execute_sync('soft') # return values? threaded with pyro somehow?
         self.postmove_cleanup()
 
     def postmove_cleanup(self):
