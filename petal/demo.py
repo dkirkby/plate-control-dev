@@ -1,5 +1,4 @@
 import posarraymaster
-import legacypositionercomm
 import petalcomm as pc
 import numpy as np
 
