@@ -157,7 +157,10 @@ class PosArrayMaster(object):
     def send_and_execute_moves(self):
         """Convenience wrapper to send, execute, and cleanup.
         """
-        self.comm.send_tables(self.hardware_ready_move_tables()) # return values? threaded with pyro somehow?
+        hw_tables = self.hardware_ready_move_tables()
+        self.comm.send_tables(hw_tables) # return values? threaded with pyro somehow?
+        self.comm.set_led(13,'on')
+        print(hw_tables)
         self.comm.execute_sync('soft') # return values? threaded with pyro somehow?
         self.postmove_cleanup()
 
