@@ -11,7 +11,7 @@ class PosState(object):
     parameters which may vary from positioner to positioner in this
     single object.
 
-    INPUTS: unit_id = SERIAL_ID of positioner
+    INPUTS: unit_id = POS_ID of positioner
             logging = boolean whether to enable logging state data to disk
 
     Notes:
@@ -35,7 +35,7 @@ class PosState(object):
             self.unit = configobj.ConfigObj(temp_filename,unrepr=True)
             self.unit.initial_comment = [comment,'']
             self.unit.filename = unit_filename
-            self.unit['SERIAL_ID'] = str(unit_id)
+            self.unit['POS_ID'] = str(unit_id)
             self.unit.write()
         else:
             self.unit = configobj.ConfigObj(unit_filename,unrepr=True)

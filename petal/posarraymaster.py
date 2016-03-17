@@ -191,7 +191,7 @@ class PosArrayMaster(object):
 
             The fields have the following types and meanings:
 
-                posid         ... string                    ... identifies the positioner by 'SERIAL_ID'
+                canid         ... unsigned integer          ... identifies the positioner by 'CAN_ID'
                 nrows         ... unsigned integer          ... number of elements in each of the list fields (i.e. number of rows of the move table)
                 motor_steps_T ... list of signed integers   ... number of motor steps to rotate on theta axis
                                                                     ... motor_steps_T > 0 ... ccw rotation

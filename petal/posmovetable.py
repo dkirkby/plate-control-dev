@@ -172,7 +172,7 @@ class PosMoveTable(object):
         if output_type == 'schedule':
             remove_keys = ['motor_steps_T','motor_steps_P','speed_mode_T','speed_mode_P','command','cmd_val1','cmd_val2']
         elif output_type == 'hardware':
-            remove_keys = ['dT','dP','Tdot','Pdot','prepause','command','cmd_val1','cmd_val2']
+            remove_keys = ['posid','dT','dP','Tdot','Pdot','prepause','command','cmd_val1','cmd_val2','stats']
         elif output_type == 'cleanup':
             remove_keys = ['motor_steps_T','motor_steps_P','speed_mode_T','speed_mode_P','Tdot','Pdot','prepause','postpause','move_time']
         elif output_type == 'full':
@@ -211,7 +211,10 @@ class PosMoveTable(object):
             table['cmd_val2'].append(rows[i].data['cmd_val2'])
             table['speed_mode_T'].append(true_moves[pc.T][i]['speed_mode'])
             table['speed_mode_P'].append(true_moves[pc.P][i]['speed_mode'])
-        table['posid'] = self.posmodel.posid
+        if output_type == 'hardware':
+			table['canid'] = self.posmodel.canid
+		else:
+			table['posid'] = self.posmodel.posid
         table['nrows'] = len(table['dT'])
         table['stats'] = self._gather_stats(table)
         restricted_table = table.copy()

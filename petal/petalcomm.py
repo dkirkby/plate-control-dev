@@ -147,56 +147,56 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not execute sync command. Exception: %s' % str(e)
 
-    def move(self, pos_id, direction, mode, motor, angle):
+    def move(self, can_id, direction, mode, motor, angle):
         """
         Low level test command to move a single positioner
         """
         # add parameter checking
         try:
             # Michael's code expects motor as a string
-            return self._call_device('move', pos_id, direction, mode, str(motor), angle)
+            return self._call_device('move', can_id, direction, mode, str(motor), angle)
         except Exception as e:
             return 'FAILED: Can not execute send_move_excute command. Exception: %s' % str(e)
 
-    def set_pos_constants(self, posids, settings):
+    def set_pos_constants(self, can_ids, settings):
         """
         Send settings over ethernet to the petal controller, where they are
-        sent over CAN to the positioners identified the list 'posids', with the setting
+        sent over CAN to the positioners identified the list 'canids', with the setting
         values in the corresponding (dictionary? list of dicts?) 'settings'.
 
-        ids          ... list of psoitioner ids
+        canids       ... list of psoitioner can ids
         settings     ... list settings dictionaries
 
         Would probably be better as a dictionary of dictionaries like this:
         constants = { 1 : {'some setting': value, 'another setting' : another_value}, 4 : {'some setting': ....  }
         """
-        if not isintance(ids, list) or not isinstance(settings,list):
+        if not isintance(can_ids, list) or not isinstance(settings,list):
             return 'FAILED: parameters must be passed as lists'
         try:
-            return self._call_device('set_pos_constants',ids, settings)
+            return self._call_device('set_pos_constants',can_ids, settings)
         except Exception as e:
             return 'FAILED: Can not set fiducials. Exception: %s' % str(e)
 	
-    def set_fiducials(self, ids, percent_duty, duty_period):
+    def set_fiducials(self, can_ids, percent_duty, duty_period):
         """
         Send settings over ethernet to the petal controller, where they are
         sent over CAN to the fiducials. Sets the fiducials identified by the list ids
         to the corresponding duty values.
-        ids          ... list of fiducial ids
+        can_ids      ... list of fiducial ids
         percent_duty ... list of values, 0-100, 0 means off
         duty_period  ... list of values, ms, time between duty cycles
         
         Would probably be better as a dictionary of dictionaries like this:
         fiducials = { 1 : {'percent': percent_duty, 'period' : duty_period}, 4 : {'percent': ....  }
         """
-        if not isintance(ids, list) or not isinstance(percent_duty,list) or not isinstance(duty_period, list):
+        if not isintance(can_ids, list) or not isinstance(percent_duty,list) or not isinstance(duty_period, list):
             return 'FAILED: parameters must be passed as lists'
         try:
-            return self._call_device('set_fiducials',ids, percent_duty, duty_period)
+            return self._call_device('set_fiducials',can_ids, percent_duty, duty_period)
         except Exception as e:
             return 'FAILED: Can not set fiducials. Exception: %s' % str(e)
 	
-    def set_device(self, pos_id, attributes):
+    def set_device(self, can_id, attributes):
         """
         Set a value on a device other than positioners or fiducials. This includes
         fans, power supplies, and sensors.
@@ -209,7 +209,7 @@ class PetalComm(object):
         As implemented, this routine does no error checking or reformatting but passes the parameters on the the petal controller
         """
         try:
-            id = int(pos_id)
+            id = int(can_id)
         except:
             return 'FAILED: Invalid positioner id'
         if not isintance(attributes, dict):
@@ -220,15 +220,15 @@ class PetalComm(object):
             return 'FAILED: Can not set attributes. Exception: %s' % str(e)
         
 	
-    def set_led(self, pos_id, state):
+    def set_led(self, can_id, state):
         """
         Set the led on positioner id on or off
         Input:
-             pos_id  (int)  positioner id   
+             can_id  (int)  positioner id on can bus 
              state   (str)  on, offf
         """
         try:
-            id = int(pos_id)
+            id = int(can_id)
         except:
             return 'FAILED: Invalid positioner id'
         if str(state).lower() not in ['on', 'off']:
