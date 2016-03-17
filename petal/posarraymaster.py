@@ -12,7 +12,7 @@ class PosArrayMaster(object):
     group of positioners (e.g. on a Petal) is coordinated. In general, all
     move requests and scheduling is accomplished with PosArrayMaster.
     """
-    def __init__(self, posids):
+    def __init__(self, posids, petal_id):
         self.posmodels = []
         for posid in posids:
             state = posstate.PosState(posid,logging=True)
@@ -20,7 +20,7 @@ class PosArrayMaster(object):
             self.posmodels.append(model)
         self.posids = posids
         self.schedule = posschedule.PosSchedule(self)
-        self.comm = petalcomm.PetalComm()
+        self.comm = petalcomm.PetalComm(petal_id)
 
     def request_targets(self, pos, commands, vals1, vals2):
         """Input a list of positioners and corresponding move targets to the schedule.
