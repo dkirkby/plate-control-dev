@@ -158,17 +158,22 @@ class PosArrayMaster(object):
     def send_and_execute_moves(self):
         """Convenience wrapper to send, execute, and cleanup.
         """
+        hw_tables = self.hardware_ready_move_tables()
+        canids = []
+        for tbl in hw_tables:
+            canids.append(tbl['canid'])
+
         # SIMPLE BLOCKING IMPLEMENTATION
         # ... so we don't send new tables while any positioners are still moving.
         # There may be better ways to achieve this, to be implemented later.
         timeout = 30 # seconds
         start_time = time.time()
         this_time = 0
-        while not(self.comm.ready_for_tables()) and (time.time()-start_time) < timeout:
+        while not(self.comm.ready_for_tables(canids)) and (time.time()-start_time) < timeout:
             time.sleep(0.5)
 
         # Send the tables and execute the moves.
-        hw_tables = self.hardware_ready_move_tables()
+
         self.comm.send_tables(hw_tables) # return values? threaded with pyro somehow?
         self.comm.set_led(13,'on')
         print(hw_tables)
