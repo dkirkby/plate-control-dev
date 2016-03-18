@@ -159,16 +159,22 @@ class PosArrayMaster(object):
         """Convenience wrapper to send, execute, and cleanup.
         """
         hw_tables = self.hardware_ready_move_tables()
-        canids = []
-        for tbl in hw_tables:
-            canids.append(tbl['canid'])
 
         # SIMPLE BLOCKING IMPLEMENTATION
         # ... so we don't send new tables while any positioners are still moving.
         # There may be better ways to achieve this, to be implemented later.
         timeout = 30 # seconds
+		comm_time_estimate = 0.2
         start_time = time.time()
         this_time = 0
+        canids = []
+		move_time_estimate = 0
+        for tbl in hw_tables:
+            canids.append(tbl['canid'])
+			temp = np.sum(tbl['move_time'])
+			if temp > move_time_estimate:
+				move_time_estimate = temp
+		move_time_estimate += comm_time_estimate
         while not(self.comm.ready_for_tables(canids)) and (time.time()-start_time) < timeout:
             time.sleep(0.5)
 
