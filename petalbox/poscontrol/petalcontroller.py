@@ -84,7 +84,7 @@ class PetalController(Application):
 		self.info('Initialized')
 		# call configure to setup the posid map
 		retcode = self.configure('constants = DEFAULT')
-		self.verbose=True
+		self.verbose=False
 
 	def configure(self, constants = 'DEFAULT'):
 		"""
@@ -354,7 +354,7 @@ class PositionerMoveControl(object):
 	"""
 
 	def __init__(self,role):
-		self.verbose=True
+		self.verbose=False
 		self.role=role
 		self.__can_frame_fmt = "=IB3x8s"
 		canlist=self.get_canconfig('canlist')
