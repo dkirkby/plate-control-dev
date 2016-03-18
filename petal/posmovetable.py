@@ -212,9 +212,9 @@ class PosMoveTable(object):
             table['speed_mode_T'].append(true_moves[pc.T][i]['speed_mode'])
             table['speed_mode_P'].append(true_moves[pc.P][i]['speed_mode'])
         if output_type == 'hardware':
-			table['canid'] = self.posmodel.canid
-		else:
-			table['posid'] = self.posmodel.posid
+            table['canid'] = self.posmodel.canid
+        else:
+            table['posid'] = self.posmodel.posid
         table['nrows'] = len(table['dT'])
         table['stats'] = self._gather_stats(table)
         restricted_table = table.copy()
