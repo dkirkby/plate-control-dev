@@ -102,7 +102,7 @@ class PetalController(Application):
 		Maps the positioner ID to a canbus
 		"""
 
-		return 'can2'
+		return 'can0'
 
 	def get_positioner_map(self):
 		pass
@@ -269,7 +269,7 @@ class PetalController(Application):
 			print ("This functionality is not yet implemented")
 			pass
 		if mode == 'soft':
-			self.pmc.send_soft_sync('can2', 20000)
+			self.pmc.send_soft_sync('can0', 20000)
 			pass
 
 		return self.SUCCESS   
