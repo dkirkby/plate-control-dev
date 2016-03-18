@@ -199,7 +199,6 @@ class PosMoveTable(object):
             table['Tdot'].append(true_moves[pc.T][i]['speed'])
             table['Pdot'].append(true_moves[pc.P][i]['speed'])
             table['prepause'].append(rows[i].data['prepause'])
-            table['postpause'].append(rows[i].data['postpause'])
             table['motor_steps_T'].append(true_moves[pc.T][i]['motor_step'])
             table['motor_steps_P'].append(true_moves[pc.P][i]['motor_step'])
             if output_type == 'hardware':
