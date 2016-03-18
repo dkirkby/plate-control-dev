@@ -84,7 +84,7 @@ class PetalController(Application):
 		self.info('Initialized')
 		# call configure to setup the posid map
 		retcode = self.configure('constants = DEFAULT')
-		self.verbose=False
+		self.verbose=True
 
 	def configure(self, constants = 'DEFAULT'):
 		"""
@@ -184,17 +184,20 @@ class PetalController(Application):
 	 
 		# here we need to assemble list of rows and then loop calls to load_rows
 		# def load_rows(self, posid, ex_code, mode_select, angle, pause):
+		print("*** tables***")
+		print(move_tables)
 		for table in move_tables:  # each table is a dictionary
 			posid=int(table['canid'])
 			canbus=self.__get_canbus(posid)
 			nrows=table['nrows']
-			xcode = '1'   #for each table, xcode starts as 1
+			xcode = '1'
+			print("** nrows **"+str(nrows))   #for each table, xcode starts as 1
 			for row in range(nrows):
 				motor_steps_T=table['motor_steps_T'][row]
 				motor_steps_P=table['motor_steps_P'][row]
 				speed_mode_T=table['speed_mode_T'][row]
 				speed_mode_P=table['speed_mode_P'][row]
-				post_pause=table['postpause'][row] + (table['movetime'][row])*1000 
+				post_pause=table['postpause'][row] + nint((table['move_time'][row])*1000) 
 				if self.verbose: print("send_tables:",  canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause)
 				if self.pmc.load_table_rows(canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause):
 					if self.verbose: print('send_tables: Error')
@@ -351,7 +354,7 @@ class PositionerMoveControl(object):
 	"""
 
 	def __init__(self,role):
-		self.verbose=False
+		self.verbose=True
 		self.role=role
 		self.__can_frame_fmt = "=IB3x8s"
 		canlist=self.get_canconfig('canlist')
