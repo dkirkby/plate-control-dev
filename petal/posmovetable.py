@@ -202,7 +202,10 @@ class PosMoveTable(object):
             table['postpause'].append(rows[i].data['postpause'])
             table['motor_steps_T'].append(true_moves[pc.T][i]['motor_step'])
             table['motor_steps_P'].append(true_moves[pc.P][i]['motor_step'])
-            table['postpause'].append(rows[i].data['postpause']*1000) # hardware postpause in integer milliseconds
+            if output_type == 'hardware':
+                table['postpause'].append(int(round(rows[i].data['postpause']*1000))) # hardware postpause in integer milliseconds
+            else:
+                table['postpause'].append(rows[i].data['postpause'])
             time1 = true_moves[pc.T][i]['move_time']
             time2 = true_moves[pc.P][i]['move_time']
             table['move_time'].append(max(time1,time2))
