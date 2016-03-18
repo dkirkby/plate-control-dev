@@ -22,7 +22,7 @@ class PosArrayMaster(object):
         self.posids = posid
         self.schedule = posschedule.PosSchedule(self)
         self.comm = petalcomm.PetalComm(petal_id)
-	self.sync_mode = 'soft' # 'soft' --> send signal to start positioners moving over CAN, 'hard' --> use the hardware sync signal line to simultaneously start positioners moving
+		self.sync_mode = 'soft' # 'soft' --> send signal to start positioners moving over CAN, 'hard' --> use the hardware sync signal line to simultaneously start positioners moving
 
     def request_targets(self, pos, commands, vals1, vals2):
         """Input a list of positioners and corresponding move targets to the schedule.
