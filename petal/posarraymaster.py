@@ -161,11 +161,10 @@ class PosArrayMaster(object):
         """
         hw_tables = self.hardware_ready_move_tables()
 
-        # SIMPLE BLOCKING IMPLEMENTATION
-        # ... so we don't send new tables while any positioners are still moving.
-        # There may be better ways to achieve this, to be implemented later.
+        # TIME ESTIMATE FOR SIMPLE BLOCKING IMPLEMENTATION
+        # ... see below
         timeout = 30 # seconds
-        comm_time_estimate = 0.2
+        comm_time_estimate = 0.5
         start_time = time.time()
         this_time = 0
         canids = []
@@ -176,14 +175,19 @@ class PosArrayMaster(object):
             if temp > move_time_estimate:
                 move_time_estimate = temp
         move_time_estimate += comm_time_estimate
-        while not(self.comm.ready_for_tables(canids)) and (time.time()-start_time) < timeout:
-            time.sleep(0.5)
+        print('move_time_estimate = ' + str(move_time_estimate))
 
-        # Send the tables and execute the moves.
+        # send tables and execute
         self.comm.send_tables(hw_tables) # return values? threaded with pyro somehow?
-        print(hw_tables)
         self.comm.execute_sync(self.sync_mode) # return values? threaded with pyro somehow?
         self.postmove_cleanup()
+
+        # SIMPLE BLOCKING IMPLEMENTATION
+        # ... so we don't send new tables while any positioners are still moving.
+        # There may be better ways to achieve this, to be implemented later.
+        while not(self.comm.ready_for_tables(canids,move_time_estimate)) and (time.time()-start_time) < timeout:
+            time.sleep(0.5)
+
 
     def postmove_cleanup(self):
         """Always call this after performing a set of moves, so that PosModel instances

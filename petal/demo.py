@@ -19,13 +19,13 @@ print(m.get('UM00013').expected_current_position_str)
 # demo script flags
 should_flash       = True
 should_home        = True
-should_direct_dtdp = False
+should_direct_dtdp = True
 should_move_qs     = False
 should_move_dqds   = False
 should_move_xy     = False
 should_move_dxdy   = False
 should_move_tp     = False
-should_move_dtdp   = True
+should_move_dtdp   = False
 
 # flash the LEDs
 if should_flash:
@@ -36,7 +36,7 @@ if should_flash:
 # run the various move types
 if should_home:
     print('\nMOVE: homing')
-    m.set(key='CREEP_TO_LIMITS',value=True)
+    #m.set(key='CREEP_TO_LIMITS',value=True) # to force only creeping to hard stops
     m.request_homing(posids)
     m.schedule_send_and_execute_moves()
 else:
