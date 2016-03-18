@@ -120,14 +120,14 @@ class PetalComm(object):
             # Failed to get status from device
             raise RuntimeError('_call_device: remote device not reachable %s' % '' if 'name' not in self.device else self.device)
 
-    def ready_for_tables(self, can_ids):
+    def ready_for_tables(self, can_ids, forced_wait_time=3):
         """Checks if all the positioners identified by can_id are ready to receive
         move tables.
         """
         # status = self.get_pos_status()
         # for each can_id, check if it's still moving
         # if everybody is stationary, then true
-        time.sleep(3) # temporary
+        time.sleep(forced_wait_time) # temporary
         return True   # temporary
 
     def send_tables(self, move_tables):

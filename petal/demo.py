@@ -1,6 +1,7 @@
 import posarraymaster
 import petalcomm as pc
 import numpy as np
+import time
 
 """Demonstrator script for initializing / moving positioner.
 """
@@ -16,6 +17,7 @@ print('INITIAL POSITION')
 print(m.get('UM00013').expected_current_position_str)
 
 # demo script flags
+should_flash       = True
 should_home        = True
 should_direct_dtdp = False
 should_move_qs     = False
@@ -24,6 +26,12 @@ should_move_xy     = False
 should_move_dxdy   = False
 should_move_tp     = False
 should_move_dtdp   = True
+
+# flash the LEDs
+if should_flash:
+	m.comm.set_led(20000,'on')
+	time.sleep(1)
+	m.comm.set_led(20000,'off')
 
 # run the various move types
 if should_home:
