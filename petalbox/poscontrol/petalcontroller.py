@@ -197,7 +197,7 @@ class PetalController(Application):
 				motor_steps_P=table['motor_steps_P'][row]
 				speed_mode_T=table['speed_mode_T'][row]
 				speed_mode_P=table['speed_mode_P'][row]
-				post_pause=table['postpause'][row] + nint((table['move_time'][row])*1000) 
+				post_pause=nint(table['postpause'][row]) + nint((table['move_time'][row])*1000) 
 				if self.verbose: print("send_tables:",  canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause)
 				if self.pmc.load_table_rows(canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause):
 					if self.verbose: print('send_tables: Error')
