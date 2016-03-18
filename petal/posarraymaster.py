@@ -19,10 +19,10 @@ class PosArrayMaster(object):
             state = posstate.PosState(posid,logging=True)
             model = posmodel.PosModel(state)
             self.posmodels.append(model)
-        self.posids = posid
+        self.posids = posids
         self.schedule = posschedule.PosSchedule(self)
         self.comm = petalcomm.PetalComm(petal_id)
-		self.sync_mode = 'soft' # 'soft' --> send signal to start positioners moving over CAN, 'hard' --> use the hardware sync signal line to simultaneously start positioners moving
+        self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
 
     def request_targets(self, pos, commands, vals1, vals2):
         """Input a list of positioners and corresponding move targets to the schedule.
@@ -136,7 +136,7 @@ class PosArrayMaster(object):
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = -1.0\n'
                 else:
                     hardstop_debounce[i] = p.axis[i].hardstop_debounce[1]
-                    p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' ('soft')+ axis_cmd_prefix + '.maxpos\n'
+                    p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + '.maxpos\n'
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = +1.0\n'
                 p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.total_limit_seeks += 1\n'
             self.request_direct_dtdp(p, hardstop_debounce[pc.T], hardstop_debounce[pc.P], cmd_prefix='debounce ')
