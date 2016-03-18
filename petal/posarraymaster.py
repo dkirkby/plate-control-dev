@@ -215,7 +215,7 @@ class PosArrayMaster(object):
                                                                     ... motor_steps_P < 0 ... cw rotation
                 speed_mode_T  ... list of strings           ... 'cruise' or 'creep' mode on theta axis
                 speed_mode_P  ... list of strings           ... 'cruise' or 'creep' mode on phi axis
-                movetime      ... list of unsigned floats   ... estimated time the row's motion will take, in seconds, not including the postpause
+                move_time     ... list of unsigned floats   ... estimated time the row's motion will take, in seconds, not including the postpause
                 postpause     ... list of unsigned integers ... pause time after the row's motion, in milliseconds, before executing the next row
         """
         hw_tables = []
