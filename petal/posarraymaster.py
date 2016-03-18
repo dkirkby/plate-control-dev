@@ -173,9 +173,7 @@ class PosArrayMaster(object):
             time.sleep(0.5)
 
         # Send the tables and execute the moves.
-
         self.comm.send_tables(hw_tables) # return values? threaded with pyro somehow?
-        self.comm.set_led(13,'on')
         print(hw_tables)
         self.comm.execute_sync('soft') # return values? threaded with pyro somehow?
         self.postmove_cleanup()
