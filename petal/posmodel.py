@@ -50,11 +50,11 @@ class PosModel(object):
     def posid(self):
         """Returns the positioner id string."""
         return self.state.read('POS_ID')
-	
-	@property
-	def canid(self):
-		"""Returns the positioner hardware id on the CAN bus."""
-		return self.state.read('CAN_ID')
+
+    @property
+    def canid(self):
+        """Returns the positioner hardware id on the CAN bus."""
+        return self.state.read('CAN_ID')
 
     @property
     def expected_current_position(self):
