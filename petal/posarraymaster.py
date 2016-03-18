@@ -19,9 +19,10 @@ class PosArrayMaster(object):
             state = posstate.PosState(posid,logging=True)
             model = posmodel.PosModel(state)
             self.posmodels.append(model)
-        self.posids = posids
+        self.posids = posid
         self.schedule = posschedule.PosSchedule(self)
         self.comm = petalcomm.PetalComm(petal_id)
+		self.sync_mode = 'soft' # 'soft' --> send signal to start positioners moving over CAN, 'hard' --> use the hardware sync signal line to simultaneously start positioners moving
 
     def request_targets(self, pos, commands, vals1, vals2):
         """Input a list of positioners and corresponding move targets to the schedule.
@@ -135,7 +136,7 @@ class PosArrayMaster(object):
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = -1.0\n'
                 else:
                     hardstop_debounce[i] = p.axis[i].hardstop_debounce[1]
-                    p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + '.maxpos\n'
+                    p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' ('soft')+ axis_cmd_prefix + '.maxpos\n'
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = +1.0\n'
                 p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.total_limit_seeks += 1\n'
             self.request_direct_dtdp(p, hardstop_debounce[pc.T], hardstop_debounce[pc.P], cmd_prefix='debounce ')
@@ -181,7 +182,7 @@ class PosArrayMaster(object):
         # Send the tables and execute the moves.
         self.comm.send_tables(hw_tables) # return values? threaded with pyro somehow?
         print(hw_tables)
-        self.comm.execute_sync('soft') # return values? threaded with pyro somehow?
+        self.comm.execute_sync(self.sync_mode) # return values? threaded with pyro somehow?
         self.postmove_cleanup()
 
     def postmove_cleanup(self):
