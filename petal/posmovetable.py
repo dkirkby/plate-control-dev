@@ -200,8 +200,8 @@ class PosMoveTable(object):
             table['Pdot'].append(true_moves[pc.P][i]['speed'])
             table['prepause'].append(rows[i].data['prepause'])
             table['postpause'].append(rows[i].data['postpause'])
-            table['motor_steps_T'].append(int(np.round(true_moves[pc.T][i]['motor_step'])))
-            table['motor_steps_P'].append(int(np.round(true_moves[pc.P][i]['motor_step'])))
+            table['motor_steps_T'].append(true_moves[pc.T][i]['motor_step'])
+            table['motor_steps_P'].append(true_moves[pc.P][i]['motor_step'])
             table['postpause'].append(rows[i].data['postpause']*1000) # hardware postpause in integer milliseconds
             time1 = true_moves[pc.T][i]['move_time']
             time2 = true_moves[pc.P][i]['move_time']
