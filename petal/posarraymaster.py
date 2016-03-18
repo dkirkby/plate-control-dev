@@ -5,6 +5,7 @@ import posstate
 import petalcomm
 import posconstants as pc
 import numpy as np
+import time
 
 class PosArrayMaster(object):
     """Maintains a list of instances of the Fiber Positioner software model
@@ -157,6 +158,16 @@ class PosArrayMaster(object):
     def send_and_execute_moves(self):
         """Convenience wrapper to send, execute, and cleanup.
         """
+        # SIMPLE BLOCKING IMPLEMENTATION
+        # ... so we don't send new tables while any positioners are still moving.
+        # There may be better ways to achieve this, to be implemented later.
+        timeout = 30 # seconds
+        start_time = time.time()
+        this_time = 0
+        while not(self.comm.ready_for_tables()) and (time.time()-start_time) < timeout:
+            time.sleep(0.5)
+
+        # Send the tables and execute the moves.
         hw_tables = self.hardware_ready_move_tables()
         self.comm.send_tables(hw_tables) # return values? threaded with pyro somehow?
         self.comm.set_led(13,'on')

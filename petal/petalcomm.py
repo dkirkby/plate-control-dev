@@ -2,7 +2,7 @@
 PetalComm
 
 some description
-version history 
+version history
 etc
 
   Version History
@@ -22,7 +22,7 @@ class PetalComm(object):
     Handles communication between petal software running on floor control computers
     and petalbox software running on the petal.
     """
-  
+
     def __init__(self, petal_id, controller = None):
         """
         Initialize the object and connect to the petal controller
@@ -30,10 +30,10 @@ class PetalComm(object):
         We support to methods to select the petal controller. If only the petal id is
         provided, the DOSlib advertiser module is used to find the corresponding controller.
         Or a dictionary with the ip and port information can be passed as controller. For example:
-        
+
                my_class = PetalComm(5,controller = {'ip' : 192.1.15.78', 'port' : 7100})
 
-        The no_dos flag should be managed one level up (just import a different PetalComm module) and 
+        The no_dos flag should be managed one level up (just import a different PetalComm module) and
         not in this file
         """
         self.petal_id = int(petal_id)
@@ -42,11 +42,11 @@ class PetalComm(object):
         self.repeat = threading.Event()
         self.repeat.clear()
         self.found_controller = threading.Event()
-        self.found_controller.clear()        
+        self.found_controller.clear()
         self.stype = '-dos-'
         self.service = 'PetalControl'
         self.device = {}
-        
+
         # Make sure we have the correct information
         if isinstance(controller, dict):
             if 'ip' not in controller.keys() or 'port' not in controller.keys():
@@ -119,7 +119,17 @@ class PetalComm(object):
                     raise RuntimeError('_call_device: Exception for command %s. Message: %s' % (str(cmd),str(e)))
             # Failed to get status from device
             raise RuntimeError('_call_device: remote device not reachable %s' % '' if 'name' not in self.device else self.device)
-    
+
+    def ready_for_tables(self, can_ids):
+        """Checks if all the positioners identified by can_id are ready to receive
+        move tables.
+        """
+        # status = self.get_pos_status()
+        # for each can_id, check if it's still moving
+        # if everybody is stationary, then true
+        time.sleep(3) # temporary
+        return True   # temporary
+
     def send_tables(self, move_tables):
         """
         Sends move tables for positioners over ethernet to the petal controller,
@@ -133,7 +143,7 @@ class PetalComm(object):
             return self._call_device('send_tables',move_tables)
         except Exception as e:
             return 'FAILED: Can not send move tables. Exception: %s' % str(e)
-	
+
     def execute_sync(self, mode):
         """
         Send the command to synchronously begin move sequences to all positioners
@@ -176,7 +186,7 @@ class PetalComm(object):
             return self._call_device('set_pos_constants',can_ids, settings)
         except Exception as e:
             return 'FAILED: Can not set fiducials. Exception: %s' % str(e)
-	
+
     def set_fiducials(self, can_ids, percent_duty, duty_period):
         """
         Send settings over ethernet to the petal controller, where they are
@@ -185,7 +195,7 @@ class PetalComm(object):
         can_ids      ... list of fiducial ids
         percent_duty ... list of values, 0-100, 0 means off
         duty_period  ... list of values, ms, time between duty cycles
-        
+
         Would probably be better as a dictionary of dictionaries like this:
         fiducials = { 1 : {'percent': percent_duty, 'period' : duty_period}, 4 : {'percent': ....  }
         """
@@ -195,13 +205,13 @@ class PetalComm(object):
             return self._call_device('set_fiducials',can_ids, percent_duty, duty_period)
         except Exception as e:
             return 'FAILED: Can not set fiducials. Exception: %s' % str(e)
-	
+
     def set_device(self, can_id, attributes):
         """
         Set a value on a device other than positioners or fiducials. This includes
         fans, power supplies, and sensors.
 
-        For now pos_id is a single positioner id (int) 
+        For now pos_id is a single positioner id (int)
         this should really be passed as a dictionary so key, value lists were change to the attributes dictionary
         Could also be a dictionary of dictionaries if multiple ids and attributes are passed at once
         lot's of possibilities...
@@ -218,13 +228,13 @@ class PetalComm(object):
             return self._call_device('set_device',id, attributes)
         except Exception as e:
             return 'FAILED: Can not set attributes. Exception: %s' % str(e)
-        
-	
+
+
     def set_led(self, can_id, state):
         """
         Set the led on positioner id on or off
         Input:
-             can_id  (int)  positioner id on can bus 
+             can_id  (int)  positioner id on can bus
              state   (str)  on, offf
         """
         try:
@@ -238,7 +248,7 @@ class PetalComm(object):
             return self._call_device('set_led',id, str(state).lower())
         except Exception as e:
             return 'FAILED: Can not set LED state. Exception: %s' % str(e)
-	
+
     def get_pos_status(self):
         """
         Returns a (dictionary?) containing status of all positioners on the petal.
@@ -256,7 +266,7 @@ class PetalComm(object):
             return self._call_device('get_fid_status')
         except Exception as e:
             return 'FAILED: Can not get fiducial status. Exception: %s' % str(e)
-	
+
     def get_device_status(self):
         """
         Returns a (dictionary?) containing status of all devices other than positioners
@@ -284,4 +294,3 @@ class PetalComm(object):
             return self._call_device('set_posid',canbus, sid, new_posid)
         except Exception as e:
             return 'FAILED: Can not set posID. Exception: %s' % str(e)
-            
