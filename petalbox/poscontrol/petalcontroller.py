@@ -19,7 +19,7 @@
    1/30/2016    MS, KH      set_led (test) function added
    3/07/2016    MS, IG      added send_tables
    3/08/2016    MS, IG      rewrote load_rows; added load_rows_angle, load_table_rows
-
+   3/24/2016    IG          filled in set_fiducials
 """
 
 from DOSlib.application import Application
@@ -84,7 +84,7 @@ class PetalController(Application):
 		self.info('Initialized')
 		# call configure to setup the posid map
 		retcode = self.configure('constants = DEFAULT')
-		self.verbose=False
+		self.verbose=True
 
 	def configure(self, constants = 'DEFAULT'):
 		"""
@@ -102,7 +102,7 @@ class PetalController(Application):
 		Maps the positioner ID to a canbus
 		"""
 
-		return 'can0'
+		return 'can2'
 
 	def get_positioner_map(self):
 		pass
@@ -132,12 +132,12 @@ class PetalController(Application):
 
 
 
-	def set_fiducials(self, ids, percent_duty, duty_period):
+	def set_fiducials(self, canbus, ids, percent_duty, duty_period):
 		"""
 		Set the ficucial power levels and period
 		Inputs include list with percentages, periods and ids
 		Returns SUCCESS or error message.
-		
+		canbus	     ... string that specifies the can bus number, eg. 'can2'
 		ids          ... list of fiducial ids
 		percent_duty ... list of values, 0-100, 0 means off
 		duty_period  ... list of values, ms, time between duty cycles
@@ -149,7 +149,18 @@ class PetalController(Application):
 	
 		for id in range(len(ids)):
 			# assemble arguments for canbus/firmware function
-			print('ID: %s, Percent %s, Period %s' % (ids[id],percent_duty[id],duty_period[id]))
+		
+			posid=int(ids[id])
+			canbus=self.__get_canbus(posid)
+		
+			percent_duty = int(percent_duty[id])
+			duty_period = int(duty_period[id])
+		
+			if self.pmc.set_fiducials(canbus, posid, percent_duty, duty_period):
+					if self.verbose: print('set_fiducials: Error')
+					return self.FAILED
+
+			if self.verbose:  print('ID: %s, Percent %s, Period %s' % (ids[id],percent_duty[id],duty_period[id]))
 		return self.SUCCESS
 	
 	def send_tables(self, move_tables):
@@ -429,6 +440,52 @@ class PositionerMoveControl(object):
 			self.pfcan[canbus].send_command(posid,5, str(select).zfill(2))
 			return True
 		except:
+			return False  
+
+	def set_fiducials(self, canbus, posid, percent_duty, duty_period):
+		
+		"""
+			Constructs the command to send fiducial control signals to the theta/phi motor pads.
+			This also sets the device mode to fiducial (rather than positioner) in the firmware.
+
+			INPUTS
+				canbus: string, can bus (example 'can2')        
+				posid:  int, positioner id (example 1008)
+				percent_duty: int, percent duty cycle of waveforms going to the theta/phi pads (example 45)
+				duty_period:  int, period of waveforms going to theta/phi pads in ms (example 20)
+		"""
+
+		
+		device_type = '01'  #fiducial = 01, positioner = 00
+		duty = str(hex(int(65536.*percent_duty/100)).replace('0x','')).zfill(4).zfill(4)
+		TIMDIVint = int(duty_period*72000000.0/1000)
+		TIMDIV = str(hex(int(duty_period*72000000.0/1000)).replace('0x', '')).zfill(8) 
+		if(TIMDIVint <= 1650):
+			if self.verbose:  print("Duty period out of range") 
+			return True
+		print(canbus, posid, 16, device_type + duty + TIMDIV)
+		try:        
+			self.pfcan[canbus].send_command(posid, 16, device_type + duty + TIMDIV)
+			return False
+		except:
+			return True 
+
+
+	def execute_sync(self, canbus, posid, mode):
+		
+		"""
+			Constructs the command to set the status of the test LED on the positioner board.
+			Note: The LED will not be installed on production boards and this method will depreciate. 
+		
+			mode:  'hard, soft'
+					
+			INPUTS
+		"""
+		mode='soft'
+		try:        
+			self.pfcan[canbus].send_command(posid,7, '')
+			return True
+		except:
 			return False   
 
 
@@ -487,6 +544,8 @@ class PositionerMoveControl(object):
 		except:
 			print ("Sending command 3 failed")
 			return 1  
+
+	
 
 	def load_table_rows(self, canbus, posid, xcode, motor, motor_steps, speed_mode, post_pause):
 		"""
