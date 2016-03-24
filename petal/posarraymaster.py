@@ -147,7 +147,7 @@ class PosArrayMaster(object):
         using the move request methods. Note the available flag to turn the
         anticollision algorithm on or off for the scheduling.
         """
-        anticollision = False # temporary, since algorithm is not yet implemented in PosSchedule
+        #anticollision = False # now implemented in PosSchedule
         self.schedule.schedule_moves(anticollision)
 
     def schedule_send_and_execute_moves(self):

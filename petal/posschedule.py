@@ -2,6 +2,7 @@ import numpy as np
 import posmovetable
 import posarraymaster
 import posconstants as pc
+import posanticollision as anticollision
 
 class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners
@@ -163,8 +164,28 @@ class PosSchedule(object):
 
     def _schedule_with_anticollision(self):
         """
-        # use poscollider module for gathering calibration data, detecting collisions, and making animations
-        # anticollision algorithm goes here
-        # (to-do)
+           Currently just a very naive anticollision that
+           stops the positioner from moving if it will collide.
+           Those positioners do not recieve their request location.
         """
-        self._schedule_without_anticollision() # placeholder to be replaced with real code
+        verbose = False
+        if verbose:
+            print("You ARE doing anticollisions")
+            print("Number of requests: "+str(len(self.requests)))
+
+        xabs = []; yabs = []; tstarts = []; pstarts = []; ttargs = []; ptargs = []; posmodels = []
+        for request in self.requests:
+            posmodel = request['posmodel']
+            xabs.append(posmodel.state.read('OFFSET_X'))
+            yabs.append(posmodel.state.read('OFFSET_Y'))
+            ttarg,ptarg = request['targt_posTP'][:]
+            tstart,pstart = request['start_posTP'][:]
+            tstarts.append(tstart)
+            pstarts.append(pstart)
+            ptargs.append(ptarg)
+            ttargs.append(ttarg)
+            posmodels.append(posmodel)
+
+        method = 'RRE'
+        avoidance_technique = 'zeroth_order'
+        self.move_tables = anticollision.run_anticol(xabs,yabs,tstarts,ttargs,pstarts,ptargs,posmodels,method,avoidance_technique,verbose)

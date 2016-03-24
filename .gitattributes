@@ -13,6 +13,7 @@ petal/pos_settings/unit_6M01.conf -text
 petal/pos_settings/unit_UM00012.conf -text
 petal/pos_settings/unit_UM00013.conf -text
 petal/pos_settings/unit_UM1020.conf -text
+petal/posanticollision.py -text
 petal/posarraymaster.py -text
 petal/poscollider.py -text
 petal/posconstants.py -text
