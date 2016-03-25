@@ -23,6 +23,7 @@ class PosArrayMaster(object):
         self.schedule = posschedule.PosSchedule(self)
         self.comm = petalcomm.PetalComm(petal_id)
         self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
+        self.anticollision_default = True # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
 
     def request_targets(self, pos, commands, vals1, vals2):
         """Input a list of positioners and corresponding move targets to the schedule.
@@ -141,13 +142,15 @@ class PosArrayMaster(object):
                 p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.total_limit_seeks += 1\n'
             self.request_direct_dtdp(p, hardstop_debounce[pc.T], hardstop_debounce[pc.P], cmd_prefix='debounce ')
 
-    def schedule_moves(self,anticollision=True):
+    def schedule_moves(self,anticollision=None):
         """Generate the schedule of moves and submoves that get positioners
         from start to target. Call this after having input all desired moves
         using the move request methods. Note the available flag to turn the
-        anticollision algorithm on or off for the scheduling.
+        anticollision algorithm on or off for the scheduling. If that flag is
+        None, then the default anticollision parameter is used.
         """
-        #anticollision = False # now implemented in PosSchedule
+        if not anticollision:
+            anticollision = self.anticollision_default
         self.schedule.schedule_moves(anticollision)
 
     def schedule_send_and_execute_moves(self):
