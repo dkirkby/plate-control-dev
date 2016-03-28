@@ -4,12 +4,15 @@ echo "checking for SYSTEC CAN on can0, can1, can2 ..."
 for i in `seq 0 2`;
 do
 #	echo $i
+	ip link set can$i down
 	check="$(ip link show can$i | grep brd)"
+
 	if ! [[ -z "${check// }" ]];
 	then
 		echo "detected SYSTEC on can$i ..."
 		ip link set can$i type can bitrate 500000
   		ip link set can$i up
+		break
 	fi
 done
 echo "updating petalcontroller.ini file ..."

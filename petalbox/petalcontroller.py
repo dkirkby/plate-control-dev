@@ -100,9 +100,14 @@ class PetalController(Application):
 	def __get_canbus(self, posid):
 		"""
 		Maps the positioner ID to a canbus
+		For right now we only have one CAN bus (ProtoDESI) and we map
+		it to that. Get the CAN bust number from petalcontroller.ini
 		"""
-
-		return 'can2'
+		config=ConfigObj('petlcontroller.ini')
+		role=config['role']
+		config=ConfigObj('petalcontroller.conf')
+		canlist=config['CAN'][role]['canlist']
+		return canlist
 
 	def get_positioner_map(self):
 		pass
