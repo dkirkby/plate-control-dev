@@ -24,6 +24,7 @@ petal/posschedule.py -text
 petal/posstate.py -text
 petal/postransforms.py -text
 petal/test_poscollider.py -text
+petalbox/caninit.py -text
 petalbox/caninit.sh -text
 petalbox/docs/systec-readme.txt -text
 petalbox/drivers/systec-readme.txt -text
