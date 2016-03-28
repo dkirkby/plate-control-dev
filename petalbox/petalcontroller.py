@@ -107,6 +107,7 @@ class PetalController(Application):
 		role=config['role']
 		config=ConfigObj('petalcontroller.conf')
 		canlist=config['CAN'][role]['canlist']
+		print("CAN configured...canlist: ",canlist)
 		return canlist
 
 	def get_positioner_map(self):
