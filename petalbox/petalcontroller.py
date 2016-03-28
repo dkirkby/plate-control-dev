@@ -103,7 +103,7 @@ class PetalController(Application):
 		For right now we only have one CAN bus (ProtoDESI) and we map
 		it to that. Get the CAN bust number from petalcontroller.ini
 		"""
-		config=ConfigObj('petlcontroller.ini')
+		config=ConfigObj('petalcontroller.ini')
 		role=config['role']
 		config=ConfigObj('petalcontroller.conf')
 		canlist=config['CAN'][role]['canlist']
