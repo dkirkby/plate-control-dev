@@ -29,12 +29,12 @@ petalbox/docs/systec-readme.txt -text
 petalbox/drivers/systec-readme.txt -text
 petalbox/drivers/systec_can-V0.9.0.tar.bz2 -text
 petalbox/hwlib/dlptemp.py -text
-petalbox/poscontrol/dotprofile -text
-petalbox/poscontrol/mvtest.py -text
-petalbox/poscontrol/petalcontroller.conf -text
-petalbox/poscontrol/petalcontroller.ini.default -text
-petalbox/poscontrol/petalcontroller.py -text
-petalbox/poscontrol/posfidcan.py -text
+petalbox/util/dotprofile -text
+petalbox/util/mvtest.py -text
+petalbox/util/petalcontroller.conf -text
+petalbox/util/petalcontroller.ini.default -text
+petalbox/util/petalcontroller.py -text
+petalbox/util/posfidcan.py -text
 posfirmware/develop/fipos_fw_2.0dev.c -text
 posfirmware/docs/FW_1.0_DESC.docx -text svneol=unset#application/zip
 posfirmware/docs/FW_2.0_DESC.docx -text
