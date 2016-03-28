@@ -31,6 +31,7 @@ petalbox/drivers/systec-readme.txt -text
 petalbox/drivers/systec_can-V0.9.0.tar.bz2 -text
 petalbox/hwlib/dlptemp.py -text
 petalbox/petalcontroller.conf -text
+petalbox/petalcontroller.conf.default -text
 petalbox/petalcontroller.ini.default -text
 petalbox/petalcontroller.py -text
 petalbox/posfidcan.py -text

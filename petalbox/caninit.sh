@@ -15,6 +15,8 @@ do
 		break
 	fi
 done
+echo "creating a local copy of petalcontroller.conf ..."
+cp petalcontroller.conf.default petalcontroller.conf 
 echo "updating petalcontroller.ini file ..."
 python3 caninit.py can$i
 echo "...done"
