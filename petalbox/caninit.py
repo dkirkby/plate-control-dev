@@ -7,7 +7,8 @@ ncan=canlist.count('can')
 if ncan < 1:
 	print("Error in canlist")
 	exit() 
-if ncan == 1: canlist=canlist+","
+if ncan == 1: canlist=list(canlist)
+
 try:
 	config=ConfigObj('petalcontroller.ini')
 	role=config['role']
