@@ -108,7 +108,7 @@ class PetalController(Application):
 		config=ConfigObj('petalcontroller.conf')
 		canlist=config['CAN'][role]['canlist']
 		print("CAN configured...canlist: ",canlist)
-		return canlist
+		return canlist[0]
 
 	def get_positioner_map(self):
 		pass
@@ -371,11 +371,12 @@ class PositionerMoveControl(object):
 	"""
 
 	def __init__(self,role):
-		self.verbose=False
+		self.verbose=True #False
 		self.role=role
 		self.__can_frame_fmt = "=IB3x8s"
 		canlist=self.get_canconfig('canlist')
 		self.pfcan={}
+		print("**** canlist ***",canlist)
 		for canbus in canlist:
 			if self.verbose: print("canbus: "+canbus)
 			self.pfcan[canbus]=posfidcan.PosFidCAN(canbus)
@@ -442,6 +443,8 @@ class PositionerMoveControl(object):
 
 		#onoff={'on':1,'off':0}
 		select ={'on':1,'off':0}[state]
+
+		print("set leds >>> canbus,posid,select",canbus,posid,select)
 		try:        
 			self.pfcan[canbus].send_command(posid,5, str(select).zfill(2))
 			return True
