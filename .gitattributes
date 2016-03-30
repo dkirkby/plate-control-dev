@@ -10,8 +10,10 @@ petal/pos_settings/_collision_settings_DEFAULT.conf -text
 petal/pos_settings/_genl_settings_DEFAULT.conf -text
 petal/pos_settings/_unit_settings_DEFAULT.conf -text
 petal/pos_settings/unit_6M01.conf -text
+petal/pos_settings/unit_UM00011.conf -text
 petal/pos_settings/unit_UM00012.conf -text
 petal/pos_settings/unit_UM00013.conf -text
+petal/pos_settings/unit_UM00014.conf -text
 petal/pos_settings/unit_UM1020.conf -text
 petal/posanticollision.py -text
 petal/posarraymaster.py -text

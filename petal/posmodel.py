@@ -1,6 +1,5 @@
 import numpy as np
 import posstate
-import posmovetable
 import postransforms
 import posconstants as pc
 

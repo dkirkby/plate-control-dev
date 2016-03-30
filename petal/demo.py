@@ -1,20 +1,21 @@
 import posarraymaster
-import petalcomm as pc
-import numpy as np
 import time
+import posconstants as pc
 
 """Demonstrator script for initializing / moving positioner.
 """
 
 # initialization
-posids = ['UM00013']
+posids = ['UM00012']#,'UM00013']
 petal_id=1
 #
 n = len(posids)
 m = posarraymaster.PosArrayMaster(posids,petal_id)
+m.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
 
 print('INITIAL POSITION')
-print(m.get('UM00013').expected_current_position_str)
+for posid in posids:
+    print(m.get(posid).expected_current_position_str)
 
 # demo script flags
 should_flash       = True
@@ -29,14 +30,16 @@ should_move_dtdp   = False
 
 # flash the LEDs
 if should_flash:
-	m.comm.set_led(20000,'on')
-	time.sleep(1)
-	m.comm.set_led(20000,'off')
+    for canid in pc.listify(m.get(key='CAN_ID')): # this usage of get method returns a list with that value for all the positioners
+        m.comm.set_led(canid,'on')
+    time.sleep(1)
+    for canid in pc.listify(m.get(key='CAN_ID')):
+        m.comm.set_led(canid,'off')
 
 # run the various move types
 if should_home:
     print('\nMOVE: homing')
-    #m.set(key='CREEP_TO_LIMITS',value=True) # to force only creeping to hard stops
+    # m.set(key='CREEP_TO_LIMITS',value=True) # to force only creeping to hard stops
     m.request_homing(posids)
     m.schedule_send_and_execute_moves()
 else:
@@ -44,13 +47,13 @@ else:
 
 # this is an 'expert' use function, which instructs the theta and phis axes to go some distances with no regard for anticollision or hardstops
 if should_direct_dtdp:
-    dt = [ 270, -180, -90]
-    dp = [ -60,    0,  60]
+    dt = [90]#[ 270,   0, -180]
+    dp = [0]#[   0, -60,   30]
     for i in range(len(dt)):
         val1 = dt[i]
         val2 = dp[i]
         print('\nMOVE: direct dtdp (' + str(val1) + ',' + str(val2) + ')')
-        m.request_direct_dtdp(posids, val1, val2)
+        m.request_direct_dtdp(posids, [val1]*n, [val2]*n)
         m.schedule_send_and_execute_moves()
 
 # the remainder below are for general usage

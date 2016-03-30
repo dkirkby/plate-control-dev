@@ -24,6 +24,7 @@ class PosArrayMaster(object):
         self.comm = petalcomm.PetalComm(petal_id)
         self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
         self.anticollision_default = True # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
+        self.anticollision_override = True # causes the anticollision_default value to be used in all cases
 
     def request_targets(self, pos, commands, vals1, vals2):
         """Input a list of positioners and corresponding move targets to the schedule.
@@ -125,7 +126,7 @@ class PosArrayMaster(object):
         for p in posmodels:
             self.request_limit_seek(p, pc.P, dir[pc.P], anticollision=True, cmd_prefix='homing P ')
         self.schedule_moves(anticollision=True)
-        retraction_time = self.schedule.total_scheduled_time()
+        # retraction_time = self.schedule.total_scheduled_time()
         for p in posmodels:
             dir[pc.T] = p.axis[pc.T].principle_hardstop_direction
             self.request_limit_seek(p, pc.T, dir[pc.T], anticollision=False, cmd_prefix='homing T ')
@@ -149,7 +150,7 @@ class PosArrayMaster(object):
         anticollision algorithm on or off for the scheduling. If that flag is
         None, then the default anticollision parameter is used.
         """
-        if not anticollision:
+        if anticollision == None or self.anticollision_override:
             anticollision = self.anticollision_default
         self.schedule.schedule_moves(anticollision)
 
@@ -169,7 +170,6 @@ class PosArrayMaster(object):
         timeout = 30 # seconds
         comm_time_estimate = 0.5
         start_time = time.time()
-        this_time = 0
         canids = []
         move_time_estimate = 0
         for tbl in hw_tables:
