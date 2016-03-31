@@ -354,7 +354,7 @@ class PetalController(Application):
 		For now this function returns a status of 'BUSY' or 'DONE' for a single
 		positioner with ID <posid>.
 		"""
-		sstatus=self.pmc.get_pos_status(self,posids)tatus ={'osu' : 42, 'michigan' : 6}
+		status=self.pmc.get_pos_status(self,posids)
 		return status
 
 
