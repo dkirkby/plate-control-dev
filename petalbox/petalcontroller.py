@@ -378,7 +378,7 @@ class PetalController(Application):
 
 	def ready_for_tables(self,posids):
 		status=False
-		dev_status=get_pos_status(posids)
+		dev_status=self.get_pos_status(posids)
 		for posid in dev_status:
 			if dev_status[posid] == 'DONE':
 				status=True
