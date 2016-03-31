@@ -6,7 +6,8 @@ import posconstants as pc
 """
 
 # initialization
-posids = ['UM00012']#,'UM00013']
+posids = ['UM00012']
+#posids = ['UM00011','UM00012','UM00013','UM00014','UM00015']
 petal_id=1
 #
 n = len(posids)
@@ -18,7 +19,7 @@ for posid in posids:
     print(m.get(posid).expected_current_position_str)
 
 # demo script flags
-should_flash       = True
+should_flash       = False
 should_home        = True
 should_direct_dtdp = True
 should_move_qs     = False
@@ -30,10 +31,11 @@ should_move_dtdp   = False
 
 # flash the LEDs
 if should_flash:
-    for canid in pc.listify(m.get(key='CAN_ID')): # this usage of get method returns a list with that value for all the positioners
+    canids = pc.listify(m.get(key='CAN_ID'),True)[0]
+    for canid in canids: # this usage of get method returns a list with that value for all the positioners
         m.comm.set_led(canid,'on')
     time.sleep(1)
-    for canid in pc.listify(m.get(key='CAN_ID')):
+    for canid in canids:
         m.comm.set_led(canid,'off')
 
 # run the various move types
@@ -47,8 +49,8 @@ else:
 
 # this is an 'expert' use function, which instructs the theta and phis axes to go some distances with no regard for anticollision or hardstops
 if should_direct_dtdp:
-    dt = [90]#[ 270,   0, -180]
-    dp = [0]#[   0, -60,   30]
+    dt = [ 270,   0, -180]
+    dp = [   0, -60,   30]
     for i in range(len(dt)):
         val1 = dt[i]
         val2 = dp[i]

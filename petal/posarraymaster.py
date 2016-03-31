@@ -168,7 +168,7 @@ class PosArrayMaster(object):
         # TIME ESTIMATE FOR SIMPLE BLOCKING IMPLEMENTATION
         # ... see below
         timeout = 30 # seconds
-        comm_time_estimate = 0.5
+        comm_time_estimate = 0.5 # seconds
         start_time = time.time()
         canids = []
         move_time_estimate = 0
@@ -180,17 +180,19 @@ class PosArrayMaster(object):
         move_time_estimate += comm_time_estimate
         print('move_time_estimate = ' + str(move_time_estimate))
 
+        # SIMPLE BLOCKING IMPLEMENTATION
+        # ... so we don't send new tables while any positioners are still moving.
+        # There may be better ways to achieve this, to be implemented later.
+        while not(self.comm.ready_for_tables(canids)) and (time.time()-start_time) < timeout:
+            time.sleep(0.5)
+
         # send tables and execute
         self.comm.send_tables(hw_tables) # return values? threaded with pyro somehow?
         self.comm.execute_sync(self.sync_mode) # return values? threaded with pyro somehow?
         self.postmove_cleanup()
-
-        # SIMPLE BLOCKING IMPLEMENTATION
-        # ... so we don't send new tables while any positioners are still moving.
-        # There may be better ways to achieve this, to be implemented later.
-        while not(self.comm.ready_for_tables(canids,move_time_estimate)) and (time.time()-start_time) < timeout:
-            time.sleep(0.5)
-
+        
+        # TIMED BLOCKING -- TEMPORARY HACK UNTIL ready_for_tables method implemented in petalcomm.py
+        #time.sleep(move_time_estimate)
 
     def postmove_cleanup(self):
         """Always call this after performing a set of moves, so that PosModel instances
