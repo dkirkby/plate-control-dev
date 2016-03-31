@@ -48,7 +48,7 @@ class PetalController(Application):
 	commands = ['set_led',				# implemented - usefull for testing (of rev 2 positioner boards)
 				'set_device',			 
 				'get_fid_status', 
-				'get_device_status', 
+				'get_pos_status', 
 				'set_fiducials',  
 				'configure',
 				'get_positioner_map',
@@ -348,13 +348,13 @@ class PetalController(Application):
 		print('set_device: ', repr(posid), repr(attributes))
 		return self.SUCCESS
 
-	def get_pos_status(self,posid):
+	def get_device_status(self,posid):
 		"""
 		[To be done: Returns a (dictionary?) containing status of all positioners on the petal.]
 		For now this function returns a status of 'BUSY' or 'DONE' for a single
 		positioner with ID <posid>.
 		"""
-		status=self.pmc.get_pos_status(posids)
+		#status=self.pmc.get_pos_status(posids)
 		return status
 
 
@@ -365,12 +365,12 @@ class PetalController(Application):
 		status ={'osu' : 34, 'michigan' : 3}
 		return status
 
-	def get_device_status(self,can_ids):
+	def get_pos_status(self,posids):
 		"""
 		Returns a (dictionary?) containing status of all devices other than positioners
 		and fiducials on the petal. This includes fans, power supplies, and sensors.
 		"""
-		canbus = self.__get_canbus(can_ids[0])
+		canbus = self.__get_canbus(posids[0])
 		retcode=self.pmc.get_device_status(canbus,posids)
 		
 		return retcode
@@ -548,7 +548,7 @@ class PositionerMoveControl(object):
 			return False  		
 
 
-	def get_device_status(self, canbus, posids):
+	def get_pos_status(self, canbus, posids):
 		
 		"""
 		Signals the positionrs to start execution of move tables.	      
