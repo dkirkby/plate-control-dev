@@ -56,7 +56,7 @@ class PetalController(Application):
 				'execute_sync',			# implemented
 				'send_tables',			# implemented
 				'set_posid',
-				'get_sids'
+				'get_sids',
 				'set_periods',
 				'set_currents']
 
