@@ -559,8 +559,9 @@ class PositionerMoveControl(object):
 			posid=int(posid)
 			status[posid]='UNKNOWN'
 			try:        
-				stat=self.pfcan[canbus].send_command_recv(posid,13, '')
-				print("stat:",stat)
+				posid_return,stat=self.pfcan[canbus].send_command_recv(posid,13, '')
+				print("posid_return,stat:",posid_return,stat)
+				stat=ord(stat)
 				if stat: status[posid]='BUSY'
 				if not stat: status[posid]='DONE'
 			except:
