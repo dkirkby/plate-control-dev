@@ -56,7 +56,9 @@ class PetalController(Application):
 				'execute_sync',			# implemented
 				'send_tables',			# implemented
 				'set_posid',
-				'get_sids']
+				'get_sids'
+				'set_periods',
+				'set_currents']
 
 	# Default configuration (can be overwritten by command line or config file)
 	defaults = {'default_petal_id' : 1,
@@ -312,6 +314,24 @@ class PetalController(Application):
 		else:
 			return self.FAILED
 
+	def set_currents(self, posid, P_currents, T_currents):
+		canbus = self.__get_canbus(posid)
+
+		retcode=self.pmc.set_currents(canbus, posid, P_currents, T_currents)		
+		if retcode:
+			return self.SUCCESS  
+		else:
+			return self.FAILED
+
+	def set_periods(self, can_id, creep_period_m0, creep_period_m1, spin_steps):
+		canbus = self.__get_canbus(posid)
+
+		retcode=self.pmc.set_periods(self, can_id, creep_period_m0, creep_period_m1, spin_steps)		
+		if retcode:
+			return self.SUCCESS  
+		else:
+			return self.FAILED
+
 	def set_pos_constants(self, posids, settings):
 		"""
 		Sets positioners identified by ids in the list posids to corresponding
@@ -328,12 +348,15 @@ class PetalController(Application):
 		print('set_device: ', repr(posid), repr(attributes))
 		return self.SUCCESS
 
-	def get_pos_status(self):
+	def get_pos_status(self,posid):
 		"""
-		Returns a (dictionary?) containing status of all positioners on the petal.
+		[To be done: Returns a (dictionary?) containing status of all positioners on the petal.]
+		For now this function returns a status of 'BUSY' or 'DONE' for a single
+		positioner with ID <posid>.
 		"""
-		status ={'osu' : 42, 'michigan' : 6}
+		sstatus=self.pmc.get_pos_status(self,posids)tatus ={'osu' : 42, 'michigan' : 6}
 		return status
+
 
 	def get_fid_status(self):
 		"""
@@ -342,12 +365,26 @@ class PetalController(Application):
 		status ={'osu' : 34, 'michigan' : 3}
 		return status
 
-	def get_device_status(self):
+	def get_device_status(self,can_ids):
 		"""
 		Returns a (dictionary?) containing status of all devices other than positioners
 		and fiducials on the petal. This includes fans, power supplies, and sensors.
 		"""
-		return self.status
+		canbus = self.__get_canbus(can_ids[0])
+		retcode=self.pcm.get_device_status(canbus,posids):
+		
+		return retcode
+
+	def ready_for_tables(self,posids):
+		status=False
+		dev_status=get_device_status(posids)
+		for posid in dev_status:
+			if dev_status[posid] == 'DONE':
+				status=True
+			else:
+				status=False
+				return status
+		return status
 	
 	def main(self):
 		while not self.shutdown_event.is_set():
@@ -509,6 +546,24 @@ class PositionerMoveControl(object):
 			return True
 		except:
 			return False  		
+
+
+	def get_device_status(self, canbus, posids):
+		
+		"""
+		Signals the positionrs to start execution of move tables.	      
+		"""
+		status={}
+		for posid in posids:
+			posid=int(posid)
+			status(posid)='UNKNOWN'
+			try:        
+				stat=self.pfcan[canbus].send_command_recv(posid,13, '')
+				if stat: status(posid)='BUSY'
+				if not stat: status(posid)='DONE'
+			except:
+				return False 
+		return status		 
 
 
 	def set_currents(self,canbus, posid, P_currents, T_currents):
