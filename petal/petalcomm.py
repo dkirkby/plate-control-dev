@@ -300,16 +300,6 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not get fiducial status. Exception: %s' % str(e)
 
-    def get_device_status(self):
-        """
-        Returns a (dictionary?) containing status of all devices other than positioners
-        and fiducials on the petal. This includes fans, power supplies, and sensors.
-        """
-        try:
-            return self._call_device('get','status')
-        except Exception as e:
-            return 'FAILED: Can not get status from device. Exception: %s' % str(e)
-
     def get_sids(self,canbus):
         """
         Returns a list of silicon IDs on CANbus <canbus>.
