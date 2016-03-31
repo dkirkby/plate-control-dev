@@ -120,15 +120,30 @@ class PetalComm(object):
             # Failed to get status from device
             raise RuntimeError('_call_device: remote device not reachable %s' % '' if 'name' not in self.device else self.device)
 
-    def ready_for_tables(self, can_ids, forced_wait_time=3):
+    def get_device_status(self, can_ids):
         """Checks if all the positioners identified by can_id are ready to receive
         move tables.
         """
         # status = self.get_pos_status()
-        # for each can_id, check if it's still moving
+        # can_ids: list of can_ids (list of integers)
         # if everybody is stationary, then true
-        time.sleep(forced_wait_time) # temporary
-        return True   # temporary
+        try:
+            return self._call_device('get_device_status',can_ids)
+        except Exception as e:
+            return 'FAILED: Can not execute get_device_status. Exception: %s' % str(e)
+
+     def ready_for_tables(self, can_ids):
+        """Checks if all the positioners identified by can_id are ready to receive
+        move tables.
+        Returns either True or False
+        """
+        # status = self.get_pos_status()
+        # can_ids: list of can_ids (list of integers)
+        # if everybody is stationary, then true
+        try:
+            return self._call_device('raedy_for_tables',can_ids)
+        except Exception as e:
+            return 'FAILED: Can not execute ready_for_tables. Exception: %s' % str(e)           
 
     def send_tables(self, move_tables):
         """
@@ -167,6 +182,24 @@ class PetalComm(object):
             return self._call_device('move', can_id, direction, mode, str(motor), angle)
         except Exception as e:
             return 'FAILED: Can not execute send_move_excute command. Exception: %s' % str(e)
+    def set_currents(self, can_id, P_currents, T_currents):
+        """
+
+        """
+        try:
+            return self._call_device('set_currents',can_id, P_currents, T_currents)
+        except Exception as e:
+            return 'FAILED: Can not set currents. Exception: %s' % str(e)
+
+    def set_periods(self, can_id, creep_period_m0, creep_period_m1, spin_steps):
+        """
+
+        """
+        try:
+            return self._call_device('set_periods',can_id, creep_period_m0, creep_period_m1, spin_steps)
+        except Exception as e:
+            return 'FAILED: Can not set periods. Exception: %s' % str(e)
+
 
     def set_pos_constants(self, can_ids, settings):
         """
