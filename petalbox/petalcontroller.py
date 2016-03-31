@@ -354,7 +354,7 @@ class PetalController(Application):
 		For now this function returns a status of 'BUSY' or 'DONE' for a single
 		positioner with ID <posid>.
 		"""
-		status=self.pmc.get_pos_status(self,posids)
+		status=self.pmc.get_pos_status(posids)
 		return status
 
 
@@ -371,7 +371,7 @@ class PetalController(Application):
 		and fiducials on the petal. This includes fans, power supplies, and sensors.
 		"""
 		canbus = self.__get_canbus(can_ids[0])
-		retcode=self.pcm.get_device_status(canbus,posids)
+		retcode=self.pmc.get_device_status(canbus,posids)
 		
 		return retcode
 
