@@ -371,7 +371,7 @@ class PetalController(Application):
 		and fiducials on the petal. This includes fans, power supplies, and sensors.
 		"""
 		canbus = self.__get_canbus(can_ids[0])
-		retcode=self.pcm.get_device_status(canbus,posids):
+		retcode=self.pcm.get_device_status(canbus,posids)
 		
 		return retcode
 
