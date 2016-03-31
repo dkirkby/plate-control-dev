@@ -132,7 +132,7 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not execute get_device_status. Exception: %s' % str(e)
 
-     def ready_for_tables(self, can_ids):
+    def ready_for_tables(self, can_ids):
         """Checks if all the positioners identified by can_id are ready to receive
         move tables.
         Returns either True or False
