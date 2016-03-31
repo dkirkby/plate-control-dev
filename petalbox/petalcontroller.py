@@ -378,7 +378,7 @@ class PetalController(Application):
 
 	def ready_for_tables(self,posids):
 		status=False
-		dev_status=get_device_status(posids)
+		dev_status=get_pos_status(posids)
 		for posid in dev_status:
 			if dev_status[posid] == 'DONE':
 				status=True
@@ -560,6 +560,7 @@ class PositionerMoveControl(object):
 			status[posid]='UNKNOWN'
 			try:        
 				stat=self.pfcan[canbus].send_command_recv(posid,13, '')
+				print("stat:",stat)
 				if stat: status[posid]='BUSY'
 				if not stat: status[posid]='DONE'
 			except:
