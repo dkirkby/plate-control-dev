@@ -14,6 +14,7 @@ petal/pos_settings/unit_UM00011.conf -text
 petal/pos_settings/unit_UM00012.conf -text
 petal/pos_settings/unit_UM00013.conf -text
 petal/pos_settings/unit_UM00014.conf -text
+petal/pos_settings/unit_UM00015.conf -text
 petal/pos_settings/unit_UM1020.conf -text
 petal/posanticollision.py -text
 petal/posarraymaster.py -text
