@@ -47,7 +47,8 @@ class PetalController(Application):
 	# List of remotely accessible commands
 	commands = ['set_led',				# implemented - usefull for testing (of rev 2 positioner boards)
 				'set_device',			 
-				'get_fid_status', 
+				'get_fid_status',
+				'get_device_status', 
 				'get_pos_status', 
 				'set_fiducials',  
 				'configure',
@@ -371,7 +372,7 @@ class PetalController(Application):
 		and fiducials on the petal. This includes fans, power supplies, and sensors.
 		"""
 		canbus = self.__get_canbus(posids[0])
-		retcode=self.pmc.get_device_status(canbus,posids)
+		retcode=self.pmc.get_pos_status(canbus,posids)
 		
 		return retcode
 
