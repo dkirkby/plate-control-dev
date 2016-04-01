@@ -566,7 +566,6 @@ class PositionerMoveControl(object):
 				if not stat: status[posid]='DONE'
 			except:
 				return False
-           print(status)
 		return status		 
 
 
