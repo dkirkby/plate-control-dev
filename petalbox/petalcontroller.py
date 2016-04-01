@@ -565,7 +565,8 @@ class PositionerMoveControl(object):
 				if stat: status[posid]='BUSY'
 				if not stat: status[posid]='DONE'
 			except:
-				return False 
+				return False
+           print(status)
 		return status		 
 
 
