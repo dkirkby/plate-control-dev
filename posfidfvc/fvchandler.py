@@ -2,9 +2,9 @@ import sbig_grab_cen
 import numpy as np
 
 class FVCHandler(object):
-    """Provides function interface to the Fiber View Camera. Can support different
+    """Provides a generic interface to the Fiber View Camera. Can support different
     particular FVC implementations, providing a common set of functions to call
-    from positioner control scripts. Provides distinction of reference fiducials.
+    from positioner control scripts.
     """
     def __init__(self, fvc_type='SBIG'):
         self.fvc_type = fvc_type   # 'SBIG' or 'FLI'
