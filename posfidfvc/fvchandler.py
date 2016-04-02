@@ -51,16 +51,13 @@ class FVCHandler(object):
         xy_np = np.array(xy).transpose()
         xy_np += self.translation
         xy_np *= self.scale
-        xy_np = np.dot(FVCHandler._rotmat2D_deg(self.rotation), xy)
+        rot = FVCHandler.rotmat2D_deg(self.rotation)
+        xy_np = np.dot(rot, xy)
         xy = xy_np.tolist()
         return xy
 
     @staticmethod
-    def _rotmat2D_rad(angle):
-        """Return the 2d rotation matrix for an angle given in radians."""
-        return np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
-
-    @staticmethod
-    def _rotmat2D_deg(angle):
+    def rotmat2D_deg(angle):
         """Return the 2d rotation matrix for an angle given in degrees."""
-        return PosPoly._rotmat2D_rad(np.deg2rad(angle))
+        radians = np.deg2rad(angle)
+        return np.array([[np.cos(radians), -np.sin(radians)], [np.sin(radians), np.cos(radians)]])
