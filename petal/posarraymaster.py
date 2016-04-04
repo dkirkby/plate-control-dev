@@ -2,7 +2,6 @@ import posmodel
 import posschedule
 import posmovetable
 import posstate
-import petalcomm
 import posconstants as pc
 import numpy as np
 import time
@@ -12,8 +11,12 @@ class PosArrayMaster(object):
     (PosModel). This module is the interface through which the motions of a
     group of positioners (e.g. on a Petal) is coordinated. In general, all
     move requests and scheduling is accomplished with PosArrayMaster.
+
+    initialize with:
+        posids ... list of positioner unique id strings
+        comm   ... petalcomm communication object
     """
-    def __init__(self, posids, petal_id):
+    def __init__(self, posids, comm):
         self.posmodels = []
         for posid in posids:
             state = posstate.PosState(posid,logging=True)
@@ -21,26 +24,13 @@ class PosArrayMaster(object):
             self.posmodels.append(model)
         self.posids = posids
         self.schedule = posschedule.PosSchedule(self)
-        self.comm = petalcomm.PetalComm(petal_id)
+        self.comm = comm
         self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
         self.anticollision_default = True # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
         self.anticollision_override = True # causes the anticollision_default value to be used in all cases
 
     def request_targets(self, pos, commands, vals1, vals2):
-        """Input a list of positioners and corresponding move targets to the schedule.
-        This method is for requests to perform complete repositioning sequence to get
-        to the targets.
-
-            - Anticollision is enabled.
-            - Only one requested target per positioner.
-            - Theta angles are wrapped across +/-180 deg
-            - Contact of hard limits is prevented.
-
-        INPUTS:
-            pos     ... list of positioner ids or posmodel instances
-            command ... corresponding list of move command strings, each element is 'QS', 'dQdS', 'obsXY', 'posXY', 'dXdY', 'obsTP', 'posTP' or 'dTdP'
-            val1    ... corresponding list of first move arguments, each element is the value for q, dq, x, dx, t, or dt
-            val2    ... corresponding list of second move arguments, each element is the value for s, ds, y, dy, p, or dp
+        """See comments for corresponding function in petal.py.
         """
         pos = pc.listify(pos,True)[0]
         commands = pc.listify(commands,True)[0]
@@ -53,22 +43,8 @@ class PosArrayMaster(object):
             else:
                 self.schedule.request_target(posmodel, commands[i], vals1[i], vals2[i])
 
-    def request_direct_dtdp(self, pos, dt, dp, cmd_prefix='', override_prev_settings=True):
-        """Input a list of positioners and corresponding move targets to the schedule.
-        This method is for direct requests of rotations by the theta and phi shafts.
-        This method is generally recommended only for expert usage.
-
-            - Anticollision is disabled.
-            - Multiple moves allowed per positioner.
-            - Theta angles are not wrapped across +/-180 deg
-            - Contact of hard limits is allowed.
-
-        INPUTS:
-            pos ... list of positioner ids or posmodel instances
-            dt  ... corresponding list of delta theta values
-            dp  ... corresponding list of delta phi values
-
-        The optional argument cmd_prefix allows adding a descriptive string to the log.
+    def request_direct_dtdp(self, pos, dt, dp, cmd_prefix=''):
+        """See comments for corresponding function in petal.py.
         """
         pos = pc.listify(pos,True)[0]
         dt = pc.listify(dt,True)[0]
@@ -83,8 +59,7 @@ class PosArrayMaster(object):
             self.schedule.add_table(table)
 
     def request_limit_seek(self, pos, axisid, direction, anticollision=True, cmd_prefix=''):
-        """Request hardstop seeking sequence for positioners in list pos.
-        The optional argument cmd_prefix allows adding a descriptive string to the log.
+        """See comments for corresponding function in petal.py.
         """
         pos = pc.listify(pos,True)[0]
         posmodels = []
@@ -113,8 +88,7 @@ class PosArrayMaster(object):
             self.schedule.add_table(table)
 
     def request_homing(self, pos):
-        """Request homing sequence for positioners in list pos to find the primary hardstop
-        and set values for the max position and min position.
+        """See comments for corresponding function in petal.py.
         """
         pos = pc.listify(pos,True)[0]
         posmodels = []
@@ -144,29 +118,17 @@ class PosArrayMaster(object):
             self.request_direct_dtdp(p, hardstop_debounce[pc.T], hardstop_debounce[pc.P], cmd_prefix='debounce ')
 
     def schedule_moves(self,anticollision=None):
-        """Generate the schedule of moves and submoves that get positioners
-        from start to target. Call this after having input all desired moves
-        using the move request methods. Note the available flag to turn the
-        anticollision algorithm on or off for the scheduling. If that flag is
-        None, then the default anticollision parameter is used.
+        """See comments for corresponding function in petal.py.
         """
         if anticollision == None or self.anticollision_override:
             anticollision = self.anticollision_default
         self.schedule.schedule_moves(anticollision)
 
-    def schedule_send_and_execute_moves(self):
-        """Convenience wrapper to schedule, send, execute, and cleanup.
-        """
-        self.schedule_moves()
-        self.send_and_execute_moves()
-
-    def send_and_execute_moves(self):
-        """Convenience wrapper to send, execute, and cleanup.
+    def send_move_tables(self):
+        """See comments for corresponding function in petal.py.
         """
         hw_tables = self.hardware_ready_move_tables()
 
-        # TIME ESTIMATE FOR SIMPLE BLOCKING IMPLEMENTATION
-        # ... see below
         timeout = 30 # seconds
         comm_time_estimate = 0.5 # seconds
         start_time = time.time()
@@ -187,12 +149,14 @@ class PosArrayMaster(object):
             time.sleep(0.5)
 
         # send tables and execute
-        self.comm.send_tables(hw_tables) # return values? threaded with pyro somehow?
-        self.comm.execute_sync(self.sync_mode) # return values? threaded with pyro somehow?
+        self.comm.send_tables(hw_tables)
+
+    def execute_moves(self):
+        """Command the positioners to do the move tables that were sent out to them.
+        Then do clean-up and logging routines to keep track of the moves that were done.
+        """
+        self.comm.execute_sync(self.sync_mode)
         self.postmove_cleanup()
-        
-        # TIMED BLOCKING -- TEMPORARY HACK UNTIL ready_for_tables method implemented in petalcomm.py
-        #time.sleep(move_time_estimate)
 
     def postmove_cleanup(self):
         """Always call this after performing a set of moves, so that PosModel instances
