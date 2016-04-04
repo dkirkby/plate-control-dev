@@ -29,32 +29,30 @@ class PosArrayMaster(object):
         self.anticollision_default = True # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
         self.anticollision_override = True # causes the anticollision_default value to be used in all cases
 
-    def request_targets(self, pos, commands, vals1, vals2):
+    def request_targets(self, pos, commands, values):
         """See comments for corresponding function in petal.py.
         """
         pos = pc.listify(pos,True)[0]
         commands = pc.listify(commands,True)[0]
-        vals1 = pc.listify(vals1,True)[0]
-        vals2 = pc.listify(vals2,True)[0]
+        values = pc.listify(values,True)[0]
         for i in range(len(pos)):
             posmodel = self.get_model_for_pos(pos[i])
             if self.schedule.already_requested(posmodel):
                 print('Positioner ' + str(posmodel.posid) + ' already has a target scheduled. Extra target request ' + str(commands[i]) + '(' + str(vals1[i]) + ',' + str(vals2[i]) + ') ignored')
             else:
-                self.schedule.request_target(posmodel, commands[i], vals1[i], vals2[i])
+                self.schedule.request_target(posmodel, commands[i], values[i][0], values[i][1])
 
-    def request_direct_dtdp(self, pos, dt, dp, cmd_prefix=''):
+    def request_direct_dtdp(self, pos, dtdp, cmd_prefix=''):
         """See comments for corresponding function in petal.py.
         """
         pos = pc.listify(pos,True)[0]
-        dt = pc.listify(dt,True)[0]
-        dp = pc.listify(dp,True)[0]
+        dtdp = pc.listify(dtdp,True)[0]
         for i in range(len(pos)):
             posmodel = self.get_model_for_pos(pos[i])
             table = posmovetable.PosMoveTable(posmodel)
-            table.set_move(0, pc.T, dt[i])
-            table.set_move(0, pc.P, dp[i])
-            table.store_orig_command(0,cmd_prefix + 'direct_dtdp',dt[i],dp[i])
+            table.set_move(0, pc.T, dtdp[i][0])
+            table.set_move(0, pc.P, dtdp[i][1])
+            table.store_orig_command(0,cmd_prefix + 'direct_dtdp',dtdp[i][0],dtdp[i][1])
             table.allow_exceed_limits = True
             self.schedule.add_table(table)
 
@@ -115,7 +113,7 @@ class PosArrayMaster(object):
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + '.maxpos\n'
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = +1.0\n'
                 p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.total_limit_seeks += 1\n'
-            self.request_direct_dtdp(p, hardstop_debounce[pc.T], hardstop_debounce[pc.P], cmd_prefix='debounce ')
+            self.request_direct_dtdp(p, hardstop_debounce, cmd_prefix='debounce ')
 
     def schedule_moves(self,anticollision=None):
         """See comments for corresponding function in petal.py.

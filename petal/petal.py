@@ -13,13 +13,13 @@ class Petal(object):
     Convenience wrapper functions are provided to combine these steps when desirable.
     """
     def __init__(self, petal_id, pos_ids, fid_ids):
-		self.petal_id = petal_id
-		self.comm = petalcomm.PetalComm(self.petal_id)
+        self.petal_id = petal_id
+        self.comm = petalcomm.PetalComm(self.petal_id)
         # later, implement auto-lookup of pos_ids and fid_ids from database etc
         self.pos = posarraymaster.PosArrayMaster(pos_ids, self.comm)
         self.fid = fidarraymaster.FidArrayMaster(fid_ids, self.comm)
 
-    def request_targets(self, pos, commands, vals1, vals2):
+    def request_targets(self, pos, commands, values):
         """Input a list of positioners and corresponding move targets to the schedule.
         This method is for requests to perform complete repositioning sequence to get
         to the targets.
@@ -32,12 +32,13 @@ class Petal(object):
         INPUTS:
             pos      ... list of positioner ids
             commands ... corresponding list of move command strings, each element is 'QS', 'dQdS', 'obsXY', 'posXY', 'dXdY', 'obsTP', 'posTP' or 'dTdP'
-            vals1    ... corresponding list of first move arguments, each element is the value for q, dq, x, dx, t, or dt
-            vals2    ... corresponding list of second move arguments, each element is the value for s, ds, y, dy, p, or dp
+            values   ... corresponding list of move arguements, in the form [[u1,v1],[u2,v2],...]
+                         ... 1st move arguments are values for q, dq, x, dx, t, or dt
+                         ... 2nd move arguments are values for s, ds, y, dy, p, or dp
         """
-        self.pos.request_targets(pos, commands, vals1, vals2)
+        self.pos.request_targets(pos, commands, values)
 
-    def request_direct_dtdp(self, pos, dt, dp, cmd_prefix=''):
+    def request_direct_dtdp(self, pos, dtdp, cmd_prefix=''):
         """Input a list of positioners and corresponding move targets to the schedule.
         This method is for direct requests of rotations by the theta and phi shafts.
         This method is generally recommended only for expert usage.
@@ -48,9 +49,9 @@ class Petal(object):
             - Contact of hard limits is allowed.
 
         INPUTS:
-            pos ... list of positioner ids
-            dt  ... corresponding list of delta theta values
-            dp  ... corresponding list of delta phi values
+            pos   ... list of positioner ids
+            dtdp  ... corresponding list of delta theta and delta phi values
+                      ... list is in the form [[dt1,dp1],[dt2,dp2],...]
 
         The optional argument cmd_prefix allows adding a descriptive string to the log.
         """
@@ -88,19 +89,19 @@ class Petal(object):
         """
         self.pos.execute_moves()
 
-    def quick_move(self, pos, commands, vals1, vals2):
+    def quick_move(self, pos, commands, values):
         """Convenience wrapper to request, schedule, send, and execute a list of moves
         to a list of positioners, all in one shot.
         """
-        self.request_targets(pos, commands, vals1, vals2)
+        self.request_targets(pos, commands, values)
         self.schedule_send_execute()
 
-    def quick_dtdp(self, pos, dt, dp, cmd_prefix=''):
+    def quick_dtdp(self, pos, dtdp, cmd_prefix=''):
         """Convenience wrapper to request, schedule, send, and execute a list of direct
         delta theta, delta phi moves. There is NO anti-collision calculation. This
         method is intended for expert usage only.
         """
-        self.request_direct_dtdp(pos, dt, dp, cmd_prefix)
+        self.request_direct_dtdp(pos, dtdp, cmd_prefix)
         self.schedule_send_execute()
 
     def schedule_send_and_execute_moves(self):
