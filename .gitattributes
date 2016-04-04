@@ -46,6 +46,7 @@ petalbox/util/dotprofile -text
 petalbox/util/mvtest.py -text
 posfidfvc/fvchandler.py -text
 posfidfvc/posmovemeasure.py -text
+posfidfvc/xy_accuracy_test.py -text
 posfirmware/develop/fipos_fw_2.0dev.c -text
 posfirmware/docs/FW_1.0_DESC.docx -text svneol=unset#application/zip
 posfirmware/docs/FW_2.0_DESC.docx -text
