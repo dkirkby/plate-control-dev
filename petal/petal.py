@@ -13,7 +13,8 @@ class Petal(object):
     Convenience wrapper functions are provided to combine these steps when desirable.
     """
     def __init__(self, petal_id, pos_ids, fid_ids):
-        self.comm = petalcomm.PetalComm(petal_id)
+		self.petal_id = petal_id
+		self.comm = petalcomm.PetalComm(self.petal_id)
         # later, implement auto-lookup of pos_ids and fid_ids from database etc
         self.pos = posarraymaster.PosArrayMaster(pos_ids, self.comm)
         self.fid = fidarraymaster.FidArrayMaster(fid_ids, self.comm)
