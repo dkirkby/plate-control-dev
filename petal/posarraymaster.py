@@ -286,7 +286,8 @@ class PosArrayMaster(object):
     def expected_current_position(self,posid=None,key=''):
         """Retrieve the current position, for a positioner identied by posid, according
         to the internal tracking of its posmodel object. Valid keys are:
-            'Q', 'S', 'obsX', 'obsY', 'obsT', 'obsP', 'shaftT', 'shaftP', 'motorT', 'motorP'
+            'Q', 'S', 'flatX', 'flatY', 'obsX', 'obsY', 'obsT', 'obsP', 'shaftT', 'shaftP', 'motorT', 'motorP'
+            'QS','flatXY','obsXY','obsTP','shaftTP','motorTP'
         See comments in posmodel.py for explanation of these values.
 
         If no posid is specified, then a single value, or list of all positioners' values is returned.
@@ -309,6 +310,18 @@ class PosArrayMaster(object):
             this_val = self.posmodels[pidx].expected_current_position
             if key[i] == '':
                 vals.append(this_val)
+            elif key[i] == 'QS':
+                vals.append([thisval['Q'],thisval['S']])
+            elif key[i] == 'flatXY':
+                vals.append([thisval['flatX'],thisval['flatY']])
+            elif key[i] == 'obsXY':
+                vals.append([thisval['obsX'],thisval['obsY']])
+            elif key[i] == 'obsTP':
+                vals.append([thisval['obsT'],thisval['obsP']])
+            elif key[i] == 'shaftTP':
+                vals.append([thisval['shaftT'],thisval['shaftP']])
+            elif key[i] == 'motorTP':
+                vals.append([thisval['motorT'],thisval['motorP']])
             else:
                 vals.append(this_val[key[i]])
         if was_not_list:

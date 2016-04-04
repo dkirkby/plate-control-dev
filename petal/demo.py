@@ -1,5 +1,4 @@
 import petal
-import petalcomm
 import time
 import posconstants as pc
 
@@ -10,8 +9,7 @@ import posconstants as pc
 pos_ids = ['UM00012']
 #pos_ids = ['UM00011','UM00012','UM00013','UM00014','UM00015']
 fid_ids = []
-petal_id=1
-comm = petalcomm.PetalComm(petal_id)
+petal_id = 1
 ptl = petal.Petal(petal_id, pos_ids, fid_ids)
 ptl.pos.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
 

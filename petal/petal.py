@@ -1,3 +1,4 @@
+import petalcomm
 import posarraymaster
 import fidarraymaster
 

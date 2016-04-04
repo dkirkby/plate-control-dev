@@ -1,4 +1,5 @@
 import petalcomm
+import postransforms
 import time
 
 class FidArrayMaster(object):
@@ -15,6 +16,7 @@ class FidArrayMaster(object):
             state = posstate.PosState(fid_id, logging=True, type='fid')
             self.fid_states.append(state)
         self.fid_ids = fid_ids
+        self.trans = postransforms.PosTransforms() # generic coordinate transforms object
 
     def all_on(self):
         """Turn all fiducials on at their default settings.
@@ -39,9 +41,9 @@ class FidArrayMaster(object):
             duty_periods.append(state.read('DEFAULT_DUTY_PERIOD'))
         self.set(self.fid_ids, duty_percents, duty_periods)
 
-    def set(self, fid_ids, duty_percents, duty_periods):
-        """Set state for list of fiducials. Input lists of corresponding lengths
-        for duty_percents and duty_periods.
+    def set_illum_parameters(self, fid_ids, duty_percents, duty_periods):
+        """Set illumination settings for a list of fiducials. Input lists of
+        corresponding lengths for duty_percents and duty_periods.
         """
         if not self.fid_states:
             return # case where no fiducials have been initialized
@@ -65,3 +67,19 @@ class FidArrayMaster(object):
             s.write('DUTY_PERCENT', duty_percents[i])
             s.write('DUTY_PERIOD', duty_periods[i])
         self.comm.set_fiducials(can_ids, duty_percents, duty_periods)
+
+    def expected_position(self, fid_ids='all', coordinates='flatXY'):
+        """Get expected xy positions of fiducials.
+        INPUT:  fid_ids      ... list of fiducial ids or 'all'
+                coordinates  ... 'QS' or 'flatXY'
+        """
+        if fid_ids == 'all':
+            fid_ids = self.fid_ids
+        vals = []
+        for fid_id in fid_ids:
+            i = fid_ids.index(fid_id)
+            vals.append(self.fid_states[i].read('EXPECTED_FLAT_XY'))
+        if coordinates == 'QS':
+            for i in range(len(vals)):
+                vals[i] = trans.flatXY_to_QS(vals[i])
+        return vals

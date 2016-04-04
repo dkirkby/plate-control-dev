@@ -56,10 +56,10 @@ class PosTransforms(object):
     See DESI-0530 for detail on the (Q,S) coordinate system.
     """
 
-    def __init__(self, posmodel=None):
-        if not(posmodel):
-            posmodel = posmodel.PosModel()
-        self.posmodel = posmodel
+    def __init__(self, this_posmodel=None):
+        if this_posmodel == None:
+            this_posmodel = posmodel.PosModel()
+        self.posmodel = this_posmodel
 
     # SHAFT RANGES
     def shaft_ranges(self, range_limits):
