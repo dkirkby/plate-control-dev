@@ -70,7 +70,7 @@ class Petal(object):
     def schedule_moves(self,anticollision=None):
         """Generate the schedule of moves and submoves that get positioners
         from start to target. Call this after having input all desired moves
-        using the move request methods. Note the available flag to turn the
+        using the move request methods. Note the available boolean to turn the
         anticollision algorithm on or off for the scheduling. If that flag is
         None, then the default anticollision parameter is used.
         """
