@@ -13,14 +13,22 @@ class FVCHandler(object):
         self.scale = 0.015       # scale factor from image plane to object plane
         self.rotation = 0        # [deg] rotation angle from image plane to object plane
 
-    def measure_and_identify(self, expected_xy=[]):
+    def measure_and_identify(self, expected_xy):
         """Calls for an FVC measurement, and returns a list of measured centroids.
         The centroids are in order according to their closeness to the list of
-        expected xy values.
+        expected xy values. If expected_xy are unknown, then argue just the number
+        of centroids expected instead (not a list).
+
+        input:  expected_xy ... list of the form [[x1,y1],[x2,y2],...] OR
+                                one integer, the total number expected centroids
         """
-        num_objects = len(expected_xy)
-        measured_xy = self.measure(num_objects)
-        sorted_xy = self.sort_by_closeness(measured_xy, expected_and_ref)
+        if isinstance(expected_xy, list):
+            num_objects = len(expected_xy)
+            measured_xy = self.measure(num_objects)
+            xy = self.sort_by_closeness(measured_xy, expected_xy)
+        else:
+            num_objects = expected_xy
+            xy = self.measure(num_objects)
         return sorted_xy
 
     def sort_by_closeness(self, unknown_xy, expected_xy):
