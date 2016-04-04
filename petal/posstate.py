@@ -11,8 +11,11 @@ class PosState(object):
     parameters which may vary from positioner to positioner in this
     single object.
 
+    This class is also used for tracking state of fiducials.
+
     INPUTS: unit_id = POS_ID of positioner
             logging = boolean whether to enable logging state data to disk
+            type    = 'pos' or 'fid' to say whether it is a positioner or a fiducial
 
     Notes:
         Default settings are used if no unit_id is supplied.
@@ -21,27 +24,38 @@ class PosState(object):
         unit) and general parameters (settings which apply uniformly to many units).
     """
 
-    def __init__(self, unit_id=None, logging=False):
+    def __init__(self, unit_id=None, logging=False, type='pos'):
         self.logging = logging
+        self.type = type
+        if self.type == 'pos':
+            self.settings_directory = pc.pos_settings_directory
+            self.logs_directory = pc.pos_logs_directory
+        else:
+            self.settings_directory = pc.fid_settings_directory
+            self.logs_directory = pc.fid_logs_directory
         if unit_id != None:
             self.unit_basename = 'unit_' + str(unit_id)
-            comment = 'Settings file for fiber positioner unit: ' + str(unit_id)
+            comment = 'Settings file for unit: ' + str(unit_id)
         else:
             self.unit_basename = 'unit_TEMP'
-            comment = 'Temporary settings file for software test purposes, not associated with a particular fiber positioner unit.'
-        unit_filename = pc.settings_directory + self.unit_basename + '.conf'
+            comment = 'Temporary settings file for software test purposes, not associated with a particular unit.'
+        unit_filename = self.settings_directory + self.unit_basename + '.conf'
         if not(os.path.isfile(unit_filename)):
-            temp_filename = pc.settings_directory + '_unit_settings_DEFAULT.conf' # read in the template file
+            temp_filename = self.settings_directory + '_unit_settings_DEFAULT.conf' # read in the template file
             self.unit = configobj.ConfigObj(temp_filename,unrepr=True)
             self.unit.initial_comment = [comment,'']
             self.unit.filename = unit_filename
-            self.unit['POS_ID'] = str(unit_id)
+            if self.type == 'pos':
+                self.unit['POS_ID'] = str(unit_id)
+            else:
+                self.unit['FID_ID'] = str(unit_id)
             self.unit.write()
         else:
             self.unit = configobj.ConfigObj(unit_filename,unrepr=True)
-        genl_filename = pc.settings_directory + self.unit['GENERAL_SETTINGS_FILE']
-        self.genl = configobj.ConfigObj(genl_filename,unrepr=True)
-        all_logs = os.listdir(pc.logs_directory)
+        if self.type == 'pos':
+            genl_filename = self.settings_directory + self.unit['GENERAL_SETTINGS_FILE']
+            self.genl = configobj.ConfigObj(genl_filename,unrepr=True)
+        all_logs = os.listdir(self.logs_directory)
         unit_logs = [x for x in all_logs if self.unit_basename in x]
         if unit_logs:
             unit_logs.sort(reverse=True)
@@ -51,14 +65,18 @@ class PosState(object):
         self.log_basename = PosState.increment_suffix(log_basename)
         self.max_log_length = 1000 # number of rows in log before starting a new file
         self.curr_log_length = 0
-        self.unit['LAST_MOVE_CMD'] = '(software initialization)'
-        self.unit['LAST_MOVE_VAL1'] = ''
-        self.unit['LAST_MOVE_VAL2'] = ''
+        if self.type == 'pos':
+            self.unit['LAST_MOVE_CMD'] = '(software initialization)'
+            self.unit['LAST_MOVE_VAL1'] = ''
+            self.unit['LAST_MOVE_VAL2'] = ''
         self.log_unit()
 
     def __str__(self):
         files = {'settings':self.unit.filename, 'log':self.log_path}
-        return pprint.pformat({'files':files, 'unit':self.unit, 'general':self.genl})
+        if self.type == 'pos':
+            return pprint.pformat({'files':files, 'unit':self.unit, 'general':self.genl})
+        else:
+            return pprint.pformat({'files':files, 'unit':self.unit})
 
     def read(self,key):
         """Returns current value for a given key.
@@ -66,7 +84,7 @@ class PosState(object):
         """
         if key in self.unit.keys():
             return self.unit[key]
-        if key in self.genl.keys():
+        if self.type == 'pos' and key in self.genl.keys():
             return self.genl[key]
         print('no key "' + repr(key) + '" found')
         return None
@@ -83,7 +101,7 @@ class PosState(object):
             self.unit[key] = val
             if write_to_disk != False:
                 self.unit.write()
-        elif key in self.genl.keys():
+        elif self.type == 'pos' and key in self.genl.keys():
             self.genl[key] = val
             if write_to_disk == True:
                 self.genl.write()
@@ -111,7 +129,7 @@ class PosState(object):
     def log_path(self):
         """Convenience method for consistent formatting of file path to log file.
         """
-        return pc.logs_directory + self.log_basename + '.csv'
+        return self.logs_directory + self.log_basename + '.csv'
 
     @staticmethod
     def increment_suffix(s):
