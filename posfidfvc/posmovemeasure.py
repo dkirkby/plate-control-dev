@@ -2,7 +2,9 @@ class PosMoveMeasure(object):
     """Coordinates moving fiber positioners with fiber view camera measurements.
     """
     def __init__(self, petals, fvc):
-        self.petals = petals # list of petal object
+        if not isinstance(petals,list):
+            petals = [petals]
+        self.petals = petals # list of petal objects
         self.fvc = fvc # fvchandler object
 ##        self.p = positioner_object  # positioner object; initialization
 ##        self.nom_xy_ref = []        # Nx2, nominal position(s) of reference fiber(s), [] means no ref fiber
@@ -24,7 +26,23 @@ class PosMoveMeasure(object):
             petal.fiducials_off()
 
     def measure(self):
-        pass
+        data = {'expected_xy':[], 'measured_xy':[], 'petal':[], 'is_pos':[], 'id':[]}
+        for petal in self.petals:
+            pos_ids = petal.pos.posids
+            data['ids'].append(pos_ids)
+            data['petal'].append([petal]*len(pos_ids))
+            data['is_pos'].append([True]*len(pos_ids))
+            data['expected_xy'].append(petal.pos.expected_current_position(pos_ids,'flatXY'))
+            fid_ids = petal.fid.fid_ids
+            data['ids'].append(fid_ids)
+            data['petal'].append([petal]*len(fid_ids))
+            data['is_pos'].append([False]*len(fid_ids))
+            data['expected_xy'].append(petal.fid.expected_position(fid_ids,'flatXY'))
+        data['measured_xy'] = self.fvc.measure_and_identify(data['expected_xy'])
+        for i in range(len(data['id'])):
+            if data['is_pos'][i]:
+                data['petal'][i].pos.set(data['id'][i],'LAST_MEAS_FLAT_X',data['measured_xy'][i][0])
+                data['petal'][i].pos.set(data['id'][i],'LAST_MEAS_FLAT_Y',data['measured_xy'][i][1])
 
     def move_and_converge(self, pos_ids, targets, coordinates='QS', num_corr_max=2):
         """Move positioners to target coordinates, then make a series of correction
