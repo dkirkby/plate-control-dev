@@ -1,5 +1,6 @@
 * text=auto !eol
 petal/demo.py -text
+petal/fid_settings/_unit_settings_DEFAULT.conf -text
 petal/fidarraymaster.py -text
 petal/focal_surface_lookup.csv -text
 petal/legacypetalcomm.py -text
