@@ -1,4 +1,5 @@
-import posarraymaster
+import petal
+import petalcomm
 import time
 import posconstants as pc
 
@@ -6,17 +7,19 @@ import posconstants as pc
 """
 
 # initialization
-posids = ['UM00012']
-#posids = ['UM00011','UM00012','UM00013','UM00014','UM00015']
+pos_ids = ['UM00012']
+#pos_ids = ['UM00011','UM00012','UM00013','UM00014','UM00015']
+fid_ids = []
 petal_id=1
-#
-n = len(posids)
-m = posarraymaster.PosArrayMaster(posids,petal_id)
-m.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
+comm = petalcomm.PetalComm(petal_id)
+ptl = petal.Petal(petal_id, pos_ids, fid_ids)
+ptl.pos.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
+
+n = len(pos_ids)
 
 print('INITIAL POSITION')
-for posid in posids:
-    print(m.get(posid).expected_current_position_str)
+for pos_id in pos_ids:
+    print(ptl.pos.get(pos_id).expected_current_position_str)
 
 # demo script flags
 should_flash       = False
@@ -31,21 +34,21 @@ should_move_dtdp   = False
 
 # flash the LEDs
 if should_flash:
-    canids = pc.listify(m.get(key='CAN_ID'),True)[0]
+    canids = pc.listify(ptl.pos.get(key='CAN_ID'),True)[0]
     for canid in canids: # this usage of get method returns a list with that value for all the positioners
-        m.comm.set_led(canid,'on')
+        ptl.pos.comm.set_led(canid,'on')
     time.sleep(1)
     for canid in canids:
-        m.comm.set_led(canid,'off')
+        ptl.pos.comm.set_led(canid,'off')
 
 # run the various move types
 if should_home:
     print('\nMOVE: homing')
-    # m.set(key='CREEP_TO_LIMITS',value=True) # to force only creeping to hard stops
-    m.request_homing(posids)
-    m.schedule_send_and_execute_moves()
+    # ptl.pos.set(key='CREEP_TO_LIMITS',value=True) # to force only creeping to hard stops
+    ptl.request_homing(pos_ids)
+    ptl.schedule_send_and_execute_moves()
 else:
-    m.set(key=['POS_T','POS_P'],value=[-180,180]) # faking having just homed
+    ptl.pos.set(key=['POS_T','POS_P'],value=[-180,180]) # faking having just homed
 
 # this is an 'expert' use function, which instructs the theta and phis axes to go some distances with no regard for anticollision or hardstops
 if should_direct_dtdp:
@@ -55,8 +58,7 @@ if should_direct_dtdp:
         val1 = dt[i]
         val2 = dp[i]
         print('\nMOVE: direct dtdp (' + str(val1) + ',' + str(val2) + ')')
-        m.request_direct_dtdp(posids, [val1]*n, [val2]*n)
-        m.schedule_send_and_execute_moves()
+        ptl.quick_dtdp(pos_ids, [val1]*n, [val2]*n)
 
 # the remainder below are for general usage
 if should_move_qs:
@@ -67,8 +69,7 @@ if should_move_qs:
         val1 = Q[i]
         val2 = S[i]
         print('\nMOVE: ' + command + ' (' + str(val1) + ',' + str(val2) + ')')
-        m.request_targets(posids, [command]*n, [val1]*n, [val2]*n)
-        m.schedule_send_and_execute_moves()
+        ptl.quick_move(pos_ids, [command]*n, [val1]*n, [val2]*n)
 
 if should_move_dqds:
     dq = [ 0,  90, -180, 90]
@@ -78,8 +79,7 @@ if should_move_dqds:
         val1 = dq[i]
         val2 = ds[i]
         print('\nMOVE: ' + command + ' (' + str(val1) + ',' + str(val2) + ')')
-        m.request_targets(posids, [command]*n, [val1]*n, [val2]*n)
-        m.schedule_send_and_execute_moves()
+        ptl.quick_move(pos_ids, [command]*n, [val1]*n, [val2]*n)
 
 if should_move_xy:
     x = [2.5,   0, -5,  0, -5.99, 6, 0, 0]
@@ -89,8 +89,7 @@ if should_move_xy:
         val1 = x[i]
         val2 = y[i]
         print('\nMOVE: ' + command + ' (' + str(val1) + ',' + str(val2) + ')')
-        m.request_targets(posids, [command]*n, [val1]*n, [val2]*n)
-        m.schedule_send_and_execute_moves()
+        ptl.quick_move(pos_ids, [command]*n, [val1]*n, [val2]*n)
 
 if should_move_dxdy:
     dx = [ 2.5,  2.5, -10,  5, 0]
@@ -100,8 +99,7 @@ if should_move_dxdy:
         val1 = dx[i]
         val2 = dy[i]
         print('\nMOVE: ' + command + ' (' + str(val1) + ',' + str(val2) + ')')
-        m.request_targets(posids, [command]*n, [val1]*n, [val2]*n)
-        m.schedule_send_and_execute_moves()
+        ptl.quick_move(pos_ids, [command]*n, [val1]*n, [val2]*n)
 
 if should_move_tp:
     t = [-90,  0, 90,   0]
@@ -111,8 +109,7 @@ if should_move_tp:
         val1 = t[i]
         val2 = p[i]
         print('\nMOVE: ' + command + ' (' + str(val1) + ',' + str(val2) + ')')
-        m.request_targets(posids, [command]*n, [val1]*n, [val2]*n)
-        m.schedule_send_and_execute_moves()
+        ptl.quick_move(pos_ids, [command]*n, [val1]*n, [val2]*n)
 
 if should_move_dtdp:
     dt = [ 210, -30,   0,  0, -30, -150]
@@ -122,5 +119,4 @@ if should_move_dtdp:
         val1 = dt[i]
         val2 = dp[i]
         print('\nMOVE: ' + command + ' (' + str(val1) + ',' + str(val2) + ')')
-        m.request_targets(posids, [command]*n, [val1]*n, [val2]*n)
-        m.schedule_send_and_execute_moves()
+        ptl.quick_move(pos_ids, [command]*n, [val1]*n, [val2]*n)
