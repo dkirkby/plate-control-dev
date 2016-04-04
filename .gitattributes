@@ -5,6 +5,7 @@ petal/focal_surface_lookup.csv -text
 petal/legacypetalcomm.py -text
 petal/legacypositionercomm.py -text
 petal/movetablescr.py -text
+petal/petal.py -text
 petal/petalcomm.py -text
 petal/petsockcomm.py -text
 petal/pos_settings/_collision_settings_DEFAULT.conf -text
