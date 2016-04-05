@@ -78,8 +78,29 @@ class FidArrayMaster(object):
         vals = []
         for fid_id in fid_ids:
             i = fid_ids.index(fid_id)
-            vals.append(self.fid_states[i].read('EXPECTED_FLAT_XY'))
+            for j in range(0,self.fid_state[i].read('N_DOTS')):
+                x = self.fid_states[i].read('EXPECTED_FLAT_X' + str(j))
+                y = self.fid_states[i].read('EXPECTED_FLAT_Y' + str(j))
+                vals.append([x,y])
         if coordinates == 'QS':
             for i in range(len(vals)):
                 vals[i] = trans.flatXY_to_QS(vals[i])
         return vals
+
+    def set_expected_position(self, fid_id, flatXY, sub_id):
+        """Set expected position of dot identified by sub_id in positioner identified
+        by fid_id.
+        """
+        if fid_id in self.fid_ids:
+            idx = self.fid_ids.index(fid_id)
+            self.fid_states[idx].write('EXPECTED_FLAT_X' + str(sub_id), flatXY[0])
+            self.fid_states[idx].write('EXPECTED_FLAT_Y' + str(sub_id), flatXY[1])
+
+    def set_last_measured_position(self, fid_id, flatXY, sub_id):
+        """Set last measured position of dot identified by sub_id in positioner identified
+        by fid_id.
+        """
+        if fid_id in self.fid_ids:
+            idx = self.fid_ids.index(fid_id)
+            self.fid_states[idx].write('LAST_MEAS_FLAT_X' + str(sub_id), flatXY[0])
+            self.fid_states[idx].write('LAST_MEAS_FLAT_Y' + str(sub_id), flatXY[1])
