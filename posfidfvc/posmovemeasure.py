@@ -141,14 +141,27 @@ class PosMoveMeasure(object):
         occur in several successive stages.
         """
         if axis == 'phi':
+            axisid = pc.P
             batches = pos_ids # implement later some selection of smaller batches of positioners guaranteed not to collide
             # some for loop through those batches
-        T = self._measure_range_arc(pos_ids,'theta')
-        P = self._measure_range_arc(pos_ids,'phi')
-        if set_calibration_values:
-            self._calculate_and_set_arms_and_offsets(T,P)
+        else:
+            axisid = pc.T
+        data = self._measure_range_arc(pos_ids,axis)
 
         # unwrapping code here
+        for pos_id in data.keys():
+            initial_angle = data[pos_id]['initial_posTP'][axisid]
+            delta = data[pos_id]['target_dtdp'][axisid]
+            obsXY = data[pos_id]['measured_obsXY']
+            center = data[pos_id]['xy_center']
+            steps_nominal = [delta]*(len(obsXY[0]) - 1)
+            xy_ctrd = np.array(obsXY) - np.array(center)
+            angles_measured = np.arctan2(xy_ctrd[:,1], xy_ctrd[:,0]) * 180/np.pi
+            angles_nominal = np.cumsum([[initial_angle] + steps_nominal])
+            for i in range(len(angles_measured)):
+
+
+
 
 
 ##        'target_dtdp'     ... the delta moves which were attempted
@@ -306,12 +319,13 @@ class PosMoveMeasure(object):
         Returns a dictionary of dictionaries containing the data. The primary
         keys for the dict are the pos_id. Then for each pos_id, each subdictionary
         contains the keys:
-            'target_dtdp'     ... the delta moves which were attempted
-            'measured_obsXY'  ... the resulting measured xy positions
-            'xy_center'       ... the best fit arc's xy center
-            'radius'          ... the best fit arc's radius
-            'petal'           ... the petal this pos_id is on
-            'trans'           ... the postransform object associated with this particular positioner
+            'initial_posTP'   ... starting theta,phi position
+            'target_dtdp'     ... delta moves which were attempted
+            'measured_obsXY'  ... resulting measured xy positions
+            'xy_center'       ... best fit arc's xy center
+            'radius'          ... best fit arc's radius
+            'petal'           ... petal this pos_id is on
+            'trans'           ... postransform object associated with this particular positioner
         """
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
         phi_clear_angle = self.phi_clear_angle
@@ -330,7 +344,7 @@ class PosMoveMeasure(object):
                 dtdp = [0,delta]
                 axisid = pc.P
             for i in range(len(these_pos_ids)):
-                data[these_pos_ids[i]] = {'target_dtdp':dtdp, 'measured_obsXY':[], 'petal':petal, 'trans':posmodels[i].trans}
+                data[these_pos_ids[i]] = {'initial_tp':initial_tp, 'target_dtdp':dtdp, 'measured_obsXY':[], 'petal':petal, 'trans':posmodels[i].trans}
         all_pos_ids = data.keys()
 
         # go to initial point
