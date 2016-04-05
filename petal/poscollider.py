@@ -4,7 +4,6 @@ import postransforms
 import posplot
 import configobj
 
-
 class PosCollider(object):
     """PosCollider contains geometry definitions for mechanical components of the
     fiber positioner. It provides the methods to check for collisions between
@@ -16,7 +15,7 @@ class PosCollider(object):
         # load up a configobj from _collision_settings_DEFAULT.conf, in pc.settings_directory
         if not(configfile):
             configfile = '_collision_settings_DEFAULT.conf'
-        filename = pc.settings_directory + configfile
+        filename = pc.pos_settings_directory + configfile
         self.config = configobj.ConfigObj(filename,unrepr=True)
         self.posmodels = []
         self.pos_neighbor_idxs = [] # indexes of all the positioners surround a given positioner
