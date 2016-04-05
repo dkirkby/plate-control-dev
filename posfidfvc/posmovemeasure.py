@@ -129,12 +129,12 @@ class PosMoveMeasure(object):
         """
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
         phi_clear_angle = self.phi_clear_angle
+        data = {}
         for petal in pos_ids_by_ptl.keys():
-            pos_ids = pos_ids_by_ptl[petal]
-            posmodels = petal.pos.get(pos_ids)
+            these_pos_ids = pos_ids_by_ptl[petal]
+            posmodels = petal.pos.get(these_pos_ids)
             initial_tp = []
             final_tp = []
-            tp = []
             if axis == 'theta':
                 n_pts = self.n_points_theta_calib
                 for posmodel in posmodels:
@@ -146,22 +146,21 @@ class PosMoveMeasure(object):
                 for posmodel in posmodels:
                     initial_tp.append([np.mean(posmodel.targetable_range_T), phi_clear_angle])
                     final_tp.append([initial_tp[-1][0], max(posmodel.targetable_range_P)])
-            data = {}
-            for i in range(len(pos_ids)):
+            for i in range(len(these_pos_ids)):
                 t = linspace(initial_tp[i][0], final_tp[i][0], n_pts)
                 p = linspace(initial_tp[i][1], final_tp[i][1], n_pts)
-                data[pos_ids[i]] = {'target_tp':[[t[j],p[j]] for j in range(n_pts)], 'measured_xy':[]}
-            for i in range(n_pts):
-                targets = [data[pos_id]['target_tp'][i] for pos_id in pos_ids]
-                (sorted_pos_ids, measured_pos_xy) = self.move_measure(pos_ids,['posTP']*len(pos_ids),targets)
-                for j in range(len(measured_pos_xy)):
-                    data[sorted_pos_ids[j]]['measured_xy'] += measured_pos_xy
-            for pos_id in data.keys():
-                (xy_ctr,radius) = fitcircle.fit(data[pos_id]['measured_xy'])
-                data[pos_id]['xy_center'] = xy_ctr
-                data[pos_id]['radius'] = radius
+                data[these_pos_ids[i]] = {'target_tp':[[t[j],p[j]] for j in range(n_pts)], 'measured_xy':[]}
+        all_pos_ids = data.keys()
+        for i in range(n_pts):
+            targets = [data[pos_id]['target_tp'][i] for pos_id in all_pos_ids]
+            (sorted_pos_ids, measured_pos_xy) = self.move_measure(all_pos_ids,['posTP']*len(all_pos_ids),targets)
+            for j in range(len(measured_pos_xy)):
+                data[sorted_pos_ids[j]]['measured_xy'] += measured_pos_xy
+        for pos_id in all_pos_ids:
+            (xy_ctr,radius) = fitcircle.fit(data[pos_id]['measured_xy'])
+            data[pos_id]['xy_center'] = xy_ctr
+            data[pos_id]['radius'] = radius
         return data
-
 
     def measure_range(self,pos_ids='all',axis='theta'):
         """Expert usage. Sweep several points about axis ('theta' or 'phi') on
