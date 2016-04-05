@@ -13,32 +13,33 @@ class FVCHandler(object):
         self.scale = 0.015       # scale factor from image plane to object plane
         self.rotation = 0        # [deg] rotation angle from image plane to object plane
 
-    def measure_and_identify(self, expected_xy, is_fiducial=[]):
+    def measure_and_identify(self, expected_pos_xy=[], expected_ref_xy=[]):
         """Calls for an FVC measurement, and returns a list of measured centroids.
         The centroids are in order according to their closeness to the list of
-        expected xy values. If expected_xy are unknown, then argue just the number
-        of centroids expected instead (not a list).
+        expected xy values.
 
-        input:  expected_xy ... list of the form [[x1,y1],[x2,y2],...] OR
-                                one integer, the total number expected centroids
-                is_fiducial ... list of booleans (of the same length as expected_xy), saying whether each expected_xy is a fixed fiducial or not
+        If the expected xy are unknown, then use the measure method instead.
+
+        INPUT:  expected_pos_xy ... list of expected positioner fiber locations
+                expected_ref_xy ... list of expected fiducial positions
+
+        OUTPUT: measured_pos_xy ... list of measured positioner fiber locations
+                measured_ref_xy ... list of measured fiducial positions
+
+        Lists of xy coordinates are of the form [[x1,y1],[x2,y2],...]
         """
-        if isinstance(expected_xy, list):
-            num_objects = len(expected_xy)
-            unsorted_xy = self.measure(num_objects)
-            measured_xy = self.sort_by_closeness(unsorted_xy, expected_xy)
-            fiducial_expected_xy = [expected_xy[i] for i in is_fiducial if is_fiducial[i]]
-            fiducial_measured_xy = [measured_xy[i] for i in is_fiducial if is_fiducial[i]]
-            xy_diff = fiducial_measured_xy - fiducial_expected_xy
+        expected_xy = expected_pos_xy + expected_ref_xy
+        num_objects = len(expected_xy)
+        unsorted_xy = self.measure(num_objects)
+        measured_xy = self.sort_by_closeness(unsorted_xy, expected_xy)
+        measured_pos_xy = measured_xy[:len(expected_pos_xy)]
+        measured_ref_xy = measured_xy[len(expected_pos_xy):]
+        if len(measured_ref_xy) > 0:
+            xy_diff = np.array(measured_ref_xy) - np.array(expected_ref_xy)
             xy_shift = np.median(xy_diff,axis=0)
-            for i in range(len(measured_xy)):
-                if not(is_fiducial[i]):
-                    measured_xy[i][0] -= xy_shift[0]
-                    measured_xy[i][1] -= xy_shift[1]
-        else:
-            num_objects = expected_xy
-            measured_xy = self.measure(num_objects)
-        return measured_xy
+            measured_pos_xy -= xy_shift
+            measured_pos_xy = measured_pos_xy.tolist()
+        return measured_pos_xy, measured_ref_xy
 
     def sort_by_closeness(self, unknown_xy, expected_xy):
         """Sorts the list unknown_xy so that each point is at the same index

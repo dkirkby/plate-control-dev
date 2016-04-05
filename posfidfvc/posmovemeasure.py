@@ -27,14 +27,13 @@ class PosMoveMeasure(object):
             petal.fiducials_off()
 
     def measure(self):
-        data = {'expected_xy':[], 'measured_xy':[], 'petal':[], 'id':[], 'is_pos':[], 'sub_ids':[]}
+        data = {'expected_xy':[], 'measured_xy':[], 'petal':[], 'id':[], 'is_pos':[]}
         for petal in self.petals:
             pos_ids = petal.pos.posids
             data['ids'].extend(pos_ids)
             data['petal'].extend([petal]*len(pos_ids))
             data['is_pos'].extend([True]*len(pos_ids))
-            data['expected_xy'].extend(petal.pos.expected_current_position(pos_ids,'flatXY'))
-            data['sub_ids'].extend(0)
+            data['expected_xy'].extend(petal.pos.expected_current_position(pos_ids,'obsXY'))
             fid_ids = petal.fid.fid_ids
             for fid_id in fid_ids:
                 fid_expected_XYs = petal.fid.expected_position(fid_id,'flatXY') # there may be multiple dots of light in a single fiducial
@@ -43,7 +42,6 @@ class PosMoveMeasure(object):
                 data['petal'].extend([petal]*n_dots)
                 data['is_pos'].extend([False]*n_dots)
                 data['expected_xy'].extend(fid_expected_XYs)
-                data['sub_ids'].extend([i for i in range(0,n_dots)])
         data['measured_xy'] = self.fvc.measure_and_identify(data['expected_xy'], data['ids'], data['sub_ids'])
         for i in range(len(data['id'])):
             if data['is_pos'][i]:
