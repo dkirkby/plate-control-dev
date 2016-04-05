@@ -13,4 +13,5 @@ petal_id = 1
 ptl = petal.Petal(petal_id, pos_ids, fid_ids)
 ptl.pos.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure(ptl,fvc)
+m.n_fiducial_dots = 1 # number of centroids the FVC should expect
 

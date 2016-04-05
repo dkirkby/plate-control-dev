@@ -6,6 +6,7 @@ class PosMoveMeasure(object):
             petals = [petals]
         self.petals = petals # list of petal objects
         self.fvc = fvc # fvchandler object
+        self.n_fiducial_dots = 1
 ##        self.p = positioner_object  # positioner object; initialization
 ##        self.nom_xy_ref = []        # Nx2, nominal position(s) of reference fiber(s), [] means no ref fiber
 ##        self.nom_xy_ctr = [0,0]     # for user convenience, PosMoveMeasure can keep it's own xy offset value so user sees things in a "centered" coordinate system
@@ -26,23 +27,30 @@ class PosMoveMeasure(object):
             petal.fiducials_off()
 
     def measure(self):
-        data = {'expected_xy':[], 'measured_xy':[], 'petal':[], 'is_pos':[], 'id':[]}
+        data = {'expected_xy':[], 'measured_xy':[], 'petal':[], 'id':[], 'is_pos':[], 'sub_ids':[]}
         for petal in self.petals:
             pos_ids = petal.pos.posids
-            data['ids'].append(pos_ids)
-            data['petal'].append([petal]*len(pos_ids))
-            data['is_pos'].append([True]*len(pos_ids))
-            data['expected_xy'].append(petal.pos.expected_current_position(pos_ids,'flatXY'))
+            data['ids'].extend(pos_ids)
+            data['petal'].extend([petal]*len(pos_ids))
+            data['is_pos'].extend([True]*len(pos_ids))
+            data['expected_xy'].extend(petal.pos.expected_current_position(pos_ids,'flatXY'))
+            data['sub_ids'].extend(0)
             fid_ids = petal.fid.fid_ids
-            data['ids'].append(fid_ids)
-            data['petal'].append([petal]*len(fid_ids))
-            data['is_pos'].append([False]*len(fid_ids))
-            data['expected_xy'].append(petal.fid.expected_position(fid_ids,'flatXY'))
-        data['measured_xy'] = self.fvc.measure_and_identify(data['expected_xy'])
+            for fid_id in fid_ids:
+                fid_expected_XYs = petal.fid.expected_position(fid_id,'flatXY') # there may be multiple dots of light in a single fiducial
+                n_dots = len(fid_expected_XYs)
+                data['ids'].extend([fid_id]*n_dots)
+                data['petal'].extend([petal]*n_dots)
+                data['is_pos'].extend([False]*n_dots)
+                data['expected_xy'].extend(fid_expected_XYs)
+                data['sub_ids'].extend([i for i in range(0,n_dots)])
+        data['measured_xy'] = self.fvc.measure_and_identify(data['expected_xy'], data['ids'], data['sub_ids'])
         for i in range(len(data['id'])):
             if data['is_pos'][i]:
                 data['petal'][i].pos.set(data['id'][i],'LAST_MEAS_FLAT_X',data['measured_xy'][i][0])
                 data['petal'][i].pos.set(data['id'][i],'LAST_MEAS_FLAT_Y',data['measured_xy'][i][1])
+            else:
+                data['petal'][i].fid.set_last_measured_position(data[id][i], data['measured_xy'][i], data['sub_ids'][i])
 
     def move_and_converge(self, pos_ids, targets, coordinates='QS', num_corr_max=2):
         """Move positioners to target coordinates, then make a series of correction
@@ -54,7 +62,6 @@ class PosMoveMeasure(object):
                     num_corr_max ... maximum number of correction moves to perform on any positioner
         """
         pass
-
 
     def move_measure(self, pos_ids, commands, values):
         """Move positioners and measure output with FVC.
@@ -131,92 +138,40 @@ class PosMoveMeasure(object):
             pos_ids_by_ptl[petal] = petal.pos.get(these_pos_ids,key)
         return pos_ids_by_ptl
 
-##    def measure_xy(self):
-##        """
-##        Make a fiber view camera measurement
-##        note: output data from fvc gets multiplied by argument
-##        meas_unit_scale and ccd angle rotated out
-##        """
-##        start_time = time.time()
-##        nom_xy_ref_temp = self.nom_xy_ref
-##        if not nom_xy_ref_temp: #MATLAB: if not(isempty(nom_xy_ref_temp))
-##            ccd_rot = PosConstants.rotmat2D(self.ccd_angle)
-##            nom_xy_ref_temp = (ccd_rot * nom_xy_ref_temp) #MATLAB: temp')'
-##        xy, xy_ref = fvc.fvc_measure_with_ref(nom_xy_ref_temp/self.meas_unit_scale)
-##        elapsed_time = time.time() - start_time
-##        xy = xy * self.meas_unit_scale
-##        xy_ref = xy_ref * self.meas_unit_scale
-##        ccd_rot = PosConstants.rotmat2D(-1 * self.ccd_angle)
-##        xy = (ccd_rot * xy) #MATLAB: xy')'
-##        xy_ref = (ccd_rot * xy_ref) #MATLAB: xy')'
-##        return xy, xy_ref, elapsed_time
-##
-##    def move(self, move_cmd, move_val_1, move_val_2):
-##        """
-##        Command positioner to move, but no fvc measurement made
-##        """
-##        rowid = self.p.move(move_cmd, move_val_1, move_val_2) #p is a positioner object; there is a move function in PositionerController
-##        small_move = 0.2
-##        if str_compare_nocase(move_cmd, 'rel_dxdy') & sqrt(math.pow(move_val_1, 2) + math.pow(move_val_2, 2)) < small_move: #MATLAB: ||
-##            #don't count as a cycle
-##            pass
-##        else:
-##            self.n_cycles = self.n_cycles + 1
-##        return rowid
-##
-##    def move_meas(self, move_cmd, move_val_1, move_val_2):
-##        """
-##        Command a positioner move, make the fvc measurement, and record
-##        Returns the rowid in the log table where values were recorded
-##        Returns 1x2 xy_trns, which is the measured xy minus the ref fiber
-##            location, then transformed to positioner center using state
-##            object's calibration values
-##        """
-##        rowid = self.move(move_cmd, move_val_1, move_val_2)
-##        xy_meas, xy_ref, meas_time = self.measure_xy
-##        xy_corr = xy_meas
-##        if not xy_ref: #MATLAB: if not(isempty(xy_ref))
-##            xy_corr = xy_corr - xy_ref[0,:] # assuming use one ref fiber #syntax concern: xy_ref[0,:]
-##        xy_corr = xy_corr - self.nom_xy_ctr
-##        xy_trns = self.p.axes.trans.obsXY_to_posXY(xy_corr) #MATLAB: corr')'
-##        #MATLAB: log_entries = containers.Map
-##        log_entries = {}
-##        log_entries['x_meas'] = xy_meas[0]
-##        log_entries['y_meas'] = xy_meas[1]
-##        log_entries['x_corr'] = xy_corr[0]
-##        log_entries['y_corr'] = xy_corr[1]
-##        log_entries['x_trns'] = xy_trns[0]
-##        log_entries['y_trns'] = xy_trns[1]
-##        for i in range(len(xy_ref)):
-##            log_entries['x_ref_' + str(i)] = xy_ref[i][0] #changed from xy_ref[i,0]
-##            log_entries['y_ref_' + str(i)] = xy_ref[i][1] #changed from xy_ref[i,1]
-##        log_entries['meas_time'] = meas_time
-##        log_entries['n_cycles'] = self.n_cycles
-##        self.p.state.add_kv_in_log(rowid, log_entries)
-##        return xy_trns, rowid
-##
-##    def move_meas_sub_note(self, move_cmd, move_val_1, move_val_2, submove, note):
-##        """
-##        same as move_meas but with additional fields for log
-##        submove         ... empty or a string
-##        note            ... empty or a string
-##        """
-##        xy_trns, rowid = self.move_meas(move_cmd, move_val_1, move_val_2)
-##        log_entries = {}
-##        if not submove: #MATLAB: if not(isempty(submove))
-##            log_entries['submove'] = submove
-##        if not note: #MATLAB: if not(isempty(note))
-##            log_entries['note'] = note
-##        self.p.state.add_kv_in_log(rowid, log_entries)
-##        return xy_trns, rowid
-##
+    def identify_fiducials(self):
+        """Nudge positioners forward/back to determine which centroid dots are fiducials.
+        """
+        ref_dist_tol = 0.1 # mm
+        nudge_dist = 10.0 # deg
+        print('Nudging positioners to identify reference fiber(s).\n')
+        print('Distance tol for identifying a fixed fiber is set to %g.\n',ref_dist_tol)
+        pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
+        nudges = [nudge_dist, -nudge_dist]
+        for petal in pos_ids_by_ptl.keys():
+            pos_ids = pos_ids_by_ptl[petal]
+            xy = []
+            for i in range(len(nudges)):
+                petal.request_direct_dtdp(pos_ids, [nudges[i],0], cmd_prefix='nudge to identify fiducials')
+                petal.schedule_send_and_execute_moves()
+                xy[i] = self.fvc.measure(self.n_fiducial_dots)
+            xy_init = xy[0]
+            xy_test = xy[1]
+            xy_ref = []
+            for i in range(len(xy_test)):
+                test_delta = np.array(xy_test[i]) - np.array(xy_init)
+                test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
+                if any(test_dist < ref_dist_tol):
+                    xy_ref.append()
+
+
+
+
 ##    def identify_ref_fibers(self):
 ##        """
 ##        Nudge positioner forward/back to determine which fibers are reference fibers
 ##        """
-##        ref_dist_tol = 0.02
-##        print('Nudge positioner to identify reference fiber(s).\n')
-##        print('Distance tol for identifying a fixed fiber is set to %g.\n',ref_dist_tol)
+##
+##
 ##        self.p.move('abs_xy', 0, 0)
 ##        self.p.move('rel_dxdy', self.initial_nudge_dist, 0)
 ##        xy_init = self.measure_xy
