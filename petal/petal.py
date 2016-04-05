@@ -56,7 +56,7 @@ class Petal(object):
 
         The optional argument cmd_prefix allows adding a descriptive string to the log.
         """
-        self.pos.request_direct_dtdp(pos, dt, dp, cmd_prefix)
+        self.pos.request_direct_dtdp(pos, dtdp, cmd_prefix)
 
     def request_limit_seek(self, pos, axisid, direction, anticollision=True, cmd_prefix=''):
         """Request hardstop seeking sequence for positioners in list pos.
