@@ -1,3 +1,8 @@
+import os
+import sys
+sys.path.append(os.path.abspath('../petal/'))
+import postransforms
+
 class PosMoveMeasure(object):
     """Coordinates moving fiber positioners with fiber view camera measurements.
     """
@@ -9,7 +14,8 @@ class PosMoveMeasure(object):
         self.n_fiducial_dots = 1
         self.ref_dist_tol = 0.050 # [mm] used for identifying fiducial dots
         self.nudge_dist   = 5.0   # [deg] used for identifying fiducial dots
-        self.fiducials_xy = [] # list of locations of the dots in the obsXY coordinate system
+        self.fiducials_xy = []    # list of locations of the dots in the obsXY coordinate system
+        self.trans = postransforms.PosTransforms() # generic coordinate transformations object
 
     def fiducials_on(self):
         """Turn on all fiducials on all petals."""
@@ -38,6 +44,7 @@ class PosMoveMeasure(object):
         for i in range(len(measured_pos_xy)):
             petals[i].pos.set(pos_ids[i],'LAST_MEAS_OBS_X',measured_pos_xy[i][0])
             petals[i].pos.set(pos_ids[i],'LAST_MEAS_OBS_Y',measured_pos_xy[i][1])
+        return pos_ids, measured_pos_xy
 
     def move_and_correct(self, pos_ids, targets, coordinates='obsXY', num_corr_max=2):
         """Move positioners to target coordinates, then make a series of correction
@@ -49,29 +56,22 @@ class PosMoveMeasure(object):
                     num_corr_max ... maximum number of correction moves to perform on any positioner
         """
         if coordinates == 'QS':
-            # convert targets to obsXY
-            pass
-        self.move_measure(pos_ids, ['obsXY']*len(pos_ids), targets)
-        pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
-        targets_by_ptl = {}
-        for petal in pos_ids_by_ptl.keys():
-            indexes = [pos_ids.index(x) for x in pos_ids if x in pos_ids_by_ptl[petal]]
-            targets_by_ptl[petal] = [targets[i] for i in indexes]
-        for i in range(num_corr_max):
-            last_obsX_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'LAST_MEAS_OBS_X')
-            last_obsY_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'LAST_MEAS_OBS_Y')
-            corr_move_pos_ids = []
-            corr_move_dxdy = []
-            for petal in self.petals:
-                corr_move_pos_ids.extend(pos_ids_by_ptl[petal])
-                last_obsXY = [[last_obsX_by_ptl[petal][j],last_obsY_by_ptl[petal][j]] for j in range(len(last_obsX_by_ptl[petal]))]
-                this_dxdy = (np.array(targets_by_ptl[petal]) - np.array(last_obsXY_by_ptl)).tolist()
-                corr_move_dxdy.extend(this_dxdy)
-            for j in range(len(corr_move_pos_ids)):
-                dx = corr_move_dxdy[j][0]
-                dy = corr_move_dxdy[j][1]
-                print(str(corr_move_pos_ids[j]) + ': correction move ' + str(j) + ' by (dx,dy)=(' + str(dx) + ',' + str(dy) + '), distance = ' + str((dx**2 + dy**2)**.5))
-            self.move_measure(corr_move_pos_ids, ['dXdY']*len(pos_ids_by_ptl[petal]), corr_move_dxdy)
+            targets = [self.trans.QS_to_obsXY(target) for target in targets]
+        obsXY = []
+        errXY = []
+        (sorted_pos_ids, measured_pos_xy) = self.move_measure(pos_ids, ['obsXY']*len(pos_ids), targets)
+        idx_sort = [sorted_pos_ids.index(p) for p in pos_ids]
+        sorted_targets = [targets[idx] for idx in idx_sort]
+        obsXY.append(measured_pos_xy)
+        errXY.append(np.array(measured_pos_xy) - (np.array(sorted_targets)).tolist())
+        for i in range(1,num_corr_max+1):
+            dxdy = (-np.array(errXY[i-1])).tolist()
+            for j in range(len(dxdy)):
+                print(str(corr_move_pos_ids[j]) + ': correction move ' + str(j) + ' by (dx,dy)=(' + str(dxdy[j][0]) + ',' + str(dxdy[j][1]) + '), distance = ' + str((dxdy[j][0]**2 + dxdy[j][1]**2)**.5))
+            (sorted_pos_ids, measured_pos_xy) = self.move_measure(sorted_pos_ids, ['dXdY']*len(sorted_pos_ids), dxdy)
+            obsXY.append(measured_pos_xy)
+            errXY.append(np.array(measured_pos_xy) - (np.array(sorted_targets)).tolist())
+        return sorted_pos_ids, sorted_targets, obsXY, errXY
 
     def move_measure(self, pos_ids, commands, values):
         """Move positioners and measure output with FVC.
@@ -88,7 +88,7 @@ class PosMoveMeasure(object):
             these_values   = [values[i]    for i in indexes]
             petal.request_targets(these_pos_ids, these_commands, these_values)
             petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
-        self.measure()
+        return self.measure()
 
     def rehome(self,pos_ids='all'):
         """Find hardstops and reset current known positions.
@@ -98,7 +98,6 @@ class PosMoveMeasure(object):
         for petal in pos_ids_by_ptl.keys():
             petal.request_homing(pos_ids_by_ptl[petal])
             petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
-        self.measure()
 
     def calibrate(self,pos_ids='all'):
         """Find hardstops, then sweep a circle of points about theta and phi to measure
@@ -126,27 +125,6 @@ class PosMoveMeasure(object):
         """
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
         pass
-
-    def pos_data_listed_by_ptl(self, pos_ids='all', key=''):
-        """Returns a dictionary with keys = petal objects and values = lists of data
-        (the particular data to retrieve is identified by key) on each petal.  If
-        pos_ids argument == 'all', then each list contains all the data on that petal.
-        If pos_ids argument is a list of pos_ids, then in the returned dictionary, each list
-        contains only the data for those positioners which are in the intersection set of
-        pos_ids with that petal's positioner ids.
-        """
-        data_by_ptl = {}
-        for petal in self.petals:
-            all_pos_on_ptl = petal.pos.get(key='POS_ID')
-            if pos_ids == 'all':
-                these_pos_ids = all_pos_on_ptl
-            elif isinstance(pos_ids,list):
-                these_pos_ids = [p for p in pos_ids if p in all_pos_on_ptl]
-            else:
-                print('invalid argument ' + str(pos_ids) + ' for pos_ids')
-                these_pos_ids = []
-            data_by_ptl[petal] = petal.pos.get(these_pos_ids,key)
-        return data_by_ptl
 
     def identify_fiducials(self):
         """Nudge positioners forward/back to determine which centroid dots are fiducials.
@@ -177,129 +155,23 @@ class PosMoveMeasure(object):
             print('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_fiducial_dots) + ')')
         self.fiducials_xy = xy_ref
 
-##
-##    def circle_meas(self, axis_idx, tp_initial, final, tp_between, n_points, note):
-##        """
-##        measure a circle of points over the positioning range
-##            axis_idx     ... identifies whether to use theta (1) or phi (2)
-##            tp_initial   ... abs theta phi to start at
-##            final        ... abs ending value of the axis that's moving
-##            tp_between   ... in between measurements return to this position. if empty, just go straight to next target
-##            n_points     ... number of points to take
-##            note         ... will be included in log entries for all moves
-##
-##            xy_ctr       ... best fit circle center
-##            radius       ... best fit circle radius
-##            xy_meas      ... the points that were measured
-##            tp_abs_cmd   ... absolute tp of the points that were commanded to go to
-##        """
-##        #axis_idx is either 1 or 2
-##        #MATLAB: switch/case code
-##        if axis_idx == 1:
-##            tp_cmd = [np.linspace(tp_initial[0], final, num = n_points).tolist(), (tp_initial[1] * np.ones(n_points)).tolist()]
-##            axisname = 'theta'
-##        elif axis_idx == 2:
-##            tp_cmd = [(tp_initial[0] * np.ones(n_points)).tolist(), np.linspace(tp_initial[1], final, num = n_points).tolist()]
-##            axisname = 'phi'
-##        xy_meas = []
-##        for i in range(n_points):
-##            print('Measuring %s circle point %i of %i ...\n', axisname, i, n_points)
-##            if tp_between:
-##                self.move('abs_tp', tp_between[0], tp_between[1])
-##            xy_meas.append(self.move_meas_sub_note('abs_tp', tp_cmd[i,0], tp_cmd[i,1], [], note))
-##        xy_ctr, radius = fitcircle(xy_meas) #MATLAB: meas')
-##        xy_ctr = xy_ctr #MATLAB = ctr'
-##        return xy_ctr, radius, xy_meas, tp_cmd
-##
-##    def range_seek(self, axis_idx, note):
-##        """
-##        measure physical range of an axis
-##        """
-##        #axis_idx is either 1 or 2
-##        #MATLAB: switch/case code
-##        if axis_idx == 1:
-##            range_val = self.p.axes.positioning_range_T
-##            tp_initial = [min(range_val), min(self.p.axes.positioning_range_P)]
-##            meas_axis = [1,0]
-##            axisname = 'theta'
-##        elif axis_idx == 2:
-##            range_val = self.p.axes.positioning_range_P
-##            tp_initial = [math.mean(self.p.axes.positioning_range_T), min(range_val)]
-##            meas_axis = [0,1]
-##            axisname = 'phi'
-##        self.move('abs_tp',tp_initial[0],tp_initial[1])
-##        print('Measuring %s min limit...\n', axisname)
-##        xy = self.move_meas_sub_note('seek_limit', -meas_axis[0], -meas_axis[1], [], note)
-##        old_allow_exceed_limits = self.p.state.kv('ALLOW_EXCEED_LIMITS')
-##        self.p.state.kv('ALLOW_EXCEED_LIMITS') = 1 #python does not like this line; no others errors show until this is fixed
-##        for i in range(2):
-##            print('Measuring intermediate point %i of 2 during %s range seek...\n', i, axisname)
-##            test_steps[i] = 0.4 * diff(range_val)
-##            xy.append(self.move_meas_sub_note('rel_dtdp', test_steps[i] * meas_axis[0], test_steps[i] * meas_axis[1], [], note))
-##        self.p.state.kv('ALLOW_EXCEED_LIMITS') = old_allow_exceed_limits
-##        print('Measuring %s max limit...\n', axisname)
-##        xy.append(self.move_meas_sub_note('seek_limit', meas_axis[0], meas_axis[1], [], note))
-##        xy_ctr, radius = fitcircle(xy) #MATLAB: y')
-##        #MATLAB: xy_ctr = xy_ctr' ..... \_O_/
-##        '''unwrap and calculate range'''
-##        test_steps[i+1] = diff(range_val) - sum(test_steps)
-##        xy_centered[:,0] = xy[:,0] - xy_ctr[0] #might not be valid python syntax
-##        xy_centered[:,1] = xy[:,1] - xy_ctr[1] #might not be valid python syntax
-##        test_steps_abs = [tp_initial[axis_idx], tp_initial[axis_idx] + sum(test_steps)] #MATLAB: cumsum(test_steps)]'
-##        a_meas = PosMoveMeasure.unwrapped_meas_angle(test_steps_abs, xy_centered)
-##        meas_range = a_meas[-1] - a_meas[0]
-##        return meas_range, xy_ctr, radius, xy
-##
-##    def stability_meas(self, n_meas):
-##        """
-##        repeated measurements without moving to determine stability
-##        """
-##        xy = []
-##        xyref = []
-##        for i in range(n_meas):
-##            temp.xy, temp.xyref = self.measure_xy #not sure of the temp.__ name is kosher for python
-##            xy.append(temp.xy)
-##            xyref.append(temp.xyref)
-##        return xy, xyref
-##
-##    """Static Methods"""
-##    def multi_unwrapped_meas_angle(a_cmd, xy_meas, wrap_restart_idxs):
-##        a_meas_unwrapped = []
-##        for i in range(len(wrap_restart_idxs)):
-##            if i == len(wrap_restart_idxs):
-##                unwrap_range = range(wrap_restart_idxs[i], len[a_cmd]) #MATLAB: unwrap_range = wrap_restart_idxs(i):length(a_cmd); in python 3: list(range(#,#))
-##            else:
-##                unwrap_range = range(wrap_restart_idxs[i], (wrap_restart_idxs[i+1]-1))
-##            a_meas_unwrapped.append(PosMoveMeasure.unwrapped_meas_angle(a_cmd[unwrap_range],xy_meas[unwrap_range,:]))
-##        return a_meas_unwrapped
-##
-##    def unwrapped_meas_angle(a_cmd, xy_meas):
-##        cmd_steps = np.diff(np.asarray(a_cmd), n = 1)
-##        a = math.atan2(xy_meas[:,1],xy_meas[:,0]) #MATLAB: a = atan2d(xy_meas(:,2),xy_meas(:,1));
-##        da = np.diff(np.asarray(a))
-##        wrap_at_180 = list_compare(np.sign(cmd_steps).tolist(), np.sign(da).tolist())
-##        for i in range(len(wrap_at_180)):
-##            if wrap_at_180[i]:
-##                da_options = [360 - da[i], 360 + da[i], da[i] - 360, da[i] + 360]
-##                _, da_select = min(abs(da_options - cmd_steps[i]))
-##                da[i] = da_options[da_select]
-##        first_pt_wrap_cutoff = 340
-##        if a[1] - a_cmd[1] > first_pt_wrap_cutoff: #checking for wrapping of first point
-##            a[1] = a[1] - 360
-##        elif a[1] - a_cmd[1] < -first_pt_wrap_cutoff:
-##            a[1] = a[1] + 360
-##        a_meas_unwrapped.append(a[1] + sum(da)) # MATLAB: a_meas_unwrapped = [a(1);a(1)+cumsum(da)];
-##        return a_meas_unwrapped
-##
-##    def make_splinefit(cmd, meas, n_pieces, order):
-##        if not n_pieces:
-##            n_pieces = ceil(len(cmd)/order) #add better logic if technique proves generally useful
-##        pp = splinefit(cmd, meas, n_pieces, order, 'r')
-##        return pp
-##
-##
-##
-##
-##
-##
-##
+    def pos_data_listed_by_ptl(self, pos_ids='all', key=''):
+        """Returns a dictionary with keys = petal objects and values = lists of data
+        (the particular data to retrieve is identified by key) on each petal.  If
+        pos_ids argument == 'all', then each list contains all the data on that petal.
+        If pos_ids argument is a list of pos_ids, then in the returned dictionary, each list
+        contains only the data for those positioners which are in the intersection set of
+        pos_ids with that petal's positioner ids.
+        """
+        data_by_ptl = {}
+        for petal in self.petals:
+            all_pos_on_ptl = petal.pos.get(key='POS_ID')
+            if pos_ids == 'all':
+                these_pos_ids = all_pos_on_ptl
+            elif isinstance(pos_ids,list):
+                these_pos_ids = [p for p in pos_ids if p in all_pos_on_ptl]
+            else:
+                print('invalid argument ' + str(pos_ids) + ' for pos_ids')
+                these_pos_ids = []
+            data_by_ptl[petal] = petal.pos.get(these_pos_ids,key)
+        return data_by_ptl
