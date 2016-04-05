@@ -121,17 +121,24 @@ class PosMoveMeasure(object):
             petal.pos.set(pos_id,'OFFSET_X',t_ctr[0])
             petal.pos.set(pos_id,'OFFSET_Y',t_ctr[1])
             obsT = np.arctan2(p_ctr[1]-t_ctr[1], p_ctr[0]-t_ctr[0]) * 180/np.pi
-            posT = np.median(P[pos_id]['target_tp'][pc.T])
+            posT = np.median(P[pos_id]['target_posTP'][pc.T])
             offset_t = obsT - posT
             petal.pos.set(pos_id,'OFFSET_T',offset_t)
             p_xymeas = P[pos_id]['measured_xy']
             p_angles = np.arctan2(p_xymeas[1]-p_ctr[1], p_xymeas[0]-p_ctr[0]) * 180/np.pi
             obsP = p_angles - obsT
-            posP = P[pos_id]['target_tp'][pc.P]
+            posP = P[pos_id]['target_posTP'][pc.P]
             offset_p = np.median(obsP - posP)
             petal.pos.set(pos_id,'OFFSET_T',offset_p)
-
-
+            trans = T[pos_id]['trans']
+            measured_obsXY = T[posid]['measured_obsXY'] + P[posid]['measured_obsXY']
+            target_posTP = T[posid]['target_posTP'] + P[posid]['target_posTP']
+            measured_posTP = trans.obsXY_to_posTP(np.transpose(measured_obsXY)).transpose()
+            scale_TP = np.divide(measured_posTP,target_posTP)
+            scale_T = np.median(scale_TP[:,pc.T])
+            scale_P = np.median(scale_TP[:,pc.P])
+            petal.pos.set(pos_id,'GEAR_CALIB_T',scale_T)
+            petal.pos.set(pos_id,'GEAR_CALIB_P',scale_P)
 
     def measure_calibration_arc(self,pos_ids='all',axis='theta'):
         """Expert usage. Sweep an arc of points about axis ('theta' or 'phi')
@@ -141,11 +148,12 @@ class PosMoveMeasure(object):
         Returns a dictionary of dictionaries containing the data. The primary
         keys for the dict are the pos_id. Then for each pos_id, each subdictionary
         contains the keys:
-            'target_tp'     ... the posTP targets which were argued
-            'measured_xy'   ... the resulting measured xy positions
-            'petal'         ... the petal this pos_id is on
-            'xy_center'     ... the best fit arc's xy center
-            'radius'        ... the best fit arc's radius
+            'target_posTP'    ... the posTP targets which were argued
+            'measured_obsXY'  ... the resulting measured xy positions
+            'xy_center'       ... the best fit arc's xy center
+            'radius'          ... the best fit arc's radius
+            'petal'           ... the petal this pos_id is on
+            'trans'           ... the postransform object associated with this particular positioner
         """
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
         phi_clear_angle = self.phi_clear_angle
@@ -169,15 +177,15 @@ class PosMoveMeasure(object):
             for i in range(len(these_pos_ids)):
                 t = linspace(initial_tp[i][0], final_tp[i][0], n_pts)
                 p = linspace(initial_tp[i][1], final_tp[i][1], n_pts)
-                data[these_pos_ids[i]] = {'target_tp':[[t[j],p[j]] for j in range(n_pts)], 'measured_xy':[], 'petal':petal}
+                data[these_pos_ids[i]] = {'target_posTP':[[t[j],p[j]] for j in range(n_pts)], 'measured_obsXY':[], 'petal':petal, 'trans':posmodels[i].trans}
         all_pos_ids = data.keys()
         for i in range(n_pts):
-            targets = [data[pos_id]['target_tp'][i] for pos_id in all_pos_ids]
-            (sorted_pos_ids, measured_pos_xy) = self.move_measure(all_pos_ids,['posTP']*len(all_pos_ids),targets)
-            for j in range(len(measured_pos_xy)):
-                data[sorted_pos_ids[j]]['measured_xy'] += measured_pos_xy
+            targets = [data[pos_id]['target_posTP'][i] for pos_id in all_pos_ids]
+            (sorted_pos_ids, measured_obsXY) = self.move_measure(all_pos_ids,['posTP']*len(all_pos_ids),targets)
+            for j in range(len(measured_obsXY)):
+                data[sorted_pos_ids[j]]['measured_obsXY'] += measured_obsXY
         for pos_id in all_pos_ids:
-            (xy_ctr,radius) = fitcircle.fit(data[pos_id]['measured_xy'])
+            (xy_ctr,radius) = fitcircle.fit(data[pos_id]['measured_obsXY'])
             data[pos_id]['xy_center'] = xy_ctr
             data[pos_id]['radius'] = radius
         return data
