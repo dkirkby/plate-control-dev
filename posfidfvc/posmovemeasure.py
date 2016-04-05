@@ -43,7 +43,7 @@ class PosMoveMeasure(object):
             these_pos_ids = petal.pos.posids
             pos_ids.extend(these_pos_ids)
             petals.extend([petal]*len(these_pos_ids))
-            expected_pos_xy.extend(petal.pos.expected_current_position(these_pos_ids,'obsXY'))
+            expected_pos_xy = pc.concat_lists_of_lists(expected_pos_xy, petal.pos.expected_current_position(these_pos_ids,'obsXY'))
         expected_ref_xy = self.fiducials_xy
         (measured_pos_xy, measured_ref_xy) = self.fvc.measure_and_identify(expected_pos_xy, expected_ref_xy)
         for i in range(len(measured_pos_xy)):
@@ -54,10 +54,19 @@ class PosMoveMeasure(object):
     def move(self, pos_ids, commands, values):
         """Move positioners.
         INPUTS:     pos_ids      ... list of positioner ids to move
-                    commands     ... list of move command arguments, see comments in petal.py
-                    targets      ... list of target coordinates of the form [[u1,v2],[u2,v2],...]
+                    commands     ... single command or list of move command arguments, see comments in petal.py
+                    targets      ... single coordinate pair or list of target coordinates of the form [[u1,v2],[u2,v2],...]
         """
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
+        n_total_pos = sum([len(pos_ids_by_ptl[petal]) for petal in pos_ids_by_ptl.keys()])
+        if not(isinstance(commands,list)):
+            commands = [commands]*n_total_pos
+        elif not(len(commands) == n_total_pos):
+            commands = [commands[0]]*n_total_pos # just use the first one in the list in this case
+        if len(values) == 2 and not(isinstance(values[0],list)):
+            values = [values]*n_total_pos
+        elif not(len(values) == n_total_pos):
+            values = [values[0]]*n_total_pos  # just use the first one in the list in this case
         for petal in pos_ids_by_ptl.keys():
             indexes = [pos_ids.index(x) for x in pos_ids if x in pos_ids_by_ptl[petal]]
             these_pos_ids  = [pos_ids[i]  for i in indexes]
@@ -87,20 +96,33 @@ class PosMoveMeasure(object):
             targets = [self.trans.QS_to_obsXY(target) for target in targets]
         obsXY = []
         errXY = []
-        (sorted_pos_ids, measured_pos_xy) = self.move_measure(pos_ids, ['obsXY']*len(pos_ids), targets)
+        (sorted_pos_ids, measured_pos_xy) = self.move_measure(pos_ids, 'obsXY', targets)
         idx_sort = [sorted_pos_ids.index(p) for p in pos_ids]
         sorted_targets = [targets[idx] for idx in idx_sort]
-        obsXY.append(measured_pos_xy)
-        errXY.append(np.array(measured_pos_xy) - (np.array(sorted_targets)).tolist())
+        obsXY = pc.concat_lists_of_lists(obsXY, measured_pos_xy)
+        errXY = pc.concat_lists_of_lists(errXY, (np.array(measured_pos_xy) - np.array(sorted_targets)).tolist())
         for i in range(1,num_corr_max+1):
             dxdy = (-np.array(errXY[i-1])).tolist()
             for j in range(len(dxdy)):
                 print(str(corr_move_pos_ids[j]) + ': correction move ' + str(j) + ' by (dx,dy)=(' + str(dxdy[j][0]) + ',' + str(dxdy[j][1]) + '), distance = ' + str((dxdy[j][0]**2 + dxdy[j][1]**2)**.5))
-            (sorted_pos_ids, measured_pos_xy) = self.move_measure(sorted_pos_ids, ['dXdY']*len(sorted_pos_ids), dxdy)
-            obsXY.append(measured_pos_xy)
-            errXY.append(np.array(measured_pos_xy) - (np.array(sorted_targets)).tolist())
+            (sorted_pos_ids, measured_pos_xy) = self.move_measure(sorted_pos_ids, 'dXdY', dxdy)
+            obsXY = pc.concat_lists_of_lists(obsXY, measured_pos_xy)
+            errXY = pc.concat_lists_of_lists(errXY, (np.array(measured_pos_xy) - np.array(sorted_targets)).tolist())
         return sorted_pos_ids, sorted_targets, obsXY, errXY
 
+    def retract_phi(self,pos_ids='all'):
+        """Get all phi arms within their clear rotation envelopes for positioners
+        identified by pos_ids.
+        """
+        pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids, key='POS_ID')
+        pos_ids = []
+        targets = []
+        for petal in pos_ids_by_ptl.keys():
+            pos_ids.extend(pos_ids_by_ptl[petal])
+            posT = petal.pos.expected_current_position(these_pos_ids,'posT')
+            posP = self.phi_clear_angle # uniform value in all cases
+            targets = pc.concat_lists_of_lists(targets, [[t,posP] for t in posT])
+        self.move(pos_ids,'posTP',targets)
 
     def rehome(self,pos_ids='all'):
         """Find hardstops and reset current known positions.
@@ -111,19 +133,16 @@ class PosMoveMeasure(object):
             petal.request_homing(pos_ids_by_ptl[petal])
             petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
 
-    def measure_range(self,pos_ids='all',axis='theta',set_calibration_values=True):
-        # BOTH AXES? OR CAN THIS BE DONE INDEPENDENTLY -- AND NO SETTING OF CALIBRATION VALUES...
-
+    def measure_range(self,pos_ids='all',axis='theta'):
         """Expert usage. Sweep several points about axis ('theta' or 'phi') on
         positioners identified by pos_ids, striking the hard limits on either end.
         Calculate the total available travel range. Note that for axis='phi', the
-        positioners must enter the collisionable zone, so the range seeking will
+        positioners must enter the collisionable zone, so the range seeking may
         occur in several successive stages.
-
-        Calling measure range inherently gathers data sufficient to make at least
-        a rough calibration of the positioner. If set_calibration_values is True,
-        then those values will get stored.
         """
+        if axis == 'phi':
+            batches = pos_ids # implement later some selection of smaller batches of positioners guaranteed not to collide
+            # some for loop through those batches
         T = self._measure_range_arc(pos_ids,'theta')
         P = self._measure_range_arc(pos_ids,'phi')
         if set_calibration_values:
@@ -132,12 +151,12 @@ class PosMoveMeasure(object):
 
 
 
-        'target_dtdp'     ... the delta moves which were attempted
-        'measured_obsXY'  ... the resulting measured xy positions
-        'xy_center'       ... the best fit arc's xy center
-        'radius'          ... the best fit arc's radius
-        'petal'           ... the petal this pos_id is on
-        'trans'           ... the postransform object associated with this particular positioner
+##        'target_dtdp'     ... the delta moves which were attempted
+##        'measured_obsXY'  ... the resulting measured xy positions
+##        'xy_center'       ... the best fit arc's xy center
+##        'radius'          ... the best fit arc's radius
+##        'petal'           ... the petal this pos_id is on
+##        'trans'           ... the postransform object associated with this particular positioner
 
         # matlab code...
         # test_steps(i+1) = diff(range) - sum(test_steps);
@@ -159,8 +178,8 @@ class PosMoveMeasure(object):
         for pos_id in T.keys():
             # gear ratio calibration calculations
             trans = T[pos_id]['trans']
-            measured_obsXY = T[posid]['measured_obsXY'] + P[posid]['measured_obsXY']
-            target_posTP = T[posid]['target_posTP'] + P[posid]['target_posTP']
+            measured_obsXY = pc.concat_lists_of_lists(T[posid]['measured_obsXY'], P[posid]['measured_obsXY'])
+            target_posTP   = pc.concat_lists_of_lists(T[posid]['target_posTP'],   P[posid]['target_posTP'])
             measured_posTP = trans.obsXY_to_posTP(np.transpose(measured_obsXY)).transpose()
             scale_TP = np.divide(measured_posTP,target_posTP)
             scale_T = np.median(scale_TP[:,pc.T])
@@ -192,7 +211,7 @@ class PosMoveMeasure(object):
             test_delta = np.array(xy_test[i]) - np.array(xy_init)
             test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
             if any(test_dist < self.ref_dist_tol):
-                xy_ref.append(xy_test[i])
+                xy_ref = pc.concat_lists_of_lists(xy_ref,xy_test[i])
         if len(xy_ref) != self.n_fiducial_dots:
             print('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_fiducial_dots) + ')')
         self.fiducials_xy = xy_ref
@@ -248,13 +267,13 @@ class PosMoveMeasure(object):
                 n_pts = self.n_points_theta_calib
                 for posmodel in posmodels:
                     targetable_range = posmodel.targetable_range_T
-                    initial_tp.append([min(targetable_range), phi_clear_angle])
-                    final_tp.append([max(targetable_range), initial_tp[-1][1]])
+                    initial_tp = pc.concat_lists_of_lists(initial_tp, [min(targetable_range), phi_clear_angle])
+                    final_tp   = pc.concat_lists_of_lists(final_tp,   [max(targetable_range), initial_tp[-1][1]])
             else:
                 n_pts = self.n_points_phi_calib
                 for posmodel in posmodels:
-                    initial_tp.append([np.mean(posmodel.targetable_range_T), phi_clear_angle])
-                    final_tp.append([initial_tp[-1][0], max(posmodel.targetable_range_P)])
+                    initial_tp = pc.concat_lists_of_lists(initial_tp, [np.mean(posmodel.targetable_range_T), phi_clear_angle])
+                    final_tp   = pc.concat_lists_of_lists(final_tp,   [initial_tp[-1][0], max(posmodel.targetable_range_P)])
             for i in range(len(these_pos_ids)):
                 t = linspace(initial_tp[i][0], final_tp[i][0], n_pts)
                 p = linspace(initial_tp[i][1], final_tp[i][1], n_pts)
@@ -264,9 +283,10 @@ class PosMoveMeasure(object):
         # make the measurements
         for i in range(n_pts):
             targets = [data[pos_id]['target_posTP'][i] for pos_id in all_pos_ids]
-            (sorted_pos_ids, measured_obsXY) = self.move_measure(all_pos_ids,['posTP']*len(all_pos_ids),targets)
+            (sorted_pos_ids, measured_obsXY) = self.move_measure(all_pos_ids,'posTP',targets)
             for j in range(len(measured_obsXY)):
-                data[sorted_pos_ids[j]]['measured_obsXY'] += measured_obsXY
+                temp = data[sorted_pos_ids[j]]['measured_obsXY']
+                data[sorted_pos_ids[j]]['measured_obsXY'] = pc.concat_lists_of_lists(temp, measured_obsXY)
 
         # circle fits
         for pos_id in all_pos_ids:
@@ -314,7 +334,7 @@ class PosMoveMeasure(object):
         all_pos_ids = data.keys()
 
         # go to initial point
-        self.move(all_pos_ids, ['posTP']*len(all_pos_ids), [initial_tp]*len(all_pos_ids))
+        self.move(all_pos_ids, 'posTP', initial_tp)
 
         # seek first limit
         for petal in pos_ids_by_ptl.keys():
@@ -323,13 +343,15 @@ class PosMoveMeasure(object):
             petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
         (sorted_pos_ids, measured_obsXY) = self.measure()
         for j in range(len(measured_obsXY)):
-            data[sorted_pos_ids[j]]['measured_obsXY'] += measured_obsXY
+            temp = data[sorted_pos_ids[j]]['measured_obsXY']
+            data[sorted_pos_ids[j]]['measured_obsXY'] = pc.concat_lists_of_lists(temp,measured_obsXY)
 
         # intermediate points
         for i in range(n_intermediate_pts):
-            (sorted_pos_ids, measured_obsXY) = self.move_measure(all_pos_ids,['dTdP']*len(all_pos_ids),[dtdp]*len(all_pos_ids))
+            (sorted_pos_ids, measured_obsXY) = self.move_measure(all_pos_ids,'dTdP',dtdp)
             for j in range(len(measured_obsXY)):
-                data[sorted_pos_ids[j]]['measured_obsXY'] += measured_obsXY
+                temp = data[sorted_pos_ids[j]]['measured_obsXY']
+                data[sorted_pos_ids[j]]['measured_obsXY'] = pc.concat_lists_of_lists(temp,measured_obsXY)
 
         # seek second limit
         for petal in pos_ids_by_ptl.keys():
@@ -338,7 +360,8 @@ class PosMoveMeasure(object):
             petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
         (sorted_pos_ids, measured_obsXY) = self.measure()
         for j in range(len(measured_obsXY)):
-            data[sorted_pos_ids[j]]['measured_obsXY'] += measured_obsXY
+            temp = data[sorted_pos_ids[j]]['measured_obsXY']
+            data[sorted_pos_ids[j]]['measured_obsXY'] = pc.concat_lists_of_lists(temp,measured_obsXY)
 
         # circle fits
         for pos_id in all_pos_ids:
