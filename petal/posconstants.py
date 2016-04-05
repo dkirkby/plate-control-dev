@@ -90,6 +90,25 @@ def delistify(uv):
             new_uv.append(uv[i])
     return new_uv
 
+def concat_lists_of_lists(L1, L2):
+    """Always output an [N][M] list, for M dimensional coordinate inputs initial and new.
+    E.g.
+    [] + [u,v] --> [[u,v]]
+    [] + [[u1,v1],[u2,v2],...] --> same
+    [[u1,v1],[u2,v2]] + [u3,v3] --> [[u1,v1],[u2,v2],[u3,v3]]
+    [[u1,v1],[u2,v2]] + [[u3,v3],[u4,v4],...] --> [[u1,v1],[u2,v2],[u3,v3],[u4,v4],...]
+    """
+    if not(L1):
+        L1 = []
+    elif not(isinstance(L1[0],list)):
+        L1 = [L1]
+    if not(L2):
+        L2 = []
+    elif not(isinstance(L2[0],list)):
+        L2 = [L2]
+    return L1 + L2
+
+
 # Enumeration of verbosity level to stdout
 not_verbose = 0
 verbose = 1
