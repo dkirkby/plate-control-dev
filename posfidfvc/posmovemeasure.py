@@ -30,6 +30,8 @@ class PosMoveMeasure(object):
             petal.fiducials_off()
 
     def measure(self):
+        """Measure positioner locations with the FVC and store the values.
+        """
         expected_pos_xy = []
         expected_ref_xy = []
         petals = []
