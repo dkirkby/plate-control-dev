@@ -2,6 +2,9 @@ import os
 import sys
 sys.path.append(os.path.abspath('../petal/'))
 import postransforms
+import poscollider
+import numpy as np
+import fitcircle
 
 class PosMoveMeasure(object):
     """Coordinates moving fiber positioners with fiber view camera measurements.
@@ -15,7 +18,9 @@ class PosMoveMeasure(object):
         self.ref_dist_tol = 0.050 # [mm] used for identifying fiducial dots
         self.nudge_dist   = 5.0   # [deg] used for identifying fiducial dots
         self.fiducials_xy = []    # list of locations of the dots in the obsXY coordinate system
-        self.trans = postransforms.PosTransforms() # generic coordinate transformations object
+        self.n_points_theta_calib = 5 # number of points in a theta calibration arc
+        self.n_points_phi_calib = 5 # number of points in a phi calibration arc
+        self.phi_Eo_margin = 3.0 # [deg] margin on staying within Eo envelope
 
     def fiducials_on(self):
         """Turn on all fiducials on all petals."""
@@ -105,16 +110,58 @@ class PosMoveMeasure(object):
         then set all these calibration values for each positioner.
         """
         self.rehome(pos_ids)
-        self.measure_calibration_arc(pos_ids,'theta')
-        self.measure_calibration_arc(pos_ids,'phi')
+        T = self.measure_calibration_arc(pos_ids,'theta')
+        P = self.measure_calibration_arc(pos_ids,'phi')
+        # now store all these lovely values into each of the positioners accordingly
 
     def measure_calibration_arc(self,pos_ids='all',axis='theta'):
         """Expert usage. Sweep an arc of points about axis ('theta' or 'phi')
         on positioners identified by pos_ids. Measure these points with the FVC
         and calculate calibration values.
+
+        Returns a dictionary of dictionaries containing the data. The primary
+        keys for the dict are the pos_id. Then for each pos_id, each subdictionary
+        contains the keys:
+            'target_tp'     ... the posTP targets which were argued
+            'measured_xy'   ... the resulting measured xy positions
+            'xy_center'     ... the best fit arc's xy center
+            'radius'        ... the best fit arc's radius
         """
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
-        pass
+        phi_clear_angle = self.phi_clear_angle
+        for petal in pos_ids_by_ptl.keys():
+            pos_ids = pos_ids_by_ptl[petal]
+            posmodels = petal.pos.get(pos_ids)
+            initial_tp = []
+            final_tp = []
+            tp = []
+            if axis == 'theta':
+                n_pts = self.n_points_theta_calib
+                for posmodel in posmodels:
+                    targetable_range = posmodel.targetable_range_T
+                    initial_tp.append([min(targetable_range), phi_clear_angle])
+                    final_tp.append([max(targetable_range), initial_tp[-1][1]])
+            else:
+                n_pts = self.n_points_phi_calib
+                for posmodel in posmodels:
+                    initial_tp.append([np.mean(posmodel.targetable_range_T), phi_clear_angle])
+                    final_tp.append([initial_tp[-1][0], max(posmodel.targetable_range_P)])
+            data = {}
+            for i in range(len(pos_ids)):
+                t = linspace(initial_tp[i][0], final_tp[i][0], n_pts)
+                p = linspace(initial_tp[i][1], final_tp[i][1], n_pts)
+                data[pos_ids[i]] = {'target_tp':[[t[j],p[j]] for j in range(n_pts)], 'measured_xy':[]}
+            for i in range(n_pts):
+                targets = [data[pos_id]['target_tp'][i] for pos_id in pos_ids]
+                (sorted_pos_ids, measured_pos_xy) = self.move_measure(pos_ids,['posTP']*len(pos_ids),targets)
+                for j in range(len(measured_pos_xy)):
+                    data[sorted_pos_ids[j]]['measured_xy'] += measured_pos_xy
+            for pos_id in data.keys():
+                (xy_ctr,radius) = fitcircle.fit(data[pos_id]['measured_xy'])
+                data[pos_id]['xy_center'] = xy_ctr
+                data[pos_id]['radius'] = radius
+        return data
+
 
     def measure_range(self,pos_ids='all',axis='theta'):
         """Expert usage. Sweep several points about axis ('theta' or 'phi') on
@@ -175,3 +222,12 @@ class PosMoveMeasure(object):
                 these_pos_ids = []
             data_by_ptl[petal] = petal.pos.get(these_pos_ids,key)
         return data_by_ptl
+
+    @property
+    def phi_clear_angle(self):
+        """Returns the phi angle in degrees for which two positioners cannot collide
+        if they both have phi at this angle or greater.
+        """
+        phi_Eo_angle = poscollider.PosCollider().config['PHI_EO']
+        phi_clear = phi_Eo_angle + self.phi_Eo_margin
+        return phi_clear
