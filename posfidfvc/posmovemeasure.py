@@ -7,6 +7,9 @@ class PosMoveMeasure(object):
         self.petals = petals # list of petal objects
         self.fvc = fvc # fvchandler object
         self.n_fiducial_dots = 1
+        self.ref_dist_tol = 0.050 # [mm] used for identifying fiducial dots
+        self.nudge_dist   = 5.0   # [deg] used for identifying fiducial dots
+        self.fiducials_xy = [] # list of locations of the dots in the obsXY coordinate system
 ##        self.p = positioner_object  # positioner object; initialization
 ##        self.nom_xy_ref = []        # Nx2, nominal position(s) of reference fiber(s), [] means no ref fiber
 ##        self.nom_xy_ctr = [0,0]     # for user convenience, PosMoveMeasure can keep it's own xy offset value so user sees things in a "centered" coordinate system
@@ -27,28 +30,20 @@ class PosMoveMeasure(object):
             petal.fiducials_off()
 
     def measure(self):
-        data = {'expected_xy':[], 'measured_xy':[], 'petal':[], 'id':[], 'is_pos':[]}
+        expected_pos_xy = []
+        expected_ref_xy = []
+        petals = []
+        pos_ids = []
         for petal in self.petals:
-            pos_ids = petal.pos.posids
-            data['ids'].extend(pos_ids)
-            data['petal'].extend([petal]*len(pos_ids))
-            data['is_pos'].extend([True]*len(pos_ids))
-            data['expected_xy'].extend(petal.pos.expected_current_position(pos_ids,'obsXY'))
-            fid_ids = petal.fid.fid_ids
-            for fid_id in fid_ids:
-                fid_expected_XYs = petal.fid.expected_position(fid_id,'flatXY') # there may be multiple dots of light in a single fiducial
-                n_dots = len(fid_expected_XYs)
-                data['ids'].extend([fid_id]*n_dots)
-                data['petal'].extend([petal]*n_dots)
-                data['is_pos'].extend([False]*n_dots)
-                data['expected_xy'].extend(fid_expected_XYs)
-        data['measured_xy'] = self.fvc.measure_and_identify(data['expected_xy'], data['ids'], data['sub_ids'])
-        for i in range(len(data['id'])):
-            if data['is_pos'][i]:
-                data['petal'][i].pos.set(data['id'][i],'LAST_MEAS_FLAT_X',data['measured_xy'][i][0])
-                data['petal'][i].pos.set(data['id'][i],'LAST_MEAS_FLAT_Y',data['measured_xy'][i][1])
-            else:
-                data['petal'][i].fid.set_last_measured_position(data[id][i], data['measured_xy'][i], data['sub_ids'][i])
+            these_pos_ids = petal.pos.posids
+            pos_ids.extend(these_pos_ids)
+            petals.extend([petal]*len(these_pos_ids))
+            expected_pos_xy.extend(petal.pos.expected_current_position(these_pos_ids,'obsXY'))
+        expected_ref_xy = self.fiducials_xy
+        (measured_pos_xy, measured_ref_xy) = self.fvc.measure_and_identify(expected_pos_xy, expected_ref_xy)
+        for i in range(len(measured_pos_xy)):
+            petals[i].pos.set(pos_ids[i],'LAST_MEAS_FLAT_X',measured_pos_xy[i][0])
+            petals[i].pos.set(pos_ids[i],'LAST_MEAS_FLAT_Y',measured_pos_xy[i][1])
 
     def move_and_converge(self, pos_ids, targets, coordinates='QS', num_corr_max=2):
         """Move positioners to target coordinates, then make a series of correction
@@ -139,65 +134,32 @@ class PosMoveMeasure(object):
     def identify_fiducials(self):
         """Nudge positioners forward/back to determine which centroid dots are fiducials.
         """
-        ref_dist_tol = 0.1 # mm
-        nudge_dist = 10.0 # deg
         print('Nudging positioners to identify reference fiber(s).\n')
-        print('Distance tol for identifying a fixed fiber is set to %g.\n',ref_dist_tol)
+        print('Distance tol for identifying a fixed fiber is set to %g.\n',self.ref_dist_tol)
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
-        nudges = [nudge_dist, -nudge_dist]
-        for petal in pos_ids_by_ptl.keys():
-            pos_ids = pos_ids_by_ptl[petal]
-            xy = []
-            for i in range(len(nudges)):
+        nudges = [self.nudge_dist, -self.nudge_dist]
+        xy_ref = []
+        for i in range(len(nudges)):
+            n_pos = 0
+            for petal in pos_ids_by_ptl.keys():
+                pos_ids = pos_ids_by_ptl[petal]
+                n_pos += len(pos_ids)
                 petal.request_direct_dtdp(pos_ids, [nudges[i],0], cmd_prefix='nudge to identify fiducials')
                 petal.schedule_send_and_execute_moves()
-                xy[i] = self.fvc.measure(self.n_fiducial_dots)
-            xy_init = xy[0]
-            xy_test = xy[1]
-            xy_ref = []
-            for i in range(len(xy_test)):
-                test_delta = np.array(xy_test[i]) - np.array(xy_init)
-                test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
-                if any(test_dist < ref_dist_tol):
-                    xy_ref.append()
+            n_dots = n_pos + self.n_fiducial_dots
+            if i == 0:
+                xy_init = self.fvc.measure(n_dots)
+            else:
+                xy_test = self.fvc.measure(n_dots)
+        for i in range(len(xy_test)):
+            test_delta = np.array(xy_test[i]) - np.array(xy_init)
+            test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
+            if any(test_dist < self.ref_dist_tol):
+                xy_ref.append(xy_test[i])
+        if len(xy_ref) != self.n_fiducial_dots:
+            print('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_fiducial_dots) + ')')
+        self.fiducials_xy = xy_ref
 
-
-
-
-##    def identify_ref_fibers(self):
-##        """
-##        Nudge positioner forward/back to determine which fibers are reference fibers
-##        """
-##
-##
-##        self.p.move('abs_xy', 0, 0)
-##        self.p.move('rel_dxdy', self.initial_nudge_dist, 0)
-##        xy_init = self.measure_xy
-##        self.p.move('rel_dxdy', -self.initial_nudge_dist, 0)
-##        xy_test = self.measure_xy
-##        xy_ref = []
-##        for i in range(len(xy_test)): # MATLAB: for i = 1:size(xy_test,1)
-##            #MATLAB: test_dist = sqrt(sum((ones(size(xy_test,1),1)*xy_test(i,:)-xy_init).^2,2));
-##            test_dist = math.pow((np.ones(len(xy_test)) * xy_test[i,:] - xy_init),2) #syntax concern: xy_test[i,:]
-##            test_dist = np.asarray(test_dist)
-##            test_dist = np.sqrt(np.sum(test_dist,axis = 0)) #axis = 0 is col sum; axis = 1 is row sum
-##            test_dist = test_dist.tolist()
-##            if test_dist < ref_dist_tol: #MATLAB: if find(test_dist < ref_dist_tol)
-##                xy_ref.append(xy_test[i,:]) #syntax concern: xy_test[i,:]
-##                print('Refernece fiber detected at (x,y) = (%.3f,%.3f)\n', xy_test[i][0], xy_test[i][1]) #changed from: xy_test[i,0], xy_test[i,1]
-##        self.nom_xy_ref = xy_ref
-##        n_ref_fibers_found = len(xy_ref)
-##        #MATLAB:
-##            #if obj.n_ref_fibers ~= n_ref_fibers_found
-##                #error('Detected %i reference fiber(s), but expected %i',n_ref_fibers_found,obj.n_ref_fibers);
-##            #end
-##        if self.n_ref_fibers == n_ref_fibers_found:
-##            try:
-##                pass
-##            except ValueError:
-##                print('Detected %i reference fiber(s), but expected %i', n_ref_fibers_found, self.n_ref_fibers)
-##        self.n_ref_fibers = n_ref_fibers_found
-##        return
 ##
 ##    def circle_meas(self, axis_idx, tp_initial, final, tp_between, n_points, note):
 ##        """

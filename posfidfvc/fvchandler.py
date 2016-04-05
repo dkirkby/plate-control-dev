@@ -7,10 +7,10 @@ class FVCHandler(object):
     from positioner control scripts.
     """
     def __init__(self, fvc_type='SBIG'):
-        self.fvc_type = fvc_type   # 'SBIG' or 'FLI'
-        self.exposure_time = 90 # ms, camera exposure time
+        self.fvc_type = fvc_type # 'SBIG' or 'FLI'
+        self.exposure_time = 90  # ms, camera exposure time
         self.translation = [0,0] # translation of origin within the image plane
-        self.scale = 0.015       # scale factor from image plane to object plane
+        self.scale = 1.0         # scale factor from image plane to object plane
         self.rotation = 0        # [deg] rotation angle from image plane to object plane
 
     def measure_and_identify(self, expected_pos_xy=[], expected_ref_xy=[]):

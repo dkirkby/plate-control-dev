@@ -7,6 +7,8 @@ import posmovemeasure
 
 # initialization
 fvc = fvchandler('SBIG')
+fvc.scale = 0.015  # mm/pixel
+fvc.rotation = -90 # deg
 pos_ids = ['UM00012']
 fid_can_ids = []
 petal_id = 1
