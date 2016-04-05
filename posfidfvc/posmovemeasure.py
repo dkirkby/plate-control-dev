@@ -10,14 +10,6 @@ class PosMoveMeasure(object):
         self.ref_dist_tol = 0.050 # [mm] used for identifying fiducial dots
         self.nudge_dist   = 5.0   # [deg] used for identifying fiducial dots
         self.fiducials_xy = [] # list of locations of the dots in the obsXY coordinate system
-##        self.p = positioner_object  # positioner object; initialization
-##        self.nom_xy_ref = []        # Nx2, nominal position(s) of reference fiber(s), [] means no ref fiber
-##        self.nom_xy_ctr = [0,0]     # for user convenience, PosMoveMeasure can keep it's own xy offset value so user sees things in a "centered" coordinate system
-##        self.n_ref_fibers = 1       # number of fixed reference fibers in FVC field of views
-##        self.meas_unit_scale = 1    # multiply fvc units (i.e. pixels) by this value to get real lengths (e.g. mm)
-##        self.ccd_angle = -90        # [deg] angle of CCD w.r.t. horizontal
-##        self.initial_nudge_dist = 2 # [mm] when determining which is the moving fiber and which are refs
-##        self.n_cycles = 0           # keeps count of non-tiny moves
 
     def fiducials_on(self):
         """Turn on all fiducials on all petals."""
@@ -44,19 +36,42 @@ class PosMoveMeasure(object):
         expected_ref_xy = self.fiducials_xy
         (measured_pos_xy, measured_ref_xy) = self.fvc.measure_and_identify(expected_pos_xy, expected_ref_xy)
         for i in range(len(measured_pos_xy)):
-            petals[i].pos.set(pos_ids[i],'LAST_MEAS_FLAT_X',measured_pos_xy[i][0])
-            petals[i].pos.set(pos_ids[i],'LAST_MEAS_FLAT_Y',measured_pos_xy[i][1])
+            petals[i].pos.set(pos_ids[i],'LAST_MEAS_OBS_X',measured_pos_xy[i][0])
+            petals[i].pos.set(pos_ids[i],'LAST_MEAS_OBS_Y',measured_pos_xy[i][1])
 
-    def move_and_converge(self, pos_ids, targets, coordinates='QS', num_corr_max=2):
+    def move_and_correct(self, pos_ids, targets, coordinates='obsXY', num_corr_max=2):
         """Move positioners to target coordinates, then make a series of correction
         moves in coordination with the fiber view camera, to converge.
 
         INPUTS:     pos_ids      ... list of positioner ids to move
                     targets      ... list of target coordinates of the form [[u1,v2],[u2,v2],...]
-                    coordinates  ... 'QS' or 'XY', identifying the coordinate system the targets are in
+                    coordinates  ... 'obsXY' or 'QS', identifying the coordinate system the targets are in
                     num_corr_max ... maximum number of correction moves to perform on any positioner
         """
-        pass
+        if coordinates == 'QS':
+            # convert targets to obsXY
+            pass
+        self.move_measure(pos_ids, ['obsXY']*len(pos_ids), targets)
+        pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
+        targets_by_ptl = {}
+        for petal in pos_ids_by_ptl.keys():
+            indexes = [pos_ids.index(x) for x in pos_ids if x in pos_ids_by_ptl[petal]]
+            targets_by_ptl[petal] = [targets[i] for i in indexes]
+        for i in range(num_corr_max):
+            last_obsX_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'LAST_MEAS_OBS_X')
+            last_obsY_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'LAST_MEAS_OBS_Y')
+            corr_move_pos_ids = []
+            corr_move_dxdy = []
+            for petal in self.petals:
+                corr_move_pos_ids.extend(pos_ids_by_ptl[petal])
+                last_obsXY = [[last_obsX_by_ptl[petal][j],last_obsY_by_ptl[petal][j]] for j in range(len(last_obsX_by_ptl[petal]))]
+                this_dxdy = (np.array(targets_by_ptl[petal]) - np.array(last_obsXY_by_ptl)).tolist()
+                corr_move_dxdy.extend(this_dxdy)
+            for j in range(len(corr_move_pos_ids)):
+                dx = corr_move_dxdy[j][0]
+                dy = corr_move_dxdy[j][1]
+                print(str(corr_move_pos_ids[j]) + ': correction move ' + str(j) + ' by (dx,dy)=(' + str(dx) + ',' + str(dy) + '), distance = ' + str((dx**2 + dy**2)**.5))
+            self.move_measure(corr_move_pos_ids, ['dXdY']*len(pos_ids_by_ptl[petal]), corr_move_dxdy)
 
     def move_measure(self, pos_ids, commands, values):
         """Move positioners and measure output with FVC.
@@ -130,8 +145,8 @@ class PosMoveMeasure(object):
             else:
                 print('invalid argument ' + str(pos_ids) + ' for pos_ids')
                 these_pos_ids = []
-            pos_ids_by_ptl[petal] = petal.pos.get(these_pos_ids,key)
-        return pos_ids_by_ptl
+            data_by_ptl[petal] = petal.pos.get(these_pos_ids,key)
+        return data_by_ptl
 
     def identify_fiducials(self):
         """Nudge positioners forward/back to determine which centroid dots are fiducials.
