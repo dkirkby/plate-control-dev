@@ -15,7 +15,6 @@ class FidArrayMaster(object):
         self.can_ids = fid_ids
         self.duty_percent = 50 # 0-100
         self.duty_period  = 55 # milliseconds
-        self.obsXY = [] # list of locations of the dots in the obsXY coordinate system
 
     def all_on(self):
         """Turn all fiducials on at their default settings.
