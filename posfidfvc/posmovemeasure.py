@@ -105,14 +105,33 @@ class PosMoveMeasure(object):
             petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
 
     def calibrate(self,pos_ids='all'):
-        """Find hardstops, then sweep a circle of points about theta and phi to measure
-        positioner center locations, R1 and R2 arm lengths, theta and phi offsets, and
-        then set all these calibration values for each positioner.
+        """Sweep a circle of points about theta and phi to measure positioner center
+        locations, R1 and R2 arm lengths, theta and phi offsets, and then set all these
+        calibration values for each positioner.
         """
-        self.rehome(pos_ids)
         T = self.measure_calibration_arc(pos_ids,'theta')
         P = self.measure_calibration_arc(pos_ids,'phi')
-        # now store all these lovely values into each of the positioners accordingly
+        for pos_id in T.keys():
+            petal = T[pos_id]['petal']
+            t_ctr = np.array(T[pos_id]['xy_center'])
+            p_ctr = np.array(P[pos_id]['xy_center'])
+            length_r1 = np.sqrt(np.sum((t_ctr - p_ctr)**2))
+            petal.pos.set(pos_id,'LENGTH_R1',length_r1)
+            petal.pos.set(pos_id,'LENGTH_R2',P[pos_id]['radius'])
+            petal.pos.set(pos_id,'OFFSET_X',t_ctr[0])
+            petal.pos.set(pos_id,'OFFSET_Y',t_ctr[1])
+            obsT = np.arctan2(p_ctr[1]-t_ctr[1], p_ctr[0]-t_ctr[0]) * 180/np.pi
+            posT = np.median(P[pos_id]['target_tp'][pc.T])
+            offset_t = obsT - posT
+            petal.pos.set(pos_id,'OFFSET_T',offset_t)
+            p_xymeas = P[pos_id]['measured_xy']
+            p_angles = np.arctan2(p_xymeas[1]-p_ctr[1], p_xymeas[0]-p_ctr[0]) * 180/np.pi
+            obsP = p_angles - obsT
+            posP = P[pos_id]['target_tp'][pc.P]
+            offset_p = np.median(obsP - posP)
+            petal.pos.set(pos_id,'OFFSET_T',offset_p)
+
+
 
     def measure_calibration_arc(self,pos_ids='all',axis='theta'):
         """Expert usage. Sweep an arc of points about axis ('theta' or 'phi')
@@ -124,6 +143,7 @@ class PosMoveMeasure(object):
         contains the keys:
             'target_tp'     ... the posTP targets which were argued
             'measured_xy'   ... the resulting measured xy positions
+            'petal'         ... the petal this pos_id is on
             'xy_center'     ... the best fit arc's xy center
             'radius'        ... the best fit arc's radius
         """
@@ -149,7 +169,7 @@ class PosMoveMeasure(object):
             for i in range(len(these_pos_ids)):
                 t = linspace(initial_tp[i][0], final_tp[i][0], n_pts)
                 p = linspace(initial_tp[i][1], final_tp[i][1], n_pts)
-                data[these_pos_ids[i]] = {'target_tp':[[t[j],p[j]] for j in range(n_pts)], 'measured_xy':[]}
+                data[these_pos_ids[i]] = {'target_tp':[[t[j],p[j]] for j in range(n_pts)], 'measured_xy':[], 'petal':petal}
         all_pos_ids = data.keys()
         for i in range(n_pts):
             targets = [data[pos_id]['target_tp'][i] for pos_id in all_pos_ids]
