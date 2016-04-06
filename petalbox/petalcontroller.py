@@ -139,7 +139,36 @@ class PetalController(Application):
 			return self.FAILED		
 
 
+	def set_fiducial(self, posid, percent_duty, duty_period):
+		"""
+		Set the ficucial power levels and period
+		Inputs include list with percentages, periods and ids
+		Returns SUCCESS or error message.
 
+		ids          fiducial id
+		percent_duty float/int 0.0 - 1. 0 = off
+		duty_period  float/int [ms] time between duty cycles 
+		"""
+		if not isinstance(ids, list) or not isinstance(percent_duty,list) or not isinstance(duty_period,list):
+			rstring = 'set_fiducials: Invalid arguments'
+			self.error(rstring)
+			return 'FAILED: ' + rstring
+	
+		#f#or id in range(len(ids)):
+			# assemble arguments for canbus/firmware function
+		
+		#	posid=int(ids[id])
+		canbus=self.__get_canbus(posid)
+		
+		#percent_duty = int(percent_duty[id])
+		#	duty_period = int(duty_period[id])
+		
+		if not self.pmc.set_fiducial(canbus, posid, percent_duty, duty_period):
+			if self.verbose: print('set_fiducials: Error')
+			return self.FAILED
+
+		if self.verbose:  print('ID: %s, Percent %s, Period %s' % (ids[id],percent_duty[id],duty_period[id]))
+		return self.SUCCESS
 
 	def set_fiducials(self, canbus, ids, percent_duty, duty_period):
 		"""
