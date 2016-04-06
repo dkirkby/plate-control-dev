@@ -489,33 +489,61 @@ class PositionerMoveControl(object):
 		except:
 			return False  
 
-	def set_fiducials(self, canbus, posid, percent_duty, duty_period):
+	def set_fiducials(self, canbus, posids, percent_dutys, duty_periods):
+		
+		"""	Constructs the command to send fiducial control signals to the theta/phi motor pads.
+			This also sets the device mode to fiducial (rather than positioner) in the firmware.
+
+			INPUTS
+				canbus: 		string, can bus (example 'can2')        
+				posids:  		int, positioner id (example 1008)
+				percent_dutys: 	list of floats, percent duty cycle of waveforms going to the 
+								theta/phi pads (example .5)
+				duty_periods:  	list of float or int, period of waveforms going to theta/phi 
+								pads in ms (example 20 or 0.05)
+		"""
+
+		device_type = '01'  #fiducial = 01, positioner = 00
+		duty = str(hex(int(65536.*percent_duty)).replace('0x','')).zfill(4).zfill(4)
+		TIMDIVint = int(duty_period*72000.)
+		TIMDIV = str(hex(TIMDIVint)).replace('0x', '')).zfill(8) 
+		if(TIMDIVint <= 1650):
+			return False
+		print(canbus, posid, 16, device_type + duty + TIMDIV)
+		try:        
+			self.pfcan[canbus].send_command(posid, 16, device_type + duty + TIMDIV)
+			return True
+		except:
+			return False 
+
+		def set_fiducial(self, canbus, posid, percent_duty, duty_period):
 		
 		"""
 			Constructs the command to send fiducial control signals to the theta/phi motor pads.
 			This also sets the device mode to fiducial (rather than positioner) in the firmware.
 
 			INPUTS
-				canbus: string, can bus (example 'can2')        
-				posid:  int, positioner id (example 1008)
-				percent_duty: int, percent duty cycle of waveforms going to the theta/phi pads (example 45)
-				duty_period:  int, period of waveforms going to theta/phi pads in ms (example 20)
+				canbus: 		string, can bus (example 'can2')        
+				posid:  		int, positioner id (example 1008)
+				percent_duty: 	float, percent duty cycle of waveforms going to the 
+								theta/phi pads (example .5)
+				duty_period:  	float or int, period of waveforms going to theta/phi 
+								pads in ms (example 20 or 0.05)
 		"""
 
-		
 		device_type = '01'  #fiducial = 01, positioner = 00
-		duty = str(hex(int(65536.*percent_duty/100)).replace('0x','')).zfill(4).zfill(4)
-		TIMDIVint = int(duty_period*72000000.0/1000)
-		TIMDIV = str(hex(int(duty_period*72000000.0/1000)).replace('0x', '')).zfill(8) 
+		duty = str(hex(int(65536.*percent_duty)).replace('0x','')).zfill(4).zfill(4)
+		TIMDIVint = int(duty_period*72000.)
+		TIMDIV = str(hex(TIMDIVint)).replace('0x', '')).zfill(8) 
 		if(TIMDIVint <= 1650):
-			if self.verbose:  print("Duty period out of range") 
-			return True
+			print("Duty period too small") 
+			return False 
 		print(canbus, posid, 16, device_type + duty + TIMDIV)
 		try:        
 			self.pfcan[canbus].send_command(posid, 16, device_type + duty + TIMDIV)
-			return False
+			return True
 		except:
-			return True 
+			return False 		
 
 
 	def execute_sync(self, canbus, posid, mode):
