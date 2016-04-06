@@ -50,7 +50,8 @@ class PetalController(Application):
 				'get_fid_status',
 				'get_device_status', 
 				'get_pos_status', 
-				'set_fiducials',  
+				'set_fiducials',
+				'set_fiducial',  
 				'configure',
 				'get_positioner_map',
 				'move',					# implemented - usefull for testing 
@@ -149,10 +150,10 @@ class PetalController(Application):
 		percent_duty float/int 0.0 - 1. 0 = off
 		duty_period  float/int [ms] time between duty cycles 
 		"""
-		if not isinstance(ids, list) or not isinstance(percent_duty,list) or not isinstance(duty_period,list):
-			rstring = 'set_fiducials: Invalid arguments'
-			self.error(rstring)
-			return 'FAILED: ' + rstring
+		#if not isinstance(ids, list) or not isinstance(percent_duty,list) or not isinstance(duty_period,list):
+		#	rstring = 'set_fiducials: Invalid arguments'
+		#	self.error(rstring)
+		#	return 'FAILED: ' + rstring
 	
 		#f#or id in range(len(ids)):
 			# assemble arguments for canbus/firmware function
