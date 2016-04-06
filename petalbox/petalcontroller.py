@@ -165,10 +165,10 @@ class PetalController(Application):
 		#	duty_period = int(duty_period[id])
 		
 		if not self.pmc.set_fiducial(canbus, posid, percent_duty, duty_period):
-			if self.verbose: print('set_fiducials: Error')
+			if self.verbose: print('set_fiducial: Error')
 			return self.FAILED
 
-		if self.verbose:  print('ID: %s, Percent %s, Period %s' % (ids[id],percent_duty[id],duty_period[id]))
+		#if self.verbose:  print('ID: %s, Percent %s, Period %s' % (ids[id],percent_duty[id],duty_period[id]))
 		return self.SUCCESS
 
 	def set_fiducials(self, canbus, ids, percent_duty, duty_period):
@@ -564,11 +564,12 @@ class PositionerMoveControl(object):
 		device_type = '01'  #fiducial = 01, positioner = 00
 		duty = str(hex(int(65536.*percent_duty)).replace('0x','')).zfill(4).zfill(4)
 		TIMDIVint = int(duty_period*72000.)
+		print("TIMDIVint:",TIMDIVint)
 		TIMDIV = str(hex(TIMDIVint).replace('0x', '')).zfill(8) 
 		if(TIMDIVint <= 1650):
 			print("Duty period too small") 
 			return False 
-		print(canbus, posid, 16, device_type + duty + TIMDIV)
+		print(">>>",canbus, posid, 16, device_type + duty + TIMDIV)
 		try:        
 			self.pfcan[canbus].send_command(posid, 16, device_type + duty + TIMDIV)
 			return True
