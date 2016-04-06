@@ -564,7 +564,7 @@ class PositionerMoveControl(object):
 		"""
 
 		device_type = '01'  #fiducial = 01, positioner = 00
-		duty = str(hex(int(65536.*percent_duty)).replace('0x','')).zfill(4).zfill(4)
+		duty = str(hex(int(65535.*percent_duty)).replace('0x','')).zfill(4)
 		TIMDIVint = int(duty_period*72000.)
 		print("TIMDIVint:",TIMDIVint)
 		TIMDIV = str(hex(TIMDIVint).replace('0x', '')).zfill(8) 
