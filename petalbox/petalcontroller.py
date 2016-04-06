@@ -545,7 +545,7 @@ class PositionerMoveControl(object):
 		except:
 			return False 
 
-		def set_fiducial(self, canbus, posid, percent_duty, duty_period):
+	def set_fiducial(self, canbus, posid, percent_duty, duty_period):
 		
 		"""
 			Constructs the command to send fiducial control signals to the theta/phi motor pads.
