@@ -167,7 +167,7 @@ class PetalController(Application):
 		retvalue = self.pmc.set_fiducial(canbus, posid, percent_duty, duty_period)
 		print("return value:",retvalue)
 		if not retvalue:
-			self.verbose: print('set_fiducial: Error')
+			if self.verbose: print('set_fiducial: Error')
 			return self.FAILED
 
 		#if self.verbose:  print('ID: %s, Percent %s, Period %s' % (ids[id],percent_duty[id],duty_period[id]))
