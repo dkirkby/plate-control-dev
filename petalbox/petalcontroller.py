@@ -164,7 +164,7 @@ class PetalController(Application):
 		#percent_duty = int(percent_duty[id])
 		#	duty_period = int(duty_period[id])
 		
-		retvalue = self.pmc.set_fiducial(canbus, posid, percent_duty, duty_period):
+		retvalue = self.pmc.set_fiducial(canbus, posid, percent_duty, duty_period)
 		print("return value:",retvalue)
 		if note retvalue:
 			self.verbose: print('set_fiducial: Error')
