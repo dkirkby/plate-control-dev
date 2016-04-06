@@ -18,8 +18,8 @@ class PosMoveMeasure(object):
         self.ref_dist_tol = 0.050 # [mm] used for identifying fiducial dots
         self.nudge_dist   = 5.0   # [deg] used for identifying fiducial dots
         self.fiducials_xy = []    # list of locations of the dots in the obsXY coordinate system
-        self.n_points_theta_calib = 5 # number of points in a theta calibration arc
-        self.n_points_phi_calib = 5 # number of points in a phi calibration arc
+        self.n_points_full_calib_T = 7 # number of points in a theta calibration arc
+        self.n_points_full_calib_P = 7 # number of points in a phi calibration arc
         self.phi_Eo_margin = 3.0 # [deg] margin on staying within Eo envelope
 
     def fiducials_on(self):
@@ -93,22 +93,30 @@ class PosMoveMeasure(object):
                     num_corr_max ... maximum number of correction moves to perform on any positioner
         """
         if coordinates == 'QS':
-            targets = [self.trans.QS_to_obsXY(target) for target in targets]
+            trans = postransforms.PosTransforms()
+            targets = [trans.QS_to_obsXY(target) for target in targets]
         obsXY = []
         errXY = []
+        err2D = []
         (sorted_pos_ids, measured_pos_xy) = self.move_measure(pos_ids, 'obsXY', targets)
         idx_sort = [sorted_pos_ids.index(p) for p in pos_ids]
         sorted_targets = [targets[idx] for idx in idx_sort]
         obsXY = pc.concat_lists_of_lists(obsXY, measured_pos_xy)
-        errXY = pc.concat_lists_of_lists(errXY, (np.array(measured_pos_xy) - np.array(sorted_targets)).tolist())
+        this_errXY = np.array(measured_pos_xy) - np.array(sorted_targets)
+        this_err2D = (this_errXY[:,0]**2 + this_errXY[:,1]**2)**.5
+        errXY = pc.concat_lists_of_lists(errXY, this_errXY.tolist())
+        err2D = pc.concat_lists_of_lists(err2D, this_err2D.tolist())
         for i in range(1,num_corr_max+1):
             dxdy = (-np.array(errXY[i-1])).tolist()
             for j in range(len(dxdy)):
-                print(str(corr_move_pos_ids[j]) + ': correction move ' + str(j) + ' by (dx,dy)=(' + str(dxdy[j][0]) + ',' + str(dxdy[j][1]) + '), distance = ' + str((dxdy[j][0]**2 + dxdy[j][1]**2)**.5))
+                print(str(corr_move_pos_ids[j]) + ': correction move ' + str(j) + ' by (dx,dy)=(' + str(dxdy[j][0]) + ',' + str(dxdy[j][1]) + '), distance = ' + str(err2D[-1][j]))
             (sorted_pos_ids, measured_pos_xy) = self.move_measure(sorted_pos_ids, 'dXdY', dxdy)
             obsXY = pc.concat_lists_of_lists(obsXY, measured_pos_xy)
-            errXY = pc.concat_lists_of_lists(errXY, (np.array(measured_pos_xy) - np.array(sorted_targets)).tolist())
-        return sorted_pos_ids, sorted_targets, obsXY, errXY
+            this_errXY = np.array(measured_pos_xy) - np.array(sorted_targets)
+            this_err2D = (this_errXY[:,0]**2 + this_errXY[:,1]**2)**.5
+            errXY = pc.concat_lists_of_lists(errXY, this_errXY.tolist())
+            err2D = pc.concat_lists_of_lists(err2D, this_err2D.tolist())
+        return sorted_pos_ids, sorted_targets, obsXY, errXY, err2D
 
     def retract_phi(self,pos_ids='all'):
         """Get all phi arms within their clear rotation envelopes for positioners
@@ -139,66 +147,65 @@ class PosMoveMeasure(object):
         Calculate the total available travel range. Note that for axis='phi', the
         positioners must enter the collisionable zone, so the range seeking may
         occur in several successive stages.
+
+        Typically one does NOT call measure_range unless the theta offsets are already
+        reasonably well known. That can be achieved by first doing a 'quick' mode
+        calibration.
         """
         if axis == 'phi':
             axisid = pc.P
+            parameter_name = 'PHYSICAL_RANGE_P'
             batches = pos_ids # implement later some selection of smaller batches of positioners guaranteed not to collide
             # some for loop through those batches
         else:
             axisid = pc.T
+            parameter_name = 'PHYSICAL_RANGE_T'
         data = self._measure_range_arc(pos_ids,axis)
 
         # unwrapping code here
         for pos_id in data.keys():
-            initial_angle = data[pos_id]['initial_posTP'][axisid]
             delta = data[pos_id]['target_dtdp'][axisid]
             obsXY = data[pos_id]['measured_obsXY']
             center = data[pos_id]['xy_center']
-            steps_nominal = [delta]*(len(obsXY[0]) - 1)
             xy_ctrd = np.array(obsXY) - np.array(center)
             angles_measured = np.arctan2(xy_ctrd[:,1], xy_ctrd[:,0]) * 180/np.pi
-            angles_nominal = np.cumsum([[initial_angle] + steps_nominal])
-            for i in range(len(angles_measured)):
+            total_angle = 0
+            direction = np.sign(delta)
+            for i in range(len(angles_measured) - 1):
+                step_measured = angles_measured[i+1] - angles_measured[i]
+                if np.sign(step_measured) != direction:
+                    step_measured += direction * 360
+                total_angle += step_measured
+            total_angle = abs(total_angle)
+            data[pos_id]['petal'].pos.set(pos_id,parameter_name,total_angle)
 
-
-
-
-
-##        'target_dtdp'     ... the delta moves which were attempted
-##        'measured_obsXY'  ... the resulting measured xy positions
-##        'xy_center'       ... the best fit arc's xy center
-##        'radius'          ... the best fit arc's radius
-##        'petal'           ... the petal this pos_id is on
-##        'trans'           ... the postransform object associated with this particular positioner
-
-        # matlab code...
-        # test_steps(i+1) = diff(range) - sum(test_steps);
-        # xy_centered(:,1) = xy(:,1) - xy_ctr(1);
-        # xy_centered(:,2) = xy(:,2) - xy_ctr(2);
-        # test_steps_abs = [tp_initial(axis_idx),tp_initial(axis_idx)+cumsum(test_steps)]';
-        # a_meas = PosMoveMeasure.unwrapped_meas_angle(test_steps_abs,xy_centered);
-        # meas_range = a_meas(end) - a_meas(1);
-
-
-    def calibrate(self,pos_ids='all'):
+    def calibrate(self,pos_ids='all',mode='quick'):
         """Sweep a circle of points about theta and phi to measure positioner center
         locations, R1 and R2 arm lengths, theta and phi offsets, and then set all these
         calibration values for each positioner.
+
+        INPUTS:  pos_ids  ... list of pos_ids or 'all'
+                 mode     ... 'full' or 'quick', see detailed comments in _measure_calibration_arc method
+
+        Typically one does NOT call 'full' mode unless the theta offsets are already
+        reasonably well known. That can be achieved by first doing a 'quick' mode
+        calibration.
         """
-        T = self._measure_calibration_arc(pos_ids,'theta')
-        P = self._measure_calibration_arc(pos_ids,'phi')
+        T = self._measure_calibration_arc(pos_ids,'theta',mode)
+        P = self._measure_calibration_arc(pos_ids,'phi',mode)
         self._calculate_and_set_arms_and_offsets(T,P)
-        for pos_id in T.keys():
-            # gear ratio calibration calculations
-            trans = T[pos_id]['trans']
-            measured_obsXY = pc.concat_lists_of_lists(T[posid]['measured_obsXY'], P[posid]['measured_obsXY'])
-            target_posTP   = pc.concat_lists_of_lists(T[posid]['target_posTP'],   P[posid]['target_posTP'])
-            measured_posTP = trans.obsXY_to_posTP(np.transpose(measured_obsXY)).transpose()
-            scale_TP = np.divide(measured_posTP,target_posTP)
-            scale_T = np.median(scale_TP[:,pc.T])
-            scale_P = np.median(scale_TP[:,pc.P])
-            petal.pos.set(pos_id,'GEAR_CALIB_T',scale_T)
-            petal.pos.set(pos_id,'GEAR_CALIB_P',scale_P)
+        if mode == 'full':
+            for pos_id in T.keys():
+                # gear ratio calibration calculations
+                trans = T[pos_id]['trans']
+                measured_obsXY = pc.concat_lists_of_lists(T[posid]['measured_obsXY'], P[posid]['measured_obsXY'])
+                target_posTP   = pc.concat_lists_of_lists(T[posid]['target_posTP'],   P[posid]['target_posTP'])
+                measured_posTP = trans.obsXY_to_posTP(np.transpose(measured_obsXY)).transpose()
+                scale_TP = np.divide(measured_posTP,target_posTP)
+                scale_T = np.median(scale_TP[:,pc.T])
+                scale_P = np.median(scale_TP[:,pc.P])
+                petal.pos.set(pos_id,'GEAR_CALIB_T',scale_T)
+                petal.pos.set(pos_id,'GEAR_CALIB_P',scale_P)
 
     def identify_fiducials(self):
         """Nudge positioners forward/back to determine which centroid dots are fiducials.
@@ -250,13 +257,22 @@ class PosMoveMeasure(object):
             data_by_ptl[petal] = petal.pos.get(these_pos_ids,key)
         return data_by_ptl
 
-    def _measure_calibration_arc(self,pos_ids='all',axis='theta'):
+    def _measure_calibration_arc(self,pos_ids='all',axis='theta',mode='quick'):
         """Expert usage. Sweep an arc of points about axis ('theta' or 'phi')
         on positioners identified by pos_ids. Measure these points with the FVC
         and do a best fit of them.
 
         INPUTS:   pos_ids ... list of pos_ids or 'all'
                   axis    ... 'theta' or 'phi'
+
+        'quick' mode: phi never exceeds Eo envelope, 3 points measured on phi axis, 4 points on theta,
+        'full' mode: phi covers full range, n points per parameter 'n_points_full_calib_T' or 'n_points_full_calib_P'
+
+        Full mode assumes all the positioners can be placed such that their phi will not interfere. This means
+        that the thetas can be made homogenous, which means having reasonably theta offsets already known. Therefore
+        quick mode ought to have been run at least once before full mode, if there is doubt as to approximate theta offsets.
+
+        OUTPUTS:  data ... see comments below
 
         Returns a dictionary of dictionaries containing the data. The primary
         keys for the dict are the pos_id. Then for each pos_id, each subdictionary
@@ -277,15 +293,21 @@ class PosMoveMeasure(object):
             initial_tp = []
             final_tp = []
             if axis == 'theta':
-                n_pts = self.n_points_theta_calib
+                n_pts = 4 if mode == 'quick' else self.n_points_full_calib_T
                 for posmodel in posmodels:
-                    targetable_range = posmodel.targetable_range_T
-                    initial_tp = pc.concat_lists_of_lists(initial_tp, [min(targetable_range), phi_clear_angle])
-                    final_tp   = pc.concat_lists_of_lists(final_tp,   [max(targetable_range), initial_tp[-1][1]])
+                    targetable_range_T = posmodel.targetable_range_T
+                    initial_tp = pc.concat_lists_of_lists(initial_tp, [min(targetable_range_T), phi_clear_angle])
+                    final_tp   = pc.concat_lists_of_lists(final_tp,   [max(targetable_range_T), initial_tp[-1][1]])
             else:
-                n_pts = self.n_points_phi_calib
+                n_pts = 3 if mode == 'quick' else self.n_points_full_calib_P
                 for posmodel in posmodels:
-                    initial_tp = pc.concat_lists_of_lists(initial_tp, [np.mean(posmodel.targetable_range_T), phi_clear_angle])
+                    if mode == 'quick':
+                        phi_min = phi_clear_angle
+                        theta = 0
+                    else:
+                        phi_min = min(posmodel.targetable_range_P)
+                        theta = posmodel.trans.obsTP_to_posTP([0,0])[pc.T] # when doing phi axis, want obsT to all be uniform (simplifies anti-collision), which means have to figure out appropriate posT for each positioner -- depends on already knowing theta offset reasonably well
+                    initial_tp = pc.concat_lists_of_lists(initial_tp, [theta, phi_min])
                     final_tp   = pc.concat_lists_of_lists(final_tp,   [initial_tp[-1][0], max(posmodel.targetable_range_P)])
             for i in range(len(these_pos_ids)):
                 t = linspace(initial_tp[i][0], final_tp[i][0], n_pts)
@@ -331,20 +353,24 @@ class PosMoveMeasure(object):
         phi_clear_angle = self.phi_clear_angle
         n_intermediate_pts = 2
         data = {}
+        initial_tp = []
         for petal in pos_ids_by_ptl.keys():
             these_pos_ids = pos_ids_by_ptl[petal]
             if axis == 'theta':
                 delta = 360/(n_intermediate_pts + 1)
-                initial_tp = [-180, phi_clear_angle]
+                initial_tp = [-180, phi_clear_angle] # always the same posT is fine when doing theta axis range finding
                 dtdp = [delta,0]
                 axisid = pc.T
             else:
                 delta = -180/(n_intermediate_pts + 1)
-                initial_tp = [0, 0]
+                posmodels = petal.pos.get(these_pos_ids)
+                for posmodel in posmodels:
+                    this_initial_tp = posmodel.trans.obsTP_to_posTP([0,0]) # when doing phi axis, want obsT to all be uniform (simplifies anti-collision), which means have to figure out appropriate posT for each positioner -- depends on already knowing theta offset reasonably well
+                    initial_tp = pc.concat_lists_of_lists(initial_tp, this_initial_tp)
                 dtdp = [0,delta]
                 axisid = pc.P
             for i in range(len(these_pos_ids)):
-                data[these_pos_ids[i]] = {'initial_tp':initial_tp, 'target_dtdp':dtdp, 'measured_obsXY':[], 'petal':petal, 'trans':posmodels[i].trans}
+                data[these_pos_ids[i]] = {'target_dtdp':dtdp, 'measured_obsXY':[], 'petal':petal}
         all_pos_ids = data.keys()
 
         # go to initial point
@@ -381,7 +407,6 @@ class PosMoveMeasure(object):
         for pos_id in all_pos_ids:
             (xy_ctr,radius) = fitcircle.fit(data[pos_id]['measured_obsXY'])
             data[pos_id]['xy_center'] = xy_ctr
-            data[pos_id]['radius'] = radius
         return data
 
     def _calculate_and_set_arms_and_offsets(self, T, P):
