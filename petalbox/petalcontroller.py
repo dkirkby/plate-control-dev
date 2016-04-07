@@ -559,7 +559,7 @@ class PositionerMoveControl(object):
 		"""
 
 		device_type = '01'  #fiducial = 01, positioner = 00
-		duty = str(hex(int(65.535*percent_duty)).replace('0x','')).zfill(4)
+		duty = str(hex(int(655.35*percent_duty)).replace('0x','')).zfill(4)
 		#TIMDIVint = int(duty_period*72000.)
 		#TIMDIV = str(hex(TIMDIVint).replace('0x', '')).zfill(8)
 		TIMDIV ='00000FA0' # hardcode this for the time being to 55 microsec. 
