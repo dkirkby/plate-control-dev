@@ -140,37 +140,35 @@ class PetalController(Application):
 			return self.FAILED		
 
 
-	def set_fiducial(self, posid, percent_duty, duty_period):
+	def set_fiducial(self, posid, percent_duty):
 		"""
-		Set the ficucial power levels and period
-		Inputs include list with percentages, periods and ids
-		Returns SUCCESS or error message.
+		Set the ficucial power levels (between 0. and 100.). Inputs less than 0. or
+		greater than 100. are automatically set to 0. and 100., respectively.
 
-		ids          fiducial id
-		percent_duty float/int 0.0 - 1. 0 = off
-		duty_period  float/int [ms] time between duty cycles 
+
+		INPUT
+			ids          	integer fiducial id
+			percent_duty 	float (int accepted) 0. to 100.  0.  (or 0) = off
+							[note: granularity is 100./65536 = 0.00153]
+		RETURNS
+			SUCCESS or error message			
 		"""
-		#if not isinstance(ids, list) or not isinstance(percent_duty,list) or not isinstance(duty_period,list):
-		#	rstring = 'set_fiducials: Invalid arguments'
-		#	self.error(rstring)
-		#	return 'FAILED: ' + rstring
-	
-		#f#or id in range(len(ids)):
-			# assemble arguments for canbus/firmware function
-		
-		#	posid=int(ids[id])
-		canbus=self.__get_canbus(posid)
-		
-		#percent_duty = int(percent_duty[id])
-		#	duty_period = int(duty_period[id])
-		
-		retvalue = self.pmc.set_fiducial(canbus, posid, percent_duty, duty_period)
-		print("return value:",retvalue)
-		if not retvalue:
-			if self.verbose: print('set_fiducial: Error')
+
+		try:
+			if percent_duty < 0.: percent_duty=0.
+			if percent_duty > 100.: percent_duty=100.
+		except:
 			return self.FAILED
 
-		#if self.verbose:  print('ID: %s, Percent %s, Period %s' % (ids[id],percent_duty[id],duty_period[id]))
+		try:
+			canbus=self.__get_canbus(posid)
+		except:
+			return self.FAILED
+		
+		if not self.pmc.set_fiducial(canbus, posid, percent_duty):
+			if self.verbose: print('set_fiducial: Error setting fiducial with id'+str(posid))
+			return self.FAILED
+
 		return self.SUCCESS
 
 	def set_fiducials(self, canbus, ids, percent_duty, duty_period):
@@ -548,7 +546,7 @@ class PositionerMoveControl(object):
 		except:
 			return False 
 
-	def set_fiducial(self, canbus, posid, percent_duty, duty_period):
+	def set_fiducial(self, canbus, posid, percent_duty):
 		
 		"""
 			Constructs the command to send fiducial control signals to the theta/phi motor pads.
@@ -557,21 +555,18 @@ class PositionerMoveControl(object):
 			INPUTS
 				canbus: 		string, can bus (example 'can2')        
 				posid:  		int, positioner id (example 1008)
-				percent_duty: 	float, percent duty cycle of waveforms going to the 
-								theta/phi pads (example .5)
-				duty_period:  	float or int, period of waveforms going to theta/phi 
-								pads in ms (example 20 or 0.05)
+
 		"""
 
 		device_type = '01'  #fiducial = 01, positioner = 00
-		duty = str(hex(int(65535.*percent_duty)).replace('0x','')).zfill(4)
-		TIMDIVint = int(duty_period*72000.)
-		print("TIMDIVint:",TIMDIVint)
-		TIMDIV = str(hex(TIMDIVint).replace('0x', '')).zfill(8) 
-		if(TIMDIVint <= 1650):
-			print("Duty period too small") 
-			return False 
-		print(">>>",canbus, posid, 16, device_type + duty + TIMDIV)
+		duty = str(hex(int(65.535*percent_duty)).replace('0x','')).zfill(4)
+		#TIMDIVint = int(duty_period*72000.)
+		#TIMDIV = str(hex(TIMDIVint).replace('0x', '')).zfill(8)
+		TIMDIV ='00000FA0' # hardcode this for the time being to 55 microsec. 
+		#if(TIMDIVint <= 1650):
+		#	print("Duty period too small") 
+		#	return False 
+		#print(">>>",canbus, posid, 16, device_type + duty + TIMDIV)
 		try:        
 			self.pfcan[canbus].send_command(posid, 16, device_type + duty + TIMDIV)
 			return True
