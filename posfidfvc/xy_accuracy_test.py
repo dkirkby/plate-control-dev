@@ -71,14 +71,14 @@ for local_target in local_targets:
 for these_targets in all_global_targets:
     (sorted_pos_ids, sorted_targets, obsXY, errXY, err2D) = m.move_and_correct(pos_ids, these_targets, coordinates='obsXY', num_corr_max=num_corr_max)
     # data logging
+    file = open(main_log_name(sorted_pos_ids[i]),'a')
     for i in range(len(sorted_pos_ids)):
-        row = str(sorted_targets[0]) + ',' + str(sorted_targets[1])
+        row = str(sorted_targets[i][0]) + ',' + str(sorted_targets[i][1])
         for submove in obsXY:
             row += ',' + submove[i][0] + ',' + submove[i][1]
         for submove in errXY:
             row += ',' + submove[i][0] + ',' + submove[i][1]
         for submove in err2D:
             row += ',' + submove[i]
-        file = open(main_log_name(sorted_pos_ids[i]),'a')
         file.write(row + '\n')
-        file.close()
+    file.close()
