@@ -44,6 +44,7 @@ petalbox/startpc.sh -text
 petalbox/util/dotprofile -text
 petalbox/util/mvtest.py -text
 posfidfvc/SBIG/SBIG_dev/51-sbig-debian.rules -text
+posfidfvc/SBIG/SBIG_dev/lib32/libsbigudrv.so -text
 posfidfvc/SBIG/SBIG_dev/lib64/libsbigudrv.so -text
 posfidfvc/SBIG/SBIG_dev/sbigudrv.h -text
 posfidfvc/SBIG/measure_camera_scale.conf -text
