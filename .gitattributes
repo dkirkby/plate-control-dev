@@ -43,6 +43,15 @@ petalbox/posfidcan.py -text
 petalbox/startpc.sh -text
 petalbox/util/dotprofile -text
 petalbox/util/mvtest.py -text
+posfidfvc/SBIG/SBIG_dev/51-sbig-debian.rules -text
+posfidfvc/SBIG/SBIG_dev/sbigudrv.h -text
+posfidfvc/SBIG/measure_camera_scale.conf -text
+posfidfvc/SBIG/measure_camera_scale.py -text
+posfidfvc/SBIG/msgfitter.py -text
+posfidfvc/SBIG/multicens.py -text
+posfidfvc/SBIG/readme -text
+posfidfvc/SBIG/sbig_grab_cen.py -text
+posfidfvc/SBIG/sbigcam.py -text
 posfidfvc/fvchandler.py -text
 posfidfvc/posmovemeasure.py -text
 posfidfvc/xy_accuracy_test.py -text
