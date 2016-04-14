@@ -141,7 +141,7 @@ class PetalComm(object):
         # can_ids: list of can_ids (list of integers)
         # if everybody is stationary, then true
         try:
-            return self._call_device('raedy_for_tables',can_ids)
+            return self._call_device('ready_for_tables',can_ids)
         except Exception as e:
             return 'FAILED: Can not execute ready_for_tables. Exception: %s' % str(e)           
 
