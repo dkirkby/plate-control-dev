@@ -60,7 +60,8 @@ class PetalController(Application):
 				'set_posid',
 				'get_sids',
 				'set_periods',
-				'set_currents']
+				'set_currents',
+				'ready_for_tables']
 
 	# Default configuration (can be overwritten by command line or config file)
 	defaults = {'default_petal_id' : 1,
@@ -350,18 +351,18 @@ class PetalController(Application):
 
 		retcode=self.pmc.set_currents(canbus, posid, P_currents, T_currents)		
 		if retcode:
-			return self.SUCCESS  
+			return self.FAILED  
 		else:
-			return self.FAILED
+			return self.SUCCESS
 
-	def set_periods(self, can_id, creep_period_m0, creep_period_m1, spin_steps):
-		canbus = self.__get_canbus(posid)
-
-		retcode=self.pmc.set_periods(self, can_id, creep_period_m0, creep_period_m1, spin_steps)		
+	def set_periods(self, can_id, creep_period_m0, creep_period_m1, spin_period):
+		canbus = self.__get_canbus(can_id)
+		print(canbus)
+		retcode=self.pmc.set_periods(canbus, can_id, creep_period_m0, creep_period_m1, spin_period)
 		if retcode:
-			return self.SUCCESS  
-		else:
 			return self.FAILED
+		else:
+			return self.SUCCESS
 
 	def set_pos_constants(self, posids, settings):
 		"""
@@ -401,6 +402,7 @@ class PetalController(Application):
 		Returns a (dictionary?) containing status of all devices other than positioners
 		and fiducials on the petal. This includes fans, power supplies, and sensors.
 		"""
+		print("<in get_pos_status>")
 		canbus = self.__get_canbus(posids[0])
 		retcode=self.pmc.get_pos_status(canbus,posids)
 		
@@ -519,7 +521,7 @@ class PositionerMoveControl(object):
 		except:
 			return False  
 
-	def set_fiducials(self, canbus, posids, percent_dutys, duty_periods):
+	def set_fiducials(self, canbus, posid, percent_duty, duty_period):
 		
 		"""	Constructs the command to send fiducial control signals to the theta/phi motor pads.
 			This also sets the device mode to fiducial (rather than positioner) in the firmware.
@@ -534,13 +536,14 @@ class PositionerMoveControl(object):
 		"""
 
 		device_type = '01'  #fiducial = 01, positioner = 00
-		duty = str(hex(int(65536.*percent_duty)).replace('0x','')).zfill(4).zfill(4)
+		duty = str(hex(int(65535.*percent_duty/100)).replace('0x','')).zfill(4)
 		TIMDIVint = int(duty_period*72000.)
 		TIMDIV = str(hex(TIMDIVint).replace('0x', '')).zfill(8) 
 		if(TIMDIVint <= 1650):
 			return False
 		print(canbus, posid, 16, device_type + duty + TIMDIV)
 		try:        
+			
 			self.pfcan[canbus].send_command(posid, 16, device_type + duty + TIMDIV)
 			return True
 		except:
@@ -562,7 +565,7 @@ class PositionerMoveControl(object):
 		duty = str(hex(int(655.35*percent_duty)).replace('0x','')).zfill(4)
 		#TIMDIVint = int(duty_period*72000.)
 		#TIMDIV = str(hex(TIMDIVint).replace('0x', '')).zfill(8)
-		TIMDIV ='00000FA0' # hardcode this for the time being to 55 microsec. 
+		TIMDIV ='00001056' # hardcode this for the time being to 55 microsec. 
 		#if(TIMDIVint <= 1650):
 		#	print("Duty period too small") 
 		#	return False 
@@ -615,7 +618,7 @@ class PositionerMoveControl(object):
 			posid=int(posid)
 			status[posid]='UNKNOWN'
 			try:        
-				posid_return,stat=self.pfcan[canbus].send_command_recv(posid,13, '')
+				posid_return,stat=self.pfcan[canbus].send_command_recv(posid,13,'')
 				print("posid_return,stat:",posid_return,stat)
 				stat=ord(stat)
 				if stat: status[posid]='BUSY'
@@ -628,40 +631,50 @@ class PositionerMoveControl(object):
 	def set_currents(self,canbus, posid, P_currents, T_currents):
 		"""
 			Sets the currents for motor 0 (phi) and motor 1 (theta).
+			Currents are entered as percents (e.g. spin current = 70, cruise_current = 50, creep_current = 30)
 		"""   
 
 		spin_current_m0 ,cruise_current_m0 ,creep_current_m0 ,hold_current_m0 = P_currents
 		spin_current_m1 ,cruise_current_m1 ,creep_current_m1 ,hold_current_m1 = T_currents
 
 		spin_current_m0 = str(hex(spin_current_m0).replace('0x','')).zfill(2)
+		print(spin_current_m0)
 		cruise_current_m0 = str(hex(cruise_current_m0).replace('0x','')).zfill(2)
 		creep_current_m0 = str(hex(creep_current_m0).replace('0x','')).zfill(2)
 		hold_current_m0 = str(hex(hold_current_m0).replace('0x','')).zfill(2)   
 		m0_currents = spin_current_m0 + cruise_current_m0 + creep_current_m0 + hold_current_m0
-
+		print(m0_currents)
 		spin_current_m1 = str(hex(spin_current_m1).replace('0x','')).zfill(2)
 		cruise_current_m1 = str(hex(cruise_current_m1).replace('0x','')).zfill(2)
 		creep_current_m1 = str(hex(creep_current_m1).replace('0x','')).zfill(2)
-		hold_0current_m1 = str(hex(hold_current_m1).replace('0x','')).zfill(2)           
+		hold_current_m1 = str(hex(hold_current_m1).replace('0x','')).zfill(2)           
 		m1_currents = spin_current_m1 + cruise_current_m1 + creep_current_m1 + hold_current_m1
-
+		print(m1_currents)
 		try:
 			self.pfcan[canbus].send_command(posid,2,m0_currents + m1_currents)
 			return 0
 		except:
 			return 1   
 
-	def set_periods(self, canbus, posid, creep_period_m0, creep_period_m1, spin_steps):
+	def set_periods(self, canbus, posid, creep_period_m0, creep_period_m1, spin_period):
 		"""
-			Needs definitions of arguments.
-		"""      
-		creep_period_m0=str(creep_period_m0).zfill(2)
-		creep_period_m1=str(creep_period_m1).zfill(2)
-		spin_steps=str(hex(spin_steps).replace('0x','')).zfill(4)
+			canbus - string that specifies the canbus, eg. 'can2'
+			posid - int, positioner id, eg. 20000
+			creep_period_m0 - e.g. period = 5: 18,000/3600/5 = 1 rev/sec = 60 rpm creep rate
+			creep_period_m1 - e.g period=5: 18,000/3600/5 = 1 rev/sec = 60 rpm creep rate
+			spin_period - Number of times to repeat each angular diplacement in spin-up table
+		"""
+
+		print(posid)
+		posid = int(posid)
+		print(canbus)      
+		creep_period_m0=str(hex(creep_period_m0).replace('0x','')).zfill(2)
+		creep_period_m1=str(hex(creep_period_m1).replace('0x','')).zfill(2)
+		spin_steps=str(hex(spin_period).replace('0x','')).zfill(2)
 		
 		if self.verbose: print("Data sent: %s" % creep_period_m0+creep_period_m1+spin_steps)
 		try:
-			self.pfcan[canbus].send_command(pid,3,creep_period_m0 + creep_period_m1 + spin_steps)
+			self.pfcan[canbus].send_command(posid,3,creep_period_m0 + creep_period_m1 + spin_steps)
 			return 0
 
 		except:
@@ -797,7 +810,7 @@ class PositionerMoveControl(object):
 				data=int(xcode + s_select,16) + int(s_motor_steps,16) + int(s_pause,16) + 4
 				self.bitsum += data
 				#print('Bitsum =', self.bitsum)                
-				self.pfcan[canbus].send_command(posid, 8, str(hex(self.bitsum).replace('0x','').zfill(8)))
+				posid_return,stat=self.pfcan[canbus].send_command_recv(posid, 8, str(hex(self.bitsum).replace('0x','').zfill(8)))
 				self.bitsum=0
 				return 0	
 			except:
