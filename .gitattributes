@@ -2,8 +2,6 @@
 petal/demo.py -text
 petal/fidarraymaster.py -text
 petal/focal_surface_lookup.csv -text
-petal/legacypetalcomm.py -text
-petal/legacypositionercomm.py -text
 petal/movetablescr.py -text
 petal/petal.py -text
 petal/petalcomm.py -text
