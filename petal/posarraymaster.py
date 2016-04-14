@@ -28,6 +28,7 @@ class PosArrayMaster(object):
         self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
         self.anticollision_default = True # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
         self.anticollision_override = True # causes the anticollision_default value to be used in all cases
+        self.verbose = False
 
     def request_targets(self, pos, commands, values):
         """See comments for corresponding function in petal.py.
@@ -126,28 +127,34 @@ class PosArrayMaster(object):
         """See comments for corresponding function in petal.py.
         """
         hw_tables = self.hardware_ready_move_tables()
-
-        timeout = 30 # seconds
         comm_time_estimate = 0.5 # seconds
-        start_time = time.time()
+        move_time_estimate = 0.0 # seconds
         canids = []
-        move_time_estimate = 0
         for tbl in hw_tables:
             canids.append(tbl['canid'])
             temp = np.sum(tbl['move_time'])
             if temp > move_time_estimate:
                 move_time_estimate = temp
         move_time_estimate += comm_time_estimate
-        print('move_time_estimate = ' + str(move_time_estimate))
+        if self.verbose:
+            print('move_time_estimate = ' + str(move_time_estimate))
 
         # SIMPLE BLOCKING IMPLEMENTATION
         # ... so we don't send new tables while any positioners are still moving.
         # There may be better ways to achieve this, to be implemented later.
-        while (time.time()-start_time) < timeout:
+        timeout_margin = 5.0 # seconds
+        timeout = move_time_estimate + timeout_margin
+        keep_waiting = True
+        start_time = time.time()
+        while keep_waiting:
+            if (time.time()-start_time) >= timeout:
+                print('Timed out at ' + str(timeout) + ' seconds waiting to send next move table.')
+                keep_waiting = False
             ready_for_tables = self.comm.ready_for_tables(canids)
-            print('ready_for_tables: ' + str(ready_for_tables))
+            if self.verbose:
+                print('ready_for_tables: ' + str(ready_for_tables))
             if ready_for_tables:
-                break
+                keep_waiting = False
             else:
                 time.sleep(0.5)
 
@@ -167,7 +174,8 @@ class PosArrayMaster(object):
         """
         for m in self.schedule.move_tables:
             m.posmodel.postmove_cleanup(m.for_cleanup)
-        print(self.expected_current_position_str())
+        if self.verbose:
+            print(self.expected_current_position_str())
         self.clear_schedule()
 
     def clear_schedule(self):
