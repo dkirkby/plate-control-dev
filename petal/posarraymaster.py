@@ -34,11 +34,11 @@ class PosArrayMaster(object):
         """
         pos = pc.listify(pos,True)[0]
         commands = pc.listify(commands,True)[0]
-        values = pc.listify(values,True)[0]
+        values = pc.listify2d(values)
         for i in range(len(pos)):
             posmodel = self.get_model_for_pos(pos[i])
             if self.schedule.already_requested(posmodel):
-                print('Positioner ' + str(posmodel.posid) + ' already has a target scheduled. Extra target request ' + str(commands[i]) + '(' + str(vals1[i]) + ',' + str(vals2[i]) + ') ignored')
+                print('Positioner ' + str(posmodel.posid) + ' already has a target scheduled. Extra target request ' + str(commands[i]) + '(' + str(values[i][0]) + ',' + str(values[i][1]) + ') ignored')
             else:
                 self.schedule.request_target(posmodel, commands[i], values[i][0], values[i][1])
 
@@ -46,7 +46,7 @@ class PosArrayMaster(object):
         """See comments for corresponding function in petal.py.
         """
         pos = pc.listify(pos,True)[0]
-        dtdp = pc.listify(dtdp,True)[0]
+        dtdp = pc.listify2d(dtdp)
         for i in range(len(pos)):
             posmodel = self.get_model_for_pos(pos[i])
             table = posmovetable.PosMoveTable(posmodel)
@@ -143,8 +143,13 @@ class PosArrayMaster(object):
         # SIMPLE BLOCKING IMPLEMENTATION
         # ... so we don't send new tables while any positioners are still moving.
         # There may be better ways to achieve this, to be implemented later.
-        while not(self.comm.ready_for_tables(canids)) and (time.time()-start_time) < timeout:
-            time.sleep(0.5)
+        while (time.time()-start_time) < timeout:
+            ready_for_tables = self.comm.ready_for_tables(canids)
+            print('ready_for_tables: ' + str(ready_for_tables))
+            if ready_for_tables:
+                break
+            else:
+                time.sleep(0.5)
 
         # send tables and execute
         self.comm.send_tables(hw_tables)

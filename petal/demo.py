@@ -20,7 +20,7 @@ for pos_id in pos_ids:
     print(ptl.pos.get(pos_id).expected_current_position_str)
 
 # demo script flags
-should_flash       = False
+should_flash       = True
 should_home        = True
 should_direct_dtdp = True
 should_move_qs     = False
@@ -54,7 +54,7 @@ if should_direct_dtdp:
     for i in range(len(dtdp)):
         values = dtdp[i]
         print('\nMOVE: direct dtdp (' + str(values[0]) + ',' + str(values[1]) + ')')
-        ptl.quick_dtdp(pos_ids, [values[0]]*n, [values[1]]*n)
+        ptl.quick_dtdp(pos_ids, [values]*n)
 
 # the remainder below are for general usage
 if should_move_qs:
@@ -64,7 +64,7 @@ if should_move_qs:
     for i in range(len(QS)):
         values = QS[i]
         print('\nMOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
-        ptl.quick_move(pos_ids, [values[0]]*n, [values[1]]*n)
+        ptl.quick_move(pos_ids, [command]*n, [values]*n)
 
 if should_move_dqds:
     dQdS = [[0,3], [90,-3], [-180,6], [90,6]]
@@ -72,7 +72,7 @@ if should_move_dqds:
     for i in range(len(dQdS)):
         values = dQdS[i]
         print('\nMOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
-        ptl.quick_move(pos_ids, [values[0]]*n, [values[1]]*n)
+        ptl.quick_move(pos_ids, [command]*n, [values]*n)
 
 if should_move_xy:
     xy = [[2.5,0], [0,2.5], [-5,0], [0,-5], [-5.99,0], [6,0], [0,8], [0,0]]
@@ -80,7 +80,7 @@ if should_move_xy:
     for i in range(len(xy)):
         values = xy[i]
         print('\nMOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
-        ptl.quick_move(pos_ids, [values[0]]*n, [values[1]]*n)
+        ptl.quick_move(pos_ids, [command]*n, [values]*n)
 
 if should_move_dxdy:
     dxdy = [[2.5,0], [2.5,0], [-10,0], [5,-5], [0,5]]
@@ -88,7 +88,7 @@ if should_move_dxdy:
     for i in range(len(dxdy)):
         values = dxdy[i]
         print('\nMOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
-        ptl.quick_move(pos_ids, [values[0]]*n, [values[1]]*n)
+        ptl.quick_move(pos_ids, [command]*n, [values]*n)
 
 if should_move_tp:
     tp = [[-90,90], [0,90], [90,90], [0,180]]
@@ -96,12 +96,12 @@ if should_move_tp:
     for i in range(len(tp)):
         values = tp[i]
         print('\nMOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
-        ptl.quick_move(pos_ids, [values[0]]*n, [values[1]]*n)
+        ptl.quick_move(pos_ids, [command]*n, [values]*n)
 
 if should_move_dtdp:
     dtdp = [[210,0], [-30,0], [0,-30], [0,30], [-30,-30], [-150,30]]
     command = 'dTdP'
-    for i in range(len(dt)):
+    for i in range(len(dtdp)):
         values = dtdp[i]
         print('\nMOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
-        ptl.quick_move(pos_ids, [values[0]]*n, [values[1]]*n)
+        ptl.quick_move(pos_ids, [command]*n, [values]*n)

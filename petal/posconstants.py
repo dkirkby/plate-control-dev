@@ -89,6 +89,16 @@ def delistify(uv):
         else:
             new_uv.append(uv[i])
     return new_uv
+    
+def listify2d(uv):
+    """If uv is [u,v], return [[u,v]]. Otherwise return uv.
+    I.e., so [[u1,v1],[u2,v2],...] would stay the same
+    """
+    if isinstance(uv,list):
+        if not(isinstance(uv[0],list)) and len(uv) == 2:
+            return [uv]
+        else:
+            return uv
 
 def concat_lists_of_lists(L1, L2):
     """Always output an [N][M] list, for M dimensional coordinate inputs initial and new.

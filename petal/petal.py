@@ -95,7 +95,7 @@ class Petal(object):
         to a list of positioners, all in one shot.
         """
         self.request_targets(pos, commands, values)
-        self.schedule_send_execute()
+        self.schedule_send_and_execute_moves()
 
     def quick_dtdp(self, pos, dtdp, cmd_prefix=''):
         """Convenience wrapper to request, schedule, send, and execute a list of direct
@@ -103,7 +103,7 @@ class Petal(object):
         method is intended for expert usage only.
         """
         self.request_direct_dtdp(pos, dtdp, cmd_prefix)
-        self.schedule_send_execute()
+        self.schedule_send_and_execute_moves()
 
     def schedule_send_and_execute_moves(self):
         """Convenience wrapper to schedule, send, and execute the pending requested
