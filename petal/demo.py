@@ -6,7 +6,7 @@ import posconstants as pc
 """
 
 # initialization
-pos_ids = ['UM00012']
+pos_ids = ['UM00012','UM00014']
 #pos_ids = ['UM00011','UM00012','UM00013','UM00014','UM00015']
 fid_ids = []
 petal_id = 1
