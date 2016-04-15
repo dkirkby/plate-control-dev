@@ -2,16 +2,15 @@ import time
 import warnings
 import multicens
 import numpy as np
-import os, gc
+import gc
 import sbigcam
-from configobj import ConfigObj
 
 # 160326: 	MS-created based on the script SBIGgrabCen.py which used an c++ compiled executable to control
 #			the SBIG camera (by calling SBIGGrabImage.py)
 #			This was replaced with the new class in sbigcam.py 
 
 
-def sbig_grab_cen(exposure_time=90, nWin=1):
+def sbig_grab_cen(exposure_time=90, nWin=1, min_brightness=5000, max_brightness=60000, verbose=False, writefits=False):
 	"""
     Calls function to grab light and dark images from SBIG camera, then centroids spots.
 	 
@@ -30,17 +29,17 @@ def sbig_grab_cen(exposure_time=90, nWin=1):
     """
 	# for now hardcode the following parameters but we will read those eventually
 	# through config parser
-	
-	config=ConfigObj('camera_scale.conf')
-	min_brightness=config.get('Settings').as_int('min_brightness')
-	max_brightness=config.get('Settings').as_int('max_brightness')
-	verbose=config.get('Preferences').as_bool('verbose')
-	writefits=config.get('Preferences').as_bool('writefits')
-	pwd=os.getcwd()
-	
+#	
+#	config=ConfigObj('camera_scale.conf')
+#	min_brightness=config.get('Settings').as_int('min_brightness')
+#	max_brightness=config.get('Settings').as_int('max_brightness')
+#	verbose=config.get('Preferences').as_bool('verbose')
+#	writefits=config.get('Preferences').as_bool('writefits')
+#	pwd=os.getcwd()
+#	
 	#min_brightness=5000
 	#max_brightness=60000
-
+    
 	# end configuration
 	
 	tic = time.time()
@@ -51,7 +50,8 @@ def sbig_grab_cen(exposure_time=90, nWin=1):
 	
 	cam.set_exposure_time(int(exposure_time))
 
-	print("verbose: ",verbose)			
+	if verbose:
+		print("verbose: ",verbose)			
 
 	if verbose: print("dark Image")
 
