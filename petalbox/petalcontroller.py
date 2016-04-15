@@ -20,6 +20,7 @@
    3/07/2016    MS, IG      added send_tables
    3/08/2016    MS, IG      rewrote load_rows; added load_rows_angle, load_table_rows
    3/24/2016    IG          filled in set_fiducials
+
 """
 
 from DOSlib.application import Application
@@ -248,9 +249,16 @@ class PetalController(Application):
 				motor_steps_P=table['motor_steps_P'][row]
 				speed_mode_T=table['speed_mode_T'][row]
 				speed_mode_P=table['speed_mode_P'][row]
-				post_pause=nint(table['postpause'][row]) + nint((table['move_time'][row])*1000) 
+				post_pause=nint(table['postpause'][row]) + nint((table['move_time'][row])*1000)
+
+				if (motor_steps_T & motor_steps_P):	#simultaneous movement of theta and phi
+					post_pause_T = 0 		#first axis command gets sent with 0 post_pause to make firmware perform simultaneous theta/phi move
+				else:
+					post_pause_T = post_pause		
+
+ 
 				if self.verbose: print("send_tables:",  canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause)
-				if self.pmc.load_table_rows(canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause):
+				if self.pmc.load_table_rows(canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause_T):
 					if self.verbose: print('send_tables: Error')
 					return self.FAILED
 				if row == (nrows - 1):  #last row in move table, xcode = 2
@@ -708,8 +716,10 @@ class PositionerMoveControl(object):
 		mode=(mode[0],mode[1],mode[2])
    
 		try:
-			self.load_rows(canbus, posid, xcode, mode, motor_steps , post_pause)
-			return  0
+			if self.load_rows(canbus, posid, xcode, mode, motor_steps , post_pause):
+				return 1
+			else:
+				return  0
 		except:
 			print("Error loading table row!")
 			return 1
@@ -731,8 +741,10 @@ class PositionerMoveControl(object):
 		if speed_mode == 'creep':  
 			motor_steps = nint(angle*self.Gear_Ratio/.1)
 		if speed_mode == 'cruise':
-			motor_steps = nint(angle*self.Gear_Ratio/3.3)      
-		self.load_rows(canbus, posid, xcode, mode, motor_steps, pause)    
+			motor_steps = nint(angle*self.Gear_Ratio/3.3)
+      
+		self.load_rows(canbus, posid, xcode, mode, motor_steps, pause)
+			    
 
 
 	def load_rows(self, canbus, posid, xcode, mode, motor_steps, pause):
@@ -812,7 +824,13 @@ class PositionerMoveControl(object):
 				#print('Bitsum =', self.bitsum)                
 				posid_return,stat=self.pfcan[canbus].send_command_recv(posid, 8, str(hex(self.bitsum).replace('0x','').zfill(8)))
 				self.bitsum=0
-				return 0	
+				
+				move_table_status = stat[4]
+				if move_table_status != 1:
+					print("Did not receive checksum match after sending a move table")
+					return 1
+				else:
+					return 0	
 			except:
 				print ("Sending command 9 failed")
 				return 1
