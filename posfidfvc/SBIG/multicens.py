@@ -118,7 +118,7 @@ def newmultiCens(img, verbose=False):
 		print ('thresholding level was less than nominal min level {}. Attempting > 0.2'.format(level))
 		pass
 		
-	if debug:
+	if verbose:
 		print('**** pre bw')
 		print(img[0:5])
 
@@ -126,7 +126,7 @@ def newmultiCens(img, verbose=False):
 	hdu=pyfits.PrimaryHDU(bw)
 
 	hdu.writeto('binaryImage.FITS')
-	if debug:
+	if verbose:
 		print("bw",bw[0:5])
 
 	labeled, nr_objects = mh.label(bw)
@@ -138,7 +138,7 @@ def newmultiCens(img, verbose=False):
 	# make sure there is at least one spot!
 	max_spots=2
 	if nr_objects < 1:
-		print("No spot found! Eciting ...")
+		print("No spot found! Exiting ...")
 	if nr_objects > max_spots:
 		print("Too many spot found ("+str(nr_objects)+") ! Exiting ...")   
 		
