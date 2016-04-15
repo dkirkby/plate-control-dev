@@ -29,6 +29,7 @@ class PosArrayMaster(object):
         self.anticollision_default = True # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
         self.anticollision_override = True # causes the anticollision_default value to be used in all cases
         self.verbose = False
+        self.canids_where_tables_were_just_sent = []
 
     def request_targets(self, pos, commands, values):
         """See comments for corresponding function in petal.py.
@@ -127,38 +128,11 @@ class PosArrayMaster(object):
         """See comments for corresponding function in petal.py.
         """
         hw_tables = self.hardware_ready_move_tables()
-        comm_time_estimate = 0.5 # seconds
-        move_time_estimate = 0.0 # seconds
         canids = []
         for tbl in hw_tables:
             canids.append(tbl['canid'])
-            temp = np.sum(tbl['move_time'])
-            if temp > move_time_estimate:
-                move_time_estimate = temp
-        move_time_estimate += comm_time_estimate
-        if self.verbose:
-            print('move_time_estimate = ' + str(move_time_estimate))
-
-        # SIMPLE BLOCKING IMPLEMENTATION
-        # ... so we don't send new tables while any positioners are still moving.
-        # There may be better ways to achieve this, to be implemented later.
-        timeout_margin = 5.0 # seconds
-        timeout = move_time_estimate + timeout_margin
-        keep_waiting = True
-        start_time = time.time()
-        while keep_waiting:
-            if (time.time()-start_time) >= timeout:
-                print('Timed out at ' + str(timeout) + ' seconds waiting to send next move table.')
-                keep_waiting = False
-            ready_for_tables = self.comm.ready_for_tables(canids)
-            if self.verbose:
-                print('ready_for_tables: ' + str(ready_for_tables))
-            if ready_for_tables:
-                keep_waiting = False
-            else:
-                time.sleep(0.5)
-
-        # send tables and execute
+        self.canids_where_tables_were_just_sent = canids
+        self._wait_while_moving()
         self.comm.send_tables(hw_tables)
 
     def execute_moves(self):
@@ -166,6 +140,7 @@ class PosArrayMaster(object):
         Then do clean-up and logging routines to keep track of the moves that were done.
         """
         self.comm.execute_sync(self.sync_mode)
+        self._wait_while_moving()
         self.postmove_cleanup()
 
     def postmove_cleanup(self):
@@ -177,6 +152,7 @@ class PosArrayMaster(object):
         if self.verbose:
             print(self.expected_current_position_str())
         self.clear_schedule()
+        self.canids_where_tables_were_just_sent = []
 
     def clear_schedule(self):
         self.schedule = posschedule.PosSchedule(self)
@@ -324,17 +300,17 @@ class PosArrayMaster(object):
             if key[i] == '':
                 vals.append(this_val)
             elif key[i] == 'QS':
-                vals.append([thisval['Q'],thisval['S']])
+                vals.append([this_val['Q'],this_val['S']])
             elif key[i] == 'flatXY':
-                vals.append([thisval['flatX'],thisval['flatY']])
+                vals.append([this_val['flatX'],this_val['flatY']])
             elif key[i] == 'obsXY':
-                vals.append([thisval['obsX'],thisval['obsY']])
+                vals.append([this_val['obsX'],this_val['obsY']])
             elif key[i] == 'obsTP':
-                vals.append([thisval['obsT'],thisval['obsP']])
+                vals.append([this_val['obsT'],this_val['obsP']])
             elif key[i] == 'shaftTP':
-                vals.append([thisval['shaftT'],thisval['shaftP']])
+                vals.append([this_val['shaftT'],this_val['shaftP']])
             elif key[i] == 'motorTP':
-                vals.append([thisval['motorT'],thisval['motorP']])
+                vals.append([this_val['motorT'],this_val['motorP']])
             else:
                 vals.append(this_val[key[i]])
         if was_not_list:
@@ -357,6 +333,27 @@ class PosArrayMaster(object):
         if was_not_list:
             strs = pc.delistify(strs)
         return strs
+
+    def _wait_while_moving(self):
+        """Blocking implementation, to not send move tables while any positioners are still moving.
+        
+        Inputs:     canids ... integer CAN id numbers of all the positioners to check whether they are moving
+        
+        The implementation has the benefit of simplicity, but it is acknowledged there may be 'better',
+        i.e. multi-threaded, ways to achieve this, to be implemented later.
+        """
+        timeout = 30.0 # seconds
+        poll_period = 0.5 # seconds
+        keep_waiting = True
+        start_time = time.time()
+        while keep_waiting:
+            if (time.time()-start_time) >= timeout:
+                print('Timed out at ' + str(timeout) + ' seconds waiting to send next move table.')
+                keep_waiting = False
+            if self.comm.ready_for_tables(self.canids_where_tables_were_just_sent):
+                keep_waiting = False
+            else:
+                time.sleep(poll_period)
 
     def _posid_listify_and_fill(self,posid):
         """Internally-used wrapper method for listification of posid. The additional functionality

@@ -22,13 +22,13 @@ for pos_id in pos_ids:
 # demo script flags
 should_flash       = True
 should_home        = True
-should_direct_dtdp = True
+should_direct_dtdp = False
 should_move_qs     = False
 should_move_dqds   = False
 should_move_xy     = False
 should_move_dxdy   = False
 should_move_tp     = False
-should_move_dtdp   = False
+should_move_dtdp   = True
 
 # flash the LEDs
 if should_flash:
@@ -41,7 +41,7 @@ if should_flash:
 
 # run the various move types
 if should_home:
-    print('NEXT MOVE: homing')
+    print('MOVE: homing')
     # ptl.pos.set(key='CREEP_TO_LIMITS',value=True) # to force only creeping to hard stops
     ptl.request_homing(pos_ids)
     ptl.schedule_send_and_execute_moves()
@@ -53,7 +53,7 @@ if should_direct_dtdp:
     dtdp = [[270,0], [0,-60], [-180,30]]
     for i in range(len(dtdp)):
         values = dtdp[i]
-        print('NEXT MOVE: direct dtdp (' + str(values[0]) + ',' + str(values[1]) + ')')
+        print('MOVE: direct dtdp (' + str(values[0]) + ',' + str(values[1]) + ')')
         ptl.quick_dtdp(pos_ids, [values]*n)
 
 # the remainder below are for general usage
@@ -62,7 +62,7 @@ if should_move_qs:
     command = 'QS'
     for i in range(len(QS)):
         values = QS[i]
-        print('NEXT MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
+        print('MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
         ptl.quick_move(pos_ids, [command]*n, [values]*n)
 
 if should_move_dqds:
@@ -70,7 +70,7 @@ if should_move_dqds:
     command = 'dQdS'
     for i in range(len(dQdS)):
         values = dQdS[i]
-        print('NEXT MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
+        print('MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
         ptl.quick_move(pos_ids, [command]*n, [values]*n)
 
 if should_move_xy:
@@ -78,7 +78,7 @@ if should_move_xy:
     command = 'posXY'
     for i in range(len(xy)):
         values = xy[i]
-        print('NEXT MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
+        print('MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
         ptl.quick_move(pos_ids, [command]*n, [values]*n)
 
 if should_move_dxdy:
@@ -86,7 +86,7 @@ if should_move_dxdy:
     command = 'dXdY'
     for i in range(len(dxdy)):
         values = dxdy[i]
-        print('NEXT MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
+        print('MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
         ptl.quick_move(pos_ids, [command]*n, [values]*n)
 
 if should_move_tp:
@@ -94,13 +94,13 @@ if should_move_tp:
     command = 'posTP'
     for i in range(len(tp)):
         values = tp[i]
-        print('NEXT MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
+        print('MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
         ptl.quick_move(pos_ids, [command]*n, [values]*n)
         
 if should_move_dtdp:
-    dtdp = [[210,0], [-30,0], [0,-30], [0,30], [-30,-30], [-150,30]]
+    dtdp = [[180,0], [-90,-90],[180,60],[-90,30]]
     command = 'dTdP'
     for i in range(len(dtdp)):
         values = dtdp[i]
-        print('NEXT MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
+        print('MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
         ptl.quick_move(pos_ids, [command]*n, [values]*n)
