@@ -23,7 +23,7 @@ is your object's name, funtion is the funtion name and args are any arguments th
 There are several changable settings for an object:
  
 The image resolution is set to 3352x2532 pixels by default as that is the resolution STF-8300M. 
-This can be changed by calling set_resolution(width, height), where width
+This can be changed by calling set_resolution(width, height), whyere width
 and height are integer arguments.
 
 The image is an exposure by default but can be set to a dark image by calling object.SetDark(x)
@@ -155,6 +155,7 @@ class SBIGCam(object):
 		#    self.SBIG = '???'
 		else: #Assume Linux
 			self.SBIG = CDLL("/usr/local/lib/libsbigudrv.so")
+		self.verbose = False
 
 	def set_image_size(self, width=3352, height=2532):
 		"""
@@ -243,7 +244,7 @@ class SBIGCam(object):
 		if Error != self.CE_NO_ERROR:
 			print ('Attempt to open driver returned error:', Error)
 			return False
-		else:
+		elif self.verbose:
 			print ('Driver successfully opened.')
 	 
 	   
@@ -253,7 +254,7 @@ class SBIGCam(object):
 		if Error != self.CE_NO_ERROR:
 			print ('Attempt to open device returned error:', Error)
 			return False
-		else:
+		elif self.verbose:
 			print ('Device successfully opened.')
 		
 		
@@ -287,7 +288,7 @@ class SBIGCam(object):
 		if Error != self.CE_NO_ERROR:
 			print ('Attempt to start exposure returned error:', Error)
 			return False
-		else:
+		elif self.verbose:
 			print ('Exposure successfully initiated.')		 
 		   
 		#Wait for exposure to end
@@ -303,7 +304,7 @@ class SBIGCam(object):
 		if Error != self.CE_NO_ERROR:
 			print ('Attempt to end exposure returned error:', Error)
 			return False
-		else:
+		elif self.verbose:
 			print ('Exposure successfully ended.')
 		 
 		   
@@ -315,7 +316,7 @@ class SBIGCam(object):
 		if Error != self.CE_NO_ERROR:
 			print ('Attempt to initialize readout returned error:', Error)
 			return False
-		else:
+		elif self.verbose:
 			print ('Readout successfully initialized.')
 		  
 		  
@@ -333,7 +334,7 @@ class SBIGCam(object):
 		#hdu = fits.PrimaryHDU(image)
 		#name = time.strftime("%Y-%m-%d-%H%M%S") + '.fits' #Saves file with timestamp
 		#hdu.writeto(name)
-		if Error == self.CE_NO_ERROR:
+		if Error == self.CE_NO_ERROR and self.verbose:
 			print ('Readout successfully completed.')
 			
 		return image
@@ -362,7 +363,7 @@ class SBIGCam(object):
 		if Error != self.CE_NO_ERROR:
 			print ('Attempt to close device returned error:', Error)
 			return False
-		else:
+		elif self.verbose:
 			print ('Device successfully closed.')
 		
 		
@@ -371,7 +372,7 @@ class SBIGCam(object):
 		if Error != self.CE_NO_ERROR:
 			print ('Attempt to close driver returned error:', Error)
 			return False
-		else:
+		elif self.verbose:
 			print ('Driver successfully closed.')
 			
 		return True
