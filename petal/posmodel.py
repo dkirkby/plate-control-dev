@@ -32,6 +32,13 @@ class PosModel(object):
         self._motor_speed_cruise   = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
         self._legacy_spinupdown    = True   # flag to enable using old firmware's fixed spinupdown_distance
 
+        # temporary parameter, to be removed at a later date
+        # As of 2016-04-18, the positioner firmware uses 'move_time' data to actually decide when to execute the next row in a move table
+        # The potential problem here is that any (even tiny) underestimate of move_time could truncate step(s). That would be bad.
+        # Future firmware will not rely on move_time -- it will just do the number of steps requested until they are all done.
+        # At that point, this margin parameter should be removed.
+        self.temporary_move_time_margin = 0.1 # seconds
+
     @property
     def _motor_speed_creep(self):
         """Returns motor creep speed (which depends on the creep period) in deg/sec."""
@@ -155,6 +162,7 @@ class PosModel(object):
         move_data = self.motor_true_move(axisid, motor_dist, allow_cruise)
         move_data['distance'] = self.axis[axisid].motor_to_shaft(move_data['distance'])
         move_data['speed']    = self.axis[axisid].motor_to_shaft(move_data['speed'])
+        move_data['move_time'] += self.temporary_move_time_margin # remove at a future date, when usage of move_time has been eliminated from positioner firmware
         return move_data
 
     def motor_true_move(self, axisid, distance, allow_cruise):
