@@ -16,7 +16,7 @@ pos_ids = ['UM00012']
 fid_can_ids = []
 petal_id = 1
 ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
-ptl.pos.anticollision_default = False
+ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure(ptl,fvc)
 m.n_fiducial_dots = 1 # number of centroids the FVC should expect
 num_corr_max = 2 # number of correction moves to do for each target
@@ -59,7 +59,7 @@ m.rehome(pos_ids='all')
 m.calibrate(pos_ids='all', mode='full')
 
 # transform test grid to each positioner's global position
-posmodels = ptl.pos.get(pos_ids)
+posmodels = ptl.get(pos_ids)
 all_global_targets = []
 for local_target in local_targets:
     these_global_targets = []
