@@ -1,6 +1,5 @@
 * text=auto !eol
 petal/demo.py -text
-petal/fidarraymaster.py -text
 petal/focal_surface_lookup.csv -text
 petal/movetablescr.py -text
 petal/petal.py -text
@@ -17,7 +16,6 @@ petal/pos_settings/unit_UM00014.conf -text
 petal/pos_settings/unit_UM00015.conf -text
 petal/pos_settings/unit_UM1020.conf -text
 petal/posanticollision.py -text
-petal/posarraymaster.py -text
 petal/poscollider.py -text
 petal/posconstants.py -text
 petal/posmodel.py -text

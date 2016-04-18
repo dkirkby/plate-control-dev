@@ -11,13 +11,13 @@ pos_ids = ['UM00012','UM00014']
 fid_ids = []
 petal_id = 1
 ptl = petal.Petal(petal_id, pos_ids, fid_ids)
-ptl.pos.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
+ptl.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
 
 n = len(pos_ids)
 
 print('INITIAL POSITION')
 for pos_id in pos_ids:
-    print(ptl.pos.get(pos_id).expected_current_position_str)
+    print(ptl.get(pos_id).expected_current_position_str)
 
 # demo script flags
 should_flash       = True
@@ -32,21 +32,21 @@ should_move_dtdp   = True
 
 # flash the LEDs
 if should_flash:
-    canids = pc.listify(ptl.pos.get(key='CAN_ID'),True)[0]
+    canids = pc.listify(ptl.get(key='CAN_ID'),True)[0]
     for canid in canids: # this usage of get method returns a list with that value for all the positioners
-        ptl.pos.comm.set_led(canid,'on')
+        ptl.comm.set_led(canid,'on')
     time.sleep(1)
     for canid in canids:
-        ptl.pos.comm.set_led(canid,'off')
+        ptl.comm.set_led(canid,'off')
 
 # run the various move types
 if should_home:
     print('MOVE: homing')
-    # ptl.pos.set(key='CREEP_TO_LIMITS',value=True) # to force only creeping to hard stops
+    # ptl.set(key='CREEP_TO_LIMITS',value=True) # to force only creeping to hard stops
     ptl.request_homing(pos_ids)
     ptl.schedule_send_and_execute_moves()
 else:
-    ptl.pos.set(key=['POS_T','POS_P'],value=[-180,180]) # faking having just homed
+    ptl.set(key=['POS_T','POS_P'],value=[-180,180]) # faking having just homed
 
 # this is an 'expert' use function, which instructs the theta and phis axes to go some distances with no regard for anticollision or hardstops
 if should_direct_dtdp:
@@ -96,7 +96,7 @@ if should_move_tp:
         values = tp[i]
         print('MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
         ptl.quick_move(pos_ids, [command]*n, [values]*n)
-        
+
 if should_move_dtdp:
     dtdp = [[180,0], [-90,-90],[180,60],[-90,30]]
     command = 'dTdP'
