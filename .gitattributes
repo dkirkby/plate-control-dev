@@ -35,6 +35,7 @@ petalbox/petalcontroller.conf -text
 petalbox/petalcontroller.conf.default -text
 petalbox/petalcontroller.ini.default -text
 petalbox/petalcontroller.py -text
+petalbox/posfid_utility.py -text
 petalbox/posfidcan.py -text
 petalbox/startpc.sh -text
 petalbox/util/dotprofile -text
