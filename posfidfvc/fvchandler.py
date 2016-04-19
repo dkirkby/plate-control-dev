@@ -64,8 +64,7 @@ class FVCHandler(object):
             xy ... list of the form [[x1,y1],[x2,y2],...]
         """
         if self.fvc_type == 'SBIG':
-            xywin,brightness,t = sbig_grab_cen.sbig_grab_cen(self.exposure_time, num_objects,writefits=True)
-            xy = [[row[0],row[1]] for row in xywin]
+            xy,brightness,t = sbig_grab_cen.sbig_grab_cen(self.exposure_time, num_objects,writefits=True)
         elif self.fvc_type == 'FLI':
             xy = [] # to be implemented
         else:
@@ -86,4 +85,5 @@ class FVCHandler(object):
 
 if __name__ == '__main__':
     f = FVCHandler()
-    f.measure(2)
+    xy = f.measure(2)
+    print(xy)
