@@ -34,10 +34,10 @@ for i in range(npos):
     state.write('OFFSET_T',tp0[0][i],write_to_disk=False)
     state.write('OFFSET_P',tp0[1][i],write_to_disk=False)
     posmodels.append(posmodel.PosModel(state))
-config = configobj.ConfigObj(pc.settings_directory + '_collision_settings_DEFAULT.conf',unrepr=True)
+config = configobj.ConfigObj(pc.pos_settings_directory + '_collision_settings_DEFAULT.conf',unrepr=True)
 config.initial_comment = ['Temporary settings file for software test purposes, not associated with a real focal plate arrangement.','']
 filename = 'collision_settings_test.conf'
-config.filename = pc.settings_directory + filename
+config.filename = pc.pos_settings_directory + filename
 edge_zone = pitch*0.6
 minX = min(xy0[0])-edge_zone
 maxX = max(xy0[0])+edge_zone
