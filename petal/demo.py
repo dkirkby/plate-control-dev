@@ -103,4 +103,4 @@ if should_move_dtdp:
     for i in range(len(dtdp)):
         values = dtdp[i]
         print('MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
-        ptl.quick_move(pos_ids, [command]*n, [values]*n)
+        ptl.quick_move(pos_ids, command, values)

@@ -64,10 +64,17 @@ class Petal(object):
             values   ... corresponding list of move arguements, in the form [[u1,v1],[u2,v2],...]
                          ... 1st move arguments are values for q, dq, x, dx, t, or dt
                          ... 2nd move arguments are values for s, ds, y, dy, p, or dp
+
+        It is allowed to argue a list of positioner ids, and only one command and one value. Then
+        this command and value will be done identically on all the positioners.
         """
         pos = pc.listify(pos,True)[0]
         commands = pc.listify(commands,True)[0]
         values = pc.listify2d(values)
+        if len(commands) != len(pos):
+            commands = [commands[0]]*len(pos)
+        if len(values) != len(pos):
+            values = [values[0]]*len(pos)
         for i in range(len(pos)):
             posmodel = self.get_model_for_pos(pos[i])
             if self.schedule.already_requested(posmodel):
@@ -91,9 +98,14 @@ class Petal(object):
                       ... list is in the form [[dt1,dp1],[dt2,dp2],...]
 
         The optional argument cmd_prefix allows adding a descriptive string to the log.
+        
+        It is allowed to argue a list of positioner ids, and only one dtdp. Then this
+        identical dtdp will be done on all the positioners.
         """
         pos = pc.listify(pos,True)[0]
         dtdp = pc.listify2d(dtdp)
+        if len(dtdp) != len(pos):
+            dtdp = [dtdp[0]]*len(pos)
         for i in range(len(pos)):
             posmodel = self.get_model_for_pos(pos[i])
             table = posmovetable.PosMoveTable(posmodel)
