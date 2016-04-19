@@ -27,6 +27,7 @@ def S2R_lookup(S):
 deg = '\u00b0'
 mm = 'mm'
 timestamp_format = '%Y-%m-%d %H:%M:%S.%f' # see strftime documentation
+filename_timestamp_format = '%Y-%m-%d_T%H%M%S'
 gear_ratio = {}
 gear_ratio['namiki'] = (46.0/14.0+1)**4  # namiki    "337:1", output rotation/motor input
 gear_ratio['maxon'] = 4100625.0/14641.0  # maxon     "280:1", output rotation/motor input

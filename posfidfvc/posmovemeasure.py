@@ -5,6 +5,7 @@ import postransforms
 import poscollider
 import numpy as np
 import fitcircle
+import posconstants as pc
 
 class PosMoveMeasure(object):
     """Coordinates moving fiber positioners with fiber view camera measurements.
@@ -212,7 +213,7 @@ class PosMoveMeasure(object):
         """
         print('Nudging positioners to identify reference fiber(s).\n')
         print('Distance tol for identifying a fixed fiber is set to %g.\n',self.ref_dist_tol)
-        pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
+        pos_ids_by_ptl = self.pos_data_listed_by_ptl('all','POS_ID')
         nudges = [self.nudge_dist, -self.nudge_dist]
         xy_ref = []
         for i in range(len(nudges)):
@@ -254,7 +255,9 @@ class PosMoveMeasure(object):
             else:
                 print('invalid argument ' + str(pos_ids) + ' for pos_ids')
                 these_pos_ids = []
-            data_by_ptl[petal] = petal.get(these_pos_ids,key)
+            this_data = petal.get(these_pos_ids,key)
+            this_data = pc.listify(this_data, keep_flat=True)[0]
+            data_by_ptl[petal] = this_data
         return data_by_ptl
 
     def _measure_calibration_arc(self,pos_ids='all',axis='theta',mode='quick'):
