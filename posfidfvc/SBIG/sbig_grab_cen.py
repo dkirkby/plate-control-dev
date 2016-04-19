@@ -80,21 +80,13 @@ def sbig_grab_cen(exposure_time=90, nWin=1, min_brightness=5000, max_brightness=
 	if brightness > max_brightness:
 		warnings.warn('Spot may be over saturated (brightness = {}'.format(brightness))
 
-	
-	# Nov 2015-MS: replace the above with a new list (list of lists)'xyWin' 
-	xywin=[]
-	for i in range(0, nWin):   # changed this from nCens to nWin to reflect that we subdivide
-	                            # the image into windows. Each window should have either one fiber
-	                            # or a fiber and a fiducial(=reference) in it
-	                            
-		# call routine to determine multiple gaussian-fitted centroids
-		xcen, ycen, fwhm = multicens.newmultiCens(LD, nWin, verbose) 
-
-		xywin.append([xcen,ycen,fwhm])
+	# call routine to determine multiple gaussian-fitted centroids
+	xcen, ycen, fwhm = multicens.multiCens(LD, nWin, verbose) 
+	xy = [[xcen[i],ycen[i]] for i in range(len(xcen))]
 
 	toc = time.time()
 	if verbose:
 		print("Time used: "+str(toc-tic)+"\n")
-	return xywin,brightness,tic-toc
+	return xy,brightness,tic-toc
 
 

@@ -21,7 +21,7 @@ def centroid(im, mask=None, w=None, x=None, y=None):
 	  (x0,y0) tuple of centroid location"""
 	from numpy import ones, arange, meshgrid
 	# 2009-09-02 13:35 IJC: Created
-	if mask==None:
+	if mask is None:
 		mask = ones(im.shape)
 	if w==None:
 		w = ones(im.shape)
@@ -64,7 +64,7 @@ def im2bw(image,level):
 	bw[threshold_indices] = 1
 	return bw
 
-def newmultiCens(img, n_centroids_to_keep=2, verbose=False):
+def multiCens(img, n_centroids_to_keep=2, verbose=False):
 # Computes centroids by finding spots and then fitting 2d gaussian
 #
 # Input 
@@ -74,126 +74,37 @@ def newmultiCens(img, n_centroids_to_keep=2, verbose=False):
 # Output:
 #       returning the centroids and FWHMs as lists (xcen,ycen,fwhm)
 
-
-
-#    tiny = 1.E-6  # Minimum change to stop centroid iterations
-#    S = 10.  # Sigma of gaussian distribution, pixels
-#    sWsize = 32  # size of small window around spots, should be about 2x spot size
-#    gThresh = 0.01  # threshold used for Gaussian cutoff
-
 	size_fitbox=10 # gaussian fitter box (length of side in pixels)
-
-	# Open the image
-	#img = mh.imread('/Users/victoriaserret/Documents/testimg_for_victoria.png')
-	if verbose:
-		print('Pre Scale')
-		print(img[0:5])
-		print(type(img))
-	
-	#img = img.astype(float)/np.max(img.astype(float))
-	# this is img2 in the matlab code. seems okay
-
 	img[img<0]=0
-
-	if verbose:
-		print('**** Post clipping')
-		print(img[0:5])
-	
 	img = img.astype(np.uint16)
-
-	level = mh.thresholding.otsu(img)
-	if verbose:
-		print('done thresholding')
-		print(level)
-		
-	normlevel = float(level)/float(img.max())
-	print("norm level: "+str(normlevel))
-	print('thresholding returned a level of {} \n'.format(level))
-
-	# check the level
-	nominal_min_norm_level = 0.2
-	if level < nominal_min_norm_level:
-		print ('thresholding level was less than nominal min level {}. Attempting > 0.2'.format(level))
-		level = nominal_min_norm_level * (float(img.max()) - float(img.min())) + float(img.min())
-		
-	if verbose:
-		print('**** pre bw')
-		print(img[0:5])
-
+	level = mh.thresholding.otsu(img)		
 	bw=im2bw(img,level)
 	hdu=pyfits.PrimaryHDU(bw)
-
 	try:
 		os.remove('binaryImage.FITS')
 	except:
 		pass
 	hdu.writeto('binaryImage.FITS')
-	if verbose:
-		print("bw",bw[0:5])
-
 	labeled, nr_objects = mh.label(bw)
-	sums = mh.labeled_sum(bw, labeled) # this is to be able to find which spots are biggest
-	while len(labeled) > n_centroids_to_keep:
-		index_of_dimmest = np.argmin(sums)
-		# code to get rid of dimmest spot
-	nr_objects = # code to count number remaining in labels
+	sizes = mh.labeled.labeled_size(labeled) # size[0] is the background size, sizes[1 and greater] are number of pixels in each region
+	sorted_sizes_indexes = np.argsort(sizes)[::-1] # return in descending order
+	good_spot_indexes = sorted_sizes_indexes[1:n_centroids_to_keep+1] # avoiding the background regions entry at the beginning
 
 	# now loop over the found spots and calculate rough centroids		
-		
 	FWHMSub = []
 	xCenSub = []
 	yCenSub = []        
-
-	for spot in range(1, nr_objects+1):
-		print("Object number "+str(spot))
-  
+	for spot in good_spot_indexes:
 		selected=np.copy(labeled)
-		# mask out all but the labeled spot
-		# 
-		# first make a copy of the labeled array and set the current objext pixels to one and
-		# all other pixels to zero 
 		selected[selected!=spot]=0
-		#pyfits.writeto('xxx_selected.fits',selected)
 		xcen,ycen=centroid(img, mask=selected, w=None, x=None, y=None)
-		print("estimate for centroids:",xcen,ycen)
-
 		nbox = size_fitbox
 		px=int(round(xcen))
 		py=int(round(ycen))		
-		print(" px py ",px,py)
 		data = img[py-nbox:py+nbox,px-nbox:px+nbox]
 		params = fitgaussian(data)
-		print("params: ")
-		print("param-x:",params[3])
-		print("param-y:",params[2])
-		print("param-wx:",params[5])
-		print("param-wy:",params[4])
-
 		xCenSub.append(float(px)-float(nbox)+params[3])
 		yCenSub.append(float(py)-float(nbox)+params[2])
 		FWHMSub.append(2.355*max(params[4],params[5]))
 
-
-	print("*** centroids (all) ***")
-	nspots=len(FWHMSub)
-	for i in range(0,nspots):
-		print("x,y,FWHM ",xCenSub[i],yCenSub[i],FWHMSub[i])
-			 
-	# make an effort to remove spots that originate from cosmic ray hits
-	#
-	# n_centroids_to_keep needs to be supplied externally
-
-	if nspots < n_centroids_to_keep:
-		warnings.warn('Only found {} centroids. Exiting... '.format(nspots))
-		sys.exit()
-	if nspots > n_centroids_to_keep:    
-	# now sort by FWHM
-		indx=np.argsort(FWHMSub)
-		indx_to_keep=indx[0:n_centroids_to_keep]
-		xCenSub=xCenSub[indx_to_keep]
-		yCenSub=xCenSub[indx_to_keep]
-		FWHMSub=xCenSub[indx_to_keep]
-
-	# and we are done
-	# returning the centroids and FWHMs as lists
 	return xCenSub, yCenSub, FWHMSub
