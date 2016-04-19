@@ -325,8 +325,7 @@ class SBIGCam(object):
 								 pixelStart = 0, pixelLength = self.WIDTH)
 		cameraData = ((c_ushort*(self.WIDTH.value))*self.HEIGHT.value)()
 		for i in range(self.HEIGHT.value):
-			Error = self.SBIG.SBIGUnivDrvCommand(self.CC_READOUT_LINE,
-												 byref(rlp), byref(cameraData, i*self.WIDTH.value*2)) #the 2 is essential
+			Error = self.SBIG.SBIGUnivDrvCommand(self.CC_READOUT_LINE,byref(rlp), byref(cameraData, i*self.WIDTH.value*2)) #the 2 is essential
 			if Error != self.CE_NO_ERROR:
 				print ('Readout failed. Writing readout then closing device and driver.')
 				break

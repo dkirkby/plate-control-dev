@@ -1,3 +1,6 @@
+import os
+import sys
+sys.path.append(os.path.abspath('./SBIG/'))
 import sbig_grab_cen
 import numpy as np
 
@@ -61,7 +64,7 @@ class FVCHandler(object):
             xy ... list of the form [[x1,y1],[x2,y2],...]
         """
         if self.fvc_type == 'SBIG':
-            xywin,brightness,t = sbig_grab_cen.sbig_grab_cen(self.exposure_time, num_objects)
+            xywin,brightness,t = sbig_grab_cen.sbig_grab_cen(self.exposure_time, num_objects,writefits=True)
             xy = [[row[0],row[1]] for row in xywin]
         elif self.fvc_type == 'FLI':
             xy = [] # to be implemented
@@ -80,3 +83,7 @@ class FVCHandler(object):
         """Return the 2d rotation matrix for an angle given in degrees."""
         radians = np.deg2rad(angle)
         return np.array([[np.cos(radians), -np.sin(radians)], [np.sin(radians), np.cos(radians)]])
+
+if __name__ == '__main__':
+    f = FVCHandler()
+    f.measure(2)

@@ -88,7 +88,7 @@ def sbig_grab_cen(exposure_time=90, nWin=1, min_brightness=5000, max_brightness=
 	                            # or a fiber and a fiducial(=reference) in it
 	                            
 		# call routine to determine multiple gaussian-fitted centroids
-		xcen, ycen, fwhm = multicens.newmultiCens(LD, verbose) 
+		xcen, ycen, fwhm = multicens.newmultiCens(LD, nWin, verbose) 
 
 		xywin.append([xcen,ycen,fwhm])
 

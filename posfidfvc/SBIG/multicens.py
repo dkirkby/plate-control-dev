@@ -5,6 +5,7 @@ import sys
 #from pylab import imshow, show
 import pyfits
 from msgfitter import fitgaussian
+import os
 
 
 def centroid(im, mask=None, w=None, x=None, y=None):
@@ -63,10 +64,8 @@ def im2bw(image,level):
 	bw[threshold_indices] = 1
 	return bw
 
-def newmultiCens(img, verbose=False):
+def newmultiCens(img, n_centroids_to_keep=2, verbose=False):
 # Computes centroids by finding spots and then fitting 2d gaussian
-#
-# based on multiCens (by JS - rewritten by MS) 
 #
 # Input 
 #       img: image as numpy array
@@ -83,7 +82,6 @@ def newmultiCens(img, verbose=False):
 #    gThresh = 0.01  # threshold used for Gaussian cutoff
 
 	size_fitbox=10 # gaussian fitter box (length of side in pixels)
-	n_centroids_to_keep = 2
 
 	# Open the image
 	#img = mh.imread('/Users/victoriaserret/Documents/testimg_for_victoria.png')
@@ -113,10 +111,10 @@ def newmultiCens(img, verbose=False):
 	print('thresholding returned a level of {} \n'.format(level))
 
 	# check the level
-	nominal_min_level = 0.2
-	if level < nominal_min_level:
+	nominal_min_norm_level = 0.2
+	if level < nominal_min_norm_level:
 		print ('thresholding level was less than nominal min level {}. Attempting > 0.2'.format(level))
-		pass
+		level = nominal_min_norm_level * (float(img.max()) - float(img.min())) + float(img.min())
 		
 	if verbose:
 		print('**** pre bw')
@@ -125,30 +123,30 @@ def newmultiCens(img, verbose=False):
 	bw=im2bw(img,level)
 	hdu=pyfits.PrimaryHDU(bw)
 
+	try:
+		os.remove('binaryImage.FITS')
+	except:
+		pass
 	hdu.writeto('binaryImage.FITS')
 	if verbose:
 		print("bw",bw[0:5])
 
 	labeled, nr_objects = mh.label(bw)
+	sums = mh.labeled_sum(bw, labeled) # this is to be able to find which spots are biggest
+	while len(labeled) > n_centroids_to_keep:
+		index_of_dimmest = np.argmin(sums)
+		# code to get rid of dimmest spot
+	nr_objects = # code to count number remaining in labels
 
-	print(" number of objects found: "+str(nr_objects))
-
-	# now loop over the found spots and calculate rough centroids
-
-	# make sure there is at least one spot!
-	max_spots=2
-	if nr_objects < 1:
-		print("No spot found! Exiting ...")
-	if nr_objects > max_spots:
-		print("Too many spot found ("+str(nr_objects)+") ! Exiting ...")   
-		
+	# now loop over the found spots and calculate rough centroids		
 		
 	FWHMSub = []
 	xCenSub = []
 	yCenSub = []        
 
-	for spot in range(1,nr_objects+1):
+	for spot in range(1, nr_objects+1):
 		print("Object number "+str(spot))
+  
 		selected=np.copy(labeled)
 		# mask out all but the labeled spot
 		# 
