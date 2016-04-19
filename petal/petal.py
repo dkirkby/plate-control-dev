@@ -32,13 +32,12 @@ class Petal(object):
         self.petal_id = petal_id
         self.comm = petalcomm.PetalComm(self.petal_id)
         self.posmodels = []
-        for posid in posids:
-            state = posstate.PosState(posid,logging=True)
+        for pos_id in pos_ids:
+            state = posstate.PosState(pos_id,logging=True)
             model = posmodel.PosModel(state)
             self.posmodels.append(model)
-        self.posids = posids
+        self.posids = pos_ids
         self.schedule = posschedule.PosSchedule(self)
-        self.comm = comm
         self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
         self.anticollision_default = True # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
         self.anticollision_override = True # causes the anticollision_default value to be used in all cases
@@ -70,7 +69,7 @@ class Petal(object):
         commands = pc.listify(commands,True)[0]
         values = pc.listify2d(values)
         for i in range(len(pos)):
-            posmodel = self._get_model_for_pos(pos[i])
+            posmodel = self.get_model_for_pos(pos[i])
             if self.schedule.already_requested(posmodel):
                 print('Positioner ' + str(posmodel.posid) + ' already has a target scheduled. Extra target request ' + str(commands[i]) + '(' + str(values[i][0]) + ',' + str(values[i][1]) + ') ignored')
             else:
@@ -96,7 +95,7 @@ class Petal(object):
         pos = pc.listify(pos,True)[0]
         dtdp = pc.listify2d(dtdp)
         for i in range(len(pos)):
-            posmodel = self._get_model_for_pos(pos[i])
+            posmodel = self.get_model_for_pos(pos[i])
             table = posmovetable.PosMoveTable(posmodel)
             table.set_move(0, pc.T, dtdp[i][0])
             table.set_move(0, pc.P, dtdp[i][1])
@@ -112,7 +111,7 @@ class Petal(object):
         pos = pc.listify(pos,True)[0]
         posmodels = []
         for p in pos:
-            posmodels.append(self._get_model_for_pos(p))
+            posmodels.append(self.get_model_for_pos(p))
         if anticollision:
             if axisid == pc.P and direction == -1:
                 # calculate thetas where extended phis do not interfere
@@ -142,7 +141,7 @@ class Petal(object):
         pos = pc.listify(pos,True)[0]
         posmodels = []
         for p in pos:
-            posmodels.append(self._get_model_for_pos(p))
+            posmodels.append(self.get_model_for_pos(p))
         hardstop_debounce = [0,0]
         dir = [0,0]
         dir[pc.P] = +1 # force this, because anticollision logic depends on it
@@ -316,7 +315,7 @@ class Petal(object):
         (posid, value) = self._equalize_input_list_lengths(posid,value)
         (posid, key)   = self._equalize_input_list_lengths(posid,key) # repetition here handles the case where there was 1 posid element, 1 key, but mulitplie elements in value
         for i in range(len(posid)):
-            p = self._get_model_for_pos(posid[i])
+            p = self.get_model_for_pos(posid[i])
             p.state.write(key[i],value[i],write_to_disk)
 
     def expected_current_position(self,posid=None,key=''):
@@ -380,6 +379,16 @@ class Petal(object):
         if was_not_list:
             strs = pc.delistify(strs)
         return strs
+
+    def get_model_for_pos(self, pos):
+        """Returns the posmodel object corresponding to a posid, or if the argument
+        is a posmodel, just returns itself.
+        """
+        if isinstance(pos, posmodel.PosModel):
+            return pos
+        else:
+            pidx = self.posids.index(pos)
+            return self.posmodels[pidx]
 
 # INTERNAL METHODS
 
@@ -448,16 +457,6 @@ class Petal(object):
                 keep_waiting = False
             else:
                 time.sleep(poll_period)
-
-    def _get_model_for_pos(self, pos):
-        """Returns the posmodel object corresponding to a posid, or if the argument
-        is a posmodel, just returns itself.
-        """
-        if isinstance(pos, posmodel.PosModel):
-            return pos
-        else:
-            pidx = self.posids.index(pos)
-            return self.posmodels[pidx]
 
     def _posid_listify_and_fill(self,posid):
         """Internally-used wrapper method for listification of posid. The additional functionality

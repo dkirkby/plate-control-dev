@@ -1,6 +1,4 @@
-import numpy as np
 import posmovetable
-import posarraymaster
 import posconstants as pc
 import posanticollision as anticollision
 
@@ -10,15 +8,14 @@ class PosSchedule(object):
     class.
 
     Note that the schedule may contain multiple move tables for the same positioner,
-    under the assumption that another module (i.e. PosArrayMaster) will generally be
+    under the assumption that another module (i.e. Petal) will generally be
     the one which merges any such tables in sequence, before sending off to the hardware.
+    
+    Initialize with the petal object this schedule applies to.
     """
 
-    def __init__(self, posarray):
-        if isinstance(posarray, posarraymaster.PosArrayMaster):
-            self.posarray = posarray
-        else:
-            print('bad posarray')
+    def __init__(self, petal):
+        self.petal = petal
         self.move_tables = []
         self.requests = []
 
@@ -34,7 +31,7 @@ class PosSchedule(object):
 
         A schedule can only contain one target request per positioner at a time.
         """
-        posmodel = self.posarray.get_model_for_pos(pos)
+        posmodel = self.petal.get_model_for_pos(pos)
         if self.already_requested(posmodel):
             print('cannot request more than one target per positioner in a given schedule')
             return
@@ -102,7 +99,7 @@ class PosSchedule(object):
         """Return as-scheduled total move distance for positioner identified by pos.
         Returns [dt,dp].
         """
-        posmodel = self.posarray.get_model_for_pos(pos)
+        posmodel = self.petal.get_model_for_pos(pos)
         dtdp = [0,0]
         for tbl in self.move_tables:
             if tbl.posmodel == posmodel:
@@ -126,7 +123,7 @@ class PosSchedule(object):
         """Returns boolean whether a request has already been registered in the
         schedule for the argued positioner.
         """
-        posmodel = self.posarray.get_model_for_pos(pos)
+        posmodel = self.petal.get_model_for_pos(pos)
         already_requested_list = [p['posmodel'] for p in self.requests]
         was_already_requested = posmodel in already_requested_list
         return was_already_requested
