@@ -51,9 +51,9 @@ class PosFidCAN(object):
 		"""
 		Sends a CAN command. Does not wait to receive a response
 		"""
+		ext_id_prefix='8'
 		try:
-			ext_id_prefix = '8'			
-			posID2 = ext_id_prefix + (hex(posID).replace('0x','')+hex(ccom).replace('0x','').zfill(2)).zfill(7)			
+			posID2 = ext_id_prefix+(hex(posID).replace('0x','')+hex(ccom).replace('0x','').zfill(2)).zfill(7)
 			posID2 = int(posID2,16)
 			data=data.replace(',','')
 			
@@ -65,6 +65,22 @@ class PosFidCAN(object):
 			print('Error sending CAN frame')
 			return 'FAILED' 
    
+
+	def send_command_byte(self, posID = 0, ccom=8, data=''):
+		"""
+		Sends a CAN command. Does not wait to receive a response
+		"""
+		ext_id_prefix='8'
+		try:
+			posID2 = ext_id_prefix+(hex(posID).replace('0x','')+hex(ccom).replace('0x','').zfill(2)).zfill(7)
+			posID2 = int(posID2,16)
+#			data=data.replace(',','')
+			self.s.send(self.build_can_frame(posID2, data))
+			time.sleep(self.__sleeptime)
+			return 'SUCCESS'
+		except socket.error:
+			print('Error sending CAN frame')
+			return 'FAILED'
 
 	def send_command_recv(self, posID= 4321, ccom=8, data=''):
 		"""

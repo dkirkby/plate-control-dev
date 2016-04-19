@@ -93,13 +93,14 @@ if __name__ == '__main__':
 	print("")
 	loop=True
 	while loop:
-		print("Select:")
+#		print("Select:")
 		print("[b]link LED (using broadcast address)")
 		print("[r]ead current CAN and silicon address")
 		print("[e]xit")
 		print("[p]rogram new CAN address")
+		print("Select: ")
 		sel=_sel.__call__()		
-		print("sel:",sel)
+		#print("sel:",sel)
 
 		sel=sel.lower()
 		if sel=='e':
