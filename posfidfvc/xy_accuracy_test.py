@@ -6,7 +6,6 @@ import fvchandler
 import posmovemeasure
 import posconstants as pc
 import datetime
-import csv
 
 # initialization
 fvc = fvchandler.FVCHandler('SBIG')

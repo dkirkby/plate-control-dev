@@ -8,13 +8,18 @@ class FVCHandler(object):
     """Provides a generic interface to the Fiber View Camera. Can support different
     particular FVC implementations, providing a common set of functions to call
     from positioner control scripts.
+    
+    The order of operations for transforming from CCD coordinates to output is:
+        1. rotation
+        2. scale
+        3. translation
     """
     def __init__(self, fvc_type='SBIG'):
         self.fvc_type = fvc_type # 'SBIG' or 'FLI'
         self.exposure_time = 90  # ms, camera exposure time
-        self.translation = [0,0] # translation of origin within the image plane
-        self.scale = 1.0         # scale factor from image plane to object plane
         self.rotation = 0        # [deg] rotation angle from image plane to object plane
+        self.scale = 1.0         # scale factor from image plane to object plane
+        self.translation = [0,0] # translation of origin within the image plane
 
     def measure_and_identify(self, expected_pos_xy=[], expected_ref_xy=[]):
         """Calls for an FVC measurement, and returns a list of measured centroids.
@@ -70,10 +75,10 @@ class FVCHandler(object):
         else:
             xy = []
         xy_np = np.array(xy).transpose()
-        xy_np += self.translation
-        xy_np *= self.scale
         rot = FVCHandler.rotmat2D_deg(self.rotation)
-        xy_np = np.dot(rot, xy)
+        xy_np = np.dot(rot, xy_np)
+        xy_np *= self.scale
+        xy_np += self.translation
         xy = xy_np.tolist()
         return xy
 

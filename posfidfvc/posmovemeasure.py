@@ -16,8 +16,8 @@ class PosMoveMeasure(object):
         self.petals = petals # list of petal objects
         self.fvc = fvc # fvchandler object
         self.n_fiducial_dots = 1
-        self.ref_dist_tol = 0.050 # [mm] used for identifying fiducial dots
-        self.nudge_dist   = 5.0   # [deg] used for identifying fiducial dots
+        self.ref_dist_tol = 0.1   # [mm] used for identifying fiducial dots
+        self.nudge_dist   = 10.0  # [deg] used for identifying fiducial dots
         self.fiducials_xy = []    # list of locations of the dots in the obsXY coordinate system
         self.n_points_full_calib_T = 7 # number of points in a theta calibration arc
         self.n_points_full_calib_P = 7 # number of points in a phi calibration arc
@@ -211,8 +211,8 @@ class PosMoveMeasure(object):
     def identify_fiducials(self):
         """Nudge positioners forward/back to determine which centroid dots are fiducials.
         """
-        print('Nudging positioners to identify reference fiber(s).\n')
-        print('Distance tol for identifying a fixed fiber is set to %g.\n',self.ref_dist_tol)
+        print('Nudging positioners to identify reference fiber(s).')
+        print('Distance tol for identifying a fixed fiber is set to' + str(self.ref_dist_tol))
         pos_ids_by_ptl = self.pos_data_listed_by_ptl('all','POS_ID')
         nudges = [self.nudge_dist, -self.nudge_dist]
         xy_ref = []
@@ -221,7 +221,7 @@ class PosMoveMeasure(object):
             for petal in pos_ids_by_ptl.keys():
                 pos_ids = pos_ids_by_ptl[petal]
                 n_pos += len(pos_ids)
-                petal.request_direct_dtdp(pos_ids, [nudges[i],0], cmd_prefix='nudge to identify fiducials')
+                petal.request_direct_dtdp(pos_ids, [0,nudges[i]], cmd_prefix='nudge to identify fiducials')
                 petal.schedule_send_and_execute_moves()
             n_dots = n_pos + self.n_fiducial_dots
             if i == 0:
@@ -313,10 +313,10 @@ class PosMoveMeasure(object):
                     initial_tp = pc.concat_lists_of_lists(initial_tp, [theta, phi_min])
                     final_tp   = pc.concat_lists_of_lists(final_tp,   [initial_tp[-1][0], max(posmodel.targetable_range_P)])
             for i in range(len(these_pos_ids)):
-                t = linspace(initial_tp[i][0], final_tp[i][0], n_pts)
-                p = linspace(initial_tp[i][1], final_tp[i][1], n_pts)
+                t = np.linspace(initial_tp[i][0], final_tp[i][0], n_pts)
+                p = np.linspace(initial_tp[i][1], final_tp[i][1], n_pts)
                 data[these_pos_ids[i]] = {'target_posTP':[[t[j],p[j]] for j in range(n_pts)], 'measured_obsXY':[], 'petal':petal, 'trans':posmodels[i].trans}
-        all_pos_ids = data.keys()
+        all_pos_ids = list(data.keys())
 
         # make the measurements
         for i in range(n_pts):
@@ -374,7 +374,7 @@ class PosMoveMeasure(object):
                 axisid = pc.P
             for i in range(len(these_pos_ids)):
                 data[these_pos_ids[i]] = {'target_dtdp':dtdp, 'measured_obsXY':[], 'petal':petal}
-        all_pos_ids = data.keys()
+        all_pos_ids = list(data.keys())
 
         # go to initial point
         self.move(all_pos_ids, 'posTP', initial_tp)
