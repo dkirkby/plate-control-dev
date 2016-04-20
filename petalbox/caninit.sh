@@ -16,7 +16,7 @@ do
 	fi
 done
 echo "creating a local copy of petalcontroller.conf ..."
-cd /home/msdos/dos_home/petalbox
+cd $PETALBOX_HOME
 cp petalcontroller.conf.default petalcontroller.conf
 echo "updating petalcontroller.ini file ..."
 python3 caninit.py can$i
