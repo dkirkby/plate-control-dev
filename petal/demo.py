@@ -20,15 +20,15 @@ for pos_id in pos_ids:
     print(ptl.get(pos_id).expected_current_position_str)
 
 # demo script flags
-should_flash       = True
+should_flash       = False
 should_home        = True
 should_direct_dtdp = False
 should_move_qs     = False
 should_move_dqds   = False
-should_move_xy     = False
+should_move_xy     = True
 should_move_dxdy   = False
 should_move_tp     = False
-should_move_dtdp   = True
+should_move_dtdp   = False
 
 # flash the LEDs
 if should_flash:
@@ -74,7 +74,8 @@ if should_move_dqds:
         ptl.quick_move(pos_ids, [command]*n, [values]*n)
 
 if should_move_xy:
-    xy = [[2.5,0], [0,2.5], [-5,0], [0,-5], [-5.99,0], [6,0], [0,8], [0,0]]
+    #xy = [[2.5,0], [0,2.5], [-5,0], [0,-5], [-5.99,0], [6,0], [0,8], [0,0]]
+    xy = [[-4,-4], [-4,0], [-4,4], [0,-4], [0,0], [0,4], [4,-4], [4,0], [4,4]]
     command = 'posXY'
     for i in range(len(xy)):
         values = xy[i]
