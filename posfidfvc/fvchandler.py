@@ -90,5 +90,8 @@ class FVCHandler(object):
 
 if __name__ == '__main__':
     f = FVCHandler()
-    xy = f.measure(2)
-    print(xy)
+    n = 3
+    xy = []
+    for i in range(n):
+        xy.append(f.measure(2))
+        print(xy[i])

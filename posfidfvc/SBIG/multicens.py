@@ -74,7 +74,7 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False):
 # Output:
 #       returning the centroids and FWHMs as lists (xcen,ycen,fwhm)
 
-	size_fitbox=10 # gaussian fitter box (length of side in pixels)
+	size_fitbox=30 # gaussian fitter box (length of side in pixels)
 	img[img<0]=0
 	img = img.astype(np.uint16)
 	level = mh.thresholding.otsu(img)		
