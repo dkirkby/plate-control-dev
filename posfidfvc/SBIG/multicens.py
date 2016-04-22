@@ -64,7 +64,7 @@ def im2bw(image,level):
 	bw[threshold_indices] = 1
 	return bw
 
-def multiCens(img, n_centroids_to_keep=2, verbose=False):
+def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=False):
 # Computes centroids by finding spots and then fitting 2d gaussian
 #
 # Input 
@@ -74,17 +74,19 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False):
 # Output:
 #       returning the centroids and FWHMs as lists (xcen,ycen,fwhm)
 
-	size_fitbox=30 # gaussian fitter box (length of side in pixels)
+	size_fitbox=20 # gaussian fitter box (length of side in pixels)
 	img[img<0]=0
 	img = img.astype(np.uint16)
 	level = mh.thresholding.otsu(img)		
 	bw=im2bw(img,level)
 	hdu=pyfits.PrimaryHDU(bw)
-	try:
-		os.remove('binaryImage.FITS')
-	except:
-		pass
-	hdu.writeto('binaryImage.FITS')
+	if write_fits:
+		filename = '_binary_image.FITS'
+		try:
+			os.remove(filename)
+		except:
+			pass
+		hdu.writeto(filename)
 	labeled, nr_objects = mh.label(bw)
 	sizes = mh.labeled.labeled_size(labeled) # size[0] is the background size, sizes[1 and greater] are number of pixels in each region
 	sorted_sizes_indexes = np.argsort(sizes)[::-1] # return in descending order

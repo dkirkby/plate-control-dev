@@ -17,6 +17,8 @@ class FVCHandler(object):
     """
     def __init__(self, fvc_type='SBIG'):
         self.fvc_type = fvc_type # 'SBIG' or 'FLI'
+        if self.fvc_type == 'SBIG':
+            self.sbig = sbig_grab_cen.SBIG_Grab_Cen()
         self.exposure_time = 90  # ms, camera exposure time
         self.rotation = 0        # [deg] rotation angle from image plane to object plane
         self.scale = 1.0         # scale factor from image plane to object plane
@@ -70,7 +72,7 @@ class FVCHandler(object):
             xy ... list of the form [[x1,y1],[x2,y2],...]
         """
         if self.fvc_type == 'SBIG':
-            xy,brightness,t = sbig_grab_cen.sbig_grab_cen(self.exposure_time, num_objects,writefits=True)
+            xy,brightness,t = self.sbig.grab(num_objects)
         elif self.fvc_type == 'FLI':
             xy = [] # to be implemented
         else:
@@ -79,7 +81,9 @@ class FVCHandler(object):
         rot = FVCHandler.rotmat2D_deg(self.rotation)
         xy_np = np.dot(rot, xy_np)
         xy_np *= self.scale
-        xy_np += self.translation
+        translation_x = self.translation[0] * np.ones(np.shape(xy_np)[1])
+        translation_y = self.translation[1] * np.ones(np.shape(xy_np)[1])
+        xy_np += [translation_x,translation_y]
         xy = xy_np.tolist()
         return xy
 
@@ -91,11 +95,13 @@ class FVCHandler(object):
 
 if __name__ == '__main__':
     f = FVCHandler()
-    n = 5
+    n_objects = 3
+    n_repeats = 5
     xy = []
-    print('start taking ' + str(n) + ' images')
+    print('start taking ' + str(n_repeats) + ' images')
     start_time = time.time()
-    for i in range(n):
-        xy.append(f.measure(2))
+    for i in range(n_repeats):
+        xy.append(f.measure(n_objects))
         print(xy[i])
-    print('total time = ' + str(time.time() - start_time))
+    total_time = time.time() - start_time
+    print('total time = ' + str(total_time) + ' (' + str(total_time/n_repeats) + ' per image)')
