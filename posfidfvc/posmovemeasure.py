@@ -195,16 +195,18 @@ class PosMoveMeasure(object):
         T = self._measure_calibration_arc(pos_ids,'theta',mode)
         P = self._measure_calibration_arc(pos_ids,'phi',mode)
         self._calculate_and_set_arms_and_offsets(T,P)
+        ptls_of_pos_ids = self.ptls_of_pos_ids(pos_ids)
         if mode == 'full':
             for pos_id in T.keys():
                 # gear ratio calibration calculations
                 trans = T[pos_id]['trans']
-                measured_obsXY = pc.concat_lists_of_lists(T[posid]['measured_obsXY'], P[posid]['measured_obsXY'])
-                target_posTP   = pc.concat_lists_of_lists(T[posid]['target_posTP'],   P[posid]['target_posTP'])
+                measured_obsXY = pc.concat_lists_of_lists(T[pos_id]['measured_obsXY'], P[pos_id]['measured_obsXY'])
+                target_posTP   = pc.concat_lists_of_lists(T[pos_id]['target_posTP'],   P[pos_id]['target_posTP'])
                 measured_posTP = trans.obsXY_to_posTP(np.transpose(measured_obsXY)).transpose()
                 scale_TP = np.divide(measured_posTP,target_posTP)
                 scale_T = np.median(scale_TP[:,pc.T])
                 scale_P = np.median(scale_TP[:,pc.P])
+                petal = ptls_of_pos_ids[pos_id]
                 petal.set(pos_id,'GEAR_CALIB_T',scale_T)
                 petal.set(pos_id,'GEAR_CALIB_P',scale_P)
 
@@ -259,6 +261,18 @@ class PosMoveMeasure(object):
             this_data = pc.listify(this_data, keep_flat=True)[0]
             data_by_ptl[petal] = this_data
         return data_by_ptl
+    
+    def ptls_of_pos_ids(self, pos_ids='all'):
+        """Returns a dictionary with keys = pos_ids and values = corresponding petal
+        on which each pos_id lives.
+        """
+        ptls_of_pos_ids = {}
+        pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID') 
+        for ptl in pos_ids_by_ptl.keys():
+            for pos_id in pos_ids_by_ptl[ptl]:
+                ptls_of_pos_ids[pos_id] = ptl
+        return ptls_of_pos_ids
+            
 
     def _measure_calibration_arc(self,pos_ids='all',axis='theta',mode='quick'):
         """Expert usage. Sweep an arc of points about axis ('theta' or 'phi')
@@ -328,7 +342,7 @@ class PosMoveMeasure(object):
 
         # circle fits
         for pos_id in all_pos_ids:
-            (xy_ctr,radius) = fitcircle.fit(data[pos_id]['measured_obsXY'])
+            (xy_ctr,radius) = fitcircle.FitCircle().fit(data[pos_id]['measured_obsXY'])
             data[pos_id]['xy_center'] = xy_ctr
             data[pos_id]['radius'] = radius
         return data
@@ -408,7 +422,7 @@ class PosMoveMeasure(object):
 
         # circle fits
         for pos_id in all_pos_ids:
-            (xy_ctr,radius) = fitcircle.fit(data[pos_id]['measured_obsXY'])
+            (xy_ctr,radius) = fitcircle.FitCircle().fit(data[pos_id]['measured_obsXY'])
             data[pos_id]['xy_center'] = xy_ctr
         return data
 

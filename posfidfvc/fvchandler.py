@@ -84,7 +84,7 @@ class FVCHandler(object):
         translation_x = self.translation[0] * np.ones(np.shape(xy_np)[1])
         translation_y = self.translation[1] * np.ones(np.shape(xy_np)[1])
         xy_np += [translation_x,translation_y]
-        xy = xy_np.tolist()
+        xy = xy_np.transpose().tolist()
         return xy
 
     @staticmethod
