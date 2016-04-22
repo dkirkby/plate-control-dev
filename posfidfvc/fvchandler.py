@@ -3,6 +3,7 @@ import sys
 sys.path.append(os.path.abspath('./SBIG/'))
 import sbig_grab_cen
 import numpy as np
+import time
 
 class FVCHandler(object):
     """Provides a generic interface to the Fiber View Camera. Can support different
@@ -90,8 +91,11 @@ class FVCHandler(object):
 
 if __name__ == '__main__':
     f = FVCHandler()
-    n = 3
+    n = 5
     xy = []
+    print('start taking ' + str(n) + ' images')
+    start_time = time.time()
     for i in range(n):
         xy.append(f.measure(2))
         print(xy[i])
+    print('total time = ' + str(time.time() - start_time))
