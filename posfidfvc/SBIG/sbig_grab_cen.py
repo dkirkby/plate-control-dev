@@ -19,6 +19,8 @@ class SBIG_Grab_Cen(object):
         self.verbose = False
         self.write_fits = True
         self.take_darks = False # whether to measure a dark image and subtract it out
+        self.flip_horizontal = True # whether to reflect image across y axis
+        self.flip_vertical = False # whether to reflect image across x axis
 
     @property
     def exposure_time(self):
@@ -49,6 +51,7 @@ class SBIG_Grab_Cen(object):
                 print("Taking dark image...")
             self.cam.set_dark(True)  
             D = self.cam.start_exposure()
+            D = self.flip(D)	
             if self.write_fits:
                 self.cam.write_fits(D,'_SBIG_dark_image.FITS')
         else:
@@ -56,7 +59,8 @@ class SBIG_Grab_Cen(object):
         if self.verbose:
             print("Taking light image...")
         self.cam.set_dark(False)
-        L = self.cam.start_exposure() 
+        L = self.cam.start_exposure()
+        L = self.flip(L)
         if self.write_fits:
             self.cam.write_fits(L,'_SBIG_light_image.FITS')
         if not(self.take_darks):
@@ -91,4 +95,11 @@ class SBIG_Grab_Cen(object):
         
     def close_camera(self):
         self.cam.close_camera()
+
+    def flip(self, img):
+        if self.flip_horizontal:
+            img = np.fliplr(img)
+        if self.flip_vertical:
+            img = np.flipud(img)
+        return img
     
