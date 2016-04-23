@@ -127,7 +127,8 @@ class PosMoveMeasure(object):
         pos_ids = []
         targets = []
         for petal in pos_ids_by_ptl.keys():
-            pos_ids.extend(pos_ids_by_ptl[petal])
+            these_pos_ids = pos_ids_by_ptl[petal]
+            pos_ids.extend(these_pos_ids)
             posT = petal.expected_current_position(these_pos_ids,'posT')
             posP = self.phi_clear_angle # uniform value in all cases
             targets = pc.concat_lists_of_lists(targets, [[t,posP] for t in posT])
@@ -441,7 +442,7 @@ class PosMoveMeasure(object):
             petal.set(pos_id,'OFFSET_X',t_ctr[0])
             petal.set(pos_id,'OFFSET_Y',t_ctr[1])
             obsT = np.arctan2(p_ctr[1]-t_ctr[1], p_ctr[0]-t_ctr[0]) * 180/np.pi
-            posT = np.median(P[pos_id]['target_posTP'][pc.T])
+            posT = P[pos_id]['target_posTP'][0][pc.T]
             offset_t = obsT - posT
             petal.set(pos_id,'OFFSET_T',offset_t)
             p_xymeas = P[pos_id]['measured_xy']

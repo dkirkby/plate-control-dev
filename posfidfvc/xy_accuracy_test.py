@@ -9,8 +9,8 @@ import datetime
 
 # initialization
 fvc = fvchandler.FVCHandler('SBIG')
-fvc.scale = 0.022  # mm/pixel
-fvc.rotation = 180 # deg
+fvc.scale = 0.02 # mm/pixel
+fvc.rotation = 0  # deg
 pos_ids = ['UM00012']
 fid_can_ids = []
 petal_id = 1
