@@ -56,13 +56,21 @@ class FVCHandler(object):
         """Sorts the list unknown_xy so that each point is at the same index
         as its closest-distance match in the list expected_xy.
         """
-        xy = []
-        u = np.array(unknown_xy)
+        if len(unknown_xy) != len(expected_xy):
+            print('warning: unknown_xy length = ' + str(len(unknown_xy)) + ' but expected_xy length = ' + str(len(expected_xy)))
+        xy = [None]*len(expected_xy)
+        dist = []
         for e in expected_xy:
-            delta = u - e
-            dist = np.sqrt(np.sum(delta**2,axis=1))
-            closest = u[np.argmin(dist),:]
-            xy.append(closest.tolist())
+            delta = np.array(unknown_xy) - np.array(e)
+            dist.append(np.sqrt(np.sum(delta**2,axis=1)).tolist())
+        dist = np.array(dist)
+        for i in range(len(unknown_xy)):
+            min_idx_1D = np.argmin(dist)
+            unknown_min_idx = np.mod(min_idx_1D,len(unknown_xy))
+            expected_min_idx = np.int(np.floor(min_idx_1D/len(expected_xy)))
+            xy[expected_min_idx] = unknown_xy[unknown_min_idx]
+            dist[expected_min_idx,:] = np.inf # disable used up "expected" row
+            dist[:,unknown_min_idx] = np.inf # disable used up "unknown" column
         return xy
 
     def measure(self, num_objects=1):

@@ -449,7 +449,7 @@ class PosMoveMeasure(object):
             obsP = p_angles - obsT
             posP = P[pos_id]['target_posTP'][pc.P]
             offset_p = np.median(obsP - posP)
-            petal.set(pos_id,'OFFSET_T',offset_p)
+            petal.set(pos_id,'OFFSET_P',offset_p)
 
     @property
     def phi_clear_angle(self):

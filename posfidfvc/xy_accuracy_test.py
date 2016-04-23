@@ -9,15 +9,15 @@ import datetime
 
 # initialization
 fvc = fvchandler.FVCHandler('SBIG')
-fvc.scale = 0.015  # mm/pixel
-fvc.rotation = -90 # deg
+fvc.scale = 0.022  # mm/pixel
+fvc.rotation = 180 # deg
 pos_ids = ['UM00012']
 fid_can_ids = []
 petal_id = 1
 ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure(ptl,fvc)
-m.n_fiducial_dots = 1 # number of centroids the FVC should expect
+m.n_fiducial_dots = 2 # number of centroids the FVC should expect
 num_corr_max = 2 # number of correction moves to do for each target
 
 # log file setup
