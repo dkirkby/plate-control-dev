@@ -311,7 +311,6 @@ class SBIGCam(object):
 		b1=time.time()
 		Error = self.SBIG.SBIGUnivDrvCommand(self.CC_QUERY_COMMAND_STATUS, byref(qcspar), byref(qcsres))
 		while qcsres.status == 2:
-			nc=nc+1
 			Error = self.SBIG.SBIGUnivDrvCommand(self.CC_QUERY_COMMAND_STATUS, byref(qcspar), byref(qcsres))
 		#End Exposure
 		eep = self.EndExposureParams(ccd = self.CCD_IMAGING)
