@@ -58,7 +58,10 @@ Modification history:
 160325-MS	renamed to sbigcam.py, renamed methods to comply with Python convention
 			added error checking, added method to write FITS file 
 			
-
+160424-MS	fixed exposure time error. The exposureTime item is in 1/100 seconds (and
+			not in msec)
+			implemented fast readout mode (set_fast_mode)
+			implemented window mode (set_window_mode)			 
 '''
 
 
@@ -66,7 +69,6 @@ Modification history:
 from ctypes import CDLL, byref, Structure, c_ushort, c_ulong, c_void_p
 from platform import system
 import numpy as np
-#from astropy.io import fits
 import pyfits as fits
 import time
 import sys
@@ -137,27 +139,27 @@ class SBIGCam(object):
 	SC_OPEN_SHUTTER = 1
 	RM_1X1 = 0
 	ABG_LOW7 = 1
+	EXP_FAST_READOUT = 0x08000000	
 	
 	def __init__(self):
 		self.DARK = 0 #Defaults to 0
-		self.exposure = c_ulong(90) #defaults to 90ms
+		self.exposure = c_ulong(9) #defaults to 90ms
 		self.TOP = c_ushort(0)
 		self.LEFT = c_ushort(0)
+		self.FAST = 0
 		#self.cam_model=cam_model
-		self.WIDTH = c_ushort(3352) 
-		self.HEIGHT = c_ushort(2532)
+		self.WIDTH = 0
+		self.HEIGHT = 0
 		#Include sbigudrv.so
 		if system() == 'Linux':
 			self.SBIG = CDLL("/usr/local/lib/libsbigudrv.so")
 		elif system() == 'Windows': #Note: Requires 32bit python to access 32bit DLL
 			self.SBIG = CDLL('C:\\Windows\system\sbigudrv.dll')
-		#elif system() == 'OSX':
-		#    self.SBIG = '???'
 		else: #Assume Linux
 			self.SBIG = CDLL("/usr/local/lib/libsbigudrv.so")
 		self.verbose = False
 
-	def set_image_size(self, width=3352, height=2532):
+	def set_image_size(self, width, height):
 		"""
 		sets the CCD chip size in pixels
 		Input
@@ -166,7 +168,6 @@ class SBIGCam(object):
 		Returns:
 			True if success
 			False if failed
-		Default CCD size is for the SBIG STF-8300
 		"""
 		try:
 			self.WIDTH = c_ushort(width)
@@ -175,6 +176,15 @@ class SBIGCam(object):
 		except:
 			return False
 
+
+	def set_window_mode(self, top=0, left=0):
+		try:
+			self.TOP=c_ushort(top)
+			self.LEFT=c_ushort(left)
+			return True
+		except:
+			return False
+			
 	def select_camera(self,name='ST8300'):
 		"""
 		sets the CCD chip size in pixels according to
@@ -189,14 +199,13 @@ class SBIGCam(object):
 
 		if name in ['ST8300','STi']:
 			try:
-				if name == 'ST800': self.set_image_size()
+				if name == 'ST8300': self.set_image_size(3352,2532)
 				if name == 'STi':self.set_image_size(648,484)
 				return True
 			except:
 				return False	
 		else:
 			return False
-
 
 
 	def set_resolution(self, width,height):
@@ -206,6 +215,10 @@ class SBIGCam(object):
 		self.set_image_size(width,height)
 		return
 
+	def set_fast_mode(self, fast_mode=False):
+		if fast_mode:
+			self.FAST=self.EXP_FAST_READOUT
+		return
 
 	def set_exposure_time(self, time=90):
 		"""
@@ -220,7 +233,7 @@ class SBIGCam(object):
 		if time > 3600000: time=3600000
 		try:
 			
-			self.exposure = c_ulong(time)
+			self.exposure = int(time/10)
 			return True
 		except:
 			return False
@@ -276,6 +289,8 @@ class SBIGCam(object):
 			Image if success, False otherwise
 		"""    
 		#Take Image  
+
+		self.exposure=c_ulong(self.exposure+self.FAST)
 		sep2 = self.StartExposureParams2(ccd = self.CCD_IMAGING, exposureTime = self.exposure,
 									abgState = self.ABG_LOW7, readoutMode = self.RM_1X1,
 									top = self.TOP, left = self.LEFT, 
@@ -290,15 +305,15 @@ class SBIGCam(object):
 			return False
 		elif self.verbose:
 			print ('Exposure successfully initiated.')		 
-		   
 		#Wait for exposure to end
 		qcspar = self.QueryCommandStatusParams(command = self.CC_START_EXPOSURE2)
 		qcsres = self.QueryCommandStatusResults(status = 6)
+		b1=time.time()
 		Error = self.SBIG.SBIGUnivDrvCommand(self.CC_QUERY_COMMAND_STATUS, byref(qcspar), byref(qcsres))
 		while qcsres.status == 2:
+			nc=nc+1
 			Error = self.SBIG.SBIGUnivDrvCommand(self.CC_QUERY_COMMAND_STATUS, byref(qcspar), byref(qcsres))
 		#End Exposure
-
 		eep = self.EndExposureParams(ccd = self.CCD_IMAGING)
 		Error = self.SBIG.SBIGUnivDrvCommand(self.CC_END_EXPOSURE, byref(eep), None)
 		if Error != self.CE_NO_ERROR:
@@ -307,7 +322,6 @@ class SBIGCam(object):
 		elif self.verbose:
 			print ('Exposure successfully ended.')
 		 
-		   
 		#Start Readout
 		srp = self.StartReadoutParams(ccd = self.CCD_IMAGING, readoutMode = self.RM_1X1,
 								 top = self.TOP, left = self.LEFT, height = self.HEIGHT,
@@ -335,7 +349,6 @@ class SBIGCam(object):
 		#hdu.writeto(name)
 		if Error == self.CE_NO_ERROR and self.verbose:
 			print ('Readout successfully completed.')
-			
 		return image
 	
 	
