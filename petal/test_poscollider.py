@@ -83,9 +83,9 @@ for k in range(len(collider.collidable_relations['A'])):
     B = collider.collidable_relations['B'][k]
     B_is_fixed = collider.collidable_relations['B_is_fixed'][k]
     if B_is_fixed and A in range(len(tables)): # might want to replace 2nd test here with one where we look in tables for a specific positioner index
-        these_sweeps = collider.spactime_collision_with_fixed(A, [Tstart,Pstart], tables[A])
+        these_sweeps = collider.spacetime_collision_with_fixed(A, [Tstart,Pstart], tables[A])
     elif A in range(len(tables)) and B in range(len(tables)): # again, might want to look for specific indexes identifying which tables go with which positioners
-        these_sweeps = collider.spactime_collision_between_positioners(A, [Tstart,Pstart], tables[A], B, [Tstart,Pstart], tables[B])
+        these_sweeps = collider.spacetime_collision_between_positioners(A, [Tstart,Pstart], tables[A], B, [Tstart,Pstart], tables[B])
     for i in range(len(these_sweeps)):
         AorB = A if i == 0 else B
         if these_sweeps[i].collision_time <= earliest_collision[AorB]:

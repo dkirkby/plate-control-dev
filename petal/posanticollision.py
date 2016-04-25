@@ -42,6 +42,7 @@ def run_RRE_anticol(x,y,t,t2,p,p2,posmodels,method, avoidance, verbose):
     tables = []    
     for i,cur_posmodel in enumerate(posmodels):
         current_table = create_table(t[i],t2[i],p[i],p_in[i],p2[i],cur_posmodel,method)
+	# jhs -- we should have a table.store_orig_command() method here
         tables.append(current_table)
 
     # Set max number of anticollision correction iterations, then intiate loop
@@ -105,9 +106,9 @@ def check_for_collisions(thetas,phis,cur_poscollider,list_tables):
 
         B_is_fixed = cur_poscollider.collidable_relations['B_is_fixed'][k]
         if B_is_fixed and A in range(len(list_tables)): # might want to replace 2nd test here with one where we look in tables for a specific positioner index
-            these_sweeps = cur_poscollider.spactime_collision_with_fixed(A, [thetas[A],phis[A]], tableA)
+            these_sweeps = cur_poscollider.spacetime_collision_with_fixed(A, [thetas[A],phis[A]], tableA)
         elif A in range(len(list_tables)) and B in range(len(list_tables)): # again, might want to look for specific indexes identifying which tables go with which positioners
-            these_sweeps = cur_poscollider.spactime_collision_between_positioners(A, [thetas[A],phis[A]], tableA, B, [thetas[B],phis[B]], tableB)
+            these_sweeps = cur_poscollider.spacetime_collision_between_positioners(A, [thetas[A],phis[A]], tableA, B, [thetas[B],phis[B]], tableB)
         # Find the earliest collision if multiple are found
         for i in range(len(these_sweeps)):
             if i == 0:
@@ -153,15 +154,15 @@ def create_table_RRE(theta_start,theta_final, phi_start, phi_inner, phi_final, c
     
     # Find the theta and phi movements for the theta movement inside the safety envelope
     dtdp = current_positioner_model.trans.delta_posTP([theta_start,phi_inner],[theta_final,phi_inner], range_wrap_limits='targetable')
-    table.set_move(0, pc.T, dtdp[0])
-    table.set_move(0, pc.P, dtdp[1])
+    table.set_move(0, pc.T, dtdp[0]) # jhs -- should this be move #1, rather than 0?
+    table.set_move(0, pc.P, dtdp[1]) # jhs -- should this be move #1, rather than 0?
     table.set_prepause (0, 0.0)
     table.set_postpause(0, 0.0)
     
     # Find the theta and phi movements for the phi extension movement
     dtdp = current_positioner_model.trans.delta_posTP([theta_final,phi_inner],[theta_final,phi_final], range_wrap_limits='targetable')
-    table.set_move(0, pc.T, dtdp[0])
-    table.set_move(0, pc.P, dtdp[1])
+    table.set_move(0, pc.T, dtdp[0]) # jhs -- should this be move #2, rather than 0?
+    table.set_move(0, pc.P, dtdp[1]) # jhs -- should this be move #2, rather than 0?
     table.set_prepause (0, 0.0)
     table.set_postpause(0, 0.0)
     

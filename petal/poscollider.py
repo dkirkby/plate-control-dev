@@ -73,12 +73,12 @@ class PosCollider(object):
                     self.plotter.add_or_change_item('PTL', '', s.time[i], self.keepout_PTL.points, s.collision_time)
         self.plotter.animate()
 
-    def spactime_collision_between_positioners(self, idxA, init_obsTP_A, tableA, idxB, init_obsTP_B, tableB):
+    def spacetime_collision_between_positioners(self, idxA, init_obsTP_A, tableA, idxB, init_obsTP_B, tableB):
         """Wrapper for spacetime_collision method, specifically for checking two positioners
         against each other."""
         return self.spacetime_collision(idxA, init_obsTP_A, tableA, idxB, init_obsTP_B, tableB)
 
-    def spactime_collision_with_fixed(self, idx, init_obsTP, table):
+    def spacetime_collision_with_fixed(self, idx, init_obsTP, table):
         """Wrapper for spacetime_collision method, specifically for checking one positioner
         against the fixed keepouts.
         """

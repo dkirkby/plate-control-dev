@@ -210,7 +210,7 @@ class PosPlot(object):
     @staticmethod
     def get_patch(item,index):
         return plt.Polygon(item['poly'][index].transpose().tolist(),
-                           linestyle=item['style'][index]['linestyle'],
+                           #linestyle=item['style'][index]['linestyle'],
                            linewidth=item['style'][index]['linewidth'],
                            edgecolor=item['style'][index]['edgecolor'],
                            facecolor=item['style'][index]['facecolor'])
@@ -218,7 +218,7 @@ class PosPlot(object):
     @staticmethod
     def set_patch(patch,item,index):
         patch.set_xy(item['poly'][index].transpose().tolist())
-        patch.set_linestyle(item['style'][index]['linestyle'])
+        #patch.set_linestyle(item['style'][index]['linestyle'])
         patch.set_linewidth(item['style'][index]['linewidth'])
         patch.set_edgecolor(item['style'][index]['edgecolor'])
         patch.set_facecolor(item['style'][index]['facecolor'])
