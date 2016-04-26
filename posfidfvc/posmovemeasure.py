@@ -445,7 +445,7 @@ class PosMoveMeasure(object):
             posT = P[pos_id]['target_posTP'][0][pc.T]
             offset_t = obsT - posT
             petal.set(pos_id,'OFFSET_T',offset_t)
-            p_xymeas = P[pos_id]['measured_xy']
+            p_xymeas = P[pos_id]['measured_obsXY']
             p_angles = np.arctan2(p_xymeas[1]-p_ctr[1], p_xymeas[0]-p_ctr[0]) * 180/np.pi
             obsP = p_angles - obsT
             posP = P[pos_id]['target_posTP'][pc.P]

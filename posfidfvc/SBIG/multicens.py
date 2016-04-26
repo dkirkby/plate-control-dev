@@ -1,7 +1,5 @@
 import numpy as np
 import mahotas as mh
-import warnings
-import sys
 #from pylab import imshow, show
 import pyfits
 from msgfitter import fitgaussian

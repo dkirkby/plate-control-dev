@@ -43,7 +43,7 @@ for pos_id in pos_ids:
 # cycles configuration (for life testing)
 
 # test grid configuration (local to any positioner)
-local_targets = [[2,0], [-2,0]]
+local_targets = [[2,0], [-2,0]] # rebrand to targets_posXY
 
 # identify fiducials and initial homing
 m.identify_fiducials()
