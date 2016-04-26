@@ -144,6 +144,7 @@ class Petal(object):
             table.set_move(0,pc.T,dist[0])
             table.set_move(0,pc.P,dist[1])
             table.store_orig_command(0,cmd_prefix + 'limit seek',direction*(axisid == pc.T),direction*(axisid == pc.P))
+            p.axis[axisid].postmove_cleanup_cmds += 'self.axis[' + repr(axisid) + '].total_limit_seeks += 1\n'
             self.schedule.add_table(table)
 
     def request_homing(self, pos):
@@ -174,7 +175,6 @@ class Petal(object):
                     hardstop_debounce[i] = p.axis[i].hardstop_debounce[1]
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + '.maxpos\n'
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = +1.0\n'
-                p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.total_limit_seeks += 1\n'
             self.request_direct_dtdp(p, hardstop_debounce, cmd_prefix='debounce ')
 
     def schedule_moves(self,anticollision=None):
