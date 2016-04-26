@@ -143,7 +143,7 @@ class SBIGCam(object):
 	
 	def __init__(self):
 		self.DARK = 0 #Defaults to 0
-		self.exposure = c_ulong(9) #defaults to 90ms
+		self.exposure = 9 # units 1/100 second (minimum exposure is 0.09 seconds)
 		self.TOP = c_ushort(0)
 		self.LEFT = c_ushort(0)
 		self.FAST = 0
@@ -203,8 +203,10 @@ class SBIGCam(object):
 				if name == 'STi':self.set_image_size(648,484)
 				return True
 			except:
+				print('could not select camera: ' + name)
 				return False	
 		else:
+			print('could not select camera: ' + name)
 			return False
 
 
@@ -220,7 +222,7 @@ class SBIGCam(object):
 			self.FAST=self.EXP_FAST_READOUT
 		return
 
-	def set_exposure_time(self, time=90):
+	def set_exposure_time(self, exp_time=90):
 		"""
 		sets the exposure time in ms
 		Input
@@ -229,11 +231,11 @@ class SBIGCam(object):
 			True if success
 			False if failed
 		"""
-		if time < 90: time = 90
-		if time > 3600000: time=3600000
+		if exp_time < 90: exp_time = 90
+		if exp_time > 3600000: exp_time=3600000
 		try:
 			
-			self.exposure = int(time/10)
+			self.exposure = int(exp_time/10)
 			return True
 		except:
 			return False
@@ -289,9 +291,8 @@ class SBIGCam(object):
 			Image if success, False otherwise
 		"""    
 		#Take Image  
-
-		self.exposure=c_ulong(self.exposure+self.FAST)
-		sep2 = self.StartExposureParams2(ccd = self.CCD_IMAGING, exposureTime = self.exposure,
+		exposure=c_ulong(self.exposure + self.FAST)
+		sep2 = self.StartExposureParams2(ccd = self.CCD_IMAGING, exposureTime = exposure,
 									abgState = self.ABG_LOW7, readoutMode = self.RM_1X1,
 									top = self.TOP, left = self.LEFT, 
 									height = self.HEIGHT, width = self.WIDTH)
@@ -308,7 +309,6 @@ class SBIGCam(object):
 		#Wait for exposure to end
 		qcspar = self.QueryCommandStatusParams(command = self.CC_START_EXPOSURE2)
 		qcsres = self.QueryCommandStatusResults(status = 6)
-		b1=time.time()
 		Error = self.SBIG.SBIGUnivDrvCommand(self.CC_QUERY_COMMAND_STATUS, byref(qcspar), byref(qcsres))
 		while qcsres.status == 2:
 			Error = self.SBIG.SBIGUnivDrvCommand(self.CC_QUERY_COMMAND_STATUS, byref(qcspar), byref(qcsres))
