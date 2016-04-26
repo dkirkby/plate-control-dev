@@ -4,6 +4,7 @@ import multicens
 import numpy as np
 import gc
 import sbigcam
+import os
 
 class SBIG_Grab_Cen(object):
     """Module for grabbing images and calculating centroids using the SBIG camera.
@@ -13,7 +14,8 @@ class SBIG_Grab_Cen(object):
         self.cam.select_camera('ST8300')
         self.close_camera() # in case driver was previously left in "open" state
         self.open_camera()      
-        self.__exposure_time = 90 # milliseconds, 90 ms is the minimum
+        self.__exposure_time = 900 # milliseconds, 90 ms is the minimum
+        self.cam.set_exposure_time(self.exposure_time)
         self.min_brightness = 5000
         self.max_brightness = 50000
         self.verbose = False
@@ -53,7 +55,13 @@ class SBIG_Grab_Cen(object):
             D = self.cam.start_exposure()
             D = self.flip(D)	
             if self.write_fits:
-                self.cam.write_fits(D,'_SBIG_dark_image.FITS')
+                filename = '_SBIG_dark_image.FITS'
+                try:
+                    os.remove(filename)
+                except:
+                    print('couldn''t remove file: ' + filename)
+                self.cam.write_fits(D,filename)
+                
         else:
             D = None             
         if self.verbose:
@@ -62,7 +70,12 @@ class SBIG_Grab_Cen(object):
         L = self.cam.start_exposure()
         L = self.flip(L)
         if self.write_fits:
-            self.cam.write_fits(L,'_SBIG_light_image.FITS')
+            filename = '_SBIG_light_image.FITS'
+            try:
+                os.remove(filename)
+            except:
+                print('couldn''t remove file: ' + filename)
+            self.cam.write_fits(L,filename)
         if not(self.take_darks):
             D = np.zeros(np.shape(L), dtype=np.int32)
         LD = np.array(L,dtype = np.int32) - np.array(D,dtype = np.int32)
@@ -82,8 +95,10 @@ class SBIG_Grab_Cen(object):
             warnings.warn('Spot may be over saturated (brightness = {}'.format(brightness))
         
         # call routine to determine multiple gaussian-fitted centroids
-        xcen, ycen, fwhm = multicens.multiCens(LD, nWin, self.verbose, self.write_fits) 
+        start_time = time.time()
+        xcen, ycen, fwhm = multicens.multiCens(LD, nWin, self.verbose, self.write_fits)
         xy = [[xcen[i],ycen[i]] for i in range(len(xcen))]
+        print('centroiding time: ' + str(time.time() - start_time))
         
         toc = time.time()
         if self.verbose:
