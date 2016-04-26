@@ -95,10 +95,12 @@ class SBIG_Grab_Cen(object):
             warnings.warn('Spot may be over saturated (brightness = {}'.format(brightness))
         
         # call routine to determine multiple gaussian-fitted centroids
-        start_time = time.time()
+        centroiding_tic = time.time()
         xcen, ycen, fwhm = multicens.multiCens(LD, nWin, self.verbose, self.write_fits)
         xy = [[xcen[i],ycen[i]] for i in range(len(xcen))]
-        print('centroiding time: ' + str(time.time() - start_time))
+        centroiding_toc = time.time()
+        if self.verbose:
+            print('centroiding time: ' + str(centroiding_toc - centroiding_tic))
         
         toc = time.time()
         if self.verbose:
