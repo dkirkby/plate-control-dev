@@ -92,6 +92,20 @@ class PosMoveMeasure(object):
                     targets      ... list of target coordinates of the form [[u1,v2],[u2,v2],...]
                     coordinates  ... 'obsXY' or 'QS', identifying the coordinate system the targets are in
                     num_corr_max ... maximum number of correction moves to perform on any positioner
+
+        OUTPUT:     data ... dictionary of dictionaries
+
+                    return dictionary format:
+                        key:   pos_id (referencing a single subdictionary for that positioner)
+                        value: subdictionary (see below)
+
+                    subdictionary format:
+                        KEYS    VALUES
+                        ----    ------
+                        target  [x,y]                       ... target coordinate
+                        obsXY   [[x0,y0],[x1,y1],...]       ... measured xy coordinates for each submove
+                        errXY   [[ex0,ey0],[ex1,ey1],...]   ... error in x and y for each submove
+                        err2D   [e0,e1,...]                 ... error distance (errx^2 + erry^2)^0.5 for each submove
         """
         def fmt(number):
             return format(number,'.3f') # for consistently printing floats in terminal output
@@ -118,7 +132,7 @@ class PosMoveMeasure(object):
             obsXY = pc.concat_lists_of_lists(obsXY, [these_obsXY])
             errXY = pc.concat_lists_of_lists(errXY, [these_errXY.tolist()])
             err2D = pc.concat_lists_of_lists(err2D, these_err2D.tolist())
-        
+
         # all these sorted pos_ids, sorted targets, etc are a bit confusing to use. perhaps better to have a
         # return a single list of "measured_move_data" instances or the like, where each instance contains all the data
         # for one positioner's move sequence.
@@ -275,18 +289,18 @@ class PosMoveMeasure(object):
             this_data = pc.listify(this_data, keep_flat=True)[0]
             data_by_ptl[petal] = this_data
         return data_by_ptl
-    
+
     def ptls_of_pos_ids(self, pos_ids='all'):
         """Returns a dictionary with keys = pos_ids and values = corresponding petal
         on which each pos_id lives.
         """
         ptls_of_pos_ids = {}
-        pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID') 
+        pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
         for ptl in pos_ids_by_ptl.keys():
             for pos_id in pos_ids_by_ptl[ptl]:
                 ptls_of_pos_ids[pos_id] = ptl
         return ptls_of_pos_ids
-            
+
 
     def _measure_calibration_arc(self,pos_ids='all',axis='theta',mode='quick'):
         """Expert usage. Sweep an arc of points about axis ('theta' or 'phi')
@@ -449,14 +463,14 @@ class PosMoveMeasure(object):
         for pos_id in all_pos_ids:
             (xy_ctr,radius) = fitcircle.FitCircle().fit(data[pos_id]['measured_obsXY'])
             data[pos_id]['xy_center'] = xy_ctr
-            
+
         # get phi axis well back in clear envelope, as a best practice housekeeping thing to do
         if axis == 'phi' and np.sign(delta) == -1:
             for petal in pos_ids_by_ptl.keys():
                 these_pos_ids = pos_ids_by_ptl[petal]
                 petal.request_limit_seek(these_pos_ids, axisid, -np.sign(delta), cmd_prefix='housekeeping extra ' + axis + ' limit seek ')
                 petal.schedule_send_and_execute_moves()
-                
+
         return data
 
     def _calculate_and_set_arms_and_offsets(self, T, P):
