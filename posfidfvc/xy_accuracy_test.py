@@ -49,7 +49,7 @@ local_targets = [[2,0], [-2,0]] # rebrand to targets_posXY
 m.identify_fiducials()
 m.rehome(pos_ids='all')
 
-# quick pre-calibration, especially because we need some reasonable values for theta offsets
+# quick pre-calibration, especially because we need some reasonable values for theta offsets prior to measuring physical travel ranges (where phi arms get extended)
 m.calibrate(pos_ids='all', mode='quick')
 
 # measure the physical travel ranges of the theta and phi axes by ramming hard limits in both directions

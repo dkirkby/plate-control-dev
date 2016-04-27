@@ -158,11 +158,15 @@ class PosMoveMeasure(object):
             axisid = pc.P
             parameter_name = 'PHYSICAL_RANGE_P'
             batches = pos_ids # implement later some selection of smaller batches of positioners guaranteed not to collide
-            # some for loop through those batches
         else:
             axisid = pc.T
             parameter_name = 'PHYSICAL_RANGE_T'
-        data = self._measure_range_arc(pos_ids,axis)
+            batches = pos_ids
+        data = {}
+        batches = pc.listify(batches, keep_flat=True)[0]
+        for batch in batches:
+            batch_data = self._measure_range_arc(batch,axis)
+            data.update(batch_data)
 
         # unwrapping code here
         for pos_id in data.keys():
@@ -224,7 +228,7 @@ class PosMoveMeasure(object):
             for petal in pos_ids_by_ptl.keys():
                 pos_ids = pos_ids_by_ptl[petal]
                 n_pos += len(pos_ids)
-                petal.request_direct_dtdp(pos_ids, [0,nudges[i]], cmd_prefix='nudge to identify fiducials')
+                petal.request_direct_dtdp(pos_ids, [0,nudges[i]], cmd_prefix='nudge to identify fiducials ')
                 petal.schedule_send_and_execute_moves()
             n_dots = n_pos + self.n_fiducial_dots
             if i == 0:
@@ -376,14 +380,14 @@ class PosMoveMeasure(object):
             these_pos_ids = pos_ids_by_ptl[petal]
             if axis == 'theta':
                 delta = 360/(n_intermediate_pts + 1)
-                initial_tp = [-180, phi_clear_angle] # always the same posT is fine when doing theta axis range finding
+                initial_tp = [-150, phi_clear_angle]
                 dtdp = [delta,0]
                 axisid = pc.T
             else:
                 delta = -180/(n_intermediate_pts + 1)
                 posmodels = petal.get(these_pos_ids)
                 for posmodel in posmodels:
-                    this_initial_tp = posmodel.trans.obsTP_to_posTP([0,0]) # when doing phi axis, want obsT to all be uniform (simplifies anti-collision), which means have to figure out appropriate posT for each positioner -- depends on already knowing theta offset reasonably well
+                    this_initial_tp = posmodel.trans.obsTP_to_posTP([0,phi_clear_angle]) # when doing phi axis, want obsT to all be uniform (simplifies anti-collision), which means have to figure out appropriate posT for each positioner -- depends on already knowing theta offset reasonably well
                     initial_tp = pc.concat_lists_of_lists(initial_tp, this_initial_tp)
                 dtdp = [0,delta]
                 axisid = pc.P
@@ -397,7 +401,7 @@ class PosMoveMeasure(object):
         # seek first limit
         for petal in pos_ids_by_ptl.keys():
             these_pos_ids = pos_ids_by_ptl[petal]
-            petal.request_limit_seek(these_pos_ids, axisid, -np.sign(delta), cmd_prefix='seeking first ' + axis + ' limit')
+            petal.request_limit_seek(these_pos_ids, axisid, -np.sign(delta), cmd_prefix='seeking first ' + axis + ' limit ')
             petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
         (sorted_pos_ids, measured_obsXY) = self.measure()
         for j in range(len(measured_obsXY)):
@@ -406,7 +410,12 @@ class PosMoveMeasure(object):
 
         # intermediate points
         for i in range(n_intermediate_pts):
-            (sorted_pos_ids, measured_obsXY) = self.move_measure(all_pos_ids,'dTdP',dtdp)
+            # Note that anticollision is NOT done here. The reason is that phi location is not perfectly
+            # well-known at this point (having just struck a hard limit). So externally need to have made
+            # sure there was a clear path for the phi arm ahead of time.
+            petal.request_direct_dtdp(all_pos_ids, dtdp, cmd_prefix='intermediate ' + axis + ' point ')
+            petal.schedule_send_and_execute_moves()
+            (sorted_pos_ids, measured_obsXY) = self.measure()
             for j in range(len(measured_obsXY)):
                 temp = data[sorted_pos_ids[j]]['measured_obsXY']
                 data[sorted_pos_ids[j]]['measured_obsXY'] = pc.concat_lists_of_lists(temp,measured_obsXY)
@@ -414,8 +423,8 @@ class PosMoveMeasure(object):
         # seek second limit
         for petal in pos_ids_by_ptl.keys():
             these_pos_ids = pos_ids_by_ptl[petal]
-            petal.request_limit_seek(these_pos_ids, axisid, np.sign(delta), cmd_prefix='seeking second ' + axis + ' limit')
-            petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
+            petal.request_limit_seek(these_pos_ids, axisid, np.sign(delta), cmd_prefix='seeking second ' + axis + ' limit ')
+            petal.schedule_send_and_execute_moves()
         (sorted_pos_ids, measured_obsXY) = self.measure()
         for j in range(len(measured_obsXY)):
             temp = data[sorted_pos_ids[j]]['measured_obsXY']
@@ -425,6 +434,14 @@ class PosMoveMeasure(object):
         for pos_id in all_pos_ids:
             (xy_ctr,radius) = fitcircle.FitCircle().fit(data[pos_id]['measured_obsXY'])
             data[pos_id]['xy_center'] = xy_ctr
+            
+        # get phi axis well back in clear envelope, as a best practice housekeeping thing to do
+        if axis == 'phi' and np.sign(delta) == -1:
+            for petal in pos_ids_by_ptl.keys():
+                these_pos_ids = pos_ids_by_ptl[petal]
+                petal.request_limit_seek(these_pos_ids, axisid, -np.sign(delta), cmd_prefix='housekeeping extra ' + axis + ' limit seek ')
+                petal.schedule_send_and_execute_moves()
+                
         return data
 
     def _calculate_and_set_arms_and_offsets(self, T, P):
@@ -442,13 +459,14 @@ class PosMoveMeasure(object):
             petal.set(pos_id,'OFFSET_X',t_ctr[0])
             petal.set(pos_id,'OFFSET_Y',t_ctr[1])
             obsT = np.arctan2(p_ctr[1]-t_ctr[1], p_ctr[0]-t_ctr[0]) * 180/np.pi
-            posT = P[pos_id]['target_posTP'][0][pc.T]
+            posT = P[pos_id]['target_posTP'][0][pc.T] # just using the first target theta angle in the phi sweep
             offset_t = obsT - posT
             petal.set(pos_id,'OFFSET_T',offset_t)
-            p_xymeas = P[pos_id]['measured_obsXY']
-            p_angles = np.arctan2(p_xymeas[1]-p_ctr[1], p_xymeas[0]-p_ctr[0]) * 180/np.pi
-            obsP = p_angles - obsT
-            posP = P[pos_id]['target_posTP'][pc.P]
+            p_xymeas = np.array(P[pos_id]['measured_obsXY'])
+            p_angles = np.arctan2(p_xymeas[:,1]-p_ctr[1], p_xymeas[:,0]-p_ctr[0]) * 180/np.pi
+            p_angles_wrapped = [p if p >=0 else p + 360 for p in p_angles]
+            obsP = p_angles_wrapped - obsT
+            posP = [posTP[pc.P] for posTP in P[pos_id]['target_posTP']]
             offset_p = np.median(obsP - posP)
             petal.set(pos_id,'OFFSET_P',offset_p)
 
