@@ -36,7 +36,7 @@ log_timestamp = datetime.datetime.now().strftime(pc.filename_timestamp_format)
 def main_log_name(pos_id):
     suffix = ('_' + log_suffix) if log_suffix else ''
     return log_directory + os.path.sep + pos_id + '_' + log_timestamp + suffix + '.csv'
-        
+
 # cycles configuration (for life testing)
 
 # test grid configuration (local to any positioner)
@@ -66,7 +66,7 @@ if should_calibrate_full:
 
 # do the xy accuracy test
 if should_do_accuracy_test:
-    
+
     # write log file headers
     main_log_header = 'timestamp,cycle,target_x,target_y'
     for i in range(num_corr_max + 1):
@@ -78,8 +78,8 @@ if should_do_accuracy_test:
     for pos_id in pos_ids:
         file = open(main_log_name(pos_id),'w')
         file.write(main_log_header)
-        file.close()  
-        
+        file.close()
+
     # transform test grid to each positioner's global position
     posmodels = ptl.get(pos_ids)
     all_global_targets = []
@@ -91,24 +91,26 @@ if should_do_accuracy_test:
 
     # run the test
     targ_num = 0
+    all_meas_data = []
     for these_targets in all_global_targets:
-        targ_num += 1      
+        targ_num += 1
         print('\nMEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_global_targets)))
-        (sorted_pos_ids, sorted_targets, obsXY, errXY, err2D) = m.move_and_correct(pos_ids, these_targets, coordinates='obsXY', num_corr_max=num_corr_max)
-  
+        these_meas_data = m.move_and_correct(pos_ids, these_targets, coordinates='obsXY', num_corr_max=num_corr_max)
+        all_meas_data.append(these_meas_data)
+
         # data logging
-        sorted_cycles = ptl.get(sorted_pos_ids,'TOTAL_MOVE_SEQUENCES')
-        for i in range(len(sorted_pos_ids)):
-            row = str(datetime.datetime.now().strftime(pc.timestamp_format))
-            row += ',' + str(sorted_cycles[i])
-            row += ',' + str(sorted_targets[i][0])
-            row += ',' + str(sorted_targets[i][1])
-            for submove in obsXY:
-                row += ',' + submove[i][0] + ',' + submove[i][1]
-            for submove in errXY:
-                row += ',' + submove[i][0] + ',' + submove[i][1]
-            for submove in err2D:
-                row += ',' + submove[i]
-            file = open(main_log_name(sorted_pos_ids[i]),'a')
+        timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
+        for p in these_meas_data.keys():
+            row = timestamp
+            row += ',' + str(ptl.get(p,'TOTAL_MOVE_SEQUENCES'))
+            row += ',' + str(these_meas_data[p]['targ_obsXY'][0])
+            row += ',' + str(these_meas_data[p]['targ_obsXY'][1])
+            for submove in these_meas_data[p]['meas_obsXY']:
+                row += ',' + submove[0] + ',' + submove[1]
+            for submove in these_meas_data[p]['errXY']:
+                row += ',' + submove[0] + ',' + submove[1]
+            for submove in these_meas_data[p]['err2D']:
+                row += ',' + submove
+            file = open(main_log_name(p),'a')
             file.write(row + '\n')
             file.close()

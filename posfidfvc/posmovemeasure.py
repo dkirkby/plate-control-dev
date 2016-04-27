@@ -34,8 +34,16 @@ class PosMoveMeasure(object):
             petal.fiducials_off()
 
     def measure(self):
-        """Measure positioner locations with the FVC and store the values.
+        """Measure positioner locations with the FVC and return the values.
+
+        Return data is a dictionary with:   keys ... pos_id
+                                          values ... [measured_obs_x, measured_obs_y]
+
+        (In a future revision, if useful we may consider having fiducial ids (and dot sub-ids)
+        returned also as keys, with corresponding measured values. As of April 2016, only
+        positioner measurements are currently returned by this method.)
         """
+        data = {}
         expected_pos_xy = []
         expected_ref_xy = []
         petals = []
@@ -50,7 +58,9 @@ class PosMoveMeasure(object):
         for i in range(len(measured_pos_xy)):
             petals[i].set(pos_ids[i],'LAST_MEAS_OBS_X',measured_pos_xy[i][0])
             petals[i].set(pos_ids[i],'LAST_MEAS_OBS_Y',measured_pos_xy[i][1])
-        return pos_ids, measured_pos_xy
+        for i in range(len(pos_ids)):
+            data[pos_ids[i]] = measured_pos_xy[i]
+        return data
 
     def move(self, pos_ids, commands, values):
         """Move positioners.
@@ -102,44 +112,44 @@ class PosMoveMeasure(object):
                     subdictionary format:
                         KEYS    VALUES
                         ----    ------
-                        target  [x,y]                       ... target coordinate
-                        obsXY   [[x0,y0],[x1,y1],...]       ... measured xy coordinates for each submove
-                        errXY   [[ex0,ey0],[ex1,ey1],...]   ... error in x and y for each submove
-                        err2D   [e0,e1,...]                 ... error distance (errx^2 + erry^2)^0.5 for each submove
+                        targ_obsXY  [x,y]                       ... target coordinates in obsXY system
+                        meas_obsXY  [[x0,y0],[x1,y1],...]       ... measured xy coordinates for each submove
+                        errXY       [[ex0,ey0],[ex1,ey1],...]   ... error in x and y for each submove
+                        err2D       [e0,e1,...]                 ... error distance (errx^2 + erry^2)^0.5 for each submove
         """
+        data = {}
         def fmt(number):
             return format(number,'.3f') # for consistently printing floats in terminal output
-        if coordinates == 'QS':
+        if coordinates == 'obsXY':
+            targ_obsXY = targets
+        elif coordinates == 'QS':
             trans = postransforms.PosTransforms()
-            targets = [trans.QS_to_obsXY(target) for target in targets]
-        for i in range(len(targets)):
-            print(str(pos_ids[i]) + ': blind move to (obsX,obsY)=(' + fmt(targets[i][0]) + ',' + fmt(targets[i][1]) + ')')
-        (sorted_pos_ids, these_obsXY) = self.move_measure(pos_ids, 'obsXY', targets)
-        idx_sort = [sorted_pos_ids.index(p) for p in pos_ids]
-        sorted_targets = [targets[idx] for idx in idx_sort]
-        these_errXY = np.array(these_obsXY) - np.array(sorted_targets)
-        these_err2D = (these_errXY[:,0]**2 + these_errXY[:,1]**2)**.5
-        obsXY = [these_obsXY]
-        errXY = [these_errXY.tolist()]
-        err2D = [these_err2D.tolist()]
+            targ_obsXY = [trans.QS_to_obsXY(target) for target in targets]
+        else:
+            print('coordinates \'' + coordinates + '\' not recognized')
+            return None
+        for i in range(len(targ_obsXY)):
+            print(str(pos_ids[i]) + ': blind move to (obsX,obsY)=(' + fmt(targ_obsXY[i][0]) + ',' + fmt(targ_obsXY[i][1]) + ')')
+        this_meas_data = self.move_measure(pos_ids, 'obsXY', targ_obsXY)
+        for p in this_meas_data.keys():
+            data[p] = {}
+            data[p]['targ_obsXY'] = targ_obsXY[pos_ids.index(p)]
+            data[p]['meas_obsXY'] = [this_meas_data[p]]
+            data[p]['errXY'] = [[data[p]['meas_obsXY'][0] - data[p]['targ_obsXY'][0],
+                                 data[p]['meas_obsXY'][1] - data[p]['targ_obsXY'][1]]]
+            data[p]['err2D'] = [(data[p]['errXY'][0]**2 + data[p]['errXY'][1]**2)**0.5]
         for i in range(1,num_corr_max+1):
-            dxdy = (-np.array(errXY[i-1])).tolist()
-            for j in range(len(dxdy)):
-                print(str(sorted_pos_ids[j]) + ': correction move ' + str(j+1) + ' of ' + str(num_corr_max) + ' by (dx,dy)=(' + fmt(dxdy[j][0]) + ',' + fmt(dxdy[j][1]) + '), distance=' + fmt(err2D[-1][j]))
-            (sorted_pos_ids, these_obsXY) = self.move_measure(sorted_pos_ids, 'dXdY', dxdy)
-            these_errXY = np.array(these_obsXY) - np.array(sorted_targets)
-            these_err2D = (these_errXY[:,0]**2 + these_errXY[:,1]**2)**.5
-            obsXY = pc.concat_lists_of_lists(obsXY, [these_obsXY])
-            errXY = pc.concat_lists_of_lists(errXY, [these_errXY.tolist()])
-            err2D = pc.concat_lists_of_lists(err2D, these_err2D.tolist())
-
-        # all these sorted pos_ids, sorted targets, etc are a bit confusing to use. perhaps better to have a
-        # return a single list of "measured_move_data" instances or the like, where each instance contains all the data
-        # for one positioner's move sequence.
-        # Or just return a dictionary of dictionaries:
-        #   primary keys: pos_ids
-        #   secondary keys: obsXY, errXY, err2D etc for that positioner
-        return sorted_pos_ids, sorted_targets, obsXY, errXY, err2D
+            dxdy = {}
+            for p in pos_ids:
+                dxdy[p] = [-data[p]['errXY'][0],-data[p]['errXY'][1]]
+                print(str(p) + ': correction move ' + str(j+1) + ' of ' + str(num_corr_max) + ' by (dx,dy)=(' + fmt(dxdy[p][0]) + ',' + fmt(dxdy[p][1]) + '), distance=' + fmt(data[p]['err2D'][-1]))
+            this_meas_data = self.move_measure(sorted_pos_ids, 'dXdY', dxdy)
+            for p in this_meas_data.keys():
+                data[p]['meas_obsXY'].append(this_meas_data[p])
+                data[p]['errXY'].append([data[p]['meas_obsXY'][0] - data[p]['targ_obsXY'][0],
+                                         data[p]['meas_obsXY'][1] - data[p]['targ_obsXY'][1]])
+                data[p]['err2D'].append((data[p]['errXY'][0]**2 + data[p]['errXY'][1]**2)**0.5)
+        return data
 
     def retract_phi(self,pos_ids='all'):
         """Get all phi arms within their clear rotation envelopes for positioners
@@ -430,10 +440,9 @@ class PosMoveMeasure(object):
             these_pos_ids = pos_ids_by_ptl[petal]
             petal.request_limit_seek(these_pos_ids, axisid, -np.sign(delta), cmd_prefix='seeking first ' + axis + ' limit ')
             petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
-        (sorted_pos_ids, measured_obsXY) = self.measure()
-        for j in range(len(measured_obsXY)):
-            temp = data[sorted_pos_ids[j]]['measured_obsXY']
-            data[sorted_pos_ids[j]]['measured_obsXY'] = pc.concat_lists_of_lists(temp,measured_obsXY)
+        meas_data = self.measure()
+        for p in meas_data.keys():
+            data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],meas_data[p])
 
         # intermediate points
         for i in range(n_intermediate_pts):
@@ -443,10 +452,9 @@ class PosMoveMeasure(object):
             # sure there was a clear path for the phi arm ahead of time.
             petal.request_direct_dtdp(all_pos_ids, dtdp, cmd_prefix='intermediate ' + axis + ' point ')
             petal.schedule_send_and_execute_moves()
-            (sorted_pos_ids, measured_obsXY) = self.measure()
-            for j in range(len(measured_obsXY)):
-                temp = data[sorted_pos_ids[j]]['measured_obsXY']
-                data[sorted_pos_ids[j]]['measured_obsXY'] = pc.concat_lists_of_lists(temp,measured_obsXY)
+            meas_data = self.measure()
+            for p in meas_data.keys():
+                data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],meas_data[p])
 
         # seek second limit
         print(prefix + ': seeking second limit')
@@ -454,10 +462,9 @@ class PosMoveMeasure(object):
             these_pos_ids = pos_ids_by_ptl[petal]
             petal.request_limit_seek(these_pos_ids, axisid, np.sign(delta), cmd_prefix='seeking second ' + axis + ' limit ')
             petal.schedule_send_and_execute_moves()
-        (sorted_pos_ids, measured_obsXY) = self.measure()
-        for j in range(len(measured_obsXY)):
-            temp = data[sorted_pos_ids[j]]['measured_obsXY']
-            data[sorted_pos_ids[j]]['measured_obsXY'] = pc.concat_lists_of_lists(temp,measured_obsXY)
+        meas_data = self.measure()
+        for p in meas_data.keys():
+            data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],meas_data[p])
 
         # circle fits
         for pos_id in all_pos_ids:
