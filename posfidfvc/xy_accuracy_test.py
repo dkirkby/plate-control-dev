@@ -10,8 +10,9 @@ import numpy as np
 
 # initialization
 fvc = fvchandler.FVCHandler('SBIG')
-fvc.scale = 0.02 # mm/pixel
+fvc.scale = 0.019 # mm/pixel (update um_scale below if not in mm)
 fvc.rotation = 0  # deg
+um_scale = 0.001 # um/mm
 pos_ids = ['UM00012']
 fid_can_ids = []
 petal_id = 1
@@ -23,8 +24,8 @@ num_corr_max = 2 # number of correction moves to do for each target
 
 # test operations to do
 should_identify_fiducials = True
-should_initial_rehome     = False
-should_calibrate_quick    = False
+should_initial_rehome     = True
+should_calibrate_quick    = True
 should_measure_ranges     = False
 should_calibrate_full     = False
 should_do_accuracy_test   = True
@@ -43,7 +44,8 @@ def summary_log_name(pos_id):
 # cycles configuration (for life testing)
 
 # test grid configuration (local to any positioner)
-local_targets = [[2,0], [-2,0]]
+#local_targets = [[2,0], [-2,0]]
+local_targets = [[2,0], [-2,0], [0,4], [0,-4], [1,1], [-2,-2], [-3,3], [4,-4]]
 
 # identify fiducials
 if should_identify_fiducials:
@@ -69,15 +71,14 @@ if should_calibrate_full:
 
 # do the xy accuracy test
 if should_do_accuracy_test:
+    submove_idxs = [i for i in range(num_corr_max+1)]
 
     # write headers for move data log files
     move_log_header = 'timestamp,cycle,target_x,target_y'
-    for i in range(num_corr_max + 1):
-        move_log_header += ',meas_x' + str(i) + ',meas_y' + str(i)
-    for i in range(num_corr_max + 1):
-        move_log_header += ',err_x' + str(i) + ',err_y' + str(i)
-    for i in range(num_corr_max + 1):
-        move_log_header += ',err_xy' + str(i)
+    for i in submove_idxs: move_log_header += ',meas_x' + str(i) + ',meas_y' + str(i)
+    for i in submove_idxs: move_log_header += ',err_x' + str(i) + ',err_y' + str(i)
+    for i in submove_idxs: move_log_header += ',err_xy' + str(i)
+    move_log_header += '\n'
     for pos_id in pos_ids:
         file = open(move_log_name(pos_id),'w')
         file.write(move_log_header)
@@ -97,7 +98,10 @@ if should_do_accuracy_test:
     all_meas_data_by_target = []
     all_meas_data_by_pos_id = {}
     for pos_id in pos_ids:
-        all_meas_data_by_pos_id[pos_id] = {'targ_obsXY':[],'meas_obsXY':[],'errXY':[],'err2D':[]}
+        all_meas_data_by_pos_id[pos_id] = {'targ_obsXY': [],
+                                           'meas_obsXY': [[] for i in submove_idxs],
+                                           'errXY':      [[] for i in submove_idxs],
+                                           'err2D':      [[] for i in submove_idxs]}
     start_timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
     start_cycles = ptl.get(pos_ids,'TOTAL_MOVE_SEQUENCES')
     
@@ -111,31 +115,35 @@ if should_do_accuracy_test:
         # store this set of measured data
         all_meas_data_by_target.append(these_meas_data)
         for pos_id in these_meas_data.keys():
-            for key in these_meas_data[pos_id].keys():
-                all_meas_data_by_pos_id[pos_id][key].append(these_meas_data[pos_id][key])
+            all_meas_data_by_pos_id[pos_id]['targ_obsXY'].append(these_meas_data[pos_id]['targ_obsXY'])
+            for i in submove_idxs:
+                all_meas_data_by_pos_id[pos_id]['meas_obsXY'][i].append(these_meas_data[pos_id]['meas_obsXY'][i])
+                all_meas_data_by_pos_id[pos_id]['errXY'][i].append(     these_meas_data[pos_id]['errXY'][i])
+                all_meas_data_by_pos_id[pos_id]['err2D'][i].append(     these_meas_data[pos_id]['err2D'][i])                    
         
         # update summary data log
         for p in pos_ids:
-            summary_log_data = str(p)
-            summary_log_data += 'cycles at start,' + str(start_cycles(pos_ids.index(p))) + '\n'
+            summary_log_data =  'pos_id,' + str(p) + '\n'
+            summary_log_data += 'cycles at start,' + str(start_cycles[pos_ids.index(p)]) + '\n'
             summary_log_data += 'cycles at finish,' + str(ptl.get(p,'TOTAL_MOVE_SEQUENCES')) + '\n'
             summary_log_data += 'start time,' + start_timestamp + '\n'
             summary_log_data += 'finish time,' + this_timestamp + '\n'
-            summary_log_data += 'num targets\n'
-            summary_log_data += 'num corrections max\n'
-            summary_log_data += 'submove index'
-            for i in range(num_corr_max + 1):
-                summary_log_data += ',' + str(i)
+            summary_log_data += 'num targets,' + str(len(all_meas_data_by_target)) + '\n'
+            summary_log_data += 'num corrections max,' + str(num_corr_max) + '\n'
+            summary_log_data += 'submove index -->'
+            for i in submove_idxs: summary_log_data += ',' + str(i)
             summary_log_data += '\n'
+            summary_log_data += 'units,um\n'
             for calc in ['max','min','mean','rms']:
                 summary_log_data += calc
-                for i in range(num_corr_max + 1):
-                    if calc == 'max':    summary_log_data += ',' + str(np.max(all_meas_data_by_pos_id[p]['err2D']))
-                    elif calc == 'min':  summary_log_data += ',' + str(np.min(all_meas_data_by_pos_id[p]['err2D']))
-                    elif calc == 'mean': summary_log_data += ',' + str(np.mean(all_meas_data_by_pos_id[p]['err2D']))
-                    elif calc == 'rms':  summary_log_data += ',' + str(np.sqrt(np.mean(np.array(all_meas_data_by_pos_id[p]['err2D'])**2)))
+                for i in submove_idxs:
+                    this_submove_data = all_meas_data_by_pos_id[p]['err2D'][i]
+                    if calc == 'max':    summary_log_data += ',' + str(np.max(this_submove_data) * um_scale)
+                    elif calc == 'min':  summary_log_data += ',' + str(np.min(this_submove_data) * um_scale)
+                    elif calc == 'mean': summary_log_data += ',' + str(np.mean(this_submove_data) * um_scale)
+                    elif calc == 'rms':  summary_log_data += ',' + str(np.sqrt(np.mean(np.array(this_submove_data)**2)) * um_scale)
                     else: pass
-                    if i == num_corr_max + 1: summary_log_data += '\n'
+                    if i == submove_idxs[-1]: summary_log_data += '\n'
             file = open(summary_log_name(pos_id),'w')
             file.write(summary_log_data)
             file.close()
@@ -143,15 +151,16 @@ if should_do_accuracy_test:
         # update move data log
         for p in these_meas_data.keys():
             row = this_timestamp
-            row += ',' + str()
+            row += ',' + str(ptl.get(p,'TOTAL_MOVE_SEQUENCES'))
             row += ',' + str(these_meas_data[p]['targ_obsXY'][0])
             row += ',' + str(these_meas_data[p]['targ_obsXY'][1])
-            for submove in these_meas_data[p]['meas_obsXY']:
-                row += ',' + submove[0] + ',' + submove[1]
-            for submove in these_meas_data[p]['errXY']:
-                row += ',' + submove[0] + ',' + submove[1]
-            for submove in these_meas_data[p]['err2D']:
-                row += ',' + submove
+            for submove_data in these_meas_data[p]['meas_obsXY']:
+                row += ',' + str(submove_data[0]) + ',' + str(submove_data[1])
+            for submove_data in these_meas_data[p]['errXY']:
+                row += ',' + str(submove_data[0]) + ',' + str(submove_data[1])
+            for submove_data in these_meas_data[p]['err2D']:
+                row += ',' + str(submove_data)
+            row += '\n'
             file = open(move_log_name(p),'a')
-            file.write(row + '\n')
+            file.write(row)
             file.close()

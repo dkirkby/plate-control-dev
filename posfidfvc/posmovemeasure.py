@@ -445,7 +445,7 @@ class PosMoveMeasure(object):
 
         # intermediate points
         for i in range(n_intermediate_pts):
-            print(prefix + ': intermediate point ' + str(i+1) + ' of ' + n_intermediate_pts)
+            print(prefix + ': intermediate point ' + str(i+1) + ' of ' + str(n_intermediate_pts))
             # Note that anticollision is NOT done here. The reason is that phi location is not perfectly
             # well-known at this point (having just struck a hard limit). So externally need to have made
             # sure there was a clear path for the phi arm ahead of time.
