@@ -22,7 +22,7 @@ m.n_fiducial_dots = 2 # number of centroids the FVC should expect
 num_corr_max = 2 # number of correction moves to do for each target
 
 # test operations to do
-should_identify_fiducials = False
+should_identify_fiducials = True
 should_initial_rehome     = False
 should_calibrate_quick    = False
 should_measure_ranges     = False
@@ -97,10 +97,7 @@ if should_do_accuracy_test:
     all_meas_data_by_target = []
     all_meas_data_by_pos_id = {}
     for pos_id in pos_ids:
-        all_meas_data_by_pos_id[pos_id]['targ_obsXY'] = []
-        all_meas_data_by_pos_id[pos_id]['meas_obsXY'] = []
-        all_meas_data_by_pos_id[pos_id]['errXY'] = []
-        all_meas_data_by_pos_id[pos_id]['err2D'] = []
+        all_meas_data_by_pos_id[pos_id] = {'targ_obsXY':[],'meas_obsXY':[],'errXY':[],'err2D':[]}
     start_timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
     start_cycles = ptl.get(pos_ids,'TOTAL_MOVE_SEQUENCES')
     

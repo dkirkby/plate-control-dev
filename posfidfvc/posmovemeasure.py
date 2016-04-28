@@ -135,20 +135,20 @@ class PosMoveMeasure(object):
             data[p] = {}
             data[p]['targ_obsXY'] = targ_obsXY[pos_ids.index(p)]
             data[p]['meas_obsXY'] = [this_meas_data[p]]
-            data[p]['errXY'] = [[data[p]['meas_obsXY'][0] - data[p]['targ_obsXY'][0],
-                                 data[p]['meas_obsXY'][1] - data[p]['targ_obsXY'][1]]]
-            data[p]['err2D'] = [(data[p]['errXY'][0]**2 + data[p]['errXY'][1]**2)**0.5]
+            data[p]['errXY'] = [[data[p]['meas_obsXY'][-1][0] - data[p]['targ_obsXY'][0],
+                                 data[p]['meas_obsXY'][-1][1] - data[p]['targ_obsXY'][1]]]
+            data[p]['err2D'] = [(data[p]['errXY'][-1][0]**2 + data[p]['errXY'][-1][1]**2)**0.5]
         for i in range(1,num_corr_max+1):
             dxdy = {}
             for p in pos_ids:
-                dxdy[p] = [-data[p]['errXY'][0],-data[p]['errXY'][1]]
+                dxdy[p] = [-data[p]['errXY'][-1][0],-data[p]['errXY'][-1][1]]
                 print(str(p) + ': correction move ' + str(i) + ' of ' + str(num_corr_max) + ' by (dx,dy)=(' + fmt(dxdy[p][0]) + ',' + fmt(dxdy[p][1]) + '), distance=' + fmt(data[p]['err2D'][-1]))
-            this_meas_data = self.move_measure(pos_ids, 'dXdY', dxdy)
+            this_meas_data = self.move_measure(list(dxdy.keys()), 'dXdY', list(dxdy.values()))
             for p in this_meas_data.keys():
                 data[p]['meas_obsXY'].append(this_meas_data[p])
-                data[p]['errXY'].append([data[p]['meas_obsXY'][0] - data[p]['targ_obsXY'][0],
-                                         data[p]['meas_obsXY'][1] - data[p]['targ_obsXY'][1]])
-                data[p]['err2D'].append((data[p]['errXY'][0]**2 + data[p]['errXY'][1]**2)**0.5)
+                data[p]['errXY'].append([data[p]['meas_obsXY'][-1][0] - data[p]['targ_obsXY'][0],
+                                         data[p]['meas_obsXY'][-1][1] - data[p]['targ_obsXY'][1]])
+                data[p]['err2D'].append((data[p]['errXY'][-1][0]**2 + data[p]['errXY'][-1][1]**2)**0.5)
         return data
 
     def retract_phi(self,pos_ids='all'):
@@ -374,10 +374,9 @@ class PosMoveMeasure(object):
         for i in range(n_pts):
             targets = [data[pos_id]['target_posTP'][i] for pos_id in all_pos_ids]
             print('\'' + mode + '\' calibration arc on ' + axis + ' axis: point ' + str(i+1) + ' of ' + str(n_pts))
-            (sorted_pos_ids, measured_obsXY) = self.move_measure(all_pos_ids,'posTP',targets)
-            for j in range(len(measured_obsXY)):
-                temp = data[sorted_pos_ids[j]]['measured_obsXY']
-                data[sorted_pos_ids[j]]['measured_obsXY'] = pc.concat_lists_of_lists(temp, measured_obsXY)
+            this_meas_data = self.move_measure(all_pos_ids,'posTP',targets)
+            for p in this_meas_data.keys():
+                data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
 
         # circle fits
         for pos_id in all_pos_ids:
