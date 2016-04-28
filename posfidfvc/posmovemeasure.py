@@ -142,8 +142,8 @@ class PosMoveMeasure(object):
             dxdy = {}
             for p in pos_ids:
                 dxdy[p] = [-data[p]['errXY'][0],-data[p]['errXY'][1]]
-                print(str(p) + ': correction move ' + str(j+1) + ' of ' + str(num_corr_max) + ' by (dx,dy)=(' + fmt(dxdy[p][0]) + ',' + fmt(dxdy[p][1]) + '), distance=' + fmt(data[p]['err2D'][-1]))
-            this_meas_data = self.move_measure(sorted_pos_ids, 'dXdY', dxdy)
+                print(str(p) + ': correction move ' + str(i) + ' of ' + str(num_corr_max) + ' by (dx,dy)=(' + fmt(dxdy[p][0]) + ',' + fmt(dxdy[p][1]) + '), distance=' + fmt(data[p]['err2D'][-1]))
+            this_meas_data = self.move_measure(pos_ids, 'dXdY', dxdy)
             for p in this_meas_data.keys():
                 data[p]['meas_obsXY'].append(this_meas_data[p])
                 data[p]['errXY'].append([data[p]['meas_obsXY'][0] - data[p]['targ_obsXY'][0],
