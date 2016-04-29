@@ -6,6 +6,7 @@ import poscollider
 import numpy as np
 import fitcircle
 import posconstants as pc
+import poscalibplot
 
 class PosMoveMeasure(object):
     """Coordinates moving fiber positioners with fiber view camera measurements.
@@ -218,7 +219,7 @@ class PosMoveMeasure(object):
             total_angle = abs(total_angle)
             data[pos_id]['petal'].set(pos_id,parameter_name,total_angle)
 
-    def calibrate(self,pos_ids='all',mode='quick'):
+    def calibrate(self,pos_ids='all',mode='quick',save_file_dir='./',save_file_timestamp='sometime'):
         """Sweep a circle of points about theta and phi to measure positioner center
         locations, R1 and R2 arm lengths, theta and phi offsets, and then set all these
         calibration values for each positioner.
@@ -234,14 +235,23 @@ class PosMoveMeasure(object):
         P = self._measure_calibration_arc(pos_ids,'phi',mode)
         self._calculate_and_set_arms_and_offsets(T,P)
         ptls_of_pos_ids = self.ptls_of_pos_ids(pos_ids)
-        if mode == 'full':
-            for pos_id in T.keys():
-                # gear ratio calibration calculations
-                trans = T[pos_id]['trans']
-                measured_obsXY = pc.concat_lists_of_lists(T[pos_id]['measured_obsXY'], P[pos_id]['measured_obsXY'])
-                target_posTP   = pc.concat_lists_of_lists(T[pos_id]['target_posTP'],   P[pos_id]['target_posTP'])
+        for pos_id in T.keys():
+            trans = T[pos_id]['trans']
+            all_measured_posTP = []
+            all_target_posTP = []
+            for data in [T,P]:
+                measured_obsXY = data[pos_id]['measured_obsXY']
+                target_posTP   = data[pos_id]['target_posTP']
                 measured_obsXY = np.transpose(measured_obsXY).tolist()
                 measured_posTP = np.transpose(trans.obsXY_to_posTP(measured_obsXY)[0])
+                axis_name = 'theta' if data == T else 'phi'
+                axis_id = pc.T if data == T else pc.P
+                save_file = save_file_dir + os.path.sep + pos_id + '_' + save_file_timestamp + '_calib_' + mode + '.png'
+                poscalibplot.plot_arc(save_file, pos_id, axis_name, np.array(target_posTP)[:,axis_id], measured_posTP[:,axis_id], np.transpose(measured_obsXY), data[pos_id]['radius'], data[pos_id]['xy_center'])
+                all_measured_posTP = pc.concat_lists_of_lists(all_measured_posTP,measured_posTP)
+                all_target_posTP = pc.concat_lists_of_lists(all_target_posTP,target_posTP)
+            if mode == 'full':
+                # gear ratio calibration calculations
                 scale_TP = np.divide(measured_posTP,target_posTP)
                 scale_T = np.median(scale_TP[:,pc.T])
                 scale_P = np.median(scale_TP[:,pc.P])

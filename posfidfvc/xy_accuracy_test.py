@@ -12,7 +12,7 @@ import numpy as np
 fvc = fvchandler.FVCHandler('SBIG')
 fvc.scale = 0.019 # mm/pixel (update um_scale below if not in mm)
 fvc.rotation = 0  # deg
-um_scale = 0.001 # um/mm
+um_scale = 1000 # um/mm
 pos_ids = ['UM00012']
 fid_can_ids = []
 petal_id = 1
@@ -26,8 +26,8 @@ num_corr_max = 2 # number of correction moves to do for each target
 should_identify_fiducials = True
 should_initial_rehome     = True
 should_calibrate_quick    = True
-should_measure_ranges     = False
-should_calibrate_full     = False
+should_measure_ranges     = True
+should_calibrate_full     = True
 should_do_accuracy_test   = True
 
 # log file setup
@@ -42,10 +42,17 @@ def summary_log_name(pos_id):
     return log_directory + os.path.sep + pos_id + '_' + log_timestamp + log_suffix + '_summary.csv'
 
 # cycles configuration (for life testing)
+# STILL TO BE IMPLEMENTED
 
 # test grid configuration (local to any positioner)
-#local_targets = [[2,0], [-2,0]]
-local_targets = [[2,0], [-2,0], [0,4], [0,-4], [1,1], [-2,-2], [-3,3], [4,-4]]
+grid_max_radius = 5.8 # mm
+grid_min_radius = 0.2 # mm
+n_pts_across = 5
+line = np.linspace(-grid_max_radius,grid_max_radius,n_pts_across)
+local_targets = [[x,y] for x in line for y in line]
+for i in range(len(local_targets)-1,-1,-1): # traverse list from end backward
+    r = (local_targets[i][0]**2 + local_targets[i][1]**2)**0.5
+    if r < grid_min_radius or r > grid_max_radius: local_targets.pop(i)
 
 # identify fiducials
 if should_identify_fiducials:
@@ -57,7 +64,7 @@ if should_initial_rehome:
 
 # quick pre-calibration, especially because we need some reasonable values for theta offsets prior to measuring physical travel ranges (where phi arms get extended)
 if should_calibrate_quick:
-    m.calibrate(pos_ids='all', mode='quick')
+    m.calibrate(pos_ids='all', mode='quick', save_file_dir=log_directory, save_file_timestamp=log_timestamp)
 
 # measure the physical travel ranges of the theta and phi axes by ramming hard limits in both directions
 if should_measure_ranges:
@@ -67,7 +74,7 @@ if should_measure_ranges:
 
 # full calibration
 if should_calibrate_full:
-    m.calibrate(pos_ids='all', mode='full')
+    m.calibrate(pos_ids='all', mode='full', save_file_dir=log_directory, save_file_timestamp=log_timestamp)
 
 # do the xy accuracy test
 if should_do_accuracy_test:
