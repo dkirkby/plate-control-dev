@@ -233,31 +233,12 @@ class PosMoveMeasure(object):
         """
         T = self._measure_calibration_arc(pos_ids,'theta',mode)
         P = self._measure_calibration_arc(pos_ids,'phi',mode)
-        self._calculate_and_set_arms_and_offsets(T,P)
-        ptls_of_pos_ids = self.ptls_of_pos_ids(pos_ids)
+        #set_gear_ratios = False if mode == 'quick' else True
+        set_gear_ratios = False # not a 100% trustworthy calculation as of 2016-04-29
+        unwrapped_data = self._calculate_and_set_arms_and_offsets(T,P,set_gear_ratios)
         for pos_id in T.keys():
-            trans = T[pos_id]['trans']
-            all_measured_posTP = []
-            all_target_posTP = []
-            for data in [T,P]:
-                measured_obsXY = data[pos_id]['measured_obsXY']
-                target_posTP   = data[pos_id]['target_posTP']
-                measured_obsXY = np.transpose(measured_obsXY).tolist()
-                measured_posTP = np.transpose(trans.obsXY_to_posTP(measured_obsXY)[0])
-                axis_name = 'theta' if data == T else 'phi'
-                axis_id = pc.T if data == T else pc.P
-                save_file = save_file_dir + os.path.sep + pos_id + '_' + save_file_timestamp + '_calib_' + mode + '.png'
-                poscalibplot.plot_arc(save_file, pos_id, axis_name, np.array(target_posTP)[:,axis_id], measured_posTP[:,axis_id], np.transpose(measured_obsXY), data[pos_id]['radius'], data[pos_id]['xy_center'])
-                all_measured_posTP = pc.concat_lists_of_lists(all_measured_posTP,measured_posTP)
-                all_target_posTP = pc.concat_lists_of_lists(all_target_posTP,target_posTP)
-            if mode == 'full':
-                # gear ratio calibration calculations
-                scale_TP = np.divide(measured_posTP,target_posTP)
-                scale_T = np.median(scale_TP[:,pc.T])
-                scale_P = np.median(scale_TP[:,pc.P])
-                petal = ptls_of_pos_ids[pos_id]
-                petal.set(pos_id,'GEAR_CALIB_T',scale_T)
-                petal.set(pos_id,'GEAR_CALIB_P',scale_P)
+            save_file = save_file_dir + os.path.sep + pos_id + '_' + save_file_timestamp + '_calib_' + mode + '.png'
+            poscalibplot.plot_arc(save_file, pos_id, unwrapped_data)
 
     def identify_fiducials(self):
         """Nudge positioners forward/back to determine which centroid dots are fiducials.
@@ -393,11 +374,12 @@ class PosMoveMeasure(object):
             (xy_ctr,radius) = fitcircle.FitCircle().fit(data[pos_id]['measured_obsXY'])
             data[pos_id]['xy_center'] = xy_ctr
             data[pos_id]['radius'] = radius
+        
         return data
 
     def _measure_range_arc(self,pos_ids='all',axis='theta'):
         """Expert usage. Measure physical range of an axis by sweep a brief arc of points
-        on positioners identified by pos_ids. Measure these points with the FVC
+        on positioners identified bye unwrapped  pos_ids. Measure these points with the FVC
         and do a best fit of them.
 
         INPUTS:   pos_ids ... list of pos_ids or 'all'
@@ -489,12 +471,14 @@ class PosMoveMeasure(object):
 
         return data
 
-    def _calculate_and_set_arms_and_offsets(self, T, P):
+    def _calculate_and_set_arms_and_offsets(self, T, P, set_gear_ratios=True):
         """Common helper function for the measure range and calibrate functions.
         T and P are data dictionaries taken on the theta and phi axes. See those
         methods for more information.
         """
+        data = {}
         for pos_id in T.keys():
+            # arms and offsets
             petal = T[pos_id]['petal']
             t_ctr = np.array(T[pos_id]['xy_center'])
             p_ctr = np.array(P[pos_id]['xy_center'])
@@ -514,6 +498,46 @@ class PosMoveMeasure(object):
             posP = [posTP[pc.P] for posTP in P[pos_id]['target_posTP']]
             offset_p = np.median(obsP - posP)
             petal.set(pos_id,'OFFSET_P',offset_p)
+            
+            # unwrap thetas
+            t_xymeas = np.array(T[pos_id]['measured_obsXY'])
+            tp_meas = T[pos_id]['trans'].obsXY_to_posTP(np.transpose(t_xymeas).tolist())[0]
+            t_meas = tp_meas[pc.T]
+            t_targ = [posTP[pc.T] for posTP in T[pos_id]['target_posTP']]
+            meas_deltas = np.diff(t_meas)
+            targ_deltas = np.diff(t_targ)
+            unwrapped_t_meas = [t_meas[0]]
+            for i in range(len(meas_deltas)):
+                if np.sign(meas_deltas[i]) != np.sign(targ_deltas[i]):
+                    meas_deltas[i] += np.sign(targ_deltas[i]) * 360
+                unwrapped_t_meas.append(unwrapped_t_meas[-1] + meas_deltas[i])
+            
+            # gather data to return in an organized fashion (used especially for plotting)
+            data[pos_id] = {}
+            data[pos_id]['xy_ctr_T'] = t_ctr
+            data[pos_id]['xy_ctr_P'] = p_ctr
+            data[pos_id]['radius_T'] = T[pos_id]['radius']
+            data[pos_id]['radius_P'] = P[pos_id]['radius']
+            data[pos_id]['measured_obsXY_T'] = t_xymeas
+            data[pos_id]['measured_obsXY_P'] = p_xymeas
+            data[pos_id]['targ_posT_during_T_sweep'] = t_targ
+            data[pos_id]['targ_posP_during_P_sweep'] = posP
+            data[pos_id]['meas_posT_during_T_sweep'] = unwrapped_t_meas
+            data[pos_id]['meas_posP_during_P_sweep'] = obsP
+            
+            # gear ratios
+            ratios_T = np.divide(data[pos_id]['meas_posT_during_T_sweep'],data[pos_id]['targ_posT_during_T_sweep'])
+            ratios_P = np.divide(data[pos_id]['meas_posP_during_P_sweep'],data[pos_id]['targ_posP_during_P_sweep'])
+            ratio_T = np.median(ratios_T)
+            ratio_P = np.median(ratios_P)
+            data[pos_id]['gear_ratio_T'] = ratio_T
+            data[pos_id]['gear_ratio_P'] = ratio_P
+            print('Measurement proposes GEAR_CALIB_T = ' + ratio_T)
+            print('Measurement proposes GEAR_CALIB_P = ' + ratio_P)
+            if set_gear_ratios:
+                petal.set(pos_id,'GEAR_CALIB_T',ratio_T)
+                petal.set(pos_id,'GEAR_CALIB_P',ratio_P)
+        return data
 
     @property
     def phi_clear_angle(self):

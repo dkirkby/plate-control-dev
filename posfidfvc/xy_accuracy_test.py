@@ -19,8 +19,10 @@ petal_id = 1
 ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure(ptl,fvc)
+m.n_points_full_calib_T = 25
+m.n_points_full_calib_P = 25
 m.n_fiducial_dots = 2 # number of centroids the FVC should expect
-num_corr_max = 2 # number of correction moves to do for each target
+num_corr_max = 3 # number of correction moves to do for each target
 
 # test operations to do
 should_identify_fiducials = True
@@ -47,7 +49,7 @@ def summary_log_name(pos_id):
 # test grid configuration (local to any positioner)
 grid_max_radius = 5.8 # mm
 grid_min_radius = 0.2 # mm
-n_pts_across = 5
+n_pts_across = 7
 line = np.linspace(-grid_max_radius,grid_max_radius,n_pts_across)
 local_targets = [[x,y] for x in line for y in line]
 for i in range(len(local_targets)-1,-1,-1): # traverse list from end backward
