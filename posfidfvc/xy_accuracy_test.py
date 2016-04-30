@@ -19,8 +19,8 @@ petal_id = 1
 ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure(ptl,fvc)
-m.n_points_full_calib_T = 25
-m.n_points_full_calib_P = 25
+m.n_points_full_calib_T = 17
+m.n_points_full_calib_P = 9
 m.n_fiducial_dots = 2 # number of centroids the FVC should expect
 num_corr_max = 3 # number of correction moves to do for each target
 
@@ -142,9 +142,8 @@ if should_do_accuracy_test:
             summary_log_data += 'submove index -->'
             for i in submove_idxs: summary_log_data += ',' + str(i)
             summary_log_data += '\n'
-            summary_log_data += 'units,um\n'
             for calc in ['max','min','mean','rms']:
-                summary_log_data += calc
+                summary_log_data += calc + '(um)'
                 for i in submove_idxs:
                     this_submove_data = all_meas_data_by_pos_id[p]['err2D'][i]
                     if calc == 'max':    summary_log_data += ',' + str(np.max(this_submove_data) * um_scale)

@@ -23,6 +23,7 @@ class PosMoveMeasure(object):
         self.n_points_full_calib_T = 7 # number of points in a theta calibration arc
         self.n_points_full_calib_P = 7 # number of points in a phi calibration arc
         self.phi_Eo_margin = 3.0 # [deg] margin on staying within Eo envelope
+        self.calib_arc_margin = 3.0 # [deg] margin on calibration arc range
 
     def fiducials_on(self):
         """Turn on all fiducials on all petals."""
@@ -150,6 +151,8 @@ class PosMoveMeasure(object):
                 data[p]['errXY'].append([data[p]['meas_obsXY'][-1][0] - data[p]['targ_obsXY'][0],
                                          data[p]['meas_obsXY'][-1][1] - data[p]['targ_obsXY'][1]])
                 data[p]['err2D'].append((data[p]['errXY'][-1][0]**2 + data[p]['errXY'][-1][1]**2)**0.5)
+        for p in data.keys():
+            print(str(p) + ': final error distance=' + fmt(data[p]['err2D'][-1]))
         return data
 
     def retract_phi(self,pos_ids='all'):
@@ -342,8 +345,8 @@ class PosMoveMeasure(object):
                 n_pts = 4 if mode == 'quick' else self.n_points_full_calib_T
                 for posmodel in posmodels:
                     targetable_range_T = posmodel.targetable_range_T
-                    initial_tp = pc.concat_lists_of_lists(initial_tp, [min(targetable_range_T), phi_clear_angle])
-                    final_tp   = pc.concat_lists_of_lists(final_tp,   [max(targetable_range_T), initial_tp[-1][1]])
+                    initial_tp = pc.concat_lists_of_lists(initial_tp, [min(targetable_range_T) + self.calib_arc_margin, phi_clear_angle])
+                    final_tp   = pc.concat_lists_of_lists(final_tp,   [max(targetable_range_T) - self.calib_arc_margin, initial_tp[-1][1]])
             else:
                 n_pts = 3 if mode == 'quick' else self.n_points_full_calib_P
                 for posmodel in posmodels:
@@ -353,8 +356,9 @@ class PosMoveMeasure(object):
                     else:
                         phi_min = min(posmodel.targetable_range_P)
                         theta = posmodel.trans.obsTP_to_posTP([0,0])[pc.T] # when doing phi axis, want obsT to all be uniform (simplifies anti-collision), which means have to figure out appropriate posT for each positioner -- depends on already knowing theta offset reasonably well
-                    initial_tp = pc.concat_lists_of_lists(initial_tp, [theta, phi_min])
-                    final_tp   = pc.concat_lists_of_lists(final_tp,   [initial_tp[-1][0], max(posmodel.targetable_range_P)])
+                    initial_tp = pc.concat_lists_of_lists(initial_tp, [theta, phi_min + self.calib_arc_margin])
+                    final_tp   = pc.concat_lists_of_lists(final_tp,   [initial_tp[-1][0], max(posmodel.targetable_range_P) - self.calib_arc_margin])
+            
             for i in range(len(these_pos_ids)):
                 t = np.linspace(initial_tp[i][0], final_tp[i][0], n_pts)
                 p = np.linspace(initial_tp[i][1], final_tp[i][1], n_pts)
@@ -532,8 +536,8 @@ class PosMoveMeasure(object):
             ratio_P = np.median(ratios_P)
             data[pos_id]['gear_ratio_T'] = ratio_T
             data[pos_id]['gear_ratio_P'] = ratio_P
-            print('Measurement proposes GEAR_CALIB_T = ' + ratio_T)
-            print('Measurement proposes GEAR_CALIB_P = ' + ratio_P)
+            print('Measurement proposes GEAR_CALIB_T = ' + format(ratio_T,'.6f'))
+            print('Measurement proposes GEAR_CALIB_P = ' + format(ratio_P,'.6f'))
             if set_gear_ratios:
                 petal.set(pos_id,'GEAR_CALIB_T',ratio_T)
                 petal.set(pos_id,'GEAR_CALIB_P',ratio_P)

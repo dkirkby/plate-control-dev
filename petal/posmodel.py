@@ -30,7 +30,7 @@ class PosModel(object):
         self._stepsize_creep       = 0.1    # deg
         self._stepsize_cruise      = 3.3    # deg
         self._motor_speed_cruise   = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
-        self._legacy_spinupdown    = True   # flag to enable using old firmware's fixed spinupdown_distance
+        self._legacy_spinupdown    = False   # flag to enable using old firmware's fixed spinupdown_distance
 
         # temporary parameter, to be removed at a later date
         # As of 2016-04-18, the positioner firmware uses 'move_time' data to actually decide when to execute the next row in a move table
