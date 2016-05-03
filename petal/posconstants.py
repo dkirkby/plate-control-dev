@@ -10,9 +10,11 @@ import enum
 np.set_printoptions(suppress=True) # suppress auto-scientific notation when printing np arrays
 
 # File location directories
-petal_directory = os.path.abspath('../petal')
-pos_settings_directory  = petal_directory + os.path.sep + 'pos_settings' + os.path.sep
-pos_logs_directory      = petal_directory + os.path.sep + 'pos_logs' + os.path.sep
+petal_directory        = os.path.abspath('../petal')
+all_logs_directory     = os.path.abspath('../../../positioner_logs')
+pos_settings_directory = petal_directory + os.path.sep + 'pos_settings' + os.path.sep
+move_logs_directory    = all_logs_directory + os.path.sep + 'move_logs' + os.path.sep
+test_logs_directory    = all_logs_directory + os.path.sep + 'test_logs' + os.path.sep
 
 # Mapping of radial coordinate R to pseudo-radial coordinate S (distance along focal surface from optical axis)
 R2Spoly = [5.00010E-01,9.99997E-01,1.91532E-07,1.72104E-09,7.31761E-11,-5.78982E-13,3.30271E-15,-1.11245E-17,1.90376E-20,-1.26341E-23]
