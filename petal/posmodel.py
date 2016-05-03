@@ -174,8 +174,7 @@ class PosModel(object):
         dist_spinup = 2 * np.sign(distance) * self._spinupdown_distance  # distance over which accel / decel to and from cruise speed
         if not(allow_cruise) or abs(distance) <= (abs(dist_spinup) + self.state.read('MIN_DIST_AT_CRUISE_SPEED')):
             move_data['motor_step']   = int(round(distance / self._stepsize_creep))
-            move_data['distance']     = move_data['motor_step'] * self._            'PHYSICAL_RANGE_T' : {'value': 370.0, 'tol':   40.0},
-            'PHYSICAL_RANGE_P' : {'value': 190.0, 'tol':   40.0},stepsize_creep
+            move_data['distance']     = move_data['motor_step'] * self._stepsize_creep
             move_data['speed_mode']   = 'creep'
             move_data['speed']        = self._motor_speed_creep
             move_data['move_time']    = abs(move_data['distance']) / move_data['speed']
