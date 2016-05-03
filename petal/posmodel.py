@@ -39,6 +39,10 @@ class PosModel(object):
         # At that point, this margin parameter should be removed.
         self.temporary_move_time_margin = 0.1 # seconds
 
+        # defaults for axes' physical ranges when settings values are unknown or absurd
+        self._nominal_physical_range_T = 370
+        self._nominal_physical_range_P = 190
+
     @property
     def _motor_speed_creep(self):
         """Returns motor creep speed (which depends on the creep period) in deg/sec."""
@@ -67,8 +71,7 @@ class PosModel(object):
         """Returns a dictionary of the current expected position in the various coordinate systems.
         The keys are:
             'Q'     ... float, deg, dependent variable, expected global Q position
-            'S'     ... float, mm,  dependent variable, expected global             'PHYSICAL_RANGE_T' : {'value': 370.0, 'tol':   40.0},
-            'PHYSICAL_RANGE_P' : {'value': 190.0, 'tol':   40.0},S position
+            'S'     ... float, mm,  dependent variable, expected global S position
             'flatX' ... float, mm, dependent variable, expected global x in a system where focal surface curvature is flattened out to an approximate plane
             'flatY' ... float, mm, dependent variable, expected global y in a system where focal surface curvature is flattened out to an approximate plane
             'obsX'  ... float, mm,  dependent variable, expected global x position
@@ -127,7 +130,7 @@ class PosModel(object):
 
     @property
     def targetable_range_P(self):
-        """Returns a [1x2] array of phi_min,physical ran phi_max, after subtracting buffer zones near the hardstops."""
+        """Returns a [1x2] array of phi_min, phi_max, after subtracting buffer zones near the hardstops."""
         return self.axis[pc.P].debounced_range
 
     @property
@@ -207,6 +210,7 @@ class PosModel(object):
         self.state.write('TOTAL_MOVE_SEQUENCES', self.state.read('TOTAL_MOVE_SEQUENCES') + 1)
         self.state.log_unit(lognote)
 
+
 class Axis(object):
     """Handler for a motion axis. Provides move syntax and keeps tracks of position.
     """
@@ -226,14 +230,13 @@ class Axis(object):
             return self.posmodel.state.read('POS_T')
         else:
             return self.posmodel.state.read('POS_P')
-            'PHYSICAL_RANGE_T' : {'value': 370.0, 'tol':   40.0},
-            'PHYSICAL_RANGE_P' : {'value': 190.0, 'tol':   40.0},
+
     @pos.setter
     def pos(self,value):
         if self.axisid == pc.T:
             self.posmodel.state.write('POS_T',value)
         else:
-            self.posmodel.state.write('POS_P',value)     
+            self.posmodel.state.write('POS_P',value)
 
     @property
     def full_range(self):
@@ -241,11 +244,16 @@ class Axis(object):
         distance.
         Returns [1x2] array of [min,max]
         """
+        tol = 40
         if self.axisid == pc.T:
             r = abs(self.posmodel.state.read('PHYSICAL_RANGE_T'))
+            nominal = self.posmodel._nominal_physical_range_T
+            if r < nominal - tol or r > nominal + tol: r = nominal # check for absurd values
             return [-0.50*r, 0.50*r]  # split theta range such that 0 is essentially in the middle
         else:
             r = abs(self.posmodel.state.read('PHYSICAL_RANGE_P'))
+            nominal = self.posmodel._nominal_physical_range_P
+            if r < nominal - tol or r > nominal + tol: r = nominal # check for absurd values
             return [-0.01*r, 0.99*r]  # split phi range such that 0 is essentially at the minimum
 
     @property
