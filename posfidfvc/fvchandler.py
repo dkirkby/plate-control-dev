@@ -102,8 +102,8 @@ class FVCHandler(object):
 
 if __name__ == '__main__':
     f = FVCHandler()
-    n_objects = 3
-    n_repeats = 1
+    n_objects = 6
+    n_repeats = 5
     xy = []
     print('start taking ' + str(n_repeats) + ' images')
     start_time = time.time()

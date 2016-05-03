@@ -244,32 +244,20 @@ class PosMoveMeasure(object):
             poscalibplot.plot_arc(save_file, pos_id, unwrapped_data)
 
     def identify_fiducials(self):
-        """Nudge positioners forward/back to determine which centroid dots are fiducials.
+        """Nudge positioners (all together) forward/back to determine which centroid dots are fiducials.
         """
         print('Nudging positioners to identify reference dots. Distance tol for identifying a ref dot is ' + str(self.ref_dist_tol))
-        pos_ids_by_ptl = self.pos_data_listed_by_ptl('all','POS_ID')
-        nudges = [self.nudge_dist, -self.nudge_dist]
-        xy_ref = []
-        for i in range(len(nudges)):
-            n_pos = 0
-            for petal in pos_ids_by_ptl.keys():
-                pos_ids = pos_ids_by_ptl[petal]
-                n_pos += len(pos_ids)
-                petal.request_direct_dtdp(pos_ids, [0,nudges[i]], cmd_prefix='nudge to identify fiducials ')
-                petal.schedule_send_and_execute_moves()
-            n_dots = n_pos + self.n_fiducial_dots
-            if i == 0:
-                xy_init = self.fvc.measure(n_dots)
-            else:
-                xy_test = self.fvc.measure(n_dots)
-        for i in range(len(xy_test)):
-            test_delta = np.array(xy_test[i]) - np.array(xy_init)
-            test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
-            if any(test_dist < self.ref_dist_tol):
-                xy_ref = pc.concat_lists_of_lists(xy_ref,xy_test[i])
-        if len(xy_ref) != self.n_fiducial_dots:
-            print('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_fiducial_dots) + ')')
-        self.fiducials_xy = xy_ref
+        self._identify(None)
+
+    def identify_positioner_locations(self, pos_ids='all'):
+        """Nudge positioners (one at a time) forward/back to determine which positioners are where on the FVC.
+        """
+        print('Nudging positioners to identify their starting locations. Distance tol for identifying a moving positioner is ' + str(self.ref_dist_tol))
+        pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
+        for petal in pos_ids_by_ptl.keys():
+            for pos_id in pos_ids_by_ptl[petal]:
+                print('Identifying positioner ' + pos_id)
+                self._identify(pos_id)
 
     def pos_data_listed_by_ptl(self, pos_ids='all', key=''):
         """Returns a dictionary with keys = petal objects and values = lists of data
@@ -542,6 +530,64 @@ class PosMoveMeasure(object):
                 petal.set(pos_id,'GEAR_CALIB_T',ratio_T)
                 petal.set(pos_id,'GEAR_CALIB_P',ratio_P)
         return data
+
+    def _identify(self, pos_id=None):
+        """Generic function for identifying either all fiducials or a single positioner's location.
+        """
+        pos_ids_by_ptl = self.pos_data_listed_by_ptl('all','POS_ID')
+        if pos_id == None:
+            identify_fiducials = True
+            cmd_prefix = 'nudge to identify fiducials '
+        else:
+            identify_fiducials = False
+            this_petal = self.ptls_of_pos_ids([pos_id])[pos_id]
+            cmd_prefix='nudge to identify positioner location '
+        nudges = [self.nudge_dist, -self.nudge_dist]
+        xy_ref = []
+        for i in range(len(nudges)):
+            n_pos = 0
+            for petal in pos_ids_by_ptl.keys():
+                pos_ids = pos_ids_by_ptl[petal]
+                n_pos += len(pos_ids)
+                if identify_fiducials:
+                    petal.request_direct_dtdp(pos_ids, [0,nudges[i]], cmd_prefix=cmd_prefix)
+                    petal.schedule_send_and_execute_moves()
+                elif petal == this_petal:
+                    petal.request_direct_dtdp(pos_id, [0,nudges[i]], cmd_prefix=cmd_prefix)
+                    petal.schedule_send_and_execute_moves()
+            n_dots = n_pos + self.n_fiducial_dots
+            if i == 0:
+                xy_init = self.fvc.measure(n_dots)
+            else:
+                xy_test = self.fvc.measure(n_dots)
+        ref_idxs = []
+        for i in range(len(xy_test)):
+            test_delta = np.array(xy_test[i]) - np.array(xy_init)
+            test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
+            if any(test_dist < self.ref_dist_tol):
+                xy_ref = pc.concat_lists_of_lists(xy_ref,xy_test[i])
+                ref_idxs.append(i)
+        if identify_fiducials:
+            if len(xy_ref) != self.n_fiducial_dots:
+                print('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_fiducial_dots) + ')')
+            self.fiducials_xy = xy_ref
+        else:
+            if n_dots - len(ref_idxs) != 1:
+                print('warning: more than one moving dots detected')
+            else:
+                ref_idxs.sort(reverse=True)
+                for i in ref_idxs:
+                    xy_test.pop(i) # get rid of all but the moving pos
+                expected_obsXY = this_petal.expected_current_position(pos_id,'obsXY')
+                measured_obsXY = xy_test[0]
+                err_x = measured_obsXY[0] - expected_obsXY[0]
+                err_y = measured_obsXY[1] - expected_obsXY[1]
+                prev_offset_x = petal.get(pos_id,'OFFSET_X')
+                prev_offset_y = petal.get(pos_id,'OFFSET_Y')
+                petal.set(pos_id,'OFFSET_X', prev_offset_x + err_x) # this works, assuming we have reasonable knowledge of theta and phi (having re-homed or quick-calibrated)
+                petal.set(pos_id,'OFFSET_Y', prev_offset_y + err_y) # this works, assuming we have reasonable knowledge of theta and phi (having re-homed or quick-calibrated)
+                this_petal.set(pos_id,'LAST_MEAS_OBS_X',measured_obsXY[0])
+                this_petal.set(pos_id,'LAST_MEAS_OBS_Y',measured_obsXY[1])
 
     @property
     def phi_clear_angle(self):

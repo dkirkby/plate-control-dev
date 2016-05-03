@@ -14,7 +14,7 @@ class SBIG_Grab_Cen(object):
         self.cam.select_camera('ST8300')
         self.close_camera() # in case driver was previously left in "open" state
         self.open_camera()      
-        self.__exposure_time = 900 # milliseconds, 90 ms is the minimum
+        self.__exposure_time = 400 # milliseconds, 90 ms is the minimum
         self.cam.set_exposure_time(self.exposure_time)
         self.min_brightness = 5000
         self.max_brightness = 50000

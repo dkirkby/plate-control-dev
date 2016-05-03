@@ -39,6 +39,10 @@ class PosModel(object):
         # At that point, this margin parameter should be removed.
         self.temporary_move_time_margin = 0.1 # seconds
 
+        # defaults for axes' physical ranges when settings values are unknown or absurd
+        self._nominal_physical_range_T = 370
+        self._nominal_physical_range_P = 190
+
     @property
     def _motor_speed_creep(self):
         """Returns motor creep speed (which depends on the creep period) in deg/sec."""
@@ -240,11 +244,16 @@ class Axis(object):
         distance.
         Returns [1x2] array of [min,max]
         """
+        tol = 40
         if self.axisid == pc.T:
             r = abs(self.posmodel.state.read('PHYSICAL_RANGE_T'))
+            nominal = self.posmodel._nominal_physical_range_T
+            if r < nominal - tol or r > nominal + tol: r = nominal # check for absurd values
             return [-0.50*r, 0.50*r]  # split theta range such that 0 is essentially in the middle
         else:
             r = abs(self.posmodel.state.read('PHYSICAL_RANGE_P'))
+            nominal = self.posmodel._nominal_physical_range_P
+            if r < nominal - tol or r > nominal + tol: r = nominal # check for absurd values
             return [-0.01*r, 0.99*r]  # split phi range such that 0 is essentially at the minimum
 
     @property

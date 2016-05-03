@@ -286,7 +286,7 @@ class PosTransforms(object):
         """Composite transformation, performs obsXY --> QS --> flatXY."""
         qs = self.obsXY_to_QS(xy)
         flatXY = self.QS_to_flatXY(qs)
-        return xy
+        return flatXY
 
     def flatXY_to_obsXY(self,xy):
         """Composite transformation, performs flatXY --> QS --> obsXY."""

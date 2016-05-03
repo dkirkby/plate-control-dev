@@ -13,20 +13,21 @@ fvc = fvchandler.FVCHandler('SBIG')
 fvc.scale = 0.019 # mm/pixel (update um_scale below if not in mm)
 fvc.rotation = 0  # deg
 um_scale = 1000 # um/mm
-pos_ids = ['UM00012']
+pos_ids = ['UM00012','UM00011','UM00014']
 fid_can_ids = []
 petal_id = 1
 ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure(ptl,fvc)
-m.n_points_full_calib_T = 17
-m.n_points_full_calib_P = 9
-m.n_fiducial_dots = 2 # number of centroids the FVC should expect
-num_corr_max = 3 # number of correction moves to do for each target
+m.n_points_full_calib_T = 5#17
+m.n_points_full_calib_P = 5#9
+m.n_fiducial_dots = 3 # number of centroids the FVC should expect
+num_corr_max = 2 # number of correction moves to do for each target
 
 # test operations to do
 should_identify_fiducials = True
 should_initial_rehome     = True
+should_identify_pos_loc   = True
 should_calibrate_quick    = True
 should_measure_ranges     = True
 should_calibrate_full     = True
@@ -59,7 +60,12 @@ for i in range(len(local_targets)-1,-1,-1): # traverse list from end backward
 # identify fiducials
 if should_identify_fiducials:
     m.identify_fiducials()
-
+    
+# identification of which positioners are in which (x,y) locations on the petal
+if should_identify_pos_loc:
+    # do a rehome here, then get the positioners a bit off the phi hardstops
+    m.identify_positioner_locations()
+    
 # initial homing
 if should_initial_rehome:
     m.rehome(pos_ids='all')
