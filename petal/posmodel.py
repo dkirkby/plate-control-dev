@@ -212,8 +212,7 @@ class Axis(object):
     """
 
     def __init__(self, posmodel, axisid):
-        self.posmodel = posmodel            'PHYSICAL_RANGE_T' : {'value': 370.0, 'tol':   40.0},
-            'PHYSICAL_RANGE_P' : {'value': 190.0, 'tol':   40.0},
+        self.posmodel = posmodel
         if not(axisid == pc.T or axisid == pc.P):
             print( 'warning: bad axis id ' + repr(axisid))
         self.axisid = axisid
