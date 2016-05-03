@@ -34,7 +34,7 @@ should_calibrate_full     = True
 should_do_accuracy_test   = True
 
 # log file setup
-log_directory = os.path.abspath('../test_logs')
+log_directory = pc.test_logs_directory
 os.makedirs(log_directory, exist_ok=True)
 log_suffix = '' # string gets appended to filenames -- useful for user to identify particular tests
 log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
