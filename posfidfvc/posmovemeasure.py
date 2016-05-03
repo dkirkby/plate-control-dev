@@ -256,7 +256,7 @@ class PosMoveMeasure(object):
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
         for petal in pos_ids_by_ptl.keys():
             for pos_id in pos_ids_by_ptl[petal]:
-                print('Identifying positioner ' + pos_id)
+                print('Identifying location of positioner ' + pos_id)
                 self._identify(pos_id)
 
     def pos_data_listed_by_ptl(self, pos_ids='all', key=''):

@@ -38,6 +38,18 @@ T = 0  # theta axis idx -- NOT the motor axis ID!!
 P = 1  # phi axis idx -- NOT the motor axis ID!!
 axis_labels = ('theta', 'phi')
 
+# Nominal and tolerance calibration values
+nominals = {'LENGTH_R1'        : {'value':   3.0, 'tol':    0.5},
+            'LENGTH_R2'        : {'value':   3.0, 'tol':    0.5},
+            'OFFSET_T'         : {'value':   0.0, 'tol':  190.0},
+            'OFFSET_P'         : {'value':   0.0, 'tol':   40.0},
+            'GEAR_CALIB_T'     : {'value':   1.0, 'tol':    0.2},
+            'GEAR_CALIB_P'     : {'value':   1.0, 'tol':    0.2},
+            'OFFSET_X'         : {'value':   0.0, 'tol': 1000.0},
+            'OFFSET_Y'         : {'value':   0.0, 'tol': 1000.0},
+            'PHYSICAL_RANGE_T' : {'value': 370.0, 'tol':   40.0},
+            'PHYSICAL_RANGE_P' : {'value': 190.0, 'tol':   40.0}}
+
 # Types
 class case(enum.Enum):
     """Enumeration of collision cases. The I, II, and III cases are described in

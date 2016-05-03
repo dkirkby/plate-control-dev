@@ -97,6 +97,12 @@ class PosState(object):
         This default behavior can be overridden (True or False) using the write_to_disk boolean argument.
         Caution should be exercised, since usually one does not a particular positioner to overwrite general settings.
         """
+        if key in pc.nominals.keys():
+            nom = self.pc.nominals[key]['value']
+            tol = self.pc.nominals[key]['tol']
+            if val < nom - tol or val > nom + tol: # check for absurd values
+                print('Attempted to set ' + str(key) + ' of ' + str(self.unit_basename) + ' to value = ' + str(val) + ', which is outside the nominal = ' + str(nom) + ' +/- ' + str(tol) + '. Defaulting to nominal value instead.')
+                val = nom
         if key in self.unit.keys():
             self.unit[key] = val
             if write_to_disk != False:
