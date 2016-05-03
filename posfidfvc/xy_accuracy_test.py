@@ -25,13 +25,16 @@ m.n_fiducial_dots = 3 # number of centroids the FVC should expect
 num_corr_max = 2 # number of correction moves to do for each target
 
 # test operations to do
-should_identify_fiducials = True
 should_initial_rehome     = True
+should_identify_fiducials = True
 should_identify_pos_loc   = True
 should_calibrate_quick    = True
 should_measure_ranges     = True
 should_calibrate_full     = True
 should_do_accuracy_test   = True
+
+# always need to initial rehome if identifying pos locations
+if should_identify_pos_loc: should_initial_rehome = True
 
 # log file setup
 log_directory = pc.test_logs_directory
@@ -57,18 +60,18 @@ for i in range(len(local_targets)-1,-1,-1): # traverse list from end backward
     r = (local_targets[i][0]**2 + local_targets[i][1]**2)**0.5
     if r < grid_min_radius or r > grid_max_radius: local_targets.pop(i)
 
+# initial homing
+if should_initial_rehome:
+    m.rehome(pos_ids='all')
+    m.move(pos_ids,'posTP',[0,m.phi_clear_angle-20]) # nice spot for nudging
+
 # identify fiducials
 if should_identify_fiducials:
     m.identify_fiducials()
     
 # identification of which positioners are in which (x,y) locations on the petal
 if should_identify_pos_loc:
-    # do a rehome here, then get the positioners a bit off the phi hardstops
     m.identify_positioner_locations()
-    
-# initial homing
-if should_initial_rehome:
-    m.rehome(pos_ids='all')
 
 # quick pre-calibration, especially because we need some reasonable values for theta offsets prior to measuring physical travel ranges (where phi arms get extended)
 if should_calibrate_quick:
