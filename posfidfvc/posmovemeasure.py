@@ -246,15 +246,19 @@ class PosMoveMeasure(object):
     def identify_fiducials(self):
         """Nudge positioners (all together) forward/back to determine which centroid dots are fiducials.
         """
-        print('Nudging positioners to identify reference dots. Distance tol for identifying a ref dot is ' + str(self.ref_dist_tol))
+        print('Nudging positioners to identify reference dots.')
+        pos_ids_by_ptl = self.pos_data_listed_by_ptl('all','POS_ID')
+        for petal in pos_ids_by_ptl.keys():
+            self.move(pos_ids_by_ptl[petal],'posTP',[0,180]) # starting point
         self._identify(None)
 
     def identify_positioner_locations(self, pos_ids='all'):
         """Nudge positioners (one at a time) forward/back to determine which positioners are where on the FVC.
         """
-        print('Nudging positioners to identify their starting locations. Distance tol for identifying a moving positioner is ' + str(self.ref_dist_tol))
+        print('Nudging positioners to identify their starting locations.')
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
         for petal in pos_ids_by_ptl.keys():
+            self.move(pos_ids_by_ptl[petal],'posTP',[0,180]) # starting point
             for pos_id in pos_ids_by_ptl[petal]:
                 print('Identifying location of positioner ' + pos_id)
                 self._identify(pos_id)
@@ -542,7 +546,7 @@ class PosMoveMeasure(object):
             identify_fiducials = False
             this_petal = self.ptls_of_pos_ids([pos_id])[pos_id]
             cmd_prefix='nudge to identify positioner location '
-        nudges = [self.nudge_dist, -self.nudge_dist]
+        nudges = [-self.nudge_dist, self.nudge_dist]
         xy_ref = []
         for i in range(len(nudges)):
             n_pos = 0

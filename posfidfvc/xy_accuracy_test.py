@@ -33,8 +33,9 @@ should_measure_ranges     = True
 should_calibrate_full     = True
 should_do_accuracy_test   = True
 
-# always need to initial rehome if identifying pos locations
+# certain operations require particular preceding operations
 if should_identify_pos_loc: should_initial_rehome = True
+if should_measure_ranges: should_calibrate_quick = True
 
 # log file setup
 log_directory = pc.test_logs_directory
@@ -63,7 +64,6 @@ for i in range(len(local_targets)-1,-1,-1): # traverse list from end backward
 # initial homing
 if should_initial_rehome:
     m.rehome(pos_ids='all')
-    m.move(pos_ids,'posTP',[0,m.phi_clear_angle-20]) # nice spot for nudging
 
 # identify fiducials
 if should_identify_fiducials:
@@ -82,6 +82,8 @@ if should_measure_ranges:
     m.measure_range(pos_ids='all', axis='theta')
     m.measure_range(pos_ids='all', axis='phi')
     m.rehome(pos_ids='all')
+    if not(should_calibrate_full):
+        m.calibrate(pos_ids='all', mode='quick', save_file_dir=log_directory, save_file_timestamp=log_timestamp) # needed after having struck hard limits
 
 # full calibration
 if should_calibrate_full:
@@ -140,10 +142,10 @@ if should_do_accuracy_test:
                 all_meas_data_by_pos_id[pos_id]['err2D'][i].append(     these_meas_data[pos_id]['err2D'][i])                    
         
         # update summary data log
-        for p in pos_ids:
-            summary_log_data =  'pos_id,' + str(p) + '\n'
-            summary_log_data += 'cycles at start,' + str(start_cycles[pos_ids.index(p)]) + '\n'
-            summary_log_data += 'cycles at finish,' + str(ptl.get(p,'TOTAL_MOVE_SEQUENCES')) + '\n'
+        for pos_id in pos_ids:
+            summary_log_data =  'pos_id,' + str(pos_id) + '\n'
+            summary_log_data += 'cycles at start,' + str(start_cycles[pos_ids.index(pos_id)]) + '\n'
+            summary_log_data += 'cycles at finish,' + str(ptl.get(pos_id,'TOTAL_MOVE_SEQUENCES')) + '\n'
             summary_log_data += 'start time,' + start_timestamp + '\n'
             summary_log_data += 'finish time,' + this_timestamp + '\n'
             summary_log_data += 'num targets,' + str(len(all_meas_data_by_target)) + '\n'
@@ -154,7 +156,7 @@ if should_do_accuracy_test:
             for calc in ['max','min','mean','rms']:
                 summary_log_data += calc + '(um)'
                 for i in submove_idxs:
-                    this_submove_data = all_meas_data_by_pos_id[p]['err2D'][i]
+                    this_submove_data = all_meas_data_by_pos_id[pos_id]['err2D'][i]
                     if calc == 'max':    summary_log_data += ',' + str(np.max(this_submove_data) * um_scale)
                     elif calc == 'min':  summary_log_data += ',' + str(np.min(this_submove_data) * um_scale)
                     elif calc == 'mean': summary_log_data += ',' + str(np.mean(this_submove_data) * um_scale)
@@ -166,18 +168,18 @@ if should_do_accuracy_test:
             file.close()
 
         # update move data log
-        for p in these_meas_data.keys():
+        for pos_id in these_meas_data.keys():
             row = this_timestamp
-            row += ',' + str(ptl.get(p,'TOTAL_MOVE_SEQUENCES'))
-            row += ',' + str(these_meas_data[p]['targ_obsXY'][0])
-            row += ',' + str(these_meas_data[p]['targ_obsXY'][1])
-            for submove_data in these_meas_data[p]['meas_obsXY']:
+            row += ',' + str(ptl.get(pos_id,'TOTAL_MOVE_SEQUENCES'))
+            row += ',' + str(these_meas_data[pos_id]['targ_obsXY'][0])
+            row += ',' + str(these_meas_data[pos_id]['targ_obsXY'][1])
+            for submove_data in these_meas_data[pos_id]['meas_obsXY']:
                 row += ',' + str(submove_data[0]) + ',' + str(submove_data[1])
-            for submove_data in these_meas_data[p]['errXY']:
+            for submove_data in these_meas_data[pos_id]['errXY']:
                 row += ',' + str(submove_data[0]) + ',' + str(submove_data[1])
-            for submove_data in these_meas_data[p]['err2D']:
+            for submove_data in these_meas_data[pos_id]['err2D']:
                 row += ',' + str(submove_data)
             row += '\n'
-            file = open(move_log_name(p),'a')
+            file = open(move_log_name(pos_id),'a')
             file.write(row)
             file.close()
