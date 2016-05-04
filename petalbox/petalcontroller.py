@@ -320,6 +320,9 @@ class PetalController(Application):
 		mode='soft': Using CAN command as the start signal.
 		"""
 		mode=mode.lower()
+		canbus = self.__get_canbus(20000)
+		
+
 		if mode not in ['hard','soft']:
 			rstring = 'execute_sync: Invalid arguments.'
 			self.error(rstring)
@@ -328,7 +331,7 @@ class PetalController(Application):
 			print ("This functionality is not yet implemented")
 			pass
 		if mode == 'soft':
-			self.pmc.send_soft_sync('can0', 20000)
+			self.pmc.send_soft_sync(canbus , 20000)
 			pass
 
 		return self.SUCCESS   
