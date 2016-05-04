@@ -11,9 +11,12 @@ def plot_arc(path, pos_id, data):
     
     for ax in ['T','P']:
         name = 'theta' if ax == 'T' else 'phi'
+        other_ax = 'P' if ax == 'T' else 'T'
+        other_name = 'phi' if ax == 'T' else 'theta'
         plot_num_base = 0 if ax == 'T' else 3
         target_angles = np.array(data[pos_id]['targ_pos' + ax + '_during_' + ax + '_sweep'])
         measured_angles = np.array(data[pos_id]['meas_pos' + ax + '_during_' + ax + '_sweep'])
+        other_axis_angle = data[pos_id]['targ_pos' + other_ax + '_during_' + ax + '_sweep']
         radius = data[pos_id]['radius_' + ax]    
         center = data[pos_id]['xy_ctr_' + ax]
         measured_xy = np.array(data[pos_id]['measured_obsXY_' + ax])
@@ -25,7 +28,7 @@ def plot_arc(path, pos_id, data):
             arc_finish += 360
         ref_arc_angles = np.arange(arc_start,arc_finish,5)*np.pi/180
         if ref_arc_angles[-1] != arc_finish:
-            np.append(ref_arc_angles,arc_finish)
+            ref_arc_angles = np.append(ref_arc_angles,arc_finish)
         arc_x = radius * np.cos(ref_arc_angles) + center[0]
         arc_y = radius * np.sin(ref_arc_angles) + center[1]
         axis_zero_angle = arc_start - target_angles[0] # where global observer would nominally see the axis's local zero point in this plot        
@@ -38,7 +41,8 @@ def plot_arc(path, pos_id, data):
         plt.plot(axis_zero_line_x,axis_zero_line_y,'k--')
         zero_text_angle = np.mod(axis_zero_angle+360, 360)
         zero_text_angle = zero_text_angle-180 if zero_text_angle > 90 and zero_text_angle < 270 else zero_text_angle
-        plt.text(np.mean(axis_zero_line_x),np.mean(axis_zero_line_y),name+'=0',rotation=zero_text_angle,horizontalalignment='center',verticalalignment='top')
+        zero_text = name + '=0\n(' + other_name + '=' + format(other_axis_angle,'.1f') + ')'
+        plt.text(np.mean(axis_zero_line_x),np.mean(axis_zero_line_y),zero_text,rotation=zero_text_angle,horizontalalignment='center',verticalalignment='top')
         for i in range(len(measured_angles)):
             text_x = center[0] + radius*1.1*np.cos((axis_zero_angle+measured_angles[i])*np.pi/180)
             text_y = center[1] + radius*1.1*np.sin((axis_zero_angle+measured_angles[i])*np.pi/180)

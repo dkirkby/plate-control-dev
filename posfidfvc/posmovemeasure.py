@@ -520,6 +520,8 @@ class PosMoveMeasure(object):
             data[pos_id]['targ_posP_during_P_sweep'] = posP
             data[pos_id]['meas_posT_during_T_sweep'] = unwrapped_t_meas
             data[pos_id]['meas_posP_during_P_sweep'] = obsP
+            data[pos_id]['targ_posP_during_T_sweep'] = T[pos_id]['target_posTP'][0][pc.P]
+            data[pos_id]['targ_posT_during_P_sweep'] = P[pos_id]['target_posTP'][0][pc.T]
             
             # gear ratios
             ratios_T = np.divide(data[pos_id]['meas_posT_during_T_sweep'],data[pos_id]['targ_posT_during_T_sweep'])

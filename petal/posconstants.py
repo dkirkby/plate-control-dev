@@ -1,6 +1,5 @@
 import os
 import numpy as np
-import itertools
 import enum
 
 """Constants and convenience methods used in the control of the Fiber Postioner.
@@ -10,8 +9,11 @@ import enum
 np.set_printoptions(suppress=True) # suppress auto-scientific notation when printing np arrays
 
 # File location directories
-petal_directory        = os.path.abspath('../petal')
-all_logs_directory     = os.path.abspath('../../../positioner_logs')
+# For environment paths, set the paths in your .bashrc file, by adding lines like:
+#    export POSITIONER_LOGS_PATH="/my/path/to/positioner_logs"
+petal_directory        = os.path.abspath('.')
+all_logs_directory     = os.environ.get("POSITIONER_LOGS_PATH") # corresponds to https://desi.lbl.gov/svn/code/focalplane/positioner_logs
+if all_logs_directory == None: all_logs_directory = os.path.abspath('../../../positioner_logs') # backup alternative to environmental path, may need to modify for your machine
 pos_settings_directory = petal_directory + os.path.sep + 'pos_settings' + os.path.sep
 move_logs_directory    = all_logs_directory + os.path.sep + 'move_logs' + os.path.sep
 test_logs_directory    = all_logs_directory + os.path.sep + 'test_logs' + os.path.sep

@@ -8,6 +8,7 @@ import posconstants as pc
 import datetime
 import numpy as np
 import time
+import pos_xytest_plot
 
 # start timer on the whole script
 script_start_time = time.time()
@@ -51,6 +52,8 @@ def move_log_name(pos_id):
     return log_directory + os.path.sep + pos_id + '_' + log_timestamp + log_suffix + '_movedata.csv'
 def summary_log_name(pos_id):
     return log_directory + os.path.sep + pos_id + '_' + log_timestamp + log_suffix + '_summary.csv'
+def summary_plot_name(pos_id):
+    return log_directory + os.path.sep + pos_id + '_' + log_timestamp + log_suffix + '_xyplot'
 
 # cycles configuration (for life testing)
 # STILL TO BE IMPLEMENTED
@@ -134,7 +137,7 @@ if should_do_accuracy_test:
     for these_targets in all_global_targets:
         targ_num += 1
         print('\nMEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_global_targets)))
-        print('Local target (posX,posY)=(' + format(local_targets[targ_num][0],'.3f') + ',' + format(local_targets[targ_num][1],'.3f') + ') for each positioner.')
+        print('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
         this_timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
         these_meas_data = m.move_and_correct(pos_ids, these_targets, coordinates='obsXY', num_corr_max=num_corr_max)
         
@@ -190,6 +193,18 @@ if should_do_accuracy_test:
             file = open(move_log_name(pos_id),'a')
             file.write(row)
             file.close()
+    
+    # make summary plots showing the targets and measured positions
+for pos_id in all_meas_data_by_pos_id.keys():
+    posmodel = ptl.get(pos_id)
+    title = log_timestamp + log_suffix
+    center = [ptl.get(pos_id,'OFFSET_X'),ptl.get(pos_id,'OFFSET_Y')]
+    theta_min = posmodel.trans.posTP_to_obsTP([min(posmodel.targetable_range_T),0])[0]
+    theta_max = posmodel.trans.posTP_to_obsTP([max(posmodel.targetable_range_T),0])[0]
+    theta_range = [theta_min,theta_max]
+    r1 = ptl.get(pos_id,'LENGTH_R1')
+    r2 = ptl.get(pos_id,'LENGTH_R2')
+    pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_meas_data_by_pos_id[pos_id],center,theta_range,r1,r2,title)
             
 script_exec_time = time.time() - script_start_time
 print('Total test time: ' + format(script_exec_time/60/60,'.1f') + 'hrs')

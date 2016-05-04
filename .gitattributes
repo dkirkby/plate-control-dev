@@ -57,6 +57,7 @@ posfidfvc/SBIG/sbig_grab_cen.py -text
 posfidfvc/SBIG/sbigcam.py -text
 posfidfvc/fitcircle.py -text
 posfidfvc/fvchandler.py -text
+posfidfvc/pos_xytest_plot.py -text
 posfidfvc/poscalibplot.py -text
 posfidfvc/posmovemeasure.py -text
 posfidfvc/xy_accuracy_test.py -text
