@@ -7,22 +7,26 @@ import posmovemeasure
 import posconstants as pc
 import datetime
 import numpy as np
+import time
+
+# start timer on the whole script
+script_start_time = time.time()
 
 # initialization
 fvc = fvchandler.FVCHandler('SBIG')
 fvc.scale = 0.019 # mm/pixel (update um_scale below if not in mm)
 fvc.rotation = 0  # deg
 um_scale = 1000 # um/mm
-pos_ids = ['UM00012','UM00011','UM00014']
+pos_ids = ['UM00012','UM00014']
 fid_can_ids = []
 petal_id = 1
 ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure(ptl,fvc)
-m.n_points_full_calib_T = 5#17
-m.n_points_full_calib_P = 5#9
-m.n_fiducial_dots = 3 # number of centroids the FVC should expect
-num_corr_max = 2 # number of correction moves to do for each target
+m.n_points_full_calib_T = 17
+m.n_points_full_calib_P = 9
+m.n_fiducial_dots = 4 # number of fiducial centroids the FVC should expect
+num_corr_max = 4 # number of correction moves to do for each target
 
 # test operations to do
 should_initial_rehome     = True
@@ -51,10 +55,11 @@ def summary_log_name(pos_id):
 # cycles configuration (for life testing)
 # STILL TO BE IMPLEMENTED
 
-# test grid configuration (local to any positioner)
+# test grid configuration (local to any positioner, centered on it)
+# this will get copied and transformed to each particular positioner's location below
 grid_max_radius = 5.8 # mm
 grid_min_radius = 0.2 # mm
-n_pts_across = 7
+n_pts_across = 27 # 7 --> 28 pts, 27 --> 528 pts
 line = np.linspace(-grid_max_radius,grid_max_radius,n_pts_across)
 local_targets = [[x,y] for x in line for y in line]
 for i in range(len(local_targets)-1,-1,-1): # traverse list from end backward
@@ -129,6 +134,7 @@ if should_do_accuracy_test:
     for these_targets in all_global_targets:
         targ_num += 1
         print('\nMEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_global_targets)))
+        print('Local target (posX,posY)=(' + format(local_targets[targ_num][0],'.3f') + ',' + format(local_targets[targ_num][1],'.3f') + ') for each positioner.')
         this_timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
         these_meas_data = m.move_and_correct(pos_ids, these_targets, coordinates='obsXY', num_corr_max=num_corr_max)
         
@@ -144,6 +150,7 @@ if should_do_accuracy_test:
         # update summary data log
         for pos_id in pos_ids:
             summary_log_data =  'pos_id,' + str(pos_id) + '\n'
+            summary_log_data += 'log_suffix,' + str(log_suffix) + '\n'
             summary_log_data += 'cycles at start,' + str(start_cycles[pos_ids.index(pos_id)]) + '\n'
             summary_log_data += 'cycles at finish,' + str(ptl.get(pos_id,'TOTAL_MOVE_SEQUENCES')) + '\n'
             summary_log_data += 'start time,' + start_timestamp + '\n'
@@ -183,3 +190,6 @@ if should_do_accuracy_test:
             file = open(move_log_name(pos_id),'a')
             file.write(row)
             file.close()
+            
+script_exec_time = time.time() - script_start_time
+print('Total test time: ' + format(script_exec_time/60/60,'.1f') + 'hrs')
