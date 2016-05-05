@@ -28,7 +28,7 @@ def plot_arc(path, pos_id, data):
             arc_finish += 360
         ref_arc_angles = np.arange(arc_start,arc_finish,5)*np.pi/180
         if ref_arc_angles[-1] != arc_finish:
-            ref_arc_angles = np.append(ref_arc_angles,arc_finish)
+            ref_arc_angles = np.append(ref_arc_angles,arc_finish*np.pi/180)
         arc_x = radius * np.cos(ref_arc_angles) + center[0]
         arc_y = radius * np.sin(ref_arc_angles) + center[1]
         axis_zero_angle = arc_start - target_angles[0] # where global observer would nominally see the axis's local zero point in this plot        
@@ -43,9 +43,10 @@ def plot_arc(path, pos_id, data):
         zero_text_angle = zero_text_angle-180 if zero_text_angle > 90 and zero_text_angle < 270 else zero_text_angle
         zero_text = name + '=0\n(' + other_name + '=' + format(other_axis_angle,'.1f') + ')'
         plt.text(np.mean(axis_zero_line_x),np.mean(axis_zero_line_y),zero_text,rotation=zero_text_angle,horizontalalignment='center',verticalalignment='top')
-        for i in range(len(measured_angles)):
-            text_x = center[0] + radius*1.1*np.cos((axis_zero_angle+measured_angles[i])*np.pi/180)
-            text_y = center[1] + radius*1.1*np.sin((axis_zero_angle+measured_angles[i])*np.pi/180)
+        for i in range(len(measured_xy)):
+            this_angle = np.arctan2(measured_xy[i,1]-center[1],measured_xy[i,0]-center[0]) * 180/np.pi
+            text_x = center[0] + radius*1.1*np.cos(this_angle)
+            text_y = center[1] + radius*1.1*np.sin(this_angle)
             plt.text(text_x,text_y,str(i),verticalalignment='center',horizontalalignment='center')
         plt.xlabel('x (mm)')
         plt.ylabel('y (mm)')
