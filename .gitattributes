@@ -66,4 +66,5 @@ posfirmware/develop/fipos_fw_2.0dev.c -text
 posfirmware/develop/fipos_fw_2.1dev.c -text
 posfirmware/docs/FW_1.0_DESC.docx -text svneol=unset#application/zip
 posfirmware/docs/FW_2.0_DESC.docx -text
+posfirmware/docs/Revision[!!-~]Changes[!!-~](for[!!-~]firmware[!!-~]versions[!!-~]after[!!-~]2.0).docx -text
 posfirmware/release/fipos_fw_1.0.c -text
