@@ -36,6 +36,7 @@ petalbox/petalcontroller.conf.default -text
 petalbox/petalcontroller.ini.default -text
 petalbox/petalcontroller.py -text
 petalbox/pf_utility.py -text
+petalbox/pfutility.sh -text
 petalbox/posfidcan.py -text
 petalbox/setup.sh -text
 petalbox/startpc.py -text
