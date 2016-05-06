@@ -95,7 +95,8 @@ if __name__ == '__main__':
 	print("")
 	print(" ID programming requires a single positioner or fiducial on the CAN bus")
 	print("")	
-	print(" (Using "+str(canchan)+")")
+	print(" (Using CANbus "+str(canchan)+")")
+	print("")	
 
 	loop=True
 	while loop:
@@ -134,7 +135,7 @@ if __name__ == '__main__':
 			sid_str= ":".join("{:02x}".format(c) for c in sid)
 			print ("  Si ID: ",sid_str)
 			try:
-				posid,fw=pmc.get_firmware_version(20000,)
+				posid,fw=pmc.get_firmware_version(20000)
 			except:
 				fw='unknown'
 			print (" FW  revision: ", str(fw))	
