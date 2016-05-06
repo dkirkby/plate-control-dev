@@ -61,7 +61,12 @@ Modification history:
 160424-MS	fixed exposure time error. The exposureTime item is in 1/100 seconds (and
 			not in msec)
 			implemented fast readout mode (set_fast_mode)
-			implemented window mode (set_window_mode)			 
+			implemented window mode (set_window_mode)
+160506-MS	added 'verbose=False' to constructor
+			allowed exposure times of less than 90 ms (needed for bias frames) and set 
+			default exposure time to 0. Note: this will still be overwritten by the camera's FW for
+			non-dark frames.
+
 '''
 
 
@@ -141,9 +146,9 @@ class SBIGCam(object):
 	ABG_LOW7 = 1
 	EXP_FAST_READOUT = 0x08000000	
 	
-	def __init__(self):
+	def __init__(self,verbose=False):
 		self.DARK = 0 #Defaults to 0
-		self.exposure = 9 # units 1/100 second (minimum exposure is 0.09 seconds)
+		self.exposure = 0 # units 1/100 second (minimum exposure is 0.09 seconds)
 		self.TOP = c_ushort(0)
 		self.LEFT = c_ushort(0)
 		self.FAST = 0
@@ -157,7 +162,7 @@ class SBIGCam(object):
 			self.SBIG = CDLL('C:\\Windows\system\sbigudrv.dll')
 		else: #Assume Linux
 			self.SBIG = CDLL("/usr/local/lib/libsbigudrv.so")
-		self.verbose = False
+		self.verbose = verbose
 
 	def set_image_size(self, width, height):
 		"""
@@ -206,7 +211,7 @@ class SBIGCam(object):
 				print('could not select camera: ' + name)
 				return False	
 		else:
-			print('could not select camera: ' + name)
+			print('Not a valid camera name (use "ST8300" or "STi") ')
 			return False
 
 
@@ -231,7 +236,7 @@ class SBIGCam(object):
 			True if success
 			False if failed
 		"""
-		if exp_time < 90: exp_time = 90
+#		if exp_time < 90: exp_time = 90  removed to allow 0s bias frames
 		if exp_time > 3600000: exp_time=3600000
 		try:
 			
@@ -389,13 +394,19 @@ class SBIGCam(object):
 		return True
 
 if __name__ == '__main__':
+
+	model={'s':'ST8300','i':'STi'}
+	camtype=input("Select camera type.  (s) for ST8300 or (i) for STi: ")
+	if camtype.lower() not in ['s','i']:
+		print("Not a valid camera type")
+		sys.exit()
 	camera = SBIGCam()
-	#Settings
+	camera.select_camera(model[camtype.lower()])	
 	#Time of exposure in between 90ms and 3600000ms
 	if not camera.open_camera():
 		print ("Can't establish connection to camera")
 		sys.exit()
-	extime = input("Exposure time in milliseconds (between 90 and 3600000): ")
+	extime = input("Exposure time in milliseconds (between 0 and 3600000): ")
 	while (type(extime) is str):
 		try:
 			extime = int(extime)
