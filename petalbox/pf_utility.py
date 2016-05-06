@@ -134,7 +134,7 @@ if __name__ == '__main__':
 				posid,fw=pmc.get_firmware_version(20000,)
 			except:
 				fw='unknown'
-			print (" FW  revision: ", str(fw)	
+			print (" FW  revision: ", str(fw))	
 
 
 		if sel=='p':
