@@ -129,17 +129,17 @@ if __name__ == '__main__':
 		if sel=='r':
 		#print (" Sending command 21 - read CAN address")
 			posid, data=pmc.get_can_address(20000)
-			print (" CAN ID: ", posid)
+			print ("   CAN ID: ", posid)
 		#print(" Sending command 19 - read sid short")
 			posid,sid=pmc.get_sid(20000)
 			sid_str= ":".join("{:02x}".format(c) for c in sid)
-			print ("  Si ID: ",sid_str)
+			print ("    Si ID: ",sid_str)
 			try:
 				posid,fw=pmc.get_firmware_version(20000)
+				fw=str(int(ord(fw))/10)
 			except:
 				fw='unknown'
-			print (" FW  revision: ", str(fw))	
-
+			print ("  FW rev.: ", fw)
 
 		if sel=='p':
 			new_id=input("Enter new CAN address (in decimal): ")
