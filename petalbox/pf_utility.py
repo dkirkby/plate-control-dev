@@ -90,10 +90,13 @@ class PositionerControl(object):
 		self.scan.send_command(id,5,str(state).zfill(2))	
 	
 if __name__ == '__main__':
-
-	_sel=_read_key()	
-	print(" ID programming requires a single positioner or fiducial on the CAN bus")
+	canchan=sys.argv[1]
+	_sel=_read_key()
 	print("")
+	print(" ID programming requires a single positioner or fiducial on the CAN bus")
+	print("")	
+	print(" (Using "+str(canchan)+")")
+
 	loop=True
 	while loop:
 #		print("Select:")
