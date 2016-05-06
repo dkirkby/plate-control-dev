@@ -55,8 +55,8 @@ class PositionerControl(object):
 		self.bitsum=0
 
 	def get_sid(self, posid):		
-		sid=self.scan.send_command_recv(posid,19,'')
-		return sid
+		sid,data=self.scan.send_command_recv(posid,19,'')
+		return sid,data
 
 	def check_sid_short(self, spid, sid):
 		pid=spid
@@ -70,13 +70,13 @@ class PositionerControl(object):
 
 	def get_can_address(self, spid):
 		pid=spid
-		posid=self.scan.send_command_recv(pid,21, '')
-		return posid
+		posid,data=self.scan.send_command_recv(pid,21, '')
+		return posid,data
 
 	def get_firmware_version(self, spid):
 		pid=spid
-		revision=self.scan.send_command_recv(pid,11, '')
-		return revision
+		revision,data=self.scan.send_command_recv(pid,11, '')
+		return revision,data
 		pass
 
 	def get_device_type(self, spid):
