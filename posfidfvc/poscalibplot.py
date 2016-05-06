@@ -44,7 +44,7 @@ def plot_arc(path, pos_id, data):
         zero_text = name + '=0\n(' + other_name + '=' + format(other_axis_angle,'.1f') + ')'
         plt.text(np.mean(axis_zero_line_x),np.mean(axis_zero_line_y),zero_text,rotation=zero_text_angle,horizontalalignment='center',verticalalignment='top')
         for i in range(len(measured_xy)):
-            this_angle = np.arctan2(measured_xy[i,1]-center[1],measured_xy[i,0]-center[0]) * 180/np.pi
+            this_angle = np.arctan2(measured_xy[i,1]-center[1],measured_xy[i,0]-center[0])
             text_x = center[0] + radius*1.1*np.cos(this_angle)
             text_y = center[1] + radius*1.1*np.sin(this_angle)
             plt.text(text_x,text_y,str(i),verticalalignment='center',horizontalalignment='center')

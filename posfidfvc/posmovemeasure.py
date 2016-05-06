@@ -474,6 +474,14 @@ class PosMoveMeasure(object):
         """
         data = {}
         for pos_id in T.keys():
+            # gather targets data
+            t_targ_posT = [posTP[pc.T] for posTP in T[pos_id]['target_posTP']]
+            t_targ_posP = [posTP[pc.P] for posTP in T[pos_id]['target_posTP']]
+            p_targ_posP = [posTP[pc.P] for posTP in P[pos_id]['target_posTP']]
+            p_targ_posT = [posTP[pc.T] for posTP in P[pos_id]['target_posTP']]        
+            t_meas_obsXY = T[pos_id]['measured_obsXY']
+            p_meas_obsXY = P[pos_id]['measured_obsXY']
+            
             # arms and offsets
             petal = T[pos_id]['petal']
             t_ctr = np.array(T[pos_id]['xy_center'])
@@ -483,30 +491,25 @@ class PosMoveMeasure(object):
             petal.set(pos_id,'LENGTH_R2',P[pos_id]['radius'])
             petal.set(pos_id,'OFFSET_X',t_ctr[0])
             petal.set(pos_id,'OFFSET_Y',t_ctr[1])
-            obsT = np.arctan2(p_ctr[1]-t_ctr[1], p_ctr[0]-t_ctr[0]) * 180/np.pi
-            posT = P[pos_id]['target_posTP'][0][pc.T] # just using the first target theta angle in the phi sweep
-            offset_t = obsT - posT
+            p_meas_obsT = np.arctan2(p_ctr[1]-t_ctr[1], p_ctr[0]-t_ctr[0]) * 180/np.pi
+            offset_t = p_meas_obsT - p_targ_posT[0] # just using the first target theta angle in the phi sweep
             petal.set(pos_id,'OFFSET_T',offset_t)
-            p_xymeas = np.array(P[pos_id]['measured_obsXY'])
-            p_angles = np.arctan2(p_xymeas[:,1]-p_ctr[1], p_xymeas[:,0]-p_ctr[0]) * 180/np.pi
-            p_angles_wrapped = [p if p >=0 else p + 360 for p in p_angles]
-            obsP = p_angles_wrapped - obsT
-            posP = [posTP[pc.P] for posTP in P[pos_id]['target_posTP']]
-            offset_p = np.median(obsP - posP)
+            xy = np.array(p_meas_obsXY)
+            angles = np.arctan2(xy[:,1]-p_ctr[1], xy[:,0]-p_ctr[0]) * 180/np.pi
+            p_meas_obsP = angles - p_meas_obsT
+            expected_sign_of_first_angle = np.sign(p_targ_posP[0])
+            expected_direction = np.sign(p_targ_posP[1] - p_targ_posP[0])
+            p_meas_obsP_wrapped = self._wrap_consecutive_angles(p_meas_obsP.tolist(), expected_sign_of_first_angle, expected_direction)
+            offset_p = np.median(np.array(p_meas_obsP_wrapped) - np.array(p_targ_posP))
             petal.set(pos_id,'OFFSET_P',offset_p)
+            p_meas_posP_wrapped = (np.array(p_meas_obsP_wrapped) - offset_p).tolist()
             
             # unwrap thetas
-            t_xymeas = np.array(T[pos_id]['measured_obsXY'])
-            tp_meas = T[pos_id]['trans'].obsXY_to_posTP(np.transpose(t_xymeas).tolist())[0]
-            t_meas = tp_meas[pc.T]
-            t_targ = [posTP[pc.T] for posTP in T[pos_id]['target_posTP']]
-            meas_deltas = np.diff(t_meas)
-            targ_deltas = np.diff(t_targ)
-            unwrapped_t_meas = [t_meas[0]]
-            for i in range(len(meas_deltas)):
-                if np.sign(meas_deltas[i]) != np.sign(targ_deltas[i]):
-                    meas_deltas[i] += np.sign(targ_deltas[i]) * 360
-                unwrapped_t_meas.append(unwrapped_t_meas[-1] + meas_deltas[i])
+            t_meas_posTP = T[pos_id]['trans'].obsXY_to_posTP(np.transpose(t_meas_obsXY).tolist())[0]
+            t_meas_posT = t_meas_posTP[pc.T]
+            expected_sign_of_first_angle = np.sign(t_targ_posT[0])
+            expected_direction = np.sign(t_targ_posT[1] - t_targ_posT[0])
+            t_meas_posT_wrapped = self._wrap_consecutive_angles(t_meas_posT, expected_sign_of_first_angle, expected_direction)
             
             # gather data to return in an organized fashion (used especially for plotting)
             data[pos_id] = {}
@@ -514,18 +517,18 @@ class PosMoveMeasure(object):
             data[pos_id]['xy_ctr_P'] = p_ctr
             data[pos_id]['radius_T'] = T[pos_id]['radius']
             data[pos_id]['radius_P'] = P[pos_id]['radius']
-            data[pos_id]['measured_obsXY_T'] = t_xymeas
-            data[pos_id]['measured_obsXY_P'] = p_xymeas
-            data[pos_id]['targ_posT_during_T_sweep'] = t_targ
-            data[pos_id]['targ_posP_during_P_sweep'] = posP
-            data[pos_id]['meas_posT_during_T_sweep'] = unwrapped_t_meas
-            data[pos_id]['meas_posP_during_P_sweep'] = obsP
-            data[pos_id]['targ_posP_during_T_sweep'] = T[pos_id]['target_posTP'][0][pc.P]
-            data[pos_id]['targ_posT_during_P_sweep'] = P[pos_id]['target_posTP'][0][pc.T]
+            data[pos_id]['measured_obsXY_T'] = t_meas_obsXY
+            data[pos_id]['measured_obsXY_P'] = p_meas_obsXY
+            data[pos_id]['targ_posT_during_T_sweep'] = t_targ_posT
+            data[pos_id]['targ_posP_during_P_sweep'] = p_targ_posP
+            data[pos_id]['meas_posT_during_T_sweep'] = t_meas_posT_wrapped
+            data[pos_id]['meas_posP_during_P_sweep'] = p_meas_posP_wrapped
+            data[pos_id]['targ_posP_during_T_sweep'] = t_targ_posP[0]
+            data[pos_id]['targ_posT_during_P_sweep'] = p_targ_posT[0]
             
             # gear ratios
-            ratios_T = np.divide(data[pos_id]['meas_posT_during_T_sweep'],data[pos_id]['targ_posT_during_T_sweep'])
-            ratios_P = np.divide(data[pos_id]['meas_posP_during_P_sweep'],data[pos_id]['targ_posP_during_P_sweep'])
+            ratios_T = np.divide(np.diff(t_meas_posT_wrapped),np.diff(t_targ_posT))
+            ratios_P = np.divide(np.diff(p_meas_posP_wrapped),np.diff(p_targ_posP))
             ratio_T = np.median(ratios_T)
             ratio_P = np.median(ratios_P)
             data[pos_id]['gear_ratio_T'] = ratio_T
@@ -603,3 +606,18 @@ class PosMoveMeasure(object):
         phi_Eo_angle = poscollider.PosCollider().config['PHI_EO']
         phi_clear = phi_Eo_angle + self.phi_Eo_margin
         return phi_clear
+        
+    def _wrap_consecutive_angles(self, angles, expected_sign_of_first_angle, expected_direction):
+        """Wrap angles in one expected direction. It is expected that the physical deltas
+        we are trying to wrap all increase or all decrease sequentially. In other words, that
+        the sequence of angles is only going one way around the circle.
+        """
+        wrapped = [angles[0]]
+        if np.sign(angles[0]) != expected_sign_of_first_angle and np.sign(angles[0]) != 0:
+            wrapped[0] -= expected_sign_of_first_angle * 360
+        for i in range(1,len(angles)):
+            delta = angles[i] - wrapped[i-1]
+            while np.sign(delta) != expected_direction and np.sign(delta) != 0:
+                delta += expected_direction * 360
+            wrapped.append(wrapped[-1] + delta)
+        return wrapped

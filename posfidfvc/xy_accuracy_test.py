@@ -15,26 +15,26 @@ script_start_time = time.time()
 
 # initialization
 fvc = fvchandler.FVCHandler('SBIG')
-fvc.scale = 0.019 # mm/pixel (update um_scale below if not in mm)
+fvc.scale = 0.0061 # mm/pixel (update um_scale below if not in mm)
 fvc.rotation = 0  # deg
 um_scale = 1000 # um/mm
-pos_ids = ['UM00012','UM00014']
+pos_ids = ['BU02']
 fid_can_ids = []
 petal_id = 1
 ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure(ptl,fvc)
-m.n_points_full_calib_T = 17
-m.n_points_full_calib_P = 9
-m.n_fiducial_dots = 4 # number of fiducial centroids the FVC should expect
-num_corr_max = 4 # number of correction moves to do for each target
+m.n_points_full_calib_T = 20#17
+m.n_points_full_calib_P = 20#9
+m.n_fiducial_dots = 3 # number of fiducial centroids the FVC should expect
+num_corr_max = 2 # number of correction moves to do for each target
 
 # test operations to do
 should_initial_rehome     = True
 should_identify_fiducials = True
-should_identify_pos_loc   = True
+should_identify_pos_loc   = False
 should_calibrate_quick    = True
-should_measure_ranges     = True
+should_measure_ranges     = False
 should_calibrate_full     = True
 should_do_accuracy_test   = True
 
@@ -48,12 +48,14 @@ os.makedirs(log_directory, exist_ok=True)
 log_suffix = '' # string gets appended to filenames -- useful for user to identify particular tests
 log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
 log_timestamp = datetime.datetime.now().strftime(pc.filename_timestamp_format)
+def path_prefix(pos_id):
+    return log_directory + os.path.sep + pos_id + '_' + log_timestamp + log_suffix
 def move_log_name(pos_id):
-    return log_directory + os.path.sep + pos_id + '_' + log_timestamp + log_suffix + '_movedata.csv'
+    return path_prefix(pos_id) + '_movedata.csv'
 def summary_log_name(pos_id):
-    return log_directory + os.path.sep + pos_id + '_' + log_timestamp + log_suffix + '_summary.csv'
+    return path_prefix(pos_id) + '_summary.csv'
 def summary_plot_name(pos_id):
-    return log_directory + os.path.sep + pos_id + '_' + log_timestamp + log_suffix + '_xyplot'
+    return path_prefix(pos_id) + '_xyplot'    
 
 # cycles configuration (for life testing)
 # STILL TO BE IMPLEMENTED
@@ -62,7 +64,7 @@ def summary_plot_name(pos_id):
 # this will get copied and transformed to each particular positioner's location below
 grid_max_radius = 5.8 # mm
 grid_min_radius = 0.2 # mm
-n_pts_across = 27 # 7 --> 28 pts, 27 --> 528 pts
+n_pts_across = 7 # 7 --> 28 pts, 27 --> 528 pts
 line = np.linspace(-grid_max_radius,grid_max_radius,n_pts_across)
 local_targets = [[x,y] for x in line for y in line]
 for i in range(len(local_targets)-1,-1,-1): # traverse list from end backward
@@ -195,16 +197,16 @@ if should_do_accuracy_test:
             file.close()
     
     # make summary plots showing the targets and measured positions
-for pos_id in all_meas_data_by_pos_id.keys():
-    posmodel = ptl.get(pos_id)
-    title = log_timestamp + log_suffix
-    center = [ptl.get(pos_id,'OFFSET_X'),ptl.get(pos_id,'OFFSET_Y')]
-    theta_min = posmodel.trans.posTP_to_obsTP([min(posmodel.targetable_range_T),0])[0]
-    theta_max = posmodel.trans.posTP_to_obsTP([max(posmodel.targetable_range_T),0])[0]
-    theta_range = [theta_min,theta_max]
-    r1 = ptl.get(pos_id,'LENGTH_R1')
-    r2 = ptl.get(pos_id,'LENGTH_R2')
-    pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_meas_data_by_pos_id[pos_id],center,theta_range,r1,r2,title)
+    for pos_id in all_meas_data_by_pos_id.keys():
+        posmodel = ptl.get(pos_id)
+        title = log_timestamp + log_suffix
+        center = [ptl.get(pos_id,'OFFSET_X'),ptl.get(pos_id,'OFFSET_Y')]
+        theta_min = posmodel.trans.posTP_to_obsTP([min(posmodel.targetable_range_T),0])[0]
+        theta_max = posmodel.trans.posTP_to_obsTP([max(posmodel.targetable_range_T),0])[0]
+        theta_range = [theta_min,theta_max]
+        r1 = ptl.get(pos_id,'LENGTH_R1')
+        r2 = ptl.get(pos_id,'LENGTH_R2')
+        pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_meas_data_by_pos_id[pos_id],center,theta_range,r1,r2,title)
             
 script_exec_time = time.time() - script_start_time
 print('Total test time: ' + format(script_exec_time/60/60,'.1f') + 'hrs')
