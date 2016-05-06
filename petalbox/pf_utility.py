@@ -74,6 +74,9 @@ class PositionerControl(object):
 		return posid
 
 	def get_firmware_version(self, spid):
+		pid=spid
+		revision=self.scan.send_command_recv(pid,11, '')
+		return revision
 		pass
 
 	def get_device_type(self, spid):
@@ -95,7 +98,7 @@ if __name__ == '__main__':
 	while loop:
 #		print("Select:")
 		print("[b]link LED (using broadcast address)")
-		print("[r]ead current CAN and silicon address")
+		print("[r]ead CAN address, silicon ID and software revision")
 		print("[e]xit")
 		print("[p]rogram new CAN address")
 		print("Select: ")
@@ -125,9 +128,15 @@ if __name__ == '__main__':
 			print (" CAN ID: ", posid)
 		#print(" Sending command 19 - read sid short")
 			posid,sid=pmc.get_sid(20000)
-
 			sid_str= ":".join("{:02x}".format(c) for c in sid)
 			print ("  Si ID: ",sid_str)
+			try:
+				posid,fw=pmc.get_firmware_version(20000,)
+			except:
+				fw='unknown'
+			print (" FW  revision: ", str(fw)	
+
+
 		if sel=='p':
 			new_id=input("Enter new CAN address (in decimal): ")
 			new_id=int(new_id)
