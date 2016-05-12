@@ -5,7 +5,7 @@
 # Revision History
 # 
 # 160418 created MS based on mvtest.py (by IG)
-# tested with FW 1.0
+# tested with FW 2.1
 
 import posfidcan
 import sys
@@ -144,7 +144,7 @@ if __name__ == '__main__':
 		if sel=='p':
 			new_id=input("Enter new CAN address (in decimal): ")
 			new_id=int(new_id)
-			new_id=(hex(new_id)).strip('0x')
+			new_id=(hex(new_id)).replace('0x','')			
 			new_id=new_id.zfill(4)
 			posid,sid=pmc.get_sid(20000)
 			sid=flip_byteorder(sid)
