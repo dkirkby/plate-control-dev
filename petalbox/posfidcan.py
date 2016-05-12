@@ -16,7 +16,7 @@ class PosFidCAN(object):
 	"""	Class for communicating with the DESI fiber positioner control (FPC) electronics
 		through Systec module via SocketCAN.
 	"""
-	__sleeptime = 0.2  #0.002 	# sleep time after sending CAN command (in seconds) -- Joe found needed 0.2 sec here for consistent operation 2016-04-14
+	__sleeptime = 0. #2  #0.002 	# sleep time after sending CAN command (in seconds) -- Joe found needed 0.2 sec here for consistent operation 2016-04-14
 	can_frame_fmt = "=IB3x8s"
 	#Create CAN socket and bind to interface channel='canX'
 	def __init__(self, channel='can0'):
