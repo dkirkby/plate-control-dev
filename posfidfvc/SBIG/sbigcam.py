@@ -377,7 +377,7 @@ class SBIGCam(object):
 		 #Close Device
 		Error = self.SBIG.SBIGUnivDrvCommand(self.CC_CLOSE_DEVICE, None, None)
 		if Error != self.CE_NO_ERROR:
-			print ('Attempt to close device returned error:', Error)
+			if self.verbose: print ('Attempt to close device returned error:', Error)
 			return False
 		elif self.verbose:
 			print ('Device successfully closed.')
