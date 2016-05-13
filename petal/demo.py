@@ -1,15 +1,16 @@
 import petal
 import time
 import posconstants as pc
+import sys
 
 """Demonstrator script for initializing / moving positioner.
 """
 
 # initialization
-pos_ids = ['UM00012','UM00014']
+pos_ids = ['UM00022']
 #pos_ids = ['UM00011','UM00012','UM00013','UM00014','UM00015']
 fid_ids = []
-petal_id = 1
+petal_id = 3
 ptl = petal.Petal(petal_id, pos_ids, fid_ids)
 ptl.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
 
@@ -20,12 +21,12 @@ for pos_id in pos_ids:
     print(ptl.get(pos_id).expected_current_position_str)
 
 # demo script flags
-should_flash       = False
+should_flash       = True
 should_home        = True
-should_direct_dtdp = False
-should_move_qs     = False
-should_move_dqds   = False
-should_move_xy     = True
+should_direct_dtdp = True
+should_move_qs     = True
+should_move_dqds   = True
+should_move_xy     = False
 should_move_dxdy   = False
 should_move_tp     = False
 should_move_dtdp   = False
@@ -44,6 +45,7 @@ if should_home:
     print('MOVE: homing')
     # ptl.set(key='CREEP_TO_LIMITS',value=True) # to force only creeping to hard stops
     ptl.request_homing(pos_ids)
+
     ptl.schedule_send_and_execute_moves()
 else:
     ptl.set(key=['POS_T','POS_P'],value=[-180,180]) # faking having just homed

@@ -461,13 +461,18 @@ class Petal(object):
         poll_period = 0.5 # seconds
         keep_waiting = True
         start_time = time.time()
+
         while keep_waiting:
+
             if (time.time()-start_time) >= timeout:
                 print('Timed out at ' + str(timeout) + ' seconds waiting to send next move table.')
                 keep_waiting = False
+
             if self.comm.ready_for_tables(self.canids_where_tables_were_just_sent):
                 keep_waiting = False
+             
             else:
+
                 time.sleep(poll_period)
 
     def _posid_listify_and_fill(self,posid):
