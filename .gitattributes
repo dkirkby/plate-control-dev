@@ -64,6 +64,7 @@ posfidfvc/fvchandler.py -text
 posfidfvc/pos_xytest_plot.py -text
 posfidfvc/poscalibplot.py -text
 posfidfvc/posmovemeasure.py -text
+posfidfvc/um_accuracy_test.py -text
 posfidfvc/xy_accuracy_test.py -text
 posfirmware/develop/fipos_fw_2.0dev.c -text
 posfirmware/develop/fipos_fw_2.1dev.c -text
