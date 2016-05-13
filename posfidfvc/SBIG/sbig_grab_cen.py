@@ -14,12 +14,12 @@ class SBIG_Grab_Cen(object):
         self.cam.select_camera('ST8300')
         self.close_camera() # in case driver was previously left in "open" state
         self.open_camera()      
-        self.__exposure_time = 400 # milliseconds, 90 ms is the minimum
+        self.__exposure_time = 100 # milliseconds, 90 ms is the minimum
         self.cam.set_exposure_time(self.exposure_time)
         self.min_brightness = 5000
         self.max_brightness = 50000
         self.verbose = False
-        self.write_fits = True
+        self.write_fits = False
         self.take_darks = False # whether to measure a dark image and subtract it out
         self.flip_horizontal = True # whether to reflect image across y axis
         self.flip_vertical = False # whether to reflect image across x axis
@@ -53,7 +53,7 @@ class SBIG_Grab_Cen(object):
                 print("Taking dark image...")
             self.cam.set_dark(True)  
             D = self.cam.start_exposure()
-            D = self.flip(D)	
+            D = self.flip(D)
             if self.write_fits:
                 filename = '_SBIG_dark_image.FITS'
                 try:
@@ -67,33 +67,42 @@ class SBIG_Grab_Cen(object):
         if self.verbose:
             print("Taking light image...")
         self.cam.set_dark(False)
-        L = self.cam.start_exposure()
-        L = self.flip(L)
-        if self.write_fits:
-            filename = '_SBIG_light_image.FITS'
-            try:
-                os.remove(filename)
-            except:
-                print('couldn''t remove file: ' + filename)
-            self.cam.write_fits(L,filename)
-        if not(self.take_darks):
-            D = np.zeros(np.shape(L), dtype=np.int32)
-        LD = np.array(L,dtype = np.int32) - np.array(D,dtype = np.int32)
-        if self.write_fits and self.take_darks:
-            self.cam.write_fits(LD,'_SBIG_diff_image.FITS')
-        
-        del L
-        del D
-        gc.collect()
-        
-        brightness = np.amax(LD)
-        if self.verbose:
-            print("Brightness: "+str(brightness))
-        if brightness < self.min_brightness:
-            warnings.warn('Spot seems dark (brightness = {})'.format(brightness))
-        if brightness > self.max_brightness:
-            warnings.warn('Spot may be over saturated (brightness = {}'.format(brightness))
-        
+
+        nexpose=3
+        while nexpose > 0:
+            L = self.cam.start_exposure()
+            L = self.flip(L)
+
+            if self.write_fits:
+                filename = '_SBIG_light_image.FITS'
+                try:
+                    os.remove(filename)
+                except:
+                    print('couldn''t remove file: ' + filename)
+                self.cam.write_fits(L,filename)
+            if not(self.take_darks):
+                D = np.zeros(np.shape(L), dtype=np.int32)
+            LD = np.array(L,dtype = np.int32) - np.array(D,dtype = np.int32)
+            if self.write_fits and self.take_darks:
+                self.cam.write_fits(LD,'_SBIG_diff_image.FITS')
+            
+            del L
+            del D
+            gc.collect()
+            
+            brightness = np.amax(LD)
+            if self.verbose:
+                print("Brightness: "+str(brightness))
+            if brightness < self.min_brightness:
+                warnings.warn('Spot seems dark (brightness = {})'.format(brightness))
+                nexpose=nexpose-1
+            else:
+                if brightness > self.max_brightness:
+                    warnings.warn('Spot may be over saturated (brightness = {}'.format(brightness))
+                nexpose=0
+                
+
+
         # call routine to determine multiple gaussian-fitted centroids
         centroiding_tic = time.time()
         xcen, ycen, fwhm = multicens.multiCens(LD, nWin, self.verbose, self.write_fits)
