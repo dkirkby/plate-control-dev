@@ -388,11 +388,13 @@ class PosTransforms(object):
         """
         (dtdp, was_not_list) = pc.listify(dtdp)
         dt = np.array(dtdp[0])
+        t = tp0[0] + dt
         wrapped_dt = dt - 360*np.sign(dt)
         wrapped_t = np.array(tp0[0]) + wrapped_dt
         t_range = self.shaft_ranges(range_wrap_limits)[pc.T]
-        if min(t_range) <= wrapped_t and wrapped_t <= max(t_range) and abs(wrapped_t) <= abs(dt):
-            dtdp[0] = dt.tolist()
+        if np.min(t_range) <= wrapped_t and wrapped_t <= np.max(t_range):
+            if (np.min(t_range) > t or np.max(t_range) < t) or np.abs(wrapped_dt) < np.abs(dt):
+                dtdp[0] = wrapped_dt.tolist()
         if was_not_list:
             dtdp = pc.delistify(dtdp)
         return dtdp
