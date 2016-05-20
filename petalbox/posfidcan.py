@@ -16,7 +16,8 @@ class PosFidCAN(object):
 	"""	Class for communicating with the DESI fiber positioner control (FPC) electronics
 		through Systec module via SocketCAN.
 	"""
-	__sleeptime = 0. #2  #0.002 	# sleep time after sending CAN command (in seconds) -- Joe found needed 0.2 sec here for consistent operation 2016-04-14
+	__sleeptime = 0.	# sleep time after sending CAN command (in seconds) -- Joe found needed 0.2 sec here for consistent operation 2016-04-14
+						# For FW 2.1 and later the sleep time can be safely set to 0 (MS 2016-
 	can_frame_fmt = "=IB3x8s"
 	#Create CAN socket and bind to interface channel='canX'
 	def __init__(self, channel='can0'):
@@ -45,37 +46,33 @@ class PosFidCAN(object):
 		"""
 		can_id, can_dlc, data = struct.unpack(self.can_frame_fmt , frame)
 		return (can_id, can_dlc, data[:can_dlc])
-	
- 
+	 
 	def send_command(self, posID = 0, ccom=8, data=''):
 		"""
 		Sends a CAN command. Does not wait to receive a response
 		"""
 		ext_id_prefix='8'
 		try:
-			posID2 = ext_id_prefix+(hex(posID).replace('0x','')+hex(ccom).replace('0x','').zfill(2)).zfill(7)
-			posID2 = int(posID2,16)
-			data=data.replace(',','')
-			
-			self.s.send(self.build_can_frame(posID2, bytearray.fromhex(data)))
-			
+			posID = ext_id_prefix+(hex(posID).replace('0x','')+hex(ccom).replace('0x','').zfill(2)).zfill(7)
+			posID = int(posID,16)
+			data=data.replace(',','')		
+			self.s.send(self.build_can_frame(posID, bytearray.fromhex(data)))			
 			time.sleep(self.__sleeptime)
 			return 'SUCCESS'
 		except socket.error:
 			print('Error sending CAN frame')
 			return 'FAILED' 
    
-
 	def send_command_byte(self, posID = 0, ccom=8, data=''):
 		"""
 		Sends a CAN command. Does not wait to receive a response
 		"""
 		ext_id_prefix='8'
 		try:
-			posID2 = ext_id_prefix+(hex(posID).replace('0x','')+hex(ccom).replace('0x','').zfill(2)).zfill(7)
-			posID2 = int(posID2,16)
+			posID = ext_id_prefix+(hex(posID).replace('0x','')+hex(ccom).replace('0x','').zfill(2)).zfill(7)
+			posID = int(posID,16)
 #			data=data.replace(',','')
-			self.s.send(self.build_can_frame(posID2, data))
+			self.s.send(self.build_can_frame(posID, data))
 			time.sleep(self.__sleeptime)
 			return 'SUCCESS'
 		except socket.error:
@@ -88,18 +85,15 @@ class PosFidCAN(object):
 		"""
 
 		try:
-
 			ext_id_prefix = '8'						#this is the extended id prefix			
-			posID2 = ext_id_prefix + (hex(posID).replace('0x','')+hex(ccom).replace('0x','').zfill(2)).zfill(7)			
-			posID2 = int(posID2,16)
+			posID = ext_id_prefix + (hex(posID).replace('0x','')+hex(ccom).replace('0x','').zfill(2)).zfill(7)			
+			posID = int(posID,16)
 			data=data.replace(',','')
 			
-			self.s.send(self.build_can_frame(posID2, bytearray.fromhex(data)))
+			self.s.send(self.build_can_frame(posID, bytearray.fromhex(data)))
 			
 			time.sleep(self.__sleeptime)			
-			
 			cf, addr = self.s.recvfrom(24)
-					
 			can_id, can_dlc, data = self.dissect_can_frame(cf)
 			can_id=can_id-0x80000000				#remove extended id prefix to give just a can id
 			intid=str(can_id)			
