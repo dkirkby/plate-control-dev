@@ -576,7 +576,7 @@ class PositionerMoveControl(object):
 		duty = str(hex(int(655.35*percent_duty)).replace('0x','')).zfill(4)
 		#TIMDIVint = int(duty_period*72000.)
 		#TIMDIV = str(hex(TIMDIVint).replace('0x', '')).zfill(8)
-		TIMDIV ='00001056' # hardcode this for the time being to 55 microsec. 
+		TIMDIV ='0FA0' # hardcode this for the time being to 55 microsec. 
 		#if(TIMDIVint <= 1650):
 		#	print("Duty period too small") 
 		#	return False 
