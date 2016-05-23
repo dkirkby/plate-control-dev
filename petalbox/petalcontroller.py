@@ -173,7 +173,7 @@ class PetalController(Application):
 
 		return self.SUCCESS
 
-	def set_fiducials(self, canbus, ids, percent_duty, duty_period):
+	def set_fiducials(self, ids, percent_duty):
 		"""
 		Set the ficucial power levels and period
 		Inputs include list with percentages, periods and ids
@@ -181,27 +181,28 @@ class PetalController(Application):
 		canbus	     ... string that specifies the can bus number, eg. 'can2'
 		ids          ... list of fiducial ids
 		percent_duty ... list of values, 0-100, 0 means off
-		duty_period  ... list of values, ms, time between duty cycles
+		
 		"""
-		if not isinstance(ids, list) or not isinstance(percent_duty,list) or not isinstance(duty_period,list):
+		if not isinstance(ids, list) or not isinstance(percent_duty,list):
 			rstring = 'set_fiducials: Invalid arguments'
 			self.error(rstring)
 			return 'FAILED: ' + rstring
 	
 		for id in range(len(ids)):
 			# assemble arguments for canbus/firmware function
-		
+			print('Here')
 			posid=int(ids[id])
+			print(posid)
 			canbus=self.__get_canbus(posid)
+			print(canbus)
+			duty = int(percent_duty[id])
+			
 		
-			percent_duty = int(percent_duty[id])
-			duty_period = int(duty_period[id])
-		
-			if self.pmc.set_fiducials(canbus, posid, percent_duty, duty_period):
+			if not self.pmc.set_fiducials(canbus, posid, duty):
 					if self.verbose: print('set_fiducials: Error')
 					return self.FAILED
 
-			if self.verbose:  print('ID: %s, Percent %s, Period %s' % (ids[id],percent_duty[id],duty_period[id]))
+			if self.verbose:  print('ID: %s, Percent %s' % (ids[id],percent_duty[id]))
 		return self.SUCCESS
 	
 	def send_tables(self, move_tables):
@@ -532,7 +533,7 @@ class PositionerMoveControl(object):
 		except:
 			return False  
 
-	def set_fiducials(self, canbus, posid, percent_duty, duty_period):
+	def set_fiducials(self, canbus, posid, percent_duty):
 		
 		"""	Constructs the command to send fiducial control signals to the theta/phi motor pads.
 			This also sets the device mode to fiducial (rather than positioner) in the firmware.
@@ -548,10 +549,11 @@ class PositionerMoveControl(object):
 
 		device_type = '01'  #fiducial = 01, positioner = 00
 		duty = str(hex(int(65535.*percent_duty/100)).replace('0x','')).zfill(4)
-		TIMDIVint = int(duty_period*72000.)
-		TIMDIV = str(hex(TIMDIVint).replace('0x', '')).zfill(8) 
-		if(TIMDIVint <= 1650):
-			return False
+		TIMDIV = '0FA0'
+		#TIMDIVint = int(duty_period*72000.)
+		#TIMDIV = str(hex(TIMDIVint).replace('0x', '')).zfill(8) 
+		#if(TIMDIVint <= 1650):
+		#	return False
 		print(canbus, posid, 16, device_type + duty + TIMDIV)
 		try:        
 			
