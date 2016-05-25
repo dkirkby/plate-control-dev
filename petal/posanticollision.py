@@ -42,25 +42,26 @@ def run_RRE_anticol(x,y,t,t2,p,p2,posmodels,method, avoidance, verbose):
     tables = []    
     for i,cur_posmodel in enumerate(posmodels):
         current_table = create_table(t[i],t2[i],p[i],p_in[i],p2[i],cur_posmodel,method)
-	# jhs -- we should have a table.store_orig_command() method here
+        # jhs -- we should have a table.store_orig_command() method here
+        # ajk -- for now I implemented  ^ in the posschedule call after this posanticollision returns
         tables.append(current_table)
 
+    # Check for collisions
+    earliest_collision, collision_indices, collision_types = check_for_collisions(t,p,pos_collider,tables)
+    if verbose:
+        print('Collisions at indices:    ',np.unique(collision_indices))
     # Set max number of anticollision correction iterations, then intiate loop
-    max_iterations = 6
-    must_correct_collisions = True
+    max_iterations = 10
     iterations = 0
-    while must_correct_collisions:
+
+    while len(collision_indices) > 0:
         iterations += 1
+        # Correct Collisions
+        tables = correct_collisions(tables,posmodels,collision_indices,collision_types, avoidance)
         # Check for collisions
-        earliest_collision, collision_index = check_for_collisions(t,p,pos_collider,tables)
-        # Check if still collisions to avoid
-        must_correct_collisions = (len(collision_index) > 0)        
-        if must_correct_collisions:
-            # Remedy the collisions
-            tables = correct_collisions(tables,posmodels,collision_index, avoidance)
-            
+        earliest_collision, collision_indices, collision_types = check_for_collisions(t,p,pos_collider,tables)                
         if verbose:
-            print('Collisions at indices:    ',np.unique(collision_index))
+            print('Collisions at indices:    ',np.unique(collision_indices))
         # Give up and stop trying if we exceed max iterations. Currently eturns instead of throwing error
         if iterations > max_iterations:
             print("Iterations for collision avoidance has exceeded %d attempts. Quitting Execution" % max_iterations)
@@ -90,9 +91,10 @@ def create_table(theta_start,theta_final, phi_start, phi_inner, phi_final, curre
 
 def check_for_collisions(thetas,phis,cur_poscollider,list_tables):
     # Use pre-made collision detection tools in poscollider class
-    earliest_collision = [np.inf]*len(cur_poscollider.posmodels)
+    earliest_collision = np.ones(len(cur_poscollider.posmodels))*np.inf
     # Store indices of colliding positioners
     collision_index = []
+    collision_type = []
     # Loop over all possible collisions
     for k in range(len(cur_poscollider.collidable_relations['A'])):
         # Get indices of current potential collision
@@ -119,14 +121,15 @@ def check_for_collisions(thetas,phis,cur_poscollider,list_tables):
                 #sweeps[AorB] = these_sweeps[i]
                 earliest_collision[AorB] = these_sweeps[i].collision_time
                 collision_index.append([A,B])
+                collision_type.append(these_sweeps[i].collision_case)
     # return the earliest collision time and collision indices
-    return earliest_collision, collision_index
+    return earliest_collision, np.asarray(collision_index), np.asarray(collision_type)
     
     
     
     
     
-def correct_collisions(tables,posmodels,collision_indices,avoidance_type='zeroth_order'):
+def correct_collisions(tables,posmodels,collision_indices,collision_types,avoidance_type='zeroth_order'):
     '''
         Wrapper function for correcting collisions. Calls the function 
         specified by 'avoidance_type' if it exists. 
@@ -154,17 +157,17 @@ def create_table_RRE(theta_start,theta_final, phi_start, phi_inner, phi_final, c
     
     # Find the theta and phi movements for the theta movement inside the safety envelope
     dtdp = current_positioner_model.trans.delta_posTP([theta_start,phi_inner],[theta_final,phi_inner], range_wrap_limits='targetable')
-    table.set_move(0, pc.T, dtdp[0]) # jhs -- should this be move #1, rather than 0?
-    table.set_move(0, pc.P, dtdp[1]) # jhs -- should this be move #1, rather than 0?
-    table.set_prepause (0, 0.0)
-    table.set_postpause(0, 0.0)
+    table.set_move(1, pc.T, dtdp[0]) 
+    table.set_move(1, pc.P, dtdp[1]) 
+    table.set_prepause (1, 0.0)
+    table.set_postpause(1, 0.0)
     
     # Find the theta and phi movements for the phi extension movement
     dtdp = current_positioner_model.trans.delta_posTP([theta_final,phi_inner],[theta_final,phi_final], range_wrap_limits='targetable')
-    table.set_move(0, pc.T, dtdp[0]) # jhs -- should this be move #2, rather than 0?
-    table.set_move(0, pc.P, dtdp[1]) # jhs -- should this be move #2, rather than 0?
-    table.set_prepause (0, 0.0)
-    table.set_postpause(0, 0.0)
+    table.set_move(2, pc.T, dtdp[0])
+    table.set_move(2, pc.P, dtdp[1])
+    table.set_prepause (2, 0.0)
+    table.set_postpause(2, 0.0)
     
     # return this positioners rre movetable
     return table
@@ -178,16 +181,23 @@ def create_table_RRE(theta_start,theta_final, phi_start, phi_inner, phi_final, c
 def correct_collisions_zerothorder(tables,posmodels,collision_indices):
     # Get a unique list of all indices causing problems
     unique_indices = np.unique(collision_indices)
-    # Find the maximum amount of time any positioner takes
-    total_times = [np.sum(tables[i].full_table['stats']['net_time']) for i in range(len(tables))]
-    max_time = np.max(total_times)
     
-    # For the troublemaker indices, simply don't move them
+    nrows = np.max([len(table.rows) for table in tables])
+
+    max_times = np.zeros(nrows)     
+    for table in tables:
+        for i in range(len(table.rows)):
+            time = table.rows[i].data['move_time'] + table.rows[i].data['prepause'] + table.rows[i].data['postpause']
+            if time > max_times[i]:
+                max_times[i] = time
+            
+    # For the colliding indices, simply don't move them
     for index in unique_indices:
         table = posmovetable.PosMoveTable(posmodels[index])
-        table.set_move(0, pc.T, 0.)
-        table.set_move(0, pc.P, 0.)
-        table.set_prepause (0, max_time)
-        table.set_postpause(0, 0.0)
+        for ind in range(len(tables[index].rows)):
+            table.set_move(ind, pc.T, 0.)
+            table.set_move(ind, pc.P, 0.)
+            table.set_prepause (ind, max_times[ind])
+            table.set_postpause(ind, 0.0)
         tables[index] = table
     return tables
