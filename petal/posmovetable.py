@@ -18,6 +18,7 @@ class PosMoveTable(object):
         if not(posmodel):
             posmodel = posmodel.PosModel()
         self.posmodel = posmodel         # the particular positioner this table applies to
+        self.log_note = ''               # optional note string which user can associate with this table, to be stored in any logging
         self.rows = []                   # internal representation of the move data
         self.rows_extra = []             # auto-generated backlash and final creep rows get stored here
         self.should_antibacklash = self.posmodel.state.read('ANTIBACKLASH_ON')
@@ -168,11 +169,12 @@ class PosMoveTable(object):
         table = {'posid':'','nrows':0,'dT':[],'dP':[],'motor_steps_T':[],'motor_steps_P':[],
                  'Tdot':[],'Pdot':[],'speed_mode_T':[],'speed_mode_P':[],
                  'prepause':[],'move_time':[],'postpause':[],
-                 'command':[],'cmd_val1':[],'cmd_val2':[]}
+                 'command':[],'cmd_val1':[],'cmd_val2':[],
+                 'log_note':''}
         if output_type == 'schedule':
             remove_keys = ['motor_steps_T','motor_steps_P','speed_mode_T','speed_mode_P','command','cmd_val1','cmd_val2']
         elif output_type == 'hardware':
-            remove_keys = ['posid','dT','dP','Tdot','Pdot','prepause','command','cmd_val1','cmd_val2','stats']
+            remove_keys = ['posid','dT','dP','Tdot','Pdot','prepause','command','cmd_val1','cmd_val2','stats','log_note']
         elif output_type == 'cleanup':
             remove_keys = ['motor_steps_T','motor_steps_P','speed_mode_T','speed_mode_P','Tdot','Pdot','prepause','postpause','move_time']
         elif output_type == 'full':
@@ -219,6 +221,7 @@ class PosMoveTable(object):
             table['posid'] = self.posmodel.posid
         table['nrows'] = len(table['dT'])
         table['stats'] = self._gather_stats(table)
+        table['log_note'] = self.log_note
         restricted_table = table.copy()
         for key in remove_keys:
             restricted_table.pop(key)

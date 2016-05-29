@@ -19,7 +19,7 @@ class PosSchedule(object):
         self.move_tables = []
         self.requests = []
 
-    def request_target(self, pos, uv_type, u, v):
+    def request_target(self, pos, uv_type, u, v, log_note=''):
         """Adds a request to the schedule for a given positioner to move to the
         target position (u,v) or by the target distance (du,dv) in the coordinate
         system indicated by uv_type.
@@ -28,6 +28,7 @@ class PosSchedule(object):
             uv_type ... string, 'QS', 'dQdS', 'obsXY', 'posXY', 'dXdY', 'obsTP', 'posTP' or 'dTdP'
                   u ... float, value of q, dq, x, dx, t, or dt
                   v ... float, value of s, ds, y, dy, p, or dp
+           log_note ... optional string to store alongside the requested move in the log data
 
         A schedule can only contain one target request per positioner at a time.
         """
@@ -65,7 +66,8 @@ class PosSchedule(object):
                           'posmodel' : posmodel,
                            'command' : uv_type,
                           'cmd_val1' : u,
-                          'cmd_val2' : v}
+                          'cmd_val2' : v,
+                          'log_note' : log_note}
         self.requests.append(new_request)
 
     def add_table(self, move_table):
@@ -157,6 +159,7 @@ class PosSchedule(object):
             table.set_prepause (0, 0.0)
             table.set_postpause(0, 0.0)
             table.store_orig_command(0, req['command'], req['cmd_val1'], req['cmd_val2'])
+            table.log_note += (' ' if table.log_note else '') + req['log_note']
             self.move_tables.append(table)
 
     def _schedule_with_anticollision(self):
@@ -171,6 +174,7 @@ class PosSchedule(object):
             print("Number of requests: "+str(len(self.requests)))
 
         xabs = []; yabs = []; tstarts = []; pstarts = []; ttargs = []; ptargs = []; posmodels = []
+        log_notes = {}
         for request in self.requests:
             posmodel = request['posmodel']
             xabs.append(posmodel.state.read('OFFSET_X'))
@@ -182,7 +186,11 @@ class PosSchedule(object):
             ptargs.append(ptarg)
             ttargs.append(ttarg)
             posmodels.append(posmodel)
+            log_notes[posmodel] = request['log_note']
 
         method = 'RRE'
         avoidance_technique = 'zeroth_order'
         self.move_tables = anticollision.run_anticol(xabs,yabs,tstarts,ttargs,pstarts,ptargs,posmodels,method,avoidance_technique,verbose)
+        
+        for table in self.move_tables:
+            table.log_note += (' ' if table.log_note else '') + log_notes[table.posmodel]

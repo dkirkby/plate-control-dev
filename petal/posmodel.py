@@ -186,7 +186,7 @@ class PosModel(object):
             move_data['move_time']    = (abs(move_data['motor_step'])*self._stepsize_cruise + 4*self._spinupdown_distance) / move_data['speed']
         return move_data
 
-    def postmove_cleanup(self, cleanup_table, lognote=''):
+    def postmove_cleanup(self, cleanup_table):
         """Always perform this after positioner physical moves have been completed,
         to update the internal tracking of shaft positions and variables.
         """
@@ -204,7 +204,7 @@ class PosModel(object):
         self.state.write('TOTAL_CREEP_MOVES_T', self.state.read('TOTAL_CREEP_MOVES_T') + cleanup_table['stats']['TOTAL_CREEP_MOVES_T'])
         self.state.write('TOTAL_CREEP_MOVES_P', self.state.read('TOTAL_CREEP_MOVES_P') + cleanup_table['stats']['TOTAL_CREEP_MOVES_P'])
         self.state.write('TOTAL_MOVE_SEQUENCES', self.state.read('TOTAL_MOVE_SEQUENCES') + 1)
-        self.state.log_unit(lognote)
+        self.state.log_unit(cleanup_table['log_note'])
 
 
 class Axis(object):

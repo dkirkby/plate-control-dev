@@ -48,43 +48,65 @@ class Petal(object):
 
 # METHODS FOR POSITIONER CONTROL
 
-    def request_targets(self, pos, commands, values):
-        """Input a list of positioners and corresponding move targets to the schedule.
-        This method is for requests to perform complete repositioning sequence to get
-        to the targets.
+    def request_targets(self, requests):
+        """Put in requests to the scheduler for specific positioners to move to specific targets.
+        
+        This method is for requesting that each robot does a complete repositioning sequence to get
+        to the desired target. This means:
 
-            - Anticollision is enabled.
+            - Anticollision is possible. (See schedule_moves method.)
             - Only one requested target per positioner.
             - Theta angles are wrapped across +/-180 deg
             - Contact of hard limits is prevented.
+        
+        INPUT:
+            requests ... dictionary of dictionaries
+            
+                dictionary format:
+                
+                    key     ... pos_id (referencing a single subdictionary for that positioner)
+                    value   ... subdictionary (see below)
 
-        INPUTS:
-            pos      ... list of positioner ids
-            commands ... corresponding list of move command strings, each element is 'QS', 'dQdS', 'obsXY', 'posXY', 'dXdY', 'obsTP', 'posTP' or 'dTdP'
-            values   ... corresponding list of move arguements, in the form [[u1,v1],[u2,v2],...]
-                         ... 1st move arguments are values for q, dq, x, dx, t, or dt
-                         ... 2nd move arguments are values for s, ds, y, dy, p, or dp
-
-        It is allowed to argue a list of positioner ids, and only one command and one value. Then
-        this command and value will be done identically on all the positioners.
+                subdictionary format:
+                
+                    KEYS        VALUES
+                    ----        ------
+                    command     move command string
+                                    ... valid values are 'QS', 'dQdS', 'obsXY', 'posXY', 'dXdY', 'obsTP', 'posTP' or 'dTdP'
+                    target      pair of target coordinates or deltas, of the form [u,v]
+                                    ... the elements u and v can be floats or integers
+                                    ... 1st element (u) is the value for q, dq, x, dx, t, or dt
+                                    ... 2nd element (v) is the value for s, ds, y, dy, p, or dp
+                    log_note    optional string to store alongside in the log data for this move
+                                    ... gets stored in the 'NOTE' field
+                                    ... if the subdict contains no note field, then '' will be added automatically
+            
+        OUTPUT:
+            Same dictionary, but with the following new entries in each subdictionary:
+            
+                    KEYS        VALUES
+                    ----        ------
+                    posmodel    object handle for the posmodel corresponding to pos_id
+                    log_note    same as log_note above, or '' is added automatically if no note was argued in requests
+            
+            In cases where this is a second request to the same robot (which is not allowed), the
+            subdictionary will be deleted from the return.            
         """
-        pos = pc.listify(pos,True)[0]
-        commands = pc.listify(commands,True)[0]
-        values = pc.listify2d(values)
-        if len(commands) != len(pos):
-            commands = [commands[0]]*len(pos)
-        if len(values) != len(pos):
-            values = [values[0]]*len(pos)
-        for i in range(len(pos)):
-            posmodel = self.get_model_for_pos(pos[i])
-            if self.schedule.already_requested(posmodel):
-                print('Positioner ' + str(posmodel.posid) + ' already has a target scheduled. Extra target request ' + str(commands[i]) + '(' + str(values[i][0]) + ',' + str(values[i][1]) + ') ignored')
+        for pos_id in requests.keys():
+            requests[pos_id]['posmodel'] = self.get_model_for_pos(pos_id)
+            if 'log_note' not in requests[pos_id]:
+                requests[pos_id]['log_note'] = ''
+            if self.schedule.already_requested(requests[pos_id]['posmodel']):
+                print('Positioner ' + str(pos_id) + ' already has a target scheduled. Extra target request ' + str(requests[pos_id]['command']) + '(' + str(requests[pos_id]['target'][0]) + ',' + str(requests[pos_id]['target'][1]) + ') ignored')
+                del requests[pos_id]
             else:
-                self.schedule.request_target(posmodel, commands[i], values[i][0], values[i][1])
+                self.schedule.request_target(requests[pos_id]['posmodel'], requests[pos_id]['command'], requests[pos_id]['target'][0], requests[pos_id]['target'][1], requests[pos_id]['log_note'])
+        return requests
 
-    def request_direct_dtdp(self, pos, dtdp, cmd_prefix=''):
-        """Input a list of positioners and corresponding move targets to the schedule.
-        This method is for direct requests of rotations by the theta and phi shafts.
+    def request_direct_dtdp(self, requests, cmd_prefix=''):
+        """Put in requests to the scheduler for specific positioners to move by specific rotation
+        amounts at their theta and phi shafts.
+
         This method is generally recommended only for expert usage.
 
             - Anticollision is disabled.
@@ -92,30 +114,57 @@ class Petal(object):
             - Theta angles are not wrapped across +/-180 deg
             - Contact of hard limits is allowed.
 
-        INPUTS:
-            pos   ... list of positioner ids
-            dtdp  ... corresponding list of delta theta and delta phi values
-                      ... list is in the form [[dt1,dp1],[dt2,dp2],...]
+        INPUT:
+            requests ... dictionary of dictionaries
+            
+                dictionary format:
+                
+                    key     ... pos_id (referencing a single subdictionary for that positioner)
+                    value   ... subdictionary (see below)
 
-        The optional argument cmd_prefix allows adding a descriptive string to the log.
-        
-        It is allowed to argue a list of positioner ids, and only one dtdp. Then this
-        identical dtdp will be done on all the positioners.
+                subdictionary format:
+                
+                    KEYS        VALUES
+                    ----        ------
+                    target      pair of target deltas, of the form [dT,dP]
+                                    ... the elements dT and dP can be floats or integers
+                    log_note    optional string to store alongside in the log data for this move
+                                    ... gets embedded in the  in the 'NOTE' field
+                                    ... if the subdict contains no note field, then '' will be added automatically
+            
+            cmd_prefix ... Optional argument, allows embedding a descriptive string to the log, embedded
+                           in the 'LAST_MOVE_CMD' field. This is different from log_note. Generally,
+                           log_note is meant for users, whereas cmd_prefix is meant for internal lower-
+                           level detailed logging.
+
+        OUTPUT:
+            Same dictionary, but with the following new entries in each subdictionary:
+            
+                    KEYS        VALUES
+                    ----        ------
+                    command     'direct_dTdP'
+                    posmodel    object handle for the posmodel corresponding to pos_id
+                    log_note    same as log_note above, or '' is added automatically if no note was argued in requests
+                    
+        It is allowed to repeatedly request_direct_dtdp on the same positioner, in cases where one
+        wishes a sequence of theta and phi rotations to all be done in one shot. (This is unlike the
+        request_targets command, where only the first request to a given positioner would be valid.)
         """
-        pos = pc.listify(pos,True)[0]
-        dtdp = pc.listify2d(dtdp)
-        if len(dtdp) != len(pos):
-            dtdp = [dtdp[0]]*len(pos)
-        for i in range(len(pos)):
-            posmodel = self.get_model_for_pos(pos[i])
+        for pos_id in requests.keys():
+            requests[pos_id]['posmodel'] = self.get_model_for_pos(pos_id)
+            if 'log_note' not in requests[pos_id]:
+                requests[pos_id]['log_note'] = ''
             table = posmovetable.PosMoveTable(posmodel)
-            table.set_move(0, pc.T, dtdp[i][0])
-            table.set_move(0, pc.P, dtdp[i][1])
-            table.store_orig_command(0,cmd_prefix + 'direct_dtdp',dtdp[i][0],dtdp[i][1])
+            table.set_move(0, pc.T, requests[pos_id]['target'][0])
+            table.set_move(0, pc.P, requests[pos_id]['target'][1])
+            cmd_str = (cmd_prefix + ' ' if cmd_prefix else '') + 'direct_dtdp'
+            table.store_orig_command(0,cmd_str,requests[pos_id]['target'][0],requests[pos_id]['target'][1])
+            table.log_note += (' ' if table.log_note else '') + requests[pos_id]['log_note']
             table.allow_exceed_limits = True
             self.schedule.add_table(table)
+        return requests            
 
-    def request_limit_seek(self, pos, axisid, direction, anticollision=True, cmd_prefix=''):
+    def request_limit_seek(self, pos, axisid, direction, anticollision=True, cmd_prefix='', log_note=''):
         """Request hardstop seeking sequence for positioners in list pos.
         The optional argument cmd_prefix allows adding a descriptive string to the log.
         This method is generally recommended only for expert usage.
@@ -143,7 +192,9 @@ class Petal(object):
             dist[axisid] = search_dist
             table.set_move(0,pc.T,dist[0])
             table.set_move(0,pc.P,dist[1])
-            table.store_orig_command(0,cmd_prefix + 'limit seek',direction*(axisid == pc.T),direction*(axisid == pc.P))
+            cmd_str = (cmd_prefix + ' ' if cmd_prefix else '') + 'limit seek'
+            table.store_orig_command(0,cmd_str,direction*(axisid == pc.T),direction*(axisid == pc.P))
+            table.log_note += (' ' if table.log_note else '') + log_note
             p.axis[axisid].postmove_cleanup_cmds += 'self.axis[' + repr(axisid) + '].total_limit_seeks += 1\n'
             self.schedule.add_table(table)
 
@@ -159,12 +210,11 @@ class Petal(object):
         dir = [0,0]
         dir[pc.P] = +1 # force this, because anticollision logic depends on it
         for p in posmodels:
-            self.request_limit_seek(p, pc.P, dir[pc.P], anticollision=True, cmd_prefix='homing P ')
+            self.request_limit_seek(p, pc.P, dir[pc.P], anticollision=True, cmd_prefix='P', log_note='homing')
         self.schedule_moves(anticollision=True)
-        # retraction_time = self.schedule.total_scheduled_time()
         for p in posmodels:
             dir[pc.T] = p.axis[pc.T].principle_hardstop_direction
-            self.request_limit_seek(p, pc.T, dir[pc.T], anticollision=False, cmd_prefix='homing T ')
+            self.request_limit_seek(p, pc.T, dir[pc.T], anticollision=False, cmd_prefix='T') # no repetition of log note here
             for i in [pc.T,pc.P]:
                 axis_cmd_prefix = 'self.axis[' + repr(i) + ']'
                 if dir[i] < 0:
@@ -175,7 +225,7 @@ class Petal(object):
                     hardstop_debounce[i] = p.axis[i].hardstop_debounce[1]
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + '.maxpos\n'
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = +1.0\n'
-            self.request_direct_dtdp(p, hardstop_debounce, cmd_prefix='debounce ')
+            self.request_direct_dtdp(p, hardstop_debounce, cmd_prefix='debounce')
 
     def schedule_moves(self,anticollision=None):
         """Generate the schedule of moves and submoves that get positioners
@@ -207,21 +257,6 @@ class Petal(object):
         self._wait_while_moving()
         self._postmove_cleanup()
 
-    def quick_move(self, pos, commands, values):
-        """Convenience wrapper to request, schedule, send, and execute a list of moves
-        to a list of positioners, all in one shot.
-        """
-        self.request_targets(pos, commands, values)
-        self.schedule_send_and_execute_moves()
-
-    def quick_dtdp(self, pos, dtdp, cmd_prefix=''):
-        """Convenience wrapper to request, schedule, send, and execute a list of direct
-        delta theta, delta phi moves. There is NO anti-collision calculation. This
-        method is intended for expert usage only.
-        """
-        self.request_direct_dtdp(pos, dtdp, cmd_prefix)
-        self.schedule_send_and_execute_moves()
-
     def schedule_send_and_execute_moves(self):
         """Convenience wrapper to schedule, send, and execute the pending requested
         moves, all in one shot.
@@ -235,6 +270,41 @@ class Petal(object):
         """
         self.send_move_tables()
         self.execute_moves()
+
+    def quick_move(self, pos_ids, command, target, log_note=''):
+        """Convenience wrapper to request, schedule, send, and execute a single move command, all in
+        one shot. You can argue multiple pos_ids if you want (as a list), though note they will all
+        get the same command and target sent to them. So for something like a local (theta,phi) coordinate
+        this often makes sense, but not for a global coordinate.
+
+        INPUTS:     pos_ids   ... either a single pos_id or a list of pos_ids
+                    command   ... string like those usually put in the requests dictionary (see request_targets method)
+                    target    ... [u,v] values, note that all positioners here get sent the same [u,v] here
+                    log_note  ... optional string to include in the log file
+        """
+        requests = {}
+        pos_ids = pc.listify(pos_ids,True)[0]
+        for pos_id in pos_ids:
+            requests[pos_id] = {'command':command, 'target':target, 'log_note':log_note}
+        self.request_targets(requests)
+        self.schedule_send_and_execute_moves()
+
+    def quick_direct_dtdp(self, pos_ids, dtdp, log_note=''):
+        """Convenience wrapper to request, schedule, send, and execute a single move command for a
+        direct (delta theta, delta phi) relative move. There is NO anti-collision calculation. This
+        method is intended for expert usage only. You can argue multiple pos_ids if you want (as a
+        list), though note they will all get the same (dt,dp) sent to them.
+        
+        INPUTS:     pos_ids   ... either a single pos_id or a list of pos_ids
+                    dtdp      ... [dt,dp], note that all pos_ids get sent the same [dt,dp] here. i.e. dt and dp are each just one number
+                    log_note  ... optional string to include in the log file
+        """
+        requests = {}
+        pos_ids = pc.listify(pos_ids,True)[0]
+        for pos_id in pos_ids:
+            requests[pos_id] = {'target':dtdp, 'log_note':log_note}
+        self.request_direct_dtdp(requests)
+        self.schedule_send_and_execute_moves()
 
     def clear_schedule(self):
         """Clear out any existing information in the move schedule.

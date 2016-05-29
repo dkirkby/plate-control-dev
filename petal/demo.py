@@ -1,7 +1,6 @@
 import petal
 import time
 import posconstants as pc
-import sys
 
 """Demonstrator script for initializing / moving positioner.
 """
@@ -13,8 +12,6 @@ fid_ids = []
 petal_id = 3
 ptl = petal.Petal(petal_id, pos_ids, fid_ids)
 ptl.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
-
-n = len(pos_ids)
 
 print('INITIAL POSITION')
 for pos_id in pos_ids:
@@ -45,65 +42,44 @@ if should_home:
     print('MOVE: homing')
     # ptl.set(key='CREEP_TO_LIMITS',value=True) # to force only creeping to hard stops
     ptl.request_homing(pos_ids)
-
     ptl.schedule_send_and_execute_moves()
 else:
     ptl.set(key=['POS_T','POS_P'],value=[-180,180]) # faking having just homed
 
 # this is an 'expert' use function, which instructs the theta and phis axes to go some distances with no regard for anticollision or hardstops
 if should_direct_dtdp:
-    dtdp = [[270,0], [0,-60], [-180,30]]
-    for i in range(len(dtdp)):
-        values = dtdp[i]
-        print('MOVE: direct dtdp (' + str(values[0]) + ',' + str(values[1]) + ')')
-        ptl.quick_dtdp(pos_ids, [values]*n)
+    targets = [[270,0], [0,-60], [-180,30]]
+    for t in targets:
+        print('MOVE: direct dtdp (' + str(t[0]) + ',' + str(t[1]) + ')')
+        requests = {}
+        for pos_id in pos_ids:
+            requests[pos_id] = {'target':t, 'log_note':'demo direct_dtdp point ' + str(targets.index(t))}
+        ptl.quick_dtdp(requests)
 
 # the remainder below are for general usage
+# first I defined here a little common wrapper function for generating the request argument dictionary that gets sent to petal
+def general_move(command,targets):
+    for t in targets:
+        print('MOVE: ' + command + ' (' + str(t[0]) + ',' + str(t[1]) + ')')
+        requests = {}
+        for pos_id in pos_ids:
+            requests[pos_id] = {'command':command, 'target':t, 'log_note':'demo ' + command + ' point ' + str(targets.index(t))}
+        ptl.quick_move(requests)
+
 if should_move_qs:
-    QS = [[0,3],[90,3],[-90,3],[60,6],[0,0]]
-    command = 'QS'
-    for i in range(len(QS)):
-        values = QS[i]
-        print('MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
-        ptl.quick_move(pos_ids, [command]*n, [values]*n)
+    general_move('QS',[[0,3],[90,3],[-90,3],[60,6],[0,0]])
 
 if should_move_dqds:
-    dQdS = [[0,3], [90,-3], [-180,6], [90,6]]
-    command = 'dQdS'
-    for i in range(len(dQdS)):
-        values = dQdS[i]
-        print('MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
-        ptl.quick_move(pos_ids, [command]*n, [values]*n)
+    general_move('dQdS',[[0,3], [90,-3], [-180,6], [90,6]])
 
 if should_move_xy:
-    #xy = [[2.5,0], [0,2.5], [-5,0], [0,-5], [-5.99,0], [6,0], [0,8], [0,0]]
-    xy = [[-4,-4], [-4,0], [-4,4], [0,-4], [0,0], [0,4], [4,-4], [4,0], [4,4]]
-    command = 'posXY'
-    for i in range(len(xy)):
-        values = xy[i]
-        print('MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
-        ptl.quick_move(pos_ids, [command]*n, [values]*n)
+    general_move('posXY',[[-4,-4], [-4,0], [-4,4], [0,-4], [0,0], [0,4], [4,-4], [4,0], [4,4]])
 
 if should_move_dxdy:
-    dxdy = [[2.5,0], [2.5,0], [-10,0], [5,-5], [0,5]]
-    command = 'dXdY'
-    for i in range(len(dxdy)):
-        values = dxdy[i]
-        print('MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
-        ptl.quick_move(pos_ids, [command]*n, [values]*n)
+    general_move('dXdY',[[2.5,0], [2.5,0], [-10,0], [5,-5], [0,5]])
 
 if should_move_tp:
-    tp = [[-90,90], [0,90], [90,90], [0,180]]
-    command = 'posTP'
-    for i in range(len(tp)):
-        values = tp[i]
-        print('MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
-        ptl.quick_move(pos_ids, [command]*n, [values]*n)
+    general_move('posTP',[[-90,90], [0,90], [90,90], [0,180]])
 
 if should_move_dtdp:
-    dtdp = [[180,0], [-90,-90],[180,60],[-90,30]]
-    command = 'dTdP'
-    for i in range(len(dtdp)):
-        values = dtdp[i]
-        print('MOVE: ' + command + ' (' + str(values[0]) + ',' + str(values[1]) + ')')
-        ptl.quick_move(pos_ids, command, values)
+    general_move('dTdP',[[180,0], [-90,-90],[180,60],[-90,30]]) # this is different from 'direct' dTdP. here, the dtdp is treated like any other general move, and anticollision calculations are allowed

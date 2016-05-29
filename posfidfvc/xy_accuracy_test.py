@@ -114,43 +114,42 @@ if should_do_accuracy_test:
         file.write(move_log_header)
         file.close()
 
-    # transform test grid to each positioner's global position
+    # transform test grid to each positioner's global position, and create all the move request dictionaries
     posmodels = ptl.get(pos_ids)
-    all_global_targets = []
+    all_targets = []
     for local_target in local_targets:
-        these_global_targets = []
+        these_targets = {}
         for posmodel in posmodels:
-            these_global_targets = pc.concat_lists_of_lists(these_global_targets, posmodel.trans.posXY_to_obsXY(local_target))
-        all_global_targets.append(these_global_targets)
+            these_targets[pos_id]['command'] = 'obsXY'
+            these_targets[pos_id]['target'] = posmodel.trans.posXY_to_obsXY(local_target)
+        all_targets.append(these_targets)
 
     # initialize some data structures for storing test data
     targ_num = 0
-    all_meas_data_by_target = []
-    all_meas_data_by_pos_id = {}
+    all_meas_data = {}
     for pos_id in pos_ids:
-        all_meas_data_by_pos_id[pos_id] = {'targ_obsXY': [],
-                                           'meas_obsXY': [[] for i in submove_idxs],
-                                           'errXY':      [[] for i in submove_idxs],
-                                           'err2D':      [[] for i in submove_idxs]}
+        all_meas_data[pos_id] = {'targ_obsXY': [],
+                                 'meas_obsXY': [[] for i in submove_idxs],
+                                 'errXY':      [[] for i in submove_idxs],
+                                 'err2D':      [[] for i in submove_idxs]}
     start_timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
     start_cycles = ptl.get(pos_ids,'TOTAL_MOVE_SEQUENCES')
     
     # run the test
-    for these_targets in all_global_targets:
+    for these_targets in all_targets:
         targ_num += 1
-        print('\nMEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_global_targets)))
+        print('\nMEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets)))
         print('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
         this_timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
-        these_meas_data = m.move_and_correct(pos_ids, these_targets, coordinates='obsXY', num_corr_max=num_corr_max)
+        m.move_and_correct(these_targets, num_corr_max=num_corr_max)
         
         # store this set of measured data
-        all_meas_data_by_target.append(these_meas_data)
-        for pos_id in these_meas_data.keys():
-            all_meas_data_by_pos_id[pos_id]['targ_obsXY'].append(these_meas_data[pos_id]['targ_obsXY'])
+        for pos_id in these_targets.keys():
+            all_meas_data[pos_id]['targ_obsXY'].append(these_targets[pos_id]['targ_obsXY'])
             for i in submove_idxs:
-                all_meas_data_by_pos_id[pos_id]['meas_obsXY'][i].append(these_meas_data[pos_id]['meas_obsXY'][i])
-                all_meas_data_by_pos_id[pos_id]['errXY'][i].append(     these_meas_data[pos_id]['errXY'][i])
-                all_meas_data_by_pos_id[pos_id]['err2D'][i].append(     these_meas_data[pos_id]['err2D'][i])                    
+                all_meas_data[pos_id]['meas_obsXY'][i].append(these_targets[pos_id]['meas_obsXY'][i])
+                all_meas_data[pos_id]['errXY'][i].append(     these_targets[pos_id]['errXY'][i])
+                all_meas_data[pos_id]['err2D'][i].append(     these_targets[pos_id]['err2D'][i])                    
         
         # update summary data log
         for pos_id in pos_ids:
@@ -160,7 +159,7 @@ if should_do_accuracy_test:
             summary_log_data += 'cycles at finish,' + str(ptl.get(pos_id,'TOTAL_MOVE_SEQUENCES')) + '\n'
             summary_log_data += 'start time,' + start_timestamp + '\n'
             summary_log_data += 'finish time,' + this_timestamp + '\n'
-            summary_log_data += 'num targets,' + str(len(all_meas_data_by_target)) + '\n'
+            summary_log_data += 'num targets,' + str(len(all_targets)) + '\n'
             summary_log_data += 'num corrections max,' + str(num_corr_max) + '\n'
             summary_log_data += 'submove index -->'
             for i in submove_idxs: summary_log_data += ',' + str(i)
@@ -168,7 +167,7 @@ if should_do_accuracy_test:
             for calc in ['max','min','mean','rms']:
                 summary_log_data += calc + '(um)'
                 for i in submove_idxs:
-                    this_submove_data = all_meas_data_by_pos_id[pos_id]['err2D'][i]
+                    this_submove_data = all_meas_data[pos_id]['err2D'][i]
                     if calc == 'max':    summary_log_data += ',' + str(np.max(this_submove_data) * um_scale)
                     elif calc == 'min':  summary_log_data += ',' + str(np.min(this_submove_data) * um_scale)
                     elif calc == 'mean': summary_log_data += ',' + str(np.mean(this_submove_data) * um_scale)
@@ -180,16 +179,16 @@ if should_do_accuracy_test:
             file.close()
 
         # update move data log
-        for pos_id in these_meas_data.keys():
+        for pos_id in these_targets.keys():
             row = this_timestamp
             row += ',' + str(ptl.get(pos_id,'TOTAL_MOVE_SEQUENCES'))
-            row += ',' + str(these_meas_data[pos_id]['targ_obsXY'][0])
-            row += ',' + str(these_meas_data[pos_id]['targ_obsXY'][1])
-            for submove_data in these_meas_data[pos_id]['meas_obsXY']:
+            row += ',' + str(these_targets[pos_id]['targ_obsXY'][0])
+            row += ',' + str(these_targets[pos_id]['targ_obsXY'][1])
+            for submove_data in these_targets[pos_id]['meas_obsXY']:
                 row += ',' + str(submove_data[0]) + ',' + str(submove_data[1])
-            for submove_data in these_meas_data[pos_id]['errXY']:
+            for submove_data in these_targets[pos_id]['errXY']:
                 row += ',' + str(submove_data[0]) + ',' + str(submove_data[1])
-            for submove_data in these_meas_data[pos_id]['err2D']:
+            for submove_data in these_targets[pos_id]['err2D']:
                 row += ',' + str(submove_data)
             row += '\n'
             file = open(move_log_name(pos_id),'a')
@@ -197,7 +196,7 @@ if should_do_accuracy_test:
             file.close()
     
     # make summary plots showing the targets and measured positions
-    for pos_id in all_meas_data_by_pos_id.keys():
+    for pos_id in all_meas_data.keys():
         posmodel = ptl.get(pos_id)
         title = log_timestamp + log_suffix
         center = [ptl.get(pos_id,'OFFSET_X'),ptl.get(pos_id,'OFFSET_Y')]
@@ -206,7 +205,7 @@ if should_do_accuracy_test:
         theta_range = [theta_min,theta_max]
         r1 = ptl.get(pos_id,'LENGTH_R1')
         r2 = ptl.get(pos_id,'LENGTH_R2')
-        pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_meas_data_by_pos_id[pos_id],center,theta_range,r1,r2,title)
+        pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_meas_data[pos_id],center,theta_range,r1,r2,title)
             
 script_exec_time = time.time() - script_start_time
 print('Total test time: ' + format(script_exec_time/60/60,'.1f') + 'hrs')
