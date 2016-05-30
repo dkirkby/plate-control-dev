@@ -403,8 +403,8 @@ class Petal(object):
     def expected_current_position(self,posid=None,key=''):
         """Retrieve the current position, for a positioner identied by posid, according
         to the internal tracking of its posmodel object. Valid keys are:
-            'Q', 'S', 'flatX', 'flatY', 'obsX', 'obsY', 'obsT', 'obsP', 'shaftT', 'shaftP', 'motorT', 'motorP'
-            'QS','flatXY','obsXY','obsTP','shaftTP','motorTP'
+            'Q', 'S', 'flatX', 'flatY', 'obsX', 'obsY', 'obsT', 'obsP', 'posT', 'posP', 'motT', 'motP'
+            'QS','flatXY','obsXY','obsTP','posTP','motTP'
         See comments in posmodel.py for explanation of these values.
 
         If no posid is specified, then a single value, or list of all positioners' values is returned.
@@ -435,10 +435,10 @@ class Petal(object):
                 vals.append([this_val['obsX'],this_val['obsY']])
             elif key[i] == 'obsTP':
                 vals.append([this_val['obsT'],this_val['obsP']])
-            elif key[i] == 'shaftTP':
-                vals.append([this_val['shaftT'],this_val['shaftP']])
+            elif key[i] == 'posTP':
+                vals.append([this_val['posT'],this_val['posP']])
             elif key[i] == 'motorTP':
-                vals.append([this_val['motorT'],this_val['motorP']])
+                vals.append([this_val['motT'],this_val['motP']])
             else:
                 vals.append(this_val[key[i]])
         if was_not_list:

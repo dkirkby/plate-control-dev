@@ -18,15 +18,14 @@ for pos_id in pos_ids:
     print(ptl.get(pos_id).expected_current_position_str)
 
 # demo script flags
-should_flash       = True
-should_home        = True
-should_direct_dtdp = True
-should_move_qs     = True
-should_move_dqds   = True
-should_move_xy     = False
-should_move_dxdy   = False
-should_move_tp     = False
-should_move_dtdp   = False
+use_standard_syntax = True # enter False to try out the "quick" move syntax
+should_flash        = False
+should_home         = True
+should_direct_dtdp  = True
+should_move_xy      = False
+should_move_dxdy    = False
+should_move_tp      = False
+should_move_dtdp    = False
 
 # flash the LEDs
 if should_flash:
@@ -46,31 +45,64 @@ if should_home:
 else:
     ptl.set(key=['POS_T','POS_P'],value=[-180,180]) # faking having just homed
 
-# this is an 'expert' use function, which instructs the theta and phis axes to go some distances with no regard for anticollision or hardstops
-if should_direct_dtdp:
-    targets = [[270,0], [0,-60], [-180,30]]
-    for t in targets:
-        print('MOVE: direct dtdp (' + str(t[0]) + ',' + str(t[1]) + ')')
-        requests = {}
-        for pos_id in pos_ids:
-            requests[pos_id] = {'target':t, 'log_note':'demo direct_dtdp point ' + str(targets.index(t))}
-        ptl.quick_dtdp(requests)
-
-# the remainder below are for general usage
-# first I defined here a little common wrapper function for generating the request argument dictionary that gets sent to petal
+# Here I define a common wrapper function that illustrates the syntax for generating move
+# requests and then executing them on the positioners. There are several distinct syntaxes, all
+# shown here, and I put in copious comments to help explain what is going on in each one.
 def general_move(command,targets):
-    for t in targets:
-        print('MOVE: ' + command + ' (' + str(t[0]) + ',' + str(t[1]) + ')')
-        requests = {}
-        for pos_id in pos_ids:
-            requests[pos_id] = {'command':command, 'target':t, 'log_note':'demo ' + command + ' point ' + str(targets.index(t))}
-        ptl.quick_move(requests)
+    for target in targets:
+        print('MOVE: ' + command + ' (' + str(target[0]) + ',' + str(target[1]) + ')')
+        log_note = 'demo ' + command + ' point ' + str(targets.index(target))
+        if use_standard_syntax:
+            
+            # The standard syntax has four basic steps: request targets, schedule them, send them to positioners,
+            # and execute the moves. See comments in petal.py for more detail. The requests are formatted as
+            # dicts of dicts, where the primary keys are positioner ids, and then each subdictionary describes
+            # the move you are requesting for that positioner.
+        
+            requests = {}
+            if command == 'direct_dTdP':
+                
+                # The 'direct_dTdP' is for 'expert' use.
+                # It instructs the theta and phis axes to simply rotate by some argued angular distances, with
+                # no regard for anticollision or travel range limits.
 
-if should_move_qs:
-    general_move('QS',[[0,3],[90,3],[-90,3],[60,6],[0,0]])
+                for pos_id in pos_ids:                
+                    requests[pos_id] = {'target':target, 'log_note':log_note}
+                ptl.request_direct_dtdp(requests)
 
-if should_move_dqds:
-    general_move('dQdS',[[0,3], [90,-3], [-180,6], [90,6]])
+            else:
+
+                # Here is the request syntax for general usage.
+                # Any coordinate system can be requested, range limits are respected, and anticollision can be calculated.
+
+                for pos_id in pos_ids: 
+                    requests[pos_id] = {'command':command, 'target':target, 'log_note':log_note}
+                ptl.request_targets(requests) # this is the general use function, where 
+            
+            # For the three steps below, petal.py also provides a wrapper function called 'schedule_send_and_execute_moves'.
+            # That function does them all in one line of syntax. But here I show them separately, for illustrative clarity
+            # of what is happening in the software. This is important to understand, because there are some potential use
+            # cases where we will indeed want to do these three operations separately.
+            
+            ptl.schedule_moves()    # all the requests get scheduled, with anticollision calcs, generating a unique table of scheduled shaft rotations on theta and phi axes for every positioner 
+            ptl.send_move_tables()  # the tables of scheduled shaft rotations are sent out to all the positioners over the CAN bus
+            ptl.execute_moves()     # the synchronized start signal is sent, so all positioners start executing their scheduled rotations in sync
+            # ptl.schedule_send_and_execute_moves() # alternative wrapper which just does the three things above in one line
+            
+        else:
+
+            # This 'quick' syntax is mostly intended for manual operations, or simple operations on test stations.
+            # You can send the command to multiple pos_ids simultaneously, but all the positioners receive the same command and target coordinates.
+            # (So it generally would make no sense to use these in any global coordinate system, where all the positioners are in different places.)
+
+            if command == 'direct_dTdP':
+                ptl.quick_direct_dtdp(pos_ids, target, log_note) # expert, no limits or anticollision
+            else:
+                ptl.quick_move(pos_ids, command, target, log_note) # general, with limits and anticollision
+
+# now do the requested move sequences
+if should_direct_dtdp:
+    general_move('direct_dTdP',[[270,0], [0,-60], [-180,30]])
 
 if should_move_xy:
     general_move('posXY',[[-4,-4], [-4,0], [-4,4], [0,-4], [0,0], [0,4], [4,-4], [4,0], [4,4]])
