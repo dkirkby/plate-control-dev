@@ -6,10 +6,10 @@ import posconstants as pc
 """
 
 # initialization
-pos_ids = ['UM00022']
+pos_ids = ['UM00014']
 #pos_ids = ['UM00011','UM00012','UM00013','UM00014','UM00015']
 fid_ids = []
-petal_id = 3
+petal_id = 1
 ptl = petal.Petal(petal_id, pos_ids, fid_ids)
 ptl.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
 
@@ -19,13 +19,13 @@ for pos_id in pos_ids:
 
 # demo script flags
 use_standard_syntax = True # enter False to try out the "quick" move syntax
-should_flash        = False
+should_flash        = True
 should_home         = True
 should_direct_dtdp  = True
-should_move_xy      = False
-should_move_dxdy    = False
-should_move_tp      = False
-should_move_dtdp    = False
+should_move_xy      = True
+should_move_dxdy    = True
+should_move_tp      = True
+should_move_dtdp    = True
 
 # flash the LEDs
 if should_flash:

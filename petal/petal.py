@@ -154,7 +154,7 @@ class Petal(object):
             requests[pos_id]['posmodel'] = self.get_model_for_pos(pos_id)
             if 'log_note' not in requests[pos_id]:
                 requests[pos_id]['log_note'] = ''
-            table = posmovetable.PosMoveTable(posmodel)
+            table = posmovetable.PosMoveTable(requests[pos_id]['posmodel'])
             table.set_move(0, pc.T, requests[pos_id]['target'][0])
             table.set_move(0, pc.P, requests[pos_id]['target'][1])
             cmd_str = (cmd_prefix + ' ' if cmd_prefix else '') + 'direct_dtdp'
@@ -207,17 +207,18 @@ class Petal(object):
         for p in pos:
             posmodels.append(self.get_model_for_pos(p))
         hardstop_debounce = [0,0]
-        dir = [0,0]
-        dir[pc.P] = +1 # force this, because anticollision logic depends on it
+        direction = [0,0]
+        direction[pc.P] = +1 # force this, because anticollision logic depends on it
         for p in posmodels:
-            self.request_limit_seek(p, pc.P, dir[pc.P], anticollision=True, cmd_prefix='P', log_note='homing')
+            self.request_limit_seek(p, pc.P, direction[pc.P], anticollision=True, cmd_prefix='P', log_note='homing')
         self.schedule_moves(anticollision=True)
         for p in posmodels:
-            dir[pc.T] = p.axis[pc.T].principle_hardstop_direction
-            self.request_limit_seek(p, pc.T, dir[pc.T], anticollision=False, cmd_prefix='T') # no repetition of log note here
+            direction[pc.T] = p.axis[pc.T].principle_hardstop_direction
+            self.request_limit_seek(p, pc.T, direction[pc.T], anticollision=False, cmd_prefix='T') # no repetition of log note here
+            pos_id = self.posids[self.posmodels.index(p)]                      
             for i in [pc.T,pc.P]:
                 axis_cmd_prefix = 'self.axis[' + repr(i) + ']'
-                if dir[i] < 0:
+                if direction[i] < 0:
                     hardstop_debounce[i] = p.axis[i].hardstop_debounce[0]
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + '.minpos\n'
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = -1.0\n'
@@ -225,7 +226,8 @@ class Petal(object):
                     hardstop_debounce[i] = p.axis[i].hardstop_debounce[1]
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + '.maxpos\n'
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = +1.0\n'
-            self.request_direct_dtdp(p, hardstop_debounce, cmd_prefix='debounce')
+                hardstop_debounce_request = {pos_id:{'target':hardstop_debounce}}
+                self.request_direct_dtdp(hardstop_debounce_request, cmd_prefix='debounce')
 
     def schedule_moves(self,anticollision=None):
         """Generate the schedule of moves and submoves that get positioners
