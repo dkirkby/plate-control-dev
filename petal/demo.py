@@ -6,7 +6,7 @@ import posconstants as pc
 """
 
 # initialization
-pos_ids = ['UM00014']
+pos_ids = ['UM00014','UM00011']
 #pos_ids = ['UM00011','UM00012','UM00013','UM00014','UM00015']
 fid_ids = []
 petal_id = 1
@@ -49,6 +49,7 @@ else:
 # requests and then executing them on the positioners. There are several distinct syntaxes, all
 # shown here, and I put in copious comments to help explain what is going on in each one.
 def general_move(command,targets):
+    targets = pc.listify2d(targets)
     for target in targets:
         print('MOVE: ' + command + ' (' + str(target[0]) + ',' + str(target[1]) + ')')
         log_note = 'demo ' + command + ' point ' + str(targets.index(target))
