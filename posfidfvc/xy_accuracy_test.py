@@ -18,23 +18,23 @@ fvc = fvchandler.FVCHandler('SBIG')
 fvc.scale = 0.0061 # mm/pixel (update um_scale below if not in mm)
 fvc.rotation = 0  # deg
 um_scale = 1000 # um/mm
-pos_ids = ['BU02']
+pos_ids = ['UM00014']
 fid_can_ids = []
 petal_id = 1
 ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure(ptl,fvc)
-m.n_points_full_calib_T = 20#17
-m.n_points_full_calib_P = 20#9
+m.n_points_full_calib_T = 11#17
+m.n_points_full_calib_P = 7#9
 m.n_fiducial_dots = 3 # number of fiducial centroids the FVC should expect
-num_corr_max = 2 # number of correction moves to do for each target
+num_corr_max = 4 # number of correction moves to do for each target
 
 # test operations to do
 should_initial_rehome     = True
 should_identify_fiducials = True
 should_identify_pos_loc   = False
 should_calibrate_quick    = True
-should_measure_ranges     = False
+should_measure_ranges     = True
 should_calibrate_full     = True
 should_do_accuracy_test   = True
 
@@ -117,13 +117,12 @@ if should_do_accuracy_test:
         file.close()
 
     # transform test grid to each positioner's global position, and create all the move request dictionaries
-    posmodels = ptl.get(pos_ids)
     all_targets = []
     for local_target in local_targets:
         these_targets = {}
-        for posmodel in posmodels:
-            these_targets[pos_id]['command'] = 'obsXY'
-            these_targets[pos_id]['target'] = posmodel.trans.posXY_to_obsXY(local_target)
+        for pos_id in pos_ids:
+            posmodel = ptl.get(pos_id)
+            these_targets[pos_id] = {'command':'obsXY', 'target':posmodel.trans.posXY_to_obsXY(local_target)}
         all_targets.append(these_targets)
 
     # initialize some data structures for storing test data

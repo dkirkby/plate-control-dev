@@ -109,7 +109,7 @@ class PosMoveMeasure(object):
                 posTP       [[t0,p0],[t1,p1],...]       ... internally-tracked expected angular positions of the (theta,phi) shafts at the outputs of their gearboxes
         """
         data = requests.copy()
-        ptls_of_pos_ids = self.ptls_of_pos_ids(data.keys())
+        ptls_of_pos_ids = self.ptls_of_pos_ids([p for p in data.keys()])
         def fmt(number):
             return format(number,'.3f') # for consistently printing floats in terminal output
         for pos_id in data.keys():
@@ -127,8 +127,8 @@ class PosMoveMeasure(object):
         for pos_id in this_meas.keys():
             m = data[pos_id] # again, for terseness
             m['meas_obsXY'] = [this_meas[pos_id]]
-            m['errXY'] = [m['meas_obsXY'][-1][0] - m['targ_obsXY'][0],
-                          m['meas_obsXY'][-1][1] - m['targ_obsXY'][1]]
+            m['errXY'] = [[m['meas_obsXY'][-1][0] - m['targ_obsXY'][0],
+                           m['meas_obsXY'][-1][1] - m['targ_obsXY'][1]]]
             m['err2D'] = [(m['errXY'][-1][0]**2 + m['errXY'][-1][1]**2)**0.5]
             m['posTP'] = ptls_of_pos_ids[pos_id].expected_current_position(pos_id,'posTP')
         for i in range(1,num_corr_max+1):
@@ -269,17 +269,15 @@ class PosMoveMeasure(object):
         pos_ids with that petal's positioner ids.
         """
         data_by_ptl = {}
+        if pos_ids != 'all':
+            pos_ids = pc.listify(pos_ids,keep_flat=True)[0]
         for petal in self.petals:
-            all_pos_on_ptl = petal.get(key='POS_ID')
+            all_pos_on_ptl = pc.listify(petal.get(key='POS_ID'),keep_flat=True)[0]
             if pos_ids == 'all':
                 these_pos_ids = all_pos_on_ptl
-            elif isinstance(pos_ids,list):
-                these_pos_ids = [p for p in pos_ids if p in all_pos_on_ptl]
             else:
-                print('invalid argument ' + str(pos_ids) + ' for pos_ids')
-                these_pos_ids = []
+                these_pos_ids = [p for p in pos_ids if p in all_pos_on_ptl]
             this_data = petal.get(these_pos_ids,key)
-            this_data = pc.listify(this_data, keep_flat=True)[0]
             data_by_ptl[petal] = this_data
         return data_by_ptl
 
@@ -301,6 +299,7 @@ class PosMoveMeasure(object):
         pos_ids_by_ptl = self.pos_data_listed_by_ptl('all','POS_ID')
         for petal in pos_ids_by_ptl.keys():
             all_pos_ids.extend(pos_ids_by_ptl[petal])
+        return all_pos_ids
 
     def _measure_calibration_arc(self,pos_ids='all',axis='theta',mode='quick'):
         """Expert usage. Sweep an arc of points about axis ('theta' or 'phi')
@@ -556,7 +555,7 @@ class PosMoveMeasure(object):
         """Generic function for identifying either all fiducials or a single positioner's location.
         """
         pos_ids_by_ptl = self.pos_data_listed_by_ptl('all','POS_ID')
-        n_dots = len(self.all_pos_ids) + self.n_fiducial_dots
+        n_dots = len(self.all_pos_ids()) + self.n_fiducial_dots
         nudges = [-self.nudge_dist, self.nudge_dist]
         xy_ref = []
         for i in range(len(nudges)):

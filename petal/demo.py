@@ -22,10 +22,10 @@ use_standard_syntax = True # enter False to try out the "quick" move syntax
 should_flash        = True
 should_home         = True
 should_direct_dtdp  = True
-should_move_xy      = True
-should_move_dxdy    = True
-should_move_tp      = True
-should_move_dtdp    = True
+should_move_xy      = False
+should_move_dxdy    = False
+should_move_tp      = False
+should_move_dtdp    = False
 
 # flash the LEDs
 if should_flash:
