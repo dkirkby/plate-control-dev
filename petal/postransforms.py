@@ -60,6 +60,13 @@ class PosTransforms(object):
         if this_posmodel == None:
             this_posmodel = posmodel.PosModel()
         self.posmodel = this_posmodel
+        self.alt_override = False  # alternate calibration values one can set, so one can temporarily override whatever the positioner's stored vals are
+        self.alt = {'LENGTH_R1' : 3.0,
+                    'LENGTH_R2' : 3.0,
+                    'OFFSET_X'  : 0.0,
+                    'OFFSET_Y'  : 0.0,
+                    'OFFSET_T'  : 0.0,
+                    'OFFSET_P'  : 0.0} 
 
     # SHAFT RANGES
     def shaft_ranges(self, range_limits):
@@ -82,14 +89,14 @@ class PosTransforms(object):
     # FUNDAMENTAL TRANSFORMATIONS
     def obsTP_to_posTP(self, tp):
         """
-        obsTP ... (theta,phi) expected position of fiber tip, including offsets and calibrations
-        posTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
+        obsTP          ... (theta,phi) expected position of fiber tip, including offsets and calibrations
+        posTP          ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
         INPUT:  [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
         RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
         """
         (tp, was_not_list) = pc.listify(tp)
-        T = np.array(tp[0]) - self.posmodel.state.read('OFFSET_T')
-        P = np.array(tp[1]) - self.posmodel.state.read('OFFSET_P')
+        T = np.array(tp[0]) - (self.posmodel.state.read('OFFSET_T') if not self.alt_override else self.alt['OFFSET_T'])
+        P = np.array(tp[1]) - (self.posmodel.state.read('OFFSET_P') if not self.alt_override else self.alt['OFFSET_P'])
         TP = np.array([T,P]).tolist()
         if was_not_list:
             TP = pc.delistify(TP)
@@ -97,14 +104,14 @@ class PosTransforms(object):
 
     def posTP_to_obsTP(self, tp):
         """
-        posTP ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
-        obsTP ... (theta,phi) expected position of fiber tip, including offsets and calibrations
+        posTP          ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
+        obsTP          ... (theta,phi) expected position of fiber tip, including offsets and calibrations
         INPUT:  [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
         RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
         """
         (tp, was_not_list) = pc.listify(tp)
-        T = np.array(tp[0]) + self.posmodel.state.read('OFFSET_T')
-        P = np.array(tp[1]) + self.posmodel.state.read('OFFSET_P')
+        T = np.array(tp[0]) + (self.posmodel.state.read('OFFSET_T') if not self.alt_override else self.alt['OFFSET_T'])
+        P = np.array(tp[1]) + (self.posmodel.state.read('OFFSET_P') if not self.alt_override else self.alt['OFFSET_P'])
         TP = np.array([T,P]).tolist()
         if was_not_list:
             TP = pc.delistify(TP)
@@ -118,7 +125,8 @@ class PosTransforms(object):
         RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         """
         (tp, was_not_list) = pc.listify(tp)
-        r = [self.posmodel.state.read('LENGTH_R1'),self.posmodel.state.read('LENGTH_R2')]
+        r = [self.posmodel.state.read('LENGTH_R1') if not self.alt_override else self.alt['LENGTH_R1'],
+             self.posmodel.state.read('LENGTH_R2') if not self.alt_override else self.alt['LENGTH_R2']]
         TP = self.posTP_to_obsTP(tp)  # adjust shaft angles into observer space (since observer sees the physical phi = 0)
         xy = self.tp2xy(TP, r)        # calculate xy in posXY space
         xy = xy.tolist()
@@ -137,7 +145,8 @@ class PosTransforms(object):
         The output "unreachable" is a list of all the indexes of the points that could not be physically reached.
         """
         (xy, was_not_list) = pc.listify(xy)
-        r = [self.posmodel.state.read('LENGTH_R1'),self.posmodel.state.read('LENGTH_R2')]
+        r = [self.posmodel.state.read('LENGTH_R1') if not self.alt_override else self.alt['LENGTH_R1'],
+             self.posmodel.state.read('LENGTH_R2') if not self.alt_override else self.alt['LENGTH_R2']]
         shaft_ranges = self.shaft_ranges(range_limits)
         obs_range = self.posTP_to_obsTP(shaft_ranges)  # want range used in next line to be according to observer (since observer sees the physical phi = 0)
         (tp, unreachable) = self.xy2tp(xy, r, obs_range)
@@ -148,14 +157,15 @@ class PosTransforms(object):
 
     def posXY_to_obsXY(self, xy):
         """
-        posXY   ... (x,y) local to fiber positioner, centered on theta axis, looking at fiber tip
-        obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
+        posXY          ... (x,y) local to fiber positioner, centered on theta axis, looking at fiber tip
+        obsXY          ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
         INPUT:  [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         """
         (xy, was_not_list) = pc.listify(xy)
-        X = np.array(xy[0]) + self.posmodel.state.read('OFFSET_X')
-        Y = np.array(xy[1]) + self.posmodel.state.read('OFFSET_Y')
+        
+        X = np.array(xy[0]) + (self.posmodel.state.read('OFFSET_X') if not self.alt_override else self.alt['OFFSET_X'])
+        Y = np.array(xy[1]) + (self.posmodel.state.read('OFFSET_Y') if not self.alt_override else self.alt['OFFSET_Y'])
         XY = np.array([X,Y]).tolist()
         if was_not_list:
             XY = pc.delistify(XY)
@@ -163,14 +173,14 @@ class PosTransforms(object):
 
     def obsXY_to_posXY(self, xy):
         """
-        obsXY   ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
-        posXY   ... (x,y) local to fiber positioner, centered on theta axis, looking at fiber tip
+        obsXY          ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
+        posXY          ... (x,y) local to fiber positioner, centered on theta axis, looking at fiber tip
         INPUT:  [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         """
         (xy, was_not_list) = pc.listify(xy)
-        X = np.array(xy[0]) - self.posmodel.state.read('OFFSET_X')
-        Y = np.array(xy[1]) - self.posmodel.state.read('OFFSET_Y')
+        X = np.array(xy[0]) - (self.posmodel.state.read('OFFSET_X') if not self.alt_override else self.alt['OFFSET_X'])
+        Y = np.array(xy[1]) - (self.posmodel.state.read('OFFSET_Y') if not self.alt_override else self.alt['OFFSET_Y'])
         XY = np.array([X,Y]).tolist()
         if was_not_list:
             XY = pc.delistify(XY)
