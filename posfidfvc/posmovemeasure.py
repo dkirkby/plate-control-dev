@@ -7,6 +7,7 @@ import numpy as np
 import fitcircle
 import posconstants as pc
 import poscalibplot
+import scipy.optimize
 
 class PosMoveMeasure(object):
     """Coordinates moving fiber positioners with fiber view camera measurements.
@@ -223,20 +224,27 @@ class PosMoveMeasure(object):
         calibration values for each positioner.
 
         INPUTS:  pos_ids  ... list of pos_ids or 'all'
-                 mode     ... 'full' or 'quick', see detailed comments in _measure_calibration_arc method
+                 mode     ... 'full' or 'quick' -- see detailed comments in _measure_calibration_arc method
+                              'grid' -- error minimizer on grid of points to find best fit calibration parameters
 
         Typically one does NOT call 'full' mode unless the theta offsets are already
         reasonably well known. That can be achieved by first doing a 'quick' mode
         calibration.
         """
-        T = self._measure_calibration_arc(pos_ids,'theta',mode)
-        P = self._measure_calibration_arc(pos_ids,'phi',mode)
-        #set_gear_ratios = False if mode == 'quick' else True
-        set_gear_ratios = False # not sure yet if we really want to adjust gear ratios automatically, hence by default False here
-        unwrapped_data = self._calculate_and_set_arms_and_offsets(T,P,set_gear_ratios)
-        for pos_id in T.keys():
-            save_file = save_file_dir + os.path.sep + pos_id + '_' + save_file_timestamp + '_calib_' + mode + '.png'
-            poscalibplot.plot_arc(save_file, pos_id, unwrapped_data)
+        save_file = save_file_dir + os.path.sep + pos_id + '_' + save_file_timestamp + '_calib_' + mode + '.png'
+        if mode = 'grid':
+            grid_data = self._measure_calibration_grid(pos_ids,keep_phi_within_Eo=True)
+            
+            for pos_id in grid_data.keys():
+                poscalibplot.plot_grid(save_file, pos_id, grid_data)
+        else:
+            T = self._measure_calibration_arc(pos_ids,'theta',mode)
+            P = self._measure_calibration_arc(pos_ids,'phi',mode)
+            #set_gear_ratios = False if mode == 'quick' else True
+            set_gear_ratios = False # not sure yet if we really want to adjust gear ratios automatically, hence by default False here
+            unwrapped_data = self._calculate_and_set_arms_and_offsets_from_arc_data(T,P,set_gear_ratios)
+            for pos_id in T.keys():
+                poscalibplot.plot_arc(save_file, pos_id, unwrapped_data)
 
     def identify_fiducials(self):
         """Nudge positioners (all together) forward/back to determine which centroid dots are fiducials.
@@ -301,10 +309,60 @@ class PosMoveMeasure(object):
             all_pos_ids.extend(pos_ids_by_ptl[petal])
         return all_pos_ids
 
+    def _measure_calibration_grid(self,pos_ids='all',keep_phi_within_Eo=True):
+        """Expert usage. Send positioner(s) to a series of commanded (theta,phi) positions. Measure
+        the (x,y) positions of these points with the FVC.
+
+        INPUTS:   pos_ids             ... list of pos_ids or 'all'
+                  keep_phi_within_Eo  ... True, to guarantee no anticollision needed
+                                          False, to cover the full range of phi with the grid
+
+        OUTPUTS:  data ... see comments below
+
+        Returns a dictionary of dictionaries containing the data. The primary
+        keys for the dict are the pos_id. Then for each pos_id, each subdictionary
+        contains the keys:
+            'target_posTP'    ... the posTP targets which were attempted
+            'measured_obsXY'  ... the resulting measured xy positions
+            'petal'           ... the petal this pos_id is on
+            'trans'           ... the postransform object associated with this particular positioner
+        """
+        pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
+        data = {}
+        
+        for petal in pos_ids_by_ptl.keys():
+            these_pos_ids = pos_ids_by_ptl[petal]
+            for pos_id in these_pos_ids:
+                data[pos_id] = {}
+                posmodel = petal.get(pos_id)
+                range_T = posmodel.targetable_range_T
+                range_P = posmodel.targetable_range_P
+                if keep_phi_within_Eo:
+                    range_P[0] = self.phi_clear_angle
+                t_cmd = np.linspace(min(range_T),max(range_T),self.n_points_full_calib_T)
+                p_cmd = np.linspace(min(range_P),max(range_P),self.n_points_full_calib_P)
+                data[pos_id]['target_posTP'] = [[t,p] for t in t_cmd for p in p_cmd]
+                data[pos_id]['trans'] = posmodel.trans
+                data[pos_id]['petal'] = petal
+                data[pos_id]['measured_obsXY'] = []
+                n_pts = len(data[pos_id][='target_posTP'])
+        all_pos_ids = list(data.keys())
+        
+        # make the measurements
+        for i in range(n_pts):
+            requests = {}
+            for pos_id in all_pos_ids:
+                requests[pos_id] = {'command':'posTP', 'target':data[pos_id]['target_posTP'][i], 'log_note':'calib grid point ' + str(i+1)}
+            print('calibration grid point ' + str(i+1) + ' of ' + str(n_pts))
+            this_meas_data = self.move_measure(requests)
+            for p in this_meas_data.keys():
+                data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
+        return data 
+
     def _measure_calibration_arc(self,pos_ids='all',axis='theta',mode='quick'):
         """Expert usage. Sweep an arc of points about axis ('theta' or 'phi')
         on positioners identified by pos_ids. Measure these points with the FVC
-        and do a best fit of them.401
+        and do a best fit of them.
 
         INPUTS:   pos_ids ... list of pos_ids or 'all'
                   axis    ... 'theta' or 'phi'
@@ -478,10 +536,35 @@ class PosMoveMeasure(object):
 
         return data
 
-    def _calculate_and_set_arms_and_offsets(self, T, P, set_gear_ratios=True):
-        """Common helper function for the measure range and calibrate functions.
-        T and P are data dictionaries taken on the theta and phi axes. See those
-        methods for more information.
+    def _calculate_and_set_arms_and_offsets_from_grid_data(self, data, set_gear_ratios=False):
+        """Helper function for grid method of calibration. See the _measure_calibration_grid method for
+        more information on format of the dictionary 'data'.
+        """
+        for pos_id in data.keys():
+            trans = data['pos_id'].trans
+            target_tp = np.array(data['target_posTP']).transpose().tolist()
+            meas_xy = np.array(data['measured_obsXY']).transpose()
+            trans.alt_override = True
+            def expected_xy(LENGTH_R1,LENGTH_R2,OFFSET_T,OFFSET_P,OFFSET_X,OFFSET_Y):
+                trans.alt['LENGTH_R1'] = LENGTH_R1
+                trans.alt['LENGTH_R2'] = LENGTH_R2
+                trans.alt['OFFSET_T'] = OFFSET_T
+                trans.alt['OFFSET_P'] = OFFSET_P
+                trans.alt['OFFSET_X'] = OFFSET_X
+                trans.alt['OFFSET_Y'] = OFFSET_Y
+                return trans.posTP_to_obsXY(target_tp)
+            def err_norm(LENGTH_R1,LENGTH_R2,OFFSET_T,OFFSET_P,OFFSET_X,OFFSET_Y):
+                expected = np.array(expected_xy(LENGTH_R1,LENGTH_R2,OFFSET_T,OFFSET_P,OFFSET_X,OFFSET_Y))
+                all_err = expected - meas_xy
+                #calculate the norm here
+                return ___
+            params0 = [,,,,,] # same order as for err_norm function
+            xopt = scipy.optimize.fmin(func=err_norm, x0=params0)
+            trans.alt_override = False
+
+    def _calculate_and_set_arms_and_offsets_from_arc_data(self, T, P, set_gear_ratios=False):
+        """Helper function for arc method of calibration. T and P are data dictionaries taken on the
+        theta and phi axes. See the _measure_calibration_arc method for more information.
         """
         data = {}
         for pos_id in T.keys():
