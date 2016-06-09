@@ -5,10 +5,10 @@ import numpy as np
 
 def plot_arc(path, pos_id, data):
     """See _calculate_and_set_arms_and_offsets() method in posmovemeasure.py for data format.
-    """    
+    """
     plt.ioff() # interactive plotting off
     fig = plt.figure(figsize=(14, 8))
-    
+
     for ax in ['T','P']:
         name = 'theta' if ax == 'T' else 'phi'
         other_ax = 'P' if ax == 'T' else 'T'
@@ -17,7 +17,7 @@ def plot_arc(path, pos_id, data):
         target_angles = np.array(data[pos_id]['targ_pos' + ax + '_during_' + ax + '_sweep'])
         measured_angles = np.array(data[pos_id]['meas_pos' + ax + '_during_' + ax + '_sweep'])
         other_axis_angle = data[pos_id]['targ_pos' + other_ax + '_during_' + ax + '_sweep']
-        radius = data[pos_id]['radius_' + ax]    
+        radius = data[pos_id]['radius_' + ax]
         center = data[pos_id]['xy_ctr_' + ax]
         measured_xy = np.array(data[pos_id]['measured_obsXY_' + ax])
 
@@ -31,7 +31,7 @@ def plot_arc(path, pos_id, data):
             ref_arc_angles = np.append(ref_arc_angles,arc_finish*np.pi/180)
         arc_x = radius * np.cos(ref_arc_angles) + center[0]
         arc_y = radius * np.sin(ref_arc_angles) + center[1]
-        axis_zero_angle = arc_start - target_angles[0] # where global observer would nominally see the axis's local zero point in this plot        
+        axis_zero_angle = arc_start - target_angles[0] # where global observer would nominally see the axis's local zero point in this plot
         axis_zero_line_x = [center[0], radius * np.cos(axis_zero_angle*np.pi/180) + center[0]]
         axis_zero_line_y = [center[1], radius * np.sin(axis_zero_angle*np.pi/180) + center[1]]
         plt.plot(arc_x,arc_y,'b-')
@@ -54,7 +54,7 @@ def plot_arc(path, pos_id, data):
         plt.grid(True)
         plt.margins(0.05, 0.05)
         plt.axis('equal')
-       
+
         plt.subplot(2,3,plot_num_base+2)
         err_angles = measured_angles - target_angles
         plt.plot(target_angles, err_angles, 'ko-')
@@ -66,7 +66,7 @@ def plot_arc(path, pos_id, data):
         plt.title('measured angle variation')
         plt.grid(True)
         plt.margins(0.1, 0.1)
-        
+
         plt.subplot(2,3,plot_num_base+3)
         measured_radii = np.sqrt(np.sum((measured_xy - center)**2,axis=1)) * 1000 # um
         best_fit_radius = radius * 1000 # um
@@ -80,8 +80,85 @@ def plot_arc(path, pos_id, data):
         plt.title('measured radius variation')
         plt.grid(True)
         plt.margins(0.1, 0.1)
-        
+
     plt.tight_layout(pad=2.0)
     plt.savefig(path,dpi=150)
     plt.close(fig)
 
+def plot_grid(path, pos_id, data):
+    """See ___ method in posmovemeasure.py for data format.
+    """
+    plt.ioff() # interactive plotting off
+    fig = plt.figure(figsize=(14, 8))
+
+    target_posTP = np.array(data[pos_id]['target_posTP'])
+    measured_obsXY = np.array(data[pos_id]['measured_obsXY'])
+    expected_obsXY = np.array(data[pos_id]['final_expected_obsXY'])
+    params = {0: {'ERR_NORM':np.array(data[pos_id]['ERR_NORM'])*1000,
+	                                   'unit':'um',
+                                       'title':'error of calibration'},
+	          1: {'LENGTH_R1':np.array(data[pos_id]['LENGTH_R1']),
+	                                    'LENGTH_R2':np.array(data[pos_id]['LENGTH_R2']),
+										'unit':'mm',
+                                        'title':'kinematic arm lengths'},
+			  2: {'OFFSET_T':np.array(data[pos_id]['OFFSET_T']),
+							            'OFFSET_P':np.array(data[pos_id]['OFFSET_P']),
+							            'unit':'deg',
+                                        'title':'theta and phi offsets'},
+			  3: {'OFFSET_X':np.array(data[pos_id]['OFFSET_X']),
+						          'unit':'mm',
+                                  'title':'global x offset'},
+			  4: {'OFFSET_Y':np.array(data[pos_id]['OFFSET_Y']),
+						          'unit':'mm',
+                                  'title':'global y offset'}}
+
+    subplot_num = 1
+    plt.subplot(2,3,subplot_num)
+    plt.plot(measured_obsXY[:,0],measured_obsXY[:,1],'ro',label='(x,y)=meas by FVC',markersize=4,markeredgecolor='r',markerfacecolor='None')
+    plt.plot(expected_obsXY[:,0],expected_obsXY[:,1],'k+',label='(x,y)=optim func(t,p)',markersize=6,markeredgewidth='1')
+    for i in range(len(target_posTP[:,0])):
+        text_x = measured_obsXY[i,0]
+        text_y = measured_obsXY[i,1]
+        plt.text(text_x,text_y,'\n\n\n(' + format(target_posTP[i,0],'.1f') + ',\n' + format(target_posTP[i,1],'.1f') + ')',
+                               verticalalignment='center',horizontalalignment='center',fontsize=6,color='gray')
+    plt.xlabel('x (mm)')
+    plt.ylabel('y (mm)')
+    plt.title(str(pos_id) + ' grid calibration points',fontsize=8)
+    plt.margins(0.1, 0.1)
+    txt_x = np.min(plt.xlim()) - np.diff(plt.xlim()) * 0.02
+    txt_y = np.max(plt.ylim()) - np.diff(plt.ylim()) * 0.05
+    plt.text(txt_x,txt_y,'Point labels are the\n(posT,posP) input\nangles (degrees).',horizontalalignment='left',verticalalignment='top',fontsize=6,color='gray')
+    plt.axis('equal')
+    plt.legend(loc='upper right',fontsize=6)
+
+    param_keys = list(params.keys())
+    param_keys.sort()
+    for p in param_keys:
+        subplot_num += 1
+        plt.subplot(2,3,subplot_num)
+        line_format = 'b-'
+        for q in params[p].keys():
+            if q != 'unit' and q != 'title':
+                xticks = np.arange(len(params[p][q]))
+                point_nums = xticks + 1
+                plt.plot(point_nums,params[p][q],line_format,label=q)
+                line_format = 'r-'
+        plt.xlabel('number of points measured')
+        plt.ylabel(params[p]['title'] + ' (' + params[p]['unit'] + ')')
+        plt.legend(loc='upper right',fontsize=8)
+        plt.xticks(point_nums, [format(x,'.0f') for x in point_nums])
+    plt.tight_layout(pad=2.0)
+    plt.savefig(path,dpi=150)
+    plt.close(fig)
+
+##fakedata = {'somepos':{'target_posTP':[[0,0],[90,0],[180,0],[-90,0]],
+##                       'measured_obsXY':[[6.1,0.2],[-0.1,5.9],[-5.7,0.2],[0.1,-6.2]],
+##					   'final_expected_obsXY':[[6,0],[0,6],[-6,0],[0,-6]],
+##					   'ERR_NORM':[.2,.1,.05,.01],
+##					   'LENGTH_R1':[3.1,2.9,3.05,2.95],
+##					   'LENGTH_R2':[3.2,2.7,2.8,3.05],
+##					   'OFFSET_T':[0,10,-20,5],
+##					   'OFFSET_P':[7,-3,-12,2],
+##					   'OFFSET_X':[1,2,-1,0],
+##					   'OFFSET_Y':[-1,0.5,2,0.3]}}
+##plot_grid('out.png','somepos',fakedata)
