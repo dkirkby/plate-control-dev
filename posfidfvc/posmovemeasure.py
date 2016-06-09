@@ -231,12 +231,13 @@ class PosMoveMeasure(object):
         reasonably well known. That can be achieved by first doing a 'quick' mode
         calibration.
         """
-        save_file = save_file_dir + os.path.sep + pos_id + '_' + save_file_timestamp + '_calib_' + mode + '.png'
-        if mode = 'grid':
+        def save_file(pos_id):
+            return save_file_dir + os.path.sep + pos_id + '_' + save_file_timestamp + '_calib_' + mode + '.png'
+        if mode == 'grid':
             grid_data = self._measure_calibration_grid(pos_ids,keep_phi_within_Eo=True)
-            
+            grid_data = self._calculate_and_set_arms_and_offsets_from_grid_data(grid_data, set_gear_ratios=False)
             for pos_id in grid_data.keys():
-                poscalibplot.plot_grid(save_file, pos_id, grid_data)
+                poscalibplot.plot_grid(save_file(pos_id), pos_id, grid_data)
         else:
             T = self._measure_calibration_arc(pos_ids,'theta',mode)
             P = self._measure_calibration_arc(pos_ids,'phi',mode)
@@ -244,7 +245,7 @@ class PosMoveMeasure(object):
             set_gear_ratios = False # not sure yet if we really want to adjust gear ratios automatically, hence by default False here
             unwrapped_data = self._calculate_and_set_arms_and_offsets_from_arc_data(T,P,set_gear_ratios)
             for pos_id in T.keys():
-                poscalibplot.plot_arc(save_file, pos_id, unwrapped_data)
+                poscalibplot.plot_arc(save_file(pos_id), pos_id, unwrapped_data)
 
     def identify_fiducials(self):
         """Nudge positioners (all together) forward/back to determine which centroid dots are fiducials.
@@ -345,7 +346,7 @@ class PosMoveMeasure(object):
                 data[pos_id]['trans'] = posmodel.trans
                 data[pos_id]['petal'] = petal
                 data[pos_id]['measured_obsXY'] = []
-                n_pts = len(data[pos_id][='target_posTP'])
+                n_pts = len(data[pos_id]['target_posTP'])
         all_pos_ids = list(data.keys())
         
         # make the measurements
@@ -538,29 +539,34 @@ class PosMoveMeasure(object):
 
     def _calculate_and_set_arms_and_offsets_from_grid_data(self, data, set_gear_ratios=False):
         """Helper function for grid method of calibration. See the _measure_calibration_grid method for
-        more information on format of the dictionary 'data'.
+        more information on format of the dictionary 'data'. This method adds the fields 'ERR_NORM' and
+        'final_expected_obsXY' to the data dictionary for each positioner.
         """
+        param_keys = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','OFFSET_X','OFFSET_Y']
         for pos_id in data.keys():
-            trans = data['pos_id'].trans
+            trans = data[pos_id].trans
             target_tp = np.array(data['target_posTP']).transpose().tolist()
             meas_xy = np.array(data['measured_obsXY']).transpose()
             trans.alt_override = True
-            def expected_xy(LENGTH_R1,LENGTH_R2,OFFSET_T,OFFSET_P,OFFSET_X,OFFSET_Y):
-                trans.alt['LENGTH_R1'] = LENGTH_R1
-                trans.alt['LENGTH_R2'] = LENGTH_R2
-                trans.alt['OFFSET_T'] = OFFSET_T
-                trans.alt['OFFSET_P'] = OFFSET_P
-                trans.alt['OFFSET_X'] = OFFSET_X
-                trans.alt['OFFSET_Y'] = OFFSET_Y
+            def expected_xy(params):
+                for i in range(len(param_keys)):
+                    trans.alt[param_keys[i]] = params[i]
                 return trans.posTP_to_obsXY(target_tp)
-            def err_norm(LENGTH_R1,LENGTH_R2,OFFSET_T,OFFSET_P,OFFSET_X,OFFSET_Y):
-                expected = np.array(expected_xy(LENGTH_R1,LENGTH_R2,OFFSET_T,OFFSET_P,OFFSET_X,OFFSET_Y))
+            def err_norm(params):
+                expected = np.array(expected_xy(params))
                 all_err = expected - meas_xy
-                #calculate the norm here
-                return ___
-            params0 = [,,,,,] # same order as for err_norm function
-            xopt = scipy.optimize.fmin(func=err_norm, x0=params0)
+                return np.linalg.norm(all_err,ord='fro')
+            param_defaults = postransforms.PosTransforms().alt
+            params0 = [param_defaults[key] for key in param_keys]
+            params_optimized = scipy.optimize.fmin(func=err_norm, x0=params0)
             trans.alt_override = False
+            petal = data[pos_id]['petal']
+            for i in range(len(param_keys)):
+                petal.set(pos_id,param_keys[i],params_optimized[i])
+                print('Grid calib on ' + str(pos_id) + ': ' + param_keys[i] + ' set to ' + params_optimized[i])
+            data[pos_id]['ERR_NORM'] = err_norm(params_optimized)
+            data[pos_id]['final_expected_obsXY'] = expected_xy(params_optimized)
+        return data
 
     def _calculate_and_set_arms_and_offsets_from_arc_data(self, T, P, set_gear_ratios=False):
         """Helper function for arc method of calibration. T and P are data dictionaries taken on the
