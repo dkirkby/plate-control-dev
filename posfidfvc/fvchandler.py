@@ -1,9 +1,18 @@
 import os
 import sys
 sys.path.append(os.path.abspath('./SBIG/'))
-import sbig_grab_cen
+try:
+    import sbig_grab_cen
+except Exception:
+    pass
 import numpy as np
 import time
+try:
+    # DOS imports
+    import Pyro4
+    from DOSlib.advertise import Seeker
+except Exception:
+    pass
 
 class FVCHandler(object):
     """Provides a generic interface to the Fiber View Camera. Can support different
@@ -19,9 +28,30 @@ class FVCHandler(object):
         self.fvc_type = fvc_type # 'SBIG' or 'FLI'
         if self.fvc_type == 'SBIG':
             self.sbig = sbig_grab_cen.SBIG_Grab_Cen()
+        elif self.fvc_type == 'DOS':
+            # In case an instance is not running, do not count on a name server
+            # Fine the FVC through the advertising instead
+            self.dos_fvc = {'proxy':None, 'uid':None}
+            seeker = Seeker('-dos-', 'DOStest', found_callback=self._dos_seeker_callback)
+            seeker.seek()
+            print("Seeking FVC...")
+            while self.dos_fvc['proxy'] == None:
+                time.sleep(1)
+            print("Found FVC")
         self.rotation = 0        # [deg] rotation angle from image plane to object plane
         self.scale = 1.0         # scale factor from image plane to object plane
         self.translation = [0,0] # translation of origin within the image plane
+
+    def _dos_seeker_callback(self, dev):
+        """Check found connection from seeker
+        """
+        for key, value in dev.items():
+            if key == 'FVC':
+                if self.dos_fvc['uid'] == value['uid']:
+                    return # Already have a connection
+                proxy = Pyro4.Proxy(value['pyro_uri'])
+                self.dos_fvc['proxy'] = proxy
+                self.dos_fvc['uid'] = value['uid']
 
     def measure_and_identify(self, expected_pos_xy=[], expected_ref_xy=[]):
         """Calls for an FVC measurement, and returns a list of measured centroids.
@@ -82,6 +112,13 @@ class FVCHandler(object):
             xy,brightness,t = self.sbig.grab(num_objects)
         elif self.fvc_type == 'FLI':
             xy = [] # to be implemented
+        elif self.fvc_type == 'DOS':
+            ret = self.dos_fvc['proxy'].measure()
+            assert ret != 'FAILED'
+            xy_dict = self.dos_fvc['proxy'].get_centers()
+            xy = []
+            for params in xy_dict.values():
+                xy.append([params[x], params[y]])
         else:
             xy = []
         xy_np = np.array(xy).transpose()
@@ -101,7 +138,7 @@ class FVCHandler(object):
         return np.array([[np.cos(radians), -np.sin(radians)], [np.sin(radians), np.cos(radians)]])
 
 if __name__ == '__main__':
-    f = FVCHandler()
+    f = FVCHandler(fvc_type='DOS')
     n_objects = 6
     n_repeats = 5
     xy = []
