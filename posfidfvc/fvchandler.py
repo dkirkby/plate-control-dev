@@ -28,7 +28,7 @@ class FVCHandler(object):
         self.fvc_type = fvc_type # 'SBIG' or 'FLI'
         if self.fvc_type == 'SBIG':
             self.sbig = sbig_grab_cen.SBIG_Grab_Cen()
-        elif self.fvc_type == 'DOS':
+        elif self.fvc_type == 'FLI':
             # In case an instance is not running, do not count on a name server
             # Fine the FVC through the advertising instead
             self.dos_fvc = {'proxy':None, 'uid':None}
@@ -111,8 +111,6 @@ class FVCHandler(object):
         if self.fvc_type == 'SBIG':
             xy,brightness,t = self.sbig.grab(num_objects)
         elif self.fvc_type == 'FLI':
-            xy = [] # to be implemented
-        elif self.fvc_type == 'DOS':
             ret = self.dos_fvc['proxy'].measure()
             assert ret != 'FAILED'
             xy_dict = self.dos_fvc['proxy'].get_centers()
@@ -138,7 +136,7 @@ class FVCHandler(object):
         return np.array([[np.cos(radians), -np.sin(radians)], [np.sin(radians), np.cos(radians)]])
 
 if __name__ == '__main__':
-    f = FVCHandler(fvc_type='DOS')
+    f = FVCHandler(fvc_type='FLI')
     n_objects = 6
     n_repeats = 5
     xy = []
