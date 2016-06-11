@@ -330,7 +330,6 @@ class PosMoveMeasure(object):
         """
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
         data = {}
-        
         for petal in pos_ids_by_ptl.keys():
             these_pos_ids = pos_ids_by_ptl[petal]
             for pos_id in these_pos_ids:
@@ -340,8 +339,10 @@ class PosMoveMeasure(object):
                 range_P = posmodel.targetable_range_P
                 if keep_phi_within_Eo:
                     range_P[0] = self.phi_clear_angle
-                t_cmd = np.linspace(min(range_T),max(range_T),self.n_points_full_calib_T)
-                p_cmd = np.linspace(min(range_P),max(range_P),self.n_points_full_calib_P)
+                t_cmd = np.linspace(min(range_T),max(range_T),self.n_points_full_calib_T + 1) # the +1 is temporary, remove that extra point in next line
+                t_cmd = t_cmd[:-1] # since theta covers +/-180, it is kind of redundant to hit essentially the same points again
+                p_cmd = np.linspace(min(range_P),max(range_P),self.n_points_full_calib_P + 1) # the +1 is temporary, remove that extra point in next line
+                p_cmd = p_cmd[:-1] # since there is very little useful data right near the center
                 data[pos_id]['target_posTP'] = [[t,p] for t in t_cmd for p in p_cmd]
                 data[pos_id]['trans'] = posmodel.trans
                 data[pos_id]['petal'] = petal
@@ -544,28 +545,47 @@ class PosMoveMeasure(object):
         """
         param_keys = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','OFFSET_X','OFFSET_Y']
         for pos_id in data.keys():
-            trans = data[pos_id].trans
-            target_tp = np.array(data['target_posTP']).transpose().tolist()
-            meas_xy = np.array(data['measured_obsXY']).transpose()
+            trans = data[pos_id]['trans']   
             trans.alt_override = True
-            def expected_xy(params):
-                for i in range(len(param_keys)):
-                    trans.alt[param_keys[i]] = params[i]
-                return trans.posTP_to_obsXY(target_tp)
-            def err_norm(params):
-                expected = np.array(expected_xy(params))
-                all_err = expected - meas_xy
-                return np.linalg.norm(all_err,ord='fro')
-            param_defaults = postransforms.PosTransforms().alt
-            params0 = [param_defaults[key] for key in param_keys]
-            params_optimized = scipy.optimize.fmin(func=err_norm, x0=params0)
+            num_DOF = len(param_keys) # need at least this many points to exactly constrain the TP --> XY transformation function
+            for key in param_keys:
+                data[pos_id][key] = []
+            data[pos_id]['ERR_NORM'] = []
+            data[pos_id]['point_numbers'] = []
+            initial_params_dict = postransforms.PosTransforms().alt
+            params0 = [initial_params_dict[key] for key in param_keys]
+            point0 = num_DOF-1
+            for pt in range(point0,len(data[pos_id]['measured_obsXY'])):
+                meas_xy = np.array([data[pos_id]['measured_obsXY'][j] for j in range(pt+1)]).transpose()
+                targ_tp = np.array([data[pos_id]['target_posTP'][j] for j in range(pt+1)]).transpose()
+                def expected_xy(params):
+                    for j in range(len(param_keys)):
+                        trans.alt[param_keys[j]] = params[j]
+                    return trans.posTP_to_obsXY(targ_tp.tolist())
+                def err_norm(params):
+                    expected = np.array(expected_xy(params))
+                    all_err = expected - meas_xy
+                    return np.linalg.norm(all_err,ord='fro')
+                for j in range(len(param_keys)):                    
+                    if 'LENGTH' in param_keys[j]:
+                        params0[j] = abs(params0[j]) # don't let the radii flip signs
+                params_optimized = scipy.optimize.fmin(func=err_norm, x0=params0, disp=False)
+                params0 = params_optimized
+                if pt > point0: # don't bother logging first point, which is always junk and just getting the (x,y) offset in the ballpark
+                    data[pos_id]['ERR_NORM'].append(err_norm(params_optimized))
+                    data[pos_id]['point_numbers'].append(pt+1)
+                    debug_str = 'Grid calib on ' + str(pos_id) + ' point ' + str(data[pos_id]['point_numbers'][-1]) + ':'
+                    debug_str += ' ERR_NORM=' + format(data[pos_id]['ERR_NORM'][-1],'.3f')
+                    for j in range(len(param_keys)):
+                        data[pos_id][param_keys[j]].append(params_optimized[j])
+                        debug_str += '  ' + param_keys[j] +': ' + format(data[pos_id][param_keys[j]][-1],'.3f')
+                    print(debug_str)
             trans.alt_override = False
             petal = data[pos_id]['petal']
-            for i in range(len(param_keys)):
-                petal.set(pos_id,param_keys[i],params_optimized[i])
-                print('Grid calib on ' + str(pos_id) + ': ' + param_keys[i] + ' set to ' + params_optimized[i])
-            data[pos_id]['ERR_NORM'] = err_norm(params_optimized)
-            data[pos_id]['final_expected_obsXY'] = expected_xy(params_optimized)
+            for key in param_keys:
+                petal.set(pos_id,key,data[pos_id][key][-1])
+                print('Grid calib on ' + str(pos_id) + ': ' + key + ' set to ' + format(data[pos_id][key][-1],'.3f'))
+            data[pos_id]['final_expected_obsXY'] = np.array(expected_xy(params_optimized)).transpose().tolist()
         return data
 
     def _calculate_and_set_arms_and_offsets_from_arc_data(self, T, P, set_gear_ratios=False):

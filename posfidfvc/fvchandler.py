@@ -116,7 +116,7 @@ class FVCHandler(object):
             xy_dict = self.dos_fvc['proxy'].get_centers()
             xy = []
             for params in xy_dict.values():
-                xy.append([params[x], params[y]])
+                xy.append([params['x'], params['y']])
         else:
             xy = []
         xy_np = np.array(xy).transpose()
@@ -136,9 +136,9 @@ class FVCHandler(object):
         return np.array([[np.cos(radians), -np.sin(radians)], [np.sin(radians), np.cos(radians)]])
 
 if __name__ == '__main__':
-    f = FVCHandler(fvc_type='FLI')
-    n_objects = 6
-    n_repeats = 5
+    f = FVCHandler(fvc_type='SBIG')
+    n_objects = 4
+    n_repeats = 1
     xy = []
     print('start taking ' + str(n_repeats) + ' images')
     start_time = time.time()

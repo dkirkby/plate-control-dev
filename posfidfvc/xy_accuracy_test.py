@@ -18,14 +18,14 @@ fvc = fvchandler.FVCHandler('SBIG')
 fvc.scale = 0.0061 # mm/pixel (update um_scale below if not in mm)
 fvc.rotation = 0  # deg
 um_scale = 1000 # um/mm
-pos_ids = ['UM00014']
+pos_ids = ['UM00013']
 fid_can_ids = []
 petal_id = 1
 ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure(ptl,fvc)
-m.n_points_full_calib_T = 11#17
-m.n_points_full_calib_P = 7#9
+m.n_points_full_calib_T = 6#11#17
+m.n_points_full_calib_P = 6#7#9
 m.n_fiducial_dots = 3 # number of fiducial centroids the FVC should expect
 num_corr_max = 4 # number of correction moves to do for each target
 
@@ -33,9 +33,10 @@ num_corr_max = 4 # number of correction moves to do for each target
 should_initial_rehome     = True
 should_identify_fiducials = True
 should_identify_pos_loc   = False
-should_calibrate_quick    = True
-should_measure_ranges     = True
-should_calibrate_full     = True
+should_calibrate_quick    = False
+should_measure_ranges     = False
+should_calibrate_grid     = True
+should_calibrate_full     = False
 should_do_accuracy_test   = True
 
 # certain operations require particular preceding operations
@@ -64,7 +65,7 @@ def summary_plot_name(pos_id):
 # this will get copied and transformed to each particular positioner's location below
 grid_max_radius = 5.8 # mm
 grid_min_radius = 0.2 # mm
-n_pts_across = 7 # 7 --> 28 pts, 27 --> 528 pts
+n_pts_across = 27 # 7 --> 28 pts, 27 --> 528 pts
 line = np.linspace(-grid_max_radius,grid_max_radius,n_pts_across)
 local_targets = [[x,y] for x in line for y in line]
 for i in range(len(local_targets)-1,-1,-1): # traverse list from end backward
@@ -93,7 +94,11 @@ if should_measure_ranges:
     m.measure_range(pos_ids='all', axis='phi')
     m.rehome(pos_ids='all')
     if not(should_calibrate_full):
-        m.calibrate(pos_ids='all', mode='quick', save_file_dir=log_directory, save_file_timestamp=log_timestamp) # needed after having struck hard limits
+        mode = 'grid' if should_calibrate_grid else should_calibrate_quick
+        m.calibrate(pos_ids='all', mode=mode, save_file_dir=log_directory, save_file_timestamp=log_timestamp) # needed after having struck hard limits
+
+if should_calibrate_grid:
+    m.calibrate(pos_ids='all', mode='grid', save_file_dir=log_directory, save_file_timestamp=log_timestamp)
 
 # full calibration
 if should_calibrate_full:

@@ -94,21 +94,22 @@ def plot_grid(path, pos_id, data):
     target_posTP = np.array(data[pos_id]['target_posTP'])
     measured_obsXY = np.array(data[pos_id]['measured_obsXY'])
     expected_obsXY = np.array(data[pos_id]['final_expected_obsXY'])
+    point_nums = np.array(data[pos_id]['point_numbers'])
     params = {0: {'ERR_NORM':np.array(data[pos_id]['ERR_NORM'])*1000,
 	                                   'unit':'um',
                                        'title':'error of calibration'},
-	          1: {'LENGTH_R1':np.array(data[pos_id]['LENGTH_R1']),
+	         1: {'LENGTH_R1':np.array(data[pos_id]['LENGTH_R1']),
 	                                    'LENGTH_R2':np.array(data[pos_id]['LENGTH_R2']),
 										'unit':'mm',
                                         'title':'kinematic arm lengths'},
-			  2: {'OFFSET_T':np.array(data[pos_id]['OFFSET_T']),
+		    2: {'OFFSET_T':np.array(data[pos_id]['OFFSET_T']),
 							            'OFFSET_P':np.array(data[pos_id]['OFFSET_P']),
 							            'unit':'deg',
                                         'title':'theta and phi offsets'},
-			  3: {'OFFSET_X':np.array(data[pos_id]['OFFSET_X']),
+		    3: {'OFFSET_X':np.array(data[pos_id]['OFFSET_X']),
 						          'unit':'mm',
                                   'title':'global x offset'},
-			  4: {'OFFSET_Y':np.array(data[pos_id]['OFFSET_Y']),
+		    4: {'OFFSET_Y':np.array(data[pos_id]['OFFSET_Y']),
 						          'unit':'mm',
                                   'title':'global y offset'}}
 
@@ -139,14 +140,14 @@ def plot_grid(path, pos_id, data):
         line_format = 'b-'
         for q in params[p].keys():
             if q != 'unit' and q != 'title':
-                xticks = np.arange(len(params[p][q]))
-                point_nums = xticks + 1
                 plt.plot(point_nums,params[p][q],line_format,label=q)
                 line_format = 'r-'
         plt.xlabel('number of points measured')
         plt.ylabel(params[p]['title'] + ' (' + params[p]['unit'] + ')')
         plt.legend(loc='upper right',fontsize=8)
         plt.xticks(point_nums, [format(x,'.0f') for x in point_nums])
+        if p == 'OFFSET_X' or p == 'OFFSET_Y':
+            plt.yticks(params[p][q], [format(x,'.1f') for x in params[p][q]])
     plt.tight_layout(pad=2.0)
     plt.savefig(path,dpi=150)
     plt.close(fig)
