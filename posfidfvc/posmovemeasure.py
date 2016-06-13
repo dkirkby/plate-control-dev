@@ -26,6 +26,8 @@ class PosMoveMeasure(object):
         self.phi_Eo_margin = 3.0 # [deg] margin on staying within Eo envelope
         self.calib_arc_margin = 3.0 # [deg] margin on calibration arc range
         self.general_trans = postransforms.PosTransforms() # general transformation object (not specific to calibration of any one positioner), useful for things like obsXY to QS or QS to obsXY coordinate transforms
+        self.grid_calib_param_keys = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','OFFSET_X','OFFSET_Y']
+        self.grid_calib_keep_phi_within_Eo = False # during grid calibration method, whether to keep phi axis always within the non-collidable envelope
 
     def fiducials_on(self):
         """Turn on all fiducials on all petals."""
@@ -234,7 +236,11 @@ class PosMoveMeasure(object):
         def save_file(pos_id):
             return save_file_dir + os.path.sep + pos_id + '_' + save_file_timestamp + '_calib_' + mode + '.png'
         if mode == 'grid':
-            grid_data = self._measure_calibration_grid(pos_ids,keep_phi_within_Eo=True)
+            if self.grid_calib_num_DOF >= self.grid_calib_num_constraints: # the '=' in >= comparison is due to some places in the code where I am requiring at least one extra point more than exact constraint 
+                print('Not enough points requested to constrain grid calibration. Defaulting to arc calibration method.')
+                self.calibrate(pos_ids,'quick',save_file_dir,save_file_timestamp)
+                return
+            grid_data = self._measure_calibration_grid(pos_ids, keep_phi_within_Eo=self.grid_calib_keep_phi_within_Eo)
             grid_data = self._calculate_and_set_arms_and_offsets_from_grid_data(grid_data, set_gear_ratios=False)
             for pos_id in grid_data.keys():
                 poscalibplot.plot_grid(save_file(pos_id), pos_id, grid_data)
@@ -453,7 +459,7 @@ class PosMoveMeasure(object):
             'target_dtdp'     ... delta moves which were attempted
             'measured_obsXY'  ... resulting measured xy positions
             'xy_center'       ... best fit arc's xy center
-            'radius'          ... best fit arc's radius
+            'radius'          ... best fit arc's raTruedius
             'petal'           ... petal this pos_id is on
             'trans'           ... postransform object associated with this particular positioner
         """
@@ -543,18 +549,17 @@ class PosMoveMeasure(object):
         more information on format of the dictionary 'data'. This method adds the fields 'ERR_NORM' and
         'final_expected_obsXY' to the data dictionary for each positioner.
         """
-        param_keys = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','OFFSET_X','OFFSET_Y']
+        param_keys = self.grid_calib_param_keys
         for pos_id in data.keys():
             trans = data[pos_id]['trans']   
             trans.alt_override = True
-            num_DOF = len(param_keys) # need at least this many points to exactly constrain the TP --> XY transformation function
             for key in param_keys:
                 data[pos_id][key] = []
             data[pos_id]['ERR_NORM'] = []
             data[pos_id]['point_numbers'] = []
             initial_params_dict = postransforms.PosTransforms().alt
             params0 = [initial_params_dict[key] for key in param_keys]
-            point0 = num_DOF-1
+            point0 = self.grid_calib_num_DOF - 1
             for pt in range(point0,len(data[pos_id]['measured_obsXY'])):
                 meas_xy = np.array([data[pos_id]['measured_obsXY'][j] for j in range(pt+1)]).transpose()
                 targ_tp = np.array([data[pos_id]['target_posTP'][j] for j in range(pt+1)]).transpose()
@@ -566,9 +571,16 @@ class PosMoveMeasure(object):
                     expected = np.array(expected_xy(params))
                     all_err = expected - meas_xy
                     return np.linalg.norm(all_err,ord='fro')
-                for j in range(len(param_keys)):                    
-                    if 'LENGTH' in param_keys[j]:
-                        params0[j] = abs(params0[j]) # don't let the radii flip signs
+                    
+                # apply some forced characteristics of parameters
+                params0[param_keys.index('LENGTH_R1')] = abs(params0[param_keys.index('LENGTH_R1')]) # don't let the radii flip signs
+                params0[param_keys.index('LENGTH_R2')] = abs(params0[param_keys.index('LENGTH_R2')]) # don't let the radii flip signs
+                offset_t_idx = param_keys.index('OFFSET_T')
+                if params0[offset_t_idx] > 180:
+                    params0[offset_t_idx] -= 360 # keep theta offset within +/-180
+                elif params0[offset_t_idx] < -180:
+                    params0[offset_t_idx] += 360 # keep theta offset within +/-180
+                
                 params_optimized = scipy.optimize.fmin(func=err_norm, x0=params0, disp=False)
                 params0 = params_optimized
                 if pt > point0: # don't bother logging first point, which is always junk and just getting the (x,y) offset in the ballpark
@@ -727,6 +739,14 @@ class PosMoveMeasure(object):
         phi_Eo_angle = poscollider.PosCollider().config['PHI_EO']
         phi_clear = phi_Eo_angle + self.phi_Eo_margin
         return phi_clear
+        
+    @property
+    def grid_calib_num_DOF(self):
+        return len(self.grid_calib_param_keys) # need at least this many points to exactly constrain the TP --> XY transformation function
+    
+    @property
+    def grid_calib_num_constraints(self):
+        return self.n_points_full_calib_T * self.n_points_full_calib_P
         
     def _wrap_consecutive_angles(self, angles, expected_sign_of_first_angle, expected_direction):
         """Wrap angles in one expected direction. It is expected that the physical deltas

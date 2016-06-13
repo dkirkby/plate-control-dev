@@ -138,28 +138,32 @@ def plot_grid(path, pos_id, data):
         subplot_num += 1
         plt.subplot(2,3,subplot_num)
         line_format = 'b-'
+        param_label = ''
         for q in params[p].keys():
             if q != 'unit' and q != 'title':
-                plt.plot(point_nums,params[p][q],line_format,label=q)
+                values = params[p][q]
+                plt.plot(point_nums,values,line_format,label=q)
                 line_format = 'r-'
+                param_label = q
         plt.xlabel('number of points measured')
         plt.ylabel(params[p]['title'] + ' (' + params[p]['unit'] + ')')
         plt.legend(loc='upper right',fontsize=8)
         plt.xticks(point_nums, [format(x,'.0f') for x in point_nums])
-        if p == 'OFFSET_X' or p == 'OFFSET_Y':
-            plt.yticks(params[p][q], [format(x,'.1f') for x in params[p][q]])
+        if param_label == 'OFFSET_X' or param_label == 'OFFSET_Y':
+            plt.yticks(plt.yticks()[0], [format(x,'.2f') for x in plt.yticks()[0]])
     plt.tight_layout(pad=2.0)
     plt.savefig(path,dpi=150)
     plt.close(fig)
 
-##fakedata = {'somepos':{'target_posTP':[[0,0],[90,0],[180,0],[-90,0]],
-##                       'measured_obsXY':[[6.1,0.2],[-0.1,5.9],[-5.7,0.2],[0.1,-6.2]],
-##					   'final_expected_obsXY':[[6,0],[0,6],[-6,0],[0,-6]],
-##					   'ERR_NORM':[.2,.1,.05,.01],
-##					   'LENGTH_R1':[3.1,2.9,3.05,2.95],
-##					   'LENGTH_R2':[3.2,2.7,2.8,3.05],
-##					   'OFFSET_T':[0,10,-20,5],
-##					   'OFFSET_P':[7,-3,-12,2],
-##					   'OFFSET_X':[1,2,-1,0],
-##					   'OFFSET_Y':[-1,0.5,2,0.3]}}
-##plot_grid('out.png','somepos',fakedata)
+#fakedata = {'somepos':{'target_posTP':[[0,0],[90,0],[180,0],[-90,0]],
+#                       'measured_obsXY':[[6.1,0.2],[-0.1,5.9],[-5.7,0.2],[0.1,-6.2]],
+#                       'final_expected_obsXY':[[6,0],[0,6],[-6,0],[0,-6]],
+#                       'point_numbers':[7,8,9,10],
+#                       'ERR_NORM':[.2,.1,.05,.01],
+#                       'LENGTH_R1':[3.1,2.9,3.05,2.95],
+#                       'LENGTH_R2':[3.2,2.7,2.8,3.05],
+#                       'OFFSET_T':[0,10,-20,5],
+#                       'OFFSET_P':[7,-3,-12,2],
+#                       'OFFSET_X':[1,2,-1,0],
+#                       'OFFSET_Y':[-1,0.5,2,0.3]}}
+#plot_grid('out.png','somepos',fakedata)
