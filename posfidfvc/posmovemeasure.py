@@ -574,13 +574,20 @@ class PosMoveMeasure(object):
                     
                 # apply some forced characteristics of parameters
                 params0[param_keys.index('LENGTH_R1')] = abs(params0[param_keys.index('LENGTH_R1')]) # don't let the radii flip signs
-                params0[param_keys.index('LENGTH_R2')] = abs(params0[param_keys.index('LENGTH_R2')]) # don't let the radii flip signs
+				length_r2_idx = param_keys.index('LENGTH_R2')
+				if params0[length_r2_idx] < 0:
+					params0[length_r2_idx] = abs(params0[param_keys.index('LENGTH_R2')]) # don't let the radii flip signs
+					offset_p_idx = param_keys.index('OFFSET_P')
+					if params0[offset_p_idx] < -180:
+						params0[offset_p_idx] += 180 # prevent combined phi / R2 sign flip
+					elif params0[offset_p_idx] > 180:
+						params0[offset_p_idx] -= 180 # prevent combined phi / R2 sign flip
                 offset_t_idx = param_keys.index('OFFSET_T')
                 if params0[offset_t_idx] > 180:
                     params0[offset_t_idx] -= 360 # keep theta offset within +/-180
                 elif params0[offset_t_idx] < -180:
                     params0[offset_t_idx] += 360 # keep theta offset within +/-180
-                
+				
                 params_optimized = scipy.optimize.fmin(func=err_norm, x0=params0, disp=False)
                 params0 = params_optimized
                 if pt > point0: # don't bother logging first point, which is always junk and just getting the (x,y) offset in the ballpark
