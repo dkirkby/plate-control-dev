@@ -28,6 +28,9 @@ class PosMoveMeasure(object):
         self.general_trans = postransforms.PosTransforms() # general transformation object (not specific to calibration of any one positioner), useful for things like obsXY to QS or QS to obsXY coordinate transforms
         self.grid_calib_param_keys = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','OFFSET_X','OFFSET_Y']
         self.grid_calib_keep_phi_within_Eo = False # during grid calibration method, whether to keep phi axis always within the non-collidable envelope
+        self.n_points_grid_calib_T = 6
+        self.n_points_grid_calib_P = 6
+
 
     def fiducials_on(self):
         """Turn on all fiducials on all petals."""
@@ -345,9 +348,9 @@ class PosMoveMeasure(object):
                 range_P = posmodel.targetable_range_P
                 if keep_phi_within_Eo:
                     range_P[0] = self.phi_clear_angle
-                t_cmd = np.linspace(min(range_T),max(range_T),self.n_points_full_calib_T + 1) # the +1 is temporary, remove that extra point in next line
+                t_cmd = np.linspace(min(range_T),max(range_T),self.n_points_grid_calib_T + 1) # the +1 is temporary, remove that extra point in next line
                 t_cmd = t_cmd[:-1] # since theta covers +/-180, it is kind of redundant to hit essentially the same points again
-                p_cmd = np.linspace(min(range_P),max(range_P),self.n_points_full_calib_P + 1) # the +1 is temporary, remove that extra point in next line
+                p_cmd = np.linspace(min(range_P),max(range_P),self.n_points_grid_calib_P + 1) # the +1 is temporary, remove that extra point in next line
                 p_cmd = p_cmd[:-1] # since there is very little useful data right near the center
                 data[pos_id]['target_posTP'] = [[t,p] for t in t_cmd for p in p_cmd]
                 data[pos_id]['trans'] = posmodel.trans
@@ -571,32 +574,17 @@ class PosMoveMeasure(object):
                     expected = np.array(expected_xy(params))
                     all_err = expected - meas_xy
                     return np.linalg.norm(all_err,ord='fro')
-                    
-                # apply some forced characteristics of parameters
-                params0[param_keys.index('LENGTH_R1')] = abs(params0[param_keys.index('LENGTH_R1')]) # don't let the radii flip signs
-				length_r2_idx = param_keys.index('LENGTH_R2')
-				if params0[length_r2_idx] < 0:
-					params0[length_r2_idx] = abs(params0[param_keys.index('LENGTH_R2')]) # don't let the radii flip signs
-					offset_p_idx = param_keys.index('OFFSET_P')
-					if params0[offset_p_idx] < -180:
-						params0[offset_p_idx] += 180 # prevent combined phi / R2 sign flip
-					elif params0[offset_p_idx] > 180:
-						params0[offset_p_idx] -= 180 # prevent combined phi / R2 sign flip
-                offset_t_idx = param_keys.index('OFFSET_T')
-                if params0[offset_t_idx] > 180:
-                    params0[offset_t_idx] -= 360 # keep theta offset within +/-180
-                elif params0[offset_t_idx] < -180:
-                    params0[offset_t_idx] += 360 # keep theta offset within +/-180
-				
-                params_optimized = scipy.optimize.fmin(func=err_norm, x0=params0, disp=False)
-                params0 = params_optimized
+ 
+                bounds = ((2.5,3.5),(2.5,3.5),(-180,180),(-50,50),(None,None),(None,None)) #Ranges which values should be in
+                params_optimized = scipy.optimize.minimize(fun=err_norm, x0=params0, bounds=bounds)
+                params0 = params_optimized.x
                 if pt > point0: # don't bother logging first point, which is always junk and just getting the (x,y) offset in the ballpark
-                    data[pos_id]['ERR_NORM'].append(err_norm(params_optimized))
+                    data[pos_id]['ERR_NORM'].append(err_norm(params_optimized.x))
                     data[pos_id]['point_numbers'].append(pt+1)
                     debug_str = 'Grid calib on ' + str(pos_id) + ' point ' + str(data[pos_id]['point_numbers'][-1]) + ':'
                     debug_str += ' ERR_NORM=' + format(data[pos_id]['ERR_NORM'][-1],'.3f')
                     for j in range(len(param_keys)):
-                        data[pos_id][param_keys[j]].append(params_optimized[j])
+                        data[pos_id][param_keys[j]].append(params_optimized.x[j])
                         debug_str += '  ' + param_keys[j] +': ' + format(data[pos_id][param_keys[j]][-1],'.3f')
                     print(debug_str)
             trans.alt_override = False
@@ -604,7 +592,7 @@ class PosMoveMeasure(object):
             for key in param_keys:
                 petal.set(pos_id,key,data[pos_id][key][-1])
                 print('Grid calib on ' + str(pos_id) + ': ' + key + ' set to ' + format(data[pos_id][key][-1],'.3f'))
-            data[pos_id]['final_expected_obsXY'] = np.array(expected_xy(params_optimized)).transpose().tolist()
+            data[pos_id]['final_expected_obsXY'] = np.array(expected_xy(params_optimized.x)).transpose().tolist()
         return data
 
     def _calculate_and_set_arms_and_offsets_from_arc_data(self, T, P, set_gear_ratios=False):
