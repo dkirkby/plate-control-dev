@@ -28,7 +28,7 @@ m.n_fiducial_dots = 0
 is_assembled = True #Bool - whether just motor or assembed positioner
 axis = 'phi' 
 condition = 180 #How far to go
-stepsize = 10 #degrees each move
+stepsize = 30 #degrees each move
 m.fvc.scale = 0.0274 # mm/pixel (update um_scale below if not in mm)
 m.fvc.rotation = 0  # deg
 um_scale = 1000 # um/mm
@@ -74,9 +74,9 @@ file.close()
 #Take data (first point is rehome)
 this_timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
 target_xy.append(m.posPolar_to_obsXY(total_move_angle))
-print('Measuring position at', axis, ' angle', str(total_move_angle), 'degrees.')
+print('Measuring position with', axis, 'angle', str(total_move_angle), 'degrees.')
 m.rehome(can_id, axis)
-meas_obsXY = m.move_measure(can_id, direction, axis, 0)
+meas_obsXY = m.measure()#m.move_measure(can_id, direction, axis, 0)
 meas_xy.append(meas_obsXY)  
 meas_angle = m.obsXY_to_posPolar(meas_obsXY)
 err_x = target_xy[-1][0] - meas_obsXY[0]
@@ -97,12 +97,14 @@ row += '\n'
 file = open(move_log_name,'a')
 file.write(row)
 file.close()
-err_angle.append((total_move_angle - meas_angle))
+err_angle.append((meas_angle - total_move_angle))
+print('Angle Error:', err_angle[-1])
 err_2D.append(np.sqrt(err_x**2 + err_y**2))
  
-while total_move_angle < condition:
+while total_move_angle <= condition:
     this_timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
     total_move_angle += stepsize
+    local_angle = direction_sign*total_move_angle
     if (total_move_angle >= motor_max_angle) and is_assembled: #safety net - at least prevents too much hardstop ramming
         break
     target_angles.append(total_move_angle)
@@ -115,13 +117,13 @@ while total_move_angle < condition:
     err_y = target_xy[-1][1] - meas_obsXY[1]
     # update move data log
     row = this_timestamp
-    row += ',' + str(direction_sign*total_move_angle)
+    row += ',' + str(local_angle)
     row += ',' + str(target_xy[-1][0])
     row += ',' + str(target_xy[-1][1])
     row += ',' + str(meas_angle)
     row += ',' + str(meas_obsXY[0])
     row += ',' + str(meas_obsXY[1])
-    row += ',' + str((direction_sign*total_move_angle - meas_angle))
+    row += ',' + str((meas_angle - local_angle))
     row += ',' + str(err_x)
     row += ',' + str(err_y)
     row += ',' + str(np.sqrt(err_x**2 + err_y**2))
@@ -129,8 +131,9 @@ while total_move_angle < condition:
     file = open(move_log_name,'a')
     file.write(row)
     file.close()
-    err_angle.append((total_move_angle - meas_angle))
+    err_angle.append((meas_angle - local_angle))
     err_2D.append(np.sqrt(err_x**2 + err_y**2))
+    print('Angle Error:', err_angle[-1])
 
 
 #Extract data

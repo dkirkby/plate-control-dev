@@ -23,26 +23,39 @@ class MotorMoveMeasure(object):
         self.angle_offset = None
         self.offset_x = None
         self.offset_y = None
-        self.antibacklash = 3 #Degrees from _genl_settings_DEFAULT.conf
         self.axis = None
         self.n_fiducial_dots = 1
         self.n_pos_dots = 1 #Do not change, does not support more than 1 positioner
-        self.ref_dist_tol = .2 #same as posmovemeasure 
+        self.ref_dist_tol = .1 #same as posmovemeasure 
         self.expected_posXY = [[self.offset_x, self.offset_y]]
         self.fiducials_xy = []
+        self.allow_cruise = True
+        #Configuration
+        self.antibacklash = 3 #Degrees from _genl_settings_DEFAULT.conf
+        self._gear_ratio = pc.gear_ratio['namiki']
+        self._gear_calib = 1 #Will be 1 for a while as we do not currently calibrate gear ratio
+        self._ccw_direction = -1 #-1 is the standard wiring for theta and phi since UM00051
+        self._stepsize_creep = .1 #posmodel
+        self._stepsize_cruise = 3.3 #posmodel
+        self._spindown_period = 12 #_genl_setting_DEFAULT.conf
+        self._min_distance_cruise = 180.0 #_genl_setting_DEFAULT.conf in motor not shaft degrees
+        self._spindown_distance = sum(range(round(self._stepsize_cruise/self._stepsize_creep)+1))*self._stepsize_creep*self._spindown_period
+        
                 
         
     def rehome(self, can_id, axis):
         print('REHOMING can id:', can_id)
         if axis == 'theta':
             self.comm.move(can_id, 'ccw', 'cruise', axis, 507) #507 degrees is 390*1.3 as done in posmodel
+            self._wait_while_moving(can_id, 'cruise')
         else:
             self.comm.move(can_id, 'ccw', 'cruise', axis, 247) #247 degrees is 190*1.3 as done in posmodel
-        self._wait_while_moving(can_id)
+            self._wait_while_moving(can_id, 'cruise')
         return
     
     def move(self, can_id, direction, axis, amount):
         #Move Command with built in antibacklash and final creep logic
+        print('Moving', axis, str(amount), 'degrees.')
         if direction == 'ccw':
             direction_opp = 'cw'
             if amount < 0: #comm.move doesn't take negative values, I want to be able to take them.
@@ -55,17 +68,19 @@ class MotorMoveMeasure(object):
                 amount = abs(amount)
                 direction = 'ccw'
                 direction_opp = 'cw'
-        mode = 'cruise'
-        if amount < 3:
-            mode = 'creep'
-        print('Moving', axis, str(amount), 'degrees.')
-        self.comm.move(can_id, direction, mode, axis, amount)
-        self._wait_while_moving(can_id)
-        self.comm.move(can_id, direction, 'creep', axis, self.antibacklash)
-        self._wait_while_moving(can_id)
-        final_creep = abs(amount - (self.antibacklash + amount))
-        self.comm.move(can_id, direction_opp, 'creep', axis, final_creep)
-        self._wait_while_moving(can_id)
+        true_dist, mode = self._true_move(amount, allow_cruise=self.allow_cruise)
+        self.comm.move(can_id, direction, mode, axis, true_dist-3.2)
+        self._wait_while_moving(can_id, mode)
+        true_anti_backlash, mode = self._true_move(self.antibacklash, allow_cruise=self.allow_cruise)
+        self.comm.move(can_id, direction, mode, axis, true_anti_backlash)
+        self._wait_while_moving(can_id,mode)
+        final_creep = amount - (true_dist + true_anti_backlash)
+        if final_creep < 0:
+            final_creep = abs(final_creep)
+            direction = direction_opp
+        true_final_creep, mode = self._true_move(final_creep, allow_cruise=False)
+        self.comm.move(can_id, direction, mode, axis, true_final_creep)
+        self._wait_while_moving(can_id,mode)
         return
         
     def measure(self):
@@ -99,8 +114,11 @@ class MotorMoveMeasure(object):
         return [posX, posY]
         
     def posXY_to_posPolar(self, xy):
-        sign = np.sign(xy[1])
-        angle = sign * np.arccos(xy[0]/self.radius)
+        arccos_arg = np.dot(xy,[1,0])/np.linalg.norm(xy)
+        #sign = np.sign(xy[1])
+        angle = np.arccos(arccos_arg)
+        if xy[1] < 0:
+                angle = 2*np.pi - angle
         return np.rad2deg(angle - self.angle_offset)
         
     def posPolar_to_obsXY(self, angle):
@@ -161,9 +179,11 @@ class MotorMoveMeasure(object):
             # arms and offsets
             ctr = np.array(meas_data['xy_center'])
             home_posXY = np.array(meas_obsXY[0]) - ctr
-            sign = np.sign(home_posXY[1])
-            arccos_arg = home_posXY[0]/meas_data['radius']
-            angle_offset = sign * np.arccos(arccos_arg)
+            #sign = np.sign(home_posXY[1])
+            arccos_arg = np.dot(home_posXY,[1,0])/np.linalg.norm(home_posXY)
+            angle_offset = np.arccos(arccos_arg)
+            if home_posXY[1] < 0:
+                angle_offset = 2*np.pi - angle_offset
             if meas_data['axis'] == 'theta':
                 #petal.set(pos_id,'LENGTH_R1',meas_data['radius'])
                 radius = meas_data['radius']
@@ -227,21 +247,45 @@ class MotorMoveMeasure(object):
             ref_idxs.sort(reverse=True)
             for i in ref_idxs:
                 xy_test.pop(i) # get rid of all but the moving pos
-            self.expected_posXY = xy_test   
+            self.expected_posXY = xy_test
+            
+    def _true_move(self, distance, allow_cruise = False):
+        true_dist = self._shaft_to_motor(distance)
+        if not(allow_cruise) or abs(true_dist) < abs((2*self._spindown_distance) + self._min_distance_cruise):
+            mode = 'creep'
+            motor_steps = int(round(true_dist/self._stepsize_creep))
+            true_dist = motor_steps * self._stepsize_creep
+        else:
+            mode = 'cruise'
+            motor_steps = int(round(true_dist/self._stepsize_cruise))
+            true_dist = motor_steps * self._stepsize_cruise
+        true_dist = self._motor_to_shaft(true_dist)
+        return true_dist, mode
+        
+    def _shaft_to_motor(self, distance):
+        return distance*self._ccw_direction*(self._gear_ratio*self._gear_calib)
+        
+    def _motor_to_shaft(self, distance):
+        return distance*self._ccw_direction/(self._gear_ratio*self._gear_calib)
     
-    
-    def _wait_while_moving(self, can_id):
+    def _wait_while_moving(self, can_id, mode):
+        #Normal wait function works intermittently, implemented manual wait with conservative time estimates.
+        if mode == 'cruise':
+            time.sleep(2)
+        else:
+            time.sleep(4)
         """Blocking implementation, to not send move tables while any positioners are still moving.
 
         Inputs:     canids ... integer CAN id numbers of all the positioners to check whether they are moving
 
         The implementation has the benefit of simplicity, but it is acknowledged there may be 'better',
         i.e. multi-threaded, ways to achieve this, to be implemented later.
-        """
+        """"""
         timeout = 30.0 # seconds
         poll_period = 0.5 # seconds
         keep_waiting = True
         start_time = time.time()
+        #time.sleep(5)
 
         while keep_waiting:
 
@@ -250,8 +294,10 @@ class MotorMoveMeasure(object):
                 keep_waiting = False
 
             if self.comm.ready_for_tables([can_id]):
+                print('ready for tables')
                 keep_waiting = False
              
             else:
-
+                print('sleeping')
                 time.sleep(poll_period)
+        """
