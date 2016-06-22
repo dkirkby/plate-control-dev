@@ -64,6 +64,8 @@ posfidfvc/SBIG/sbigcam.py -text
 posfidfvc/SBIG/stf.py -text
 posfidfvc/fitcircle.py -text
 posfidfvc/fvchandler.py -text
+posfidfvc/motormovemeasure.py -text
+posfidfvc/motortest.py -text
 posfidfvc/pos_xytest_plot.py -text
 posfidfvc/poscalibplot.py -text
 posfidfvc/posmovemeasure.py -text
