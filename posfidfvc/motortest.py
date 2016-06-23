@@ -20,15 +20,15 @@ import posconstants as pc
 import numpy as np
 
 direction = 'cw'
-pos_id = 'M00004' #name for plots only
-can_id = 1004
+pos_id = 'Ti01' #name for plots only
+can_id = 221
 petal_id = 4
 m = motormovemeasure.MotorMoveMeasure(petal_id)
 m.n_fiducial_dots = 0
 is_assembled = True #Bool - whether just motor or assembed positioner
 axis = 'phi' 
 condition = 180 #How far to go
-stepsize = 30 #degrees each move
+stepsize = 9 #degrees each move
 m.fvc.scale = 0.0274 # mm/pixel (update um_scale below if not in mm)
 m.fvc.rotation = 0  # deg
 um_scale = 1000 # um/mm
@@ -107,9 +107,9 @@ while total_move_angle <= condition:
     local_angle = direction_sign*total_move_angle
     if (total_move_angle >= motor_max_angle) and is_assembled: #safety net - at least prevents too much hardstop ramming
         break
-    target_angles.append(total_move_angle)
-    target_xy.append(m.posPolar_to_obsXY(direction_sign*total_move_angle))
-    print('Measuring position at', axis, ' angle', str(total_move_angle), 'degrees.')
+    target_angles.append(local_angle)
+    target_xy.append(m.posPolar_to_obsXY(local_angle))
+    print('Measuring position at', axis, 'angle', str(total_move_angle), 'degrees.')
     meas_obsXY = m.move_measure(can_id, direction, axis, stepsize)
     meas_xy.append(meas_obsXY)  
     meas_angle = m.obsXY_to_posPolar(meas_obsXY)
@@ -156,14 +156,22 @@ summary += 'mean_err_angle,' + str(np.mean(err_angle)) + '\n'
 summary += 'rms_err_angle,' + str(np.sqrt(np.mean(np.array(err_angle)**2))) + '\n'
 file.write(summary)
 file.close()
-           
+          
 #Plot Positions
 figure = plt.figure(figsize=(10, 8), dpi=150)
 plt.title(title + '_plot')
+circle_angles = np.arange(0,365,5)*np.pi/180
+circle_x = m.offset_x + m.radius * np.cos(circle_angles)
+circle_y = m.offset_y + m.radius * np.sin(circle_angles)
+offset_line_angles = np.array([m.angle_offset-np.pi,m.angle_offset])
+offset_line_x = m.offset_x + m.radius * np.cos(offset_line_angles)
+offset_line_y = m.offset_y + m.radius * np.sin(offset_line_angles)
 plt.ylabel('obsY (mm)')
 plt.xlabel('obsX (mm)')
 plt.plot(target_x, target_y,'ro',label='target points',markersize=4,markeredgecolor='r',markerfacecolor='None')
 plt.plot(meas_x, meas_y,'k+',label='measured data',markersize=6,markeredgewidth='1')
+#plt.plot(circle_x, circle_y, 'b')
+#plt.plot(offset_line_x, offset_line_y, 'r')
 plt.grid(True)
 plt.axis('equal')
 plt.savefig(pc.test_logs_directory + title + '_plot.png',dpi=150)
