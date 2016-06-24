@@ -56,34 +56,27 @@ class MotorMoveMeasure(object):
         if axis == 'theta':
             self.comm.move(can_id, 'ccw', 'cruise', axis, 507) #507 degrees is 390*1.3 as done in posmodel
             self._wait_while_moving(can_id, 'cruise')
-            self.comm.move(can_id, 'cw', 'creep', axis, self.antibacklash + self.hardstop_clearence)
-            self._wait_while_moving(can_id, 'creep')
         else:
             self.comm.move(can_id, 'ccw', 'cruise', axis, 247) #247 degrees is 190*1.3 as done in posmodel
             self._wait_while_moving(can_id, 'cruise')
-            self.comm.move(can_id, 'cw', 'creep', axis, self.antibacklash + self.hardstop_clearence)
-            self._wait_while_moving(can_id, 'creep')
+        self.comm.move(can_id, 'cw', 'cruise', axis, self.hardstop_clearence)
+        self._wait_while_moving(can_id, 'cruise')
         return
     
     def move(self, can_id, direction, axis, amount):
         #Move Command with built in antibacklash and final creep logic
         print('Moving', axis, direction, str(amount), 'degrees.')
-        move_dist = amount #account for spin up and down
+        amount = amount - self.antibacklash
+        move_dist = amount
         if direction == 'ccw':
             direction_opp = 'cw'
-            if amount < 0: #comm.move doesn't take negative values, I want to be able to take them.
-                amount = abs(amount) 
-                direction = 'cw'
-                direction_opp = 'ccw'
         else:
             direction_opp = 'ccw'
-            if amount < 0:
-                amount = abs(amount)
-                direction = 'ccw'
-                direction_opp = 'cw'
+
         true_dist = self._true_move(amount, allow_cruise=self.allow_cruise)
+        print(true_dist['speed_mode'])
         if true_dist['speed_mode'] == 'cruise':
-            move_dist -= self._cruise_adjustment
+            move_dist -= self._cruise_adjustment #account for spin up and down
         self.comm.move(can_id, direction, true_dist['speed_mode'], axis, move_dist)
         self._wait_while_moving(can_id, true_dist['speed_mode'])
         
@@ -91,7 +84,7 @@ class MotorMoveMeasure(object):
         self.comm.move(can_id, direction, true_anti_backlash['speed_mode'], axis, self.antibacklash)
         self._wait_while_moving(can_id,true_anti_backlash['speed_mode'])
         
-        final_creep = amount - (true_dist['distance'] + true_anti_backlash['distance'])
+        final_creep = amount - (true_dist['distance'])# true_anti_backlash['distance'])
         if final_creep < 0:
             final_creep = abs(final_creep)
             direction = direction_opp
@@ -237,11 +230,11 @@ class MotorMoveMeasure(object):
         """Generic function for identifying either all fiducials or a single positioner's location.
         """
         print('IDENTIFY')
-        nudges = [-10, 10]
+        nudges = ['ccw', 'cw']
         xy_ref = []
         n_dots = self.n_fiducial_dots + self.n_pos_dots
         for i in range(len(nudges)):
-            self.move(can_id, 'cw', axis, nudges[i])
+            self.comm.move(can_id, nudges[i],'cruise', axis, 10)
             if i == 0:
                 xy_init = self.fvc.measure(n_dots)
             else:
