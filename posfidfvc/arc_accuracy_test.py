@@ -17,6 +17,7 @@ script_start_time = time.time()
 # test configuration
 pos_ids = ['UM00013']
 pos_id_suffixes = ['titanium']
+log_suffix = '20C'
 def forward_back_sequence(start,step,nsteps,nrepeats):
     '''total number of entries in sequence = 1 + 2*nsteps*nrepeats'''
     sequence = [start]
@@ -141,16 +142,21 @@ for test in tests:
         data[pos_id][test][key] = test['data'][pos_id][key]
         data[pos_id]['combined'][key].append(test['data'][pos_id][key])
 
-# fits on measured data
+# best circle fits on measured data
 for pos_id in pos_ids:
-    data['meas_obsXY'] = [[data[pos_id]['combined']['meas_obsX'][i],data[pos_id]['combined']['meas_obsY'][i]] for i in range(len(data[pos_id]['combined']['meas_obsX']))]
-
-    # best fit circle
-    (xy_ctr,radius) = fitcircle.FitCircle().fit(data['meas_obsXY'])
+    meas_obsXY = [[data[pos_id]['combined']['meas_obsX'][i],data[pos_id]['combined']['meas_obsY'][i]] for i in range(len(data[pos_id]['combined']['meas_obsX']))]
+    (xy_ctr,radius) = fitcircle.FitCircle().fit(meas_obsXY)
     data[pos_id]['xy_ctr'] = xy_ctr
     data[pos_id]['radius'] = radius
     
-    # best fit angle offset (calibration of this offset is not what we're testing here)
+    # best angle offset (calibration of this offset is not what we're testing here)
+    x = data[pos_id]['combined']['meas_obsX']
+    y = data[pos_id]['combined']['meas_obsY']
+    meas_angle = np.arctan2(y,x)*180/np.pi
+    data[pos_id]['offset_angle'] = np.mean(meas_angle - data[pos_id]['combined']['targ_angle'])
+    
+# log and plot
+# plot xy errors
 
 --> CONTINUE WORK HERE
 
