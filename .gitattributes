@@ -62,6 +62,7 @@ posfidfvc/SBIG/readme -text
 posfidfvc/SBIG/sbig_grab_cen.py -text
 posfidfvc/SBIG/sbigcam.py -text
 posfidfvc/SBIG/stf.py -text
+posfidfvc/arc_accuracy_test.py -text
 posfidfvc/fitcircle.py -text
 posfidfvc/fvchandler.py -text
 posfidfvc/motormovemeasure.py -text
