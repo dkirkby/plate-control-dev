@@ -11,6 +11,9 @@ import time
 import pos_arctest_plot
 import fitcircle
 
+# simulation mode
+simulate = True
+
 # start timer on the whole script
 script_start_time = time.time()
 
@@ -52,13 +55,17 @@ time_per_move_guess = 9 # seconds
 print('   total all tests: ' + str(total_pts) + ' points, roughly ' + format(total_pts*time_per_move_guess/60,'0.1f') + ' minutes to complete test')
 
 # initialization
-fvc = fvchandler.FVCHandler('SBIG')
+if simulate:
+    fvc = fvchandler.FVCHandler('simulator')
+else:
+    fvc = fvchandler.FVCHandler('SBIG')
 fvc.scale = 0.0061 # mm/pixel (update um_scale below if not in mm)
 fvc.rotation = 0  # deg
 um_scale = 1000 # um/mm
 fid_can_ids = []
 petal_id = 1
 ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
+ptl.simulator_on = simulate
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure(ptl,fvc)
 m.n_fiducial_dots = 3 # number of fiducial centroids the FVC should expect
@@ -82,6 +89,7 @@ if should_measure_ranges: should_calibrate_quick = True
 log_directory = pc.test_logs_directory
 os.makedirs(log_directory, exist_ok=True)
 log_timestamp = datetime.datetime.now().strftime(pc.filename_timestamp_format)
+if simulate: log_timestamp += '_SIMULATED'
 log_suffix = ('_' + 'log_suffix') if log_suffix else ''
 def summary_name(pos_id):
     pos_id_suffix = pos_id_suffixes[pos_ids.index(pos_id)]
@@ -105,7 +113,6 @@ is_first_test_in_sequence = True
 pt = 0
 data_keys = ['meas_obsX','meas_obsY','cycle']
 for test in tests:
-    pt += 1
     for pos_id in pos_ids:
         test[pos_id] = {} # will store measured data in here for each positioner
         for key in data_keys:
@@ -127,6 +134,7 @@ for test in tests:
         requests = {}
         for pos_id in pos_ids:
             requests[pos_id] = {'command':'posTP', 'target':tp, 'log_note':test['axis'] + ' ' + test['title']}
+        pt += 1
         print('Measuring target ' + str(pt) + ' of ' + str(total_pts) + ' at angle ' + str(angle) + ' on ' + test['axis'] + ' (' + test['title'] + ' sequence)')
         test['timestamps'].append(str(datetime.datetime.now().strftime(pc.timestamp_format)))
         this_meas_data = m.move_measure(requests)
@@ -144,6 +152,9 @@ for pos_id in pos_ids:
     for test in tests:
         for key in data_keys:
             combined[pos_id][key].extend(test[pos_id][key])
+combined['targ_angle'] = []
+for test in tests:
+    combined['targ_angle'].extend(test['targ_angle'])
 
 # best circle fits on measured data
 for pos_id in pos_ids:
@@ -157,7 +168,7 @@ for pos_id in pos_ids:
     
     # best angle offset (calibration of this offset is not what we're testing here)
     meas_angle = np.degrees(np.arctan2(y,x))
-    combined['offset_angle'] = np.mean(meas_angle - combined[pos_id]['targ_angle'])
+    combined[pos_id]['offset_angle'] = np.mean(meas_angle - combined['targ_angle'])
     
 # collect log data
 for pos_id in pos_ids:
@@ -195,7 +206,7 @@ for pos_id in pos_ids:
             row += ',' + str(test[pos_id]['cycle'][i])
             row += ',' + str(test['title'])
             row += ',' + str(test['axis'])
-            row += ',' + str(test[pos_id]['targ_angle'][i])
+            row += ',' + str(test['targ_angle'][i])
             row += ',' + str(test[pos_id]['meas_obsX'][i])
             row += ',' + str(test[pos_id]['meas_obsY'][i])
             row += ',' + str(test[pos_id]['err_radial'][i])

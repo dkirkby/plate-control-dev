@@ -29,7 +29,7 @@ def plot(path, pos_id, tests, title):
     markers = std_markers.copy()
     colors = std_colors.copy()
     for test in tests:
-        angle = test[pos_id]['targ_angle']
+        angle = test['targ_angle']
         err_r = test[pos_id]['err_radial']
         err_r = np.multiply(err_r,1000)
         plt.plot(angle,err_r,markers.pop(0),label=test['title'],markeredgecolor=colors.pop(0),markerfacecolor='None',markersize=3)
@@ -42,7 +42,7 @@ def plot(path, pos_id, tests, title):
     colors = std_colors.copy()
     for test in tests:
         plt.subplot(2,3,remaining_subplots.pop(0))
-        angle = test[pos_id]['targ_angle']
+        angle = test['targ_angle']
         err_t = test[pos_id]['err_tangential']
         err_t = np.multiply(err_t,1000)
         plt.plot(angle,err_t,markers.pop(0),markeredgecolor=colors.pop(0),markerfacecolor='None',markersize=3)
@@ -73,7 +73,7 @@ def plot(path, pos_id, tests, title):
 #    x_meas = np.add([3.05, 3.1, -3.2, -4.2],x0)
 #    y_meas = np.add([3.99, -4.2, 4.2, -2.9],y0)
 #    a_targ = np.arctan2(y_meas,x_meas)
-#    faketest[pos_id]['targ_angle'] = np.degrees(a_targ).tolist()
+#    faketest['targ_angle'] = np.degrees(a_targ).tolist()
 #    faketest[pos_id]['meas_obsX'] = x_meas.tolist()
 #    faketest[pos_id]['meas_obsY'] = y_meas.tolist()
 #    r0 = 5

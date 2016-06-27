@@ -34,24 +34,16 @@ class FVCHandler(object):
             self.dos_fvc = {'proxy':None, 'uid':None}
             seeker = Seeker('-dos-', 'DOStest', found_callback=self._dos_seeker_callback)
             seeker.seek()
-            print("Seeking FVC...")
+            print('Seeking FVC...')
             while self.dos_fvc['proxy'] == None:
                 time.sleep(1)
-            print("Found FVC")
+            print('Found FVC')
+        elif self.fvc_type == 'simulator':
+            self.sim_err_max = 0.1
+            print('FVCHandler is in simulator mode with max errors of size ' + str(self.sim_err_max) + '.')
         self.rotation = 0        # [deg] rotation angle from image plane to object plane
         self.scale = 1.0         # scale factor from image plane to object plane
         self.translation = [0,0] # translation of origin within the image plane
-
-    def _dos_seeker_callback(self, dev):
-        """Check found connection from seeker
-        """
-        for key, value in dev.items():
-            if key == 'FVC':
-                if self.dos_fvc['uid'] == value['uid']:
-                    return # Already have a connection
-                proxy = Pyro4.Proxy(value['pyro_uri'])
-                self.dos_fvc['proxy'] = proxy
-                self.dos_fvc['uid'] = value['uid']
 
     def measure_and_identify(self, expected_pos_xy=[], expected_ref_xy=[]):
         """Calls for an FVC measurement, and returns a list of measured centroids.
@@ -68,17 +60,22 @@ class FVCHandler(object):
 
         Lists of xy coordinates are of the form [[x1,y1],[x2,y2],...]
         """
-        expected_xy = expected_pos_xy + expected_ref_xy
-        num_objects = len(expected_xy)
-        unsorted_xy = self.measure(num_objects)
-        measured_xy = self.sort_by_closeness(unsorted_xy, expected_xy)
-        measured_pos_xy = measured_xy[:len(expected_pos_xy)]
-        measured_ref_xy = measured_xy[len(expected_pos_xy):]
-        if len(measured_ref_xy) > 0:
-            xy_diff = np.array(measured_ref_xy) - np.array(expected_ref_xy)
-            xy_shift = np.median(xy_diff,axis=0)
-            measured_pos_xy -= xy_shift
-            measured_pos_xy = measured_pos_xy.tolist()
+        if self.fvc_type == 'simulator':
+            sim_errors = np.random.uniform(-self.sim_err_max,self.sim_err_max,np.shape(expected_pos_xy))
+            measured_pos_xy = (expected_pos_xy + sim_errors).tolist()
+            measured_ref_xy = expected_ref_xy
+        else:
+            expected_xy = expected_pos_xy + expected_ref_xy
+            num_objects = len(expected_xy)
+            unsorted_xy = self.measure(num_objects)
+            measured_xy = self.sort_by_closeness(unsorted_xy, expected_xy)
+            measured_pos_xy = measured_xy[:len(expected_pos_xy)]
+            measured_ref_xy = measured_xy[len(expected_pos_xy):]
+            if len(measured_ref_xy) > 0:
+                xy_diff = np.array(measured_ref_xy) - np.array(expected_ref_xy)
+                xy_shift = np.median(xy_diff,axis=0)
+                measured_pos_xy -= xy_shift
+                measured_pos_xy = measured_pos_xy.tolist()
         return measured_pos_xy, measured_ref_xy
 
     def sort_by_closeness(self, unknown_xy, expected_xy):
@@ -106,7 +103,7 @@ class FVCHandler(object):
         """Calls for an FVC image capture, applies transformations to get the
         centroids into the units and orientation of the object plane,  and returns
         the centroids.
-            xy ... list of the form [[x1,y1],[x2,y2],...]
+            num_objects     ... number of dots to look for in the captured image
         """
         if self.fvc_type == 'SBIG':
             xy,brightness,t = self.sbig.grab(num_objects)
@@ -128,6 +125,17 @@ class FVCHandler(object):
         xy_np += [translation_x,translation_y]
         xy = xy_np.transpose().tolist()
         return xy
+
+    def _dos_seeker_callback(self, dev):
+        """Check found connection from seeker
+        """
+        for key, value in dev.items():
+            if key == 'FVC':
+                if self.dos_fvc['uid'] == value['uid']:
+                    return # Already have a connection
+                proxy = Pyro4.Proxy(value['pyro_uri'])
+                self.dos_fvc['proxy'] = proxy
+                self.dos_fvc['uid'] = value['uid']
 
     @staticmethod
     def rotmat2D_deg(angle):

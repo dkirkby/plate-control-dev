@@ -10,11 +10,17 @@ import numpy as np
 import time
 import pos_xytest_plot
 
+# simulation mode
+simulate = True
+
 # start timer on the whole script
 script_start_time = time.time()
 
 # initialization
-fvc = fvchandler.FVCHandler('SBIG')
+if simulate:
+    fvc = fvchandler.FVCHandler('simulator')
+else:
+    fvc = fvchandler.FVCHandler('SBIG')
 fvc.scale = 0.0061 # mm/pixel (update um_scale below if not in mm)
 fvc.rotation = 0  # deg
 um_scale = 1000 # um/mm
@@ -22,6 +28,7 @@ pos_ids = ['UM00013']
 fid_can_ids = []
 petal_id = 1
 ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
+ptl.simulator_on = simulate
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure(ptl,fvc)
 m.n_points_full_calib_T = 4#11#17
@@ -49,6 +56,7 @@ os.makedirs(log_directory, exist_ok=True)
 log_suffix = '' # string gets appended to filenames -- useful for user to identify particular tests
 log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
 log_timestamp = datetime.datetime.now().strftime(pc.filename_timestamp_format)
+if simulate: log_timestamp += '_SIMULATED'
 def path_prefix(pos_id):
     return log_directory + os.path.sep + pos_id + '_' + log_timestamp + log_suffix
 def move_log_name(pos_id):

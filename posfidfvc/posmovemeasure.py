@@ -693,10 +693,22 @@ class PosMoveMeasure(object):
                 this_petal = self.ptls_of_pos_ids(pos_id)[pos_id]
                 this_petal.request_direct_dtdp(request)
                 this_petal.schedule_send_and_execute_moves()
-            if i == 0:
-                xy_init = self.fvc.measure(n_dots)
+            if self.fvc.fvc_type == 'simulator':
+                xy_meas = []
+                for petal in self.petals:
+                    positioners_current = petal.expected_current_position(posid=pos_ids_by_ptl[petal],key='obsXY')
+                    xy_meas = pc.concat_lists_of_lists(xy_meas,positioners_current)
+                n_new_fiducials = self.n_fiducial_dots - len(self.fiducials_xy)
+                faraway = 2*np.max(np.max(xy_meas))
+                new_fiducials = np.random.uniform(low=faraway,high=2*faraway,size=(n_new_fiducials,2)).tolist()
+                self.fiducials_xy = pc.concat_lists_of_lists(self.fiducials_xy,new_fiducials)
+                xy_meas = pc.concat_lists_of_lists(xy_meas,self.fiducials_xy)
             else:
-                xy_test = self.fvc.measure(n_dots)
+                xy_meas = self.fvc_measure(n_dots)
+            if i == 0:
+                xy_init = xy_meas
+            else:
+                xy_test = xy_meas
         ref_idxs = []
         for i in range(len(xy_test)):
             test_delta = np.array(xy_test[i]) - np.array(xy_init)

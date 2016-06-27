@@ -28,6 +28,7 @@ class Petal(object):
     by unique id number, log expected and measured positions, log cycles and total on time, etc.
     """
     def __init__(self, petal_id, pos_ids, fid_ids):
+        self.simulator_on = False # controls whether in software-only simulation mode
         self.verbose = False # whether to print verbose information at the terminal
         self.petal_id = petal_id
         self.comm = petalcomm.PetalComm(self.petal_id)
@@ -529,22 +530,19 @@ class Petal(object):
         The implementation has the benefit of simplicity, but it is acknowledged there may be 'better',
         i.e. multi-threaded, ways to achieve this, to be implemented later.
         """
+        if self.simulator_on:
+            return        
         timeout = 30.0 # seconds
         poll_period = 0.5 # seconds
         keep_waiting = True
         start_time = time.time()
-
         while keep_waiting:
-
             if (time.time()-start_time) >= timeout:
                 print('Timed out at ' + str(timeout) + ' seconds waiting to send next move table.')
                 keep_waiting = False
-
             if self.comm.ready_for_tables(self.canids_where_tables_were_just_sent):
-                keep_waiting = False
-             
+                keep_waiting = False             
             else:
-
                 time.sleep(poll_period)
 
     def _posid_listify_and_fill(self,posid):
