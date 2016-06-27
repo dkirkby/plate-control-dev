@@ -8,8 +8,8 @@ import posconstants as pc
 import datetime
 import numpy as np
 import time
-import pos_xytest_plot
-import collections
+import pos_arctest_plot
+import fitcircle
 
 # start timer on the whole script
 script_start_time = time.time()
@@ -28,24 +28,24 @@ def forward_back_sequence(start,step,nsteps,nrepeats):
             sequence += [sequence[-1] - step]
     return sequence
 tests = []
-tests.append({'axis':'phi', 'title':'150 deg cruise', 'target_angle':forward_back_sequence(start=15, step=150, nsteps=1, nrepeats=15)})
-tests.append({'axis':'phi', 'title':'30 deg cruise', 'target_angle':forward_back_sequence(start=15, step=30, nsteps=5, nrepeats=6)})
+tests.append({'axis':'phi', 'title':'150 deg cruise', 'targ_angle':forward_back_sequence(start=15, step=150, nsteps=1, nrepeats=15)})
+tests.append({'axis':'phi', 'title':'30 deg cruise', 'targ_angle':forward_back_sequence(start=15, step=30, nsteps=5, nrepeats=6)})
 temp = forward_back_sequence(     start=15,  step=1, nsteps=5, nrepeats=1)
 temp.extend(forward_back_sequence(start=45,  step=1, nsteps=5, nrepeats=1))
 temp.extend(forward_back_sequence(start=75,  step=1, nsteps=5, nrepeats=1))
 temp.extend(forward_back_sequence(start=105, step=1, nsteps=5, nrepeats=1))
 temp.extend(forward_back_sequence(start=135, step=1, nsteps=5, nrepeats=1))
 temp.extend(forward_back_sequence(start=165, step=1, nsteps=5, nrepeats=1))
-tests.append({'axis':'phi', 'title':'1 deg creep', 'target_angle':temp})
+tests.append({'axis':'phi', 'title':'1 deg creep', 'targ_angle':temp})
 temp = forward_back_sequence(     start=15,  step=0.2, nsteps=5, nrepeats=1)
 temp.extend(forward_back_sequence(start=45,  step=0.2, nsteps=5, nrepeats=1))
 temp.extend(forward_back_sequence(start=75,  step=0.2, nsteps=5, nrepeats=1))
 temp.extend(forward_back_sequence(start=105, step=0.2, nsteps=5, nrepeats=1))
 temp.extend(forward_back_sequence(start=135, step=0.2, nsteps=5, nrepeats=1))
 temp.extend(forward_back_sequence(start=165, step=0.2, nsteps=5, nrepeats=1))
-tests.append({'axis':'phi', 'title':'0.2 deg creep', 'target_angle':temp})
+tests.append({'axis':'phi', 'title':'0.2 deg creep', 'targ_angle':temp})
 for test in tests:
-    test['n_pts'] = len(test['target_angle'])
+    test['n_pts'] = len(test['targ_angle'])
     print(test['title'] + ': ' + str(test['n_pts']) + ' points')
 total_pts = sum([test['n_pts'] for test in tests])
 time_per_move_guess = 9 # seconds
@@ -83,16 +83,16 @@ log_directory = pc.test_logs_directory
 os.makedirs(log_directory, exist_ok=True)
 log_timestamp = datetime.datetime.now().strftime(pc.filename_timestamp_format)
 log_suffix = ('_' + 'log_suffix') if log_suffix else ''
-def path_prefix(pos_id):
+def summary_name(pos_id):
     pos_id_suffix = pos_id_suffixes[pos_ids.index(pos_id)]
     pos_id_suffix = ('_') + pos_id_suffix if pos_id_suffix else ''
-    return log_directory + os.path.sep + pos_id + pos_id_suffix + '_' + log_timestamp + log_suffix
-def move_log_name(pos_id):
-    return path_prefix(pos_id) + '_movedata.csv'
-def summary_log_name(pos_id):
-    return path_prefix(pos_id) + '_summary.csv'
-def summary_plot_name(pos_id):
-    return path_prefix(pos_id) + '_xyplot'  
+    return pos_id + pos_id_suffix + '_' + log_timestamp + log_suffix
+def path_prefix(pos_id):
+    return log_directory + os.path.sep + summary_name(pos_id)
+def log_path(pos_id):
+    return path_prefix(pos_id) + '.csv'
+def plot_path(pos_id):
+    return path_prefix(pos_id) + '.png'  
 
 
 # initial homing, fiducial identification, positioner location and range-finding
@@ -103,13 +103,14 @@ m.identify_positioner_locations()
 # begin tests sequence
 is_first_test_in_sequence = True
 pt = 0
-data_keys = ['meas_obsX','meas_obsY','targ_angle']
+data_keys = ['meas_obsX','meas_obsY','cycle']
 for test in tests:
     pt += 1
-    test['data'] = {}
     for pos_id in pos_ids:
+        test[pos_id] = {} # will store measured data in here for each positioner
         for key in data_keys:
-            test['data'][pos_id][key] = []
+            test[pos_id][key] = []
+    test['timestamps'] = []
     
     # measure physical travel range of axis and rehome
     if is_first_test_in_sequence:  
@@ -121,158 +122,92 @@ for test in tests:
         is_first_test_in_sequence = False
         
     # do the test
-    for angle in test['target_angles']:
+    for angle in test['targ_angle']:
         tp =  [0,angle] if test['axis'] == 'phi' else [angle,120]
         requests = {}
         for pos_id in pos_ids:
             requests[pos_id] = {'command':'posTP', 'target':tp, 'log_note':test['axis'] + ' ' + test['title']}
-            test['data'][pos_id]['targ_angle'].append(angle)
         print('Measuring target ' + str(pt) + ' of ' + str(total_pts) + ' at angle ' + str(angle) + ' on ' + test['axis'] + ' (' + test['title'] + ' sequence)')
-        this_timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
+        test['timestamps'].append(str(datetime.datetime.now().strftime(pc.timestamp_format)))
         this_meas_data = m.move_measure(requests)
         for pos_id in this_meas_data.keys():
-            test['data'][pos_id]['meas_obsX'].append(this_meas_data[pos_id][0])
-            test['data'][pos_id]['meas_obsY'].append(this_meas_data[pos_id][1])
+            test[pos_id]['meas_obsX'].append(this_meas_data[pos_id][0])
+            test[pos_id]['meas_obsY'].append(this_meas_data[pos_id][1])
+            test[pos_id]['cycle'].append(ptl.get(pos_id,'TOTAL_MOVE_SEQUENCES'))
             
-# useful alternate arrangements of data
-data = {}
+# combined data, for use in fitting
+combined = {}
 for pos_id in pos_ids:
-    data[pos_id] = {}
-    data[pos_id]['combined'] = {} # useful for fitting
+    combined[pos_id] = {}
     for key in data_keys:
-        data[pos_id]['combined'][key] = []
-for test in tests:
-    data[pos_id][test] = {}
-    for key in data_keys:
-        data[pos_id][test][key] = test['data'][pos_id][key]
-        data[pos_id]['combined'][key].append(test['data'][pos_id][key])
+        combined[pos_id][key] = []
+    for test in tests:
+        for key in data_keys:
+            combined[pos_id][key].extend(test[pos_id][key])
 
 # best circle fits on measured data
 for pos_id in pos_ids:
-    meas_obsXY = [[data[pos_id]['combined']['meas_obsX'][i],data[pos_id]['combined']['meas_obsY'][i]] for i in range(len(data[pos_id]['combined']['meas_obsX']))]
+    x = combined[pos_id]['meas_obsX']
+    y = combined[pos_id]['meas_obsY']
+    meas_obsXY = [[x[i],y[i]] for i in range(len(x))]
     (xy_ctr,radius) = fitcircle.FitCircle().fit(meas_obsXY)
-    data[pos_id]['xy_ctr'] = xy_ctr
-    data[pos_id]['radius'] = radius
+    combined[pos_id]['x_center'] = xy_ctr[0]
+    combined[pos_id]['y_center'] = xy_ctr[1]
+    combined[pos_id]['radius'] = radius
     
     # best angle offset (calibration of this offset is not what we're testing here)
-    x = data[pos_id]['combined']['meas_obsX']
-    y = data[pos_id]['combined']['meas_obsY']
-    meas_angle = np.arctan2(y,x)*180/np.pi
-    data[pos_id]['offset_angle'] = np.mean(meas_angle - data[pos_id]['combined']['targ_angle'])
+    meas_angle = np.degrees(np.arctan2(y,x))
+    combined['offset_angle'] = np.mean(meas_angle - combined[pos_id]['targ_angle'])
     
-# log and plot
-# plot xy errors
+# collect log data
+for pos_id in pos_ids:
+    for test in tests:
+        x_meas = test[pos_id]['meas_obsX']
+        y_meas = test[pos_id]['meas_obsY']
+        a_targ = np.radians(test['targ_angle']) + np.radians(combined[pos_id]['offset_angle'])
+        r0 = combined[pos_id]['radius']
+        x0 = combined[pos_id]['x_center']
+        y0 = combined[pos_id]['y_center']
+        sin = np.sin(a_targ)
+        cos = np.cos(a_targ)
+        tan = np.tan(a_targ)
+        x_targ = r0*cos
+        y_targ = r0*sin
+        err_x = x_meas - x_targ
+        err_y = y_meas - y_targ
+        err_tangential = (err_y - err_x*tan)/(sin*tan + cos)
+        err_radial = (err_x + sin*err_tangential)/cos
+        err_total = np.sqrt(err_radial**2 + err_tangential**2)        
+        test[pos_id]['err_total'] = err_total.tolist()
+        test[pos_id]['err_radial'] = err_radial.tolist()
+        test[pos_id]['err_tangential'] = err_tangential.tolist()
 
---> CONTINUE WORK HERE
+# write logs
+move_log_header = 'timestamp,cycle,test_title,axis,targ_angle,meas_obsX,meas_obsY,err_radial,err_tangential,err_total\n'
+for pos_id in pos_ids:
+    file = open(log_path(pos_id),'w')
+    file.write(move_log_header)
+    file.close()
+    for test in tests:
+        file = open(log_path(pos_id),'a')
+        for i in range(len(test['timestamps'])):
+            row = test['timestamps'][i]
+            row += ',' + str(test[pos_id]['cycle'][i])
+            row += ',' + str(test['title'])
+            row += ',' + str(test['axis'])
+            row += ',' + str(test[pos_id]['targ_angle'][i])
+            row += ',' + str(test[pos_id]['meas_obsX'][i])
+            row += ',' + str(test[pos_id]['meas_obsY'][i])
+            row += ',' + str(test[pos_id]['err_radial'][i])
+            row += ',' + str(test[pos_id]['err_tangential'][i])
+            row += ',' + str(test[pos_id]['err_total'][i])
+            row += '\n'
+            file.write(row)
+        file.close()            
 
-
-
-
-    # write headers for move data log files
-    move_log_header = 'timestamp,cycle,target_x,target_y'
-        submove_fields = ['meas_obsXY','errXY','err2D','posTP']
-        for i in submove_idxs: move_log_header += ',meas_x' + str(i) + ',meas_y' + str(i)
-        for i in submove_idxs: move_log_header += ',err_x'  + str(i) + ',err_y' + str(i)
-        for i in submove_idxs: move_log_header += ',err_xy' + str(i)
-        for i in submove_idxs: move_log_header += ',pos_t'  + str(i) + ',pos_p' + str(i)
-        move_log_header += '\n'
-        for pos_id in pos_ids:
-            file = open(move_log_name(pos_id),'w')
-            file.write(move_log_header)
-            file.close()
-
-        # transform test grid to each positioner's global position, and create all the move request dictionaries
-        all_targets = []
-        for local_target in local_targets:
-            these_targets = {}
-            for pos_id in pos_ids:
-                posmodel = ptl.get(pos_id)
-                these_targets[pos_id] = {'command':'obsXY', 'target':posmodel.trans.posXY_to_obsXY(local_target)}
-            all_targets.append(these_targets)
-
-        # initialize some data structures for storing test data
-        targ_num = 0
-        all_data_by_target = []
-        all_data_by_pos_id = {}
-        for pos_id in pos_ids:
-            all_data_by_pos_id[pos_id] = {'targ_obsXY': []}
-            for key in submove_fields:
-                all_data_by_pos_id[pos_id][key] = [[] for i in submove_idxs]
-        start_timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
-        start_cycles = ptl.get(pos_ids,'TOTAL_MOVE_SEQUENCES')
-        
-        # run the test
-        for these_targets in all_targets:
-            targ_num += 1
-            print('\nMEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets)))
-            print('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
-            this_timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
-            these_meas_data = m.move_and_correct(these_targets, num_corr_max=num_corr_max)
-            
-            # store this set of measured data
-            all_data_by_target.append(these_meas_data)
-            for pos_id in these_targets.keys():
-                all_data_by_pos_id[pos_id]['targ_obsXY'].append(these_meas_data[pos_id]['targ_obsXY'])
-                for sub in submove_idxs:
-                    for key in submove_fields:
-                        all_data_by_pos_id[pos_id][key][sub].append(these_meas_data[pos_id][key][sub])              
-            
-            # update summary data log
-            for pos_id in pos_ids:
-                summary_log_data =  'pos_id,' + str(pos_id) + '\n'
-                summary_log_data += 'log_suffix,' + str(log_suffix) + '\n'
-                summary_log_data += 'cycles at start,' + str(start_cycles[pos_ids.index(pos_id)]) + '\n'
-                summary_log_data += 'cycles at finish,' + str(ptl.get(pos_id,'TOTAL_MOVE_SEQUENCES')) + '\n'
-                summary_log_data += 'start time,' + start_timestamp + '\n'
-                summary_log_data += 'finish time,' + this_timestamp + '\n'
-                summary_log_data += 'num targets,' + str(len(all_targets)) + '\n'
-                summary_log_data += 'num corrections max,' + str(num_corr_max) + '\n'
-                summary_log_data += 'submove index -->'
-                for i in submove_idxs: summary_log_data += ',' + str(i)
-                summary_log_data += '\n'
-                for calc in ['max','min','mean','rms']:
-                    summary_log_data += calc + '(um)'
-                    for i in submove_idxs:
-                        this_submove_data = all_data_by_pos_id[pos_id]['err2D'][i]
-                        if calc == 'max':    summary_log_data += ',' + str(np.max(this_submove_data) * um_scale)
-                        elif calc == 'min':  summary_log_data += ',' + str(np.min(this_submove_data) * um_scale)
-                        elif calc == 'mean': summary_log_data += ',' + str(np.mean(this_submove_data) * um_scale)
-                        elif calc == 'rms':  summary_log_data += ',' + str(np.sqrt(np.mean(np.array(this_submove_data)**2)) * um_scale)
-                        else: pass
-                        if i == submove_idxs[-1]: summary_log_data += '\n'
-                file = open(summary_log_name(pos_id),'w')
-                file.write(summary_log_data)
-                file.close()
-
-            # update move data log
-            for pos_id in these_targets.keys():
-                row = this_timestamp
-                row += ',' + str(ptl.get(pos_id,'TOTAL_MOVE_SEQUENCES'))
-                row += ',' + str(these_targets[pos_id]['targ_obsXY'][0])
-                row += ',' + str(these_targets[pos_id]['targ_obsXY'][1])
-                for key in submove_fields:
-                    for submove_data in these_targets[pos_id][key]:
-                        if isinstance(submove_data,list):
-                            for j in range(len(submove_data)):
-                                row += ',' + str(submove_data[j])
-                        else:
-                            row += ',' + str(submove_data)
-                row += '\n'
-                file = open(move_log_name(pos_id),'a')
-                file.write(row)
-                file.close()
-        
-        # make summary plots showing the targets and measured positions
-        for pos_id in all_data_by_pos_id.keys():
-            posmodel = ptl.get(pos_id)
-            title = log_timestamp + log_suffix
-            center = [ptl.get(pos_id,'OFFSET_X'),ptl.get(pos_id,'OFFSET_Y')]
-            theta_min = posmodel.trans.posTP_to_obsTP([min(posmodel.targetable_range_T),0])[0]
-            theta_max = posmodel.trans.posTP_to_obsTP([max(posmodel.targetable_range_T),0])[0]
-            theta_range = [theta_min,theta_max]
-            r1 = ptl.get(pos_id,'LENGTH_R1')
-            r2 = ptl.get(pos_id,'LENGTH_R2')
-            pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_data_by_pos_id[pos_id],center,theta_range,r1,r2,title)
+# make summary plots
+for pos_id in pos_ids:
+    pos_arctest_plot.plot(plot_path(pos_id), pos_id, tests, summary_name(pos_id))
                 
 script_exec_time = time.time() - script_start_time
 print('Total test time: ' + format(script_exec_time/60/60,'.1f') + 'hrs')
