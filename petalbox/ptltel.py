@@ -89,22 +89,28 @@ class PtlTel(object):
 		pwmchip_path = '/sys/devices/platform/ocp/48304000.epwmss/48304200.ehrpwm/pwm/' + pwmchip[0].replace('\n','')
 
 		if fan == 'GFA_FAN1':		#P8_13
-			#TODO check that pwm1 directory does not exist before echoing 1 to export
+
 			os.system('sudo chmod -R a+rwx ' + pwmchip_path)
-			os.system('echo 1 > '+ pwmchip_path + '/export')  #create pwm1
+			check_export = os.popen('ls ' + pwmchip_path).readlines()
+			if 'pwm1\n' not in check_export:
+				os.system('echo 1 > '+ pwmchip_path + '/export')  #create pwm1
+
 			os.system('sudo chmod -R a+rwx ' + pwmchip_path) 
 			os.system('echo ' + str(period)+ ' > ' + pwmchip_path + '/pwm1/period')
 			os.system('echo ' + str(duty) + ' > ' + pwmchip_path + '/pwm1/duty_cycle')
-			os.system('echo ' + str(enable) +' > ' + pwmchip_path + '/pwm1/enable')			
+			os.system('echo ' + str(1) +' > ' + pwmchip_path + '/pwm1/enable')			
 			
 		elif fan == 'GFA_FAN2':		#P8_19
-			#TODO check that pwm1 directory does not exist before echoing 1 to export
-                        os.system('sudo chmod -R a+rwx ' + pwmchip_path)
-                        os.system('echo 0 > '+ pwmchip_path + '/export')  #create pwm0
-                        os.system('sudo chmod -R a+rwx ' + pwmchip_path)
-                        os.system('echo ' + str(period)+ ' > ' + pwmchip_path + '/pwm0/period')
-                        os.system('echo ' + str(duty) + ' > ' + pwmchip_path + '/pwm0/duty_cycle')
-                        os.system('echo ' + str(enable) +' > ' + pwmchip_path + '/pwm0/enable')
+
+			os.system('sudo chmod -R a+rwx ' + pwmchip_path)
+
+			check_export = os.popen('ls ' + pwmchip_path).readlines()
+			if 'pwm0\n' not in check_export:
+				os.system('echo 0 > '+ pwmchip_path + '/export')  #create pwm0
+			os.system('sudo chmod -R a+rwx ' + pwmchip_path)
+			os.system('echo ' + str(period)+ ' > ' + pwmchip_path + '/pwm0/period')
+			os.system('echo ' + str(duty) + ' > ' + pwmchip_path + '/pwm0/duty_cycle')
+			os.system('echo ' + str(1) +' > ' + pwmchip_path + '/pwm0/enable')
 		else:
 			print('Error applying fan settings, check arguments!')
 	
