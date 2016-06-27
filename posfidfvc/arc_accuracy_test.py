@@ -89,19 +89,24 @@ if should_measure_ranges: should_calibrate_quick = True
 log_directory = pc.test_logs_directory
 os.makedirs(log_directory, exist_ok=True)
 log_timestamp = datetime.datetime.now().strftime(pc.filename_timestamp_format)
-if simulate: log_timestamp += '_SIMULATED'
-log_suffix = ('_' + 'log_suffix') if log_suffix else ''
+def log_timestamp_with_notes():
+    return (log_timestamp + '_SIMULATED') if simulate else log_timestamp
 def summary_name(pos_id):
     pos_id_suffix = pos_id_suffixes[pos_ids.index(pos_id)]
     pos_id_suffix = ('_') + pos_id_suffix if pos_id_suffix else ''
-    return pos_id + pos_id_suffix + '_' + log_timestamp + log_suffix
+    mod_log_suffix = ('_' + log_suffix) if log_suffix else ''
+    return pos_id + pos_id_suffix + '_' + log_timestamp_with_notes() + mod_log_suffix
+def multiline_summary_name(pos_id):
+    pos_id_suffix = pos_id_suffixes[pos_ids.index(pos_id)]
+    pos_id_suffix = (' ') + pos_id_suffix if pos_id_suffix else ''
+    mod_log_suffix = (' ' + log_suffix) if log_suffix else ''
+    return pos_id + pos_id_suffix + mod_log_suffix + '\n' + log_timestamp_with_notes()
 def path_prefix(pos_id):
-    return log_directory + os.path.sep + summary_name(pos_id)
+    return log_directory + summary_name(pos_id)
 def log_path(pos_id):
     return path_prefix(pos_id) + '.csv'
 def plot_path(pos_id):
-    return path_prefix(pos_id) + '.png'  
-
+    return path_prefix(pos_id) + '.png'
 
 # initial homing, fiducial identification, positioner location and range-finding
 m.rehome(pos_ids='all')
@@ -167,8 +172,23 @@ for pos_id in pos_ids:
     combined[pos_id]['radius'] = radius
     
     # best angle offset (calibration of this offset is not what we're testing here)
+    x = np.subtract(x,combined[pos_id]['x_center'])
+    y = np.subtract(y,combined[pos_id]['y_center'])
     meas_angle = np.degrees(np.arctan2(y,x))
-    combined[pos_id]['offset_angle'] = np.mean(meas_angle - combined['targ_angle'])
+    targ_angle = np.array(combined['targ_angle'])
+    def wrap_err(meas,targ):
+        diff = meas_angle - targ_angle
+        err = diff - np.mean(diff)
+        return err
+    meas_angle_wrapped = meas_angle
+    err = wrap_err(meas_angle_wrapped,targ_angle)
+    while (np.max(err) - np.min(err)) >= 360:
+        meas_angle_wrapped[err < -180] += 360
+        err = wrap_err(meas_angle_wrapped,targ_angle)
+    #meas_angle[err > +180] -= 360 # wrapping about +/-180 so comparable to targ_angle
+    meas_angle_wrapped = meas_angle
+    meas_angle_wrapped[err < -180] += 360 # wrapping about +/-180 so comparable to targ_angle
+    combined[pos_id]['offset_angle'] = np.mean(meas_angle_wrapped - targ_angle) 
     
 # collect log data
 for pos_id in pos_ids:
@@ -182,19 +202,22 @@ for pos_id in pos_ids:
         sin = np.sin(a_targ)
         cos = np.cos(a_targ)
         tan = np.tan(a_targ)
-        x_targ = r0*cos
-        y_targ = r0*sin
+        x_targ = r0*cos + x0
+        y_targ = r0*sin + y0
         err_x = x_meas - x_targ
         err_y = y_meas - y_targ
-        err_tangential = (err_y - err_x*tan)/(sin*tan + cos)
-        err_radial = (err_x + sin*err_tangential)/cos
-        err_total = np.sqrt(err_radial**2 + err_tangential**2)        
+        err_xy = np.array([err_x,err_y])
+        radial_unit_vec = np.array([cos,sin])
+        tangen_unit_vec = np.dot([[0,-1],[1,0]],radial_unit_vec)
+        err_radial = np.sum(np.multiply(err_xy,radial_unit_vec),axis=0) # one-liner to dot each by its own unit vec
+        err_tangen = np.sum(np.multiply(err_xy,tangen_unit_vec),axis=0) # one-liner to dot each by its own unit vec
+        err_total = np.sqrt(err_radial**2 + err_tangen**2)        
         test[pos_id]['err_total'] = err_total.tolist()
         test[pos_id]['err_radial'] = err_radial.tolist()
-        test[pos_id]['err_tangential'] = err_tangential.tolist()
+        test[pos_id]['err_tangen'] = err_tangen.tolist()
 
 # write logs
-move_log_header = 'timestamp,cycle,test_title,axis,targ_angle,meas_obsX,meas_obsY,err_radial,err_tangential,err_total\n'
+move_log_header = 'timestamp,cycle,test_title,axis,targ_angle,meas_obsX,meas_obsY,err_radial,err_tangen,err_total\n'
 for pos_id in pos_ids:
     file = open(log_path(pos_id),'w')
     file.write(move_log_header)
@@ -210,7 +233,7 @@ for pos_id in pos_ids:
             row += ',' + str(test[pos_id]['meas_obsX'][i])
             row += ',' + str(test[pos_id]['meas_obsY'][i])
             row += ',' + str(test[pos_id]['err_radial'][i])
-            row += ',' + str(test[pos_id]['err_tangential'][i])
+            row += ',' + str(test[pos_id]['err_tangen'][i])
             row += ',' + str(test[pos_id]['err_total'][i])
             row += '\n'
             file.write(row)
@@ -218,7 +241,7 @@ for pos_id in pos_ids:
 
 # make summary plots
 for pos_id in pos_ids:
-    pos_arctest_plot.plot(plot_path(pos_id), pos_id, tests, summary_name(pos_id))
+    pos_arctest_plot.plot(plot_path(pos_id), pos_id, tests, multiline_summary_name(pos_id))
                 
 script_exec_time = time.time() - script_start_time
 print('Total test time: ' + format(script_exec_time/60/60,'.1f') + 'hrs')

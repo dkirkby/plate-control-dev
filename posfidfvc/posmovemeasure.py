@@ -573,7 +573,7 @@ class PosMoveMeasure(object):
                 def err_norm(params):
                     expected = np.array(expected_xy(params))
                     all_err = expected - meas_xy
-                    return np.linalg.norm(all_err,ord='fro')
+                    return np.linalg.norm(all_err,ord='fro')/np.sqrt(np.size(all_err,axis=1))
  
                 bounds = ((2.5,3.5),(2.5,3.5),(-180,180),(-50,50),(None,None),(None,None)) #Ranges which values should be in
                 params_optimized = scipy.optimize.minimize(fun=err_norm, x0=params0, bounds=bounds)

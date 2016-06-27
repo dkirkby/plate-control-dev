@@ -35,6 +35,7 @@ def plot(path, pos_id, tests, title):
         plt.plot(angle,err_r,markers.pop(0),label=test['title'],markeredgecolor=colors.pop(0),markerfacecolor='None',markersize=3)
     plt.xlabel('target (deg)')
     plt.ylabel('radial error (um)')
+    plt.title('all tests')
     plt.legend(loc='upper right',fontsize=6)
 
     remaining_subplots = [2,3,5,6]
@@ -43,7 +44,7 @@ def plot(path, pos_id, tests, title):
     for test in tests:
         plt.subplot(2,3,remaining_subplots.pop(0))
         angle = test['targ_angle']
-        err_t = test[pos_id]['err_tangential']
+        err_t = test[pos_id]['err_tangen']
         err_t = np.multiply(err_t,1000)
         plt.plot(angle,err_t,markers.pop(0),markeredgecolor=colors.pop(0),markerfacecolor='None',markersize=3)
         plt.xlabel('target ' + test['axis'] + ' (deg)')
@@ -61,34 +62,3 @@ def plot(path, pos_id, tests, title):
     plt.savefig(path,dpi=150)
     plt.close(fig)
     
-#faketests = []
-#pos_id = 'somepos'
-#for i in range(4):
-#    faketest = {}
-#    faketest[pos_id] = {}
-#    faketest['axis'] = 'phi'
-#    faketest['title'] = 'test ' + str(i)
-#    x0 = i/10
-#    y0 = i/10
-#    x_meas = np.add([3.05, 3.1, -3.2, -4.2],x0)
-#    y_meas = np.add([3.99, -4.2, 4.2, -2.9],y0)
-#    a_targ = np.arctan2(y_meas,x_meas)
-#    faketest['targ_angle'] = np.degrees(a_targ).tolist()
-#    faketest[pos_id]['meas_obsX'] = x_meas.tolist()
-#    faketest[pos_id]['meas_obsY'] = y_meas.tolist()
-#    r0 = 5
-#    sin = np.sin(a_targ)
-#    cos = np.cos(a_targ)
-#    tan = np.tan(a_targ)
-#    x_targ = r0*cos
-#    y_targ = r0*sin
-#    err_x = x_meas - x_targ
-#    err_y = y_meas - y_targ
-#    err_tangential = (err_y - err_x*tan)/(sin*tan + cos)
-#    err_radial = (err_x + sin*err_tangential)/cos
-#    err_total = np.sqrt(err_radial**2 + err_tangential**2)    
-#    faketest[pos_id]['err_total'] = err_total.tolist()
-#    faketest[pos_id]['err_radial'] = err_radial.tolist()
-#    faketest[pos_id]['err_tangential'] = err_tangential.tolist()
-#    faketests.append(faketest)
-#plot('out.png',pos_id,faketests,'some title')

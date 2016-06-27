@@ -56,15 +56,16 @@ os.makedirs(log_directory, exist_ok=True)
 log_suffix = '' # string gets appended to filenames -- useful for user to identify particular tests
 log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
 log_timestamp = datetime.datetime.now().strftime(pc.filename_timestamp_format)
-if simulate: log_timestamp += '_SIMULATED'
+def log_timestamp_with_notes():
+    return (log_timestamp + '_SIMULATED') if simulate else log_timestamp
 def path_prefix(pos_id):
-    return log_directory + os.path.sep + pos_id + '_' + log_timestamp + log_suffix
+    return log_directory + os.path.sep + pos_id + '_' + log_timestamp_with_notes() + log_suffix
 def move_log_name(pos_id):
     return path_prefix(pos_id) + '_movedata.csv'
 def summary_log_name(pos_id):
     return path_prefix(pos_id) + '_summary.csv'
 def summary_plot_name(pos_id):
-    return path_prefix(pos_id) + '_xyplot'    
+    return path_prefix(pos_id) + '_xyplot'
 
 # cycles configuration (for life testing)
 # STILL TO BE IMPLEMENTED
@@ -73,7 +74,7 @@ def summary_plot_name(pos_id):
 # this will get copied and transformed to each particular positioner's location below
 grid_max_radius = 5.8 # mm
 grid_min_radius = 0.2 # mm
-n_pts_across = 5 # 7 --> 28 pts, 27 --> 528 pts
+n_pts_across = 7 # 7 --> 28 pts, 27 --> 528 pts
 line = np.linspace(-grid_max_radius,grid_max_radius,n_pts_across)
 local_targets = [[x,y] for x in line for y in line]
 for i in range(len(local_targets)-1,-1,-1): # traverse list from end backward
@@ -94,7 +95,7 @@ if should_identify_pos_loc:
 
 # quick pre-calibration, especially because we need some reasonable values for theta offsets prior to measuring physical travel ranges (where phi arms get extended)
 if should_calibrate_quick:
-    m.calibrate(pos_ids='all', mode='quick', save_file_dir=log_directory, save_file_timestamp=log_timestamp)
+    m.calibrate(pos_ids='all', mode='quick', save_file_dir=log_directory, save_file_timestamp=log_timestamp_with_notes())
 
 # measure the physical travel ranges of the theta and phi axes by ramming hard limits in both directions
 if should_measure_ranges:
@@ -103,14 +104,14 @@ if should_measure_ranges:
     m.rehome(pos_ids='all')
     if not(should_calibrate_full):
         mode = 'grid' if should_calibrate_grid else should_calibrate_quick
-        m.calibrate(pos_ids='all', mode=mode, save_file_dir=log_directory, save_file_timestamp=log_timestamp) # needed after having struck hard limits
+        m.calibrate(pos_ids='all', mode=mode, save_file_dir=log_directory, save_file_timestamp=log_timestamp_with_notes()) # needed after having struck hard limits
 
 if should_calibrate_grid:
-    m.calibrate(pos_ids='all', mode='grid', save_file_dir=log_directory, save_file_timestamp=log_timestamp)
+    m.calibrate(pos_ids='all', mode='grid', save_file_dir=log_directory, save_file_timestamp=log_timestamp_with_notes())
 
 # full calibration
 if should_calibrate_full:
-    m.calibrate(pos_ids='all', mode='full', save_file_dir=log_directory, save_file_timestamp=log_timestamp)
+    m.calibrate(pos_ids='all', mode='full', save_file_dir=log_directory, save_file_timestamp=log_timestamp_with_notes())
 
 # do the xy accuracy test
 if should_do_accuracy_test:

@@ -95,26 +95,16 @@ def plot_grid(path, pos_id, data):
     measured_obsXY = np.array(data[pos_id]['measured_obsXY'])
     expected_obsXY = np.array(data[pos_id]['final_expected_obsXY'])
     point_nums = np.array(data[pos_id]['point_numbers'])
-    params = {0: {'ERR_NORM':np.array(data[pos_id]['ERR_NORM'])*1000,
-	                                   'unit':'um',
-                                       'title':'error of calibration'},
-	         1: {'LENGTH_R1':np.array(data[pos_id]['LENGTH_R1']),
-	                                    'LENGTH_R2':np.array(data[pos_id]['LENGTH_R2']),
-										'unit':'mm',
-                                        'title':'kinematic arm lengths'},
-		    2: {'OFFSET_T':np.array(data[pos_id]['OFFSET_T']),
-							            'OFFSET_P':np.array(data[pos_id]['OFFSET_P']),
-							            'unit':'deg',
-                                        'title':'theta and phi offsets'},
-		    3: {'OFFSET_X':np.array(data[pos_id]['OFFSET_X']),
-						          'unit':'mm',
-                                  'title':'global x offset'},
-		    4: {'OFFSET_Y':np.array(data[pos_id]['OFFSET_Y']),
-						          'unit':'mm',
-                                  'title':'global y offset'}}
+    params = {0: {'ERR_NORM':np.array(data[pos_id]['ERR_NORM'])*1000, 'unit':'um', 'title':'error of calibration'},
+              1: {'LENGTH_R1':np.array(data[pos_id]['LENGTH_R1']), 'unit':'mm', 'title':'kinematic arm length'},
+              2: {'LENGTH_R2':np.array(data[pos_id]['LENGTH_R2']), 'unit':'mm', 'title':'kinematic arm length'},
+              3: {'OFFSET_T':np.array(data[pos_id]['OFFSET_T']), 'unit':'deg', 'title':'theta offset angle'},
+    		    4: {'OFFSET_P':np.array(data[pos_id]['OFFSET_P']), 'unit':'deg', 'title':'phi offset angle'},
+		    5: {'OFFSET_X':np.array(data[pos_id]['OFFSET_X']), 'unit':'mm', 'title':'global x offset'},
+		    6: {'OFFSET_Y':np.array(data[pos_id]['OFFSET_Y']), 'unit':'mm', 'title':'global y offset'}}
 
     subplot_num = 1
-    plt.subplot(2,3,subplot_num)
+    plt.subplot(2,4,subplot_num)
     plt.plot(measured_obsXY[:,0],measured_obsXY[:,1],'ro',label='(x,y)=meas by FVC',markersize=4,markeredgecolor='r',markerfacecolor='None')
     plt.plot(expected_obsXY[:,0],expected_obsXY[:,1],'k+',label='(x,y)=optim func(t,p)',markersize=6,markeredgewidth='1')
     for i in range(len(target_posTP[:,0])):
@@ -136,7 +126,7 @@ def plot_grid(path, pos_id, data):
     param_keys.sort()
     for p in param_keys:
         subplot_num += 1
-        plt.subplot(2,3,subplot_num)
+        plt.subplot(2,4,subplot_num)
         line_format = 'b-'
         param_label = ''
         for q in params[p].keys():
@@ -148,7 +138,7 @@ def plot_grid(path, pos_id, data):
         plt.xlabel('number of points measured')
         plt.ylabel(params[p]['title'] + ' (' + params[p]['unit'] + ')')
         plt.legend(loc='upper right',fontsize=8)
-        plt.xticks(point_nums, [format(x,'.0f') for x in point_nums])
+        #plt.xticks(point_nums, [format(x,'.0f') for x in point_nums])
         if param_label == 'OFFSET_X' or param_label == 'OFFSET_Y':
             plt.yticks(plt.yticks()[0], [format(x,'.2f') for x in plt.yticks()[0]])
     plt.tight_layout(pad=2.0)
