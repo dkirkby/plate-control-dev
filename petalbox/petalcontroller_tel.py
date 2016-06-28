@@ -171,8 +171,7 @@ class PetalController(Application):
 			percent_duty	float 0. to 100., 0. = off
 
 		RETURNS
-			temps		dictionary of temperature sensor readings (in degrees C) by temp sensor id	
-	
+			SUCCESS OR FAILED	
 		
 		"""
 		try:
