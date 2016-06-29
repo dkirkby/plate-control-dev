@@ -704,7 +704,7 @@ class PosMoveMeasure(object):
                 self.fiducials_xy = pc.concat_lists_of_lists(self.fiducials_xy,new_fiducials)
                 xy_meas = pc.concat_lists_of_lists(xy_meas,self.fiducials_xy)
             else:
-                xy_meas = self.fvc_measure(n_dots)
+                xy_meas = self.fvc.measure(n_dots)
             if i == 0:
                 xy_init = xy_meas
             else:

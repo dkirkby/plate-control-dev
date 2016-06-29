@@ -12,15 +12,15 @@ import pos_arctest_plot
 import fitcircle
 
 # simulation mode
-simulate = True
+simulate = False
 
 # start timer on the whole script
 script_start_time = time.time()
 
 # test configuration
 pos_ids = ['UM00013']
-pos_id_suffixes = ['titanium']
-log_suffix = '20C'
+pos_id_suffixes = ['']
+log_suffix = 'room_temp'
 def forward_back_sequence(start,step,nsteps,nrepeats):
     '''total number of entries in sequence = 1 + 2*nsteps*nrepeats'''
     sequence = [start]
@@ -59,7 +59,7 @@ if simulate:
     fvc = fvchandler.FVCHandler('simulator')
 else:
     fvc = fvchandler.FVCHandler('SBIG')
-fvc.scale = 0.0061 # mm/pixel (update um_scale below if not in mm)
+fvc.scale = 0.018670 # mm/pixel (update um_scale below if not in mm)
 fvc.rotation = 0  # deg
 um_scale = 1000 # um/mm
 fid_can_ids = []
@@ -69,21 +69,6 @@ ptl.simulator_on = simulate
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure(ptl,fvc)
 m.n_fiducial_dots = 3 # number of fiducial centroids the FVC should expect
-num_corr_max = 3 # number of correction moves to do for each target
-
-# test operations to do
-should_initial_rehome     = True
-should_identify_fiducials = True
-should_identify_pos_loc   = False
-should_calibrate_quick    = False
-should_measure_ranges     = False
-should_calibrate_grid     = True
-should_calibrate_full     = False
-should_do_accuracy_test   = True
-
-# certain operations require particular preceding operations
-if should_identify_pos_loc: should_initial_rehome = True
-if should_measure_ranges: should_calibrate_quick = True
 
 # general log file setup
 log_directory = pc.test_logs_directory
