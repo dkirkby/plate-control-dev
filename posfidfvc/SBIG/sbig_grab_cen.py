@@ -14,13 +14,13 @@ class SBIG_Grab_Cen(object):
         self.cam.select_camera('ST8300')
         self.close_camera() # in case driver was previously left in "open" state
         self.open_camera()      
-        self.__exposure_time = 100 # milliseconds, 90 ms is the minimum
+        self.__exposure_time = 200 # milliseconds, 90 ms is the minimum
         self.cam.set_exposure_time(self.exposure_time)
         self.min_brightness = 5000
         self.max_brightness = 50000
         self.verbose = False
-        self.write_fits = False
-        self.take_darks = False # whether to measure a dark image and subtract it out
+        self.write_fits = True
+        self.take_darks = True # whether to measure a dark image and subtract it out
         self.flip_horizontal = True # whether to reflect image across y axis
         self.flip_vertical = False # whether to reflect image across x axis
 

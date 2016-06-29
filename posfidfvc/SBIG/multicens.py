@@ -72,10 +72,12 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=False):
 # Output:
 #       returning the centroids and FWHMs as lists (xcen,ycen,fwhm)
 
+	level_fraction_of_peak = 0.3
 	size_fitbox=20 # gaussian fitter box (length of side in pixels)
 	img[img<0]=0
 	img = img.astype(np.uint16)
-	level = mh.thresholding.otsu(img)		
+	level_fancy_unused = mh.thresholding.otsu(img)
+	level = int(level_fraction_of_peak*np.max(np.max(img)))
 	bw=im2bw(img,level)
 	hdu=pyfits.PrimaryHDU(bw)
 	if write_fits:

@@ -64,7 +64,8 @@ while keep_measuring:
         input_pos.append(float(user_val))
 #        xy.append(fvc.fvc_measure_with_ref([])) #no xy_ref output for fvc; Mx2 values
 #          don't really need fvc_measure_with_ref here. mMaybe want to resurrect this later.  
-        xywin,brightness,t = sbig_grab_cen.sbig_grab_cen(sbig_exposure_time, 1)
+        sbig = sbig_grab_cen.SBIG_Grab_Cen()
+        xywin,brightness,t = sbig.grab(1)
         measurement.append(xywin)
     else:
         print ("Didn't recognize input.\n")
