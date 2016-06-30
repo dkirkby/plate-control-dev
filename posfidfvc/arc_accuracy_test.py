@@ -18,9 +18,9 @@ simulate = False
 script_start_time = time.time()
 
 # test configuration
-pos_ids = ['UM00013']
-pos_id_suffixes = ['']
-log_suffix = 'room_temp'
+pos_ids = ['SS01','TI01','M00003']
+pos_id_suffixes = ['416SS','Ti6Al4V','6061T6']
+log_suffix = 'Chamber6105_RH12_15C_5V_100curr'
 def forward_back_sequence(start,step,nsteps,nrepeats):
     '''total number of entries in sequence = 1 + 2*nsteps*nrepeats'''
     sequence = [start]
@@ -31,28 +31,24 @@ def forward_back_sequence(start,step,nsteps,nrepeats):
             sequence += [sequence[-1] - step]
     return sequence
 tests = []
-tests.append({'axis':'phi', 'title':'150 deg cruise', 'targ_angle':forward_back_sequence(start=15, step=150, nsteps=1, nrepeats=15)})
-tests.append({'axis':'phi', 'title':'30 deg cruise', 'targ_angle':forward_back_sequence(start=15, step=30, nsteps=5, nrepeats=6)})
+tests.append({'axis':'phi', 'title':'150 deg cruise', 'targ_angle':forward_back_sequence(start=15, step=150, nsteps=1, nrepeats=10)})
+tests.append({'axis':'phi', 'title':'30 deg cruise', 'targ_angle':forward_back_sequence(start=15, step=30, nsteps=5, nrepeats=3)})
 temp = forward_back_sequence(     start=15,  step=1, nsteps=5, nrepeats=1)
-temp.extend(forward_back_sequence(start=45,  step=1, nsteps=5, nrepeats=1))
-temp.extend(forward_back_sequence(start=75,  step=1, nsteps=5, nrepeats=1))
-temp.extend(forward_back_sequence(start=105, step=1, nsteps=5, nrepeats=1))
-temp.extend(forward_back_sequence(start=135, step=1, nsteps=5, nrepeats=1))
+temp.extend(forward_back_sequence(start=90,  step=1, nsteps=5, nrepeats=1))
 temp.extend(forward_back_sequence(start=165, step=1, nsteps=5, nrepeats=1))
 tests.append({'axis':'phi', 'title':'1 deg creep', 'targ_angle':temp})
 temp = forward_back_sequence(     start=15,  step=0.2, nsteps=5, nrepeats=1)
-temp.extend(forward_back_sequence(start=45,  step=0.2, nsteps=5, nrepeats=1))
-temp.extend(forward_back_sequence(start=75,  step=0.2, nsteps=5, nrepeats=1))
-temp.extend(forward_back_sequence(start=105, step=0.2, nsteps=5, nrepeats=1))
-temp.extend(forward_back_sequence(start=135, step=0.2, nsteps=5, nrepeats=1))
+temp.extend(forward_back_sequence(start=90,  step=0.2, nsteps=5, nrepeats=1))
 temp.extend(forward_back_sequence(start=165, step=0.2, nsteps=5, nrepeats=1))
 tests.append({'axis':'phi', 'title':'0.2 deg creep', 'targ_angle':temp})
 for test in tests:
     test['n_pts'] = len(test['targ_angle'])
     print(test['title'] + ': ' + str(test['n_pts']) + ' points')
-total_pts = sum([test['n_pts'] for test in tests])
-time_per_move_guess = 9 # seconds
-print('   total all tests: ' + str(total_pts) + ' points, roughly ' + format(total_pts*time_per_move_guess/60,'0.1f') + ' minutes to complete test')
+calib_pts = 1 + 2 + len(pos_ids)*2 + 5 + 1
+test_pts = sum([test['n_pts'] for test in tests])
+total_pts = calib_pts + test_pts
+time_per_move_guess = 14 # seconds
+print('   total all tests: ' + str(total_pts) + ' points, expect roughly ' + format(total_pts*time_per_move_guess/60,'0.1f') + ' minutes to complete test')
 
 # initialization
 if simulate:
