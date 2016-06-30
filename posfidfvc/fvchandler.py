@@ -145,7 +145,7 @@ class FVCHandler(object):
 
 if __name__ == '__main__':
     f = FVCHandler(fvc_type='SBIG')
-    n_objects = 4
+    n_objects = 6
     n_repeats = 1
     xy = []
     print('start taking ' + str(n_repeats) + ' images')

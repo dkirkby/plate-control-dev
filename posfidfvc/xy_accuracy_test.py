@@ -11,7 +11,7 @@ import time
 import pos_xytest_plot
 
 # simulation mode
-simulate = True
+simulate = False
 
 # start timer on the whole script
 script_start_time = time.time()

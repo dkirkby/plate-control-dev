@@ -20,7 +20,7 @@ script_start_time = time.time()
 # test configuration
 pos_ids = ['SS01','TI01','M00003']
 pos_id_suffixes = ['416SS','Ti6Al4V','6061T6']
-log_suffix = 'Chamber6105_RH12_15C_5V_100curr'
+log_suffix = 'Chamber6105_RH03_7C_7.5V_100curr'
 def forward_back_sequence(start,step,nsteps,nrepeats):
     '''total number of entries in sequence = 1 + 2*nsteps*nrepeats'''
     sequence = [start]
@@ -48,7 +48,7 @@ calib_pts = 1 + 2 + len(pos_ids)*2 + 5 + 1
 test_pts = sum([test['n_pts'] for test in tests])
 total_pts = calib_pts + test_pts
 time_per_move_guess = 14 # seconds
-print('   total all tests: ' + str(total_pts) + ' points, expect roughly ' + format(total_pts*time_per_move_guess/60,'0.1f') + ' minutes to complete test')
+print('   total all tests: ' + str(test_pts) + ' points, expect roughly ' + format(total_pts*time_per_move_guess/60,'0.1f') + ' minutes to complete test')
 
 # initialization
 if simulate:
@@ -121,7 +121,7 @@ for test in tests:
         for pos_id in pos_ids:
             requests[pos_id] = {'command':'posTP', 'target':tp, 'log_note':test['axis'] + ' ' + test['title']}
         pt += 1
-        print('Measuring target ' + str(pt) + ' of ' + str(total_pts) + ' at angle ' + str(angle) + ' on ' + test['axis'] + ' (' + test['title'] + ' sequence)')
+        print('Measuring target ' + str(pt) + ' of ' + str(test_pts) + ' at angle ' + str(angle) + ' on ' + test['axis'] + ' (' + test['title'] + ' sequence)')
         test['timestamps'].append(str(datetime.datetime.now().strftime(pc.timestamp_format)))
         this_meas_data = m.move_measure(requests)
         for pos_id in this_meas_data.keys():
