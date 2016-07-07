@@ -9,7 +9,7 @@ import os
 import time
 import Adafruit_BBIO.GPIO as GPIO
 
-class PtlTel(object):
+class PtlTelemetry(object):
 	"""	Class for communicating with the DESI petalbox telemetry electronics 
 	"""
 
