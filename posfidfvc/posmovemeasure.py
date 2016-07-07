@@ -20,7 +20,8 @@ class PosMoveMeasure(object):
         self.n_fiducial_dots = 1
         self.ref_dist_tol = 0.1   # [mm] used for identifying fiducial dots
         self.nudge_dist   = 10.0  # [deg] used for identifying fiducial dots
-        self.fiducials_xy = []    # list of locations of the dots in the obsXY coordinate system
+        self.fiducials_xy = []    # list of nominal locations of the fixed reference dots in the obsXY coordinate system
+		self.last_meas_fiducials_xy = [] # convenient location to store list of measured fiducial dot positions from the most recent FVC measurement
         self.n_points_full_calib_T = 7 # number of points in a theta calibration arc
         self.n_points_full_calib_P = 7 # number of points in a phi calibration arc
         self.phi_Eo_margin = 3.0 # [deg] margin on staying within Eo envelope
@@ -30,7 +31,6 @@ class PosMoveMeasure(object):
         self.grid_calib_keep_phi_within_Eo = False # during grid calibration method, whether to keep phi axis always within the non-collidable envelope
         self.n_points_grid_calib_T = 6
         self.n_points_grid_calib_P = 6
-
 
     def fiducials_on(self):
         """Turn on all fiducials on all petals."""
@@ -69,6 +69,7 @@ class PosMoveMeasure(object):
             petals[i].set(pos_ids[i],'LAST_MEAS_OBS_Y',measured_pos_xy[i][1])
         for i in range(len(pos_ids)):
             data[pos_ids[i]] = measured_pos_xy[i]
+		self.last_meas_fiducials_xy = measured_ref_xy
         return data
 
     def move(self, requests):
