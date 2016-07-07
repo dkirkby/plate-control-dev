@@ -317,3 +317,33 @@ class PetalComm(object):
             return self._call_device('set_posid',canbus, sid, new_posid)
         except Exception as e:
             return 'FAILED: Can not set posID. Exception: %s' % str(e)
+
+    def read_temp_ptl(self):
+        """
+        Returns a dictionary of temperature sensor readings on BeagleBone 1-wire bus.
+        Keys are temperature sensor serial numbers and values are temperatures in degrees C.
+        """
+        try:
+
+            return self._call_device('read_temp_ptl')
+        except Exception as e:
+            return 'FAILED: Can not read temperature sensors.  Exception: %s' % str(e)
+
+    def fan_pwm_ptl(self, pwm_out, percent_duty):
+        """
+        Sets PWM duty cycles for pwm output (pwm_out= 'GFA_FAN1' or 'GFA_FAN2')
+        """
+        try:
+            return self._call_device('fan_pwm_ptl', pwm_out, percent_duty)
+        except Exception as e:
+            return 'FAILED:  Can not set PWM.  Exception: %s' % str(e)
+
+    def switch_en_ptl(self, pin_name, state):
+        """
+        Switches power supply enable lines/ device enable lines to either high or low (state = 1 or 0)
+        PIN NAMES:  "SYNC", "PS1_EN", "PS2_EN", "GFAPWR_EN", "GFA_FAN1", "GFA_FAN2"
+        """
+        try:
+            return self._call_device('switch_en_ptl', pin_name, state)
+        except Exception as e:
+            return 'FAILED: Can not switch GPIO.  Exception: %s' % str(e)
