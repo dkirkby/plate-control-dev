@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3.4
 
 """
    DOS device application to control the DESI positioner petal
@@ -27,6 +27,7 @@ from DOSlib.application import Application
 import time
 import threading
 import posfidcan
+import ptltel
 from configobj import ConfigObj
 import sys
 
@@ -62,7 +63,10 @@ class PetalController(Application):
 				'get_sids',
 				'set_periods',
 				'set_currents',
-				'ready_for_tables']
+				'ready_for_tables',
+				'read_temp_ptl',
+				'fan_pwm_ptl',
+				'switch_en_ptl']
 
 	# Default configuration (can be overwritten by command line or config file)
 	defaults = {'default_petal_id' : 1,
@@ -85,6 +89,7 @@ class PetalController(Application):
 		# Bring in the Positioner Move object
 
 		self.pmc=PositionerMoveControl(self.role)
+		self.pt = ptltel.PtlTelemetry()
 
 		self.status = 'INITIALIZED'
 		self.info('Initialized')
@@ -139,7 +144,75 @@ class PetalController(Application):
 		if retcode:
 			return self.SUCCESS  
 		else:
-			return self.FAILED		
+			return self.FAILED
+
+
+	def read_temp_ptl(self):
+		"""
+		Returns dictionary of temperatures in degrees C, by temp. sensor id.  eg. {'28-000003f9c7c0': 22.812, '28-0000075c977a': 22.562}, number of entries depends
+                on the number of 1-wire devices detected on P8_07 		
+
+		"""
+
+		try:	
+			temps = self.pt.read_temp_sensors()
+
+		except:
+			return self.FAILED
+
+		return temps
+
+	def fan_pwm_ptl(self, pwm_out, percent_duty):
+		"""
+		Set PWM duty cycle for fan or aux pwm.
+	
+		INPUTS
+			pwm_out		string: 'GFA_FAN1', 'GFA_FAN2', 'PWM_AUX1', or 'PWM_AUX2')
+			percent_duty	float 0. to 100., 0. = off
+
+		RETURNS
+			SUCCESS OR FAILED	
+		
+		"""
+		try:
+			self.pt.control_pwm(str(pwm_out), percent_duty)
+
+		except:
+			return self.FAILED
+
+		return self.SUCCESS
+
+	def switch_en_ptl(self, pin_name = "SYNC", state = 0):
+		"""
+		Switch state of Beaglebone GPIO outputs (power supply enables, fan enables, etc.)
+
+		INPUTS
+			pin_name	string, eg. "GFA_FAN1"
+			state		int 0, or 1 (0 = off, 1 = on)
+
+		RETURNS
+			SUCCESS or FAILED
+
+
+		PIN NAMES
+
+                        #Outputs
+                        "SYNC" = "P9_12"
+                        "PS1_EN" = "P9_11"
+                        "PS2_EN" = "P9_13"
+                        "GFA_FAN1" = "P8_12"
+                        "GFA_FAN2" = "P8_14"
+                        "GFAPWR_EN" = "P8_15"
+
+		"""
+	 
+		try:
+			self.pt.switch(pin_name, state)
+		except:
+			return self.FAILED
+
+		return self.SUCCESS
+
 
 
 	def set_fiducial(self, posid, percent_duty):
@@ -190,7 +263,7 @@ class PetalController(Application):
 	
 		for id in range(len(ids)):
 			# assemble arguments for canbus/firmware function
-			print('Here')
+		
 			posid=int(ids[id])
 			print(posid)
 			canbus=self.__get_canbus(posid)
