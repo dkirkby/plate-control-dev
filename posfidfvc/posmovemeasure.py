@@ -21,11 +21,12 @@ class PosMoveMeasure(object):
         self.ref_dist_tol = 0.1   # [mm] used for identifying fiducial dots
         self.nudge_dist   = 10.0  # [deg] used for identifying fiducial dots
         self.fiducials_xy = []    # list of nominal locations of the fixed reference dots in the obsXY coordinate system
-		self.last_meas_fiducials_xy = [] # convenient location to store list of measured fiducial dot positions from the most recent FVC measurement
+        self.last_meas_fiducials_xy = [] # convenient location to store list of measured fiducial dot positions from the most recent FVC measurement
         self.n_points_full_calib_T = 7 # number of points in a theta calibration arc
         self.n_points_full_calib_P = 7 # number of points in a phi calibration arc
         self.phi_Eo_margin = 3.0 # [deg] margin on staying within Eo envelope
         self.calib_arc_margin = 3.0 # [deg] margin on calibration arc range
+        self.use_current_theta_during_phi_range_meas = False # useful for when theta axis is not installed on certain sample positioners
         self.general_trans = postransforms.PosTransforms() # general transformation object (not specific to calibration of any one positioner), useful for things like obsXY to QS or QS to obsXY coordinate transforms
         self.grid_calib_param_keys = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','OFFSET_X','OFFSET_Y']
         self.grid_calib_keep_phi_within_Eo = False # during grid calibration method, whether to keep phi axis always within the non-collidable envelope
@@ -69,7 +70,7 @@ class PosMoveMeasure(object):
             petals[i].set(pos_ids[i],'LAST_MEAS_OBS_Y',measured_pos_xy[i][1])
         for i in range(len(pos_ids)):
             data[pos_ids[i]] = measured_pos_xy[i]
-		self.last_meas_fiducials_xy = measured_ref_xy
+        self.last_meas_fiducials_xy = measured_ref_xy
         return data
 
     def move(self, requests):
@@ -487,7 +488,11 @@ class PosMoveMeasure(object):
                 axisid = pc.P
                 for pos_id in these_pos_ids:
                     posmodel = petal.get(pos_id)
-                    initial_tp = posmodel.trans.obsTP_to_posTP([0,phi_clear_angle]) # when doing phi axis, want obsT to all be uniform (simplifies anti-collision), which means have to figure out appropriate posT for each positioner -- depends on already knowing theta offset reasonably well
+                    if self.use_current_theta_during_phi_range_meas:
+                        theta_initial = petal.expected_current_position(pos_id,'obsT')
+                    else:
+                        theta_initial = 0
+                    initial_tp = posmodel.trans.obsTP_to_posTP([theta_initial,phi_clear_angle]) # when doing phi axis, want obsT to all be uniform (simplifies anti-collision), which means have to figure out appropriate posT for each positioner -- depends on already knowing theta offset reasonably well
                     initial_tp_requests[pos_id] = {'command':'posTP', 'target':initial_tp,  'log_note':'range arc ' + axis + ' initial point'}
             for i in range(len(these_pos_ids)):
                 data[these_pos_ids[i]] = {'target_dtdp':dtdp, 'measured_obsXY':[], 'petal':petal}

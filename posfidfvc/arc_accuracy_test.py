@@ -20,7 +20,8 @@ script_start_time = time.time()
 # test configuration
 pos_ids = ['SS01','TI01','M00003']
 pos_id_suffixes = ['416SS','Ti6Al4V','6061T6']
-log_suffix = 'Chamber6105_RH03_7C_7.5V_100curr'
+approx_thetaphi_offsets = [[-179,None],[-179,None],[-179,None]] # manual entry of rough estimate of as-installed offsets, enter None where not applicable
+log_suffix = '25C_5V_100curr_RH38'
 def forward_back_sequence(start,step,nsteps,nrepeats):
     '''total number of entries in sequence = 1 + 2*nsteps*nrepeats'''
     sequence = [start]
@@ -32,14 +33,16 @@ def forward_back_sequence(start,step,nsteps,nrepeats):
     return sequence
 tests = []
 tests.append({'axis':'phi', 'title':'150 deg cruise', 'targ_angle':forward_back_sequence(start=15, step=150, nsteps=1, nrepeats=10)})
-tests.append({'axis':'phi', 'title':'30 deg cruise', 'targ_angle':forward_back_sequence(start=15, step=30, nsteps=5, nrepeats=3)})
-temp = forward_back_sequence(     start=15,  step=1, nsteps=5, nrepeats=1)
-temp.extend(forward_back_sequence(start=90,  step=1, nsteps=5, nrepeats=1))
-temp.extend(forward_back_sequence(start=165, step=1, nsteps=5, nrepeats=1))
+tests.append({'axis':'phi', 'title':'30 deg cruise', 'targ_angle':forward_back_sequence(start=15, step=50, nsteps=3, nrepeats=3)})
+temp = forward_back_sequence(     start=15,  step=1, nsteps=3, nrepeats=1)
+temp.extend(forward_back_sequence(start=65,  step=1, nsteps=3, nrepeats=1))
+temp.extend(forward_back_sequence(start=115, step=1, nsteps=3, nrepeats=1))
+temp.extend(forward_back_sequence(start=165, step=1, nsteps=3, nrepeats=1))
 tests.append({'axis':'phi', 'title':'1 deg creep', 'targ_angle':temp})
-temp = forward_back_sequence(     start=15,  step=0.2, nsteps=5, nrepeats=1)
-temp.extend(forward_back_sequence(start=90,  step=0.2, nsteps=5, nrepeats=1))
-temp.extend(forward_back_sequence(start=165, step=0.2, nsteps=5, nrepeats=1))
+temp = forward_back_sequence(     start=15,  step=0.2, nsteps=3, nrepeats=1)
+temp.extend(forward_back_sequence(start=65,  step=0.2, nsteps=3, nrepeats=1))
+temp.extend(forward_back_sequence(start=115, step=0.2, nsteps=3, nrepeats=1))
+temp.extend(forward_back_sequence(start=165, step=0.2, nsteps=3, nrepeats=1))
 tests.append({'axis':'phi', 'title':'0.2 deg creep', 'targ_angle':temp})
 for test in tests:
     test['n_pts'] = len(test['targ_angle'])
@@ -64,7 +67,17 @@ ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
 ptl.simulator_on = simulate
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure(ptl,fvc)
-m.n_fiducial_dots = 3 # number of fiducial centroids the FVC should expect
+m.use_current_theta_during_phi_range_meas = True
+m.n_fiducial_dots = 1 # number of fiducial centroids the FVC should expect
+
+# function for setting arbitrary theta offsets after rehoming
+def set_rough_theta_offsets():
+    for pos_id in pos_ids:
+        approx_offsets = approx_thetaphi_offsets[pos_ids.index(pos_id)]
+        if approx_offsets[pc.T] != None:
+            ptl.set(pos_id,'OFFSET_T',approx_offsets[pc.T])
+        if approx_offsets[pc.P] != None:
+            ptl.set(pos_id,'OFFSET_P',approx_offsets[pc.P]) 
 
 # general log file setup
 log_directory = pc.test_logs_directory
@@ -80,8 +93,10 @@ def summary_name(pos_id):
 def multiline_summary_name(pos_id):
     pos_id_suffix = pos_id_suffixes[pos_ids.index(pos_id)]
     pos_id_suffix = (' ') + pos_id_suffix if pos_id_suffix else ''
-    mod_log_suffix = (' ' + log_suffix) if log_suffix else ''
-    return pos_id + pos_id_suffix + mod_log_suffix + '\n' + log_timestamp_with_notes()
+    mod_log_suffix = ('\n' + log_suffix) if log_suffix else ''
+    s = pos_id + pos_id_suffix + mod_log_suffix + '\n' + log_timestamp_with_notes()
+    s = s.replace('_',' ')
+    return s
 def path_prefix(pos_id):
     return log_directory + summary_name(pos_id)
 def log_path(pos_id):
@@ -91,8 +106,9 @@ def plot_path(pos_id):
 
 # initial homing, fiducial identification, positioner location and range-finding
 m.rehome(pos_ids='all')
+set_rough_theta_offsets()
 m.identify_fiducials()
-m.identify_positioner_locations()
+#m.identify_positioner_locations() # needs to be run at least once after initial hardware setup
 
 # begin tests sequence
 is_first_test_in_sequence = True
@@ -104,6 +120,7 @@ for test in tests:
         for key in data_keys:
             test[pos_id][key] = []
     test['timestamps'] = []
+    test['meas_refXY'] = []
     
     # measure physical travel range of axis and rehome
     if is_first_test_in_sequence:  
@@ -112,6 +129,7 @@ for test in tests:
         if 'phi' in [t['axis'] for t in tests]:
             m.measure_range(pos_ids='all', axis='phi')
         m.rehome(pos_ids='all')
+        set_rough_theta_offsets()
         is_first_test_in_sequence = False
         
     # do the test
@@ -121,13 +139,14 @@ for test in tests:
         for pos_id in pos_ids:
             requests[pos_id] = {'command':'posTP', 'target':tp, 'log_note':test['axis'] + ' ' + test['title']}
         pt += 1
-        print('Measuring target ' + str(pt) + ' of ' + str(test_pts) + ' at angle ' + str(angle) + ' on ' + test['axis'] + ' (' + test['title'] + ' sequence)')
+        print('Measuring target ' + str(pt) + ' of ' + str(test_pts) + ' at angle ' + format(angle,'.2f') + ' on ' + test['axis'] + ' (' + test['title'] + ' sequence)')
         test['timestamps'].append(str(datetime.datetime.now().strftime(pc.timestamp_format)))
         this_meas_data = m.move_measure(requests)
         for pos_id in this_meas_data.keys():
             test[pos_id]['meas_obsX'].append(this_meas_data[pos_id][0])
             test[pos_id]['meas_obsY'].append(this_meas_data[pos_id][1])
             test[pos_id]['cycle'].append(ptl.get(pos_id,'TOTAL_MOVE_SEQUENCES'))
+            test['meas_refXY'].append(m.last_meas_fiducials_xy)
             
 # combined data, for use in fitting
 combined = {}
@@ -198,7 +217,10 @@ for pos_id in pos_ids:
         test[pos_id]['err_tangen'] = err_tangen.tolist()
 
 # write logs
-move_log_header = 'timestamp,cycle,test_title,axis,targ_angle,meas_obsX,meas_obsY,err_radial,err_tangen,err_total\n'
+move_log_header = 'timestamp,cycle,test_title,axis,targ_angle,meas_obsX,meas_obsY'
+for i in range(m.n_fiducial_dots):
+    move_log_header += ',meas_refX' + str(i) + ',meas_refY' + str(i)
+move_log_header += ',err_radial,err_tangen,err_total\n'
 for pos_id in pos_ids:
     file = open(log_path(pos_id),'w')
     file.write(move_log_header)
@@ -213,6 +235,9 @@ for pos_id in pos_ids:
             row += ',' + str(test['targ_angle'][i])
             row += ',' + str(test[pos_id]['meas_obsX'][i])
             row += ',' + str(test[pos_id]['meas_obsY'][i])
+            for j in range(m.n_fiducial_dots):
+                row += ',' + str(test['meas_refXY'][i][j][0])
+                row += ',' + str(test['meas_refXY'][i][j][1])
             row += ',' + str(test[pos_id]['err_radial'][i])
             row += ',' + str(test[pos_id]['err_tangen'][i])
             row += ',' + str(test[pos_id]['err_total'][i])
