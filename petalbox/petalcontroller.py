@@ -20,7 +20,7 @@
    3/07/2016    MS, IG      added send_tables
    3/08/2016    MS, IG      rewrote load_rows; added load_rows_angle, load_table_rows
    3/24/2016    IG          filled in set_fiducials
-
+   7/7/2016	IG	    added telemetry functions: switch_en_ptl, read_temp_ptl, fan_pwm_ptl
 """
 
 from DOSlib.application import Application
