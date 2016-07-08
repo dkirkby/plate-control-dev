@@ -26,7 +26,7 @@
 from DOSlib.application import Application
 import time
 import threading
-import posfidcan
+#import posfidcan
 import ptltel
 from configobj import ConfigObj
 import sys
@@ -85,10 +85,13 @@ class PetalController(Application):
 		except:
 			self.default_petal_id = self.default['default_petal_id']
 		self.controller_type = self.config['controller_type']
-		
+		self.simulator=False
+		if self.controller_type =='SIMULATOR':
+			self.simulator=True
+
 		# Bring in the Positioner Move object
 
-		self.pmc=PositionerMoveControl(self.role)
+		self.pmc=PositionerMoveControl(self.role, self.controller_type) # controller_type is HARDWARE or SIMULATOR
 		self.pt = ptltel.PtlTelemetry()
 
 		self.status = 'INITIALIZED'
@@ -128,9 +131,8 @@ class PetalController(Application):
 		"""
 		Send the command to get silicon IDs
 		""" 
-		retcode = self.pmc.get_sids(canbus)
 
-		if retcode:
+		if self.pmc.get_sids(canbus)
 			return self.SUCCESS  
 		else:
 			return self.FAILED	
@@ -139,9 +141,7 @@ class PetalController(Application):
 		"""
 		Send the command to set positioner ID based on silicon IDs
 		""" 
-		retcode = self.pmc.set_posid(canbus,sid,posid)
-
-		if retcode:
+		if self.pmc.set_posid(canbus,sid,posid)
 			return self.SUCCESS  
 		else:
 			return self.FAILED
@@ -174,6 +174,18 @@ class PetalController(Application):
 			SUCCESS OR FAILED	
 		
 		"""
+
+		if pwm_out not in ['GFA_FAN1', 'GFA_FAN2', 'PWM_AUX1', 'PWM_AUX2']:
+			return self.FAILED
+
+		try:
+			percent_duty = float(percent_duty)
+			if percent_duty < 0.: percent_duty = 0.
+			if percent_duty > 100.: percent_duty = 100.
+		except:
+			if self.verbose: print('fan_pwm_ptl: pwm value error')
+			return self.FAILED
+
 		try:
 			self.pt.control_pwm(str(pwm_out), percent_duty)
 
@@ -214,7 +226,6 @@ class PetalController(Application):
 		return self.SUCCESS
 
 
-
 	def set_fiducial(self, posid, percent_duty):
 		"""
 		Set the ficucial power levels (between 0. and 100.). Inputs less than 0. or
@@ -239,10 +250,12 @@ class PetalController(Application):
 			canbus=self.__get_canbus(posid)
 		except:
 			return self.FAILED
-		
-		if not self.pmc.set_fiducial(canbus, posid, percent_duty):
-			if self.verbose: print('set_fiducial: Error setting fiducial with id'+str(posid))
-			return self.FAILED
+		if not self.simulator:
+			if not self.pmc.set_fiducial(canbus, posid, percent_duty):
+				if self.verbose: print('set_fiducial: Error setting fiducial with id'+str(posid))
+				return self.FAILED
+		else:
+			pass		
 
 		return self.SUCCESS
 
@@ -270,10 +283,12 @@ class PetalController(Application):
 			print(canbus)
 			duty = int(percent_duty[id])
 			
-		
-			if not self.pmc.set_fiducials(canbus, posid, duty):
+			if not self.simulator:
+				if not self.pmc.set_fiducials(canbus, posid, duty):
 					if self.verbose: print('set_fiducials: Error')
 					return self.FAILED
+			else:
+				pass		
 
 			if self.verbose:  print('ID: %s, Percent %s' % (ids[id],percent_duty[id]))
 		return self.SUCCESS
@@ -312,34 +327,36 @@ class PetalController(Application):
 		# def load_rows(self, posid, ex_code, mode_select, angle, pause):
 		print("*** tables***")
 		print(move_tables)
-		for table in move_tables:  # each table is a dictionary
-			posid=int(table['canid'])
-			canbus=self.__get_canbus(posid)
-			nrows=table['nrows']
-			xcode = '1'
-			print("** nrows **"+str(nrows))   #for each table, xcode starts as 1
-			for row in range(nrows):
-				motor_steps_T=table['motor_steps_T'][row]
-				motor_steps_P=table['motor_steps_P'][row]
-				speed_mode_T=table['speed_mode_T'][row]
-				speed_mode_P=table['speed_mode_P'][row]
-				post_pause=nint(table['postpause'][row]) + nint((table['move_time'][row])*1000)
+		if not self.simulator:
+			for table in move_tables:  # each table is a dictionary
+				posid=int(table['canid'])
+				canbus=self.__get_canbus(posid)
+				nrows=table['nrows']
+				xcode = '1'
+				print("** nrows **"+str(nrows))   #for each table, xcode starts as 1
+				for row in range(nrows):
+					motor_steps_T=table['motor_steps_T'][row]
+					motor_steps_P=table['motor_steps_P'][row]
+					speed_mode_T=table['speed_mode_T'][row]
+					speed_mode_P=table['speed_mode_P'][row]
+					post_pause=nint(table['postpause'][row]) + nint((table['move_time'][row])*1000)
 
-				if (motor_steps_T & motor_steps_P):	#simultaneous movement of theta and phi
-					post_pause_T = 0 		#first axis command gets sent with 0 post_pause to make firmware perform simultaneous theta/phi move
-				else:
-					post_pause_T = post_pause		
-
- 
-				if self.verbose: print("send_tables:",  canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause)
-				if self.pmc.load_table_rows(canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause_T):
-					if self.verbose: print('send_tables: Error')
-					return self.FAILED
-				if row == (nrows - 1):  #last row in move table, xcode = 2
-					xcode='2'
-				if self.pmc.load_table_rows(canbus, posid,xcode,'phi',motor_steps_P,speed_mode_P,post_pause):
-					if self.verbose: print('send_tables: Error')
-					return self.FAILED
+					if (motor_steps_T & motor_steps_P):	#simultaneous movement of theta and phi
+						post_pause_T = 0 		#first axis command gets sent with 0 post_pause to make firmware perform simultaneous theta/phi move
+					else:
+						post_pause_T = post_pause		
+	 
+					if self.verbose: print("send_tables:",  canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause)
+					if not self.pmc.load_table_rows(canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause_T):
+						if self.verbose: print('send_tables: Error')
+						return self.FAILED
+					if row == (nrows - 1):  #last row in move table, xcode = 2
+						xcode='2'
+					if not self.pmc.load_table_rows(canbus, posid,xcode,'phi',motor_steps_P,speed_mode_P,post_pause):
+						if self.verbose: print('send_tables: Error')
+						return self.FAILED
+		else:
+			pass				
 
 		#if self.verbose: print('send_tables: %s' % repr(move_tables))
 		return self.SUCCESS
@@ -395,8 +412,7 @@ class PetalController(Application):
 		"""
 		mode=mode.lower()
 		canbus = self.__get_canbus(20000)
-		
-
+	
 		if mode not in ['hard','soft']:
 			rstring = 'execute_sync: Invalid arguments.'
 			self.error(rstring)
@@ -405,10 +421,10 @@ class PetalController(Application):
 			print ("This functionality is not yet implemented")
 			pass
 		if mode == 'soft':
-			self.pmc.send_soft_sync(canbus , 20000)
-			pass
-
-		return self.SUCCESS   
+			if self.pmc.send_soft_sync(canbus , 20000)
+				return self.SUCCESS
+			else:
+				return self.FAILED  
 
 	def set_led(self, posid, state):
 		"""
@@ -424,30 +440,25 @@ class PetalController(Application):
 			return 'FAILED: ' + rstring
 		# call canbus function
 		canbus = self.__get_canbus(posid)
-		retcode = self.pmc.set_reset_leds(canbus, posid, state.lower())
-		# do anything with retcode?
-		if retcode:
-			return self.SUCCESS  
+		if self.pmc.set_reset_leds(canbus, posid, state.lower())
+			return self.SUCCESS
 		else:
 			return self.FAILED
 
 	def set_currents(self, posid, P_currents, T_currents):
 		canbus = self.__get_canbus(posid)
-
-		retcode=self.pmc.set_currents(canbus, posid, P_currents, T_currents)		
-		if retcode:
-			return self.FAILED  
-		else:
+		if self.pmc.set_currents(canbus, posid, P_currents, T_currents)		
 			return self.SUCCESS
+		else:
+			return self.FAILED
 
 	def set_periods(self, can_id, creep_period_m0, creep_period_m1, spin_period):
 		canbus = self.__get_canbus(can_id)
-		print(canbus)
-		retcode=self.pmc.set_periods(canbus, can_id, creep_period_m0, creep_period_m1, spin_period)
-		if retcode:
-			return self.FAILED
-		else:
+		#print(canbus)
+		if self.pmc.set_periods(canbus, can_id, creep_period_m0, creep_period_m1, spin_period)
 			return self.SUCCESS
+		else:
+			return self.FAILED
 
 	def set_pos_constants(self, posids, settings):
 		"""
@@ -525,7 +536,12 @@ class PositionerMoveControl(object):
 			canlist: list of canbuses (strings). Example: canlist=['can0','can2']
 	"""
 
-	def __init__(self,role):
+	def __init__(self,role,controller_type):
+		if controller_type == 'HARDWARE':
+			import posfidcan
+		else:
+			import posfidcansim as posfidcan
+
 		self.verbose=True #False
 		self.role=role
 		self.__can_frame_fmt = "=IB3x8s"
@@ -628,8 +644,7 @@ class PositionerMoveControl(object):
 		#if(TIMDIVint <= 1650):
 		#	return False
 		print(canbus, posid, 16, device_type + duty + TIMDIV)
-		try:        
-			
+		try:		
 			self.pfcan[canbus].send_command(posid, 16, device_type + duty + TIMDIV)
 			return True
 		except:
@@ -724,23 +739,23 @@ class PositionerMoveControl(object):
 		spin_current_m1 ,cruise_current_m1 ,creep_current_m1 ,hold_current_m1 = T_currents
 
 		spin_current_m0 = str(hex(spin_current_m0).replace('0x','')).zfill(2)
-		print(spin_current_m0)
+		#print(spin_current_m0)
 		cruise_current_m0 = str(hex(cruise_current_m0).replace('0x','')).zfill(2)
 		creep_current_m0 = str(hex(creep_current_m0).replace('0x','')).zfill(2)
 		hold_current_m0 = str(hex(hold_current_m0).replace('0x','')).zfill(2)   
 		m0_currents = spin_current_m0 + cruise_current_m0 + creep_current_m0 + hold_current_m0
-		print(m0_currents)
+		#print(m0_currents)
 		spin_current_m1 = str(hex(spin_current_m1).replace('0x','')).zfill(2)
 		cruise_current_m1 = str(hex(cruise_current_m1).replace('0x','')).zfill(2)
 		creep_current_m1 = str(hex(creep_current_m1).replace('0x','')).zfill(2)
 		hold_current_m1 = str(hex(hold_current_m1).replace('0x','')).zfill(2)           
 		m1_currents = spin_current_m1 + cruise_current_m1 + creep_current_m1 + hold_current_m1
-		print(m1_currents)
+		#print(m1_currents)
 		try:
 			self.pfcan[canbus].send_command(posid,2,m0_currents + m1_currents)
-			return 0
+			return True
 		except:
-			return 1   
+			return False
 
 	def set_periods(self, canbus, posid, creep_period_m0, creep_period_m1, spin_period):
 		"""
@@ -761,12 +776,10 @@ class PositionerMoveControl(object):
 		if self.verbose: print("Data sent: %s" % creep_period_m0+creep_period_m1+spin_steps)
 		try:
 			self.pfcan[canbus].send_command(posid,3,creep_period_m0 + creep_period_m1 + spin_steps)
-			return 0
-
+			return True
 		except:
 			print ("Sending command 3 failed")
-			return 1  
-
+			return False
 	
 
 	def load_table_rows(self, canbus, posid, xcode, motor, motor_steps, speed_mode, post_pause):
@@ -797,10 +810,10 @@ class PositionerMoveControl(object):
 			if self.load_rows(canbus, posid, xcode, mode, motor_steps , post_pause):
 				return 1
 			else:
-				return  0
+				return 0
 		except:
 			print("Error loading table row!")
-			return 1
+			return 0
 
 	def load_rows_angle(self, canbus, posid, xcode, mode, angle, pause):
 		""" 
@@ -885,14 +898,14 @@ class PositionerMoveControl(object):
 			self.pfcan[canbus].send_command(posid, 4, hexdata)  
 		except:
 			print ("Sending command 4 failed")
-			return 1
+			return 0
 
 		if xcode == '1': # increment bitsum if xcode=1 
 			data=int(xcode + s_select,16) + int(s_motor_steps,16) + int(s_pause,16) + 4                             
 			self.bitsum += data
 			#print(str(hex(data).replace('0x','').zfill(8)))
 			#print('Bitsum =', self.bitsum)
-			return 0
+			return 1
 
 		if xcode == '2': #else:
 		#Send both last command and bitsum, reset bitsum for next move table    
@@ -906,15 +919,15 @@ class PositionerMoveControl(object):
 				move_table_status = stat[4]
 				if move_table_status != 1:
 					print("Did not receive checksum match after sending a move table")
-					return 1
+					return 0
 				else:
-					return 0	
+					return 1
 			except:
 				print ("Sending command 9 failed")
-				return 1
-
+				return 0
 		if xcode == '0':
-			return 0
+			return 1
+		return 0	
 
 ######################################
 
