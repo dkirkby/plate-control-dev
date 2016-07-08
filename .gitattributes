@@ -51,6 +51,7 @@ petalbox/petalcontroller_sim.py -text
 petalbox/pf_utility.py -text
 petalbox/pfutility.sh -text
 petalbox/posfidcan.py -text
+petalbox/posfidcansim.py -text
 petalbox/ptltel.py -text
 petalbox/setup.sh -text
 petalbox/startpc.py -text
