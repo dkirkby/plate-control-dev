@@ -21,7 +21,7 @@ script_start_time = time.time()
 pos_ids = ['SS01','TI01','M00003']
 pos_id_suffixes = ['416SS','Ti6Al4V','6061T6']
 approx_thetaphi_offsets = [[-179,None],[-179,None],[-179,None]] # manual entry of rough estimate of as-installed offsets, enter None where not applicable
-log_suffix = '25C_5V_100curr_RH38'
+log_suffix = '-7C_7.5V_100curr_RH05'
 def forward_back_sequence(start,step,nsteps,nrepeats):
     '''total number of entries in sequence = 1 + 2*nsteps*nrepeats'''
     sequence = [start]
