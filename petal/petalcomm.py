@@ -213,7 +213,7 @@ class PetalComm(object):
         Would probably be better as a dictionary of dictionaries like this:
         constants = { 1 : {'some setting': value, 'another setting' : another_value}, 4 : {'some setting': ....  }
         """
-        if not isintance(can_ids, list) or not isinstance(settings,list):
+        if not isinstance(can_ids, list) or not isinstance(settings,list):
             return 'FAILED: parameters must be passed as lists'
         try:
             return self._call_device('set_pos_constants',can_ids, settings)
@@ -232,7 +232,7 @@ class PetalComm(object):
         Would probably be better as a dictionary of dictionaries like this:
         fiducials = { 1 : {'percent': percent_duty, 'period' : duty_period}, 4 : {'percent': ....  }
         """
-        if not isintance(can_ids, list) or not isinstance(percent_duty,list) or not isinstance(duty_period, list):
+        if not isinstance(can_ids, list) or not isinstance(percent_duty,list) or not isinstance(duty_period, list):
             return 'FAILED: parameters must be passed as lists'
         try:
             return self._call_device('set_fiducials',can_ids, percent_duty, duty_period)
@@ -255,7 +255,7 @@ class PetalComm(object):
             id = int(can_id)
         except:
             return 'FAILED: Invalid positioner id'
-        if not isintance(attributes, dict):
+        if not isinstance(attributes, dict):
             return 'FAILED: Attributes must be passed as dictionary'
         try:
             return self._call_device('set_device',id, attributes)
