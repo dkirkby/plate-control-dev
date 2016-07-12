@@ -132,7 +132,7 @@ class PetalController(Application):
 		Send the command to get silicon IDs
 		""" 
 
-		if self.pmc.get_sids(canbus)
+		if self.pmc.get_sids(canbus):
 			return self.SUCCESS  
 		else:
 			return self.FAILED	
@@ -141,7 +141,7 @@ class PetalController(Application):
 		"""
 		Send the command to set positioner ID based on silicon IDs
 		""" 
-		if self.pmc.set_posid(canbus,sid,posid)
+		if self.pmc.set_posid(canbus,sid,posid):
 			return self.SUCCESS  
 		else:
 			return self.FAILED
@@ -421,7 +421,7 @@ class PetalController(Application):
 			print ("This functionality is not yet implemented")
 			pass
 		if mode == 'soft':
-			if self.pmc.send_soft_sync(canbus , 20000)
+			if self.pmc.send_soft_sync(canbus , 20000):
 				return self.SUCCESS
 			else:
 				return self.FAILED  
@@ -440,14 +440,14 @@ class PetalController(Application):
 			return 'FAILED: ' + rstring
 		# call canbus function
 		canbus = self.__get_canbus(posid)
-		if self.pmc.set_reset_leds(canbus, posid, state.lower())
+		if self.pmc.set_reset_leds(canbus, posid, state.lower()):
 			return self.SUCCESS
 		else:
 			return self.FAILED
 
 	def set_currents(self, posid, P_currents, T_currents):
 		canbus = self.__get_canbus(posid)
-		if self.pmc.set_currents(canbus, posid, P_currents, T_currents)		
+		if self.pmc.set_currents(canbus, posid, P_currents, T_currents):
 			return self.SUCCESS
 		else:
 			return self.FAILED
@@ -455,7 +455,7 @@ class PetalController(Application):
 	def set_periods(self, can_id, creep_period_m0, creep_period_m1, spin_period):
 		canbus = self.__get_canbus(can_id)
 		#print(canbus)
-		if self.pmc.set_periods(canbus, can_id, creep_period_m0, creep_period_m1, spin_period)
+		if self.pmc.set_periods(canbus, can_id, creep_period_m0, creep_period_m1, spin_period):
 			return self.SUCCESS
 		else:
 			return self.FAILED
