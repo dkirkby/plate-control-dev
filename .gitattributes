@@ -93,3 +93,4 @@ posfirmware/release/fipos_fw_1.0.c -text
 posfirmware/release/fipos_fw_2.0.c -text
 posfirmware/release/fipos_fw_2.1.c -text
 posfirmware/release/fw21.hex -text
+ups/plate_control.table -text
