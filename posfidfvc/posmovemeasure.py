@@ -58,9 +58,12 @@ class PosMoveMeasure(object):
         expected_ref_xy = []
         petals = []
         pos_ids = []
+        posmodels = []
         for petal in self.petals:
             these_pos_ids = petal.posids
+            these_posmodels = petal.posmodels
             pos_ids.extend(these_pos_ids)
+            posmodels.extend(these_posmodels)
             petals.extend([petal]*len(these_pos_ids))
             expected_pos_xy = pc.concat_lists_of_lists(expected_pos_xy, petal.expected_current_position(these_pos_ids,'obsXY'))
         expected_ref_xy = self.fiducials_xy
@@ -68,6 +71,13 @@ class PosMoveMeasure(object):
         for i in range(len(measured_pos_xy)):
             petals[i].set(pos_ids[i],'LAST_MEAS_OBS_X',measured_pos_xy[i][0])
             petals[i].set(pos_ids[i],'LAST_MEAS_OBS_Y',measured_pos_xy[i][1])
+            if self.should_adjust_state_with_camera:
+                tp, unreachable = posmodels[i].trans.obsXY_to_posTP(measured_pos_xy[i])
+                theta_old = posmodels[i].state.read('POS_T')
+                if abs(theta_old - 360 - tp[0]) < 10:
+                    tp[0] += 360
+                posmodels[i].state.write('POS_T',tp[0])
+                posmodels[i].state.write('POS_P',tp[1])
         for i in range(len(pos_ids)):
             data[pos_ids[i]] = measured_pos_xy[i]
         self.last_meas_fiducials_xy = measured_ref_xy
@@ -768,7 +778,7 @@ class PosMoveMeasure(object):
         """
         wrapped = [angles[0]]
         if np.sign(angles[0]) != expected_sign_of_first_angle and np.sign(angles[0]) != 0:
-            wrapped[0] += expected_sign_of_first_angle * 360
+            wrapped[0] -= expected_sign_of_first_angle * 360
         for i in range(1,len(angles)):
             delta = angles[i] - wrapped[i-1]
             while np.sign(delta) != expected_direction and np.sign(delta) != 0:
