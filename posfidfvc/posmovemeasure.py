@@ -768,7 +768,7 @@ class PosMoveMeasure(object):
         """
         wrapped = [angles[0]]
         if np.sign(angles[0]) != expected_sign_of_first_angle and np.sign(angles[0]) != 0:
-            wrapped[0] -= expected_sign_of_first_angle * 360
+            wrapped[0] += expected_sign_of_first_angle * 360
         for i in range(1,len(angles)):
             delta = angles[i] - wrapped[i-1]
             while np.sign(delta) != expected_direction and np.sign(delta) != 0:
