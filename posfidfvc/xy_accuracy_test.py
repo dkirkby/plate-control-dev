@@ -20,11 +20,11 @@ script_start_time = time.time()
 if simulate:
     fvc = fvchandler.FVCHandler('simulator')
 else:
-    fvc = fvchandler.FVCHandler('SBIG')
+    fvc = fvchandler.FVCHandler('FLI')
 fvc.scale = 0.0061 # mm/pixel (update um_scale below if not in mm)
 fvc.rotation = 0  # deg
 um_scale = 1000 # um/mm
-pos_ids = ['UM00013']
+pos_ids = ['UM00013','UM00014','UM00017','UM00022']
 fid_can_ids = []
 petal_id = 1
 ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
