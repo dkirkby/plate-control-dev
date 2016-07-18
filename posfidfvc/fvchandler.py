@@ -45,7 +45,7 @@ class FVCHandler(object):
         self.scale = 1.0         # scale factor from image plane to object plane
         self.translation = [0,0] # translation of origin within the image plane
 
-    def measure_and_identify(self, expected_pos_xy=[], expected_ref_xy=[]):
+    def measure_and_identify(self, target_dict):
         """Calls for an FVC measurement, and returns a list of measured centroids.
         The centroids are in order according to their closeness to the list of
         expected xy values.
@@ -65,13 +65,21 @@ class FVCHandler(object):
             measured_pos_xy = (expected_pos_xy + sim_errors).tolist()
             measured_ref_xy = expected_ref_xy
 		elif self.fvc_type == 'FLI':
-			# 1. pass expected_pos_xy (in mm at the focal plate) thru platemaker to get expected_pos_xy (in pixels at the FVC CCD)
-			# 2. tell FVC software where we expect the positioner centroids to be so it can identify positioners
-			# 3. use DOS commands to ask FVC to take a picture
-			# 4. use DOS commands to get the centroids list
-			# 5. send centroids (in pixels at FVC) thru platemaker to get measured xy (in mm at focal plate)
+            self.exptime = 1 #sec
+            # 1. pass expected_pos_xy (in mm at the focal plate) thru platemaker to get expected_pos_xy (in pixels at the FVC CCD)
+			
+            # For now, just need to pass the FVC a list of expected positions, then tell is to take an exposure and measure centroids, then return those.
+            fvc_uri = 'PYRO:FVC@131.243.51.74:47449'
+            fvc = Pyro4.Proxy(fvc_uri)
+            print(target_dict)
+            fvc.set_target_dict(target_dict) # 2. tell FVC software where we expect the positioner centroids to be so it can identify positioners
+            fvc.set(exptime=self.exptime)
+            fvc.measure() # 3. use DOS commands to ask FVC to take a picture
+            measured_pos_xy = fvc.get_all_centers() # 4. use DOS commands to get the centroids list
+            measured_ref_xy = []
+
+            # 5. send centroids (in pixels at FVC) thru platemaker to get measured xy (in mm at focal plate)
 			# 6. organize those centroids so you can return them as measured_pos_xy, measured_ref_xy
-			pass
         else:
             expected_xy = expected_pos_xy + expected_ref_xy
             num_objects = len(expected_xy)
