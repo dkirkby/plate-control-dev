@@ -20,7 +20,8 @@ class PosMoveMeasure(object):
         self.n_fiducial_dots = 1
         self.ref_dist_tol = 0.1   # [mm] used for identifying fiducial dots
         self.nudge_dist   = 10.0  # [deg] used for identifying fiducial dots
-        self.fiducials_xy = []    # list of nominal locations of the fixed reference dots in the obsXY coordinate system
+        
+        #self.fiducials_xy = []    # list of nominal locations of the fixed reference dots in the obsXY coordinate system
         self.last_meas_fiducials_xy = [] # convenient location to store list of measured fiducial dot positions from the most recent FVC measurement
         self.n_points_full_calib_T = 7 # number of points in a theta calibration arc
         self.n_points_full_calib_P = 7 # number of points in a phi calibration arc
@@ -33,6 +34,22 @@ class PosMoveMeasure(object):
         self.n_points_grid_calib_T = 6
         self.n_points_grid_calib_P = 6
 
+        self.fid_dict = {1100: {'x': -71.3107,'y': 145.9311,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1118: {'x': -71.3222,'y': 104.0277,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1102: {'x': -80.5255,'y': 166.9440,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1103: {'x': -80.4125,'y': 83.0324,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1117: {'x': -89.4959,'y': 135.5507,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1106: {'x': -89.4696,'y': 114.5588,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1107: {'x': -107.8175,'y': 166.9728,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1108: {'x': -107.7875,'y': 124.9432,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1116: {'x': -107.8036,'y': 83.0034,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1115: {'x': -125.0158,'y': 180.9813,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1111: {'x': -125.0252,'y': 68.8910,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1112: {'x': -149.9411,'y': 181.0755,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1113: {'x': -160.0506,'y': 69.0207,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1114: {'x': -185.0396,'y': 114.9531,'mag': 0.000, 'meas_err': 1.000,'flags':8}}
+
+
     def fiducials_on(self):
         """Turn on all fiducials on all petals."""
         for petal in self.petals:
@@ -42,6 +59,32 @@ class PosMoveMeasure(object):
         """Turn off all fiducials on all petals."""
         for petal in self.petals:
             petal.fiducials_off()
+
+    def create_target_file(self,pos_xy):
+        """creates a target dict to send to fvc handler
+        INPUT: expected xy positions of positioners in [[x1,y1],[x2,y2],..]
+
+        Written by PAF for the FLI"""
+
+        target_dict = self.fid_dict
+        for n in range(len(pos_xy)):
+            target_dict[n] = {'x':n[0],'y':n[1],'mag':0.000,'meas_err':1.000,'flags':4}
+
+        return target_dict
+
+    def measured_xy_from_fvc_centroid(self,center_dict):
+        """reformats the centroid dictionary from the fvc to a list of measured [x,y]
+        centroids for the positioner software
+
+        written by PAF for the FLI""" 
+
+        measured_pos_xy = []
+        for n in center_dict:
+            measured_pos_xy.append([[center_dict[n]['x']],[center_dict[n]['y']]])
+
+
+        return measured_pos_xy
+            
 
     def measure(self):
         """Measure positioner locations with the FVC and return the values.
@@ -63,14 +106,16 @@ class PosMoveMeasure(object):
             pos_ids.extend(these_pos_ids)
             petals.extend([petal]*len(these_pos_ids))
             expected_pos_xy = pc.concat_lists_of_lists(expected_pos_xy, petal.expected_current_position(these_pos_ids,'obsXY'))
-        expected_ref_xy = self.fiducials_xy
-        (measured_pos_xy, measured_ref_xy) = self.fvc.measure_and_identify(expected_pos_xy, expected_ref_xy)
+        #expected_ref_xy = self.fiducials_xy
+        target_file = self.create_target_file(expected_pos_xy) #Put in by Parker. Need to get it in the right format for the FLI
+        list_measured_xy = self.fvc.measure_and_identify(target_file) #this is the right format for the FLI
+        measured_pos_xy = measured_xy_from_fvc_centroid(list_measured_xy)
         for i in range(len(measured_pos_xy)):
             petals[i].set(pos_ids[i],'LAST_MEAS_OBS_X',measured_pos_xy[i][0])
             petals[i].set(pos_ids[i],'LAST_MEAS_OBS_Y',measured_pos_xy[i][1])
         for i in range(len(pos_ids)):
             data[pos_ids[i]] = measured_pos_xy[i]
-        self.last_meas_fiducials_xy = measured_ref_xy
+        #self.last_meas_fiducials_xy = measured_ref_xy
         return data
 
     def move(self, requests):
