@@ -1,12 +1,14 @@
 #! /usr/bin/env python
 import petalcomm
+import posconstants as pc
 import posmodel
 import posschedule
 import posmovetable
 import posstate
-import posconstants as pc
 import numpy as np
 import time
+import os
+import datetime
 
 from DOSlib.application import Application
 from DOSlib.discovery import discoverable
@@ -66,6 +68,7 @@ class Petal(Application):
                 'anticollision_override' : True,
                 'fid_duty_percent' : 50,
                 'fid_duty_period' : 55,
+                'logdir ' : None
                 }
     
     def init(self):
@@ -86,10 +89,30 @@ class Petal(Application):
         self.loglevel('INFO')
         self.info('Initializing')
 
+        self.logdir = self.config['logdir']
+        if self.logdir == None:
+            try:
+                self.logdir = os.environ['POSITIONER_LOGS_PATH']
+            except:
+                print('ERROR: must specify a log directory on the command line or set POSITIONER_LOGS_PATH')
+                return
+        if not os.path.isdir(os.path.join(self.logdir, 'move_logs')):
+            os.mkdir(os.path.join(self.logdir,'move_logs'))
+        if not os.path.isdir(os.path.join(self.logdir, 'test_logs')):
+            os.mkdir(os.path.join(self.logdir,'test_logs'))
+        pc.set_logs_directory(self.logdir)
+        self.info('init: using log directory %s' % self.logdir)
+
         # status shared variable
         self.status_sv = self.shared_variable('STATUS')  
         self.status_sv.publish()
-        print(repr(self.status_sv))
+
+        # Telemetry information
+        # (temperatures, fan pwm duty cycles, GPIO switches)
+        self.telemetry_sv = self.shared_variable('TELEMETRY')
+        self.telemetry_sv.publish()
+        self.telemetry_sv.write({'last_updated' : datetime.datetime.utcnow().isoformat().replace('T',' ')})
+        
         # Update user information
         self.add_interlock_information(interlock = 'DOS', key =self.role + '_STATUS',
                                        set_condition=['READY'],
@@ -138,7 +161,10 @@ class Petal(Application):
         # reset application state
         self.status_sv.write('INITIALIZED')
 
-        # see if we have something to do in configure
+        # update telemetry
+        self._update_telemetry()
+        
+        # see if we have anything else to do in configure
 
         self.info('Configured')
         self.status_sv.write('READY')
@@ -457,6 +483,8 @@ class Petal(Application):
              status
              posid = < list of positioners>, key = < pos model keyword>
              petal_id
+             telemetry
+             logdir
              <any key in self.config>
              
         Retrieve the state value identified by string key, for positioner
@@ -501,6 +529,11 @@ class Petal(Application):
                 get_posid = True
             elif param in ['pos_ids', 'posids']:
                 return self.posids
+            elif param == 'logdir':
+                return self.logdir
+            elif param == 'telemetry':
+                self._update_telemetry()
+                return self.telemetry_sv._value
             elif param in ['fid_ids', 'fidids']:
                 return self.fidids
             else:
@@ -664,14 +697,41 @@ class Petal(Application):
         """
         Run loop for Petal application
         """
+        while self.status_sv._value != 'READY' and not self.shutdown_event.is_set():
+            # wait for configure
+            self.sleep(1)
+        self.info('main: starting telemetry update loop')
+        
         while not self.shutdown_event.is_set():
+            # update telemetry
+            self._update_telemetry()
             self.sleep(1)
 
         print('Petal appplication %s exiting' % self.role)
         return
 
 # INTERNAL METHODS
-
+    def _update_telemetry(self):
+        """
+        Retrieve telemetry information from the petalcontroller
+        """
+        try:
+            current = self.telemetry_sv._value
+            temps = self.communicate('read_temp_ptl')
+            if isinstance(temps, dict):
+                current.update(temps)
+            pwms = self.communicate('read_fan_pwm')
+            if isinstance(pwms, dict):
+                current.update(pwms)
+            switches = self.communicate('read_switch_ptl')
+            if isinstance(switches, dict):
+                current.update(switches)
+            current['last_updated'] = datetime.datetime.utcnow().isoformat().replace('T',' ')
+            self.telemetry_sv.write(current)
+        except Exception as e:
+            print(str(e))
+            pass
+        
     def _hardware_ready_move_tables(self):
         """Strips out information that isn't necessary to send to petalbox, and
         formats for sending. Any cases of multiple tables for one positioner are
@@ -772,12 +832,13 @@ class Petal(Application):
 if __name__ == '__main__':
     import argparse
     import json
-    import sys
+    import sys, os
     
     parser = argparse.ArgumentParser()
     parser.add_argument('--service',action='store',default='DOStest',type=str)
-    parser.add_argument('--device_mode',action='store_true')
+    parser.add_argument('--device_mode', action='store', default = None, help = 'Set to True for device_mode')
     parser.add_argument('--role', action='store', nargs = 1, required = True, help = 'Role name (required)', type=str)
+    parser.add_argument('--logdir', action='store', help = 'Logfile directory (write access required)', type=str)
     parser.add_argument('--petal', action='store', nargs = 1, help = 'Petal Id [0-9]', type=int)
     parser.add_argument('file', type=argparse.FileType('r'), help = 'file with pos_ids and fid_ids')                        
     args = parser.parse_args()
@@ -801,8 +862,14 @@ if __name__ == '__main__':
         
     # Create application instance
     if args.device_mode:
-        myPetal = Petal(petal_id = pid, pos_ids = pos_ids, fid_ids = fid_ids, device_mode = True, service = args.service)
+        if args.logdir:
+            myPetal = Petal(petal_id = pid, pos_ids = pos_ids, fid_ids = fid_ids, device_mode = True, logdir = args.logdir, service = args.service)
+        else:
+            myPetal = Petal(petal_id = pid, pos_ids = pos_ids, fid_ids = fid_ids, device_mode = True, service = args.service)
     else:
-        myPetal = Petal(petal_id = pid, pos_ids = pos_ids, fid_ids = fid_ids)
+        if args.logdir:
+            myPetal = Petal(petal_id = pid, pos_ids = pos_ids, fid_ids = fid_ids, logdir = args.logdir)
+        else:
+            myPetal = Petal(petal_id = pid, pos_ids = pos_ids, fid_ids = fid_ids)
     # Enter run loop
     myPetal.run()

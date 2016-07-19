@@ -338,6 +338,15 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED:  Can not set PWM.  Exception: %s' % str(e)
 
+    def read_fan_pwm(self, pwm_out = None):
+        """
+        Read back PWM duty cycles for pwm output (pwm_out= 'GFA_FAN1' or 'GFA_FAN2')
+        """
+        try:
+            return self._call_device('read_fan_pwm', pwm_out)
+        except Exception as e:
+            return 'FAILED:  Can not read PWM.  Exception: %s' % str(e)
+
     def switch_en_ptl(self, pin_name, state):
         """
         Switches power supply enable lines/ device enable lines to either high or low (state = 1 or 0)
@@ -347,3 +356,14 @@ class PetalComm(object):
             return self._call_device('switch_en_ptl', pin_name, state)
         except Exception as e:
             return 'FAILED: Can not switch GPIO.  Exception: %s' % str(e)
+
+    def read_switch_ptl(self, pin_name = None):
+        """
+        Read back switch
+        Switches power supply enable lines/ device enable lines to either high or low (state = 1 or 0)
+        PIN NAMES:  "SYNC", "PS1_EN", "PS2_EN", "GFAPWR_EN", "GFA_FAN1", "GFA_FAN2"
+        """
+        try:
+            return self._call_device('read_switch_ptl', pin_name)
+        except Exception as e:
+            return 'FAILED: Can not read switch GPIO.  Exception: %s' % str(e)
