@@ -1,5 +1,6 @@
 * text=auto !eol
 petal/demo.py -text
+petal/demo_dos.py -text
 petal/focal_surface_lookup.csv -text
 petal/movetablescr.py -text
 petal/petal.py -text
