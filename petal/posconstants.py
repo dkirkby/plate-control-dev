@@ -14,7 +14,7 @@ np.set_printoptions(suppress=True) # suppress auto-scientific notation when prin
 
 petal_directory        = os.environ.get("PETAL_PATH")
 if os.environ.get('UMFLAG'): petal_directory        = os.environ.get("PETAL_PATH")
-petal_directory        = os.path.abspath('../petal')
+if petal_directory == None: petal_directory        = os.path.abspath('../petal')
 all_logs_directory     = os.environ.get("POSITIONER_LOGS_PATH") # corresponds to https://desi.lbl.gov/svn/code/focalplane/positioner_logs
 if all_logs_directory == None: all_logs_directory = os.path.abspath('../../../positioner_logs') # backup alternative to environmental path, may need to modify for your machine
 pos_settings_directory = petal_directory + os.path.sep + 'pos_settings' + os.path.sep

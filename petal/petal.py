@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+import os
+import importlib
 import petalcomm
 import posmodel
 import posschedule
@@ -6,8 +9,9 @@ import posstate
 import posconstants as pc
 import numpy as np
 import time
+from DOSlib.application import Application
 
-class Petal(object):
+class Petal(Application):
     """Controls a petal. Communicates with the PetalBox hardware via PetalComm.
 
     The general sequence to make postioners move is:
@@ -27,25 +31,63 @@ class Petal(object):
     purpose of running test stands only. Later implementations should track fiducials' physical hardware
     by unique id number, log expected and measured positions, log cycles and total on time, etc.
     """
-    def __init__(self, petal_id, pos_ids, fid_ids):
-        self.simulator_on = False # controls whether in software-only simulation mode
-        self.verbose = False # whether to print verbose information at the terminal
-        self.petal_id = petal_id
+    defaults = {'petal_id': 0,
+                'pos_ids': [2, 4, 8, 10],
+                'fid_ids': [1, 5, 7, 9, 12, 15, 18, 20], # later, implement auto-lookup of pos_ids and fid_ids from database etc
+                'fid_duty_percent': 50, # 0-100 -- later, implement setting on a fiducial-by-fiducial basis
+                'fid_duty_period':  55, # milliseconds -- later, implement setting on a fiducial-by-fiducial basis
+                'petal_path': os.path.abspath(os.path.dirname(__file__)),
+                'positioner_logs_path': os.path.join(os.getenv('DOS_INSTANCES_DIRECTORY'), os.getenv('DOS_INSTANCE'), 'logs', 'positioner_logs'),
+                'simulator_on': False, # controls whether in software-only or simulation mode
+                'sync_mode': 'soft', # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
+                'anticollision_default': True, # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
+                'anticollision_override': True # causes the anticollision_default value to be used in all cases
+               }
+    commands = ['request_targets', 'request_direct_dtdp', 'request_limit_seek', 'request_homing',
+                'schedule_moves', 'send_move_tables', 'execute_moves', 'schedule_send_and_execute_moves',
+                'send_and_execute_moves', 'quick_move', 'quick_direct_dtdp', 'clear_schedule',
+                'fiducials_on', 'fiducials_off', 'get', 'set', 'expected_current_position',
+                'expected_current_position_str', 'get_model_for_pos']
+
+    def init(self):
+        ''' Inital setup for Petal '''
+
+        # Use environment variables to interact with configuration file
+        os.environ['PETAL_PATH'] = self.config['petal_path']
+        positioner_logs_path = self.config['positioner_logs_path']
+        os.environ['POSITIONER_LOGS_PATH'] = positioner_logs_path
+        # Make these directories if they do not yet exist
+        if not os.path.exists(positioner_logs_path):
+            os.mkdir(positioner_logs_path)
+        move_dir = os.path.join(positioner_logs_path, 'move_logs')
+        if not os.path.exists(move_dir):
+            os.mkdir(move_dir)
+        importlib.reload(pc)
+
+        self._setup_initial_config()
+
         self.comm = petalcomm.PetalComm(self.petal_id)
         self.posmodels = []
-        for pos_id in pos_ids:
+        for pos_id in self.config['pos_ids']:
             state = posstate.PosState(pos_id,logging=True)
             model = posmodel.PosModel(state)
             self.posmodels.append(model)
-        self.posids = pos_ids
         self.schedule = posschedule.PosSchedule(self)
-        self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
-        self.anticollision_default = True # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
-        self.anticollision_override = True # causes the anticollision_default value to be used in all cases
         self.canids_where_tables_were_just_sent = []
-        self.fid_can_ids = fid_ids # later, implement auto-lookup of pos_ids and fid_ids from database etc
-        self.fid_duty_percent = 50 # 0-100 -- later, implement setting on a fiducial-by-fiducial basis
-        self.fid_duty_period  = 55 # milliseconds -- later, implement setting on a fiducial-by-fiducial basis
+
+    def _setup_initial_config(self):
+        ''' Set (or reset) member object to the values in the configuration. '''
+
+        ## TODO: More type checking!! ##
+        self.simulator_on = self.config['simulator_on'] if 'T' in str(self.config['simulator_on']) else False
+        self.petal_id = self.config['petal_id']
+        self.sync_mode = self.config['sync_mode']
+        self.posids = self.config['pos_ids']
+        self.anticollision_default = self.config['anticollision_default'] if 'T' in str(self.config['anticollision_default']) else False
+        self.anticollision_override = self.config['anticollision_override'] if 'T' in str(self.config['anticollision_override']) else False
+        self.fid_can_ids = self.config['fid_ids']
+        self.fid_duty_percent = self.config['fid_duty_percent']
+        self.fid_duty_period  = self.config['fid_duty_period']
 
 # METHODS FOR POSITIONER CONTROL
 
@@ -517,8 +559,7 @@ class Petal(object):
         """
         for m in self.schedule.move_tables:
             m.posmodel.postmove_cleanup(m.for_cleanup)
-        if self.verbose:
-            print(self.expected_current_position_str())
+        self.debug(self.expected_current_position_str())
         self.clear_schedule()
         self.canids_where_tables_were_just_sent = []
 
@@ -572,3 +613,12 @@ class Petal(object):
                 print('either the var1 or the var2 must be of length 1')
                 return None, None
         return var1, var2
+
+    def main(self):
+        while not self.shutdown_event.is_set():
+            self.sleep(1)
+
+if __name__ == '__main__':
+    app = Petal()
+    app.run()
+
