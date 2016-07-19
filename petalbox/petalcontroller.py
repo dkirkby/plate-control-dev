@@ -27,7 +27,10 @@ from DOSlib.application import Application
 import time
 import threading
 #import posfidcan
-import ptltel
+try:
+	import ptltel
+except:
+	pass
 from configobj import ConfigObj
 import sys
 
@@ -92,7 +95,8 @@ class PetalController(Application):
 		# Bring in the Positioner Move object
 
 		self.pmc=PositionerMoveControl(self.role, self.controller_type) # controller_type is HARDWARE or SIMULATOR
-		self.pt = ptltel.PtlTelemetry()
+		if not self.simulator:
+			self.pt = ptltel.PtlTelemetry()
 
 		self.status = 'INITIALIZED'
 		self.info('Initialized')
