@@ -70,6 +70,7 @@ class PetalController(Application):
                 'ready_for_tables',
                 'read_temp_ptl',
                 'fan_pwm_ptl',
+                'read_fan_pwm',
                 'switch_en_ptl',
                 'read_switch_ptl'
                 ]
@@ -92,6 +93,8 @@ class PetalController(Application):
             self.default_petal_id = self.default['default_petal_id']
         self.controller_type = self.config['controller_type']
         self.simulator=False
+        self.simulated_switch = {}
+        self.simulated_pwm = {}
         if self.controller_type =='SIMULATOR':
             self.simulator=True
 
@@ -204,8 +207,47 @@ class PetalController(Application):
                 return 'FAILED: ' + rstring
         else:
             if self.simulator:
+                self.simulated_pwm[pwm_out] = percent_duty
                 return self.SUCCESS
         return 'FAILED: Petalbox telemetry not available'
+
+    def read_fan_pwm(self, pwm_out = None):
+        """
+        Read PWM duty cycle for fan or aux pwm.
+    
+        INPUTS
+            pwm_out     None or string: 'GFA_FAN1', 'GFA_FAN2', 'PWM_AUX1', or 'PWM_AUX2')
+
+        RETURNS
+            dictionary with duty cycles        
+        """
+        allowed = ['GFA_FAN1', 'GFA_FAN2', 'PWM_AUX1', 'PWM_AUX2']
+        if pwm_out is not None and pwm_out not in allowed:
+            return 'FAILED: invalid device for fan_pwm_ptl command'
+        results = {}
+        if telemetry_available:
+            if pwm_out == None:
+                devices = allowed
+            else:
+                devices = [pwm_out]
+            try:
+                for d in devices:
+                    results[d] = self.pt.read_pwm(d)   # function doesn't exist
+                return results
+            except Exception as e:
+                rstring = 'read_fan_pwm: Exception calling read_pwm: %s' % str(e)
+                self.error(rstring)
+                return 'FAILED: ' + rstring
+        else:
+            if self.simulator:
+                if pwm_out == None:
+                    return self.simulated_pwm
+                elif pwm_out in self.simulated_pwm:
+                    return {pwm_out : self.simulated_pwm[pwm_out]}
+                else:
+                    return 'FAILED: Invalid device for read_fan_pwm command'
+        return 'FAILED: Petalbox telemetry not available'
+    
 
     def switch_en_ptl(self, pin_name = "SYNC", state = 0):
         """
@@ -239,7 +281,7 @@ class PetalController(Application):
                 return 'FAILED: ' + rstring
         else:
             if self.simulator:
-                self.simulated_switch['pin_name'] = state
+                self.simulated_switch[pin_name] = state
                 return self.SUCCESS
         return 'FAILED: Petalbox telemetry is not available'
 
@@ -282,7 +324,7 @@ class PetalController(Application):
                 if pin_name == None:
                     return self.simulated_switch
                 elif pin_name in self.simulated_switch:
-                    return simulated_switch[pin_name]
+                    return {pin_name : self.simulated_switch[pin_name]}
                 else:
                     return 'FAILED: Invalid pin name'
         return 'FAILED: Petalbox telemetry is not available'
