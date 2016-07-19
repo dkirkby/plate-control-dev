@@ -79,12 +79,14 @@ posfidfvc/SBIG/stf.py -text
 posfidfvc/arc_accuracy_test.py -text
 posfidfvc/fitcircle.py -text
 posfidfvc/fvchandler.py -text
+posfidfvc/fvchandler_dos.py -text
 posfidfvc/motormovemeasure.py -text
 posfidfvc/motortest.py -text
 posfidfvc/pos_arctest_plot.py -text
 posfidfvc/pos_xytest_plot.py -text
 posfidfvc/poscalibplot.py -text
 posfidfvc/posmovemeasure.py -text
+posfidfvc/posmovemeasure_dos.py -text
 posfidfvc/um_accuracy_test.py -text
 posfidfvc/xy_accuracy_post.py -text
 posfidfvc/xy_accuracy_test.py -text
