@@ -1,4 +1,7 @@
 setupRequired(DOSlib)
 pathPrepend(PATH, ${PRODUCT_DIR}/bin)
-pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)
+pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/petal)
+pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/petalbox)
+pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/posfidfvc)
+
 
