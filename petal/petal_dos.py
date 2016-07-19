@@ -9,6 +9,7 @@ import numpy as np
 import time
 import os
 import datetime
+import Pyro4
 
 from DOSlib.application import Application
 from DOSlib.discovery import discoverable
@@ -148,7 +149,7 @@ class Petal(Application):
              self._setup_discovery(discovery.discoverable)
         self.info('Initialized')
         self.status_sv.write('INITIALIZED')
-
+            
     def _setup_discovery(self, discoverable):
         # Setup application for discovery and discover other DOS applications                                                                                               
         discoverable(role = self.role, tag = self.tag, interface = self.role)
@@ -389,12 +390,16 @@ class Petal(Application):
         """Send move tables that have been scheduled out to the positioners.
         """
         hw_tables = self._hardware_ready_move_tables()
+        print(repr(hw_tables))
         canids = []
         for tbl in hw_tables:
             canids.append(tbl['canid'])
         self.canids_where_tables_were_just_sent = canids
+        print('waiting')
         self._wait_while_moving()
+        print('done')
         self.comm.send_tables(hw_tables)
+        print('sent')
 
     def execute_moves(self):
         """Command the positioners to do the move tables that were sent out to them.
@@ -402,19 +407,23 @@ class Petal(Application):
         """
         self.comm.execute_sync(self.sync_mode)
         self._wait_while_moving()
+        print('before cleanup')
         self._postmove_cleanup()
 
     def schedule_send_and_execute_moves(self):
         """Convenience wrapper to schedule, send, and execute the pending requested
         moves, all in one shot.
         """
+        self.info('scheduling moves')
         self.schedule_moves()
+        self.info('excuting moves')
         self.send_and_execute_moves()
 
     def send_and_execute_moves(self):
         """Convenience wrapper to send and execute the pending moves (that have already
         been scheduled).
         """
+        print('send_and_execute_moves')
         self.send_move_tables()
         self.execute_moves()
 
@@ -538,8 +547,8 @@ class Petal(Application):
                 return self.fidids
             else:
                 return 'FAILED: invalid argument for get command'
-        if get_posid or 'posid' in kw:
-            if get_posid:
+        if get_posid or 'posid' in kw or 'key' in kw:
+            if get_posid or 'posid' not in kw:
                 posid = None
             else:
                 posid = kw['posid']
@@ -772,9 +781,11 @@ class Petal(Application):
         """
         for m in self.schedule.move_tables:
             m.posmodel.postmove_cleanup(m.for_cleanup)
+        print('done clean')
         if self.verbose:
             self.info('_postmove_cleanup: ' + self.expected_current_position_str())
         self.clear_schedule()
+        print('cleared')
         self.canids_where_tables_were_just_sent = []
 
     def _wait_while_moving(self):
@@ -843,6 +854,11 @@ if __name__ == '__main__':
     parser.add_argument('file', type=argparse.FileType('r'), help = 'file with pos_ids and fid_ids')                        
     args = parser.parse_args()
 
+    # cleanup sys.args for application framework
+    
+
+    print(repr(args))
+    print(repr(sys.argv))
     # Read positioner and fiducial ids for this petal
     config = json.load(args.file)
     if args.petal:
