@@ -10,6 +10,8 @@ import time
 
 from DOSlib.application import Application
 from DOSlib.discovery import discoverable
+from DOSlib.util import dos_parser
+from DOSlib.advertise import Seeker
 
 class Petal(Application):
     """Controls a petal. Communicates with the PetalBox hardware via PetalComm.
@@ -37,6 +39,24 @@ class Petal(Application):
     commands = ['configure',
                 'get',
                 'set',
+                'request_targets',
+                'request_direct_dtdp',
+                'request_limit_seek',
+                'request_homing',
+                'schedule_moves',
+                'send_move_tables',
+                'execute_moves',
+                'schedule_send_and_execute_moves',
+                'send_and_execute_moves',
+                'quick_move',
+                'quick_direct_dtdp',
+                'clear_schedule',
+                'fiducials_on',
+                'fiducials_off',
+                'expected_current_position',
+                'expected_current_position_str',
+                'get_model_for_pos',
+                'communicate'
                 ]
 
     defaults = {'verbose' : False,
@@ -48,42 +68,107 @@ class Petal(Application):
                 'fid_duty_period' : 55,
                 }
     
-    def init(self, petal_id, pos_ids, fid_ids):
+    def init(self):
         """
         Initialize petal application.
+        petal_id, pos_ids, fid_ids are passed from the command line via self.config
         """
-        assert isinstance(petal_id,int), 'Invalid type for petal id'
-        assert isinstance(pos_id, (list, tuple)), 'pos_ids must be a list or tuple'
-        assert isinstance(fid_id, (list, tuple)), 'fid_ids must be a list or tuple'
+        try:
+            self.petal_id = self.config['petal_id']
+            self.posids = self.config['pos_ids']
+            self.fidids = self.config['fid_ids']
+        except:
+            return 'FAILED: missing parameter (petal_id, pos_ids, fid_ids)'
+        assert isinstance(self.petal_id,int), 'Invalid type for petal id'
+        assert isinstance(self.posids, (list, tuple)), 'pos_ids must be a list or tuple'
+        assert isinstance(self.fidids, (list, tuple)), 'fid_ids must be a list or tuple'
 
         self.loglevel('INFO')
         self.info('Initializing')
 
         # status shared variable
+        self.status_sv = self.shared_variable('STATUS')  
+        self.status_sv.publish()
+        print(repr(self.status_sv))
+        # Update user information
+        self.add_interlock_information(interlock = 'DOS', key =self.role + '_STATUS',
+                                       set_condition=['READY'],
+                                       enabled=True)
         
-        self.simulator_on = False # controls whether in software-only simulation mode
-        self.verbose = False # whether to print verbose information at the terminal
-        self.petal_id = petal_id
-        self.comm = petalcomm.PetalComm(self.petal_id)
+        self.simulator_on = True if 'T' in str(self.config['simulator_on']).upper() else False
+        self.verbose = True if 'T' in str(self.config['verbose']).upper() else False
+        try:
+            self.comm = petalcomm.PetalComm(self.petal_id)
+        except Exception as e:
+            rstring = 'init: Exception creating PetalComm object: %s' % str(e)
+            self.error(rstring)
+            return 'FAILED: ' + rstring
         self.posmodels = []
-        for pos_id in pos_ids:
+        for pos_id in self.posids:
             state = posstate.PosState(pos_id,logging=True)
             model = posmodel.PosModel(state)
             self.posmodels.append(model)
-        self.posids = pos_ids
+
         self.schedule = posschedule.PosSchedule(self)
-        self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
-        self.anticollision_default = True # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
-        self.anticollision_override = True # causes the anticollision_default value to be used in all cases
+        
+        self.sync_mode = str(self.config['sync_mode']).lower()  # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
+        self.anticollision_default = True  if 'T' in str(self.config['anticollision_default']).upper() else False
+        self.anticollision_override = True if 'T' in str(self.config['anticollision_override']).upper() else False
+        
         self.canids_where_tables_were_just_sent = []
-        self.fid_can_ids = fid_ids # later, implement auto-lookup of pos_ids and fid_ids from database etc
-        self.fid_duty_percent = 50 # 0-100 -- later, implement setting on a fiducial-by-fiducial basis
-        self.fid_duty_period  = 55 # milliseconds -- later, implement setting on a fiducial-by-fiducial basis
+        self.fid_can_ids = self.fidids # later, implement auto-lookup of pos_ids and fid_ids from database etc
+        self.fid_duty_percent = int(self.config['fid_duty_percent'])
+        self.fid_duty_period  = int(self.config['fid_duty_period'])  # milliseconds
 
+        # setup discovery, update status and we are done
+        if self.connected:
+             self._setup_discovery(discovery.discoverable)
+        self.info('Initialized')
+        self.status_sv.write('INITIALIZED')
+
+    def _setup_discovery(self, discoverable):
+        # Setup application for discovery and discover other DOS applications                                                                                               
+        discoverable(role = self.role, tag = self.tag, interface = self.role)
+        self.info('_setup_discovery: Done')
+
+    def configure(self, *args, **kwargs):
+        """
+        configure Petal application
+        """
+        # reset application state
+        self.status_sv.write('INITIALIZED')
+
+        # see if we have something to do in configure
+
+        self.info('Configured')
+        self.status_sv.write('READY')
+        return self.SUCCESS
+    
 # METHODS FOR POSITIONER CONTROL
+    def communicate(self, *args, **kwargs):
+        """
+        Send a command to petalcomm
+        """
+        try:
+            a, kw = dos_parser(*args, **kwargs)
+        except:
+            a = []
+            kw = {}
 
+        if len(a) == 0:
+            return 'FAILED: invalid arguments for comm command'
+        try:
+            command = a[0]
+            del a[0]
+            return getattr(self.comm, command)(*a)
+        except Exception as e:
+            rstring = 'comm: Exception executing command %s: %s' % (str(command),str(e))
+            self.error(rstring)
+            return 'FAILED: ' + rstring
+        
     def request_targets(self, requests):
-        """Put in requests to the scheduler for specific positioners to move to specific targets.
+        """
+        Put in requests to the scheduler for specific positioners to move to specific targets.
         
         This method is for requesting that each robot does a complete repositioning sequence to get
         to the desired target. This means:
@@ -131,7 +216,7 @@ class Petal(Application):
             if 'log_note' not in requests[pos_id]:
                 requests[pos_id]['log_note'] = ''
             if self.schedule.already_requested(requests[pos_id]['posmodel']):
-                print('Positioner ' + str(pos_id) + ' already has a target scheduled. Extra target request ' + str(requests[pos_id]['command']) + '(' + str(requests[pos_id]['target'][0]) + ',' + str(requests[pos_id]['target'][1]) + ') ignored')
+                self.info('request_targets: Positioner ' + str(pos_id) + ' already has a target scheduled. Extra target request ' + str(requests[pos_id]['command']) + '(' + str(requests[pos_id]['target'][0]) + ',' + str(requests[pos_id]['target'][1]) + ') ignored')
                 del requests[pos_id]
             else:
                 self.schedule.request_target(requests[pos_id]['posmodel'], requests[pos_id]['command'], requests[pos_id]['target'][0], requests[pos_id]['target'][1], requests[pos_id]['log_note'])
@@ -365,8 +450,16 @@ class Petal(Application):
 
 # GETTERS, SETTERS, STATUS METHODS
 
-    def get(self,posid=None,key=''):
-        """Retrieve the state value identified by string key, for positioner
+    def get(self,*args, **kwargs):
+        """
+        Return configuration and positioner information.
+        Options include
+             status
+             posid = < list of positioners>, key = < pos model keyword>
+             petal_id
+             <any key in self.config>
+             
+        Retrieve the state value identified by string key, for positioner
         identified by id posid.
 
         If no key is specified, return the whole posmodel.
@@ -387,22 +480,63 @@ class Petal(Application):
             m.get(key=['POS_T']) # gets this value for all positioners identified in posids
             m.get() # gets all posmodel objects for all positioners identified in posids
         """
-        (posid, was_not_list) = self._posid_listify_and_fill(posid)
-        (key, temp) = pc.listify(key,keep_flat=True)
-        (posid, key) = self._equalize_input_list_lengths(posid,key)
-        vals = []
-        for i in range(len(posid)):
-            pidx = self.posids.index(posid[i])
-            if key[i] == '':
-                vals.append(self.posmodels[pidx])
-            else:
-                vals.append(self.posmodels[pidx].state.read(key[i]))
-        if was_not_list:
-            vals = pc.delistify(vals)
-        return vals
+        try:
+            a,kw = dos_parser(*args, **kwargs)
+        except Exception as e:
+            print('Exception %s'% str(e))
+            a = []
+            kw = {}
 
-    def set(self,posid=None,key=None,value=None,write_to_disk=None):
-        """Set the state value identified by string key, for positioner unit
+        get_posid = False
+        if len(a) == 1:
+            param = str(a[0]).lower()
+
+            if param.startswith('petal'):
+                return self.petal_id
+            elif param == 'status':
+                return self.status_sv._value
+            elif param in self.config:
+                return self.config[param]
+            elif param == 'posid':
+                get_posid = True
+            elif param in ['pos_ids', 'posids']:
+                return self.posids
+            elif param in ['fid_ids', 'fidids']:
+                return self.fidids
+            else:
+                return 'FAILED: invalid argument for get command'
+        if get_posid or 'posid' in kw:
+            if get_posid:
+                posid = None
+            else:
+                posid = kw['posid']
+            if 'key' not in kw:
+                key = ''
+            else:
+                key = kw['key']
+            (posid, was_not_list) = self._posid_listify_and_fill(posid)
+            (key, temp) = pc.listify(key,keep_flat=True)
+            (posid, key) = self._equalize_input_list_lengths(posid,key)
+            vals = []
+            for i in range(len(posid)):
+                pidx = self.posids.index(posid[i])
+                if key[i] == '':
+                    vals.append(self.posmodels[pidx])
+                else:
+                    vals.append(self.posmodels[pidx].state.read(key[i]))
+            if was_not_list:
+                vals = pc.delistify(vals)
+            if 'repr' in kw and kw['repr'] == True:
+                return repr(vals)
+            else:
+                return vals
+        else:
+            return 'FAILED: invalid option(s) for get command'
+        
+    def set(self,posid=None,key=None,value=None,write_to_disk=None, **kwargs):
+        """
+        Set positioner state values or configuration variables
+        Set the state value identified by string key, for positioner unit
         identified by id posid.
 
         Note comments for posstate.write() method, which explain the optional
@@ -423,9 +557,26 @@ class Petal(Application):
             m.set(['XXXXX','YYYYY'],['FINAL_CREEP_ON','DEVICE_ID'],[False,227]) # sets multiple different values on multiple different positioners
             m.set(key=['POS_T','POS_P'],value=[0,180]) # sets these values for all positioners identified in posids
         """
+
+        try:
+            args = []
+            a, kw = dos_parser(*args, **kwargs)
+        except:
+            a = []
+            kw = {}
+
+        # Set a configuration variable?
+        if len(kw) != 0:
+            for k, v in kw.items():
+                if k in self.config:
+                    self.config[k] = v
+            return self.SUCCESS
+
+        # Set positioner value
         if key == None or value == None:
-            print('either no key or no value was specified to setval')
-            return
+            rstring = 'set: either no key or no value was specified to setval'
+            self.error(rstring)
+            return 'FAILED: ' + rstring
         (posid, temp) = self._posid_listify_and_fill(posid)
         (key,   temp) = pc.listify(key,keep_flat=True)
         (value, temp) = pc.listify(value,keep_flat=True)
@@ -435,7 +586,8 @@ class Petal(Application):
         for i in range(len(posid)):
             p = self.get_model_for_pos(posid[i])
             p.state.write(key[i],value[i],write_to_disk)
-
+        return self.SUCCESS
+    
     def expected_current_position(self,posid=None,key=''):
         """Retrieve the current position, for a positioner identied by posid, according
         to the internal tracking of its posmodel object. Valid keys are:
@@ -508,6 +660,16 @@ class Petal(Application):
             pidx = self.posids.index(pos)
             return self.posmodels[pidx]
 
+    def main(self):
+        """
+        Run loop for Petal application
+        """
+        while not self.shutdown_event.is_set():
+            self.sleep(1)
+
+        print('Petal appplication %s exiting' % self.role)
+        return
+
 # INTERNAL METHODS
 
     def _hardware_ready_move_tables(self):
@@ -551,7 +713,7 @@ class Petal(Application):
         for m in self.schedule.move_tables:
             m.posmodel.postmove_cleanup(m.for_cleanup)
         if self.verbose:
-            print(self.expected_current_position_str())
+            self.info('_postmove_cleanup: ' + self.expected_current_position_str())
         self.clear_schedule()
         self.canids_where_tables_were_just_sent = []
 
@@ -571,7 +733,7 @@ class Petal(Application):
         start_time = time.time()
         while keep_waiting:
             if (time.time()-start_time) >= timeout:
-                print('Timed out at ' + str(timeout) + ' seconds waiting to send next move table.')
+                self.info('_wait_while_moving: Timed out at ' + str(timeout) + ' seconds waiting to send next move table.')
                 keep_waiting = False
             if self.comm.ready_for_tables(self.canids_where_tables_were_just_sent):
                 keep_waiting = False             
@@ -594,7 +756,7 @@ class Petal(Application):
         lengths of key / value requests.
         """
         if not(isinstance(var1,list)) or not(isinstance(var2,list)):
-            print('both var1 and var2 must be lists, even if single-element')
+            self.info('_equalize_input_list_lengths: both var1 and var2 must be lists, even if single-element')
             return None, None
         if len(var1) != len(var2):
             if len(var1) == 1:
@@ -602,6 +764,45 @@ class Petal(Application):
             elif len(var2) == 1:
                 var2 = var2*len(var1) # note here var2 is starting as a list
             else:
-                print('either the var1 or the var2 must be of length 1')
+                self.info('_equalize_input_list_lengths: either the var1 or the var2 must be of length 1')
                 return None, None
         return var1, var2
+
+###################################################
+if __name__ == '__main__':
+    import argparse
+    import json
+    import sys
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--service',action='store',default='DOStest',type=str)
+    parser.add_argument('--device_mode',action='store_true')
+    parser.add_argument('--role', action='store', nargs = 1, required = True, help = 'Role name (required)', type=str)
+    parser.add_argument('--petal', action='store', nargs = 1, help = 'Petal Id [0-9]', type=int)
+    parser.add_argument('file', type=argparse.FileType('r'), help = 'file with pos_ids and fid_ids')                        
+    args = parser.parse_args()
+
+    # Read positioner and fiducial ids for this petal
+    config = json.load(args.file)
+    if args.petal:
+        pid = args.petal
+    else:
+        # get petal id from role name
+        if args.role[0][-1].isdigit():
+            pid = int(args.role[0][-1])
+            if args.role[0][-2:-1].isdigit():
+                pid = pid + 10* int(args.role[0][-2])
+    if str(pid) in config:
+        pos_ids = config[str(pid)]['pos_ids']
+        fid_ids = config[str(pid)]['fid_ids']
+    else:
+        print('Configuration file does not include pos and fid ids for petal %s' % str(pid))
+        sys.exit()
+        
+    # Create application instance
+    if args.device_mode:
+        myPetal = Petal(petal_id = pid, pos_ids = pos_ids, fid_ids = fid_ids, device_mode = True, service = args.service)
+    else:
+        myPetal = Petal(petal_id = pid, pos_ids = pos_ids, fid_ids = fid_ids)
+    # Enter run loop
+    myPetal.run()
