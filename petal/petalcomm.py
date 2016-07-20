@@ -367,3 +367,31 @@ class PetalComm(object):
             return self._call_device('read_switch_ptl', pin_name)
         except Exception as e:
             return 'FAILED: Can not read switch GPIO.  Exception: %s' % str(e)
+
+    def read_HRPG600(self):
+        """
+        Read back power supply status signals, returns dict:  {"PS1_OK" : True, "PS2_OK" : True, "GFAPWR_OK" : True}
+        True = ON, False = OFF
+        """
+        try:
+            return self._call_device('read_HRPG600')
+        except Exception as e:
+            return 'FAILED: Can not read HRPG600 power supply status signals.  Exception: %s' % str(e)
+
+    def get_GPIO_names(self):
+        """
+        Returns dictionary of all pin names (inputs, outputs, pwm, 1-wire).  Names are keys, values are descriptions of the pin functionality
+        """
+        try:
+            return self._call_device('get_GPIO_names')
+        except Exception as e:
+            return 'FAILED: Can not read GPIO names.  Exception: %s' % str(e)
+
+    def read_fan_tach(self):
+        """
+        Reads GFA fan tachometer signals, returns dictionary:  {'GFA_FAN1' : 5000, 'GFA_FAN2' : 5000}
+        """
+        try:
+            return self._call_device('read_fan_tach')
+        except Exception as e:
+            return 'FAILED: Can not read GPIO names.  Exception: %s' % str(e)
