@@ -45,7 +45,53 @@ class FVCHandler(object):
         self.scale = 1.0         # scale factor from image plane to object plane
         self.translation = [0,0] # translation of origin within the image plane
 
-    def measure_and_identify(self, target_dict):
+        self.fid_dict = {1100: {'x': -71.3107,'y': 145.9311,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1118: {'x': -71.3222,'y': 104.0277,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1102: {'x': -80.5255,'y': 166.9440,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1103: {'x': -80.4125,'y': 83.0324,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1117: {'x': -89.4959,'y': 135.5507,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1106: {'x': -89.4696,'y': 114.5588,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1107: {'x': -107.8175,'y': 166.9728,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1108: {'x': -107.7875,'y': 124.9432,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1116: {'x': -107.8036,'y': 83.0034,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1115: {'x': -125.0158,'y': 180.9813,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1111: {'x': -125.0252,'y': 68.8910,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1112: {'x': -149.9411,'y': 181.0755,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1113: {'x': -160.0506,'y': 69.0207,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1114: {'x': -185.0396,'y': 114.9531,'mag': 0.000, 'meas_err': 1.000,'flags':8}}
+
+    def create_target_dict(self, expected_pos_xy):
+        """creates a target dict to send to fvc handler
+        INPUT: expected xy positions of positioners in [[x1,y1],[x2,y2],..]
+
+        Written by PAF for the FLI"""
+
+        target_dict = self.fid_dict
+        for i,n in enumerate(expected_pos_xy):
+            target_dict[n] = {'x':n[0],'y':n[1],'mag':0.000,'meas_err':1.000,'flags':4}
+
+        return target_dict
+
+    def measured_xy_from_fvc_centroid(self,center_dict):
+        """reformats the centroid dictionary from the fvc to a list of measured [x,y]
+        centroids for the positioner software
+
+        written by PAF for the FLI""" 
+
+        measured_pos_xy = []
+        measured_ref_xy = []
+        for n in center_dict:
+            if center_dict[n]['flag']==5.0:
+                measured_pos_xy.append([[center_dict[n]['x']],[center_dict[n]['y']]])
+            elif center_dict[n]['flag']==8.0:
+                measured_ref_xy.append([[center_dict[n]['x']],[center_dict[n]['y']]])
+            else:
+                print('Doesnt seem to be a fiber or positioner') 
+
+
+        return measured_pos_xy, measured_ref_xy
+
+    def measure_and_identify(self,expected_pos_xy,expected_ref_xy):
         """Calls for an FVC measurement, and returns a list of measured centroids.
         The centroids are in order according to their closeness to the list of
         expected xy values.
@@ -65,21 +111,27 @@ class FVCHandler(object):
             measured_pos_xy = (expected_pos_xy + sim_errors).tolist()
             measured_ref_xy = expected_ref_xy
 		elif self.fvc_type == 'FLI':
-            self.exptime = 1 #sec
             # 1. pass expected_pos_xy (in mm at the focal plate) thru platemaker to get expected_pos_xy (in pixels at the FVC CCD)
-			
-            # For now, just need to pass the FVC a list of expected positions, then tell is to take an exposure and measure centroids, then return those.
+            # 2. tell FVC software where we expect the positioner centroids to be so it can identify positioners
+            # 3. use DOS commands to ask FVC to take a picture
+            # 4. use DOS commands to get the centroids list
+            # 5. send centroids (in pixels at FVC) thru platemaker to get measured xy (in mm at focal plate)
+            # 6. organize those centroids so you can return them as measured_pos_xy, measured_ref_xy
+            self.exptime = 1 #sec
+            target_dict = create_target_dict(expected_pos_xy)
             fvc_uri = 'PYRO:FVC@131.243.51.74:47449'
             fvc = Pyro4.Proxy(fvc_uri)
-            print(target_dict)
-            fvc.set_target_dict(target_dict) # 2. tell FVC software where we expect the positioner centroids to be so it can identify positioners
             fvc.set(exptime=self.exptime)
-            fvc.measure() # 3. use DOS commands to ask FVC to take a picture
-            measured_pos_xy = fvc.get_all_centers() # 4. use DOS commands to get the centroids list
-            measured_ref_xy = []
+            fvc.set_bias_image('fvc.bias.fits')
+            fvc.set_target_dict(target_dict) 
+            fvc.calibrate()
+            fvc.measure() 
+            measured_dict = fvc.get_centers()
+            measured_pos_xy,measured_ref_xy =measured_xy_from_fvc_centroid(measured_dict) 
 
-            # 5. send centroids (in pixels at FVC) thru platemaker to get measured xy (in mm at focal plate)
-			# 6. organize those centroids so you can return them as measured_pos_xy, measured_ref_xy
+            
+			
+            return measured_pos_xy, measured_ref_xy
         else:
             expected_xy = expected_pos_xy + expected_ref_xy
             num_objects = len(expected_xy)
