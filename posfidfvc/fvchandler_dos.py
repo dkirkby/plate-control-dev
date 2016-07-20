@@ -61,9 +61,11 @@ class FVCHandler(object):
         Lists of xy coordinates are of the form [[x1,y1],[x2,y2],...]
         """
         if self.fvc_type == 'simulator':
-            sim_errors = np.random.uniform(-self.sim_err_max,self.sim_err_max,np.shape(expected_pos_xy))
-            measured_pos_xy = (expected_pos_xy + sim_errors).tolist()
-            measured_ref_xy = expected_ref_xy
+#            sim_errors = np.random.uniform(-self.sim_err_max,self.sim_err_max,np.shape(expected_pos_xy))
+#            measured_pos_xy = (expected_pos_xy + sim_errors).tolist()
+#            measured_ref_xy = expected_ref_xy
+            measured_pos_xy = []
+            measured_ref_xy = []
         elif self.fvc_type == 'FLI':
             self.exptime = 1 #sec
             # 1. pass expected_pos_xy (in mm at the focal plate) thru platemaker to get expected_pos_xy (in pixels at the FVC CCD)          

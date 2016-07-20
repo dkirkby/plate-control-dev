@@ -27,7 +27,7 @@ class PosMoveMeasure(object):
         self.ref_dist_tol = 0.1   # [mm] used for identifying fiducial dots
         self.nudge_dist   = 10.0  # [deg] used for identifying fiducial dots
         
-        #self.fiducials_xy = []    # list of nominal locations of the fixed reference dots in the obsXY coordinate system
+        self.fiducials_xy = []    # list of nominal locations of the fixed reference dots in the obsXY coordinate system
         self.last_meas_fiducials_xy = [] # convenient location to store list of measured fiducial dot positions from the most recent FVC measurement
         self.n_points_full_calib_T = 7 # number of points in a theta calibration arc
         self.n_points_full_calib_P = 7 # number of points in a phi calibration arc
@@ -71,10 +71,9 @@ class PosMoveMeasure(object):
         INPUT: expected xy positions of positioners in [[x1,y1],[x2,y2],..]
 
         Written by PAF for the FLI"""
-
         target_dict = self.fid_dict
         for n in range(len(pos_xy)):
-            target_dict[n] = {'x':n[0],'y':n[1],'mag':0.000,'meas_err':1.000,'flags':4}
+            target_dict[n] = {'x':pos_xy[n][0],'y':pos_xy[n][1],'mag':0.000,'meas_err':1.000,'flags':4}
 
         return target_dict
 
@@ -108,11 +107,11 @@ class PosMoveMeasure(object):
         petals = []
         pos_ids = []
         for pid, petal in self.Petals.items():
-            these_pos_ids = petal.posids
+            these_pos_ids = petal.get('posids')
             pos_ids.extend(these_pos_ids)
             petals.extend([pid]*len(these_pos_ids))
             expected_pos_xy = pc.concat_lists_of_lists(expected_pos_xy, petal.expected_current_position(these_pos_ids,'obsXY'))
-        #expected_ref_xy = self.fiducials_xy
+        expected_ref_xy = self.fiducials_xy
         target_file = self.create_target_file(expected_pos_xy) #Put in by Parker. Need to get it in the right format for the FLI
         list_measured_xy = self.fvc.measure_and_identify(target_file) #this is the right format for the FLI
         measured_pos_xy = measured_xy_from_fvc_centroid(list_measured_xy)
@@ -400,7 +399,7 @@ class PosMoveMeasure(object):
             these_pos_ids = pos_ids_by_ptl[pid]
             for pos_id in these_pos_ids:
                 data[pos_id] = {}
-                posmodel = self.Petals[pid].get(pos_id)
+                posmodel = self.Petals[pid].get(posid=pos_id)
                 range_T = posmodel.targetable_range_T
                 range_P = posmodel.targetable_range_P
                 if keep_phi_within_Eo:
@@ -411,7 +410,7 @@ class PosMoveMeasure(object):
                 p_cmd = p_cmd[:-1] # since there is very little useful data right near the center
                 data[pos_id]['target_posTP'] = [[t,p] for t in t_cmd for p in p_cmd]
                 data[pos_id]['trans'] = posmodel.trans
-                data[pos_id]['petal'] = petal
+                data[pos_id]['petal'] = self.Petals[pid]
                 data[pos_id]['measured_obsXY'] = []
                 n_pts = len(data[pos_id]['target_posTP'])
         all_pos_ids = list(data.keys())
@@ -459,7 +458,7 @@ class PosMoveMeasure(object):
         data = {}
         for pid in pos_ids_by_ptl.keys():
             these_pos_ids = pos_ids_by_ptl[id]
-            posmodels = self.Petals[pid].get(these_pos_ids)
+            posmodels = self.Petals[pid].get(posid=these_pos_ids)
             initial_tp = []
             final_tp = []
             if axis == 'theta':
@@ -542,7 +541,7 @@ class PosMoveMeasure(object):
                 dtdp = [0,delta]
                 axisid = pc.P
                 for pos_id in these_pos_ids:
-                    posmodel = self.Petals[pid].get(pos_id)
+                    posmodel = self.Petals[pid].get(posid=pos_id)
                     if self.use_current_theta_during_phi_range_meas:
                         theta_initial = petal.expected_current_position(pos_id,'obsT')
                     else:

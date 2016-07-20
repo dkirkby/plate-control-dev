@@ -1,7 +1,7 @@
 import os
 import sys
 sys.path.append(os.path.abspath('../petal/'))
-import fvchandler
+import fvchandler_dos as fvchandler
 import posmovemeasure_dos as posmovemeasure
 import posconstants as pc
 import datetime
@@ -11,7 +11,7 @@ import pos_xytest_plot
 from DOSlib.advertise import Seeker
 import Pyro4
 # simulation mode
-simulate = False
+simulate = True #False
 
 # start timer on the whole script
 script_start_time = time.time()
@@ -109,8 +109,10 @@ for i in range(len(local_targets)-1,-1,-1): # traverse list from end backward
 
 # initial homing
 if should_initial_rehome:
-    m.rehome(pos_ids='all')
-
+    try:
+        m.rehome(pos_ids='all')
+    except Exception as e:
+        print('Exception in rehome: %s' % str(e))
 # identify fiducials
 if should_identify_fiducials:
     m.identify_fiducials()
