@@ -94,57 +94,67 @@ class PtlTelemetry(object):
 		modulename=self.get_GPIO_names.__name__+": "
 		try:
 			pin_info = {}
-			pin_info["W1"] = 'Input (1-wire) pin to which all temperature sensors are connected, read state by reading temperatures'
-			pin_info["SYNC"] = 'Output pin for sending synchronization signal to positioners, read state by using read_GPIOstate()'
-			pin_info["PS1_EN"] = 'Output pin that enables positioner power supply 1 when set high, read state by using read_GPIOstate()'
-			pin_info["PS2_EN"] = 'Output pin that enables positioner power supply 1 when set high, read state by using read_GPIOstate()'
-			pin_info["GFA_FAN1"] = 'Output for enabling power to GFA fan 1, read state by using read_GPIOstate()'
-			pin_info["GFA_FAN2"] = 'Output for enabling power to GFA fan 2, read state by using read_GPIOstate()'
-			pin_info["GFAPWR_EN"] = 'Output for enabling GFA power supply, read state by using read_GPIOstate()'
-			pin_info["PS1_OK"] = 'Input for reading back feedback signal from positioner power supply 1, read state by using read_GPIOstate()'
-			pin_info["PS2_OK"] = 'Input for reading back feedback signal from positioner power supply 2, read state by using read_GPIOstate()'
-			pin_info["GFAPWR_OK"] = 'Input for reading back feedback signal from GFA power supply, read state by using read_GPIOstate()'
-			pin_info["CANBRD1_EN"] = 'Output for switching power to SYSTEC CAN board 1, read state by using read_GPIOstate()'
-			pin_info["CANBRD2_EN"] = 'Output for switching power to SYSTEC CAN board 2, read state by using read_GPIOstate()'
-			pin_info["GFA_PWM1"] = 'Output (PWM) for controlling GFA_FAN1 speed, read state (duty_cycle) by using read_PWMstate()'
-			pin_info["GFA_PWM2"] = 'Output (PWM) for controlling GFA_FAN2 speed, read state (duty_cycle) by using read_PWMstate()'
-			pin_info["GFA_TACH1"] = 'Input (pulsed) connected to GFA_FAN1 tachometer sensor, read_state by using read_tach()'
-			pin_info["GFA_TACH2"] = 'Input (pulsed) connected to GFA_FAN2 tachometer sensor, read_state by using read_tach()'
+			pin_info["W1"] = 'Input (1-wire) pin to which all temperature sensors are connected'
+			pin_info["SYNC"] = 'Output pin for sending synchronization signal to positioners'
+			pin_info["PS1_EN"] = 'Output pin that enables positioner power supply 1 when set high'
+			pin_info["PS2_EN"] = 'Output pin that enables positioner power supply 1 when set high'
+			pin_info["GFA_FAN1"] = 'Output for enabling power to GFA fan 1'
+			pin_info["GFA_FAN2"] = 'Output for enabling power to GFA fan 2'
+			pin_info["GFAPWR_EN"] = 'Output for enabling GFA power supply'
+			pin_info["PS1_OK"] = 'Input for reading back feedback signal from positioner power supply 1'
+			pin_info["PS2_OK"] = 'Input for reading back feedback signal from positioner power supply 2'
+			pin_info["GFAPWR_OK"] = 'Input for reading back feedback signal from GFA power supply'
+			pin_info["CANBRD1_EN"] = 'Output for switching power to SYSTEC CAN board 1'
+			pin_info["CANBRD2_EN"] = 'Output for switching power to SYSTEC CAN board 2'
+			pin_info["GFA_PWM1"] = 'Output (PWM) for controlling GFA_FAN1 speed'
+			pin_info["GFA_PWM2"] = 'Output (PWM) for controlling GFA_FAN2 speed'
+			pin_info["GFA_TACH1"] = 'Input (pulsed) connected to GFA_FAN1 tachometer sensor'
+			pin_info["GFA_TACH2"] = 'Input (pulsed) connected to GFA_FAN2 tachometer sensor'
 			return pin_info
 
 		except Exception as e:
 			rstring = modulename + 'Error reading pin info: %s' % str(e)
 			return 'FAILED: ' + rstring
 
-	def read_PWMstate(self):
+	def read_pwm(self, device):
 		"""
 		Function that returns pwm duty cycles on pins "GFA_PWM1" and "GFA_PWM2" as dictionary, eg. {"GFA_PWM1" : 50, "GFA_PWM2" : 20}
 		"""
-		modulename=self.read_PWMstate.__name__+": "
+		modulename=self.read_pwm.__name__+": "
 
-		pwms = {}
 		try:
-			pwms["GFA_PWM1"] = self.PWM1
-			pwms["GFA_PWM2"] = self.PWM2
-			return pwms
+			if device == 'GFA_FAN1':
+				pwm = self.PWM1
+			elif device == 'GFA_FAN2':
+				pwm = self.PWM2
+			else:
+				rstring = modulename + 'Invalid fan name: %s' % str(device)
+				#self.error(rstring)
+				return 'FAILED: ' + rstring
+
+			return pwm
 
 		except Exception as e:
 			rstring = modulename + 'Error reading PWM state: %s' % str(e)
 			return 'FAILED: ' + rstring
 
-	def read_GPIOstate(self, pin):
+	def read_switch(self):
 		"""
-		Input - pin name
-		Returns direction ('in' or 'out') and value of GPIO pin eg. ('out', 1)
+		Returns dictionary of output pin states
 		"""
-		modulename=self.read_GPIOstate.__name__+": "
+		modulename=self.read_switch.__name__+": "
 		try:
-			state = os.popen('sudo config-pin -q ' + self.pins[pin]).readlines()
-			value = state[0].split('Value: ')
-			value = int(value[-1].replace('\n',''))			
-			direction = state[0].split('Direction: ')
-			direction = direction[1][0:3].replace(' ','')  
-			return direction, value
+			states = {}
+			outputs = ['SYNC', 'GFA_FAN1', 'GFA_FAN2', 'PS1_EN', 'PS2_EN', 'GFAPWR_EN', 'CANBRD1_EN', 'CANBRD2_EN']
+			for p in outputs:
+				state = os.popen('sudo config-pin -q ' + self.pins[p]).readlines()
+				value = state[0].split('Value: ')
+				value = int(value[-1].replace('\n',''))			
+				#direction = state[0].split('Direction: ')
+				#direction = direction[1][0:3].replace(' ','')
+				states[p] = value
+				  
+			return states
 
 		except Exception as e:
 			rstring = modulename + 'Error reading GPIO state: %s' % str(e)
