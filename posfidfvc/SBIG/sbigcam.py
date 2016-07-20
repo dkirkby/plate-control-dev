@@ -71,7 +71,7 @@ Modification history:
 
 
 
-from ctypes import CDLL, byref, Structure, c_ushort, c_ulong, c_void_p
+from ctypes import CDLL, byref, Structure, c_ushort, c_ulong, c_void_p, c_double, c_int
 from platform import system
 import numpy as np
 import pyfits as fits
@@ -126,6 +126,10 @@ class SBIGCam(object):
 	
 	class QueryCommandStatusResults(Structure):
 		_fields_ = [('status', c_ushort)]
+  
+	class SetTemperatureRegulationParams2(Structure):
+		_fields_ = [('regulation', c_int),
+					('ccdSetpoint', c_double)]
 	
 	#Enumerated values taken from sbigudrv.h
 	CC_OPEN_DRIVER = 17
@@ -139,6 +143,7 @@ class SBIGCam(object):
 	CC_START_READOUT = 35
 	CC_READOUT_LINE = 3
 	CC_QUERY_COMMAND_STATUS = 12
+	CC_SET_TEMPERATURE_REGULATION2 = 51
 	CCD_IMAGING = 0
 	SC_CLOSE_SHUTTER = 2
 	SC_OPEN_SHUTTER = 1
@@ -254,7 +259,37 @@ class SBIGCam(object):
 		"""
 		self.DARK = bool(x)
 		return
+  
+	def temperature_control(self, command, temp):
+		"""
+  		Requires camera to be open (open_camera())
+  		
+  		Command values:
+		0 - 'off' - regulation off
+		1 - 'on' - regulation on
+		2 - 'override' - regulation override
+		3 - 'freeze_on' - freeze TE cooler (ST-8/7 cameras)
+		4 - 'freeze_off' - unfreeze TE cooler
+		5 - 'autofreeze_on' - enable auto-freeze
+		6 - 'autofreeze_off' - disable auto-freeze
 		
+  		temp is the CCD temperature in celsius to activate regulation
+    		"""
+		commands = {'off':0, 'on':1, 'override':2,'freeze_on':3,'freeze_off':4,'autofreeze_on':5, 'autofreeze_off':6}
+		if command not in commands.keys() and commands not in range(0,7):
+			print('Invalid Command')
+			return False
+		elif command in commands.keys():
+			command = commands[command]
+		trp2 = self.SetTemperatureRegulationParams2(regulation = c_int(command), ccdSetpoint = c_double(temp))
+		Error = self.SBIG.SBIGUnivDrvCommand(self.CC_SET_TEMPERATURE_REGULATION2, byref(trp2), None)
+		if Error != self.CE_NO_ERROR:
+			print('Attempt to adjust temperature control returned error:', Error)
+			return False
+		elif self.verbose:
+			print('Temperature command:', command, 'set. Temperature:', temp, 'C')
+		return True
+  
 	def open_camera(self):
 		"""
 		initializes driver and camera
