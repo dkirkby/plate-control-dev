@@ -74,8 +74,6 @@ class PetalController(Application):
                 'switch_en_ptl',
                 'read_switch_ptl',
                 'get_GPIO_names',
-                'read_GPIOstate',
-                'read_PWMstate',
                 'read_HRPG600',
                 'read_fan_tach'
                 ]
@@ -172,7 +170,7 @@ class PetalController(Application):
                 return self.FAILED
         else:
             if self.simulator:
-                names_desc = {'GFA_PWM2': 'Output (PWM) for controlling GFA_FAN2 speed, read state (duty_cycle) by using read_PWMstate()', 'PS2_OK': 'Input for reading back feedback signal from positioner power supply 2, read state by using read_GPIOstate()', 'GFA_PWM1': 'Output (PWM) for controlling GFA_FAN1 speed, read state (duty_cycle) by using read_PWMstate()', 'GFA_FAN2': 'Output for enabling power to GFA fan 2, read state by using read_GPIOstate()', 'GFAPWR_OK': 'Input for reading back feedback signal from GFA power supply, read state by using read_GPIOstate()', 'CANBRD1_EN': 'Output for switching power to SYSTEC CAN board 1, read state by using read_GPIOstate()', 'CANBRD2_EN': 'Output for switching power to SYSTEC CAN board 2, read state by using read_GPIOstate()', 'SYNC': 'Output pin for sending synchronization signal to positioners, read state by using read_GPIOstate()', 'GFA_TACH2': 'Input (pulsed) connected to GFA_FAN2 tachometer sensor, read_state by using read_tach()', 'GFA_FAN1': 'Output for enabling power to GFA fan 1, read state by using read_GPIOstate()', 'PS1_EN': 'Output pin that enables positioner power supply 1 when set high, read state by using read_GPIOstate()', 'PS1_OK': 'Input for reading back feedback signal from positioner power supply 1, read state by using read_GPIOstate()', 'W1': 'Input (1-wire) pin to which all temperature sensors are connected, read state by reading temperatures', 'GFA_TACH1': 'Input (pulsed) connected to GFA_FAN1 tachometer sensor, read_state by using read_tach()', 'PS2_EN': 'Output pin that enables positioner power supply 1 when set high, read state by using read_GPIOstate()', 'GFAPWR_EN': 'Output for enabling GFA power supply, read state by using read_GPIOstate()'}
+                names_desc = {'PS1_OK': 'Input for reading back feedback signal from positioner power supply 1', 'PS2_EN': 'Output pin that enables positioner power supply 1 when set high', 'GFA_FAN1': 'Output for enabling power to GFA fan 1', 'GFAPWR_OK': 'Input for reading back feedback signal from GFA power supply', 'PS2_OK': 'Input for reading back feedback signal from positioner power supply 2', 'CANBRD2_EN': 'Output for switching power to SYSTEC CAN board 2', 'CANBRD1_EN': 'Output for switching power to SYSTEC CAN board 1', 'GFAPWR_EN': 'Output for enabling GFA power supply', 'GFA_PWM2': 'Output (PWM) for controlling GFA_FAN2 speed', 'GFA_TACH2': 'Input (pulsed) connected to GFA_FAN2 tachometer sensor', 'W1': 'Input (1-wire) pin to which all temperature sensors are connected', 'GFA_TACH1': 'Input (pulsed) connected to GFA_FAN1 tachometer sensor', 'SYNC': 'Output pin for sending synchronization signal to positioners', 'GFA_FAN2': 'Output for enabling power to GFA fan 2', 'GFA_PWM1': 'Output (PWM) for controlling GFA_FAN1 speed', 'PS1_EN': 'Output pin that enables positioner power supply 1 when set high'}
             else:
                 return 'FAILED: No GPIO name information available'
         return names_desc
@@ -263,10 +261,10 @@ class PetalController(Application):
 
     def fan_pwm_ptl(self, pwm_out, percent_duty):
         """
-        Set PWM duty cycle for fan or aux pwm.
+        Set PWM duty cycle for fans.
     
         INPUTS
-            pwm_out     string: 'GFA_FAN1', 'GFA_FAN2', 'PWM_AUX1', or 'PWM_AUX2')
+            pwm_out     string: 'GFA_FAN1' or 'GFA_FAN2')
             percent_duty    float 0. to 100., 0. = off
 
         RETURNS
@@ -274,7 +272,7 @@ class PetalController(Application):
         
         """
 
-        if pwm_out not in ['GFA_FAN1', 'GFA_FAN2', 'PWM_AUX1', 'PWM_AUX2']:
+        if pwm_out not in ['GFA_FAN1', 'GFA_FAN2']:
             return 'FAILED: invalid device for fan_pwm_ptl command'
 
         try:
@@ -300,6 +298,7 @@ class PetalController(Application):
                 return self.SUCCESS
         return 'FAILED: Petalbox telemetry not available'
 
+   
     def read_fan_pwm(self, pwm_out = None):
         """
         Read PWM duty cycle for fan or aux pwm.
@@ -310,7 +309,7 @@ class PetalController(Application):
         RETURNS
             dictionary with duty cycles        
         """
-        allowed = ['GFA_FAN1', 'GFA_FAN2', 'PWM_AUX1', 'PWM_AUX2']
+        allowed = ['GFA_FAN1', 'GFA_FAN2']
         if pwm_out is not None and pwm_out not in allowed:
             return 'FAILED: invalid device for fan_pwm_ptl command'
         results = {}
@@ -321,7 +320,7 @@ class PetalController(Application):
                 devices = [pwm_out]
             try:
                 for d in devices:
-                    results[d] = self.pt.read_pwm(d)   # function doesn't exist
+                    results[d] = self.pt.read_pwm(d)
                 return results
             except Exception as e:
                 rstring = 'read_fan_pwm: Exception calling read_pwm: %s' % str(e)
@@ -359,11 +358,14 @@ class PetalController(Application):
                         "GFA_FAN1" = "P8_12"
                         "GFA_FAN2" = "P8_14"
                         "GFAPWR_EN" = "P8_15"
-
+			"CANBRD1_EN" = "P8_9"
+			"CANBRD2_EN" = "P8_11"
         """
+       
         if telemetry_available:
             try:
                 self.pt.switch(pin_name, state)
+                return self.SUCCESS
             except Exception as e:
                 rstring = 'switch_en_ptl: Exception calling switch function: %s' % str(e)
                 self.error(rstring)
@@ -372,8 +374,9 @@ class PetalController(Application):
             if self.simulator:
                 self.simulated_switch[pin_name] = state
                 return self.SUCCESS
-        return 'FAILED: Petalbox telemetry is not available'
+            return 'FAILED: Petalbox telemetry is not available'
 
+    
     def read_switch_ptl(self, pin_name = None):
         """
         Read state of Beaglebone GPIO outputs (power supply enables, fan enables, etc.)
@@ -397,7 +400,7 @@ class PetalController(Application):
         """
         if telemetry_available:
             try:
-                retcode = self.pt.read_switch(pin_name, state)
+                retcode = self.pt.read_switch()
                 if pin_name == None:
                     return retcode
                 elif pin_name in retcode:   # add check that retcode is a dictionary
@@ -417,7 +420,8 @@ class PetalController(Application):
                 else:
                     return 'FAILED: Invalid pin name'
         return 'FAILED: Petalbox telemetry is not available'
-        
+    
+     
     def set_fiducial(self, posid, percent_duty):
         """
         Set the ficucial power levels (between 0. and 100.). Inputs less than 0. or
