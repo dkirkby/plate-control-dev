@@ -92,6 +92,7 @@ posfidfvc/posmovemeasure_dos.py -text
 posfidfvc/um_accuracy_test.py -text
 posfidfvc/xy_accuracy_post.py -text
 posfidfvc/xy_accuracy_test.py -text
+posfidfvc/xy_accuracy_test_dos.py -text
 posfirmware/develop/fipos_fw_2.0dev.c -text
 posfirmware/develop/fipos_fw_2.1dev.c -text
 posfirmware/docs/FW_1.0_DESC.docx -text svneol=unset#application/zip
