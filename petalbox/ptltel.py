@@ -18,6 +18,7 @@ class PetalTelemetry(object):
 
 	def __init__(self):
 		
+		modulename=self.__init__.__name__+": "
 		try:
 			os.system('sudo config-pin "P8.13" pwm')
 			os.system('sudo config-pin "P8.19" pwm')
@@ -25,7 +26,9 @@ class PetalTelemetry(object):
 			GPIO.cleanup()
 			
 			self.pins = {}
-
+			self.PWM1 = 0
+			self.PWM2 = 0
+ 
 			#1-Wire
 			self.pins["W1"] = "P8_07"
 
@@ -65,12 +68,12 @@ class PetalTelemetry(object):
 			GPIO.setup(self.pins["GFAPWR_OK"], GPIO.IN)
 			GPIO.setup(self.pins["PS1_OK"], GPIO.IN)
 			GPIO.setup(self.pins["PS2_OK"], GPIO.IN)			
-			return self.SUCCESS
+			#return self.SUCCESS
 
 		except Exception as e:
-			rstring = modulname + 'Error initializing petal telemetry: %s' str(e)
-            self.error(rstring)
-            return 'FAILED: ' + rstring
+			rstring = modulename + 'Error initializing petal telemetry: %s' %  str(e)
+			#self.error(rstring)
+			return 'FAILED: ' + rstring
 		
 
 	def __cleanup__(self):
@@ -79,9 +82,56 @@ class PetalTelemetry(object):
 			GPIO.cleanup()
 			return
 		except Exception as e:
-			rstring = modulname + 'Error running GPIO cleanup: %s' str(e)
-            self.error(rstring)
-            return 'FAILED: ' + rstring
+			rstring = modulename + 'Error running GPIO cleanup: %s' % str(e)
+			#self.error(rstring)
+			return 'FAILED: ' + rstring
+
+	def get_pin_info(self):
+		"""
+		Function that returns a dictionary of pin names and descriptions
+		"""
+
+		modulename=self.get_pin_info.__name__+": "
+		try:
+			pin_info = {}
+			pin_info["W1"] = 'Input (1-wire) pin to which all temperature sensors are connected, read state by reading temperatures'
+			pin_info["SYNC"] = 'Output pin for sending synchronization signal to positioners, read state by using read_GPIOstate()'
+			pin_info["PS1_EN"] = 'Output pin that enables positioner power supply 1 when set high, read state by using read_GPIOstate()'
+			pin_info["PS2_EN"] = 'Output pin that enables positioner power supply 1 when set high, read state by using read_GPIOstate()'
+			pin_info["GFA_FAN1"] = 'Output for enabling power to GFA fan 1, read state by using read_GPIOstate()'
+			pin_info["GFA_FAN2"] = 'Output for enabling power to GFA fan 2, read state by using read_GPIOstate()'
+			pin_info["GFAPWR_EN"] = 'Output for enabling GFA power supply, read state by using read_GPIOstate()'
+			pin_info["PS1_OK"] = 'Input for reading back feedback signal from positioner power supply 1, read state by using read_GPIOstate()'
+			pin_info["PS2_OK"] = 'Input for reading back feedback signal from positioner power supply 2, read state by using read_GPIOstate()'
+			pin_info["GFAPWR_OK"] = 'Input for reading back feedback signal from GFA power supply, read state by using read_GPIOstate()'
+			pin_info["CANBRD1_EN"] = 'Output for switching power to SYSTEC CAN board 1, read state by using read_GPIOstate()'
+			pin_info["CANBRD2_EN"] = 'Output for switching power to SYSTEC CAN board 2, read state by using read_GPIOstate()'
+			pin_info["GFA_PWM1"] = 'Output (PWM) for controlling GFA_FAN1 speed, read state (duty_cycle) by using read_PWMstate()'
+			pin_info["GFA_PWM2"] = 'Output (PWM) for controlling GFA_FAN2 speed, read state (duty_cycle) by using read_PWMstate()'
+			pin_info["GFA_TACH1"] = 'Input (pulsed) connected to GFA_FAN1 tachometer sensor, read_state by using read_tach()'
+			pin_info["GFA_TACH2"] = 'Input (pulsed) connected to GFA_FAN2 tachometer sensor, read_state by using read_tach()'
+
+			return pin_info
+
+		except Exception as e:
+			rstring = modulename + 'Error reading pin info: %s' % str(e)
+			return 'FAILED: ' + rstring
+
+	def read_PWMstate(self):
+		"""
+		Function that returns pwm duty cycles on pins "GFA_PWM1" and "GFA_PWM2" as dictionary, eg. {"GFA_PWM1" : 50, "GFA_PWM2" : 20}
+		"""
+		modulename=self.read_PWMstate.__name__+": "
+
+		pwms = {}
+		try:
+			pwms["GFA_PWM1"] = self.PWM1
+			pwms["GFA_PWM2"] = self.PWM2
+			return pwms
+
+		except Exception as e:
+			rstring = modulename + 'Error reading PWM state: %s' % str(e)
+			return 'FAILED: ' + rstring
 
 	def read_GPIOstate(self, pin):
 		"""
@@ -98,9 +148,9 @@ class PetalTelemetry(object):
 			return direction, value
 
 		except Exception as e:
-			rstring = modulname + 'Error reading GPIO state: %s' str(e)
-            self.error(rstring)
-            return 'FAILED: ' + rstring
+			rstring = modulename + 'Error reading GPIO state: %s' % str(e)
+			#self.error(rstring)
+			return 'FAILED: ' + rstring
 
 	def read_temp_sensors(self):
 		"""
@@ -108,7 +158,7 @@ class PetalTelemetry(object):
 		eg. {'28-000003f9c7c0': 22.812, '28-0000075c977a': 22.562}, number of entries depends 
 		on the number of 1-wire devices detected on P8_07
 		"""
-		modulename=self.read_temp_sensor.__name__+": "
+		modulename=self.read_temp_sensors.__name__+": "
 		
 		temp_sensors = {}
 
@@ -116,11 +166,11 @@ class PetalTelemetry(object):
 			#list of all 1-wire ids detected on the bus (P8_07)
 			ids = os.popen('cat /sys/devices/w1_bus_master1/w1_master_slaves').readlines()		
 		except Exception as e:
-			rstring = modulname + 'Error opening 1-wire file: %s' str(e)
-            self.error(rstring)
-            return 'FAILED: ' + rstring
+			rstring = modulename + 'Error opening 1-wire file: %s' % str(e)
+			#self.error(rstring)
+			return 'FAILED: ' + rstring
 
-        try:    
+		try:    
 			for id in ids:
 				id = id.replace('\n', '')
 				w1 = '/sys/devices/w1_bus_master1/' + id + '/w1_slave'
@@ -130,28 +180,28 @@ class PetalTelemetry(object):
 			return temp_sensors
 
 		except Exception as e:
-			rstring = modulname + 'Error reading temp sensors: %s' str(e)
-            self.error(rstring)
-            return 'FAILED: ' + rstring
+			rstring = modulename + 'Error reading temp sensors: %s' % str(e)
+			#self.error(rstring)
+			return 'FAILED: ' + rstring
 
 
-	def control_pwm(self, fan= 'GFA_FAN1', duty=50):
+	def control_pwm(self, fan= 'GFA_FAN1', duty_cycle=50):
 		"""
 		Change duty cycle (speed control)
 		"""
 		modulename=self.control_pwm.__name__+": "
  
 		period = 40000   #period in ns (corresponds to 25 KHz fan pwm specification)
-		duty = int(400.*duty) #on-time in ns
+		duty = int(400.*duty_cycle) #on-time in ns
 
 		try:
 			#find path to P8_13, P8_19 pwmchip
 			pwmchip = os.popen('ls /sys/devices/platform/ocp/48304000.epwmss/48304200.ehrpwm/pwm/').readlines()
 			pwmchip_path = '/sys/devices/platform/ocp/48304000.epwmss/48304200.ehrpwm/pwm/' + pwmchip[0].replace('\n','')
 		except Exception as e:
-			rstring = modulname + 'Error locating pwmchip: %s' str(e)
-            self.error(rstring)
-            return 'FAILED: ' + rstring
+			rstring = modulename + 'Error locating pwmchip: %s' % str(e)
+			#self.error(rstring)
+			return 'FAILED: ' + rstring
    	
 
 		if fan == 'GFA_FAN1':		#P8_13
@@ -165,11 +215,12 @@ class PetalTelemetry(object):
 				os.system('sudo chmod -R a+rwx ' + pwmchip_path) 
 				os.system('echo ' + str(period)+ ' > ' + pwmchip_path + '/pwm1/period')
 				os.system('echo ' + str(duty) + ' > ' + pwmchip_path + '/pwm1/duty_cycle')
-				os.system('echo ' + str(1) +' > ' + pwmchip_path + '/pwm1/enable')			
+				os.system('echo ' + str(1) +' > ' + pwmchip_path + '/pwm1/enable')
+				self.PWM1 = duty_cycle			
 			except Exception as e:
-				rstring = modulname + 'Error GFA fan1 control: %s' str(e)
-           	 	self.error(rstring)
-            	return 'FAILED: ' + rstring
+				rstring = modulename + 'Error GFA fan1 control: %s' % str(e)
+				#self.error(rstring)
+				return 'FAILED: ' + rstring
 			
 		elif fan == 'GFA_FAN2':		#P8_19
 
@@ -183,17 +234,18 @@ class PetalTelemetry(object):
 				os.system('echo ' + str(period)+ ' > ' + pwmchip_path + '/pwm0/period')
 				os.system('echo ' + str(duty) + ' > ' + pwmchip_path + '/pwm0/duty_cycle')
 				os.system('echo ' + str(1) +' > ' + pwmchip_path + '/pwm0/enable')
+				self.PWM2 = duty_cycle
 			except Exception as e:
-				rstring = modulname + 'Error GFA fan2 control: %s' str(e)
-           	 	self.error(rstring)
-            	return 'FAILED: ' + rstring
+				rstring = modulename + 'Error GFA fan2 control: %s' % str(e)
+				#self.error(rstring)
+				return 'FAILED: ' + rstring
 
 		else:
-			rstring = modulname + 'Invalid fan name: %s' str(e)
-           	self.error(rstring)
-            return 'FAILED: ' + rstring
+			rstring = modulename + 'Invalid fan name: %s' % str(fan)
+			#self.error(rstring)
+			return 'FAILED: ' + rstring
 
-		return self.SUCCESS
+		return 'SUCCESS'
 
  
 	def switch(self, pin = "SYNC", state = 0):
@@ -207,10 +259,10 @@ class PetalTelemetry(object):
 			else:
 				GPIO.output(self.pins[pin], GPIO.LOW)
 		except Exception as e:
-			string = modulname + 'Error switch power to load switches: %s' str(e)
-           	self.error(rstring)
-            return 'FAILED: ' + rstring
-		return self.SUCCESS
+			string = modulename + 'Error switch power to load switches: %s' % str(e)
+			#self.error(rstring)
+			return 'FAILED: ' + rstring
+		return 'SUCCESS'
    
 	def read_HRPG600(self):
 		"""
@@ -239,9 +291,9 @@ class PetalTelemetry(object):
 			return PSOK
 			
 		except Exception as e:
-			string = modulname + 'Error reading HPPG power supply: %s' str(e)
-           	self.error(rstring)
-            return 'FAILED: ' + rstring
+			string = modulename + 'Error reading HPPG power supply: %s' % str(e)
+			#self.error(rstring)
+			return 'FAILED: ' + rstring
 
 	def read_fan_tach(self, samples):
 		"""
@@ -302,9 +354,9 @@ class PetalTelemetry(object):
 			return speed_rpm
 
 		except Exception as e:
-			string = modulname + 'Error reading fan speed: %s' str(e)
-           	self.error(rstring)
-            return 'FAILED: ' + rstring
+			string = modulename + 'Error reading fan speed: %s' % str(e)
+			#self.error(rstring)
+			return 'FAILED: ' + rstring
 	
 
 
