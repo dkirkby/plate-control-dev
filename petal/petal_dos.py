@@ -389,17 +389,16 @@ class Petal(Application):
     def send_move_tables(self):
         """Send move tables that have been scheduled out to the positioners.
         """
-        hw_tables = self._hardware_ready_move_tables()
-        print(repr(hw_tables))
+        try:
+            hw_tables = self._hardware_ready_move_tables()
+        except Exception as e:
+            self.error('send_move_tables: Exception: %s' % str(e))
         canids = []
         for tbl in hw_tables:
             canids.append(tbl['canid'])
         self.canids_where_tables_were_just_sent = canids
-        print('waiting')
         self._wait_while_moving()
-        print('done')
         self.comm.send_tables(hw_tables)
-        print('sent')
 
     def execute_moves(self):
         """Command the positioners to do the move tables that were sent out to them.
@@ -407,25 +406,32 @@ class Petal(Application):
         """
         self.comm.execute_sync(self.sync_mode)
         self._wait_while_moving()
-        print('before cleanup')
-        self._postmove_cleanup()
+        try:
+            self._postmove_cleanup()
+        except Exception as e:
+            self.error('execute_moves: Exception: %s' % str(e))
 
-    def schedule_send_and_execute_moves(self):
+    def schedule_send_and_execute_moves(self, *args, **kwargs):
         """Convenience wrapper to schedule, send, and execute the pending requested
         moves, all in one shot.
         """
         self.info('scheduling moves')
         self.schedule_moves()
         self.info('excuting moves')
-        self.send_and_execute_moves()
+        try:
+            self.send_and_execute_moves()
+        except Exception as e:
+            self.error('schedule_send_and_execute_moves: Exception: %s' % str(e))
 
     def send_and_execute_moves(self):
         """Convenience wrapper to send and execute the pending moves (that have already
         been scheduled).
         """
-        print('send_and_execute_moves')
         self.send_move_tables()
-        self.execute_moves()
+        try:
+            self.execute_moves()
+        except Exception as e:
+            self.error('send_execute_moves: Exception: %s' % str(e))
 
     def quick_move(self, pos_ids, command, target, log_note=''):
         """Convenience wrapper to request, schedule, send, and execute a single move command, all in
@@ -779,13 +785,14 @@ class Petal(Application):
         """This always gets called after performing a set of moves, so that PosModel instances
         can be informed that the move was physically done on the hardware.
         """
-        for m in self.schedule.move_tables:
-            m.posmodel.postmove_cleanup(m.for_cleanup)
-        print('done clean')
+        try:
+            for m in self.schedule.move_tables:
+                m.posmodel.postmove_cleanup(m.for_cleanup)
+        except Exception as e:
+            self.error('_postmove_cleanup: Exception: %s' % str(e))
         if self.verbose:
             self.info('_postmove_cleanup: ' + self.expected_current_position_str())
         self.clear_schedule()
-        print('cleared')
         self.canids_where_tables_were_just_sent = []
 
     def _wait_while_moving(self):
@@ -855,10 +862,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # cleanup sys.args for application framework
-    
-
-    print(repr(args))
-    print(repr(sys.argv))
+    try:
+        sys.argv.remove(args.file.name)
+    except: 
+        pass
     # Read positioner and fiducial ids for this petal
     config = json.load(args.file)
     if args.petal:
