@@ -2,7 +2,7 @@ import os
 import sys
 sys.path.append(os.path.abspath('../petal/'))
 import fvchandler_dos as fvchandler
-import posmovemeasure_dos as posmovemeasure
+import posmovemeasure as posmovemeasure
 import posconstants as pc
 import datetime
 import numpy as np

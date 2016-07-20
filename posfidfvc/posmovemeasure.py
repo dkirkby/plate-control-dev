@@ -223,7 +223,7 @@ class PosMoveMeasure(object):
         INPUTS:     pos_ids ... 'all' or a list of specific pos_ids
         """
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
-        print('rehoming')
+        print('rehoming', repr(pos_ids_by_ptl))
         for petal in pos_ids_by_ptl.keys():
             petal.request_homing(pos_ids_by_ptl[petal])
             petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
@@ -342,7 +342,7 @@ class PosMoveMeasure(object):
                 these_pos_ids = all_pos_on_ptl
             else:
                 these_pos_ids = [p for p in pos_ids if p in all_pos_on_ptl]
-            this_data = petal.get(these_pos_ids,key)
+            this_data = petal.get(posid=these_pos_ids,key=key)
             data_by_ptl[petal] = this_data
         return data_by_ptl
 
@@ -390,7 +390,7 @@ class PosMoveMeasure(object):
             these_pos_ids = pos_ids_by_ptl[petal]
             for pos_id in these_pos_ids:
                 data[pos_id] = {}
-                posmodel = petal.get(pos_id)
+                posmodel = petal.get(posid=pos_id)
                 range_T = posmodel.targetable_range_T
                 range_P = posmodel.targetable_range_P
                 if keep_phi_within_Eo:
@@ -449,7 +449,7 @@ class PosMoveMeasure(object):
         data = {}
         for petal in pos_ids_by_ptl.keys():
             these_pos_ids = pos_ids_by_ptl[petal]
-            posmodels = petal.get(these_pos_ids)
+            posmodels = petal.get(posid=these_pos_ids)
             initial_tp = []
             final_tp = []
             if axis == 'theta':
@@ -532,7 +532,7 @@ class PosMoveMeasure(object):
                 dtdp = [0,delta]
                 axisid = pc.P
                 for pos_id in these_pos_ids:
-                    posmodel = petal.get(pos_id)
+                    posmodel = petal.get(posid=pos_id)
                     if self.use_current_theta_during_phi_range_meas:
                         theta_initial = petal.expected_current_position(pos_id,'obsT')
                     else:
@@ -782,8 +782,8 @@ class PosMoveMeasure(object):
                 measured_obsXY = xy_test[0]
                 err_x = measured_obsXY[0] - expected_obsXY[0]
                 err_y = measured_obsXY[1] - expected_obsXY[1]
-                prev_offset_x = this_petal.get(pos_id,'OFFSET_X')
-                prev_offset_y = this_petal.get(pos_id,'OFFSET_Y')
+                prev_offset_x = this_petal.get(posid=pos_id,key='OFFSET_X')
+                prev_offset_y = this_petal.get(posid=pos_id,key='OFFSET_Y')
                 this_petal.set(pos_id,'OFFSET_X', prev_offset_x + err_x) # this works, assuming we have reasonable knowledge of theta and phi (having re-homed or quick-calibrated)
                 this_petal.set(pos_id,'OFFSET_Y', prev_offset_y + err_y) # this works, assuming we have reasonable knowledge of theta and phi (having re-homed or quick-calibrated)
                 this_petal.set(pos_id,'LAST_MEAS_OBS_X',measured_obsXY[0])
