@@ -12,7 +12,7 @@ import time
 import Adafruit_BBIO.GPIO as GPIO
 import numpy as np
 
-class PetalTelemetry(object):
+class PtlTelemetry(object):
 	"""	Class for communicating with the DESI petalbox telemetry electronics 
 	"""
 
@@ -91,7 +91,7 @@ class PetalTelemetry(object):
 		Function that returns a dictionary of pin names and descriptions
 		"""
 
-		modulename=self.get_pin_info.__name__+": "
+		modulename=self.get_GPIO_names.__name__+": "
 		try:
 			pin_info = {}
 			pin_info["W1"] = 'Input (1-wire) pin to which all temperature sensors are connected, read state by reading temperatures'
@@ -269,7 +269,7 @@ class PetalTelemetry(object):
 		True = Power supply on
 		False = Powers supply off
 		"""
-		modulename=self.read_PSOK.__name__+": "
+		modulename=self.read_HRPG600.__name__+": "
 		PSOK = {}
 
 		try:
