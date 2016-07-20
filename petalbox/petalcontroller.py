@@ -72,7 +72,12 @@ class PetalController(Application):
                 'fan_pwm_ptl',
                 'read_fan_pwm',
                 'switch_en_ptl',
-                'read_switch_ptl'
+                'read_switch_ptl',
+                'get_GPIO_names',
+                'read_GPIOstate',
+                'read_PWMstate',
+                'read_HRPG600',
+                'read_fan_tach'
                 ]
 
     # Default configuration (can be overwritten by command line or config file)
@@ -155,6 +160,90 @@ class PetalController(Application):
             return self.SUCCESS  
         else:
             return self.FAILED
+
+    def get_GPIO_names(self):
+        """
+        Returns dictionary of GPIO pin names and descriptions
+        """
+        if telemetry_available:
+            try:
+                names_desc = self.pt.get_GPIO_names()
+            except:
+                return self.FAILED
+        else:
+            if self.simulator:
+                names_desc = {'GFA_PWM2': 'Output (PWM) for controlling GFA_FAN2 speed, read state (duty_cycle) by using read_PWMstate()', 'PS2_OK': 'Input for reading back feedback signal from positioner power supply 2, read state by using read_GPIOstate()', 'GFA_PWM1': 'Output (PWM) for controlling GFA_FAN1 speed, read state (duty_cycle) by using read_PWMstate()', 'GFA_FAN2': 'Output for enabling power to GFA fan 2, read state by using read_GPIOstate()', 'GFAPWR_OK': 'Input for reading back feedback signal from GFA power supply, read state by using read_GPIOstate()', 'CANBRD1_EN': 'Output for switching power to SYSTEC CAN board 1, read state by using read_GPIOstate()', 'CANBRD2_EN': 'Output for switching power to SYSTEC CAN board 2, read state by using read_GPIOstate()', 'SYNC': 'Output pin for sending synchronization signal to positioners, read state by using read_GPIOstate()', 'GFA_TACH2': 'Input (pulsed) connected to GFA_FAN2 tachometer sensor, read_state by using read_tach()', 'GFA_FAN1': 'Output for enabling power to GFA fan 1, read state by using read_GPIOstate()', 'PS1_EN': 'Output pin that enables positioner power supply 1 when set high, read state by using read_GPIOstate()', 'PS1_OK': 'Input for reading back feedback signal from positioner power supply 1, read state by using read_GPIOstate()', 'W1': 'Input (1-wire) pin to which all temperature sensors are connected, read state by reading temperatures', 'GFA_TACH1': 'Input (pulsed) connected to GFA_FAN1 tachometer sensor, read_state by using read_tach()', 'PS2_EN': 'Output pin that enables positioner power supply 1 when set high, read state by using read_GPIOstate()', 'GFAPWR_EN': 'Output for enabling GFA power supply, read state by using read_GPIOstate()'}
+            else:
+                return 'FAILED: No GPIO name information available'
+        return names_desc
+
+    def read_HRPG600(self):
+        """
+        Read "DC-OK" signals from HRPG-600 series power supplies.  Returns dictionary, eg: {"PS1_OK" : True, "PS2_OK" : True, "GFAPWR_OK" : True}
+        True = ON, False = OFF
+        """
+        if telemetry_available:
+            try:
+                psok = self.pt.read_HRPG600()
+            except:
+                return self.FAILED
+        else:
+            if self.simulator:
+                psok = {"PS1_OK" : True, "PS2_OK" : True, "GFAPWR_OK" : True}
+            else:
+                return 'FAILED: No HRPG600 feedback information available'
+        return psok
+
+    def read_fan_tach(self):
+        """
+        Read GFA fan tachometer readings (in rpm), returns dict eg:  {'GFA_FAN1' : 5000, 'GFA_FAN2' : 5000}
+        """
+        if telemetry_available:
+            try:
+                tach = {'GFA_FAN1' : 5000, 'GFA_FAN2' : 5000}		#currently not safe to use, so run in simulator mode at all times
+            except:
+                return self.FAILED
+
+        else:
+            if self.simulator:
+                tach = {'GFA_FAN1' : 5000, 'GFA_FAN2' : 5000}
+            else:
+                return 'FAILED: No GFA fan tachometer information available'
+        return tach 
+
+    def read_GPIOstate(self, pin_name):
+        """
+        Returns direction and value for GPIO pins setup as regular inputs and outputs (not PWM, 1-wire, or pulsed)
+        """
+        if telemetry_available:
+            try:
+                gpio_state = self.pt.read_GPIOstate(pin_name)
+            except:
+                return self.FAILED
+        else:
+            if self.simulator:
+                gpio_state = ('out', 1)
+            else:
+                return 'FAILED: No GPIO state information available'
+        return gpio_state
+
+    def read_PWMstate(self):
+        """
+        Returns pwm duty cycle settings for GFA_FAN1 and GFA_FAN2 as dict.  eg: {'GFA_FAN1': 50, 'GFA_FAN2' : 10}
+        """
+        if telemetry_available:
+            try:
+                pwms = self.pt.read_PWMstate()
+            except:
+                return self.FAILED
+
+        else:
+            if self.simulator:
+                pwms = {'GFA_FAN1' : 50, 'GFA_FAN2' : 10}
+            else:
+                return 'FAILED: No PWM duty setting information available'
+        return pwms
+        
 
     def read_temp_ptl(self):
         """
