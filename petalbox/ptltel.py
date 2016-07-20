@@ -86,7 +86,7 @@ class PetalTelemetry(object):
 			#self.error(rstring)
 			return 'FAILED: ' + rstring
 
-	def get_pin_info(self):
+	def get_GPIO_names(self):
 		"""
 		Function that returns a dictionary of pin names and descriptions
 		"""
@@ -110,7 +110,6 @@ class PetalTelemetry(object):
 			pin_info["GFA_PWM2"] = 'Output (PWM) for controlling GFA_FAN2 speed, read state (duty_cycle) by using read_PWMstate()'
 			pin_info["GFA_TACH1"] = 'Input (pulsed) connected to GFA_FAN1 tachometer sensor, read_state by using read_tach()'
 			pin_info["GFA_TACH2"] = 'Input (pulsed) connected to GFA_FAN2 tachometer sensor, read_state by using read_tach()'
-
 			return pin_info
 
 		except Exception as e:
