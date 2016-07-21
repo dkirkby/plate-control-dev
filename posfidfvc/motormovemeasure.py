@@ -66,7 +66,8 @@ class MotorMoveMeasure(object):
     def move(self, can_id, direction, axis, amount):
         #Move Command with built in antibacklash and final creep logic
         print('Moving', axis, direction, str(amount), 'degrees.')
-        amount = amount - self.antibacklash
+        direction_sign = {'cw':1,'ccw':-1}
+        amount = abs(direction_sign[direction]*amount + self.antibacklash) #Used to be amount - self.antibacklash, antibacklash move is in same direction as move
         move_dist = amount
         if direction == 'ccw':
             direction_opp = 'cw'
@@ -81,7 +82,7 @@ class MotorMoveMeasure(object):
         self._wait_while_moving(can_id, true_dist['speed_mode'])
         
         true_anti_backlash = self._true_move(self.antibacklash, allow_cruise=self.allow_cruise)
-        self.comm.move(can_id, direction, true_anti_backlash['speed_mode'], axis, self.antibacklash)
+        self.comm.move(can_id, 'ccw', true_anti_backlash['speed_mode'], axis, self.antibacklash)
         self._wait_while_moving(can_id,true_anti_backlash['speed_mode'])
         
         final_creep = amount - (true_dist['distance'])# true_anti_backlash['distance'])
@@ -123,13 +124,24 @@ class MotorMoveMeasure(object):
         posY = xy[1] - self.offset_y
         return [posX, posY]
         
-    def posXY_to_posPolar(self, xy):
+    def posXY_to_posPolar2(self, xy):
         arccos_arg = np.dot(xy,[1,0])/np.linalg.norm(xy)
         #sign = np.sign(xy[1])
         angle = np.arccos(arccos_arg)
         if xy[1] < 0:
                 angle = 2*np.pi - angle
         return np.rad2deg(angle - self.angle_offset)
+        
+    def posXY_to_posPolar(self, xy):
+        arccos_arg = np.dot(xy,[1,0])/np.linalg.norm(xy)
+        #sign = np.sign(xy[1])
+        angle = np.arccos(arccos_arg)
+        if xy[1] < 0:
+                angle = - angle
+        angle = np.rad2deg(angle - self.angle_offset)
+        if angle > 360 or angle < -360:
+            angle = angle % 360
+        return angle
         
     def posPolar_to_obsXY(self, angle):
         return self.posXY_to_obsXY(self.posPolar_to_posXY(angle))
@@ -148,8 +160,8 @@ class MotorMoveMeasure(object):
             data = {'target_angle':[], 'measured_obsXY':[], 'xy_center':[0,0], 'radius':0, 'axis':axis}
             if axis == 'theta':
                 n_pts = 4 if mode == 'quick' else 11
-                initial = -180
-                final = 180 #Assume full range is 0,360 (realistically +-190)
+                initial = 0
+                final = 360 #Assume full range is 0,360 (realistically +-190)
             else:
                 n_pts = 3 if mode == 'quick' else 7
                 initial = 0
@@ -197,7 +209,7 @@ class MotorMoveMeasure(object):
             if meas_data['axis'] == 'theta':
                 #petal.set(pos_id,'LENGTH_R1',meas_data['radius'])
                 radius = meas_data['radius']
-                angle_offset += np.pi
+                #angle_offset += np.pi
             else:
                 #petal.set(pos_id,'LENGTH_R2',meas_data['radius'])
                 radius = meas_data['radius']
