@@ -130,6 +130,10 @@ class SBIGCam(object):
 	class SetTemperatureRegulationParams2(Structure):
 		_fields_ = [('regulation', c_int),
 					('ccdSetpoint', c_double)]
+    class MiscellaneousControlParams(Structure):
+        _fields_ = [('fanEnable', c_ushort),
+                    ('shutterCommand', c_ushort),
+					('ledState', c_ushort)]
 	
 	#Enumerated values taken from sbigudrv.h
 	CC_OPEN_DRIVER = 17
@@ -149,7 +153,9 @@ class SBIGCam(object):
 	SC_OPEN_SHUTTER = 1
 	RM_1X1 = 0
 	ABG_LOW7 = 1
-	EXP_FAST_READOUT = 0x08000000	
+	EXP_FAST_READOUT = 0x08000000
+    CC_MISCELLANEOUS_CONTROL = 13
+    LED_OFF = 0	
 	
 	def __init__(self,verbose=False):
 		self.DARK = 0 #Defaults to 0
@@ -168,6 +174,7 @@ class SBIGCam(object):
 		else: #Assume Linux
 			self.SBIG = CDLL("/usr/local/lib/libsbigudrv.so")
 		self.verbose = verbose
+        self.shutter = False
 
 	def set_image_size(self, width, height):
 		"""
@@ -209,8 +216,13 @@ class SBIGCam(object):
 
 		if name in ['ST8300','STi']:
 			try:
-				if name == 'ST8300': self.set_image_size(3352,2532)
-				if name == 'STi':self.set_image_size(648,484)
+				if name == 'ST8300':
+                    self.set_image_size(3352,2532)
+                    self.shutter = False
+				if name == 'STi':
+                    self.set_image_size(648,484)
+                    self.shutter=True
+                
 				return True
 			except:
 				print('could not select camera: ' + name)
@@ -360,6 +372,18 @@ class SBIGCam(object):
 			return False
 		elif self.verbose:
 			print ('Exposure successfully ended.')
+
+        #Close shutter for STi cameras
+        if self.shutter:
+            shutt = self.MiscellaneousControlParams(fanEnable=0,shutterCommand=self.SC_CLOSE_SHUTTER,ledState=self.LED_OFF)
+			Error = self.SBIG.SBIGUnivDrvCommand(self.CC_MISCELLANEOUS_CONTROL, byref(shutt), None)
+			#print(Error)
+			if Error!=self.CE_NO_ERROR:
+				print("wasn't able to close shutter: ",Error)
+			elif self.verbose:
+				print("Shutter closed")
+		else:
+			pass
 		 
 		#Start Readout
 		srp = self.StartReadoutParams(ccd = self.CCD_IMAGING, readoutMode = self.RM_1X1,
