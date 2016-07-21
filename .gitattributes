@@ -84,6 +84,7 @@ posfidfvc/fvchandler.py -text
 posfidfvc/fvchandler_dos.py -text
 posfidfvc/motormovemeasure.py -text
 posfidfvc/motortest.py -text
+posfidfvc/pd_accuracy_test.py -text
 posfidfvc/pos_arctest_plot.py -text
 posfidfvc/pos_xytest_plot.py -text
 posfidfvc/poscalibplot.py -text

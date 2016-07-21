@@ -68,7 +68,8 @@ class FVCHandler(object):
 
         target_dict = self.fid_dict
         for i,n in enumerate(expected_pos_xy):
-            target_dict[n] = {'x':n[0],'y':n[1],'mag':0.000,'meas_err':1.000,'flags':4}
+            id = int(3000+i)
+            target_dict[id] = {'x':n[0],'y':n[1],'mag':0.000,'meas_err':1.000,'flags':4}
 
         return target_dict
 
@@ -82,11 +83,14 @@ class FVCHandler(object):
         measured_ref_xy = []
         for n in center_dict:
             if center_dict[n]['flag']==5.0:
-                measured_pos_xy.append([[center_dict[n]['x']],[center_dict[n]['y']]])
+                measured_pos_xy.append([center_dict[n]['x'],center_dict[n]['y']])
+            elif center_dict[n]['flag']==3.0:
+                measured_pos_xy.append([center_dict[n]['x'],center_dict[n]['y']])
+                print(center_dict[n],'This was flagged as a 3')
             elif center_dict[n]['flag']==8.0:
-                measured_ref_xy.append([[center_dict[n]['x']],[center_dict[n]['y']]])
+                measured_ref_xy.append([center_dict[n]['x'],center_dict[n]['y']])
             else:
-                print('Doesnt seem to be a fiber or positioner') 
+                print(center_dict[n]['flag'],type(center_dict[n]['flag']),'Doesnt seem to be a fiber or positioner') 
 
 
         return measured_pos_xy, measured_ref_xy
@@ -110,7 +114,7 @@ class FVCHandler(object):
             sim_errors = np.random.uniform(-self.sim_err_max,self.sim_err_max,np.shape(expected_pos_xy))
             measured_pos_xy = (expected_pos_xy + sim_errors).tolist()
             measured_ref_xy = expected_ref_xy
-		elif self.fvc_type == 'FLI':
+        elif self.fvc_type == 'FLI':
             # 1. pass expected_pos_xy (in mm at the focal plate) thru platemaker to get expected_pos_xy (in pixels at the FVC CCD)
             # 2. tell FVC software where we expect the positioner centroids to be so it can identify positioners
             # 3. use DOS commands to ask FVC to take a picture
@@ -118,19 +122,17 @@ class FVCHandler(object):
             # 5. send centroids (in pixels at FVC) thru platemaker to get measured xy (in mm at focal plate)
             # 6. organize those centroids so you can return them as measured_pos_xy, measured_ref_xy
             self.exptime = 1 #sec
-            target_dict = create_target_dict(expected_pos_xy)
-            fvc_uri = 'PYRO:FVC@131.243.51.74:47449'
+            target_dict = self.create_target_dict(expected_pos_xy)
+            fvc_uri = 'PYRO:FVC@131.243.51.74:40539'
             fvc = Pyro4.Proxy(fvc_uri)
             fvc.set(exptime=self.exptime)
-            fvc.set_bias_image('fvc.bias.fits')
             fvc.set_target_dict(target_dict) 
-            fvc.calibrate()
+            fvc.print_targets()
+            #fvc.calibrate_image()
             fvc.measure() 
             measured_dict = fvc.get_centers()
-            measured_pos_xy,measured_ref_xy =measured_xy_from_fvc_centroid(measured_dict) 
-
-            
-			
+            #print(measured_dict)
+            measured_pos_xy,measured_ref_xy = self.measured_xy_from_fvc_centroid(measured_dict)	
             return measured_pos_xy, measured_ref_xy
         else:
             expected_xy = expected_pos_xy + expected_ref_xy
