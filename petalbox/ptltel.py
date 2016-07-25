@@ -11,6 +11,7 @@ import os
 import time
 import Adafruit_BBIO.GPIO as GPIO
 import numpy as np
+import select
 
 class PtlTelemetry(object):
 	"""	Class for communicating with the DESI petalbox telemetry electronics 
@@ -22,6 +23,9 @@ class PtlTelemetry(object):
 		try:
 			os.system('sudo config-pin "P8.13" pwm')
 			os.system('sudo config-pin "P8.19" pwm')
+
+			self.gfa_tach1 = '/sys/class/gpio/gpio46/'
+			self.gfa_tach2 = '/sys/class/gpio/gpio65/'
 			
 			GPIO.cleanup()
 			
@@ -67,15 +71,15 @@ class PtlTelemetry(object):
 			GPIO.setup(self.pins["GFA_TACH2"], GPIO.IN)
 			GPIO.setup(self.pins["GFAPWR_OK"], GPIO.IN)
 			GPIO.setup(self.pins["PS1_OK"], GPIO.IN)
-			GPIO.setup(self.pins["PS2_OK"], GPIO.IN)			
-			#return self.SUCCESS
+			GPIO.setup(self.pins["PS2_OK"], GPIO.IN)
+			
+			return
 
 		except Exception as e:
 			rstring = modulename + 'Error initializing petal telemetry: %s' %  str(e)
 			#self.error(rstring)
 			return 'FAILED: ' + rstring
 		
-
 	def __cleanup__(self):
 		modulename=self.__cleanup__.__name__+": "
 		try:
@@ -304,66 +308,86 @@ class PtlTelemetry(object):
 			#self.error(rstring)
 			return 'FAILED: ' + rstring
 
-	def read_fan_tach(self, samples):
+	def read_fan_tach(self):
 		"""
-		input - samples (int), number of rising edges to wait for
-		returns speeds for inflow and outflow fans as dict, eg. {'inlet' : 5000, 'outlet' : 5000}
+		Returns speeds for inflow and outflow fans as dict, eg. {'GFA_FAN1' : 5000, 'GFA_FAN2' : 5000}
 		"""
 		modulename=self.read_fan_tach.__name__+": "
 		speed_rpm = {}
 
+		if not self.read_switch()['GFA_FAN1']:
+			return 'FAILED: Fans must be on.'
+
+		if not self.read_switch()['GFA_FAN2']:
+			return 'FAILED: Fans must be on.'
+
+		with open(os.path.join(self.gfa_tach1, 'edge'), 'w') as f:
+			f.write('both')
+
+		with open(os.path.join(self.gfa_tach2, 'edge'), 'w') as f:
+			f.write('both')
+		
+		self.ftach1 = open(os.path.join(self.gfa_tach1, 'value'), 'r')
+		self.ftach2 = open(os.path.join(self.gfa_tach2, 'value'), 'r')
+		self.po1 = select.poll()
+		self.po1.register(self.ftach1, select.POLLPRI)
+		self.po2 = select.poll()
+		self.po2.register(self.ftach2, select.POLLPRI)
+
 		try:
-			#inlet
-			#check if fan is enabled
-			fan_state = os.popen('sudo config-pin -q ' + self.pins["GFA_FAN1"]).readlines()
-			fan_state = int(fan_state[0][fan_state[0].index('\n')-1])
-
+			#GFA_FAN1
 			t=[]
-			
-			if fan_state:
-				for edge in range(samples):
-					GPIO.wait_for_edge(self.pins["GFA_TACH1"], GPIO.RISING)
-					t.append(time.time())		
-
-				t=np.array(t)
-				diff = np.ediff1d(t)
-				
-				diff = diff[abs(diff - np.mean(diff) < 1*np.std(diff))]
-				diff = np.mean(diff)
-				rpm = 60./(diff*2)
-				speed_rpm["inlet"] = int(rpm)
-
-			else:
-				speed_rpm["inlet"] = 'fan_off'
-			
-
-			#outlet
-			#check if fan is enabled
-			fan_state = os.popen('sudo config-pin -q ' + self.pins["GFA_FAN2"]).readlines()
-			fan_state = int(fan_state[0][fan_state[0].index('\n')-1])
-
-			t=[]
-
-			if fan_state:
-				for edge in range(samples):
-					GPIO.wait_for_edge(self.pins["GFA_TACH2"], GPIO.RISING)
+			start=time.time()
+			end = time.time()
+			while abs(start-end) < 1:
+				events = self.po1.poll(5)
+				if not events:
+					pass
+				else:
 					t.append(time.time())
+					self.ftach1.seek(0)
+					pstate = self.ftach1.read()
+				end = time.time()
 
-				t=np.array(t)
-				diff = np.ediff1d(t)
+			tdiff = np.mean(np.diff(np.array(t)))
+			rpm1 = 60./(4*tdiff)
 
-				diff = diff[abs(diff - np.mean(diff) < 1*np.std(diff))]
-				diff = np.mean(diff)
-				rpm = 60./(diff*2)
-				speed_rpm["outlet"] = int(rpm)
+			#GFA_FAN2
+			t2=[]
+			start=time.time()
+			end = time.time()
+			while abs(start-end) < 1:
+				events2 = self.po2.poll(5)
+				if not events2:
+					pass
+				else:
+					t2.append(time.time())
+					self.ftach2.seek(0)
+					pstate = self.ftach2.read()
+				end = time.time()
 
-			else:
-				speed_rpm["outlet"] = 'fan_off'
+			t2diff = np.mean(np.diff(np.array(t2)))
+			rpm2 = 60./(4*t2diff)
 
+			speed_rpm['GFA_FAN1'] = rpm1
+			speed_rpm['GFA_FAN2'] = rpm2
+
+			self.po1.unregister(self.ftach1)
+			self.po2.unregister(self.ftach2)
+
+			with open(os.path.join(self.gfa_tach1, 'edge'), 'w') as f:
+				f.write('none')
+
+			with open(os.path.join(self.gfa_tach2, 'edge'), 'w') as f:
+				f.write('none')
+
+			self.ftach2.close()
+			self.ftach1.close()
+			
 			return speed_rpm
 
 		except Exception as e:
-			string = modulename + 'Error reading fan speed: %s' % str(e)
+			rstring = modulename + 'Error reading fan speed: %s' % str(e)
 			#self.error(rstring)
 			return 'FAILED: ' + rstring
 	
