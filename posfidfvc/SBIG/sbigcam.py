@@ -271,18 +271,6 @@ class SBIGCam(object):
         except:
             return False
 
-        if name in ['ST8300','STi']:
-            try:
-                if name == 'ST8300': self.set_image_size(3352,2532)
-                if name == 'STi':self.set_image_size(648,484)
-                return True
-            except:
-                print('could not select camera: ' + name)
-                return False    
-        else:
-            print('Not a valid camera name (use "ST8300" or "STi") ')
-            return False
-
     def set_window_mode(self, top=0, left=0):
         try:
             self.TOP=c_ushort(top)
@@ -496,167 +484,9 @@ class SBIGCam(object):
         # name = time.strftime("%Y-%m-%d-%H%M%S") + '.fits' # Saves file with timestamp
         # hdu.writeto(name)
         return image
-    
-    
-    def write_fits(self, image, name):
-        """
-        Writes out image to a FITS file with name 'name'
-        Input:
-            image: numpy array
-            name: string, filename 
-        """
-        #image = np.ctypeslib.as_array(cameraData)
-        try:
-            hdu = fits.PrimaryHDU(image)
-        #name = time.strftime("%Y-%m-%d-%H%M%S") + '.fits' #Saves file with timestamp
-            hdu.writeto(name)
-            return True
-        except:
-            return False
-=======
-    def temperature_control(self, command, temp):
-        """
-        Requires camera to be open (open_camera())
         
-        Command values:
-        0 - 'off' - regulation off
-        1 - 'on' - regulation on
-        2 - 'override' - regulation override
-        3 - 'freeze_on' - freeze TE cooler (ST-8/7 cameras)
-        4 - 'freeze_off' - unfreeze TE cooler
-        5 - 'autofreeze_on' - enable auto-freeze
-        6 - 'autofreeze_off' - disable auto-freeze
-        
-        temp is the CCD temperature in celsius to activate regulation
-            """
-        commands = {'off':0, 'on':1, 'override':2,'freeze_on':3,'freeze_off':4,'autofreeze_on':5, 'autofreeze_off':6}
-        if command not in commands.keys() and commands not in range(0,7):
-            print('Invalid Command')
-            return False
-        elif command in commands.keys():
-            command = commands[command]
-        trp2 = self.SetTemperatureRegulationParams2(regulation = c_int(command), ccdSetpoint = c_double(temp))
-        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_SET_TEMPERATURE_REGULATION2, byref(trp2), None)
-        if Error != self.CE_NO_ERROR:
-            print('Attempt to adjust temperature control returned error:', Error)
-            return False
-        elif self.verbose:
-            print('Temperature command:', command, 'set. Temperature:', temp, 'C')
         return True
-  
-    def open_camera(self):
-        """
-        initializes driver and camera
-        """
-         #Open Driver
-        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_OPEN_DRIVER, None, None)
-        if Error != self.CE_NO_ERROR:
-            print ('Attempt to open driver returned error:', Error)
-            return False
-        elif self.verbose:
-            print ('Driver successfully opened.')
-     
        
-        #Open Device
-        odp = self.OpenDeviceParams(deviceType = 0x7F00)
-        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_OPEN_DEVICE, byref(odp), None)
-        if Error != self.CE_NO_ERROR:
-            print ('Attempt to open device returned error:', Error)
-            return False
-        elif self.verbose:
-            print ('Device successfully opened.')
-        
-        
-        #Establish Link
-        elr = self.EstablishLinkResults()
-        elp = self.EstablishLinkParams(sbigUseOnly = 0)
-        self.SBIG.SBIGUnivDrvCommand(self.CC_ESTABLISH_LINK, byref(elp), byref(elr))
-        if elr.cameraType == 0xFFFF:
-            print ('No camera found.')
-            return False
-        return True
-        
-    def start_exposure(self): 
-        """
-        starts the exposure
-        Input
-            None
-        Returns
-            Image if success, False otherwise
-        """    
-        #Take Image  
-        exposure=c_ulong(self.exposure + self.FAST)
-        sep2 = self.StartExposureParams2(ccd = self.CCD_IMAGING, exposureTime = exposure,
-                                    abgState = self.ABG_LOW7, readoutMode = self.RM_1X1,
-                                    top = self.TOP, left = self.LEFT, 
-                                    height = self.HEIGHT, width = self.WIDTH)
-        if self.DARK:
-            sep2.openShutter = self.SC_CLOSE_SHUTTER
-        else:
-            sep2.openShutter = self.SC_OPEN_SHUTTER
-        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_START_EXPOSURE2, byref(sep2), None)
-        if Error != self.CE_NO_ERROR:
-            print ('Attempt to start exposure returned error:', Error)
-            return False
-        elif self.verbose:
-            print ('Exposure successfully initiated.')       
-        #Wait for exposure to end
-        qcspar = self.QueryCommandStatusParams(command = self.CC_START_EXPOSURE2)
-        qcsres = self.QueryCommandStatusResults(status = 6)
-        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_QUERY_COMMAND_STATUS, byref(qcspar), byref(qcsres))
-        while qcsres.status == 2:
-            Error = self.SBIG.SBIGUnivDrvCommand(self.CC_QUERY_COMMAND_STATUS, byref(qcspar), byref(qcsres))
-        #End Exposure
-        eep = self.EndExposureParams(ccd = self.CCD_IMAGING)
-        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_END_EXPOSURE, byref(eep), None)
-        if Error != self.CE_NO_ERROR:
-            print ('Attempt to end exposure returned error:', Error)
-            return False
-        elif self.verbose:
-            print ('Exposure successfully ended.')
-
-        #Close shutter for STi cameras
-        if self.shutter:
-            shutt = self.MiscellaneousControlParams(fanEnable=0,shutterCommand=self.SC_CLOSE_SHUTTER,ledState=self.LED_OFF)
-            Error = self.SBIG.SBIGUnivDrvCommand(self.CC_MISCELLANEOUS_CONTROL, byref(shutt), None)
-            #print(Error)
-            if Error!=self.CE_NO_ERROR:
-                print("wasn't able to close shutter: ",Error)
-            elif self.verbose:
-                print("Shutter closed")
-        else:
-            pass
-         
-        #Start Readout
-        srp = self.StartReadoutParams(ccd = self.CCD_IMAGING, readoutMode = self.RM_1X1,
-                                 top = self.TOP, left = self.LEFT, height = self.HEIGHT,
-                                 width = self.WIDTH)
-        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_START_READOUT, byref(srp), None)
-        if Error != self.CE_NO_ERROR:
-            print ('Attempt to initialize readout returned error:', Error)
-            return False
-        elif self.verbose:
-            print ('Readout successfully initialized.')
-          
-          
-        #Readout
-        rlp = self.ReadoutLinesParams(ccd = self.CCD_IMAGING, readoutMode = self.RM_1X1,
-                                 pixelStart = 0, pixelLength = self.WIDTH)
-        cameraData = ((c_ushort*(self.WIDTH.value))*self.HEIGHT.value)()
-        for i in range(self.HEIGHT.value):
-            Error = self.SBIG.SBIGUnivDrvCommand(self.CC_READOUT_LINE,byref(rlp), byref(cameraData, i*self.WIDTH.value*2)) #the 2 is essential
-            if Error != self.CE_NO_ERROR:
-                print ('Readout failed. Writing readout then closing device and driver.')
-                break
-        image = np.ctypeslib.as_array(cameraData)
-        #hdu = fits.PrimaryHDU(image)
-        #name = time.strftime("%Y-%m-%d-%H%M%S") + '.fits' #Saves file with timestamp
-        #hdu.writeto(name)
-        if Error == self.CE_NO_ERROR and self.verbose:
-            print ('Readout successfully completed.')
-        return image
-    
-    
     def write_fits(self, image, name):
         """
         Writes out image to a FITS file with name 'name'
@@ -779,14 +609,7 @@ class SBIGCam(object):
                     +repr(qtsr2.fanSpeed))
 
             print (results_text)
-            
 
-        
-
-
-    
-
-            
         return True
 
 if __name__ == '__main__':
