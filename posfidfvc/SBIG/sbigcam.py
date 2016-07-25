@@ -211,26 +211,23 @@ class SBIGCam(object):
     LED_BLINK_LOW                   = 2
     LED_BLINK_HIGH                  = 3
     # temperature regulation codes
-    """
-    Requires camera to be open (open_camera())
-    Command values:
-    0 - 'off' - regulation off
-    1 - 'on' - regulation on
-    2 - 'override' - regulation override
-    3 - 'freeze_on' - freeze TE cooler (ST-8/7 cameras)
-    4 - 'freeze_off' - unfreeze TE cooler
-    5 - 'autofreeze_on' - enable auto-freeze
-    6 - 'autofreeze_off' - disable auto-freeze
-    temp is the CCD temperature in celsius to activate regulation
-    """
-    # prebuild dictionaries to avoid rebuilding upon each command call
-    tempRegulationDict = {'REGULATION_OFF'                  : 0, 
-                          'REGULATION_ON'                   : 1,
-                          'REGULATION_OVERRIDE'             : 2,
-                          'REGULATION_FREEZE'               : 3,
-                          'REGULATION_UNFREEZE'             : 4,
-                          'REGULATION_ENABLE_AUTOFREEZE'    : 5,
-                          'REGULATION_DISABLE_AUTOFREEZE'   : 6}
+    REGULATION_OFF                  = 0
+    REGULATION_ON                   = 1
+    REGULATION_OVERRIDE             = 2
+    REGULATION_FREEZE               = 3
+    REGULATION_UNFREEZE             = 4
+    REGULATION_ENABLE_AUTOFREEZE    = 5
+    REGULATION_DISABLE_AUTOFREEZE   = 6
+    
+
+    # prebuild dictionaries to avoid rebuilding upon each regulation call
+    tempRegulationDict = {'off':                REGULATION_OFF,
+                          'on':                 REGULATION_ON,
+                          'override':           REGULATION_OVERRIDE,
+                          'freeze':             REGULATION_FREEZE,
+                          'unfreeze':           REGULATION_UNFREEZE,
+                          'enable_autofreeze':  REGULATION_ENABLE_AUTOFREEZE,
+                          'disable_autofreeze': REGULATION_DISABLE_AUTOFREEZE}
     # inverse mapping for displaying messages
     # regulationDictInv = {regulationDict[k]: k for k in regulationDict.keys()}
     
@@ -253,6 +250,48 @@ class SBIGCam(object):
             self.SBIG = CDLL("/usr/local/lib/libsbigudrv.so")
         self.verbose = verbose
         self.keepShutterOpen = False
+
+    def keep_shutter_open(self, keepShutterOpen=False):
+        
+        if keepShutterOpen == True:
+            self.keepShutterOpen = True
+            return True
+        elif keepShutterOpen == False:
+            self.keepShutterOpen = False
+            return True
+        else:
+            print ('Invalid shutter option. Boolean required.')
+            return False            
+
+    def open_shutter(self):
+        
+        mcp = self.MiscellaneousControlParams(
+                fanEnable = c_bool(True),
+                shutterCommand = self.SC_OPEN_SHUTTER,
+                ledState = self.LED_ON)
+        Error = self.SBIG.SBIGUnivDrvCommand(
+                   self.CC_MISCELLANEOUS_CONTROL, byref(mcp), None)
+        if Error != self.CE_NO_ERROR:
+            print("Opening shutter returned error:", Error)
+            return False
+        elif self.verbose:
+            print("Shutter opened.")
+            return True
+            
+    def close_shutter(self):
+        
+        mcp = self.MiscellaneousControlParams(
+                fanEnable = c_bool(True),
+                shutterCommand = self.SC_CLOSE_SHUTTER,
+                ledState = self.LED_ON)
+        Error = self.SBIG.SBIGUnivDrvCommand(
+                   self.CC_MISCELLANEOUS_CONTROL, byref(mcp), None)
+        if Error != self.CE_NO_ERROR:
+            print("Closing shutter returned error:", Error)
+            return False
+        elif self.verbose:
+            print("Shutter closed.")
+            return True
 
     def set_image_size(self, width, height):
         """
@@ -437,10 +476,10 @@ class SBIGCam(object):
                        self.CC_MISCELLANEOUS_CONTROL, byref(mcp), None)
             #print(Error)
                        
-        if Error != self.CE_NO_ERROR:
-            print("Closing ST-i shutter returned error:", Error)
-        elif self.verbose:
-            print("ST-i shutter successfully closed.")
+            if Error != self.CE_NO_ERROR:
+                print("Closing ST-i shutter returned error:", Error)
+            elif self.verbose:
+                print("ST-i shutter closed.")
          
         # Start Readout
         srp = self.StartReadoutParams(ccd = self.CCD_IMAGING, readoutMode = self.RM_1X1,
@@ -451,8 +490,7 @@ class SBIGCam(object):
             print ('Attempt to initialise readout returned error:', Error)
             return False
         elif self.verbose:
-            print ('Readout successfully initiated.')
-          
+            print ('Readout initiated.')
           
         # Readout
         rlp = self.ReadoutLinesParams(ccd = self.CCD_IMAGING, readoutMode = self.RM_1X1,
@@ -526,10 +564,12 @@ class SBIGCam(object):
         elif self.verbose:
             print ('Driver successfully closed.')
 
-    def set_temperature_regulation2(self, regulationInput, CCDSetpoint):
+    def set_temperature_regulation(self, regulationInput, CCDSetpoint=-10.0):
         """
+        This is actually CC_SET_TEMPERATURE_REGULATION2, in degree celcius,
+        not the legacy method in A/D units
+
         Requires camera to be open (open_camera())
-        
         Command values:
         0 - 'off' - regulation off
         1 - 'on' - regulation on
@@ -538,16 +578,14 @@ class SBIGCam(object):
         4 - 'freeze_off' - unfreeze TE cooler
         5 - 'autofreeze_on' - enable auto-freeze
         6 - 'autofreeze_off' - disable auto-freeze
-        
         temp is the CCD temperature in celsius to activate regulation
+        
         """
         # check input
         if regulationInput in self.tempRegulationDict.keys():
-            regulation = self.regulationDict[regulationInput]
-        elif regulationInput in self.tempRegulationDict.values():
-            regulation = regulationInput
+            regulation = self.tempRegulationDict[regulationInput]
         else:
-            print('Invalid Command')
+            print('Invalid temperature regulation command.')
             return False
             
         # send driver command
@@ -560,7 +598,7 @@ class SBIGCam(object):
             print('Temperature regulation returned error: ', Error)
             return False
         elif self.verbose:
-            print('Temperature regulation set: ', regulation, 
+            print('Temperature regulation set: ', regulationInput, 
                       '. CCD Setpoint: ', CCDSetpoint, 'degree C.')
         return True
   
@@ -568,7 +606,7 @@ class SBIGCam(object):
         
         '''
         standard request returns temperature status in A/D units
-        advanced request returns degree celsius, recommended
+        advanced request returns degree celsius, recommended, request=2
         '''
 
         tsp = self.QueryTemperatureStatusParams(request = c_int(2))
@@ -579,38 +617,54 @@ class SBIGCam(object):
         if Error != self.CE_NO_ERROR:
             print ('Temperature status query returned error:', Error)
             return False
-        elif self.verbose:
-            results_text = ('Temperature status query results: '     +'\n'
-                +'Cooling Enabled: ' 
-                    + repr(qtsr2.coolingEnabled)                     +'\n'
-                +'Fan Enabled: ' 
-                    + repr(qtsr2.fanEnabled)                         +'\n'
-                +'CCD Setpoint: ' 
-                    + repr(qtsr2.ccdSetpoint)                        +'\n'
-                +'Imaging CCD Temperature: '
-                    +repr(qtsr2.imagingCCDTemperature)               +'\n'
-                +'Tracking CCD Temperature: '
-                    +repr(qtsr2.trackingCCDTemperature)              +'\n'
-                +'External Tracking CCD Temperature: '
-                    +repr(qtsr2.externalTrackingCCDTemperature)      +'\n'
-                +'Ambient Temperature: '
-                    +repr(qtsr2.ambientTemperature)                  +'\n'
-                +'Imaging CCD Power: '
-                    +repr(qtsr2.imagingCCDPower)                     +'\n'
-                +'Tracking CCD Power: '
-                    +repr(qtsr2.trackingCCDPower)                    +'\n'
-                +'External Tracking CCD Power: '
-                    +repr(qtsr2.externalTrackingCCDPower)            +'\n'
-                +'Heatsink Temperature: '
-                    +repr(qtsr2.heatsinkTemperature)                 +'\n'
-                +'Fan Power: '
-                    +repr(qtsr2.fanPower)                            +'\n'
-                +'Fan Speed: '
-                    +repr(qtsr2.fanSpeed))
-
-            print (results_text)
-
-        return True
+        else:
+            
+            tempStatusDict = {
+                'cooling_enabled':                  qtsr2.coolingEnabled,
+                'fan_enabled':                      qtsr2.fanEnabled,
+                'ccd_setpoint':                     qtsr2.ccdSetpoint,
+                'imaging_ccd_temperature':          qtsr2.imagingCCDTemperature,
+                'tracking_ccd_temperature':         qtsr2.trackingCCDTemperature,
+                'external_tracking_ccd_temperature':qtsr2.externalTrackingCCDTemperature,
+                'ambient_temperature':              qtsr2.ambientTemperature,
+                'imaging_ccd_power':                qtsr2.imagingCCDPower,
+                'tracking_ccd_power':               qtsr2.trackingCCDPower,
+                'external_tracking_ccd_power':      qtsr2.externalTrackingCCDPower,
+                'heatsink_temperature':             qtsr2.heatsinkTemperature,
+                'fan_power':                        qtsr2.fanPower,
+                'fan_speed':                        qtsr2.fanSpeed}            
+            
+            if self.verbose:
+                results_text = ('Temperature status query results: '     +'\n'
+                    +'Cooling Enabled: ' 
+                        + repr(qtsr2.coolingEnabled)                     +'\n'
+                    +'Fan Enabled: ' 
+                        + repr(qtsr2.fanEnabled)                         +'\n'
+                    +'CCD Setpoint: ' 
+                        + repr(qtsr2.ccdSetpoint)                        +'\n'
+                    +'Imaging CCD Temperature: '
+                        +repr(qtsr2.imagingCCDTemperature)               +'\n'
+                    +'Tracking CCD Temperature: '
+                        +repr(qtsr2.trackingCCDTemperature)              +'\n'
+                    +'External Tracking CCD Temperature: '
+                        +repr(qtsr2.externalTrackingCCDTemperature)      +'\n'
+                    +'Ambient Temperature: '
+                        +repr(qtsr2.ambientTemperature)                  +'\n'
+                    +'Imaging CCD Power: '
+                        +repr(qtsr2.imagingCCDPower)                     +'\n'
+                    +'Tracking CCD Power: '
+                        +repr(qtsr2.trackingCCDPower)                    +'\n'
+                    +'External Tracking CCD Power: '
+                        +repr(qtsr2.externalTrackingCCDPower)            +'\n'
+                    +'Heatsink Temperature: '
+                        +repr(qtsr2.heatsinkTemperature)                 +'\n'
+                    +'Fan Power: '
+                        +repr(qtsr2.fanPower)                            +'\n'
+                    +'Fan Speed: '
+                        +repr(qtsr2.fanSpeed))
+                print (results_text)
+                
+                return tempStatusDict
 
 if __name__ == '__main__':
 
@@ -626,16 +680,32 @@ if __name__ == '__main__':
     if not camera.open_camera():
         print ("Can't establish connection to camera")
         sys.exit()
-    extime = input("Exposure time in milliseconds (between 0 and 3600000): ")
-    while (type(extime) is str):
+    # set temperature regulation
+    regulation = input("Enter temperature regulation mode:")
+    if not regulation in camera.tempRegulationDict.keys():
+        print("invalid input.")   
+        camera.close_camera()
+        sys.exit()
+    setpoint = input("Enter CCD Setpoint:")
+    while (type(setpoint) is str):
         try:
-            extime = int(extime)
+            setpoint = float(setpoint)
+        except:
+            print("Invalid input.")
+            camera.close_camera()
+            sys.exit()
+    camera.set_temperature_regulation(regulation, setpoint)
+    camera.query_temperature_status()
+    exptime = input("Exposure time in milliseconds (between 0 and 3600000): ")
+    while (type(exptime) is str):
+        try:
+            exptime = int(exptime)
         except ValueError:
             print("Looks like that's not a valid exposure time ")
             camera.close_camera()
             sys.exit()
-    camera.set_exposure_time(extime)        
-    response= input("Will this be a dark image? (Y/N) ") 
+    camera.set_exposure_time(exptime)        
+    response= input("Will this be a dark image? (Y/N) ")
     # 1 for dark, 0 for exposure
     try:
         if response[0].lower() not in ['y','n']:
@@ -645,8 +715,9 @@ if __name__ == '__main__':
             if response[0].lower() == 'y':
                 camera.set_dark(True)
     except:
-        print("Input Error")            
+        print("Input Error")
+        
     image=camera.start_exposure()
     filename = 'sbig'+time.strftime("%y%m%d-%H%M%S") + '.fits' 
-    camera.write_fits(image,filename)
+    camera.write_fits(image, filename)
     camera.close_camera()
