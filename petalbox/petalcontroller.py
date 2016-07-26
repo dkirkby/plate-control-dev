@@ -198,7 +198,7 @@ class PetalController(Application):
         """
         if telemetry_available:
             try:
-                tach = {'GFA_FAN1' : 5000, 'GFA_FAN2' : 5000}		#currently not safe to use, so run in simulator mode at all times
+                tach = self.pt.read_fan_tach()
             except:
                 return self.FAILED
 
