@@ -1,4 +1,4 @@
-import os
+ipcsimport os
 import sys
 sys.path.append(os.path.abspath('./SBIG/'))
 try:
@@ -73,10 +73,9 @@ class FVCHandler(object):
             time.sleep(delay)
             
     def create_target_dict(self, expected_pos_xy):
-        """creates a target dict to send to fvc handler
+        """creates a target dict to send to FLI
         INPUT: expected xy positions of positioners in [[x1,y1],[x2,y2],..]
-
-        Written by PAF for the FLI"""
+        """
 
         target_dict = self.fid_dict
         for i,n in enumerate(expected_pos_xy):
@@ -85,11 +84,36 @@ class FVCHandler(object):
 
         return target_dict
 
+    def fake_platemaker(self,measured_centroids):
+        """ Takes FVC centroids and turns them into XY positions"""
+
+        xy = measured_centroids
+        xy_np = np.array(xy).transpose()
+        rot = FVCHandler.rotmat2D_deg(self.rotation)
+        xy_np = np.dot(rot, xy_np)
+        xy_np *= self.scale
+        translation_x = self.translation[0] * np.ones(np.shape(xy_np)[1])
+        translation_y = self.translation[1] * np.ones(np.shape(xy_np)[1])
+        xy_np += [translation_x,translation_y]
+        xy = xy_np.transpose().tolist()
+        return xy
+
+    def create_new_fid_dict(self,center_dict):
+        fid_dict = center_dict
+        for n in center_dict:
+             if center_dict[n]['flag']==8.0:
+                  xy = self.fake_platemaker([[center_dict[n]['x'],center_dict[n]['y']]]
+)
+                  print(xy)
+                  fid_dict[n]['x'] = xy[0][0]
+                  self.fid_dict[n]['y'] = xy[0][1]
+
+        return fid_dict
+
     def measured_xy_from_fvc_centroid(self,center_dict):
         """reformats the centroid dictionary from the fvc to a list of measured [x,y]
-        centroids for the positioner software
-
-        written by PAF for the FLI""" 
+        centroids for the positioner software for the FLI
+        """
 
         measured_pos_xy = []
         measured_ref_xy = []
@@ -104,6 +128,10 @@ class FVCHandler(object):
             else:
                 print(center_dict[n]['flag'],type(center_dict[n]['flag']),'Doesnt seem to be a fiber or positioner') 
 
+        measured_pos_xy=self.fake_platemaker(measured_pos_centroid)
+        measured_ref_xy=self.fake_platemaker(measured_ref_centroid)
+        fid_dict = self.create_new_fid_dict(center_dict)
+	#fid_dict=measured_ref_xy
 
         return measured_pos_xy, measured_ref_xy
 
