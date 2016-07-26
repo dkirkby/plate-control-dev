@@ -4,6 +4,10 @@ March 2016
 
 Author: Kevin Fanning (kfanning@umich.edu) referencing sbigudrv.h
 
+KH: This is modeled after the chimera sbig driver. Only a subset of the functions are implemented here.
+    For more information see the chimera software on github at
+    https://github.com/astroufsc/chimera-sbig/tree/master/chimera_sbig/instruments
+
 Requires: ctypes*, platform*, numpy, pyfits, time*
 *Refers to packages in Python's Standard Library
 
@@ -251,47 +255,33 @@ class SBIGCam(object):
         self.verbose = verbose
         self.keepShutterOpen = False
 
-    def keep_shutter_open(self, keepShutterOpen=False):
+    def keep_shutter_open(self, keepShutterOpen = False):
         
-        if keepShutterOpen == True:
-            self.keepShutterOpen = True
-            return True
-        elif keepShutterOpen == False:
-            self.keepShutterOpen = False
-            return True
+        if isinstance(keepShutterOpen, bool):
+            self.keepShutterOpen = keepShutterOpen
         else:
             print ('Invalid shutter option. Boolean required.')
             return False            
 
-    def open_shutter(self):
+    def set_shutter(self, shutterState):
         
-        mcp = self.MiscellaneousControlParams(
-                fanEnable = c_bool(True),
-                shutterCommand = self.SC_OPEN_SHUTTER,
-                ledState = self.LED_ON)
-        Error = self.SBIG.SBIGUnivDrvCommand(
-                   self.CC_MISCELLANEOUS_CONTROL, byref(mcp), None)
-        if Error != self.CE_NO_ERROR:
-            print("Opening shutter returned error:", Error)
+        shutterState = str(shutterState)
+        if shutterState in ['open', 'closed']:
+            if shutterState == 'open':
+                mcp = self.MiscellaneousControlParams(shutterCommand = self.SC_OPEN_SHUTTER)
+            elif shutterState == 'closed':
+                mcp = self.MiscellaneousControlParams(shutterCommand = self.SC_CLOSE_SHUTTER)
+            Error = self.SBIG.SBIGUnivDrvCommand(
+                       self.CC_MISCELLANEOUS_CONTROL, byref(mcp), None)
+            if Error != self.CE_NO_ERROR:
+                print("Setting shutter returned error:", Error)
+                return False
+            elif self.verbose:
+                print("Shutter is now:", shutterState)
+                return True
+        else:
+            print('Invalid shutter state, open and closed only.')
             return False
-        elif self.verbose:
-            print("Shutter opened.")
-            return True
-            
-    def close_shutter(self):
-        
-        mcp = self.MiscellaneousControlParams(
-                fanEnable = c_bool(True),
-                shutterCommand = self.SC_CLOSE_SHUTTER,
-                ledState = self.LED_ON)
-        Error = self.SBIG.SBIGUnivDrvCommand(
-                   self.CC_MISCELLANEOUS_CONTROL, byref(mcp), None)
-        if Error != self.CE_NO_ERROR:
-            print("Closing shutter returned error:", Error)
-            return False
-        elif self.verbose:
-            print("Shutter closed.")
-            return True
 
     def set_image_size(self, width, height):
         """
@@ -468,18 +458,10 @@ class SBIGCam(object):
         # close shutter for ST-i camera
         # This section is skipped for 8300 camera and keepShutterOpen=True
         if self.cameraName == 'STi' and self.keepShutterOpen == False:
-            mcp = self.MiscellaneousControlParams(
-                    fanEnable = c_bool(True),
-                    shutterCommand = self.SC_CLOSE_SHUTTER,
-                    ledState = self.LED_ON)
-            Error = self.SBIG.SBIGUnivDrvCommand(
-                       self.CC_MISCELLANEOUS_CONTROL, byref(mcp), None)
-            #print(Error)
-                       
-            if Error != self.CE_NO_ERROR:
-                print("Closing ST-i shutter returned error:", Error)
-            elif self.verbose:
-                print("ST-i shutter closed.")
+            try:
+                self.set_shutter('closed')
+            except: 
+                print('Could not close ST-i shutter.')
          
         # Start Readout
         srp = self.StartReadoutParams(ccd = self.CCD_IMAGING, readoutMode = self.RM_1X1,
@@ -517,7 +499,7 @@ class SBIGCam(object):
         if Error != self.CE_NO_ERROR:
             print ('End readout failed with error code: ', Error)
         elif self.verbose:
-            print ('Readout sucessfully ended.')
+            print ('Readout session was ended.')
         # hdu = fits.PrimaryHDU(image)
         # name = time.strftime("%Y-%m-%d-%H%M%S") + '.fits' # Saves file with timestamp
         # hdu.writeto(name)
@@ -549,7 +531,7 @@ class SBIGCam(object):
         if Error == 20:
             print ('Code 20: device already closed.')
         elif Error != self.CE_NO_ERROR:
-            if self.verbose: print ('Attempt to close device returned error:', Error)
+            if self.verbose: print ('Closing device returned error:', Error)
             return False
         elif self.verbose:
             print ('Device successfully closed.')
@@ -574,10 +556,10 @@ class SBIGCam(object):
         0 - 'off' - regulation off
         1 - 'on' - regulation on
         2 - 'override' - regulation override
-        3 - 'freeze_on' - freeze TE cooler (ST-8/7 cameras)
-        4 - 'freeze_off' - unfreeze TE cooler
-        5 - 'autofreeze_on' - enable auto-freeze
-        6 - 'autofreeze_off' - disable auto-freeze
+        3 - 'freeze' - freeze TE cooler (ST-8/7 cameras)
+        4 - 'unfreeze' - unfreeze TE cooler
+        5 - 'enable_autofreeze' - enable auto-freeze
+        6 - 'disable_autofreeze' - disable auto-freeze
         temp is the CCD temperature in celsius to activate regulation
         
         """
@@ -601,7 +583,68 @@ class SBIGCam(object):
             print('Temperature regulation set: ', regulationInput, 
                       '. CCD Setpoint: ', CCDSetpoint, 'degree C.')
         return True
-  
+        
+    def set_fan(self, fanState):
+        
+        fanState = str(fanState)
+
+        if fanState in ['on', 'off']:
+            
+            if fanState == 'on':                
+                mcp = self.MiscellaneousControlParams(fanEnable = True)
+            elif fanState == 'off':
+                mcp = self.MiscellaneousControlParams(fanEnable = False)
+                
+            Error = self.SBIG.SBIGUnivDrvCommand(
+                   self.CC_MISCELLANEOUS_CONTROL, byref(mcp), None)
+            if Error != self.CE_NO_ERROR:
+                print("Setting fan returned error:", Error)
+                return False
+            elif self.verbose:
+                print("Cooling fan is now:", fanState)
+                return True
+        else:
+            print('Invalid TEC state, on or off only.')
+            return False
+        
+    def set_tec(self, tecState):
+        # set thermoelectric cooler, status indicated by 'coolingEnabled'
+        tecState = str(tecState)
+        ccdSetpoint = self.query_ccd_setpoint()
+        if tecState in ['on', 'off']:
+            try:
+                if tecState == 'on':                
+                    self.set_temperature_regulation('on', ccdSetpoint)
+                elif tecState == 'off':
+                    self.set_temperature_regulation('off', ccdSetpoint)
+                return True
+            except:
+                print('Setting TEC failed.')
+                return False
+        else:
+            print('Invalid TEC state, on or off only.')
+            return False
+                    
+    def set_autofreeze(self, autofreezeState):
+        
+        autofreezeState = str(autofreezeState)
+        ccdSetpoint = self.query_ccd_setpoint()
+        if autofreezeState in ['on', 'off']:
+            try:
+                if autofreezeState == 'on':                
+                    self.set_temperature_regulation(
+                        'enable_autofreeze', ccdSetpoint)
+                elif autofreezeState == 'off':
+                    self.set_temperature_regulation(
+                        'disable_autofreeze', ccdSetpoint)
+                return True
+            except:
+                print('Setting autofreeze function failed.')
+                return False
+        else:
+            print('Invalid autofreeze state, on or off only.')
+            return False
+    
     def query_temperature_status(self):
         
         '''
@@ -665,6 +708,11 @@ class SBIGCam(object):
                 print (results_text)
                 
                 return tempStatusDict
+
+    def query_ccd_setpoint(self):
+        
+        results = self.query_temperature_status()
+        return results['ccd_setpoint']
 
 if __name__ == '__main__':
 
