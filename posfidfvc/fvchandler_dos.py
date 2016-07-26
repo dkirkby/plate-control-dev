@@ -7,6 +7,7 @@ except Exception:
     pass
 import numpy as np
 import time
+import threading
 try:
     # DOS imports
     import Pyro4
@@ -106,15 +107,16 @@ class FVCHandler(object):
 
         return measured_pos_xy, measured_ref_xy
 
-    def measure_and_identify(self,expected_pos_xy,expected_ref_xy):
+    def measure_and_identify(self, expected_pos_xy, expected_ref_xy, send_target_dict = False):
         """Calls for an FVC measurement, and returns a list of measured centroids.
         The centroids are in order according to their closeness to the list of
         expected xy values.
 
         If the expected xy are unknown, then use the measure method instead.
 
-        INPUT:  expected_pos_xy ... list of expected positioner fiber locations
-                expected_ref_xy ... list of expected fiducial positions
+        INPUT:  expected_pos_xy ... list of expected positioner fiber locations (optional)
+                expected_ref_xy ... list of expected fiducial positions (optional)
+                send_target_dict    if True create and send target dict to FVC
 
         OUTPUT: measured_pos_xy ... list of measured positioner fiber locations
                 measured_ref_xy ... list of measured fiducial positions
@@ -133,35 +135,33 @@ class FVCHandler(object):
             # 5. send centroids (in pixels at FVC) thru platemaker to get measured xy (in mm at focal plate)
             # 6. organize those centroids so you can return them as measured_pos_xy, measured_ref_xy
             self.exptime = 1 #sec
-            # current set of FVC commands
-            #target_dict = self.create_target_dict(expected_pos_xy)
-            #fvc_uri = 'PYRO:FVC@131.243.51.74:40539'
-            #fvc = Pyro4.Proxy(fvc_uri)
-            #fvc.set(exptime=self.exptime)
-            #fvc.set_target_dict(target_dict) 
-            #fvc.print_targets()
-            # proposed set of FVC commands
             try:
                 fvc = self.dos_fvc['proxy']
                 fvc.set(exptime=self.exptime)
             except Exception as e:
-                self.error('messure_and_identify: Exception communicating with the FVC: %s' % str(e))
+                print('messure_and_identify: Exception communicating with the FVC: %s' % str(e))
                 self.dos_fvc['uid'] = None
                 self.seeker.seek()
                 try:
                     fvc = self.dos_fvc['proxy']
                     fvc.set(exptime=self.exptime)
                 except Exception as e:
-                    rstring = 'measure_and_identify: Exception  attempting to reset FVC connection: %s' % str(e))
-                    self.error(rstring)
+                    rstring = 'measure_and_identify: Exception attempting to reset FVC connection: %s' % str(e)
+                    print(rstring)
                     self.dos_fvc['uid'] = None
                     return 'FAILED: ' + rstring
-            fvc.set_target_dict(expected_pos_xy)
+            if send_targer_dict == True:
+                t = self.create_target_dict(expected_pos_xy)
+                fvc.set_target_dict(t)
                 
-            #fvc.calibrate_image()
-            fvc.measure() 
-            measured_dict = fvc.get("centers")
-            print(measured_dict)
+            try:
+                fvc.measure() 
+                measured_dict = fvc.get("centers")
+                print(measured_dict)
+            except Exception as e:
+                rstring = 'measure_and_identify: Exception calling fvc.measure or fvc.get(centers): %s' % str(e)
+                print(rstring)
+                return 'FAILED: ' + rstring 
             measured_pos_xy,measured_ref_xy = self.measured_xy_from_fvc_centroid(measured_dict)	
             return measured_pos_xy, measured_ref_xy
         else:
