@@ -340,7 +340,7 @@ class PtlTelemetry(object):
 			start=time.time()
 			end = time.time()
 			while abs(start-end) < 1:
-				events = self.po1.poll(5)
+				events = self.po1.poll(.5)
 				if not events:
 					pass
 				else:
@@ -348,16 +348,19 @@ class PtlTelemetry(object):
 					self.ftach1.seek(0)
 					pstate = self.ftach1.read()
 				end = time.time()
+			if len(t) > 1:
+				tdiff = np.mean(np.diff(np.array(t)))
+				rpm1 = int(60./(4*tdiff))
 
-			tdiff = np.mean(np.diff(np.array(t)))
-			rpm1 = 60./(4*tdiff)
+			else: 
+				rpm1 = 'None'
 
 			#GFA_FAN2
 			t2=[]
 			start=time.time()
 			end = time.time()
 			while abs(start-end) < 1:
-				events2 = self.po2.poll(5)
+				events2 = self.po2.poll(.5)
 				if not events2:
 					pass
 				else:
@@ -365,9 +368,11 @@ class PtlTelemetry(object):
 					self.ftach2.seek(0)
 					pstate = self.ftach2.read()
 				end = time.time()
-
-			t2diff = np.mean(np.diff(np.array(t2)))
-			rpm2 = 60./(4*t2diff)
+			if len(t2) > 1:
+				t2diff = np.mean(np.diff(np.array(t2)))
+				rpm2 = int(60./(4*t2diff))
+			else:
+				rpm2 = 'None'
 
 			speed_rpm['GFA_FAN1'] = rpm1
 			speed_rpm['GFA_FAN2'] = rpm2
