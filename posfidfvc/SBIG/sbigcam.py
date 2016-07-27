@@ -89,7 +89,7 @@ Changelog:
             for customising features.
             added self.keepShutterOpen boolean flag for tests that require
             open shutter.
-            going to add force shutter open and close methods.
+            added shutter open and close and other methods
 
 '''
 
@@ -159,7 +159,7 @@ class SBIGCam(object):
         _fields_ = [('request',                         c_int)]
 
     class QueryTemperatureStatusResults2(Structure):
-        _fields_ = [('coolingEnabled',                  c_bool),
+        _fields_ = [('coolingEnabled',                  c_int),
                     ('fanEnabled',                      c_ushort),
                     ('ccdSetpoint',                     c_double),
                     ('imagingCCDTemperature',           c_double),
@@ -222,8 +222,8 @@ class SBIGCam(object):
     REGULATION_UNFREEZE             = 4
     REGULATION_ENABLE_AUTOFREEZE    = 5
     REGULATION_DISABLE_AUTOFREEZE   = 6
-    
-
+    REGULATION_ENABLE_MASK          = 0x0001
+    REGULATION_FROZEN_MASK          = 0x8000
     # prebuild dictionaries to avoid rebuilding upon each regulation call
     tempRegulationDict = {'off':                REGULATION_OFF,
                           'on':                 REGULATION_ON,
@@ -235,7 +235,7 @@ class SBIGCam(object):
     # inverse mapping for displaying messages
     # regulationDictInv = {regulationDict[k]: k for k in regulationDict.keys()}
     
-    def __init__(self, verbose=True):
+    def __init__(self, verbose=False):
         self.cameraName = 'No Camera Selected'
         self.DARK = 0 # Defaults to 0
         self.exposure = 0 # units 1/100 second (minimum exposure is 0.09 seconds)
@@ -260,17 +260,22 @@ class SBIGCam(object):
         if isinstance(keepShutterOpen, bool):
             self.keepShutterOpen = keepShutterOpen
         else:
-            print ('Invalid shutter option. Boolean required.')
-            return False            
+            if self.verbose:
+                print ('Invalid shutter option. Boolean required.')
+        return self.keepShutterOpen
 
     def set_shutter(self, shutterState):
         
         shutterState = str(shutterState)
         if shutterState in ['open', 'closed']:
             if shutterState == 'open':
-                mcp = self.MiscellaneousControlParams(shutterCommand = self.SC_OPEN_SHUTTER)
+                mcp = self.MiscellaneousControlParams(
+                        shutterCommand = self.SC_OPEN_SHUTTER,
+                        ledState = c_ushort(1))
             elif shutterState == 'closed':
-                mcp = self.MiscellaneousControlParams(shutterCommand = self.SC_CLOSE_SHUTTER)
+                mcp = self.MiscellaneousControlParams(
+                        shutterCommand = self.SC_CLOSE_SHUTTER,
+                        ledState = c_ushort(1))
             Error = self.SBIG.SBIGUnivDrvCommand(
                        self.CC_MISCELLANEOUS_CONTROL, byref(mcp), None)
             if Error != self.CE_NO_ERROR:
@@ -278,7 +283,7 @@ class SBIGCam(object):
                 return False
             elif self.verbose:
                 print("Shutter is now:", shutterState)
-                return True
+            return True
         else:
             print('Invalid shutter state, open and closed only.')
             return False
@@ -313,7 +318,7 @@ class SBIGCam(object):
         sets the CCD chip size in pixels according to
         the camera model selected
         Input
-            name: string, camera model (must be 'STF 8300M' or 'ST-i')
+            name: string, camera model (must be 'ST8300' or 'STi')
         Returns:
             True if success
             False if failed
@@ -460,6 +465,7 @@ class SBIGCam(object):
         if self.cameraName == 'STi' and self.keepShutterOpen == False:
             try:
                 self.set_shutter('closed')
+                print('ST-i shutter closed.')
             except: 
                 print('Could not close ST-i shutter.')
          
@@ -546,7 +552,7 @@ class SBIGCam(object):
         elif self.verbose:
             print ('Driver successfully closed.')
 
-    def set_temperature_regulation(self, regulationInput, CCDSetpoint=-10.0):
+    def set_temperature_regulation(self, regulationInput, CCDSetpoint=None):
         """
         This is actually CC_SET_TEMPERATURE_REGULATION2, in degree celcius,
         not the legacy method in A/D units
@@ -569,7 +575,9 @@ class SBIGCam(object):
         else:
             print('Invalid temperature regulation command.')
             return False
-            
+        if CCDSetpoint is None:
+            # query current setpoint from driver
+            CCDSetpoint = self.query_ccd_setpoint()    
         # send driver command
         trp2 = self.SetTemperatureRegulationParams2(
                     regulation  = c_int(regulation),
@@ -586,14 +594,18 @@ class SBIGCam(object):
         
     def set_fan(self, fanState):
         
+        # does not seem to be supported by STF-8300
         fanState = str(fanState)
-
         if fanState in ['on', 'off']:
             
             if fanState == 'on':                
-                mcp = self.MiscellaneousControlParams(fanEnable = True)
+                mcp = self.MiscellaneousControlParams(
+                        fanEnable = c_bool(True),
+                        ledState = c_ushort(1))
             elif fanState == 'off':
-                mcp = self.MiscellaneousControlParams(fanEnable = False)
+                mcp = self.MiscellaneousControlParams(
+                        fanEnable = c_bool(False),
+                        ledState = c_ushort(1))
                 
             Error = self.SBIG.SBIGUnivDrvCommand(
                    self.CC_MISCELLANEOUS_CONTROL, byref(mcp), None)
@@ -602,21 +614,20 @@ class SBIGCam(object):
                 return False
             elif self.verbose:
                 print("Cooling fan is now:", fanState)
-                return True
+            return True
         else:
-            print('Invalid TEC state, on or off only.')
+            print('Invalid fanState state, on or off only.')
             return False
         
     def set_tec(self, tecState):
         # set thermoelectric cooler, status indicated by 'coolingEnabled'
         tecState = str(tecState)
-        ccdSetpoint = self.query_ccd_setpoint()
         if tecState in ['on', 'off']:
             try:
                 if tecState == 'on':                
-                    self.set_temperature_regulation('on', ccdSetpoint)
+                    self.set_temperature_regulation('on')
                 elif tecState == 'off':
-                    self.set_temperature_regulation('off', ccdSetpoint)
+                    self.set_temperature_regulation('off')
                 return True
             except:
                 print('Setting TEC failed.')
@@ -624,13 +635,39 @@ class SBIGCam(object):
         else:
             print('Invalid TEC state, on or off only.')
             return False
+            
+    def freeze_tec(self):
+        
+        trp2 = self.SetTemperatureRegulationParams2(
+                    regulation = self.tempRegulationDict['freeze'])
+        Error = self.SBIG.SBIGUnivDrvCommand(
+                    self.CC_SET_TEMPERATURE_REGULATION2, byref(trp2), None)
+        if Error != self.CE_NO_ERROR:
+            print('Freezing TEC returned error: ', Error)
+            return False
+        elif self.verbose:
+            print('TEC is frozen for readout.')
+        return True
+        
+    def unfreeze_tec(self):
+        
+        trp2 = self.SetTemperatureRegulationParams2(
+                    regulation = self.tempRegulationDict['unfreeze'])
+        Error = self.SBIG.SBIGUnivDrvCommand(
+                    self.CC_SET_TEMPERATURE_REGULATION2, byref(trp2), None)
+        if Error != self.CE_NO_ERROR:
+            print('Unfreezing TEC returned error: ', Error)
+            return False
+        elif self.verbose:
+            print('TEC is unfrozen.')
+        return True
                     
     def set_autofreeze(self, autofreezeState):
         
         autofreezeState = str(autofreezeState)
-        ccdSetpoint = self.query_ccd_setpoint()
         if autofreezeState in ['on', 'off']:
             try:
+                ccdSetpoint = self.query_ccd_setpoint()
                 if autofreezeState == 'on':                
                     self.set_temperature_regulation(
                         'enable_autofreeze', ccdSetpoint)
@@ -661,26 +698,10 @@ class SBIGCam(object):
             print ('Temperature status query returned error:', Error)
             return False
         else:
-            
-            tempStatusDict = {
-                'cooling_enabled':                  qtsr2.coolingEnabled,
-                'fan_enabled':                      qtsr2.fanEnabled,
-                'ccd_setpoint':                     qtsr2.ccdSetpoint,
-                'imaging_ccd_temperature':          qtsr2.imagingCCDTemperature,
-                'tracking_ccd_temperature':         qtsr2.trackingCCDTemperature,
-                'external_tracking_ccd_temperature':qtsr2.externalTrackingCCDTemperature,
-                'ambient_temperature':              qtsr2.ambientTemperature,
-                'imaging_ccd_power':                qtsr2.imagingCCDPower,
-                'tracking_ccd_power':               qtsr2.trackingCCDPower,
-                'external_tracking_ccd_power':      qtsr2.externalTrackingCCDPower,
-                'heatsink_temperature':             qtsr2.heatsinkTemperature,
-                'fan_power':                        qtsr2.fanPower,
-                'fan_speed':                        qtsr2.fanSpeed}            
-            
             if self.verbose:
                 results_text = ('Temperature status query results: '     +'\n'
                     +'Cooling Enabled: ' 
-                        + repr(qtsr2.coolingEnabled)                     +'\n'
+                        + repr(hex(qtsr2.coolingEnabled))                +'\n'
                     +'Fan Enabled: ' 
                         + repr(qtsr2.fanEnabled)                         +'\n'
                     +'CCD Setpoint: ' 
@@ -707,12 +728,47 @@ class SBIGCam(object):
                         +repr(qtsr2.fanSpeed))
                 print (results_text)
                 
-                return tempStatusDict
+            tempStatusDict = {
+                'cooling_enabled':                  qtsr2.coolingEnabled,
+                'fan_enabled':                      qtsr2.fanEnabled,
+                'ccd_setpoint':                     qtsr2.ccdSetpoint,
+                'imaging_ccd_temperature':          qtsr2.imagingCCDTemperature,
+                'tracking_ccd_temperature':         qtsr2.trackingCCDTemperature,
+                'external_tracking_ccd_temperature':qtsr2.externalTrackingCCDTemperature,
+                'ambient_temperature':              qtsr2.ambientTemperature,
+                'imaging_ccd_power':                qtsr2.imagingCCDPower,
+                'tracking_ccd_power':               qtsr2.trackingCCDPower,
+                'external_tracking_ccd_power':      qtsr2.externalTrackingCCDPower,
+                'heatsink_temperature':             qtsr2.heatsinkTemperature,
+                'fan_power':                        qtsr2.fanPower,
+                'fan_speed':                        qtsr2.fanSpeed}
+            return tempStatusDict
 
+    def query_tec_enabled(self):
+        
+        results = self.query_temperature_status()
+        return bool(results['cooling_enabled'] & self.REGULATION_ENABLE_MASK)
+        
+    def query_tec_frozen(self):
+        
+        results = self.query_temperature_status()
+        return bool(results['cooling_enabled'] & self.REGULATION_FROZEN_MASK)
+        
+    def query_fan_enabled(self):
+        
+        results = self.query_temperature_status()
+        return results['fan_enabled']
+    
     def query_ccd_setpoint(self):
         
         results = self.query_temperature_status()
         return results['ccd_setpoint']
+        
+    def query_imaging_ccd_temperature(self):
+        
+        results = self.query_temperature_status()
+        return results['imaging_ccd_temperature']
+    
 
 if __name__ == '__main__':
 
