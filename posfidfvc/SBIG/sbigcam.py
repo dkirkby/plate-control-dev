@@ -591,7 +591,21 @@ class SBIGCam(object):
             print('Temperature regulation set: ', regulationInput, 
                       '. CCD Setpoint: ', CCDSetpoint, 'degree C.')
         return True
-        
+    
+    def set_ccd_setpoint(self, CCDSetpoint):
+
+        regulation = self.query_tec_enabled()
+        if regulation:
+            regulation = 'on'
+        if not regulation:
+            regulation = 'off'
+        try:
+            self.set_temperature_regulation(regulation, CCDSetpoint)
+            return True
+        except:
+            print('Changing CCD Setpoint failed.')
+            return False
+    
     def set_fan(self, fanState):
         
         # does not seem to be supported by STF-8300
