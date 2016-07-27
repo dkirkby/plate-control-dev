@@ -552,7 +552,7 @@ class SBIGCam(object):
         elif self.verbose:
             print ('Driver successfully closed.')
 
-    def set_temperature_regulation(self, regulationInput, CCDSetpoint=None):
+    def set_temperature_regulation(self, regulationInput, ccdSetpoint=None):
         """
         This is actually CC_SET_TEMPERATURE_REGULATION2, in degree celcius,
         not the legacy method in A/D units
@@ -575,13 +575,13 @@ class SBIGCam(object):
         else:
             print('Invalid temperature regulation command.')
             return False
-        if CCDSetpoint is None:
+        if ccdSetpoint is None:
             # query current setpoint from driver
-            CCDSetpoint = self.query_ccd_setpoint()    
+            ccdSetpoint = self.query_ccd_setpoint()    
         # send driver command
         trp2 = self.SetTemperatureRegulationParams2(
                     regulation  = c_int(regulation),
-                    ccdSetpoint = c_double(CCDSetpoint))
+                    ccdSetpoint = c_double(ccdSetpoint))
         Error = self.SBIG.SBIGUnivDrvCommand(
                     self.CC_SET_TEMPERATURE_REGULATION2, byref(trp2), None)
         if Error != self.CE_NO_ERROR:
@@ -589,10 +589,10 @@ class SBIGCam(object):
             return False
         elif self.verbose:
             print('Temperature regulation set: ', regulationInput, 
-                      '. CCD Setpoint: ', CCDSetpoint, 'degree C.')
+                      '. CCD Setpoint: ', ccdSetpoint, 'degree C.')
         return True
     
-    def set_ccd_setpoint(self, CCDSetpoint):
+    def set_ccd_setpoint(self, ccdSetpoint):
 
         regulation = self.query_tec_enabled()
         if regulation:
@@ -600,7 +600,9 @@ class SBIGCam(object):
         if not regulation:
             regulation = 'off'
         try:
-            self.set_temperature_regulation(regulation, CCDSetpoint)
+            self.set_temperature_regulation(regulation, ccdSetpoint)
+            if self.verbose:
+                print('New CCD Setpoint:', ccdSetpoint)
             return True
         except:
             print('Changing CCD Setpoint failed.')
