@@ -98,6 +98,8 @@ class PetalController(Application):
         self.simulator=False
         self.simulated_switch = {}
         self.simulated_pwm = {}
+        self.fidstatus = {}
+
         if self.controller_type =='SIMULATOR':
             self.simulator=True
 
@@ -134,7 +136,9 @@ class PetalController(Application):
         role=config['role']
         config=ConfigObj('petalcontroller.conf')
         canlist=config['CAN'][role]['canlist']
-        self.info("CAN configured...canlist: ",canlist)
+        print(canlist)
+        print(type(canlist[0]))
+        #self.info("CAN configured...canlist: ", canlist)
         return canlist[0]
 
     def get_positioner_map(self):
@@ -475,10 +479,12 @@ class PetalController(Application):
         
             posid=int(ids[id])
             print(posid)
+            print(type(posid))
             canbus=self.__get_canbus(posid)
             print(canbus)
             duty = int(percent_duty[id])
-            
+            self.fidstatus[str(ids[id])] = int(percent_duty[id])
+
             if not self.simulator:
                 if not self.pmc.set_fiducials(canbus, posid, duty):
                     if self.verbose: print('set_fiducials: Error')
@@ -686,7 +692,7 @@ class PetalController(Application):
         """
         Returns a dictionary containing status of all fiducials on the petal.
         """
-        status ={'osu' : 34, 'michigan' : 3}
+        status = self.fidstatus
         return status
 
     def get_pos_status(self,posids):
