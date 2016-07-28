@@ -50,6 +50,7 @@ class Petal(Application):
                 'send_move_tables',
                 'execute_moves',
                 'schedule_send_and_execute_moves',
+                'move',
                 'send_and_execute_moves',
                 'quick_move',
                 'quick_direct_dtdp',
@@ -69,13 +70,15 @@ class Petal(Application):
                 'anticollision_override' : True,
                 'fid_duty_percent' : 50,
                 'fid_duty_period' : 55,
-                'logdir ' : None
+                'logdir' : None
                 }
     
     def init(self):
         """
         Initialize petal application.
         petal_id, pos_ids, fid_ids are passed from the command line via self.config
+        They can be set by passing a configuration file which is parsed when before creating
+        the Petal object.
         """
         try:
             self.petal_id = self.config['petal_id']
@@ -92,11 +95,12 @@ class Petal(Application):
 
         self.logdir = self.config['logdir']
         if self.logdir == None:
-            try:
+            if 'POSITIONER_LOGS_PATH' in os.environ:
                 self.logdir = os.environ['POSITIONER_LOGS_PATH']
-            except:
-                print('ERROR: must specify a log directory on the command line or set POSITIONER_LOGS_PATH')
-                return
+            else:
+                rstring = 'init: must specify a log directory on the command line or set POSITIONER_LOGS_PATH'
+                self.error(rstring)
+                raise RuntimeError(rstring)
         if not os.path.isdir(os.path.join(self.logdir, 'move_logs')):
             os.mkdir(os.path.join(self.logdir,'move_logs'))
         if not os.path.isdir(os.path.join(self.logdir, 'test_logs')):
@@ -411,6 +415,13 @@ class Petal(Application):
         except Exception as e:
             self.error('execute_moves: Exception: %s' % str(e))
 
+    def move(self, *args, **kwargs):
+        """
+        Wrapper function to move positioners from receiving targets to actually moving.
+        """
+        self.info('move: not yet...')
+        return self.SUCCESS
+    
     def schedule_send_and_execute_moves(self, *args, **kwargs):
         """Convenience wrapper to schedule, send, and execute the pending requested
         moves, all in one shot.
@@ -854,12 +865,11 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
     parser.add_argument('--service',action='store',default='DOStest',type=str)
-    parser.add_argument('--device_mode', action='store', default = None, help = 'Set to True for device_mode')
     parser.add_argument('--role', action='store', nargs = 1, required = True, help = 'Role name (required)', type=str)
     parser.add_argument('--logdir', action='store', help = 'Logfile directory (write access required)', type=str)
     parser.add_argument('--petal', action='store', nargs = 1, help = 'Petal Id [0-9]', type=int)
-    parser.add_argument('file', type=argparse.FileType('r'), help = 'file with pos_ids and fid_ids')                        
-    args = parser.parse_args()
+    parser.add_argument('--file', type=argparse.FileType('r'), required = True, help = 'file with pos_ids and fid_ids')                        
+    args, unknown = parser.parse_known_args()
 
     # cleanup sys.args for application framework
     try:
@@ -884,15 +894,13 @@ if __name__ == '__main__':
         sys.exit()
         
     # Create application instance
-    if args.device_mode:
-        if args.logdir:
-            myPetal = Petal(petal_id = pid, pos_ids = pos_ids, fid_ids = fid_ids, device_mode = True, logdir = args.logdir, service = args.service)
-        else:
-            myPetal = Petal(petal_id = pid, pos_ids = pos_ids, fid_ids = fid_ids, device_mode = True, service = args.service)
-    else:
+    try:
         if args.logdir:
             myPetal = Petal(petal_id = pid, pos_ids = pos_ids, fid_ids = fid_ids, logdir = args.logdir)
         else:
             myPetal = Petal(petal_id = pid, pos_ids = pos_ids, fid_ids = fid_ids)
-    # Enter run loop
-    myPetal.run()
+        # Enter run loop
+            myPetal.run()
+    except Exception as e:
+        print('PETAL%d: Uncaught exception in run loop: %s' % (pid, str(e)))
+        sys.exit()
