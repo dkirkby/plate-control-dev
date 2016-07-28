@@ -61,7 +61,7 @@ class PosMoveMeasure(object):
         petals = []
         pos_ids = []
         for petal in self.petals:
-            these_pos_ids = petal.get(key="POS_ID")
+            these_pos_ids = petal.get('posids')   #(key="POS_ID")
             pos_ids.extend(these_pos_ids)
             petals.extend([petal]*len(these_pos_ids))
             expected_pos_xy = pc.concat_lists_of_lists(expected_pos_xy, petal.expected_current_position(these_pos_ids,'obsXY'))
