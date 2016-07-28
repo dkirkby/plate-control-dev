@@ -61,7 +61,7 @@ class PosMoveMeasure(object):
         petals = []
         pos_ids = []
         for petal in self.petals:
-            these_pos_ids = petal.posids
+            these_pos_ids = petal.get(key="POS_ID")
             pos_ids.extend(these_pos_ids)
             petals.extend([petal]*len(these_pos_ids))
             expected_pos_xy = pc.concat_lists_of_lists(expected_pos_xy, petal.expected_current_position(these_pos_ids,'obsXY'))
@@ -261,6 +261,7 @@ class PosMoveMeasure(object):
             P = self._measure_calibration_arc(pos_ids,'phi',mode)
             #set_gear_ratios = False if mode == 'quick' else True
             set_gear_ratios = False # not sure yet if we really want to adjust gear ratios automatically, hence by default False here
+            print("Finished measuring calibration arcs",T,P)
             unwrapped_data = self._calculate_and_set_arms_and_offsets_from_arc_data(T,P,set_gear_ratios)
             for pos_id in T.keys():
                 poscalibplot.plot_arc(save_file(pos_id), pos_id, unwrapped_data)
