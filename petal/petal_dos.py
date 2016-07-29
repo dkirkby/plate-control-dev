@@ -46,11 +46,13 @@ class Petal(Application):
                 'request_direct_dtdp',
                 'request_limit_seek',
                 'request_homing',
+                'home',
+                'move',
+                'general_move',
                 'schedule_moves',
                 'send_move_tables',
                 'execute_moves',
                 'schedule_send_and_execute_moves',
-                'move',
                 'send_and_execute_moves',
                 'quick_move',
                 'quick_direct_dtdp',
@@ -395,10 +397,27 @@ class Petal(Application):
             p.axis[axisid].postmove_cleanup_cmds += 'self.axis[' + repr(axisid) + '].total_limit_seeks += 1\n'
             self.schedule.add_table(table)
 
-    def request_homing(self, pos):
+    def home(self, positioner = None):
+        """
+        wrapper functions for request_homing and schedule_send_and_execute_moves
+        """
+        try:
+            self.request_homing(positioner)
+            self.schedule_send_and_execute_moves()
+        except Exception as e:
+            rstring = 'home: Exception homing positioners: %s' % str(e)
+            self.error(rstring)
+            return 'FAILED: ' + rstring
+        return self.SUCCESS
+    
+    def request_homing(self, positioner = None):
         """Request homing sequence for positioners in list pos to find the primary hardstop
         and set values for the max position and min position.
         """
+        if positioner is None:
+            pos = self.get('posids')
+        else:
+            pos = positioner
         pos = pc.listify(pos,True)[0]
         posmodels = []
         for p in pos:
@@ -425,7 +444,8 @@ class Petal(Application):
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = +1.0\n'
                 hardstop_debounce_request = {pos_id:{'target':hardstop_debounce}}
                 self.request_direct_dtdp(hardstop_debounce_request, cmd_prefix='debounce')
-
+        return self.SUCCESS
+    
     def schedule_moves(self,anticollision=None):
         """Generate the schedule of moves and submoves that get positioners
         from start to target. Call this after having input all desired moves
@@ -436,7 +456,8 @@ class Petal(Application):
         if anticollision == None or self.anticollision_override:
             anticollision = self.anticollision_default
         self.schedule.schedule_moves(anticollision)
-
+        return self.SUCCESS
+    
     def send_move_tables(self):
         """Send move tables that have been scheduled out to the positioners.
         """
@@ -450,7 +471,8 @@ class Petal(Application):
         self.canids_where_tables_were_just_sent = canids
         self._wait_while_moving()
         self.comm.send_tables(hw_tables)
-
+        return self.SUCCESS
+    
     def execute_moves(self):
         """Command the positioners to do the move tables that were sent out to them.
         Then do clean-up and logging routines to keep track of the moves that were done.
@@ -461,7 +483,9 @@ class Petal(Application):
             self._postmove_cleanup()
             self._update_positions()
         except Exception as e:
-            self.error('execute_moves: Exception: %s' % str(e))
+            rstring = 'execute_moves: Exception: %s' % str(e)
+            self.error(rstring)
+            return 'FAILED: ' + rstring
 
     def general_move(self, command,targets, posids = None, use_standard_syntax = True):
         """
@@ -538,7 +562,8 @@ class Petal(Application):
                 self.error('move: Positioner %s is not on Petal %d' % (repr(posid), self.petal_id))
                 # decide whether to abort or to remove posid from request list. Right now do nothing
         try:
-            self.request_targets(these_requests)
+            print(repr(requests))
+            self.request_targets(requests)
         except Exception as e:
             rstring = 'move: Exception in request_targets call: %s' % str(e)
             self.error(rstring)
@@ -561,7 +586,9 @@ class Petal(Application):
         try:
             self.send_and_execute_moves()
         except Exception as e:
-            self.error('schedule_send_and_execute_moves: Exception: %s' % str(e))
+            rstring = 'schedule_send_and_execute_moves: Exception: %s' % str(e)
+            self.error(rstring)
+            return 'FAILED: ' + rstring
 
     def send_and_execute_moves(self):
         """Convenience wrapper to send and execute the pending moves (that have already
@@ -571,7 +598,9 @@ class Petal(Application):
         try:
             self.execute_moves()
         except Exception as e:
-            self.error('send_execute_moves: Exception: %s' % str(e))
+            rstring = 'send_execute_moves: Exception: %s' % str(e)
+            self.error(rstring)
+            return 'FAILED: ' + rstring
 
     def quick_move(self, pos_ids, command, target, log_note=''):
         """Convenience wrapper to request, schedule, send, and execute a single move command, all in
@@ -590,6 +619,7 @@ class Petal(Application):
             requests[pos_id] = {'command':command, 'target':target, 'log_note':log_note}
         self.request_targets(requests)
         self.schedule_send_and_execute_moves()
+        return self.SUCCESS
 
     def quick_direct_dtdp(self, pos_ids, dtdp, log_note=''):
         """Convenience wrapper to request, schedule, send, and execute a single move command for a
@@ -607,12 +637,15 @@ class Petal(Application):
             requests[pos_id] = {'target':dtdp, 'log_note':log_note}
         self.request_direct_dtdp(requests)
         self.schedule_send_and_execute_moves()
-
+        return self.SUCCESS
+    
     def clear_schedule(self):
         """Clear out any existing information in the move schedule.
         """
         self.schedule = posschedule.PosSchedule(self)
-
+        self.warn('clear_schedule: not yet implemented')
+        return 'FAILED: clear_schedule: not yet implemented'
+    
 # METHODS FOR FIDUCIAL CONTROL
 
     def fiducials_on(self):
@@ -858,23 +891,23 @@ class Petal(Application):
             pidx = self.posids.index(posid[i])
             this_val = self.posmodels[pidx].expected_current_position
             if key[i] == '':
-                vals.append(round(this_val,3))
+                vals.append(this_val)
             elif key[i] == 'QS':
-                vals.append([round(this_val['Q'],3),round(this_val['S']],3))
+                vals.append([this_val['Q'],this_val['S']])
             elif key[i] == 'flatXY':
-                vals.append([round(this_val['flatX'],3),round(this_val['flatY']],3))
+                vals.append([this_val['flatX'],this_val['flatY']])
             elif key[i] == 'posXY':
-                vals.append([round(this_val['posX'],3),round(this_val['posY']],3))
+                vals.append([this_val['posX'],this_val['posY']])
             elif key[i] == 'obsXY':
-                vals.append([round(this_val['obsX'],3),round(this_val['obsY']],3))
+                vals.append([this_val['obsX'],this_val['obsY']])
             elif key[i] == 'obsTP':
-                vals.append([round(this_val['obsT'],3),round(this_val['obsP']],3))
+                vals.append([this_val['obsT'],this_val['obsP']])
             elif key[i] == 'posTP':
-                vals.append([round(this_val['posT'],3),round(this_val['posP']],3))
+                vals.append([this_val['posT'],this_val['posP']])
             elif key[i] == 'motorTP':
-                vals.append([round(this_val['motT'],3),round(this_val['motP']],3))
+                vals.append([this_val['motT'],this_val['motP']])
             else:
-                vals.append(round(this_val[key[i]],3))
+                vals.append(this_val[key[i]])
         if was_not_list:
             vals = pc.delistify(vals)
         return vals
