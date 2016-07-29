@@ -814,7 +814,7 @@ class Petal(Application):
                     return self.status_update_rate
                 elif k in self.config:
                     self.config[k] = v
-            return self.SUCCESSa
+            return self.SUCCESS
 
         # Set positioner value
         if key == None or value == None:
