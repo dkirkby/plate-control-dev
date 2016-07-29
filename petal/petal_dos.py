@@ -77,7 +77,7 @@ class Petal(Application):
                 'gfa_fan1_pwm' : 5,
                 'gfa_fan2' : 'on',
                 'gfa_fan2_pwm' : 5,
-                'status_update_rate' : 10,
+                'status_update_rate' : 60,
                 }
     
     def init(self):
@@ -951,9 +951,10 @@ class Petal(Application):
         while not self.shutdown_event.is_set():
             # update telemetry
             self._update_telemetry()
-            self._update_positions()
             self._update_petalbox()
-            self.sleep(self.status_update_rate)
+            for i in range(6):
+                self._update_positions()
+                self.sleep(self.status_update_rate/6.0)
 
         print('Petal appplication %s exiting' % self.role)
         return
