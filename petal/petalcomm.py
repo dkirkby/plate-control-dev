@@ -76,7 +76,12 @@ class PetalComm(object):
             self.device['proxy'] = Pyro4.Proxy(self.device['pyro_uri'])
             print('Connected to Petal Controller %d' % self.petal_id)
 
-
+    def is_connected(self):
+        """
+        Returns the status of the found_controller flag.
+        """
+        return self.found_controller.is_set()
+    
     # Internal callback and utility functions
     def _repeat_seeker(self):
         while self.repeat.is_set():
@@ -218,7 +223,7 @@ class PetalComm(object):
         try:
             return self._call_device('set_pos_constants',can_ids, settings)
         except Exception as e:
-            return 'FAILED: Can not set fiducials. Exception: %s' % str(e)
+            return 'FAILED: Can not set positioner constants. Exception: %s' % str(e)
 
     def set_fiducials(self, can_ids, percent_duty, duty_period):
         """
@@ -235,7 +240,7 @@ class PetalComm(object):
         if not isinstance(can_ids, list) or not isinstance(percent_duty,list) or not isinstance(duty_period, list):
             return 'FAILED: parameters must be passed as lists'
         try:
-            return self._call_device('set_fiducials',can_ids, percent_duty, duty_period)
+            return self._call_device('set_fiducials',can_ids, percent_duty)
         except Exception as e:
             return 'FAILED: Can not set fiducials. Exception: %s' % str(e)
 

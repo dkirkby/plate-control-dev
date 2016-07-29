@@ -31,7 +31,7 @@ class Petal(Application):
         petal_id    ... integer id number of the petal
         pos_ids     ... list of positioner unique id strings
         fid_ids     ... list of fiducials ids -- as of April 2016, these are just CAN ids -- this will be changed to unique id strings at a later date
-
+        fid_can_ids ... list of can ids of the fiducials
         Eventually these can come from some (configuration/constants database). For now we assume that are provide to the constructor.
         
     As of April 2016, the implementation for handling fiducials is kept as simple as possible, for the
@@ -70,7 +70,11 @@ class Petal(Application):
                 'anticollision_override' : True,
                 'fid_duty_percent' : 50,
                 'fid_duty_period' : 55,
-                'logdir' : None
+                'logdir' : None,
+                'gfa_fan1' : 'on',
+                'gfa_fan1_pwm' : 10,
+                'gfa_fan2' : 'on',
+                'gfa_fan2_pwm' : 10,
                 }
     
     def init(self):
@@ -84,11 +88,15 @@ class Petal(Application):
             self.petal_id = self.config['petal_id']
             self.posids = self.config['pos_ids']
             self.fidids = self.config['fid_ids']
+            self.fid_can_ids = self.config['fid_can_ids']
         except:
-            return 'FAILED: missing parameter (petal_id, pos_ids, fid_ids)'
+            rstring =  'init: missing parameter (petal_id, pos_ids, fid_ids, fid_can_ids'
+            self.error(rstring)
+            return 'FAILED: ' + rstring
         assert isinstance(self.petal_id,int), 'Invalid type for petal id'
         assert isinstance(self.posids, (list, tuple)), 'pos_ids must be a list or tuple'
         assert isinstance(self.fidids, (list, tuple)), 'fid_ids must be a list or tuple'
+        assert isinstance(self.fid_can_ids, (list, tuple)), 'fid_can_ids must be a list or tuple'
 
         self.loglevel('INFO')
         self.info('Initializing')
@@ -112,6 +120,15 @@ class Petal(Application):
         self.status_sv = self.shared_variable('STATUS')  
         self.status_sv.publish()
 
+        # petalbox status
+        self.petalbox_status = {}
+        self.petalbox_sv = self.shared_variable('PETALBOX')
+        self.petalbox_sv.publish()
+    
+        # actuator positions
+        self.positions_sv = self.shared_variable('POSITIONS')
+        self.positions_sv.publish()
+        
         # Telemetry information
         # (temperatures, fan pwm duty cycles, GPIO switches)
         self.telemetry_sv = self.shared_variable('TELEMETRY')
@@ -125,12 +142,25 @@ class Petal(Application):
         
         self.simulator_on = True if 'T' in str(self.config['simulator_on']).upper() else False
         self.verbose = True if 'T' in str(self.config['verbose']).upper() else False
+        
         try:
             self.comm = petalcomm.PetalComm(self.petal_id)
         except Exception as e:
             rstring = 'init: Exception creating PetalComm object: %s' % str(e)
             self.error(rstring)
             return 'FAILED: ' + rstring
+
+        self.gfa_fan1_on = True if str(self.config['gfa_fan1']).upper() in ['ON', 'TRUE', '1'] else False
+        self.gfa_fan2_on = True if str(self.config['gfa_fan2']).upper() in ['ON', 'TRUE', '1'] else False
+        self.gfa_fan1_pwm = float(self.config['gfa_fan1_pwm'])
+        self.gfa_fan2_pwm = float(self.config['gfa_fan2_pwm'])
+        if not self.comm.found_controller.is_set():
+            self.info('init: initializing petalbox hardware.')
+            self.fiducials_off()
+            self._set_gfafans('GFA_FAN1', state = self.gfa_fan1_on, pwm = self.gfa_fan1_pwm) 
+            self._set_gfafans('GFA_FAN2', state = self.gfa_fan2_on, pwm = self.gfa_fan2_pwm)
+        else:
+            self.warn('init: cannot initalize petalbox hardware at this time.')
         self.posmodels = []
         for pos_id in self.posids:
             state = posstate.PosState(pos_id,logging=True)
@@ -144,7 +174,6 @@ class Petal(Application):
         self.anticollision_override = True if 'T' in str(self.config['anticollision_override']).upper() else False
         
         self.canids_where_tables_were_just_sent = []
-        self.fid_can_ids = self.fidids # later, implement auto-lookup of pos_ids and fid_ids from database etc
         self.fid_duty_percent = int(self.config['fid_duty_percent'])
         self.fid_duty_period  = int(self.config['fid_duty_period'])  # milliseconds
 
@@ -153,6 +182,12 @@ class Petal(Application):
              self._setup_discovery(discovery.discoverable)
         self.info('Initialized')
         self.status_sv.write('INITIALIZED')
+        # call configure() when in device mode
+        if self.device_mode == True:
+            self.info('calling configure')
+            retcode = self.configure()
+            if 'FAILED' in retcode:
+                raise RuntimeError('init: ' + retcode)
             
     def _setup_discovery(self, discoverable):
         # Setup application for discovery and discover other DOS applications                                                                                               
@@ -170,7 +205,16 @@ class Petal(Application):
         self._update_telemetry()
         
         # see if we have anything else to do in configure
-
+        if self.comm.is_connected():
+            self.info('init: initializing petalbox hardware.')
+            self.fiducials_off()
+            self._set_gfafans('GFA_FAN1', state = self.gfa_fan1_on, pwm = self.gfa_fan1_pwm) 
+            self._set_gfafans('GFA_FAN2', state = self.gfa_fan2_on, pwm = self.gfa_fan2_pwm)
+        else:
+            rstring = 'configure: cannot continue until petalcontroller is found.'
+            self.error(rstring)
+            return 'FAILED: ' + rstring
+    
         self.info('Configured')
         self.status_sv.write('READY')
         return self.SUCCESS
@@ -412,14 +456,33 @@ class Petal(Application):
         self._wait_while_moving()
         try:
             self._postmove_cleanup()
+            self._update_positions()
         except Exception as e:
             self.error('execute_moves: Exception: %s' % str(e))
 
-    def move(self, *args, **kwargs):
+    def move(self, requests, *args, **kwargs):
         """
         Wrapper function to move positioners from receiving targets to actually moving.
+        See request_targets method for description of allowed formats for the request object.
         """
-        self.info('move: not yet...')
+        # add some code to validate that the requested posids are on this petal
+        all_pos_on_ptl = pc.listify(self.get(key='POS_ID'),keep_flat=True)[0]
+        for posid in requests.keys():
+            if posid not in all_pos_on_ptl:
+                self.error('move: Positioner %s is not on Petal %d' % (repr(posid), self.petal_id))
+                # decide whether to abort or to remove posid from request list. Right now do nothing
+        try:
+            self.request_targets(these_requests)
+        except Exception as e:
+            rstring = 'move: Exception in request_targets call: %s' % str(e)
+            self.error(rstring)
+            return 'FAILED: ' + rstring
+        try:
+            self.schedule_send_and_execute_moves() # in future, may do this in a different thread for each petal
+        except Exception as e:
+            rstring = 'move: Exception in schedule_send_and_execute_move call: %s' % str(e)
+            self.error(rstring)
+            return 'FAILED: ' + rstring
         return self.SUCCESS
     
     def schedule_send_and_execute_moves(self, *args, **kwargs):
@@ -492,6 +555,12 @@ class Petal(Application):
         duty_percents = [self.fid_duty_percent]*len(self.fid_can_ids)
         duty_periods = [self.fid_duty_period]*len(self.fid_can_ids)
         self.comm.set_fiducials(self.fid_can_ids, duty_percents, duty_periods)
+        self.petalbox_status['fiducials_state'] = True
+        self.petalbox_status['fiducials_duty'] = self.fid_duty_percent
+        self.petalbox_status['last_updated'] = datetime.datetime.utcnow().isoformat()
+        self.petalbox_sv.write(self.petalbox_status)
+        self.info('fiducials are turned on')
+        return self.SUCCESS
 
     def fiducials_off(self):
         """Turn all the fiducials off.
@@ -499,7 +568,13 @@ class Petal(Application):
         duty_percents = [0]*len(self.fid_can_ids)
         duty_periods = [self.fid_duty_period]*len(self.fid_can_ids)
         self.comm.set_fiducials(self.fid_can_ids, duty_percents, duty_periods)
-
+        self.petalbox_status['fiducials_state'] = False
+        self.petalbox_status['fiducials_duty'] = self.fid_duty_percent
+        self.petalbox_status['last_updated'] = datetime.datetime.utcnow().isoformat()
+        self.petalbox_sv.write(self.petalbox_status)
+        self.info('fiducials are turned off')
+        return self.SUCCESS
+    
 # GETTERS, SETTERS, STATUS METHODS
 
     def get(self,*args, **kwargs):
@@ -511,6 +586,9 @@ class Petal(Application):
              petal_id
              telemetry
              logdir
+             is_connected,
+             positions
+             petalbox
              <any key in self.config>
              
         Retrieve the state value identified by string key, for positioner
@@ -545,7 +623,9 @@ class Petal(Application):
         if len(a) == 1:
             param = str(a[0]).lower()
 
-            if param.startswith('petal'):
+            if param == 'petalbox':
+                return self.petalbox_status
+            elif param.startswith('petal'):
                 return self.petal_id
             elif param == 'status':
                 return self.status_sv._value
@@ -557,11 +637,21 @@ class Petal(Application):
                 return self.posids
             elif param == 'logdir':
                 return self.logdir
+            elif param == 'positions':
+                self._update_positions()
+                return self.positions_sv._value
+            elif param == 'is_connected':
+                if self.comm == None:
+                    return 'FAILED: No petalcomm object available'
+                else:
+                    return self.communicate('is_connected')
             elif param == 'telemetry':
                 self._update_telemetry()
                 return self.telemetry_sv._value
             elif param in ['fid_ids', 'fidids']:
                 return self.fidids
+            elif param in ['fid_can_ids', 'fidcanids']:
+                return self.fid_can_ids
             else:
                 return 'FAILED: invalid argument for get command'
         if get_posid or 'posid' in kw or 'key' in kw:
@@ -595,6 +685,9 @@ class Petal(Application):
     def set(self,posid=None,key=None,value=None,write_to_disk=None, **kwargs):
         """
         Set positioner state values or configuration variables
+        Configuration:
+            fid_duty_percent, gfa_fan1, gfa_fan2, gfa_fan1_pwm, gfa_fan2_pwm
+            fiducials
         Set the state value identified by string key, for positioner unit
         identified by id posid.
 
@@ -627,13 +720,33 @@ class Petal(Application):
         # Set a configuration variable?
         if len(kw) != 0:
             for k, v in kw.items():
-                if k in self.config:
+                if k == 'fid_duty_percent':
+                    self.fid_duty_percent = v
+                elif 'fiducials' in kw:
+                    if k == 'fiducials':
+                        if v  in ('ON', 'on', True, 1):
+                            return self.fiducials_on()
+                        elif v in ('OFF', 'off', False, 0):
+                            return self.fiducials_off()
+                        else:
+                            return 'FAILED: set: invalid option for set fiducials command.'
+                elif k == 'gfa_fan1':
+                    if 'gfa_fan1_pwm' in kw:
+                        return self._set_gfafans('GFA_FAN1', state = kw['gfa_fan1'], pwm = kw['gfa_fan1_pwm'])
+                    else:
+                        return self._set_gfafans('GFA_FAN1', state = kw['gfa_fan1'])
+                elif k == 'gfa_fan2':
+                    if 'gfa_fan2_pwm' in kw:
+                        return self._set_gfafans('GFA_FAN2', state = kw['gfa_fan2'], pwm = kw['gfa_fan2_pwm'])
+                    else:
+                        return self._set_gfafans('GFA_FAN2', state = kw['gfa_fan2'])
+                elif k in self.config:
                     self.config[k] = v
             return self.SUCCESS
 
         # Set positioner value
         if key == None or value == None:
-            rstring = 'set: either no key or no value was specified to setval'
+            rstring = 'set: either no key (or value) was specified or and invalid keyword was used.'
             self.error(rstring)
             return 'FAILED: ' + rstring
         (posid, temp) = self._posid_listify_and_fill(posid)
@@ -678,6 +791,8 @@ class Petal(Application):
                 vals.append([this_val['Q'],this_val['S']])
             elif key[i] == 'flatXY':
                 vals.append([this_val['flatX'],this_val['flatY']])
+            elif key[i] == 'posXY':
+                vals.append([this_val['posX'],this_val['posY']])
             elif key[i] == 'obsXY':
                 vals.append([this_val['obsX'],this_val['obsY']])
             elif key[i] == 'obsTP':
@@ -731,12 +846,32 @@ class Petal(Application):
         while not self.shutdown_event.is_set():
             # update telemetry
             self._update_telemetry()
-            self.sleep(1)
+            self._update_positions()
+            self.sleep(2)
 
         print('Petal appplication %s exiting' % self.role)
         return
 
 # INTERNAL METHODS
+    def _set_gfafans(self, fan, state = 'on', pwm = None):
+        """
+        turn GFA fans on/off and set pwm
+        """
+        if fan not in ['GFA_FAN1', 'GFA_FAN2']:
+            return 'FAILED: invalid GFA fan'
+        if state in ['on', 'ON', True, 1]:
+            self.comm.switch_en_ptl(fan, 1)
+            self.petalbox_status['%s_state' %fan] = True
+        elif state in ['off', 'OFF', False, 0]:
+            self.comm.switch_en_ptl(fan, 0)
+            self.petalbox_status['%s_state' %fan] = False
+        if pwm != None:
+            self.comm.fan_pwm_ptl(fan,pwm)
+            self.petalbox_status['%s_pwm' %fan] = pwm            
+        self.petalbox_status['last_updated'] = datetime.datetime.utcnow().isoformat()
+        self.petalbox_sv.write(self.petalbox_status)
+        return self.SUCCESS
+        
     def _update_telemetry(self):
         """
         Retrieve telemetry information from the petalcontroller
@@ -746,18 +881,31 @@ class Petal(Application):
             temps = self.communicate('read_temp_ptl')
             if isinstance(temps, dict):
                 current.update(temps)
-            pwms = self.communicate('read_fan_pwm')
-            if isinstance(pwms, dict):
-                current.update(pwms)
-            switches = self.communicate('read_switch_ptl')
-            if isinstance(switches, dict):
-                current.update(switches)
+#            pwms = self.communicate('read_fan_pwm')
+#            if isinstance(pwms, dict):
+#                current.update(pwms)
+#            switches = self.communicate('read_switch_ptl')
+#            if isinstance(switches, dict):
+#                current.update(switches)
+            # fiducial status
+            if 'fiducials_state' in self.petalbox_status:
+                current['fiducials'] = self.petalbox_status['fiducials_state']
             current['last_updated'] = datetime.datetime.utcnow().isoformat().replace('T',' ')
             self.telemetry_sv.write(current)
         except Exception as e:
-            print(str(e))
-            pass
-        
+            self.error('_update_telemetry: Exception reading telemetry: %s' % str(e))
+
+    def _update_positions(self):
+        """
+        Retrieve expected position information
+        """
+        try:
+            current = self.expected_current_position(self.posids, key='obsXY')
+            p = zip(self.posids, current)
+            self.positions_sv.write(list(p))
+        except Exception as e:
+            self.error('_update_positions: Exception reading expected positions: %s' % str(e))
+                    
     def _hardware_ready_move_tables(self):
         """Strips out information that isn't necessary to send to petalbox, and
         formats for sending. Any cases of multiple tables for one positioner are
@@ -889,6 +1037,7 @@ if __name__ == '__main__':
     if str(pid) in config:
         pos_ids = config[str(pid)]['pos_ids']
         fid_ids = config[str(pid)]['fid_ids']
+        fid_can_ids = config[str(pid)]['fid_can_ids']
     else:
         print('Configuration file does not include pos and fid ids for petal %s' % str(pid))
         sys.exit()
@@ -896,11 +1045,11 @@ if __name__ == '__main__':
     # Create application instance
     try:
         if args.logdir:
-            myPetal = Petal(petal_id = pid, pos_ids = pos_ids, fid_ids = fid_ids, logdir = args.logdir)
+            myPetal = Petal(petal_id = pid, pos_ids = pos_ids, fid_ids = fid_ids, fid_can_ids = fid_can_ids, logdir = args.logdir, service='DOStest')
         else:
-            myPetal = Petal(petal_id = pid, pos_ids = pos_ids, fid_ids = fid_ids)
+            myPetal = Petal(petal_id = pid, pos_ids = pos_ids, fid_ids = fid_ids, fid_can_ids = fid_can_ids, service='DOStest')
         # Enter run loop
-            myPetal.run()
+        myPetal.run()
     except Exception as e:
         print('PETAL%d: Uncaught exception in run loop: %s' % (pid, str(e)))
         sys.exit()
