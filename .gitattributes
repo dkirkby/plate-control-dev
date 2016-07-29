@@ -4,7 +4,6 @@ petal/demo_dos.py -text
 petal/focal_surface_lookup.csv -text
 petal/movetablescr.py -text
 petal/petal.py -text
-petal/petal_config.json -text
 petal/petal_dos.py -text
 petal/petalcomm.py -text
 petal/petsockcomm.py -text
@@ -39,6 +38,7 @@ petal/posplot.py -text
 petal/posschedule.py -text
 petal/posstate.py -text
 petal/postransforms.py -text
+petal/protodesi_config.json -text
 petal/test_poscollider.py -text
 petalbox/caninit.py -text
 petalbox/caninit.sh -text
