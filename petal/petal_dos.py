@@ -1026,6 +1026,8 @@ class Petal(Application):
                     current[str(k)+'_TACH'] = tach[k]
             fid_status = self.communicate('get_fid_status')
             if isinstance(fid_status, dict):
+                for k in fid_status:
+                    current['FID_'+str(k)] = fid_status[k]
                 current.update(fid_status)
             current['last_updated'] = datetime.datetime.utcnow().isoformat().replace('T',' ')
             self.telemetry_sv.write(current)
