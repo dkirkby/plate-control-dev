@@ -858,23 +858,23 @@ class Petal(Application):
             pidx = self.posids.index(posid[i])
             this_val = self.posmodels[pidx].expected_current_position
             if key[i] == '':
-                vals.append(this_val)
+                vals.append(round(this_val,3))
             elif key[i] == 'QS':
-                vals.append([this_val['Q'],this_val['S']])
+                vals.append([round(this_val['Q'],3),round(this_val['S']],3))
             elif key[i] == 'flatXY':
-                vals.append([this_val['flatX'],this_val['flatY']])
+                vals.append([round(this_val['flatX'],3),round(this_val['flatY']],3))
             elif key[i] == 'posXY':
-                vals.append([this_val['posX'],this_val['posY']])
+                vals.append([round(this_val['posX'],3),round(this_val['posY']],3))
             elif key[i] == 'obsXY':
-                vals.append([this_val['obsX'],this_val['obsY']])
+                vals.append([round(this_val['obsX'],3),round(this_val['obsY']],3))
             elif key[i] == 'obsTP':
-                vals.append([this_val['obsT'],this_val['obsP']])
+                vals.append([round(this_val['obsT'],3),round(this_val['obsP']],3))
             elif key[i] == 'posTP':
-                vals.append([this_val['posT'],this_val['posP']])
+                vals.append([round(this_val['posT'],3),round(this_val['posP']],3))
             elif key[i] == 'motorTP':
-                vals.append([this_val['motT'],this_val['motP']])
+                vals.append([round(this_val['motT'],3),round(this_val['motP']],3))
             else:
-                vals.append(this_val[key[i]])
+                vals.append(round(this_val[key[i]],3))
         if was_not_list:
             vals = pc.delistify(vals)
         return vals
