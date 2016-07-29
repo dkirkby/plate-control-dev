@@ -72,9 +72,10 @@ class Petal(Application):
                 'fid_duty_period' : 55,
                 'logdir' : None,
                 'gfa_fan1' : 'on',
-                'gfa_fan1_pwm' : 10,
+                'gfa_fan1_pwm' : 5,
                 'gfa_fan2' : 'on',
-                'gfa_fan2_pwm' : 10,
+                'gfa_fan2_pwm' : 5,
+                'status_update_rate' : 10,
                 }
     
     def init(self):
@@ -101,6 +102,7 @@ class Petal(Application):
         self.loglevel('INFO')
         self.info('Initializing')
 
+        self.status_update_rate = float(self.config['status_update_rate'])
         self.logdir = self.config['logdir']
         if self.logdir == None:
             if 'POSITIONER_LOGS_PATH' in os.environ:
@@ -154,7 +156,10 @@ class Petal(Application):
         self.gfa_fan2_on = True if str(self.config['gfa_fan2']).upper() in ['ON', 'TRUE', '1'] else False
         self.gfa_fan1_pwm = float(self.config['gfa_fan1_pwm'])
         self.gfa_fan2_pwm = float(self.config['gfa_fan2_pwm'])
-        if not self.comm.found_controller.is_set():
+        self.fid_duty_percent = int(self.config['fid_duty_percent'])
+        self.fid_duty_period  = int(self.config['fid_duty_period'])  # milliseconds
+        
+        if self.comm.is_connected():
             self.info('init: initializing petalbox hardware.')
             self.fiducials_off()
             self._set_gfafans('GFA_FAN1', state = self.gfa_fan1_on, pwm = self.gfa_fan1_pwm) 
@@ -174,8 +179,6 @@ class Petal(Application):
         self.anticollision_override = True if 'T' in str(self.config['anticollision_override']).upper() else False
         
         self.canids_where_tables_were_just_sent = []
-        self.fid_duty_percent = int(self.config['fid_duty_percent'])
-        self.fid_duty_period  = int(self.config['fid_duty_period'])  # milliseconds
 
         # setup discovery, update status and we are done
         if self.connected:
@@ -460,6 +463,69 @@ class Petal(Application):
         except Exception as e:
             self.error('execute_moves: Exception: %s' % str(e))
 
+    def general_move(self, command,targets, posids = None, use_standard_syntax = True):
+        """
+        A common wrapper function that illustrates the syntax for generating move
+        requests and then executing them on the positioners.
+        If posids == None, the list of petal postioners is used (self.get('posids'))
+        There are several distinct syntaxes, all shown here:
+        if should_direct_dtdp:
+              general_move('direct_dTdP',[[270,0], [0,-60], [-180,30]])
+        if should_move_xy:
+              general_move('posXY',[[-4,-4], [-4,0], [-4,4], [0,-4], [0,0], [0,4], [4,-4], [4,0], [4,4]])
+        if should_move_dxdy:
+              general_move('dXdY',[[2.5,0], [2.5,0], [-10,0], [5,-5], [0,5]])
+        if should_move_tp:
+              general_move('posTP',[[-90,90], [0,90], [90,90], [0,180]])
+        if should_move_dtdp:
+              general_move('dTdP',[[180,0], [-90,-90],[180,60],[-90,30]])
+              # this is different from 'direct' dTdP. here, the dtdp is treated like any other general move, and anticollision calculations are allowed
+        """
+        targets = pc.listify2d(targets)
+        pos_ids = posids if posids != None else self.get('posids')
+        self.info('general_move: using positioners %s' % repr(posids))
+        for target in targets:
+            self.info('general_move: ' + command + ' (' + str(target[0]) + ',' + str(target[1]) + ')')
+            log_note = 'general_move ' + command + ' point ' + str(targets.index(target))
+            if use_standard_syntax:
+                # The standard syntax has four basic steps: request targets, schedule them, send them to positioners,
+                # and execute the moves. See comments in petal.py for more detail. The requests are formatted as
+                # dicts of dicts, where the primary keys are positioner ids, and then each subdictionary describes
+                # the move you are requesting for that positioner.
+                requests = {}
+                if command == 'direct_dTdP':
+                    # The 'direct_dTdP' is for 'expert' use.
+                    # It instructs the theta and phis axes to simply rotate by some argued angular distances, with
+                    # no regard for anticollision or travel range limits.
+
+                    for pos_id in pos_ids:                
+                        requests[pos_id] = {'target':target, 'log_note':log_note}
+                    self.request_direct_dtdp(requests)
+                else:
+
+                    # Here is the request syntax for general usage.
+                    # Any coordinate system can be requested, range limits are respected, and anticollision can be calculated.
+
+                    for pos_id in pos_ids: 
+                        requests[pos_id] = {'command':command, 'target':target, 'log_note':log_note}
+                    self.request_targets(requests) # this is the general use function, where 
+
+                self.schedule_moves()    # all the requests get scheduled, with anticollision calcs, generating a unique table of scheduled shaft rotations on theta and phi axes for every positioner 
+                self.send_move_tables()  # the tables of scheduled shaft rotations are sent out to all the positioners over the CAN bus
+                self.execute_moves()     # the synchronized start signal is sent, so all positioners start executing their scheduled rotations in sync
+                # ptl.schedule_send_and_execute_moves() # alternative wrapper which just does the three things above in one line
+
+            else:
+                # This 'quick' syntax is mostly intended for manual operations, or simple operations on test stations.
+                # You can send the command to multiple pos_ids simultaneously, but all the positioners receive the same command and target coordinates.
+                # (So it generally would make no sense to use these in any global coordinate system, where all the positioners are in different places.)
+                if command == 'direct_dTdP':
+                    self.quick_direct_dtdp(pos_ids, target, log_note) # expert, no limits or anticollision
+                else:
+                    self.quick_move(pos_ids, command, target, log_note) # general, with limits and anticollision
+
+        return self.SUCCESS
+                
     def move(self, requests, *args, **kwargs):
         """
         Wrapper function to move positioners from receiving targets to actually moving.
@@ -559,7 +625,7 @@ class Petal(Application):
         self.petalbox_status['fiducials_duty'] = self.fid_duty_percent
         self.petalbox_status['last_updated'] = datetime.datetime.utcnow().isoformat()
         self.petalbox_sv.write(self.petalbox_status)
-        self.info('fiducials are turned on')
+        self.info('fiducials_on: fiducials are turned on')
         return self.SUCCESS
 
     def fiducials_off(self):
@@ -572,7 +638,7 @@ class Petal(Application):
         self.petalbox_status['fiducials_duty'] = self.fid_duty_percent
         self.petalbox_status['last_updated'] = datetime.datetime.utcnow().isoformat()
         self.petalbox_sv.write(self.petalbox_status)
-        self.info('fiducials are turned off')
+        self.info('fiducials_off: fiducials are turned off')
         return self.SUCCESS
     
 # GETTERS, SETTERS, STATUS METHODS
@@ -589,6 +655,7 @@ class Petal(Application):
              is_connected,
              positions
              petalbox
+             status_update_rate
              <any key in self.config>
              
         Retrieve the state value identified by string key, for positioner
@@ -624,6 +691,7 @@ class Petal(Application):
             param = str(a[0]).lower()
 
             if param == 'petalbox':
+                self._update_petalbox()
                 return self.petalbox_status
             elif param.startswith('petal'):
                 return self.petal_id
@@ -637,6 +705,8 @@ class Petal(Application):
                 return self.posids
             elif param == 'logdir':
                 return self.logdir
+            elif param == 'status_update_rate':
+                return self.status_update_rate
             elif param == 'positions':
                 self._update_positions()
                 return self.positions_sv._value
@@ -687,7 +757,7 @@ class Petal(Application):
         Set positioner state values or configuration variables
         Configuration:
             fid_duty_percent, gfa_fan1, gfa_fan2, gfa_fan1_pwm, gfa_fan2_pwm
-            fiducials
+            fiducials, status_update_rate
         Set the state value identified by string key, for positioner unit
         identified by id posid.
 
@@ -740,9 +810,11 @@ class Petal(Application):
                         return self._set_gfafans('GFA_FAN2', state = kw['gfa_fan2'], pwm = kw['gfa_fan2_pwm'])
                     else:
                         return self._set_gfafans('GFA_FAN2', state = kw['gfa_fan2'])
+                elif k == 'status_update_rate':
+                    return self.status_update_rate
                 elif k in self.config:
                     self.config[k] = v
-            return self.SUCCESS
+            return self.SUCCESSa
 
         # Set positioner value
         if key == None or value == None:
@@ -847,7 +919,8 @@ class Petal(Application):
             # update telemetry
             self._update_telemetry()
             self._update_positions()
-            self.sleep(2)
+            self._update_petalbox()
+            self.sleep(self.status_update_rate)
 
         print('Petal appplication %s exiting' % self.role)
         return
@@ -861,35 +934,66 @@ class Petal(Application):
             return 'FAILED: invalid GFA fan'
         if state in ['on', 'ON', True, 1]:
             self.comm.switch_en_ptl(fan, 1)
-            self.petalbox_status['%s_state' %fan] = True
+            self.petalbox_status[fan] = 'on'
+            self.info('_set_gfafans: %s is on' % fan)
         elif state in ['off', 'OFF', False, 0]:
             self.comm.switch_en_ptl(fan, 0)
-            self.petalbox_status['%s_state' %fan] = False
+            self.petalbox_status[fan] = 'off'
+            self.info('_set_gfafans: %s is off' % fan)
         if pwm != None:
             self.comm.fan_pwm_ptl(fan,pwm)
-            self.petalbox_status['%s_pwm' %fan] = pwm            
+            self.petalbox_status['%s_PWM' %fan] = float(pwm)            
+            self.info('_set_gfafans: %s pwm is now %s' % (fan,str(pwm)))
         self.petalbox_status['last_updated'] = datetime.datetime.utcnow().isoformat()
         self.petalbox_sv.write(self.petalbox_status)
         return self.SUCCESS
-        
+    
+    def _update_petalbox(self):
+        """
+        Update petalcontroller status
+        """
+        try:
+            current = {}
+            hrpg600 = self.communicate('read_HRPG600')
+            if isinstance(hrpg600, dict):
+                current.update(hrpg600)
+            switches = self.communicate('read_switch_ptl')
+            if isinstance(switches, dict):
+                for k in switches:
+                    if switches[k] == 1: switches[k] = True
+                    if switches[k] == 0: switches[k] = False
+                current.update(switches)
+            self.petalbox_status.update(current)
+            self.petalbox_status['last_updated'] = datetime.datetime.utcnow().isoformat()
+            self.petalbox_sv.write(self.petalbox_status)
+        except Exception as e:
+            self.error('_update_petalbox: Exception reading device status: %s' % str(e))
+            
     def _update_telemetry(self):
         """
         Retrieve telemetry information from the petalcontroller
         """
         try:
-            current = self.telemetry_sv._value
+            current = {}
             temps = self.communicate('read_temp_ptl')
             if isinstance(temps, dict):
-                current.update(temps)
-#            pwms = self.communicate('read_fan_pwm')
-#            if isinstance(pwms, dict):
-#                current.update(pwms)
-#            switches = self.communicate('read_switch_ptl')
-#            if isinstance(switches, dict):
-#                current.update(switches)
-            # fiducial status
-            if 'fiducials_state' in self.petalbox_status:
-                current['fiducials'] = self.petalbox_status['fiducials_state']
+                for k in temps:
+                    if k.startswith('28-00'):
+                        key = 'TEMP_' + k[-2:].upper()
+                        current[key] = temps[k]
+                    else:
+                        current[k] = temps[k]
+            pwms = self.communicate('read_fan_pwm')
+            if isinstance(pwms, dict):
+                for k in pwms:
+                    current[str(k)+'_PWM'] = pwms[k]
+            tach = self.communicate('read_fan_tach')
+            if isinstance(tach, dict):
+                for k in pwms:
+                    current[str(k)+'_TACH'] = tach[k]
+            fid_status = self.communicate('get_fid_status')
+            if isinstance(fid_status, dict):
+                current.update(fid_status)
             current['last_updated'] = datetime.datetime.utcnow().isoformat().replace('T',' ')
             self.telemetry_sv.write(current)
         except Exception as e:
