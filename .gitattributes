@@ -58,7 +58,6 @@ petalbox/pfutility.sh -text
 petalbox/posfidcan.py -text
 petalbox/posfidcansim.py -text
 petalbox/ptltel.py -text
-petalbox/ptltel_dos.py -text
 petalbox/setup.sh -text
 petalbox/startpc.py -text
 petalbox/startpc.sh -text
