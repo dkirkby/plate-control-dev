@@ -1146,6 +1146,19 @@ class Petal(Application):
 
 ###################################################
 if __name__ == '__main__':
+    """
+    Many options to configure can be set on the command line. Some are processed here and the rest is passed on
+    to the application framework.
+    A configuration file (like protodesi_config.json in this directory) is required to provide the list of positioners
+    and fiducials.
+    logdir needs tobe set to tell the plate_control software where to write the log files.
+    The convention for petal role names is PETALx where x is the petal number (from 0 through 9). The code extracts the
+    petal number from the role name.
+    For now we use the default service (DOStest) to advertise in device mode.
+    device mode can be set on the command line with --device_mode True
+    A typical command string to start a petal in device mode looks like this
+    python3 petal_dos.py --role PETAL0 --device_mode True --logdir <your log directory --file protodesi_config.json
+    """
     import argparse
     import json
     import sys, os
