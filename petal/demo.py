@@ -6,10 +6,11 @@ import posconstants as pc
 """
 
 # initialization
-pos_ids = ['UM00014','UM00011']
-#pos_ids = ['UM00011','UM00012','UM00013','UM00014','UM00015']
+#pos_ids = ['UM00014','UM00011']
+# Use same positioners as for demo_dos script (to help with debugging)
+pos_ids = ['UM00013','UM00014','UM00017','UM00022']
 fid_ids = []
-petal_id = 1
+petal_id = 0
 ptl = petal.Petal(petal_id, pos_ids, fid_ids)
 ptl.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
 
