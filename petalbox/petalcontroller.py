@@ -1134,6 +1134,12 @@ class PositionerMoveControl(object):
 ######################################
 
 if (__name__ == '__main__'):
+    """
+    command line arguments are forwarded to the application framework
+    Arguments for the PetalController include controller_type  (set to SIMULATOR
+    to run without canbus/BBB hardware) and role. The convention is to give the
+    PetalControllers the role name PCx where x is the petal number (from 0 - 9)
+    """
     p = PetalController(device_mode=True, service='PetalControl')
     p.run()
     sys.exit()
