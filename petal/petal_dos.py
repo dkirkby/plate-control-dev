@@ -68,7 +68,7 @@ class Petal(Application):
     defaults = {'verbose' : False,
                 'simulator_on' : False,
                 'sync_mode' : 'soft',
-                'anticollision_default' : True,
+                'anticollision_default' : False,
                 'anticollision_override' : True,
                 'fid_duty_percent' : 50,
                 'fid_duty_period' : 55,
@@ -446,7 +446,7 @@ class Petal(Application):
                 self.request_direct_dtdp(hardstop_debounce_request, cmd_prefix='debounce')
         return self.SUCCESS
     
-    def schedule_moves(self,anticollision=None):
+    def schedule_moves(self, anticollision=None):
         """Generate the schedule of moves and submoves that get positioners
         from start to target. Call this after having input all desired moves
         using the move request methods. Note the available boolean to turn the
@@ -562,7 +562,6 @@ class Petal(Application):
                 self.error('move: Positioner %s is not on Petal %d' % (repr(posid), self.petal_id))
                 # decide whether to abort or to remove posid from request list. Right now do nothing
         try:
-            print(repr(requests))
             self.request_targets(requests)
         except Exception as e:
             rstring = 'move: Exception in request_targets call: %s' % str(e)
@@ -643,8 +642,6 @@ class Petal(Application):
         """Clear out any existing information in the move schedule.
         """
         self.schedule = posschedule.PosSchedule(self)
-        self.warn('clear_schedule: not yet implemented')
-        return 'FAILED: clear_schedule: not yet implemented'
     
 # METHODS FOR FIDUCIAL CONTROL
 
@@ -689,6 +686,8 @@ class Petal(Application):
              positions
              petalbox
              status_update_rate
+             anticollision_default
+             anticollision_override
              <any key in self.config>
              
         Retrieve the state value identified by string key, for positioner
@@ -722,7 +721,6 @@ class Petal(Application):
         get_posid = False
         if len(a) == 1:
             param = str(a[0]).lower()
-
             if param == 'petalbox':
                 self._update_petalbox()
                 return self.petalbox_status
@@ -730,8 +728,10 @@ class Petal(Application):
                 return self.petal_id
             elif param == 'status':
                 return self.status_sv._value
-            elif param in self.config:
-                return self.config[param]
+            elif param == 'anticollision_default':
+                return self.anticollision_default
+            elif param == 'anticollision_override':
+                return self.anticollision_override
             elif param == 'posid':
                 get_posid = True
             elif param in ['pos_ids', 'posids']:
@@ -755,6 +755,8 @@ class Petal(Application):
                 return self.fidids
             elif param in ['fid_can_ids', 'fidcanids']:
                 return self.fid_can_ids
+            elif param in self.config:
+                return self.config[param]
             else:
                 return 'FAILED: invalid argument for get command'
         if get_posid or 'posid' in kw or 'key' in kw:
@@ -790,7 +792,7 @@ class Petal(Application):
         Set positioner state values or configuration variables
         Configuration:
             fid_duty_percent, gfa_fan1, gfa_fan2, gfa_fan1_pwm, gfa_fan2_pwm
-            fiducials, status_update_rate
+            fiducials, status_update_rate, anticollision_default, anticollision_override
         Set the state value identified by string key, for positioner unit
         identified by id posid.
 
@@ -844,7 +846,11 @@ class Petal(Application):
                     else:
                         return self._set_gfafans('GFA_FAN2', state = kw['gfa_fan2'])
                 elif k == 'status_update_rate':
-                    return self.status_update_rate
+                    self.status_update_rate = v
+                elif k == 'anticollision_default':
+                    self.anticollision_default = True if 'T' in str(v).upper() else False
+                elif k == 'anticollision_override':
+                    self.anticollision_override = True if 'T' in str(v).upper() else False
                 elif k in self.config:
                     self.config[k] = v
             return self.SUCCESS
@@ -951,11 +957,14 @@ class Petal(Application):
         while not self.shutdown_event.is_set():
             # update telemetry
             self._update_telemetry()
+            if self.shutdown_event.is_set():
+                break
             self._update_petalbox()
             for i in range(6):
+                if self.shutdown_event.is_set():
+                    break
                 self._update_positions()
                 self.sleep(self.status_update_rate/6.0)
-
         print('Petal appplication %s exiting' % self.role)
         return
 
