@@ -45,10 +45,10 @@ for pos_id in pos_ids:
 
 # demo script flags
 use_standard_syntax = True # enter False to try out the "quick" move syntax
-should_flash        = True
+should_flash        = False
 should_home         = True
-should_direct_dtdp  = True
-should_move_xy      = False
+should_direct_dtdp  = False
+should_move_xy      = True
 should_move_dxdy    = False
 should_move_tp      = False
 should_move_dtdp    = False
@@ -104,13 +104,13 @@ def general_move(command,targets):
 
                 for pos_id in pos_ids: 
                     requests[pos_id] = {'command':command, 'target':target, 'log_note':log_note}
+                    
                 ptl.request_targets(requests) # this is the general use function, where 
             
             # For the three steps below, petal.py also provides a wrapper function called 'schedule_send_and_execute_moves'.
             # That function does them all in one line of syntax. But here I show them separately, for illustrative clarity
             # of what is happening in the software. This is important to understand, because there are some potential use
             # cases where we will indeed want to do these three operations separately.
-            
             ptl.schedule_moves()    # all the requests get scheduled, with anticollision calcs, generating a unique table of scheduled shaft rotations on theta and phi axes for every positioner 
             ptl.send_move_tables()  # the tables of scheduled shaft rotations are sent out to all the positioners over the CAN bus
             ptl.execute_moves()     # the synchronized start signal is sent, so all positioners start executing their scheduled rotations in sync

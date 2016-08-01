@@ -20,10 +20,10 @@ for pos_id in pos_ids:
 
 # demo script flags
 use_standard_syntax = True # enter False to try out the "quick" move syntax
-should_flash        = True
+should_flash        = False
 should_home         = True
-should_direct_dtdp  = True
-should_move_xy      = False
+should_direct_dtdp  = False
+should_move_xy      = True
 should_move_dxdy    = False
 should_move_tp      = False
 should_move_dtdp    = False
