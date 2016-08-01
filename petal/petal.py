@@ -239,6 +239,7 @@ class Petal(object):
         """
         if anticollision == None or self.anticollision_override:
             anticollision = self.anticollision_default
+            
         self.schedule.schedule_moves(anticollision)
 
     def send_move_tables(self):
@@ -572,3 +573,4 @@ class Petal(object):
                 print('either the var1 or the var2 must be of length 1')
                 return None, None
         return var1, var2
+    
