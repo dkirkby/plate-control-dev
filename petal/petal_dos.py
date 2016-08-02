@@ -559,8 +559,18 @@ class Petal(Application):
         all_pos_on_ptl = pc.listify(self.get(key='POS_ID'),keep_flat=True)[0]
         for posid in requests.keys():
             if posid not in all_pos_on_ptl:
-                self.error('move: Positioner %s is not on Petal %d' % (repr(posid), self.petal_id))
-                # decide whether to abort or to remove posid from request list. Right now do nothing
+                rstring = 'move: positioner %s is not on Petal %d' % (repr(posid), self.petal_id)
+                self.error(rstring)
+                return 'FAILED: ' + rstring
+            # Check format of request object
+            if 'command' not in requests[posid]:
+                rstring = 'move: invalid request format. command is missing'
+                self.error(rstring)
+                return 'FAILED: ' + rstring
+            if 'target' not in requests[posid] and not isinstance(requests[posid]['target'], (tuple, list)):
+                rstring= 'move: invalid request format. target missing or invalid type.'
+                self.error(rstring)
+                return 'FAILED: ' + rstring
         try:
             self.request_targets(requests)
         except Exception as e:
