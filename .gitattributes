@@ -1,4 +1,6 @@
 * text=auto !eol
+bin/petal -text
+bin/petalcontroller -text
 petal/demo.py -text
 petal/demo_dos.py -text
 petal/focal_surface_lookup.csv -text
