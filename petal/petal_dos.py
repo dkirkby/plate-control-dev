@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 import petalcomm
 import posconstants as pc
 import posmodel
