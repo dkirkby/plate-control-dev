@@ -184,7 +184,7 @@ class Petal(Application):
 
         # setup discovery, update status and we are done
         if self.connected:
-             self._setup_discovery(discovery.discoverable)
+             self._setup_discovery(discoverable)
         self.info('Initialized')
         self.status_sv.write('INITIALIZED')
         # call configure() when in device mode
