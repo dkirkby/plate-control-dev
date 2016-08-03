@@ -160,17 +160,6 @@ class PosSchedule(object):
             table.set_postpause(0, 0.0)
             table.store_orig_command(0, req['command'], req['cmd_val1'], req['cmd_val2'])
             table.log_note += (' ' if table.log_note else '') + req['log_note']
-""" Debugging code  (KH)
-            t = table._for_output_type('schedule')
-            keys = sorted(list(t.keys()))
-            for k in keys:
-                if k == 'stats':
-                    subkeys = sorted(list(t['stats'].keys()))
-                    for kk in subkeys:
-                        print('\t',kk,': ', repr(t['stats'][kk]))
-                else:
-                    print(k, ': ', repr(t[k]))
-"""
             self.move_tables.append(table)
 
     def _schedule_with_anticollision(self):
