@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.4
+#!/usr/bin/env python3
 
 """
    DOS device application to control the DESI positioner petal
@@ -136,8 +136,6 @@ class PetalController(Application):
         role=config['role']
         config=ConfigObj('petalcontroller.conf')
         canlist=config['CAN'][role]['canlist']
-        print(canlist)
-        print(type(canlist[0]))
         #self.info("CAN configured...canlist: ", canlist)
         return canlist[0]
 
@@ -478,10 +476,7 @@ class PetalController(Application):
             # assemble arguments for canbus/firmware function
         
             posid=int(ids[id])
-            print(posid)
-            print(type(posid))
             canbus=self.__get_canbus(posid)
-            print(canbus)
             duty = int(percent_duty[id])
             self.fidstatus[str(ids[id])] = int(percent_duty[id])
 
