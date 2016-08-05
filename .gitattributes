@@ -17,6 +17,7 @@ petal/pos_settings/genl_settings_001.conf -text
 petal/pos_settings/unit_6M01.conf -text
 petal/pos_settings/unit_BU02.conf -text
 petal/pos_settings/unit_M00003.conf -text
+petal/pos_settings/unit_M00012.conf -text
 petal/pos_settings/unit_SS01.conf -text
 petal/pos_settings/unit_TI01.conf -text
 petal/pos_settings/unit_UM00011.conf -text
