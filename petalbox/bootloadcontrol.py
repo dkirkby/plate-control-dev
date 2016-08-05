@@ -22,7 +22,7 @@ class BootLoadControl(object):
 			self.scan=posfidcan.PosFidCAN('can0')
 		
 			#part size in bytes, should fit into 64KB buffer
-			self.part_size = 16000 #20000 #!8000 #8000 #64000	
+			self.part_size = 16000 	
 			self.broadcast_id=20000
 
 			#CAN command ids
@@ -82,10 +82,14 @@ class BootLoadControl(object):
 		try:
 			verification = {}
 			for can_id in can_ids:
-				time.sleep(0.2)
+				time.sleep(.1)
 				id, data = self.scan.send_command_recv(can_id, self.ver_comnr, '')
 				data = ''.join("{:02x}".format(c) for c in data)
-				verification[can_id] = data
+				verification[can_id] = int(data[1])
+				if verification[can_id]:
+					verification[can_id] = 'OK'
+				else:
+					verification[can_id] = 'ERROR'
 			return verification
 
 		except Exception as e:
@@ -153,17 +157,16 @@ class BootLoadControl(object):
 			self.send_nparts(pid)
 			time.sleep(1)
 
-		#loop through parts
+			#loop through parts
 			for n in range(1 , (self.nparts + 1)):
 				time.sleep(1)
-				for p in range(0,self.get_packets_in_n(n)):		#(int(bc.part_size/4))):
+				for p in range(0,self.get_packets_in_n(n)):	
 					packet_array=[]
 			
 					packet_np = self.get_packet(n,p)
 					packet_array.append(packet_np)
 					self.send_packet(pid, n, p, packet_np)
 					time.sleep(pause)
-			
 	
 			return 'SUCCESS'
 		
