@@ -1,7 +1,12 @@
-#!/usr/bin/env python3     #
-import petalcomm
+#!/usr/bin/env python
+"""
+   PROTODESI VERSION
+   This is the DOS version of petal.py
+"""
+
 import posconstants as pc
 import posmodel
+import petalcomm
 import posschedule
 import posmovetable
 import posstate
