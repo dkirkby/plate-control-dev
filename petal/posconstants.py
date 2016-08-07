@@ -13,10 +13,17 @@ np.set_printoptions(suppress=True) # suppress auto-scientific notation when prin
 #    export POSITIONER_LOGS_PATH="/my/path/to/positioner_logs"
 
 petal_directory        = os.environ.get("PETAL_PATH")
-if os.environ.get('UMFLAG'): petal_directory        = os.environ.get("PETAL_PATH")
-if petal_directory == None: petal_directory        = os.path.abspath('../petal')
+if os.environ.get('UMFLAG'):
+    petal_directory        = os.environ.get("PETAL_PATH")
+else:
+    petal_directory = os.path.join(os.environ('PLATE_CONTROL_DIR'),'petal')
+if petal_directory == None:
+    petal_directory        = os.path.abspath('../petal')
+    
+# this can be reset at runtime with the set_logs_directory function    
 all_logs_directory     = os.environ.get("POSITIONER_LOGS_PATH") # corresponds to https://desi.lbl.gov/svn/code/focalplane/positioner_logs
-if all_logs_directory == None: all_logs_directory = os.path.abspath('../../../positioner_logs') # backup alternative to environmental path, may need to modify for your machine
+if all_logs_directory == None:
+    all_logs_directory = os.path.abspath('../../../positioner_logs') # backup alternative to environmental path, may need to modify for your machine
 pos_settings_directory = petal_directory + os.path.sep + 'pos_settings' + os.path.sep
 move_logs_directory    = all_logs_directory + os.path.sep + 'move_logs' + os.path.sep
 test_logs_directory    = all_logs_directory + os.path.sep + 'test_logs' + os.path.sep
