@@ -34,7 +34,7 @@ except:
     telemetry_available = False
 from configobj import ConfigObj
 import sys
-
+import os
 
 def set_bit(value, bit):
     return value | (1<<bit)
@@ -102,6 +102,7 @@ class PetalController(Application):
 
         if self.controller_type =='SIMULATOR':
             self.simulator=True
+        self.info('init: using controller type: %s' % self.controller_type)
 
         # Bring in the Positioner Move object
 
@@ -132,10 +133,17 @@ class PetalController(Application):
         For right now we only have one CAN bus (ProtoDESI) and we map
         it to that. Get the CAN bust number from petalcontroller.ini
         """
-        config=ConfigObj('petalcontroller.ini')
+        if 'PLATE_CONTROL_DIR' in os.environ:
+            ini_file = os.path.join(os.environ['PLATE_CONTROL_DIR'],'petalbox','petalcontroller.ini')
+            conf_file = os.path.join(os.environ['PLATE_CONTROL_DIR'],'petalbox','petalcontroller.conf')
+        else:
+            ini_file = 'petalcontroller.ini'
+            conf_file = 'petalcontroller.conf'
+        config=ConfigObj(init_file)
         role=config['role']
-        config=ConfigObj('petalcontroller.conf')
+        config=ConfigObj(conf_file)
         canlist=config['CAN'][role]['canlist']
+        self.info('__get_canbus: using %s and %s' % (ini_file, conf_file))
         #self.info("CAN configured...canlist: ", canlist)
         return canlist[0]
 
