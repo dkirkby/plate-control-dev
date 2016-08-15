@@ -16,10 +16,14 @@ petal/pos_settings/_unit_settings_DEFAULT.conf -text
 petal/pos_settings/genl_settings_001.conf -text
 petal/pos_settings/unit_6M01.conf -text
 petal/pos_settings/unit_BU02.conf -text
+petal/pos_settings/unit_M00001.conf -text
+petal/pos_settings/unit_M00002.conf -text
 petal/pos_settings/unit_M00003.conf -text
 petal/pos_settings/unit_M00012.conf -text
+petal/pos_settings/unit_M00013.conf -text
 petal/pos_settings/unit_SS01.conf -text
 petal/pos_settings/unit_TI01.conf -text
+petal/pos_settings/unit_UM00002.conf -text
 petal/pos_settings/unit_UM00011.conf -text
 petal/pos_settings/unit_UM00012.conf -text
 petal/pos_settings/unit_UM00013.conf -text
@@ -29,9 +33,6 @@ petal/pos_settings/unit_UM00017.conf -text
 petal/pos_settings/unit_UM00022.conf -text
 petal/pos_settings/unit_UM00023.conf -text
 petal/pos_settings/unit_UM00030.conf -text
-petal/pos_settings/unit_UM00051.conf -text
-petal/pos_settings/unit_UM00054.conf -text
-petal/pos_settings/unit_UM00058.conf -text
 petal/pos_settings/unit_UM1020.conf -text
 petal/posanticollision.py -text
 petal/poscollider.py -text
