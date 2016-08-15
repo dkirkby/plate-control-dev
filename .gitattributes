@@ -44,6 +44,7 @@ petal/posschedule.py -text
 petal/posstate.py -text
 petal/postransforms.py -text
 petal/protodesi_config.json -text
+petal/protodesisim_config.json -text
 petal/test_poscollider.py -text
 petalbox/bootloadcontrol.py -text
 petalbox/caninit.py -text
