@@ -1022,9 +1022,9 @@ class Petal(Application):
                 current.update(hrpg600)
             switches = self.communicate('read_switch_ptl')
             if isinstance(switches, dict):
-                for k in switches:
-                    if switches[k] == 1: switches[k] = True
-                    if switches[k] == 0: switches[k] = False
+#                for k in switches:
+#                    if switches[k] == 1: switches[k] = True
+#                    if switches[k] == 0: switches[k] = False
                 current.update(switches)
             self.petalbox_status.update(current)
             self.petalbox_status['last_updated'] = datetime.datetime.utcnow().isoformat()
