@@ -133,6 +133,9 @@ class Petal(Application):
         self.petalbox_status = {}
         self.petalbox_sv = self.shared_variable('PETALBOX')
         self.petalbox_sv.publish()
+        # fiducials status  (also in petal box but this is for the GUI)
+        self.fiducials_sv = self.shared_variable('FIDUCIALS', group = 'PETAL')
+        self.fiducials_sv.publish(allowMultiplePublishers=True)
     
         # actuator positions
         self.positions_sv = self.shared_variable('POSITIONS')
@@ -670,6 +673,7 @@ class Petal(Application):
         self.petalbox_status['fiducials_duty'] = self.fid_duty_percent
         self.petalbox_status['last_updated'] = datetime.datetime.utcnow().isoformat()
         self.petalbox_sv.write(self.petalbox_status)
+        self.fiducials_sv.write({'fiducials_state' : True})
         self.info('fiducials_on: fiducials are turned on')
         return self.SUCCESS
 
@@ -683,6 +687,7 @@ class Petal(Application):
         self.petalbox_status['fiducials_duty'] = self.fid_duty_percent
         self.petalbox_status['last_updated'] = datetime.datetime.utcnow().isoformat()
         self.petalbox_sv.write(self.petalbox_status)
+        self.fiducials_sv.write({'fiducials_state' : False})
         self.info('fiducials_off: fiducials are turned off')
         return self.SUCCESS
     
