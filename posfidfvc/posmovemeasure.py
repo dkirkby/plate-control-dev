@@ -61,15 +61,12 @@ class PosMoveMeasure(object):
         petals = []
         pos_ids = []
         for petal in self.petals:
-            these_pos_ids = petal.get(key="POS_ID")
+            these_pos_ids = petal.posids
             pos_ids.extend(these_pos_ids)
             petals.extend([petal]*len(these_pos_ids))
             expected_pos_xy = pc.concat_lists_of_lists(expected_pos_xy, petal.expected_current_position(these_pos_ids,'obsXY'))
         expected_ref_xy = self.fiducials_xy
-
         measured_pos_xy,measured_ref_xy = self.fvc.measure_and_identify(expected_pos_xy,expected_ref_xy) 
-        print(measured_pos_xy)
-
         for i in range(len(measured_pos_xy)):
             petals[i].set(pos_ids[i],'LAST_MEAS_OBS_X',measured_pos_xy[i][0])
             petals[i].set(pos_ids[i],'LAST_MEAS_OBS_Y',measured_pos_xy[i][1])
@@ -451,7 +448,7 @@ class PosMoveMeasure(object):
 
         # circle fits
         for pos_id in all_pos_ids:
-            print(pos_id,"In circle fits",data[pos_id]['measured_obsXY'])
+            #print(pos_id,"In circle fits",data[pos_id]['measured_obsXY'])
             (xy_ctr,radius) = fitcircle.FitCircle().fit(data[pos_id]['measured_obsXY'])
             data[pos_id]['xy_center'] = xy_ctr
             data[pos_id]['radius'] = radius
@@ -776,8 +773,8 @@ class PosMoveMeasure(object):
         the sequence of angles is only going one way around the circle.
         """
         wrapped = [angles[0]]
-        if np.sign(angles[0]) != expected_sign_of_first_angle and np.sign(angles[0]) != 0:
-            wrapped[0] += expected_sign_of_first_angle * 360
+        if np.sign(angles[0]) != expected_sign_of_first_angle and abs(angles[0]) > 10: #essentially a "not close to 0" check to prevent incorrect wrapping on example: targetP = 5 deg and measP is -1 deg, normally would be wrapped but should not be
+            wrapped[0] -= expected_sign_of_first_angle * 360
         for i in range(1,len(angles)):
             delta = angles[i] - wrapped[i-1]
             while np.sign(delta) != expected_direction and np.sign(delta) != 0:

@@ -111,9 +111,9 @@ def email_error(traceback, timestamp): #TODO add helpful interpretation of trace
         server.ehlo()
         server.starttls()
         server.login('umdesi.teststand', 'UM00022,UM00017')
-        text = 'Test ' + timestamp + 'ran into an error. \nHere is the traceback:\n\n' + traceback
+        text = 'Test ' + timestamp + ' ran into an error. \nHere is the traceback:\n\n' + traceback
         message = MIMEText(text)
-        message['Subject'] = 'Test Error Report'
+        message['Subject'] = 'Test Error Report ' + timestamp
         message['From'] = 'UM-DESI Test Stand'
         message['To'] = ', '.join(teststand_operatorlist)
         server.sendmail('umdesi.teststand@gmail.com', teststand_operatorlist, message.as_string())

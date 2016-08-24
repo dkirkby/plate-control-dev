@@ -19,8 +19,8 @@ class SBIG_Grab_Cen(object):
         self.min_brightness = 5000
         self.max_brightness = 50000
         self.verbose = False
-        self.write_fits = True
-        self.take_darks = True # whether to measure a dark image and subtract it out
+        self.write_fits = False
+        self.take_darks = False # whether to measure a dark image and subtract it out
         self.flip_horizontal = True # whether to reflect image across y axis
         self.flip_vertical = False # whether to reflect image across x axis
 
@@ -114,6 +114,7 @@ class SBIG_Grab_Cen(object):
         toc = time.time()
         if self.verbose:
             print("Time used: "+str(toc-tic)+"\n")
+        
         return xy,brightness,tic-toc
         
     def open_camera(self):

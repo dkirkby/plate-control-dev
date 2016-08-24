@@ -20,8 +20,8 @@ fvc = fvchandler.FVCHandler('SBIG')
 fvc.scale = 0.0274 # mm/pixel (update um_scale below if not in mm) #Test2 = .0274 Test1 = .0282
 fvc.rotation = 0  # deg
 um_scale = 1000 # um/mm
-pos_ids = ['M00012','M00013']
-pos_notes = ['Compliant motor - no theta friction tab', 'Compliant motor - no theta nor phi friction tab']
+pos_ids = ['M00034']
+pos_notes = ['Internal mandrels, compliant theta motor']
 while len(pos_notes) < len(pos_ids):
     pos_notes.append('')
 fid_can_ids = []
@@ -45,7 +45,7 @@ should_measure_ranges     = True
 should_calibrate_grid     = False
 should_calibrate_full     = True
 should_do_accuracy_test   = True
-should_auto_commit_logs   = False
+should_auto_commit_logs   = True
 should_report             = True
 should_email              = True
 

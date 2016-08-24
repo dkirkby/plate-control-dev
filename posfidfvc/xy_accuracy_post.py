@@ -16,9 +16,9 @@ import csv
 from sys import argv, exit
 
 try:
-	#filename='UM00022_2016-05-12_T184730' #_movedata.csv'
-	filename = argv[1]
-	submove= argv[2]
+	filename='/home/msdos/dos_products/positioner_logs/test_logs/M00007_2016-06-24_T150218_movedata.csv'
+	#filename = argv[1]
+	submove= 0
 except:
 	print(" please specify filename and submove")
 	exit()

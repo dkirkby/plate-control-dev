@@ -19,8 +19,8 @@ sys.path.append(os.path.abspath('../petal/'))
 import posconstants as pc
 import numpy as np
 
-pos_id = 'M00004' #name for plots only
-can_id = 1004
+pos_id = 'M00013' #name for plots only
+can_id = 101
 petal_id = 4
 m = motormovemeasure.MotorMoveMeasure(petal_id)
 m.n_fiducial_dots = 0
