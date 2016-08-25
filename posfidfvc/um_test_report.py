@@ -25,7 +25,7 @@ stat_list = ['max','min','avg','rms']
 indent = '    '
 um_scale = 1000
 #People who want test results
-teststand_watcherlist = ['kfanning@umich.edu','gtarle@umich.edu','schubnel@umich.edu','cweave@umich.edu','njswimm@umich.edu']
+teststand_watcherlist = ['kfanning@umich.edu','gtarle@umich.edu','schubnel@umich.edu','cweave@umich.edu','njswimm@umich.edu','igershko@umich.edu']
 #People who want test error reports
 teststand_operatorlist = ['kfanning@umich.edu']
 
