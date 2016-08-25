@@ -81,7 +81,7 @@ class Petal(Application):
                 'gfa_fan1' : 'on',
                 'gfa_fan1_pwm' : 5,
                 'gfa_fan2' : 'on',
-                'gfa_fan2_pwm' : 5,
+                'gfa_fan2_pwm' : 20,
                 'status_update_rate' : 60,
                 }
     
