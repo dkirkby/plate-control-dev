@@ -256,13 +256,13 @@ try:
                          'calib_full.png','calib_quick.png','summary.csv','movedata.csv']
             for pos_id in pos_ids:
                 for file in filetypes:
-                    command = 'svn add ' + pos_id + '_' + log_timestamp + '_' + file
+                    command = 'svn add ' + pc.test_logs_directory + pos_id + '_' + log_timestamp + '_' + file
                     try:
                         os.system(command)
                     except:
                         print('Failed run command: ' + command)
             try:
-                os.system('svn commit -m "' + log_timestamp + ' test logs"')
+                os.system('svn commit ' + pc.test_logs_directory + ' -m "' + log_timestamp + ' test logs"')
             except:
                 print('Failed to commit files.')
                     
