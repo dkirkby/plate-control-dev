@@ -1,4 +1,4 @@
-ipcsimport os
+import os
 import sys
 sys.path.append(os.path.abspath('./SBIG/'))
 try:
@@ -25,7 +25,7 @@ class FVCHandler(object):
         2. scale
         3. translation
     """
-    def __init__(self, fvc_type='SBIG'):
+    def __init__(self, fvc_type='FLI'):
         self.fvc_type = fvc_type # 'SBIG' or 'FLI'
         self.dos_fvc = {'pyro_uri' : None, 'proxy':None, 'uid':None}
         if self.fvc_type == 'SBIG':
@@ -64,7 +64,9 @@ class FVCHandler(object):
                          1111: {'x': -125.0252,'y': 68.8910,'mag': 0.000, 'meas_err': 1.000,'flags':8},
                          1112: {'x': -149.9411,'y': 181.0755,'mag': 0.000, 'meas_err': 1.000,'flags':8},
                          1113: {'x': -160.0506,'y': 69.0207,'mag': 0.000, 'meas_err': 1.000,'flags':8},
-                         1114: {'x': -185.0396,'y': 114.9531,'mag': 0.000, 'meas_err': 1.000,'flags':8}}
+                         1114: {'x': -185.0396,'y': 114.9531,'mag': 0.000, 'meas_err': 1.000,'flags':8},
+                         1101: {'x': -160.7356,'y': 114.4618,'mag': 0.000, 'meas_err':1.000,'flags':8},
+                         1109: {'x': -120.7548,'y': 161.8665,'mag':0.000, 'meas_err': 1.000, 'flags':8}}
 
     # Internal callback and utility functions
     def _repeat_seeker(self, delay = 4.0):
@@ -86,7 +88,8 @@ class FVCHandler(object):
 
     def fake_platemaker(self,measured_centroids):
         """ Takes FVC centroids and turns them into XY positions"""
-
+        
+        
         xy = measured_centroids
         xy_np = np.array(xy).transpose()
         rot = FVCHandler.rotmat2D_deg(self.rotation)
@@ -104,7 +107,7 @@ class FVCHandler(object):
              if center_dict[n]['flag']==8.0:
                   xy = self.fake_platemaker([[center_dict[n]['x'],center_dict[n]['y']]]
 )
-                  print(xy)
+                  #print(xy)
                   fid_dict[n]['x'] = xy[0][0]
                   self.fid_dict[n]['y'] = xy[0][1]
 
@@ -115,21 +118,22 @@ class FVCHandler(object):
         centroids for the positioner software for the FLI
         """
 
-        measured_pos_xy = []
-        measured_ref_xy = []
+        measured_pos_xy = {}
+        measured_ref_xy = {}
         for n in center_dict:
+            #print(center_dict)
             if center_dict[n]['flag']==5.0:
-                measured_pos_xy.append([center_dict[n]['x'],center_dict[n]['y']])
+                measured_pos_xy[n]=self.fake_platemaker([[center_dict[n]['x']+6000,center_dict[n]['y']]])[0]
             elif center_dict[n]['flag']==3.0:
-                measured_pos_xy.append([center_dict[n]['x'],center_dict[n]['y']])
+                measured_pos_xy[n]=self.fake_platemaker([[center_dict[n]['x']+6000,center_dict[n]['y']]])[0]
                 print(center_dict[n],'This was flagged as a 3')
             elif center_dict[n]['flag']==8.0:
-                measured_ref_xy.append([center_dict[n]['x'],center_dict[n]['y']])
+                measured_ref_xy[n]=self.fake_platemaker([[center_dict[n]['x']+6000,center_dict[n]['y']]])[0]
             else:
-                print(center_dict[n]['flag'],type(center_dict[n]['flag']),'Doesnt seem to be a fiber or positioner') 
-
-        measured_pos_xy=self.fake_platemaker(measured_pos_centroid)
-        measured_ref_xy=self.fake_platemaker(measured_ref_centroid)
+                print(n,center_dict[n]['flag'],type(center_dict[n]['flag']),'Doesnt seem to be a fiber or positioner') 
+        #print(measured_pos_centroid)
+        #measured_pos_xy=self.fake_platemaker(measured_pos_centroid)
+        #measured_ref_xy=self.fake_platemaker(measured_ref_centroid)
         fid_dict = self.create_new_fid_dict(center_dict)
 	#fid_dict=measured_ref_xy
 
@@ -162,7 +166,7 @@ class FVCHandler(object):
             # 4. use DOS commands to get the centroids list
             # 5. send centroids (in pixels at FVC) thru platemaker to get measured xy (in mm at focal plate)
             # 6. organize those centroids so you can return them as measured_pos_xy, measured_ref_xy
-            self.exptime = 1 #sec
+            self.exptime = 2. #sec
             try:
                 fvc = self.dos_fvc['proxy']
                 fvc.set(exptime=self.exptime)
@@ -178,20 +182,22 @@ class FVCHandler(object):
                     print(rstring)
                     self.dos_fvc['uid'] = None
                     return 'FAILED: ' + rstring
-            if send_targer_dict == True:
+            if send_target_dict == True:
                 t = self.create_target_dict(expected_pos_xy)
                 fvc.set_target_dict(t)
                 
             try:
-                fvc.measure() 
+                print(fvc.measure(1)) 
                 measured_dict = fvc.get("centers")
-                print(measured_dict)
+                #print(measured_dict)
             except Exception as e:
                 rstring = 'measure_and_identify: Exception calling fvc.measure or fvc.get(centers): %s' % str(e)
                 print(rstring)
                 return 'FAILED: ' + rstring 
+
             measured_pos_xy,measured_ref_xy = self.measured_xy_from_fvc_centroid(measured_dict)	
             return measured_pos_xy, measured_ref_xy
+
         else:
             expected_xy = expected_pos_xy + expected_ref_xy
             num_objects = len(expected_xy)
