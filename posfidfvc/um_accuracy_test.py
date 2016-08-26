@@ -173,6 +173,7 @@ try:
         start_timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
         start_cycles = ptl.get(pos_ids,'TOTAL_MOVE_SEQUENCES')
         
+        
         # run the test
         for these_targets in all_targets:
             targ_num += 1
@@ -252,7 +253,7 @@ try:
          
         #Commit logs through SVN
         if should_auto_commit_logs:
-            filetypes = ['xyplot_submove0.png','xyplot_submove0.png','xyplot_submove0.png','xyplot_submove0.png',
+            filetypes = ['xyplot_submove0.png','xyplot_submove1.png','xyplot_submove2.png','xyplot_submove3.png',
                          'calib_full.png','calib_quick.png','summary.csv','movedata.csv']
             for pos_id in pos_ids:
                 for file in filetypes:
