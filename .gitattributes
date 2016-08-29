@@ -39,8 +39,10 @@ petal/pos_settings/unit_UM00017.conf -text
 petal/pos_settings/unit_UM00022.conf -text
 petal/pos_settings/unit_UM00023.conf -text
 petal/pos_settings/unit_UM00030.conf -text
+petal/pos_settings/unit_UM00031.conf -text
 petal/pos_settings/unit_UM00032.conf -text
 petal/pos_settings/unit_UM00051.conf -text
+petal/pos_settings/unit_UM00052.conf -text
 petal/pos_settings/unit_UM00054.conf -text
 petal/pos_settings/unit_UM00058.conf -text
 petal/pos_settings/unit_UM1020.conf -text
