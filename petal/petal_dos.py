@@ -299,7 +299,8 @@ class Petal(Application):
             In cases where this is a second request to the same robot (which is not allowed), the
             subdictionary will be deleted from the return.            
         """
-        for pos_id in requests.keys():
+        req_copy = dict(requests)
+        for pos_id in req_copy.keys():
             requests[pos_id]['posmodel'] = self.get_model_for_pos(pos_id)
             if 'log_note' not in requests[pos_id]:
                 requests[pos_id]['log_note'] = ''
@@ -479,6 +480,7 @@ class Petal(Application):
         self.canids_where_tables_were_just_sent = canids
         self._wait_while_moving()
         self.comm.send_tables(hw_tables)
+        print("Send tables was successful")
         return self.SUCCESS
     
     def execute_moves(self):
@@ -486,6 +488,7 @@ class Petal(Application):
         Then do clean-up and logging routines to keep track of the moves that were done.
         """
         self.comm.execute_sync(self.sync_mode)
+        print("Sync was successful")
         self._wait_while_moving()
         try:
             self._postmove_cleanup()
