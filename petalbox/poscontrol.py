@@ -208,16 +208,12 @@ class PositionerControl(object):
 		self._shifter.pack(side=TOP,  expand=1, padx=10, pady=5)
 		
 		fixedFont = Pmw.logicalfont('Fixed')
- 		self.commentbox = Pmw.ScrolledText(g_shifter.interior(),
-				# borderframe = 1,
-				labelpos = 'n',
-				label_text='Comment',
-#                columnheader = 1,
-#                rowheader = 1,
-#                rowcolumnheader = 1,
-               usehullsize = 1,
-               hull_width = 280,
-               hull_height =80
+		self.commentbox = Pmw.ScrolledText(g_shifter.interior(),
+			labelpos = 'n',
+			label_text='Comment',
+			usehullsize = 1,
+			hull_width = 280,
+			hull_height =80)
 #-				text_wrap='none',
 #-				text_font = fixedFont,
 #				Header_font = fixedFont,
@@ -228,7 +224,7 @@ class PositionerControl(object):
 #-				text_pady = 4)
 #				Header_padx = 4,
 #				rowheader_pady = 4,
-				)
+				
 
 		self.commentbox.pack(side=TOP,padx = 5, pady = 5, fill = 'both', expand = 1)
 		buttonbox=Frame(g_shifter.interior())
