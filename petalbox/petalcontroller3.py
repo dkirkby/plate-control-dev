@@ -87,6 +87,7 @@ class PetalController(Application):
         """
         Initialize PetalController application. Set up variables, call configure
         """
+        os.system('cansend can0 004e2080#00')
         self.info('INITIALIZING Device %s' % self.role)
         self.loglevel('INFO')
         # Get configuration information (add more configuration variables as needed)
