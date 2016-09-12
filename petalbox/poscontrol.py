@@ -241,15 +241,14 @@ class PositionerControl(object):
 		g_logging.pack(side=TOP, fill=BOTH, expand=1, padx=5, pady=5)
 		fixedFont = Pmw.logicalfont('Fixed')
  		self.statusbox = Pmw.ScrolledText(g_logging.interior(),
+			hull_width = 200,
+			hull_height = 100)
 				# borderframe = 1,
 #				labelpos = 'n',
 #				label_text='SCS Status',
 #                columnheader = 1,
 #                rowheader = 1,
 #                rowcolumnheader = 1,
-               usehullsize = 1,
-               hull_width = 200,
-               hull_height = 100,
 #-				text_wrap='none',
 #-				text_font = fixedFont,
 #				Header_font = fixedFont,
@@ -257,7 +256,6 @@ class PositionerControl(object):
 #                rowheader_width = 3,
 #                rowcolumnheader_width = 3,
 #				rowheader_pady = 4,
-				)
 
 		self.statusbox.pack(side=TOP,padx = 5, pady = 5, fill = 'both', expand = 1)
 
