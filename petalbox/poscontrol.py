@@ -5,14 +5,17 @@
 # 
 # History:
 # 	Aug. 2016: created
-from tkinter import *
+
+try:
+    from Tkinter import *
+except ImportError:
+    from tkinter import *
 import Pmw
 import time,os
 import pickle
 #from pscemail import PSCemail
-import pylab as pl
+#import pylab as pl
 from configobj import ConfigObj
-
 
 class PositionerControl(object):
 	def __init__(self, root,verbose=False,log=False):		
@@ -20,6 +23,8 @@ class PositionerControl(object):
 		self.root = root
 		self.log = log
 		self.root.title('Positioner Control')
+
+		Pmw.initialise(root=None,size=None)
 
 # lock the update
 		self.lockupdate=False
@@ -95,8 +100,6 @@ class PositionerControl(object):
 		#self.logfile.write('*** Starting new SCS logfile *** UT date:'+scsdate+' UT time: '+scstime+' ***\n' )     
 
 
-
-
 # the GUI components
 		width=20
 		self.defcol=root.cget("bg")
@@ -158,9 +161,6 @@ class PositionerControl(object):
 		
 		g_time.pack(side=TOP, fill=X, expand=1, padx=5, pady=5)		
 		
-######## center frame #######################################################		
-
-
 # ======================== Relay group =================================
 #
 		ctrlgroup = Pmw.Group(left_frame, tag_text = 'Control')
@@ -173,7 +173,6 @@ class PositionerControl(object):
                 command = self.read_posid)
 		self._posid.pack(side=TOP,  expand=1, padx=10, pady=5)
 
-
 		self._dtheta = Pmw.EntryField(ctrlgroup.interior(),
                 labelpos = 'w',
                 label_text = 'Delta Theta (deg):',
@@ -181,14 +180,12 @@ class PositionerControl(object):
                 command = self.read_theta)
 		self._dtheta.pack(side=TOP,  expand=1, padx=10, pady=5)
 
-
 		self._dphi = Pmw.EntryField(ctrlgroup.interior(),
                 labelpos = 'w',
                 label_text = '    Delta Phi (deg):',
                 validate = None,
                 command = self.read_phi)
 		self._dphi.pack(side=TOP,  expand=1, padx=10, pady=5)
-
 
 		move_button = Button(ctrlgroup.interior(),
 			bg='gainsboro',
@@ -212,8 +209,9 @@ class PositionerControl(object):
 			labelpos = 'n',
 			label_text='Comment',
 			usehullsize = 1,
-			hull_width = 280,
-			hull_height =80)
+			hull_width = 60,
+			hull_height =60,
+			text_font = fixedFont)
 #-				text_wrap='none',
 #-				text_font = fixedFont,
 #				Header_font = fixedFont,
@@ -239,10 +237,12 @@ class PositionerControl(object):
 #	
 		g_logging = Pmw.Group(right_frame, tag_text = 'Log')
 		g_logging.pack(side=TOP, fill=BOTH, expand=1, padx=5, pady=5)
-		fixedFont = Pmw.logicalfont('Fixed')
+		fixedFont = Pmw.logicalfont('Fixed',sizeIncr=-6)
 		self.statusbox = Pmw.ScrolledText(g_logging.interior(),
-			hull_width = 200,
-			hull_height = 100)
+			usehullsize = 1,
+			hull_width = 60,
+			hull_height = 60,
+			text_font = fixedFont)
 				# borderframe = 1,
 #				labelpos = 'n',
 #				label_text='SCS Status',
