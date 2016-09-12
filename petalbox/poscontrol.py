@@ -240,7 +240,7 @@ class PositionerControl(object):
 		g_logging = Pmw.Group(right_frame, tag_text = 'Log')
 		g_logging.pack(side=TOP, fill=BOTH, expand=1, padx=5, pady=5)
 		fixedFont = Pmw.logicalfont('Fixed')
- 		self.statusbox = Pmw.ScrolledText(g_logging.interior(),
+		self.statusbox = Pmw.ScrolledText(g_logging.interior(),
 			hull_width = 200,
 			hull_height = 100)
 				# borderframe = 1,
