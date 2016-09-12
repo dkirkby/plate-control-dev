@@ -123,20 +123,33 @@ class PositionerControl(object):
 #
 		g_time = Pmw.Group(left_frame, tag_text = ' Time and Date')
 		
-		messagebar_rid = Pmw.MessageBar(g_time.interior(), entry_width=width, entry_relief=GROOVE,
-                            labelpos=W, label_text='Log Nr.:')                            
+		messagebar_rid = Pmw.MessageBar(g_time.interior(),
+			entry_width=width,
+			entry_relief=GROOVE,
+			labelpos=W,
+			label_text='Log Nr.:')                            
 		messagebar_rid.pack(side=BOTTOM, fill=X, expand=1, padx=10, pady=5)
 		
-		messagebar_rt = Pmw.MessageBar(g_time.interior(), entry_width=width, entry_relief=GROOVE,
-                            labelpos=W, label_text='Uptime:')
+		messagebar_rt = Pmw.MessageBar(g_time.interior(),
+			entry_width=width,
+			entry_relief=GROOVE,
+			labelpos=W,
+			label_text='Uptime:')
 		messagebar_rt.pack(side=BOTTOM, fill=X, expand=1, padx=10, pady=5)
 
-		messagebar = Pmw.MessageBar(g_time.interior(), entry_width=width, entry_relief=GROOVE,
-                            labelpos=W, label_text='Local Time:')
+		messagebar = Pmw.MessageBar(g_time.interior(),
+			entry_width=width,
+			entry_relief=GROOVE,
+			labelpos=W,
+			label_text='Local Time:')
+
 		messagebar.pack(side=BOTTOM, fill=X, expand=1, padx=10, pady=5)
 
-  		messagebar_ut = Pmw.MessageBar(g_time.interior(), entry_width=width, entry_relief=GROOVE,
-                            labelpos=W, label_text='        UT:')
+  		messagebar_ut = Pmw.MessageBar(g_time.interior(),
+			entry_width=width,
+			entry_relief=GROOVE,
+			labelpos=W,
+			label_text='        UT:')
 		messagebar_ut.pack(side=BOTTOM, fill=X, expand=1, padx=10, pady=5)
 		
 		
