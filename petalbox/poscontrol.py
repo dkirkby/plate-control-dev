@@ -5,7 +5,7 @@
 # 
 # History:
 # 	Aug. 2016: created
-from Tkinter import *
+from tkinter import *
 import Pmw
 import time,os
 import pickle
