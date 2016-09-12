@@ -144,8 +144,7 @@ class PositionerControl(object):
 			label_text='Local Time:')
 
 		messagebar.pack(side=BOTTOM, fill=X, expand=1, padx=10, pady=5)
-
-  		messagebar_ut = Pmw.MessageBar(g_time.interior(),
+			messagebar_ut = Pmw.MessageBar(g_time.interior(),
 			entry_width=width,
 			entry_relief=GROOVE,
 			labelpos=W,
