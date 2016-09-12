@@ -74,6 +74,7 @@ petalbox/petalcontroller3.py -text
 petalbox/petalcontroller_sim.py -text
 petalbox/pf_utility.py -text
 petalbox/pfutility.sh -text
+petalbox/poscontrol.py -text
 petalbox/posfidcan.py -text
 petalbox/posfidcansim.py -text
 petalbox/ptltel.py -text
