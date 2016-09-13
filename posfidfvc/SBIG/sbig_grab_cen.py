@@ -19,8 +19,8 @@ class SBIG_Grab_Cen(object):
         self.min_brightness = 5000
         self.max_brightness = 50000
         self.verbose = False
-        self.write_fits = False
-        self.take_darks = False # whether to measure a dark image and subtract it out
+        self.write_fits = True
+        self.take_darks = True # whether to measure a dark image and subtract it out
         self.flip_horizontal = True # whether to reflect image across y axis
         self.flip_vertical = False # whether to reflect image across x axis
 
@@ -47,6 +47,7 @@ class SBIG_Grab_Cen(object):
         Sample call:
         	xywin, brightness, time = sbig_grab_cen_instance.grab(1)
          """
+        imgfiles = []
         tic = time.time()
         if self.take_darks:
             if self.verbose:
@@ -61,7 +62,7 @@ class SBIG_Grab_Cen(object):
                 except:
                     print('couldn''t remove file: ' + filename)
                 self.cam.write_fits(D,filename)
-                
+                imgfiles.append(filename)                
         else:
             D = None             
         if self.verbose:
@@ -80,11 +81,15 @@ class SBIG_Grab_Cen(object):
                 except:
                     print('couldn''t remove file: ' + filename)
                 self.cam.write_fits(L,filename)
+                imgfiles.append(filename)
             if not(self.take_darks):
                 D = np.zeros(np.shape(L), dtype=np.int32)
             LD = np.array(L,dtype = np.int32) - np.array(D,dtype = np.int32)
             if self.write_fits and self.take_darks:
-                self.cam.write_fits(LD,'_SBIG_diff_image.FITS')
+                filename = '_SBIG_diff_image.FITS'
+                self.cam.write_fits(LD,filename)
+                imgfiles.append(filename)
+                
             
             del L
             del D
@@ -105,7 +110,9 @@ class SBIG_Grab_Cen(object):
 
         # call routine to determine multiple gaussian-fitted centroids
         centroiding_tic = time.time()
-        xcen, ycen, fwhm = multicens.multiCens(LD, nWin, self.verbose, self.write_fits)
+        xcen, ycen, fwhm, binfile = multicens.multiCens(LD, nWin, self.verbose, self.write_fits)
+        if binfile:
+            imgfiles.append(binfile)
         xy = [[xcen[i],ycen[i]] for i in range(len(xcen))]
         centroiding_toc = time.time()
         if self.verbose:
@@ -115,7 +122,7 @@ class SBIG_Grab_Cen(object):
         if self.verbose:
             print("Time used: "+str(toc-tic)+"\n")
         
-        return xy,brightness,tic-toc
+        return xy,brightness,tic-toc,imgfiles
         
     def open_camera(self):
         self.cam.open_camera()

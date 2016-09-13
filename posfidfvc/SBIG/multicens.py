@@ -88,6 +88,8 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=False):
 		except:
 			pass
 		hdu.writeto(filename)
+	else:
+		filename = []
 	labeled, nr_objects = mh.label(bw)
 	sizes = mh.labeled.labeled_size(labeled) # size[0] is the background size, sizes[1 and greater] are number of pixels in each region
 	sorted_sizes_indexes = np.argsort(sizes)[::-1] # return in descending order
@@ -110,4 +112,4 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=False):
 		yCenSub.append(float(py)-float(nbox)+params[2])
 		FWHMSub.append(2.355*max(params[4],params[5]))
 
-	return xCenSub, yCenSub, FWHMSub
+	return xCenSub, yCenSub, FWHMSub, filename

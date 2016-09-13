@@ -8,6 +8,7 @@ import fitcircle
 import posconstants as pc
 import poscalibplot
 import scipy.optimize
+import datetime
 
 class PosMoveMeasure(object):
     """Coordinates moving fiber positioners with fiber view camera measurements.
@@ -33,6 +34,8 @@ class PosMoveMeasure(object):
         self.grid_calib_keep_phi_within_Eo = False # during grid calibration method, whether to keep phi axis always within the non-collidable envelope
         self.n_points_grid_calib_T = 6
         self.n_points_grid_calib_P = 6
+        self.err_level_to_save_move0_img = np.inf # value at which to preserve move 0 fvc images (for debugging if a measurement is off by a lot)
+        self.err_level_to_save_movei_img = np.inf # value at which to preserve corr moves fvc images (for debugging if a measurement is off by a lot)
 
     def fiducials_on(self):
         """Turn on all fiducials on all petals."""
@@ -66,16 +69,14 @@ class PosMoveMeasure(object):
             petals.extend([petal]*len(these_pos_ids))
             expected_pos_xy = pc.concat_lists_of_lists(expected_pos_xy, petal.expected_current_position(these_pos_ids,'obsXY'))
         expected_ref_xy = self.fiducials_xy
-        measured_pos_xy,measured_ref_xy = self.fvc.measure_and_identify(expected_pos_xy,expected_ref_xy) 
+        measured_pos_xy,measured_ref_xy,imgfiles = self.fvc.measure_and_identify(expected_pos_xy,expected_ref_xy) 
         for i in range(len(measured_pos_xy)):
             petals[i].set(pos_ids[i],'LAST_MEAS_OBS_X',measured_pos_xy[i][0])
             petals[i].set(pos_ids[i],'LAST_MEAS_OBS_Y',measured_pos_xy[i][1])
         for i in range(len(pos_ids)):
             data[pos_ids[i]] = measured_pos_xy[i]
-            #print(data)
-        #self.last_meas_fiducials_xy = measured_ref_xy
-        
-        return data
+        self.last_meas_fiducials_xy = measured_ref_xy
+        return data,imgfiles
 
     def move(self, requests):
         """Move positioners.
@@ -118,7 +119,7 @@ class PosMoveMeasure(object):
                 meas_obsXY  [[x0,y0],[x1,y1],...]       ... measured xy coordinates for each submove
                 errXY       [[ex0,ey0],[ex1,ey1],...]   ... error in x and y for each submove
                 err2D       [e0,e1,...]                 ... error distance (errx^2 + erry^2)^0.5 for each submove
-                posTP       [[t0,p0],[t1,p1],...]       ... internally-tracked expected angular positions of the (theta,phi) shafts at the outputs of their gearboxes
+                posTP       [[t0,p0],[t1,p1],...]       ... ierr_level_to_save_movei_imgnternally-tracked expected angular positions of the (theta,phi) shafts at the outputs of their gearboxes
         """
         data = requests.copy()
         ptls_of_pos_ids = self.ptls_of_pos_ids([p for p in data.keys()])
@@ -135,7 +136,8 @@ class PosMoveMeasure(object):
                 return
             m['log_note'] = 'blind move'
             print(str(pos_id) + ': blind move to (obsX,obsY)=(' + fmt(m['targ_obsXY'][0]) + ',' + fmt(m['targ_obsXY'][1]) + ')')
-        this_meas = self.move_measure(data)
+        this_meas,imgfiles = self.move_measure(data)
+        save_img = False
         for pos_id in this_meas.keys():
             m = data[pos_id] # again, for terseness
             m['meas_obsXY'] = [this_meas[pos_id]]
@@ -143,8 +145,15 @@ class PosMoveMeasure(object):
                            m['meas_obsXY'][-1][1] - m['targ_obsXY'][1]]]
             m['err2D'] = [(m['errXY'][-1][0]**2 + m['errXY'][-1][1]**2)**0.5]
             m['posTP'] = ptls_of_pos_ids[pos_id].expected_current_position(pos_id,'posTP')
+            if m['err2D'][-1] > self.err_level_to_save_move0_img:
+                save_img = True
+        if save_img:
+            timestamp_str = datetime.datetime.now().strftime(pc.filename_timestamp_format)
+            for file in imgfiles:
+                os.rename(file, pc.test_logs_directory + timestamp_str + '_move0' + file)
         for i in range(1,num_corr_max+1):
             correction = {}
+            save_img = False
             for pos_id in data.keys():
                 correction[pos_id] = {}
                 dxdy = [-data[pos_id]['errXY'][-1][0],-data[pos_id]['errXY'][-1][1]]
@@ -152,7 +161,7 @@ class PosMoveMeasure(object):
                 correction[pos_id]['target'] = dxdy
                 correction[pos_id]['log_note'] = 'correction move ' + str(i)
                 print(str(pos_id) + ': correction move ' + str(i) + ' of ' + str(num_corr_max) + ' by (dx,dy)=(' + fmt(dxdy[0]) + ',' + fmt(dxdy[1]) + '), \u221A(dx\u00B2+dy\u00B2)=' + fmt(data[pos_id]['err2D'][-1]))
-            this_meas = self.move_measure(correction)
+            this_meas,imgfiles = self.move_measure(correction)
             for pos_id in this_meas.keys():
                 m = data[pos_id] # again, for terseness
                 m['meas_obsXY'].append(this_meas[pos_id])
@@ -160,6 +169,12 @@ class PosMoveMeasure(object):
                                    m['meas_obsXY'][-1][1] - m['targ_obsXY'][1]])
                 m['err2D'].append((m['errXY'][-1][0]**2 + m['errXY'][-1][1]**2)**0.5)
                 m['posTP'].append(ptls_of_pos_ids[pos_id].expected_current_position(pos_id,'posTP'))
+                if m['err2D'][-1] > self.err_level_to_save_movei_img:
+                    save_img = True
+            if save_img:
+                timestamp_str = datetime.datetime.now().strftime(pc.filename_timestamp_format)
+                for file in imgfiles:
+                    os.rename(file, pc.test_logs_directory + timestamp_str + '_move' + str(i) + file)                
         for pos_id in data.keys():
             print(str(pos_id) + ': final error distance=' + fmt(data[pos_id]['err2D'][-1]))
         return data
@@ -372,7 +387,7 @@ class PosMoveMeasure(object):
             for pos_id in all_pos_ids:
                 requests[pos_id] = {'command':'posTP', 'target':data[pos_id]['target_posTP'][i], 'log_note':'calib grid point ' + str(i+1)}
             print('calibration grid point ' + str(i+1) + ' of ' + str(n_pts))
-            this_meas_data = self.move_measure(requests)
+            this_meas_data,imgfiles = self.move_measure(requests)
             for p in this_meas_data.keys():
                 data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
         return data 
@@ -442,7 +457,7 @@ class PosMoveMeasure(object):
             for pos_id in all_pos_ids:
                 requests[pos_id] = {'command':'posTP', 'target':data[pos_id]['target_posTP'][i], 'log_note':'calib arc on ' + axis + ' point ' + str(i+1)}
             print('\'' + mode + '\' calibration arc on ' + axis + ' axis: point ' + str(i+1) + ' of ' + str(n_pts))
-            this_meas_data = self.move_measure(requests)
+            this_meas_data,imgfiles = self.move_measure(requests)
             for p in this_meas_data.keys():
                 data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
 
@@ -716,7 +731,7 @@ class PosMoveMeasure(object):
                 self.fiducials_xy = pc.concat_lists_of_lists(self.fiducials_xy,new_fiducials)
                 xy_meas = pc.concat_lists_of_lists(xy_meas,self.fiducials_xy)
             else:
-                xy_meas = self.fvc.measure(n_dots)
+                xy_meas,imgfiles = self.fvc.measure(n_dots)
             if i == 0:
                 xy_init = xy_meas
             else:

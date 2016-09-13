@@ -110,6 +110,7 @@ class FVCHandler(object):
 
         Lists of xy coordinates are of the form [[x1,y1],[x2,y2],...]
         """
+        imgfiles = []        
         if self.fvc_type == 'simulator':
             sim_errors = np.random.uniform(-self.sim_err_max,self.sim_err_max,np.shape(expected_pos_xy))
             measured_pos_xy = (expected_pos_xy + sim_errors).tolist()
@@ -137,7 +138,7 @@ class FVCHandler(object):
         else:
             expected_xy = expected_pos_xy + expected_ref_xy
             num_objects = len(expected_xy)
-            unsorted_xy = self.measure(num_objects)
+            unsorted_xy,imgfiles = self.measure(num_objects)
             measured_xy = self.sort_by_closeness(unsorted_xy, expected_xy)
             measured_pos_xy = measured_xy[:len(expected_pos_xy)]
             measured_ref_xy = measured_xy[len(expected_pos_xy):]
@@ -146,7 +147,7 @@ class FVCHandler(object):
                 xy_shift = np.median(xy_diff,axis=0)
                 measured_pos_xy -= xy_shift
                 measured_pos_xy = measured_pos_xy.tolist()
-        return measured_pos_xy, measured_ref_xy
+        return measured_pos_xy, measured_ref_xy, imgfiles
 
     def sort_by_closeness(self, unknown_xy, expected_xy):
         """Sorts the list unknown_xy so that each point is at the same index
@@ -175,8 +176,9 @@ class FVCHandler(object):
         the centroids.
             num_objects     ... number of dots to look for in the captured image
         """
+        imgfiles = []
         if self.fvc_type == 'SBIG':
-            xy,brightness,t = self.sbig.grab(num_objects)
+            xy,brightness,t,imgfiles = self.sbig.grab(num_objects)
         elif self.fvc_type == 'FLI':
             ret = self.dos_fvc['proxy'].measure()
             assert ret != 'FAILED'
@@ -194,7 +196,7 @@ class FVCHandler(object):
         translation_y = self.translation[1] * np.ones(np.shape(xy_np)[1])
         xy_np += [translation_x,translation_y]
         xy = xy_np.transpose().tolist()
-        return xy
+        return xy,imgfiles
 
     def _dos_seeker_callback(self, dev):
         """Check found connection from seeker
@@ -215,7 +217,7 @@ class FVCHandler(object):
 
 if __name__ == '__main__':
     f = FVCHandler(fvc_type='SBIG')
-    n_objects = 4
+    n_objects = 5
     n_repeats = 1
     xy = []
     print('start taking ' + str(n_repeats) + ' images')

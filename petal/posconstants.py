@@ -15,8 +15,8 @@ np.set_printoptions(suppress=True) # suppress auto-scientific notation when prin
 petal_directory        = os.environ.get("PETAL_PATH")
 if os.environ.get('UMFLAG'):
     petal_directory        = os.environ.get("PETAL_PATH")
-else:
-    petal_directory = os.path.join(os.environ.get('PLATE_CONTROL_DIR'),'petal')
+#else:
+#    petal_directory = os.path.join(os.environ.get('PLATE_CONTROL_DIR'),'petal')
 if petal_directory == None:
     petal_directory        = os.path.abspath('../petal')
     
