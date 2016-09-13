@@ -21,7 +21,6 @@ class PosMoveMeasure(object):
         self.n_fiducial_dots = 1
         self.ref_dist_tol = 0.1   # [mm] used for identifying fiducial dots
         self.nudge_dist   = 10.0  # [deg] used for identifying fiducial dots
-        
         self.fiducials_xy = []    # list of nominal locations of the fixed reference dots in the obsXY coordinate system
         self.last_meas_fiducials_xy = [] # convenient location to store list of measured fiducial dot positions from the most recent FVC measurement
         self.n_points_full_calib_T = 7 # number of points in a theta calibration arc
@@ -35,7 +34,7 @@ class PosMoveMeasure(object):
         self.n_points_grid_calib_T = 6
         self.n_points_grid_calib_P = 6
         self.err_level_to_save_move0_img = np.inf # value at which to preserve move 0 fvc images (for debugging if a measurement is off by a lot)
-        self.err_level_to_save_movei_img = np.inf # value at which to preserve corr moves fvc images (for debugging if a measurement is off by a lot)
+        self.err_level_to_save_moven_img = np.inf # value at which to preserve last corr move fvc images (for debugging if a measurement is off by a lot)
 
     def fiducials_on(self):
         """Turn on all fiducials on all petals."""
@@ -169,7 +168,7 @@ class PosMoveMeasure(object):
                                    m['meas_obsXY'][-1][1] - m['targ_obsXY'][1]])
                 m['err2D'].append((m['errXY'][-1][0]**2 + m['errXY'][-1][1]**2)**0.5)
                 m['posTP'].append(ptls_of_pos_ids[pos_id].expected_current_position(pos_id,'posTP'))
-                if m['err2D'][-1] > self.err_level_to_save_movei_img:
+                if m['err2D'][-1] > self.err_level_to_save_moven_img and i == num_corr_max:
                     save_img = True
             if save_img:
                 timestamp_str = datetime.datetime.now().strftime(pc.filename_timestamp_format)

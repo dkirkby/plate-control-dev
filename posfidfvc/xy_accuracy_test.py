@@ -31,12 +31,12 @@ ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
 ptl.simulator_on = simulate
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure(ptl,fvc)
-m.err_level_to_save_move0_img = 0.100 # when to save blind move fvc images (i.e. for debugging purposes, because a really bad measurement may have happened)
-m.err_level_to_save_movei_img = 0.020 # when to save correction move fvc images (i.e. for debugging purposes, because a really bad measurement may have happened)
+m.err_level_to_save_move0_img = 0.070 # when to save blind move fvc images (i.e. for debugging purposes, because a really bad measurement may have happened)
+m.err_level_to_save_moven_img = 0.005 # when to save last correction move fvc images (i.e. for debugging purposes, because a really bad measurement may have happened)
 m.n_points_full_calib_T = 4#11#17
 m.n_points_full_calib_P = 4#7#9
-m.n_points_grid_calib_T = 6
-m.n_points_grid_calib_P = 6
+m.n_points_grid_calib_T = 8
+m.n_points_grid_calib_P = 5
 m.n_fiducial_dots = 4 # number of fiducial centroids the FVC should expect
 num_corr_max = 4 # number of correction moves to do for each target
 
@@ -49,6 +49,7 @@ should_measure_ranges     = True
 should_calibrate_grid     = True
 should_calibrate_full     = False
 should_do_accuracy_test   = True
+should_retract_between    = True
 
 # certain operations require particular preceding operations
 if should_identify_pos_loc: should_initial_rehome = True
@@ -76,9 +77,9 @@ def summary_plot_name(pos_id):
 
 # test grid configuration (local to any positioner, centered on it)
 # this will get copied and transformed to each particular positioner's location below
-grid_max_radius = 5.7 # mm
-grid_min_radius = 0.3 # mm
-n_pts_across = 54 # 7 --> 28 pts, 27 --> 528 pts
+grid_max_radius = 5.6 # mm
+grid_min_radius = 0.4 # mm
+n_pts_across = 27 # 7 --> 28 pts, 27 --> 528 pts
 line = np.linspace(-grid_max_radius,grid_max_radius,n_pts_across)
 local_targets = [[x,y] for x in line for y in line]
 for i in range(len(local_targets)-1,-1,-1): # traverse list from end backward
@@ -141,6 +142,12 @@ if should_do_accuracy_test:
             posmodel = ptl.get(pos_id)
             these_targets[pos_id] = {'command':'obsXY', 'target':posmodel.trans.posXY_to_obsXY(local_target)}
         all_targets.append(these_targets)
+        
+    # place to return positioner between each move
+    between_targets = {}
+    for pos_id in pos_ids:
+        posmodel = ptl.get(pos_id)
+        between_targets[pos_id] = {'command':'posTP', 'target':[0,90]}
 
     # initialize some data structures for storing test data
     targ_num = 0
@@ -156,6 +163,8 @@ if should_do_accuracy_test:
     # run the test
     for these_targets in all_targets:
         targ_num += 1
+        if should_retract_between:
+            m.move(between_targets)        
         print('\nMEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets)))
         print('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
         this_timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
