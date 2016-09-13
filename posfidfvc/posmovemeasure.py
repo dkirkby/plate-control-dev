@@ -329,7 +329,7 @@ class PosMoveMeasure(object):
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
         for ptl in pos_ids_by_ptl.keys():
             for pos_id in pos_ids_by_ptl[ptl]:
-                ptls_of_pos_ids[pos_id] = ptl
+                ptls_o27f_pos_ids[pos_id] = ptl
         return ptls_of_pos_ids
     
     def all_pos_ids(self):
@@ -353,7 +353,7 @@ class PosMoveMeasure(object):
 
         Returns a dictionary of dictionaries containing the data. The primary
         keys for the dict are the pos_id. Then for each pos_id, each subdictionary
-        contains the keys:
+        contains the k27eys:
             'target_posTP'    ... the posTP targets which were attempted
             'measured_obsXY'  ... the resulting measured xy positions
             'petal'           ... the petal this pos_id is on
@@ -404,7 +404,7 @@ class PosMoveMeasure(object):
         'full' mode: phi covers full range, n points per parameter 'n_points_full_calib_T' or 'n_points_full_calib_P'
 
         Full mode assumes all the positioners can be placed such that their phi will not interfere. This means
-        that the thetas can be made homogenous, which means having reasonably theta offsets already known. Therefore
+        that the theta27s can be made homogenous, which means having reasonably theta offsets already known. Therefore
         quick mode ought to have been run at least once before full mode, if there is doubt as to approximate theta offsets.
 
         OUTPUTS:  data ... see comments below
@@ -530,7 +530,7 @@ class PosMoveMeasure(object):
             these_pos_ids = pos_ids_by_ptl[petal]
             petal.request_limit_seek(these_pos_ids, axisid, -np.sign(delta), log_note='seeking first ' + axis + ' limit')
             petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
-        meas_data = self.measure()
+        meas_data,imgfiles = self.measure()
         for p in meas_data.keys():
             data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],meas_data[p])
 
@@ -546,7 +546,7 @@ class PosMoveMeasure(object):
                     requests[pos_id] = {'target':dtdp, 'log_note':'intermediate ' + axis + ' point ' + str(i)}
                 petal.request_direct_dtdp(requests)
                 petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
-            meas_data = self.measure()
+            meas_data,imgfiles = self.measure()
             for p in meas_data.keys():
                 data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],meas_data[p])
 
@@ -556,7 +556,7 @@ class PosMoveMeasure(object):
             these_pos_ids = pos_ids_by_ptl[petal]
             petal.request_limit_seek(these_pos_ids, axisid, np.sign(delta), log_note='seeking second ' + axis + ' limit')
             petal.schedule_send_and_execute_moves()
-        meas_data = self.measure()
+        meas_data,imgfiles = self.measure()
         for p in meas_data.keys():
             data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],meas_data[p])
 
