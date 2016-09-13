@@ -329,7 +329,7 @@ class PosMoveMeasure(object):
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
         for ptl in pos_ids_by_ptl.keys():
             for pos_id in pos_ids_by_ptl[ptl]:
-                ptls_o27f_pos_ids[pos_id] = ptl
+                ptls_of_pos_ids[pos_id] = ptl
         return ptls_of_pos_ids
     
     def all_pos_ids(self):
