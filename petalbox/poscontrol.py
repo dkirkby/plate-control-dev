@@ -5,7 +5,7 @@
 # 
 # History:
 # 	Aug. 2016: created
-
+from __future__ import print_function
 try:
     from Tkinter import *
 except ImportError:
@@ -13,8 +13,6 @@ except ImportError:
 import Pmw
 import time,os
 import pickle
-#from pscemail import PSCemail
-#import pylab as pl
 from configobj import ConfigObj
 
 class PositionerControl(object):
@@ -30,76 +28,31 @@ class PositionerControl(object):
 		self.lockupdate=False
 
 # read the config file
-		#cconfigfile=os.environ.get('PSC_HWCONFPATH')+'control.conf'
-		#cconfig = ConfigObj(cconfigfile)
-		self.t_update=2000 # int(cconfig['topgui']['t_update'])*1000	# update time in msec
-		#configfile=os.environ.get('PSC_HWCONFPATH')+'gui.conf'
-		#config = ConfigObj(configfile)
-		#self.t_alarm=int(cconfig['topgui']['t_alarm'])
+		sdate=time.strftime("%y%m%d-%H%M", time.localtime())
+		config = ConfigObj(os.environ.get('PETALBOX_HOME')+'/poscontrol.conf')
+		self.t_update = int(config['POS']['t_update'])*1000	# update time in msec
+
+		if self.log:
+			logfile_path = config['POS']['logfile_path']
+			logfile=logfile_path+'poslog-'+sdate+'.log'
+			if os.path.exists(logfile_name):
+				if self.verbose: print('Log file does exist')
+				self.logfile=open(logfile_name,'a')
+			else:
+				if self.verbose: print('Log file does not exist')
+				try:
+					if self.verbose: print('... creating '+logfile_path)
+					os.makedirs(logfile_path)
+					self.logfile=open(logfile_name,'w')
+				except:
+					print("Can't create logfile")
+					self.log=False
+
+		if self.log:			
+			self.logfile.write('Starting new session: '+time.strftime("%y%m%d-%H%M%S", time.localtime())+'\n' )     
 
 		self.tstart=time.time()	# the start time of the GUI
-		self.tstartemail=time.time()
-#		self.pmail=PSCemail('schubnel@umich.edu')	# list of email recipients for email alerts.
-		self.notify=None
-		#if cconfig['topgui']['notify'] == 'yes':
-		#	self.email=PSCemail(cconfig['topgui']['notify_list'])
-#			self.notify='yes'
-
-#		if cconfig['topgui']['notify_phone'] == 'yes':
-#			self.pmail=PSCemail('schubnel@gmail.com')#cconfig['topgui']['notify_phone_list'])	
 		
-# read limits from the param configuration file
-	
-		#self.read_config()
-		
-# pyro stuff
-
-		
-
-# get last used scs run id number
-		#homedir=os.environ.get('PSC_HOME')
-		#indexfile = homedir+'log/scsindex.dat'
-				
-		#if self.verbose: print '*** index file:', indexfile
-		
-		#if os.path.exists(indexfile):
-		#	info='index file does exist'
-		#	if self.verbose: print '*** '+info+' ***'
-		#	fd=open(indexfile,'r')
-		self.scsrunid=1 #pickle.load(fd) +1
-		#	fd.close()
-		#else:
-		#	info='index file does not exist'
-		#	if self.verbose: print '*** '+info+' ***'
-		#	self.scsrunid=0
-		#fd=open(indexfile,'w')
-		#pickle.dump(self.scsrunid, fd)
-		#fd.close()
-
-# Start a new log file
-# get time and date and create file name
-#
-
-# open logbook file
-# 
-#log bfile Format /log/yymm/scsryymmdd%%%.log
-		#srunid= '%6.6i' % self.scsrunid
-		#logfile_path='/data/scs/log/gui/'+scsdate[0:4]+'/'
-		#logfile_name=logfile_path+'scs'+scsdate+'r'+srunid+'.log'
-		#if os.path.exists(logfile_name):
-		#	if self.verbose: print 'log file does exist'
-		#	self.logfile=open(logfile_name,'a')
-		#else:
-		#	if verbose: print '*** log file does not exist'
-		#	if not os.path.exists(logfile_path):
-		#		info='directory does not exist... creating'
-		#		if verbose: print '*** .... creating '+logfile_path
-		#		os.makedirs(logfile_path)
-		#	self.logfile=open(logfile_name,'w')
-#
-		#self.logfile.write('*** Starting new SCS logfile *** UT date:'+scsdate+' UT time: '+scstime+' ***\n' )     
-
-
 # the GUI components
 		width=20
 		self.defcol=root.cget("bg")
@@ -125,15 +78,7 @@ class PositionerControl(object):
 # ======================== Time group =================================
 #
 		g_time = Pmw.Group(left_frame, tag_text = ' Time and Date')
-		
-		messagebar_rid = Pmw.MessageBar(g_time.interior(),
-			entry_width=width,
-			entry_relief=GROOVE,
-			labelpos=W,
-			label_text='Log Nr.:')                            
-
-		messagebar_rid.pack(side=BOTTOM, fill=X, expand=1, padx=10, pady=5)
-		
+	
 		messagebar_rt = Pmw.MessageBar(g_time.interior(),
 			entry_width=width,
 			entry_relief=GROOVE,
@@ -157,7 +102,6 @@ class PositionerControl(object):
 			label_text='        UT:')
 
 		messagebar_ut.pack(side=BOTTOM, fill=X, expand=1, padx=10, pady=5)
-		
 		
 		g_time.pack(side=TOP, fill=X, expand=1, padx=5, pady=5)		
 		
@@ -205,6 +149,7 @@ class PositionerControl(object):
 		self._shifter.pack(side=TOP,  expand=1, padx=10, pady=5)
 		
 		fixedFont = Pmw.logicalfont('Fixed')
+		fixedFont = Pmw.logicalfont('Fixed',sizeIncr=-6)
 		self.commentbox = Pmw.ScrolledText(g_shifter.interior(),
 			labelpos = 'n',
 			label_text='Comment',
@@ -243,19 +188,6 @@ class PositionerControl(object):
 			hull_width = 60,
 			hull_height = 60,
 			text_font = fixedFont)
-				# borderframe = 1,
-#				labelpos = 'n',
-#				label_text='SCS Status',
-#                columnheader = 1,
-#                rowheader = 1,
-#                rowcolumnheader = 1,
-#-				text_wrap='none',
-#-				text_font = fixedFont,
-#				Header_font = fixedFont,
-#                Header_foreground = 'blue',
-#                rowheader_width = 3,
-#                rowcolumnheader_width = 3,
-#				rowheader_pady = 4,
 
 		self.statusbox.pack(side=TOP,padx = 5, pady = 5, fill = 'both', expand = 1)
 
@@ -278,12 +210,12 @@ class PositionerControl(object):
 		logo.image=img
 		logo.pack(side=TOP,fill=X,expand=1)
 # --------------------------
-		self.time_display(messagebar,messagebar_ut,messagebar_rt,messagebar_rid)
+		self.time_display(messagebar,messagebar_ut,messagebar_rt)
 		
 		stime=time.strftime("%H:%M:%S", time.localtime())
 	
-		self.statusbox.insert('end',stime+' ***SCS start ***\n')
-		self.statusbox.insert('end',stime+' Run ID: '+str(self.scsrunid)+'\n')
+		self.statusbox.insert('end',stime+' *** Session start ***\n')
+#		self.statusbox.insert('end',stime+' Run ID: '+str(self.scsrunid)+'\n')
 		
 
 	def write_stext(self, stext):
@@ -309,8 +241,6 @@ class PositionerControl(object):
 		#stime=time.strftime("%H:%M:%S", time.localtime())
 		shiftername=self._shifter.getvalue()
 		stext=' New Op: '+shiftername+'\n'
-		#self.statusbox.insert('end',stext)
-		#self.logfile.write(stext)  
 		self.write_stext(stext)
 
 	def read_posid(self):
@@ -329,15 +259,38 @@ class PositionerControl(object):
 		self.write_stext(stext)
 
 	def move_pos(self):
-		posid=self._posid.getvalue()
-		theta=self._dtheta.getvalue()
-		phi=self._dphi.getvalue()
-		stext=' Move req.: ID'+posid+' T'+theta+' P'+phi+'\n'
+		try:
+			posid=self._posid.getvalue()
+			dtheta=self._dtheta.getvalue()
+			dphi=self._dphi.getvalue()
+			stext=' Move req. ID:'+posid+' T:'+dtheta+' P:'+dphi+'\n'	
+			self.write_stext(stext)
+		except:
+			stext=" Invalid entry\n"
+			self.write_stext(stext)
+			return
+		try:
+			dt = float(dtheta)
+			dp = float(dphi)
+			if posid != '':
+				self.move_positioner(posid,dt,dp)
+		except:
+			stext=" Invalid values\n"
+			self.write_stext(stext)
 
-		# here we ask for the move
+	def move_positioner(self,posid,dt,dp):
+		"""
+			Calls the appropriate DOS routine to move the positioner.
 
-		self.write_stext(stext)
+			INPUTS:
+				posid(string): positioner ID (for example 'UM00012')
+				dtheta (signed float): delta theta angle move request (degrees)
+				dphi (signed float): delta phi angle move request (degrees) 
+		"""
 
+	
+
+		pass
 
 	def sec2HMS(self,seconds):
 		seconds=int(seconds)
@@ -349,7 +302,7 @@ class PositionerControl(object):
 			return "%02d:%02d" % (minutes, seconds)
 		return "%02d:%02d:%02d" % (hours, minutes, seconds)
 
-	def time_display(self,label,label_ut,label_rt,label_id):	
+	def time_display(self,label,label_ut,label_rt):	
 		def update_func():
 			lowcolor='lightblue1'
 			highcolor='pink1'
@@ -360,7 +313,6 @@ class PositionerControl(object):
 			label_ut.message('state',time.asctime(time.gmtime()))
 			runtime= self.sec2HMS(time.time()-self.tstart)
 			label_rt.message('state',runtime)
-			label_id.message('state',str(self.scsrunid))
 		update_func()
 
 
@@ -377,11 +329,9 @@ if __name__ == '__main__':
 	root =Tk()
 	
 	rs=PositionerControl(root,verbose,log=False)
-
 	bottom_menu=Frame(root)
 	exitButton = Button(bottom_menu, bg='gainsboro',text = 'Exit', command = root.destroy)
 	exitButton.pack(side=LEFT)
-
 	bottom_menu.pack(side=BOTTOM, fill=X, expand=1, padx=5, pady=5)
 	root.mainloop()
 
