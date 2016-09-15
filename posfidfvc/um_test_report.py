@@ -25,9 +25,9 @@ stat_list = ['max','min','avg','rms']
 indent = '    '
 um_scale = 1000
 #People who want test results
-teststand_watcherlist = ['kfanning@umich.edu','gtarle@umich.edu','schubnel@umich.edu','cweave@umich.edu','njswimm@umich.edu','igershko@umich.edu']
+teststand_watcherlist = ['kfanning@umich.edu','gtarle@umich.edu','schubnel@umich.edu','cweave@umich.edu','njswimm@umich.edu','igershko@umich.edu', 'plawton@umich.edu']
 #People who want test error reports
-teststand_operatorlist = ['kfanning@umich.edu']
+teststand_operatorlist = ['kfanning@umich.edu','plawton@umich.edu','njswimm@umich.edu']
 
 def fmt(number):
     return format(number,'.1f')
@@ -66,7 +66,11 @@ def pass_fail(max0,max1,max2,rms3):
     else:
         return 'PASS'
 
-def email_report(text, timestamp, pos_ids):
+def email_report(text, timestamp, pos_ids,to='limited'):
+    if to == 'full':
+        recipients = teststand_watcherlist
+    else:
+        recipients = teststand_operatorlist
     try:
         server = smtplib.SMTP("smtp.gmail.com", 587)
         server.ehlo()
@@ -75,7 +79,7 @@ def email_report(text, timestamp, pos_ids):
         message = MIMEMultipart()
         message['Subject'] = 'Test Complete (' + timestamp + ')'
         message['From'] = 'UM-DESI Test Stand'
-        message['To'] = ', '.join(teststand_watcherlist)
+        message['To'] = ', '.join(recipients)
         file = pc.test_logs_directory + timestamp + '_report.txt'
         try:
             fp = open(file)
@@ -99,7 +103,7 @@ def email_report(text, timestamp, pos_ids):
                     print('Failed to attach file:',file)
         content = MIMEText(text)
         message.attach(content)    
-        server.sendmail('umdesi.teststand@gmail.com', teststand_watcherlist, message.as_string())
+        server.sendmail('umdesi.teststand@gmail.com', recipients, message.as_string())
         server.close()
     except:
         print('Failed to email message')
@@ -113,7 +117,7 @@ def email_error(traceback, timestamp): #TODO add helpful interpretation of trace
         server.login('umdesi.teststand', 'UM00022,UM00017')
         text = 'Test ' + timestamp + ' ran into an error. \nHere is the traceback:\n\n' + traceback
         message = MIMEText(text)
-        message['Subject'] = 'Test Error Report ' + timestamp
+        message['Subject'] = 'Test Error Report (' + timestamp + ')'
         message['From'] = 'UM-DESI Test Stand'
         message['To'] = ', '.join(teststand_operatorlist)
         server.sendmail('umdesi.teststand@gmail.com', teststand_operatorlist, message.as_string())
@@ -121,7 +125,7 @@ def email_error(traceback, timestamp): #TODO add helpful interpretation of trace
     except:
         print('Failed to email message')
 
-def do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, should_email=False):
+def do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, time, should_email=False, to='full'):
     test_summaries = pc.test_logs_directory + 'UM_test_summaries.csv'
     report_log = pc.test_logs_directory + os.path.sep + log_timestamp + '_results.txt'
     #Update prior test data from SVN
@@ -216,7 +220,7 @@ def do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, should
     #Write log
     report_log = pc.test_logs_directory + log_timestamp + '_report.txt'
     text = 'UM Positioner Test Report\n' + 'Test ID: ' + log_timestamp + '\n\n' + 'Positioner status (more detail below):\n'
-    email = 'UM Positioner Test Report\n' + 'Test ID: ' + log_timestamp + '\n\n' + 'Positioner status:\n'
+    email = 'UM Positioner Test Report\n' + 'Test ID: ' + log_timestamp + '\n'+ 'Execute time: ' + time + 'hours\n\n' + 'Positioner status:\n'
     count = 0
     for pos_id in pos_ids:
         data = summary_posids[pos_id]
@@ -255,7 +259,7 @@ def do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, should
     email += '\n\nMore test information can be found in attached images and report text file.\n'
     email += 'NOTE: This is an automated message sent by the test stand. Please do not reply to this message.'
     if should_email:    
-        email_report(email, log_timestamp, pos_ids)
+        email_report(email, log_timestamp, pos_ids,to)
 
     #Update test summaries
     update = ''

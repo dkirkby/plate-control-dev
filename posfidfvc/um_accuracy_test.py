@@ -20,8 +20,8 @@ fvc = fvchandler.FVCHandler('SBIG')
 fvc.scale = 0.0274 # mm/pixel (update um_scale below if not in mm) #Test2 = .0274 Test1 = .0282
 fvc.rotation = 0  # deg
 um_scale = 1000 # um/mm
-pos_ids = ['M00034']
-pos_notes = ['Internal mandrels, compliant theta motor']
+pos_ids = ['M00017']
+pos_notes = ['']
 while len(pos_notes) < len(pos_ids):
     pos_notes.append('')
 fid_can_ids = []
@@ -49,6 +49,8 @@ should_auto_commit_logs   = True
 should_report             = True
 should_email              = True
 
+email_list = 'full' #full or limited
+
 # certain operations require particular preceding operations
 if should_identify_pos_loc: should_initial_rehome = True
 if should_measure_ranges: should_calibrate_quick = True
@@ -72,7 +74,7 @@ def summary_plot_name(pos_id):
 # test grid configuration (local to any positioner, centered on it)
 # this will get copied and transformed to each particular positioner's location below
 grid_max_radius = 5.8 # mm
-grid_min_radius = 0.2 # mm
+grid_min_radius = 0.5 # mm
 n_pts_across = 27 # 7 --> 28 pts, 27 --> 528 pts
 line = np.linspace(-grid_max_radius,grid_max_radius,n_pts_across)
 local_targets = [[x,y] for x in line for y in line]
@@ -172,8 +174,7 @@ try:
                 all_data_by_pos_id[pos_id][key] = [[] for i in submove_idxs]
         start_timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
         start_cycles = ptl.get(pos_ids,'TOTAL_MOVE_SEQUENCES')
-        
-        
+       
         # run the test
         for these_targets in all_targets:
             targ_num += 1
@@ -246,10 +247,13 @@ try:
             r1 = ptl.get(pos_id,'LENGTH_R1')
             r2 = ptl.get(pos_id,'LENGTH_R2')
             pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_data_by_pos_id[pos_id],center,theta_range,r1,r2,title)
+
+        script_exec_time = time.time() - script_start_time
+        test_time = format(script_exec_time/60/60,'.1f')        
         
         #Test report and email only on certain tests
         if should_report and num_corr_max == 3 and n_pts_across == 27:
-            test_report.do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, should_email)
+            test_report.do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, should_email, email_list)
          
         #Commit logs through SVN
         if should_auto_commit_logs:
