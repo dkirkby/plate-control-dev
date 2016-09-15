@@ -35,7 +35,7 @@ m.err_level_to_save_move0_img = 0.070 # when to save blind move fvc images (i.e.
 m.err_level_to_save_moven_img = 0.005 # when to save last correction move fvc images (i.e. for debugging purposes, because a really bad measurement may have happened)
 m.n_points_full_calib_T = 4#11#17
 m.n_points_full_calib_P = 4#7#9
-m.n_points_grid_calib_T = 8
+m.n_points_grid_calib_T = 10
 m.n_points_grid_calib_P = 5
 m.n_fiducial_dots = 4 # number of fiducial centroids the FVC should expect
 num_corr_max = 4 # number of correction moves to do for each target
@@ -78,7 +78,7 @@ def summary_plot_name(pos_id):
 # test grid configuration (local to any positioner, centered on it)
 # this will get copied and transformed to each particular positioner's location below
 grid_max_radius = 5.6 # mm
-grid_min_radius = 0.4 # mm
+grid_min_radius = 0.8 # mm
 n_pts_across = 27 # 7 --> 28 pts, 27 --> 528 pts
 line = np.linspace(-grid_max_radius,grid_max_radius,n_pts_across)
 local_targets = [[x,y] for x in line for y in line]
