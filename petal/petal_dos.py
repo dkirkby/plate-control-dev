@@ -106,7 +106,7 @@ class Petal(Application):
         assert isinstance(self.fidids, (list, tuple)), 'fid_ids must be a list or tuple'
         assert isinstance(self.fid_can_ids, (list, tuple)), 'fid_can_ids must be a list or tuple'
 
-        self.loglevel('INFO')
+        #self.loglevel('INFO')
         self.info('Initializing')
 
         self.status_update_rate = float(self.config['status_update_rate'])
@@ -301,7 +301,12 @@ class Petal(Application):
         """
         req_copy = dict(requests)
         for pos_id in req_copy.keys():
-            requests[pos_id]['posmodel'] = self.get_model_for_pos(pos_id)
+            try:
+                requests[pos_id]['posmodel'] = self.get_model_for_pos(pos_id)
+            except Exception as e:
+                error = 'Cannot get_model_for_pos %s: %s' % (pos_id, e)
+                self.warn('request_targets: %s' % error)
+                return 'FAILED: ' % error
             if 'log_note' not in requests[pos_id]:
                 requests[pos_id]['log_note'] = ''
             if self.schedule.already_requested(requests[pos_id]['posmodel']):
@@ -362,14 +367,20 @@ class Petal(Application):
             requests[pos_id]['posmodel'] = self.get_model_for_pos(pos_id)
             if 'log_note' not in requests[pos_id]:
                 requests[pos_id]['log_note'] = ''
+            self.debug('requests are %s' % requests)
+            self.debug('Getting PosMoveTable')
             table = posmovetable.PosMoveTable(requests[pos_id]['posmodel'])
+            self.debug('Setting moves on table')
             table.set_move(0, pc.T, requests[pos_id]['target'][0])
             table.set_move(0, pc.P, requests[pos_id]['target'][1])
             cmd_str = (cmd_prefix + ' ' if cmd_prefix else '') + 'direct_dtdp'
+            self.debug('Storing original command on table')
             table.store_orig_command(0,cmd_str,requests[pos_id]['target'][0],requests[pos_id]['target'][1])
             table.log_note += (' ' if table.log_note else '') + requests[pos_id]['log_note']
             table.allow_exceed_limits = True
+            self.debug('Scheduling')
             self.schedule.add_table(table)
+            self.debug('Scheduling complete')
         return requests            
 
     def request_limit_seek(self, pos, axisid, direction, anticollision=True, cmd_prefix='', log_note=''):
@@ -962,10 +973,14 @@ class Petal(Application):
         """Returns the posmodel object corresponding to a posid, or if the argument
         is a posmodel, just returns itself.
         """
+        self.debug('in get_model_for_pos')
         if isinstance(pos, posmodel.PosModel):
+            self.debug('pos is already a PosModel, returning')
             return pos
         else:
+            self.debug('pos is not a PosModel')
             pidx = self.posids.index(pos)
+            self.debug('pidx is now %s' % pidx)
             return self.posmodels[pidx]
 
     def main(self):
@@ -1000,11 +1015,11 @@ class Petal(Application):
             return 'FAILED: invalid GFA fan'
         if state in ['on', 'ON', True, 1]:
             self.comm.switch_en_ptl(fan, 1)
-            self.petalbox_status[fan] = 'on'
+            self.petalbox_status[fan] = 1 #'on'
             self.info('_set_gfafans: %s is on' % fan)
         elif state in ['off', 'OFF', False, 0]:
             self.comm.switch_en_ptl(fan, 0)
-            self.petalbox_status[fan] = 'off'
+            self.petalbox_status[fan] = 0 #'off'
             self.info('_set_gfafans: %s is off' % fan)
         if pwm != None:
             self.comm.fan_pwm_ptl(fan,pwm)
