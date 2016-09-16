@@ -77,6 +77,7 @@ petalbox/pf_utility.py -text
 petalbox/pfutility.sh -text
 petalbox/poscontrol.conf -text
 petalbox/poscontrol.py -text
+petalbox/poscontrol.sh -text
 petalbox/poscontrol2.gif -text svneol=unset#image/gif
 petalbox/posfidcan.py -text
 petalbox/posfidcansim.py -text
