@@ -12,6 +12,9 @@ import pos_xytest_plot
 import um_test_report as test_report
 import traceback
 
+import petalcomm
+import posmodel
+
 # start timer on the whole script
 script_start_time = time.time()
 
@@ -20,8 +23,9 @@ fvc = fvchandler.FVCHandler('SBIG')
 fvc.scale = 0.0274 # mm/pixel (update um_scale below if not in mm) #Test2 = .0274 Test1 = .0282
 fvc.rotation = 0  # deg
 um_scale = 1000 # um/mm
-pos_ids = ['M00017']
-pos_notes = ['']
+bcast_id = 20000
+pos_ids = ['M00015']
+pos_notes = ['T and P compliant motors, 2 orange tabs T, 1 orange tab P'] #notes for report to add about positioner (reported with positioner in same slot as pos_ids list)
 while len(pos_notes) < len(pos_ids):
     pos_notes.append('')
 fid_can_ids = []
@@ -35,6 +39,21 @@ m.n_fiducial_dots = 0 # number of fiducial centroids the FVC should expect
 num_corr_max = 3 # number of correction moves to do for each target
 
 
+#get general configuration parameters and send them to positioners
+pcomm = petalcomm.PetalComm(petal_id)
+pm = posmodel.PosModel()
+
+creep_p = pm.state.read('CREEP_PERIOD')
+spin_p = pm.state.read('SPINUPDOWN_PERIOD')
+
+curr_spin = pm.state.read('CURR_SPIN_UP_DOWN')
+curr_creep = pm.state.read('CURR_CREEP')
+curr_cruise = pm.state.read('CURR_CRUISE')
+curr_hold = pm.state.read('CURR_HOLD')
+
+pcomm.set_currents(bcast_id, [curr_spin, curr_cruise, curr_creep, curr_hold], [curr_spin, curr_cruise, curr_creep, curr_hold])
+pcomm.set_periods(bcast_id, creep_p, creep_p, spin_p)
+print('CURRENTS AND PERIODS: ', creep_p, spin_p, curr_spin, curr_cruise, curr_creep, curr_hold) 
 
 # test operations to do
 should_initial_rehome     = True
