@@ -400,3 +400,12 @@ class PetalComm(object):
             return self._call_device('read_fan_tach')
         except Exception as e:
             return 'FAILED: Can not read GPIO names.  Exception: %s' % str(e)
+
+    def select_mode(self):
+        """
+        Starts up in normal mode rather than bootloader mode
+        """
+        try:
+            return self._call_device('select_mode')
+        except Exception as e:
+            return 'FAILED: Can not select mode.  Exception: %s' % str(e)
