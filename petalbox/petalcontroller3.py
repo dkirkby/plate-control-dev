@@ -75,7 +75,8 @@ class PetalController(Application):
                 'read_switch_ptl',
                 'get_GPIO_names',
                 'read_HRPG600',
-                'read_fan_tach'
+                'read_fan_tach',
+                'select_mode'
                 ]
 
     # Default configuration (can be overwritten by command line or config file)
@@ -110,7 +111,6 @@ class PetalController(Application):
         self.pmc=PositionerMoveControl(self.role, self.controller_type) # controller_type is HARDWARE or SIMULATOR
         if not self.simulator and telemetry_available:
             self.pt = ptltel.PtlTelemetry()
-
         self.status = 'INITIALIZED'
         self.info('Initialized')
         # call configure to setup the posid map
@@ -498,7 +498,12 @@ class PetalController(Application):
 
             if self.verbose:  print('ID: %s, Percent %s' % (ids[id],percent_duty[id]))
         return self.SUCCESS
-    
+
+    def select_mode(self):
+        canbus=self.__get_canbus(20000)
+        self.pmc.select_mode(canbus) 
+        return self.SUCCESS
+
     def send_tables(self, move_tables):
         """
         Sends move table over CAN to the positioners. 
@@ -580,6 +585,7 @@ class PetalController(Application):
         """
         xcode='0' # single command
         pause=0
+        self.select_mode()
 
         if self.verbose: print(posid,direction,move_mode,motor,angle)
 
@@ -826,7 +832,16 @@ class PositionerMoveControl(object):
             self.pfcan[canbus].send_command(posid,5, str(select).zfill(2))
             return True
         except:
-            return False  
+            return False
+  
+    def select_mode(self, canbus):
+        try:
+            self.pfcan[canbus].send_command(self.posid_all, 128, '00')
+            return True
+        except:
+            print("False")
+            return False
+
 
     def set_fiducials(self, canbus, posid, percent_duty):
         
