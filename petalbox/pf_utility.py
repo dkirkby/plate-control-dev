@@ -13,8 +13,12 @@ import time
 import math
 import struct
 import string
+import os
+
 
 can_frame_fmt = "=IB3x8s"
+os.system('cansend ' + str(sys.argv[1]) + ' 004e2080#00')
+sleept = 0.5
 
 class _read_key:
     def __init__(self):
@@ -53,6 +57,9 @@ class PositionerControl(object):
 	def __init__(self,canchan):
 		self.scan=posfidcan.PosFidCAN(str(canchan).lower())
 		self.bitsum=0
+
+	def set_mode(self, pid):
+		status=self.scan.send_command(pid,128,'00')
 
 	def get_sid(self, posid):		
 		sid,data=self.scan.send_command_recv(posid,19,'')
@@ -106,6 +113,7 @@ if __name__ == '__main__':
 		print("[e]xit")
 		print("[p]rogram new CAN address")
 		print("Select: ")
+		
 		sel=_sel.__call__()		
 		#print("sel:",sel)
 
@@ -121,6 +129,8 @@ if __name__ == '__main__':
 		pmc=PositionerControl(canchan)
 
 		if sel=='b':
+			pmc.set_mode(brdcast_id)
+			time.sleep(sleept)	
 			for i in range(8):
 				pmc.set_reset_led(brdcast_id,'on')
 				time.sleep(0.1)
@@ -128,6 +138,8 @@ if __name__ == '__main__':
 
 		if sel=='r':
 		#print (" Sending command 21 - read CAN address")
+			pmc.set_mode(brdcast_id)
+			time.sleep(sleept)
 			posid, data=pmc.get_can_address(20000)
 			print ("   CAN ID: ", posid)
 		#print(" Sending command 19 - read sid short")
@@ -136,12 +148,19 @@ if __name__ == '__main__':
 			print ("    Si ID: ",sid_str)
 			try:
 				posid,fw=pmc.get_firmware_version(20000)
-				fw=str(int(ord(fw))/10)
+				if len(fw) == 1:
+					fw=str(int(ord(fw))/10)
+				else:
+					
+					fw=str(int(str(fw[1]),16))+"."+str(int(str(fw[0]),16))
+		
 			except:
 				fw='unknown'
 			print ("  FW rev.: ", fw)
 
 		if sel=='p':
+			pmc.set_mode(brdcast_id)
+			time.sleep(sleept)
 			new_id=input("Enter new CAN address (in decimal): ")
 			new_id=int(new_id)
 			new_id=(hex(new_id)).replace('0x','')			
