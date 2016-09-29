@@ -26,6 +26,14 @@
 from DOSlib.application import Application
 import time
 import threading
+import struct
+import string
+import time
+import sys
+import posfidcan
+import math
+from intelhex import IntelHex
+
 #import posfidcan
 try:
     import ptltel
@@ -76,7 +84,9 @@ class PetalController(Application):
                 'get_GPIO_names',
                 'read_HRPG600',
                 'read_fan_tach',
-                'select_mode'
+                'select_mode',
+                'program',
+                'request_verification'
                 ]
 
     # Default configuration (can be overwritten by command line or config file)
@@ -88,7 +98,7 @@ class PetalController(Application):
         """
         Initialize PetalController application. Set up variables, call configure
         """
-        os.system('cansend can0 004e2080#00')
+        
         self.info('INITIALIZING Device %s' % self.role)
         self.loglevel('INFO')
         # Get configuration information (add more configuration variables as needed)
@@ -499,10 +509,55 @@ class PetalController(Application):
             if self.verbose:  print('ID: %s, Percent %s' % (ids[id],percent_duty[id]))
         return self.SUCCESS
 
-    def select_mode(self):
-        canbus=self.__get_canbus(20000)
-        self.pmc.select_mode(canbus) 
-        return self.SUCCESS
+    def select_mode(self, pid, mode = 'normal'):
+        """
+        Inputs:  pid (int, positioner CAN id)
+                 mode (string, 'normal' or 'bootloader')
+
+        Returns: SUCCESS or FAILED
+        """
+
+        canbus=self.__get_canbus(pid)
+        
+        try:
+                self.pmc.select_mode(canbus, pid, mode) 
+                return self.SUCCESS
+
+        except Exception as e:
+                return e
+
+    def program(self, pid, hex_file = 'fw21.hex'):
+        """
+        Inputs:  pid (int, positioner CAN id)
+                 hex_file (string, file name of specific firmware version hex file (should be in petalbox))
+
+        Returns: SUCCESS or FAILED
+        """
+        print('Now programming CAN id %d with %s...'% (pid, hex_file))
+        canbus=self.__get_canbus(pid)
+        try:
+                self.pmc.program(canbus, pid, hex_file)
+                return self.SUCCESS
+
+        except:
+                return self.FAILED
+
+    def request_verification(self, can_ids):
+        """
+        Inputs:  pid (int, positioner CAN id)
+                 can_ids (list of ints, list of positioner CAN ids, eg. [1001, 1002, 1003])
+
+        Returns: dictionary of CAN ids (keys) and statuses (values - 'OK' or 'ERROR')  or FAILED
+        """
+
+        canbus=self.__get_canbus(can_ids[0])
+        try:
+                statuses = self.pmc.request_verification(canbus, can_ids)
+                return statuses
+
+        except:
+                return self.FAILED
+
 
     def send_tables(self, move_tables):
         """
@@ -749,6 +804,7 @@ class PositionerMoveControl(object):
     """
 
     def __init__(self,role,controller_type):
+        import bootloadcontrol
         if controller_type == 'HARDWARE':
             import posfidcan
         else:
@@ -767,6 +823,17 @@ class PositionerMoveControl(object):
         self.bitsum=0
         self.cmd={'led':5} # container for the command numbers 'led_cmd':5  etc.
         self.posid_all=20000
+
+        #booloader definitions
+        self.part_size = 16000
+        self.broadcast_id = 20000
+        self.mode_comnr = 128
+        self.codesz_comnr = 129
+        self.nparts_comnr = 130
+        self.data_comnr=132
+        self.ver_comnr =131
+        self.codesize = 0
+        self.nparts = 0
 
     def get_canconfig(self,para):
         """
@@ -834,13 +901,6 @@ class PositionerMoveControl(object):
         except:
             return False
   
-    def select_mode(self, canbus):
-        try:
-            self.pfcan[canbus].send_command(self.posid_all, 128, '00')
-            return True
-        except:
-            print("False")
-            return False
 
 
     def set_fiducials(self, canbus, posid, percent_duty):
@@ -1150,6 +1210,152 @@ class PositionerMoveControl(object):
         if xcode == '0':
             return 1
         return 0    
+
+    def get_packets_in_n(self,partn):
+
+        try:
+            if partn == self.nparts:
+                packets_n = self.codesize - (self.nparts-1)*(self.part_size/4)
+            else:
+                packets_n = self.part_size/4
+            return int(packets_n)
+
+        except Exception as e:
+            return 'FAILED: Error retrieving packets in part n: %s' % str(e)
+
+    def send_codesize(self, canbus, pid):   #send size of firmware code in words
+
+        try:
+            size = str(hex(self.codesize).replace('0x','')).zfill(8)
+            self.pfcan[canbus].send_command(pid,self.codesz_comnr, size)
+            return 'SUCCESS'
+
+        except Exception as e:
+
+            return 'FAILED: Error sending code size: %s' % str(e)
+
+    def send_nparts(self, canbus, pid):     #send the number of parts that the code has been divided into
+        try:
+            parts = str(hex(self.nparts).replace('0x','')).zfill(8)
+            self.pfcan[canbus].send_command(pid,self.nparts_comnr, parts)
+            return 'SUCCESS'
+
+        except Exception as e:
+            return 'FAILED: Error sending number of parts in hex file: %s' % str(e)
+
+
+    def select_mode(self, canbus, pid, mode = 'bootloader'):
+       
+        try:
+            if mode == 'bootloader':
+                self.pfcan[canbus].send_command(pid, self.mode_comnr ,'01')
+            else:
+                self.pfcan[canbus].send_command(pid, self.mode_comnr, '00')
+
+        except Exception as e:
+            return 'FAILED: Error selecting between bootloader and normal modes' % str(e)
+        return 'SUCCESS'
+
+    def request_verification(self, canbus, can_ids):
+
+                try:
+                        verification = {}
+                        for can_id in can_ids:
+                                time.sleep(.1)
+                                id, data = self.pfcan[canbus].send_command_recv(can_id, self.ver_comnr, '')
+                                data = ''.join("{:02x}".format(c) for c in data)
+
+                                verification[can_id] = int(data[1])
+                                if verification[can_id]:
+                                        verification[can_id] = 'OK'
+                                else:
+                                        verification[can_id] = 'ERROR'
+                        return verification
+
+                except Exception as e:
+                        return 'FAILED: Error requesting bootloader verification: %s' % str(e)
+
+    def send_packet(self, canbus, pid, partn = 1, packetn = 1, packet = '01234567'):
+
+                try:
+                        checksum = str(bin(int(packet, 16))).replace('0b','').count('1')
+                        checksum = str(hex(checksum).replace('0x','')).zfill(2)
+                        partn = str(partn).zfill(2)
+                        packetn = str(hex(packetn).replace('0x','')).zfill(4)
+                        self.pfcan[canbus].send_command(pid, self.data_comnr, str(partn + packetn + packet + checksum))
+                        return 'SUCCESS'
+
+                except Exception as e:
+                        return 'FAILED: Error sending firmware packet: %s' % str(e)
+
+
+
+        #retrieve packet for given part number and packet number from hex file
+    def get_packet(self, partn = 1, packetn = 0):
+
+                try:
+                        packet_addr = self.hexfile.minaddr()+(partn-1)*self.part_size  + 4*packetn              #start address of 4 byte packet
+                        packet=''
+                        packet_byte=[0,0,0,0]
+
+                        if partn == self.nparts and packetn > self.get_packets_in_n(partn):
+                                packet = '00000000'
+
+                        else:
+                                for i in range(0,4):
+                                        packet_byte[i] = str(hex(self.hexfile[packet_addr + i]).replace('0x','')).zfill(2)
+                                        packet = packet + packet_byte[i]
+
+                        return packet
+
+                except Exception as e:
+                        return 'FAILED: Error retrieving packet from hex file: %s' % str(e)
+
+
+    def program(self, canbus, can_id, hex_file = 'fw21.hex'):
+
+                try:
+                        pid = can_id                 #broadcast id
+                        pause = 0
+                        bl_wait = 1
+
+                        self.hexfile=IntelHex(hex_file)
+
+
+                        self.codesize=int(math.ceil(float(self.hexfile.maxaddr() - self.hexfile.minaddr()+1)/4))                #code size in 32-bit wordshex
+                        self.nparts=int(math.ceil(float(self.hexfile.maxaddr() - self.hexfile.minaddr()+1)/self.part_size))
+
+                        if self.verbose:
+                                print(self.hexfile.maxaddr())
+                                print(self.hexfile.minaddr())
+
+                                print(int(math.ceil(float(self.hexfile.maxaddr() - self.hexfile.minaddr()+1)/4)))
+
+                                print(self.get_packets_in_n(1))
+                                print(self.get_packets_in_n(2))
+                                print(self.nparts)
+
+                        self.send_codesize(canbus, pid)
+                        time.sleep(bl_wait)
+                        self.send_nparts(canbus, pid)
+                        time.sleep(bl_wait)
+
+                        #loop through parts
+                        for n in range(1 , (self.nparts + 1)):
+                                time.sleep(bl_wait)
+                                for p in range(0,self.get_packets_in_n(n)):
+                                        packet_array=[]
+
+                                        packet_np = self.get_packet(n,p)
+                                        packet_array.append(packet_np)
+                                        self.send_packet(canbus, pid, n, p, packet_np)
+                                        time.sleep(pause)
+
+                        return 'SUCCESS'
+
+                except Exception as e:
+
+                        return 'FAILED: Error with bootloader programming: %s' % str(e)
 
 ######################################
 
