@@ -111,6 +111,7 @@ class PetalController(Application):
         self.simulated_switch = {}
         self.simulated_pwm = {}
         self.fidstatus = {}
+        self.mode = ''
 
         if self.controller_type =='SIMULATOR':
             self.simulator=True
@@ -512,11 +513,11 @@ class PetalController(Application):
     def select_mode(self, pid, mode = 'normal'):
         """
         Inputs:  pid (int, positioner CAN id)
-                 mode (string, 'normal' or 'bootloader')
+                 mode (string, 'normal', 'normal_old' or 'bootloader')
 
         Returns: SUCCESS or FAILED
         """
-
+        self.mode = mode
         canbus=self.__get_canbus(pid)
         
         try:
@@ -605,7 +606,10 @@ class PetalController(Application):
                     motor_steps_P=table['motor_steps_P'][row]
                     speed_mode_T=table['speed_mode_T'][row]
                     speed_mode_P=table['speed_mode_P'][row]
-                    post_pause=nint(table['postpause'][row]) #+ nint((table['move_time'][row])*1000)
+                    if self.mode == 'normal_old':
+                        post_pause=nint(table['postpause'][row]) + nint((table['move_time'][row])*1000)
+                    else:
+                        post_pause=nint(table['postpause'][row])
 
                     if (motor_steps_T & motor_steps_P): #simultaneous movement of theta and phi
                         post_pause_T = 0        #first axis command gets sent with 0 post_pause to make firmware perform simultaneous theta/phi move
@@ -640,7 +644,7 @@ class PetalController(Application):
         """
         xcode='0' # single command
         pause=0
-        self.select_mode()
+        self.select_mode(posid, 'normal')
 
         if self.verbose: print(posid,direction,move_mode,motor,angle)
 
