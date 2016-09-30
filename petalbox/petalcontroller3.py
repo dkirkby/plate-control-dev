@@ -545,7 +545,7 @@ class PetalController(Application):
 
     def request_verification(self, can_ids):
         """
-        Inputs:  pid (int, positioner CAN id)
+        Inputs:  
                  can_ids (list of ints, list of positioner CAN ids, eg. [1001, 1002, 1003])
 
         Returns: dictionary of CAN ids (keys) and statuses (values - 'OK' or 'ERROR')  or FAILED
