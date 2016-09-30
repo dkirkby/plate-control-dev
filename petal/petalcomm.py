@@ -401,11 +401,33 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not read GPIO names.  Exception: %s' % str(e)
 
-    def select_mode(self):
+    def select_mode(self, pid, mode = 'normal'):
         """
         Starts up in normal mode rather than bootloader mode
         """
         try:
-            return self._call_device('select_mode')
+            return self._call_device('select_mode', pid, mode)
         except Exception as e:
             return 'FAILED: Can not select mode.  Exception: %s' % str(e)
+
+    def program(self, pid, hex_file = 'fw21.hex'):
+        """
+        Sends specified hex_file to specified pid 
+        """
+        try:
+            return self._call_device('program', pid, hex_file)
+        except Exception as e:
+            return 'FAILED: Can not select mode.  Exception: %s' % str(e)
+
+    def request_verification(self, can_ids = [3001, 3002]):
+        """
+        Requests verification that bootloader programming was successful, returns dictionary of can_ids and statuses ('OK' or 'ERROR' strings as dict values)
+        """
+        try:
+            return self._call_device('request_verification', can_ids)
+        except Exception as e:
+            return 'FAILED: Can not select mode.  Exception: %s' % str(e)
+
+
+
+
