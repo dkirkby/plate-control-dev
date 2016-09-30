@@ -808,7 +808,7 @@ class PositionerMoveControl(object):
     """
 
     def __init__(self,role,controller_type):
-        import bootloadcontrol
+        
         if controller_type == 'HARDWARE':
             import posfidcan
         else:
