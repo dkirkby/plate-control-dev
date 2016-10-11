@@ -128,6 +128,7 @@ posfirmware/docs/FW_1.0_DESC.docx -text svneol=unset#application/zip
 posfirmware/docs/FW_2.0_DESC.docx -text
 posfirmware/docs/FW_3.0_DESC.docx -text
 posfirmware/docs/Revision[!!-~]Changes[!!-~](for[!!-~]firmware[!!-~]versions[!!-~]after[!!-~]2.0).docx -text
+posfirmware/release/bl30.bin -text
 posfirmware/release/fipos_fw_1.0.c -text
 posfirmware/release/fipos_fw_2.0.c -text
 posfirmware/release/fipos_fw_2.1.c -text
