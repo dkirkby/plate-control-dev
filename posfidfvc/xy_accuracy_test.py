@@ -21,29 +21,29 @@ if simulate:
     fvc = fvchandler.FVCHandler('simulator')
 else:
     fvc = fvchandler.FVCHandler('SBIG')
-fvc.scale = 0.024376 # mm/pixel (update um_scale below if not in mm)
+fvc.scale = 0.021666 # mm/pixel (update um_scale below if not in mm)
 fvc.rotation = 0  # deg
 um_scale = 1000 # um/mm
-pos_ids = ['M00035','M00038']
+pos_ids = ['M00055','M00012','M00058','M00026']
 fid_can_ids = []
-petal_id = 1
+petal_id = 0 # i.e. petalbox #
 ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
 ptl.simulator_on = simulate
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure(ptl,fvc)
-m.err_level_to_save_move0_img = 0.200 # when to save blind move fvc images (i.e. for debugging purposes, because a really bad measurement may have happened)
-m.err_level_to_save_moven_img = 0.050 # when to save last correction move fvc images (i.e. for debugging purposes, because a really bad measurement may have happened)
+m.err_level_to_save_move0_img = 7.000 # when to save blind move fvc images (i.e. for debugging purposes, because a really bad measurement may have happened)
+m.err_level_to_save_moven_img = 7.000 # when to save last correction move fvc images (i.e. for debugging purposes, because a really bad measurement may have happened)
 m.n_points_full_calib_T = 17
 m.n_points_full_calib_P = 9
-m.n_points_grid_calib_T = 8
+m.n_points_grid_calib_T = 5
 m.n_points_grid_calib_P = 6
-m.n_fiducial_dots = 4 # number of fiducial centroids the FVC should expect
+m.n_fiducial_dots = 1 # number of fiducial centroids the FVC should expect
 num_corr_max = 4 # number of correction moves to do for each target
 
 # test operations to do
 should_initial_rehome     = True
 should_identify_fiducials = True
-should_identify_pos_loc   = False
+should_identify_pos_loc   = True
 should_calibrate_quick    = True
 should_measure_ranges     = True
 should_calibrate_grid     = True
@@ -58,7 +58,7 @@ if should_measure_ranges: should_calibrate_quick = True
 # log file setup
 log_directory = pc.test_logs_directory
 os.makedirs(log_directory, exist_ok=True)
-log_suffix = '2x5milTabsBothAxes' # string gets appended to filenames -- useful for user to identify particular tests
+log_suffix = '' # string gets appended to filenames -- useful for user to identify particular tests
 log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
 log_timestamp = datetime.datetime.now().strftime(pc.filename_timestamp_format)
 def log_timestamp_with_notes():
@@ -78,8 +78,8 @@ def summary_plot_name(pos_id):
 # test grid configuration (local to any positioner, centered on it)
 # this will get copied and transformed to each particular positioner's location below
 grid_max_radius = 5.6 # mm
-grid_min_radius = 0.8 # mm
-n_pts_across = 7 # 7 --> 28 pts, 27 --> 528 pts
+grid_min_radius = 0.5 # mm
+n_pts_across = 11 # 7 --> 28 pts, 27 --> 528 pts
 line = np.linspace(-grid_max_radius,grid_max_radius,n_pts_across)
 local_targets = [[x,y] for x in line for y in line]
 for i in range(len(local_targets)-1,-1,-1): # traverse list from end backward
