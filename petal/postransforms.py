@@ -66,7 +66,7 @@ class PosTransforms(object):
                     'OFFSET_X'  : 0.0,
                     'OFFSET_Y'  : 0.0,
                     'OFFSET_T'  : 0.0,
-                    'OFFSET_P'  : 0.0} 
+                    'OFFSET_P'  : 0.0}
 
     # SHAFT RANGES
     def shaft_ranges(self, range_limits):
@@ -476,6 +476,7 @@ class PosTransforms(object):
         HYPOT[hypot <= inner] = inner
         X = HYPOT*np.cos(angle)
         Y = HYPOT*np.sin(angle)
+        ANGLE = np.arctan2(Y,X)
 
         # transfrom from cartesian XY to angles TP
         arccos_arg = (X**2 + Y**2 - (r[0]**2 + r[1]**2)) / (2 * r[0] * r[1])
@@ -483,9 +484,22 @@ class PosTransforms(object):
         arcsin_arg = r[1] / HYPOT * np.sin(P)
         outofrange = np.abs(arcsin_arg) > 1 # will round arcsin arguments to 1 or -1
         arcsin_arg[outofrange] = np.sign(arcsin_arg[outofrange])
-        T = np.arctan2(Y,X) - np.arcsin(arcsin_arg)
-        T *= 180/np.pi
+        T1 = ANGLE - np.arcsin(arcsin_arg)
+        T2 = ANGLE - np.arctan2(r[1]*np.sin(P),r[0]+r[1]*np.cos(P)) 
+        T1 *= 180/np.pi
+        T2 *= 180/np.pi
+        T = np.zeros_like(T1)
         P *= 180/np.pi
+        for i in range(len(T)):
+            XY_err = np.inf
+            for T_try in [T1[i],T2[i]]:
+                XY_try = PosTransforms.tp2xy([T_try,P[i]],r)
+                X_err = np.array(XY_try[0]) - X[i]
+                Y_err = np.array(XY_try[1]) - Y[i]
+                XY_err_new = (X_err**2 + Y_err**2)**0.5
+                if XY_err_new < XY_err:
+                    XY_err = XY_err_new
+                    T[i] = T_try        
 
         # wrap angles into travel ranges
         TP = np.array([T,P])
