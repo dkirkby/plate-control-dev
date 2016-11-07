@@ -102,8 +102,8 @@ class SBIG_Grab_Cen(object):
                 warnings.warn('Spot seems dark (brightness = {})'.format(brightness))
                 nexpose=nexpose-1
             else:
-                if brightness > self.max_brightness:
-                    warnings.warn('Spot may be over saturated (brightness = {}'.format(brightness))
+                #if brightness > self.max_brightness:
+                    #warnings.warn('Spot may be over saturated (brightness = {}'.format(brightness))
                 nexpose=0
                 
 
@@ -126,6 +126,7 @@ class SBIG_Grab_Cen(object):
         
     def open_camera(self):
         self.cam.open_camera()
+        self.cam.initialize_shutter()
         
     def close_camera(self):
         self.cam.close_camera()
