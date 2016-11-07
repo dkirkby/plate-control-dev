@@ -90,6 +90,10 @@ Changelog:
             added self.keepShutterOpen boolean flag for tests that require
             open shutter.
             added shutter open and close and other methods
+            
+161107-KF  Added initialize_shutter to allow one to "click" the shutter without
+           needing to power cycle the camera. Added error handling using this
+           function to start_exposure to avoid shutter errors.
 
 '''
 
@@ -379,6 +383,31 @@ class SBIGCam(object):
         """
         self.DARK = bool(x)
         return
+        
+    def initialize_shutter(self):
+        """
+        Initializes (clicks) shutter, similar to what happens
+        when power cycling. Should clear errors when start exposure
+        fails to work.
+        Input
+            None
+        Returns
+            True if success, False otherwise
+        """    
+        mcp = self.MiscellaneousControlParams(True,self.SC_INITIALIZE_SHUTTER,self.LED_ON)
+        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_MISCELLANEOUS_CONTROL,byref(mcp),None)
+        if Error != self.CE_NO_ERROR:
+            print ('Attempt to open initialize shutter returned error:', Error)
+            return False
+        elif self.verbose:
+            print ('Shutter initialized.')
+        # Wait for shutter to initialize
+        qcspar = self.QueryCommandStatusParams(command = self.CC_MISCELLANEOUS_CONTROL)
+        qcsres = self.QueryCommandStatusResults(status = 6)
+        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_QUERY_COMMAND_STATUS, byref(qcspar), byref(qcsres))
+        while qcsres.status == 2:
+            Error = self.SBIG.SBIGUnivDrvCommand(self.CC_QUERY_COMMAND_STATUS, byref(qcspar), byref(qcsres))
+        return True
 
     def open_camera(self):
         """
@@ -442,7 +471,13 @@ class SBIGCam(object):
         Error = self.SBIG.SBIGUnivDrvCommand(self.CC_START_EXPOSURE2, byref(sep2), None)
         if Error != self.CE_NO_ERROR:
             print ('Attempt to start exposure returned error:', Error)
-            return False
+            self.initialize_shutter()
+            Error = self.SBIG.SBIGUnivDrvCommand(self.CC_START_EXPOSURE2, byref(sep2), None)
+            if Error != self.CE_NO_ERROR:
+                print ('Attempt to start exposure returned error:', Error)
+                return False
+            elif self.verbose:
+                print ('Exposure successfully initiated.') 
         elif self.verbose:
             print ('Exposure successfully initiated.')       
         # Wait for exposure to end
