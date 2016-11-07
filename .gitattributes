@@ -96,6 +96,7 @@ petal/posplot.py -text
 petal/posschedule.py -text
 petal/posstate.py -text
 petal/postransforms.py -text
+petal/power_test.py -text
 petal/protodesi_config.json -text
 petal/protodesisim_config.json -text
 petal/test_poscollider.py -text
