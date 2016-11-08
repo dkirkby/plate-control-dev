@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Currently a very basic anticollision code that will
-vastly improve over time with future improvements.
+vastly improve over time with future updates.
 @author: Anthony Kremin
 @institution: University of Michigan
 @email: kremin[at]umich.edu
@@ -24,8 +24,6 @@ def run_anticol(x,y,t,t2,p,p2,posmodels, method = 'RRE', avoidance='zeroth_order
     else:
         print("RRE is all that is available currently. Continuing with RRE")
         return run_RRE_anticol(x,y,t,t2,p,p2,posmodels,method,avoidance,verbose)
-
-
 
 
 
@@ -149,21 +147,21 @@ def create_table_RRE(theta_start,theta_final, phi_start, phi_inner, phi_final, c
     table = posmovetable.PosMoveTable(current_positioner_model)
     
     # Find the theta and phi movements for the retract move
-    dtdp = current_positioner_model.trans.delta_posTP([theta_start,phi_start],[theta_start,phi_inner], range_wrap_limits='targetable')
+    dtdp = current_positioner_model.trans.delta_obsTP([theta_start,phi_start],[theta_start,phi_inner], range_wrap_limits='targetable')
     table.set_move(0, pc.T, dtdp[0])
     table.set_move(0, pc.P, dtdp[1])
     table.set_prepause (0, 0.0)
     table.set_postpause(0, 0.0)
     
     # Find the theta and phi movements for the theta movement inside the safety envelope
-    dtdp = current_positioner_model.trans.delta_posTP([theta_start,phi_inner],[theta_final,phi_inner], range_wrap_limits='targetable')
+    dtdp = current_positioner_model.trans.delta_obsTP([theta_start,phi_inner],[theta_final,phi_inner], range_wrap_limits='targetable')
     table.set_move(1, pc.T, dtdp[0]) 
     table.set_move(1, pc.P, dtdp[1]) 
     table.set_prepause (1, 0.0)
     table.set_postpause(1, 0.0)
     
     # Find the theta and phi movements for the phi extension movement
-    dtdp = current_positioner_model.trans.delta_posTP([theta_final,phi_inner],[theta_final,phi_final], range_wrap_limits='targetable')
+    dtdp = current_positioner_model.trans.delta_obsTP([theta_final,phi_inner],[theta_final,phi_final], range_wrap_limits='targetable')
     table.set_move(2, pc.T, dtdp[0])
     table.set_move(2, pc.P, dtdp[1])
     table.set_prepause (2, 0.0)
