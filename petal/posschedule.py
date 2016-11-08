@@ -179,8 +179,8 @@ class PosSchedule(object):
             posmodel = request['posmodel']
             xabs.append(posmodel.state.read('OFFSET_X'))
             yabs.append(posmodel.state.read('OFFSET_Y'))
-            ttarg,ptarg = request['targt_posTP'][:]
-            tstart,pstart = request['start_posTP'][:]
+            ttarg,ptarg = posmodel.trans.posTP_to_obsTP(request['targt_posTP'][:])
+            tstart,pstart = posmodel.trans.posTP_to_obsTP(request['start_posTP'][:])
             tstarts.append(tstart)
             pstarts.append(pstart)
             ptargs.append(ptarg)
