@@ -110,7 +110,7 @@ class PetalController(Application):
         for i in netifaces.interfaces():
             if i.startswith('can'):    # got a canbus interface
                 try:
-                    if 'broadcast' in netifaces.ifaddresses(i)[netifaces.AF_LINK]:
+                    if 'broadcast' in netifaces.ifaddresses(i)[netifaces.AF_LINK][0]:
                         self.info('init: Found SYSTEC interface %s' % i)
                         canlist.append(i)
                 except:
