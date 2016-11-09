@@ -765,7 +765,7 @@ class PositionerMoveControl(object):
         self.__can_frame_fmt = "=IB3x8s"
         if isinstance(canlist, (list, tuple)) and len(canlist) != 0:
             can_list = canlist
-        elif isintance(canlist,str):
+        elif isinstance(canlist,str):
             can_list = [canlist]
         else:
             can_list=self.get_canconfig('canlist')
