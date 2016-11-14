@@ -122,9 +122,9 @@ class PetalController(Application):
         # If autoconf is set True, set the bitrate on the can interface(s) and bring them up using ip system calls
         if self.autoconf == True:
             for can in canlist:
-                retcode=subprocess.call('sudo ip link set can0 type can bitrate 500000'.split()) 
-                if retcode == 0:
-                    retcode=subprocess.call('sudo ip link set can0 type can bitrate 500000'.split())                
+                retcode = subprocess.call('sudo ip link set %s down' % can.split()) 
+                retcode += subprocess.call('sudo ip link set can0 type %s bitrate 500000' % can.split()) 
+                retcode += subprocess.call('sudo ip link set %s up' % can.split())                
                 self.info('init: Configured canbus interface %r. Return code: %r' % (can, retcode))
 
         # Bring in the Positioner Move object
