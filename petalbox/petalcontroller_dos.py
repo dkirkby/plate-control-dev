@@ -123,7 +123,7 @@ class PetalController(Application):
         if self.autoconf == True:
             for can in canlist:
                 retcode = subprocess.call(('sudo ip link set %s down' % can).split()) 
-                retcode += subprocess.call(('sudo ip link set can0 type %s bitrate 500000' % can).split()) 
+                retcode += subprocess.call(('sudo ip link set %s type bitrate 500000' % can).split()) 
                 retcode += subprocess.call(('sudo ip link set %s up' % can).split())                
                 self.info('init: Configured canbus interface %r. Return code: %r' % (can, retcode))
 
