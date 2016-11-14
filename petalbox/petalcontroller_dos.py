@@ -26,6 +26,7 @@
 from DOSlib.application import Application
 import time
 import threading
+import subprocess
 import netifaces
 #import posfidcan
 try:
@@ -82,6 +83,7 @@ class PetalController(Application):
     # Default configuration (can be overwritten by command line or config file)
     defaults = {'default_petal_id' : 1,
                 'controller_type' : 'HARDWARE',
+                'autoconf' : True,
                 }
 
     def init(self):
@@ -95,6 +97,7 @@ class PetalController(Application):
             self.default_petal_id = int(self.config['default_petal_id'])
         except:
             self.default_petal_id = self.default['default_petal_id']
+        self.autoconf = True if 'T' in str(self.config['autoconf']).upper() else False
         self.controller_type = self.config['controller_type']
         self.simulator=False
         self.simulated_switch = {}
@@ -115,6 +118,14 @@ class PetalController(Application):
                         canlist.append(i)
                 except:
                     pass
+
+        # If autoconf is set True, set the bitrate on the can interface(s) and bring them up using ip system calls
+        if self.autoconf == True:
+            for can in canlist:
+                retcode=subprocess.call('sudo ip link set can0 type can bitrate 500000'.split()) 
+                if retcode == 0:
+                    retcode=subprocess.call('sudo ip link set can0 type can bitrate 500000'.split())                
+                self.info('init: Configured canbus interface %r. Return code: %r' % (can, retcode))
 
         # Bring in the Positioner Move object
         self.pmc=PositionerMoveControl(self.role, self.controller_type, canlist = canlist) # controller_type is HARDWARE or SIMULATOR
