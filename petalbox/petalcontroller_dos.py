@@ -155,6 +155,7 @@ class PetalController(Application):
         For right now we only have one CAN bus (ProtoDESI) and we map
         it to that. Get the CAN bust number from petalcontroller.ini
         """
+        """
         if 'PLATE_CONTROL_DIR' in os.environ:
             ini_file = os.path.join(os.environ['PLATE_CONTROL_DIR'],'petalbox','petalcontroller.ini')
             conf_file = os.path.join(os.environ['PLATE_CONTROL_DIR'],'petalbox','petalcontroller.conf')
@@ -167,6 +168,19 @@ class PetalController(Application):
         canlist=config['CAN'][role]['canlist']
         self.info('__get_canbus: using %s and %s' % (ini_file, conf_file))
         #self.info("CAN configured...canlist: ", canlist)
+        """
+
+        # Find list of canbus interfaces with SYSTEC module
+        canlist = []
+        for i in netifaces.interfaces():
+            if i.startswith('can'):    # got a canbus interface
+                try:
+                    if 'broadcast' in netifaces.ifaddresses(i)[netifaces.AF_LINK][0]:
+                        self.info('init: Found SYSTEC interface %s' % i)
+                        canlist.append(i)
+                except:
+                    pass
+        # this will throw an exception if no canbus is found - handle the error condition either here or at the caller
         return canlist[0]
 
     def get_positioner_map(self):
@@ -800,6 +814,7 @@ class PositionerMoveControl(object):
             return 'FAILED'
         
         if para == 'canlist':
+            """
             try:
                 cconfig=ConfigObj('petalcontroller.conf')
                 canlist= cconfig['CAN'][self.role]['canlist']
@@ -808,7 +823,18 @@ class PositionerMoveControl(object):
             except:
                 print ("Error reading petalcontroller.conf file")
                 return 'FAILED'
-
+            """
+            # Find list of canbus interfaces with SYSTEC module
+            canlist = []
+            for i in netifaces.interfaces():
+                if i.startswith('can'):    # got a canbus interface
+                    try:
+                        if 'broadcast' in netifaces.ifaddresses(i)[netifaces.AF_LINK][0]:
+                            self.info('init: Found SYSTEC interface %s' % i)
+                            canlist.append(i)
+                    except:
+                        pass
+            return canlist
 
     def get_sids(self, canbus):
         """
