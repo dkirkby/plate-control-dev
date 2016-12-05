@@ -13,6 +13,7 @@ petal/petsockcomm.py -text
 petal/pos_settings/_collision_settings_DEFAULT.conf -text
 petal/pos_settings/_genl_settings_DEFAULT.conf -text
 petal/pos_settings/_unit_settings_DEFAULT.conf -text
+petal/pos_settings/collision_settings_test.conf -text
 petal/pos_settings/genl_settings_001.conf -text
 petal/pos_settings/unit_6M01.conf -text
 petal/pos_settings/unit_BU02.conf -text
@@ -60,6 +61,7 @@ petal/pos_settings/unit_M00065.conf -text
 petal/pos_settings/unit_M00066.conf -text
 petal/pos_settings/unit_M00067.conf -text
 petal/pos_settings/unit_M00068.conf -text
+petal/pos_settings/unit_M00091.conf -text
 petal/pos_settings/unit_M00169.conf -text
 petal/pos_settings/unit_M00170.conf -text
 petal/pos_settings/unit_M00171.conf -text
@@ -175,7 +177,9 @@ petal/pos_settings/unit_M00349.conf -text
 petal/pos_settings/unit_M00350.conf -text
 petal/pos_settings/unit_M00357.conf -text
 petal/pos_settings/unit_SS01.conf -text
+petal/pos_settings/unit_TEMP.conf -text
 petal/pos_settings/unit_TI01.conf -text
+petal/pos_settings/unit_TI03.conf -text
 petal/pos_settings/unit_UM00002.conf -text
 petal/pos_settings/unit_UM00011.conf -text
 petal/pos_settings/unit_UM00012.conf -text
