@@ -1,9 +1,0 @@
-setupRequired(DOSlib)
-envSet(PETAL_PATH, ${PRODUCT_DIR}/petal)
-envSet(POSITIONER_LOGS_PATH, /data/logs/petal)
-pathPrepend(PATH, ${PRODUCT_DIR}/bin)
-pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/petal)
-pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/petalbox)
-pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/posfidfvc)
-
-
