@@ -1,4 +1,4 @@
-import numpy as np
++import numpy as np
 import mahotas as mh
 #from pylab import imshow, show
 import pyfits
