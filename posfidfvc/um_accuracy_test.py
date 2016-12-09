@@ -14,30 +14,39 @@ import traceback
 
 import petalcomm
 import posmodel
+import configobj
+
+
+# read the configuration file
+if len(sys.argv) ==1:
+    configfile='accuracy_test.conf'
+else:
+    configfile=sys.argv[1]
+
+config = configobj.ConfigObj(configfile,unrepr=True)
 
 # start timer on the whole script
 script_start_time = time.time()
 
 # initialization
 fvc = fvchandler.FVCHandler('SBIG')
-fvc.scale = 0.0274 # mm/pixel (update um_scale below if not in mm) #Test2 = .0274 Test1 = .0282
+fvc.scale =  config['local']['scale'] # mm/pixel (update um_scale below if not in mm) #Test2 = .0274 Test1 = .0282
 fvc.rotation = 0  # deg
 um_scale = 1000 # um/mm
-bcast_id = 20000
-pos_ids = ['M00015']
-pos_notes = ['T and P compliant motors, 2 orange tabs T, 1 orange tab P'] #notes for report to add about positioner (reported with positioner in same slot as pos_ids list)
+bcast_id = config['positioners']['bcast_id'] # 20000
+pos_ids = config['positioners']['ids']
+pos_notes = config['positioners']['notes'] #notes for report to add about positioner (reported with positioner in same slot as pos_ids list)
 while len(pos_notes) < len(pos_ids):
     pos_notes.append('')
 fid_can_ids = []
-petal_id = 4
+petal_id = config['petal']['petal_id']
 ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
-ptl.anticollision_default = False
+ptl.anticollision_default = config['petal']['anticollision']
 m = posmovemeasure.PosMoveMeasure(ptl,fvc)
-m.n_points_full_calib_T = 17
-m.n_points_full_calib_P = 9
-m.n_fiducial_dots = 0 # number of fiducial centroids the FVC should expect
-num_corr_max = 3 # number of correction moves to do for each target
-
+m.n_points_full_calib_T = config['calib']['n_points_full_calib_T']
+m.n_points_full_calib_P = config['calib']['n_points_full_calib_P']
+m.n_fiducial_dots = config['calib']['n_fiducial_dots'] # number of fiducial centroids the FVC should expect
+num_corr_max = config['mode']['num_corr_max'] # number of correction moves to do for each target
 
 #get general configuration parameters and send them to positioners
 pcomm = petalcomm.PetalComm(petal_id)
@@ -55,20 +64,24 @@ pcomm.set_currents(bcast_id, [curr_spin, curr_cruise, curr_creep, curr_hold], [c
 pcomm.set_periods(bcast_id, creep_p, creep_p, spin_p)
 print('CURRENTS AND PERIODS: ', creep_p, spin_p, curr_spin, curr_cruise, curr_creep, curr_hold) 
 
-# test operations to do
-should_initial_rehome     = True
-should_identify_fiducials = True
-should_identify_pos_loc   = True
-should_calibrate_quick    = True
-should_measure_ranges     = True
-should_calibrate_grid     = False
-should_calibrate_full     = True
-should_do_accuracy_test   = True
-should_auto_commit_logs   = True
-should_report             = True
-should_email              = True
+#select mode
+pcomm.select_mode(bcast_id, 'normal_old')
 
-email_list = 'full' #full or limited
+
+# test operations to do
+should_initial_rehome     = config['mode']['should_initial_rehome']
+should_identify_fiducials = config['mode']['should_identify_fiducials']
+should_identify_pos_loc   = config['mode']['should_identify_pos_loc']
+should_calibrate_quick    = config['mode']['should_calibrate_quick']
+should_measure_ranges     = config['mode']['should_measure_ranges']
+should_calibrate_grid     = config['mode']['should_calibrate_grid']
+should_calibrate_full     = config['mode']['should_calibrate_full']
+should_do_accuracy_test   = config['mode']['should_do_accuracy_test']
+should_auto_commit_logs   = config['mode']['should_auto_commit_logs']
+should_report             = config['mode']['should_report']
+should_email              = config['mode']['should_email']
+
+email_list = config['email']['email_list'] #full or limited
 
 # certain operations require particular preceding operations
 if should_identify_pos_loc: should_initial_rehome = True
@@ -77,30 +90,31 @@ if should_measure_ranges: should_calibrate_quick = True
 # log file setup
 log_directory = pc.test_logs_directory
 os.makedirs(log_directory, exist_ok=True)
-log_suffix = '' # string gets appended to filenames -- useful for user to identify particular tests
+log_suffix = config['mode']['log_suffix'] # string gets appended to filenames -- useful for user to identify particular tests
 log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
 log_timestamp = datetime.datetime.now().strftime(pc.filename_timestamp_format)
+def path_prefix(pos_id):
+    return log_directory + os.path.sep + pos_id + '_' + log_timestamp + log_suffix
 def move_log_name(pos_id):
-    return log_directory + os.path.sep + pos_id + '_' + log_timestamp + log_suffix + '_movedata.csv'
+    return path_prefix(pos_id) + '_movedata.csv'
 def summary_log_name(pos_id):
-    return log_directory + os.path.sep + pos_id + '_' + log_timestamp + log_suffix + '_summary.csv'
+    return path_prefix(pos_id) + '_summary.csv'
 def summary_plot_name(pos_id):
-    return log_directory + os.path.sep + pos_id + '_' + log_timestamp + log_suffix + '_xyplot'
+    return path_prefix(pos_id) + '_xyplot'    
 
 # cycles configuration (for life testing)
 # STILL TO BE IMPLEMENTED
 
 # test grid configuration (local to any positioner, centered on it)
 # this will get copied and transformed to each particular positioner's location below
-grid_max_radius = 5.8 # mm
-grid_min_radius = 0.5 # mm
-n_pts_across = 27 # 7 --> 28 pts, 27 --> 528 pts
+grid_max_radius = config['grid']['grid_max_radius'] # mm
+grid_min_radius =  config['grid']['grid_min_radius'] # mm
+n_pts_across = config['grid']['n_pts_across']  # 7 --> 28 pts, 27 --> 528 pts
 line = np.linspace(-grid_max_radius,grid_max_radius,n_pts_across)
 local_targets = [[x,y] for x in line for y in line]
 for i in range(len(local_targets)-1,-1,-1): # traverse list from end backward
     r = (local_targets[i][0]**2 + local_targets[i][1]**2)**0.5
     if r < grid_min_radius or r > grid_max_radius: local_targets.pop(i)
-
 '''
 select_targets=[]
 select_targets.extend(local_targets[1:5])
@@ -125,7 +139,7 @@ try:
     if should_initial_rehome:
         print("REHOME")
         m.rehome(pos_ids='all')
-    
+
     # identify fiducials
     if should_identify_fiducials:
         print("ID FIDUCIALS")
