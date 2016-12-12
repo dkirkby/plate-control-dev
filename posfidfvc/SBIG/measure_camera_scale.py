@@ -65,13 +65,14 @@ while keep_measuring:
 #        xy.append(fvc.fvc_measure_with_ref([])) #no xy_ref output for fvc; Mx2 values
 #          don't really need fvc_measure_with_ref here. mMaybe want to resurrect this later.  
         sbig = sbig_grab_cen.SBIG_Grab_Cen()
-        xywin,brightness,t = sbig.grab(1)
+        xywin,brightness,t = sbig.grab(2)
+        print("centroids measured: ",xywin)
         measurement.append(xywin)
     else:
         print ("Didn't recognize input.\n")
         
 # input_pos is a list of the positions (this is typically in micron, e.g. [0,10,20])
-xy=tuple(x[0] for x in measurement) # this is now a list of [xcen,ycen,fwhm] again
+xy=list([x[0],x[1]] for x in measurement) # this is now a list of [xcen,ycen,fwhm] again
 
 if verbose:
     print("*************")
