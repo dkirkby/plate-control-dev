@@ -229,6 +229,7 @@ petalbox/petalcontroller.ini.default -text
 petalbox/petalcontroller.py -text
 petalbox/petalcontroller3.py -text
 petalbox/petalcontroller_dos.py -text
+petalbox/petalcontroller_orig.py -text
 petalbox/petalcontroller_sim.py -text
 petalbox/pf_utility.py -text
 petalbox/pfutility.sh -text
