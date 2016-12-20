@@ -9,11 +9,13 @@ import numpy as np
 import csv
 import sys
 
-class PostPlots(object):
-	def __init__(self):
-		pass
 
-	def read_movedata(self,filename):
+class PostPlots(object):
+	def __init__(self,filename):
+		self.filename=filename
+
+
+	def read_movedata(self):
 		"""
 		Reads movedata from filename and returns dictionary 'movedata'
 		INPUT
@@ -35,7 +37,8 @@ class PostPlots(object):
 				'pos_p<i>'
 
 		"""	
-		movefile=csv.DictReader(open(filename))
+
+		movefile=csv.DictReader(open(self.filename))
 		movedata={}
 		for row in movefile:
 		    for column, value in row.items():
@@ -133,12 +136,10 @@ class PostPlots(object):
 		TX=np.array([float(i) for i in movelist['target_x']])
 		TY=np.array([float(i) for i in movelist['target_y']])
 
-		for i in range (0,nmoves):
-			ax=fig6.add_subplot(wins+i+1)
-
-			DX=np.array([float(i) for i in movelist['meas_x'+str(i)]]) - TX
-			DY=np.array([float(i) for i in movelist['meas_y'+str(i)]]) - TY
-
+		for ii in range (0,nmoves):
+			ax=fig6.add_subplot(wins+ii+1)
+			DX=np.array([float(i) for i in movelist['meas_x'+str(ii)]]) - TX
+			DY=np.array([float(i) for i in movelist['meas_y'+str(ii)]]) - TY
 			distance = np.sqrt(DX**2 + DY**2) * 1000.
 
 			if i==0:
@@ -155,7 +156,7 @@ class PostPlots(object):
 			avg=np.mean(distance)
 			rms = np.sqrt(np.mean(distance*distance))
 			maxval = np.max(distance)
-			text='Submove '+str(i)
+			text='Submove '+str(ii)
 			ax.text(0.4,0.9,text,transform=ax.transAxes)
 
 			lvals=('Max: ','Mean: ','Sigma: ','Avg: ','RMS: ')
@@ -178,10 +179,12 @@ class PostPlots(object):
 
 if __name__=="__main__":
 
-	post=PostPlots()
-	filepath=''
+	filepath=os.environ['POSITIONER_LOGS']+'/test_logs'
 	filename='M00175_2016-12-05_T172230_slamtest20'
-	movelist=post.read_movedata(filepath+filename+'_movedata.csv')
+
+	post=PostPlots(filepath+filename+'_movedata.csv')
+
+	movelist=post.read_movedata()
 	ngridpoints=movelist['nentries']
 	print("... creating histoplot")
 	fig=post.histoplot(movelist)
