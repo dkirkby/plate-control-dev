@@ -80,6 +80,7 @@ should_do_accuracy_test   = config['mode']['should_do_accuracy_test']
 should_auto_commit_logs   = config['mode']['should_auto_commit_logs']
 should_report             = config['mode']['should_report']
 should_email              = config['mode']['should_email']
+should_final_position     = config['mode']['should_final_position']
 
 email_list = config['email']['email_list'] #full or limited
 
@@ -135,6 +136,9 @@ local_targets =select_targets
 #    itarget[0]=itarget[0]+0.05
 #    itarget[1]=itarget[1]+0.05
 try:
+    #Update config files
+    os.system('svn up ' + pc.pos_settings_directory)
+
     # initial homing
     if should_initial_rehome:
         print("REHOME")
@@ -303,7 +307,17 @@ try:
                 os.system('svn commit ' + pc.test_logs_directory + ' -m "' + log_timestamp + ' test logs"')
             except:
                 print('Failed to commit files.')
-                    
+    
+    #Reset to neutral position                
+    if should_final_position:
+        target = {}
+        for pos_id in pos_ids:
+            target[pos_id] = {'command':'posTP', 'target':[180,-3]}
+        m.move(target)
+        print('Setting to neutral position')
+    
+    #Commit config files
+    os.system('svn commit ' + pc.pos_settings_directory + ' -m "Auto updated configuration files."')
 
 except (KeyboardInterrupt, SystemExit):
     raise
