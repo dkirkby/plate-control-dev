@@ -25,9 +25,9 @@ stat_list = ['max','min','avg','rms']
 indent = '    '
 um_scale = 1000
 #People who want test results
-teststand_watcherlist = ['kfanning@umich.edu','gtarle@umich.edu','schubnel@umich.edu','cweave@umich.edu','njswimm@umich.edu','igershko@umich.edu', 'plawton@umich.edu']
+teststand_watcherlist = ['kfanning@umich.edu','gtarle@umich.edu','schubnel@umich.edu','cweave@umich.edu','njswimm@umich.edu','igershko@umich.edu', 'bfreud@umich.edu']
 #People who want test error reports
-teststand_operatorlist = ['kfanning@umich.edu','plawton@umich.edu','njswimm@umich.edu']
+teststand_operatorlist = ['kfanning@umich.edu', 'bfreud@umich.edu','njswimm@umich.edu']
 
 def fmt(number):
     return format(number,'.1f')
@@ -41,7 +41,7 @@ def stat_summ(stat, value, mean, stdev, unit = ''):
         preposition = ' standard deviations above the mean of all tests'
     return stat + ' = ' + fmt(value) + unit + ', ' + fmt(num_stdevs) + preposition
 
-def status(max0, max1, max2, rms3):
+def status(max0, max1, max2, max3, rms3):
     reason = ''
     if max0 > 100:
         condition = ' FAIL \n'
@@ -55,13 +55,16 @@ def status(max0, max1, max2, rms3):
     if max2 > 100:
         condition = ' FAIL \n'
         reason += '    Failure reason 4: correction move 2 max error (' + fmt(max2) + 'um) is above 100um.\n'
+    if max3 > 12:
+        condition = ' FAIL \n'
+        reason += '    Failure reason 5: correction move 3 max error (' + fmt(max3) + 'um) is above 12um.\n'
     if reason == '':
         return ' PASS \n'
     else:
         return condition + reason
         
-def pass_fail(max0,max1,max2,rms3):
-    if (max0 > 100) or (max1 > 100) or (max2 > 100) or (rms3 > 5):
+def pass_fail(max0,max1,max2,max3,rms3):
+    if (max0 > 100) or (max1 > 100) or (max2 > 100) or (max3 > 12) or (rms3 > 5):
         return 'FAIL'
     else:
         return 'PASS'
@@ -81,6 +84,7 @@ def email_report(text, timestamp, pos_ids,to='limited'):
         message['From'] = 'UM-DESI Test Stand'
         message['To'] = ', '.join(recipients)
         file = pc.test_logs_directory + timestamp + '_report.txt'
+        #Attach text report
         try:
             fp = open(file)
             attachment = MIMEText(fp.read())
@@ -91,6 +95,13 @@ def email_report(text, timestamp, pos_ids,to='limited'):
             print('Failed to attach file:',file)
         image_types = ['xyplot_submove0.png','xyplot_submove1.png']
         for pos_id in pos_ids:
+            #Attach movedata
+            movedata = pc.test_logs_directory + pos_id + '_' + timestamp + '_' + 'movedata.csv'
+            mvdt = open(movedata)
+            attm = MIMEText(mvdt.read())
+            attm.add_header('Content-Disposition', 'attachment', filename=(pos_id + '_' + timestamp + '_' + 'movedata.csv'))
+            message.attach(attm)
+            #Attach submove images
             for image in image_types:
                 file = pc.test_logs_directory + pos_id + '_' + timestamp + '_' + image
                 try:
@@ -193,7 +204,7 @@ def do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, time, 
                 lst.append({'max':max3[-1],'min':min3[-1],'avg':avg3[-1],'rms':rms3[-1]})
         summary_posids[pos_id] = lst
     for i in range(len_old, len(min0)):
-        pf.append(pass_fail(max0[i],max1[i],max1[i],rms3[i]))
+        pf.append(pass_fail(max0[i],max1[i],max2[i],max3[i],rms3[i]))
                 
     statistics = [{'min':{'mean':np.mean(min0),'stdev':np.sqrt(np.mean(np.array(min0)**2)-np.mean(min0)**2)},
                    'max':{'mean':np.mean(max0),'stdev':np.sqrt(np.mean(np.array(max0)**2)-np.mean(max0)**2)},
@@ -220,19 +231,19 @@ def do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, time, 
     #Write log
     report_log = pc.test_logs_directory + log_timestamp + '_report.txt'
     text = 'UM Positioner Test Report\n' + 'Test ID: ' + log_timestamp + '\n\n' + 'Positioner status (more detail below):\n'
-    email = 'UM Positioner Test Report\n' + 'Test ID: ' + log_timestamp + '\n'+ 'Execute time: ' + time + 'hours\n\n' + 'Positioner status:\n'
+    email = 'UM Positioner Test Report\n' + 'Test ID: ' + log_timestamp + '\n'+ 'Execute time: ' + str(time) + ' hours\n\n' + 'Positioner status:\n'
     count = 0
     for pos_id in pos_ids:
         data = summary_posids[pos_id]
-        text += pos_id + ' - ' + pass_fail(data[0]['max'],data[1]['max'],data[2]['max'],data[3]['rms']) + '\n'
+        text += pos_id + ' - ' + pass_fail(data[0]['max'],data[1]['max'],data[2]['max'],data[3]['max'],data[3]['rms']) + '\n'
         count += 1
         if count%5 == 0:
             text += '\n             '
     text += '\n\n\n\n'
     for pos_id in pos_ids:
         data = summary_posids[pos_id]
-        text += 'Positioner ' + pos_id + ' -' + status(data[0]['max'],data[1]['max'],data[2]['max'],data[3]['rms'])
-        email += '\nPositioner: ' + pos_id + ' - ' + pass_fail(data[0]['max'],data[1]['max'],data[2]['max'],data[3]['rms']) + '\n'
+        text += 'Positioner ' + pos_id + ' -' + status(data[0]['max'],data[1]['max'],data[2]['max'],data[3]['max'],data[3]['rms'])
+        email += '\nPositioner: ' + pos_id + ' - ' + pass_fail(data[0]['max'],data[1]['max'],data[2]['max'],data[3]['max'],data[3]['rms']) + '\n'
         if pos_notes[pos_ids.index(pos_id)] != '':
             email += pos_notes[pos_ids.index(pos_id)] + '\n'
         for i in range(len(move_list)):
@@ -272,7 +283,9 @@ def do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, time, 
     write_ts = open(test_summaries,'a')
     write_ts.write(update)
     write_ts.close()
+    '''
     try:
         os.system('svn commit ' + test_summaries + ' -m "UM_test_summaries automated update"')
     except:
         pass
+    '''
