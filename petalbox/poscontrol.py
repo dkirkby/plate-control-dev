@@ -18,6 +18,7 @@ import pickle
 from configobj import ConfigObj
 import sys, os
 sys.path.append(os.path.abspath('../petal/'))
+
 import petal
 import petalcomm
 
@@ -30,7 +31,9 @@ except:
 	except:
 		pass
 
-petal_id = int(sys.argv[1])
+PCnum = int(os.popen('more /home/msdos/dos_home/dos_config/start_PETALCONTROLLER | grep DEVICE=').readlines()[0].split('PC')[1].replace('"\n',''))
+petal_id = PCnum
+
 pos_ids=[]
 list = os.popen('ls ../petal/pos_settings').readlines()
 for unit in list:
