@@ -290,6 +290,7 @@ petal/protodesi_config.json -text
 petal/protodesisim_config.json -text
 petal/test_poscollider.py -text
 petalbox/bootloadcontrol.py -text
+petalbox/canmap.json -text
 petalbox/docs/systec-readme.txt -text
 petalbox/drivers/systec-readme.txt -text
 petalbox/drivers/systec_can-V0.9.0.tar.bz2 -text
