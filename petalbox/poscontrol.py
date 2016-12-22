@@ -22,14 +22,7 @@ sys.path.append(os.path.abspath('../petal/'))
 import petal
 import petalcomm
 
-#for for FW version >= 3.0, start in normal mode:
-try:
-	os.system('cansend can0 004E2080#00')
-except:
-	try:
-		os.system('cansend can2 004e2080#00')
-	except:
-		pass
+
 
 PCnum = int(os.popen('more /home/msdos/dos_home/dos_config/start_PETALCONTROLLER | grep DEVICE=').readlines()[0].split('PC')[1].replace('"\n',''))
 petal_id = PCnum
@@ -208,6 +201,7 @@ class PositionerControl(object):
                 labelpos = 'w',
                 label_text = 'Delta Theta (deg):',
                 validate = None,
+                value = '0',
                 command = self.read_theta)
 		self._dtheta.pack(side=TOP,  expand=1, padx=10, pady=5)
 
@@ -215,6 +209,7 @@ class PositionerControl(object):
                 labelpos = 'w',
                 label_text = '    Delta Phi (deg):',
                 validate = None,
+                value = '0',
                 command = self.read_phi)
 		self._dphi.pack(side=TOP,  expand=1, padx=10, pady=5)
 
@@ -223,6 +218,12 @@ class PositionerControl(object):
 			text = 'Move', 
 			command = self.move_pos,height=0)
 		move_button.pack(side=RIGHT)
+
+		finsert_button = Button(ctrlgroup.interior(),
+			bg='gainsboro',
+			text='Insert Fiber',
+			command=self.finsert_pos, height=0)
+		finsert_button.pack(side=LEFT)
 
 		home_button = Button(ctrlgroup.interior(),
 			bg='gainsboro',
@@ -375,14 +376,30 @@ class PositionerControl(object):
 		request[posid] = {'target': [theta, phi]}
 		self.ptl.request_direct_dtdp(request)
 		self.ptl.schedule_send_and_execute_moves()
+		self._dtheta.setvalue('0')
+		self._dphi.setvalue('0')
 
 		self.write_stext(stext)
+
 	def home_pos(self):
 		posid=self._posid.getvalue()
 		stext=' Move req.: Home ID'+posid+'\n'
 		self.write_stext(stext)
 		self.ptl.request_homing(posid)
 		self.ptl.schedule_send_and_execute_moves()
+
+	def finsert_pos(self):
+		posid=self._posid.getvalue()
+		stext=' Move req.: Insert Fiber ID'+posid+'\n'
+		self.ptl.request_homing(posid)
+		self.ptl.schedule_send_and_execute_moves()
+
+		request = {}
+		request[posid] = {'target': [180, -3]}
+		self.ptl.request_direct_dtdp(request)
+		self.ptl.schedule_send_and_execute_moves()
+		self.write_stext(stext)
+
 
 	def sec2HMS(self,seconds):
 		seconds=int(seconds)
