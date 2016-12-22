@@ -85,6 +85,7 @@ class BootLoadControl(object):
 				time.sleep(.1)
 				id, data = self.scan.send_command_recv(can_id, self.ver_comnr, '')
 				data = ''.join("{:02x}".format(c) for c in data)
+				
 				verification[can_id] = int(data[1])
 				if verification[can_id]:
 					verification[can_id] = 'OK'
@@ -174,7 +175,10 @@ class BootLoadControl(object):
 			return 'FAILED: Error with bootloader programming: %s' % str(e)
 
 
-
+if __name__ == '__main__':
+	
+	bc=BootLoadControl()
+	bc.program(20000, 'fw30.hex')
 
 
 
