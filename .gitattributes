@@ -45,6 +45,9 @@ petal/pos_settings/unit_M00033.conf -text
 petal/pos_settings/unit_M00034.conf -text
 petal/pos_settings/unit_M00035.conf -text
 petal/pos_settings/unit_M00038.conf -text
+petal/pos_settings/unit_M00039.conf -text
+petal/pos_settings/unit_M00043.conf -text
+petal/pos_settings/unit_M00044.conf -text
 petal/pos_settings/unit_M00051.conf -text
 petal/pos_settings/unit_M00053.conf -text
 petal/pos_settings/unit_M00055.conf -text
@@ -61,7 +64,10 @@ petal/pos_settings/unit_M00065.conf -text
 petal/pos_settings/unit_M00066.conf -text
 petal/pos_settings/unit_M00067.conf -text
 petal/pos_settings/unit_M00068.conf -text
+petal/pos_settings/unit_M00073.conf -text
+petal/pos_settings/unit_M00082.conf -text
 petal/pos_settings/unit_M00091.conf -text
+petal/pos_settings/unit_M00096.conf -text
 petal/pos_settings/unit_M00169.conf -text
 petal/pos_settings/unit_M00170.conf -text
 petal/pos_settings/unit_M00171.conf -text
