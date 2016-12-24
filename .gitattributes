@@ -307,6 +307,7 @@ petalbox/posfidcansim.py -text
 petalbox/ptltel.py -text
 petalbox/util/dotprofile -text
 petalbox/util/mvtest.py -text
+petalbox_img/Petalcontroller[!!-~]Setup[!!-~]Instructions.docx -text
 posfidfvc/SBIG/SBIG_dev/51-sbig-debian.rules -text
 posfidfvc/SBIG/SBIG_dev/arm/libsbigudrv.a -text
 posfidfvc/SBIG/SBIG_dev/arm/libsbigudrv.so -text
