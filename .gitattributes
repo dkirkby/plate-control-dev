@@ -323,6 +323,7 @@ posfidfvc/SBIG/sbig_grab_cen.py -text
 posfidfvc/SBIG/sbigcam.py -text
 posfidfvc/SBIG/stf.py -text
 posfidfvc/__init__.py -text
+posfidfvc/accelerated_lifetime_test.py -text
 posfidfvc/accuracy_test.default.conf -text
 posfidfvc/arc_accuracy_test.py -text
 posfidfvc/fitcircle.py -text
