@@ -329,6 +329,7 @@ posfidfvc/arc_accuracy_test.py -text
 posfidfvc/fitcircle.py -text
 posfidfvc/fvchandler.py -text
 posfidfvc/fvchandler_dos.py -text
+posfidfvc/lifetime_test.py -text
 posfidfvc/motormovemeasure.py -text
 posfidfvc/motortest.py -text
 posfidfvc/pd_accuracy_test.py -text
