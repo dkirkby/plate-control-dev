@@ -31,7 +31,7 @@ class AccuracyTest(object):
 #		self.logging=True
 
 
-	def  xyaccuracy_test(self):
+	def  run_xyaccuracy_test(self):
 
 		config = self.config
 
