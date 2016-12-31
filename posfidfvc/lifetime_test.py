@@ -5,7 +5,7 @@ sys.path.append(os.path.abspath('../petal/'))
 import petal
 import fvchandler
 import posmovemeasure
-import accuracy_test
+import xyaccuracy_test
 from os import environ
 
 def generate_random_posXY(r_min, r_max):
@@ -93,23 +93,19 @@ for local_target in move_list:
         these_targets[pos_id] = {'command':'posXY', 'target':local_target}
     life_moves.append(these_targets)
 
-acc_test=accuracy_test.AccuracyTest()
-
-
+acc_test=xyaccuracy_test.AccuracyTest()
+acc_test.enable_logging()
 for i in range(LOOPS):
     print('Running accuracy test', i+1, 'of', LOOPS+1)
     acc_test.run_xyaccuracy_test()
-    print('Starting loop', i+1, 'of', loops)
+    print('Starting loop', i+1, 'of', LOOPS)
     print('REPOSITIONING', num_moves, 'CYCLES.') #Move Cycles
+    m = posmovemeasure.PosMoveMeasure(ptl,fvc)
     for j in range(len(move_list)):
         print('Cycle', j+1, 'of', num_moves)
         m.move(life_moves[j])
 
 print('Running accuracy test', i+1, 'of', LOOPS+1)
 acc_test.run_xyaccuracy_test()
-
-
-
-
 
 
