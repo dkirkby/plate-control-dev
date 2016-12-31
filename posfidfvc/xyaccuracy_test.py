@@ -13,27 +13,27 @@ import um_test_report as test_report
 import traceback
 import logging
 import petalcomm
-import posmodel
+import posmodel as pmodel
 import configobj
-
+import shutil
 
 
 class AccuracyTest(object):
 
 	def __init__(self,configfile='accuracy_test.conf'): 
 		self.config = configobj.ConfigObj(configfile,unrepr=True)
-#		self.logging=False
+		self.log=False
 
-#	def enable_logging(self,logfile='')		
-#		now=datetime.datetime.now().strftime("%y%m%d.%H%M%S")
-#		if not logfile: logfile = 'xyaccuracy_test_'+now
-#		self.logfile=logfile
-#		self.logging=True
+	def enable_logging(self,logfile=''):		
+		now=datetime.datetime.now().strftime("%y%m%d.%H%M%S")
+		if not logfile: logfile = 'xyaccuracy_test_'+now+'.log'
+		logging.basicConfig(filename=logfile,format='%(asctime)s %(message)s',level=logging.INFO)		# ToDo: read logging level from config file
+		self.log=True
 
-
-	def  run_xyaccuracy_test(self):
+	def run_xyaccuracy_test(self):
 
 		config = self.config
+		log=self.log
 
 		# start timer on the whole script
 		script_start_time = time.time()
@@ -60,7 +60,8 @@ class AccuracyTest(object):
 
 		#get general configuration parameters and send them to positioners
 		pcomm = petalcomm.PetalComm(petal_id)
-		pm = posmodel.PosModel()
+
+		pm = pmodel.PosModel()
 
 		creep_p = pm.state.read('CREEP_PERIOD')
 		spin_p = pm.state.read('SPINUPDOWN_PERIOD')
@@ -72,8 +73,9 @@ class AccuracyTest(object):
 
 		pcomm.set_currents(bcast_id, [curr_spin, curr_cruise, curr_creep, curr_hold], [curr_spin, curr_cruise, curr_creep, curr_hold])
 		pcomm.set_periods(bcast_id, creep_p, creep_p, spin_p)
-		print('CURRENTS AND PERIODS: ', creep_p, spin_p, curr_spin, curr_cruise, curr_creep, curr_hold,flush=True) 
 
+		print('CURRENTS AND PERIODS: ', creep_p, spin_p, curr_spin, curr_cruise, curr_creep, curr_hold) 
+		if log: logging.info('setting CURRENTS AND PERIODS: ')
 		#select mode
 		#pcomm.select_mode(bcast_id, 'normal_old')  # MS Dec29, 2016: commented out per advice from Irena
 
@@ -112,6 +114,19 @@ class AccuracyTest(object):
 			return path_prefix(pos_id) + '_summary.csv'
 		def summary_plot_name(pos_id):
 			return path_prefix(pos_id) + '_xyplot'    
+		def cal_prior_name(pos_id):
+			return path_prefix(pos_id) + '_cal_prior.conf'    
+		def cal_after_name(pos_id):
+			return path_prefix(pos_id) + '_cal_after.conf' 
+
+
+		# save a copy of the unit_*.conf file prior to calibration	
+		for pos_id in pos_ids:
+			try:
+				shutil.copy2(pc.pos_settings_directory+'/unit_'+pos_id+'.conf',cal_prior_name(pos_id))
+			except:
+				print ("Error copying unit_"+pos_id+" file")
+
 
 		# cycles configuration (for life testing)
 		# STILL TO BE IMPLEMENTED
@@ -132,26 +147,31 @@ class AccuracyTest(object):
 			# initial homing
 			if should_initial_rehome:
 				print("REHOME")
+				if log: logging.info("REHOME")
 				m.rehome(pos_ids='all')
 
 			# identify fiducials
 			if should_identify_fiducials:
 				print("ID FIDUCIALS")
+				if log: logging.info("ID FIDUCIALS")
 				m.identify_fiducials()
 			
 			# identification of which positioners are in which (x,y) locations on the petal
 			if should_identify_pos_loc:
 				print("ID POS")
+				if log: logging.info("ID POS")
 				m.identify_positioner_locations()
 				
 			# quick pre-calibration, especially because we need some reasonable values for theta offsets prior to measuring physical travel ranges (where phi arms get extended)
 			if should_calibrate_quick:
 				print("CALIBRATE QUICK")
+				if log: logging.info("CALIBRATE QUICK")
 				m.calibrate(pos_ids='all', mode='quick', save_file_dir=log_directory, save_file_timestamp=log_timestamp)
 			
 			# measure the physical travel ranges of the theta and phi axes by ramming hard limits in both directions
 			if should_measure_ranges:
 				print("MEASURE RANGES") 
+				if log: logging.info("MEASURE RANGES")
 				m.measure_range(pos_ids='all', axis='theta')
 				m.measure_range(pos_ids='all', axis='phi')
 				m.rehome(pos_ids='all')
@@ -205,8 +225,13 @@ class AccuracyTest(object):
 				# run the test
 				for these_targets in all_targets:
 					targ_num += 1
-					print('\nMEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets)))
-					print('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
+					message='\nMEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets))
+					print(message)
+					if log: logging.info(message)
+					message='Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.'
+
+					print(message)
+					if log: logging.info(message)
 					this_timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
 					these_meas_data = m.move_and_correct(these_targets, num_corr_max=num_corr_max)
 					
@@ -278,6 +303,15 @@ class AccuracyTest(object):
 				script_exec_time = time.time() - script_start_time
 				test_time = format(script_exec_time/60/60,'.1f')        
 				
+
+				# save a copy of the unit_*.conf file prior to calibration	
+				for pos_id in pos_ids:
+					try:
+						shutil.copy2(pc.pos_settings_directory+'/unit_'+pos_id+'.conf',cal_after_name(pos_id))
+					except:
+						print ("Error copying unit_"+pos_id+" file")
+
+
 				#Test report and email only on certain tests
 				if should_report and num_corr_max == 3 and n_pts_across == 27:
 					test_report.do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, should_email, email_list)
@@ -308,4 +342,6 @@ class AccuracyTest(object):
 			raise
 			
 		script_exec_time = time.time() - script_start_time
-		print('Total test time: ' + format(script_exec_time/60/60,'.1f') + 'hrs')
+		message='Total test time: ' + format(script_exec_time/60/60,'.1f') + 'hrs'
+		print(message)
+		if log: logging.info(message)
