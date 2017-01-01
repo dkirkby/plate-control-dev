@@ -20,9 +20,11 @@ import shutil
 
 class AccuracyTest(object):
 
-	def __init__(self,configfile='accuracy_test.conf'): 
+	def __init__(self,petal,posmove,configfile='accuracy_test.conf'): 
 		self.config = configobj.ConfigObj(configfile,unrepr=True)
 		self.log=False
+		self.m=posmove   
+		self.ptl=petal
 
 	def enable_logging(self,logfile=''):		
 		now=datetime.datetime.now().strftime("%y%m%d.%H%M%S")
@@ -31,6 +33,8 @@ class AccuracyTest(object):
 		self.log=True
 
 	def run_xyaccuracy_test(self):
+		m=self.m
+		ptl=self.ptl
 
 		config = self.config
 		log=self.log
@@ -50,9 +54,9 @@ class AccuracyTest(object):
 			pos_notes.append('')
 		fid_can_ids = []
 		petal_id = config['petal']['petal_id']
-		ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
+		#ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
 		ptl.anticollision_default = config['petal']['anticollision']
-		m = posmovemeasure.PosMoveMeasure(ptl,fvc)
+		#m = posmovemeasure.PosMoveMeasure(ptl,fvc)
 		m.n_points_full_calib_T = config['calib']['n_points_full_calib_T']
 		m.n_points_full_calib_P = config['calib']['n_points_full_calib_P']
 		m.n_fiducial_dots = config['calib']['n_fiducial_dots'] # number of fiducial centroids the FVC should expect
