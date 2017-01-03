@@ -339,7 +339,6 @@ posfidfvc/pos_xytest_plot.py -text
 posfidfvc/poscalibplot.py -text
 posfidfvc/posmovemeasure.py -text
 posfidfvc/posmovemeasure_dos.py -text
-posfidfvc/um_accuracy_test.py -text
 posfidfvc/um_test_report.py -text
 posfidfvc/xy_accuracy_post.py -text
 posfidfvc/xy_accuracy_test.py -text
