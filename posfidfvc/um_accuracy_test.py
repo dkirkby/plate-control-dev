@@ -19,9 +19,10 @@ import configobj
 
 # read the configuration file
 if len(sys.argv) ==1:
-    configfile='accuracy_test.conf'
+    configfile=os.environ['POSFIDFVC_PATH']+'/accuracy_test.conf'
 else:
     configfile=sys.argv[1]
+print("configfile:",configfile,flush=True)
 
 config = configobj.ConfigObj(configfile,unrepr=True)
 
@@ -62,10 +63,10 @@ curr_hold = pm.state.read('CURR_HOLD')
 
 pcomm.set_currents(bcast_id, [curr_spin, curr_cruise, curr_creep, curr_hold], [curr_spin, curr_cruise, curr_creep, curr_hold])
 pcomm.set_periods(bcast_id, creep_p, creep_p, spin_p)
-print('CURRENTS AND PERIODS: ', creep_p, spin_p, curr_spin, curr_cruise, curr_creep, curr_hold) 
+print('CURRENTS AND PERIODS: ', creep_p, spin_p, curr_spin, curr_cruise, curr_creep, curr_hold,flush=True) 
 
 #select mode
-pcomm.select_mode(bcast_id, 'normal_old')
+#pcomm.select_mode(bcast_id, 'normal_old')  # MS Dec29, 2016: commented out per advice from Irena
 
 
 # test operations to do
@@ -132,13 +133,8 @@ select_targets.extend(local_targets[201:213])
 select_targets.extend(local_targets[226:238])
 local_targets =select_targets
 '''
-#for itarget in local_targets:
-#    itarget[0]=itarget[0]+0.05
-#    itarget[1]=itarget[1]+0.05
-try:
-    #Update config files
-    os.system('svn up ' + pc.pos_settings_directory)
 
+try:
     # initial homing
     if should_initial_rehome:
         print("REHOME")
@@ -307,17 +303,7 @@ try:
                 os.system('svn commit ' + pc.test_logs_directory + ' -m "' + log_timestamp + ' test logs"')
             except:
                 print('Failed to commit files.')
-    
-    #Reset to neutral position                
-    if should_final_position:
-        target = {}
-        for pos_id in pos_ids:
-            target[pos_id] = {'command':'posTP', 'target':[180,-3]}
-        m.move(target)
-        print('Setting to neutral position')
-    
-    #Commit config files
-    os.system('svn commit ' + pc.pos_settings_directory + ' -m "Auto updated configuration files."')
+                    
 
 except (KeyboardInterrupt, SystemExit):
     raise
