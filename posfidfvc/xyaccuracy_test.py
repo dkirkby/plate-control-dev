@@ -1,3 +1,12 @@
+# module xyaccuracy_test.py
+# created December 2016 based on xy_accuracy_test.py
+#
+# Change log:
+# 
+# 
+#
+
+
 import os
 import sys
 sys.path.append(os.path.abspath('../petal/'))
@@ -15,7 +24,8 @@ import logging
 import petalcomm
 import posmodel as pmodel
 import configobj
-import shutil
+
+
 
 
 class AccuracyTest(object):
@@ -26,7 +36,7 @@ class AccuracyTest(object):
 
 	def enable_logging(self,logfile=''):		
 		now=datetime.datetime.now().strftime("%y%m%d.%H%M%S")
-		if not logfile: logfile = 'log/xyaccuracy_test_'+now+'.log'
+		if not logfile: logfile = 'logs/xyaccuracy_test_'+now+'.log'
 		logging.basicConfig(filename=logfile,format='%(asctime)s %(message)s',level=logging.INFO)		# ToDo: read logging level from config file
 		self.log=True
 
@@ -348,6 +358,6 @@ class AccuracyTest(object):
 		return m
 
 if __name__=="__main__":
-	acc_test=xyaccuracy_test.AccuracyTest()
+	acc_test=AccuracyTest()
 	acc_test.enable_logging()
 	acc_test.run_xyaccuracy_test()
