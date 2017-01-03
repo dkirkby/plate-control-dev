@@ -20,22 +20,17 @@ import shutil
 
 class AccuracyTest(object):
 
-	def __init__(self,petal,posmove,configfile='accuracy_test.conf'): 
+	def __init__(self,configfile='accuracy_test.conf'): 
 		self.config = configobj.ConfigObj(configfile,unrepr=True)
 		self.log=False
-		self.m=posmove   
-		self.ptl=petal
 
 	def enable_logging(self,logfile=''):		
 		now=datetime.datetime.now().strftime("%y%m%d.%H%M%S")
-		if not logfile: logfile = 'xyaccuracy_test_'+now+'.log'
+		if not logfile: logfile = 'log/xyaccuracy_test_'+now+'.log'
 		logging.basicConfig(filename=logfile,format='%(asctime)s %(message)s',level=logging.INFO)		# ToDo: read logging level from config file
 		self.log=True
 
 	def run_xyaccuracy_test(self):
-		m=self.m
-		ptl=self.ptl
-
 		config = self.config
 		log=self.log
 
@@ -54,9 +49,9 @@ class AccuracyTest(object):
 			pos_notes.append('')
 		fid_can_ids = []
 		petal_id = config['petal']['petal_id']
-		#ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
+		ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
 		ptl.anticollision_default = config['petal']['anticollision']
-		#m = posmovemeasure.PosMoveMeasure(ptl,fvc)
+		m = posmovemeasure.PosMoveMeasure(ptl,fvc)
 		m.n_points_full_calib_T = config['calib']['n_points_full_calib_T']
 		m.n_points_full_calib_P = config['calib']['n_points_full_calib_P']
 		m.n_fiducial_dots = config['calib']['n_fiducial_dots'] # number of fiducial centroids the FVC should expect
@@ -79,7 +74,7 @@ class AccuracyTest(object):
 		pcomm.set_periods(bcast_id, creep_p, creep_p, spin_p)
 
 		print('CURRENTS AND PERIODS: ', creep_p, spin_p, curr_spin, curr_cruise, curr_creep, curr_hold) 
-		if log: logging.info('setting CURRENTS AND PERIODS: ')
+		if log: logging.info('setting CURRENTS AND PERIODS')
 		#select mode
 		#pcomm.select_mode(bcast_id, 'normal_old')  # MS Dec29, 2016: commented out per advice from Irena
 
@@ -232,10 +227,11 @@ class AccuracyTest(object):
 					message='\nMEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets))
 					print(message)
 					if log: logging.info(message)
-					message='Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.'
 
+					message='Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.'
 					print(message)
 					if log: logging.info(message)
+
 					this_timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
 					these_meas_data = m.move_and_correct(these_targets, num_corr_max=num_corr_max)
 					
@@ -349,3 +345,9 @@ class AccuracyTest(object):
 		message='Total test time: ' + format(script_exec_time/60/60,'.1f') + 'hrs'
 		print(message)
 		if log: logging.info(message)
+		return m
+
+if __name__=="__main__":
+	acc_test=xyaccuracy_test.AccuracyTest()
+	acc_test.enable_logging()
+	acc_test.run_xyaccuracy_test()
