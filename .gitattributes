@@ -408,6 +408,7 @@ posfirmware/develop/BootLoaderSTM32F103/stm32f10x_flash.crf -text
 posfirmware/develop/BootLoaderSTM32F103/stm32f10x_flash.d -text
 posfirmware/develop/BootLoaderSTM32F103/system_stm32f10x.crf -text
 posfirmware/develop/BootLoaderSTM32F103/system_stm32f10x.d -text
+posfirmware/develop/bootloader_description.pdf -text svneol=unset#unset
 posfirmware/develop/bootloadersyncf31.c -text
 posfirmware/develop/fipos_fw_2.0dev.c -text
 posfirmware/develop/fipos_fw_2.1dev.c -text
