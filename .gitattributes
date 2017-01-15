@@ -359,6 +359,7 @@ posfidfvc/SBIG/readme -text
 posfidfvc/SBIG/sbig_grab_cen.py -text
 posfidfvc/SBIG/sbigcam.py -text
 posfidfvc/SBIG/stf.py -text
+posfidfvc/SBIG/usbreset.c -text
 posfidfvc/SBIG/usbreset.py -text
 posfidfvc/__init__.py -text
 posfidfvc/accelerated_lifetime_test.py -text
