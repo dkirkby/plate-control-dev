@@ -20,9 +20,8 @@ try:
 except:
 	pass	
 cam.verbose=True
-cam.open_camera()  
-cam.initialize_shutter()    
-cam.set_exposure_time = 100
+cam.open_camera()   
+cam.set_exposure_time(200)
 cam.set_dark(False)
 cam.start_exposure
 L = flip_horizontal(cam.start_exposure())
