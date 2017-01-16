@@ -125,7 +125,7 @@ def email_error(traceback, timestamp): #TODO add helpful interpretation of trace
     except:
         print('Failed to email message')
 
-def do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, time, should_email=False, to='full'):
+def do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, time, to='full'):
     #Gather Data    
     summary_posids = {}
     for pos_id in pos_ids:

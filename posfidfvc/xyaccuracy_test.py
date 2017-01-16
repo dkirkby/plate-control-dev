@@ -24,7 +24,7 @@ import logging
 import petalcomm
 import posmodel as pmodel
 import configobj
-
+import shutil
 
 
 
@@ -99,7 +99,6 @@ class AccuracyTest(object):
 		should_calibrate_full     = config['mode']['should_calibrate_full']
 		should_do_accuracy_test   = config['mode']['should_do_accuracy_test']
 		should_auto_commit_logs   = config['mode']['should_auto_commit_logs']
-		should_report             = config['mode']['should_report']
 		should_email              = config['mode']['should_email']
 		should_final_position     = config['mode']['should_final_position']
 
@@ -133,8 +132,8 @@ class AccuracyTest(object):
 		for pos_id in pos_ids:
 			try:
 				shutil.copy2(pc.pos_settings_directory+'/unit_'+pos_id+'.conf',cal_prior_name(pos_id))
-			except:
-				print ("Error copying unit_"+pos_id+" file")
+			except IOError as e:
+				print ("Error copying unit_"+pos_id+" file: "+str(e))
 
 
 		# cycles configuration (for life testing)
@@ -323,8 +322,8 @@ class AccuracyTest(object):
 
 
 				#Test report and email only on certain tests
-				if should_report and num_corr_max == 3 and n_pts_across == 27:
-					test_report.do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, should_email, email_list)
+				if should_email:
+					test_report.do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, test_time, email_list)
 				 
 				#Commit logs through SVN
 				if should_auto_commit_logs:
