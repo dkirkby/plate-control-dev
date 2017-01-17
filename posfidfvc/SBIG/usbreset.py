@@ -47,3 +47,5 @@ def resetSBIG():
 	print(device)	
 	subprocess.call(["/home/msdos/dos_products/posfidfvc/SBIG/usbreset",device])
 
+if __name__=="__main__":
+	resetSBIG()
