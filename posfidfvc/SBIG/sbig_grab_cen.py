@@ -92,7 +92,6 @@ class SBIG_Grab_Cen(object):
                 
             
             del L
-            del D
             gc.collect()
             
             brightness = np.amax(LD)
@@ -107,6 +106,9 @@ class SBIG_Grab_Cen(object):
                 nexpose=0
                 
 
+
+        del D
+        gc.collect()
 
         # call routine to determine multiple gaussian-fitted centroids
         centroiding_tic = time.time()
