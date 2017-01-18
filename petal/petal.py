@@ -251,6 +251,23 @@ class Petal(object):
             canids.append(tbl['canid'])
         self.canids_where_tables_were_just_sent = canids
         self._wait_while_moving()
+
+	
+        parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
+        for pos_id in self.posids:
+
+            state = posstate.PosState(pos_id,logging=True)
+            can_id = int(state.read('CAN_ID'))
+
+            parameter_vals = []
+            for parameter_key in parameter_keys:
+                parameter_vals.append(state.read(parameter_key))
+
+            #syntax for setting currents: comm.set_currents(can_id, [curr_spin_p, curr_cruise_p, curr_creep_p, curr_hold_p], [curr_spin_t, curr_cruise_t, curr_creep_t, curr_hold_t])
+            self.comm.set_currents(can_id, [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]], [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]])
+            #syntax for setting periods: comm.set_periods(can_id, creep_period_p, creep_period_t, spin_period)
+            self.comm.set_periods(can_id, parameter_vals[4], parameter_vals[4], parameter_vals[5])
+
         self.comm.send_tables(hw_tables)
 
     def execute_moves(self):
