@@ -349,6 +349,14 @@ class AccuracyTest(object):
 			if should_email:
 				test_report.email_error(traceback.format_exc(),log_timestamp)
 			raise
+   
+		if should_final_position:
+			target = {}
+			for pos_id in pos_ids:
+				target[pos_id] = {'command':'posTP', 'target':[185,-3]}
+			print('Setting to neutral position')
+			m.move(target)
+
 			
 		script_exec_time = time.time() - script_start_time
 		message='Total test time: ' + format(script_exec_time/60/60,'.1f') + 'hrs'

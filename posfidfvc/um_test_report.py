@@ -24,9 +24,9 @@ stat_list = ['max','min','avg','rms']
 indent = '    '
 um_scale = 1000
 #People who want test results
-teststand_watcherlist = ['kfanning@umich.edu','gtarle@umich.edu','schubnel@umich.edu','cweave@umich.edu','njswimm@umich.edu','igershko@umich.edu', 'bfreud@umich.edu']
+teststand_watcherlist = ['kfanning@umich.edu','gtarle@umich.edu','schubnel@umich.edu','cweave@umich.edu','njswimm@umich.edu','igershko@umich.edu', 'bfreud@umich.edu','zqsun@umich.edu']
 #People who want test error reports
-teststand_operatorlist = ['kfanning@umich.edu', 'bfreud@umich.edu','njswimm@umich.edu']
+teststand_operatorlist = ['kfanning@umich.edu', 'bfreud@umich.edu','njswimm@umich.edu','zqsun@umich.edu']
 
 def fmt(number):
     return format(number,'.1f')
@@ -136,7 +136,7 @@ def do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, time, 
             max0 = np.max(data)*um_scale
             avg0 = np.mean(data)*um_scale
             rms0 = np.sqrt(np.mean(np.array(data)**2)) * um_scale
-            lst.append({'max':max0[-1],'min':min0[-1],'avg':avg0[-1],'rms':rms0[-1]})
+            lst.append({'max':max0,'min':min0,'avg':avg0,'rms':rms0})
         summary_posids[pos_id] = lst
      
     #Write email
@@ -149,6 +149,5 @@ def do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, time, 
         for i in range(len(move_list)):
             email += move_list[i] + ' (max,min,avg,rms): ' + fmt(data[i]['max']) + ', ' + fmt(data[i]['min']) + ', ' + fmt(data[i]['avg']) + ', ' + fmt(data[i]['rms']) + ' (um)\n'
     email += '\n\n'
-    email += 'NOTE: This is an automated message sent by the test stand. Please do not reply to this message.'
-    if should_email:    
-        email_report(email, log_timestamp, pos_ids,to)
+    email += 'NOTE: This is an automated message sent by the test stand. Please do not reply to this message.'   
+    email_report(email, log_timestamp, pos_ids,to)
