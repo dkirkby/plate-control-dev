@@ -256,7 +256,7 @@ class Petal(object):
 		# Currently this is a heavy-traffic-but-robust implementation, where we are doing this every single time we send a move table.
         parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
         for posmodel in self.posmodels:
-		state = posmodel.state
+            state = posmodel.state
             can_id = int(state.read('CAN_ID'))
             parameter_vals = []
             for parameter_key in parameter_keys:
