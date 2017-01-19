@@ -82,6 +82,8 @@ class PosState(object):
         """Returns current value for a given key.
         All sections of all configobj structures are searched to full-depth.
         """
+        self.unit.reload()
+        self.genl.reload()
         if key in self.unit.keys():
             return self.unit[key]
         if self.type == 'pos' and key in self.genl.keys():
@@ -113,7 +115,7 @@ class PosState(object):
                 self.genl.write()
         else:
             print('value not set, because the key "' + repr(key) + '" was not found')
-
+ 
     def log_unit(self,note=''):
         """All current unit parameters are written to the hardware unit's log file.
         """
