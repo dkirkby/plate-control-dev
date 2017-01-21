@@ -28,6 +28,7 @@ class FVCHandler(object):
         self.fvc_type = fvc_type # 'SBIG' or 'FLI'
         if self.fvc_type == 'SBIG':
             self.sbig = sbig_grab_cen.SBIG_Grab_Cen()
+            self.sbig.take_darks = False # typically we have the test stand in a dark enough enclosure, so False here saves time
         elif self.fvc_type == 'FLI':
             # In case an instance is not running, do not count on a name server
             # Fine the FVC through the advertising instead
@@ -44,6 +45,7 @@ class FVCHandler(object):
         self.rotation = 0        # [deg] rotation angle from image plane to object plane
         self.scale = 1.0         # scale factor from image plane to object plane
         self.translation = [0,0] # translation of origin within the image plane
+        self.exptime = 0.4
 
         self.fid_dict = {1100: {'x': -71.3107,'y': 145.9311,'mag': 0.000, 'meas_err': 1.000,'flags':8},
                          1118: {'x': -71.3222,'y': 104.0277,'mag': 0.000, 'meas_err': 1.000,'flags':8},
@@ -122,7 +124,7 @@ class FVCHandler(object):
             # 4. use DOS commands to get the centroids list
             # 5. send centroids (in pixels at FVC) thru platemaker to get measured xy (in mm at focal plate)
             # 6. organize those centroids so you can return them as measured_pos_xy, measured_ref_xy
-            self.exptime = 1 #sec
+            
             target_dict = self.create_target_dict(expected_pos_xy)
             fvc_uri = 'PYRO:FVC@131.243.51.74:40539'
             fvc = Pyro4.Proxy(fvc_uri)
@@ -217,7 +219,7 @@ class FVCHandler(object):
 
 if __name__ == '__main__':
     f = FVCHandler(fvc_type='SBIG')
-    n_objects = 5
+    n_objects = 4
     n_repeats = 1
     xy = []
     print('start taking ' + str(n_repeats) + ' images')
