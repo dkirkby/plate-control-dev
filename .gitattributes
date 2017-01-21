@@ -292,6 +292,12 @@ petal/pos_settings/unit_M00686.conf -text
 petal/pos_settings/unit_M00687.conf -text
 petal/pos_settings/unit_M00691.conf -text
 petal/pos_settings/unit_M00696.conf -text
+petal/pos_settings/unit_M00937.conf -text
+petal/pos_settings/unit_M00938.conf -text
+petal/pos_settings/unit_M00940.conf -text
+petal/pos_settings/unit_M00941.conf -text
+petal/pos_settings/unit_M00942.conf -text
+petal/pos_settings/unit_M00985.conf -text
 petal/pos_settings/unit_SS01.conf -text
 petal/pos_settings/unit_TI01.conf -text
 petal/pos_settings/unit_TI03.conf -text
