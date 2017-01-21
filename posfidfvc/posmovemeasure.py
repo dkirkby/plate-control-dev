@@ -272,7 +272,7 @@ class PosMoveMeasure(object):
             P = self._measure_calibration_arc(pos_ids,'phi',mode)
             #set_gear_ratios = False if mode == 'quick' else True
             set_gear_ratios = False # not sure yet if we really want to adjust gear ratios automatically, hence by default False here
-            print("Finished measuring calibration arcs",T,P)
+            print("Finished measuring calibration arcs")#,T,P)
             unwrapped_data = self._calculate_and_set_arms_and_offsets_from_arc_data(T,P,set_gear_ratios)
             for pos_id in T.keys():
                 poscalibplot.plot_arc(save_file(pos_id), pos_id, unwrapped_data)
@@ -433,7 +433,7 @@ class PosMoveMeasure(object):
                     initial_tp = pc.concat_lists_of_lists(initial_tp, [min(targetable_range_T) + self.calib_arc_margin, phi_clear_angle])
                     final_tp   = pc.concat_lists_of_lists(final_tp,   [max(targetable_range_T) - self.calib_arc_margin, initial_tp[-1][1]])
             else:
-                n_pts = 3 if mode == 'quick' else self.n_points_full_calib_P
+                n_pts = 4 if mode == 'quick' else self.n_points_full_calib_P
                 for posmodel in posmodels:
                     if mode == 'quick':
                         phi_min = phi_clear_angle
@@ -640,8 +640,9 @@ class PosMoveMeasure(object):
             t_ctr = np.array(T[pos_id]['xy_center'])
             p_ctr = np.array(P[pos_id]['xy_center'])
             length_r1 = np.sqrt(np.sum((t_ctr - p_ctr)**2))
+            length_r2 = P[pos_id]['radius']
             petal.set(pos_id,'LENGTH_R1',length_r1)
-            petal.set(pos_id,'LENGTH_R2',P[pos_id]['radius'])
+            petal.set(pos_id,'LENGTH_R2',length_r2)
             petal.set(pos_id,'OFFSET_X',t_ctr[0])
             petal.set(pos_id,'OFFSET_Y',t_ctr[1])
             p_meas_obsT = np.arctan2(p_ctr[1]-t_ctr[1], p_ctr[0]-t_ctr[0]) * 180/np.pi
@@ -650,9 +651,9 @@ class PosMoveMeasure(object):
             xy = np.array(p_meas_obsXY)
             angles = np.arctan2(xy[:,1]-p_ctr[1], xy[:,0]-p_ctr[0]) * 180/np.pi
             p_meas_obsP = angles - p_meas_obsT
-            expected_sign_of_first_angle = np.sign(p_targ_posP[0])
+            p_meas_obsP[p_meas_obsP < 0] += 360
             expected_direction = np.sign(p_targ_posP[1] - p_targ_posP[0])
-            p_meas_obsP_wrapped = self._wrap_consecutive_angles(p_meas_obsP.tolist(), expected_sign_of_first_angle, expected_direction)
+            p_meas_obsP_wrapped = self._wrap_consecutive_angles(p_meas_obsP.tolist(), expected_direction)
             offset_p = np.median(np.array(p_meas_obsP_wrapped) - np.array(p_targ_posP))
             petal.set(pos_id,'OFFSET_P',offset_p)
             p_meas_posP_wrapped = (np.array(p_meas_obsP_wrapped) - offset_p).tolist()
@@ -660,9 +661,8 @@ class PosMoveMeasure(object):
             # unwrap thetas
             t_meas_posTP = T[pos_id]['trans'].obsXY_to_posTP(np.transpose(t_meas_obsXY).tolist())[0]
             t_meas_posT = t_meas_posTP[pc.T]
-            expected_sign_of_first_angle = np.sign(t_targ_posT[0])
             expected_direction = np.sign(t_targ_posT[1] - t_targ_posT[0])
-            t_meas_posT_wrapped = self._wrap_consecutive_angles(t_meas_posT, expected_sign_of_first_angle, expected_direction)
+            t_meas_posT_wrapped = self._wrap_consecutive_angles(t_meas_posT, expected_direction)
             
             # gather data to return in an organized fashion (used especially for plotting)
             data[pos_id] = {}
@@ -686,8 +686,8 @@ class PosMoveMeasure(object):
             ratio_P = np.median(ratios_P)
             data[pos_id]['gear_ratio_T'] = ratio_T
             data[pos_id]['gear_ratio_P'] = ratio_P
-            print('Measurement proposes GEAR_CALIB_T = ' + format(ratio_T,'.6f'))
-            print('Measurement proposes GEAR_CALIB_P = ' + format(ratio_P,'.6f'))
+            print(pos_id + ': measurement proposes GEAR_CALIB_T = ' + format(ratio_T,'.6f'))
+            print(pos_id + ': measurement proposes GEAR_CALIB_P = ' + format(ratio_P,'.6f'))
             if set_gear_ratios:
                 petal.set(pos_id,'GEAR_CALIB_T',ratio_T)
                 petal.set(pos_id,'GEAR_CALIB_P',ratio_P)
@@ -781,14 +781,12 @@ class PosMoveMeasure(object):
     def grid_calib_num_constraints(self):
         return self.n_points_full_calib_T * self.n_points_full_calib_P
         
-    def _wrap_consecutive_angles(self, angles, expected_sign_of_first_angle, expected_direction):
+    def _wrap_consecutive_angles(self, angles, expected_direction):
         """Wrap angles in one expected direction. It is expected that the physical deltas
         we are trying to wrap all increase or all decrease sequentially. In other words, that
         the sequence of angles is only going one way around the circle.
         """
         wrapped = [angles[0]]
-        if np.sign(angles[0]) != expected_sign_of_first_angle and abs(angles[0]) > 10: #essentially a "not close to 0" check to prevent incorrect wrapping on example: targetP = 5 deg and measP is -1 deg, normally would be wrapped but should not be
-            wrapped[0] -= expected_sign_of_first_angle * 360
         for i in range(1,len(angles)):
             delta = angles[i] - wrapped[i-1]
             while np.sign(delta) != expected_direction and np.sign(delta) != 0:
