@@ -52,8 +52,8 @@ class SBIG_Grab_Cen(object):
         if self.take_darks:
             if self.verbose:
                 print("Taking dark image...")
-            self.cam.set_dark(True)  
-            D = self.cam.start_exposure()
+            self.cam.set_dark(True)
+            D = self.start_exposure()
             D = self.flip(D)
             if self.write_fits:
                 filename = '_SBIG_dark_image.FITS'
@@ -71,7 +71,7 @@ class SBIG_Grab_Cen(object):
 
         nexpose=3
         while nexpose > 0:
-            L = self.cam.start_exposure()
+            L = self.start_exposure()
             L = self.flip(L)
 
             if self.write_fits:
@@ -132,6 +132,21 @@ class SBIG_Grab_Cen(object):
         
     def close_camera(self):
         self.cam.close_camera()
+        
+    def start_exposure(self):
+        '''Wraps the usual start_exposure function with some mild error handling.
+        '''
+        max_tries = 3
+        i = 0
+        while i < max_tries:
+            img = self.cam.start_exposure()
+            if not isinstance(img,np.ndarray):
+                print('Try ' + str(i+1) + ' of ' + str(max_tries) + ' to start exposure failed.')
+                time.sleep(0.2) # pause and then take another try, in case the camera failure was some brief intermittent comm issue
+                i += 1
+            else:
+                break
+        return img
 
     def flip(self, img):
         if self.flip_horizontal:
