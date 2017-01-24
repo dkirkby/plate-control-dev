@@ -37,6 +37,7 @@ class PosMoveMeasure(object):
         self.err_level_to_save_moven_img = np.inf # value at which to preserve last corr move fvc images (for debugging if a measurement is off by a lot)
         self.offsets_update_tol = 0.065 # [mm] tolerance on error between requested and measured positions, above which to update the OFFSET_T, OFFSET_P parameters
         self.offsets_update_fraction = 0.8 # fraction of error distance by which to adjust OFFSET_T, OFFSET_P parameters after measuring an excessive error with FVC
+        self.offsets_update_max_iter = 3 # maximum number of offset update re-measurements to do in a row
 
     def fiducials_on(self):
         """Turn on all fiducials on all petals."""
@@ -90,41 +91,73 @@ class PosMoveMeasure(object):
             petal.request_targets(these_requests)            
             petal.schedule_send_and_execute_moves() # in future, may do this in a different thread for each petal
 
-    def move_measure(self, requests, update_offsets_for_large_err=False):
+    def move_measure(self, requests, offsets_update_iter=np.Inf):
         """Move positioners and measure output with FVC.
         See comments on inputs from move method.
         See comments on outputs from measure method.
-        update_offsets_for_large_err ... If True, then for each positioner check if the error > offsets_update_tol.
-                                         If the error has exceeded this tolerance, then OFFSET_T and OFFSET_P parameters
-                                         are adjusted in the error direction, to try to mitigate the error for future moves.
-                                        (The idea here is to deal with cases here the shaft has slipped and we have
-                                         slightly lost count of shaft positions.)
+        offsets_update_iter ... remaining number of iterations (recursion breaking parameter) allowed
+                                for tuning the theta and phi offsets. if no argument, then updating of
+                                offsets is disabled by defaulting this argument to start at a higher
+                                value than max allowed iteration.
 
         """
         self.move(requests)
         data,imgfiles = self.measure()
-        if update_offsets_for_large_err:
-            ptls_of_pos_ids = self.ptls_of_pos_ids([p for p in requests.keys()])
-            for pos_id in requests.keys():
-                petal = ptls_of_pos_ids[pos_id]
-                measured_obsXY = data[pos_id]
-                expected_obsXY = petal.expected_current_position(pos_id,'obsXY')
-                err_xy = ((measured_obsXY[0]-expected_obsXY[0])**2 + (measured_obsXY[1]-expected_obsXY[1])**2)**0.5
-                if err_xy > self.offsets_update_tol:
-                    posmodel = petal.get(pos_id)
-                    measured_posTP = posmodel.trans.obsXY_to_posTP(data[pos_id])[0]
-                    expected_posTP = ptls_of_pos_ids[pos_id].expected_current_position(pos_id,'posTP')
-                    delta_offset_T = (measured_posTP[0] - expected_posTP[0]) * self.offsets_update_fraction
-                    delta_offset_P = (measured_posTP[1] - expected_posTP[1]) * self.offsets_update_fraction
-                    old_offset_T = petal.get(pos_id,'OFFSET_T')
-                    old_offset_P = petal.get(pos_id,'OFFSET_P')
-                    new_offset_T = old_offset_T + delta_offset_T
-                    new_offset_P = old_offset_P + delta_offset_P
-                    petal.set(pos_id,'OFFSET_T',new_offset_T,True)
-                    petal.set(pos_id,'OFFSET_P',new_offset_P,True)
-                    print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed OFFSET_T from ' + self.fmt(old_offset_T) + ' to ' + self.fmt(new_offset_T))
-                    print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed OFFSET_P from ' + self.fmt(old_offset_P) + ' to ' + self.fmt(new_offset_P))
+        if offsets_update_iter < self.offsets_update_max_iter:
+            # IMPORTANT! NEED TO FIGURE OUT HOW TO PERMANENTLY LOG AND CLEARLY ALERT US TO THE FACT THAT
+            # THIS DYNAMIC FIX IS HAPPENING. OTHERWISE IN PRINCIPLE YOUR POSITIONER COULD BE FIXING ITS
+            # "CALIBRATION" WITH EVERY MOVE, AND APPEARING TO FUNCTION OK -- WHEN REALLY ALLY THAT'S HAPPENING
+            # IS YOU'RE TAKING FREE ERROR CORRECTION MOVES. IN OTHER WORDS, THIS ALGORITHM APPEARS SOUND
+            # AS A RARE OCCURRENCE, BUT NOT IF IT IS BEING USED A LOT (IN WHICH CASE IT COULD SCREW UP OUR
+            # ABILITY TO DO ANTICOLLISION).
+            delta_offsets_TP = self.test_and_update_offsets(data)
+            new_requests = {}
+            for pos_id in delta_offsets_TP.keys():
+                if any(delta_offsets_TP[pos_id]):
+                    new_requests[pos_id] = {'command':'dTdP', 'target':delta_offsets_TP[pos_id], 'log_note':'offsets adjustment iteration ' + str(offsets_update_iter)}
+            if any(new_requests):
+                self.move_measure(requests,offsets_update_iter+1)
+                data,imgfiles = self.measure()
         return data,imgfiles
+        
+    def test_and_update_offsets(self,measured_data):
+        """Check if errors between measured positions and expected positions exceeds a tolerance
+        value, and if so, then adjust the OFFSET_T and OFFSET_P parameters in the direction of the
+        measuread error.
+        
+        The idea here is to deal gracefully with cases where the shaft has slipped
+        just a little, and we have slightly lost count of shaft positions, or where the initial
+        calibration was just a little off.
+        
+        The usage of OFFSET_T and OFFSET_P as the adjustable knobs is NOT exactly the right thing
+        to do from a purely conceptual standpoint. The knobs we are REALLY trying to turn are
+        
+        The input value 'measured_data' is the same format as produced by the 'measure()' function.
+        """
+        delta_offsets_TP = {}
+        ptls_of_pos_ids = self.ptls_of_pos_ids([p for p in measured_data.keys()])
+        for pos_id in measured_data.keys():
+            delta_offsets_TP[pos_id] = [0,0]
+            petal = ptls_of_pos_ids[pos_id]
+            measured_obsXY = measured_data[pos_id]
+            expected_obsXY = petal.expected_current_position(pos_id,'obsXY')
+            err_xy = ((measured_obsXY[0]-expected_obsXY[0])**2 + (measured_obsXY[1]-expected_obsXY[1])**2)**0.5
+            if err_xy > self.offsets_update_tol:
+                posmodel = petal.get(pos_id)
+                measured_posTP = posmodel.trans.obsXY_to_posTP(measured_data[pos_id])[0]
+                expected_posTP = ptls_of_pos_ids[pos_id].expected_current_position(pos_id,'posTP')
+                delta_offset_T = (measured_posTP[0] - expected_posTP[0]) * self.offsets_update_fraction
+                delta_offset_P = (measured_posTP[1] - expected_posTP[1]) * self.offsets_update_fraction
+                old_offset_T = petal.get(pos_id,'OFFSET_T')
+                old_offset_P = petal.get(pos_id,'OFFSET_P')
+                new_offset_T = old_offset_T + delta_offset_T
+                new_offset_P = old_offset_P + delta_offset_P
+                petal.set(pos_id,'OFFSET_T',new_offset_T,True)
+                petal.set(pos_id,'OFFSET_P',new_offset_P,True)
+                print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed OFFSET_T from ' + self.fmt(old_offset_T) + ' to ' + self.fmt(new_offset_T))
+                print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed OFFSET_P from ' + self.fmt(old_offset_P) + ' to ' + self.fmt(new_offset_P))
+                delta_offsets_TP[pos_id] = [delta_offset_T,delta_offset_P]
+        return delta_offsets_TP
 
     def move_and_correct(self, requests, num_corr_max=2):
         """Move positioners to requested target coordinates, then make a series of correction
@@ -162,7 +195,7 @@ class PosMoveMeasure(object):
                 return
             m['log_note'] = 'blind move'
             print(str(pos_id) + ': blind move to (obsX,obsY)=(' + self.fmt(m['targ_obsXY'][0]) + ',' + self.fmt(m['targ_obsXY'][1]) + ')')
-        this_meas,imgfiles = self.move_measure(data,True)
+        this_meas,imgfiles = self.move_measure(data,offsets_update_iter=0)
         save_img = False
         for pos_id in this_meas.keys():
             m = data[pos_id] # again, for terseness
@@ -187,7 +220,7 @@ class PosMoveMeasure(object):
                 correction[pos_id]['target'] = dxdy
                 correction[pos_id]['log_note'] = 'correction move ' + str(i)
                 print(str(pos_id) + ': correction move ' + str(i) + ' of ' + str(num_corr_max) + ' by (dx,dy)=(' + self.fmt(dxdy[0]) + ',' + self.fmt(dxdy[1]) + '), \u221A(dx\u00B2+dy\u00B2)=' + self.fmt(data[pos_id]['err2D'][-1]))
-            this_meas,imgfiles = self.move_measure(correction,True)
+            this_meas,imgfiles = self.move_measure(correction)
             for pos_id in this_meas.keys():
                 m = data[pos_id] # again, for terseness
                 m['meas_obsXY'].append(this_meas[pos_id])
