@@ -35,6 +35,8 @@ class PosMoveMeasure(object):
         self.n_points_grid_calib_P = 6
         self.err_level_to_save_move0_img = np.inf # value at which to preserve move 0 fvc images (for debugging if a measurement is off by a lot)
         self.err_level_to_save_moven_img = np.inf # value at which to preserve last corr move fvc images (for debugging if a measurement is off by a lot)
+        self.offsets_update_tol = 0.065 # [mm] tolerance on error between requested and measured positions, above which to update the OFFSET_T, OFFSET_P parameters
+        self.offsets_update_fraction = 0.8 # fraction of error distance by which to adjust OFFSET_T, OFFSET_P parameters after measuring an excessive error with FVC
 
     def fiducials_on(self):
         """Turn on all fiducials on all petals."""
@@ -45,7 +47,6 @@ class PosMoveMeasure(object):
         """Turn off all fiducials on all petals."""
         for petal in self.petals:
             petal.fiducials_off()
-
 
     def measure(self):
         """Measure positioner locations with the FVC and return the values.
@@ -89,13 +90,41 @@ class PosMoveMeasure(object):
             petal.request_targets(these_requests)            
             petal.schedule_send_and_execute_moves() # in future, may do this in a different thread for each petal
 
-    def move_measure(self, requests):
+    def move_measure(self, requests, update_offsets_for_large_err=False):
         """Move positioners and measure output with FVC.
         See comments on inputs from move method.
         See comments on outputs from measure method.
+        update_offsets_for_large_err ... If True, then for each positioner check if the error > offsets_update_tol.
+                                         If the error has exceeded this tolerance, then OFFSET_T and OFFSET_P parameters
+                                         are adjusted in the error direction, to try to mitigate the error for future moves.
+                                        (The idea here is to deal with cases here the shaft has slipped and we have
+                                         slightly lost count of shaft positions.)
+
         """
         self.move(requests)
-        return self.measure()
+        data,imgfiles = self.measure()
+        if update_offsets_for_large_err:
+            ptls_of_pos_ids = self.ptls_of_pos_ids([p for p in requests.keys()])
+            for pos_id in requests.keys():
+                petal = ptls_of_pos_ids[pos_id]
+                measured_obsXY = data[pos_id]
+                expected_obsXY = petal.expected_current_position(pos_id,'obsXY')
+                err_xy = ((measured_obsXY[0]-expected_obsXY[0])**2 + (measured_obsXY[1]-expected_obsXY[1])**2)**0.5
+                if err_xy > self.offsets_update_tol:
+                    posmodel = petal.get(pos_id)
+                    measured_posTP = posmodel.trans.obsXY_to_posTP(data[pos_id])[0]
+                    expected_posTP = ptls_of_pos_ids[pos_id].expected_current_position(pos_id,'posTP')
+                    delta_offset_T = (measured_posTP[0] - expected_posTP[0]) * self.offsets_update_fraction
+                    delta_offset_P = (measured_posTP[1] - expected_posTP[1]) * self.offsets_update_fraction
+                    old_offset_T = petal.get(pos_id,'OFFSET_T')
+                    old_offset_P = petal.get(pos_id,'OFFSET_P')
+                    new_offset_T = old_offset_T + delta_offset_T
+                    new_offset_P = old_offset_P + delta_offset_P
+                    petal.set(pos_id,'OFFSET_T',new_offset_T,True)
+                    petal.set(pos_id,'OFFSET_P',new_offset_P,True)
+                    print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed OFFSET_T from ' + self.fmt(old_offset_T) + ' to ' + self.fmt(new_offset_T))
+                    print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed OFFSET_P from ' + self.fmt(old_offset_P) + ' to ' + self.fmt(new_offset_P))
+        return data,imgfiles
 
     def move_and_correct(self, requests, num_corr_max=2):
         """Move positioners to requested target coordinates, then make a series of correction
@@ -122,8 +151,6 @@ class PosMoveMeasure(object):
         """
         data = requests.copy()
         ptls_of_pos_ids = self.ptls_of_pos_ids([p for p in data.keys()])
-        def fmt(number):
-            return format(number,'.3f') # for consistently printing floats in terminal output
         for pos_id in data.keys():
             m = data[pos_id] # for terseness below
             if m['command'] == 'obsXY':
@@ -134,8 +161,8 @@ class PosMoveMeasure(object):
                 print('coordinates \'' + m['command'] + '\' not valid or not allowed')
                 return
             m['log_note'] = 'blind move'
-            print(str(pos_id) + ': blind move to (obsX,obsY)=(' + fmt(m['targ_obsXY'][0]) + ',' + fmt(m['targ_obsXY'][1]) + ')')
-        this_meas,imgfiles = self.move_measure(data)
+            print(str(pos_id) + ': blind move to (obsX,obsY)=(' + self.fmt(m['targ_obsXY'][0]) + ',' + self.fmt(m['targ_obsXY'][1]) + ')')
+        this_meas,imgfiles = self.move_measure(data,True)
         save_img = False
         for pos_id in this_meas.keys():
             m = data[pos_id] # again, for terseness
@@ -159,8 +186,8 @@ class PosMoveMeasure(object):
                 correction[pos_id]['command'] = 'dXdY'
                 correction[pos_id]['target'] = dxdy
                 correction[pos_id]['log_note'] = 'correction move ' + str(i)
-                print(str(pos_id) + ': correction move ' + str(i) + ' of ' + str(num_corr_max) + ' by (dx,dy)=(' + fmt(dxdy[0]) + ',' + fmt(dxdy[1]) + '), \u221A(dx\u00B2+dy\u00B2)=' + fmt(data[pos_id]['err2D'][-1]))
-            this_meas,imgfiles = self.move_measure(correction)
+                print(str(pos_id) + ': correction move ' + str(i) + ' of ' + str(num_corr_max) + ' by (dx,dy)=(' + self.fmt(dxdy[0]) + ',' + self.fmt(dxdy[1]) + '), \u221A(dx\u00B2+dy\u00B2)=' + self.fmt(data[pos_id]['err2D'][-1]))
+            this_meas,imgfiles = self.move_measure(correction,True)
             for pos_id in this_meas.keys():
                 m = data[pos_id] # again, for terseness
                 m['meas_obsXY'].append(this_meas[pos_id])
@@ -175,7 +202,7 @@ class PosMoveMeasure(object):
                 for file in imgfiles:
                     os.rename(file, pc.test_logs_directory + timestamp_str + '_move' + str(i) + file)                
         for pos_id in data.keys():
-            print(str(pos_id) + ': final error distance=' + fmt(data[pos_id]['err2D'][-1]))
+            print(str(pos_id) + ': final error distance=' + self.fmt(data[pos_id]['err2D'][-1]))
         return data
 
     def retract_phi(self,pos_ids='all'):
@@ -793,3 +820,8 @@ class PosMoveMeasure(object):
                 delta += expected_direction * 360
             wrapped.append(wrapped[-1] + delta)
         return wrapped
+
+    def fmt(self,number):
+        """for consistently printing floats in terminal output
+        """
+        return format(number,'.3f')
