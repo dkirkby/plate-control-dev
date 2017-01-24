@@ -89,8 +89,6 @@ class SBIG_Grab_Cen(object):
                 filename = '_SBIG_diff_image.FITS'
                 self.cam.write_fits(LD,filename)
                 imgfiles.append(filename)
-                
-            
             del L
             gc.collect()
             
@@ -104,9 +102,6 @@ class SBIG_Grab_Cen(object):
                 #if brightness > self.max_brightness:
                     #warnings.warn('Spot may be over saturated (brightness = {}'.format(brightness))
                 nexpose=0
-                
-
-
         del D
         gc.collect()
 
