@@ -35,9 +35,9 @@ class PosMoveMeasure(object):
         self.n_points_grid_calib_P = 6
         self.err_level_to_save_move0_img = np.inf # value at which to preserve move 0 fvc images (for debugging if a measurement is off by a lot)
         self.err_level_to_save_moven_img = np.inf # value at which to preserve last corr move fvc images (for debugging if a measurement is off by a lot)
-        self.offsets_update_tol = 0.065 # [mm] tolerance on error between requested and measured positions, above which to update the OFFSET_T, OFFSET_P parameters
-        self.offsets_update_fraction = 0.8 # fraction of error distance by which to adjust OFFSET_T, OFFSET_P parameters after measuring an excessive error with FVC
-        self.offsets_update_max_iter = 3 # maximum number of offset update re-measurements to do in a row
+        self.update_TP_tol = 0.065 # [mm] tolerance on error between requested and measured positions, above which to update the POS_T,POS_P or OFFSET_T,OFFSET_P parameters
+        self.update_TP_fraction = 0.8 # fraction of error distance by which to adjust POS_T,POS_P or OFFSET_T,OFFSET_P parameters after measuring an excessive error with FVC
+        self.update_TP_max_iter = 3 # maximum number of shaft angle update re-measurements to do in a row
 
     def fiducials_on(self):
         """Turn on all fiducials on all petals."""
@@ -91,73 +91,84 @@ class PosMoveMeasure(object):
             petal.request_targets(these_requests)            
             petal.schedule_send_and_execute_moves() # in future, may do this in a different thread for each petal
 
-    def move_measure(self, requests, offsets_update_iter=np.Inf):
+    def move_measure(self, requests, update_TP_iter=np.Inf, should_update_TP_offsets=False):
         """Move positioners and measure output with FVC.
         See comments on inputs from move method.
         See comments on outputs from measure method.
-        offsets_update_iter ... remaining number of iterations (recursion breaking parameter) allowed
-                                for tuning the theta and phi offsets. if no argument, then updating of
-                                offsets is disabled by defaulting this argument to start at a higher
-                                value than max allowed iteration.
+        update_TP_iter ... remaining number of iterations (recursion breaking parameter) allowed for tuning the theta
+                           and phi shaft angles. if no argument, then updating is disabled by defaulting this argument
+                           to start at a higher value than max allowed iteration.
+        should_update_TP_offsets ... defaults to off. see comments on this in test_and_update_TP function
 
         """
         self.move(requests)
         data,imgfiles = self.measure()
-        if offsets_update_iter < self.offsets_update_max_iter:
+        if update_TP_iter < self.update_TP_max_iter:
             # IMPORTANT! NEED TO FIGURE OUT HOW TO PERMANENTLY LOG AND CLEARLY ALERT US TO THE FACT THAT
-            # THIS DYNAMIC FIX IS HAPPENING. OTHERWISE IN PRINCIPLE YOUR POSITIONER COULD BE FIXING ITS
-            # "CALIBRATION" WITH EVERY MOVE, AND APPEARING TO FUNCTION OK -- WHEN REALLY ALLY THAT'S HAPPENING
-            # IS YOU'RE TAKING FREE ERROR CORRECTION MOVES. IN OTHER WORDS, THIS ALGORITHM APPEARS SOUND
-            # AS A RARE OCCURRENCE, BUT NOT IF IT IS BEING USED A LOT (IN WHICH CASE IT COULD SCREW UP OUR
-            # ABILITY TO DO ANTICOLLISION).
-            delta_offsets_TP = self.test_and_update_offsets(data)
+            # THIS DYNAMIC FIX IS HAPPENING. OTHERWISE IN PRINCIPLE YOUR POSITIONER COULD BE "FIXING" ITS
+            # POSITION TRACKING OR CALIBRATION WITH EVERY MOVE, AND APPEARING TO FUNCTION OK -- WHEN REALLY
+            # ALL THAT'S HAPPENING IS WE'RE TAKING FREE ERROR CORRECTION MOVES. IN OTHER WORDS, THIS ALGORITHM
+            # APPEARS SOUND AS A RARE/LIMITED OCCURRENCE, BUT *NOT* OK IF IT IS BEING USED A LOT (IN WHICH
+            # CASE IT COULD SCREW UP OUR ABILITY TO DO ANTICOLLISION).
+            delta_TP = self.test_and_update_TP(data,should_update_TP_offsets)
             new_requests = {}
-            for pos_id in delta_offsets_TP.keys():
-                if any(delta_offsets_TP[pos_id]):
-                    new_requests[pos_id] = {'command':'dTdP', 'target':delta_offsets_TP[pos_id], 'log_note':'offsets adjustment iteration ' + str(offsets_update_iter)}
+            for pos_id in delta_TP.keys():
+                if any(delta_TP[pos_id]):
+                    new_requests[pos_id] = {'command':'dTdP', 'target':delta_TP[pos_id], 'log_note':'shaft angles adjustment iteration ' + str(update_TP_iter)}
             if any(new_requests):
-                self.move_measure(requests,offsets_update_iter+1)
+                self.move_measure(requests,update_TP_iter+1)
                 data,imgfiles = self.measure()
         return data,imgfiles
         
-    def test_and_update_offsets(self,measured_data):
+    def test_and_update_TP(self,measured_data,should_update_TP_offsets=False):
         """Check if errors between measured positions and expected positions exceeds a tolerance
-        value, and if so, then adjust the OFFSET_T and OFFSET_P parameters in the direction of the
-        measuread error.
+        value, and if so, then adjust parameters in the direction of the measured error.
         
-        The idea here is to deal gracefully with cases where the shaft has slipped
+        By default, this function will only changed the internally-tracked shaft position, POS_T
+        and POS_P. The assumption is that we have fairly stable theta and phi offset values, based
+        on the mechanical reality of the robot. However there is an option (perhaps useful in limited cases,
+        such as when a calibration angle unwrap appears to have gone awry on a new test stand setup) where
+        one would indeed want to change the calibration parameters, OFFSET_T and OFFSET_P. Activate
+        this by arguing "should_update_TP_offsets=True".
+        
+        The overall idea here is to be able to deal gracefully with cases where the shaft has slipped
         just a little, and we have slightly lost count of shaft positions, or where the initial
         calibration was just a little off.
         
-        The usage of OFFSET_T and OFFSET_P as the adjustable knobs is NOT exactly the right thing
-        to do from a purely conceptual standpoint. The knobs we are REALLY trying to turn are
-        
         The input value 'measured_data' is the same format as produced by the 'measure()' function.
+        
+        The return is a dictionary with:
+            keys   ... pos_ids 
+            values ... 1x2 [delta_theta,delta_phi]
         """
-        delta_offsets_TP = {}
+        delta_TP = {}
         ptls_of_pos_ids = self.ptls_of_pos_ids([p for p in measured_data.keys()])
         for pos_id in measured_data.keys():
-            delta_offsets_TP[pos_id] = [0,0]
+            delta_TP[pos_id] = [0,0]
             petal = ptls_of_pos_ids[pos_id]
             measured_obsXY = measured_data[pos_id]
             expected_obsXY = petal.expected_current_position(pos_id,'obsXY')
             err_xy = ((measured_obsXY[0]-expected_obsXY[0])**2 + (measured_obsXY[1]-expected_obsXY[1])**2)**0.5
-            if err_xy > self.offsets_update_tol:
+            if err_xy > self.update_TP_tol:
                 posmodel = petal.get(pos_id)
                 measured_posTP = posmodel.trans.obsXY_to_posTP(measured_data[pos_id])[0]
                 expected_posTP = ptls_of_pos_ids[pos_id].expected_current_position(pos_id,'posTP')
-                delta_offset_T = (measured_posTP[0] - expected_posTP[0]) * self.offsets_update_fraction
-                delta_offset_P = (measured_posTP[1] - expected_posTP[1]) * self.offsets_update_fraction
-                old_offset_T = petal.get(pos_id,'OFFSET_T')
-                old_offset_P = petal.get(pos_id,'OFFSET_P')
-                new_offset_T = old_offset_T + delta_offset_T
-                new_offset_P = old_offset_P + delta_offset_P
-                petal.set(pos_id,'OFFSET_T',new_offset_T,True)
-                petal.set(pos_id,'OFFSET_P',new_offset_P,True)
-                print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed OFFSET_T from ' + self.fmt(old_offset_T) + ' to ' + self.fmt(new_offset_T))
-                print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed OFFSET_P from ' + self.fmt(old_offset_P) + ' to ' + self.fmt(new_offset_P))
-                delta_offsets_TP[pos_id] = [delta_offset_T,delta_offset_P]
-        return delta_offsets_TP
+                delta_T = (measured_posTP[0] - expected_posTP[0]) * self.update_TP_fraction
+                delta_P = (measured_posTP[1] - expected_posTP[1]) * self.update_TP_fraction
+                if should_update_TP_offsets:
+                    param = 'OFFSET'
+                else:
+                    param = 'POS'
+                old_T = petal.get(pos_id,param + '_T')
+                old_P = petal.get(pos_id,param + '_P')              
+                new_T = old_T + delta_T
+                new_P = old_P + delta_P
+                petal.set(pos_id,param + '_T',new_T,True)
+                petal.set(pos_id,param + '_P',new_P,True)
+                print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_T from ' + self.fmt(old_T) + ' to ' + self.fmt(new_T))
+                print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
+                delta_TP[pos_id] = [delta_T,delta_P]
+        return delta_TP
 
     def move_and_correct(self, requests, num_corr_max=2):
         """Move positioners to requested target coordinates, then make a series of correction
@@ -195,7 +206,7 @@ class PosMoveMeasure(object):
                 return
             m['log_note'] = 'blind move'
             print(str(pos_id) + ': blind move to (obsX,obsY)=(' + self.fmt(m['targ_obsXY'][0]) + ',' + self.fmt(m['targ_obsXY'][1]) + ')')
-        this_meas,imgfiles = self.move_measure(data,offsets_update_iter=0)
+        this_meas,imgfiles = self.move_measure(data,update_TP_iter=0)
         save_img = False
         for pos_id in this_meas.keys():
             m = data[pos_id] # again, for terseness
@@ -670,6 +681,8 @@ class PosMoveMeasure(object):
                     debug_str = 'Grid calib on ' + str(pos_id) + ' point ' + str(data[pos_id]['point_numbers'][-1]) + ':'
                     debug_str += ' ERR_NORM=' + format(data[pos_id]['ERR_NORM'][-1],'.3f')
                     for j in range(len(param_keys)):
+                        if param_keys[j] == 'OFFSET_T' or param_keys[j] == 'OFFSET_P':
+                            params_optimized.x[j] = self._centralized_angular_offset_value(params_optimized.x[j])
                         data[pos_id][param_keys[j]].append(params_optimized.x[j])
                         debug_str += '  ' + param_keys[j] +': ' + format(data[pos_id][param_keys[j]][-1],'.3f')
                     print(debug_str)
@@ -707,6 +720,7 @@ class PosMoveMeasure(object):
             petal.set(pos_id,'OFFSET_Y',t_ctr[1])
             p_meas_obsT = np.arctan2(p_ctr[1]-t_ctr[1], p_ctr[0]-t_ctr[0]) * 180/np.pi
             offset_t = p_meas_obsT - p_targ_posT[0] # just using the first target theta angle in the phi sweep
+            offset_t = self._centralized_angular_offset_value(offset_t)
             petal.set(pos_id,'OFFSET_T',offset_t)
             xy = np.array(p_meas_obsXY)
             angles = np.arctan2(xy[:,1]-p_ctr[1], xy[:,0]-p_ctr[0]) * 180/np.pi
@@ -715,6 +729,7 @@ class PosMoveMeasure(object):
             expected_direction = np.sign(p_targ_posP[1] - p_targ_posP[0])
             p_meas_obsP_wrapped = self._wrap_consecutive_angles(p_meas_obsP.tolist(), expected_direction)
             offset_p = np.median(np.array(p_meas_obsP_wrapped) - np.array(p_targ_posP))
+            offset_p = self._centralized_angular_offset_value(offset_p)
             petal.set(pos_id,'OFFSET_P',offset_p)
             p_meas_posP_wrapped = (np.array(p_meas_obsP_wrapped) - offset_p).tolist()
             
@@ -853,6 +868,19 @@ class PosMoveMeasure(object):
                 delta += expected_direction * 360
             wrapped.append(wrapped[-1] + delta)
         return wrapped
+    
+    def _centralized_angular_offset_value(self,offset_angle):
+        """A special unwrapping check for OFFSET_T and OFFSET_P angles, for which we are always
+        going to want to default to the option closer to 0 deg. Hence if our calibration routine
+        calculates a best fit value for example of OFFSET_T or OFFSET_P = 351 deg, then the real
+        setting we want to apply should clearly instead be -9.
+        """
+        try_plus = offset_angle % 360
+        try_minus = offset_angle % -360
+        if abs(try_plus) <= abs(try_minus):
+            return try_plus
+        else:
+            return try_minus
 
     def fmt(self,number):
         """for consistently printing floats in terminal output
