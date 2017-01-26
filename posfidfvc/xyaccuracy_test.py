@@ -73,7 +73,11 @@ class AccuracyTest(object):
 		script_start_time = time.time()
 
 		# initialization
+		
+		# JOE TEMPORARY COMMENT: I BELIEVE THIS CHOICE OF 'SBIG' SHOULD GO INTO
+		# CONFIG FILE, SINCE SOMETIMES WE WILL USE 'FLI' OR 'simulator'.
 		fvc = fvchandler.FVCHandler('SBIG')
+		
 		fvc.scale =  config['local']['scale'] # mm/pixel (update um_scale below if not in mm) #Test2 = .0274 Test1 = .0282
 		fvc.rotation = 0  # deg
 		um_scale = 1000 # um/mm
@@ -82,17 +86,28 @@ class AccuracyTest(object):
 		pos_notes = config['positioners']['notes'] #notes for report to add about positioner (reported with positioner in same slot as pos_ids list)
 		while len(pos_notes) < len(pos_ids):
 			pos_notes.append('')
+		
+		# JOE TEMPORARY COMMENT: IN NEAR FUTURE WE WILL IMPLEMENT "fid_ids" HERE, SIMILAR TO pos_ids
 		fid_can_ids = []
+		
 		petal_id = config['petal']['petal_id']
 		ptl = petal.Petal(petal_id, pos_ids, fid_can_ids)
 		ptl.anticollision_default = config['petal']['anticollision']
 		m = posmovemeasure.PosMoveMeasure(ptl,fvc)
 		m.n_points_full_calib_T = config['calib']['n_points_full_calib_T']
 		m.n_points_full_calib_P = config['calib']['n_points_full_calib_P']
+		
+		# JOE TEMPORARY COMMENT: NOTE THAT WE WILL ENHANCE THIS IN THE NEAR FUTURE ONCE
+		# WE HAVE INDIVIDUAL CONFIG FILES FOR FIDUCIALS IMPLEMENTED (SIMILAR TO POSITIONERS)
 		m.n_fiducial_dots = config['calib']['n_fiducial_dots'] # number of fiducial centroids the FVC should expect
+		
 		num_corr_max = config['mode']['num_corr_max'] # number of correction moves to do for each target
 
 		#get general configuration parameters and send them to positioners
+		
+		# JOE TEMPORARY COMMENT: THE SENDING OF PARAMETERS IS NOW HANDLED AUTOMATICALLY IN PETAL.PY,
+		# SO I BELIEVE SHOULD REMOVE THIS STUFF HERE, SO THAT WE GUARANTEE WE ARE RUNNING POSITIONERS
+		# AS WE WILL ON THE MOUNTAIN.
 		pcomm = petalcomm.PetalComm(petal_id)
 
 		pm = pmodel.PosModel()
