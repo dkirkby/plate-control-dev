@@ -27,7 +27,6 @@ import configobj
 import shutil
 
 
-
 class AccuracyTest(object):
 
 	def __init__(self,configfile='accuracy_test.conf'): 
@@ -39,6 +38,32 @@ class AccuracyTest(object):
 		if not logfile: logfile = 'logs/xyaccuracy_test_'+now+'.log'
 		logging.basicConfig(filename=logfile,format='%(asctime)s %(message)s',level=logging.INFO)		# ToDo: read logging level from config file
 		self.log=True
+
+	def update_config(self):
+		config = self.config
+
+		should_initial_rehome     = config['mode']['should_initial_rehome']
+		should_identify_fiducials = config['mode']['should_identify_fiducials']
+		should_identify_pos_loc   = config['mode']['should_identify_pos_loc']
+		should_calibrate_quick    = config['mode']['should_calibrate_quick']
+		should_measure_ranges     = config['mode']['should_measure_ranges']
+		should_calibrate_grid     = config['mode']['should_calibrate_grid']
+		should_calibrate_full     = config['mode']['should_calibrate_full']
+		should_do_accuracy_test   = config['mode']['should_do_accuracy_test']
+		should_auto_commit_logs   = config['mode']['should_auto_commit_logs']
+		should_report             = config['mode']['should_report']
+		should_email              = config['mode']['should_email']
+		should_final_position     = config['mode']['should_final_position']
+
+		self.should=(should_initial_rehome,should_identify_fiducials,should_identify_pos_loc,should_calibrate_quick,
+		should_measure_ranges,should_calibrate_grid,should_calibrate_full,should_do_accuracy_test,should_auto_commit_logs,
+		should_report,should_email,should_final_position)
+
+
+		self.email_list = config['email']['email_list'] #full or limited
+
+		self.n_pts_across = config['grid']['n_pts_across']
+		self.log_suffix = config['mode']['log_suffix']
 
 	def run_xyaccuracy_test(self):
 		config = self.config
@@ -90,19 +115,25 @@ class AccuracyTest(object):
 
 
 		# test operations to do
-		should_initial_rehome     = config['mode']['should_initial_rehome']
-		should_identify_fiducials = config['mode']['should_identify_fiducials']
-		should_identify_pos_loc   = config['mode']['should_identify_pos_loc']
-		should_calibrate_quick    = config['mode']['should_calibrate_quick']
-		should_measure_ranges     = config['mode']['should_measure_ranges']
-		should_calibrate_grid     = config['mode']['should_calibrate_grid']
-		should_calibrate_full     = config['mode']['should_calibrate_full']
-		should_do_accuracy_test   = config['mode']['should_do_accuracy_test']
-		should_auto_commit_logs   = config['mode']['should_auto_commit_logs']
-		should_email              = config['mode']['should_email']
-		should_final_position     = config['mode']['should_final_position']
 
-		email_list = config['email']['email_list'] #full or limited
+		(should_initial_rehome,should_identify_fiducials,should_identify_pos_loc,should_calibrate_quick,
+		should_measure_ranges,should_calibrate_grid,should_calibrate_full,should_do_accuracy_test,should_auto_commit_logs,
+		should_report,should_email,should_final_position) = self.should
+
+		#should_initial_rehome     = config['mode']['should_initial_rehome']
+		#should_identify_fiducials = config['mode']['should_identify_fiducials']
+		#should_identify_pos_loc   = config['mode']['should_identify_pos_loc']
+		#should_calibrate_quick    = config['mode']['should_calibrate_quick']
+		#should_measure_ranges     = config['mode']['should_measure_ranges']
+		#should_calibrate_grid     = config['mode']['should_calibrate_grid']
+		#should_calibrate_full     = config['mode']['should_calibrate_full']
+		#should_do_accuracy_test   = config['mode']['should_do_accuracy_test']
+		#should_auto_commit_logs   = config['mode']['should_auto_commit_logs']
+		#should_report             = config['mode']['should_report']
+		#should_email              = config['mode']['should_email']
+		#should_final_position     = config['mode']['should_final_position']
+
+		email_list = self.email_list #config['email']['email_list'] #full or limited
 
 		# certain operations require particular preceding operations
 		if should_identify_pos_loc: should_initial_rehome = True
@@ -111,7 +142,7 @@ class AccuracyTest(object):
 		# log file setup
 		log_directory = pc.test_logs_directory
 		os.makedirs(log_directory, exist_ok=True)
-		log_suffix = config['mode']['log_suffix'] # string gets appended to filenames -- useful for user to identify particular tests
+		log_suffix = self.log_suffix #config['mode']['log_suffix'] # string gets appended to filenames -- useful for user to identify particular tests
 		log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
 		log_timestamp = datetime.datetime.now().strftime(pc.filename_timestamp_format)
 		def path_prefix(pos_id):
@@ -131,9 +162,12 @@ class AccuracyTest(object):
 		# save a copy of the unit_*.conf file prior to calibration	
 		for pos_id in pos_ids:
 			try:
+				#cmd1=pc.pos_settings_directory+'/unit_'+pos_id+'.conf'
+				#cmd2=cal_prior_name(pos_id)
+				#print(cmd1, cmd2)
 				shutil.copy2(pc.pos_settings_directory+'/unit_'+pos_id+'.conf',cal_prior_name(pos_id))
 			except IOError as e:
-				print ("Error copying unit_"+pos_id+" file: "+str(e))
+				print ("Error copying unit_"+pos_id+" file:",str(e))
 
 
 		# cycles configuration (for life testing)
@@ -143,7 +177,7 @@ class AccuracyTest(object):
 		# this will get copied and transformed to each particular positioner's location below
 		grid_max_radius = config['grid']['grid_max_radius'] # mm
 		grid_min_radius =  config['grid']['grid_min_radius'] # mm
-		n_pts_across = config['grid']['n_pts_across']  # 7 --> 28 pts, 27 --> 528 pts
+		n_pts_across = self.n_pts_across #config['grid']['n_pts_across']  # 7 --> 28 pts, 27 --> 528 pts
 		line = np.linspace(-grid_max_radius,grid_max_radius,n_pts_across)
 		local_targets = [[x,y] for x in line for y in line]
 		for i in range(len(local_targets)-1,-1,-1): # traverse list from end backward
@@ -367,4 +401,5 @@ class AccuracyTest(object):
 if __name__=="__main__":
 	acc_test=AccuracyTest()
 	acc_test.enable_logging()
+	acc_test.update_config()
 	acc_test.run_xyaccuracy_test()
