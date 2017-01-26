@@ -98,7 +98,7 @@ class PosMoveMeasure(object):
         update_TP_iter ... remaining number of iterations (recursion breaking parameter) allowed for tuning the theta
                            and phi shaft angles. if no argument, then updating is disabled by defaulting this argument
                            to start at a higher value than max allowed iteration.
-        should_update_TP_offsets ... defaults to off. see comments on this in test_and_update_TP function
+        should_update_TP_offsets ... defaults to off. see comments on this in _test_and_update_TP function
 
         """
         self.move(requests)
@@ -110,7 +110,7 @@ class PosMoveMeasure(object):
             # ALL THAT'S HAPPENING IS WE'RE TAKING FREE ERROR CORRECTION MOVES. IN OTHER WORDS, THIS ALGORITHM
             # APPEARS SOUND AS A RARE/LIMITED OCCURRENCE, BUT *NOT* OK IF IT IS BEING USED A LOT (IN WHICH
             # CASE IT COULD SCREW UP OUR ABILITY TO DO ANTICOLLISION).
-            delta_TP = self.test_and_update_TP(data,should_update_TP_offsets)
+            delta_TP = self._test_and_update_TP(data,should_update_TP_offsets)
             new_requests = {}
             for pos_id in delta_TP.keys():
                 if any(delta_TP[pos_id]):
@@ -119,56 +119,6 @@ class PosMoveMeasure(object):
                 self.move_measure(requests,update_TP_iter+1)
                 data,imgfiles = self.measure()
         return data,imgfiles
-        
-    def test_and_update_TP(self,measured_data,should_update_TP_offsets=False):
-        """Check if errors between measured positions and expected positions exceeds a tolerance
-        value, and if so, then adjust parameters in the direction of the measured error.
-        
-        By default, this function will only changed the internally-tracked shaft position, POS_T
-        and POS_P. The assumption is that we have fairly stable theta and phi offset values, based
-        on the mechanical reality of the robot. However there is an option (perhaps useful in limited cases,
-        such as when a calibration angle unwrap appears to have gone awry on a new test stand setup) where
-        one would indeed want to change the calibration parameters, OFFSET_T and OFFSET_P. Activate
-        this by arguing "should_update_TP_offsets=True".
-        
-        The overall idea here is to be able to deal gracefully with cases where the shaft has slipped
-        just a little, and we have slightly lost count of shaft positions, or where the initial
-        calibration was just a little off.
-        
-        The input value 'measured_data' is the same format as produced by the 'measure()' function.
-        
-        The return is a dictionary with:
-            keys   ... pos_ids 
-            values ... 1x2 [delta_theta,delta_phi]
-        """
-        delta_TP = {}
-        ptls_of_pos_ids = self.ptls_of_pos_ids([p for p in measured_data.keys()])
-        for pos_id in measured_data.keys():
-            delta_TP[pos_id] = [0,0]
-            petal = ptls_of_pos_ids[pos_id]
-            measured_obsXY = measured_data[pos_id]
-            expected_obsXY = petal.expected_current_position(pos_id,'obsXY')
-            err_xy = ((measured_obsXY[0]-expected_obsXY[0])**2 + (measured_obsXY[1]-expected_obsXY[1])**2)**0.5
-            if err_xy > self.update_TP_tol:
-                posmodel = petal.get(pos_id)
-                measured_posTP = posmodel.trans.obsXY_to_posTP(measured_data[pos_id])[0]
-                expected_posTP = ptls_of_pos_ids[pos_id].expected_current_position(pos_id,'posTP')
-                delta_T = (measured_posTP[0] - expected_posTP[0]) * self.update_TP_fraction
-                delta_P = (measured_posTP[1] - expected_posTP[1]) * self.update_TP_fraction
-                if should_update_TP_offsets:
-                    param = 'OFFSET'
-                else:
-                    param = 'POS'
-                old_T = petal.get(pos_id,param + '_T')
-                old_P = petal.get(pos_id,param + '_P')              
-                new_T = old_T + delta_T
-                new_P = old_P + delta_P
-                petal.set(pos_id,param + '_T',new_T,True)
-                petal.set(pos_id,param + '_P',new_P,True)
-                print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_T from ' + self.fmt(old_T) + ' to ' + self.fmt(new_T))
-                print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
-                delta_TP[pos_id] = [delta_T,delta_P]
-        return delta_TP
 
     def move_and_correct(self, requests, num_corr_max=2):
         """Move positioners to requested target coordinates, then make a series of correction
@@ -839,6 +789,56 @@ class PosMoveMeasure(object):
                 this_petal.set(pos_id,'LAST_MEAS_OBS_X',measured_obsXY[0])
                 this_petal.set(pos_id,'LAST_MEAS_OBS_Y',measured_obsXY[1])
 
+    def _test_and_update_TP(self,measured_data,should_update_TP_offsets=False):
+        """Check if errors between measured positions and expected positions exceeds a tolerance
+        value, and if so, then adjust parameters in the direction of the measured error.
+        
+        By default, this function will only changed the internally-tracked shaft position, POS_T
+        and POS_P. The assumption is that we have fairly stable theta and phi offset values, based
+        on the mechanical reality of the robot. However there is an option (perhaps useful in limited cases,
+        such as when a calibration angle unwrap appears to have gone awry on a new test stand setup) where
+        one would indeed want to change the calibration parameters, OFFSET_T and OFFSET_P. Activate
+        this by arguing "should_update_TP_offsets=True".
+        
+        The overall idea here is to be able to deal gracefully with cases where the shaft has slipped
+        just a little, and we have slightly lost count of shaft positions, or where the initial
+        calibration was just a little off.
+        
+        The input value 'measured_data' is the same format as produced by the 'measure()' function.
+        
+        The return is a dictionary with:
+            keys   ... pos_ids 
+            values ... 1x2 [delta_theta,delta_phi]
+        """
+        delta_TP = {}
+        ptls_of_pos_ids = self.ptls_of_pos_ids([p for p in measured_data.keys()])
+        for pos_id in measured_data.keys():
+            delta_TP[pos_id] = [0,0]
+            petal = ptls_of_pos_ids[pos_id]
+            measured_obsXY = measured_data[pos_id]
+            expected_obsXY = petal.expected_current_position(pos_id,'obsXY')
+            err_xy = ((measured_obsXY[0]-expected_obsXY[0])**2 + (measured_obsXY[1]-expected_obsXY[1])**2)**0.5
+            if err_xy > self.update_TP_tol:
+                posmodel = petal.get(pos_id)
+                measured_posTP = posmodel.trans.obsXY_to_posTP(measured_data[pos_id])[0]
+                expected_posTP = ptls_of_pos_ids[pos_id].expected_current_position(pos_id,'posTP')
+                delta_T = (measured_posTP[0] - expected_posTP[0]) * self.update_TP_fraction
+                delta_P = (measured_posTP[1] - expected_posTP[1]) * self.update_TP_fraction
+                if should_update_TP_offsets:
+                    param = 'OFFSET'
+                else:
+                    param = 'POS'
+                old_T = petal.get(pos_id,param + '_T')
+                old_P = petal.get(pos_id,param + '_P')              
+                new_T = old_T + delta_T
+                new_P = old_P + delta_P
+                petal.set(pos_id,param + '_T',new_T,True)
+                petal.set(pos_id,param + '_P',new_P,True)
+                print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_T from ' + self.fmt(old_T) + ' to ' + self.fmt(new_T))
+                print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
+                delta_TP[pos_id] = [delta_T,delta_P]
+        return delta_TP
+				
     @property
     def phi_clear_angle(self):
         """Returns the phi angle in degrees for which two positioners cannot collide
