@@ -25,7 +25,7 @@ class FVCHandler(object):
         3. translation
     """
     def __init__(self, fvc_type='SBIG'):
-        self.fvc_type = fvc_type # 'SBIG' or 'FLI'
+        self.fvc_type = fvc_type # 'SBIG' or 'FLI' or 'simulator'
         if self.fvc_type == 'SBIG':
             self.sbig = sbig_grab_cen.SBIG_Grab_Cen()
             self.sbig.take_darks = False # typically we have the test stand in a dark enough enclosure, so False here saves time
