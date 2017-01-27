@@ -522,7 +522,9 @@ class SBIGCam(object):
         for i in range(self.HEIGHT.value):
             Error = self.SBIG.SBIGUnivDrvCommand(self.CC_READOUT_LINE, byref(rlp), byref(cameraData, i*self.WIDTH.value*2)) # the 2 is essential
             if Error != self.CE_NO_ERROR:
-                print ('Readout failed. Writing readout then closing device and driver.')
+                print ('Readout failed with error ' + str(Error) + '. Writing readout then closing device and driver.')
+                if Error == 8:
+                    print('(Error 8 means CE_RX_TIMEOUT, "Receive (Rx) timeout error")')
                 break
         image = np.ctypeslib.as_array(cameraData)
         if Error == self.CE_NO_ERROR and self.verbose:
@@ -567,13 +569,15 @@ class SBIGCam(object):
             return False
             
     def close_camera(self):
+        return_val = True        
+        
          # Close Device
         Error = self.SBIG.SBIGUnivDrvCommand(self.CC_CLOSE_DEVICE, None, None)
         if Error == 20:
             print ('Code 20: device already closed.')
         elif Error != self.CE_NO_ERROR:
-            if self.verbose: print ('Closing device returned error:', Error)
-            return False
+            print ('Closing device returned error:', Error)
+            return_val = False
         elif self.verbose:
             print ('Device successfully closed.')
         
@@ -583,9 +587,11 @@ class SBIGCam(object):
             print ('Code 20: driver already closed.')
         elif Error != self.CE_NO_ERROR:
             print ('Attempt to close driver returned error:', Error)
-            return False
+            return_val = False
         elif self.verbose:
             print ('Driver successfully closed.')
+        
+        return return_val
 
     def set_temperature_regulation(self, regulationInput, ccdSetpoint=None):
         """

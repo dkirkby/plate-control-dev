@@ -5,17 +5,13 @@ import numpy as np
 import gc
 import sbigcam
 import os
+import pdb
 
 class SBIG_Grab_Cen(object):
     """Module for grabbing images and calculating centroids using the SBIG camera.
     """
     def __init__(self):  
-        self.cam=sbigcam.SBIGCam()
-        self.cam.select_camera('ST8300')
-        self.close_camera() # in case driver was previously left in "open" state
-        self.open_camera()      
-        self.__exposure_time = 200 # milliseconds, 90 ms is the minimum
-        self.cam.set_exposure_time(self.exposure_time)
+        self._cam_init()
         self.min_brightness = 5000
         self.max_brightness = 50000
         self.verbose = False
@@ -23,6 +19,14 @@ class SBIG_Grab_Cen(object):
         self.take_darks = True # whether to measure a dark image and subtract it out
         self.flip_horizontal = True # whether to reflect image across y axis
         self.flip_vertical = False # whether to reflect image across x axis
+
+    def _cam_init(self):
+        self.cam=sbigcam.SBIGCam()
+        self.cam.select_camera('ST8300')
+        self.close_camera() # in case driver was previously left in "open" state
+        self.open_camera()      
+        self.__exposure_time = 200 # milliseconds, 90 ms is the minimum
+        self.cam.set_exposure_time(self.exposure_time)
 
     @property
     def exposure_time(self):
@@ -75,18 +79,19 @@ class SBIG_Grab_Cen(object):
             L = self.flip(L)
 
             if self.write_fits:
-                filename = '_SBIG_light_image.FITS'
+                filename = '_SBIG_light_image_exp' + str(nexpose) + '.FITS'
                 try:
                     os.remove(filename)
                 except:
-                    print('couldn''t remove file: ' + filename)
+                    if self.verbose:
+                        print('couldn''t remove file: ' + filename)
                 self.cam.write_fits(L,filename)
                 imgfiles.append(filename)
             if not(self.take_darks):
                 D = np.zeros(np.shape(L), dtype=np.int32)
             LD = np.array(L,dtype = np.int32) - np.array(D,dtype = np.int32)
             if self.write_fits and self.take_darks:
-                filename = '_SBIG_diff_image.FITS'
+                filename = '_SBIG_diff_image_exp' + str(nexpose) + '.FITS'
                 self.cam.write_fits(LD,filename)
                 imgfiles.append(filename)
             del L
@@ -99,8 +104,8 @@ class SBIG_Grab_Cen(object):
                 warnings.warn('Spot seems dark (brightness = {})'.format(brightness))
                 nexpose=nexpose-1
             else:
-                #if brightness > self.max_brightness:
-                    #warnings.warn('Spot may be over saturated (brightness = {}'.format(brightness))
+                if brightness > self.max_brightness:
+                    warnings.warn('Spot may be over-saturated (brightness = {}'.format(brightness))                
                 nexpose=0
         del D
         gc.collect()
@@ -131,16 +136,18 @@ class SBIG_Grab_Cen(object):
     def start_exposure(self):
         '''Wraps the usual start_exposure function with some mild error handling.
         '''
-        max_tries = 3
-        i = 0
-        while i < max_tries:
+        img = self.cam.start_exposure()
+        if not(isinstance(img,np.ndarray)) or not(img.any()):
+            print('The camera returned a completely black image, indicating a possible readout failure.')
+            print('We have paused here in debug mode, so that we may attempt to recover and keep going.')
+            print('  1. Contact Joe, Michael, or Irena and bring them over.')
+            print('  2. Unplug the camera''s USB and power.')
+            print('  3. Replug them.')
+            print('  4. Wait at least 10 seconds.')
+            print('  5. To exit debugger and keep going, type "continue" and then hit enter.')
+            pdb.set_trace()
+            self._cam_init()
             img = self.cam.start_exposure()
-            if not isinstance(img,np.ndarray):
-                print('Try ' + str(i+1) + ' of ' + str(max_tries) + ' to start exposure failed.')
-                time.sleep(0.2) # pause and then take another try, in case the camera failure was some brief intermittent comm issue
-                i += 1
-            else:
-                break
         return img
 
     def flip(self, img):
