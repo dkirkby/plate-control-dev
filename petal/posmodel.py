@@ -221,6 +221,16 @@ class PosModel(object):
         self.state.write('TOTAL_MOVE_SEQUENCES', self.state.read('TOTAL_MOVE_SEQUENCES') + 1)
         self.state.log_unit(cleanup_table['log_note'])
 
+    def clear_postmove_cleanup_cmds_without_executing(self):
+        """Useful for example if a positioner is disabled, and we don't want any false post-move
+        cleanup to be attempted. The reason this function is needed sometimes is due to a corner
+        I backed into, where the postmove_cleanup_cmds need to be stored separate from the cleanup_table.
+        So for example if scheduler denies a move request, then even though there was no move_table
+        generated, it still needs to separately be able to clear out any of these commands that might
+        be lurking.
+        """
+        for axis in self.axis:
+            axis.postmove_cleanup_cmds = ''
 
 class Axis(object):
     """Handler for a motion axis. Provides move syntax and keeps tracks of position.
