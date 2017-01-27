@@ -52,9 +52,7 @@ class PosState(object):
             self.unit.write()
         else:
             self.unit = configobj.ConfigObj(unit_filename,unrepr=True)
-        if self.type == 'pos':
-            genl_filename = self.settings_directory + self.unit['GENERAL_SETTINGS_FILE']
-            self.genl = configobj.ConfigObj(genl_filename,unrepr=True)
+     
         all_logs = os.listdir(self.logs_directory)
         unit_logs = [x for x in all_logs if self.unit_basename in x]
         if unit_logs:
@@ -74,7 +72,7 @@ class PosState(object):
     def __str__(self):
         files = {'settings':self.unit.filename, 'log':self.log_path}
         if self.type == 'pos':
-            return pprint.pformat({'files':files, 'unit':self.unit, 'general':self.genl})
+            return pprint.pformat({'files':files, 'unit':self.unit})
         else:
             return pprint.pformat({'files':files, 'unit':self.unit})
 
@@ -83,21 +81,14 @@ class PosState(object):
         All sections of all configobj structures are searched to full-depth.
         """
         self.unit.reload()
-        self.genl.reload()
         if key in self.unit.keys():
             return self.unit[key]
-        if self.type == 'pos' and key in self.genl.keys():
-            return self.genl[key]
         print('no key "' + repr(key) + '" found')
+        print('keys: ' + str(self.unit.keys()))
         return None
 
     def write(self,key,val,write_to_disk=None):
         """Set a value.
-        In the default usage, there is an important distinction made between unit parameters and general parameters:
-            unit    ... the new value is stored in memory, but is ALSO written to the file on disk
-            general ... the new value is only stored in memory, it is NOT written to disk
-        This default behavior can be overridden (True or False) using the write_to_disk boolean argument.
-        Caution should be exercised, since usually one does not a particular positioner to overwrite general settings.
         """
         if key in pc.nominals.keys():
             nom = pc.nominals[key]['value']
@@ -109,10 +100,6 @@ class PosState(object):
             self.unit[key] = val
             if write_to_disk != False:
                 self.unit.write()
-        elif self.type == 'pos' and key in self.genl.keys():
-            self.genl[key] = val
-            if write_to_disk == True:
-                self.genl.write()
         else:
             print('value not set, because the key "' + repr(key) + '" was not found')
  
