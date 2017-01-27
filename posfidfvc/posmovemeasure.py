@@ -35,7 +35,7 @@ class PosMoveMeasure(object):
         self.n_points_grid_calib_P = 6
         self.err_level_to_save_move0_img = np.inf # value at which to preserve move 0 fvc images (for debugging if a measurement is off by a lot)
         self.err_level_to_save_moven_img = np.inf # value at which to preserve last corr move fvc images (for debugging if a measurement is off by a lot)
-		self.tp_updates_mode = 'posTP' # options are None, 'posTP', 'offsetsTP'. see comments in move_measure() function for explanation
+        self.tp_updates_mode = 'posTP' # options are None, 'posTP', 'offsetsTP'. see comments in move_measure() function for explanation
         self.tp_updates_tol = 0.065 # [mm] tolerance on error between requested and measured positions, above which to update the POS_T,POS_P or OFFSET_T,OFFSET_P parameters
         self.tp_updates_fraction = 0.8 # fraction of error distance by which to adjust POS_T,POS_P or OFFSET_T,OFFSET_P parameters after measuring an excessive error with FVC
 
@@ -827,7 +827,7 @@ class PosMoveMeasure(object):
                 expected_posTP = ptls_of_pos_ids[pos_id].expected_current_position(pos_id,'posTP')
                 delta_T = (measured_posTP[0] - expected_posTP[0]) * self.tp_updates_fraction
                 delta_P = (measured_posTP[1] - expected_posTP[1]) * self.tp_updates_fraction
-                if tp_updates='offsetsTP':
+                if tp_updates == 'offsetsTP':
                     param = 'OFFSET'
                 else:
                     param = 'POS'
@@ -840,7 +840,7 @@ class PosMoveMeasure(object):
                 print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_T from ' + self.fmt(old_T) + ' to ' + self.fmt(new_T))
                 print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
                 delta_TP[pos_id] = [delta_T,delta_P]
-				posmodel.state.log_unit('updated ' + param + '_T and ' + param + '_P after positioning error of ' + self.fmt(err_xy) + ' mm')
+                posmodel.state.log_unit('updated ' + param + '_T and ' + param + '_P after positioning error of ' + self.fmt(err_xy) + ' mm')
         return delta_TP
 				
     @property

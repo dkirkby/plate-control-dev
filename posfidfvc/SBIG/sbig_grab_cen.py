@@ -73,13 +73,14 @@ class SBIG_Grab_Cen(object):
             print("Taking light image...")
         self.cam.set_dark(False)
 
-        nexpose=3
-        while nexpose > 0:
+        n_exposures_max = 3
+        n = 0
+        while n < n_exposures_max:
             L = self.start_exposure()
             L = self.flip(L)
 
             if self.write_fits:
-                filename = '_SBIG_light_image_exp' + str(nexpose) + '.FITS'
+                filename = '_SBIG_light_image_exp' + str(n) + '.FITS'
                 try:
                     os.remove(filename)
                 except:
@@ -91,7 +92,7 @@ class SBIG_Grab_Cen(object):
                 D = np.zeros(np.shape(L), dtype=np.int32)
             LD = np.array(L,dtype = np.int32) - np.array(D,dtype = np.int32)
             if self.write_fits and self.take_darks:
-                filename = '_SBIG_diff_image_exp' + str(nexpose) + '.FITS'
+                filename = '_SBIG_diff_image_exp' + str(n) + '.FITS'
                 self.cam.write_fits(LD,filename)
                 imgfiles.append(filename)
             del L
@@ -102,11 +103,11 @@ class SBIG_Grab_Cen(object):
                 print("Brightness: "+str(brightness))
             if brightness < self.min_brightness:
                 warnings.warn('Spot seems dark (brightness = {})'.format(brightness))
-                nexpose=nexpose-1
+                n += 1
             else:
                 if brightness > self.max_brightness:
                     warnings.warn('Spot may be over-saturated (brightness = {}'.format(brightness))                
-                nexpose=0
+                n = n_exposures_max
         del D
         gc.collect()
 
