@@ -335,16 +335,25 @@ class Petal(object):
     def fiducials_on(self):
         """Turn all the fiducials on.
         """
-        duty_percents = [self.fid_duty_percent]*len(self.fid_can_ids)
-        duty_periods = [self.fid_duty_period]*len(self.fid_can_ids)
-        self.comm.set_fiducials(self.fid_can_ids, duty_percents, duty_periods)
+        fid_can_ids = self.fid_can_ids # re-implement to look up from each fiducial's state file
+        duty_percents = [self.fid_duty_percent]*len(fid_can_ids) # re-implement to read from each fiducial's state file, 'DUTY_DEFAULT_ON'
+        self._send_fiducial_settings(self.fid_can_ids, duty_percents) # may need fixing?
 
     def fiducials_off(self):
         """Turn all the fiducials off.
         """
-        duty_percents = [0]*len(self.fid_can_ids)
-        duty_periods = [self.fid_duty_period]*len(self.fid_can_ids)
-        self.comm.set_fiducials(self.fid_can_ids, duty_percents, duty_periods)
+        fid_can_ids = self.fid_can_ids # re-implement to look up from each fiducial's state file
+        duty_percents = [0]*len(fid_can_ids) # re-implement to write 0.0 into each fiducial's state file, 'DUTY_DEFAULT_OFF'
+        self._send_fiducial_settings(fid_can_ids, duty_percents) # may need fixing?
+	
+    def _send_fiducial_settings(fid_can_ids, duty_percents):
+        """Send fiducial settings out to petalboxes, and log it.
+        """
+        self.comm.set_fiducials(fid_can_ids, duty_percents) # may need fixing?
+        # pseudocode
+		# for each of the fiducials
+		#   write the new duty percent value to DUTY_STATE
+		#	run log_unit function in its state object
 
 # GETTERS, SETTERS, STATUS METHODS
 
