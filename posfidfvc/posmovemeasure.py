@@ -35,9 +35,9 @@ class PosMoveMeasure(object):
         self.n_points_grid_calib_P = 6
         self.err_level_to_save_move0_img = np.inf # value at which to preserve move 0 fvc images (for debugging if a measurement is off by a lot)
         self.err_level_to_save_moven_img = np.inf # value at which to preserve last corr move fvc images (for debugging if a measurement is off by a lot)
-        self.update_TP_tol = 0.065 # [mm] tolerance on error between requested and measured positions, above which to update the POS_T,POS_P or OFFSET_T,OFFSET_P parameters
-        self.update_TP_fraction = 0.8 # fraction of error distance by which to adjust POS_T,POS_P or OFFSET_T,OFFSET_P parameters after measuring an excessive error with FVC
-        self.update_TP_max_iter = 3 # maximum number of shaft angle update re-measurements to do in a row
+		self.tp_updates_mode = 'posTP' # options are None, 'posTP', 'offsetsTP'. see comments in move_measure() function for explanation
+        self.tp_updates_tol = 0.065 # [mm] tolerance on error between requested and measured positions, above which to update the POS_T,POS_P or OFFSET_T,OFFSET_P parameters
+        self.tp_updates_fraction = 0.8 # fraction of error distance by which to adjust POS_T,POS_P or OFFSET_T,OFFSET_P parameters after measuring an excessive error with FVC
 
     def fiducials_on(self):
         """Turn on all fiducials on all petals."""
@@ -91,33 +91,32 @@ class PosMoveMeasure(object):
             petal.request_targets(these_requests)            
             petal.schedule_send_and_execute_moves() # in future, may do this in a different thread for each petal
 
-    def move_measure(self, requests, update_TP_iter=np.Inf, should_update_TP_offsets=False):
+    def move_measure(self, requests, tp_updates=None):
         """Move positioners and measure output with FVC.
         See comments on inputs from move method.
         See comments on outputs from measure method.
-        update_TP_iter ... remaining number of iterations (recursion breaking parameter) allowed for tuning the theta
-                           and phi shaft angles. if no argument, then updating is disabled by defaulting this argument
-                           to start at a higher value than max allowed iteration.
-        should_update_TP_offsets ... defaults to off. see comments on this in _test_and_update_TP function
-
+        tp_updates  ... This optional setting allows one to turn on a mode where the measured fiber positions
+		                will be compared against the expected positions, and then if the error exceeds some
+					    tolerance value, we will update internal parameters to mitigate the error on future moves.
+						
+					        tp_updates='posTP'     ... updates will be made to the internally-tracked shaft positions, POS_T and POS_P
+						    tp_updates='offsetsTP' ... updates will be made to the calibration values OFFSET_T and OFFSET_P
+						    tp_updates=None        ... no updating (this is the default)
+						
+						The intention of the 'posTP' option is that if the physical motor shaft hangs up slightly and loses
+						sync with the rotating magnetic field in the motors, then we slightly lose count of where we are. So
+						updating 'posTP' adjusts our internal count of shaft angle to try to mitigate.
+						
+						The usage of the 'offsetsTP' option is expected to be far less common than 'posTP', because
+						we anticipate that the calibration offsets should be quite stable, reflecting the unchanging
+						physical geometry of the fiber positioner as-installed. The purpose of using 'offsetsTP' would be more
+						limited to scenarios of initial calibration, if for some reason we find that the usual calibrations are
+						failing.
         """
         self.move(requests)
         data,imgfiles = self.measure()
-        if update_TP_iter < self.update_TP_max_iter:
-            # IMPORTANT! NEED TO FIGURE OUT HOW TO PERMANENTLY LOG AND CLEARLY ALERT US TO THE FACT THAT
-            # THIS DYNAMIC FIX IS HAPPENING. OTHERWISE IN PRINCIPLE YOUR POSITIONER COULD BE "FIXING" ITS
-            # POSITION TRACKING OR CALIBRATION WITH EVERY MOVE, AND APPEARING TO FUNCTION OK -- WHEN REALLY
-            # ALL THAT'S HAPPENING IS WE'RE TAKING FREE ERROR CORRECTION MOVES. IN OTHER WORDS, THIS ALGORITHM
-            # APPEARS SOUND AS A RARE/LIMITED OCCURRENCE, BUT *NOT* OK IF IT IS BEING USED A LOT (IN WHICH
-            # CASE IT COULD SCREW UP OUR ABILITY TO DO ANTICOLLISION).
-            delta_TP = self._test_and_update_TP(data,should_update_TP_offsets)
-            new_requests = {}
-            for pos_id in delta_TP.keys():
-                if any(delta_TP[pos_id]):
-                    new_requests[pos_id] = {'command':'dTdP', 'target':delta_TP[pos_id], 'log_note':'shaft angles adjustment iteration ' + str(update_TP_iter)}
-            if any(new_requests):
-                self.move_measure(requests,update_TP_iter+1)
-                data,imgfiles = self.measure()
+        if tp_updates == 'posTP' or tp_updates =='offsetsTP':
+            self._test_and_update_TP(data,tp_updates)
         return data,imgfiles
 
     def move_and_correct(self, requests, num_corr_max=2):
@@ -156,7 +155,7 @@ class PosMoveMeasure(object):
                 return
             m['log_note'] = 'blind move'
             print(str(pos_id) + ': blind move to (obsX,obsY)=(' + self.fmt(m['targ_obsXY'][0]) + ',' + self.fmt(m['targ_obsXY'][1]) + ')')
-        this_meas,imgfiles = self.move_measure(data,update_TP_iter=0)
+        this_meas,imgfiles = self.move_measure(data, tp_updates=self.tp_updates_mode)
         save_img = False
         for pos_id in this_meas.keys():
             m = data[pos_id] # again, for terseness
@@ -181,7 +180,7 @@ class PosMoveMeasure(object):
                 correction[pos_id]['target'] = dxdy
                 correction[pos_id]['log_note'] = 'correction move ' + str(i)
                 print(str(pos_id) + ': correction move ' + str(i) + ' of ' + str(num_corr_max) + ' by (dx,dy)=(' + self.fmt(dxdy[0]) + ',' + self.fmt(dxdy[1]) + '), \u221A(dx\u00B2+dy\u00B2)=' + self.fmt(data[pos_id]['err2D'][-1]))
-            this_meas,imgfiles = self.move_measure(correction)
+            this_meas,imgfiles = self.move_measure(correction, tp_updates=self.tp_updates_mode)
             for pos_id in this_meas.keys():
                 m = data[pos_id] # again, for terseness
                 m['meas_obsXY'].append(this_meas[pos_id])
@@ -407,7 +406,7 @@ class PosMoveMeasure(object):
             for pos_id in all_pos_ids:
                 requests[pos_id] = {'command':'posTP', 'target':data[pos_id]['target_posTP'][i], 'log_note':'calib grid point ' + str(i+1)}
             print('calibration grid point ' + str(i+1) + ' of ' + str(n_pts))
-            this_meas_data,imgfiles = self.move_measure(requests)
+            this_meas_data,imgfiles = self.move_measure(requests, tp_updates=None)
             for p in this_meas_data.keys():
                 data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
         return data 
@@ -477,7 +476,7 @@ class PosMoveMeasure(object):
             for pos_id in all_pos_ids:
                 requests[pos_id] = {'command':'posTP', 'target':data[pos_id]['target_posTP'][i], 'log_note':'calib arc on ' + axis + ' point ' + str(i+1)}
             print('\'' + mode + '\' calibration arc on ' + axis + ' axis: point ' + str(i+1) + ' of ' + str(n_pts))
-            this_meas_data,imgfiles = self.move_measure(requests)
+            this_meas_data,imgfiles = self.move_measure(requests, tp_updates=None)
             for p in this_meas_data.keys():
                 data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
 
@@ -789,7 +788,7 @@ class PosMoveMeasure(object):
                 this_petal.set(pos_id,'LAST_MEAS_OBS_X',measured_obsXY[0])
                 this_petal.set(pos_id,'LAST_MEAS_OBS_Y',measured_obsXY[1])
 
-    def _test_and_update_TP(self,measured_data,should_update_TP_offsets=False):
+    def _test_and_update_TP(self,measured_data,tp_updates='posTP'):
         """Check if errors between measured positions and expected positions exceeds a tolerance
         value, and if so, then adjust parameters in the direction of the measured error.
         
@@ -798,13 +797,17 @@ class PosMoveMeasure(object):
         on the mechanical reality of the robot. However there is an option (perhaps useful in limited cases,
         such as when a calibration angle unwrap appears to have gone awry on a new test stand setup) where
         one would indeed want to change the calibration parameters, OFFSET_T and OFFSET_P. Activate
-        this by arguing "should_update_TP_offsets=True".
+        this by arguing tp_updates='offsetsTP'.
         
         The overall idea here is to be able to deal gracefully with cases where the shaft has slipped
         just a little, and we have slightly lost count of shaft positions, or where the initial
         calibration was just a little off.
         
         The input value 'measured_data' is the same format as produced by the 'measure()' function.
+		
+		Any updating of parameters that occurs will be written to the move log. Check the notes field for
+		a note like 'updated POS_T and POS_P after positioning error of 0.214 mm', to figure out when
+		this has occurred.
         
         The return is a dictionary with:
             keys   ... pos_ids 
@@ -818,13 +821,13 @@ class PosMoveMeasure(object):
             measured_obsXY = measured_data[pos_id]
             expected_obsXY = petal.expected_current_position(pos_id,'obsXY')
             err_xy = ((measured_obsXY[0]-expected_obsXY[0])**2 + (measured_obsXY[1]-expected_obsXY[1])**2)**0.5
-            if err_xy > self.update_TP_tol:
+            if err_xy > self.tp_updates_tol:
                 posmodel = petal.get(pos_id)
                 measured_posTP = posmodel.trans.obsXY_to_posTP(measured_data[pos_id])[0]
                 expected_posTP = ptls_of_pos_ids[pos_id].expected_current_position(pos_id,'posTP')
-                delta_T = (measured_posTP[0] - expected_posTP[0]) * self.update_TP_fraction
-                delta_P = (measured_posTP[1] - expected_posTP[1]) * self.update_TP_fraction
-                if should_update_TP_offsets:
+                delta_T = (measured_posTP[0] - expected_posTP[0]) * self.tp_updates_fraction
+                delta_P = (measured_posTP[1] - expected_posTP[1]) * self.tp_updates_fraction
+                if tp_updates='offsetsTP':
                     param = 'OFFSET'
                 else:
                     param = 'POS'
@@ -837,6 +840,7 @@ class PosMoveMeasure(object):
                 print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_T from ' + self.fmt(old_T) + ' to ' + self.fmt(new_T))
                 print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
                 delta_TP[pos_id] = [delta_T,delta_P]
+				posmodel.state.log_unit('updated ' + param + '_T and ' + param + '_P after positioning error of ' + self.fmt(err_xy) + ' mm')
         return delta_TP
 				
     @property
