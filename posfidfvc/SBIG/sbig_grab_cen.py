@@ -5,12 +5,12 @@ import numpy as np
 import gc
 import sbigcam
 import os
-import pdb
 
 class SBIG_Grab_Cen(object):
     """Module for grabbing images and calculating centroids using the SBIG camera.
     """
     def __init__(self):  
+        self.__exposure_time = 200 # milliseconds, 90 ms is the minimum
         self._cam_init()
         self.min_brightness = 5000
         self.max_brightness = 50000
@@ -25,7 +25,6 @@ class SBIG_Grab_Cen(object):
         self.cam.select_camera('ST8300')
         self.close_camera() # in case driver was previously left in "open" state
         self.open_camera()      
-        self.__exposure_time = 200 # milliseconds, 90 ms is the minimum
         self.cam.set_exposure_time(self.exposure_time)
 
     @property
@@ -139,14 +138,7 @@ class SBIG_Grab_Cen(object):
         '''
         img = self.cam.start_exposure()
         if not(isinstance(img,np.ndarray)) or not(img.any()):
-            print('The camera returned a completely black image, indicating a possible readout failure.')
-            print('We have paused here in debug mode, so that we may attempt to recover and keep going.')
-            print('  1. Contact Joe, Michael, or Irena and bring them over.')
-            print('  2. Unplug the camera''s USB and power.')
-            print('  3. Replug them.')
-            print('  4. Wait at least 10 seconds.')
-            print('  5. To exit debugger and keep going, type "continue" and then hit enter.')
-            pdb.set_trace()
+            print('The camera returned a completely black image, indicating a possible readout failure. Will attempt to re-initialize the camera and keep going.')
             self._cam_init()
             img = self.cam.start_exposure()
         return img
