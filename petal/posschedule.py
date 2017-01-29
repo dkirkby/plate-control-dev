@@ -34,7 +34,7 @@ class PosSchedule(object):
         """
         posmodel = self.petal.get_model_for_pos(pos)
         if self.already_requested(posmodel):
-            print(str(posmodel.state.get('POS_ID')) + ': cannot request more than one target per positioner in a given schedule')
+            print(str(posmodel.state.read('POS_ID')) + ': cannot request more than one target per positioner in a given schedule')
             return
         if self._deny_request_because_disabled(posmodel):
             return
@@ -203,9 +203,9 @@ class PosSchedule(object):
         """This is a special function specifically because there is a bit of care we need to
         consistently take with regard to post-move cleanup, if a request is going to be denied.
         """
-        enabled = posmodel.state.get('CTRL_ENABLED'):
+        enabled = posmodel.state.read('CTRL_ENABLED')
         if enabled == False: # this is specifically NOT worded as "if not enabled:", because here we actually do not want a value of None to pass the test, in case the parameter field 'CTRL_ENABLED' has not yet been implemented in the positioner's .conf file
             posmodel.clear_postmove_cleanup_cmds_without_executing()
-            print(str(posmodel.state.get('POS_ID')) + ': move request denied because CTRL_ENABLED = ' + str(enabled))
+            print(str(posmodel.state.read('POS_ID')) + ': move request denied because CTRL_ENABLED = ' + str(enabled))
             return True
         return False
