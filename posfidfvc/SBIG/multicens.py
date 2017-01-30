@@ -21,16 +21,19 @@ def centroid(im, mask=None, w=None, x=None, y=None):
 	# 2009-09-02 13:35 IJC: Created
 	if mask is None:
 		mask = ones(im.shape)
-	if w==None:
-		w = ones(im.shape)
-	if not (im.shape==mask.shape and im.shape==w.shape):
+	#if w==None:
+	#	w = ones(im.shape)
+	if not (im.shape==mask.shape):
 		print ("Image, mask, and weights must have same shape! Exiting.")
 		return -1
 	if x==None or y==None:
 		xx = arange(im.shape[1])
 		yy = arange(im.shape[0])
 		x,y = meshgrid(xx,yy)
-	zz=im*mask*w    
+	if w==None:
+		zz=im*mask    
+	else:
+		zz=im*mask*w    	
 	z=zz.sum()    
 	x0 = (x*zz).sum()/z
 	y0 = (y*zz).sum()/z
@@ -62,7 +65,7 @@ def im2bw(image,level):
 	bw[threshold_indices] = 1
 	return bw
 
-def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=False):
+def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True):
 # Computes centroids by finding spots and then fitting 2d gaussian
 #
 # Input 
