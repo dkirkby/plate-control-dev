@@ -11,10 +11,8 @@ petal/petal_dos.py -text
 petal/petalcomm.py -text
 petal/petsockcomm.py -text
 petal/pos_settings/_collision_settings_DEFAULT.conf -text
-petal/pos_settings/_genl_settings_DEFAULT.conf -text
 petal/pos_settings/_unit_settings_DEFAULT.conf -text
 petal/pos_settings/collision_settings_test.conf -text
-petal/pos_settings/genl_settings_001.conf -text
 petal/pos_settings/unit_6M01.conf -text
 petal/pos_settings/unit_BU02.conf -text
 petal/pos_settings/unit_M00001.conf -text
