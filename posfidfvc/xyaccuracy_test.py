@@ -4,7 +4,8 @@
 # Change log:
 # 
 # 
-#
+# 2017-01-31(MS): moved instantiation of fvc to __init__
+# 2017-01-31(MS): FVC type is now an entry in config file
 
 
 import os
@@ -26,12 +27,18 @@ import posmodel as pmodel
 import configobj
 import shutil
 
-
 class AccuracyTest(object):
 
 	def __init__(self,configfile='accuracy_test.conf'): 
 		self.config = configobj.ConfigObj(configfile,unrepr=True)
 		self.log=False
+		# JOE TEMPORARY COMMENT: I BELIEVE THIS CHOICE OF 'SBIG' SHOULD GO INTO
+		# CONFIG FILE, SINCE SOMETIMES WE WILL USE 'FLI' OR 'simulator'.
+		# Michael: Done!
+		fvc_type=self.config['local']['scale']
+		self.fvc = fvchandler.FVCHandler(fvc_type)
+		self.fvc.rotation = 0  # deg
+		self.fvc.scale =  self.config['local']['scale'] # mm/pixel (update um_scale below if not in mm) #Test2 = .0274 Test1 = .0282
 
 	def enable_logging(self,logfile=''):		
 		now=datetime.datetime.now().strftime("%y%m%d.%H%M%S")
@@ -58,7 +65,7 @@ class AccuracyTest(object):
 		self.should=(should_initial_rehome,should_identify_fiducials,should_identify_pos_loc,should_calibrate_quick,
 		should_measure_ranges,should_calibrate_grid,should_calibrate_full,should_do_accuracy_test,should_auto_commit_logs,
 		should_report,should_email,should_final_position)
-
+		self.fvc.scale =  config['local']['scale']
 
 		self.email_list = config['email']['email_list'] #full or limited
 
@@ -73,13 +80,8 @@ class AccuracyTest(object):
 		script_start_time = time.time()
 
 		# initialization
-		
-		# JOE TEMPORARY COMMENT: I BELIEVE THIS CHOICE OF 'SBIG' SHOULD GO INTO
-		# CONFIG FILE, SINCE SOMETIMES WE WILL USE 'FLI' OR 'simulator'.
-		fvc = fvchandler.FVCHandler('SBIG')
-		
-		fvc.scale =  config['local']['scale'] # mm/pixel (update um_scale below if not in mm) #Test2 = .0274 Test1 = .0282
-		fvc.rotation = 0  # deg
+		fvc = self.fvc # fvchandler.FVCHandler('SBIG')
+
 		um_scale = 1000 # um/mm
 		bcast_id = config['positioners']['bcast_id'] # 20000
 		pos_ids = config['positioners']['ids']
@@ -134,19 +136,6 @@ class AccuracyTest(object):
 		(should_initial_rehome,should_identify_fiducials,should_identify_pos_loc,should_calibrate_quick,
 		should_measure_ranges,should_calibrate_grid,should_calibrate_full,should_do_accuracy_test,should_auto_commit_logs,
 		should_report,should_email,should_final_position) = self.should
-
-		#should_initial_rehome     = config['mode']['should_initial_rehome']
-		#should_identify_fiducials = config['mode']['should_identify_fiducials']
-		#should_identify_pos_loc   = config['mode']['should_identify_pos_loc']
-		#should_calibrate_quick    = config['mode']['should_calibrate_quick']
-		#should_measure_ranges     = config['mode']['should_measure_ranges']
-		#should_calibrate_grid     = config['mode']['should_calibrate_grid']
-		#should_calibrate_full     = config['mode']['should_calibrate_full']
-		#should_do_accuracy_test   = config['mode']['should_do_accuracy_test']
-		#should_auto_commit_logs   = config['mode']['should_auto_commit_logs']
-		#should_report             = config['mode']['should_report']
-		#should_email              = config['mode']['should_email']
-		#should_final_position     = config['mode']['should_final_position']
 
 		email_list = self.email_list #config['email']['email_list'] #full or limited
 
