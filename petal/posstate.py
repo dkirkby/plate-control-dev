@@ -31,8 +31,8 @@ class PosState(object):
             self.settings_directory = pc.pos_settings_directory
             self.logs_directory = pc.move_logs_directory
         else:
-            self.settings_directory = pc.fid_settings_directory # to be implemented
-            self.logs_directory = pc.fid_logs_directory # to be implemented
+            self.settings_directory = pc.fid_settings_directory
+            self.logs_directory = pc.fid_logs_directory
         if unit_id != None:
             self.unit_basename = 'unit_' + str(unit_id)
             comment = 'Settings file for unit: ' + str(unit_id)
