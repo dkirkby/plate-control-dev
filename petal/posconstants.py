@@ -28,9 +28,9 @@ if all_logs_directory == None:
 pos_settings_directory = petal_directory + os.path.sep + 'pos_settings' + os.path.sep
 move_logs_directory    = all_logs_directory + os.path.sep + 'move_logs' + os.path.sep
 test_logs_directory    = all_logs_directory + os.path.sep + 'test_logs' + os.path.sep
+fid_logs_directory     = all_logs_directory + os.path.sep + 'fiducial_logs' + os.path.sep
 
 fid_settings_directory = petal_directory + os.path.sep + 'fid_settings' + os.path.sep
-fid_logs_directory = petal_directory + os.path.sep + 'fiducial_logs' + os.path.sep
 
 def set_logs_directory(dir):
     global all_logs_directory, move_logs_directory, test_logs_directory
