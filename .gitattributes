@@ -5,8 +5,6 @@ petal/demo.py -text
 petal/demo_dos.py -text
 petal/fid_settings/_unit_settings_DEFAULT.conf -text
 petal/fid_settings/unit_P001.conf -text
-petal/fiducial_logs/unit_P001_log_00000000.csv -text
-petal/fiducial_logs/unit_P001_log_00000001.csv -text
 petal/focal_surface_lookup.csv -text
 petal/move_dos.py -text
 petal/movetablescr.py -text
