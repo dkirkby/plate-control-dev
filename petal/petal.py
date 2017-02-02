@@ -45,8 +45,7 @@ class Petal(object):
         self.canids_where_tables_were_just_sent = []
         self.fid_can_ids = fid_ids # later, implement auto-lookup of pos_ids and fid_ids from database etc
         self.fid_duty_percent = 50 # 0-100 -- later, implement setting on a fiducial-by-fiducial basis
-        self.fid_duty_period  = 55 # milliseconds -- later, implement setting on a fiducial-by-fiducial basis
-
+ 
 # METHODS FOR POSITIONER CONTROL
 
     def request_targets(self, requests):
@@ -255,8 +254,8 @@ class Petal(object):
 		# Set the duty cycle currents and creep or accel/decel speeds.
 		# Currently this is a heavy-traffic-but-robust implementation, where we are doing this every single time we send a move table.
         parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
-        for posmodel in self.posmodels:
-            state = posmodel.state
+        for p in self.posmodels:
+            state = p.state
             can_id = int(state.read('CAN_ID'))
             parameter_vals = []
             for parameter_key in parameter_keys:
@@ -346,7 +345,7 @@ class Petal(object):
         duty_percents = [0]*len(fid_can_ids) # re-implement to write 0.0 into each fiducial's state file, 'DUTY_DEFAULT_OFF'
         self._send_fiducial_settings(fid_can_ids, duty_percents) # may need fixing?
 	
-    def _send_fiducial_settings(fid_can_ids, duty_percents):
+    def _send_fiducial_settings(self,fid_can_ids, duty_percents):
         """Send fiducial settings out to petalboxes, and log it.
         """
         self.comm.set_fiducials(fid_can_ids, duty_percents) # may need fixing?
