@@ -63,6 +63,13 @@ class PosModel(object):
         return self.state.read('CAN_ID')
 
     @property
+    def busid(self):
+        """Returns the name of the can bus that the positioner belongs to."""
+        return 'can' + str(self.state.read('BUS_ID'))
+        
+
+
+    @property
     def expected_current_position(self):
         """Returns a dictionary of the current expected position in the various coordinate systems.
         The keys are:
