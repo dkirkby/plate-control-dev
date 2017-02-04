@@ -50,6 +50,7 @@ def S2R_lookup(S):
 # Constants
 deg = '\u00b0'
 mm = 'mm'
+um_per_mm = 1000
 timestamp_format = '%Y-%m-%d %H:%M:%S.%f' # see strftime documentation
 filename_timestamp_format = '%Y-%m-%d_T%H%M%S'
 gear_ratio = {}
