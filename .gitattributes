@@ -419,6 +419,7 @@ posfidfvc/arc_accuracy_test.py -text
 posfidfvc/fitcircle.py -text
 posfidfvc/fvchandler.py -text
 posfidfvc/fvchandler_dos.py -text
+posfidfvc/initial_setup.py -text
 posfidfvc/lifetime_test.py -text
 posfidfvc/motormovemeasure.py -text
 posfidfvc/motortest.py -text
@@ -430,6 +431,7 @@ posfidfvc/poscalibplot.py -text
 posfidfvc/posmovemeasure.py -text
 posfidfvc/posmovemeasure_dos.py -text
 posfidfvc/posperform.py -text
+posfidfvc/test_settings/xytest_LBNL1_default.conf -text
 posfidfvc/um_test_report.py -text
 posfidfvc/xy_accuracy_post.py -text
 posfidfvc/xy_accuracy_test.py -text

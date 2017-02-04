@@ -3,12 +3,9 @@ import configobj
 import sys, os
 sys.path.append(os.path.abspath('../petal/'))
 import petal
-import fvchandler
 import posconstants as pc
-import posmovemeasure
 import xyaccuracy_test
 import datetime
-from os import environ
 
 
 def stime():
@@ -36,18 +33,9 @@ def generate_posXY(r_min,r_max,npoints):
 	return list(p)[:npoints]
 
 
-LOOPS =10
-NMOVES=1000
-NSTRIKES=10
-SEED=123456
-trange_h=375
-prange_h=185
-
-TESTING=True
-
 
 # set seed for random generator
-
+SEED=123456
 np.random.seed(SEED)
 
 
@@ -76,51 +64,35 @@ ptl = petal.Petal(petal_id, pos_ids, fid_ids)
 log_directory = pc.test_logs_directory
 log_timestamp = datetime.datetime.now().strftime(pc.filename_timestamp_format)
 
-move_list = generate_posXY(r_min,r_max,NMOVES*LOOPS)
+# initialize the test handler
+acc_test = xyaccuracy_test.AccuracyTest()
+acc_test.enable_logging()
 
 #create all the move request dictionaries
 life_moves = []
-for local_target in move_list:
+targets_list = generate_posXY(r_min,r_max,config['looping']['n_unmeasured_moves_per_loop'])
+for local_target in targets_list:
 	these_targets = {}
 	for pos_id in sorted(pos_ids):
 		these_targets[pos_id] = {'command':'posXY', 'target':local_target}
 	life_moves.append(these_targets)
 
-acc_test=xyaccuracy_test.AccuracyTest()
-acc_test.enable_logging()
 
 
 
-# 1) perform xy_accuracy test
-
-acc_test.update_config()
-
-logwrite(flog,': Starting first xyaccuracy test - 198 poins')
-
-if not TESTING:
-	m=acc_test.run_xyaccuracy_test()
-else:
-	print ('RUNNING XY TEST 198 poins')
-# 2) repeat 10 x (1000 random moves, 10 hardstop strikes, 28 point xy test w/ quick calibration only)
-
-# quick calibration only during loop 
-# 28 point test (n=7)
-
-config['mode']['should_calibrate_full'] = 'False'
-config['grid']['n_pts_across'] = '7'
-config.write()
-acc_test.update_config()
-
-for i in range(LOOPS):
-	logwrite(flog,': Starting loop '+str(i+1)+' of '+str(LOOPS))
-
-	# 1000 random moves
-
-	for j in range(NMOVES):
-		if j%100 == 0:
-			print('Cycle '+str(j+1)+' of '+str(NMOVES))
-		if not TESTING:
-			m.move(life_moves[j+i*NMOVES])
+total_loops = len(config['sequence']['n_pts_across_per_loop'])
+n_between_loops = config['sequence']['n_unmeasured_moves_between_loops']
+for i in range(total_loops):
+    logwrite(flog,': Starting xy test in loop ' + str(i+1) + ' of ' + str(total_loops))
+    acc_test.update_loop_settings(i)
+    acc_test.run_xyaccuracy_test()
+    if i >= total_loops - 1:
+        break # the last loop does not have unmeasured moves
+    logwrite(flog,': Starting unmeasured move sequence in loop ' + str(i+1) + ' of ' + str(total_loops))
+    for j in range(n_between_loops):
+		if j % 100 == 0:
+			print('... now at cycle ' + str(j+1) + ' of ' + str(n_between_loops) + ' within loop ' + str(i+1) ' of ' + str(total_loops))
+		m.move(life_moves[j+i*NMOVES])
 	print("MOVES"+str(life_moves[j+i*NMOVES]))	
 
 	logwrite(flog,': Finished move loop '+str(i+1)+' of '+str(LOOPS))
@@ -134,8 +106,8 @@ for i in range(LOOPS):
 
 	for k in range(NSTRIKES):
 
-		theta=np.random.uniform(0, trange_h)
-		phi=np.random.uniform(0, prange_h)
+		theta=np.random.uniform(0, trange_h) # this was hard coded at 375
+		phi=np.random.uniform(0, prange_h) # this was hard coded at 185
 		print("PHI "+str(phi))
 		#move theta and phi to random positions
 		requests={}
