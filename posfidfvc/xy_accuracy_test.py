@@ -41,7 +41,18 @@ m.n_fiducial_dots = 1 # number of fiducial centroids the FVC should expect
 num_corr_max = 4 #4 # number of correction moves to do for each target
 
 # new shaft-angle updating mode
-m.tp_updates_mode='posTP'
+m.tp_updates_mode = 'posTP'
+m.tp_updates_tol = np.Inf
+m.tp_updates_fraction = 0.8
+tp_updates_str = '_tpupdates_' + m.tp_updates_mode + '_tol' + str(m.tp_updates_tol) + '_frac' + str(m.tp_updates_fraction)
+
+# current settings
+curr = 50
+ptl.set(key='CURR_SPIN_UP_DOWN',value=curr)
+ptl.set(key='CURR_CREEP',value=curr)
+ptl.set(key='CURR_CRUISE',value=curr)
+ptl.set(key='CURR_HOLD',value=0)
+curr_str = '_curr' + str(curr)
 
 # test operations to do
 should_initial_rehome     = True
@@ -61,7 +72,7 @@ if should_measure_ranges: should_calibrate_quick = True
 # log file setup
 log_directory = pc.test_logs_directory
 os.makedirs(log_directory, exist_ok=True)
-log_suffix = 'gamma_25C_24RH' # string gets appended to filenames -- useful for user to identify particular tests
+log_suffix = 'gamma_24C_40RH' + curr_str + tp_updates_str # string gets appended to filenames -- useful for user to identify particular tests
 log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
 log_timestamp = datetime.datetime.now().strftime(pc.filename_timestamp_format)
 def log_timestamp_with_notes():
@@ -82,7 +93,7 @@ def summary_plot_name(pos_id):
 # this will get copied and transformed to each particular positioner's location below
 grid_max_radius = 5.6 # mm
 grid_min_radius = 0.5 # mm
-n_pts_across = 27 # 7 --> 28 pts, 27 --> 528 pts
+n_pts_across = 9 # 7 --> 28 pts, 27 --> 528 pts
 line = np.linspace(-grid_max_radius,grid_max_radius,n_pts_across)
 local_targets = [[x,y] for x in line for y in line]
 for i in range(len(local_targets)-1,-1,-1): # traverse list from end backward
