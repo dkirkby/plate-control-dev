@@ -1,4 +1,5 @@
 import os
+import inspect
 import numpy as np
 import enum
 
@@ -8,36 +9,31 @@ import enum
 # Interpreter settings
 np.set_printoptions(suppress=True) # suppress auto-scientific notation when printing np arrays
 
+# Verson of plate_control code we are running
+# Determined by reading what path in the directory structure we are running from.
+# This works on assumption of the particular directory structure that we have set up in the SVN, true as of 2017-02-07.
+# Should result in either 'trunk' or 'v0.31' or the like.
+petal_directory = os.path.abspath(inspect.getframeinfo(inspect.currentframe()).filename)
+code_version = petal_directory.split(os.path.sep)[-3]
+
 # File location directories
-# For environment paths, set the paths in your .bashrc file, by adding lines like:
+# For environment paths, set the paths in your .bashrc file, by adding the lines:
 #    export POSITIONER_LOGS_PATH="/my/path/to/positioner_logs"
+#    export FP_SETTINGS_PATH="/my/path/to/fp_settings"
+all_logs_directory = os.environ.get("POSITIONER_LOGS_PATH") # corresponds to https://desi.lbl.gov/svn/code/focalplane/positioner_logs
+all_settings_directory = os.environ.get("FP_SETTINGS_PATH") # corresponds to https://desi.lbl.gov/svn/code/focalplane/fp_settings
+move_logs_directory = all_logs_directory + os.path.sep + 'move_logs' + os.path.sep
+test_logs_directory = all_logs_directory + os.path.sep + 'test_logs' + os.path.sep
+fid_logs_directory  = all_logs_directory + os.path.sep + 'fiducial_logs' + os.path.sep
+pos_settings_directory = all_settings_directory + os.path.sep + 'pos_settings' + os.path.sep
+fid_settings_directory = all_settings_directory + os.path.sep + 'fid_settings' + os.path.sep
+collision_settings_directory = all_settings_directory + os.path.sep + 'collision_settings' + os.path.sep
+# 2017-02-07, Joe: previously there was a function here called 'set_logs_directory()'. It was for being able
+# to change these paths above at runtime. This is a bad thing to do, because it breaks our assumptions elsewhere
+# about how we are keeping config files and log files up-to-date in the SVN. So I removed that function. We
+# still may need a more mature implementation of storing/retrieving these settings and logs, but *whatever* it is,
+# it has to be thought through clearly and reviewed.
 
-petal_directory        = os.environ.get("PETAL_PATH")
-'''
-if os.environ.get('UMFLAG'):
-    petal_directory        = os.environ.get("PETAL_PATH")
-#else:
-#    petal_directory = os.path.join(os.environ.get('PLATE_CONTROL_DIR'),'petal')
-if petal_directory == None:
-    petal_directory        = os.path.abspath('../petal')
-'''    
-# this can be reset at runtime with the set_logs_directory function    
-all_logs_directory     = os.environ.get("POSITIONER_LOGS_PATH") # corresponds to https://desi.lbl.gov/svn/code/focalplane/positioner_logs
-if all_logs_directory == None:
-    all_logs_directory = os.path.abspath('../../../positioner_logs') # backup alternative to environmental path, may need to modify for your machine
-pos_settings_directory = petal_directory + os.path.sep + 'pos_settings' + os.path.sep
-move_logs_directory    = all_logs_directory + os.path.sep + 'move_logs' + os.path.sep
-test_logs_directory    = all_logs_directory + os.path.sep + 'test_logs' + os.path.sep
-fid_logs_directory     = all_logs_directory + os.path.sep + 'fiducial_logs' + os.path.sep
-
-fid_settings_directory = petal_directory + os.path.sep + 'fid_settings' + os.path.sep
-
-def set_logs_directory(dir):
-    global all_logs_directory, move_logs_directory, test_logs_directory
-    all_logs_directory = dir
-    move_logs_directory    = all_logs_directory + os.path.sep + 'move_logs' + os.path.sep
-    test_logs_directory    = all_logs_directory + os.path.sep + 'test_logs' + os.path.sep
-    
 # Mapping of radial coordinate R to pseudo-radial coordinate S (distance along focal surface from optical axis)
 R2Spoly = [5.00010E-01,9.99997E-01,1.91532E-07,1.72104E-09,7.31761E-11,-5.78982E-13,3.30271E-15,-1.11245E-17,1.90376E-20,-1.26341E-23]
 R2S_lookup_path = petal_directory + os.path.sep + 'focal_surface_lookup.csv'
