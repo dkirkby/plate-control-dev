@@ -217,6 +217,7 @@ class PosMoveTable(object):
             table['speed_mode_P'].append(true_moves[pc.P][i]['speed_mode'])
         if output_type == 'hardware':
             table['canid'] = self.posmodel.canid
+            table['busid'] = self.posmodel.busid
         else:
             table['posid'] = self.posmodel.posid
         table['nrows'] = len(table['dT'])
