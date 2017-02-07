@@ -1,13 +1,10 @@
 * text=auto !eol
 bin/petal -text
 bin/petalcontroller -text
-petal/demo.py -text
-petal/demo_dos.py -text
 petal/fid_settings/_unit_settings_DEFAULT.conf -text
 petal/fid_settings/unit_P001.conf -text
 petal/focal_surface_lookup.csv -text
 petal/move_dos.py -text
-petal/movetablescr.py -text
 petal/petal.py -text
 petal/petal_dos.py -text
 petal/petalcomm.py -text
@@ -372,10 +369,6 @@ petal/posplot.py -text
 petal/posschedule.py -text
 petal/posstate.py -text
 petal/postransforms.py -text
-petal/power_test.py -text
-petal/protodesi_config.json -text
-petal/protodesisim_config.json -text
-petal/test_poscollider.py -text
 petal/tests_and_demos/demo.py -text
 petal/tests_and_demos/demo_dos.py -text
 petal/tests_and_demos/movetablescr.py -text
