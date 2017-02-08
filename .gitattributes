@@ -1,8 +1,6 @@
 * text=auto !eol
 bin/petal -text
 bin/petalcontroller -text
-petal/fid_settings/_unit_settings_DEFAULT.conf -text
-petal/fid_settings/unit_P001.conf -text
 petal/focal_surface_lookup.csv -text
 petal/petal.py -text
 petal/petal_dos.py -text
