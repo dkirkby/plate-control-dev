@@ -6,7 +6,8 @@ import petal
 import posconstants as pc
 import xyaccuracy_test
 import datetime
-
+import Tkinter
+import tkFileDialog
 
 def stime():
 	# convinience function; returns current date/time as string yymmdd.hhmmss 
@@ -32,12 +33,14 @@ def generate_posXY(r_min,r_max,npoints):
 	p=zip(x[index],y[index])
 	return list(p)[:npoints]
 
-
-
 # set seed for random generator
 SEED=123456
 np.random.seed(SEED)
 
+# select configuration file for test
+Tkinter.Tk().withdraw()
+in_path = tkFileDialog.askopenfilename()
+print in_path
 
 if len(sys.argv) ==1:
 	configfile='accuracy_test.conf'
