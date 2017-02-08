@@ -178,8 +178,9 @@ class BootLoadControl(object):
 if __name__ == '__main__':
 	
 	bc=BootLoadControl()
-	bc.program(20000, 'fw30.hex')
-
+	print('Programming.....')
+	bc.program(sys.argv[1], 'fw21.hex')
+	print('Done!')
 
 
 
