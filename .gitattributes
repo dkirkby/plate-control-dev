@@ -57,25 +57,17 @@ posfidfvc/SBIG/stf.py -text
 posfidfvc/SBIG/usbreset.c -text
 posfidfvc/SBIG/usbreset.py -text
 posfidfvc/__init__.py -text
-posfidfvc/accuracy_test.default.conf -text
 posfidfvc/fitcircle.py -text
 posfidfvc/fvchandler.py -text
 posfidfvc/fvchandler_dos.py -text
 posfidfvc/initialize_hw_setup.py -text
-posfidfvc/lifetime_test.py -text
-posfidfvc/motormovemeasure.py -text
-posfidfvc/motortest.py -text
 posfidfvc/pos_xytest_plot.py -text
 posfidfvc/poscalibplot.py -text
 posfidfvc/posmovemeasure.py -text
 posfidfvc/posmovemeasure_dos.py -text
 posfidfvc/posperform.py -text
 posfidfvc/um_test_report.py -text
-posfidfvc/xy_accuracy_post.py -text
-posfidfvc/xy_accuracy_test.py -text
-posfidfvc/xy_accuracy_test_dos.py -text
 posfidfvc/xyaccuracy_test.py -text
-posfidfvc/xypost_plots.py -text
 posfirmware/develop/bootloader_description.pdf -text svneol=unset#unset
 posfirmware/develop/bootloadersyncf31.c -text
 posfirmware/develop/fipos_fw_2.0dev.c -text
