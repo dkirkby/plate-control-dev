@@ -37,13 +37,40 @@ class Petal(object):
             state = posstate.PosState(pos_id,logging=True)
             model = posmodel.PosModel(state)
             self.posmodels.append(model)
+            
+            # Set the duty cycle currents and creep or accel/decel speeds.
+            # Currently, these need to be set again via the set_parameters function anytime a positioner is powered up after petal initialization or
+            # anytime a parameter is changed in the configuration file
+            parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
+
+            can_id = model.canid
+            bus_id = model.busid
+
+            parameter_vals = []
+            for parameter_key in parameter_keys:
+                parameter_vals.append(state.read(parameter_key))
+            #syntax for setting currents: comm.set_currents(can_id, [curr_spin_p, curr_cruise_p, curr_creep_p, curr_hold_p], [curr_spin_t, curr_cruise_t, curr_creep_t, curr_hold_t])
+            self.comm.set_currents(bus_id, can_id, [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]], [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]])
+            #syntax for setting periods: comm.set_periods(can_id, creep_period_p, creep_period_t, spin_period)
+            self.comm.set_periods(bus_id, can_id, parameter_vals[4], parameter_vals[4], parameter_vals[5])
+
+
         self.posids = pos_ids
         self.schedule = posschedule.PosSchedule(self)
         self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
         self.anticollision_default = True # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
         self.anticollision_override = True # causes the anticollision_default value to be used in all cases
         self.canids_where_tables_were_just_sent = []
+        self.busids_where_tables_were_just_sent = []
         self.fid_can_ids = fid_ids # later, implement auto-lookup of pos_ids and fid_ids from database etc
+        self.fid_bus_ids =[]
+
+        for fid_id in fid_ids:
+            state = posstate.PosState(fid_id, logging=True)
+            self.fid_bus_ids.append(state.read('BUS_ID'))
+
+        
+
         self.fid_duty_percent = 50 # 0-100 -- later, implement setting on a fiducial-by-fiducial basis
  
 # METHODS FOR POSITIONER CONTROL
@@ -246,26 +273,34 @@ class Petal(object):
         """
         hw_tables = self._hardware_ready_move_tables()
         canids = []
+        busids = []
         for tbl in hw_tables:
             canids.append(tbl['canid'])
+            busids.append(tbl['busid'])
         self.canids_where_tables_were_just_sent = canids
+        self.busids_where_tables_were_just_sent = busids
         self._wait_while_moving()
+        self.comm.send_tables(hw_tables)
 
-		# Set the duty cycle currents and creep or accel/decel speeds.
-		# Currently this is a heavy-traffic-but-robust implementation, where we are doing this every single time we send a move table.
+    def set_parameters(self):
+        """Send the current and period parameter settings to the positioners"""
+        # Set the duty cycle currents and creep or accel/decel speeds.
+        # Currently this function needs to be called each time parameters change after petal initialization and if a positioner is plugged in/powered on after
+        # petal initialization
         parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
         for p in self.posmodels:
             state = p.state
-            can_id = int(state.read('CAN_ID'))
+            can_id = p.canid
+            bus_id = p.busid
+
             parameter_vals = []
             for parameter_key in parameter_keys:
                 parameter_vals.append(state.read(parameter_key))
             #syntax for setting currents: comm.set_currents(can_id, [curr_spin_p, curr_cruise_p, curr_creep_p, curr_hold_p], [curr_spin_t, curr_cruise_t, curr_creep_t, curr_hold_t])
-            self.comm.set_currents(can_id, [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]], [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]])
+            self.comm.set_currents(bus_id, can_id, [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]], [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]])
             #syntax for setting periods: comm.set_periods(can_id, creep_period_p, creep_period_t, spin_period)
-            self.comm.set_periods(can_id, parameter_vals[4], parameter_vals[4], parameter_vals[5])
+            self.comm.set_periods(bus_id, can_id, parameter_vals[4], parameter_vals[4], parameter_vals[5])
 
-        self.comm.send_tables(hw_tables)
 
     def execute_moves(self):
         """Command the positioners to do the move tables that were sent out to them.
@@ -348,7 +383,7 @@ class Petal(object):
     def _send_fiducial_settings(self,fid_can_ids, duty_percents):
         """Send fiducial settings out to petalboxes, and log it.
         """
-        self.comm.set_fiducials(fid_can_ids, duty_percents) # may need fixing?
+        self.comm.set_fiducials(fid_bus_ids, fid_can_ids, duty_percents) # may need fixing?
         # pseudocode
 		# for each of the fiducials
 		#   write the new duty percent value to DUTY_STATE
@@ -545,6 +580,7 @@ class Petal(object):
             print(self.expected_current_position_str())
         self.clear_schedule()
         self.canids_where_tables_were_just_sent = []
+        self.busids_where_tables_were_just_sent = []
 
     def _wait_while_moving(self):
         """Blocking implementation, to not send move tables while any positioners are still moving.
@@ -554,6 +590,7 @@ class Petal(object):
         The implementation has the benefit of simplicity, but it is acknowledged there may be 'better',
         i.e. multi-threaded, ways to achieve this, to be implemented later.
         """
+
         if self.simulator_on:
             return        
         timeout = 30.0 # seconds
@@ -564,7 +601,7 @@ class Petal(object):
             if (time.time()-start_time) >= timeout:
                 print('Timed out at ' + str(timeout) + ' seconds waiting to send next move table.')
                 keep_waiting = False
-            if self.comm.ready_for_tables(self.canids_where_tables_were_just_sent):
+            if self.comm.ready_for_tables(self.busids_where_tables_were_just_sent, self.canids_where_tables_were_just_sent):
                 keep_waiting = False             
             else:
                 time.sleep(poll_period)
