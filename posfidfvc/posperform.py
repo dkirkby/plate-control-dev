@@ -10,7 +10,8 @@ import Tkinter
 import tkFileDialog
 
 # set up logging of the high-level actions of posperform.py
-posperf_logfile_name = pc.test_logs_directory + 'posperf_' + pc.timestamp_str_now() + '.log'
+initial_timestamp = pc.timestamp_str_now() 
+posperf_logfile_name = pc.test_logs_directory + initial_timestamp + '_posperform.log'
 def logwrite(text,stdout=True):
     """convinience function; writes log info to file and optionally to screen"""
     line = pc.timestamp_str_now() + ': ' + text
@@ -43,22 +44,21 @@ if configfile:
 else:
     gui_root = tk.Tk()
     configfile = tk.filedialog.askopenfilename(initialdir=pc.test_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title="Select the configuration file for this test run.")
-    print('File ' + str(settings_filename) + ' selected for test settings.')
     gui_root.destroy()
-
+print('File ' + str(settings_filename) + ' selected as template for test settings.')
 config = configobj.ConfigObj(configfile,unrepr=True)
+config_traveler_name = pc.test_logs_directory + initial_timestamp + '_' + os.path.basename(configfile)
+config.filename = config_traveler_name
+config.write()
 
-
-logwrite('Start of positioner performance test.')
-
+# gather up some values from the config file
 petal_id = config['petal']['petal_id']
 pos_ids = config['positioners']['ids']
 fid_ids = []
 
-r_max=config['grid']['grid_max_radius']
-r_min=config['grid']['grid_min_radius']
-
-logwrite('Pos IDs: '+str(pos_ids))
+logwrite('Start of positioner performance test.')
+logwrite
+logwrite('Pos IDs: ' + str(pos_ids))
 
 ptl = petal.Petal(petal_id, pos_ids, fid_ids)
 
@@ -68,7 +68,7 @@ acc_test.enable_logging()
 
 #create all the move request dictionaries
 life_moves = []
-targets_list = generate_posXY(r_min,r_max,config['looping']['n_unmeasured_moves_per_loop'])
+targets_list = generate_posXY(config['grid']['grid_min_radius'],config['grid']['grid_max_radius'],config['looping']['n_unmeasured_moves_per_loop'])
 for local_target in targets_list:
 	these_targets = {}
 	for pos_id in sorted(pos_ids):
