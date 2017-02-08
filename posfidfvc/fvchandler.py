@@ -25,7 +25,7 @@ class FVCHandler(object):
         3. translation
     """
     def __init__(self, fvc_type='SBIG'):
-        self.fvc_type = fvc_type # 'SBIG' or 'FLI' or 'simulator'
+        self.fvc_type = fvc_type # 'SBIG' or 'SBIG_legacy' or 'FLI' or 'simulator'
         if self.fvc_type == 'SBIG':
             self.sbig = sbig_grab_cen.SBIG_Grab_Cen()
             self.sbig.take_darks = False # typically we have the test stand in a dark enough enclosure, so False here saves time
@@ -138,6 +138,7 @@ class FVCHandler(object):
             measured_pos_xy,measured_ref_xy = self.measured_xy_from_fvc_centroid(measured_dict)	
             return measured_pos_xy, measured_ref_xy
         else:
+            # FUTURE IMPELEMENTATION -- THIS STUFF GOES INTO 'SBIG_legacy' OPTION, AND FLI-LIKE SBIG DOES SOMETHING MORE LIKE 'FLI' ABOVE
             expected_xy = expected_pos_xy + expected_ref_xy
             num_objects = len(expected_xy)
             unsorted_xy,imgfiles = self.measure(num_objects)
