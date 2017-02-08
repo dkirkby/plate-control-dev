@@ -25,6 +25,7 @@ petalbox/canmap.json -text
 petalbox/docs/systec-readme.txt -text
 petalbox/drivers/systec-readme.txt -text
 petalbox/drivers/systec_can-V0.9.0.tar.bz2 -text
+petalbox/fw31.hex -text
 petalbox/hwlib/dlptemp.py -text
 petalbox/petalcontroller.py -text
 petalbox/petalcontroller_devel.py -text
