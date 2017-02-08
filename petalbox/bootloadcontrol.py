@@ -177,9 +177,11 @@ class BootLoadControl(object):
 
 if __name__ == '__main__':
 	
+
+	hex_file_name = 'fw31.hex'
 	bc=BootLoadControl()
-	print('Programming.....')
-	bc.program(sys.argv[1], 'fw21.hex')
+	print('Programming ' + hex_file_name + '.....')
+	bc.program(sys.argv[1], hex_file_name)
 	print('Done!')
 
 
