@@ -70,7 +70,6 @@ posfidfvc/poscalibplot.py -text
 posfidfvc/posmovemeasure.py -text
 posfidfvc/posmovemeasure_dos.py -text
 posfidfvc/posperform.py -text
-posfidfvc/test_settings/xytest_LBNL1_default.conf -text
 posfidfvc/um_test_report.py -text
 posfidfvc/xy_accuracy_post.py -text
 posfidfvc/xy_accuracy_test.py -text
