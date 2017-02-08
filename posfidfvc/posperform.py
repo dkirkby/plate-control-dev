@@ -38,14 +38,14 @@ SEED=123456
 np.random.seed(SEED)
 
 # select configuration file for test
-Tkinter.Tk().withdraw()
-in_path = tkFileDialog.askopenfilename()
-print in_path
-
-if len(sys.argv) ==1:
-	configfile='accuracy_test.conf'
+configfile = '' # For debug purposes, if you want to short-circuit the gui because it is annoying, you could hard-code a filename here, for any file located in the standard test_settings directory.
+if configfile:
+    configfile = pc.test_settings_directory + configfile
 else:
-	configfile=sys.argv[1]
+    gui_root = tk.Tk()
+    configfile = tk.filedialog.askopenfilename(initialdir=pc.test_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title="Select the configuration file for this test run.")
+    print('File ' + str(settings_filename) + ' selected for test settings.')
+    gui_root.destroy()
 
 config = configobj.ConfigObj(configfile,unrepr=True)
 print(stime())
