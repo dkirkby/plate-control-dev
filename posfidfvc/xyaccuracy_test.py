@@ -80,7 +80,7 @@ class AccuracyTest(object):
         os.makedirs(log_directory, exist_ok=True)
         log_suffix = self.log_suffix #self.config['mode']['log_suffix'] # string gets appended to filenames -- useful for user to identify particular tests
         log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
-        log_timestamp = datetime.datetime.now().strftime(pc.filename_timestamp_format)
+        log_timestamp = pc.timestamp_str_now()
         def path_prefix(pos_id):
             return log_directory + os.path.sep + pos_id + '_' + log_timestamp + log_suffix
         def move_log_name(pos_id):

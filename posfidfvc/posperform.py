@@ -9,16 +9,15 @@ import datetime
 import Tkinter
 import tkFileDialog
 
-def stime():
-	# convinience function; returns current date/time as string yymmdd.hhmmss 
-	now=datetime.datetime.now().strftime("%y%m%d.%H%M%S")
-	return now
-
-def logwrite(fhandle,text,stdout=True):
-	# convinience function; writes log info to file and optionally to screen	
-	fhandle.write(stime()+text)
-	if stdout: print(stime()+text)
-
+# set up logging of the high-level actions of posperform.py
+posperf_logfile_name = pc.test_logs_directory + 'posperf_' + pc.timestamp_str_now() + '.log'
+def logwrite(text,stdout=True):
+    """convinience function; writes log info to file and optionally to screen"""
+    line = pc.timestamp_str_now() + ': ' + text
+    filehandle = open(posperf_logfile_name)
+    filehandle.write('\n' + line)
+    filehandle.close()
+    if stdout: print(line)
 
 def generate_posXY(r_min,r_max,npoints):
 	'''Generates uniformly distributed points in circular area
@@ -48,10 +47,9 @@ else:
     gui_root.destroy()
 
 config = configobj.ConfigObj(configfile,unrepr=True)
-print(stime())
-flog=open('log/posperf_'+stime()+'.log','w')
 
-logwrite(flog,': Start of positioner performance test ')
+
+logwrite('Start of positioner performance test.')
 
 petal_id = config['petal']['petal_id']
 pos_ids = config['positioners']['ids']
@@ -60,12 +58,9 @@ fid_ids = []
 r_max=config['grid']['grid_max_radius']
 r_min=config['grid']['grid_min_radius']
 
-logwrite(flog,': Pos IDs: '+str(pos_ids))
+logwrite('Pos IDs: '+str(pos_ids))
 
 ptl = petal.Petal(petal_id, pos_ids, fid_ids)
-
-log_directory = pc.test_logs_directory
-log_timestamp = datetime.datetime.now().strftime(pc.filename_timestamp_format)
 
 # initialize the test handler
 acc_test = xyaccuracy_test.AccuracyTest()
@@ -86,22 +81,22 @@ for local_target in targets_list:
 total_loops = len(config['sequence']['n_pts_across_per_loop'])
 n_between_loops = config['sequence']['n_unmeasured_moves_between_loops']
 for i in range(total_loops):
-    logwrite(flog,': Starting xy test in loop ' + str(i+1) + ' of ' + str(total_loops))
+    logwrite('Starting xy test in loop ' + str(i+1) + ' of ' + str(total_loops))
     acc_test.update_loop_settings(i)
     acc_test.run_xyaccuracy_test()
     if i >= total_loops - 1:
         break # the last loop does not have unmeasured moves
-    logwrite(flog,': Starting unmeasured move sequence in loop ' + str(i+1) + ' of ' + str(total_loops))
+    logwrite('Starting unmeasured move sequence in loop ' + str(i+1) + ' of ' + str(total_loops))
     for j in range(n_between_loops):
 		if j % 100 == 0:
 			print('... now at cycle ' + str(j+1) + ' of ' + str(n_between_loops) + ' within loop ' + str(i+1) ' of ' + str(total_loops))
 		m.move(life_moves[j+i*NMOVES])
 	print("MOVES"+str(life_moves[j+i*NMOVES]))	
 
-	logwrite(flog,': Finished move loop '+str(i+1)+' of '+str(LOOPS))
+	logwrite('Finished move loop '+str(i+1)+' of '+str(LOOPS))
 
 	# 10 hardstop strikes
-	logwrite(flog,': Start '+str(NSTRIKES)+' hardstop strikes')
+	logwrite('Start '+str(NSTRIKES)+' hardstop strikes')
 
 	#turn off anti-backlash & creep move to save time 
 	ptl.set(key='ANTIBACKLASH_ON', value=False)
@@ -138,7 +133,7 @@ for i in range(total_loops):
 	else:
 		print ('RUNNING XY TEST 28 poins')
 
-	logwrite(flog,': Finished xyaccuracy test '+str(i+1)+' of '+str(LOOPS))
+	logwrite('Finished xyaccuracy test '+str(i+1)+' of '+str(LOOPS))
 
 # switch back to full calibration 
 # 198 point test (n=17)
@@ -146,13 +141,11 @@ config['mode']['should_calibrate_full'] = 'True'
 config['grid']['n_pts_across'] = '17'
 config.write()
 acc_test.update_config()
-logwrite(flog,': Starting final xyaccuracy test - 198 poins')
+logwrite('Starting final xyaccuracy test - 198 poins')
 
 if not TESTING:
 	acc_test.run_xyaccuracy_test()
 else:
 	print ('RUNNING XY TEST 198 poins')
 
-logwrite(flog,': End of performance test')
-
-flog.close()
+logwrite('End of performance test')

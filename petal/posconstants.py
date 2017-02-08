@@ -2,6 +2,7 @@ import os
 import inspect
 import numpy as np
 import enum
+import datetime
 
 """Constants and convenience methods used in the control of the Fiber Postioner.
 """
@@ -171,5 +172,5 @@ def is_very_verbose(verbosity_enum):
         boole = True
     return boole
 
-
-
+def timestamp_str_now():
+    return datetime.datetime.now().strftime(filename_timestamp_format)
