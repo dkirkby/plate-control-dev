@@ -13,8 +13,8 @@ np.set_printoptions(suppress=True) # suppress auto-scientific notation when prin
 # Determined by reading what path in the directory structure we are running from.
 # This works on assumption of the particular directory structure that we have set up in the SVN, true as of 2017-02-07.
 # Should result in either 'trunk' or 'v0.31' or the like.
-petal_directory = os.path.abspath(inspect.getframeinfo(inspect.currentframe()).filename)
-code_version = petal_directory.split(os.path.sep)[-3]
+petal_directory = os.path.dirname(os.path.abspath(inspect.getframeinfo(inspect.currentframe()).filename))
+code_version = petal_directory.split(os.path.sep)[-2]
 
 # File location directories
 # For environment paths, set the paths in your .bashrc file, by adding the lines:
