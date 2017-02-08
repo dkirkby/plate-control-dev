@@ -137,17 +137,21 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not execute get_pos_status. Exception: %s' % str(e)
 
-    def ready_for_tables(self, can_ids):
+    def ready_for_tables(self, bus_ids, can_ids):
         """Checks if all the positioners identified by can_id are ready to receive
         move tables.
         Returns either True or False
         """
         # status = self.get_pos_status()
+        # bus_ids: list of bus_ids (list of strings such as 'can0')
         # can_ids: list of can_ids (list of integers)
         # if everybody is stationary, then true
+        
         try:
-            return self._call_device('ready_for_tables',can_ids)
+            return self._call_device('ready_for_tables', bus_ids, can_ids)
         except Exception as e:
+            print('FAILED: Can not execute ready_for_tables. Exception: %s' % str(e))
+            print(bus_ids, can_ids)
             return 'FAILED: Can not execute ready_for_tables. Exception: %s' % str(e)           
 
     def send_tables(self, move_tables):
@@ -187,21 +191,21 @@ class PetalComm(object):
             return self._call_device('move', can_id, direction, mode, str(motor), angle)
         except Exception as e:
             return 'FAILED: Can not execute send_move_excute command. Exception: %s' % str(e)
-    def set_currents(self, can_id, P_currents, T_currents):
+    def set_currents(self, bus_id, can_id, P_currents, T_currents):
         """
 
         """
         try:
-            return self._call_device('set_currents',can_id, P_currents, T_currents)
+            return self._call_device('set_currents', bus_id, can_id, P_currents, T_currents)
         except Exception as e:
             return 'FAILED: Can not set currents. Exception: %s' % str(e)
 
-    def set_periods(self, can_id, creep_period_m0, creep_period_m1, spin_steps):
+    def set_periods(self, bus_id, can_id, creep_period_m0, creep_period_m1, spin_steps):
         """
 
         """
         try:
-            return self._call_device('set_periods',can_id, creep_period_m0, creep_period_m1, spin_steps)
+            return self._call_device('set_periods', bus_id, can_id, creep_period_m0, creep_period_m1, spin_steps)
         except Exception as e:
             return 'FAILED: Can not set periods. Exception: %s' % str(e)
 
@@ -225,7 +229,7 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not set positioner constants. Exception: %s' % str(e)
 
-    def set_fiducials(self, can_ids, percent_duty, duty_period):
+    def set_fiducials(self, bus_ids, can_ids, percent_duty, duty_period):
         """
         Send settings over ethernet to the petal controller, where they are
         sent over CAN to the fiducials. Sets the fiducials identified by the list ids
@@ -268,7 +272,7 @@ class PetalComm(object):
             return 'FAILED: Can not set attributes. Exception: %s' % str(e)
 
 
-    def set_led(self, can_id, state):
+    def set_led(self, bus_id, can_id, state):
         """
         Set the led on positioner id on or off
         Input:
@@ -283,7 +287,7 @@ class PetalComm(object):
             return 'FAILED: Invalid LED state'
 
         try:
-            return self._call_device('set_led',id, str(state).lower())
+            return self._call_device('set_led',bus_id, id, str(state).lower())
         except Exception as e:
             return 'FAILED: Can not set LED state. Exception: %s' % str(e)
 
