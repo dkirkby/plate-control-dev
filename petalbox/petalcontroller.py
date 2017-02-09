@@ -21,6 +21,7 @@
    3/08/2016    MS, IG      rewrote load_rows; added load_rows_angle, load_table_rows
    3/24/2016    IG          filled in set_fiducials
    7/07/2016    IG          added telemetry functions: switch_en_ptl, read_temp_ptl, fan_pwm_ptl
+   2/09/2016    IG          Implemented multiple canbus functionality (canbus received from unit_configuration files), removed set_fiducial command
   
 """
 
@@ -29,15 +30,12 @@ import time
 import threading
 import subprocess
 import netifaces
-import json
 
-#import posfidcan
 try:
     import ptltel
     telemetry_available = True
 except:
     telemetry_available = False
-#from configobj import ConfigObj
 import sys
 import os
 
@@ -61,10 +59,8 @@ class PetalController(Application):
                 'get_fid_status',
                 'get_device_status', 
                 'get_pos_status', 
-                'set_fiducials',
-                'set_fiducial',  
+                'set_fiducials',  
                 'configure',
-                'get_positioner_map',
                 'move',                 # implemented - usefull for testing 
                 'execute_sync',         # implemented
                 'send_tables',          # implemented
@@ -143,11 +139,7 @@ class PetalController(Application):
         # call configure to setup the posid map
         retcode = self.configure('constants = DEFAULT')
 
-        with open('/home/msdos/dos_home/dos_products/petalbox/canmap.json', 'r', encoding = 'utf-8') as f:
-            self.canmap = json.load(f)
-        self.info(str(self.canmap))
         self.verbose=True
-        self.use_canjson = False
 
     def configure(self, constants = 'DEFAULT'):
         """
@@ -159,24 +151,6 @@ class PetalController(Application):
         return self.SUCCESS
     
 # PML functions (functions that can be accessed remotely)
-
-    def __get_canbus(self, posid):
-        """
-        Maps the positioner ID to a canbus based on canbus to can_id mapping as specified in canmap.json file, or returns
-        lowest numbered CAN channel found if self_usecanjson = False.   
-      
-        """
-
-        posid=int(posid)
-        if self.use_canjson:
-            for k,v in self.canmap.items():
-                if posid in v:
-                    return str(k)
-        else:	
-            return self.canlist[0]
-	
-    def get_positioner_map(self):
-        pass
 
     def get_sids(self, canbus):
         """
@@ -459,41 +433,7 @@ class PetalController(Application):
                     return 'FAILED: Invalid pin name'
         return 'FAILED: Petalbox telemetry is not available'
     
-     
-    def set_fiducial(self, posid, percent_duty):
-        """
-        Set the ficucial power levels (between 0. and 100.). Inputs less than 0. or
-        greater than 100. are automatically set to 0. and 100., respectively.
-
-
-        INPUT
-            ids             integer fiducial id
-            percent_duty    float (int accepted) 0. to 100.  0.  (or 0) = off
-                            [note: granularity is 100./65536 = 0.00153]
-        RETURNS
-            SUCCESS or error message            
-        """
-
-        try:
-            if percent_duty < 0.: percent_duty=0.
-            if percent_duty > 100.: percent_duty=100.
-        except:
-            return self.FAILED
-
-        try:
-            canbus=self.__get_canbus(posid)
-        except:
-            return self.FAILED
-        if not self.simulator:
-            if not self.pmc.set_fiducial(canbus, posid, percent_duty):
-                if self.verbose: print('set_fiducial: Error setting fiducial with id'+str(posid))
-                return self.FAILED
-        else:
-            pass        
-
-        return self.SUCCESS
-
-    def set_fiducials(self, ids, percent_duty):
+    def set_fiducials(self, canbuses, ids, percent_duty):
         """
         Set the ficucial power levels and period
         Inputs include list with percentages, periods and ids
@@ -512,8 +452,9 @@ class PetalController(Application):
             # assemble arguments for canbus/firmware function
         
             posid=int(ids[id])
-            canbus=self.__get_canbus(posid)
+
             duty = int(percent_duty[id])
+            canbus = str(canbuses[id])
             self.fidstatus[str(ids[id])] = int(percent_duty[id])
 
             if not self.simulator:
@@ -540,11 +481,12 @@ class PetalController(Application):
             Each dictionary is the move table for one positioner.
 
             The dictionary has the following fields:
-                {'posid':'','nrows':0,'motor_steps_T':[],'motor_steps_P':[],'speed_mode_T':[],'speed_mode_P':[],'move_time':[],'postpause':[]}
+                {'canid': 0,'busid': 'can0', 'nrows':0,'motor_steps_T':[],'motor_steps_P':[],'speed_mode_T':[],'speed_mode_P':[],'move_time':[],'postpause':[]}
 
             The fields have the following types and meanings:
 
-                posid         ... string                    ... identifies the positioner by 'SERIAL_ID'
+                canid         ... unsigned integer          ... identifies the positioner by 'CAN_ID'
+                busid	      ... string                    ... identifies the positioner's canbus as string such as 'can0'
                 nrows         ... unsigned integer          ... number of elements in each of the list fields (i.e. number of rows of the move table)
                 motor_steps_T or
                 motor_steps_P ... list of signed integers   ... number of motor steps to rotate
@@ -559,11 +501,15 @@ class PetalController(Application):
         # here we need to assemble list of rows and then loop calls to load_rows
         # def load_rows(self, posid, ex_code, mode_select, angle, pause):
         print("*** tables***")
-        print(move_tables)
+        self.info(move_tables)
+
+        #reset SYNC line
+        self.switch_en_ptl('SYNC', 0)
+ 
         if not self.simulator:
             for table in move_tables:  # each table is a dictionary
                 posid=int(table['canid'])
-                canbus=self.__get_canbus(posid)
+                canbus = str(table['busid'])
                 nrows=table['nrows']
                 xcode = '1'
                 print("** nrows **"+str(nrows))   #for each table, xcode starts as 1
@@ -572,7 +518,7 @@ class PetalController(Application):
                     motor_steps_P=table['motor_steps_P'][row]
                     speed_mode_T=table['speed_mode_T'][row]
                     speed_mode_P=table['speed_mode_P'][row]
-                    post_pause=nint(table['postpause'][row]) + nint((table['move_time'][row])*1000)
+                    post_pause=nint(table['postpause'][row])
 
                     if (motor_steps_T & motor_steps_P): #simultaneous movement of theta and phi
                         post_pause_T = 0        #first axis command gets sent with 0 post_pause to make firmware perform simultaneous theta/phi move
@@ -595,7 +541,7 @@ class PetalController(Application):
         return self.SUCCESS
 
 
-    def move(self, posid, direction, move_mode, motor, angle ):
+    def move(self, canbus, posid, direction, move_mode, motor, angle ):
         """
         Sends single move and executes. This function is usually used from console.
         
@@ -630,7 +576,7 @@ class PetalController(Application):
             return 'FAILED: ' + rstring
 
         mode=(direction,move_mode,motor)
-        canbus = self.__get_canbus(posid)
+
 
         retcode=self.pmc.load_rows_angle(canbus, posid, xcode, mode, angle, pause)
 
@@ -644,22 +590,22 @@ class PetalController(Application):
         mode='soft': Using CAN command as the start signal.
         """
         mode=mode.lower()
-        canbus = self.__get_canbus(20000)
     
         if mode not in ['hard','soft']:
             rstring = 'execute_sync: Invalid arguments.'
             self.error(rstring)
             return 'FAILED: ' + rstring
         if mode == 'hard':
-            print ("This functionality is not yet implemented")
-            pass
-        if mode == 'soft':
-            if self.pmc.send_soft_sync(canbus , 20000):
-                return self.SUCCESS
-            else:
-                return self.FAILED  
+            self.switch_en_ptl('SYNC', 1)
+           
+        if mode == 'soft':	#send soft sync command to all detected CAN buses
+            for canbus in ['can1', 'can2']:
+ 
+                self.pmc.send_soft_sync(canbus , 20000)
 
-    def set_led(self, posid, state):
+        return self.SUCCESS
+
+    def set_led(self, canbus, posid, state):
         """
         Send the command to set positioner LED ON or OFF
         """ 
@@ -668,31 +614,29 @@ class PetalController(Application):
             self.error(rstring)
             return 'FAILED: ' + rstring
         if state.lower() not in ['on','off']:
-            rstring = 'execute_sync: Invalid LED state arguments.'
+            rstring = 'set_led: Invalid LED state arguments.'
             self.error(rstring)
             return 'FAILED: ' + rstring
-        # call canbus function
-        canbus = self.__get_canbus(posid)
+
         if self.pmc.set_reset_leds(canbus, posid, state.lower()):
             return self.SUCCESS
         else:
             return self.FAILED
 
-    def set_currents(self, posid, P_currents, T_currents):
-        canbus = self.__get_canbus(posid)
+    def set_currents(self, canbus, posid, P_currents, T_currents):
         if self.pmc.set_currents(canbus, posid, P_currents, T_currents):
             return self.SUCCESS
         else:
             return self.FAILED
 
-    def set_periods(self, can_id, creep_period_m0, creep_period_m1, spin_period):
-        canbus = self.__get_canbus(can_id)
-        #print(canbus)
+    def set_periods(self, canbus, can_id, creep_period_m0, creep_period_m1, spin_period):
+
         if self.pmc.set_periods(canbus, can_id, creep_period_m0, creep_period_m1, spin_period):
             return self.SUCCESS
         else:
             return self.FAILED
 
+   
     def set_pos_constants(self, posids, settings):
         """
         Sets positioners identified by ids in the list posids to corresponding
@@ -717,7 +661,7 @@ class PetalController(Application):
         """
         #status=self.pmc.get_pos_status(posids)
         return status
-
+    
 
     def get_fid_status(self):
         """
@@ -726,20 +670,20 @@ class PetalController(Application):
         status = self.fidstatus
         return status
 
-    def get_pos_status(self,posids):
+    def get_pos_status(self, busids, posids):
         """
-        Returns a (dictionary?) containing status of all devices other than positioners
-        and fiducials on the petal. This includes fans, power supplies, and sensors.
+        Returns positioner movement status.  Input is a dictionary with can id keys and canbus values (eg. {1004: 'can0', 1001: 'can1'})
         """
-        print("<in get_pos_status>")
-        canbus = self.__get_canbus(posids[0])
-        retcode=self.pmc.get_pos_status(canbus,posids)
+        
+        retcode=self.pmc.get_pos_status(busids, posids)
         
         return retcode
 
-    def ready_for_tables(self,posids):
+    def ready_for_tables(self, busids, posids):
         status=False
-        dev_status=self.get_pos_status(posids)
+        print('ready_for_tables - BUSIDS POSIDS: ', busids, posids)
+        dev_status=self.get_pos_status(busids, posids)
+        
         for posid in dev_status:
             if dev_status[posid] == 'DONE':
                 status=True
@@ -870,50 +814,6 @@ class PositionerMoveControl(object):
         except:
             return False 
 
-    def set_fiducial(self, canbus, posid, percent_duty):
-        
-        """
-            Constructs the command to send fiducial control signals to the theta/phi motor pads.
-            This also sets the device mode to fiducial (rather than positioner) in the firmware.
-
-            INPUTS
-                canbus:         string, can bus (example 'can2')        
-                posid:          int, positioner id (example 1008)
-
-        """
-
-        device_type = '01'  #fiducial = 01, positioner = 00
-        duty = str(hex(int(655.35*percent_duty)).replace('0x','')).zfill(4)
-        #TIMDIVint = int(duty_period*72000.)
-        #TIMDIV = str(hex(TIMDIVint).replace('0x', '')).zfill(8)
-        TIMDIV ='0FA0' # hardcode this for the time being to 55 microsec. 
-        #if(TIMDIVint <= 1650):
-        #   print("Duty period too small") 
-        #   return False 
-        #print(">>>",canbus, posid, 16, device_type + duty + TIMDIV)
-        try:        
-            self.pfcan[canbus].send_command(posid, 16, device_type + duty + TIMDIV)
-            return True
-        except:
-            return False        
-
-
-    def execute_sync(self, canbus, posid, mode):
-        
-        """
-            Constructs the command to set the status of the test LED on the positioner board.
-            Note: The LED will not be installed on production boards and this method will depreciate. 
-        
-            mode:  'hard, soft'
-                    
-            INPUTS
-        """
-        mode='soft'
-        try:        
-            self.pfcan[canbus].send_command(posid,7, '')
-            return True
-        except:
-            return False   
 
 
     def send_soft_sync(self, canbus, posid):
@@ -929,16 +829,19 @@ class PositionerMoveControl(object):
             return False        
 
 
-    def get_pos_status(self, canbus, posids):
+    def get_pos_status(self, busids, posids):
         
         """
         Signals the positionrs to start execution of move tables.         
         """
         status={}
-        for posid in posids:
-            posid=int(posid)
+        for id in range(len(posids)):
+            posid=posids[id]
             status[posid]='UNKNOWN'
             try:        
+                canbus = busids[id]
+                print('ABOUT TO SEND get_pos_status command')
+                print(canbus, posid)
                 posid_return,stat=self.pfcan[canbus].send_command_recv(posid,13,'')
                 print("posid_return,stat:",posid_return,stat)
                 stat=ord(stat)
@@ -988,7 +891,7 @@ class PositionerMoveControl(object):
 
         print(posid)
         posid = int(posid)
-        print(canbus)      
+        print('SET_PERIODS CANBUS: ' + canbus)      
         creep_period_m0=str(hex(creep_period_m0).replace('0x','')).zfill(2)
         creep_period_m1=str(hex(creep_period_m1).replace('0x','')).zfill(2)
         spin_steps=str(hex(spin_period).replace('0x','')).zfill(2)
