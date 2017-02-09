@@ -15,7 +15,7 @@ class PosCollider(object):
         # load up a configobj from _collision_settings_DEFAULT.conf, in pc.settings_directory
         if not(configfile):
             configfile = '_collision_settings_DEFAULT.conf'
-        filename = pc.pos_settings_directory + configfile
+        filename = pc.collision_settings_directory + configfile#pc.pos_settings_directory + configfile
         self.config = configobj.ConfigObj(filename,unrepr=True)
         self.posmodels = []
         self.pos_neighbor_idxs = [] # indexes of all the positioners surround a given positioner
@@ -409,7 +409,8 @@ class PosSweep(object):
             for ax in [pc.T,pc.P]:
                 discrete_step = self.tp_dot[ax,i] * timestep
                 this_discrete_position[ax] = discrete_position[ax,-1] + np.arange(1,len(this_discrete_time)+1)*discrete_step
-                this_discrete_position[ax][-1] = self.tp[ax,i] # force the final step to end at the right place (thus slightly changing the effective speed of the final step)
+                if len(this_discrete_position[ax]>0):
+                     this_discrete_position[ax][-1] = self.tp[ax,i] # force the final step to end at the right place (thus slightly changing the effective speed of the final step)
                 this_speed[ax] = self.tp_dot[ax,i]*np.ones_like(this_discrete_time) # for book keeping
             discrete_position = np.append(discrete_position, this_discrete_position, axis=1)
             discrete_time = np.append(discrete_time, this_discrete_time)

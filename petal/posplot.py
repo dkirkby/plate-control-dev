@@ -198,7 +198,8 @@ class PosPlot(object):
             codec = 'mpeg4'
             input_file = os.path.join(self.save_dir, self.framefile_prefix + '%' + str(self.n_framefile_digits) + 'd' + self.framefile_extension)
             output_file = os.path.join(self.save_dir,'animation.mp4')
-            ffmpeg_cmd = 'ffmpeg' + ' -y ' + ' -r ' + str(fps) + ' -i ' + input_file + ' -q:v ' + str(quality) + ' -vcodec ' + codec + ' ' + output_file
+            #ffmpeg_cmd = 'ffmpeg' + ' -y ' + ' -r ' + str(fps) + ' -i ' + input_file + ' -q:v ' + str(quality) + ' -vcodec ' + codec + ' ' + output_file
+            ffmpeg_cmd = 'ffmpeg' + ' -y ' + ' -r ' + str(fps) + ' -i ' + input_file + ' -vcodec ' + codec + ' ' + output_file
             os.system(ffmpeg_cmd)
 
     def grab_frame(self, frame_number):
@@ -217,8 +218,9 @@ class PosPlot(object):
 
     @staticmethod
     def set_patch(patch,item,index):
-        patch.set_xy(item['poly'][index].transpose().tolist())
-        #patch.set_linestyle(item['style'][index]['linestyle'])
-        patch.set_linewidth(item['style'][index]['linewidth'])
-        patch.set_edgecolor(item['style'][index]['edgecolor'])
-        patch.set_facecolor(item['style'][index]['facecolor'])
+        if len(item['poly'])>index:
+            patch.set_xy(item['poly'][index].transpose().tolist())
+            #patch.set_linestyle(item['style'][index]['linestyle'])
+            patch.set_linewidth(item['style'][index]['linewidth'])
+            patch.set_edgecolor(item['style'][index]['edgecolor'])
+            patch.set_facecolor(item['style'][index]['facecolor'])

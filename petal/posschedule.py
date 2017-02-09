@@ -18,6 +18,10 @@ class PosSchedule(object):
         self.petal = petal
         self.move_tables = []
         self.requests = []
+        self.verbose = True
+        anticol_avoidance = 'EM'
+        self.anticol = anticollision.PosAnticol(anticol_avoidance,self.verbose)
+
 
     def request_target(self, pos, uv_type, u, v, log_note=''):
         """Adds a request to the schedule for a given positioner to move to the
@@ -167,37 +171,17 @@ class PosSchedule(object):
             self.move_tables.append(table)
 
     def _schedule_with_anticollision(self):
+        """  
+            Call the PosAnticol Class and have it generate 
+            movetables for all requests in self.requests 
         """
-           Currently just a very naive anticollision that
-           stops the positioner from moving if it will collide.
-           Those positioners do not recieve their request location.
-        """
-        verbose = False
-        if verbose:
+        if self.verbose:
             print("You ARE doing anticollisions")
             print("Number of requests: "+str(len(self.requests)))
 
-        xabs = []; yabs = []; tstarts = []; pstarts = []; ttargs = []; ptargs = []; posmodels = []
-        log_notes = {}
-        for request in self.requests:
-            posmodel = request['posmodel']
-            xabs.append(posmodel.state.read('OFFSET_X'))
-            yabs.append(posmodel.state.read('OFFSET_Y'))
-            ttarg,ptarg = posmodel.trans.posTP_to_obsTP(request['targt_posTP'][:])
-            tstart,pstart = posmodel.trans.posTP_to_obsTP(request['start_posTP'][:])
-            tstarts.append(tstart)
-            pstarts.append(pstart)
-            ptargs.append(ptarg)
-            ttargs.append(ttarg)
-            posmodels.append(posmodel)
-            log_notes[posmodel] = request['log_note']
+        self.move_tables = self.anticol.run_anticol(self.requests,self.petal.posids)
 
-        method = 'RRE'
-        avoidance_technique = 'zeroth_order'
-        self.move_tables = anticollision.run_anticol(xabs,yabs,tstarts,ttargs,pstarts,ptargs,posmodels,method,avoidance_technique,verbose)
-        
-        for table in self.move_tables:
-            table.log_note += (' ' if table.log_note else '') + log_notes[table.posmodel]
+
 
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to

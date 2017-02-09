@@ -1,4 +1,4 @@
-import petalcomm
+#import petalcomm
 import posmodel
 import posschedule
 import posmovetable
@@ -27,11 +27,20 @@ class Petal(object):
     purpose of running test stands only. Later implementations should track fiducials' physical hardware
     by unique id number, log expected and measured positions, log cycles and total on time, etc.
     """
-    def __init__(self, petal_id, pos_ids, fid_ids):
-        self.simulator_on = False # controls whether in software-only simulation mode
+    def __init__(self, petal_id, pos_ids, fid_ids,set_simulator = False):
+        self.simulator_on = set_simulator # controls whether in software-only simulation mode
         self.verbose = False # whether to print verbose information at the terminal
         self.petal_id = petal_id
-        self.comm = petalcomm.PetalComm(self.petal_id)
+        try:
+            import petalcomm
+            self.comm = petalcomm.PetalComm(self.petal_id)
+        except:
+            if self.simulator_on:
+                print("Something went wrong with PetalComm assignment. Setting self.comm = None and continuing.")
+                self.comm = None
+            else:
+                raise
+        #self.comm = petalcomm.PetalComm(self.petal_id)
         self.posmodels = []
         for pos_id in pos_ids:
             state = posstate.PosState(pos_id,logging=True)
