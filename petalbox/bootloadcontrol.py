@@ -134,7 +134,7 @@ class BootLoadControl(object):
 	def program(self, can_id, hex_file = 'fw21.hex'):
 	
 		try:
-			pid = self.broadcast_id			#broadcast id
+			pid = can_id
 			pause = 0 
 
 			self.hexfile=IntelHex(hex_file)
