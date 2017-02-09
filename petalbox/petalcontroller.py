@@ -599,7 +599,7 @@ class PetalController(Application):
             self.switch_en_ptl('SYNC', 1)
            
         if mode == 'soft':	#send soft sync command to all detected CAN buses
-            for canbus in ['can1', 'can2']:
+            for canbus in ['can0', 'can1']:
  
                 self.pmc.send_soft_sync(canbus , 20000)
 
