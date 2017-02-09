@@ -7,6 +7,8 @@ import posconstants as pc
 import numpy as np
 import time
 
+
+
 class Petal(object):
     """Controls a petal. Communicates with the PetalBox hardware via PetalComm.
 
@@ -59,11 +61,15 @@ class Petal(object):
             for parameter_key in parameter_keys:
                 parameter_vals.append(state.read(parameter_key))
             #syntax for setting currents: comm.set_currents(can_id, [curr_spin_p, curr_cruise_p, curr_creep_p, curr_hold_p], [curr_spin_t, curr_cruise_t, curr_creep_t, curr_hold_t])
-            self.comm.set_currents(bus_id, can_id, [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]], [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]])
-            #syntax for setting periods: comm.set_periods(can_id, creep_period_p, creep_period_t, spin_period)
-            self.comm.set_periods(bus_id, can_id, parameter_vals[4], parameter_vals[4], parameter_vals[5])
-
-
+            try:
+                self.comm.set_currents(bus_id, can_id, [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]], [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]])
+                #syntax for setting periods: comm.set_periods(can_id, creep_period_p, creep_period_t, spin_period)
+                self.comm.set_periods(bus_id, can_id, parameter_vals[4], parameter_vals[4], parameter_vals[5])
+            except:
+                if self.simulator_on:
+                    pass
+                else:
+                    raise
         self.posids = pos_ids
         self.schedule = posschedule.PosSchedule(self)
         self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
