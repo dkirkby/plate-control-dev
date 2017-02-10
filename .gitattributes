@@ -421,7 +421,6 @@ posfidfvc/SBIG/sbigcam.py -text
 posfidfvc/SBIG/stf.py -text
 posfidfvc/SBIG/usbreset.c -text
 posfidfvc/SBIG/usbreset.py -text
-posfidfvc/__init__.py -text
 posfidfvc/fitcircle.py -text
 posfidfvc/fvchandler.py -text
 posfidfvc/fvchandler_dos.py -text
