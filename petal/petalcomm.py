@@ -234,16 +234,14 @@ class PetalComm(object):
         Send settings over ethernet to the petal controller, where they are
         sent over CAN to the fiducials. Sets the fiducials identified by the list ids
         to the corresponding duty values.
-        can_ids      ... list of fiducial ids
+        bus_ids      ... list of bus ids where you find each fiducial
+        can_ids      ... list of can id addresses for each fiducial on its bus
         percent_duty ... list of values, 0-100, 0 means off
-
-        Would probably be better as a dictionary of dictionaries like this:
-        fiducials = { 1 : {'percent': percent_duty, 'period' : duty_period}, 4 : {'percent': ....  }
         """
         if not isinstance(bus_ids, list) or not isinstance(can_ids, list) or not isinstance(percent_duty,list):
             return 'FAILED: parameters must be passed as lists'
         try:
-            return self._call_device('set_fiducials',can_ids, percent_duty) # JOE: DOES THIS NEED SOME ARGUMENTS ABOUT BUS_IDs?
+            return self._call_device('set_fiducials', bus_ids, can_ids, percent_duty)
         except Exception as e:
             return 'FAILED: Can not set fiducials. Exception: %s' % str(e)
 
