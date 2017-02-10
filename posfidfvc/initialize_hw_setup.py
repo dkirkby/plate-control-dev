@@ -52,22 +52,17 @@ fvcflip 1
 asphere 1
 """
 
-"""MY QUESTIONS:
-    Steve that looks real good to me.
 
-1. Is fvcflip an ambiguous name? Can you include a comment in the file, or change the param name, to remind my brain at a later date which plane you are mirroring across?
 
-2. Can you include a one-liner in the comments saying what your order of ops is for the scale, rotate, offset, and flip operations, in some particular transformation direction, like when going from fvc pix to focal plane mm?
- Otherwise I will have pain figuring out what numbers to give you.
-
-3. Do we need a flag here saying whether there is a corrector present? Or is that told to platemaker in some other way?
-
-4. Can you write in the comments for the asphere flag what 0 and 1 mean? Again my brain is guaranteed to forget which is which in a month from now.
+"""HOW TO READ AN FVC IMAGE AND GIVE PLATEMAKER THE RIGHT ORIENTATION / VALUES FOR INSTRUMENT FILE:
+See picture that steve made.
+I posted it at:
+https://desi.lbl.gov/trac/wiki/DOS/PositionerLoop    
 """
 
            
 """COMMENTS FROM ERIC ON FORMAT OF FIDUCIALS DATA FILE FOR PLATEMAKER
-named fiducials_em.dat ? Or does this data go into the config file for instrument?
+PER EMAIL 2017-02-10, THIS STUFF DOES GO INTO THE .par INSTRUMENT FILE
 
 Internally to Steve, it’s the same format as the files he uses for positioners and positioner_calib. There is an example in $PLATEMAKER_DIR/test/data/testinst1/fiducial-testinst1.dat, which is just a copy of the defualt file in dervishtools, trunk/desi/etc/default/fiducial-default.dat.
 
@@ -91,4 +86,6 @@ It looks like this:
 1114  9.49977  60.87482  0
 1101  16.43042  37.25640  0
 1109  263.43168  37.11059  0
+
+(but actually use flag 8 indicating it is a fiducial)
 """

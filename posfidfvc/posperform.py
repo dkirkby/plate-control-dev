@@ -20,19 +20,6 @@ def logwrite(text,stdout=True):
     filehandle.close()
     if stdout: print(line)
 
-def generate_posXY(r_min,r_max,npoints):
-	'''Generates uniformly distributed points in circular area
-	   Starts with uniformly distributed square then reject points
-	   found outside the circle.
-	   Returns list.'''
-
-	x = np.random.uniform(-r_max, r_max, npoints*2)
-	y = np.random.uniform(-r_max, r_max, npoints*2)
-	r = np.sqrt(x**2 + y**2)
-	index=np.where(np.logical_and(r < r_max,r > r_min))
-	p=zip(x[index],y[index])
-	return list(p)[:npoints]
-
 # set seed for random generator
 SEED=123456
 np.random.seed(SEED)
@@ -68,9 +55,9 @@ ptl = petal.Petal(petal_id, pos_ids, fid_ids)
 acc_test = xyaccuracy_test.AccuracyTest()
 acc_test.enable_logging()
 
-#create all the move request dictionaries
+# create all the move request dictionaries
 life_moves = []
-targets_list = generate_posXY(config['grid']['grid_min_radius'],config['grid']['grid_max_radius'],config['looping']['n_unmeasured_moves_per_loop'])
+targets_list = acc_test.generate_posXY(config['n_unmeasured_moves_between_loops'])
 for local_target in targets_list:
 	these_targets = {}
 	for pos_id in sorted(pos_ids):

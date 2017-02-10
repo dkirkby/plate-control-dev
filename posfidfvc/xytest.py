@@ -45,15 +45,14 @@ class AccuracyTest(object):
         for ptl_id in [petal_id]: # this elaboration of a for loop is just a placeholder for future implementations, where we would have a list of multiple petals being handled by posmovemeasure 
             petals += petal.Petal(ptl_id, pos_ids, fid_ids)
         self.m = posmovemeasure.PosMoveMeasure(ptl_ids,self.fvc)
-        
+        self.m.n_fiducial_dots = self.num_expected_fiducial_dots() # this will need enhancement / elaboration to work with platemaker / fvc interfaces
         self.ptl.anticollision_default = self.config['petal']['anticollision']
-        
         self.should_log = False
         self.should_auto_commit_logs = self.config['mode']['should_auto_commit_logs']
         self.should_email = self.config['mode']['should_email']
         self.should_report = self.config['mode']['should_report']
         self.email_list = self.config['email']['email_list'] #full or limited
-        self.log_suffix = self.config['mode']['log_suffix']
+
 
     def enable_logging(self,logfile=''):        
         now=datetime.datetime.now().strftime("%y%m%d.%H%M%S")
@@ -62,14 +61,8 @@ class AccuracyTest(object):
         self.should_log=True        
 
     def run_xyaccuracy_test(self, loop_number=0):
-        # grab config settings for this test
-        self.n_pts_across_grid = self.config['sequence']['n_pts_across_grid'][loop_number]
-        self.n_points_calib_T = self.config['sequence']['n_points_calib_T'][loop_number]
-        self.n_points_calib_P = self.config['sequence']['n_points_calib_P'][loop_number]
-        self.num_corr_max = self.config['sequence']['num_corr_max'][loop_number]
-
-        # start timer on the whole script
-        script_start_time = time.time()
+        # start timer on this loop
+        loop_start_time = time.time()
         
         # JOE TEMPORARY COMMENT: NOTE THAT WE WILL ENHANCE THIS IN THE NEAR FUTURE ONCE
         # WE HAVE INDIVIDUAL CONFIG FILES FOR FIDUCIALS IMPLEMENTED (SIMILAR TO POSITIONERS)
@@ -81,7 +74,7 @@ class AccuracyTest(object):
         # log file setup
         log_directory = pc.test_logs_directory
         os.makedirs(log_directory, exist_ok=True)
-        log_suffix = self.log_suffix #self.config['mode']['log_suffix'] # string gets appended to filenames -- useful for user to identify particular tests
+        log_suffix = self.config['log_suffix'] # string gets appended to filenames -- useful for user to identify particular tests
         log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
         log_timestamp = pc.timestamp_str_now()
         def path_prefix(pos_id):
@@ -108,15 +101,8 @@ class AccuracyTest(object):
             except IOError as e:
                 print ("Error copying unit_"+pos_id+" file:",str(e))
 
-        # test grid configuration (local to any positioner, centered on it)
-        # this will get copied and transformed to each particular positioner's location below
-        grid_max_radius = self.config['grid']['grid_max_radius'] # mm
-        grid_min_radius =  self.config['grid']['grid_min_radius'] # mm
-        line = np.linspace(-grid_max_radius,grid_max_radius,self.n_pts_across_grid)
-        local_targets = [[x,y] for x in line for y in line]
-        for i in range(len(local_targets)-1,-1,-1): # traverse list from end backward
-            r = (local_targets[i][0]**2 + local_targets[i][1]**2)**0.5
-            if r < grid_min_radius or r > grid_max_radius: local_targets.pop(i)
+        local_targets = self.generate_xytargets_grid(self.config['npoints_across_grid'][loop_number])
+        
 
         try:
            
@@ -240,8 +226,8 @@ class AccuracyTest(object):
                 r2 = ptl.get(pos_id,'LENGTH_R2')
                 pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_data_by_pos_id[pos_id],center,theta_range,r1,r2,title)
 
-            script_exec_time = time.time() - script_start_time
-            test_time = format(script_exec_time/60/60,'.1f')        
+            loop_exec_time = time.time() - loop_start_time
+            test_time = format(loop_exec_time/60/60,'.1f')        
             
 
             # save a copy of the unit_*.conf file prior to calibration    
@@ -294,6 +280,37 @@ class AccuracyTest(object):
         print(message)
         if self.should_log:
             logging.info(message)
+
+    def generate_xytargets_grid(self, npoints_across_grid):
+        """test grid configuration (local to any positioner, centered on it)
+        this will get copied and transformed to each particular positioner's location below
+        """
+        grid_max_radius = self.config['grid_max_radius']
+        grid_min_radius =  self.config['grid_min_radius']
+        line = np.linspace(-grid_max_radius,grid_max_radius,npoints_across_grid)
+        local_targets = [[x,y] for x in line for y in line]
+        for i in range(len(local_targets)-1,-1,-1): # traverse list from end backward
+            r = (local_targets[i][0]**2 + local_targets[i][1]**2)**0.5
+            if r < grid_min_radius or r > grid_max_radius: local_targets.pop(i)
+
+    def generate_posXY(self, npoints_total):
+        '''Generates uniformly distributed points in circular area
+        Starts with uniformly distributed square then reject points
+        found outside the circle.
+        Returns list.
+        '''
+        r_min = self.config['grid']['grid_min_radius']
+        r_max = self.config['grid']['grid_max_radius']
+        x = np.random.uniform(-r_max, r_max, npoints_total*2)
+        y = np.random.uniform(-r_max, r_max, npoints_total*2)
+        r = np.sqrt(x**2 + y**2)
+        index=np.where(np.logical_and(r < r_max,r > r_min))
+        p=zip(x[index],y[index])
+        return list(p)[:npoints_total]
+    
+    def num_expected_fiducial_dots(self):
+        self.count_fiducial_dots()
+
 
 if __name__=="__main__":
     acc_test=AccuracyTest()
