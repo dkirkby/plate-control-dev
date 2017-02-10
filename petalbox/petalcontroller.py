@@ -438,7 +438,7 @@ class PetalController(Application):
         Set the ficucial power levels and period
         Inputs include list with percentages, periods and ids
         Returns SUCCESS or error message.
-        canbus       ... string that specifies the can bus number, eg. 'can2'
+        canbus       ... list of strings that specifies the can bus number, eg. 'can2'
         ids          ... list of fiducial ids
         percent_duty ... list of values, 0-100, 0 means off
         
