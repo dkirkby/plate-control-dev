@@ -10,7 +10,6 @@ class PosModel(object):
     as cruise / creep / backlash / hardstop approach).
 
     One instance of PosModel corresponds to one PosState to physical positioner.
-    But we will consider refactoring to array-wise later on.
     """
 
     def __init__(self, state=None):

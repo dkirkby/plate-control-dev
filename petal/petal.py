@@ -30,12 +30,15 @@ class Petal(object):
     by unique id number, log expected and measured positions, log cycles and total on time, etc.
     """
     def __init__(self, petal_id, pos_ids, fid_ids, simulator_on=False):
+        # petalcontroller setup
         self.petal_id = petal_id
         self.verbose = False # whether to print verbose information at the terminal
         self.simulator_on = simulator_on # controls whether in software-only simulation mode
         if not(self.simulator_on):
             import petalcomm
             self.comm = petalcomm.PetalComm(self.petal_id)
+            
+        # positioners setup
         self.posmodels = []
         for pos_id in pos_ids:
             state = posstate.PosState(pos_id,logging=True)
@@ -48,13 +51,23 @@ class Petal(object):
         self.anticollision_override = True # causes the anticollision_default value to be used in all cases
         self.canids_where_tables_were_just_sent = []
         self.busids_where_tables_were_just_sent = []
-        self.fid_can_ids = fid_ids # later, implement auto-lookup of pos_ids and fid_ids from database etc
-        self.fid_bus_ids =[]
+        self.set_motor_parameters()
+        
+        # fiducials setup
+        self.fidstates = {}
         for fid_id in fid_ids:
             state = posstate.PosState(fid_id, logging=True)
-            self.fid_bus_ids.append(state.read('BUS_ID'))
-        self.fid_duty_percent = 50 # 0-100 -- later, implement setting on a fiducial-by-fiducial basis
-        self.set_motor_parameters()
+            self.fidstates[fid_id] = state
+        
+        # power suppliees setup?
+        # to-do
+        
+        # fans setup?
+        # to-do
+        
+        # sensors setup?
+        # to-do
+
  
 # METHODS FOR POSITIONER CONTROL
 
@@ -353,32 +366,79 @@ class Petal(object):
         """
         self.schedule = posschedule.PosSchedule(self)
 
-# METHODS FOR FIDUCIAL CONTROL
-
-    def fiducials_on(self):
-        """Turn all the fiducials on.
+# METHODS FOR FIDUCIAL CONTROL    
+    def set_all_fiducials(self, setting='off'):
+        """Turn all the fiducials on or off.
+        See method set_fiducials() for valid values of argument 'setting'.
         """
-        fid_can_ids = self.fid_can_ids # re-implement to look up from each fiducial's state file
-        duty_percents = [self.fid_duty_percent]*len(fid_can_ids) # re-implement to read from each fiducial's state file, 'DUTY_DEFAULT_ON'
-        self._send_fiducial_settings(self.fid_can_ids, duty_percents) # may need fixing?
-
-    def fiducials_off(self):
-        """Turn all the fiducials off.
-        """
-        fid_can_ids = self.fid_can_ids # re-implement to look up from each fiducial's state file
-        duty_percents = [0]*len(fid_can_ids) # re-implement to write 0.0 into each fiducial's state file, 'DUTY_DEFAULT_OFF'
-        self._send_fiducial_settings(fid_can_ids, duty_percents) # may need fixing?
-	
-    def _send_fiducial_settings(self, fid_bus_ids, fid_can_ids, duty_percents):
-        """Send fiducial settings out to petalboxes, and log it.
+        all_fid_ids = self.fid_ids
+        self.set_all_fiducials(all_fid_ids, setting)
+    
+    def set_fiducials(self, fid_ids, setting='off'):
+        """Set a list of specific fiducials on or off.
+        Valid values for the argument setting:
+            'on'         ... turns each fiducial to its default on value
+            'off'        ... turns each fiducial individually to its default off value
+            int or float ... a single integer or float from 0-100 sets all the fiducials uniformly to that one value
         """
         if self.simulator_on:
             return
-        self.comm.set_fiducials(fid_bus_ids, fid_can_ids, duty_percents) # may need fixing?
-        # pseudocode
-        # for each of the fiducials
-        #   write the new duty percent value to DUTY_STATE
-        #	run log_unit function in its state object
+        bus_ids = self.get_fids_val(fid_ids,'BUS_ID')
+        can_ids = self.get_fids_val(fid_ids,'CAN_ID')
+        if isinstance(setting,int) or isinstance(setting,float):
+            if setting < 0:
+                setting = 0
+            if setting > 100:
+                setting = 100
+            duties = [setting]*len(fid_ids)
+        elif setting == 'on':
+            duties = self.get_fids_val(fid_ids,'DUTY_DEFAULT_ON')
+        else:
+            duties = self.get_fids_val(fid_ids,'DUTY_DEFAULT_OFF')
+        enabled = self.get_fids_val(fid_ids,'CTRL_ENABLED')
+        rng = range(len(fid_ids))
+        fid_ids = [fid_ids[i] for i in rng if enabled[i]]
+        bus_ids = [bus_ids[i] for i in rng if enabled[i]]
+        can_ids = [can_ids[i] for i in rng if enabled[i]]
+        duties  = [duties[i]  for i in rng if enabled[i]]
+        self.comm.set_fiducials(bus_ids, can_ids, duties)
+        for i in rng:
+            self.fidstates[fid_ids[i]].write('DUTY_STATE',duties[i])
+            self.fidstates[fid_ids[i]].log_unit()
+
+    @property
+    def fid_ids(self):
+        """Returns a list of all the fiducial ids on the petal.
+        """
+        return list(self.fidstates.keys())
+
+    def fid_bus_ids(self,fid_ids):
+        """Returns a list of bus ids where you find each of the fiducials (identified
+        in the list fid_ids). These come back in the same order.
+        """
+        return self.get_fids_val(fid_ids,'BUS_ID')
+    
+    def fid_can_ids(self,fid_ids):
+        """Returns a list of can ids where each fiducial (identified in the list
+        fid_ids) is addressed on its bus. These come back in the same order.
+        """
+        return self.get_fids_val(fid_ids,'CAN_ID')
+    
+    def fid_default_duties(self,fid_ids):
+        """Returns a list of default duty percent settings which each fiducial (identified
+        in the list fid_ids) is supposed to be set to when turning it on.
+        """
+        return self.get_fids_val(fid_ids,'DUTY_DEFAULT_ON')
+    
+    def get_fids_val(self,fid_ids,key):
+        """Returns a list of the values for string key, for all fiducials identified
+        in the list fid_ids.
+        """
+        vals = []
+        for fid_id in fid_ids:
+            vals.append(self.fidstates[key])
+        return vals
+
 
 # GETTERS, SETTERS, STATUS METHODS
 

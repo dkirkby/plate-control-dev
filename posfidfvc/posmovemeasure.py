@@ -18,7 +18,6 @@ class PosMoveMeasure(object):
             petals = [petals]
         self.petals = petals # list of petal objects
         self.fvc = fvc # fvchandler object
-        self.n_fiducial_dots = 1
         self.ref_dist_tol = 0.1   # [mm] used for identifying fiducial dots
         self.nudge_dist   = 10.0  # [deg] used for identifying fiducial dots
         self.fiducials_xy = []    # list of nominal locations of the fixed reference dots in the obsXY coordinate system
@@ -42,12 +41,12 @@ class PosMoveMeasure(object):
     def fiducials_on(self):
         """Turn on all fiducials on all petals."""
         for petal in self.petals:
-            petal.fiducials_on()
+            petal.set_all_fiducials('on')
 
     def fiducials_off(self):
         """Turn off all fiducials on all petals."""
         for petal in self.petals:
-            petal.fiducials_off()
+            petal.set_all_fiducials('off')
 
     def measure(self):
         """Measure positioner locations with the FVC and return the values.
@@ -721,7 +720,7 @@ class PosMoveMeasure(object):
         """Generic function for identifying either all fiducials or a single positioner's location.
         """
         pos_ids_by_ptl = self.pos_data_listed_by_ptl('all','POS_ID')
-        n_dots = len(self.all_pos_ids()) + self.n_fiducial_dots
+        n_dots = len(self.all_pos_ids()) + self.n_fiducial_dots()
         nudges = [-self.nudge_dist, self.nudge_dist]
         xy_ref = []
         for i in range(len(nudges)):
@@ -748,7 +747,7 @@ class PosMoveMeasure(object):
                 for petal in self.petals:
                     positioners_current = petal.expected_current_position(posid=pos_ids_by_ptl[petal],key='obsXY')
                     xy_meas = pc.concat_lists_of_lists(xy_meas,positioners_current)
-                n_new_fiducials = self.n_fiducial_dots - len(self.fiducials_xy)
+                n_new_fiducials = self.n_fiducial_dots() - len(self.fiducials_xy)
                 faraway = 2*np.max(np.max(xy_meas))
                 new_fiducials = np.random.uniform(low=faraway,high=2*faraway,size=(n_new_fiducials,2)).tolist()
                 self.fiducials_xy = pc.concat_lists_of_lists(self.fiducials_xy,new_fiducials)
@@ -767,8 +766,8 @@ class PosMoveMeasure(object):
                 xy_ref = pc.concat_lists_of_lists(xy_ref,xy_test[i])
                 ref_idxs.append(i)
         if identify_fiducials:
-            if len(xy_ref) != self.n_fiducial_dots:
-                print('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_fiducial_dots) + ')')
+            if len(xy_ref) != self.n_fiducial_dots():
+                print('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_fiducial_dots()) + ')')
             self.fiducials_xy = xy_ref
         else:
             if n_dots - len(ref_idxs) != 1:
@@ -859,7 +858,21 @@ class PosMoveMeasure(object):
     @property
     def grid_calib_num_constraints(self):
         return self.n_points_full_calib_T * self.n_points_full_calib_P
-        
+    
+    @property
+    def n_moving_dots(self):
+        """Returns the total number of mobile dots (on functioning positioners) to expect in an fvc image.
+        """
+    
+    @property
+    def n_fixed_dots(self):
+        """Returns the total number of immobile light dots (fiducials or non-functioning positioners) to expect in an fvc image.
+        """
+        n = 0
+        for ptl in self.petals:
+            for 
+        return n
+            
     def _wrap_consecutive_angles(self, angles, expected_direction):
         """Wrap angles in one expected direction. It is expected that the physical deltas
         we are trying to wrap all increase or all decrease sequentially. In other words, that
