@@ -229,22 +229,21 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not set positioner constants. Exception: %s' % str(e)
 
-    def set_fiducials(self, bus_ids, can_ids, percent_duty, duty_period):
+    def set_fiducials(self, bus_ids, can_ids, percent_duty):
         """
         Send settings over ethernet to the petal controller, where they are
         sent over CAN to the fiducials. Sets the fiducials identified by the list ids
         to the corresponding duty values.
         can_ids      ... list of fiducial ids
         percent_duty ... list of values, 0-100, 0 means off
-        duty_period  ... list of values, ms, time between duty cycles
 
         Would probably be better as a dictionary of dictionaries like this:
         fiducials = { 1 : {'percent': percent_duty, 'period' : duty_period}, 4 : {'percent': ....  }
         """
-        if not isinstance(can_ids, list) or not isinstance(percent_duty,list) or not isinstance(duty_period, list):
+        if not isinstance(bus_ids, list) or not isinstance(can_ids, list) or not isinstance(percent_duty,list):
             return 'FAILED: parameters must be passed as lists'
         try:
-            return self._call_device('set_fiducials',can_ids, percent_duty)
+            return self._call_device('set_fiducials',can_ids, percent_duty) # JOE: DOES THIS NEED SOME ARGUMENTS ABOUT BUS_IDs?
         except Exception as e:
             return 'FAILED: Can not set fiducials. Exception: %s' % str(e)
 
