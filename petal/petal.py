@@ -29,64 +29,32 @@ class Petal(object):
     purpose of running test stands only. Later implementations should track fiducials' physical hardware
     by unique id number, log expected and measured positions, log cycles and total on time, etc.
     """
-    def __init__(self, petal_id, pos_ids, fid_ids,set_simulator = False):
-        self.simulator_on = set_simulator # controls whether in software-only simulation mode
-        self.verbose = False # whether to print verbose information at the terminal
+    def __init__(self, petal_id, pos_ids, fid_ids, simulator_on=False):
         self.petal_id = petal_id
-        try:
+        self.verbose = False # whether to print verbose information at the terminal
+        self.simulator_on = simulator_on # controls whether in software-only simulation mode
+        if not(self.simulator_on):
             import petalcomm
             self.comm = petalcomm.PetalComm(self.petal_id)
-        except:
-            if self.simulator_on:
-                print("Something went wrong with PetalComm assignment. Setting self.comm = None and continuing.")
-                self.comm = None
-            else:
-                raise
-        #self.comm = petalcomm.PetalComm(self.petal_id)
         self.posmodels = []
         for pos_id in pos_ids:
             state = posstate.PosState(pos_id,logging=True)
             model = posmodel.PosModel(state)
             self.posmodels.append(model)
-            
-            # Set the duty cycle currents and creep or accel/decel speeds.
-            # Currently, these need to be set again via the set_parameters function anytime a positioner is powered up after petal initialization or
-            # anytime a parameter is changed in the configuration file
-            parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
-
-            can_id = model.canid
-            bus_id = model.busid
-
-            parameter_vals = []
-            for parameter_key in parameter_keys:
-                parameter_vals.append(state.read(parameter_key))
-            #syntax for setting currents: comm.set_currents(can_id, [curr_spin_p, curr_cruise_p, curr_creep_p, curr_hold_p], [curr_spin_t, curr_cruise_t, curr_creep_t, curr_hold_t])
-            try:
-                self.comm.set_currents(bus_id, can_id, [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]], [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]])
-                #syntax for setting periods: comm.set_periods(can_id, creep_period_p, creep_period_t, spin_period)
-                self.comm.set_periods(bus_id, can_id, parameter_vals[4], parameter_vals[4], parameter_vals[5])
-            except:
-                if self.simulator_on:
-                    pass
-                else:
-                    raise
         self.posids = pos_ids
         self.schedule = posschedule.PosSchedule(self)
         self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
-        self.anticollision_default = True # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
+        self.anticollision_default = True  # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
         self.anticollision_override = True # causes the anticollision_default value to be used in all cases
         self.canids_where_tables_were_just_sent = []
         self.busids_where_tables_were_just_sent = []
         self.fid_can_ids = fid_ids # later, implement auto-lookup of pos_ids and fid_ids from database etc
         self.fid_bus_ids =[]
-
         for fid_id in fid_ids:
             state = posstate.PosState(fid_id, logging=True)
             self.fid_bus_ids.append(state.read('BUS_ID'))
-
-        
-
         self.fid_duty_percent = 50 # 0-100 -- later, implement setting on a fiducial-by-fiducial basis
+        self.set_motor_parameters()
  
 # METHODS FOR POSITIONER CONTROL
 
@@ -286,6 +254,8 @@ class Petal(object):
     def send_move_tables(self):
         """Send move tables that have been scheduled out to the positioners.
         """
+        if self.simulator_on:
+            return
         hw_tables = self._hardware_ready_move_tables()
         canids = []
         busids = []
@@ -297,11 +267,13 @@ class Petal(object):
         self._wait_while_moving()
         self.comm.send_tables(hw_tables)
 
-    def set_parameters(self):
+    def set_motor_parameters(self):
         """Send the current and period parameter settings to the positioners"""
         # Set the duty cycle currents and creep or accel/decel speeds.
         # Currently this function needs to be called each time parameters change after petal initialization and if a positioner is plugged in/powered on after
         # petal initialization
+        if self.simulator_on:
+            return
         parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
         for p in self.posmodels:
             state = p.state
@@ -321,6 +293,8 @@ class Petal(object):
         """Command the positioners to do the move tables that were sent out to them.
         Then do clean-up and logging routines to keep track of the moves that were done.
         """
+        if self.simulator_on:
+            return
         self.comm.execute_sync(self.sync_mode)
         self._wait_while_moving()
         self._postmove_cleanup()
@@ -395,14 +369,16 @@ class Petal(object):
         duty_percents = [0]*len(fid_can_ids) # re-implement to write 0.0 into each fiducial's state file, 'DUTY_DEFAULT_OFF'
         self._send_fiducial_settings(fid_can_ids, duty_percents) # may need fixing?
 	
-    def _send_fiducial_settings(self,fid_can_ids, duty_percents):
+    def _send_fiducial_settings(self, fid_bus_ids, fid_can_ids, duty_percents):
         """Send fiducial settings out to petalboxes, and log it.
         """
+        if self.simulator_on:
+            return
         self.comm.set_fiducials(fid_bus_ids, fid_can_ids, duty_percents) # may need fixing?
         # pseudocode
-		# for each of the fiducials
-		#   write the new duty percent value to DUTY_STATE
-		#	run log_unit function in its state object
+        # for each of the fiducials
+        #   write the new duty percent value to DUTY_STATE
+        #	run log_unit function in its state object
 
 # GETTERS, SETTERS, STATUS METHODS
 
