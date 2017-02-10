@@ -21,3 +21,74 @@ m.measure_range(pos_ids='all', axis='theta')
 m.measure_range(pos_ids='all', axis='phi')
 m.rehome(pos_ids='all')
 m.calibrate(pos_ids='all', mode='quick', save_file_dir=log_directory, save_file_timestamp=log_timestamp_with_notes()) # needed after having struck hard limits
+
+           
+
+
+"""EMAIL FROM STEVE ON STARTING POINT FOR INSTRUMENT PARAMETERS CONFIG FILE
+All,
+
+Here is a sample configuration file for an "instrument".  Let us call the instrument "em" for engineering model (or whatever you want).
+Pound sign (#) is a comment line.  Blank lines are OK.  I will need to write up the meaning of fvcrot, fvcxoff, fvcyoff, and fvcflip, since the operations are not commutative.  None of the parameters is mandatory.
+
+Steve
+
+File is called em.par
+
+#First 3 parameters are appropriate for protoDESI FLI camera.
+fvcnrow 6000
+fvcncol 6000
+fvcpixmm .006
+
+#Scale and orientation of FVC camera - these are appropriate for protoDESI
+#fvcmag is demagnification from focal plane to FVC ccd.
+fvcmag 21.842
+fvcrot  0.
+fvcxoff 0.
+fvcyoff 0.
+fvcflip 1
+
+#Flat or aspheric focal plane?
+asphere 1
+"""
+
+"""MY QUESTIONS:
+    Steve that looks real good to me.
+
+1. Is fvcflip an ambiguous name? Can you include a comment in the file, or change the param name, to remind my brain at a later date which plane you are mirroring across?
+
+2. Can you include a one-liner in the comments saying what your order of ops is for the scale, rotate, offset, and flip operations, in some particular transformation direction, like when going from fvc pix to focal plane mm?
+ Otherwise I will have pain figuring out what numbers to give you.
+
+3. Do we need a flag here saying whether there is a corrector present? Or is that told to platemaker in some other way?
+
+4. Can you write in the comments for the asphere flag what 0 and 1 mean? Again my brain is guaranteed to forget which is which in a month from now.
+"""
+
+           
+"""COMMENTS FROM ERIC ON FORMAT OF FIDUCIALS DATA FILE FOR PLATEMAKER
+named fiducials_em.dat ? Or does this data go into the config file for instrument?
+
+Internally to Steve, it’s the same format as the files he uses for positioners and positioner_calib. There is an example in $PLATEMAKER_DIR/test/data/testinst1/fiducial-testinst1.dat, which is just a copy of the defualt file in dervishtools, trunk/desi/etc/default/fiducial-default.dat.
+
+It looks like this:
+
+#ProtoDESI - actual Fiducial positions
+#serial   q        s     flags
+1100  201.29864  57.62478  0
+1118  158.65941  57.62944  0
+1102  223.32243  61.13366  0
+1103  136.73378  61.23237  0
+1117  194.16599  37.48592  0
+1106  163.62382  37.03236  0
+1107  247.73668  45.35403  0
+1108  179.81027  17.21309  0
+1116  112.26703  45.38117  0
+1115  270.01638  55.98100  0
+1111  89.97447  56.10901  0
+1112  293.97813  61.37240  0
+1113  57.94744  66.04711  0
+1114  9.49977  60.87482  0
+1101  16.43042  37.25640  0
+1109  263.43168  37.11059  0
+"""
