@@ -45,20 +45,22 @@ else:
     gui_root = tk.Tk()
     configfile = tk.filedialog.askopenfilename(initialdir=pc.test_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title="Select the configuration file for this test run.")
     gui_root.destroy()
-print('File ' + str(settings_filename) + ' selected as template for test settings.')
+logwrite('File ' + str(settings_filename) + ' selected as template for test settings.')
 config = configobj.ConfigObj(configfile,unrepr=True)
 config_traveler_name = pc.test_logs_directory + initial_timestamp + '_' + os.path.basename(configfile)
 config.filename = config_traveler_name
 config.write()
 
 # gather up some values from the config file
-petal_id = config['petal']['petal_id']
+ptl_ids = config['petal']['petal_id']
 pos_ids = config['positioners']['ids']
 fid_ids = []
 
-logwrite('Start of positioner performance test.')
-logwrite
+
+logwrite('Petal IDs: ' + str(ptl_ids))
+logwrite('Fid IDs: ' + str(fid_ids))
 logwrite('Pos IDs: ' + str(pos_ids))
+
 
 ptl = petal.Petal(petal_id, pos_ids, fid_ids)
 
@@ -77,7 +79,7 @@ for local_target in targets_list:
 
 
 
-
+logwrite('Start of positioner performance test.')
 total_loops = len(config['sequence']['n_pts_across_per_loop'])
 n_between_loops = config['sequence']['n_unmeasured_moves_between_loops']
 for i in range(total_loops):

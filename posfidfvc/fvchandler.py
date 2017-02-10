@@ -118,6 +118,27 @@ class FVCHandler(object):
             measured_pos_xy = (expected_pos_xy + sim_errors).tolist()
             measured_ref_xy = expected_ref_xy
         elif self.fvc_type == 'FLI':
+            
+            # will use new api here to talk to platemaker + fvc
+            # the format of the expected positions to send them is:
+            #   list of dictionaries
+            #   each dict has keys: 'id', 'q', 's', 'flags'
+            #   id and flags are integers
+            #   q,s are floats
+            # and as a result from measure() function I get the same structure, but now q,s are the measured positions
+            # I do not get fiducials from measure() function
+            #
+            # measure() --> centers, one per fiber or one per fiducial
+            #                 - use this in this function
+            #                 - using klaus's DOSlib.proxies api, it handles working with platemaker already
+            #
+            # locate() --> centroids, one for every light dot (four from fiducials)
+            #                 - use this in fvchandler's measure function
+            #                 - using DOS calls direct to fvc.py
+            #                 - these come back as just pixel centroids
+            #                 - to get an unidentified list when you know nothing but # of dots, send a list of 0s of that length
+            
+            
             # 1. pass expected_pos_xy (in mm at the focal plate) thru platemaker to get expected_pos_xy (in pixels at the FVC CCD)
             # 2. tell FVC software where we expect the positioner centroids to be so it can identify positioners
             # 3. use DOS commands to ask FVC to take a picture

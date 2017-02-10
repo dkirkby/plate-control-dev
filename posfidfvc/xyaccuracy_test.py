@@ -37,14 +37,17 @@ class AccuracyTest(object):
             self.fvc.rotation = self.config['local']['rotation']  # deg
             self.fvc.scale =  self.config['local']['scale'] # mm/pixel
         pos_ids = self.config['positioners']['pos_ids']
-        pos_notes = self.config['positioners']['notes'] #notes for report to add about positioner (reported with positioner in same slot as pos_ids list)
+        pos_notes = self.config['positioners']['notes'] # notes for report to add about positioner (reported with positioner in same slot as pos_ids list)
         while len(pos_notes) < len(pos_ids):
             pos_notes.append('')
         fid_ids = self.config['fiducials']['fid_ids']
-        petal_id = self.config['petal']['petal_id']
-        self.ptl = petal.Petal(petal_id, pos_ids, fid_ids)
+        petal_id = self.config['petals']['petal_id'] # note that single petal is not general. below I treat this as a 
+        for ptl_id in [petal_id]: # this elaboration of a for loop is just a placeholder for future implementations, where we would have a list of multiple petals being handled by posmovemeasure 
+            petals += petal.Petal(ptl_id, pos_ids, fid_ids)
+        self.m = posmovemeasure.PosMoveMeasure(ptl_ids,self.fvc)
+        
         self.ptl.anticollision_default = self.config['petal']['anticollision']
-        self.m = posmovemeasure.PosMoveMeasure(self.ptl,self.fvc)
+        
         self.should_log = False
         self.should_auto_commit_logs = self.config['mode']['should_auto_commit_logs']
         self.should_email = self.config['mode']['should_email']
