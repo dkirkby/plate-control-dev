@@ -21,44 +21,59 @@ import time
 import pos_xytest_plot
 import um_test_report as test_report
 import traceback
-import logging
 import configobj
 import shutil
+import tkinter
+import tkinter.filedialog
 
 
 class XYTest(object):
+    """XYTest handles running a fiber positioner xy accuracy test. It supports being called
+    repeatedly in a loop, with variable settings for each loop in terms of number of calibration
+    moves, number of test moves, number of unmeasured life moves, number of hardstop slams, etc.
+    The idea is that we can really tailor a robust test suite into a single automated setup.
+    """
 
-    def __init__(self,configfile): 
-        self.config = configobj.ConfigObj(configfile,unrepr=True)
-        fvc_type = self.config['local']['fvc_type']
-        self.fvc = fvchandler.FVCHandler(fvc_type)
-        if self.config['local']['platemaker_type'] == 'NONE':
-            self.fvc.rotation = self.config['local']['rotation']  # deg
-            self.fvc.scale =  self.config['local']['scale'] # mm/pixel
-        pos_ids = self.config['positioners']['pos_ids']
-        pos_notes = self.config['positioners']['notes'] # notes for report to add about positioner (reported with positioner in same slot as pos_ids list)
-        while len(pos_notes) < len(pos_ids):
-            pos_notes.append('')
-        fid_ids = self.config['fiducials']['fid_ids']
-        petal_id = self.config['petals']['petal_id'] # note that single petal is not general. below I treat this as a 
-        for ptl_id in [petal_id]: # this elaboration of a for loop is just a placeholder for future implementations, where we would have a list of multiple petals being handled by posmovemeasure 
-            petals += petal.Petal(ptl_id, pos_ids, fid_ids)
-        self.m = posmovemeasure.PosMoveMeasure(ptl_ids,self.fvc)
-        self.m.n_fiducial_dots = self.num_expected_fiducial_dots() # this will need enhancement / elaboration to work with platemaker / fvc interfaces
-        self.ptl.anticollision_default = self.config['petal']['anticollision']
-        self.should_log = False
-        self.should_auto_commit_logs = self.config['mode']['should_auto_commit_logs']
-        self.should_email = self.config['mode']['should_email']
-        self.should_report = self.config['mode']['should_report']
-        self.email_list = self.config['email']['email_list'] #full or limited
-
-    def enable_logging(self,loggingfunction):
-        """loggingfunction is a function handle. The function it refers to should take
-        the same form as logwrite() in posperform.py, whose arguments are (text,stdout=True).
-        The reason for doing things this way is so that we can have xytest write in the same
-        format and the same file as very specifically set up by posperform.
+    def __init__(self,configfile=''):
+        """For the input 'configfile', you typically would leave it as the default empty string. This causes
+        a gui file picker to come up. For debug purposes, if you want to short-circuit the gui because it is
+        annoying, then you could argue a filename here. Templates for configfiles are found in the DESI svn at
+        https://desi.lbl.gov/svn/code/focalplane/fp_settings/test_settings/
         """
-        self.logwrite = loggingfunction
+        
+        # set up configuration traveler file that goes with this test, and begin logging
+        if not(configfile):
+            gui_root = tkinter.Tk()
+            configfile = tkinter.filedialog.askopenfilename(initialdir=pc.test_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title="Select the configuration file for this test run.")
+            gui_root.destroy()
+        config = configobj.ConfigObj(configfile,unrepr=True)
+        initial_timestamp = pc.timestamp_str_now() 
+        config_traveler_name = pc.test_logs_directory + initial_timestamp + '_' + os.path.basename(configfile)
+        config.filename = config_traveler_name
+        config.write()
+        self.logwrite('File ' + str(configfile) + ' selected as template for test settings.')
+        self.logwrite('Test will be run from a uniquely-generated traveler config file located at ' + str(config.filename) + ' which was based off the template.')
+        
+        # set up fvc and platemaker
+        fvc = fvchandler.FVCHandler(self.config['fvc_type'])       
+        if self.config['platemaker_type'] == 'BUILT-IN':
+            fvc.rotation = self.config['rotation']  # deg
+            fvc.scale =  self.config['scale'] # mm/pixel
+        self.logwrite('FVC initialized.')
+        
+        # set up positioners, fiducials, and petals
+        self.pos_ids = self.config['pos_ids']
+        self.pos_notes = self.config['pos_notes'] # notes for report to add about positioner (reported with positioner in same slot as pos_ids list)
+        while len(self.pos_notes) < len(self.pos_ids):
+            self.pos_notes.append('')
+        fid_ids = self.config['fid_ids']
+        ptl_ids = self.config['ptl_ids']
+        petals = []
+        for ptl_id in ptl_ids: # this elaboration of a for loop is just a placeholder for future implementations, where we would have a list of multiple petals being handled by posmovemeasure 
+            petals += petal.Petal(ptl_id, self.pos_ids, fid_ids)
+            petals[-1].anticollision_default = self.config['anticollision']
+        self.m = posmovemeasure.PosMoveMeasure(petals,fvc)
+        self.logwrite('posmovemeasure initialized.')
 
     def run_xyaccuracy_test(self, loop_number=0):
         # start timer on this loop
@@ -69,7 +84,6 @@ class XYTest(object):
         # self.m.n_fiducial_dots = ptl.n_fiducial_dots + self.config['calib']['n_other_dots']
         self.m.n_fiducial_dots = self.config['calib']['n_other_dots'] # number of fiducial centroids the FVC should expect
 
-        email_list = self.email_list #self.config['email']['email_list'] #full or limited
 
         # log file setup
         log_directory = pc.test_logs_directory
@@ -239,11 +253,11 @@ class XYTest(object):
 
 
             #Test report and email only on certain tests
-            if should_email:
-                test_report.do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, test_time, email_list)
+            if self.config['should_email']:
+                test_report.do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, test_time, self.config['email_list'])
              
             #Commit logs through SVN
-            if should_auto_commit_logs:
+            if self.config['should_auto_commit_logs']:
                 filetypes = ['xyplot_submove0.png','xyplot_submove1.png','xyplot_submove2.png','xyplot_submove3.png',
                              'calib_full.png','calib_quick.png','summary.csv','movedata.csv']
                 for pos_id in pos_ids:
@@ -263,7 +277,7 @@ class XYTest(object):
             raise
         except:
             #Email traceback to alert that test failed and why
-            if should_email:
+            if self.config['should_email']:
                 test_report.email_error(traceback.format_exc(),log_timestamp)
             raise
    
@@ -281,36 +295,60 @@ class XYTest(object):
         if self.should_log:
             logging.info(message)
 
-    def generate_xytargets_grid(self, npoints_across_grid):
-        """test grid configuration (local to any positioner, centered on it)
-        this will get copied and transformed to each particular positioner's location below
+    def logwrite(self,text,stdout=True):
+        """Standard logging function for writing to the test traveler config file.
         """
-        grid_max_radius = self.config['grid_max_radius']
-        grid_min_radius =  self.config['grid_min_radius']
-        line = np.linspace(-grid_max_radius,grid_max_radius,npoints_across_grid)
-        local_targets = [[x,y] for x in line for y in line]
-        for i in range(len(local_targets)-1,-1,-1): # traverse list from end backward
-            r = (local_targets[i][0]**2 + local_targets[i][1]**2)**0.5
-            if r < grid_min_radius or r > grid_max_radius: local_targets.pop(i)
+        line = '# ' + pc.timestamp_str_now() + ': ' + text
+        filehandle = open(self.config.filename)
+        filehandle.write('\n' + line)
+        filehandle.close()
+        if stdout:
+            print(line)
 
-    def generate_posXY(self, npoints_total):
-        '''Generates uniformly distributed points in circular area
-        Starts with uniformly distributed square then reject points
-        found outside the circle.
-        Returns list.
-        '''
-        r_min = self.config['grid']['grid_min_radius']
-        r_max = self.config['grid']['grid_max_radius']
-        x = np.random.uniform(-r_max, r_max, npoints_total*2)
-        y = np.random.uniform(-r_max, r_max, npoints_total*2)
+    def generate_posXY_targets_grid(self, npoints_across_grid):
+        """Make rectilinear grid of local (x,y) targets. Returns a list.
+        """
+        r_min = self.config['targ_min_radius']
+        r_max = self.config['targ_max_radius']
+        t_min = self.config['targ_min_theta']
+        t_max = self.config['targ_max_theta']
+        line = np.linspace(-r_max,r_max,npoints_across_grid)
+        targets = [[x,y] for x in line for y in line]
+        for i in range(len(targets)-1,-1,-1): # traverse list from end backward
+            r = (targets[i][0]**2 + targets[i][1]**2)**0.5
+            t = np.arctan2(targets[i][1],targets[i][0])*180/np.pi
+            if r < r_min or r > r_max or t < t_min or t > t_max:
+                targets.pop(i)
+        return targets
+
+    def generate_posXY_targets_random(self, npoints_total):
+        """Make uniformly distributed list of (x,y) points that fall within the patrol disk.
+        """
+        r_min = self.config['targ_min_radius']
+        r_max = self.config['targ_max_radius']
+        t_min = self.config['targ_min_theta']
+        t_max = self.config['targ_max_theta']
+        
+        # continue fixing this up here...
+        npoints = 0
+        while npoints < npoints_total:
+            x = np.random.uniform(-r_max, r_max)
+            y = np.random.uniform(-r_max, r_max)
         r = np.sqrt(x**2 + y**2)
         index=np.where(np.logical_and(r < r_max,r > r_min))
         p=zip(x[index],y[index])
-        return list(p)[:npoints_total]
+        targets = list(p)[:npoints_total]
+        return targets
     
-    def num_expected_fiducial_dots(self):
-        self.count_fiducial_dots()
-
+    def generate_move_requests(self, xytargets_list):
+        """make list of move request dictionaries for this set of local xy targets
+        """
+        requests = []
+        for local_target in xytargets_list:
+            these_targets = {}
+            for pos_id in sorted(self.pos_ids):
+                these_targets[pos_id] = {'command':'posXY', 'target':local_target}
+            requests.append(these_targets)
 
 if __name__=="__main__":
     test=XYTest()

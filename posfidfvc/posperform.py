@@ -6,56 +6,16 @@ import petal
 import posconstants as pc
 import xytest
 import datetime
-import Tkinter
-import tkFileDialog
+
 
 
 # set seed for random generator ... DOES THIS NEED TO BE IN HERE?
 SEED=123456
 np.random.seed(SEED)
 
-# select configuration traveler file that goes with this test, and set up logging
-configfile = '' # For debug purposes, if you want to short-circuit the gui because it is annoying, you could hard-code a filename here, for any file located in the standard test_settings directory.
-if configfile:
-    configfile = pc.test_settings_directory + configfile
-else:
-    gui_root = tk.Tk()
-    configfile = tk.filedialog.askopenfilename(initialdir=pc.test_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title="Select the configuration file for this test run.")
-    gui_root.destroy()
-config = configobj.ConfigObj(configfile,unrepr=True)
-initial_timestamp = pc.timestamp_str_now() 
-config_traveler_name = pc.test_logs_directory + initial_timestamp + '_' + os.path.basename(configfile)
-config.filename = config_traveler_name
-config.write()
-def logwrite(text,stdout=True):
-    """convinience function; writes log info to file and optionally to screen"""
-    line = '# ' + pc.timestamp_str_now() + ': ' + text
-    filehandle = open(config_traveler_name)
-    filehandle.write('\n' + line)
-    filehandle.close()
-    if stdout: print(line)
-logwrite('File ' + str(settings_filename) + ' selected as template for test settings.')
-
-# gather up some values from the config file
-ptl_ids = config['ptl_ids']
-pos_ids = config['pos_ids']
-fid_ids = config['fid_ids']
-logwrite('Petal IDs: ' + str(ptl_ids))
-logwrite('Fiducial IDs: ' + str(fid_ids))
-logwrite('Positioner IDs: ' + str(pos_ids))
 
 # initialize the test handler
-test = xytest.XYTest()
-test.enable_logging()
-
-# create all the move request dictionaries
-life_moves = []
-targets_list = acc_test.generate_posXY(config['n_unmeasured_moves_between_loops'])
-for local_target in targets_list:
-	these_targets = {}
-	for pos_id in sorted(pos_ids):
-		these_targets[pos_id] = {'command':'posXY', 'target':local_target}
-	life_moves.append(these_targets)
+test = xytest.XYTest(config,logwrite)
 
 
 
