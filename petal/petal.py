@@ -113,14 +113,20 @@ class Petal(object):
                     log_note    same as log_note above, or '' is added automatically if no note was argued in requests
             
             In cases where this is a second request to the same robot (which is not allowed), the
-            subdictionary will be deleted from the return.            
+            subdictionary will be deleted from the return.
+            
+            In cases where the request was made to a disabled positioner, the subdictionary will be
+            deleted from the return.
         """
         for pos_id in requests.keys():
             requests[pos_id]['posmodel'] = self.get_model_for_pos(pos_id)
             if 'log_note' not in requests[pos_id]:
                 requests[pos_id]['log_note'] = ''
-            if self.schedule.already_requested(requests[pos_id]['posmodel']):
-                print('Positioner ' + str(pos_id) + ' already has a target scheduled. Extra target request ' + str(requests[pos_id]['command']) + '(' + str(requests[pos_id]['target'][0]) + ',' + str(requests[pos_id]['target'][1]) + ') ignored')
+            if not(self.get(pos_id,'CTRL_ENABLED')):
+                print(self._request_denied_disabled_str(pos_id,requests[pos_id]))
+                del requests[pos_id]
+            elif self.schedule.already_requested(requests[pos_id]['posmodel']):
+                print('Positioner ' + str(pos_id) + ' already has a target scheduled. Extra target request ' + self._target_str(requests[pos_id]) + ' ignored.')
                 del requests[pos_id]
             else:
                 self.schedule.request_target(requests[pos_id]['posmodel'], requests[pos_id]['command'], requests[pos_id]['target'][0], requests[pos_id]['target'][1], requests[pos_id]['log_note'])
@@ -172,19 +178,24 @@ class Petal(object):
         It is allowed to repeatedly request_direct_dtdp on the same positioner, in cases where one
         wishes a sequence of theta and phi rotations to all be done in one shot. (This is unlike the
         request_targets command, where only the first request to a given positioner would be valid.)
+        
+        In cases where the request was made to a disabled positioner, the request will be ignored.
         """
         for pos_id in requests.keys():
-            requests[pos_id]['posmodel'] = self.get_model_for_pos(pos_id)
-            if 'log_note' not in requests[pos_id]:
-                requests[pos_id]['log_note'] = ''
-            table = posmovetable.PosMoveTable(requests[pos_id]['posmodel'])
-            table.set_move(0, pc.T, requests[pos_id]['target'][0])
-            table.set_move(0, pc.P, requests[pos_id]['target'][1])
-            cmd_str = (cmd_prefix + ' ' if cmd_prefix else '') + 'direct_dtdp'
-            table.store_orig_command(0,cmd_str,requests[pos_id]['target'][0],requests[pos_id]['target'][1])
-            table.log_note += (' ' if table.log_note else '') + requests[pos_id]['log_note']
-            table.allow_exceed_limits = True
-            self.schedule.add_table(table)
+            if not(self.get(pos_id,'CTRL_ENABLED')):
+                print(self._request_denied_disabled_str(pos_id,requests[pos_id]))
+            else:
+                requests[pos_id]['posmodel'] = self.get_model_for_pos(pos_id)
+                if 'log_note' not in requests[pos_id]:
+                    requests[pos_id]['log_note'] = ''
+                table = posmovetable.PosMoveTable(requests[pos_id]['posmodel'])
+                table.set_move(0, pc.T, requests[pos_id]['target'][0])
+                table.set_move(0, pc.P, requests[pos_id]['target'][1])
+                cmd_str = (cmd_prefix + ' ' if cmd_prefix else '') + 'direct_dtdp'
+                table.store_orig_command(0,cmd_str,requests[pos_id]['target'][0],requests[pos_id]['target'][1])
+                table.log_note += (' ' if table.log_note else '') + requests[pos_id]['log_note']
+                table.allow_exceed_limits = True
+                self.schedule.add_table(table)
         return requests            
 
     def request_limit_seek(self, pos, axisid, direction, anticollision=True, cmd_prefix='', log_note=''):
@@ -261,7 +272,10 @@ class Petal(object):
         """
         if anticollision == None or self.anticollision_override:
             anticollision = self.anticollision_default
-            
+        # Should add here gathering list of all the disabled positioners and generating false zero-distance
+        # move requests? to get them into the anticollision? Will this need any special flag known to anti-
+        # collision, to make sure it knows these are fixed, and can't for example move out of a neighbor's
+        # way, then back to where it started.
         self.schedule.schedule_moves(anticollision)
 
     def send_move_tables(self):
@@ -690,3 +704,14 @@ class Petal(object):
                 return None, None
         return var1, var2
     
+    def _target_str(self, target_request_dict): 
+        """Makes a human readable string describing a target request dictionary.
+        """
+        cmd = str(target_request_dict['command'])
+        val1 = format(target_request_dict['target'][0],'.3f')
+        val2 = format(target_request_dict['target'][1],'.3f')
+        return cmd + '(' + val1 + ',' + val2 + ')'
+        
+    def _request_denied_disabled_str(self, pos_id, target_request_dict):
+        return 'Positioner ' + str(pos_id) + ' is disabled. Target request ' + self._target_str(target_request_dict) + ' ignored.'
+        
