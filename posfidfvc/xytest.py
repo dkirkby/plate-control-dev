@@ -26,11 +26,10 @@ import configobj
 import shutil
 
 
-class AccuracyTest(object):
+class XYTest(object):
 
-    def __init__(self,configfile='accuracy_test.conf'): 
+    def __init__(self,configfile): 
         self.config = configobj.ConfigObj(configfile,unrepr=True)
-
         fvc_type = self.config['local']['fvc_type']
         self.fvc = fvchandler.FVCHandler(fvc_type)
         if self.config['local']['platemaker_type'] == 'NONE':
@@ -53,12 +52,13 @@ class AccuracyTest(object):
         self.should_report = self.config['mode']['should_report']
         self.email_list = self.config['email']['email_list'] #full or limited
 
-
-    def enable_logging(self,logfile=''):        
-        now=datetime.datetime.now().strftime("%y%m%d.%H%M%S")
-        if not logfile: logfile = 'logs/xyaccuracy_test_'+now+'.log'
-        logging.basicConfig(filename=logfile,format='%(asctime)s %(message)s',level=logging.INFO)        # ToDo: read logging level from config file
-        self.should_log=True        
+    def enable_logging(self,loggingfunction):
+        """loggingfunction is a function handle. The function it refers to should take
+        the same form as logwrite() in posperform.py, whose arguments are (text,stdout=True).
+        The reason for doing things this way is so that we can have xytest write in the same
+        format and the same file as very specifically set up by posperform.
+        """
+        self.logwrite = loggingfunction
 
     def run_xyaccuracy_test(self, loop_number=0):
         # start timer on this loop
@@ -313,7 +313,7 @@ class AccuracyTest(object):
 
 
 if __name__=="__main__":
-    acc_test=AccuracyTest()
-    acc_test.enable_logging()
-    acc_test.update_config()
-    acc_test.run_xyaccuracy_test()
+    test=XYTest()
+    test.enable_logging()
+    test.update_config()
+    test.run_xyaccuracy_test()
