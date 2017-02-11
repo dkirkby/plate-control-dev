@@ -175,15 +175,17 @@ class Petal(object):
                     posmodel    object handle for the posmodel corresponding to pos_id
                     log_note    same as log_note above, or '' is added automatically if no note was argued in requests
                     
+            In cases where the request was made to a disabled positioner, the subdictionary will be
+            deleted from the return.
+            
         It is allowed to repeatedly request_direct_dtdp on the same positioner, in cases where one
         wishes a sequence of theta and phi rotations to all be done in one shot. (This is unlike the
         request_targets command, where only the first request to a given positioner would be valid.)
-        
-        In cases where the request was made to a disabled positioner, the request will be ignored.
         """
         for pos_id in requests.keys():
             if not(self.get(pos_id,'CTRL_ENABLED')):
                 print(self._request_denied_disabled_str(pos_id,requests[pos_id]))
+                del requests[pos_id]
             else:
                 requests[pos_id]['posmodel'] = self.get_model_for_pos(pos_id)
                 if 'log_note' not in requests[pos_id]:
@@ -202,11 +204,16 @@ class Petal(object):
         """Request hardstop seeking sequence for positioners in list pos.
         The optional argument cmd_prefix allows adding a descriptive string to the log.
         This method is generally recommended only for expert usage.
+        Requests to disabled positioners will be ignored.
         """
         pos = pc.listify(pos,True)[0]
         posmodels = []
         for p in pos:
-            posmodels.append(self.get_model_for_pos(p))
+            posmodel = self.get_model_for_pos(p)
+            if posmodel.state.read('CTRL_ENABLED'):
+                posmodels.append(posmodel)
+            else:
+                print('Positioner ' + str(posmodel.state.read('POS_ID')) + ' is disabled. Limit seek request ignored.')
         if anticollision:
             if axisid == pc.P and direction == -1:
                 # calculate thetas where extended phis do not interfere
@@ -235,11 +242,16 @@ class Petal(object):
     def request_homing(self, pos):
         """Request homing sequence for positioners in list pos to find the primary hardstop
         and set values for the max position and min position.
+        Requests to disabled positioners will be ignored.
         """
         pos = pc.listify(pos,True)[0]
         posmodels = []
         for p in pos:
-            posmodels.append(self.get_model_for_pos(p))
+            posmodel = self.get_model_for_pos(p)
+            if posmodel.state.read('CTRL_ENABLED'):
+                posmodels.append(posmodel)
+            else:
+                print('Positioner ' + str(posmodel.state.read('POS_ID')) + ' is disabled. Homing request ignored.')
         hardstop_debounce = [0,0]
         direction = [0,0]
         direction[pc.P] = +1 # force this, because anticollision logic depends on it
