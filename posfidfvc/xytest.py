@@ -22,7 +22,6 @@ import pos_xytest_plot
 import um_test_report as test_report
 import traceback
 import configobj
-import shutil
 import tkinter
 import tkinter.filedialog
 
@@ -46,13 +45,16 @@ class XYTest(object):
             gui_root = tkinter.Tk()
             configfile = tkinter.filedialog.askopenfilename(initialdir=pc.test_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title="Select the configuration file for this test run.")
             gui_root.destroy()
-        config = configobj.ConfigObj(configfile,unrepr=True)
+        self.config = configobj.ConfigObj(configfile,unrepr=True)
         initial_timestamp = pc.timestamp_str_now() 
         config_traveler_name = pc.test_logs_directory + initial_timestamp + '_' + os.path.basename(configfile)
-        config.filename = config_traveler_name
-        config.write()
+        self.config.filename = config_traveler_name
+        self.config.write()
         self.logwrite('File ' + str(configfile) + ' selected as template for test settings.')
-        self.logwrite('Test will be run from a uniquely-generated traveler config file located at ' + str(config.filename) + ' which was based off the template.')
+        self.logwrite('Test will be run from a uniquely-generated traveler config file located at ' + str(self.config.filename) + ' which was based off the template.')
+        
+        # verifications of config file
+        self.n_loops = self._calculate_and_check_n_loops()
         
         # set up fvc and platemaker
         fvc = fvchandler.FVCHandler(self.config['fvc_type'])       
@@ -75,20 +77,18 @@ class XYTest(object):
         self.m = posmovemeasure.PosMoveMeasure(petals,fvc)
         self.logwrite('posmovemeasure initialized.')
 
-    def run_xyaccuracy_test(self, loop_number=0):
+        # set up lookup table for random targets
+        self.rand_targs_idx = 0 # where we are in the random targets list
+        self.rand_tags_list = ...logic here to read in all the values from the csv file specified in .conf
+
+    def run_xyaccuracy_test(self, loop_number):
         # start timer on this loop
         loop_start_time = time.time()
-        
-        # JOE TEMPORARY COMMENT: NOTE THAT WE WILL ENHANCE THIS IN THE NEAR FUTURE ONCE
-        # WE HAVE INDIVIDUAL CONFIG FILES FOR FIDUCIALS IMPLEMENTED (SIMILAR TO POSITIONERS)
-        # self.m.n_fiducial_dots = ptl.n_fiducial_dots + self.config['calib']['n_other_dots']
-        self.m.n_fiducial_dots = self.config['calib']['n_other_dots'] # number of fiducial centroids the FVC should expect
 
-
-        # log file setup
+        # data files setup
         log_directory = pc.test_logs_directory
         os.makedirs(log_directory, exist_ok=True)
-        log_suffix = self.config['log_suffix'] # string gets appended to filenames -- useful for user to identify particular tests
+        log_suffix = self.config['log_suffix'] 
         log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
         log_timestamp = pc.timestamp_str_now()
         def path_prefix(pos_id):
@@ -99,23 +99,8 @@ class XYTest(object):
             return path_prefix(pos_id) + '_summary.csv'
         def summary_plot_name(pos_id):
             return path_prefix(pos_id) + '_xyplot'    
-        def cal_prior_name(pos_id):
-            return path_prefix(pos_id) + '_cal_prior.conf'    
-        def cal_after_name(pos_id):
-            return path_prefix(pos_id) + '_cal_after.conf' 
 
-
-        # save a copy of the unit_*.conf file prior to calibration    
-        for pos_id in pos_ids:
-            try:
-                #cmd1=pc.pos_settings_directory+'/unit_'+pos_id+'.conf'
-                #cmd2=cal_prior_name(pos_id)
-                #print(cmd1, cmd2)
-                shutil.copy2(pc.pos_settings_directory+'/unit_'+pos_id+'.conf',cal_prior_name(pos_id))
-            except IOError as e:
-                print ("Error copying unit_"+pos_id+" file:",str(e))
-
-        local_targets = self.generate_xytargets_grid(self.config['npoints_across_grid'][loop_number])
+        local_targets = self.generate_posXY_targets_grid(self.config['npoints_across_grid'][loop_number])
         
 
         try:
@@ -241,16 +226,7 @@ class XYTest(object):
                 pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_data_by_pos_id[pos_id],center,theta_range,r1,r2,title)
 
             loop_exec_time = time.time() - loop_start_time
-            test_time = format(loop_exec_time/60/60,'.1f')        
-            
-
-            # save a copy of the unit_*.conf file prior to calibration    
-            for pos_id in pos_ids:
-                try:
-                    shutil.copy2(pc.pos_settings_directory+'/unit_'+pos_id+'.conf',cal_after_name(pos_id))
-                except:
-                    print ("Error copying unit_"+pos_id+" file")
-
+            test_time = format(loop_exec_time/60/60,'.1f')
 
             #Test report and email only on certain tests
             if self.config['should_email']:
@@ -295,6 +271,10 @@ class XYTest(object):
         if self.should_log:
             logging.info(message)
 
+    def run_unmeasured_moves(self, loop_number):
+        """Exercise positioners to a series of target positions without doing FVC measurements in-between.
+        """
+
     def logwrite(self,text,stdout=True):
         """Standard logging function for writing to the test traveler config file.
         """
@@ -308,37 +288,28 @@ class XYTest(object):
     def generate_posXY_targets_grid(self, npoints_across_grid):
         """Make rectilinear grid of local (x,y) targets. Returns a list.
         """
-        r_min = self.config['targ_min_radius']
         r_max = self.config['targ_max_radius']
-        t_min = self.config['targ_min_theta']
-        t_max = self.config['targ_max_theta']
         line = np.linspace(-r_max,r_max,npoints_across_grid)
         targets = [[x,y] for x in line for y in line]
-        for i in range(len(targets)-1,-1,-1): # traverse list from end backward
-            r = (targets[i][0]**2 + targets[i][1]**2)**0.5
-            t = np.arctan2(targets[i][1],targets[i][0])*180/np.pi
-            if r < r_min or r > r_max or t < t_min or t > t_max:
+        for i in range(len(targets)):
+            if not(self.target_within_limits(targets[i])):
                 targets.pop(i)
         return targets
 
-    def generate_posXY_targets_random(self, npoints_total):
-        """Make uniformly distributed list of (x,y) points that fall within the patrol disk.
+    def target_within_limits(self, xytarg):
+        """Check whether [x,y] target is within the patrol limits.
         """
         r_min = self.config['targ_min_radius']
         r_max = self.config['targ_max_radius']
         t_min = self.config['targ_min_theta']
         t_max = self.config['targ_max_theta']
-        
-        # continue fixing this up here...
-        npoints = 0
-        while npoints < npoints_total:
-            x = np.random.uniform(-r_max, r_max)
-            y = np.random.uniform(-r_max, r_max)
+        x = xytarg[0]
+        y = xytarg[1]
         r = np.sqrt(x**2 + y**2)
-        index=np.where(np.logical_and(r < r_max,r > r_min))
-        p=zip(x[index],y[index])
-        targets = list(p)[:npoints_total]
-        return targets
+        t = np.arctan2(y,x)*180/np.pi
+        if r > r_min and r < r_max and t > t_min and t < t_max:
+            return True
+        return False
     
     def generate_move_requests(self, xytargets_list):
         """make list of move request dictionaries for this set of local xy targets
@@ -349,9 +320,25 @@ class XYTest(object):
             for pos_id in sorted(self.pos_ids):
                 these_targets[pos_id] = {'command':'posXY', 'target':local_target}
             requests.append(these_targets)
+        return requests
+
+    def _calculate_and_check_n_loops(self):
+        """Returns total number of loops in test configuration.
+        (Also checks that all params in config file are consistent.)
+        """
+        keys = ['n_pts_across_grid','n_points_calib_T','n_points_calib_P','num_corr_max','should_measure_ranges','calibration_type','cruise_current_override','creep_current_override']
+        all_n = [len(self.config[key]) for key in keys]
+        n = max(all_n) # if all lengthss are same, then they must all be as long as the longest one
+        all_same = True
+        for i in range(len(keys)):
+            if all_n(i) != n:
+                self.logwrite('Error: ' + keys[i] + ' has only ' + str(all_n(i)) + ' entries (expected ' + str(n) + ')')
+                all_same = False
+        if not(all_same):
+            sys.exit('Not all loop lengths the same in config file ' + self.config.filename)
+        else:
+            return n
 
 if __name__=="__main__":
     test=XYTest()
-    test.enable_logging()
-    test.update_config()
     test.run_xyaccuracy_test()
