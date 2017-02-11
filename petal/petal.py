@@ -23,11 +23,7 @@ class Petal(object):
     Initialization inputs:
         petal_id    ... integer id number of the petal
         pos_ids     ... list of positioner unique id strings
-        fid_ids     ... list of fiducials ids -- as of April 2016, these are just CAN ids -- this will be changed to unique id strings at a later date
-
-    As of April 2016, the implementation for handling fiducials is kept as simple as possible, for the
-    purpose of running test stands only. Later implementations should track fiducials' physical hardware
-    by unique id number, log expected and measured positions, log cycles and total on time, etc.
+        fid_ids     ... list of fiducials unique id strings
     """
     def __init__(self, petal_id, pos_ids, fid_ids, simulator_on=False):
         # petalcontroller setup
