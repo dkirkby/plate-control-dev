@@ -430,6 +430,7 @@ posfidfvc/poscalibplot.py -text
 posfidfvc/posmovemeasure.py -text
 posfidfvc/posmovemeasure_dos.py -text
 posfidfvc/um_test_report.py -text
+posfidfvc/xytest.py -text
 posfirmware/develop/bootloader_description.pdf -text svneol=unset#unset
 posfirmware/develop/bootloadersyncf31.c -text
 posfirmware/develop/fipos_fw_2.0dev.c -text
