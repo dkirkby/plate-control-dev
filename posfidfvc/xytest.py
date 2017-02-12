@@ -167,62 +167,51 @@ class XYTest(object):
 
         local_targets = self.generate_posXY_targets_grid(self.config['npoints_across_grid'][loop_number])
         
-
-        try:
-           
-                       
+        submove_idxs = [i for i in range(self.num_corr_max+1)]
+        
+        # write headers for move data log files
+        move_log_header = 'timestamp,cycle,target_x,target_y'
+        submove_fields = ['meas_obsXY','errXY','err2D','posTP']
+        for i in submove_idxs: move_log_header += ',meas_x' + str(i) + ',meas_y' + str(i)
+        for i in submove_idxs: move_log_header += ',err_x'  + str(i) + ',err_y' + str(i)
+        for i in submove_idxs: move_log_header += ',err_xy' + str(i)
+        for i in submove_idxs: move_log_header += ',pos_t'  + str(i) + ',pos_p' + str(i)
+        move_log_header += '\n'
+        for pos_id in self.pos_ids:
+            file = open(move_log_name(pos_id),'w')
+            file.write(move_log_header)
+            file.close()
+        
+        # transform test grid to each positioner's global position, and create all the move request dictionaries
+        all_targets = []
+        for local_target in local_targets:
+            these_targets = {}
+            for pos_id in self.pos_ids:
+                trans = self.m.trans(pos_id)
+                these_targets[pos_id] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(local_target)}
+            all_targets.append(these_targets)
             
-            
-            submove_idxs = [i for i in range(self.num_corr_max+1)]
+        # initialize some data structures for storing test data
+        targ_num = 0
+        all_data_by_target = []
+        all_data_by_pos_id = {}
+        start_cycles = {}
+        for pos_id in self.pos_ids:
+            all_data_by_pos_id[pos_id] = {'targ_obsXY': []}
+            for key in submove_fields:
+                all_data_by_pos_id[pos_id][key] = [[] for i in submove_idxs]
+            start_cycles[pos_id] = self.m.state(pos_id).read('TOTAL_MOVE_SEQUENCES')
+        start_timestamp = pc.timestamp_str_now()
         
-            # write headers for move data log files
-            move_log_header = 'timestamp,cycle,target_x,target_y'
-            submove_fields = ['meas_obsXY','errXY','err2D','posTP']
-            for i in submove_idxs: move_log_header += ',meas_x' + str(i) + ',meas_y' + str(i)
-            for i in submove_idxs: move_log_header += ',err_x'  + str(i) + ',err_y' + str(i)
-            for i in submove_idxs: move_log_header += ',err_xy' + str(i)
-            for i in submove_idxs: move_log_header += ',pos_t'  + str(i) + ',pos_p' + str(i)
-            move_log_header += '\n'
-            for pos_id in pos_ids:
-                file = open(move_log_name(pos_id),'w')
-                file.write(move_log_header)
-                file.close()
-        
-            # transform test grid to each positioner's global position, and create all the move request dictionaries
-            all_targets = []
-            for local_target in local_targets:
-                these_targets = {}
-                for pos_id in pos_ids:
-                    posmodel = ptl.get(pos_id)
-                    these_targets[pos_id] = {'command':'obsXY', 'target':posmodel.trans.posXY_to_obsXY(local_target)}
-                all_targets.append(these_targets)
-        
-            # initialize some data structures for storing test data
-            targ_num = 0
-            all_data_by_target = []
-            all_data_by_pos_id = {}
-            for pos_id in pos_ids:
-                all_data_by_pos_id[pos_id] = {'targ_obsXY': []}
-                for key in submove_fields:
-                    all_data_by_pos_id[pos_id][key] = [[] for i in submove_idxs]
-            start_timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
-            start_cycles = ptl.get(pos_ids,'TOTAL_MOVE_SEQUENCES')
-           
-            # run the test
+        # run the test
+        try:  
             start_time = time.time()
             for these_targets in all_targets:
                 targ_num += 1
-                message='\nMEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets))
-                print(message)
-                if self.should_log:
-                    logging.info(message)
-
-                message='Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.'
-                print(message)
-                if self.should_log:
-                    logging.info(message)
-
-                this_timestamp = str(datetime.datetime.now().strftime(pc.timestamp_format))
+                print('')
+                self.logwrite('MEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets))
+                self.logwrite('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
+                this_timestamp = pc.timestamp_now_str()
                 these_meas_data = self.m.move_and_correct(these_targets, num_corr_max=self.num_corr_max)
                 
                 # store this set of measured data
@@ -320,14 +309,6 @@ class XYTest(object):
             if self.config['should_email']:
                 test_report.email_error(traceback.format_exc(),log_timestamp)
             raise
-   
-        # retract the phi arm as the final step
-        target = {}
-        for pos_id in pos_ids:
-            target[pos_id] = {'command':'posTP', 'target':[185,-3]}
-        print('Setting to neutral position')
-        self.m.move(target)
-
             
         
         self.logwrite(str(NTARGETS) + ' targets measured in ' + self._elapsed_time_str(start_time) + '.')

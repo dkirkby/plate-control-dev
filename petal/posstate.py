@@ -107,7 +107,7 @@ class PosState(object):
         """All current unit parameters are written to the hardware unit's log file.
         """
         if self.logging:
-            timestamp = datetime.datetime.now().strftime(pc.timestamp_format)
+            timestamp = pc.timestamp_str_now()
             if note == '':
                 note = ' ' # just to make csv file cell look blank in excel
             if self.curr_log_length >= self.max_log_length:

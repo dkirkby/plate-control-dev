@@ -166,7 +166,7 @@ class PosMoveMeasure(object):
             if m['err2D'][-1] > self.err_level_to_save_move0_img:
                 save_img = True
         if save_img:
-            timestamp_str = datetime.datetime.now().strftime(pc.filename_timestamp_format)
+            timestamp_str = pc.timestamp_str_now()
             for file in imgfiles:
                 os.rename(file, pc.test_logs_directory + timestamp_str + '_move0' + file)
         for i in range(1,num_corr_max+1):
@@ -190,7 +190,7 @@ class PosMoveMeasure(object):
                 if m['err2D'][-1] > self.err_level_to_save_moven_img and i == num_corr_max:
                     save_img = True
             if save_img:
-                timestamp_str = datetime.datetime.now().strftime(pc.filename_timestamp_format)
+                timestamp_str = pc.timestamp_str_now()
                 for file in imgfiles:
                     os.rename(file, pc.test_logs_directory + timestamp_str + '_move' + str(i) + file)                
         for pos_id in data.keys():
@@ -375,14 +375,19 @@ class PosMoveMeasure(object):
     def state(self, pos_id):
         """Returns the posstate object associated wtih pos_id.
         """
-        ptl = self.ptls_of_pos_ids(pos_id)[pos_id]
-        return ptl.get_model_for_pos(pos_id).state
+        return self.posmodel(pos_id).state
     
     def trans(self, pos_id):
         """Returns the postransforms object associated with pos_id.
         """
+        return self.posmodel(pos_id).trans
+    
+    def posmodel(self, pos_id):
+        """Returns the posmodel object associated with pos_id.
+        """
         ptl = self.ptls_of_pos_ids(pos_id)[pos_id]
-        return ptl.get_model_for_pos(pos_id).trans
+        return ptl.get_model_for_pos(pos_id)
+        
 
     def _measure_calibration_grid(self,pos_ids='all',keep_phi_within_Eo=True):
         """Expert usage. Send positioner(s) to a series of commanded (theta,phi) positions. Measure
