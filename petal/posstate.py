@@ -61,7 +61,7 @@ class PosState(object):
         else:
             log_basename = self.unit_basename + '_log_'
         self.log_basename = PosState.increment_suffix(log_basename)
-        self.max_log_length = 1000 # number of rows in log before starting a new file
+        self.max_log_length = 10000 # number of rows in log before starting a new file
         self.curr_log_length = 0
         if self.type == 'pos':
             self.unit['LAST_MOVE_CMD'] = '(software initialization)'

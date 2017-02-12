@@ -136,6 +136,7 @@ class XYTest(object):
                 self.m.rehome(pos_ids='all')
                 for pos_id in self.pos_ids:
                     state = self.m.state(pos_id)
+                    self.new_and_changed_files.add(state.unit.filename)
                     for key in ['PHYSICAL_RANGE_T','PHYSICAL_RANGE_P']:
                         self.logwrite(str(pos_id) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
                 self.logwrite('Calibration of physical travel ranges completed in ' + self._elapsed_time_str(start_time) + '.')
@@ -160,7 +161,7 @@ class XYTest(object):
         log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
         log_timestamp = pc.timestamp_str_now()
         def path_prefix(pos_id):
-            return log_directory + os.path.sep + pos_id + '_' + log_timestamp + log_suffix
+            return pc.test_logs_directory + os.path.sep + pos_id + '_' + log_timestamp + log_suffix
         def move_log_name(pos_id):
             return path_prefix(pos_id) + '_movedata.csv'
         def summary_log_name(pos_id):
@@ -260,6 +261,7 @@ class XYTest(object):
                 for pos_id in these_targets.keys():
                     state = self.m.state(pos_id)
                     self.new_and_changed_files.add(state.logpath)
+                    self.new_and_changed_files.add(state.unit.filename)
                     row = this_timestamp
                     row += ',' + str(state.read('TOTAL_MOVE_SEQUENCES'))
                     row += ',' + str(state.log_basename)
@@ -292,19 +294,14 @@ class XYTest(object):
             # Test report and email only on certain tests
             if self.config['should_email']:
                 test_report.do_test_report(self.pos_ids, all_data_by_pos_id, log_timestamp, self.pos_notes, self._elapsed_time_str(start_time), self.config['email_list'])
-             
-            
-
         except (KeyboardInterrupt, SystemExit):
             raise
         except:
-            #Email traceback to alert that test failed and why
+            # Email traceback to alert that test failed and why
             if self.config['should_email']:
                 test_report.email_error(traceback.format_exc(),log_timestamp)
-            raise
-            
-        
-        self.logwrite(str(NTARGETS) + ' targets measured in ' + self._elapsed_time_str(start_time) + '.')
+            raise            
+        self.logwrite(str(len(all_data_by_target)) + ' targets measured in ' + self._elapsed_time_str(start_time) + '.')
 
     def run_unmeasured_moves(self, loop_number):
         """Exercise positioners to a series of target positions without doing FVC measurements in-between.
@@ -316,6 +313,9 @@ class XYTest(object):
             for j in range(n_moves):
                 status_str = '... now at move ' + str(j+1) + ' of ' + str(n_moves) + ' within loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops)
                 if j % 1000 == 0:
+                    for pos_id in self.pos_ids:
+                        state = self.m.state(pos_id)
+                        self.new_and_changed_files.add(state.logpath)
                     self.logwrite(status_str)
                 elif j % 50 == 0:
                     print(status_str)
@@ -469,7 +469,6 @@ if __name__=="__main__":
     test.logwrite('Code version: ' + pc.code_version)
     test.intro_questions()
     test.get_and_log_comments_from_user()
-
     for loop_num in range(test.n_loops):
         test.logwrite('Starting xy test in loop ' + str(loop_num + 1) + ' of ' + str(test.n_loops))
         test.set_current_overrides(loop_num)
