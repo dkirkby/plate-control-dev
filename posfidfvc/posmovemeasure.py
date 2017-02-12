@@ -359,6 +359,18 @@ class PosMoveMeasure(object):
             all_pos_ids.extend(pos_ids_by_ptl[petal])
         return all_pos_ids
 
+    def state(self, pos_id):
+        """Returns the posstate object associated wtih pos_id.
+        """
+        ptl = self.ptls_of_pos_ids(pos_id)[pos_id]
+        return ptl.get_model_for_pos(pos_id).state
+    
+    def trans(self, pos_id):
+        """Returns the postransforms object associated with pos_id.
+        """
+        ptl = self.ptls_of_pos_ids(pos_id)[pos_id]
+        return ptl.get_model_for_pos(pos_id).trans
+
     def _measure_calibration_grid(self,pos_ids='all',keep_phi_within_Eo=True):
         """Expert usage. Send positioner(s) to a series of commanded (theta,phi) positions. Measure
         the (x,y) positions of these points with the FVC.

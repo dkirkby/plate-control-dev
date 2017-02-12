@@ -32,6 +32,7 @@ class XYTest(object):
         """
         
         # set up configuration traveler file that goes with this test, and begin logging
+        os.makedirs(pc.test_logs_directory, exist_ok=True)
         if not(configfile):
             gui_root = tkinter.Tk()
             configfile = tkinter.filedialog.askopenfilename(initialdir=pc.test_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title="Select the configuration file for this test run.")
@@ -81,6 +82,45 @@ class XYTest(object):
                     self.rand_xy_targs_list.append([float(row[0]),float(row[1])])
         self.logwrite('Read in ' + str(len(self.rand_xy_targs_list)) + ' xy targets from file ' + targs_file + ' and formed move requests.')
 
+    def intro_questions(self):
+        user_vals = []
+        print('Please enter the name of who is running the test.',end=' ')
+        user_vals.append('TEST OPERATOR: ' + input('your name: '))
+        print('')
+        
+        print('Please enter the name of the test station.',end=' ')
+        user_vals.append('TEST STATION: ' + input('station name: '))
+        print('')
+        
+        print('Please enter the current temperature at the test stand (degrees Celsius). Leave blank if not measured.',end=' ')
+        user_vals.append('TEMPERATURE (CELSIUS): ' + input('temperature: '))
+        print('')
+        
+        print('Please enter the current relative humidity at the test stand. Leave blank if not measured.',end=' ')
+        user_vals.append('RELATIVE HUMIDITY: ' + input('relative humidity: '))
+        print('')
+        
+        print('You entered:')
+        for s in user_vals:
+            print('  ' + s)
+        try_again = input('If this is ok, hit enter to continue. Otherwise, type any character and enter to start over: ')
+        if try_again:
+            self.intro_questions()
+        else:
+            for s in user_vals:
+                self.logwrite('user-entry: ' + s)
+        
+    def get_and_log_comments_from_user(self):
+        print('\nPlease enter any specific observations or notes about this test. These will be recorded into the test log. You can keep on entering notes until you hit enter on a blank line.',end=' ')
+        thanks_msg = False
+        note = input('observation/note: ')
+        while note:
+            self.logwrite('user-entry: OBSERVATION/NOTE: ' + note)
+            note = input('observation/note: ')
+            thanks_msg = True
+        if thanks_msg:
+            print('Thank you, notes entered into log at ' + self.config.filename)
+
     def run_calibration(self, loop_number):
         """Move positioners through a short sequence to calibrate them.
         """
@@ -92,16 +132,17 @@ class XYTest(object):
             self.m.n_points_full_calib_T = n_pts_calib_T
             self.m.n_points_full_calib_P = n_pts_calib_P
             self.m.calibrate(pos_ids='all', mode='full', save_file_dir=pc.test_logs_directory, save_file_timestamp=pc.timestamp_str_now())
-        self.logwrite('Calibration with ' + str(n_pts_calib_T) + ' theta points and ' + str(n_pts_calib_P) + ' phi points completed in ' + self._elapsed_time_str(start_time) + '.')
+            for pos_id in self.pos_ids:
+                state = self.m.state(pos_id)
+                for key in ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']:
+                    self.logwrite(str(pos_id) + ': set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
+            self.logwrite('Calibration with ' + str(n_pts_calib_T) + ' theta points and ' + str(n_pts_calib_P) + ' phi points completed in ' + self._elapsed_time_str(start_time) + '.')
         
     def run_xyaccuracy_test(self, loop_number):
         """Move positioners to a series of xy targets and measure performance.
         """
         
-        # data files setup
-        log_directory = pc.test_logs_directory
-        os.makedirs(log_directory, exist_ok=True)
-        log_suffix = self.config['log_suffix'] 
+        log_suffix = self.config['log_suffix']
         log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
         log_timestamp = pc.timestamp_str_now()
         def path_prefix(pos_id):
@@ -323,7 +364,7 @@ class XYTest(object):
         """Standard logging function for writing to the test traveler config file.
         """
         line = '# ' + pc.timestamp_str_now() + ': ' + text
-        filehandle = open(self.config.filename)
+        filehandle = open(self.config.filename,'a')
         filehandle.write('\n' + line)
         filehandle.close()
         if stdout:
@@ -389,6 +430,8 @@ class XYTest(object):
 
 if __name__=="__main__":
     test = XYTest()
+    test.intro_questions()
+    test.get_and_log_comments_from_user()
     test.logwrite('Start of positioner performance test.')
     for loop_num in range(test.n_loops):
         test.logwrite('Starting xy test in loop ' + str(loop_num + 1) + ' of ' + str(test.n_loops))
@@ -397,3 +440,5 @@ if __name__=="__main__":
         test.run_unmeasured_moves(loop_num)
         test.run_hardstop_strikes(loop_num)
     test.logwrite('All test loops complete.')
+    test.get_and_log_comments_from_user()
+    test.logwrite('Test complete.')
