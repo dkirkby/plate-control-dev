@@ -3,6 +3,21 @@
 # THEREAFTER, WE DON'T HAVE TO REPEAT THESE ALL THE TIME FOR EVERY XY ACCURACY
 # TEST.
 
+import petal
+import posmovemeasure
+import fvchandler
+import posconstants as pc
+
+# initialization
+pos_ids = []
+fid_ids = []
+ptl_ids = []
+petals = [petal.Petal(ptl_ids[0], pos_ids, fid_ids)] # single-petal placeholder for generality of future implementations, where we could have a list of multiple petals, and need to correlate pos_ids and fid_ids to thier particular petals
+fvc = fvchandler.FVCHandler('SBIG')      
+fvc.rotation = 0 # deg
+fvc.scale = 0.2 # mm/pixel
+m = posmovemeasure.PosMoveMeasure(petals,fvc)
+start_timestamp = pc.timestamp_str_now()
 
 # initial homing
 m.rehome(pos_ids='all')
@@ -14,13 +29,13 @@ m.identify_fiducials()
 m.identify_positioner_locations()
 
 # quick pre-calibration, especially because we need some reasonable values for theta offsets prior to measuring physical travel ranges (where phi arms get extended)
-m.calibrate(pos_ids='all', mode='quick', save_file_dir=log_directory, save_file_timestamp=log_timestamp_with_notes())
+m.calibrate(pos_ids='all', mode='quick', save_file_dir=pc.test_logs_directory, save_file_timestamp=start_timestamp)
 
 # measure the physical travel ranges of the theta and phi axes by ramming hard limits in both directions
 m.measure_range(pos_ids='all', axis='theta')
 m.measure_range(pos_ids='all', axis='phi')
 m.rehome(pos_ids='all')
-m.calibrate(pos_ids='all', mode='quick', save_file_dir=log_directory, save_file_timestamp=log_timestamp_with_notes()) # needed after having struck hard limits
+m.calibrate(pos_ids='all', mode='quick', save_file_dir=pc.test_logs_directory, save_file_timestamp=start_timestamp) # needed after having struck hard limits
 
            
 
