@@ -209,6 +209,19 @@ class PosMoveMeasure(object):
                 posT = petal.expected_current_position(pos_id,'posT')
                 requests[pos_id] = {'command':'posTP', 'target':[posT,posP]}
         self.move(requests)
+    
+    def park(self,pos_ids='all'):
+        """Fully retract phi arms inward, and put thetas at their neutral theta = 0 position.
+        """
+        pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids, key='POS_ID')
+        requests = {}
+        for petal in pos_ids_by_ptl.keys():
+            for pos_id in pos_ids_by_ptl[petal]:
+                posmodel = petal.get_model_for_pos(pos_id)
+                posT = 0
+                posP = max(posmodel.targetable_range_P)
+                requests[pos_id] = {'command':'posTP', 'target':[posT,posP]}
+        self.move(requests)
 
     def rehome(self,pos_ids='all'):
         """Find hardstops and reset current known positions.

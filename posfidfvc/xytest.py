@@ -483,5 +483,7 @@ if __name__=="__main__":
         test.run_hardstop_strikes(loop_num)
         test.clear_current_overrides()
     test.logwrite('All test loops complete.')
+    test.m.park(pos_ids='all')
+    test.logwrite('Moved positioners into \'parked\' position.')
     test.get_and_log_comments_from_user()
     test.logwrite('Test complete.')
