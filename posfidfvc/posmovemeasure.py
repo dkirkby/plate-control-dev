@@ -901,7 +901,7 @@ class PosMoveMeasure(object):
         """
         n = 0
         for ptl in self.petals:
-            for 
+            pass#for 
         return n
             
     def _wrap_consecutive_angles(self, angles, expected_direction):

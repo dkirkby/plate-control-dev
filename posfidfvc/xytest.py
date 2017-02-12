@@ -5,7 +5,6 @@ import fvchandler
 import petal
 import posmovemeasure
 import posconstants as pc
-import datetime
 import numpy as np
 import time
 import pos_xytest_plot
@@ -42,6 +41,7 @@ class XYTest(object):
         config_traveler_name = pc.test_logs_directory + initial_timestamp + '_' + os.path.basename(configfile)
         self.config.filename = config_traveler_name
         self.config.write()
+        self.new_and_mod_files = [self.config.filename] # start a list to keep track of all files that need to be added / committed to SVN
         self.logwrite('File ' + str(configfile) + ' selected as template for test settings.')
         self.logwrite('Test will be run from a uniquely-generated traveler config file located at ' + str(self.config.filename) + ' which was based off the template.')
         
@@ -170,7 +170,7 @@ class XYTest(object):
         submove_idxs = [i for i in range(self.num_corr_max+1)]
         
         # write headers for move data log files
-        move_log_header = 'timestamp,cycle,target_x,target_y'
+        move_log_header = 'timestamp,cycle,move_log,target_x,target_y'
         submove_fields = ['meas_obsXY','errXY','err2D','posTP']
         for i in submove_idxs: move_log_header += ',meas_x' + str(i) + ',meas_y' + str(i)
         for i in submove_idxs: move_log_header += ',err_x'  + str(i) + ',err_y' + str(i)
@@ -209,7 +209,7 @@ class XYTest(object):
             for these_targets in all_targets:
                 targ_num += 1
                 print('')
-                self.logwrite('MEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets))
+                self.logwrite('MEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets)))
                 self.logwrite('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
                 this_timestamp = pc.timestamp_now_str()
                 these_meas_data = self.m.move_and_correct(these_targets, num_corr_max=self.num_corr_max)
@@ -223,14 +223,14 @@ class XYTest(object):
                             all_data_by_pos_id[pos_id][key][sub].append(these_meas_data[pos_id][key][sub])              
                 
                 # update summary data log
-                for pos_id in pos_ids:
+                for pos_id in self.pos_ids:
                     summary_log_data =  'pos_id,' + str(pos_id) + '\n'
                     summary_log_data += 'log_suffix,' + str(log_suffix) + '\n'
-                    summary_log_data += 'cycles at start,' + str(start_cycles[pos_ids.index(pos_id)]) + '\n'
-                    summary_log_data += 'cycles at finish,' + str(ptl.get(pos_id,'TOTAL_MOVE_SEQUENCES')) + '\n'
+                    summary_log_data += 'cycles at start,' + str(start_cycles[pos_id]) + '\n'
+                    summary_log_data += 'cycles at finish,' + str(self.m.state(pos_id).read('TOTAL_MOVE_SEQUENCES')) + '\n'
                     summary_log_data += 'start time,' + start_timestamp + '\n'
                     summary_log_data += 'finish time,' + this_timestamp + '\n'
-                    summary_log_data += 'num requested targets,' + str(len(all_targets)) + '\n'
+                    summary_log_data += 'num targets measured,' + str(len(all_data_by_target)) + '\n'
                     summary_log_data += 'num corrections max,' + str(self.num_corr_max) + '\n'
                     summary_log_data += 'submove index -->'
                     for i in submove_idxs: summary_log_data += ',' + str(i)
@@ -249,10 +249,12 @@ class XYTest(object):
                     file.write(summary_log_data)
                     file.close()
         
-                # update move data log
+                # update test data log
                 for pos_id in these_targets.keys():
+                    state = self.m.state(pos_id)
                     row = this_timestamp
-                    row += ',' + str(ptl.get(pos_id,'TOTAL_MOVE_SEQUENCES'))
+                    row += ',' + str(state.read('TOTAL_MOVE_SEQUENCES'))
+                    row += ',' + str(state.log_basename)
                     row += ',' + str(these_targets[pos_id]['targ_obsXY'][0])
                     row += ',' + str(these_targets[pos_id]['targ_obsXY'][1])
                     for key in submove_fields:
@@ -269,38 +271,21 @@ class XYTest(object):
             
             # make summary plots showing the targets and measured positions
             for pos_id in all_data_by_pos_id.keys():
-                posmodel = ptl.get(pos_id)
+                posmodel = self.m.posmodel(pos_id)
                 title = log_timestamp + log_suffix
-                center = [ptl.get(pos_id,'OFFSET_X'),ptl.get(pos_id,'OFFSET_Y')]
+                center = [posmodel.state.read('OFFSET_X'),posmodel.state.read('OFFSET_Y')]
                 theta_min = posmodel.trans.posTP_to_obsTP([min(posmodel.targetable_range_T),0])[0]
                 theta_max = posmodel.trans.posTP_to_obsTP([max(posmodel.targetable_range_T),0])[0]
                 theta_range = [theta_min,theta_max]
-                r1 = ptl.get(pos_id,'LENGTH_R1')
-                r2 = ptl.get(pos_id,'LENGTH_R2')
+                r1 = posmodel.state.read('LENGTH_R1')
+                r2 = posmodel.state.read('LENGTH_R2')
                 pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_data_by_pos_id[pos_id],center,theta_range,r1,r2,title)
 
-            
-
-            #Test report and email only on certain tests
+            # Test report and email only on certain tests
             if self.config['should_email']:
-                test_report.do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, test_time, self.config['email_list'])
+                test_report.do_test_report(self.pos_ids, all_data_by_pos_id, log_timestamp, self.pos_notes, self._elapsed_time_str(start_time), self.config['email_list'])
              
-            #Commit logs through SVN
-            if self.config['should_auto_commit_logs']:
-                filetypes = ['xyplot_submove0.png','xyplot_submove1.png','xyplot_submove2.png','xyplot_submove3.png',
-                             'calib_full.png','calib_quick.png','summary.csv','movedata.csv']
-                for pos_id in pos_ids:
-                    for file in filetypes:
-                        command = 'svn add ' + pc.test_logs_directory + pos_id + '_' + log_timestamp + '_' + file
-                        try:
-                            os.system(command)
-                        except:
-                            print('Failed run command: ' + command)
-                try:
-                    os.system('svn commit ' + pc.test_logs_directory + ' -m "' + log_timestamp + ' test logs"')
-                except:
-                    print('Failed to commit files.')
-                            
+            
 
         except (KeyboardInterrupt, SystemExit):
             raise
@@ -447,14 +432,36 @@ class XYTest(object):
         """Standard string for elapsed time.
         """
         return format((time.time()-start_time)/60/60,'.2f') + ' hrs'
-
-
+    
+    def svn_add_commit(self):
+        # Commit logs through SVN
+        if self.config['should_auto_commit_logs']:
+            all_files = ''
+            for file in self.new_and_mod_files:
+                all_files += ' ' + file
+            if all_files:
+                self.logwrite('The following files were generated or modified during the test and need to be added / committed to svn:' + all_files)
+                print('')
+                print('Enter you svn username and password for committing the logs to the server. These will not be saved to the logfile, but will briefly be clear-text in this script''s memory while it is running.')
+                svn_user = input('svn username: ')
+                svn_pass = input('svn password: ')
+                print('Will attemp to commit the logs automatically now. This may take a few minutes...')
+                os.system('svn add --username j' + svn_user + ' --password ' + svn_pass + ' --non-interactive' + all_files)
+                err = os.system('svn commit --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive -m "autocommit from xytest script"' + all_files)
+                del svn_user
+                del svn_pass
+                if err == 0:
+                    print('...automatic svn commit appears to have worked.')
+                else:
+                    print('...automatic svn commit may have failed. We''ll need to check manually and make sure all files uploaded properly. A list of the files needing upload is in the traveler conf file.')
 
 if __name__=="__main__":
     test = XYTest()
+    test.logwrite('Start of positioner performance test.')
+    test.logwrite('Code version: ' + pc.code_version)
     test.intro_questions()
     test.get_and_log_comments_from_user()
-    test.logwrite('Start of positioner performance test.')
+
     for loop_num in range(test.n_loops):
         test.logwrite('Starting xy test in loop ' + str(loop_num + 1) + ' of ' + str(test.n_loops))
         test.set_current_overrides(loop_num)
@@ -467,4 +474,5 @@ if __name__=="__main__":
     test.m.park(pos_ids='all')
     test.logwrite('Moved positioners into \'parked\' position.')
     test.get_and_log_comments_from_user()
-    test.logwrite('Test complete.')
+    test.logwrite('Test complete.')    
+    test.svn_add_commit()
