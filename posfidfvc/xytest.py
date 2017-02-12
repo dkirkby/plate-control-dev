@@ -119,14 +119,25 @@ class XYTest(object):
             note = input('observation/note: ')
             thanks_msg = True
         if thanks_msg:
-            print('Thank you, notes entered into log at ' + self.config.filename)
+            print('Thank you, notes entered into log at ' + self.config.filename)        
 
     def run_calibration(self, loop_number):
         """Move positioners through a short sequence to calibrate them.
         """
-        n_pts_calib_T = self.config['n_points_calib_T']
-        n_pts_calib_P = self.config['n_points_calib_P']
+        n_pts_calib_T = self.config['n_points_calib_T'][loop_number]
+        n_pts_calib_P = self.config['n_points_calib_P'][loop_number]
         if n_pts_calib_T >= 4 and n_pts_calib_P >= 3:
+            if self.config['should_measure_ranges'][loop_number]:
+                start_time = time.time()
+                self.logwrite('Starting physical travel range measurement sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
+                self.m.measure_range(pos_ids='all', axis='theta')
+                self.m.measure_range(pos_ids='all', axis='phi')
+                self.m.rehome(pos_ids='all')
+                for pos_id in self.pos_ids:
+                    state = self.m.state(pos_id)
+                    for key in ['PHYSICAL_RANGE_T','PHYSICAL_RANGE_P']:
+                        self.logwrite(str(pos_id) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
+                self.logwrite('Calibration of physical travel ranges completed in ' + self._elapsed_time_str(start_time) + '.')
             start_time = time.time()
             self.logwrite('Starting arc calibration sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             self.m.n_points_full_calib_T = n_pts_calib_T
@@ -135,7 +146,7 @@ class XYTest(object):
             for pos_id in self.pos_ids:
                 state = self.m.state(pos_id)
                 for key in ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']:
-                    self.logwrite(str(pos_id) + ': set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
+                    self.logwrite(str(pos_id) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
             self.logwrite('Calibration with ' + str(n_pts_calib_T) + ' theta points and ' + str(n_pts_calib_P) + ' phi points completed in ' + self._elapsed_time_str(start_time) + '.')
         
     def run_xyaccuracy_test(self, loop_number):
@@ -370,6 +381,34 @@ class XYTest(object):
         if stdout:
             print(line)
 
+    def set_current_overrides(self, loop_number):
+        """If the test config calls for overriding cruise or creep currents to a particular value
+        for this loop, this method sets that. It also stores the old setting for later restoration.
+        """
+        self.old_currents = {}
+        for pos_id in self.pos_ids:
+            self.old_currents[pos_id] = {}
+        for key in ['CURR_CRUISE','CURR_CREEP']:
+            if key == 'CURR_CRUISE':
+                curr_val = self.config['cruise_current_override'][loop_number]
+            else:
+                curr_val = self.config['creep_current_override'][loop_number]
+            for pos_id in self.pos_ids:
+                state = self.m.state(pos_id)
+                self.old_currents[pos_id][key] = state.read(key)
+                if curr_val != None:
+                    state.write(key,curr_val)
+                    self.logwrite(str(pos_id) + ': Set ' + key + ' to ' + str(curr_val))
+        
+    def clear_current_overrides(self):
+        """Restore current settings for each positioner to their original values.
+        """
+        for key in ['CURR_CRUISE','CURR_CREEP']:
+            for pos_id in self.pos_ids:
+                state = self.m.state(pos_id)
+                state.write(key, self.old_currents[pos_id][key])
+                self.logwrite(str(pos_id) + ': Restored ' + key + ' to ' + str(self.old_currents[pos_id][key]))
+
     def generate_posXY_targets_grid(self, npoints_across_grid):
         """Make rectilinear grid of local (x,y) targets. Returns a list.
         """
@@ -428,6 +467,8 @@ class XYTest(object):
         """
         return format((time.time()-start_time)/60/60,'.2f') + ' hrs'
 
+
+
 if __name__=="__main__":
     test = XYTest()
     test.intro_questions()
@@ -435,10 +476,12 @@ if __name__=="__main__":
     test.logwrite('Start of positioner performance test.')
     for loop_num in range(test.n_loops):
         test.logwrite('Starting xy test in loop ' + str(loop_num + 1) + ' of ' + str(test.n_loops))
+        test.set_current_overrides(loop_num)
         test.run_calibration(loop_num)
         test.run_xyaccuracy_test(loop_num)
         test.run_unmeasured_moves(loop_num)
         test.run_hardstop_strikes(loop_num)
+        test.clear_current_overrides()
     test.logwrite('All test loops complete.')
     test.get_and_log_comments_from_user()
     test.logwrite('Test complete.')
