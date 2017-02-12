@@ -61,7 +61,7 @@ class XYTest(object):
             self.pos_notes.append('')
         fid_ids = self.config['fid_ids']
         ptl_ids = self.config['ptl_ids']
-        petals = [petal.Petal(ptl_id, self.pos_ids, fid_ids)] # single-petal placeholder for generality of future implementations, where we could have a list of multiple petals, and need to correlate pos_ids and fid_ids to thier particular petals
+        petals = [petal.Petal(ptl_ids[0], self.pos_ids, fid_ids)] # single-petal placeholder for generality of future implementations, where we could have a list of multiple petals, and need to correlate pos_ids and fid_ids to thier particular petals
         for ptl in petals:
             ptl.anticollision_default = self.config['anticollision']
         self.m = posmovemeasure.PosMoveMeasure(petals,fvc)
