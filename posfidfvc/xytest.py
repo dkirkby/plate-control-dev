@@ -41,7 +41,8 @@ class XYTest(object):
         config_traveler_name = pc.test_logs_directory + initial_timestamp + '_' + os.path.basename(configfile)
         self.config.filename = config_traveler_name
         self.config.write()
-        self.new_and_mod_files = [self.config.filename] # start a list to keep track of all files that need to be added / committed to SVN
+        self.new_and_changed_files = set()  # start a set to keep track of all files that need to be added / committed to SVN
+        self.new_and_changed_files.add(self.config.filename)
         self.logwrite('File ' + str(configfile) + ' selected as template for test settings.')
         self.logwrite('Test will be run from a uniquely-generated traveler config file located at ' + str(self.config.filename) + ' which was based off the template.')
         
@@ -142,7 +143,9 @@ class XYTest(object):
             self.logwrite('Starting arc calibration sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             self.m.n_points_full_calib_T = n_pts_calib_T
             self.m.n_points_full_calib_P = n_pts_calib_P
-            self.m.calibrate(pos_ids='all', mode='full', save_file_dir=pc.test_logs_directory, save_file_timestamp=pc.timestamp_str_now())
+            files = self.m.calibrate(pos_ids='all', mode='full', save_file_dir=pc.test_logs_directory, save_file_timestamp=pc.timestamp_str_now())
+            for file in files:
+                self.new_and_changed_files.add(file)
             for pos_id in self.pos_ids:
                 state = self.m.state(pos_id)
                 for key in ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']:
@@ -178,7 +181,9 @@ class XYTest(object):
         for i in submove_idxs: move_log_header += ',pos_t'  + str(i) + ',pos_p' + str(i)
         move_log_header += '\n'
         for pos_id in self.pos_ids:
-            file = open(move_log_name(pos_id),'w')
+            filename = move_log_name(pos_id)
+            self.new_and_changed_files.add(filename)
+            file = open(filename,'w')
             file.write(move_log_header)
             file.close()
         
@@ -245,13 +250,16 @@ class XYTest(object):
                             elif calc == 'rms':  summary_log_data += ',' + str(np.sqrt(np.mean(np.array(this_submove_data)**2)) * pc.um_per_mm)
                             else: pass
                             if i == submove_idxs[-1]: summary_log_data += '\n'
-                    file = open(summary_log_name(pos_id),'w')
+                    filename = summary_log_name(pos_id)
+                    self.new_and_changed_files.add(filename)
+                    file = open(filename,'w')
                     file.write(summary_log_data)
                     file.close()
         
                 # update test data log
                 for pos_id in these_targets.keys():
                     state = self.m.state(pos_id)
+                    self.new_and_changed_files.add(state.logpath)
                     row = this_timestamp
                     row += ',' + str(state.read('TOTAL_MOVE_SEQUENCES'))
                     row += ',' + str(state.log_basename)
@@ -336,6 +344,28 @@ class XYTest(object):
                 self.m.move(retract_requests)
                 self.m.rehome(self.pos_ids)
             self.logwrite(str(n_strikes) + ' hardstop strikes completed in ' + self._elapsed_time_str(start_time) + '.')
+    
+    def svn_add_commit(self):
+        # Commit logs through SVN
+        if self.config['should_auto_commit_logs']:
+            files_str = ''
+            for file in self.new_and_changed_files:
+                files_str += ' ' + file
+            if files_str:
+                self.logwrite('The following files were generated or modified during the test and need to be added / committed to svn:' + files_str)
+                print('')
+                print('Enter you svn username and password for committing the logs to the server. These will not be saved to the logfile, but will briefly be clear-text in this script''s memory while it is running.')
+                svn_user = input('svn username: ')
+                svn_pass = input('svn password: ')
+                print('Will attempt to commit the logs automatically now. This may take a few minutes...')
+                os.system('svn add --username j' + svn_user + ' --password ' + svn_pass + ' --non-interactive' + files_str)
+                err = os.system('svn commit --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive -m "autocommit from xytest script"' + files_str)
+                del svn_user
+                del svn_pass
+                if err == 0:
+                    print('...automatic svn commit appears to have worked.')
+                else:
+                    print('...automatic svn commit may have failed. We''ll need to check manually and make sure all files uploaded properly. A list of the files needing upload is in the traveler conf file.')
 
     def logwrite(self,text,stdout=True):
         """Standard logging function for writing to the test traveler config file.
@@ -432,28 +462,6 @@ class XYTest(object):
         """Standard string for elapsed time.
         """
         return format((time.time()-start_time)/60/60,'.2f') + ' hrs'
-    
-    def svn_add_commit(self):
-        # Commit logs through SVN
-        if self.config['should_auto_commit_logs']:
-            all_files = ''
-            for file in self.new_and_mod_files:
-                all_files += ' ' + file
-            if all_files:
-                self.logwrite('The following files were generated or modified during the test and need to be added / committed to svn:' + all_files)
-                print('')
-                print('Enter you svn username and password for committing the logs to the server. These will not be saved to the logfile, but will briefly be clear-text in this script''s memory while it is running.')
-                svn_user = input('svn username: ')
-                svn_pass = input('svn password: ')
-                print('Will attemp to commit the logs automatically now. This may take a few minutes...')
-                os.system('svn add --username j' + svn_user + ' --password ' + svn_pass + ' --non-interactive' + all_files)
-                err = os.system('svn commit --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive -m "autocommit from xytest script"' + all_files)
-                del svn_user
-                del svn_pass
-                if err == 0:
-                    print('...automatic svn commit appears to have worked.')
-                else:
-                    print('...automatic svn commit may have failed. We''ll need to check manually and make sure all files uploaded properly. A list of the files needing upload is in the traveler conf file.')
 
 if __name__=="__main__":
     test = XYTest()
