@@ -371,7 +371,7 @@ class PosMoveMeasure(object):
 
         Returns a dictionary of dictionaries containing the data. The primary
         keys for the dict are the pos_id. Then for each pos_id, each subdictionary
-        contains the k27eys:
+        contains the keys:
             'target_posTP'    ... the posTP targets which were attempted
             'measured_obsXY'  ... the resulting measured xy positions
             'petal'           ... the petal this pos_id is on
@@ -701,6 +701,7 @@ class PosMoveMeasure(object):
             data[pos_id]['meas_posP_during_P_sweep'] = p_meas_posP_wrapped
             data[pos_id]['targ_posP_during_T_sweep'] = t_targ_posP[0]
             data[pos_id]['targ_posT_during_P_sweep'] = p_targ_posT[0]
+            data[pos_id]['posmodel'] = petal.get(pos_id)
             
             # gear ratios
             ratios_T = np.divide(np.diff(t_meas_posT_wrapped),np.diff(t_targ_posT))

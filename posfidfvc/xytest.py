@@ -81,10 +81,23 @@ class XYTest(object):
                     self.rand_xy_targs_list.append([float(row[0]),float(row[1])])
         self.logwrite('Read in ' + str(len(self.rand_xy_targs_list)) + ' xy targets from file ' + targs_file + ' and formed move requests.')
 
+    def run_calibration(self, loop_number):
+        """Move positioners through a short sequence to calibrate them.
+        """
+        n_pts_calib_T = self.config['n_points_calib_T']
+        n_pts_calib_P = self.config['n_points_calib_P']
+        if n_pts_calib_T >= 4 and n_pts_calib_P >= 3:
+            start_time = time.time()
+            self.logwrite('Starting arc calibration sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
+            self.m.n_points_full_calib_T = n_pts_calib_T
+            self.m.n_points_full_calib_P = n_pts_calib_P
+            self.m.calibrate(pos_ids='all', mode='full', save_file_dir=pc.test_logs_directory, save_file_timestamp=pc.timestamp_str_now())
+        self.logwrite('Calibration with ' + str(n_pts_calib_T) + ' theta points and ' + str(n_pts_calib_P) + ' phi points completed in ' + self._elapsed_time_str(start_time) + '.')
+        
     def run_xyaccuracy_test(self, loop_number):
-        # start timer on this loop
-        loop_start_time = time.time()
-
+        """Move positioners to a series of xy targets and measure performance.
+        """
+        
         # data files setup
         log_directory = pc.test_logs_directory
         os.makedirs(log_directory, exist_ok=True)
@@ -105,9 +118,8 @@ class XYTest(object):
 
         try:
            
-            self.m.n_points_full_calib_T = self.n_points_calib_T
-            self.m.n_points_full_calib_P = self.n_points_calib_P            
-            self.m.calibrate(pos_ids='all', mode='full', save_file_dir=log_directory, save_file_timestamp=log_timestamp)
+                       
+            
             
             submove_idxs = [i for i in range(self.num_corr_max+1)]
         
@@ -145,6 +157,7 @@ class XYTest(object):
             start_cycles = ptl.get(pos_ids,'TOTAL_MOVE_SEQUENCES')
            
             # run the test
+            start_time = time.time()
             for these_targets in all_targets:
                 targ_num += 1
                 message='\nMEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets))
@@ -225,8 +238,7 @@ class XYTest(object):
                 r2 = ptl.get(pos_id,'LENGTH_R2')
                 pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_data_by_pos_id[pos_id],center,theta_range,r1,r2,title)
 
-            loop_exec_time = time.time() - loop_start_time
-            test_time = format(loop_exec_time/60/60,'.1f')
+            
 
             #Test report and email only on certain tests
             if self.config['should_email']:
@@ -265,17 +277,15 @@ class XYTest(object):
         self.m.move(target)
 
             
-        script_exec_time = time.time() - script_start_time
-        message='Total test time: ' + format(script_exec_time/60/60,'.1f') + 'hrs'
-        print(message)
-        if self.should_log:
-            logging.info(message)
+        
+        self.logwrite(str(NTARGETS) + ' targets measured in ' + self._elapsed_time_str(start_time) + '.')
 
     def run_unmeasured_moves(self, loop_number):
         """Exercise positioners to a series of target positions without doing FVC measurements in-between.
         """
         n_moves = self.config['n_unmeasured_moves_between_loops']
         if loop_number < self.n_loops - 1 and n_moves > 0: # the last loop does not have unmeasured moves after it
+            start_time = time.time()
             self.logwrite('Starting unmeasured move sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             for j in range(n_moves):
                 status_str = '... now at move ' + str(j+1) + ' of ' + str(n_moves) + ' within loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops)
@@ -291,13 +301,14 @@ class XYTest(object):
                         self.rand_xy_targs_idx = 0
                 requests = self.generate_posXY_move_requests([targ_xy])[0]
                 self.m.move(requests)
-            self.logwrite(str(n_moves) + ' moves complete!')   
+            self.logwrite(str(n_moves) + ' moves completed in ' + self._elapsed_time_str(start_time) + '.')
     
     def run_hardstop_strikes(self, loop_number):
         """Exercise positioners to a series of hardstop strikes without doing FVC measurements in-between.
         """
         n_strikes = self.config['n_hardstop_strikes_between_loops']
         if loop_number < self.n_loops - 1 and n_strikes > 0: # the last loop does not have hardstop strikes after it
+            start_time = time.time()
             self.logwrite('Starting hardstop strike sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             retract_requests = {}
             for pos_id in self.pos_ids:
@@ -306,7 +317,7 @@ class XYTest(object):
                 print('... now at strike ' + str(j+1) + ' of ' + str(n_strikes) + ' within loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
                 self.m.move(retract_requests)
                 self.m.rehome(self.pos_ids)
-            self.logwrite(str(n_strikes) + ' hardstop strikes complete!')   
+            self.logwrite(str(n_strikes) + ' hardstop strikes completed in ' + self._elapsed_time_str(start_time) + '.')
 
     def logwrite(self,text,stdout=True):
         """Standard logging function for writing to the test traveler config file.
@@ -358,7 +369,7 @@ class XYTest(object):
         """Returns total number of loops in test configuration.
         (Also checks that all params in config file are consistent.)
         """
-        keys = ['n_pts_across_grid','n_points_calib_T','n_points_calib_P','num_corr_max','should_measure_ranges','calibration_type','cruise_current_override','creep_current_override']
+        keys = ['n_pts_across_grid','n_points_calib_T','n_points_calib_P','num_corr_max','should_measure_ranges','cruise_current_override','creep_current_override']
         all_n = [len(self.config[key]) for key in keys]
         n = max(all_n) # if all lengthss are same, then they must all be as long as the longest one
         all_same = True
@@ -370,12 +381,18 @@ class XYTest(object):
             sys.exit('Not all loop lengths the same in config file ' + self.config.filename)
         else:
             return n
+    
+    def _elapsed_time_str(self,start_time):
+        """Standard string for elapsed time.
+        """
+        return format((time.time()-start_time)/60/60,'.2f') + ' hrs'
 
 if __name__=="__main__":
     test = XYTest()
     test.logwrite('Start of positioner performance test.')
     for loop_num in range(test.n_loops):
         test.logwrite('Starting xy test in loop ' + str(loop_num + 1) + ' of ' + str(test.n_loops))
+        test.run_calibration(loop_num)
         test.run_xyaccuracy_test(loop_num)
         test.run_unmeasured_moves(loop_num)
         test.run_hardstop_strikes(loop_num)

@@ -8,6 +8,7 @@ def plot_arc(path, pos_id, data):
     """
     plt.ioff() # interactive plotting off
     fig = plt.figure(figsize=(14, 8))
+    state = data[pos_id]['posmodel'].state
 
     for ax in ['T','P']:
         name = 'theta' if ax == 'T' else 'phi'
@@ -48,6 +49,11 @@ def plot_arc(path, pos_id, data):
             text_x = center[0] + radius*1.1*np.cos(this_angle)
             text_y = center[1] + radius*1.1*np.sin(this_angle)
             plt.text(text_x,text_y,str(i),verticalalignment='center',horizontalalignment='center')
+        if ax == 'T':
+            calib_vals_txt = ''
+            for key in ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']:
+                calib_vals_txt += format(key,'12s') + ' = ' + format(state.read(key),'.3f') + '\n'
+            plt.text(min(plt.xlim())+0.2,max(plt.ylim())-0.2,calib_vals_txt,fontsize=6,color='gray',family='monospace',horizontalalignment='left',verticalalignment='top')
         plt.xlabel('x (mm)')
         plt.ylabel('y (mm)')
         plt.title(pos_id + ' ' + name + ' calibration points')
