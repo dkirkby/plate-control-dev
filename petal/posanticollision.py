@@ -27,11 +27,12 @@ class PosAnticol:
     verbose    boolean    if True, it will open much more information to terminal
                           this is just for debugging purposes only.
     '''
-    def __init__(self,avoidance = 'EM',verbose = False):   
-        # Define the phi position in degrees at which the positioner is safe
-        self.phisafe = 144.
-        
+    def __init__(self,avoidance = 'EM',verbose = False):    
+        ##############################
+        # User defineable parameters #
+        ##############################
         # Define how close to a target you must before moving to the exact final position
+        # **note the "true" tolerance is max(tolerance,angstep)**
         self.tolerance = 2.
         
         # How far in theta or Phi do you move on each iterative step of the avoidance method
@@ -42,16 +43,25 @@ class PosAnticol:
         self.coeffca = 0.#100.0   # central attractive force, currently unused
         self.coeffn =  6.0  # repuslive force amplitude of neighbors and walls
         self.coeffa = 10.0  # attractive force amplitude of the target location 
+              
+        # Assign specified variables
+        self.avoidance = avoidance
+        self.verbose = verbose
+
+        #############################################
+        # Parameters defined by harware or software #
+        #############################################
+        # Define the phi position in degrees at which the positioner is safe
+        self.phisafe = 144.
         
         # Some convenience definitions regarding the size of positioners
         motor_width = 1.58
         self.rtol = 2*motor_width
         self.max_thetabody = 3.967-motor_width # mm
         
-        # Assign specified variables
-        self.avoidance = avoidance
-        self.verbose = verbose
-
+        # Determine how close we can actually need to get to the final target before calling it a success
+        self.ang_threshold = max(self.tolerance, self.angstep)
+        
         # to get accurate timestep information, we use a dummy posmodel
         pmod = PosModel()
         self.dt = self.angstep/pmod.axis[0].motor_to_shaft(pmod._motor_speed_cruise)
@@ -83,9 +93,9 @@ class PosAnticol:
             for req in requests:
                 if req['posmodel'].posid == posunitid:
                     posmodel = req['posmodel']
+                    posmodels.append(posmodel)
                     xoffs.append(posmodel.state.read('OFFSET_X'))
                     yoffs.append(posmodel.state.read('OFFSET_Y'))
-                    posmodels.append(posmodel)
                     tpstart.append(posmodel.trans.posTP_to_obsTP(req['start_posTP']))
                     tptarg.append(posmodel.trans.posTP_to_obsTP(req['targt_posTP']))
                     log_notes.append(req['log_note'])
@@ -184,7 +194,7 @@ class PosAnticol:
         # Define whether phi increases, decreases, or stays static
         dp_directions = {'rotate':0,'retract':-1,'extend':1}
         
-        # Redefine lists as numpy arrays
+        # Redefine list as numpy arrays
         posmodels = np.asarray(posmodels)
         for step in order_of_operations:
             tabledicts[step] = np.asarray(tabledicts[step])
@@ -338,7 +348,8 @@ class PosAnticol:
                     print("\n\nCollision was claimed, but case is non-collision Case I")
                 continue
             elif collision_type == pc.case.II:
-                print("\n\nSolving phi-phi collision!\n")
+                if self.verbose:
+                    print("\n\nSolving phi-phi collision!\n")
                 # change larger phi since it has less distance to travel before safety
                 if pss[A] > pss[B]:
                     changing = A
@@ -347,11 +358,13 @@ class PosAnticol:
                     changing = B
                     unchanging = A              
             elif collision_type == pc.case.IIIA:
-                print("\n\nSolving phi-theta collision!\n")
+                if self.verbose:
+                    print("\n\nSolving phi-theta collision!\n")
                 changing = A
                 unchanging = B
             elif collision_type == pc.case.IIIB:
-                print("\n\nSolving theta-phi collision!\n")
+                if self.verbose:
+                    print("\n\nSolving theta-phi collision!\n")
                 changing = B
                 unchanging = A
             elif collision_type == pc.case.GFA:
@@ -386,7 +399,6 @@ class PosAnticol:
             # Create a dictionary called neighbors with all useful information of the neighbors
             neighbors = {}
             neighbors['posmodels'] = np.asarray(posmodels[neighbor_idxs])
-
             neighbors['phins'] = np.asarray(pss[neighbor_idxs])
             neighbors['thetans'] = np.asarray(tss[neighbor_idxs])
             neighbors['thetants'] = np.asarray(tfs[neighbor_idxs])
@@ -452,7 +464,7 @@ class PosAnticol:
             
             # If length 0, don't create.
             # elif length 1, create with one step.
-            # else length > 1, add all rows
+            # else length > 1, add all steps
             if type(dts) == type(None):
                 if self.verbose:
                     print("Number of rows in the new version of the table is: %d" % 0)
@@ -496,9 +508,6 @@ class PosAnticol:
         dTs = []
         dPs = []
 
-        # Define how close we need to get to the final target before calling it a success
-        threshold = max(self.tolerance, self.angstep)
-
         # Find the xy of the starting position and get the theta and phi ranges
         # we are allowed to move to
         xstart,ystart = posmodel.trans.obsTP_to_flatXY(start)
@@ -531,7 +540,7 @@ class PosAnticol:
                 phis.append(phi)
             wait = False
             # If we are within tolerance of the final target
-            if ((np.abs(phi - target[pc.P]) < threshold) and (np.abs(theta - target[pc.T] < threshold))):
+            if ((np.abs(phi - target[pc.P]) < self.ang_threshold) and (np.abs(theta - target[pc.T] < self.ang_threshold))):
                 xo,yo = posmodel.trans.obsTP_to_flatXY([target[pc.T],target[pc.P]])
                 rhons = np.hypot(xns-xo,yns-yo)
                 # If all of the collideable objects are far enough away, we're done
@@ -731,23 +740,20 @@ class PosAnticol:
         # Remove "None" cases corresponding to fixed collisions
         if None in unique_indices.keys():
             unique_indices.pop(None)
-        # Find the largest number of rows in any table
-        nrows = np.max([len(table.rows) for table in tables])
-        # Initialize an array for assignment later
-        max_times = np.zeros(nrows)     
-        for table in tables:
-            for i in range(len(table.rows)):
-                time = table.rows[i].data['move_time'] + table.rows[i].data['prepause'] + table.rows[i].data['postpause']
-                if time > max_times[i]:
-                    max_times[i] = time      
+
+        # Find out how long the longest move takes to execute
+        movetimes = np.asarray([table.for_schedule['move_time'] for table in tables])
+        if self.verbose:
+            print("std of movetimes was: ",np.std(movetimes))
+        max_time = np.max(movetimes)
+                    
         # For the colliding indices, simply don't move them
         for index in unique_indices.keys():
             table = posmovetable.PosMoveTable(posmodels[index])
-            for ind in range(len(tables[index].rows)):
-                table.set_move(ind, pc.T, 0.)
-                table.set_move(ind, pc.P, 0.)
-                table.set_prepause (ind, max_times[ind])
-                table.set_postpause(ind, 0.0)
+            table.set_move(0, pc.T, 0.)
+            table.set_move(0, pc.P, 0.)
+            table.set_prepause (0, max_time)
+            table.set_postpause(0, 0.0)
             tables[index] = table
         return tables  
         
