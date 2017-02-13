@@ -1,6 +1,5 @@
 import os
 import configobj
-import datetime
 import csv
 import pprint
 import posconstants as pc
@@ -24,9 +23,9 @@ class PosState(object):
         unit) and general parameters (settings which apply uniformly to many units).
     """
 
-    def __init__(self, unit_id=None, logging=False, type='pos'):
+    def __init__(self, unit_id=None, logging=False, device_type='pos'):
         self.logging = logging
-        self.type = type
+        self.type = device_type
         if self.type == 'pos':
             self.settings_directory = pc.pos_settings_directory
             self.logs_directory = pc.move_logs_directory
