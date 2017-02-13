@@ -448,14 +448,14 @@ class PetalController(Application):
             self.error(rstring)
             return 'FAILED: ' + rstring
     
-        for id in range(len(ids)):
+        for i in range(len(ids)):
             # assemble arguments for canbus/firmware function
         
-            posid=int(ids[id])
+            posid=int(ids[i])
 
-            duty = int(percent_duty[id])
-            canbus = str(canbuses[id])
-            self.fidstatus[str(ids[id])] = int(percent_duty[id])
+            duty = int(percent_duty[i])
+            canbus = str(canbuses[i])
+            self.fidstatus[str(ids[i])] = int(percent_duty[i])
 
             if not self.simulator:
                 if not self.pmc.set_fiducials(canbus, posid, duty):
@@ -464,7 +464,7 @@ class PetalController(Application):
             else:
                 pass        
 
-            if self.verbose:  print('ID: %s, Percent %s' % (ids[id],percent_duty[id]))
+            if self.verbose:  print('ID: %s, Percent %s' % (ids[i],percent_duty[i]))
         return self.SUCCESS
     
     def send_tables(self, move_tables):
@@ -756,9 +756,10 @@ class PositionerMoveControl(object):
     def set_posid(self, canbus, sid, new_posid):
         """
             Sets the positioner ID (CAN address). 
+            JOE - looks like work in progress here? ...how is sid used, and new_posid?
         """ 
         try:
-            self.pfcan[canbus].send_command(posid,24, '')        
+            self.pfcan[canbus].send_command(posid,24, '')
             self.pfcan[canbus].send_command(posid,19, '')
             return True
         except:
@@ -833,14 +834,14 @@ class PositionerMoveControl(object):
     def get_pos_status(self, busids, posids):
         
         """
-        Signals the positionrs to start execution of move tables.         
+        Signals the positioners to start execution of move tables.         
         """
         status={}
-        for id in range(len(posids)):
-            posid=int(posids[id])
+        for i in range(len(posids)):
+            posid=int(posids[i])
             status[posid]='UNKNOWN'
             try:        
-                canbus = str(busids[id])
+                canbus = str(busids[i])
                 print('ABOUT TO SEND get_pos_status command')
                 print(canbus, posid)
                 posid_return,stat=self.pfcan[canbus].send_command_recv(posid,13,'') # can we map this to what the number 13 means?
