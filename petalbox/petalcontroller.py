@@ -836,13 +836,13 @@ class PositionerMoveControl(object):
         """
         status={}
         for id in range(len(posids)):
-            posid=posids[id]
+            posid=int(posids[id])
             status[posid]='UNKNOWN'
             try:        
-                canbus = busids[id]
+                canbus = str(busids[id])
                 print('ABOUT TO SEND get_pos_status command')
                 print(canbus, posid)
-                posid_return,stat=self.pfcan[canbus].send_command_recv(posid,13,'')
+                posid_return,stat=self.pfcan[canbus].send_command_recv(posid,13,'') # can we map this to what the number 13 means?
                 print("posid_return,stat:",posid_return,stat)
                 stat=ord(stat)
                 if stat: status[posid]='BUSY'
