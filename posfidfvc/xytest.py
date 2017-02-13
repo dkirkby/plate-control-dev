@@ -49,8 +49,15 @@ class XYTest(object):
         # verifications of config file
         self.n_loops = self._calculate_and_check_n_loops()
         
+        # simulation mode
+        self.simulate = self.config['simulate']
+        
         # set up fvc and platemaker
-        fvc = fvchandler.FVCHandler(self.config['fvc_type'])       
+        if self.simulate:
+            fvc_type = 'simulator'
+        else:
+            fvc_type = self.config['fvc_type']
+        fvc = fvchandler.FVCHandler(fvc_type)       
         if self.config['platemaker_type'] == 'BUILT-IN':
             fvc.rotation = self.config['rotation']  # deg
             fvc.scale =  self.config['scale'] # mm/pixel
@@ -63,7 +70,7 @@ class XYTest(object):
             self.pos_notes.append('')
         fid_ids = self.config['fid_ids']
         ptl_ids = self.config['ptl_ids']
-        petals = [petal.Petal(ptl_ids[0], self.pos_ids, fid_ids)] # single-petal placeholder for generality of future implementations, where we could have a list of multiple petals, and need to correlate pos_ids and fid_ids to thier particular petals
+        petals = [petal.Petal(ptl_ids[0], self.pos_ids, fid_ids, simulator_on=self.simulate)] # single-petal placeholder for generality of future implementations, where we could have a list of multiple petals, and need to correlate pos_ids and fid_ids to thier particular petals
         for ptl in petals:
             ptl.anticollision_default = self.config['anticollision']
         self.m = posmovemeasure.PosMoveMeasure(petals,fvc)

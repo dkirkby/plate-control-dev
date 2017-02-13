@@ -17,6 +17,10 @@ class PosModel(object):
             self.state = posstate.PosState()
         else:
             self.state = state
+        if self.canid == -1 and self.posid not in [None,'None','xxxxx']:
+            print('Positioner ' + str(self.posid) + ' currently shows a can_id of ' + str(self.canid) + ', which often indicates that we haven''t yet put the real can_id into its configuration file. If you know the right can_id, you can enter it now. Otherwise you may need to stop whatever is running right now and fix this issue first.')
+            user_canid = input('Enter can_id number for ' + str(self.posid) + ' here: ')
+            self.state.write('CAN_ID',int(user_canid))
         self.trans = postransforms.PosTransforms(self)
 
         # axes

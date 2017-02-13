@@ -3,42 +3,42 @@
 # THEREAFTER, WE DON'T HAVE TO REPEAT THESE ALL THE TIME FOR EVERY XY ACCURACY
 # TEST.
 
+import os
+import sys
+sys.path.append(os.path.abspath('../petal/'))
 import petal
 import posmovemeasure
 import fvchandler
 import posconstants as pc
 
-# initialization
-pos_ids = []
-fid_ids = []
-ptl_ids = []
-petals = [petal.Petal(ptl_ids[0], pos_ids, fid_ids)] # single-petal placeholder for generality of future implementations, where we could have a list of multiple petals, and need to correlate pos_ids and fid_ids to thier particular petals
-fvc = fvchandler.FVCHandler('SBIG')      
+# software initialization and startup
+sim = False
+pos_ids = ['M00095','M00072']#,'M00077','M00078','M00094','M00098','M00112','M00105','M00084','M00095','M00072','M00036','M00037','M00047','M00048','M00107']
+fid_ids = ['F017']
+ptl_ids = [42]
+petals = [petal.Petal(ptl_ids[0], pos_ids, fid_ids, simulator_on=sim)] # single-petal placeholder for generality of future implementations, where we could have a list of multiple petals, and need to correlate pos_ids and fid_ids to thier particular petals
+for ptl in petals:
+    ptl.anticollision_default = False
+if sim:
+    fvc = fvchandler.FVCHandler('simulator')
+else:
+    fvc = fvchandler.FVCHandler('SBIG')      
 fvc.rotation = 0 # deg
 fvc.scale = 0.2 # mm/pixel
 m = posmovemeasure.PosMoveMeasure(petals,fvc)
 start_timestamp = pc.timestamp_str_now()
 
-# initial homing
-m.rehome(pos_ids='all')
-
-# identify fiducials
-m.identify_fiducials()
-    
-# identification of which positioners are in which (x,y) locations on the petal
+# calibration routines
+m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
+m.identify_fiducials() 
 m.identify_positioner_locations()
-
-# quick pre-calibration, especially because we need some reasonable values for theta offsets prior to measuring physical travel ranges (where phi arms get extended)
-m.calibrate(pos_ids='all', mode='quick', save_file_dir=pc.test_logs_directory, save_file_timestamp=start_timestamp)
-
-# measure the physical travel ranges of the theta and phi axes by ramming hard limits in both directions
-m.measure_range(pos_ids='all', axis='theta')
-m.measure_range(pos_ids='all', axis='phi')
-m.rehome(pos_ids='all')
-m.calibrate(pos_ids='all', mode='quick', save_file_dir=pc.test_logs_directory, save_file_timestamp=start_timestamp) # needed after having struck hard limits
-
+m.calibrate(mode='quick', save_file_dir=pc.test_logs_directory, save_file_timestamp=start_timestamp) # need to calibrate prior to measuring  physical travel ranges (where phi arms get extended, and need some reasonable values for theta offsets before doing such extensions)
+m.measure_range(axis='theta')
+m.measure_range(axis='phi')
+m.rehome() # rehome again because range measurements intentionally ran against hardstops, messing up shaft angle counters
+m.one_point_calibration() # do a measurement at one point with fvc after the blind rehome
+m.park() # retract all positioners to their parked positions
            
-
 
 """EMAIL FROM STEVE ON STARTING POINT FOR INSTRUMENT PARAMETERS CONFIG FILE
 All,

@@ -8,7 +8,6 @@ import fitcircle
 import posconstants as pc
 import poscalibplot
 import scipy.optimize
-import datetime
 
 class PosMoveMeasure(object):
     """Coordinates moving fiber positioners with fiber view camera measurements.
@@ -37,6 +36,16 @@ class PosMoveMeasure(object):
         self.tp_updates_mode = 'posTP' # options are None, 'posTP', 'offsetsTP'. see comments in move_measure() function for explanation
         self.tp_updates_tol = 0.065 # [mm] tolerance on error between requested and measured positions, above which to update the POS_T,POS_P or OFFSET_T,OFFSET_P parameters
         self.tp_updates_fraction = 0.8 # fraction of error distance by which to adjust POS_T,POS_P or OFFSET_T,OFFSET_P parameters after measuring an excessive error with FVC
+
+    @property
+    def n_fiducial_dots(self):
+        """Number of fixed reference dots to expect in the field of view.
+        """
+        n_dots = 0
+        for petal in self.petals:
+            n_dots_ptl = petal.n_fiducial_dots
+            n_dots += n_dots_ptl
+        return n_dots
 
     def fiducials_on(self):
         """Turn on all fiducials on all petals."""
@@ -207,7 +216,7 @@ class PosMoveMeasure(object):
         for petal in pos_ids_by_ptl.keys():
             for pos_id in pos_ids_by_ptl[petal]:
                 posT = petal.expected_current_position(pos_id,'posT')
-                requests[pos_id] = {'command':'posTP', 'target':[posT,posP]}
+                requests[pos_id] = {'command':'posTP', 'target':[posT,posP], 'log_note':'retracting phi'}
         self.move(requests)
     
     def park(self,pos_ids='all'):
@@ -215,13 +224,40 @@ class PosMoveMeasure(object):
         """
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids, key='POS_ID')
         requests = {}
+        posT = 0
         for petal in pos_ids_by_ptl.keys():
             for pos_id in pos_ids_by_ptl[petal]:
                 posmodel = petal.get_model_for_pos(pos_id)
-                posT = 0
                 posP = max(posmodel.targetable_range_P)
-                requests[pos_id] = {'command':'posTP', 'target':[posT,posP]}
+                requests[pos_id] = {'command':'posTP', 'target':[posT,posP], 'log_note':'parking'}
         self.move(requests)
+        
+    def one_point_calibration(self,pos_ids='all'):
+        """Goes to a single point, makes measurement with FVC, and re-calibrates the internally-
+        tracked angles for the current theta and phi shaft positions.
+        
+        This method is attractive after steps like rehoming to hardstops, because it is very
+        quick to do, and should be fairly accurate in most cases. But will never be as statistically
+        robust as a regular calibration routine, which does arcs of multiple points and then takes
+        the best fit circle. And of course, one_point_calibration() does absolutely nothing to
+        calibrate all the mechanical properties of the positioner, like (x,y) offsets, (t,p) offsets,
+        kinematic arm lengths, etc. It just updates our internal counter on where we currently expect
+        the theta and phi shafts to be.
+        """
+        posT = 0
+        posP = self.phi_clear_angle
+        old_tp_updates_tol = self.tp_updates_tol
+        old_tp_updates_fraction = self.tp_updates_fraction
+        self.tp_updates_tol = 0.001
+        self.tp_updates_fraction = 0.999
+        pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids, key='POS_ID')
+        requests = {}
+        for petal in pos_ids_by_ptl.keys():
+            for pos_id in pos_ids_by_ptl[petal]:
+                requests[pos_id] = {'command':'posTP', 'target':[posT,posP], 'log_note':'one point calibration'}
+        self.move_measure(requests,tp_updates='posTP')
+        self.tp_updates_tol = old_tp_updates_tol
+        self.tp_updates_fraction = old_tp_updates_fraction
 
     def rehome(self,pos_ids='all'):
         """Find hardstops and reset current known positions.
@@ -758,7 +794,7 @@ class PosMoveMeasure(object):
         """Generic function for identifying either all fiducials or a single positioner's location.
         """
         pos_ids_by_ptl = self.pos_data_listed_by_ptl('all','POS_ID')
-        n_dots = len(self.all_pos_ids()) + self.n_fiducial_dots()
+        n_dots = len(self.all_pos_ids()) + self.n_fiducial_dots
         nudges = [-self.nudge_dist, self.nudge_dist]
         xy_ref = []
         for i in range(len(nudges)):
@@ -785,10 +821,11 @@ class PosMoveMeasure(object):
                 for petal in self.petals:
                     positioners_current = petal.expected_current_position(posid=pos_ids_by_ptl[petal],key='obsXY')
                     xy_meas = pc.concat_lists_of_lists(xy_meas,positioners_current)
-                n_new_fiducials = self.n_fiducial_dots() - len(self.fiducials_xy)
-                faraway = 2*np.max(np.max(xy_meas))
-                new_fiducials = np.random.uniform(low=faraway,high=2*faraway,size=(n_new_fiducials,2)).tolist()
-                self.fiducials_xy = pc.concat_lists_of_lists(self.fiducials_xy,new_fiducials)
+                n_new_fiducials = max(self.n_fiducial_dots - len(self.fiducials_xy),0)
+                if n_new_fiducials:
+                    faraway = 2*np.max(np.max(np.abs(xy_meas)))
+                    new_fiducials = np.random.uniform(low=faraway,high=2*faraway,size=(n_new_fiducials,2)).tolist()
+                    self.fiducials_xy = pc.concat_lists_of_lists(self.fiducials_xy,new_fiducials)
                 xy_meas = pc.concat_lists_of_lists(xy_meas,self.fiducials_xy)
             else:
                 xy_meas,imgfiles = self.fvc.measure(n_dots)
@@ -804,8 +841,8 @@ class PosMoveMeasure(object):
                 xy_ref = pc.concat_lists_of_lists(xy_ref,xy_test[i])
                 ref_idxs.append(i)
         if identify_fiducials:
-            if len(xy_ref) != self.n_fiducial_dots():
-                print('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_fiducial_dots()) + ')')
+            if len(xy_ref) != self.n_fiducial_dots:
+                print('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_fiducial_dots) + ')')
             self.fiducials_xy = xy_ref
         else:
             if n_dots - len(ref_idxs) != 1:
