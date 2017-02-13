@@ -673,6 +673,7 @@ class PetalController(Application):
     def get_pos_status(self, busids, posids):
         """
         Returns positioner movement status.  Input is a dictionary with can id keys and canbus values (eg. {1004: 'can0', 1001: 'can1'})
+        JOE - I think this statement about "Input is a dictionary..." is not true -- can we clarify here?
         """
         
         retcode=self.pmc.get_pos_status(busids, posids)
