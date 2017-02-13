@@ -18,7 +18,7 @@ class PosSchedule(object):
         self.petal = petal
         self.move_tables = []
         self.requests = []
-        self.anticol = anticollision.PosAnticol(avoidance = 'EM',verbose = True)
+        self.anticol = anticollision.PosAnticol(avoidance = 'EM',verbose = False)
 
 
     def request_target(self, pos, uv_type, u, v, log_note=''):
