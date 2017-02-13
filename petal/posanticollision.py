@@ -159,6 +159,7 @@ class PosAnticol:
         maxtimes = {item:0. for item in order_of_operations}
         tpstart = {item:[] for item in order_of_operations} 
         tpfinal = {item:[] for item in order_of_operations}
+        
         # Loops through the requests
         # Each request must have retract, rotate, and extend moves
         # Which each have different start and end theta/phis
@@ -203,7 +204,7 @@ class PosAnticol:
             movetimes[step] = np.asarray(movetimes[step])
             
             # Check for collisions
-            collision_indices, collision_types, collision_steps = self._check_for_collisions(tpstart[step],pos_collider,tabledicts[step])
+            collision_indices, collision_types = self._check_for_collisions(tpstart[step],pos_collider,tabledicts[step])
             
  
             # If no collisions, move directly to the next step
@@ -236,7 +237,7 @@ class PosAnticol:
                 print("Max times to start are: ",maxtimes)
                 
             # Check for collisions
-            collision_indices, collision_types, collision_steps = self._check_for_collisions(tpstart[step],pos_collider,tabledicts[step])
+            collision_indices, collision_types = self._check_for_collisions(tpstart[step],pos_collider,tabledicts[step])
                 
             if self.verbose:
                 self._printindices('Collisions after Round 1, in Step ',step,collision_indices)        
@@ -257,7 +258,7 @@ class PosAnticol:
             output_tables.append(newtab)
     
         # Check for collisions in the total rre movetable
-        collision_indices, collision_types, collision_steps = self._check_for_collisions(tpstart['retract'],pos_collider,output_tables)   
+        collision_indices, collision_types = self._check_for_collisions(tpstart['retract'],pos_collider,output_tables)   
         itter = 0
         
         # While there are still collisions, keep eliminating the positioners that collide
@@ -266,7 +267,7 @@ class PosAnticol:
             if self.verbose:
                 self._printindices('Collisions before zeroth order run ',itter,collision_indices)
             output_tables = self._avoid_collisions_zerothorder(output_tables,posmodels,collision_indices)
-            collision_indices, collision_types, collision_steps = self._check_for_collisions(tpstart['retract'],pos_collider,output_tables)
+            collision_indices, collision_types = self._check_for_collisions(tpstart['retract'],pos_collider,output_tables)
             itter += 1
                    
         if self.verbose:
@@ -552,7 +553,8 @@ class PosAnticol:
                     phi = target[pc.P]
                     thetas.append(theta)
                     phis.append(phi)
-                    print("Final Loop reached!   Theta =  %f   and phi = %f    nitters = %d" %(theta,phi,i+1))
+                    if self.verbose:
+                        print("Final Loop reached!   Theta =  %f   and phi = %f    nitters = %d" %(theta,phi,i+1))
                     # If desired we can plot the movement and the potential field seen
                     # by the positioner
                     if self.verbose:
@@ -776,7 +778,6 @@ class PosAnticol:
                                     this has 2 indices in a pair [*,*] if 2 positioners collided
                                     or [*,None] if colliding with a wall of fiducial.
                 collision_types:   Type of collision as specified in the pc class
-                collision_steps:   The step at which the collision happens within the move table
         '''
         posmodel_index_iterable = range(len(cur_poscollider.posmodels))
         sweeps = [[] for i in posmodel_index_iterable]
@@ -785,12 +786,10 @@ class PosAnticol:
         collision_step = [np.inf for i in posmodel_index_iterable]
         earliest_collision = [np.inf for i in posmodel_index_iterable]
         nontriv = 0
-        for k in range(len(cur_poscollider.collidable_relations['A'])):
-            A = cur_poscollider.collidable_relations['A'][k]
-            B = cur_poscollider.collidable_relations['B'][k]
+        colrelations = cur_poscollider.collidable_relations
+        for A, B, B_is_fixed in zip(colrelations['A'],colrelations['B'],colrelations['B_is_fixed']):
             tableA = list_tables[A].for_schedule
             obsTPA = tps[A]
-            B_is_fixed = cur_poscollider.collidable_relations['B_is_fixed'][k]
             if B_is_fixed and A in range(len(list_tables)): # might want to replace 2nd test here with one where we look in tables for a specific positioner index
                 these_sweeps = cur_poscollider.spacetime_collision_with_fixed(A, obsTPA, tableA)
             elif A in range(len(list_tables)) and B in range(len(list_tables)): # again, might want to look for specific indexes identifying which tables go with which positioners
@@ -808,7 +807,6 @@ class PosAnticol:
                     collision_index[A] = [A,B]
                 collision_type[A] = these_sweeps[0].collision_case
                 if these_sweeps[0].collision_time < np.inf:
-                    collision_step[A] = self._get_index_of_collision(list_tables[A].for_schedule,these_sweeps[0].collision_time)
                     earliest_collision[A] = these_sweeps[0].collision_time
             for i in range(1,len(these_sweeps)):
                 if these_sweeps[i].collision_time < earliest_collision[B]:
@@ -820,12 +818,10 @@ class PosAnticol:
                     else:
                         collision_index[B] = [A,B]
                     collision_type[B] = these_sweeps[i].collision_case
-                    collision_step[B] = self._get_index_of_collision(list_tables[B].for_schedule,these_sweeps[i].collision_time)
 
-        collision_indices, collision_types, collision_steps = \
-                    np.asarray(collision_index), np.asarray(collision_type), np.asarray(collision_step)
+        collision_indices = np.asarray(collision_index)
+        collision_types = np.asarray(collision_type)
         collision_indices = collision_indices[collision_types != pc.case.I]
-        collision_steps = collision_steps[collision_types != pc.case.I]
         collision_types = collision_types[collision_types != pc.case.I]
         
         collision_mask = np.ones(len(collision_indices)).astype(bool)
@@ -839,39 +835,12 @@ class PosAnticol:
     
         collision_indices = collision_indices[collision_mask]
         collision_types = collision_types[collision_mask]
-        collision_steps = collision_steps[collision_mask]
         
         # return the earliest collision time and collision indices
-        return collision_indices, collision_types, collision_steps
+        return collision_indices, collision_types
     
         
     
-        
-    
-    def _get_index_of_collision(self,positioner_table, collision_time):
-        '''
-            * this function is deprecated *
-            Given the input movetable and the time of the collision,
-            tell me what step in the table to collision takes place in
-        '''
-        upper_time_bounds = np.asarray(positioner_table['stats']['net_time'])
-        lower_time_bounds = np.append([0.],upper_time_bounds[:-1])
-        total_time = upper_time_bounds[-1]
-        if collision_time == np.inf:
-            print("Collision time infinite. Returing ind = None")
-            return None
-        elif collision_time > total_time:
-            print("Collision time was later than the total move time for the position. Returning ind = None")
-            return None        
-        else: 
-            ind = None
-            for i in range(positioner_table['nrows']):
-                if upper_time_bounds[i] >= collision_time and lower_time_bounds[i] <= collision_time:
-                    ind = i
-
-            return ind
-
-
     def _potential(self,rhoc,rhons,rhoa):
         '''
             Where the 'forces' the positioner feels are defined. The potential
