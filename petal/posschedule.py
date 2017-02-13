@@ -18,9 +18,7 @@ class PosSchedule(object):
         self.petal = petal
         self.move_tables = []
         self.requests = []
-        self.verbose = True
-        anticol_avoidance = 'EM'
-        self.anticol = anticollision.PosAnticol(anticol_avoidance,self.verbose)
+        self.anticol = anticollision.PosAnticol(avoidance = 'EM',verbose = False)
 
 
     def request_target(self, pos, uv_type, u, v, log_note=''):
@@ -175,7 +173,7 @@ class PosSchedule(object):
             Call the PosAnticol Class and have it generate 
             movetables for all requests in self.requests 
         """
-        if self.verbose:
+        if self.anticol.verbose:
             print("You ARE doing anticollisions")
             print("Number of requests: "+str(len(self.requests)))
 
