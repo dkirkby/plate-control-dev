@@ -161,20 +161,30 @@ class PosAnticol:
             tpfinal['rotate'].append([tpf[0],phi_inner])
             tpstart['extend'].append([tpf[0],phi_inner])
             tpfinal['extend'].append(tpf)
+            # Unwrap the three movetables and add each of r,r,and e to
+            # a seperate list for that movetype
+            # Also append the movetime for that move to a list
             for key in order_of_operations:
                 movetime = current_tables_dict[key].for_schedule['move_time']
                 tabledicts[key].append(current_tables_dict[key])
                 movetimes[key].append(movetime[0])
-    
+                
+        # For each of r, r, and e, find the maximum time that 
+        # any positioner takes. The rest will be assigned to wait
+        # until that slowest positioner is done moving before going to
+        # the next move
         for key in order_of_operations:
             maxtimes[key] = max(movetimes[key])
             for table,movetime in zip(tabledicts[key],movetimes[key]): 
                 if movetime<maxtimes[key]:
                     table.set_postpause(0,maxtimes[key]-movetime)
-        print("Max times to start are: ",maxtimes)
+        if self.verbose:
+            print("Max times to start are: ",maxtimes)
         
-    
+        # Define whether phi increases, decreases, or stays static
         dp_directions = {'rotate':0,'retract':-1,'extend':1}
+        
+        # Redefine lists as numpy arrays
         posmodels = np.asarray(posmodels)
         for step in order_of_operations:
             tabledicts[step] = np.asarray(tabledicts[step])
@@ -190,25 +200,30 @@ class PosAnticol:
             if len(collision_indices) == 0:
                 continue
             
-            print('\n\n\n\nStep: ',step,'    Round: 1/1:\n')
             if self.verbose:
+                print('\n\n\n\nStep: ',step,'    Round: 1/1:\n')
+
                 try:
                     self._printindices('Collisions before iteration ',1,collision_indices)  
                 except:
                     pdb.set_trace()
 
+            # Avoid the collisions that were found
             tabledicts[step] = self._avoid_collisions(tabledicts[step],posmodels,collision_indices,\
                                     collision_types,pos_collider,\
                                     tpstart[step],tpfinal[step],dp_directions[step])
-                                    
+                                 
+            # Update the movetimes for every positioner for this step
             for i,table in enumerate(tabledicts[step]):
                 movetime = table.for_schedule['move_time']
                 movetimes[step][i] = movetime[0]
+            # Find the new max time for this step, and update the pospauses
             maxtimes[step] = max(movetimes[step])
             for table,movetime in zip(tabledicts[step],movetimes[step]): 
                 if movetime<maxtimes[step]:
                     table.set_postpause(0,maxtimes[step]-movetime)
-            print("Max times to start are: ",maxtimes)
+            if self.verbose:
+                print("Max times to start are: ",maxtimes)
                 
             # Check for collisions
             collision_indices, collision_types, collision_steps = self._check_for_collisions(tpstart[step],pos_collider,tabledicts[step])
@@ -216,18 +231,27 @@ class PosAnticol:
             if self.verbose:
                 self._printindices('Collisions after Round 1, in Step ',step,collision_indices)        
 
+
+        # The step is extend. If collisions still exist after avoidance,
+        # Set that positioner to not move
         tabledicts['extend'] = self._avoid_collisions_zerothorder(tabledicts['extend'],posmodels,collision_indices)
+        
+        # For each positioner, merge the three steps (r,r,e) into a single move table
         output_tables = []
         for tablenum in range(len(tabledicts['retract'])):
-            # return the output tables
+            # start with copy of the retract step table
             newtab = copymodule.deepcopy(tabledicts['retract'][tablenum])
+            # append the rotate and extend moves onto the end of the retract table
             for step in ['rotate','extend']:
                 newtab.extend(tabledicts[step][tablenum])
             output_tables.append(newtab)
     
-        # Check for collisions
+        # Check for collisions in the total rre movetable
         collision_indices, collision_types, collision_steps = self._check_for_collisions(tpstart['retract'],pos_collider,output_tables)   
         itter = 0
+        
+        # While there are still collisions, keep eliminating the positioners that collide
+        # by setting them so that they don't move
         while len(collision_indices)>0:
             if self.verbose:
                 self._printindices('Collisions before zeroth order run ',itter,collision_indices)
@@ -297,12 +321,18 @@ class PosAnticol:
             Function that is called with a list of collisions that need to be avoided. This uses a 'force law' type approach 
             to generate moves that avoid neighboring positioners that it would otherwise collide with.
         '''
+        # Unpack the starting and ending theta/phis for all collisions
         tss = tpss[:,0]
         pss = tpss[:,1]
         tfs = tpfs[:,0]
-        pfs = tpfs[:,1]           
+        pfs = tpfs[:,1] 
+    
+        # For each collision, check what type it is and try to resolve it          
         for current_collision_indices,collision_type in zip(collision_indices,collision_types):
             A,B = current_collision_indices
+            
+            # Determine which positioner to have avoid the other, which depends on
+            # the type of collisions
             if collision_type == pc.case.I:
                 if self.verbose:
                     print("\n\nCollision was claimed, but case is non-collision Case I")
@@ -330,19 +360,30 @@ class PosAnticol:
             elif collision_type == pc.case.PTL:
                 changing = A
                 unchanging = None
-                #continue
+
+            # Get the posmodel of the positioner we'll be working with
+            # and info about it's neighbors
             changing_posmodel = posmodels[changing]
             neighbor_idxs = pos_collider.pos_neighbor_idxs[changing]
             fixed_neighbors = pos_collider.fixed_neighbor_cases[changing]
+            # Set a boolean if the petal is something we need to avoid
             avoid_petal = (pc.case.PTL in fixed_neighbors)
+            
+            # if we collided with a positioner. Make sure the positioner is a neighbor
+            # otherwise something strange has happened
             if unchanging != None:
                 assert unchanging in neighbor_idxs, "Make sure the neighbor includes the position that it supposedly collided with"
 
+            # define the beginning and ending locations for the positioner we're moving
             start = self._assign_properly(tss[changing],pss[changing])
             target = self._assign_properly(tfs[changing],pfs[changing])
-            print("Trying to correct indices ",A,B," with em avoidance")
+            if self.verbose:
+                print("Trying to correct indices ",A,B," with em avoidance")
+            # If the target is where we start, something weird is up
             if target[0] == start[0] and target[1]==start[1] and self.verbose:
                 pdb.set_trace() 
+                
+            # Create a dictionary called neighbors with all useful information of the neighbors
             neighbors = {}
             neighbors['posmodels'] = np.asarray(posmodels[neighbor_idxs])
 
@@ -356,7 +397,8 @@ class PosAnticol:
             neighbors['theta_body_yns'] = np.zeros(len(neighbor_idxs))
             neighbors['xoffs'] = self.xoffs[neighbor_idxs]
             neighbors['yoffs'] = self.yoffs[neighbor_idxs]
-
+            
+            # Loop through the neighbors and calculate the x,y's for each
             for it,neigh in enumerate(neighbors['posmodels']):
                 neighbors['xns'][it],neighbors['yns'][it] = \
                                     neigh.trans.obsTP_to_flatXY(\
@@ -369,6 +411,9 @@ class PosAnticol:
                 neighbors['theta_body_xns'][it] = neighbors['xoffs'][it] + np.cos(angle)*self.max_thetabody 
                 neighbors['theta_body_yns'][it] = neighbors['yoffs'][it] + np.sin(angle)*self.max_thetabody  
 
+            # If we have to avoid the petal, do some work to find the x,y location
+            # of the petal and place some 'avoidance' objects along it so that
+            # our positioner is repulsed by them and thus the petal edge
             if avoid_petal:
                 petalx = pos_collider.keepout_PTL.points[0]
                 petaly = pos_collider.keepout_PTL.points[1]
@@ -398,29 +443,41 @@ class PosAnticol:
                 neighbors['theta_body_xns'] = np.concatenate((neighbors['theta_body_xns'],petalx))
                 neighbors['theta_body_yns'] = np.concatenate((neighbors['theta_body_yns'],petaly))
 
-
+            # With the positioner and neighbors setup, resolve the specific scenario and
+            # return dt,dp,pausetime  lists that I can convert into a new movetable
             dts,dps,times = self._em_resolution(changing_posmodel,start,target,neighbors,dp_direction)
 
+            # Convert steps into a new movetable
             new_table = posmovetable.PosMoveTable(changing_posmodel)
+            
+            # If length 0, don't create.
+            # elif length 1, create with one step.
+            # else length > 1, add all rows
             if type(dts) == type(None):
-                print("Number of rows in the new version of the table is: %d" % 0)
+                if self.verbose:
+                    print("Number of rows in the new version of the table is: %d" % 0)
                 pass
             elif type(dts) in [np.float,np.int,int,float,np.float64,np.int64]:
-                print("Number of rows in the new version of the table is: %d" % 1)
+                if self.verbose:
+                    print("Number of rows in the new version of the table is: %d" % 1)
                 new_table.set_move(0, pc.T, dts)
                 new_table.set_move(0, pc.P, dps)
                 new_table.set_prepause(0, 0.0)
                 new_table.set_postpause(0, times)
-                tables[changing] = new_table            
+                # Replace the old table with the newly created one
+                tables[changing] = new_table     
             else:
-                print("Number of rows in the new version of the table is: %d" % dts.size)
+                if self.verbose:
+                    print("Number of rows in the new version of the table is: %d" % dts.size)
                 for row in range(dts.size):
                     new_table.set_move(row, pc.T, dts[row])
                     new_table.set_move(row, pc.P, dps[row])
                     new_table.set_prepause(row, 0.0)
                     new_table.set_postpause(row, times[row])
+                # Replace the old table with the newly created one
                 tables[changing] = new_table
-            
+                
+        # After all collision avoidances attempted. Return the new list of movetables    
         return tables
         
  
