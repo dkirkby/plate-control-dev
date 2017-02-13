@@ -541,7 +541,7 @@ class PetalController(Application):
         return self.SUCCESS
 
 
-    def move(self, canbus, posid, direction, move_mode, motor, angle ):
+    def move(self, canbus, canid, direction, move_mode, motor, angle ):
         """
         Sends single move and executes. This function is usually used from console.
         
@@ -554,7 +554,7 @@ class PetalController(Application):
         xcode='0' # single command
         pause=0
 
-        if self.verbose: print(posid,direction,move_mode,motor,angle)
+        if self.verbose: print(canid,direction,move_mode,motor,angle)
 
         # make sure the passed arguments are valid 
         direction=direction.lower()
@@ -578,7 +578,7 @@ class PetalController(Application):
         mode=(direction,move_mode,motor)
 
 
-        retcode=self.pmc.load_rows_angle(canbus, posid, xcode, mode, angle, pause)
+        retcode=self.pmc.load_rows_angle(canbus, canid, xcode, mode, angle, pause)
 
         return self.SUCCESS
 
