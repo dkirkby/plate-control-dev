@@ -37,7 +37,7 @@ class Petal(object):
         # positioners setup
         self.posmodels = []
         for pos_id in pos_ids:
-            state = posstate.PosState(pos_id,logging=True)
+            state = posstate.PosState(pos_id, logging=True, device_type='pos')
             model = posmodel.PosModel(state)
             self.posmodels.append(model)
         self.posids = pos_ids
@@ -52,7 +52,7 @@ class Petal(object):
         # fiducials setup
         self.fidstates = {}
         for fid_id in fid_ids:
-            state = posstate.PosState(fid_id, logging=True)
+            state = posstate.PosState(fid_id, logging=True, device_type='fid')
             self.fidstates[fid_id] = state
         
         # power suppliees setup?
@@ -114,18 +114,21 @@ class Petal(object):
             In cases where the request was made to a disabled positioner, the subdictionary will be
             deleted from the return.
         """
+        mark_for_delete = set()
         for pos_id in requests.keys():
             requests[pos_id]['posmodel'] = self.get_model_for_pos(pos_id)
             if 'log_note' not in requests[pos_id]:
                 requests[pos_id]['log_note'] = ''
             if not(self.get(pos_id,'CTRL_ENABLED')):
                 print(self._request_denied_disabled_str(pos_id,requests[pos_id]))
-                del requests[pos_id]
+                mark_for_delete.add(pos_id)
             elif self.schedule.already_requested(requests[pos_id]['posmodel']):
                 print('Positioner ' + str(pos_id) + ' already has a target scheduled. Extra target request ' + self._target_str(requests[pos_id]) + ' ignored.')
-                del requests[pos_id]
+                mark_for_delete.add(pos_id)
             else:
                 self.schedule.request_target(requests[pos_id]['posmodel'], requests[pos_id]['command'], requests[pos_id]['target'][0], requests[pos_id]['target'][1], requests[pos_id]['log_note'])
+        for pos_id in mark_for_delete:
+            del requests[pos_id]
         return requests
 
     def request_direct_dtdp(self, requests, cmd_prefix=''):
@@ -178,22 +181,25 @@ class Petal(object):
         wishes a sequence of theta and phi rotations to all be done in one shot. (This is unlike the
         request_targets command, where only the first request to a given positioner would be valid.)
         """
+        mark_for_delete = set()
         for pos_id in requests.keys():
             if not(self.get(pos_id,'CTRL_ENABLED')):
                 print(self._request_denied_disabled_str(pos_id,requests[pos_id]))
-                del requests[pos_id]
-            else:
-                requests[pos_id]['posmodel'] = self.get_model_for_pos(pos_id)
-                if 'log_note' not in requests[pos_id]:
-                    requests[pos_id]['log_note'] = ''
-                table = posmovetable.PosMoveTable(requests[pos_id]['posmodel'])
-                table.set_move(0, pc.T, requests[pos_id]['target'][0])
-                table.set_move(0, pc.P, requests[pos_id]['target'][1])
-                cmd_str = (cmd_prefix + ' ' if cmd_prefix else '') + 'direct_dtdp'
-                table.store_orig_command(0,cmd_str,requests[pos_id]['target'][0],requests[pos_id]['target'][1])
-                table.log_note += (' ' if table.log_note else '') + requests[pos_id]['log_note']
-                table.allow_exceed_limits = True
-                self.schedule.add_table(table)
+                mark_for_delete.add(pos_id)
+        for pos_id in mark_for_delete:
+            del requests[pos_id]
+        for pos_id in requests.keys():
+            requests[pos_id]['posmodel'] = self.get_model_for_pos(pos_id)
+            if 'log_note' not in requests[pos_id]:
+                requests[pos_id]['log_note'] = ''
+            table = posmovetable.PosMoveTable(requests[pos_id]['posmodel'])
+            table.set_move(0, pc.T, requests[pos_id]['target'][0])
+            table.set_move(0, pc.P, requests[pos_id]['target'][1])
+            cmd_str = (cmd_prefix + ' ' if cmd_prefix else '') + 'direct_dtdp'
+            table.store_orig_command(0,cmd_str,requests[pos_id]['target'][0],requests[pos_id]['target'][1])
+            table.log_note += (' ' if table.log_note else '') + requests[pos_id]['log_note']
+            table.allow_exceed_limits = True
+            self.schedule.add_table(table)
         return requests            
 
     def request_limit_seek(self, pos, axisid, direction, anticollision=True, cmd_prefix='', log_note=''):
@@ -290,6 +296,7 @@ class Petal(object):
         """Send move tables that have been scheduled out to the positioners.
         """
         if self.simulator_on:
+            print('Simulator skips sending move tables to positioners.')
             return
         hw_tables = self._hardware_ready_move_tables()
         canids = []
@@ -308,6 +315,7 @@ class Petal(object):
         # Currently this function needs to be called each time parameters change after petal initialization and if a positioner is plugged in/powered on after
         # petal initialization
         if self.simulator_on:
+            print('Simulator skips sending motor parameters to positioners.')
             return
         parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
         for p in self.posmodels:
@@ -322,6 +330,7 @@ class Petal(object):
             self.comm.set_currents(bus_id, can_id, [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]], [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]])
             #syntax for setting periods: comm.set_periods(can_id, creep_period_p, creep_period_t, spin_period)
             self.comm.set_periods(bus_id, can_id, parameter_vals[4], parameter_vals[4], parameter_vals[5])
+            print(p.posid + ' (bus=' + str(bus_id) + ', canid=' + str(can_id) + '): motor currents and periods set')
 
 
     def execute_moves(self):
@@ -329,9 +338,10 @@ class Petal(object):
         Then do clean-up and logging routines to keep track of the moves that were done.
         """
         if self.simulator_on:
-            return
-        self.comm.execute_sync(self.sync_mode)
-        self._wait_while_moving()
+            print('Simulator skips sending execute moves command to positioners.')
+        else:
+            self.comm.execute_sync(self.sync_mode)
+            self._wait_while_moving()
         self._postmove_cleanup()
 
     def schedule_send_and_execute_moves(self):
@@ -407,6 +417,7 @@ class Petal(object):
         save_as_default ... only used when seting is a number, in which case True means we will store that setting permanently to the fiducials' config file, False means its just a temporary setting this time
         """
         if self.simulator_on:
+            print('Simulator skips sending out set_fiducials commands.')
             return
         bus_ids = self.get_fids_val(fid_ids,'BUS_ID')
         can_ids = self.get_fids_val(fid_ids,'CAN_ID')
@@ -432,6 +443,13 @@ class Petal(object):
             if save_as_default:
                 self.fidstates[fid_ids[i]].write('DUTY_DEFAULT_ON',duties[i])
             self.fidstates[fid_ids[i]].log_unit()
+
+    @property
+    def n_fiducial_dots(self):
+        """Returns number of fixed fiducial dots this petal contributes in the field of view.
+        """
+        n_dots = self.get_fids_val(self.fid_ids,'N_DOTS')
+        return sum(n_dots)
 
     @property
     def fid_ids(self):
@@ -463,7 +481,7 @@ class Petal(object):
         """
         vals = []
         for fid_id in fid_ids:
-            vals.append(self.fidstates[key])
+            vals.append(self.fidstates[fid_id].read(key))
         return vals
 
 
@@ -671,16 +689,18 @@ class Petal(object):
 
         if self.simulator_on:
             return        
-        timeout = 30.0 # seconds
+        timeout = 15.0 # seconds
         poll_period = 0.5 # seconds
         keep_waiting = True
         start_time = time.time()
         while keep_waiting:
-            if (time.time()-start_time) >= timeout:
+            elapsed_time = time.time() - start_time
+            print(str(elapsed_time))
+            if elapsed_time >= timeout:
                 print('Timed out at ' + str(timeout) + ' seconds waiting to send next move table.')
                 keep_waiting = False
             if self.comm.ready_for_tables(self.busids_where_tables_were_just_sent, self.canids_where_tables_were_just_sent):
-                keep_waiting = False             
+                keep_waiting = False
             else:
                 time.sleep(poll_period)
 
