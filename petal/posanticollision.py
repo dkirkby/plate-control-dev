@@ -140,23 +140,27 @@ class PosAnticol:
         pos_collider = poscollider.PosCollider()
         pos_collider.add_positioners(posmodels)
     
+        # Name the three steps in rre (used for dictionary keys)
         order_of_operations = ['retract','rotate','extend']
     
         # Generate complete movetables under RRE method
         tabledicts = {item:[] for item in order_of_operations}   
         movetimes = {item:[] for item in order_of_operations}
         maxtimes = {item:0. for item in order_of_operations}
-        tpss = {item:[] for item in order_of_operations} 
-        tpfs = {item:[] for item in order_of_operations}
+        tpstart = {item:[] for item in order_of_operations} 
+        tpfinal = {item:[] for item in order_of_operations}
+        # Loops through the requests
+        # Each request must have retract, rotate, and extend moves
+        # Which each have different start and end theta/phis
         for tps, tpf, cur_posmodel in zip(tps_list, tpf_list, posmodels):
             current_tables_dict = self._create_table_RREdict(tps, tpf,cur_posmodel)
             phi_inner = max(self.phisafe,tps[pc.P])
-            tpss['retract'].append(tps)
-            tpfs['retract'].append([tps[0],phi_inner])
-            tpss['rotate'].append([tps[0],phi_inner])
-            tpfs['rotate'].append([tpf[0],phi_inner])
-            tpss['extend'].append([tpf[0],phi_inner])
-            tpfs['extend'].append(tpf)
+            tpstart['retract'].append(tps)
+            tpfinal['retract'].append([tps[0],phi_inner])
+            tpstart['rotate'].append([tps[0],phi_inner])
+            tpfinal['rotate'].append([tpf[0],phi_inner])
+            tpstart['extend'].append([tpf[0],phi_inner])
+            tpfinal['extend'].append(tpf)
             for key in order_of_operations:
                 movetime = current_tables_dict[key].for_schedule['move_time']
                 tabledicts[key].append(current_tables_dict[key])
@@ -174,12 +178,12 @@ class PosAnticol:
         posmodels = np.asarray(posmodels)
         for step in order_of_operations:
             tabledicts[step] = np.asarray(tabledicts[step])
-            tpss[step] = np.asarray(tpss[step])
-            tpfs[step] = np.asarray(tpfs[step])
+            tpstart[step] = np.asarray(tpstart[step])
+            tpfinal[step] = np.asarray(tpfinal[step])
             movetimes[step] = np.asarray(movetimes[step])
             
             # Check for collisions
-            collision_indices, collision_types, collision_steps = self._check_for_collisions(tpss[step],pos_collider,tabledicts[step])
+            collision_indices, collision_types, collision_steps = self._check_for_collisions(tpstart[step],pos_collider,tabledicts[step])
             
  
             # If no collisions, move directly to the next step
@@ -195,7 +199,7 @@ class PosAnticol:
 
             tabledicts[step] = self._avoid_collisions(tabledicts[step],posmodels,collision_indices,\
                                     collision_types,pos_collider,\
-                                    tpss[step],tpfs[step],dp_directions[step])
+                                    tpstart[step],tpfinal[step],dp_directions[step])
                                     
             for i,table in enumerate(tabledicts[step]):
                 movetime = table.for_schedule['move_time']
@@ -207,7 +211,7 @@ class PosAnticol:
             print("Max times to start are: ",maxtimes)
                 
             # Check for collisions
-            collision_indices, collision_types, collision_steps = self._check_for_collisions(tpss[step],pos_collider,tabledicts[step])
+            collision_indices, collision_types, collision_steps = self._check_for_collisions(tpstart[step],pos_collider,tabledicts[step])
                 
             if self.verbose:
                 self._printindices('Collisions after Round 1, in Step ',step,collision_indices)        
@@ -222,13 +226,13 @@ class PosAnticol:
             output_tables.append(newtab)
     
         # Check for collisions
-        collision_indices, collision_types, collision_steps = self._check_for_collisions(tpss['retract'],pos_collider,output_tables)   
+        collision_indices, collision_types, collision_steps = self._check_for_collisions(tpstart['retract'],pos_collider,output_tables)   
         itter = 0
         while len(collision_indices)>0:
             if self.verbose:
                 self._printindices('Collisions before zeroth order run ',itter,collision_indices)
             output_tables = self._avoid_collisions_zerothorder(output_tables,posmodels,collision_indices)
-            collision_indices, collision_types, collision_steps = self._check_for_collisions(tpss['retract'],pos_collider,output_tables)
+            collision_indices, collision_types, collision_steps = self._check_for_collisions(tpstart['retract'],pos_collider,output_tables)
             itter += 1
                    
         if self.verbose:
@@ -419,24 +423,33 @@ class PosAnticol:
             
         return tables
         
-        
+ 
+       
     def _em_resolution(self,posmodel,start,target,neighbors=None,dp_direction = 0):
         '''
             Avoids the neightbors for the currenct posmodel and gets the positioner from the 
             start t,p to the target t,p without hitting the neighbors using a 'force law' repulsion/attraction
             type of avoidance.
         '''
+        # Intialize values
         theta = start[pc.T]
         phi = start[pc.P]    
         thetas = [theta]
-        threshold = max(self.tolerance, self.angstep)
+        phis = [phi]
         dTs = []
         dPs = []
-        phis = [phi]
+
+        # Define how close we need to get to the final target before calling it a success
+        threshold = max(self.tolerance, self.angstep)
+
+        # Find the xy of the starting position and get the theta and phi ranges
+        # we are allowed to move to
         xstart,ystart = posmodel.trans.obsTP_to_flatXY(start)
         tmin,tmax = posmodel.targetable_range_T
         pmin,pmax = posmodel.targetable_range_P
         phi_safe = self.phisafe
+        
+        # Move without waiting unless specific criteria in the loop are met
         wait = False
         for i in range(10000):
             if wait:
@@ -445,9 +458,14 @@ class PosAnticol:
                 thetas.append(theta)
                 phis.append(phi)            
             else:
+                # Merge neighbor positioner locations, neighbor theta body locations,
+                # and fixed object locations into a single array of objects to avoid
                 xns = np.concatenate((neighbors['xns'],neighbors['theta_body_xns']))
                 yns = np.concatenate((neighbors['yns'],neighbors['theta_body_yns']))
+                # Calculate the potential surrounding the current point and 
+                # return the direction that minimizes the potential
                 theta_new,phi_new = self._take_step(posmodel,[theta,phi],target,xns,yns,tmin,tmax,pmin,pmax,phi_safe)
+                # Save the change in theta and phi and redefine things for the next loop
                 dTs.append(theta_new-theta)
                 dPs.append(phi_new-phi)
                 theta = theta_new
@@ -455,9 +473,12 @@ class PosAnticol:
                 thetas.append(theta)
                 phis.append(phi)
             wait = False
+            # If we are within tolerance of the final target
             if ((np.abs(phi - target[pc.P]) < threshold) and (np.abs(theta - target[pc.T] < threshold))):
                 xo,yo = posmodel.trans.obsTP_to_flatXY([target[pc.T],target[pc.P]])
                 rhons = np.hypot(xns-xo,yns-yo)
+                # If all of the collideable objects are far enough away, we're done
+                # Move to the final location and exit
                 if np.all(rhons>self.rtol):
                     dTs.append(target[pc.T]-theta)
                     dPs.append(target[pc.P]-phi)
@@ -466,33 +487,50 @@ class PosAnticol:
                     thetas.append(theta)
                     phis.append(phi)
                     print("Final Loop reached!   Theta =  %f   and phi = %f    nitters = %d" %(theta,phi,i+1))
-                    #self._plot_potential(posmodel,target,neighbors)
-                    #plt.title("Start ts=%d ps=%d tf=%d pf=%d" %    (start[pc.T],start[pc.P],target[pc.T],target[pc.P]))
-                    #xls,yls = posmodel.trans.obsTP_to_flatXY([np.asarray(thetas),np.asarray(phis)])
-                    #plt.plot(xls,yls,'g.',markersize=8)
-                    #plt.plot(xstart,ystart,'k^',markersize=10)
-                    #plt.show()
+                    # If desired we can plot the movement and the potential field seen
+                    # by the positioner
+                    if self.verbose:
+                        self._plot_potential(posmodel,target,neighbors)
+                        plt.title("Start ts=%d ps=%d tf=%d pf=%d" %    (start[pc.T],start[pc.P],target[pc.T],target[pc.P]))
+                        xls,yls = posmodel.trans.obsTP_to_flatXY([np.asarray(thetas),np.asarray(phis)])
+                        plt.plot(xls,yls,'g.',markersize=8)
+                        plt.plot(xstart,ystart,'k^',markersize=10)
+                        plt.show()
                     return self._condense(np.asarray(dTs),np.asarray(dPs))
+                # If neighbors are too close, but they are moving, wait until
+                # the neighbors clear the vicinity
                 elif dp_direction != 0:
                     wait = True
+                # If neighbors won't move out of the way, give up as we can't get there
                 else:
                     break
+                
+            # Figure out if we're extending or retracting, and move the theta/phis of neighbors
+            # accordingly so we know where they are during the next move
+            # The positioners only move when outside safety envelope, so we check that
             if dp_direction == 1:
                 neighbors['phins'][neighbors['phins']<neighbors['phints']] = neighbors['phins'][neighbors['phins']<neighbors['phints']]+self.angstep
             elif dp_direction == -1:
                 neighbors['phins'][neighbors['phins']>neighbors['phints']] =  neighbors['phins'][neighbors['phins']>neighbors['phints']]-self.angstep
+            # If rotation, the neighbors aren't moving. Say so and continue.
             elif i == 0:
                 print("I'm assuming the phis of neighbors don't change.")
+            # For those that are moving, update the neighbor locations.
             if dp_direction != 0:
                 for it,neigh in enumerate(neighbors['posmodels']):
                     neighbors['xns'][it],neighbors['yns'][it] = neigh.trans.obsTP_to_flatXY([neighbors['thetans'][it],neighbors['phins'][it]])
-        
-        #self._plot_potential(posmodel,target,neighbors)
-        #plt.title("Start ts=%d ps=%d tf=%d pf=%d" % (start[pc.T],start[pc.P],target[pc.T],target[pc.P]))
-        #xls,yls = posmodel.trans.obsTP_to_flatXY([np.asarray(thetas),np.asarray(phis)])
-        #plt.plot(xls,yls,'g.',markersize=8)        
-        #plt.plot(xstart,ystart,'k^',markersize=10)
-        #plt.show()
+                    
+        # If loop is completed or broken and no solution found,
+        # we can plot the movements performed and the potential the positioner saw
+        if self.verbose:
+            self._plot_potential(posmodel,target,neighbors)
+            plt.title("Start ts=%d ps=%d tf=%d pf=%d" % (start[pc.T],start[pc.P],target[pc.T],target[pc.P]))
+            xls,yls = posmodel.trans.obsTP_to_flatXY([np.asarray(thetas),np.asarray(phis)])
+            plt.plot(xls,yls,'g.',markersize=8)        
+            plt.plot(xstart,ystart,'k^',markersize=10)
+            plt.show()
+            
+        # If the loop didn't converge or we broke, return None's since we didn't have success
         return None,None,None
     
     
@@ -506,20 +544,29 @@ class PosAnticol:
         It selects the option that minimizes the potential and returns the final location
         of that minimizing movement in local theta,phi 
         '''
+        # Get the xy location of the target
         xa,ya = posmodel.trans.obsTP_to_flatXY(target)
         
+        # Define the current and desired locations, and the angular steps to use
         theta, phi = current[pc.T],current[pc.P]
         thetaa,phia = target[pc.T],target[pc.P]
         angstep = self.angstep#1. #0.01
         stepper_array = np.array([-1,0,1])*angstep
       
-        V_prev = np.inf
+        # If within safety envelope, proceed directly to desired location
         if phi > phi_safe:
             if phia > phi_safe:
                 return thetaa,phia
     
+        # Initialize the next phi value to old value
         phi_next = phi
         theta_next = theta
+        # Initialize the potential to infinity
+        V_prev = np.inf
+        
+        # Loop through possible steps and calculate the potential at each.
+        # If the angle is outside acceptable limits, we move on to the next without
+        # calculating the potential
         for pstep in stepper_array:
             phi_rw = phi + pstep
             if phi_rw < pmin or phi_rw > pmax:
@@ -546,7 +593,8 @@ class PosAnticol:
                     V_prev = V
                     phi_next = phi_rw
                     theta_next = theta_rw
-    
+
+        # Ensure that the moves remain within allowable limits    
         if phi_next > pmax:
             phi_next = pmax
         elif phi_next < pmin:
@@ -556,6 +604,8 @@ class PosAnticol:
         elif theta_next < tmin:
             theta_next = tmin   
             
+        # If the best move is to do nothing, random walk by 2*stepsize
+        # so long as the random walk is within allowable angle constraints
         if phi_next == phi and theta_next == theta:
             if theta >= (tmin + 5):
                 if theta <= (tmax - 5):
@@ -621,9 +671,12 @@ class PosAnticol:
         '''
         # Get a unique list of all indices causing problems
         unique_indices = self._unique_inds(collision_indices)
+        # Remove "None" cases corresponding to fixed collisions
         if None in unique_indices.keys():
             unique_indices.pop(None)
+        # Find the largest number of rows in any table
         nrows = np.max([len(table.rows) for table in tables])
+        # Initialize an array for assignment later
         max_times = np.zeros(nrows)     
         for table in tables:
             for i in range(len(table.rows)):
@@ -662,11 +715,12 @@ class PosAnticol:
                 collision_types:   Type of collision as specified in the pc class
                 collision_steps:   The step at which the collision happens within the move table
         '''
-        sweeps = [[] for i in range(len(cur_poscollider.posmodels))]
-        collision_index = [[] for i in range(len(cur_poscollider.posmodels))]
-        collision_type = [pc.case.I for i in range(len(cur_poscollider.posmodels))]
-        collision_step = [np.inf for i in range(len(cur_poscollider.posmodels))]
-        earliest_collision = [np.inf for i in range(len(cur_poscollider.posmodels))]
+        posmodel_index_iterable = range(len(cur_poscollider.posmodels))
+        sweeps = [[] for i in posmodel_index_iterable]
+        collision_index = [[] for i in posmodel_index_iterable]
+        collision_type = [pc.case.I for i in posmodel_index_iterable]
+        collision_step = [np.inf for i in posmodel_index_iterable]
+        earliest_collision = [np.inf for i in posmodel_index_iterable]
         nontriv = 0
         for k in range(len(cur_poscollider.collidable_relations['A'])):
             A = cur_poscollider.collidable_relations['A'][k]
@@ -763,13 +817,14 @@ class PosAnticol:
             It can also give long range attraction to the center of the posioner range
             and short range repulsion to preferentially 
         '''
-        rhoa = np.abs(rhoa)
+        # Avoid divide-by-zero errors by setting 0 valued distances to a very small number
         if rhoc == 0.:
             rhoc = 1e-12
         if np.any(rhons == 0.):
             rhons[rhons==0.] = 1e-12
         if rhoa == 0.:
             rhoa = 1e-12        
+        # Return the potential given the distances and the class-defined coefficients
         return ( (self.coeffn*np.sum((1./(rhons*rhons)))) - (self.coeffa/(rhoa**0.5))) 
                  # (self.coeffcr/(rhoc**4)) +  - (self.coeffca/(rhoc**0.25))  #7,3     
         
@@ -793,16 +848,25 @@ class PosAnticol:
                 output_times: np.array   list of waittimes after each move after all merging is done
                 
         '''
+        # Intialize the arrays that will be output
         output_t = [dts[0]]
         output_p = [dps[0]]
         output_times = [0.]
         current_column = 0
+        # Loop through the given array of dthetas,dphis
         for i in range(1,dts.size):
+            # If the change in theta and phi is the same as before,
+            # We don't need a new step, just increase the time we perform
+            # the previous step
             if dts[i]==dts[i-1] and dps[i]==dps[i-1]:
                 output_t[current_column] += dts[i]
                 output_p[current_column] += dps[i]
+            # If we're not moving, we don't make a new move, we only add waittime
+            # after the current move
             elif dts[i]==0 and dps[i]==0:
                 output_times[current_column] += self.dt
+            # if none of the cases above, add a new move in the movetable
+            # for the given dtheta, dphi, with no waittime 
             else:
                 output_t.append(dts[i])
                 output_p.append(dps[i])
