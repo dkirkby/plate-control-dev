@@ -176,7 +176,6 @@ class PosSchedule(object):
         if self.anticol.verbose:
             print("You ARE doing anticollisions")
             print("Number of requests: "+str(len(self.requests)))
-
         self.move_tables = self.anticol.run_anticol(self.requests,self.petal.posids)
 
 

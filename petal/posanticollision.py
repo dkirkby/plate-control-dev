@@ -563,7 +563,8 @@ class PosAnticol:
                         xls,yls = posmodel.trans.obsTP_to_flatXY([np.asarray(thetas),np.asarray(phis)])
                         plt.plot(xls,yls,'g.',markersize=8)
                         plt.plot(xstart,ystart,'k^',markersize=10)
-                        plt.show()
+                        #plt.show()
+                        plt.close()
                     return self._condense(np.asarray(dTs),np.asarray(dPs))
                 # If neighbors are too close, but they are moving, wait until
                 # the neighbors clear the vicinity
@@ -596,7 +597,8 @@ class PosAnticol:
             xls,yls = posmodel.trans.obsTP_to_flatXY([np.asarray(thetas),np.asarray(phis)])
             plt.plot(xls,yls,'g.',markersize=8)        
             plt.plot(xstart,ystart,'k^',markersize=10)
-            plt.show()
+            #plt.show()
+            plt.close()
             
         # If the loop didn't converge or we broke, return None's since we didn't have success
         return None,None,None
@@ -744,9 +746,12 @@ class PosAnticol:
             unique_indices.pop(None)
 
         # Find out how long the longest move takes to execute
-        movetimes = np.asarray([table.for_schedule['move_time'] for table in tables])
+        movetimes = np.asarray([table.for_schedule['move_time'][-1] for table in tables])
         if self.verbose:
-            print("std of movetimes was: ",np.std(movetimes))
+            try:
+                print("std of movetimes was: ",np.std(movetimes))
+            except:
+                pass
         max_time = np.max(movetimes)
                     
         # For the colliding indices, simply don't move them
@@ -757,6 +762,7 @@ class PosAnticol:
             table.set_prepause (0, max_time)
             table.set_postpause(0, 0.0)
             tables[index] = table
+        #pdb.set_trace()
         return tables  
         
         
@@ -783,7 +789,6 @@ class PosAnticol:
         sweeps = [[] for i in posmodel_index_iterable]
         collision_index = [[] for i in posmodel_index_iterable]
         collision_type = [pc.case.I for i in posmodel_index_iterable]
-        collision_step = [np.inf for i in posmodel_index_iterable]
         earliest_collision = [np.inf for i in posmodel_index_iterable]
         nontriv = 0
         colrelations = cur_poscollider.collidable_relations
