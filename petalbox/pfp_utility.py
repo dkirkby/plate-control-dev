@@ -18,7 +18,7 @@ import os
 
 can_frame_fmt = "=IB3x8s"
 os.system('cansend ' + str(sys.argv[1]) + ' 004e2080#00')
-sleept = 0.2
+sleept = 0.5
 
 class _read_key:
     def __init__(self):
