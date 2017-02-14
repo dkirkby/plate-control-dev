@@ -13,8 +13,8 @@ import posconstants as pc
 
 # software initialization and startup
 sim = False
-pos_ids = ['M00095','M00072']#,'M00077','M00078','M00094','M00098','M00112','M00105','M00084','M00095','M00072','M00036','M00037','M00047','M00048','M00107']
-fid_ids = ['F017']
+pos_ids = ['M00104']
+fid_ids = ['F017','extradots']
 ptl_ids = [42]
 petals = [petal.Petal(ptl_ids[0], pos_ids, fid_ids, simulator_on=sim)] # single-petal placeholder for generality of future implementations, where we could have a list of multiple petals, and need to correlate pos_ids and fid_ids to thier particular petals
 for ptl in petals:
@@ -24,7 +24,7 @@ if sim:
 else:
     fvc = fvchandler.FVCHandler('SBIG')      
 fvc.rotation = 0 # deg
-fvc.scale = 0.2 # mm/pixel
+fvc.scale = 0.04 # mm/pixel
 m = posmovemeasure.PosMoveMeasure(petals,fvc)
 start_timestamp = pc.timestamp_str_now()
 

@@ -404,7 +404,7 @@ class Petal(object):
         See method set_fiducials() for valid values of argument 'setting'.
         """
         all_fid_ids = self.fid_ids
-        self.set_all_fiducials(all_fid_ids, setting, save_as_default)
+        self.set_fiducials(all_fid_ids, setting, save_as_default)
     
     def set_fiducials(self, fid_ids, setting, save_as_default=False):
         """Set a list of specific fiducials on or off.
@@ -419,6 +419,7 @@ class Petal(object):
         if self.simulator_on:
             print('Simulator skips sending out set_fiducials commands.')
             return
+        fid_ids = pc.listify(fid_ids,keep_flat=True)[0]
         bus_ids = self.get_fids_val(fid_ids,'BUS_ID')
         can_ids = self.get_fids_val(fid_ids,'CAN_ID')
         if isinstance(setting,int) or isinstance(setting,float):
@@ -480,6 +481,7 @@ class Petal(object):
         in the list fid_ids.
         """
         vals = []
+        fid_ids = pc.listify(fid_ids,keep_flat=True)[0]
         for fid_id in fid_ids:
             vals.append(self.fidstates[fid_id].read(key))
         return vals
@@ -695,7 +697,6 @@ class Petal(object):
         start_time = time.time()
         while keep_waiting:
             elapsed_time = time.time() - start_time
-            print(str(elapsed_time))
             if elapsed_time >= timeout:
                 print('Timed out at ' + str(timeout) + ' seconds waiting to send next move table.')
                 keep_waiting = False
