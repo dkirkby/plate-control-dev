@@ -1,19 +1,10 @@
 import os
 import sys
 sys.path.append(os.path.abspath('./SBIG/'))
-try:
-    import sbig_grab_cen
-except Exception:
-    pass
+sys.path.append(os.path.abspath('../petal/'))
 import numpy as np
 import time
-import threading
-try:
-    # DOS imports
-    import Pyro4
-    from DOSlib.advertise import Seeker
-except Exception:
-    pass
+import postransforms
 
 class FVCHandler(object):
     """Provides a generic interface to the Fiber View Camera. Can support different
@@ -26,82 +17,107 @@ class FVCHandler(object):
         3. translation
     """
     def __init__(self, fvc_type='SBIG'):
-        self.fvc_type = fvc_type # 'SBIG' or 'SBIG_legacy' or 'FLI' or 'simulator'
+        self.fvc_type = fvc_type # 'SBIG' or 'SBIG_Yale' or 'FLI' or 'simulator'
         if self.fvc_type == 'SBIG':
+            import sbig_grab_cen
             self.sbig = sbig_grab_cen.SBIG_Grab_Cen()
             self.sbig.take_darks = False # typically we have the test stand in a dark enough enclosure, so False here saves time
-        elif self.fvc_type == 'FLI':
-            # In case an instance is not running, do not count on a name server
-            # Fine the FVC through the advertising instead
-            self.dos_fvc = {'pyro_uri' : None, 'proxy':None, 'uid':None}
-            seeker = Seeker('-dos-', 'DOStest', found_callback=self._dos_seeker_callback)
-            seeker.seek()
-            print('Seeking FVC...')
-            delay = 4.0
-            self.seeker_thread = threading.Thread(target=self._repeat_seeker, 
-                                                  kwargs={'delay':delay})
-            self.seeker_thread.setDaemon(True)
-            self.seeker_thread.start()
-            while self.dos_fvc['proxy'] == None:
-                time.sleep(1)
-            print('Found FVC')
+        elif self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':   
+            from DOSlib.proxies import FVC
+            import json
+            self.platemaker_instrument = 'em'
+            self.fvcproxy = FVC(self.platemaker_instrument)
+            print('proxy FVC created for instrument %s' % self.fvcproxy.get('instrument'))
+            # I think here we would want to set the FVC either in FLI mode or SBIG mode?
         elif self.fvc_type == 'simulator':
             self.sim_err_max = 0.1
             print('FVCHandler is in simulator mode with max errors of size ' + str(self.sim_err_max) + '.')
+        if 'SBIG' in self.fvc_type:
+            self._exposure_time = 0.2
+            self.max_counts = 2**16 - 1
+        else:
+            self._exposure_time = 1.0
+        self.exposure_time = self.__exposure_time
+        self.trans = postransforms.PosTransforms() # general transformer object -- does not look up specific positioner info, but fine for QS <--> global X,Y conversions
+        self.last_sequence_id = ''
         self.rotation = 0        # [deg] rotation angle from image plane to object plane
         self.scale = 1.0         # scale factor from image plane to object plane
         self.translation = [0,0] # translation of origin within the image plane
-        self.exptime = 0.4
 
-        self.fid_dict = {1100: {'x': -71.3107,'y': 145.9311,'mag': 0.000, 'meas_err': 1.000,'flags':8},
-                         1118: {'x': -71.3222,'y': 104.0277,'mag': 0.000, 'meas_err': 1.000,'flags':8},
-                         1102: {'x': -80.5255,'y': 166.9440,'mag': 0.000, 'meas_err': 1.000,'flags':8},
-                         1103: {'x': -80.4125,'y': 83.0324,'mag': 0.000, 'meas_err': 1.000,'flags':8},
-                         1117: {'x': -89.4959,'y': 135.5507,'mag': 0.000, 'meas_err': 1.000,'flags':8},
-                         1106: {'x': -89.4696,'y': 114.5588,'mag': 0.000, 'meas_err': 1.000,'flags':8},
-                         1107: {'x': -107.8175,'y': 166.9728,'mag': 0.000, 'meas_err': 1.000,'flags':8},
-                         1108: {'x': -107.7875,'y': 124.9432,'mag': 0.000, 'meas_err': 1.000,'flags':8},
-                         1116: {'x': -107.8036,'y': 83.0034,'mag': 0.000, 'meas_err': 1.000,'flags':8},
-                         1115: {'x': -125.0158,'y': 180.9813,'mag': 0.000, 'meas_err': 1.000,'flags':8},
-                         1111: {'x': -125.0252,'y': 68.8910,'mag': 0.000, 'meas_err': 1.000,'flags':8},
-                         1112: {'x': -149.9411,'y': 181.0755,'mag': 0.000, 'meas_err': 1.000,'flags':8},
-                         1113: {'x': -160.0506,'y': 69.0207,'mag': 0.000, 'meas_err': 1.000,'flags':8},
-                         1114: {'x': -185.0396,'y': 114.9531,'mag': 0.000, 'meas_err': 1.000,'flags':8}}
+    @property
+    def exposure_time(self):
+        """Time in seconds to expose.
+        """
+        return self.__exposure_time
 
-    def create_target_dict(self, expected_pos_xy):
-        """creates a target dict to send to fvc handler
-        INPUT: expected xy positions of positioners in [[x1,y1],[x2,y2],..]
-
-        Written by PAF for the FLI"""
-
-        target_dict = self.fid_dict
-        for i,n in enumerate(expected_pos_xy):
-            id = int(3000+i)
-            target_dict[id] = {'x':n[0],'y':n[1],'mag':0.000,'meas_err':1.000,'flags':4}
-
-        return target_dict
-
-    def measured_xy_from_fvc_centroid(self,center_dict):
-        """reformats the centroid dictionary from the fvc to a list of measured [x,y]
-        centroids for the positioner software
-
-        written by PAF for the FLI""" 
-
-        measured_pos_xy = []
-        measured_ref_xy = []
-        for n in center_dict:
-            if center_dict[n]['flag']==5.0:
-                measured_pos_xy.append([center_dict[n]['x'],center_dict[n]['y']])
-            elif center_dict[n]['flag']==3.0:
-                measured_pos_xy.append([center_dict[n]['x'],center_dict[n]['y']])
-                print(center_dict[n],'This was flagged as a 3')
-            elif center_dict[n]['flag']==8.0:
-                measured_ref_xy.append([center_dict[n]['x'],center_dict[n]['y']])
+    @pos.setter
+    def exposure_time(self,value):
+        self.__exposure_time = value
+        if self.fvc_type == 'SBIG':
+            self.sbig.exposure_time = value
+        elif self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':
+            self.fvcproxy.set(exptime=value)
+    
+    @property
+    def next_sequence_id(self):
+        self.last_sequence_id = pc.timestamp_str_now()
+        return self.last_sequence_id
+        
+        
+    def measure_fvc_pixels(self, num_objects):
+        """Gets a measurement from the fiber view camera of the centroid positions
+        of all the dots of light landing on the CCD.
+        
+        INPUTS:  num_objects  ... integer, number of dots FVC should look for
+        
+        OUTPUT:  xy           ... list of measured dot positions in FVC pixel coordinates, of the form [[x1,y1],[x2,y2],...]
+                 brightnesses ... list of the brightness values for each dot, in the same order
+                 imgfiles     ... list of image filenames that were produced
+        """
+        xy = []
+        brightnesses = []
+        imgfiles = []
+        if self.fvc_type == 'SBIG':
+            xy,brightnesses,t,imgfiles = self.sbig.grab(num_objects)
+            brightnesses = [b/self.max_counts for b in brightnesses]
+        else:
+            zeros_dict = {}
+            for i in range(num_objects):
+                zeros_dict[i] = {'x':0.0, 'y':0.0, 'mag':0.0, 'meas_err':1.0, 'flags':4}
+            err = self.fvcproxy.set_targets(zeros_dict)
+            sequence_id = self.next_sequence_id
+            imgfiles = ['fvc_' + str(sequence_id) + '.FITS']
+            centroids = self.fvcproxy.locate(expid=sequence_id, im=imgfiles[0], send_centroids=True)
+            if centroids == 'FAILED':
+                print('Failed to locate centroids using FVC.')
             else:
-                print(center_dict[n]['flag'],type(center_dict[n]['flag']),'Doesnt seem to be a fiber or positioner') 
+                for params in self.centroids.values():
+                    xy.append(params['x'],params['y'])
+                    brightnesses.append(self.mag2brightness(params['mag']))
+        return xy,brightnesses,imgfiles
 
-
-        return measured_pos_xy, measured_ref_xy
+#
+#    def measured_xy_from_fvc_centroid(self,center_dict):
+#        """reformats the centroid dictionary from the fvc to a list of measured [x,y]
+#        centroids for the positioner software
+#
+#        written by PAF for the FLI""" 
+#
+#        measured_pos_xy = []
+#        measured_ref_xy = []
+#        for n in center_dict:
+#            if center_dict[n]['flag']==5.0:
+#                measured_pos_xy.append([center_dict[n]['x'],center_dict[n]['y']])
+#            elif center_dict[n]['flag']==3.0:
+#                measured_pos_xy.append([center_dict[n]['x'],center_dict[n]['y']])
+#                print(center_dict[n],'This was flagged as a 3')
+#            elif center_dict[n]['flag']==8.0:
+#                measured_ref_xy.append([center_dict[n]['x'],center_dict[n]['y']])
+#            else:
+#                print(center_dict[n]['flag'],type(center_dict[n]['flag']),'Doesnt seem to be a fiber or positioner') 
+#
+#
+#        return measured_pos_xy, measured_ref_xy
 
     def measure_and_identify(self,expected_pos_xy,expected_ref_xy):
         """Calls for an FVC measurement, and returns a list of measured centroids.
@@ -123,7 +139,7 @@ class FVCHandler(object):
             sim_errors = np.random.uniform(-self.sim_err_max,self.sim_err_max,np.shape(expected_pos_xy))
             measured_pos_xy = (expected_pos_xy + sim_errors).tolist()
             measured_ref_xy = expected_ref_xy
-        elif self.fvc_type == 'FLI':
+        elif self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':
             
             # will use new api here to talk to platemaker + fvc
             # the format of the expected positions to send them is:
@@ -152,22 +168,34 @@ class FVCHandler(object):
             # 5. send centroids (in pixels at FVC) thru platemaker to get measured xy (in mm at focal plate)
             # 6. organize those centroids so you can return them as measured_pos_xy, measured_ref_xy
             
-            target_dict = self.create_target_dict(expected_pos_xy)
-            fvc_uri = 'PYRO:FVC@131.243.51.74:40539'
-            fvc = Pyro4.Proxy(fvc_uri)
-            fvc.set(exptime=self.exptime)
-            fvc.set_target_dict(target_dict) 
-            fvc.print_targets()
+#            target_dict = self.create_target_dict(expected_pos_xy)
+#            fvc_uri = 'PYRO:FVC@131.243.51.74:40539'
+#            fvc = Pyro4.Proxy(fvc_uri)
+#            fvc.set(exptime=self.exptime)
+#            fvc.set_target_dict(target_dict) 
+#            fvc.print_targets()
             #fvc.calibrate_image()
-            fvc.measure() 
-            measured_dict = fvc.get_centers()
-            #print(measured_dict)
-            measured_pos_xy,measured_ref_xy = self.measured_xy_from_fvc_centroid(measured_dict)	
+            
+            index = 0 # future implementation: use positioner/fiducial index mapping module
+            expected_xy = []
+            for xylist in [expected_pos_xy,expected_ref_xy]:
+                if xylist == expected_pos_xy:
+                    flag = 4 # flag 4 means fiber center
+                else:
+                    flag = 8 # flag 8 means fiducial center
+                for xy in xylist:
+                    qs = self.trans.obsXY_to_QS(xy)
+                    expected_xy.append({'id':index, 'q':qs[0], 's':qs[1], 'flags':flag})
+                    index += 1
+            measured_xy = DOSLIBPROXYGOESHERE.measure(expected_xy, self.next_sequence_id)
+            for xydict in measured_xy:
+                # make these match up in order...
+            measured_pos_xy,measured_ref_xy = self.measured_xy_from_fvc_centroid(measured_dict)
             return measured_pos_xy, measured_ref_xy
         else:
-            # FUTURE IMPELEMENTATION -- THIS STUFF GOES INTO 'SBIG_legacy' OPTION, AND FLI-LIKE SBIG DOES SOMETHING MORE LIKE 'FLI' ABOVE
             expected_xy = expected_pos_xy + expected_ref_xy
             num_objects = len(expected_xy)
+            unsorted_xy,brightnesses,imgfiles = self.measure_fvc_pixels(num_objects)
             unsorted_xy,imgfiles = self.measure(num_objects)
             measured_xy = self.sort_by_closeness(unsorted_xy, expected_xy)
             measured_pos_xy = measured_xy[:len(expected_pos_xy)]
@@ -208,14 +236,9 @@ class FVCHandler(object):
         """
         imgfiles = []
         if self.fvc_type == 'SBIG':
-            xy,brightness,t,imgfiles = self.sbig.grab(num_objects)
+            # already_moved
         elif self.fvc_type == 'FLI':
-            ret = self.dos_fvc['proxy'].measure()
-            assert ret != 'FAILED'
-            xy_dict = self.dos_fvc['proxy'].get_centers()
-            xy = []
-            for params in xy_dict.values():
-                xy.append([params['x'], params['y']])
+            
         else:
             xy = []
         xy_np = np.array(xy).transpose()
@@ -228,17 +251,15 @@ class FVCHandler(object):
         xy = xy_np.transpose().tolist()
         return xy,imgfiles
 
-    def _dos_seeker_callback(self, dev):
-        """Check found connection from seeker
+    def mag2brightness(self,value):
+        """Convert magnitude values coming from Rabinowitz code to a normalized
+        brightness value in the range 0.0 to 1.0. Would prefer if Rabinowitz can
+        modify his code later on to just give us the counts from the camera.
         """
-        for key, value in dev.items():
-            if key == 'FVC':
-                if self.dos_fvc['uid'] == value['uid']:
-                    return # Already have a connection
-                proxy = Pyro4.Proxy(value['pyro_uri'])
-                self.dos_fvc['proxy'] = proxy
-                self.dos_fvc['pyro_uri'] = value['pyro_uri']
-                self.dos_fvc['uid'] = value['uid']
+        newval = 10**(value/-2.5)
+        newval = min(newval,1.0)
+        newval = max(newval,0.0)
+        return newval
 
     @staticmethod
     def rotmat2D_deg(angle):

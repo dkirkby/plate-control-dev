@@ -46,6 +46,7 @@ class SBIG_Grab_Cen(object):
             xywin      ... list of centroid coordinates and fwhms for each spot in window ('list of lists')
             brightness ... value of brightest pixel (dark subtracted)
             time       ... elapsed time in seconds
+            imgfiles   ... filenames of images produced
             
         Sample call:
         	xywin, brightness, time = sbig_grab_cen_instance.grab(1)
