@@ -65,7 +65,6 @@ posfidfvc/initialize_hw_setup.py -text
 posfidfvc/pos_xytest_plot.py -text
 posfidfvc/poscalibplot.py -text
 posfidfvc/posmovemeasure.py -text
-posfidfvc/posmovemeasure_dos.py -text
 posfidfvc/um_test_report.py -text
 posfidfvc/xytest.py -text
 posfirmware/develop/bootloader_description.pdf -text svneol=unset#unset
