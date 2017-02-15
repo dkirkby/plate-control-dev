@@ -5,6 +5,7 @@ sys.path.append(os.path.abspath('../petal/'))
 import numpy as np
 import time
 import postransforms
+import posconstants as pc
 
 class FVCHandler(object):
     """Provides a generic interface to the Fiber View Camera. Can support different
@@ -66,13 +67,12 @@ class FVCHandler(object):
         if self.fvc_type == 'SBIG':
             self.sbig.exposure_time = value
         elif self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':
-            self.fvcproxy.set(exptime=value)
+            self.fvcproxy.send_fvc_command('set',exptime=value)
     
     @property
     def next_sequence_id(self):
         self.last_sequence_id = pc.timestamp_str_now()
         return self.last_sequence_id
-        
         
     def measure_fvc_pixels(self, num_objects):
         """Gets a measurement from the fiber view camera of the centroid positions
@@ -96,8 +96,7 @@ class FVCHandler(object):
                 zeros_dict[i] = {'x':0.0, 'y':0.0, 'mag':0.0, 'meas_err':1.0, 'flags':4}
             err = self.fvcproxy.set_targets(zeros_dict)
             sequence_id = self.next_sequence_id
-            imgfiles = ['fvc_' + str(sequence_id) + '.FITS']
-            centroids = self.fvcproxy.locate(expid=sequence_id, im=imgfiles[0], send_centroids=True)
+            centroids = self.fvcproxy.send_fvc_command('locate',expid=sequence_id, send_centroids=True)
             if centroids == 'FAILED':
                 print('Failed to locate centroids using FVC.')
             else:
@@ -148,7 +147,7 @@ class FVCHandler(object):
                 for xy in xylist:
                     qs = self.trans.obsXY_to_QS(xy)
                     expected_xy.append({'id':index, 'q':qs[0], 's':qs[1], 'flags':flag})
-            measured_xy = self.fvcproxy.measure(expected_xy, self.next_sequence_id)
+            measured_xy = self.fvcproxy.measure(expected_xy)
             measured_pos_xy = [None]*len(indices_pos)
             measured_ref_xy = [None]*len(indices_ref)
             for xydict in measured_xy:
