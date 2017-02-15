@@ -7,6 +7,7 @@ except Exception:
     pass
 import numpy as np
 import time
+import threading
 try:
     # DOS imports
     import Pyro4
@@ -32,10 +33,15 @@ class FVCHandler(object):
         elif self.fvc_type == 'FLI':
             # In case an instance is not running, do not count on a name server
             # Fine the FVC through the advertising instead
-            self.dos_fvc = {'proxy':None, 'uid':None}
+            self.dos_fvc = {'pyro_uri' : None, 'proxy':None, 'uid':None}
             seeker = Seeker('-dos-', 'DOStest', found_callback=self._dos_seeker_callback)
             seeker.seek()
             print('Seeking FVC...')
+            delay = 4.0
+            self.seeker_thread = threading.Thread(target=self._repeat_seeker, 
+                                                  kwargs={'delay':delay})
+            self.seeker_thread.setDaemon(True)
+            self.seeker_thread.start()
             while self.dos_fvc['proxy'] == None:
                 time.sleep(1)
             print('Found FVC')
@@ -231,6 +237,7 @@ class FVCHandler(object):
                     return # Already have a connection
                 proxy = Pyro4.Proxy(value['pyro_uri'])
                 self.dos_fvc['proxy'] = proxy
+                self.dos_fvc['pyro_uri'] = value['pyro_uri']
                 self.dos_fvc['uid'] = value['uid']
 
     @staticmethod

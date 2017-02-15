@@ -61,7 +61,6 @@ posfidfvc/SBIG/usbreset.c -text
 posfidfvc/SBIG/usbreset.py -text
 posfidfvc/fitcircle.py -text
 posfidfvc/fvchandler.py -text
-posfidfvc/fvchandler_dos.py -text
 posfidfvc/initialize_hw_setup.py -text
 posfidfvc/pos_xytest_plot.py -text
 posfidfvc/poscalibplot.py -text
