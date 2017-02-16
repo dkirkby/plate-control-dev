@@ -119,5 +119,4 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True):
         peaks.append(peak)
         if peak < 0 or peak > 2**16-1:
             print('peak = ' + str(peak) + ' brightness appears out of expected range')
-    print(peaks)
     return xCenSub, yCenSub, peaks, FWHMSub, filename

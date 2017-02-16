@@ -94,7 +94,7 @@ class FVCHandler(object):
             zeros_dict = {}
             for i in range(num_objects):
                 zeros_dict[i] = {'x':0.0, 'y':0.0, 'mag':0.0, 'meas_err':1.0, 'flags':4}
-            err = self.fvcproxy.set_targets(zeros_dict)
+            self.fvcproxy.set_targets(zeros_dict)
             sequence_id = self.next_sequence_id
             centroids = self.fvcproxy.send_fvc_command('locate',expid=sequence_id, send_centroids=True)
             if centroids == 'FAILED':
@@ -211,7 +211,7 @@ class FVCHandler(object):
         translation_y = self.translation[1] * np.ones(np.shape(xy_np)[1])
         xy_np += [translation_x,translation_y]
         xy = xy_np.transpose().tolist()
-        return xy,imgfiles
+        return xy,brightnesses,imgfiles
 
     def mag2brightness(self,value):
         """Convert magnitude values coming from Rabinowitz code to a normalized
@@ -234,10 +234,17 @@ if __name__ == '__main__':
     n_objects = 19
     n_repeats = 1
     xy = []
+    brightnesses = []
     print('start taking ' + str(n_repeats) + ' images')
     start_time = time.time()
     for i in range(n_repeats):
-        xy.append(f.measure(n_objects)[0])
+        these_xy,these_brightnesses,imgfiles = f.measure(n_objects)
+        xy.append(these_xy)
+        brightnesses.append(these_brightnesses)
+        print('measured xy positions:')
         print(xy[i])
+        print('measured brightnesses:')
+        print(brightnesses[i])
+        print('')
     total_time = time.time() - start_time
     print('total time = ' + str(total_time) + ' (' + str(total_time/n_repeats) + ' per image)')
