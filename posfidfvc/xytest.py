@@ -59,7 +59,7 @@ class XYTest(object):
         self.logwrite('Number of test loops: ' + str(self.n_loops))
         
         # simulation mode
-        self.simulate = self.hwsetup_conf['simulate']
+        self.simulate = self.xytest_conf['simulate']
         self.logwrite('Simulation mode on: ' + str(self.simulate))
         
         # set up fvc and platemaker
