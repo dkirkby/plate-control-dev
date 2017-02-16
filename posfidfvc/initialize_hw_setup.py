@@ -13,7 +13,7 @@ import posconstants as pc
 
 # software initialization and startup
 sim = False
-pos_ids = ['M00108', 'M00104']
+pos_ids = ['M00108','M00104']
 fid_ids = ['F017','extradots']
 ptl_ids = [42]
 petals = [petal.Petal(ptl_ids[0], pos_ids, fid_ids, simulator_on=sim)] # single-petal placeholder for generality of future implementations, where we could have a list of multiple petals, and need to correlate pos_ids and fid_ids to thier particular petals
@@ -24,19 +24,28 @@ if sim:
 else:
     fvc = fvchandler.FVCHandler('SBIG')      
 fvc.rotation = 0 # deg
-fvc.scale = 0.04 # mm/pixel
+fvc.scale = 0.043 # mm/pixel
 m = posmovemeasure.PosMoveMeasure(petals,fvc)
 start_timestamp = pc.timestamp_str_now()
+
+# deal with possible extra fiducial dots
+print('Sometimes there are \'extra\' fixed dots of light in the setup, such as fixed reference fibers. If the test setup is only using standard fiducial devices, hit enter. But if there ARE extra fixed fibers in this test setup, then enter the number of them here.')
+user_val = input('number of extra dots: ')
+if not(user_val):
+    n_extra_dots = 0
+else:
+    n_extra_dots = int(user_val)
+m.petals[0].fidstates['extradots'].write('N_DOTS',n_extra_dots)
 
 # calibration routines
 m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
 m.identify_fiducials() 
 m.identify_positioner_locations()
 m.calibrate(mode='quick', save_file_dir=pc.test_logs_directory, save_file_timestamp=start_timestamp) # need to calibrate prior to measuring  physical travel ranges (where phi arms get extended, and need some reasonable values for theta offsets before doing such extensions)
-#m.measure_range(axis='theta')
-#m.measure_range(axis='phi')
-#m.rehome() # rehome again because range measurements intentionally ran against hardstops, messing up shaft angle counters
-#m.one_point_calibration() # do a measurement at one point with fvc after the blind rehome
+m.measure_range(axis='theta')
+m.measure_range(axis='phi')
+m.rehome() # rehome again because range measurements intentionally ran against hardstops, messing up shaft angle counters
+m.one_point_calibration() # do a measurement at one point with fvc after the blind rehome
 m.park() # retract all positioners to their parked positions
            
 
