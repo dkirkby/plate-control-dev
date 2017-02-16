@@ -163,8 +163,7 @@ class FVCHandler(object):
         else:
             expected_xy = expected_pos_xy + expected_ref_xy
             num_objects = len(expected_xy)
-            unsorted_xy,brightnesses,imgfiles = self.measure_fvc_pixels(num_objects)
-            unsorted_xy,imgfiles = self.measure(num_objects)
+            unsorted_xy,brightnesses,imgfiles = self.measure(num_objects)
             measured_xy = self.sort_by_closeness(unsorted_xy, expected_xy)
             measured_pos_xy = measured_xy[:len(expected_pos_xy)]
             measured_ref_xy = measured_xy[len(expected_pos_xy):]
