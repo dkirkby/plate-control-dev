@@ -909,8 +909,8 @@ class PosMoveMeasure(object):
                 old_P = petal.get(pos_id,param + '_P')              
                 new_T = old_T + delta_T
                 new_P = old_P + delta_P
-                petal.set(pos_id,param + '_T',new_T,True)
-                petal.set(pos_id,param + '_P',new_P,True)
+                posmodel.axis[pc.T].pos = new_T
+                posmodel.axis[pc.P].pos = new_P
                 print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_T from ' + self.fmt(old_T) + ' to ' + self.fmt(new_T))
                 print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
                 delta_TP[pos_id] = [delta_T,delta_P]

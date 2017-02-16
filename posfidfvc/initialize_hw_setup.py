@@ -13,8 +13,8 @@ import posconstants as pc
 
 # software initialization and startup
 sim = False
-pos_ids = ['M00104']
-fid_ids = ['F017','extradots']
+pos_ids = ['M00108', 'M00104']
+fid_ids = ['extradots'] #['F017','extradots']
 ptl_ids = [42]
 petals = [petal.Petal(ptl_ids[0], pos_ids, fid_ids, simulator_on=sim)] # single-petal placeholder for generality of future implementations, where we could have a list of multiple petals, and need to correlate pos_ids and fid_ids to thier particular petals
 for ptl in petals:
