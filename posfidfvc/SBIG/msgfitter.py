@@ -32,6 +32,7 @@ def moments(data):
 	width_y = sqrt(abs((arange(row.size)-x)**2*row).sum()/row.sum())
 	height = data.max()
 	return bias, height, x, y, width_x, width_y
+
 def fitgaussian(data):
 	"""Returns (height, x, y, width_x, width_y)
 	the gaussian parameters of a 2D distribution found by a fit"""

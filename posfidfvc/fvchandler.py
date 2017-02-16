@@ -88,8 +88,8 @@ class FVCHandler(object):
         brightnesses = []
         imgfiles = []
         if self.fvc_type == 'SBIG':
-            xy,brightnesses,t,imgfiles = self.sbig.grab(num_objects)
-            brightnesses = [b/self.max_counts for b in brightnesses]
+            xy,peaks,t,imgfiles = self.sbig.grab(num_objects)
+            brightnesses = [x/self.max_counts for x in peaks]
         else:
             zeros_dict = {}
             for i in range(num_objects):
@@ -237,7 +237,7 @@ if __name__ == '__main__':
     print('start taking ' + str(n_repeats) + ' images')
     start_time = time.time()
     for i in range(n_repeats):
-        xy.append(f.measure(n_objects))
+        xy.append(f.measure(n_objects)[0])
         print(xy[i])
     total_time = time.time() - start_time
     print('total time = ' + str(total_time) + ' (' + str(total_time/n_repeats) + ' per image)')
