@@ -11,11 +11,16 @@ import posmovemeasure
 import fvchandler
 import posconstants as pc
 
+# get some identifying info
+station = input('Enter the station name: ')
+extradots_name = 'extradots_' + station
+
 # software initialization and startup
 sim = False
 pos_ids = ['M00108','M00104']
-fid_ids = ['F017','extradots']
+fid_ids = ['F017']
 ptl_ids = [42]
+fid_ids.append(extradots_name)
 petals = [petal.Petal(ptl_ids[0], pos_ids, fid_ids, simulator_on=sim)] # single-petal placeholder for generality of future implementations, where we could have a list of multiple petals, and need to correlate pos_ids and fid_ids to thier particular petals
 for ptl in petals:
     ptl.anticollision_default = False
@@ -35,7 +40,8 @@ if not(user_val):
     n_extra_dots = 0
 else:
     n_extra_dots = int(user_val)
-m.petals[0].fidstates['extradots'].write('N_DOTS',n_extra_dots)
+m.petals[0].fidstates[extradots_name].write('N_DOTS',n_extra_dots)
+m.petals[0].fidstates[extradots_name].write('CTRL_ENABLED',False)
 
 # calibration routines
 m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
@@ -47,7 +53,9 @@ m.measure_range(axis='phi')
 m.rehome() # rehome again because range measurements intentionally ran against hardstops, messing up shaft angle counters
 m.one_point_calibration() # do a measurement at one point with fvc after the blind rehome
 m.park() # retract all positioners to their parked positions
-           
+
+# generate the hardware setup file
+# (might start this higher up)
 
 """EMAIL FROM STEVE ON STARTING POINT FOR INSTRUMENT PARAMETERS CONFIG FILE
 All,
