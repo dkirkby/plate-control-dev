@@ -875,7 +875,7 @@ class PosMoveMeasure(object):
                 for i in ref_idxs:
                     xy_test.pop(i) # get rid of all but the moving pos
                 expected_obsXY = this_petal.expected_current_position(pos_id,'obsXY')
-                measured_obsXY = self.fvc.obsXY_to_fvcXY_noplatemaker(xy_test[0])[0]
+                measured_obsXY = self.fvc.fvcXY_to_obsXY_noplatemaker(xy_test[0])[0]
                 err_x = measured_obsXY[0] - expected_obsXY[0]
                 err_y = measured_obsXY[1] - expected_obsXY[1]
                 prev_offset_x = this_petal.get(posid=pos_id,key='OFFSET_X')

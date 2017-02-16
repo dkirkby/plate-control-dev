@@ -68,8 +68,8 @@ class XYTest(object):
         else:
             fvc_type = self.hwsetup_conf['fvc_type']
         fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite)       
-        fvc.rotation = self.hwsetup_conf['rotation']  # deg
-        fvc.scale = self.hwsetup_conf['scale'] # mm/pixel
+        fvc.rotation = self.hwsetup_conf['rotation']
+        fvc.scale = self.hwsetup_conf['scale']
         fvc.exposure_time = self.hwsetup_conf['exposure_time']
         self.logwrite('FVC type: ' + str(fvc_type))
         self.logwrite('FVC rotation: ' + str(fvc.rotation))
