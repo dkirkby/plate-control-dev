@@ -12,61 +12,28 @@ import fvchandler
 import posconstants as pc
 import tkinter
 import tkinter.filedialog
+import configobj
 
-# get some identifying info
-station = input('Enter the station name: ')
-extradots_name = 'extradots_' + station
-print('Locate the positioner config files that correspond to each of the positioners that are installed. Hit cancel on the dialog box when done.')
-keep_getting = True
-i = 0
-pos_ids = []
-while keep_getting:
-    message = 'Pick pos file #' + str(i+1) + '. Cancel when done.'
-    gui_root = tkinter.Tk()
-    configfile = tkinter.filedialog.askopenfilename(initialdir=pc.pos_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
-    gui_root.destroy()
-    if not(configfile):
-        keep_getting = False
-    else:
-        pos_id = configfile.split('unit_')[1].split('.conf')[0]
-        if pos_id not in pos_ids:
-            pos_ids.append(pos_id)
-            i += 1
-print('Positioners selected:')
-for pos_id in pos_ids:
-    print('  ' + pos_id)
-ok = input('Is this all correct? (yes/no)')
-if not('y' in ok or 'Y' in ok):
-    # implement an exit here
-    pass
-
-# software initialization and startup
-sim = False
-pos_ids = ['M00108','M00104']
-fid_ids = ['F017']
-ptl_ids = [42]
-fid_ids.append(extradots_name)
-petals = [petal.Petal(ptl_ids[0], pos_ids, fid_ids, simulator_on=sim)] # single-petal placeholder for generality of future implementations, where we could have a list of multiple petals, and need to correlate pos_ids and fid_ids to thier particular petals
-for ptl in petals:
-    ptl.anticollision_default = False
-if sim:
-    fvc = fvchandler.FVCHandler('simulator')
-else:
-    fvc = fvchandler.FVCHandler('SBIG')      
-fvc.rotation = 0 # deg
-fvc.scale = 0.043 # mm/pixel
-m = posmovemeasure.PosMoveMeasure(petals,fvc)
+# unique timestamp
 start_timestamp = pc.timestamp_str_now()
 
-# deal with possible extra fiducial dots
-print('Sometimes there are \'extra\' fixed dots of light in the setup, such as fixed reference fibers. If the test setup is only using standard fiducial devices, hit enter. But if there ARE extra fixed fibers in this test setup, then enter the number of them here.')
-user_val = input('number of extra dots: ')
-if not(user_val):
-    n_extra_dots = 0
-else:
-    n_extra_dots = int(user_val)
-m.petals[0].fidstates[extradots_name].write('N_DOTS',n_extra_dots)
-m.petals[0].fidstates[extradots_name].write('CTRL_ENABLED',False)
+# get the station config info
+message = 'Pick hardware setup file.'
+gui_root = tkinter.Tk()
+hwsetup_conf = tkinter.filedialog.askopenfilename(initialdir=pc.hwsetups_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
+gui_root.destroy()
+hwsetup = configobj.ConfigObj(hwsetup_conf,unrepr=True)
+
+# software initialization and startup
+fvc = fvchandler.FVCHandler(hwsetup['fvc_type'])    
+fvc.rotation = 0 # deg
+fvc.scale = 0.043 # mm/pixel
+sim = fvc.fvc_type == 'simulator'
+pos_ids = hwsetup['pos_ids']
+fid_ids = hwsetup['fid_ids']
+ptl = petal.Petal(hwsetup['ptl_id'], pos_ids, fid_ids, simulator_on=sim)
+ptl.anticollision_default = False
+m = posmovemeasure.PosMoveMeasure([ptl],fvc)
 
 # calibration routines
 m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
@@ -79,8 +46,33 @@ m.rehome() # rehome again because range measurements intentionally ran against h
 m.one_point_calibration() # do a measurement at one point with fvc after the blind rehome
 m.park() # retract all positioners to their parked positions
 
-# generate the hardware setup file
-# (might start this higher up)
+# VERIFICATIONS AND CALIBRATIONS SEQUENCE:
+# (TO IMPLEMENT IN FULLY AUTOMATED FASHION (IN THIS ORDER)
+#   [note, not doing focus here -- too difficult to automate with our astronomy cameras' lack of control over lenses]
+#   - calibrate each fiducial
+#       - get relative brightness at a standard setting
+#   - calibrate fiber illumination
+#       - get relative brightness at a standard setting
+#   - select new optimal combination of settings for:
+#       - fiducial brightness
+#       - fiber brightness
+#           - if manual setting, tell user:
+#               - how much to change power level
+#               - or if there is too much variation, which spots look dim (make a plot where the point labels are the relative brightness)
+#       - camera exposure time (may prefer to leave this fixed, for test timing issues)
+#   (rehome)
+#   - verify each positioner moves
+#   - verify number of extra ref dots
+#   - verify positioner motor directions are correct:
+#       - theta, by moving a few degrees with phi arm a little extended
+#           - use this to set first rough fvc scale
+#       - phi, by moving 180 degress with phi arm retracted, and dot shouldn't move much
+#   (quick calibration)
+#   - using plate_type, which defines the possible device locations:
+#       - which devices are in which holes
+#       - calculate fvc rotation, offset, and scale
+#       - calculate precise xy offsets for each positioner, and for fiducial dots, and record these to their calib files
+#       - make a platemaker instrument file if needed
 
 """EMAIL FROM STEVE ON STARTING POINT FOR INSTRUMENT PARAMETERS CONFIG FILE
 All,

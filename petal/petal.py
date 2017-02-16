@@ -53,7 +53,7 @@ class Petal(object):
         # fiducials setup
         self.fidstates = {}
         for fid_id in fid_ids:
-            state = posstate.PosState(fid_id, logging=True, device_type='fid', printfunc=self.printfunc)
+            state = posstate.PosState(fid_id, logging=False, device_type='fid', printfunc=self.printfunc)
             self.fidstates[fid_id] = state
         
         # power suppliees setup?
