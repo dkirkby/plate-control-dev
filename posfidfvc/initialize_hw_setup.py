@@ -14,7 +14,7 @@ import posconstants as pc
 # software initialization and startup
 sim = False
 pos_ids = ['M00108', 'M00104']
-fid_ids = ['extradots'] #['F017','extradots']
+fid_ids = ['F017','extradots']
 ptl_ids = [42]
 petals = [petal.Petal(ptl_ids[0], pos_ids, fid_ids, simulator_on=sim)] # single-petal placeholder for generality of future implementations, where we could have a list of multiple petals, and need to correlate pos_ids and fid_ids to thier particular petals
 for ptl in petals:
@@ -33,10 +33,10 @@ m.rehome() # start out rehoming to hardstops because no idea if last recorded ax
 m.identify_fiducials() 
 m.identify_positioner_locations()
 m.calibrate(mode='quick', save_file_dir=pc.test_logs_directory, save_file_timestamp=start_timestamp) # need to calibrate prior to measuring  physical travel ranges (where phi arms get extended, and need some reasonable values for theta offsets before doing such extensions)
-m.measure_range(axis='theta')
-m.measure_range(axis='phi')
-m.rehome() # rehome again because range measurements intentionally ran against hardstops, messing up shaft angle counters
-m.one_point_calibration() # do a measurement at one point with fvc after the blind rehome
+#m.measure_range(axis='theta')
+#m.measure_range(axis='phi')
+#m.rehome() # rehome again because range measurements intentionally ran against hardstops, messing up shaft angle counters
+#m.one_point_calibration() # do a measurement at one point with fvc after the blind rehome
 m.park() # retract all positioners to their parked positions
            
 

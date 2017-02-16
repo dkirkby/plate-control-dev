@@ -65,7 +65,7 @@ class FVCHandler(object):
     def exposure_time(self,value):
         self.__exposure_time = value
         if self.fvc_type == 'SBIG':
-            self.sbig.exposure_time = value
+            self.sbig.exposure_time = value*1000 # sbig_grab_cen thinks in milliseconds
         elif self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':
             self.fvcproxy.send_fvc_command('set',exptime=value)
     
