@@ -22,6 +22,7 @@ def plot(path_no_ext, pos_id, data, center, theta_range, r1, r2, title_txt):
     annulus_inner_y = center[1] + np.abs(r1-r2) * np.sin(annulus_angles)
     annulus_outer_x = center[0] + np.abs(r1+r2) * np.cos(annulus_angles)
     annulus_outer_y = center[1] + np.abs(r1+r2) * np.sin(annulus_angles)
+    filenames = set()
     for s in range(n_submoves):
         fig = plt.figure(figsize=(10, 8))
         meas_x = [data['meas_obsXY'][s][i][0] for i in range(n_targets)]
@@ -49,6 +50,9 @@ def plot(path_no_ext, pos_id, data, center, theta_range, r1, r2, title_txt):
         plt.margins(0.0, 0.03)
         plt.axis('equal')
         plt.legend(loc='upper right',fontsize=8)
-        plt.savefig(path_no_ext + '_submove' + str(s) + '.png',dpi=150)
+        this_filename = path_no_ext + '_submove' + str(s) + '.png'
+        filenames.add(this_filename)
+        plt.savefig(this_filename,dpi=150)
         plt.close(fig)
+    return filenames
 

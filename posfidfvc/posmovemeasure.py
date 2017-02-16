@@ -12,7 +12,8 @@ import scipy.optimize
 class PosMoveMeasure(object):
     """Coordinates moving fiber positioners with fiber view camera measurements.
     """
-    def __init__(self, petals, fvc):
+    def __init__(self, petals, fvc, printfunc=print):
+        self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         if not isinstance(petals,list):
             petals = [petals]
         self.petals = petals # list of petal objects
@@ -124,7 +125,7 @@ class PosMoveMeasure(object):
         self.move(requests)
         data,imgfiles = self.measure()
         if tp_updates == 'posTP' or tp_updates =='offsetsTP':
-            self._test_and_update_TP(data,tp_updates)
+            self._test_and_update_TP(data, tp_updates)
         return data,imgfiles
 
     def move_and_correct(self, requests, num_corr_max=2):
@@ -159,10 +160,10 @@ class PosMoveMeasure(object):
             elif m['command'] == 'QS':
                 m['targ_obsXY'] = self.general_trans.QS_to_obsXY(m['target'])
             else:
-                print('coordinates \'' + m['command'] + '\' not valid or not allowed')
+                self.printfunc('coordinates \'' + m['command'] + '\' not valid or not allowed')
                 return
             m['log_note'] = 'blind move'
-            print(str(pos_id) + ': blind move to (obsX,obsY)=(' + self.fmt(m['targ_obsXY'][0]) + ',' + self.fmt(m['targ_obsXY'][1]) + ')')
+            self.printfunc(str(pos_id) + ': blind move to (obsX,obsY)=(' + self.fmt(m['targ_obsXY'][0]) + ',' + self.fmt(m['targ_obsXY'][1]) + ')')
         this_meas,imgfiles = self.move_measure(data, tp_updates=self.tp_updates_mode)
         save_img = False
         for pos_id in this_meas.keys():
@@ -187,7 +188,7 @@ class PosMoveMeasure(object):
                 correction[pos_id]['command'] = 'dXdY'
                 correction[pos_id]['target'] = dxdy
                 correction[pos_id]['log_note'] = 'correction move ' + str(i)
-                print(str(pos_id) + ': correction move ' + str(i) + ' of ' + str(num_corr_max) + ' by (dx,dy)=(' + self.fmt(dxdy[0]) + ',' + self.fmt(dxdy[1]) + '), \u221A(dx\u00B2+dy\u00B2)=' + self.fmt(data[pos_id]['err2D'][-1]))
+                self.printfunc(str(pos_id) + ': correction move ' + str(i) + ' of ' + str(num_corr_max) + ' by (dx,dy)=(' + self.fmt(dxdy[0]) + ',' + self.fmt(dxdy[1]) + '), \u221A(dx\u00B2+dy\u00B2)=' + self.fmt(data[pos_id]['err2D'][-1]))
             this_meas,imgfiles = self.move_measure(correction, tp_updates=self.tp_updates_mode)
             for pos_id in this_meas.keys():
                 m = data[pos_id] # again, for terseness
@@ -203,7 +204,7 @@ class PosMoveMeasure(object):
                 for file in imgfiles:
                     os.rename(file, pc.test_logs_directory + timestamp_str + '_move' + str(i) + file)                
         for pos_id in data.keys():
-            print(str(pos_id) + ': final error distance=' + self.fmt(data[pos_id]['err2D'][-1]))
+            self.printfunc(str(pos_id) + ': final error distance=' + self.fmt(data[pos_id]['err2D'][-1]))
         return data
 
     def retract_phi(self,pos_ids='all'):
@@ -264,7 +265,7 @@ class PosMoveMeasure(object):
         INPUTS:     pos_ids ... 'all' or a list of specific pos_ids
         """
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
-        print('rehoming', repr(pos_ids_by_ptl))
+        self.printfunc('rehoming', repr(pos_ids_by_ptl))
         for petal in pos_ids_by_ptl.keys():
             petal.request_homing(pos_ids_by_ptl[petal])
             petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
@@ -331,7 +332,7 @@ class PosMoveMeasure(object):
         files = set()
         if mode == 'grid':
             if self.grid_calib_num_DOF >= self.grid_calib_num_constraints: # the '=' in >= comparison is due to some places in the code where I am requiring at least one extra point more than exact constraint 
-                print('Not enough points requested to constrain grid calibration. Defaulting to arc calibration method.')
+                self.printfunc('Not enough points requested to constrain grid calibration. Defaulting to arc calibration method.')
                 return self.calibrate(pos_ids,'quick',save_file_dir,save_file_timestamp)
             grid_data = self._measure_calibration_grid(pos_ids, keep_phi_within_Eo=self.grid_calib_keep_phi_within_Eo)
             grid_data = self._calculate_and_set_arms_and_offsets_from_grid_data(grid_data, set_gear_ratios=False)
@@ -344,7 +345,7 @@ class PosMoveMeasure(object):
             P = self._measure_calibration_arc(pos_ids,'phi',mode)
             #set_gear_ratios = False if mode == 'quick' else True
             set_gear_ratios = False # not sure yet if we really want to adjust gear ratios automatically, hence by default False here
-            print("Finished measuring calibration arcs")#,T,P)
+            self.printfunc("Finished measuring calibration arcs")#,T,P)
             unwrapped_data = self._calculate_and_set_arms_and_offsets_from_arc_data(T,P,set_gear_ratios)
             for pos_id in T.keys():
                 file = save_file(pos_id)
@@ -355,7 +356,7 @@ class PosMoveMeasure(object):
     def identify_fiducials(self):
         """Nudge positioners (all together) forward/back to determine which centroid dots are fiducials.
         """
-        print('Nudging positioners to identify reference dots.')
+        self.printfunc('Nudging positioners to identify reference dots.')
         requests = {}
         for pos_id in self.all_pos_ids():
             requests[pos_id] = {'command':'posTP', 'target':[0,180], 'log_note':'identify fiducials starting point'}
@@ -365,13 +366,13 @@ class PosMoveMeasure(object):
     def identify_positioner_locations(self):
         """Nudge positioners (one at a time) forward/back to determine which positioners are where on the FVC.
         """
-        print('Nudging positioners to identify their starting locations.')
+        self.printfunc('Nudging positioners to identify their starting locations.')
         requests = {}
         for pos_id in self.all_pos_ids():
             requests[pos_id] = {'command':'posTP', 'target':[0,180], 'log_note':'identify positioners starting point'}
         self.move(requests) # go to starting point
         for pos_id in self.all_pos_ids():
-            print('Identifying location of positioner ' + pos_id)
+            self.printfunc('Identifying location of positioner ' + pos_id)
             self._identify(pos_id)
 
     def pos_data_listed_by_ptl(self, pos_ids='all', key=''):
@@ -477,7 +478,7 @@ class PosMoveMeasure(object):
             requests = {}
             for pos_id in all_pos_ids:
                 requests[pos_id] = {'command':'posTP', 'target':data[pos_id]['target_posTP'][i], 'log_note':'calib grid point ' + str(i+1)}
-            print('calibration grid point ' + str(i+1) + ' of ' + str(n_pts))
+            self.printfunc('calibration grid point ' + str(i+1) + ' of ' + str(n_pts))
             this_meas_data,imgfiles = self.move_measure(requests, tp_updates=None)
             for p in this_meas_data.keys():
                 data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
@@ -547,14 +548,13 @@ class PosMoveMeasure(object):
             requests = {}
             for pos_id in all_pos_ids:
                 requests[pos_id] = {'command':'posTP', 'target':data[pos_id]['target_posTP'][i], 'log_note':'calib arc on ' + axis + ' point ' + str(i+1)}
-            print('\'' + mode + '\' calibration arc on ' + axis + ' axis: point ' + str(i+1) + ' of ' + str(n_pts))
+            self.printfunc('\'' + mode + '\' calibration arc on ' + axis + ' axis: point ' + str(i+1) + ' of ' + str(n_pts))
             this_meas_data,imgfiles = self.move_measure(requests, tp_updates=None)
             for p in this_meas_data.keys():
                 data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
 
         # circle fits
         for pos_id in all_pos_ids:
-            #print(pos_id,"In circle fits",data[pos_id]['measured_obsXY'])
             (xy_ctr,radius) = fitcircle.FitCircle().fit(data[pos_id]['measured_obsXY'])
             data[pos_id]['xy_center'] = xy_ctr
             data[pos_id]['radius'] = radius
@@ -612,11 +612,11 @@ class PosMoveMeasure(object):
 
         prefix = 'range measurement on ' + axis + ' axis'
         # go to initial point
-        print(prefix + ': initial point')
+        self.printfunc(prefix + ': initial point')
         self.move(initial_tp_requests)
 
         # seek first limit
-        print(prefix + ': seeking first limit')
+        self.printfunc(prefix + ': seeking first limit')
         for petal in pos_ids_by_ptl.keys():
             these_pos_ids = pos_ids_by_ptl[petal]
             petal.request_limit_seek(these_pos_ids, axisid, -np.sign(delta), log_note='seeking first ' + axis + ' limit')
@@ -627,7 +627,7 @@ class PosMoveMeasure(object):
 
         # intermediate points
         for i in range(n_intermediate_pts):
-            print(prefix + ': intermediate point ' + str(i+1) + ' of ' + str(n_intermediate_pts))
+            self.printfunc(prefix + ': intermediate point ' + str(i+1) + ' of ' + str(n_intermediate_pts))
             # Note that anticollision is NOT done here. The reason is that phi location is not perfectly
             # well-known at this point (having just struck a hard limit). So externally need to have made
             # sure there was a clear path for the phi arm ahead of time.
@@ -642,7 +642,7 @@ class PosMoveMeasure(object):
                 data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],meas_data[p])
 
         # seek second limit
-        print(prefix + ': seeking second limit')
+        self.printfunc(prefix + ': seeking second limit')
         for petal in pos_ids_by_ptl.keys():
             these_pos_ids = pos_ids_by_ptl[petal]
             petal.request_limit_seek(these_pos_ids, axisid, np.sign(delta), log_note='seeking second ' + axis + ' limit')
@@ -711,7 +711,7 @@ class PosMoveMeasure(object):
             petal = data[pos_id]['petal']
             for key in param_keys:
                 petal.set(pos_id,key,data[pos_id][key][-1])
-                print('Grid calib on ' + str(pos_id) + ': ' + key + ' set to ' + format(data[pos_id][key][-1],'.3f'))
+                self.printfunc('Grid calib on ' + str(pos_id) + ': ' + key + ' set to ' + format(data[pos_id][key][-1],'.3f'))
             data[pos_id]['final_expected_obsXY'] = np.array(expected_xy(params_optimized.x)).transpose().tolist()
         return data
 
@@ -783,8 +783,8 @@ class PosMoveMeasure(object):
             ratio_P = np.median(ratios_P)
             data[pos_id]['gear_ratio_T'] = ratio_T
             data[pos_id]['gear_ratio_P'] = ratio_P
-            print(pos_id + ': measurement proposes GEAR_CALIB_T = ' + format(ratio_T,'.6f'))
-            print(pos_id + ': measurement proposes GEAR_CALIB_P = ' + format(ratio_P,'.6f'))
+            self.printfunc(pos_id + ': measurement proposes GEAR_CALIB_T = ' + format(ratio_T,'.6f'))
+            self.printfunc(pos_id + ': measurement proposes GEAR_CALIB_P = ' + format(ratio_P,'.6f'))
             if set_gear_ratios:
                 petal.set(pos_id,'GEAR_CALIB_T',ratio_T)
                 petal.set(pos_id,'GEAR_CALIB_P',ratio_P)
@@ -842,11 +842,11 @@ class PosMoveMeasure(object):
                 ref_idxs.append(i)
         if identify_fiducials:
             if len(xy_ref) != self.n_fiducial_dots:
-                print('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_fiducial_dots) + ')')
+                self.printfunc('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_fiducial_dots) + ')')
             self.fiducials_xy = xy_ref
         else:
             if n_dots - len(ref_idxs) != 1:
-                print('warning: more than one moving dots detected')
+                self.printfunc('warning: more than one moving dots detected')
             else:
                 ref_idxs.sort(reverse=True)
                 for i in ref_idxs:
@@ -911,8 +911,8 @@ class PosMoveMeasure(object):
                 new_P = old_P + delta_P
                 posmodel.axis[pc.T].pos = new_T
                 posmodel.axis[pc.P].pos = new_P
-                print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_T from ' + self.fmt(old_T) + ' to ' + self.fmt(new_T))
-                print(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
+                self.printfunc(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_T from ' + self.fmt(old_T) + ' to ' + self.fmt(new_T))
+                self.printfunc(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
                 delta_TP[pos_id] = [delta_T,delta_P]
                 posmodel.state.log_unit('updated ' + param + '_T and ' + param + '_P after positioning error of ' + self.fmt(err_xy) + ' mm')
         return delta_TP

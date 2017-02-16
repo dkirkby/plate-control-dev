@@ -17,7 +17,8 @@ class FVCHandler(object):
         2. scale
         3. translation
     """
-    def __init__(self, fvc_type='SBIG', platemaker_instrument='em'):
+    def __init__(self, fvc_type='SBIG', platemaker_instrument='em', printfunc=print):
+        self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.fvc_type = fvc_type # 'SBIG' or 'SBIG_Yale' or 'FLI' or 'simulator'
         if self.fvc_type == 'SBIG':
             import sbig_grab_cen
@@ -28,7 +29,7 @@ class FVCHandler(object):
             # I think here we would want to set the FVC either in FLI mode or SBIG mode?
         elif self.fvc_type == 'simulator':
             self.sim_err_max = 0.1
-            print('FVCHandler is in simulator mode with max errors of size ' + str(self.sim_err_max) + '.')
+            self.printfunc('FVCHandler is in simulator mode with max errors of size ' + str(self.sim_err_max) + '.')
         if 'SBIG' in self.fvc_type:
             self.exposure_time = 0.2
             self.max_counts = 2**16 - 1
@@ -53,7 +54,7 @@ class FVCHandler(object):
         from DOSlib.proxies import FVC
         self.__platemaker_instrument = name
         self.fvcproxy = FVC(self.platemaker_instrument)
-        print('proxy FVC created for instrument %s' % self.fvcproxy.get('instrument'))
+        self.printfunc('proxy FVC created for instrument %s' % self.fvcproxy.get('instrument'))
 
     @property
     def exposure_time(self):
@@ -98,7 +99,7 @@ class FVCHandler(object):
             sequence_id = self.next_sequence_id
             centroids = self.fvcproxy.send_fvc_command('locate',expid=sequence_id, send_centroids=True)
             if centroids == 'FAILED':
-                print('Failed to locate centroids using FVC.')
+                self.printfunc('Failed to locate centroids using FVC.')
             else:
                 for params in self.centroids.values():
                     xy.append(params['x'],params['y'])
@@ -179,7 +180,7 @@ class FVCHandler(object):
         as its closest-distance match in the list expected_xy.
         """
         if len(unknown_xy) != len(expected_xy):
-            print('warning: unknown_xy length = ' + str(len(unknown_xy)) + ' but expected_xy length = ' + str(len(expected_xy)))
+            self.printfunc('warning: unknown_xy length = ' + str(len(unknown_xy)) + ' but expected_xy length = ' + str(len(expected_xy)))
         xy = [None]*len(expected_xy)
         dist = []
         for e in expected_xy:

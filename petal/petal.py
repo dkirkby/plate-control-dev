@@ -25,19 +25,20 @@ class Petal(object):
         pos_ids     ... list of positioner unique id strings
         fid_ids     ... list of fiducials unique id strings
     """
-    def __init__(self, petal_id, pos_ids, fid_ids, simulator_on=False):
-        # petalcontroller setup
+    def __init__(self, petal_id, pos_ids, fid_ids, simulator_on=False, printfunc=print):
+        # petal setup
         self.petal_id = petal_id
         self.verbose = False # whether to print verbose information at the terminal
         self.simulator_on = simulator_on # controls whether in software-only simulation mode
         if not(self.simulator_on):
             import petalcomm
             self.comm = petalcomm.PetalComm(self.petal_id)
-            
+        self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
+
         # positioners setup
         self.posmodels = []
         for pos_id in pos_ids:
-            state = posstate.PosState(pos_id, logging=True, device_type='pos')
+            state = posstate.PosState(pos_id, logging=True, device_type='pos', printfunc=self.printfunc)
             model = posmodel.PosModel(state)
             self.posmodels.append(model)
         self.posids = pos_ids
@@ -52,7 +53,7 @@ class Petal(object):
         # fiducials setup
         self.fidstates = {}
         for fid_id in fid_ids:
-            state = posstate.PosState(fid_id, logging=True, device_type='fid')
+            state = posstate.PosState(fid_id, logging=True, device_type='fid', printfunc=self.printfunc)
             self.fidstates[fid_id] = state
         
         # power suppliees setup?
@@ -120,10 +121,10 @@ class Petal(object):
             if 'log_note' not in requests[pos_id]:
                 requests[pos_id]['log_note'] = ''
             if not(self.get(pos_id,'CTRL_ENABLED')):
-                print(self._request_denied_disabled_str(pos_id,requests[pos_id]))
+                self.printfunc(self._request_denied_disabled_str(pos_id,requests[pos_id]))
                 mark_for_delete.add(pos_id)
             elif self.schedule.already_requested(requests[pos_id]['posmodel']):
-                print('Positioner ' + str(pos_id) + ' already has a target scheduled. Extra target request ' + self._target_str(requests[pos_id]) + ' ignored.')
+                self.printfunc('Positioner ' + str(pos_id) + ' already has a target scheduled. Extra target request ' + self._target_str(requests[pos_id]) + ' ignored.')
                 mark_for_delete.add(pos_id)
             else:
                 self.schedule.request_target(requests[pos_id]['posmodel'], requests[pos_id]['command'], requests[pos_id]['target'][0], requests[pos_id]['target'][1], requests[pos_id]['log_note'])
@@ -184,7 +185,7 @@ class Petal(object):
         mark_for_delete = set()
         for pos_id in requests.keys():
             if not(self.get(pos_id,'CTRL_ENABLED')):
-                print(self._request_denied_disabled_str(pos_id,requests[pos_id]))
+                self.printfunc(self._request_denied_disabled_str(pos_id,requests[pos_id]))
                 mark_for_delete.add(pos_id)
         for pos_id in mark_for_delete:
             del requests[pos_id]
@@ -215,7 +216,7 @@ class Petal(object):
             if posmodel.state.read('CTRL_ENABLED'):
                 posmodels.append(posmodel)
             else:
-                print('Positioner ' + str(posmodel.state.read('POS_ID')) + ' is disabled. Limit seek request ignored.')
+                self.printfunc('Positioner ' + str(posmodel.state.read('POS_ID')) + ' is disabled. Limit seek request ignored.')
         if anticollision:
             if axisid == pc.P and direction == -1:
                 # calculate thetas where extended phis do not interfere
@@ -253,7 +254,7 @@ class Petal(object):
             if posmodel.state.read('CTRL_ENABLED'):
                 posmodels.append(posmodel)
             else:
-                print('Positioner ' + str(posmodel.state.read('POS_ID')) + ' is disabled. Homing request ignored.')
+                self.printfunc('Positioner ' + str(posmodel.state.read('POS_ID')) + ' is disabled. Homing request ignored.')
         hardstop_debounce = [0,0]
         direction = [0,0]
         direction[pc.P] = +1 # force this, because anticollision logic depends on it
@@ -296,7 +297,8 @@ class Petal(object):
         """Send move tables that have been scheduled out to the positioners.
         """
         if self.simulator_on:
-            print('Simulator skips sending move tables to positioners.')
+            if self.verbose:
+                print('Simulator skips sending move tables to positioners.')
             return
         hw_tables = self._hardware_ready_move_tables()
         canids = []
@@ -315,14 +317,14 @@ class Petal(object):
         # Currently this function needs to be called each time parameters change after petal initialization and if a positioner is plugged in/powered on after
         # petal initialization
         if self.simulator_on:
-            print('Simulator skips sending motor parameters to positioners.')
+            if self.verbose:
+                print('Simulator skips sending motor parameters to positioners.')
             return
         parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
         for p in self.posmodels:
             state = p.state
             can_id = p.canid
             bus_id = p.busid
-
             parameter_vals = []
             for parameter_key in parameter_keys:
                 parameter_vals.append(state.read(parameter_key))
@@ -330,7 +332,7 @@ class Petal(object):
             self.comm.set_currents(bus_id, can_id, [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]], [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]])
             #syntax for setting periods: comm.set_periods(can_id, creep_period_p, creep_period_t, spin_period)
             self.comm.set_periods(bus_id, can_id, parameter_vals[4], parameter_vals[4], parameter_vals[5])
-            print(p.posid + ' (bus=' + str(bus_id) + ', canid=' + str(can_id) + '): motor currents and periods set')
+            self.printfunc(p.posid + ' (bus=' + str(bus_id) + ', canid=' + str(can_id) + '): motor currents and periods set')
 
 
     def execute_moves(self):
@@ -338,7 +340,8 @@ class Petal(object):
         Then do clean-up and logging routines to keep track of the moves that were done.
         """
         if self.simulator_on:
-            print('Simulator skips sending execute moves command to positioners.')
+            if self.verbose:
+                print('Simulator skips sending execute moves command to positioners.')
         else:
             self.comm.execute_sync(self.sync_mode)
             self._wait_while_moving()
@@ -417,7 +420,8 @@ class Petal(object):
         save_as_default ... only used when seting is a number, in which case True means we will store that setting permanently to the fiducials' config file, False means its just a temporary setting this time
         """
         if self.simulator_on:
-            print('Simulator skips sending out set_fiducials commands.')
+            if self.verbose:
+                print('Simulator skips sending out set_fiducials commands.')
             return
         fid_ids = pc.listify(fid_ids,keep_flat=True)[0]
         bus_ids = self.get_fids_val(fid_ids,'BUS_ID')
@@ -548,7 +552,7 @@ class Petal(object):
             m.set(key=['POS_T','POS_P'],value=[0,180]) # sets these values for all positioners identified in posids
         """
         if key == None or value == None:
-            print('either no key or no value was specified to setval')
+            self.printfunc('either no key or no value was specified to setval')
             return
         (posid, temp) = self._posid_listify_and_fill(posid)
         (key,   temp) = pc.listify(key,keep_flat=True)
@@ -698,7 +702,7 @@ class Petal(object):
         while keep_waiting:
             elapsed_time = time.time() - start_time
             if elapsed_time >= timeout:
-                print('Timed out at ' + str(timeout) + ' seconds waiting to send next move table.')
+                self.printfunc('Timed out at ' + str(timeout) + ' seconds waiting to send next move table.')
                 keep_waiting = False
             if self.comm.ready_for_tables(self.busids_where_tables_were_just_sent, self.canids_where_tables_were_just_sent):
                 keep_waiting = False

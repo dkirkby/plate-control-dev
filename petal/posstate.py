@@ -23,7 +23,8 @@ class PosState(object):
         unit) and general parameters (settings which apply uniformly to many units).
     """
 
-    def __init__(self, unit_id=None, logging=False, device_type='pos'):
+    def __init__(self, unit_id=None, logging=False, device_type='pos', printfunc=print):
+        self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.logging = logging
         self.type = device_type
         if self.type == 'pos':
@@ -82,8 +83,8 @@ class PosState(object):
         self.unit.reload()
         if key in self.unit.keys():
             return self.unit[key]
-        print('no key "' + repr(key) + '" found')
-        print('keys: ' + str(self.unit.keys()))
+        self.printfunc('no key "' + repr(key) + '" found')
+        self.printfunc('keys: ' + str(self.unit.keys()))
         return None
 
     def write(self,key,val,write_to_disk=None):
@@ -93,14 +94,14 @@ class PosState(object):
             nom = pc.nominals[key]['value']
             tol = pc.nominals[key]['tol']
             if val < nom - tol or val > nom + tol: # check for absurd values
-                print('Attempted to set ' + str(key) + ' of ' + str(self.unit_basename) + ' to value = ' + str(val) + ', which is outside the nominal = ' + str(nom) + ' +/- ' + str(tol) + '. Defaulting to nominal value instead.')
+                self.printfunc('Attempted to set ' + str(key) + ' of ' + str(self.unit_basename) + ' to value = ' + str(val) + ', which is outside the nominal = ' + str(nom) + ' +/- ' + str(tol) + '. Defaulting to nominal value instead.')
                 val = nom
         if key in self.unit.keys():
             self.unit[key] = val
             if write_to_disk != False:
                 self.unit.write()
         else:
-            print('value not set, because the key "' + repr(key) + '" was not found')
+            self.printfunc('value not set, because the key "' + repr(key) + '" was not found')
  
     def log_unit(self,note=''):
         """All current unit parameters are written to the hardware unit's log file.

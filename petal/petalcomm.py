@@ -1,16 +1,3 @@
-"""
-PetalComm
-
-some description
-version history
-etc
-
-  Version History
-  0.1.0    2/1/2016   JS     Initial version
-  0.2.0    3/1/2016   KH     added communication code
-"""
-VERSION = '0.2.0'
-
 import threading
 import re
 import time

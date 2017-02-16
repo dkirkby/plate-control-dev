@@ -37,7 +37,7 @@ class XYTest(object):
         gui_root = tkinter.Tk()
         if not(hwsetup_conf):
             message = "Select hardware setup file."
-            xytest_conf = tkinter.filedialog.askopenfilename(initialdir=pc.test_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
+            hwsetup_conf = tkinter.filedialog.askopenfilename(initialdir=pc.hwsetups_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
         if not(xytest_conf):
             message = "Select test configuration file."
             xytest_conf = tkinter.filedialog.askopenfilename(initialdir=pc.test_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
@@ -50,9 +50,9 @@ class XYTest(object):
         self.xytest_conf.write()
         self.new_and_changed_files = set()  # start a set to keep track of all files that need to be added / committed to SVN
         self.new_and_changed_files.add(self.xytest_conf.filename)
-        self.logwrite('File ' + hwsetup_conf + ' selected as hardare setup.')
-        self.logwrite('File ' + xytest_conf + ' selected as template for test settings.')
-        self.logwrite('Test will be run from a uniquely-generated traveler config file located at ' + str(self.xytest_conf.filename) + ' which was based off the template.')
+        self.logwrite('Hardware setup file: ' + hwsetup_conf)
+        self.logwrite('Test template file: ' + xytest_conf)
+        self.logwrite('Test traveler file:' + self.xytest_conf.filename)
         
         # verifications of config file
         self.n_loops = self._calculate_and_check_n_loops()
@@ -67,10 +67,12 @@ class XYTest(object):
             fvc_type = 'simulator'
         else:
             fvc_type = self.hwsetup_conf['fvc_type']
-        fvc = fvchandler.FVCHandler(fvc_type)       
+        fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite)       
         fvc.rotation = self.hwsetup_conf['rotation']  # deg
         fvc.scale =  self.hwsetup_conf['scale'] # mm/pixel
-        self.logwrite('FVC of type ' + str(fvc_type) + ' initialized wtih rotation = ' + str(fvc.rotation) + ' and scale = ' + str(fvc.scale))
+        self.logwrite('FVC type: ' + str(fvc_type))
+        self.logwrite('FVC rotation: ' + str(fvc.rotation))
+        self.logwrite('FVC scale: ' + str(fvc.scale))
         
         # set up positioners, fiducials, and petals
         self.pos_ids = self.hwsetup_conf['pos_ids']
@@ -78,20 +80,22 @@ class XYTest(object):
         while len(self.pos_notes) < len(self.pos_ids):
             self.pos_notes.append('')
         fid_ids = self.hwsetup_conf['fid_ids']
-        ptl_ids = self.hwsetup_conf['ptl_ids']
-        petals = [petal.Petal(ptl_ids[0], self.pos_ids, fid_ids, simulator_on=self.simulate)] # single-petal placeholder for generality of future implementations, where we could have a list of multiple petals, and need to correlate pos_ids and fid_ids to thier particular petals
+        ptl_id = self.hwsetup_conf['ptl_id']
+        petals = [petal.Petal(ptl_id, self.pos_ids, fid_ids, simulator_on=self.simulate, printfunc=self.logwrite)]
         for ptl in petals:
             ptl.anticollision_default = self.xytest_conf['anticollision']
-        self.m = posmovemeasure.PosMoveMeasure(petals,fvc)
+        self.m = posmovemeasure.PosMoveMeasure(petals,fvc,printfunc=self.logwrite)
+        self.pos_ids = self.m.all_pos_ids()
         self.logwrite('Positoners: ' + str(self.pos_ids))
+        self.logwrite('Positoner notes: ' + str(self.pos_notes))
         self.logwrite('Fiducials: ' + str(fid_ids))
-        self.logwrite('Petals: ' + str(ptl_ids))
+        self.logwrite('Petal: ' + str(ptl_id))
         self.logwrite('posmovemeasure initialized.')
 
         # set up lookup table for random targets
         self.rand_xy_targs_idx = 0 # where we are in the random targets list
         self.rand_xy_targs_list = []
-        targs_file = self.xytest_conf['rand_xy_targs_file']
+        targs_file = pc.test_settings_directory + self.xytest_conf['rand_xy_targs_file']
         with open(targs_file, newline='') as csvfile:
             reader = csv.reader(csvfile)
             header_rows_remaining = 1
@@ -100,7 +104,8 @@ class XYTest(object):
                     header_rows_remaining -= 1
                 else:
                     self.rand_xy_targs_list.append([float(row[0]),float(row[1])])
-        self.logwrite('Read in ' + str(len(self.rand_xy_targs_list)) + ' xy targets from file ' + targs_file + ' and formed move requests.')
+        self.logwrite('Random targets file: ' + targs_file)
+        self.logwrite('Random targets file length: ' + str(len(self.rand_xy_targs_list)) + ' targets')
 
     def intro_questions(self):
         user_vals = []
@@ -166,6 +171,7 @@ class XYTest(object):
             files = self.m.calibrate(pos_ids='all', mode='full', save_file_dir=pc.test_logs_directory, save_file_timestamp=pc.timestamp_str_now())
             for file in files:
                 self.new_and_changed_files.add(file)
+                self.logwrite('Calibration plot file: ' + file)
             for pos_id in self.pos_ids:
                 state = self.m.state(pos_id)
                 for key in ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']:
@@ -188,9 +194,13 @@ class XYTest(object):
         def summary_plot_name(pos_id):
             return path_prefix(pos_id) + '_xyplot'    
 
-        local_targets = self.generate_posXY_targets_grid(self.xytest_conf['npoints_across_grid'][loop_number])
+        local_targets = self.generate_posXY_targets_grid(self.xytest_conf['n_pts_across_grid'][loop_number])
+        self.logwrite('Number of local targets = ' + str(len(local_targets)))
+        self.logwrite('Local target xy positions: ' + str(local_targets))
         
-        submove_idxs = [i for i in range(self.num_corr_max+1)]
+        num_corr_max = self.xytest_conf['num_corr_max'][loop_number]
+        submove_idxs = [i for i in range(num_corr_max+1)]
+        self.logwrite('Number of corrections max = ' + str(num_corr_max))
         
         # write headers for move data log files
         move_log_header = 'timestamp,cycle,move_log,target_x,target_y'
@@ -236,8 +246,8 @@ class XYTest(object):
                 print('')
                 self.logwrite('MEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets)))
                 self.logwrite('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
-                this_timestamp = pc.timestamp_now_str()
-                these_meas_data = self.m.move_and_correct(these_targets, num_corr_max=self.num_corr_max)
+                this_timestamp = pc.timestamp_str_now()
+                these_meas_data = self.m.move_and_correct(these_targets, num_corr_max)
                 
                 # store this set of measured data
                 all_data_by_target.append(these_meas_data)
@@ -256,7 +266,7 @@ class XYTest(object):
                     summary_log_data += 'start time,' + start_timestamp + '\n'
                     summary_log_data += 'finish time,' + this_timestamp + '\n'
                     summary_log_data += 'num targets measured,' + str(len(all_data_by_target)) + '\n'
-                    summary_log_data += 'num corrections max,' + str(self.num_corr_max) + '\n'
+                    summary_log_data += 'num corrections max,' + str(num_corr_max) + '\n'
                     summary_log_data += 'submove index -->'
                     for i in submove_idxs: summary_log_data += ',' + str(i)
                     summary_log_data += '\n'
@@ -279,7 +289,7 @@ class XYTest(object):
                 # update test data log
                 for pos_id in these_targets.keys():
                     state = self.m.state(pos_id)
-                    self.new_and_changed_files.add(state.logpath)
+                    self.new_and_changed_files.add(state.log_path)
                     self.new_and_changed_files.add(state.unit.filename)
                     row = this_timestamp
                     row += ',' + str(state.read('TOTAL_MOVE_SEQUENCES'))
@@ -308,7 +318,12 @@ class XYTest(object):
                 theta_range = [theta_min,theta_max]
                 r1 = posmodel.state.read('LENGTH_R1')
                 r2 = posmodel.state.read('LENGTH_R2')
-                pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_data_by_pos_id[pos_id],center,theta_range,r1,r2,title)
+                filenames = pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_data_by_pos_id[pos_id],center,theta_range,r1,r2,title)
+                self.logwrite(pos_id + ': Summary log file: ' + summary_log_name(pos_id))
+                self.logwrite(pos_id + ': Full data log file: ' + move_log_name(pos_id))
+                for filename in filenames:
+                    self.logwrite(pos_id + ': Summary plot file: ' + filename)
+
 
             # Test report and email only on certain tests
             if self.xytest_conf['should_email']:
@@ -334,7 +349,7 @@ class XYTest(object):
                 if j % 1000 == 0:
                     for pos_id in self.pos_ids:
                         state = self.m.state(pos_id)
-                        self.new_and_changed_files.add(state.logpath)
+                        self.new_and_changed_files.add(state.log_path)
                     self.logwrite(status_str)
                 elif j % 50 == 0:
                     print(status_str)
@@ -366,25 +381,25 @@ class XYTest(object):
     
     def svn_add_commit(self):
         # Commit logs through SVN
-        if self.xytest_conf['should_auto_commit_logs']:
+        if self.xytest_conf['should_auto_commit_logs'] and not(self.simulate):
             files_str = ''
             for file in self.new_and_changed_files:
                 files_str += ' ' + file
             if files_str:
                 self.logwrite('The following files were generated or modified during the test and need to be added / committed to svn:' + files_str)
                 print('')
-                print('Enter you svn username and password for committing the logs to the server. These will not be saved to the logfile, but will briefly be clear-text in this script''s memory while it is running.')
+                print('Enter your svn username and password for committing the logs to the server. These will not be saved to the logfile, but will briefly be clear-text in this script''s memory while it is running.')
                 svn_user = input('svn username: ')
                 svn_pass = input('svn password: ')
-                print('Will attempt to commit the logs automatically now. This may take a few minutes...')
+                self.logfile('Will attempt to commit the logs automatically now. This may take a few minutes...')
                 os.system('svn add --username j' + svn_user + ' --password ' + svn_pass + ' --non-interactive' + files_str)
                 err = os.system('svn commit --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive -m "autocommit from xytest script"' + files_str)
                 del svn_user
                 del svn_pass
                 if err == 0:
-                    print('...automatic svn commit appears to have worked.')
+                    self.logfile('...automatic svn commit appears to have worked.')
                 else:
-                    print('...automatic svn commit may have failed. We''ll need to check manually and make sure all files uploaded properly. A list of the files needing upload is in the traveler conf file.')
+                    self.logfile('...automatic svn commit may have failed. Need to check manually and make sure all files uploaded properly. A list of the files needing upload is in the traveler conf file.')
 
     def logwrite(self,text,stdout=True):
         """Standard logging function for writing to the test traveler config file.
@@ -414,15 +429,19 @@ class XYTest(object):
                 if curr_val != None:
                     state.write(key,curr_val)
                     self.logwrite(str(pos_id) + ': Set ' + key + ' to ' + str(curr_val))
+                else:
+                    self.logwrite(str(pos_id) + ': ' + key + ' is ' + str(self.old_currents[pos_id][key]))
+                    self.old_currents[pos_id][key] = None # indicates later in clear_current_overrides() method whether to do anything
         
     def clear_current_overrides(self):
         """Restore current settings for each positioner to their original values.
         """
         for key in ['CURR_CRUISE','CURR_CREEP']:
             for pos_id in self.pos_ids:
-                state = self.m.state(pos_id)
-                state.write(key, self.old_currents[pos_id][key])
-                self.logwrite(str(pos_id) + ': Restored ' + key + ' to ' + str(self.old_currents[pos_id][key]))
+                if self.old_currents[pos_id][key] != None:
+                    state = self.m.state(pos_id)
+                    state.write(key, self.old_currents[pos_id][key])
+                    self.logwrite(str(pos_id) + ': Restored ' + key + ' to ' + str(self.old_currents[pos_id][key]))
 
     def generate_posXY_targets_grid(self, npoints_across_grid):
         """Make rectilinear grid of local (x,y) targets. Returns a list.
@@ -430,7 +449,7 @@ class XYTest(object):
         r_max = self.xytest_conf['targ_max_radius']
         line = np.linspace(-r_max,r_max,npoints_across_grid)
         targets = [[x,y] for x in line for y in line]
-        for i in range(len(targets)):
+        for i in range(len(targets)-1,-1,-1): # go backwards thru list for popping so indices always work 
             if not(self.target_within_limits(targets[i])):
                 targets.pop(i)
         return targets
@@ -469,12 +488,11 @@ class XYTest(object):
         n = max(all_n) # if all lengthss are same, then they must all be as long as the longest one
         all_same = True
         for i in range(len(keys)):
-            if all_n(i) != n:
-                self.logwrite('Error: ' + keys[i] + ' has only ' + str(all_n(i)) + ' entries (expected ' + str(n) + ')')
+            if all_n[i] != n:
+                self.logwrite('Error: ' + keys[i] + ' has only ' + str(all_n[i]) + ' entries (expected ' + str(n) + ')')
                 all_same = False
         if not(all_same):
-            self.logwrite('Not all loop lengths the same in config file ' + self.xytest_conf.filename)
-            sys.exit()
+            sys.exit('Not all loop lengths the same in config file ' + self.xytest_conf.filename)
         else:
             return n
     
@@ -501,5 +519,6 @@ if __name__=="__main__":
     test.m.park(pos_ids='all')
     test.logwrite('Moved positioners into \'parked\' position.')
     test.get_and_log_comments_from_user()
-    test.logwrite('Test complete.')    
+    test.logwrite('Test complete.')
+    test.logwrite('Files changed or generated: ' + str(test.new_and_changed_files))
     test.svn_add_commit()
