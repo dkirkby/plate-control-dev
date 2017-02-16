@@ -10,10 +10,35 @@ import petal
 import posmovemeasure
 import fvchandler
 import posconstants as pc
+import tkinter
+import tkinter.filedialog
 
 # get some identifying info
 station = input('Enter the station name: ')
 extradots_name = 'extradots_' + station
+print('Locate the positioner config files that correspond to each of the positioners that are installed. Hit cancel on the dialog box when done.')
+keep_getting = True
+i = 0
+pos_ids = []
+while keep_getting:
+    message = 'Pick pos file #' + str(i+1) + '. Cancel when done.'
+    gui_root = tkinter.Tk()
+    configfile = tkinter.filedialog.askopenfilename(initialdir=pc.pos_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
+    gui_root.destroy()
+    if not(configfile):
+        keep_getting = False
+    else:
+        pos_id = configfile.split('unit_')[1].split('.conf')[0]
+        if pos_id not in pos_ids:
+            pos_ids.append(pos_id)
+            i += 1
+print('Positioners selected:')
+for pos_id in pos_ids:
+    print('  ' + pos_id)
+ok = input('Is this all correct? (yes/no)')
+if not('y' in ok or 'Y' in ok):
+    # implement an exit here
+    pass
 
 # software initialization and startup
 sim = False
