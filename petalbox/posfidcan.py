@@ -24,7 +24,8 @@ class PosFidCAN(object):
 		
 		try:	
 			self.s = socket.socket(socket.AF_CAN, socket.SOCK_RAW, socket.CAN_RAW)		
-			self.s.bind((channel,))	
+			self.s.bind((channel,))
+			self.s.settimeout(10)	
 		except socket.error:
 			print('Error creating and/or binding socket')
 		return		
@@ -92,8 +93,12 @@ class PosFidCAN(object):
 			
 			self.s.send(self.build_can_frame(posID, bytearray.fromhex(data)))
 			
-			time.sleep(self.__sleeptime)			
-			cf, addr = self.s.recvfrom(24)
+			time.sleep(self.__sleeptime)
+			try:			
+				cf, addr = self.s.recvfrom(24)
+			except socket.timeout:
+				print('Socket timeout error: positioner probably did not respond.  Check that it is connected, power is on, and the CAN id is correct')
+				return('FAILED')
 			can_id, can_dlc, data = self.dissect_can_frame(cf)
 			can_id=can_id-0x80000000				#remove extended id prefix to give just a can id
 			intid=str(can_id)			
