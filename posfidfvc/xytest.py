@@ -189,7 +189,7 @@ class XYTest(object):
         log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
         log_timestamp = pc.timestamp_str_now()
         def path_prefix(pos_id):
-            return pc.test_logs_directory + os.path.sep + pos_id + '_' + log_timestamp + log_suffix
+            return pc.test_logs_directory + pos_id + '_' + log_timestamp + log_suffix
         def move_log_name(pos_id):
             return path_prefix(pos_id) + '_movedata.csv'
         def summary_log_name(pos_id):
@@ -326,7 +326,7 @@ class XYTest(object):
                 self.logwrite(pos_id + ': Full data log file: ' + move_log_name(pos_id))
                 for filename in filenames:
                     self.logwrite(pos_id + ': Summary plot file: ' + filename)
-
+                    self.new_and_changed_files.add(filename)
 
             # Test report and email only on certain tests
             if self.xytest_conf['should_email']:
