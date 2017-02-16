@@ -18,9 +18,8 @@ class PosMoveMeasure(object):
             petals = [petals]
         self.petals = petals # list of petal objects
         self.fvc = fvc # fvchandler object
-        self.ref_dist_tol = 0.1   # [mm] used for identifying fiducial dots
+        self.ref_dist_tol = 5.0   # [pixels on FVC CCD] used for identifying fiducial dots
         self.nudge_dist   = 10.0  # [deg] used for identifying fiducial dots
-        self.fiducials_xy = []    # list of nominal locations of the fixed reference dots in the obsXY coordinate system
         self.last_meas_fiducials_xy = [] # convenient location to store list of measured fiducial dot positions from the most recent FVC measurement
         self.n_points_full_calib_T = 7 # number of points in a theta calibration arc
         self.n_points_full_calib_P = 7 # number of points in a phi calibration arc
@@ -37,6 +36,7 @@ class PosMoveMeasure(object):
         self.tp_updates_mode = 'posTP' # options are None, 'posTP', 'offsetsTP'. see comments in move_measure() function for explanation
         self.tp_updates_tol = 0.065 # [mm] tolerance on error between requested and measured positions, above which to update the POS_T,POS_P or OFFSET_T,OFFSET_P parameters
         self.tp_updates_fraction = 0.8 # fraction of error distance by which to adjust POS_T,POS_P or OFFSET_T,OFFSET_P parameters after measuring an excessive error with FVC
+        self.extradots_fid_state = None # TEMPORARY HACK until individual fiducial dot locations tracking is properly handled
 
     @property
     def n_fiducial_dots(self):
@@ -57,6 +57,27 @@ class PosMoveMeasure(object):
         """Turn off all fiducials on all petals."""
         for petal in self.petals:
             petal.set_all_fiducials('off')
+            
+    @property
+    def fiducial_dots_fvcXY(self):
+        """List of nominal locations of all fixed reference dots in the FOV. List is
+        of the form [[x1,y1],[x2,y2],...]. All values are in the fvc XY pixel space.
+        """
+        xy = []
+        for petal in self.petals:
+            more_xy = petal.fiducial_dots_fvcXY
+            xy.extend(more_xy)
+        return xy
+    
+    @property
+    def fiducial_dots_obsXY(self):
+        """List of nominal locations of all fixed reference dots in the FOV. List is
+        of the form [[x1,y1],[x2,y2],...]. All values are in the observer XY coordinate
+        system (millimeters).
+        """
+        fvcXY = self.fiducial_dots_fvcXY
+        obsXY = self.fvc.fvcXY_to_obsXY_noplatemaker(fvcXY)
+        return obsXY
 
     def measure(self):
         """Measure positioner locations with the FVC and return the values.
@@ -78,7 +99,7 @@ class PosMoveMeasure(object):
             pos_ids.extend(these_pos_ids)
             petals.extend([petal]*len(these_pos_ids))
             expected_pos_xy = pc.concat_lists_of_lists(expected_pos_xy, petal.expected_current_position(these_pos_ids,'obsXY'))
-        expected_ref_xy = self.fiducials_xy
+        expected_ref_xy = self.fiducial_dots_obsXY
         measured_pos_xy,measured_ref_xy,imgfiles = self.fvc.measure_and_identify(expected_pos_xy,expected_ref_xy) 
         for i in range(len(measured_pos_xy)):
             petals[i].set(pos_ids[i],'LAST_MEAS_OBS_X',measured_pos_xy[i][0])
@@ -820,15 +841,17 @@ class PosMoveMeasure(object):
                 xy_meas = []
                 for petal in self.petals:
                     positioners_current = petal.expected_current_position(posid=pos_ids_by_ptl[petal],key='obsXY')
+                    positioners_current = self.fvc.obsXY_to_fvcXY_noplatemaker(positioners_current)
                     xy_meas = pc.concat_lists_of_lists(xy_meas,positioners_current)
-                n_new_fiducials = max(self.n_fiducial_dots - len(self.fiducials_xy),0)
+                n_new_fiducials = max(self.n_fiducial_dots - len(self.fiducial_dots_fvcXY),0)
                 if n_new_fiducials:
                     faraway = 2*np.max(np.max(np.abs(xy_meas)))
                     new_fiducials = np.random.uniform(low=faraway,high=2*faraway,size=(n_new_fiducials,2)).tolist()
-                    self.fiducials_xy = pc.concat_lists_of_lists(self.fiducials_xy,new_fiducials)
-                xy_meas = pc.concat_lists_of_lists(xy_meas,self.fiducials_xy)
+                    fiducials_xy = pc.concat_lists_of_lists(self.fiducial_dots_obsXY,new_fiducials)
+                    self.set_fiducials_xy_extradots(fiducials_xy) # temporary hack, see function description
+                xy_meas = pc.concat_lists_of_lists(xy_meas,self.fiducial_dots_fvcXY)
             else:
-                xy_meas,brightnesses,imgfiles = self.fvc.measure(n_dots)
+                xy_meas,brightnesses,imgfiles = self.fvc.measure_fvc_pixels(n_dots)
             if i == 0:
                 xy_init = xy_meas
             else:
@@ -843,7 +866,7 @@ class PosMoveMeasure(object):
         if identify_fiducials:
             if len(xy_ref) != self.n_fiducial_dots:
                 self.printfunc('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_fiducial_dots) + ')')
-            self.fiducials_xy = xy_ref
+            self.set_fiducials_xy_extradots(xy_ref)  # temporary hack, see function description
         else:
             if n_dots - len(ref_idxs) != 1:
                 self.printfunc('warning: more than one moving dots detected')
@@ -852,7 +875,7 @@ class PosMoveMeasure(object):
                 for i in ref_idxs:
                     xy_test.pop(i) # get rid of all but the moving pos
                 expected_obsXY = this_petal.expected_current_position(pos_id,'obsXY')
-                measured_obsXY = xy_test[0]
+                measured_obsXY = self.fvc.obsXY_to_fvcXY_noplatemaker(xy_test[0])[0]
                 err_x = measured_obsXY[0] - expected_obsXY[0]
                 err_y = measured_obsXY[1] - expected_obsXY[1]
                 prev_offset_x = this_petal.get(posid=pos_id,key='OFFSET_X')
@@ -861,6 +884,16 @@ class PosMoveMeasure(object):
                 this_petal.set(pos_id,'OFFSET_Y', prev_offset_y + err_y) # this works, assuming we have reasonable knowledge of theta and phi (having re-homed or quick-calibrated)
                 this_petal.set(pos_id,'LAST_MEAS_OBS_X',measured_obsXY[0])
                 this_petal.set(pos_id,'LAST_MEAS_OBS_Y',measured_obsXY[1])
+    
+    def set_fiducials_xy_extradots(self,fvcXY):
+        """THIS IS A TEMPORARY HACK until individual fiducial dot locations tracking is properly handled.
+        Other files touched by this hack are xytest.py and the hwsetup .conf files.
+        This function puts all the argued xy dots into a special "extradots" fiducial config file.
+        """
+        x = [xy[0] for xy in fvcXY]
+        y = [xy[1] for xy in fvcXY]
+        self.extradots_fid_state.write('DOTS_FVC_X',x)
+        self.extradots_fid_state.write('DOTS_FVC_Y',y)
 
     def _test_and_update_TP(self,measured_data,tp_updates='posTP'):
         """Check if errors between measured positions and expected positions exceeds a tolerance

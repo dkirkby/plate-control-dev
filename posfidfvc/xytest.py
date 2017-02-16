@@ -69,7 +69,8 @@ class XYTest(object):
             fvc_type = self.hwsetup_conf['fvc_type']
         fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite)       
         fvc.rotation = self.hwsetup_conf['rotation']  # deg
-        fvc.scale =  self.hwsetup_conf['scale'] # mm/pixel
+        fvc.scale = self.hwsetup_conf['scale'] # mm/pixel
+        fvc.exposure_time = self.hwsetup_conf['exposure_time']
         self.logwrite('FVC type: ' + str(fvc_type))
         self.logwrite('FVC rotation: ' + str(fvc.rotation))
         self.logwrite('FVC scale: ' + str(fvc.scale))
@@ -81,16 +82,18 @@ class XYTest(object):
             self.pos_notes.append('')
         fid_ids = self.hwsetup_conf['fid_ids']
         ptl_id = self.hwsetup_conf['ptl_id']
-        petals = [petal.Petal(ptl_id, self.pos_ids, fid_ids, simulator_on=self.simulate, printfunc=self.logwrite)]
-        for ptl in petals:
-            ptl.anticollision_default = self.xytest_conf['anticollision']
-        self.m = posmovemeasure.PosMoveMeasure(petals,fvc,printfunc=self.logwrite)
+        ptl = petal.Petal(ptl_id, self.pos_ids, fid_ids, simulator_on=self.simulate, printfunc=self.logwrite)
+        ptl.anticollision_default = self.xytest_conf['anticollision']
+        self.m = posmovemeasure.PosMoveMeasure([ptl],fvc,printfunc=self.logwrite)
         self.pos_ids = self.m.all_pos_ids()
         self.logwrite('Positoners: ' + str(self.pos_ids))
         self.logwrite('Positoner notes: ' + str(self.pos_notes))
         self.logwrite('Fiducials: ' + str(fid_ids))
         self.logwrite('Petal: ' + str(ptl_id))
         self.logwrite('posmovemeasure initialized.')
+        
+        # TEMPORARY HACK until individual fiducial dot locations tracking is properly handled
+        self.m.extradots_fid_state = ptl.fidstates[self.hwsetup_conf['extradots_id']]
 
         # set up lookup table for random targets
         self.rand_xy_targs_idx = 0 # where we are in the random targets list

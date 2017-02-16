@@ -26,14 +26,17 @@ hwsetup = configobj.ConfigObj(hwsetup_conf,unrepr=True)
 
 # software initialization and startup
 fvc = fvchandler.FVCHandler(hwsetup['fvc_type'])    
-fvc.rotation = 0 # deg
-fvc.scale = 0.043 # mm/pixel
+fvc.rotation = hwsetup['rotation']
+fvc.scale = hwsetup['scale']
 sim = fvc.fvc_type == 'simulator'
 pos_ids = hwsetup['pos_ids']
 fid_ids = hwsetup['fid_ids']
 ptl = petal.Petal(hwsetup['ptl_id'], pos_ids, fid_ids, simulator_on=sim)
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure([ptl],fvc)
+
+# TEMPORARY HACK until individual fiducial dot locations tracking is properly handled
+m.extradots_fid_state = ptl.fidstates[hwsetup['extradots_id']]
 
 # calibration routines
 m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all

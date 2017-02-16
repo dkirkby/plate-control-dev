@@ -103,7 +103,7 @@ class FVCHandler(object):
             else:
                 for params in self.centroids.values():
                     xy.append(params['x'],params['y'])
-                    brightnesses.append(self.mag2brightness(params['mag']))
+                    brightnesses.append(self.mag_to_brightness(params['mag']))
         return xy,brightnesses,imgfiles
 
     def measure_and_identify(self,expected_pos_xy,expected_ref_xy):
@@ -120,6 +120,8 @@ class FVCHandler(object):
                 measured_ref_xy ... list of measured fiducial positions
 
         Lists of xy coordinates are of the form [[x1,y1],[x2,y2],...]
+        
+        All coordinates are in obsXY space (mm at the focal plane).
         """
         imgfiles = []        
         if self.fvc_type == 'simulator':
@@ -168,12 +170,20 @@ class FVCHandler(object):
             measured_xy = self.sort_by_closeness(unsorted_xy, expected_xy)
             measured_pos_xy = measured_xy[:len(expected_pos_xy)]
             measured_ref_xy = measured_xy[len(expected_pos_xy):]
-            if len(measured_ref_xy) > 0:
-                xy_diff = np.array(measured_ref_xy) - np.array(expected_ref_xy)
-                xy_shift = np.median(xy_diff,axis=0)
-                measured_pos_xy -= xy_shift
-                measured_pos_xy = measured_pos_xy.tolist()
+            measured_pos_xy = self.correct_using_ref(measured_pos_xy, measured_ref_xy, expected_ref_xy)
         return measured_pos_xy, measured_ref_xy, imgfiles
+
+    def correct_using_ref(self, measured_pos_xy, measured_ref_xy, expected_ref_xy):
+        """Evaluates the correction that transforms measured_ref_xy into expected_ref_xy,
+        and then applies this to the measured_xy values.
+        """
+        if len(measured_ref_xy) > 0:
+            xy_diff = np.array(measured_ref_xy) - np.array(expected_ref_xy)
+            xy_shift = np.median(xy_diff,axis=0)
+            measured_pos_xy -= xy_shift
+            measured_pos_xy = measured_pos_xy.tolist()
+            # if two or more ref dots that are widely enough spaced, consider applying rotation and scale corrections here
+        return measured_pos_xy
 
     def sort_by_closeness(self, unknown_xy, expected_xy):
         """Sorts the list unknown_xy so that each point is at the same index
@@ -197,23 +207,22 @@ class FVCHandler(object):
         return xy
 
     def measure(self, num_objects=1):
-        """Calls for an FVC image capture, applies transformations to get the
-        centroids into the units and orientation of the object plane,  and returns
+        """Calls for an FVC image capture, applies simple transformations to get the
+        centroids into the units and orientation of the object plane, and returns
         the centroids.
+        
+        This method short-circuits platemaker, operating directly on dots from the fiber
+        view camera in a more simplistic manner. The general idea is that this is not a
+        replacement for the accuracy performance of platemaker. Rather it is used for
+        bootstrapping our knowledge of a new setup to a good-enough point where we can
+        start to use platemaker.
             num_objects     ... number of dots to look for in the captured image
         """
-        xy,brightnesses,imgfiles = self.measure_fvc_pixels(num_objects)
-        xy_np = np.array(xy).transpose()
-        rot = FVCHandler.rotmat2D_deg(self.rotation)
-        xy_np = np.dot(rot, xy_np)
-        xy_np *= self.scale
-        translation_x = self.translation[0] * np.ones(np.shape(xy_np)[1])
-        translation_y = self.translation[1] * np.ones(np.shape(xy_np)[1])
-        xy_np += [translation_x,translation_y]
-        xy = xy_np.transpose().tolist()
-        return xy,brightnesses,imgfiles
+        fvcXY,brightnesses,imgfiles = self.measure_fvc_pixels(num_objects)
+        obsXY = self.fvcXY_to_obsXY_noplatemaker(fvcXY)
+        return obsXY,brightnesses,imgfiles
 
-    def mag2brightness(self,value):
+    def mag_to_brightness(self,value):
         """Convert magnitude values coming from Rabinowitz code to a normalized
         brightness value in the range 0.0 to 1.0. Would prefer if Rabinowitz can
         modify his code later on to just give us the counts from the camera.
@@ -223,6 +232,42 @@ class FVCHandler(object):
         newval = max(newval,0.0)
         return newval
 
+    def fvcXY_to_obsXY_noplatemaker(self,xy):
+        """Convert a list of xy values in fvc pixel space to obsXY coordinates,
+        using a simple rotation, scale, translate sequence rather than platemaker.
+          INPUT:  [[x1,y1],[x2,y2],...]  fvcXY (pixels on the CCD)
+          OUTPUT: [[x1,y1],[x2,y2],...]  obsXY (mm at the focal plane)
+        """
+        if xy != []:
+            xy = pc.listify2d(xy)
+            xy_np = np.array(xy).transpose()
+            rot = FVCHandler.rotmat2D_deg(self.rotation)
+            xy_np = np.dot(rot, xy_np)
+            xy_np *= self.scale
+            translation_x = self.translation[0] * np.ones(np.shape(xy_np)[1])
+            translation_y = self.translation[1] * np.ones(np.shape(xy_np)[1])
+            xy_np += [translation_x,translation_y]
+            xy = xy_np.transpose().tolist()       
+        return xy
+    
+    def obsXY_to_fvcXY_noplatemaker(self,xy):
+        """Convert a list of xy values in obsXY coordinates to fvc pixel space,
+        using a simple rotation, scale, translate sequence rather than platemaker.
+          INPUT:  [[x1,y1],[x2,y2],...]  obsXY (mm at the focal plane)
+          OUTPUT: [[x1,y1],[x2,y2],...]  fvcXY (pixels on the CCD)
+        """
+        if xy != []:
+            xy = pc.listify2d(xy)
+            xy_np = np.array(xy).transpose()
+            translation_x = self.translation[0] * np.ones(np.shape(xy_np)[1])
+            translation_y = self.translation[1] * np.ones(np.shape(xy_np)[1])
+            xy_np -= [translation_x,translation_y]
+            xy_np /= self.scale
+            rot = FVCHandler.rotmat2D_deg(-self.rotation)
+            xy_np = np.dot(rot, xy_np)
+            xy = xy_np.transpose().tolist() 
+        return xy
+    
     @staticmethod
     def rotmat2D_deg(angle):
         """Return the 2d rotation matrix for an angle given in degrees."""

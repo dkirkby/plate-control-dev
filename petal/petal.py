@@ -455,6 +455,20 @@ class Petal(object):
         """
         n_dots = self.get_fids_val(self.fid_ids,'N_DOTS')
         return sum(n_dots)
+    
+    @property
+    def fiducial_dots_fvcXY(self):
+        """Returns a list of all [x,y] positions of all fiducial dots this petal contributes
+        in the field of view. List is of the form [[x1,y1],[x2,y2],...]. The coordinates
+        are all given in fiber view camera pixel space.
+        """
+        x = []
+        y = []
+        for fid_id in self.fid_ids:
+            x.extend(self.get_fids_val(fid_id,'DOTS_FVC_X')[0])
+            y.extend(self.get_fids_val(fid_id,'DOTS_FVC_Y')[0])
+        xy = [[x[i],y[i]] for i in range(len(x))]
+        return xy
 
     @property
     def fid_ids(self):
