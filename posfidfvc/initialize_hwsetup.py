@@ -1,8 +1,3 @@
-# THIS IS THE BEGINNINGS OF A NEW SCRIPT WHICH WE WILL RUN WHENEVER WE SET UP
-# HARDWARE ON A TEST STAND. ALL THE INITIAL CALIBRATIONS AND CHECKS HAPPEN HERE.
-# THEREAFTER, WE DON'T HAVE TO REPEAT THESE ALL THE TIME FOR EVERY XY ACCURACY
-# TEST.
-
 import os
 import sys
 sys.path.append(os.path.abspath('../petal/'))
@@ -49,6 +44,8 @@ m.rehome() # rehome again because range measurements intentionally ran against h
 m.one_point_calibration() # do a measurement at one point with fvc after the blind rehome
 m.park() # retract all positioners to their parked positions
 
+# COMMENTS ON FUTURE WORK BELOW...
+# --------------------------------
 # VERIFICATIONS AND CALIBRATIONS SEQUENCE:
 # (TO IMPLEMENT IN FULLY AUTOMATED FASHION (IN THIS ORDER)
 #   [note, not doing focus here -- too difficult to automate with our astronomy cameras' lack of control over lenses]
