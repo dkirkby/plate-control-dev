@@ -30,6 +30,7 @@ pos_settings_directory = all_settings_directory + os.path.sep + 'pos_settings' +
 fid_settings_directory = all_settings_directory + os.path.sep + 'fid_settings' + os.path.sep
 test_settings_directory = all_settings_directory + os.path.sep + 'test_settings' + os.path.sep
 collision_settings_directory = all_settings_directory + os.path.sep + 'collision_settings' + os.path.sep
+hwsetups_directory = all_settings_directory + os.path.sep + 'hwsetups' + os.path.sep
 # 2017-02-07, Joe: previously there was a function here called 'set_logs_directory()'. It was for being able
 # to change these paths above at runtime. This is a bad thing to do, because it breaks our assumptions elsewhere
 # about how we are keeping config files and log files up-to-date in the SVN. So I removed that function. We

@@ -23,63 +23,75 @@ class XYTest(object):
     The idea is that we can really tailor a robust test suite into a single automated setup.
     """
 
-    def __init__(self,configfile=''):
-        """For the input 'configfile', you typically would leave it as the default empty string. This causes
-        a gui file picker to come up. For debug purposes, if you want to short-circuit the gui because it is
-        annoying, then you could argue a filename here. Templates for configfiles are found in the DESI svn at
-        https://desi.lbl.gov/svn/code/focalplane/fp_settings/test_settings/
+    def __init__(self,hwsetup_conf='',xytest_conf=''):
+        """For the inputs hwsetup_conf and xytest_conf, you typically would leave these as the default empty
+        string. This causes a gui file picker to come up. For debug purposes, if you want to short-circuit the
+        gui because it is annoying, then you could argue a filename here. Templates for configfiles are found
+        in the DESI svn at
+            https://desi.lbl.gov/svn/code/focalplane/fp_settings/hwsetups/
+            https://desi.lbl.gov/svn/code/focalplane/fp_settings/test_settings/
         """
         
-        # set up configuration traveler file that goes with this test, and begin logging
+        # set up configuration and traveler files that goes with this test, and begin logging
         os.makedirs(pc.test_logs_directory, exist_ok=True)
-        if not(configfile):
-            gui_root = tkinter.Tk()
-            configfile = tkinter.filedialog.askopenfilename(initialdir=pc.test_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title="Select the configuration file for this test run.")
-            gui_root.destroy()
-        self.config = configobj.ConfigObj(configfile,unrepr=True)
+        gui_root = tkinter.Tk()
+        if not(hwsetup_conf):
+            message = "Select hardware setup file."
+            xytest_conf = tkinter.filedialog.askopenfilename(initialdir=pc.test_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
+        if not(xytest_conf):
+            message = "Select test configuration file."
+            xytest_conf = tkinter.filedialog.askopenfilename(initialdir=pc.test_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
+        gui_root.destroy()
+        self.hwsetup_conf = configobj.ConfigObj(hwsetup_conf,unrepr=True)
+        self.xytest_conf = configobj.ConfigObj(xytest_conf,unrepr=True)
         initial_timestamp = pc.timestamp_str_now() 
-        config_traveler_name = pc.test_logs_directory + initial_timestamp + '_' + os.path.basename(configfile)
-        self.config.filename = config_traveler_name
-        self.config.write()
+        traveler_name = pc.test_logs_directory + initial_timestamp + '_' + os.path.basename(xytest_conf)
+        self.xytest_conf.filename = traveler_name
+        self.xytest_conf.write()
         self.new_and_changed_files = set()  # start a set to keep track of all files that need to be added / committed to SVN
-        self.new_and_changed_files.add(self.config.filename)
-        self.logwrite('File ' + str(configfile) + ' selected as template for test settings.')
-        self.logwrite('Test will be run from a uniquely-generated traveler config file located at ' + str(self.config.filename) + ' which was based off the template.')
+        self.new_and_changed_files.add(self.xytest_conf.filename)
+        self.logwrite('File ' + hwsetup_conf + ' selected as hardare setup.')
+        self.logwrite('File ' + xytest_conf + ' selected as template for test settings.')
+        self.logwrite('Test will be run from a uniquely-generated traveler config file located at ' + str(self.xytest_conf.filename) + ' which was based off the template.')
         
         # verifications of config file
         self.n_loops = self._calculate_and_check_n_loops()
+        self.logwrite('Number of test loops: ' + str(self.n_loops))
         
         # simulation mode
-        self.simulate = self.config['simulate']
+        self.simulate = self.hwsetup_conf['simulate']
+        self.logwrite('Simulation mode on: ' + str(self.simulate))
         
         # set up fvc and platemaker
         if self.simulate:
             fvc_type = 'simulator'
         else:
-            fvc_type = self.config['fvc_type']
+            fvc_type = self.hwsetup_conf['fvc_type']
         fvc = fvchandler.FVCHandler(fvc_type)       
-        if self.config['platemaker_type'] == 'BUILT-IN':
-            fvc.rotation = self.config['rotation']  # deg
-            fvc.scale =  self.config['scale'] # mm/pixel
-        self.logwrite('FVC initialized.')
+        fvc.rotation = self.hwsetup_conf['rotation']  # deg
+        fvc.scale =  self.hwsetup_conf['scale'] # mm/pixel
+        self.logwrite('FVC of type ' + str(fvc_type) + ' initialized wtih rotation = ' + str(fvc.rotation) + ' and scale = ' + str(fvc.scale))
         
         # set up positioners, fiducials, and petals
-        self.pos_ids = self.config['pos_ids']
-        self.pos_notes = self.config['pos_notes'] # notes for report to add about positioner (reported with positioner in same slot as pos_ids list)
+        self.pos_ids = self.hwsetup_conf['pos_ids']
+        self.pos_notes = self.hwsetup_conf['pos_notes'] # notes for report to add about positioner (reported with positioner in same slot as pos_ids list)
         while len(self.pos_notes) < len(self.pos_ids):
             self.pos_notes.append('')
-        fid_ids = self.config['fid_ids']
-        ptl_ids = self.config['ptl_ids']
+        fid_ids = self.hwsetup_conf['fid_ids']
+        ptl_ids = self.hwsetup_conf['ptl_ids']
         petals = [petal.Petal(ptl_ids[0], self.pos_ids, fid_ids, simulator_on=self.simulate)] # single-petal placeholder for generality of future implementations, where we could have a list of multiple petals, and need to correlate pos_ids and fid_ids to thier particular petals
         for ptl in petals:
-            ptl.anticollision_default = self.config['anticollision']
+            ptl.anticollision_default = self.xytest_conf['anticollision']
         self.m = posmovemeasure.PosMoveMeasure(petals,fvc)
+        self.logwrite('Positoners: ' + str(self.pos_ids))
+        self.logwrite('Fiducials: ' + str(fid_ids))
+        self.logwrite('Petals: ' + str(ptl_ids))
         self.logwrite('posmovemeasure initialized.')
 
         # set up lookup table for random targets
         self.rand_xy_targs_idx = 0 # where we are in the random targets list
         self.rand_xy_targs_list = []
-        targs_file = self.config['rand_xy_targs_file']
+        targs_file = self.xytest_conf['rand_xy_targs_file']
         with open(targs_file, newline='') as csvfile:
             reader = csv.reader(csvfile)
             header_rows_remaining = 1
@@ -127,15 +139,15 @@ class XYTest(object):
             note = input('observation/note: ')
             thanks_msg = True
         if thanks_msg:
-            print('Thank you, notes entered into log at ' + self.config.filename)        
+            print('Thank you, notes entered into log at ' + self.xytest_conf.filename)        
 
     def run_calibration(self, loop_number):
         """Move positioners through a short sequence to calibrate them.
         """
-        n_pts_calib_T = self.config['n_points_calib_T'][loop_number]
-        n_pts_calib_P = self.config['n_points_calib_P'][loop_number]
+        n_pts_calib_T = self.xytest_conf['n_points_calib_T'][loop_number]
+        n_pts_calib_P = self.xytest_conf['n_points_calib_P'][loop_number]
         if n_pts_calib_T >= 4 and n_pts_calib_P >= 3:
-            if self.config['should_measure_ranges'][loop_number]:
+            if self.xytest_conf['should_measure_ranges'][loop_number]:
                 start_time = time.time()
                 self.logwrite('Starting physical travel range measurement sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
                 self.m.measure_range(pos_ids='all', axis='theta')
@@ -164,7 +176,7 @@ class XYTest(object):
         """Move positioners to a series of xy targets and measure performance.
         """
         
-        log_suffix = self.config['log_suffix']
+        log_suffix = self.xytest_conf['log_suffix']
         log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
         log_timestamp = pc.timestamp_str_now()
         def path_prefix(pos_id):
@@ -176,7 +188,7 @@ class XYTest(object):
         def summary_plot_name(pos_id):
             return path_prefix(pos_id) + '_xyplot'    
 
-        local_targets = self.generate_posXY_targets_grid(self.config['npoints_across_grid'][loop_number])
+        local_targets = self.generate_posXY_targets_grid(self.xytest_conf['npoints_across_grid'][loop_number])
         
         submove_idxs = [i for i in range(self.num_corr_max+1)]
         
@@ -299,13 +311,13 @@ class XYTest(object):
                 pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_data_by_pos_id[pos_id],center,theta_range,r1,r2,title)
 
             # Test report and email only on certain tests
-            if self.config['should_email']:
-                test_report.do_test_report(self.pos_ids, all_data_by_pos_id, log_timestamp, self.pos_notes, self._elapsed_time_str(start_time), self.config['email_list'])
+            if self.xytest_conf['should_email']:
+                test_report.do_test_report(self.pos_ids, all_data_by_pos_id, log_timestamp, self.pos_notes, self._elapsed_time_str(start_time), self.xytest_conf['email_list'])
         except (KeyboardInterrupt, SystemExit):
             raise
         except:
             # Email traceback to alert that test failed and why
-            if self.config['should_email']:
+            if self.xytest_conf['should_email']:
                 test_report.email_error(traceback.format_exc(),log_timestamp)
             raise            
         self.logwrite(str(len(all_data_by_target)) + ' targets measured in ' + self._elapsed_time_str(start_time) + '.')
@@ -313,7 +325,7 @@ class XYTest(object):
     def run_unmeasured_moves(self, loop_number):
         """Exercise positioners to a series of target positions without doing FVC measurements in-between.
         """
-        n_moves = self.config['n_unmeasured_moves_between_loops']
+        n_moves = self.xytest_conf['n_unmeasured_moves_between_loops']
         if loop_number < self.n_loops - 1 and n_moves > 0: # the last loop does not have unmeasured moves after it
             start_time = time.time()
             self.logwrite('Starting unmeasured move sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
@@ -339,7 +351,7 @@ class XYTest(object):
     def run_hardstop_strikes(self, loop_number):
         """Exercise positioners to a series of hardstop strikes without doing FVC measurements in-between.
         """
-        n_strikes = self.config['n_hardstop_strikes_between_loops']
+        n_strikes = self.xytest_conf['n_hardstop_strikes_between_loops']
         if loop_number < self.n_loops - 1 and n_strikes > 0: # the last loop does not have hardstop strikes after it
             start_time = time.time()
             self.logwrite('Starting hardstop strike sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
@@ -354,7 +366,7 @@ class XYTest(object):
     
     def svn_add_commit(self):
         # Commit logs through SVN
-        if self.config['should_auto_commit_logs']:
+        if self.xytest_conf['should_auto_commit_logs']:
             files_str = ''
             for file in self.new_and_changed_files:
                 files_str += ' ' + file
@@ -378,7 +390,7 @@ class XYTest(object):
         """Standard logging function for writing to the test traveler config file.
         """
         line = '# ' + pc.timestamp_str_now() + ': ' + text
-        filehandle = open(self.config.filename,'a')
+        filehandle = open(self.xytest_conf.filename,'a')
         filehandle.write('\n' + line)
         filehandle.close()
         if stdout:
@@ -393,9 +405,9 @@ class XYTest(object):
             self.old_currents[pos_id] = {}
         for key in ['CURR_CRUISE','CURR_CREEP']:
             if key == 'CURR_CRUISE':
-                curr_val = self.config['cruise_current_override'][loop_number]
+                curr_val = self.xytest_conf['cruise_current_override'][loop_number]
             else:
-                curr_val = self.config['creep_current_override'][loop_number]
+                curr_val = self.xytest_conf['creep_current_override'][loop_number]
             for pos_id in self.pos_ids:
                 state = self.m.state(pos_id)
                 self.old_currents[pos_id][key] = state.read(key)
@@ -415,7 +427,7 @@ class XYTest(object):
     def generate_posXY_targets_grid(self, npoints_across_grid):
         """Make rectilinear grid of local (x,y) targets. Returns a list.
         """
-        r_max = self.config['targ_max_radius']
+        r_max = self.xytest_conf['targ_max_radius']
         line = np.linspace(-r_max,r_max,npoints_across_grid)
         targets = [[x,y] for x in line for y in line]
         for i in range(len(targets)):
@@ -426,8 +438,8 @@ class XYTest(object):
     def target_within_limits(self, xytarg):
         """Check whether [x,y] target is within the patrol limits.
         """
-        r_min = self.config['targ_min_radius']
-        r_max = self.config['targ_max_radius']
+        r_min = self.xytest_conf['targ_min_radius']
+        r_max = self.xytest_conf['targ_max_radius']
         x = xytarg[0]
         y = xytarg[1]
         r = np.sqrt(x**2 + y**2)
@@ -453,7 +465,7 @@ class XYTest(object):
         (Also checks that all params in config file are consistent.)
         """
         keys = ['n_pts_across_grid','n_points_calib_T','n_points_calib_P','num_corr_max','should_measure_ranges','cruise_current_override','creep_current_override']
-        all_n = [len(self.config[key]) for key in keys]
+        all_n = [len(self.xytest_conf[key]) for key in keys]
         n = max(all_n) # if all lengthss are same, then they must all be as long as the longest one
         all_same = True
         for i in range(len(keys)):
@@ -461,7 +473,8 @@ class XYTest(object):
                 self.logwrite('Error: ' + keys[i] + ' has only ' + str(all_n(i)) + ' entries (expected ' + str(n) + ')')
                 all_same = False
         if not(all_same):
-            sys.exit('Not all loop lengths the same in config file ' + self.config.filename)
+            self.logwrite('Not all loop lengths the same in config file ' + self.xytest_conf.filename)
+            sys.exit()
         else:
             return n
     
