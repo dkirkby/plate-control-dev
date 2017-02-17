@@ -391,7 +391,7 @@ class XYTest(object):
                 print('Enter your svn username and password for committing the logs to the server. These will not be saved to the logfile, but will briefly be clear-text in this script''s memory while it is running.')
                 svn_user = input('svn username: ')
                 svn_pass = input('svn password: ')
-                self.print('Will attempt to commit the logs automatically now. This may take a few minutes...')
+                print('Will attempt to commit the logs automatically now. This may take a few minutes...')
                 err1 = []
                 err2 = []
                 for file in self.new_and_changed_files:
