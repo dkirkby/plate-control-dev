@@ -385,25 +385,28 @@ class XYTest(object):
     def svn_add_commit(self):
         # Commit logs through SVN
         if self.xytest_conf['should_auto_commit_logs'] and not(self.simulate):
-            files_str = ''
-            for file in self.new_and_changed_files:
-                files_str += ' ' + file
-            if files_str:
-                self.logwrite('The following files were generated or modified during the test and need to be added / committed to svn:' + files_str)
+            if self.new_and_changed_files:
+                self.logwrite('Doing svn_add_commit().')
                 print('')
                 print('Enter your svn username and password for committing the logs to the server. These will not be saved to the logfile, but will briefly be clear-text in this script''s memory while it is running.')
                 svn_user = input('svn username: ')
                 svn_pass = input('svn password: ')
-                self.logfile('Will attempt to commit the logs automatically now. This may take a few minutes...')
-                os.system('svn add --username j' + svn_user + ' --password ' + svn_pass + ' --non-interactive' + files_str)
-                err = os.system('svn commit --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive -m "autocommit from xytest script"' + files_str)
+                self.print('Will attempt to commit the logs automatically now. This may take a few minutes...')
+                err1 = []
+                err2 = []
+                for file in self.new_and_changed_files:
+                    err1.append(os.system('svn add --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + file))
+                    err2.append(os.system('svn commit --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + file))
+                    print('SVN upload of file ' + file + ' returned: ' + str(err1[-1]) + ' (add) and ' + str(err2[-1]) + ' (commit)')
+                if any(err2):
+                    print('Warning: it appears that not all the log or plot files committed ok to SVN. Check through carefully and do this manually. The files that failed were:')
+                    for err in err2:
+                        if err:
+                            file = self.new_and_changed_files(err2.index(err))
+                            print(file)
                 del svn_user
                 del svn_pass
-                if err == 0:
-                    self.logfile('...automatic svn commit appears to have worked.')
-                else:
-                    self.logfile('...automatic svn commit may have failed. Need to check manually and make sure all files uploaded properly. A list of the files needing upload is in the traveler conf file.')
-
+                
     def logwrite(self,text,stdout=True):
         """Standard logging function for writing to the test traveler config file.
         """
