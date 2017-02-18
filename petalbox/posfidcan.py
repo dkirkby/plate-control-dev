@@ -23,9 +23,10 @@ class PosFidCAN(object):
 	def __init__(self, channel='can0'):
 		
 		try:	
+			self.channel = channel
 			self.s = socket.socket(socket.AF_CAN, socket.SOCK_RAW, socket.CAN_RAW)		
 			self.s.bind((channel,))
-			self.s.settimeout(10)	
+			self.s.settimeout(10)	#give up on receiving resonse from positioner ater this amount of time in seconds	
 		except socket.error:
 			print('Error creating and/or binding socket')
 		return		
@@ -97,13 +98,14 @@ class PosFidCAN(object):
 			try:			
 				cf, addr = self.s.recvfrom(24)
 			except socket.timeout:
-				print('Socket timeout error: positioner probably did not respond.  Check that it is connected, power is on, and the CAN id is correct')
-				return('FAILED')
+				print('Socket timeout error: positioner probably did not respond.  Check that it is connected, power is on, and the CAN id is correct.  Problem with canid, busid: ', posID, self.channel)
+				return('FAILED: can_id, bus_id: ', posID, self.channel)
 			can_id, can_dlc, data = self.dissect_can_frame(cf)
 			can_id=can_id-0x80000000				#remove extended id prefix to give just a can id
 			intid=str(can_id)			
 			return (int(intid) , data)
 		except socket.error:
+			
 			print('Error sending CAN frame')
 			return 'FAILED' 
 
