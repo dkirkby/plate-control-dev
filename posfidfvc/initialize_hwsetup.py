@@ -73,6 +73,13 @@ m.park() # retract all positioners to their parked positions
 #       - calculate fvc rotation, offset, and scale
 #       - calculate precise xy offsets for each positioner, and for fiducial dots, and record these to their calib files
 #       - make a platemaker instrument file if needed
+#   - phi bearing bond integrity
+#       - we can detect if phi bearing bond is broken by ramming ferrule holder hard against stop and looking for lateral prying motion
+#       - this will be a great one to generally automate, and perhaps incor
+#       1. ram hard stop with no back-off and measure
+#       2. back off a few degrees and re-measure
+#       3. do a few more points on the phi arc
+#       4. calculate: if there is any significant radial component w.r.t. phi arc center when you rammed hard stop, then there was prying / broken bond
 
 """EMAIL FROM STEVE ON STARTING POINT FOR INSTRUMENT PARAMETERS CONFIG FILE
 All,

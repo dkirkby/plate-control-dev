@@ -343,8 +343,8 @@ class XYTest(object):
     def run_unmeasured_moves(self, loop_number):
         """Exercise positioners to a series of target positions without doing FVC measurements in-between.
         """
-        n_moves = self.xytest_conf['n_unmeasured_moves_between_loops']
-        if loop_number < self.n_loops - 1 and n_moves > 0: # the last loop does not have unmeasured moves after it
+        n_moves = self.xytest_conf['n_unmeasured_moves_after_loop'][loop_number]
+        if n_moves > 0:
             start_time = time.time()
             self.logwrite('Starting unmeasured move sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             for j in range(n_moves):
@@ -369,8 +369,8 @@ class XYTest(object):
     def run_hardstop_strikes(self, loop_number):
         """Exercise positioners to a series of hardstop strikes without doing FVC measurements in-between.
         """
-        n_strikes = self.xytest_conf['n_hardstop_strikes_between_loops']
-        if loop_number < self.n_loops - 1 and n_strikes > 0: # the last loop does not have hardstop strikes after it
+        n_strikes = self.xytest_conf['n_hardstop_strikes_after_loop'][loop_number]
+        if n_strikes > 0:
             start_time = time.time()
             self.logwrite('Starting hardstop strike sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             retract_requests = {}
