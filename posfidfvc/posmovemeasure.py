@@ -971,15 +971,15 @@ class PosMoveMeasure(object):
     def n_moving_dots(self):
         """Returns the total number of mobile dots (on functioning positioners) to expect in an fvc image.
         """
+        self.printfunc('n_moving_dots() method not yet implemented')
+        pass
     
     @property
     def n_fixed_dots(self):
         """Returns the total number of immobile light dots (fiducials or non-functioning positioners) to expect in an fvc image.
         """
-        n = 0
-        for ptl in self.petals:
-            pass#for 
-        return n
+        self.printfunc('n_fixed_dots() method not yet implemented')
+        pass
             
     def _wrap_consecutive_angles(self, angles, expected_direction):
         """Wrap angles in one expected direction. It is expected that the physical deltas
