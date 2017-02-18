@@ -438,7 +438,7 @@ class PetalController(Application):
         Set the ficucial power levels and period
         Inputs include list with percentages, periods and ids
         Returns SUCCESS or error message.
-        canbus       ... list of strings that specifies the can bus number, eg. 'can2'
+        canbus       ... string that specifies the can bus number, eg. 'can2'
         ids          ... list of fiducial ids
         percent_duty ... list of values, 0-100, 0 means off
         
@@ -448,14 +448,14 @@ class PetalController(Application):
             self.error(rstring)
             return 'FAILED: ' + rstring
     
-        for i in range(len(ids)):
+        for id in range(len(ids)):
             # assemble arguments for canbus/firmware function
         
-            posid=int(ids[i])
+            posid=int(ids[id])
 
-            duty = int(percent_duty[i])
-            canbus = str(canbuses[i])
-            self.fidstatus[str(ids[i])] = int(percent_duty[i])
+            duty = int(percent_duty[id])
+            canbus = str(canbuses[id])
+            self.fidstatus[str(ids[id])] = int(percent_duty[id])
 
             if not self.simulator:
                 if not self.pmc.set_fiducials(canbus, posid, duty):
@@ -464,7 +464,7 @@ class PetalController(Application):
             else:
                 pass        
 
-            if self.verbose:  print('ID: %s, Percent %s' % (ids[i],percent_duty[i]))
+            if self.verbose:  print('ID: %s, Percent %s' % (ids[id],percent_duty[id]))
         return self.SUCCESS
     
     def send_tables(self, move_tables):
@@ -541,7 +541,7 @@ class PetalController(Application):
         return self.SUCCESS
 
 
-    def move(self, canbus, canid, direction, move_mode, motor, angle ):
+    def move(self, canbus, posid, direction, move_mode, motor, angle ):
         """
         Sends single move and executes. This function is usually used from console.
         
@@ -554,7 +554,7 @@ class PetalController(Application):
         xcode='0' # single command
         pause=0
 
-        if self.verbose: print(canid,direction,move_mode,motor,angle)
+        if self.verbose: print(posid,direction,move_mode,motor,angle)
 
         # make sure the passed arguments are valid 
         direction=direction.lower()
@@ -578,7 +578,7 @@ class PetalController(Application):
         mode=(direction,move_mode,motor)
 
 
-        retcode=self.pmc.load_rows_angle(canbus, canid, xcode, mode, angle, pause)
+        retcode=self.pmc.load_rows_angle(canbus, posid, xcode, mode, angle, pause)
 
         return self.SUCCESS
 
@@ -673,7 +673,6 @@ class PetalController(Application):
     def get_pos_status(self, busids, posids):
         """
         Returns positioner movement status.  Input is a dictionary with can id keys and canbus values (eg. {1004: 'can0', 1001: 'can1'})
-        JOE - I think this statement about "Input is a dictionary..." is not true -- can we clarify here?
         """
         
         retcode=self.pmc.get_pos_status(busids, posids)
@@ -685,13 +684,16 @@ class PetalController(Application):
         print('ready_for_tables - BUSIDS POSIDS: ', busids, posids)
         dev_status=self.get_pos_status(busids, posids)
         
-        for posid in dev_status:
-            if dev_status[posid] == 'DONE':
-                status=True
-            else:
-                status=False
-                return status
-        return status
+        try:
+            for posid in dev_status:
+                if dev_status[posid] == 'DONE':
+                    status=True
+                else:
+                    status=False
+                    return status
+            return status
+        except:
+            return dev_status
     
     def main(self):
         while not self.shutdown_event.is_set():
@@ -732,7 +734,7 @@ class PositionerMoveControl(object):
       
         self.pfcan={}
         print("**** canlist ***",can_list)
-        for canbus in can_list:
+        for canbus in ['can0', 'can1']:
             if self.verbose: print("canbus: "+canbus)
             self.pfcan[canbus]=posfidcan.PosFidCAN(canbus)
         self.Gear_Ratio=(46.0/14.0+1)**4 # gear_ratio for Namiki motors
@@ -756,10 +758,9 @@ class PositionerMoveControl(object):
     def set_posid(self, canbus, sid, new_posid):
         """
             Sets the positioner ID (CAN address). 
-            JOE - looks like work in progress here? ...how is sid used, and new_posid?
         """ 
         try:
-            self.pfcan[canbus].send_command(posid,24, '')
+            self.pfcan[canbus].send_command(posid,24, '')        
             self.pfcan[canbus].send_command(posid,19, '')
             return True
         except:
@@ -834,19 +835,22 @@ class PositionerMoveControl(object):
     def get_pos_status(self, busids, posids):
         
         """
-        Signals the positioners to start execution of move tables.         
+        Signals the positionrs to start execution of move tables.         
         """
         status={}
-        for i in range(len(posids)):
-            posid=int(posids[i])
+        print('BUSIDS get_pos_status: ',busids) 
+        for id in range(len(posids)):
+            posid=posids[id]
             status[posid]='UNKNOWN'
             try:        
-                canbus = str(busids[i])
+                canbus = busids[id]
                 print('ABOUT TO SEND get_pos_status command')
-                print(canbus, posid)
-                posid_return,stat=self.pfcan[canbus].send_command_recv(posid,13,'') # can we map this to what the number 13 means?
-                print("posid_return,stat:",posid_return,stat)
-                stat=ord(stat)
+                try:
+                    posid_return,stat=self.pfcan[canbus].send_command_recv(posid,13,'')
+                    print("posid_return,stat: ",posid_return,stat)
+                    stat=ord(stat)
+                except:
+                    return ['ERROR: UNRESPONSIVE POSITIONER. CANID, BUSID: ', posid, canbus] 
                 if stat: status[posid]='BUSY'
                 if not stat: status[posid]='DONE'
             except:
