@@ -18,9 +18,8 @@ class BootLoadControl(object):
 
 	def __init__(self):
 		try:
-			self.verbose = False
-			self.scan=posfidcan.PosFidCAN('can0')
-		
+			self.verbose = True
+			self.scan=posfidcan.PosFidCAN('can0')		
 			#part size in bytes, should fit into 64KB buffer
 			self.part_size = 16000 	
 			self.broadcast_id=20000
@@ -131,7 +130,7 @@ class BootLoadControl(object):
 			return 'FAILED: Error retrieving packet from hex file: %s' % str(e)
 
 
-	def program(self, can_id, hex_file = 'fw21.hex'):
+	def program(self, can_id, hex_file = 'fw31.hex'):
 	
 		try:
 			pid = can_id
@@ -178,20 +177,9 @@ class BootLoadControl(object):
 if __name__ == '__main__':
 	
 
-	hex_file_name = 'fw31.hex'
+	hex_file_name = str(sys.argv[2]) #'fw31.hex'
 	bc=BootLoadControl()
 	print('Programming ' + hex_file_name + '.....')
-	bc.program(sys.argv[1], hex_file_name)
+	bc.program(int(sys.argv[1]), hex_file_name)
+	print(bc.request_verification([int(sys.argv[1])]))
 	print('Done!')
-
-
-
-
-
-
-
-
-
-
-
-
