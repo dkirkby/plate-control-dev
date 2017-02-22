@@ -56,10 +56,12 @@ class PosSchedule(object):
         elif uv_type == 'dQdS':
             start_uv = [current_position['Q'],current_position['S']]
             targt_uv = posmodel.trans.addto_QS(start_uv,[u,v])
+            targt_uv = self._zero_for_nan(targt_uv)
             (targt_posTP,unreachable) = posmodel.trans.QS_to_posTP(targt_uv,lims)
         elif uv_type == 'dXdY':
             start_uv = [current_position['posX'],current_position['posY']]
             targt_uv = posmodel.trans.addto_posXY(start_uv,[u,v])
+            targt_uv = self._zero_for_nan(targt_uv)
             (targt_posTP,unreachable) = posmodel.trans.posXY_to_posTP(targt_uv,lims)
         elif uv_type == 'dTdP':
             targt_posTP = posmodel.trans.addto_posTP(start_posTP,[u,v],lims)
@@ -179,8 +181,6 @@ class PosSchedule(object):
             print("Number of requests: "+str(len(self.requests)))
         self.move_tables = self.anticol.run_anticol(self.requests,self.petal.posids)
 
-
-
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
         consistently take with regard to post-move cleanup, if a request is going to be denied.
@@ -191,3 +191,13 @@ class PosSchedule(object):
             print(str(posmodel.state.read('POS_ID')) + ': move request denied because CTRL_ENABLED = ' + str(enabled))
             return True
         return False
+    
+    def _zero_for_nan(self,arr):
+        """Turn any nan in a list into zero.
+        """
+        for i in range(len(arr)):
+            if not(arr[i]):
+                arr[i] = 0
+                print('replaced nan with zero')
+        return arr
+                
