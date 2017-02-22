@@ -87,6 +87,7 @@ class PosFidCAN(object):
 		"""
 
 		try:
+			posID_int = posID
 			ext_id_prefix = '8'						#this is the extended id prefix			
 			posID = ext_id_prefix + (hex(posID).replace('0x','')+hex(ccom).replace('0x','').zfill(2)).zfill(7)			
 			posID = int(posID,16)
@@ -98,8 +99,8 @@ class PosFidCAN(object):
 			try:			
 				cf, addr = self.s.recvfrom(24)
 			except socket.timeout:
-				print('Socket timeout error: positioner probably did not respond.  Check that it is connected, power is on, and the CAN id is correct.  Problem with canid, busid: ', posID, self.channel)
-				return('FAILED: can_id, bus_id: ', posID, self.channel)
+				print('Socket timeout error: positioner probably did not respond.  Check that it is connected, power is on, and the CAN id is correct.  Problem with canid, busid: ', posID_int, self.channel)
+				return('FAILED: can_id, bus_id: ', posID_int, self.channel)
 			can_id, can_dlc, data = self.dissect_can_frame(cf)
 			can_id=can_id-0x80000000				#remove extended id prefix to give just a can id
 			intid=str(can_id)			
