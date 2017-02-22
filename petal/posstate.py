@@ -80,7 +80,7 @@ class PosState(object):
         """Returns current value for a given key.
         All sections of all configobj structures are searched to full-depth.
         """
-        self.unit.reload()
+        # self.unit.reload()
         if key in self.unit.keys():
             return self.unit[key]
         self.printfunc('no key "' + repr(key) + '" found')
