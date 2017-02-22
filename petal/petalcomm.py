@@ -135,7 +135,10 @@ class PetalComm(object):
         # if everybody is stationary, then true
         
         try:
-            return self._call_device('ready_for_tables', bus_ids, can_ids)
+            retcode = self._call_device('ready_for_tables', bus_ids, can_ids)
+            if type(retcode) != bool:
+                print(retcode)
+            return retcode
         except Exception as e:
             print('FAILED: Can not execute ready_for_tables. Exception: %s' % str(e))
             print(bus_ids, can_ids)
