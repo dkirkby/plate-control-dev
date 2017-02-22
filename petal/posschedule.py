@@ -42,12 +42,13 @@ class PosSchedule(object):
             return
         current_position = posmodel.expected_current_position
         start_posTP = [current_position['posT'],current_position['posP']]
+        lims = 'targetable'
         if uv_type == 'QS':
-            (targt_posTP,unreachable) = posmodel.trans.QS_to_posTP([u,v])
+            (targt_posTP,unreachable) = posmodel.trans.QS_to_posTP([u,v],lims)
         elif uv_type == 'obsXY':
-            (targt_posTP,unreachable) = posmodel.trans.obsXY_to_posTP([u,v])
+            (targt_posTP,unreachable) = posmodel.trans.obsXY_to_posTP([u,v],lims)
         elif uv_type == 'posXY':
-            (targt_posTP,unreachable) = posmodel.trans.posXY_to_posTP([u,v])
+            (targt_posTP,unreachable) = posmodel.trans.posXY_to_posTP([u,v],lims)
         elif uv_type == 'obsTP':
             targt_posTP = posmodel.trans.obsTP_to_posTP([u,v])
         elif uv_type == 'posTP':
@@ -55,13 +56,13 @@ class PosSchedule(object):
         elif uv_type == 'dQdS':
             start_uv = [current_position['Q'],current_position['S']]
             targt_uv = posmodel.trans.addto_QS(start_uv,[u,v])
-            (targt_posTP,unreachable) = posmodel.trans.QS_to_posTP(targt_uv)
+            (targt_posTP,unreachable) = posmodel.trans.QS_to_posTP(targt_uv,lims)
         elif uv_type == 'dXdY':
             start_uv = [current_position['posX'],current_position['posY']]
             targt_uv = posmodel.trans.addto_posXY(start_uv,[u,v])
-            (targt_posTP,unreachable) = posmodel.trans.posXY_to_posTP(targt_uv)
+            (targt_posTP,unreachable) = posmodel.trans.posXY_to_posTP(targt_uv,lims)
         elif uv_type == 'dTdP':
-            targt_posTP = posmodel.trans.addto_posTP(start_posTP,[u,v],range_wrap_limits='none')
+            targt_posTP = posmodel.trans.addto_posTP(start_posTP,[u,v],lims)
         else:
             print('bad uv_type "' + str(uv_type) + '" for target request')
             return

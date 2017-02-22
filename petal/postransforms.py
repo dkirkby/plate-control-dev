@@ -262,10 +262,10 @@ class PosTransforms(object):
         obsXY = self.posXY_to_obsXY(posXY)
         return obsXY
 
-    def obsXY_to_posTP(self,xy):
+    def obsXY_to_posTP(self,xy,range_limits='full'):
         """Composite transformation, performs obsXY --> posXY --> posTP."""
         posXY = self.obsXY_to_posXY(xy)
-        (tp,unreachable) = self.posXY_to_posTP(posXY)
+        (tp,unreachable) = self.posXY_to_posTP(posXY,range_limits)
         return tp, unreachable
 
     def posTP_to_QS(self,tp):
@@ -274,10 +274,10 @@ class PosTransforms(object):
         qs = self.obsXY_to_QS(xy)
         return qs
 
-    def QS_to_posTP(self,qs):
+    def QS_to_posTP(self,qs,range_limits='full'):
         """Composite transformation, performs QS --> obsXY --> posXY --> posTP."""
         xy = self.QS_to_obsXY(qs)
-        (tp,unreachable) = self.obsXY_to_posTP(xy)
+        (tp,unreachable) = self.obsXY_to_posTP(xy,range_limits)
         return tp, unreachable
 
     def posTP_to_flatXY(self,tp):
@@ -286,10 +286,10 @@ class PosTransforms(object):
         xy = self.QS_to_flatXY(qs)
         return xy
 
-    def flatXY_to_posTP(self,xy):
+    def flatXY_to_posTP(self,xy,range_limits='full'):
         """Composite transformation, performs flatXY --> QS --> obsXY --> posXY --> posTP."""
         qs = self.flatXY_to_QS(xy)
-        (tp,unreachable) = self.QS_to_posTP(qs)
+        (tp,unreachable) = self.QS_to_posTP(qs,range_limits)
         return tp, unreachable
 
     def obsXY_to_flatXY(self,xy):
@@ -310,9 +310,9 @@ class PosTransforms(object):
         xy = self.posTP_to_flatXY(posTP)
         return xy
 
-    def flatXY_to_obsTP(self,xy):
+    def flatXY_to_obsTP(self,xy,range_limits='full'):
         """Composite transformation, performs flatXY --> QS --> obsXY --> posXY --> posTP --> obsTP"""
-        (posTP,unreachable) = self.flatXY_to_posTP(xy)
+        (posTP,unreachable) = self.flatXY_to_posTP(xy,range_limits)
         obsTP = self.posTP_to_obsTP(posTP)
         return obsTP, unreachable
 
