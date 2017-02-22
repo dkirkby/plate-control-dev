@@ -599,7 +599,7 @@ class PetalController(Application):
             self.switch_en_ptl('SYNC', 1)
            
         if mode == 'soft':	#send soft sync command to all detected CAN buses
-            for canbus in ['can0', 'can1']:
+            for canbus in ['can1', 'can2']:
  
                 self.pmc.send_soft_sync(canbus , 20000)
 
@@ -850,7 +850,8 @@ class PositionerMoveControl(object):
                     print("posid_return,stat: ",posid_return,stat)
                     stat=ord(stat)
                 except:
-                    return ['ERROR: UNRESPONSIVE POSITIONER. CANID, BUSID: ', posid, canbus] 
+                    return_str = 'ERROR: Unresponsive positioner. CAN_ID = %s  BUS_ID = %s'%(str(posid), canbus)
+                    return return_str
                 if stat: status[posid]='BUSY'
                 if not stat: status[posid]='DONE'
             except:
