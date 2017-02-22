@@ -286,10 +286,13 @@ if __name__ == '__main__':
         these_xy,these_brightnesses,imgfiles = f.measure(n_objects)
         xy.append(these_xy)
         brightnesses.append(these_brightnesses)
+        print('ndots: ' + str(len(xy[i])))
         print('measured xy positions:')
         print(xy[i])
         print('measured brightnesses:')
         print(brightnesses[i])
+        print('dimmest (scale 0 to 1): ' + str(min(brightnesses[i])))
+        print('brightest (scale 0 to 1): ' + str(max(brightnesses[i])))
         print('')
     total_time = time.time() - start_time
     print('total time = ' + str(total_time) + ' (' + str(total_time/n_repeats) + ' per image)')
