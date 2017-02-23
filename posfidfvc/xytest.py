@@ -119,6 +119,10 @@ class XYTest(object):
         print('Please enter the name of the test station.',end=' ')
         user_vals.append('TEST STATION: ' + input('station name: '))
         print('')
+
+        print('Please enter the voltage of the power supply at the test stand.',end=' ')
+        user_vals.append('SUPPLY VOLTAGE: ' + input('supply voltage: '))
+        print('')
         
         print('Please enter the current temperature at the test stand (degrees Celsius). Leave blank if not measured.',end=' ')
         user_vals.append('TEMPERATURE (CELSIUS): ' + input('temperature: '))
