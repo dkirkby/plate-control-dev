@@ -271,7 +271,7 @@ class PosMoveMeasure(object):
         old_tp_updates_tol = self.tp_updates_tol
         old_tp_updates_fraction = self.tp_updates_fraction
         self.tp_updates_tol = 0.001
-        self.tp_updates_fraction = 0.999
+        self.tp_updates_fraction = 1.0
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids, key='POS_ID')
         requests = {}
         for petal in pos_ids_by_ptl.keys():
@@ -776,7 +776,7 @@ class PosMoveMeasure(object):
             p_meas_posP_wrapped = (np.array(p_meas_obsP_wrapped) - offset_p).tolist()
             
             # unwrap thetas
-            t_meas_posTP = T[pos_id]['trans'].obsXY_to_posTP(np.transpose(t_meas_obsXY).tolist())[0]
+            t_meas_posTP = T[pos_id]['trans'].obsXY_to_posTP(np.transpose(t_meas_obsXY).tolist(),range_limits='full')[0]
             t_meas_posT = t_meas_posTP[pc.T]
             expected_direction = np.sign(t_targ_posT[1] - t_targ_posT[0])
             t_meas_posT_wrapped = self._wrap_consecutive_angles(t_meas_posT, expected_direction)
@@ -930,8 +930,12 @@ class PosMoveMeasure(object):
             err_xy = ((measured_obsXY[0]-expected_obsXY[0])**2 + (measured_obsXY[1]-expected_obsXY[1])**2)**0.5
             if err_xy > self.tp_updates_tol:
                 posmodel = petal.get(pos_id)
-                measured_posTP = posmodel.trans.obsXY_to_posTP(measured_data[pos_id])[0]
                 expected_posTP = ptls_of_pos_ids[pos_id].expected_current_position(pos_id,'posTP')
+                measured_posTP = posmodel.trans.obsXY_to_posTP(measured_data[pos_id],range_limits='full')[0]
+                T_options = measured_posTP[0] + np.array([0,360,-360])
+                T_diff = np.abs(T_options - expected_posTP[0])
+                T_best = T_options[np.argmin(T_diff)]
+                measured_posTP[0] = T_best
                 delta_T = (measured_posTP[0] - expected_posTP[0]) * self.tp_updates_fraction
                 delta_P = (measured_posTP[1] - expected_posTP[1]) * self.tp_updates_fraction
                 if tp_updates == 'offsetsTP':
