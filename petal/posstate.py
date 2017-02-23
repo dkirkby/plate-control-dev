@@ -42,7 +42,7 @@ class PosState(object):
         unit_filename = self.settings_directory + self.unit_basename + '.conf'
         if not(os.path.isfile(unit_filename)):
             temp_filename = self.settings_directory + '_unit_settings_DEFAULT.conf' # read in the template file
-            self.unit = configobj.ConfigObj(temp_filename,unrepr=True)
+            self.unit = configobj.ConfigObj(temp_filename,unrepr=True,encoding='utf-8')
             self.unit.initial_comment = [comment,'']
             self.unit.filename = unit_filename
             if self.type == 'pos':
@@ -51,7 +51,7 @@ class PosState(object):
                 self.unit['FID_ID'] = str(unit_id)
             self.unit.write()
         else:
-            self.unit = configobj.ConfigObj(unit_filename,unrepr=True)
+            self.unit = configobj.ConfigObj(unit_filename,unrepr=True,encoding='utf-8')
      
         all_logs = os.listdir(self.logs_directory)
         unit_logs = [x for x in all_logs if self.unit_basename in x]

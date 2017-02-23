@@ -42,21 +42,25 @@ class XYTest(object):
             message = "Select test configuration file."
             xytest_conf = tkinter.filedialog.askopenfilename(initialdir=pc.test_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
         gui_root.destroy()
-        self.hwsetup_conf = configobj.ConfigObj(hwsetup_conf,unrepr=True)
-        self.xytest_conf = configobj.ConfigObj(xytest_conf,unrepr=True)
-        initial_timestamp = pc.timestamp_str_now() 
-        traveler_name = pc.test_logs_directory + initial_timestamp + '_' + os.path.basename(xytest_conf)
-        self.xytest_conf.filename = traveler_name
-        self.xytest_conf.write()
-        self.new_and_changed_files = set()  # start a set to keep track of all files that need to be added / committed to SVN
-        self.new_and_changed_files.add(self.xytest_conf.filename)
-        self.logwrite('Hardware setup file: ' + hwsetup_conf)
-        self.logwrite('Test template file: ' + xytest_conf)
-        self.logwrite('Test traveler file:' + self.xytest_conf.filename)
-        
-        # verifications of config file
+        self.hwsetup_conf = configobj.ConfigObj(hwsetup_conf,unrepr=True,encoding='utf-8')
+        self.xytest_conf = configobj.ConfigObj(xytest_conf,unrepr=True,encoding='utf-8')
+        self.starting_loop_number = self.xytest_conf['current_loop_number']
         self.n_loops = self._calculate_and_check_n_loops()
-        self.logwrite('Number of test loops: ' + str(self.n_loops))
+        if self.starting_loop_number == 0:
+            initial_timestamp = pc.timestamp_str_now()
+            traveler_name = pc.test_logs_directory + initial_timestamp + '_' + os.path.basename(xytest_conf)
+            self.xytest_conf.filename = traveler_name
+            self.new_and_changed_files = set()  # start a set to keep track of all files that need to be added / committed to SVN
+            self.track_file(self.xytest_conf.filename)
+            self.xytest_conf.final_comment.append('\n\n# *** TEST LOG ***') # just for formatting
+            self.xytest_conf.write()
+            self.logwrite('Hardware setup file: ' + hwsetup_conf)
+            self.logwrite('Test template file: ' + xytest_conf)
+            self.logwrite('Test traveler file:' + self.xytest_conf.filename)
+        else:
+            self.logwrite('*** RESTARTING TEST AT LOOP ' + str(self.starting_loop_number) + ' ***')
+            self.new_and_changed_files = self.xytest_conf['new_and_changed_files']
+        self.logwrite('Total number of test loops: ' + str(self.n_loops))
         
         # simulation mode
         self.simulate = self.xytest_conf['simulate']
@@ -109,7 +113,7 @@ class XYTest(object):
                     self.rand_xy_targs_list.append([float(row[0]),float(row[1])])
         self.logwrite('Random targets file: ' + targs_file)
         self.logwrite('Random targets file length: ' + str(len(self.rand_xy_targs_list)) + ' targets')
-
+        
     def intro_questions(self):
         user_vals = []
         print('Please enter the name of who is running the test.',end=' ')
@@ -167,7 +171,7 @@ class XYTest(object):
                 self.m.rehome(pos_ids='all')
                 for pos_id in self.pos_ids:
                     state = self.m.state(pos_id)
-                    self.new_and_changed_files.add(state.unit.filename)
+                    self.track_file(state.unit.filename)
                     for key in ['PHYSICAL_RANGE_T','PHYSICAL_RANGE_P']:
                         self.logwrite(str(pos_id) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
                 self.logwrite('Calibration of physical travel ranges completed in ' + self._elapsed_time_str(start_time) + '.')
@@ -177,7 +181,7 @@ class XYTest(object):
             self.m.n_points_full_calib_P = n_pts_calib_P
             files = self.m.calibrate(pos_ids='all', mode='full', save_file_dir=pc.test_logs_directory, save_file_timestamp=pc.timestamp_str_now())
             for file in files:
-                self.new_and_changed_files.add(file)
+                self.track_file(file)
                 self.logwrite('Calibration plot file: ' + file)
             for pos_id in self.pos_ids:
                 state = self.m.state(pos_id)
@@ -219,7 +223,7 @@ class XYTest(object):
         move_log_header += '\n'
         for pos_id in self.pos_ids:
             filename = move_log_name(pos_id)
-            self.new_and_changed_files.add(filename)
+            self.track_file(filename)
             file = open(filename,'w')
             file.write(move_log_header)
             file.close()
@@ -288,7 +292,7 @@ class XYTest(object):
                             else: pass
                             if i == submove_idxs[-1]: summary_log_data += '\n'
                     filename = summary_log_name(pos_id)
-                    self.new_and_changed_files.add(filename)
+                    self.track_file(filename)
                     file = open(filename,'w')
                     file.write(summary_log_data)
                     file.close()
@@ -296,8 +300,8 @@ class XYTest(object):
                 # update test data log
                 for pos_id in these_targets.keys():
                     state = self.m.state(pos_id)
-                    self.new_and_changed_files.add(state.log_path)
-                    self.new_and_changed_files.add(state.unit.filename)
+                    self.track_file(state.log_path)
+                    self.track_file(state.unit.filename)
                     row = this_timestamp
                     row += ',' + str(state.read('TOTAL_MOVE_SEQUENCES'))
                     row += ',' + str(state.log_basename)
@@ -330,7 +334,7 @@ class XYTest(object):
                 self.logwrite(pos_id + ': Full data log file: ' + move_log_name(pos_id))
                 for filename in filenames:
                     self.logwrite(pos_id + ': Summary plot file: ' + filename)
-                    self.new_and_changed_files.add(filename)
+                    self.track_file(filename)
 
             # Test report and email only on certain tests
             if self.xytest_conf['should_email']:
@@ -356,7 +360,7 @@ class XYTest(object):
                 if j % 1000 == 0:
                     for pos_id in self.pos_ids:
                         state = self.m.state(pos_id)
-                        self.new_and_changed_files.add(state.log_path)
+                        self.track_file(state.log_path)
                     self.logwrite(status_str)
                 elif j % 50 == 0:
                     print(status_str)
@@ -415,9 +419,8 @@ class XYTest(object):
         """Standard logging function for writing to the test traveler config file.
         """
         line = '# ' + pc.timestamp_str_now() + ': ' + text
-        filehandle = open(self.xytest_conf.filename,'a')
-        filehandle.write('\n' + line)
-        filehandle.close()
+        self.xytest_conf.final_comment.append(line)
+        self.xytest_conf.write()
         if stdout:
             print(line)
 
@@ -489,6 +492,13 @@ class XYTest(object):
             requests.append(these_targets)
         return requests
 
+    def track_file(self,filename):
+        """Use this to put new filenames into the list of new and changed files we keep track of.
+        This list gets put into the log later, and is also used for auto-updating of the SVN.
+        """
+        self.new_and_changed_files.add(filename)
+        self.xytest_conf['new_and_changed_files'] = self.new_and_changed_files
+
     def _calculate_and_check_n_loops(self):
         """Returns total number of loops in test configuration.
         (Also checks that all params in config file are consistent.)
@@ -517,7 +527,9 @@ if __name__=="__main__":
     test.logwrite('Code version: ' + pc.code_version)
     test.intro_questions()
     test.get_and_log_comments_from_user()
-    for loop_num in range(test.n_loops):
+    for loop_num in range(test.starting_loop_number, test.n_loops):
+        test.xytest_conf['current_loop_number'] = loop_num
+        test.xytest_conf.write()
         test.logwrite('Starting xy test in loop ' + str(loop_num + 1) + ' of ' + str(test.n_loops))
         test.set_current_overrides(loop_num)
         test.run_calibration(loop_num)
