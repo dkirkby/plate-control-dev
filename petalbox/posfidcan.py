@@ -62,7 +62,7 @@ class PosFidCAN(object):
 			time.sleep(self.__sleeptime)
 			return 'SUCCESS'
 		except socket.error:
-			print('Error sending CAN frame')
+			print('Error sending CAN frame in send_command')
 			return 'FAILED' 
    
 	def send_command_byte(self, posID = 0, ccom=8, data=''):
@@ -78,7 +78,7 @@ class PosFidCAN(object):
 			time.sleep(self.__sleeptime)
 			return 'SUCCESS'
 		except socket.error:
-			print('Error sending CAN frame')
+			print('Error sending CAN frame in send_command_byte')
 			return 'FAILED'
 
 	def send_command_recv(self, posID= 4321, ccom=8, data=''):
@@ -107,7 +107,7 @@ class PosFidCAN(object):
 			return (int(intid) , data)
 		except socket.error:
 			
-			print('Error sending CAN frame')
+			print('Error sending CAN frame in send_command_recv')
 			return 'FAILED' 
 
 
