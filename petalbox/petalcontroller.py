@@ -130,7 +130,7 @@ class PetalController(Application):
             except Exception as e:
                print('Error initializing detected CAN channel(s).  Exception: ' + str(e))
         # Bring in the Positioner Move object
-        self.pmc=PositionerMoveControl(self.role, self.controller_type, canlist = self.canlist) # controller_type is HARDWARE or SIMULATOR
+        self.pmc=PositionerMoveControl(self.role, self.controller_type, self.canlist) # controller_type is HARDWARE or SIMULATOR
         if not self.simulator and telemetry_available:
             self.pt = ptltel.PtlTelemetry()
 
@@ -599,8 +599,8 @@ class PetalController(Application):
             self.switch_en_ptl('SYNC', 1)
            
         if mode == 'soft':	#send soft sync command to all detected CAN buses
-            for canbus in ['can1', 'can2']:
- 
+            for canbus in self.canlist:
+             
                 self.pmc.send_soft_sync(canbus , 20000)
 
         return self.SUCCESS
@@ -734,9 +734,11 @@ class PositionerMoveControl(object):
       
         self.pfcan={}
         print("**** canlist ***",can_list)
-        for canbus in ['can0', 'can1']:
-            if self.verbose: print("canbus: "+canbus)
-            self.pfcan[canbus]=posfidcan.PosFidCAN(canbus)
+        for canbus in can_list:
+            try:
+                self.pfcan[canbus]=posfidcan.PosFidCAN(canbus)
+            except Exception as e:
+                print('ERROR in pmc init: ', str(e))
         self.Gear_Ratio=(46.0/14.0+1)**4 # gear_ratio for Namiki motors
         self.bitsum=0
         self.cmd={'led':5} # container for the command numbers 'led_cmd':5  etc.
