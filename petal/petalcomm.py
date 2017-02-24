@@ -58,21 +58,22 @@ class PetalComm(object):
             self.delay = 4.0
 
         # Connect to the device (if we found anything)
-        if self.device == {}:
-            need_answer = True
-            while need_answer:
-                err_question = 'Petal Controller ' + str(self.petal_id) + ' was not discovered. Do you want to:\n  1: try again now\n  2: quit now\nEnter 1 or 2 >> '
-                answer = input(err_question)
-                if '1' in answer:
-                    time.sleep(2)
-                    need_answer = False
-                elif '2' in answer:
-                    sys.exit(0)
-                else:
-                    print('Input ' + str(answer) + ' not understood.')
+        while self.device == {}:
+            err_question = 'Petal Controller ' + str(self.petal_id) + ' was not discovered. Do you want to:\n  1: try again now\n  2: quit now\n  3: continue anyway (not recommended)\nEnter 1, 2, or 3 >> '
+            answer = input(err_question)
+            if '1' in answer:
+                time.sleep(2)
+            elif '2' in answer:
+                sys.exit(0)
+            elif '3' in answer:
+                print('Ok, continuing along, even though petalcomm found nothing to talk to.')
+                break
+            else:
+                print('Input ' + str(answer) + ' not understood.')
         else:
-            self.device['proxy'] = Pyro4.Proxy(self.device['pyro_uri'])
-            print('Connected to Petal Controller %d' % self.petal_id)
+            if self.device:
+                self.device['proxy'] = Pyro4.Proxy(self.device['pyro_uri'])
+                print('Connected to Petal Controller %d' % self.petal_id)
 
     def is_connected(self):
         """
