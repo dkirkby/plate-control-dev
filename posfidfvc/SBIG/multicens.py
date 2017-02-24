@@ -65,7 +65,7 @@ def im2bw(image,level):
     bw[threshold_indices] = 1
     return bw
 
-def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True):
+def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_otsu=False):
 # Computes centroids by finding spots and then fitting 2d gaussian
 #
 # Input 
@@ -75,13 +75,16 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True):
 # Output:
 #       returning the centroids and FWHMs as lists (xcen,ycen,fwhm)
 
-    level_fraction_of_peak = 0.1
     size_fitbox=14 # gaussian fitter box (length of side in pixels)
     img[img<0]=0
     img = img.astype(np.uint16)
-    level_otsu = mh.thresholding.otsu(img)
+    level_fraction_of_peak = 0.1
     level_frac = int(level_fraction_of_peak*np.max(np.max(img)))
-    level = max(level_otsu,level_frac)
+    if no_otsu:
+        level = level_frac
+    else:
+        level_otsu = mh.thresholding.otsu(img)
+        level = max(level_otsu,level_frac)
     bw=im2bw(img,level)
     hdu=pyfits.PrimaryHDU(bw)
     if write_fits:
@@ -97,6 +100,12 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True):
     sizes = mh.labeled.labeled_size(labeled) # size[0] is the background size, sizes[1 and greater] are number of pixels in each region
     sorted_sizes_indexes = np.argsort(sizes)[::-1] # return in descending order
     good_spot_indexes = sorted_sizes_indexes[1:n_centroids_to_keep+1] # avoiding the background regions entry at the beginning
+
+    # In rare cases of having many bright spots and just a small # of dimmer (but still
+    # usable) spots, then the otsu level is too high. In that case, we can retry, forcing
+    # the more simplistic level_frac.
+    if len(good_spot_indexes) < n_centroids_to_keep and not(no_otsu):
+        return multiCens(img,n_centroids_to_keep,verbose,write_fits,no_otsu=True)
 
     # now loop over the found spots and calculate rough centroids        
     FWHMSub = []
