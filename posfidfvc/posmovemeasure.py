@@ -47,16 +47,19 @@ class PosMoveMeasure(object):
             n_dots_ptl = petal.n_fiducial_dots
             n_dots += n_dots_ptl
         return n_dots
-
-    def fiducials_on(self):
-        """Turn on all fiducials on all petals."""
+    
+    def set_fiducials(self, setting='on'):
+        """Apply uniform settings to all fiducials on all petals simultaneously.
+        See set_fiducials() comments in petal for further details on argument and
+        return formats. The typical usage is:
+            set_fiducials('on')
+            set_fiducials('off')
+        """
+        all_settings_done = {}
         for petal in self.petals:
-            petal.set_all_fiducials('on')
-
-    def fiducials_off(self):
-        """Turn off all fiducials on all petals."""
-        for petal in self.petals:
-            petal.set_all_fiducials('off')
+            settings_done = petal.set_fiducials(setting=setting)
+            all_settings_done.update(settings_done)
+        return all_settings_done
             
     @property
     def fiducial_dots_fvcXY(self):

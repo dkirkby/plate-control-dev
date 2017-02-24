@@ -401,16 +401,11 @@ class Petal(object):
         """
         self.schedule = posschedule.PosSchedule(self)
 
-# METHODS FOR FIDUCIAL CONTROL    
-    def set_all_fiducials(self, setting, save_as_default=False):
-        """Turn all the fiducials on or off.
-        See method set_fiducials() for valid values of argument 'setting'.
-        """
-        all_fid_ids = self.fid_ids
-        self.set_fiducials(all_fid_ids, setting, save_as_default)
-    
-    def set_fiducials(self, fid_ids, setting, save_as_default=False):
+# METHODS FOR FIDUCIAL CONTROL        
+    def set_fiducials(self, fid_ids='all', setting='on', save_as_default=False):
         """Set a list of specific fiducials on or off.
+        
+        fid_ids ... 1 fiducial id string, or a list of fiducial id strings, or 'all'
         
         setting ... what to set the fiducials to, as described below:
             'on'         ... turns each fiducial to its default on value
@@ -418,12 +413,19 @@ class Petal(object):
             int or float ... a single integer or float from 0-100 sets all the argued fiducials uniformly to that one value
         
         save_as_default ... only used when seting is a number, in which case True means we will store that setting permanently to the fiducials' config file, False means its just a temporary setting this time
+        
+        Method returns a dictionary of all the settings that were made, where
+            key   --> fiducial ids
+            value --> duty state that was set
+        Fiducials that do not have control enabled would not be in this dictionary.
         """
         if self.simulator_on:
             if self.verbose:
                 print('Simulator skips sending out set_fiducials commands.')
             return
         fid_ids = pc.listify(fid_ids,keep_flat=True)[0]
+        if fid_ids[0] == 'all':
+            fid_ids = self.fid_ids
         bus_ids = self.get_fids_val(fid_ids,'BUS_ID')
         can_ids = self.get_fids_val(fid_ids,'CAN_ID')
         if isinstance(setting,int) or isinstance(setting,float):
@@ -443,12 +445,15 @@ class Petal(object):
         can_ids = [can_ids[i] for i in rng if enabled[i]]
         duties  = [duties[i]  for i in rng if enabled[i]]
         self.comm.set_fiducials(bus_ids, can_ids, duties)
-        for i in rng:
+        settings_done = {}
+        for i in range(len(fid_ids)):
             self.fidstates[fid_ids[i]].write('DUTY_STATE',duties[i])
+            settings_done[fid_ids[i]] = duties[i]
             if save_as_default:
                 self.fidstates[fid_ids[i]].write('DUTY_DEFAULT_ON',duties[i])
             self.fidstates[fid_ids[i]].log_unit()
-
+        return settings_done
+    
     @property
     def n_fiducial_dots(self):
         """Returns number of fixed fiducial dots this petal contributes in the field of view.

@@ -94,7 +94,9 @@ class XYTest(object):
         self.logwrite('Positoner notes: ' + str(self.pos_notes))
         self.logwrite('Fiducials: ' + str(fid_ids))
         self.logwrite('Petal: ' + str(ptl_id))
-        self.logwrite('posmovemeasure initialized.')
+        self.logwrite('PosMoveMeasure initialized.')
+        fid_settings_done = self.m.set_fiducials('on')
+        self.logwrite('Fiducials turned on: ' + str(fid_settings_done))
         
         # TEMPORARY HACK until individual fiducial dot locations tracking is properly handled
         self.m.extradots_fid_state = ptl.fidstates[self.hwsetup_conf['extradots_id']]
