@@ -41,7 +41,7 @@ class XYTest(object):
         if not(xytest_conf):
             message = "Select test configuration file."
             xytest_conf = tkinter.filedialog.askopenfilename(initialdir=pc.test_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
-        gui_root.destroy()
+        gui_root.withdraw()
         self.hwsetup_conf = configobj.ConfigObj(hwsetup_conf,unrepr=True,encoding='utf-8')
         self.xytest_conf = configobj.ConfigObj(xytest_conf,unrepr=True,encoding='utf-8')
         self.starting_loop_number = self.xytest_conf['current_loop_number']
