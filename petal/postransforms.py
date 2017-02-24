@@ -471,7 +471,7 @@ class PosTransforms(object):
         unreachable[hypot < inner] = True
         inner += np.finfo(float).eps*10 # slight contraction to avoid numeric divide-by-zero type of errors
         outer -= np.finfo(float).eps*10 # slight contraction to avoid numeric divide-by-zero type of errors
-        HYPOT = hypot
+        HYPOT = hypot.copy()
         HYPOT[hypot >= outer] = outer
         HYPOT[hypot <= inner] = inner
         X = HYPOT*np.cos(angle)
@@ -480,6 +480,8 @@ class PosTransforms(object):
 
         # transfrom from cartesian XY to angles TP
         arccos_arg = (X**2 + Y**2 - (r[0]**2 + r[1]**2)) / (2 * r[0] * r[1])
+        arccos_arg[arccos_arg < -1] = -1 # deal with slight numeric errors where arccos_arg comes back like -1.0000000000000002
+        arccos_arg[arccos_arg > 1]  =  1 # deal with slight numeric errors where arccos_arg comes back like +1.0000000000000002
         P = np.arccos(arccos_arg)
         arcsin_arg = r[1] / HYPOT * np.sin(P)
         outofrange = np.abs(arcsin_arg) > 1 # will round arcsin arguments to 1 or -1
