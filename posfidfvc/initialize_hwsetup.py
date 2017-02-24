@@ -16,7 +16,7 @@ start_timestamp = pc.timestamp_str_now()
 message = 'Pick hardware setup file.'
 gui_root = tkinter.Tk()
 hwsetup_conf = tkinter.filedialog.askopenfilename(initialdir=pc.hwsetups_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
-#gui_root.destroy()  # don't need that. Can lead to memory error
+gui_root.withdraw()
 hwsetup = configobj.ConfigObj(hwsetup_conf,unrepr=True)
 
 # software initialization and startup
