@@ -2,6 +2,7 @@ import threading
 import re
 import time
 import Pyro4
+import sys
 from DOSlib.advertise import Seeker
 
 class PetalComm(object):
@@ -56,9 +57,14 @@ class PetalComm(object):
             self.found_controller.wait(timeout = 1.0)
             self.delay = 4.0
 
-        # Connect to the device (if we found anything
+        # Connect to the device (if we found anything)
         if self.device == {}:
-            print('Petal Controller %d not yet discovered. Continuing...' % self.petal_id)
+            err_question = 'Petal Controller ' + str(self.petal_id) + ' was not discovered. Do you want to quit now and fix this? (y/n)\nquit now? >> '
+            answer = input(err_question)
+            if 'y' in answer.lower():
+                sys.exit(0)
+            else:
+                print('Ok, continuing. You probably made the wrong choice, but whatevs, human.')
         else:
             self.device['proxy'] = Pyro4.Proxy(self.device['pyro_uri'])
             print('Connected to Petal Controller %d' % self.petal_id)
