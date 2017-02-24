@@ -18,6 +18,7 @@ petal/test_interior_unreachable_nan.py -text
 petal/tests_and_demos/demo.py -text
 petal/tests_and_demos/movetablescr.py -text
 petal/tests_and_demos/power_test.py -text
+petal/tests_and_demos/test_interior_unreachable_nan.py -text
 petal/tests_and_demos/test_poscollider.py -text
 petal/tests_and_demos/test_tp_update_transform.py -text
 petalbox/bootloadcontrol.py -text
