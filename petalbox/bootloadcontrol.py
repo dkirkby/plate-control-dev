@@ -18,7 +18,7 @@ class BootLoadControl(object):
 
 	def __init__(self):
 		try:
-			self.verbose = True
+			self.verbose = False
 			self.scan=posfidcan.PosFidCAN('can0')		
 			#part size in bytes, should fit into 64KB buffer
 			self.part_size = 16000 	
