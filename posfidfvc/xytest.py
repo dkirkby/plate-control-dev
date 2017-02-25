@@ -14,6 +14,7 @@ import configobj
 import tkinter
 import tkinter.filedialog
 import csv
+import getpass
 
 
 class XYTest(object):
@@ -396,15 +397,11 @@ class XYTest(object):
         # Commit logs through SVN
         if self.xytest_conf['should_auto_commit_logs'] and not(self.simulate):
             if self.new_and_changed_files:
-                self.logwrite('Doing svn_add_commit().')
                 print('')
-                print('Enter your svn username and password for committing the logs to the server. These will not be saved to the logfile, but will briefly be clear-text in this script''s memory while it is running.')
-                while(True):
-                    svn_user = input('svn username: ')
-                    svn_pass = input('svn password: ')
-                    done = input('Are these correct? (y/n) >> ')
-                    if 'y' in done.lower():
-                        break
+                print('Enter your svn username and password for committing the logs to the server. These will not be saved to the logfile, but will briefly be clear-text in this script\'s memory while it is running.')
+                svn_user = input('svn username: ')
+                svn_pass = getpass.getpass('svn password: ')
+                print('')
                 print('Will attempt to commit the logs automatically now. This may take a long time. In the messages printed to the screen for each file, a return value of 0 means it was committed to the SVN ok.')
                 err1 = []
                 err2 = []
@@ -414,6 +411,12 @@ class XYTest(object):
                     n += 1
                     err1.append(os.system('svn add --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + file))
                     err2.append(os.system('svn commit --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + file))
+                    if n == 1 and (any(err1) or any(err2)):
+                        print('The first file attempted didn\'t work. Perhaps the user/pass wasn\'t right?')
+                        try_again = input('Try again? (y/n) >> ')
+                        if 'y' in try_again.lower():
+                            self.svn_add_commit()
+                        return
                     print('SVN upload of file ' + str(n) + ' of ' + str(n_total) + ' (' + os.path.basename(file) + ') returned: ' + str(err1[-1]) + ' (add) and ' + str(err2[-1]) + ' (commit)')
                 if any(err2):
                     print('Warning: it appears that not all the log or plot files committed ok to SVN. Check through carefully and do this manually. The files that failed were:')
