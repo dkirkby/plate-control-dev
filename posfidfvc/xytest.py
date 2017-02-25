@@ -397,6 +397,7 @@ class XYTest(object):
         # Commit logs through SVN
         if self.xytest_conf['should_auto_commit_logs'] and not(self.simulate):
             if self.new_and_changed_files:
+                start_time = time.time()
                 print('')
                 print('Enter your svn username and password for committing the logs to the server. These will not be saved to the logfile, but will briefly be clear-text in this script\'s memory while it is running.')
                 svn_user = input('svn username: ')
@@ -428,6 +429,7 @@ class XYTest(object):
                             print(file)
                 del svn_user
                 del svn_pass
+                print('SVN uploads completed in ' + self._elapsed_time_str(start_time))
                 
     def logwrite(self,text,stdout=True):
         """Standard logging function for writing to the test traveler config file.
