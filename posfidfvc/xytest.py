@@ -416,6 +416,8 @@ class XYTest(object):
                         try_again = input('Try again? (y/n) >> ')
                         if 'y' in try_again.lower():
                             self.svn_add_commit()
+                        del svn_user
+                        del svn_pass
                         return
                     print('SVN upload of file ' + str(n) + ' of ' + str(n_total) + ' (' + os.path.basename(file) + ') returned: ' + str(err1[-1]) + ' (add) and ' + str(err2[-1]) + ' (commit)')
                 if any(err2):
