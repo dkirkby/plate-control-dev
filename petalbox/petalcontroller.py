@@ -599,7 +599,7 @@ class PetalController(Application):
             self.switch_en_ptl('SYNC', 1)
            
         if mode == 'soft':	#send soft sync command to all detected CAN buses
-            for canbus in self.canlist:
+            for canbus in ['can0']: #self.canlist: removed entire canlist since other buses are not terminated and cause crashing
              
                 self.pmc.send_soft_sync(canbus , 20000)
 
