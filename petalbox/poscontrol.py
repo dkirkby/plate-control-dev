@@ -28,13 +28,14 @@ PCnum = int(os.popen('more /home/msdos/dos_home/dos_config/start_PETALCONTROLLER
 petal_id = PCnum
 
 pos_ids=[]
-list = os.popen('ls ../petal/pos_settings').readlines()
+list = os.popen('ls ../fp_settings/pos_settings').readlines()
 for unit in list:
 	if unit[0:4] == 'unit':
 		unit=str(unit).replace('unit_', '')
 		unit=str(unit).replace('.conf\n', '')
 		pos_ids.append(unit)
 	
+os.system('sed -i "s/can1/can0/g" /home/msdos/dos_home/dos_products/fp_settings/pos_settings/unit_*.conf')
 
 print(pos_ids)
 
