@@ -1,5 +1,4 @@
 import time
-import warnings
 import multicens
 import numpy as np
 import gc
@@ -13,7 +12,7 @@ class SBIG_Grab_Cen(object):
         self.__exposure_time = 200 # milliseconds, 90 ms is the minimum
         self._cam_init()
         self.min_brightness = 5000
-        self.max_brightness = 50000
+        self.max_brightness = 60000
         self.verbose = False
         self.write_fits = True
         self.take_darks = True # whether to measure a dark image and subtract it out
@@ -73,41 +72,35 @@ class SBIG_Grab_Cen(object):
             print("Taking light image...")
         self.cam.set_dark(False)
 
-        n_exposures_max = 3
-        n = 0
-        while n < n_exposures_max:
-            L = self.start_exposure()
-            L = self.flip(L)
+        L = self.start_exposure()
+        L = self.flip(L)
 
-            if self.write_fits:
-                filename = '_SBIG_light_image_exp' + str(n) + '.FITS'
-                try:
-                    os.remove(filename)
-                except:
-                    if self.verbose:
-                        print('couldn''t remove file: ' + filename)
-                self.cam.write_fits(L,filename)
-                imgfiles.append(filename)
-            if not(self.take_darks):
-                D = np.zeros(np.shape(L), dtype=np.int32)
-            LD = np.array(L,dtype = np.int32) - np.array(D,dtype = np.int32)
-            if self.write_fits and self.take_darks:
-                filename = '_SBIG_diff_image_exp' + str(n) + '.FITS'
-                self.cam.write_fits(LD,filename)
-                imgfiles.append(filename)
-            del L
-            gc.collect()
-            
-            brightness = np.amax(LD)
-            if self.verbose:
-                print("Brightness: "+str(brightness))
-            if brightness < self.min_brightness:
-                warnings.warn('Spot seems dark (brightness = {})'.format(brightness))
-                n += 1
-            else:
-                if brightness > self.max_brightness:
-                    warnings.warn('Spot may be over-saturated (brightness = {}'.format(brightness))                
-                n = n_exposures_max
+        if self.write_fits:
+            filename = '_SBIG_light_image.FITS'
+            try:
+                os.remove(filename)
+            except:
+                if self.verbose:
+                    print('couldn''t remove file: ' + filename)
+            self.cam.write_fits(L,filename)
+            imgfiles.append(filename)
+        if not(self.take_darks):
+            D = np.zeros(np.shape(L), dtype=np.int32)
+        LD = np.array(L,dtype = np.int32) - np.array(D,dtype = np.int32)
+        if self.write_fits and self.take_darks:
+            filename = '_SBIG_diff_image.FITS'
+            self.cam.write_fits(LD,filename)
+            imgfiles.append(filename)
+        del L
+        gc.collect()
+        
+        brightness = np.amax(LD)
+        if self.verbose:
+            print('Brightness: ' + str(brightness))
+        if brightness < self.min_brightness:
+            print('Warning: the brightest spot in the image is undersaturated. Value = ' + str(brightness))
+        elif brightness > self.max_brightness:
+            print('Warning: the brightest spot in the image is oversaturated. Value = ' + str(brightness))
         del D
         gc.collect()
 
