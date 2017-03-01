@@ -240,6 +240,12 @@ class Petal(object):
             table.store_orig_command(0,cmd_str,direction*(axisid == pc.T),direction*(axisid == pc.P))
             table.log_note += (' ' if table.log_note else '') + log_note
             p.axis[axisid].postmove_cleanup_cmds += 'self.axis[' + repr(axisid) + '].total_limit_seeks += 1\n'
+            axis_cmd_prefix = 'self.axis[' + repr(axisid) + ']'
+            if direction < 0:
+                direction_cmd_suffix = '.minpos\n'
+            else:
+                direction_cmd_suffix = '.maxpos\n'
+            p.axis[axisid].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + direction_cmd_suffix
             self.schedule.add_table(table)
 
     def request_homing(self, pos):
@@ -269,11 +275,9 @@ class Petal(object):
                 axis_cmd_prefix = 'self.axis[' + repr(i) + ']'
                 if direction[i] < 0:
                     hardstop_debounce[i] = p.axis[i].hardstop_debounce[0]
-                    p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + '.minpos\n'
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = -1.0\n'
                 else:
                     hardstop_debounce[i] = p.axis[i].hardstop_debounce[1]
-                    p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + '.maxpos\n'
                     p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = +1.0\n'
                 hardstop_debounce_request = {pos_id:{'target':hardstop_debounce}}
                 self.request_direct_dtdp(hardstop_debounce_request, cmd_prefix='debounce')
