@@ -49,6 +49,7 @@ m.park() # retract all positioners to their parked positions
 # VERIFICATIONS AND CALIBRATIONS SEQUENCE:
 # (TO IMPLEMENT IN FULLY AUTOMATED FASHION (IN THIS ORDER)
 #   [note, not doing focus here -- too difficult to automate with our astronomy cameras' lack of control over lenses]
+#   - look up the can_ids for all the positioners, and validate that the number of unique can_ids matches the number of positioners
 #   - calibrate each fiducial
 #       - get relative brightness at a standard setting
 #   - calibrate fiber illumination
