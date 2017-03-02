@@ -3,12 +3,17 @@
 
 import numpy as np
 import collections
+import posconstants as pc
 
 class Summarizer(object):
     '''Provides common functions for summarizing fiber positioner performance data.
     '''
 
     def __init__(self, this_test_data):
+        ''' The dictionary this_test_data should contain values for all keys with
+        type 'test' listed in the tuples below.
+        '''
+        
         self.thresholds = [0.003, 0.005] # mm, possible values for correction move cut-off point
         data_key_defs_list = [('start time',                      'loop'), # the second string in all these tuples says at what points the value may change
                               ('finish time',                     'move'),
@@ -17,10 +22,11 @@ class Summarizer(object):
                               ('num targets',                     'move')] 
         self.err_keys =      [ 'blind max'] # max error on the blind move 0
         for threshold in self.thresholds:
-            self.err_keys.append( ('corr max'      + self._threshold_suffix(threshold),  'move')) # max error after correction moves (threshold is applied)
-            self.err_keys.append( ('corr rms'      + self._threshold_suffix(threshold),  'move')) # rms error after correction moves (threshold is applied)
-            self.err_keys.append( ('mean num corr' + self._threshold_suffix(threshold),  'move')) # avg number of correction moves it took to reach either threshold or end of submove data
-            self.err_keys.append( ('max num corr'  + self._threshold_suffix(threshold),  'move')) # max number of correction moves it took to reach either threshold or end of submove data
+            suffix = Summarizer._threshold_suffix(threshold)
+            self.err_keys.append( ('corr max'      + suffix,      'move')) # max error after correction moves (threshold is applied)
+            self.err_keys.append( ('corr rms'      + suffix,      'move')) # rms error after correction moves (threshold is applied)
+            self.err_keys.append( ('mean num corr' + suffix,      'move')) # avg number of correction moves it took to reach either threshold or end of submove data
+            self.err_keys.append( ('max num corr'  + suffix,      'move')) # max number of correction moves it took to reach either threshold or end of submove data
         data_key_defs_list.extend(self.err_keys)
         data_key_defs_list.extend([
                               ('total move sequences at finish',  'move'),
@@ -43,20 +49,45 @@ class Summarizer(object):
         self.loop_keys = [k for k in self.all_keys if data_key_defs_dict[k] == 'loop']
         self.move_keys = [k for k in self.all_keys if data_key_defs_dict[k] == 'move']
         self.test_keys = [k for k in self.all_keys if data_key_defs_dict[k] == 'test']    
-        self.row_template = collections.OrderedDict.fromkeys(self.all_keys)
+        self._row_template = collections.OrderedDict.fromkeys(self.all_keys)
         for key in this_test_data.keys():
             if key in self.all_keys:
-                self.row_template[key] = this_test_data[key]
+                self._row_template[key] = this_test_data[key]
             else:
                 print('Warning: ' + str(key) + ' is not a valid key for the summarizer.')
         for key in self.test_keys:
             if key not in this_test_data.keys():
                 print('Warning: ' + str(key) + ' was not provided when initializing summarizer.')
 
-    def _threshold_suffix(self, value):
-        '''For consistent internal generation of certain keys.
+    
+    def csv_writeable_header(self):
+        '''Returns a string with descriptive headers for each of the columns in csv_writeable_summary.
         '''
-        return ' - ' + str(value) + ' um threshold'
+        s = ''
+        for key in self.all_keys:
+            s += key
+            if key in self.err_keys:
+                s += ' (um)'
+            s += ','
+        s = s[:-1] # remove that last comma
+        return s
+
+    def csv_writeable_row(self, err_data):
+        '''Makes a string that is formatted for writing a new line to a csv log file.
+        See error_summary() method for comments on the dictionary err_data.
+        '''
+        s = ''
+        um_per_mm = 1000
+        row = self.make_row(err_data)
+        for key in row.keys():
+            this_val = row[key]
+            if key in self.err_keys:
+                this_val = format(this_val * um_per_mm, '.1f')
+            else:
+                this_val = str(this_val)
+            s += this_val + ','
+        s = s[:-1] # remove that last comma
+        return s
 
     def error_summary(err_data, threshold):
         '''Summarizes the error data for a single positioner.
@@ -97,45 +128,56 @@ class Summarizer(object):
                     summary['all corr errs'][i] = this_err
                     if this_err <= threshold:
                         has_hit_threshold[i] = True
-        summary['corr max'] = max(summary['all corr errs'])
-        summary['corr rms'] = np.sqrt(np.sum(np.power(summary['all corr errs'],2))/n)
-        summary['mean num corr'] = np.mean(summary['all corr nums'])
-        summary['max num corr'] = max(summary['all corr nums'])
+        suffix = Summarizer._threshold_suffix(threshold)
+        summary['corr max'      + suffix] = max(summary['all corr errs'])
+        summary['corr rms'      + suffix] = np.sqrt(np.sum(np.power(summary['all corr errs'],2))/n)
+        summary['mean num corr' + suffix] = np.mean(summary['all corr nums'])
+        summary['max num corr'  + suffix] = max(summary['all corr nums'])
         return summary
 
-    def row_data(self, err_data):
+    def make_row(self, err_data):
         '''Makes a row of values. These are returned as an ordered dictionary based
         on the row template. See error_summary() method for comments on err_data.
         '''
-        # (deep?) copy the row_template ordered dict, then fill it in below
+        row = self._row_template.copy()
+        row['finish time'] = pc.
+                              ('curr cruise',                     'loop'),
+                              ('curr creep',                      'loop'),
+                              ('num targets',                     'move')] 
+        self.err_keys =      [ 'blind max'] # max error on the blind move 0
+        for threshold in self.thresholds:
+            suffix = Summarizer._threshold_suffix(threshold)
+            self.err_keys.append( ('corr max'      + suffix,      'move')) # max error after correction moves (threshold is applied)
+            self.err_keys.append( ('corr rms'      + suffix,      'move')) # rms error after correction moves (threshold is applied)
+            self.err_keys.append( ('mean num corr' + suffix,      'move')) # avg number of correction moves it took to reach either threshold or end of submove data
+            self.err_keys.append( ('max num corr'  + suffix,      'move')) # max number of correction moves it took to reach either threshold or end of submove data
+        data_key_defs_list.extend(self.err_keys)
+        data_key_defs_list.extend([
+                              ('total move sequences at finish',  'move'),
+                              ('total limit seeks T at finish',   'move'),
+                              ('total limit seeks P at finish',   'move'),
+                              ('xytest data file',                'loop'),
+                              ('xytest log file',                 'test'),
+                              ('pos log files',                   'move'),
+                              ('num pts calib T',                 'loop'),
+                              ('num pts calib P',                 'loop'),
+                              ('test operator',                   'test'),
+                              ('test station',                    'test'),
+                              ('supply voltage',                  'test'),
+                              ('temperature (C)',                 'test'),
+                              ('relative humidity',               'test'),
+                              ('operator notes',                  'test')])        
+            
         for threshold in self.thresholds:
             summary = self.error_summary(err_data,threshold)
+            for key in summary.keys():
+                if key in self.err_keys:
+                    row[key] = summary[key]
         
+        return row
 
-    def csv_writeable_row(err_data):
-        '''Makes a string that is formatted for writing a new line to a csv log file.
-        See error_summary() method for comments on the dictionary err_data.
+    @staticmethod
+    def _threshold_suffix(value):
+        '''For consistent internal generation of certain keys.
         '''
-        s = ''
-        um_per_mm = 1000
-        row_data = self.row_data(err_data)
-        for key in row_data.keys():
-            this_val = row_data[key]
-            if key in self.err_keys:
-                this_val = format(this_val * um_per_mm, '.1f')
-            else:
-                this_val = str(this_val)
-            s += this_val + ','
-        s = s[:-1] # remove that last comma
-        return s
-    
-    def csv_writeable_header():
-        '''Returns a string with descriptive headers for each of the columns in csv_writeable_summary.
-        '''
-        s = ''.join([s + ',' for s in single_val_keys])
-        s = s[:-1] # remove that last comma
-        
-        # put in something here to add the unit ' (um)' as a suffix on some pre-defined list of the keys that need scaling
-        return s
-
-    
+        return ' - ' + str(value) + ' um threshold'
