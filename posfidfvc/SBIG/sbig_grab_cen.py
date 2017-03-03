@@ -13,6 +13,7 @@ class SBIG_Grab_Cen(object):
         self._cam_init()
         self.min_brightness = 5000
         self.max_brightness = 60000
+        self.min_num_nonzero_pixels = 100
         self.verbose = False
         self.write_fits = True
         self.take_darks = True # whether to measure a dark image and subtract it out
@@ -35,11 +36,12 @@ class SBIG_Grab_Cen(object):
         self.__exposure_time = int(exposure_time)
         self.cam.set_exposure_time(self.exposure_time)
 
-    def grab(self, nWin=1):
+    def grab(self, nWin=1, n_retries=5):
         """Calls function to grab light and dark images from SBIG camera, then centroids spots.
         
         INPUTS:
             nWin       ... integer, number of centroid windows. For the measure_camera_scale script, nwin should be equal 1
+            n_retries  ... integer, max number of recursive retries in certain cases of getting an error
     
         RETURNS
             xywin      ... list of centroid coordinates and fwhms for each spot in window ('list of lists')
@@ -107,6 +109,10 @@ class SBIG_Grab_Cen(object):
         # call routine to determine multiple gaussian-fitted centroids
         centroiding_tic = time.time()
         xcen, ycen, peaks, fwhm, binfile = multicens.multiCens(LD, nWin, self.verbose, self.write_fits)
+        if min(peaks) < self.min_brightness and n_retries > 0:
+            print('Retrying image grab (' + str(n_retries) + ' attempts remaining) after got back a very low peak brightness value = ' + str(min(peaks)))
+            return self.grab(nWin, n_retries-1)
+            
         if binfile:
             imgfiles.append(binfile)
         xy = [[xcen[i],ycen[i]] for i in range(len(xcen))]
@@ -131,8 +137,18 @@ class SBIG_Grab_Cen(object):
         '''Wraps the usual start_exposure function with some mild error handling.
         '''
         img = self.cam.start_exposure()
-        if not(isinstance(img,np.ndarray)) or not(img.any()):
-            print('The camera returned a completely black image, indicating a possible readout failure. Will attempt to re-initialize the camera and keep going.')
+        no_img = not(isinstance(img,np.ndarray))
+        num_nonzero_pixels = np.count_nonzero(img)
+        all_black = num_nonzero_pixels == 0
+        nearly_all_black = num_nonzero_pixels < self.min_num_nonzero_pixels
+        if no_img or all_black or nearly_all_black:
+            if no_img:
+                desc = 'no image'
+            elif all_black:
+                desc = 'a completely black image'
+            else:
+                desc = 'an image with only ' + str(num_nonzero_pixels) + ' non-black pixels'
+            print('The camera returned ' + desc + ', indicating a possible readout failure. Will attempt to re-initialize the camera and keep going.')
             self._cam_init()
             img = self.cam.start_exposure()
         return img
