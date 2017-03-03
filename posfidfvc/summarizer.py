@@ -4,61 +4,55 @@
 import numpy as np
 import collections
 import posconstants as pc
+import posstate
+
+init_data_keys = ['test loop data file',
+                  'num pts calib T',
+                  'num pts calib P',
+                  'test operator',
+                  'test station',
+                  'supply voltage',
+                  'temperature (C)',
+                  'relative humidity',
+                  'operator notes']
 
 class Summarizer(object):
-    '''Provides common functions for summarizing fiber positioner performance data.
+    '''Provides common functions for summarizing a fiber positioner's performance data.
     '''
 
-    def __init__(self, this_test_data):
-        ''' The dictionary this_test_data should contain values for all keys with
-        type 'test' listed in the tuples below.
-        '''
+    def __init__(self, pos_id, xytest_log_file, init_data, thresholds=[0.003,0.005]):
+        ''' The dictionary init_data should contain values for all the keys given
+        in the list init_data_keys.
+            
         
-        self.thresholds = [0.003, 0.005] # mm, possible values for correction move cut-off point
-        data_key_defs_list = [('start time',                      'loop'), # the second string in all these tuples says at what points the value may change
-                              ('finish time',                     'move'),
-                              ('curr cruise',                     'loop'),
-                              ('curr creep',                      'loop'),
-                              ('num targets',                     'move')] 
-        self.err_keys =      [ 'blind max'] # max error on the blind move 0
+        Usage is to initialize a new summarizer at the beginning of every test loop.
+        '''
+        self.pos_id = pos_id
+        self.state = posstate.PosState(pos_id)
+        self.thresholds = thresholds # mm, possible values for correction move cut-off point
+        self._row_template = collections.OrderedDict()
+        self._row_template['start time']                     = pc.timestamp_str_now()
+        self._row_template['finish time']                    = ''
+        self._row_template['curr cruise']                    = self.state.read('CURR_CRUISE')
+        self._row_template['curr creep']                     = self.state.read('CURR_CREEP')
+        self._row_template['num targets']                    = 0     # number of targets tested in this loop
+        self._row_template['blind max']                      = None  # max error on the blind move 0
+        self.err_keys = []
         for threshold in self.thresholds:
             suffix = Summarizer._threshold_suffix(threshold)
-            self.err_keys.append( ('corr max'      + suffix,      'move')) # max error after correction moves (threshold is applied)
-            self.err_keys.append( ('corr rms'      + suffix,      'move')) # rms error after correction moves (threshold is applied)
-            self.err_keys.append( ('mean num corr' + suffix,      'move')) # avg number of correction moves it took to reach either threshold or end of submove data
-            self.err_keys.append( ('max num corr'  + suffix,      'move')) # max number of correction moves it took to reach either threshold or end of submove data
-        data_key_defs_list.extend(self.err_keys)
-        data_key_defs_list.extend([
-                              ('total move sequences at finish',  'move'),
-                              ('total limit seeks T at finish',   'move'),
-                              ('total limit seeks P at finish',   'move'),
-                              ('xytest data file',                'loop'),
-                              ('xytest log file',                 'test'),
-                              ('pos log files',                   'move'),
-                              ('num pts calib T',                 'loop'),
-                              ('num pts calib P',                 'loop'),
-                              ('test operator',                   'test'),
-                              ('test station',                    'test'),
-                              ('supply voltage',                  'test'),
-                              ('temperature (C)',                 'test'),
-                              ('relative humidity',               'test'),
-                              ('operator notes',                  'test')])
-        data_key_defs_dict = collections.OrderedDict(data_key_defs_list)
-    
-        self.all_keys = list(data_key_defs_dict.keys())
-        self.loop_keys = [k for k in self.all_keys if data_key_defs_dict[k] == 'loop']
-        self.move_keys = [k for k in self.all_keys if data_key_defs_dict[k] == 'move']
-        self.test_keys = [k for k in self.all_keys if data_key_defs_dict[k] == 'test']    
-        self._row_template = collections.OrderedDict.fromkeys(self.all_keys)
-        for key in this_test_data.keys():
-            if key in self.all_keys:
-                self._row_template[key] = this_test_data[key]
-            else:
-                print('Warning: ' + str(key) + ' is not a valid key for the summarizer.')
-        for key in self.test_keys:
-            if key not in this_test_data.keys():
-                print('Warning: ' + str(key) + ' was not provided when initializing summarizer.')
-
+            self.err_keys.append('corr max'      + suffix)           # max error after correction moves (threshold is applied)
+            self.err_keys.append('corr rms'      + suffix)           # rms error after correction moves (threshold is applied)
+            self.err_keys.append('mean num corr' + suffix)           # avg number of correction moves it took to reach either threshold or end of submove data
+            self.err_keys.append('max num corr'  + suffix)           # max number of correction moves it took to reach either threshold or end of submove data
+        for key in self.err_keys:
+            self._row_template[key] = None
+        self._row_template['total move sequences at finish'] = None
+        self._row_template['total limit seeks T at finish']  = None
+        self._row_template['total limit seeks P at finish']  = None
+        self._row_template['xytest log file']                = xytest_log_file
+        self._row_template['pos log files']                  = [self.state.log_basename]
+        for key in init_data_keys:
+            self._row_template[key] = init_data[key]
     
     def csv_writeable_header(self):
         '''Returns a string with descriptive headers for each of the columns in csv_writeable_summary.
@@ -139,26 +133,20 @@ class Summarizer(object):
         '''Makes a row of values. These are returned as an ordered dictionary based
         on the row template. See error_summary() method for comments on err_data.
         '''
+        if self.state.log_basename not in self._row_template['pos log files']:
+            self._row_template['pos log files'].append(self.state.log_basename)
         row = self._row_template.copy()
-        row['finish time'] = pc.
-                              ('curr cruise',                     'loop'),
-                              ('curr creep',                      'loop'),
-                              ('num targets',                     'move')] 
-        self.err_keys =      [ 'blind max'] # max error on the blind move 0
+        row['start time'] = self._loop_start_time
+        row['finish time'] = pc.timestamp_str_now()
         for threshold in self.thresholds:
-            suffix = Summarizer._threshold_suffix(threshold)
-            self.err_keys.append( ('corr max'      + suffix,      'move')) # max error after correction moves (threshold is applied)
-            self.err_keys.append( ('corr rms'      + suffix,      'move')) # rms error after correction moves (threshold is applied)
-            self.err_keys.append( ('mean num corr' + suffix,      'move')) # avg number of correction moves it took to reach either threshold or end of submove data
-            self.err_keys.append( ('max num corr'  + suffix,      'move')) # max number of correction moves it took to reach either threshold or end of submove data
-        data_key_defs_list.extend(self.err_keys)
-        data_key_defs_list.extend([
-                              ('total move sequences at finish',  'move'),
-                              ('total limit seeks T at finish',   'move'),
-                              ('total limit seeks P at finish',   'move'),
-                              ('xytest data file',                'loop'),
-                              ('xytest log file',                 'test'),
-                              ('pos log files',                   'move'),
+            summary = self.error_summary(err_data,threshold)
+            for key in summary.keys():
+                if key in self.err_keys:
+                    row[key] = summary[key]
+        row['num targets'] = len(summary['all blind errs'])
+        row['total move sequences at finish'] = self.state.read('TOTAL_MOVE_SEQUENCES')
+        row['total limit seeks T at finish'] = self.state.read('TOTAL_LIMIT_SEEKS_T')
+        row['total limit seeks P at finish'] = self.state.read('TOTAL_LIMIT_SEEKS_P')
                               ('num pts calib T',                 'loop'),
                               ('num pts calib P',                 'loop'),
                               ('test operator',                   'test'),
@@ -168,11 +156,7 @@ class Summarizer(object):
                               ('relative humidity',               'test'),
                               ('operator notes',                  'test')])        
             
-        for threshold in self.thresholds:
-            summary = self.error_summary(err_data,threshold)
-            for key in summary.keys():
-                if key in self.err_keys:
-                    row[key] = summary[key]
+
         
         return row
 
