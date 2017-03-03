@@ -346,10 +346,11 @@ class Petal(object):
         if self.simulator_on:
             if self.verbose:
                 print('Simulator skips sending execute moves command to positioners.')
+            self._postmove_cleanup()
         else:
             self.comm.execute_sync(self.sync_mode)
+            self._postmove_cleanup()
             self._wait_while_moving()
-        self._postmove_cleanup()
 
     def schedule_send_and_execute_moves(self):
         """Convenience wrapper to schedule, send, and execute the pending requested
