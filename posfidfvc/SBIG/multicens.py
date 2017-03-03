@@ -105,6 +105,7 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
     # usable) spots, then the otsu level is too high. In that case, we can retry, forcing
     # the more simplistic level_frac.
     if len(good_spot_indexes) < n_centroids_to_keep and not(no_otsu):
+        print('Retrying centroiding using fractional level (' + str(level_fraction_of_peak) + ' * peak) instead of otsu method')
         return multiCens(img,n_centroids_to_keep,verbose,write_fits,no_otsu=True)
 
     # now loop over the found spots and calculate rough centroids        

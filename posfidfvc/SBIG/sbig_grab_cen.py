@@ -36,7 +36,7 @@ class SBIG_Grab_Cen(object):
         self.__exposure_time = int(exposure_time)
         self.cam.set_exposure_time(self.exposure_time)
 
-    def grab(self, nWin=1, n_retries=5):
+    def grab(self, nWin=1, n_retries=10):
         """Calls function to grab light and dark images from SBIG camera, then centroids spots.
         
         INPUTS:
