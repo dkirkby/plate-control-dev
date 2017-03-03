@@ -5,6 +5,7 @@ import fvchandler
 import petal
 import posmovemeasure
 import posconstants as pc
+import summarizer
 import numpy as np
 import time
 import pos_xytest_plot
@@ -15,6 +16,7 @@ import tkinter
 import tkinter.filedialog
 import csv
 import getpass
+import collections
 
 
 class XYTest(object):
@@ -62,10 +64,11 @@ class XYTest(object):
             self.logwrite('*** RESTARTING TEST AT LOOP ' + str(self.starting_loop_number) + ' ***')
             self.new_and_changed_files = self.xytest_conf['new_and_changed_files']
         self.logwrite('Total number of test loops: ' + str(self.n_loops))
+        test.logwrite('Code version: ' + pc.code_version)
         
         # simulation mode
         self.simulate = self.xytest_conf['simulate']
-        self.logwrite('Simulation mode on: ' + str(self.simulate))
+        self.logwrite('Simulation mode on: ' + str(self.simulate))        
         
         # set up fvc and platemaker
         if self.simulate:
@@ -99,6 +102,23 @@ class XYTest(object):
         fid_settings_done = self.m.set_fiducials('on')
         self.logwrite('Fiducials turned on: ' + str(fid_settings_done))
         
+        # set up the test summarizers
+        self.summarizers = {}
+        summarizer_init_data = {}
+        summarizer_init_data['test loop data file'] = ''
+        summarizer_init_data['num pts calib T']     = None
+        summarizer_init_data['num pts calib P']     = None
+        summarizer_init_data['xytest log file']     = self.xytest_conf.filename
+        user_vals = self.intro_questions()
+        for key in user_vals.keys():
+            self.logwrite('user-entry: ' + key + user_vals[key])
+            summarizer_init_data[key] = user_vals[key]
+        summarizer_init_data['operator notes'] = self.get_and_log_comments_from_user()
+        for pos_id in self.pos_ids:
+            self.summarizers[pos_id] = summarizer.Summarizer(pos_id,summarizer_init_data)
+            self.track_file(self.summarizers[pos_id].filename)
+        self.logwrite('Data summarizers for all positioners initialized.')
+        
         # TEMPORARY HACK until individual fiducial dot locations tracking is properly handled
         self.m.extradots_fid_state = ptl.fidstates[self.hwsetup_conf['extradots_id']]
 
@@ -118,47 +138,34 @@ class XYTest(object):
         self.logwrite('Random targets file length: ' + str(len(self.rand_xy_targs_list)) + ' targets')
         
     def intro_questions(self):
-        user_vals = []
-        print('Please enter the name of who is running the test.',end=' ')
-        user_vals.append('TEST OPERATOR: ' + input('your name: '))
+        print('Please enter the following data. Hit blank if unknown or unmeasured.')
+        user_vals = collections.OrderedDict.fromkeys(summarizer.user_data_keys)
+        for key in user_vals.keys():
+            user_vals.append(input(key + ': '))
         print('')
-        
-        print('Please enter the name of the test station.',end=' ')
-        user_vals.append('TEST STATION: ' + input('station name: '))
-        print('')
-
-        print('Please enter the voltage of the power supply at the test stand.',end=' ')
-        user_vals.append('SUPPLY VOLTAGE: ' + input('supply voltage: '))
-        print('')
-        
-        print('Please enter the current temperature at the test stand (degrees Celsius). Leave blank if not measured.',end=' ')
-        user_vals.append('TEMPERATURE (CELSIUS): ' + input('temperature: '))
-        print('')
-        
-        print('Please enter the current relative humidity at the test stand. Leave blank if not measured.',end=' ')
-        user_vals.append('RELATIVE HUMIDITY: ' + input('relative humidity: '))
-        print('')
-        
         print('You entered:')
-        for s in user_vals:
-            print('  ' + s)
+        for key in user_vals.keys():
+            print('  ' + key + user_vals[key])
+        print('')
         try_again = input('If this is ok, hit enter to continue. Otherwise, type any character and enter to start over: ')
         if try_again:
             self.intro_questions()
         else:
-            for s in user_vals:
-                self.logwrite('user-entry: ' + s)
+            return user_vals
         
     def get_and_log_comments_from_user(self):
         print('\nPlease enter any specific observations or notes about this test. These will be recorded into the test log. You can keep on entering notes until you hit enter on a blank line.',end=' ')
         thanks_msg = False
+        notes = []
         note = input('observation/note: ')
         while note:
             self.logwrite('user-entry: OBSERVATION/NOTE: ' + note)
+            notes.append(note)
             note = input('observation/note: ')
             thanks_msg = True
         if thanks_msg:
-            print('Thank you, notes entered into log at ' + self.xytest_conf.filename)        
+            print('Thank you, notes entered into log at ' + self.xytest_conf.filename)   
+        return notes
 
     def run_calibration(self, loop_number):
         """Move positioners through a short sequence to calibrate them.
@@ -207,6 +214,11 @@ class XYTest(object):
             return path_prefix(pos_id) + '_summary.csv'
         def summary_plot_name(pos_id):
             return path_prefix(pos_id) + '_xyplot'    
+
+        n_pts_calib_T = self.xytest_conf['n_points_calib_T'][loop_number]
+        n_pts_calib_P = self.xytest_conf['n_points_calib_P'][loop_number]
+        for pos_id in self.pos_ids:
+            self.summarizers[pos_id].update_loop_inits(move_log_name(pos_id), n_pts_calib_T, n_pts_calib_P)
 
         local_targets = self.generate_posXY_targets_grid(self.xytest_conf['n_pts_across_grid'][loop_number])
         self.logwrite('Number of local targets = ' + str(len(local_targets)))
@@ -271,32 +283,13 @@ class XYTest(object):
                         for key in submove_fields:
                             all_data_by_pos_id[pos_id][key][sub].append(these_meas_data[pos_id][key][sub])              
                 
-                # update summary data log
+                # update summary data logs
                 for pos_id in self.pos_ids:
-                    summary_log_data =  'pos_id,' + str(pos_id) + '\n'
-                    summary_log_data += 'log_suffix,' + str(log_suffix) + '\n'
-                    summary_log_data += 'cycles at start,' + str(start_cycles[pos_id]) + '\n'
-                    summary_log_data += 'cycles at finish,' + str(self.m.state(pos_id).read('TOTAL_MOVE_SEQUENCES')) + '\n'
-                    summary_log_data += 'start time,' + start_timestamp + '\n'
-                    summary_log_data += 'finish time,' + this_timestamp + '\n'
-                    summary_log_data += 'num targets measured,' + str(len(all_data_by_target)) + '\n'
-                    summary_log_data += 'num corrections max,' + str(num_corr_max) + '\n'
-                    summary_log_data += 'submove index -->'
-                    for i in submove_idxs: summary_log_data += ',' + str(i)
-                    summary_log_data += '\n'
-                    for calc in ['max','min','mean','rms']:
-                        summary_log_data += calc + '(um)'
-                        for i in submove_idxs:
-                            this_submove_data = all_data_by_pos_id[pos_id]['err2D'][i]
-                            if calc == 'max':    summary_log_data += ',' + str(np.max(this_submove_data) * pc.um_per_mm)
-                            elif calc == 'min':  summary_log_data += ',' + str(np.min(this_submove_data) * pc.um_per_mm)
-                            elif calc == 'mean': summary_log_data += ',' + str(np.mean(this_submove_data) * pc.um_per_mm)
-                            elif calc == 'rms':  summary_log_data += ',' + str(np.sqrt(np.mean(np.array(this_submove_data)**2)) * pc.um_per_mm)
-                            else: pass
-                            if i == submove_idxs[-1]: summary_log_data += '\n'
-                    filename = summary_log_name(pos_id)
-                    self.track_file(filename)
-                    file = open(filename,'w')
+                    summ = self.summarizers[pos_id]
+                    
+                    
+                    # this writing to file should all be handled by the summarizer class
+                    file = open(summ.filename,'w')
                     file.write(summary_log_data)
                     file.close()
         
@@ -540,9 +533,6 @@ class XYTest(object):
 if __name__=="__main__":
     test = XYTest()
     test.logwrite('Start of positioner performance test.')
-    test.logwrite('Code version: ' + pc.code_version)
-    test.intro_questions()
-    test.get_and_log_comments_from_user()
     for loop_num in range(test.starting_loop_number, test.n_loops):
         test.xytest_conf['current_loop_number'] = loop_num
         test.xytest_conf.write()

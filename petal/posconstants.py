@@ -25,6 +25,7 @@ all_logs_directory = os.environ.get("POSITIONER_LOGS_PATH") # corresponds to htt
 all_settings_directory = os.environ.get("FP_SETTINGS_PATH") # corresponds to https://desi.lbl.gov/svn/code/focalplane/fp_settings
 move_logs_directory = all_logs_directory + os.path.sep + 'move_logs' + os.path.sep
 test_logs_directory = all_logs_directory + os.path.sep + 'test_logs' + os.path.sep
+test_summaries_directory = all_logs_directory + os.path.sep + 'xytest_summaries' + os.path.sep
 fid_logs_directory  = all_logs_directory + os.path.sep + 'fiducial_logs' + os.path.sep
 pos_settings_directory = all_settings_directory + os.path.sep + 'pos_settings' + os.path.sep
 fid_settings_directory = all_settings_directory + os.path.sep + 'fid_settings' + os.path.sep
