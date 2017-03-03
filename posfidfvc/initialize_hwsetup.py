@@ -33,6 +33,10 @@ m = posmovemeasure.PosMoveMeasure([ptl],fvc)
 # TEMPORARY HACK until individual fiducial dot locations tracking is properly handled
 m.extradots_fid_state = ptl.fidstates[hwsetup['extradots_id']]
 
+# Put here a function to print out a quick table of all the pos_ids and corresponding can_ids,
+# then ask the user if this is correct or not, before proceeding. Probably also include
+# ability to fix those values right there.
+
 # calibration routines
 m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
 m.identify_fiducials() 
