@@ -28,8 +28,8 @@ class FVCHandler(object):
             self.platemaker_instrument = platemaker_instrument # this setter also initializes self.fvcproxy
             # I think here we would want to set the FVC either in FLI mode or SBIG mode?
         elif self.fvc_type == 'simulator':
-            self.sim_err_max = 0.1
-            self.printfunc('FVCHandler is in simulator mode with max errors of size ' + str(self.sim_err_max) + '.')
+            self.sim_err_max = 0.01 # 2D err max for simulator
+            self.printfunc('FVCHandler is in simulator mode with max 2D errors of size ' + str(self.sim_err_max) + '.')
         if 'SBIG' in self.fvc_type:
             self.exposure_time = 0.2
             self.max_counts = 2**16 - 1
@@ -125,8 +125,10 @@ class FVCHandler(object):
         """
         imgfiles = []        
         if self.fvc_type == 'simulator':
-            sim_errors = np.random.uniform(-self.sim_err_max,self.sim_err_max,np.shape(expected_pos_xy))
-            measured_pos_xy = (expected_pos_xy + sim_errors).tolist()
+            sim_error_magnitudes = np.random.uniform(-self.sim_err_max,self.sim_err_max,len(expected_pos_xy))
+            sim_error_angles = np.random.uniform(-np.pi,np.pi,len(expected_pos_xy))
+            sim_errors = sim_error_magnitudes * np.array([np.cos(sim_error_angles),np.sin(sim_error_angles)])
+            measured_pos_xy = (expected_pos_xy + np.transpose(sim_errors)).tolist()
             measured_ref_xy = expected_ref_xy
         elif self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':
             fiber_ctr_flag = 4
