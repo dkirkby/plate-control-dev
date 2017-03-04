@@ -1,4 +1,3 @@
-#import petalcomm
 import posmodel
 import posschedule
 import posmovetable
@@ -6,8 +5,6 @@ import posstate
 import posconstants as pc
 import numpy as np
 import time
-
-
 
 class Petal(object):
     """Controls a petal. Communicates with the PetalBox hardware via PetalComm.
@@ -351,6 +348,8 @@ class Petal(object):
             self.comm.execute_sync(self.sync_mode)
             self._postmove_cleanup()
             self._wait_while_moving()
+        self.canids_where_tables_were_just_sent = []
+        self.busids_where_tables_were_just_sent = []
 
     def schedule_send_and_execute_moves(self):
         """Convenience wrapper to schedule, send, and execute the pending requested
@@ -705,8 +704,6 @@ class Petal(object):
         if self.verbose:
             print(self.expected_current_position_str())
         self.clear_schedule()
-        self.canids_where_tables_were_just_sent = []
-        self.busids_where_tables_were_just_sent = []
 
     def _wait_while_moving(self):
         """Blocking implementation, to not send move tables while any positioners are still moving.
@@ -716,7 +713,6 @@ class Petal(object):
         The implementation has the benefit of simplicity, but it is acknowledged there may be 'better',
         i.e. multi-threaded, ways to achieve this, to be implemented later.
         """
-
         if self.simulator_on:
             return        
         timeout = 15.0 # seconds
@@ -726,7 +722,7 @@ class Petal(object):
         while keep_waiting:
             elapsed_time = time.time() - start_time
             if elapsed_time >= timeout:
-                self.printfunc('Timed out at ' + str(timeout) + ' seconds waiting to send next move table.')
+                self.printfunc('Timed out at ' + str(timeout) + ' seconds waiting for positioners to be ready to receive next commands.')
                 keep_waiting = False
             if self.comm.ready_for_tables(self.busids_where_tables_were_just_sent, self.canids_where_tables_were_just_sent):
                 keep_waiting = False
