@@ -33,6 +33,26 @@ m = posmovemeasure.PosMoveMeasure([ptl],fvc)
 # TEMPORARY HACK until individual fiducial dot locations tracking is properly handled
 m.extradots_fid_state = ptl.fidstates[hwsetup['extradots_id']]
 
+# check ids with user
+print('\n\nHere are the known positioners and fiducials:\n')
+print(str(len(pos_ids)) + ' POSITIONERS:')
+for pos_id in pos_ids:
+    print('  ' + format(pos_id+':','11s') + 'busid = ' + format(str(ptl.get(pos_id,'BUS_ID')),'5s') + '  canid = ' + format(str(ptl.get(pos_id,'CAN_ID')),'5s'))
+print('\n' + str(len(fid_ids)) + ' FIDUCIALS:')
+for fid_id in fid_ids:
+    print('  ' + format(fid_id+':','11s') + 'busid = ' + format(str(ptl.get_fids_val(fid_id,'BUS_ID')[0]),'5s') + '  canid = ' + format(str(ptl.get_fids_val(fid_id,'CAN_ID')[0]),'5s') + '  ndots = ' + str(ptl.get_fids_val(fid_id,'N_DOTS')[0]))
+print('\nPlease check each of these carefully.',end=' ')
+ids_unchecked = True
+while ids_unchecked:
+    response = input('Are these all correct (yes/no): ')
+    if 'n' in response.lower():
+        print('Exiting, to give user a chance to fix the problem(s).\n\n')
+        sys.exit(0)
+    elif 'y' in response.lower():
+        ids_unchecked = False
+    else:
+        print('Respond yes or no.')
+        
 # Put here a function to print out a quick table of all the pos_ids and corresponding can_ids,
 # then ask the user if this is correct or not, before proceeding. Probably also include
 # ability to fix those values right there.
