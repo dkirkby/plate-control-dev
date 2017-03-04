@@ -9,6 +9,7 @@ import tkinter.filedialog
 import tkinter.messagebox
 import csv
 import collections
+import datetime
 
 # grading parameters
 # c.f. DESI-XXXX Fiber Positioner Grades
@@ -106,7 +107,8 @@ for pos_id in d.keys():
     d[pos_id]['grade'] = fail_grade
 
 # write report
-timestamp_str = pc.timestamp_str_now()
+timestamp = datetime.datetime.now()
+timestamp_str = timestamp.strftime(pc.filename_timestamp_format)
 gui_root = tkinter.Tk()
 report_file = tkinter.filedialog.asksaveasfilename(title='Save grade report as...',initialdir=pc.all_logs_directory,initialfile=timestamp_str + '_positioner_grades_report.csv',filetypes=filetypes)
 if not(report_file):
@@ -116,24 +118,24 @@ if report_file:
     with open(report_file,'w',newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(['REPORT DATE:'])
-        writer.writerow([timestamp_str])
+        writer.writerow(['',timestamp])
         writer.writerow([''])
         writer.writerow(['SPECIFICATIONS APPLIED IN THIS REPORT:'])
-        writer.writerow(['grade'] + grade_spec_headers)
+        writer.writerow(['','grade'] + grade_spec_headers)
         for key in grade_specs.keys():
-            writer.writerow([key] + list(grade_specs[key].values()))
-        writer.writerow([fail_grade + ' ... does not meet any of the above grades.'])
+            writer.writerow(['',key] + list(grade_specs[key].values()))
+        writer.writerow(['',fail_grade + ' ... does not meet any of the above grades.'])
         writer.writerow([''])
         writer.writerow(['TOTALS FOR EACH GRADE:'])
-        writer.writerow(['grade', 'quantity', 'percent'])
+        writer.writerow(['','grade', 'quantity', 'percent'])
         def percent(value):
             return format(value/len(d)*100,'.1f')+'%'
         for key in all_grades:
             total_this_grade = len([pos_id for pos_id in d.keys() if d[pos_id]['grade'] == key])
-            writer.writerow([key,total_this_grade,percent(total_this_grade)])
-        writer.writerow(['all',len(d),percent(len(d))])
+            writer.writerow(['',key,total_this_grade,percent(total_this_grade)])
+        writer.writerow(['','all',len(d),percent(len(d))])
         writer.writerow([''])
         writer.writerow(['INDIVIDUAL POSITIONER GRADES:'])
-        writer.writerow(['pos_id','grade'])
+        writer.writerow(['','pos_id','grade'])
         for pos_id in pos_ids:
-            writer.writerow([pos_id,d[pos_id]['grade']])
+            writer.writerow(['',pos_id,d[pos_id]['grade']])
