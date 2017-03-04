@@ -12,6 +12,9 @@ import configobj
 # unique timestamp
 start_timestamp = pc.timestamp_str_now()
 
+# update all files from the SVN
+# TO BE IMPLEMENTED
+
 # get the station config info
 message = 'Pick hardware setup file.'
 gui_root = tkinter.Tk()
