@@ -57,10 +57,10 @@ class PosState(object):
         unit_logs = [x for x in all_logs if self.unit_basename in x]
         if unit_logs:
             unit_logs.sort(reverse=True)
-            log_basename = os.path.splitext(unit_logs[0])[0]
+            self.log_basename = os.path.splitext(unit_logs[0])[0]
         else:
             log_basename = self.unit_basename + '_log_'
-        self.log_basename = PosState.increment_suffix(log_basename)
+            self.log_basename = PosState.increment_suffix(log_basename)
         self.max_log_length = 10000 # number of rows in log before starting a new file
         self.curr_log_length = 0
         if self.type == 'pos':
