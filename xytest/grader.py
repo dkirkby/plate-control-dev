@@ -13,34 +13,49 @@ import collections
 # grading parameters
 # c.f. DESI-XXXX Fiber Positioner Grades
 grade_specs = collections.OrderedDict()
-grade_specs['A'] = {'blind max um' : [ 100],
-                    'blind max %'  : [1.00],
-                    'corr max um'  : [  12],
-                    'corr max %'   : [1.00],
-                    'corr rms um'  : [   5],
-                    'corr rms %'   : [1.00],
-                    'failure current'      : 80,
-                    'has extended gearbox' : False}
-grade_specs['B'] = {'blind max um' : [ 100],
-                    'blind max %'  : [1.00],
-                    'corr max um'  : [  12,   30],
-                    'corr max %'   : [0.95, 0.05],
-                    'corr rms um'  : [   5],
-                    'corr rms %'   : [0.95],
-                    'failure current'      : 100,
-                    'has extended gearbox' : False}
-grade_specs['C'] =  {'blind max um' : [ 100],
-                     'blind max %'  : [0.95],
-                     'corr max um'  : [  12,   50],
-                     'corr max %'   : [0.95, 0.05],
-                     'corr rms um'  : [   5],
-                     'corr rms %'   : [0.95],
-                     'failure current'      : 100,
-                     'has extended gearbox' : False}
-grade_specs['D'] = grade_specs['B']
-grade_specs['D']['has extended gearbox'] = True
-grade_specs['E'] = grade_specs['C']
-grade_specs['E']['has extended gearbox'] = True
+grade_spec_headers = ['blind max um','blind max %','corr max um','corr max %','corr rms um','corr rms %','failure current','has extended gearbox']
+
+grade = 'A'
+grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
+grade_specs[grade]['blind max um']         = [ 100]
+grade_specs[grade]['blind max %']          = [1.00]
+grade_specs[grade]['corr max um']          = [  12]
+grade_specs[grade]['corr max %']           = [1.00]
+grade_specs[grade]['corr rms um']          = [   5]
+grade_specs[grade]['corr rms %']           = [1.00]
+grade_specs[grade]['failure current']      = 80
+grade_specs[grade]['has extended gearbox'] = False
+
+grade = 'B'
+grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
+grade_specs[grade]['blind max um']         = [ 100]
+grade_specs[grade]['blind max %']          = [1.00]
+grade_specs[grade]['corr max um']          = [  12,   30]
+grade_specs[grade]['corr max %']           = [0.95, 0.05]
+grade_specs[grade]['corr rms um']          = [   5]
+grade_specs[grade]['corr rms %']           = [0.95]
+grade_specs[grade]['failure current']      = 100
+grade_specs[grade]['has extended gearbox'] = False
+
+grade = 'C'
+grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
+grade_specs[grade]['blind max um']         = [ 100]
+grade_specs[grade]['blind max %']          = [0.95]
+grade_specs[grade]['corr max um']          = [  12,   50]
+grade_specs[grade]['corr max %']           = [0.95, 0.05]
+grade_specs[grade]['corr rms um']          = [   5]
+grade_specs[grade]['corr rms %']           = [0.95]
+grade_specs[grade]['failure current']      = 100
+grade_specs[grade]['has extended gearbox'] = False
+
+grade = 'D'
+grade_specs[grade] = grade_specs['B'].copy()
+grade_specs[grade]['has extended gearbox'] = True
+
+grade = 'E'
+grade_specs[grade] = grade_specs['C'].copy()
+grade_specs[grade]['has extended gearbox'] = True
+
 fail_grade = 'F'
 
 # get the files list
@@ -86,6 +101,8 @@ with open(motor_types_file,'r',newline='') as csvfile:
             d[row['pos_id']]['has extended gearbox'] = theta_extended or phi_extended
             
 # read data and grade positioners
+for pos_id in d.keys():
+    d[pos_id]['grade'] = fail_grade
 
 # write report
 gui_root = tkinter.Tk()
@@ -95,7 +112,12 @@ if not(report_file):
 gui_root.withdraw()
 if report_file:
     with open(report_file,'w',newline='') as csvfile:
-        writer = csv.DictWriter(csvfile,fieldnames=['test1','test2'])
-        writer.writeheader()
-        writer.writerow({'test1':1,'test2':2})
-        writer.writerow({'test1':10,'test2':100})
+        writer = csv.writer(csvfile)
+        some_grade = list(grade_specs.keys())[0]
+        writer.writerow(['Grade'] + grade_spec_headers)
+        for key in grade_specs.keys():
+            writer.writerow([key] + list(grade_specs[key].values()))
+        writer.writerow([''])
+        writer.writerow(['POS_ID','GRADE'])
+        for pos_id in pos_ids:
+            writer.writerow([pos_id,d[pos_id]['grade']])
