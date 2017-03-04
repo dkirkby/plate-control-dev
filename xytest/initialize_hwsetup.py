@@ -1,6 +1,7 @@
 import os
 import sys
 sys.path.append(os.path.abspath('../petal/'))
+sys.path.append(os.path.abspath('../posfidfvc/'))
 import petal
 import posmovemeasure
 import fvchandler

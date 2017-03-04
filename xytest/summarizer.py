@@ -4,9 +4,9 @@
 import os
 import sys
 sys.path.append(os.path.abspath('../petal/'))
+import posconstants as pc
 import numpy as np
 import collections
-import posconstants as pc
 import csv
 import datetime
 
