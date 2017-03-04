@@ -426,7 +426,7 @@ class Petal(object):
         if self.simulator_on:
             if self.verbose:
                 print('Simulator skips sending out set_fiducials commands.')
-            return
+            return {}
         fid_ids = pc.listify(fid_ids,keep_flat=True)[0]
         if fid_ids[0] == 'all':
             fid_ids = self.fid_ids

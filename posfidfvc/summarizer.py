@@ -4,9 +4,9 @@
 import numpy as np
 import collections
 import posconstants as pc
-import posstate
 import os
 import csv
+import datetime
 
 init_data_keys = ['test loop data file',
                   'num pts calib T',
@@ -24,14 +24,13 @@ class Summarizer(object):
     '''Provides common functions for summarizing a fiber positioner's performance data.
     '''
 
-    def __init__(self, pos_id, init_data, thresholds_mm=[0.003,0.005]):
+    def __init__(self, state, init_data, thresholds_mm=[0.003,0.005]):
         ''' The dictionary init_data should contain values for all the keys given
         in the list init_data_keys.
         
         Make sure to also update_loop_inits() at the beginning of any new xytest loop.
         '''
-        self.pos_id = pos_id
-        self.state = posstate.PosState(pos_id)
+        self.state = state
         self.thresholds_um = [t*pc.um_per_mm for t in thresholds_mm] # operate in um
         self.row_template = collections.OrderedDict()
         self.row_template['start time']                     = ''
@@ -54,8 +53,10 @@ class Summarizer(object):
         self.row_template['total limit seeks P at finish']  = None
         self.row_template['pos log files']                  = [self.state.log_basename]
         for key in init_data_keys:
+            if 'file' in key:
+                init_data[key] = os.path.basename(init_data[key])
             self.row_template[key] = init_data[key]
-        self.basename = pos_id + '_summary.csv'
+        self.basename = self.state.read('POS_ID') + '_summary.csv'
         self.filename = pc.test_summaries_directory + self.basename
         if not(os.path.isfile(self.filename)): # checking whether need to start a new file
             with open(self.filename, 'w', newline='') as csvfile:
@@ -72,14 +73,43 @@ class Summarizer(object):
         The inputs to this method are those particular data which we cannot
         otherwise infer from positioner state, or the internal clock, etc.
         '''
-        self.row_template['test loop data file'] = loop_data_file
+        self.row_template['test loop data file'] = os.path.basename(loop_data_file)
         self.row_template['num pts calib T']     = n_pts_calib_T
         self.row_template['num pts calib P']     = n_pts_calib_P
-        self.row_template['start time']          = pc.timestamp_str_now()
+        self.row_template['start time']          = datetime.datetime.now()
         self.row_template['curr cruise']         = self.state.read('CURR_CRUISE')
         self.row_template['curr creep']          = self.state.read('CURR_CREEP')
         self.next_row_is_new = True
 
+    def write_row(self, err_data_mm):
+        '''Makes a row of values and writes them to the csv file.
+        See threshold_and_summarize() method for comments on err_data.
+        '''
+        if self.state.log_basename not in self.row_template['pos log files']:
+            self.row_template['pos log files'].append(self.state.log_basename)
+        row = self.row_template.copy()
+        row['finish time'] = datetime.datetime.now()
+        for threshold in self.thresholds_um:
+            err_summary = Summarizer.threshold_and_summarize(err_data_mm,threshold)
+            for key in err_summary.keys():
+                if key in self.err_keys:
+                    row[key] = format(err_summary[key] * pc.um_per_mm, '.1f')
+        row['num targets'] = len(err_summary['all blind errs (um)'])
+        row['total move sequences at finish'] = self.state.read('TOTAL_MOVE_SEQUENCES')
+        row['total limit seeks T at finish'] = self.state.read('TOTAL_LIMIT_SEEKS_T')
+        row['total limit seeks P at finish'] = self.state.read('TOTAL_LIMIT_SEEKS_P')
+        with open(self.filename,'r', newline='') as csvfile:
+            rows = list(csv.reader(csvfile))
+        row_vals = list(row.values())
+        if self.next_row_is_new:
+            rows.append(row_vals)
+            self.next_row_is_new = False
+        else:
+            rows[-1] = list(row_vals)
+        with open(self.filename, 'w', newline='') as csvfile:
+            csv.writer(csvfile).writerows(rows)
+
+    @staticmethod
     def threshold_and_summarize(err_data_mm, threshold_um):
         '''Summarizes the error data for a single positioner, applying thresholds
         to determine which correction submoves are the ones at which in practice
@@ -131,35 +161,8 @@ class Summarizer(object):
         err_summary['max num corr'  + suffix] = max(err_summary['all corr nums'])
         return err_summary
 
-    def write_row(self, err_data_mm):
-        '''Makes a row of values and writes them to the csv file.
-        See threshold_and_summarize() method for comments on err_data.
-        '''
-        if self.state.log_basename not in self.row_template['pos log files']:
-            self.row_template['pos log files'].append(self.state.log_basename)
-        row = self.row_template.copy()
-        row['finish time'] = pc.timestamp_str_now()
-        for threshold in self.thresholds_um:
-            err_summary = self.threshold_and_summarize(err_data_mm,threshold)
-            for key in err_summary.keys():
-                if key in self.err_keys:
-                    row[key] = format(err_summary[key] * pc.um_per_mm, '.1f')
-        row['num targets'] = len(err_summary['all blind errs (um)'])
-        row['total move sequences at finish'] = self.state.read('TOTAL_MOVE_SEQUENCES')
-        row['total limit seeks T at finish'] = self.state.read('TOTAL_LIMIT_SEEKS_T')
-        row['total limit seeks P at finish'] = self.state.read('TOTAL_LIMIT_SEEKS_P')
-        with open(self.filename,'r', newline='') as csvfile:
-            rows = list(csv.reader(csvfile))
-        if self.next_row_is_new:
-            rows.append(row)
-            self.next_row_is_new = False
-        else:
-            rows[-1] = row
-        with open(self.filename, 'w', newline='') as csvfile:
-            csv.writer(csvfile).writerows(rows)
-
     @staticmethod
     def _threshold_suffix(value):
         '''For consistent internal generation of certain keys.
         '''
-        return ' - ' + str(value) + ' um threshold'
+        return ' with ' + str(value) + ' um threshold'

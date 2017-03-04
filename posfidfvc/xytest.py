@@ -64,7 +64,7 @@ class XYTest(object):
             self.logwrite('*** RESTARTING TEST AT LOOP ' + str(self.starting_loop_number) + ' ***')
             self.new_and_changed_files = self.xytest_conf['new_and_changed_files']
         self.logwrite('Total number of test loops: ' + str(self.n_loops))
-        test.logwrite('Code version: ' + pc.code_version)
+        self.logwrite('Code version: ' + pc.code_version)
         
         # simulation mode
         self.simulate = self.xytest_conf['simulate']
@@ -115,7 +115,8 @@ class XYTest(object):
             summarizer_init_data[key] = user_vals[key]
         summarizer_init_data['operator notes'] = self.get_and_log_comments_from_user()
         for pos_id in self.pos_ids:
-            self.summarizers[pos_id] = summarizer.Summarizer(pos_id,summarizer_init_data)
+            state = self.m.petals[0].get(pos_id).state
+            self.summarizers[pos_id] = summarizer.Summarizer(state,summarizer_init_data)
             self.track_file(self.summarizers[pos_id].filename)
         self.logwrite('Data summarizers for all positioners initialized.')
         
@@ -139,17 +140,20 @@ class XYTest(object):
         
     def intro_questions(self):
         print('Please enter the following data. Hit blank if unknown or unmeasured.')
-        user_vals = collections.OrderedDict.fromkeys(summarizer.user_data_keys)
+        keys = summarizer.user_data_keys.copy()
+        keys.remove('operator notes') # this one is handled separately in get_and_log_comments_from_user()
+        user_vals = collections.OrderedDict.fromkeys(keys)
         for key in user_vals.keys():
-            user_vals.append(input(key + ': '))
+            user_vals[key] = input(key + ': ')
         print('')
         print('You entered:')
+        nchar = max([len(key) for key in user_vals.keys()])
         for key in user_vals.keys():
-            print('  ' + key + user_vals[key])
+            print('  ' + format(key + ':',str(nchar + 2) + 's') + user_vals[key])
         print('')
         try_again = input('If this is ok, hit enter to continue. Otherwise, type any character and enter to start over: ')
         if try_again:
-            self.intro_questions()
+            return self.intro_questions()
         else:
             return user_vals
         
