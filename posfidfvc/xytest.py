@@ -262,7 +262,6 @@ class XYTest(object):
             for key in submove_fields:
                 all_data_by_pos_id[pos_id][key] = [[] for i in submove_idxs]
             start_cycles[pos_id] = self.m.state(pos_id).read('TOTAL_MOVE_SEQUENCES')
-        start_timestamp = pc.timestamp_str_now()
         
         # run the test
         try:  
@@ -285,13 +284,7 @@ class XYTest(object):
                 
                 # update summary data logs
                 for pos_id in self.pos_ids:
-                    summ = self.summarizers[pos_id]
-                    
-                    
-                    # this writing to file should all be handled by the summarizer class
-                    file = open(summ.filename,'w')
-                    file.write(summary_log_data)
-                    file.close()
+                    self.summarizers[pos_id].write_row(all_data_by_pos_id[pos_id]['err2D'])
         
                 # update test data log
                 for pos_id in these_targets.keys():
