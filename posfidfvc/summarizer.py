@@ -1,10 +1,12 @@
 # For description of plan for what this module will produce and the overall test data architecture, see:
 # https://docs.google.com/spreadsheets/d/1XG8HlfBhMVonhohbZknwzM72AP0cquVI2t4Qyq_Af9s/edit?ts=58b6fc39#gid=0
 
+import os
+import sys
+sys.path.append(os.path.abspath('../petal/'))
 import numpy as np
 import collections
 import posconstants as pc
-import os
 import csv
 import datetime
 
@@ -37,15 +39,14 @@ class Summarizer(object):
         self.row_template['finish time']                    = ''
         self.row_template['curr cruise']                    = 0
         self.row_template['curr creep']                     = 0
-        self.row_template['num targets']                    = 0     # number of targets tested in this loop
-        self.row_template['blind max (um)']                 = None  # max error on the blind move 0
-        self.err_keys = []
+        self.row_template['num targets']                    = 0     # number of targets tested in this loop 
+        self.err_keys = ['blind max (um)']                          # max error on the blind move 0
         for threshold in self.thresholds_um:
             suffix = Summarizer._threshold_suffix(threshold)
-            self.err_keys.append('corr max (um)' + suffix)    # max error after correction moves (threshold is applied)
-            self.err_keys.append('corr rms (um)' + suffix)    # rms error after correction moves (threshold is applied)
-            self.err_keys.append('mean num corr' + suffix)    # avg number of correction moves it took to reach either threshold or end of submove data
-            self.err_keys.append('max num corr'  + suffix)    # max number of correction moves it took to reach either threshold or end of submove data
+            self.err_keys.append('corr max (um)' + suffix)          # max error after correction moves (threshold is applied)
+            self.err_keys.append('corr rms (um)' + suffix)          # rms error after correction moves (threshold is applied)
+            self.err_keys.append('mean num corr' + suffix)          # avg number of correction moves it took to reach either threshold or end of submove data
+            self.err_keys.append('max num corr'  + suffix)          # max number of correction moves it took to reach either threshold or end of submove data
         for key in self.err_keys:
             self.row_template[key] = None
         self.row_template['total move sequences at finish'] = None
@@ -93,7 +94,7 @@ class Summarizer(object):
             err_summary = Summarizer.threshold_and_summarize(err_data_mm,threshold)
             for key in err_summary.keys():
                 if key in self.err_keys:
-                    row[key] = format(err_summary[key] * pc.um_per_mm, '.1f')
+                    row[key] = format(err_summary[key], '.1f')
         row['num targets'] = len(err_summary['all blind errs (um)'])
         row['total move sequences at finish'] = self.state.read('TOTAL_MOVE_SEQUENCES')
         row['total limit seeks T at finish'] = self.state.read('TOTAL_LIMIT_SEEKS_T')
@@ -166,3 +167,26 @@ class Summarizer(object):
         '''For consistent internal generation of certain keys.
         '''
         return ' with ' + str(value) + ' um threshold'
+    
+if __name__=="__main__":
+    # run test cases for threshold_and_summarize()
+    # "true" values are from an excel spreadsheet calculation on real-world data
+    err_data = [[0.028169452013332,0.021436811598223,0.023928159045896,0.024339236279999,0.031831043836598,0.034609541686335,0.023621655142686,0.020402133168994,0.028652613331112,0.033175378665464,0.026614576128739,0.041078462988307,0.023884844353844,0.026105129073477,0.018933721272118,0.01618311911478,0.013677214087998,0.012099116464476,0.019385674835018,0.021887908217353,0.020976683421511,0.016668289464721,0.01341539430437,0.012203607390022,0.007815563242094,0.017099508476174,0.015600822884922,0.016584027196105,0.016810059117646,0.01552520005531,0.007391547461906,0.007252068538014,0.011592666896079,0.011082980638929,0.010800879022651,0.003391265059674,0.012535850737464,0.004387897938428,0.015969054884395,0.008458762887985,0.016868250391597,0.005695955276547,0.020027522111801,0.000845768378139],
+                [0.004794174357359,0.003641585669747,0.002108625877434,0.001340605068994,0.004326917668511,0.001623646153267,0.000852159314832,0.000151442419284,0.000332732460091,0.00565438068241,0.002455295314705,0.00464278144297,0.002181445953209,0.00182872135294,0.001999190186998,0.003206162996257,0.001506354604211,0.002726798565418,0.002474931866478,0.000358945544821,0.002849470458558,0.004500668087429,0.002398135801399,0.001275330714124,0.003219054631011,0.001353435379599,0.003153951227507,0.001094113660144,0.004142619536975,0.001261361965688,0.000995809171527,0.00187777587623,0.001125517847051,0.002765140323848,0.001855050786611,0.000332737873872,0.003221622909516,0.002281780336601,0.005400464474233,0.002217467041436,0.006406583722401,0.000324688821745,0.005422933145789,0.001658287974615],
+                [0.003336121974541,0.000679012086957,0.001332133818887,0.002966143287441,0.001833742277795,0.001966634143416,0.000300631809676,0.001401120144275,0.001893191985907,0.003204597344948,0.006311611666338,0.007191381373886,0.002846822978382,0.00272202422593,0.000684825526799,0.002136871220576,0.000730729240323,0.001989741033593,0.001782835108649,0.001806545347983,0.000647751686366,0.000218315774483,0.001118941042961,0.000421816707346,0.000219344604132,9.72637324678929E-05,0.001852404320124,0.000154826640447,0.001231737062061,0.001284084004358,0.002519970079442,0.001206413388389,0.000437009728294,0.0003686734607,0.000262301420282,0.000612299769062,0.002311908594873,0.000668134655038,0.000714256017467,0.00163836318095,0.005142929130147,0.000986956758298,0.006637697342092,0.000378191781701],
+                [0.002584805683331,0.000548639181369,0.000208857177722,0.001855268913839,0.000353719503139,0.001724087492575,0.000744996530456,0.00067036979768,0.003263324841986,0.001525170538827,0.000426540654257,0.001417458473573,0.002456035587335,0.000662834720693,7.80486244991122E-05,0.000697052281869,0.001088429066988,0.002730852977829,0.002312130337657,0.000331730348798,0.000364506283744,0.001064664329409,0.000486716245743,0.000507730749569,0.00113415745198,0.00119567876286,0.000257951680312,0.000686562469686,0.001259778017192,0.000914741821213,0.002747213612962,0.001447302280182,0.001418156646772,0.002089908763,0.000701918468109,0.000352211217988,0.000798973374287,0.000757025200624,0.000355575795804,0.000880713024189,0.005701276690373,0.000351164926666,0.006399230167376,0.000855158919996]]
+    thresholds = [3,5] # um
+    true_err_max = [6.399230167376,6.399230167376]
+    true_err_rms = [2.108590212502,2.846248709431]
+    true_num_max = [3,3]
+    true_num_avg = [1.40909090909091,1.06818181818182]
+    for i in range(len(thresholds)):
+        err_summary = Summarizer.threshold_and_summarize(err_data,thresholds[i])
+        suffix = Summarizer._threshold_suffix(thresholds[i])
+        print('Threshold: ' + str(thresholds[i]) + ' um')
+        print('  true err max = ' + str(true_err_max[i]) + ',  Summarizer err max = ' + str(err_summary['corr max (um)' + suffix]))
+        print('  true err rms = ' + str(true_err_rms[i]) + ',  Summarizer err rms = ' + str(err_summary['corr rms (um)' + suffix]))
+        print('  true max num corr = ' + str(true_num_max[i]) + ',  Summarizer max num corr = ' + str(err_summary['max num corr' + suffix]))
+        print('  true avg num corr = ' + str(true_num_avg[i]) + ',  Summarizer avg num corr = ' + str(err_summary['mean num corr' + suffix]))
+
+
