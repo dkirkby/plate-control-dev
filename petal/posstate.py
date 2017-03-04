@@ -29,7 +29,7 @@ class PosState(object):
         self.type = device_type
         if self.type == 'pos':
             self.settings_directory = pc.pos_settings_directory
-            self.logs_directory = pc.move_logs_directory
+            self.logs_directory = pc.pos_logs_directory
         else:
             self.settings_directory = pc.fid_settings_directory
             self.logs_directory = pc.fid_logs_directory

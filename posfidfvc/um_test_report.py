@@ -85,14 +85,14 @@ def email_report(text, timestamp, pos_ids,to='limited'):
         image_types = ['xyplot_submove0.png','xyplot_submove1.png']
         for pos_id in pos_ids:
             #Attach movedata
-            movedata = pc.test_logs_directory + pos_id + '_' + timestamp + '_' + 'movedata.csv'
+            movedata = pc.xytest_data_directory + pos_id + '_' + timestamp + '_' + 'movedata.csv'
             mvdt = open(movedata)
             attm = MIMEText(mvdt.read())
             attm.add_header('Content-Disposition', 'attachment', filename=(pos_id + '_' + timestamp + '_' + 'movedata.csv'))
             message.attach(attm)
             #Attach submove images
             for image in image_types:
-                file = pc.test_logs_directory + pos_id + '_' + timestamp + '_' + image
+                file = pc.xytest_plots_directory + pos_id + '_' + timestamp + '_' + image
                 try:
                     fp = open(file, 'rb')
                     img = MIMEImage(fp.read())

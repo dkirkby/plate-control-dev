@@ -202,7 +202,7 @@ class PosMoveMeasure(object):
         if save_img:
             timestamp_str = pc.timestamp_str_now()
             for file in imgfiles:
-                os.rename(file, pc.test_logs_directory + timestamp_str + '_move0' + file)
+                os.rename(file, pc.xytest_plots_directory + timestamp_str + '_move0' + file)
         for i in range(1,num_corr_max+1):
             correction = {}
             save_img = False
@@ -226,7 +226,7 @@ class PosMoveMeasure(object):
             if save_img:
                 timestamp_str = pc.timestamp_str_now()
                 for file in imgfiles:
-                    os.rename(file, pc.test_logs_directory + timestamp_str + '_move' + str(i) + file)                
+                    os.rename(file, pc.xytest_plots_directory + timestamp_str + '_move' + str(i) + file)                
         for pos_id in data.keys():
             self.printfunc(str(pos_id) + ': final error distance=' + self.fmt(data[pos_id]['err2D'][-1]))
         return data

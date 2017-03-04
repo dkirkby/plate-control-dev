@@ -64,7 +64,7 @@ while ids_unchecked:
 m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
 m.identify_fiducials() 
 m.identify_positioner_locations()
-m.calibrate(mode='quick', save_file_dir=pc.test_logs_directory, save_file_timestamp=start_timestamp) # need to calibrate prior to measuring  physical travel ranges (where phi arms get extended, and need some reasonable values for theta offsets before doing such extensions)
+m.calibrate(mode='quick', save_file_dir=pc.xytest_plots_directory, save_file_timestamp=start_timestamp) # need to calibrate prior to measuring  physical travel ranges (where phi arms get extended, and need some reasonable values for theta offsets before doing such extensions)
 m.measure_range(axis='theta')
 m.measure_range(axis='phi')
 m.rehome() # rehome again because range measurements intentionally ran against hardstops, messing up shaft angle counters

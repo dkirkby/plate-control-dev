@@ -36,7 +36,7 @@ class XYTest(object):
         """
         
         # set up configuration and traveler files that goes with this test, and begin logging
-        os.makedirs(pc.test_logs_directory, exist_ok=True)
+        os.makedirs(pc.xytest_logs_directory, exist_ok=True)
         gui_root = tkinter.Tk()
         if not(hwsetup_conf):
             message = "Select hardware setup file."
@@ -51,7 +51,7 @@ class XYTest(object):
         self.n_loops = self._calculate_and_check_n_loops()
         if self.starting_loop_number == 0:
             initial_timestamp = pc.timestamp_str_now()
-            traveler_name = pc.test_logs_directory + initial_timestamp + '_' + os.path.basename(xytest_conf)
+            traveler_name = pc.xytest_logs_directory + initial_timestamp + '_' + os.path.basename(xytest_conf)
             self.xytest_conf.filename = traveler_name
             self.new_and_changed_files = set()  # start a set to keep track of all files that need to be added / committed to SVN
             self.track_file(self.xytest_conf.filename)
@@ -193,7 +193,7 @@ class XYTest(object):
             self.logwrite('Starting arc calibration sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             self.m.n_points_full_calib_T = n_pts_calib_T
             self.m.n_points_full_calib_P = n_pts_calib_P
-            files = self.m.calibrate(pos_ids='all', mode='full', save_file_dir=pc.test_logs_directory, save_file_timestamp=pc.timestamp_str_now())
+            files = self.m.calibrate(pos_ids='all', mode='full', save_file_dir=pc.xytest_plots_directory, save_file_timestamp=pc.timestamp_str_now())
             for file in files:
                 self.track_file(file)
                 self.logwrite('Calibration plot file: ' + file)
@@ -210,14 +210,10 @@ class XYTest(object):
         log_suffix = self.xytest_conf['log_suffix']
         log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
         log_timestamp = pc.timestamp_str_now()
-        def path_prefix(pos_id):
-            return pc.test_logs_directory + pos_id + '_' + log_timestamp + log_suffix
         def move_log_name(pos_id):
-            return path_prefix(pos_id) + '_movedata.csv'
-        def summary_log_name(pos_id):
-            return path_prefix(pos_id) + '_summary.csv'
+            return pc.xytest_data_directory  + pos_id + '_' + log_timestamp + log_suffix + '_movedata.csv'
         def summary_plot_name(pos_id):
-            return path_prefix(pos_id) + '_xyplot'    
+            return pc.xytest_plots_directory + pos_id + '_' + log_timestamp + log_suffix + '_xyplot'    
 
         n_pts_calib_T = self.xytest_conf['n_points_calib_T'][loop_number]
         n_pts_calib_P = self.xytest_conf['n_points_calib_P'][loop_number]
@@ -323,7 +319,7 @@ class XYTest(object):
                 r1 = posmodel.state.read('LENGTH_R1')
                 r2 = posmodel.state.read('LENGTH_R2')
                 filenames = pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_data_by_pos_id[pos_id],center,theta_range,r1,r2,title)
-                self.logwrite(pos_id + ': Summary log file: ' + summary_log_name(pos_id))
+                self.logwrite(pos_id + ': Summary log file: ' + self.summarizers[pos_id].filename)
                 self.logwrite(pos_id + ': Full data log file: ' + move_log_name(pos_id))
                 for filename in filenames:
                     self.logwrite(pos_id + ': Summary plot file: ' + filename)

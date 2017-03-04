@@ -58,7 +58,7 @@ class Summarizer(object):
                 init_data[key] = os.path.basename(init_data[key])
             self.row_template[key] = init_data[key]
         self.basename = self.state.read('POS_ID') + '_summary.csv'
-        self.filename = pc.test_summaries_directory + self.basename
+        self.filename = pc.xytest_summaries_directory + self.basename
         if not(os.path.isfile(self.filename)): # checking whether need to start a new file
             with open(self.filename, 'w', newline='') as csvfile:
                 csv.writer(csvfile).writerow(self.row_template.keys()) # write header row

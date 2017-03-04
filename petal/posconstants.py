@@ -21,17 +21,19 @@ code_version = petal_directory.split(os.path.sep)[-2]
 # For environment paths, set the paths in your .bashrc file, by adding the lines:
 #    export POSITIONER_LOGS_PATH="/my/path/to/positioner_logs"
 #    export FP_SETTINGS_PATH="/my/path/to/fp_settings"
-all_logs_directory = os.environ.get("POSITIONER_LOGS_PATH") # corresponds to https://desi.lbl.gov/svn/code/focalplane/positioner_logs
-all_settings_directory = os.environ.get("FP_SETTINGS_PATH") # corresponds to https://desi.lbl.gov/svn/code/focalplane/fp_settings
-move_logs_directory = all_logs_directory + os.path.sep + 'move_logs' + os.path.sep
-test_logs_directory = all_logs_directory + os.path.sep + 'test_logs' + os.path.sep
-test_summaries_directory = all_logs_directory + os.path.sep + 'xytest_summaries' + os.path.sep
-fid_logs_directory  = all_logs_directory + os.path.sep + 'fiducial_logs' + os.path.sep
-pos_settings_directory = all_settings_directory + os.path.sep + 'pos_settings' + os.path.sep
-fid_settings_directory = all_settings_directory + os.path.sep + 'fid_settings' + os.path.sep
-test_settings_directory = all_settings_directory + os.path.sep + 'test_settings' + os.path.sep
+all_logs_directory           = os.environ.get("POSITIONER_LOGS_PATH") # corresponds to https://desi.lbl.gov/svn/code/focalplane/positioner_logs
+all_settings_directory       = os.environ.get("FP_SETTINGS_PATH") # corresponds to https://desi.lbl.gov/svn/code/focalplane/fp_settings
+pos_logs_directory           = all_logs_directory + os.path.sep + 'pos_logs' + os.path.sep
+fid_logs_directory           = all_logs_directory + os.path.sep + 'fid_logs' + os.path.sep
+xytest_data_directory        = all_logs_directory + os.path.sep + 'xytest_data' + os.path.sep
+xytest_logs_directory        = all_logs_directory + os.path.sep + 'xytest_logs' + os.path.sep
+xytest_plots_directory       = all_logs_directory + os.path.sep + 'xytest_plots' + os.path.sep
+xytest_summaries_directory   = all_logs_directory + os.path.sep + 'xytest_summaries' + os.path.sep
+pos_settings_directory       = all_settings_directory + os.path.sep + 'pos_settings' + os.path.sep
+fid_settings_directory       = all_settings_directory + os.path.sep + 'fid_settings' + os.path.sep
+test_settings_directory      = all_settings_directory + os.path.sep + 'test_settings' + os.path.sep
 collision_settings_directory = all_settings_directory + os.path.sep + 'collision_settings' + os.path.sep
-hwsetups_directory = all_settings_directory + os.path.sep + 'hwsetups' + os.path.sep
+hwsetups_directory           = all_settings_directory + os.path.sep + 'hwsetups' + os.path.sep
 # 2017-02-07, Joe: previously there was a function here called 'set_logs_directory()'. It was for being able
 # to change these paths above at runtime. This is a bad thing to do, because it breaks our assumptions elsewhere
 # about how we are keeping config files and log files up-to-date in the SVN. So I removed that function. We
