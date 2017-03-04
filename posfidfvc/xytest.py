@@ -109,6 +109,7 @@ class XYTest(object):
         summarizer_init_data['num pts calib T']     = None
         summarizer_init_data['num pts calib P']     = None
         summarizer_init_data['xytest log file']     = self.xytest_conf.filename
+        summarizer_init_data['code version']        = pc.code_version
         user_vals = self.intro_questions()
         for key in user_vals.keys():
             self.logwrite('user-entry: ' + key + user_vals[key])

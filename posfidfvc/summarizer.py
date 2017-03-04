@@ -14,13 +14,14 @@ init_data_keys = ['test loop data file',
                   'num pts calib T',
                   'num pts calib P',
                   'xytest log file',
+                  'code version',
                   'test operator',
                   'test station',
                   'supply voltage',
                   'temperature (C)',
                   'relative humidity',
                   'operator notes']
-user_data_keys = init_data_keys[4:] # subset of init_data_keys that get manually entered by user
+user_data_keys = init_data_keys[5:] # subset of init_data_keys that get manually entered by user
 
 class Summarizer(object):
     '''Provides common functions for summarizing a fiber positioner's performance data.
