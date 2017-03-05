@@ -52,15 +52,16 @@ class PosState(object):
             self.unit.write()
         else:
             self.unit = configobj.ConfigObj(unit_filename,unrepr=True,encoding='utf-8')
-     
-        all_logs = os.listdir(self.logs_directory)
-        unit_logs = [x for x in all_logs if self.unit_basename in x]
-        if unit_logs:
-            unit_logs.sort(reverse=True)
-            self.log_basename = os.path.splitext(unit_logs[0])[0]
-        else:
-            log_basename = self.unit_basename + '_log_'
-            self.log_basename = PosState.increment_suffix(log_basename)
+        self.log_basename = self.unit['CURRENT_LOG_BASENAME']
+        if not(self.log_basename):
+            all_logs = os.listdir(self.logs_directory)
+            unit_logs = [x for x in all_logs if self.unit_basename in x]
+            if unit_logs:
+                unit_logs.sort(reverse=True)
+                self.log_basename = os.path.splitext(unit_logs[0])[0]
+            else:
+                log_basename = self.unit_basename + '_log_'
+                self.log_basename = PosState.increment_suffix(log_basename)
         self.max_log_length = 10000 # number of rows in log before starting a new file
         self.curr_log_length = 0
         if self.type == 'pos':
@@ -83,11 +84,11 @@ class PosState(object):
         # self.unit.reload()
         if key in self.unit.keys():
             return self.unit[key]
-        self.printfunc('no key "' + repr(key) + '" found')
+        self.printfunc('no key ' + repr(key) + ' found')
         self.printfunc('keys: ' + str(self.unit.keys()))
         return None
 
-    def write(self,key,val,write_to_disk=None):
+    def write(self,key,val):
         """Set a value.
         """
         if key in pc.nominals.keys():
@@ -98,8 +99,7 @@ class PosState(object):
                 val = nom
         if key in self.unit.keys():
             self.unit[key] = val
-            if write_to_disk != False:
-                self.unit.write()
+            self.unit.write()
         else:
             self.printfunc('value not set, because the key "' + repr(key) + '" was not found')
  
@@ -112,6 +112,7 @@ class PosState(object):
                 note = ' ' # just to make csv file cell look blank in excel
             if self.curr_log_length >= self.max_log_length:
                 self.log_basename = PosState.increment_suffix(self.log_basename)
+                self.write('CURRENT_LOG_BASENAME',self.log_basename)
                 self.curr_log_length = 0
             if not(os.path.isfile(self.log_path)): # checking whether need to start a new file
                 with open(self.log_path, 'w', newline='') as csvfile:

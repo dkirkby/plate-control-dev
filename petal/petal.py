@@ -552,12 +552,9 @@ class Petal(object):
             vals = pc.delistify(vals)
         return vals
 
-    def set(self,posid=None,key=None,value=None,write_to_disk=None):
+    def set(self,posid=None,key=None,value=None):
         """Set the state value identified by string key, for positioner unit
         identified by id posid.
-
-        Note comments for posstate.write() method, which explain the optional
-        argument 'write_to_disk'.
 
         If no posid is specified, value is set for all positioners.
 
@@ -565,7 +562,6 @@ class Petal(object):
         setting multiple values. The other arguments can either:
             ... also be lists, of same length as posid
             ... or just a single value, which gets applied uniformly to all posid.
-            ... (except write_to_disk, which is always just a single boolean value, not a list, and applies to all affected posid)
 
         Examples:
             m = posarraymaster.PosArrayMaster(posids)
@@ -585,7 +581,7 @@ class Petal(object):
         (posid, key)   = self._equalize_input_list_lengths(posid,key) # repetition here handles the case where there was 1 posid element, 1 key, but mulitplie elements in value
         for i in range(len(posid)):
             p = self.get_model_for_pos(posid[i])
-            p.state.write(key[i],value[i],write_to_disk)
+            p.state.write(key[i],value[i])
 
     def expected_current_position(self,posid=None,key=''):
         """Retrieve the current position, for a positioner identied by posid, according
