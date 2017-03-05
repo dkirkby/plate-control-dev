@@ -99,6 +99,8 @@ class XYTest(object):
         self.logwrite('Positoner notes: ' + str(self.pos_notes))
         self.logwrite('Fiducials: ' + str(fid_ids))
         self.logwrite('Petal: ' + str(ptl_id))
+        self.m.make_plots_during_calib = self.xytest_conf['should_make_plots']
+        self.logwrite('Automatic generation of calibration and submove plots is turned ' + ('ON' if self.xytest_conf['should_make_plots'] else 'OFF') + '.')
         self.logwrite('PosMoveMeasure initialized.')
         fid_settings_done = self.m.set_fiducials('on')
         self.logwrite('Fiducials turned on: ' + str(fid_settings_done))
@@ -311,21 +313,22 @@ class XYTest(object):
                     file.close()
             
             # make summary plots showing the targets and measured positions
-            for pos_id in all_data_by_pos_id.keys():
-                posmodel = self.m.posmodel(pos_id)
-                title = log_timestamp + log_suffix
-                center = [posmodel.state.read('OFFSET_X'),posmodel.state.read('OFFSET_Y')]
-                theta_min = posmodel.trans.posTP_to_obsTP([min(posmodel.targetable_range_T),0])[0]
-                theta_max = posmodel.trans.posTP_to_obsTP([max(posmodel.targetable_range_T),0])[0]
-                theta_range = [theta_min,theta_max]
-                r1 = posmodel.state.read('LENGTH_R1')
-                r2 = posmodel.state.read('LENGTH_R2')
-                filenames = pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_data_by_pos_id[pos_id],center,theta_range,r1,r2,title)
-                self.logwrite(pos_id + ': Summary log file: ' + self.summarizers[pos_id].filename)
-                self.logwrite(pos_id + ': Full data log file: ' + move_log_name(pos_id))
-                for filename in filenames:
-                    self.logwrite(pos_id + ': Summary plot file: ' + filename)
-                    self.track_file(filename)
+            if self.xytest_conf['should_make_plots']:
+                for pos_id in all_data_by_pos_id.keys():
+                    posmodel = self.m.posmodel(pos_id)
+                    title = log_timestamp + log_suffix
+                    center = [posmodel.state.read('OFFSET_X'),posmodel.state.read('OFFSET_Y')]
+                    theta_min = posmodel.trans.posTP_to_obsTP([min(posmodel.targetable_range_T),0])[0]
+                    theta_max = posmodel.trans.posTP_to_obsTP([max(posmodel.targetable_range_T),0])[0]
+                    theta_range = [theta_min,theta_max]
+                    r1 = posmodel.state.read('LENGTH_R1')
+                    r2 = posmodel.state.read('LENGTH_R2')
+                    filenames = pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_data_by_pos_id[pos_id],center,theta_range,r1,r2,title)
+                    self.logwrite(pos_id + ': Summary log file: ' + self.summarizers[pos_id].filename)
+                    self.logwrite(pos_id + ': Full data log file: ' + move_log_name(pos_id))
+                    for filename in filenames:
+                        self.logwrite(pos_id + ': Summary plot file: ' + filename)
+                        self.track_file(filename)
 
             # Test report and email only on certain tests
             if self.xytest_conf['should_email']:
