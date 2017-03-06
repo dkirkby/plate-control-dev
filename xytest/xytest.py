@@ -118,7 +118,7 @@ class XYTest(object):
         summarizer_init_data['code version']        = pc.code_version
         user_vals = self.intro_questions()
         for key in user_vals.keys():
-            self.logwrite('user-entry: ' + key + user_vals[key])
+            self.logwrite('user-entry: ' + key + ': ' + user_vals[key])
             summarizer_init_data[key] = user_vals[key]
         summarizer_init_data['operator notes'] = self.get_and_log_comments_from_user()
         for pos_id in self.pos_ids:
