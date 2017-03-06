@@ -25,6 +25,7 @@ user_data_keys = init_data_keys[5:] # subset of init_data_keys that get manually
 thresholds_um = [3.0,5.0] # [um] candidate 2D error thresholds to calculate where in real operation on the mountain we would have stopped correcting
 stat_cuts = [0.95,1.00] # statistical cutoffs for best moves at which to report
 
+
 class Summarizer(object):
     '''Provides common functions for summarizing a fiber positioner's performance data.
     When run as an application, summarizer.py provides a utility for making summary files out of
@@ -46,16 +47,7 @@ class Summarizer(object):
         self.row_template['curr cruise']                    = 0
         self.row_template['curr creep']                     = 0
         self.row_template['num targets']                    = 0     # number of targets tested in this loop 
-        self.err_keys = []                          
-        for cut in stat_cuts:
-            suffix1 = Summarizer.statcut_suffix(cut)
-            self.err_keys.append('blind max (um)' + suffix1)    # max error on the blind move 0
-            for threshold in thresholds_um:
-                suffix2 = Summarizer.err_suffix(cut,threshold)
-                self.err_keys.append('corr max (um)' + suffix2) # max error after correction moves (threshold is applied)
-                self.err_keys.append('corr rms (um)' + suffix2) # rms error after correction moves (threshold is applied)
-                self.err_keys.append('mean num corr' + suffix2) # avg number of correction moves it took to reach either threshold or end of submove data
-                self.err_keys.append('max num corr'  + suffix2) # max number of correction moves it took to reach either threshold or end of submove data
+        self.err_keys = Summarizer.make_err_keys()
         for key in self.err_keys:
             self.row_template[key] = None
         self.row_template['total move sequences at finish'] = None
@@ -183,7 +175,7 @@ class Summarizer(object):
             suffix1 = Summarizer.statcut_suffix(cut)
             err_summary['blind max (um)' + suffix1] = max(err_summary['all blind errs (um)'][idxs])
             suffix2 = Summarizer.err_suffix(cut,threshold_um)
-            err_summary['corr max (um)' + suffix2] = max(err_summary['all corr errs (um)'])
+            err_summary['corr max (um)' + suffix2] = max(err_summary['all corr errs (um)'][idxs])
             err_summary['corr rms (um)' + suffix2] = np.sqrt(np.sum(np.power(err_summary['all corr errs (um)'][idxs],2))/n)
             err_summary['mean num corr' + suffix2] = np.mean(err_summary['all corr nums'][idxs])
             err_summary['max num corr'  + suffix2] = max(err_summary['all corr nums'][idxs])
@@ -201,6 +193,21 @@ class Summarizer(object):
             return ' all targets'
         else:
             return ' best ' + format(stat_cut*100,'g') + '%'
+    
+    @staticmethod
+    def make_err_keys():
+        '''Return list of valid keys for the error data.'''
+        err_keys = []                          
+        for cut in stat_cuts:
+            suffix1 = Summarizer.statcut_suffix(cut)
+            err_keys.append('blind max (um)' + suffix1)    # max error on the blind move 0
+            for threshold in thresholds_um:
+                suffix2 = Summarizer.err_suffix(cut,threshold)
+                err_keys.append('corr max (um)' + suffix2) # max error after correction moves (threshold is applied)
+                err_keys.append('corr rms (um)' + suffix2) # rms error after correction moves (threshold is applied)
+                err_keys.append('mean num corr' + suffix2) # avg number of correction moves it took to reach either threshold or end of submove data
+                err_keys.append('max num corr'  + suffix2) # max number of correction moves it took to reach either threshold or end of submove data
+        return err_keys
     
 if __name__=="__main__":
     import tkinter

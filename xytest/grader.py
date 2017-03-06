@@ -10,12 +10,15 @@ import tkinter.messagebox
 import csv
 import collections
 import summarizer
+import numpy as np
 
 # grading parameters
 # c.f. DESI-XXXX Fiber Positioner Grades
 # the list specs refer to values at the stat_cuts specified in the summarizer
 grade_specs = collections.OrderedDict()
-grade_spec_headers = ['blind max um','blind max %','corr max um','corr max %','corr rms um','corr rms %','failure current','has extended gearbox']
+grade_spec_headers = ['blind max um','corr max um','corr rms um','failure current','has extended gearbox']
+grade_spec_err_keys = grade_spec_headers[0:2]
+grading_threshold = summarizer.thresholds_um[0]
 
 grade = 'A'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
@@ -23,7 +26,7 @@ grade_specs[grade]['blind max um']         = [ 100, 100]
 grade_specs[grade]['corr max um']          = [  12,  12]
 grade_specs[grade]['corr rms um']          = [   5,   5]
 grade_specs[grade]['failure current']      = 80
-grade_specs[grade]['has extended gearbox'] = False
+grade_specs[grade]['has extended gearbox'] = True
 
 grade = 'B'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
@@ -31,7 +34,7 @@ grade_specs[grade]['blind max um']         = [ 100, 100]
 grade_specs[grade]['corr max um']          = [  12,  30]
 grade_specs[grade]['corr rms um']          = [   5,  10]
 grade_specs[grade]['failure current']      = 90
-grade_specs[grade]['has extended gearbox'] = False
+grade_specs[grade]['has extended gearbox'] = True
 
 grade = 'C'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
@@ -39,7 +42,7 @@ grade_specs[grade]['blind max um']         = [ 100, 200]
 grade_specs[grade]['corr max um']          = [  20,  50]
 grade_specs[grade]['corr rms um']          = [  10,  20]
 grade_specs[grade]['failure current']      = 100
-grade_specs[grade]['has extended gearbox'] = False
+grade_specs[grade]['has extended gearbox'] = True
 
 grade = 'D'
 grade_specs[grade] = grade_specs['B'].copy()
@@ -94,13 +97,56 @@ with open(motor_types_file,'r',newline='') as csvfile:
         if row['pos_id'] in d.keys():
             d[row['pos_id']]['has extended gearbox'] = theta_extended or phi_extended
             
-# read data and grade positioners
-# 1. assess failure current
-# 2. ignore all results from tests below failure current
-# 3. do the grading calcs
+# read in the summary data
+err_keys = summarizer.Summarizer.make_err_keys()
+err_keys = [s for s in err_keys if 'num' not in s]
+for pos_id in d.keys():
+    with open(d[pos_id]['file'],'r',newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
+        valid_keys = []
+        for key in err_keys + ['curr cruise','curr creep']:
+            if key in reader.fieldnames:
+                valid_keys.append(key)
+                d[pos_id][key] = []
+        for row in reader:
+            for key in valid_keys:
+                val = row[key]
+                if val.replace('.','').isnumeric():
+                    val = float(val)
+                    if val % 1 == 0:
+                        val = int(val)
+                else:
+                    val = None
+                d[pos_id][key].append(val)
+        
+# grade positioners
 for pos_id in d.keys():
     d[pos_id]['grade'] = fail_grade
-    d[pos_id]['failure current'] = 0
+    for grade in grade_specs.keys():
+        this_grade_valid = True
+        selection1 = np.array(d[pos_id]['curr cruise']) >= grade_specs[grade]['failure current']
+        selection2 = np.array(d[pos_id]['curr creep']) >= grade_specs[grade]['failure current']
+        selection = selection1 * selection2
+        for i in range(len(summarizer.stat_cuts)):
+            cut = summarizer.stat_cuts[i]
+            suffix1 = summarizer.Summarizer.statcut_suffix(cut)
+            suffix2 = summarizer.Summarizer.err_suffix(cut,grading_threshold)
+            blind_max = np.array(d[pos_id]['blind max (um)' + suffix1])[selection]
+            corr_max = np.array(d[pos_id]['corr max (um)' + suffix2])[selection]
+            corr_rms = np.array(d[pos_id]['corr rms (um)' + suffix2])[selection]
+            if max(blind_max) > grade_specs[grade]['blind max um'][i]:
+                this_grade_valid = False
+            if max(corr_max) > grade_specs[grade]['corr max um'][i]:
+                this_grade_valid = False
+            if max(corr_rms) > grade_specs[grade]['corr rms um'][i]:
+                this_grade_valid = False
+        if d[pos_id]['has extended gearbox'] and not(grade_specs[grade]['has extended gearbox']):
+            this_grade_valid = False
+        if not(d[pos_id]['has extended gearbox']) and grade_specs[grade]['has extended gearbox']:
+            this_grade_valid = False
+        if this_grade_valid:
+            d[pos_id]['grade'] = grade
+            break
 
 # write report
 timestamp_str = pc.timestamp_str_now()
@@ -117,7 +163,11 @@ if report_file:
         writer.writerow(['',timestamp_str])
         writer.writerow([''])
         writer.writerow(['SPECIFICATIONS APPLIED IN THIS REPORT:'])
-        writer.writerow(['statistical cuts at best ' + str([100*x for x in summarizer.stat_cuts])])
+        stat_cuts_text = [summarizer.Summarizer.statcut_suffix(s) for s in summarizer.stat_cuts]
+        stat_cuts_text = ''.join([s + ',' for s in stat_cuts_text])
+        stat_cuts_text = stat_cuts_text[1:-1] # removal of leading whitespace and trailing comma
+        writer.writerow(['statistical cuts made at [' + stat_cuts_text + ']'])
+        writer.writerow(['correction moves threshold at ' + format(grading_threshold,'.1f') + ' um'])
         writer.writerow(['','grade'] + grade_spec_headers)
         for key in grade_specs.keys():
             writer.writerow(['',key] + list(grade_specs[key].values()))
@@ -133,6 +183,6 @@ if report_file:
         writer.writerow(['','all',len(d),percent(len(d))])
         writer.writerow([''])
         writer.writerow(['INDIVIDUAL POSITIONER GRADES:'])
-        writer.writerow(['','pos_id','grade','failure current'])
+        writer.writerow(['','pos_id','grade'])
         for pos_id in pos_ids:
-            writer.writerow(['', pos_id, d[pos_id]['grade'], d[pos_id]['failure current']])
+            writer.writerow(['', pos_id, d[pos_id]['grade']])
