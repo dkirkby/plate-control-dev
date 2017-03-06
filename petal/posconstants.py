@@ -177,4 +177,7 @@ def is_very_verbose(verbosity_enum):
     return boole
 
 def timestamp_str_now():
+    return datetime.datetime.now().strftime(timestamp_format)
+
+def filename_timestamp_str_now():
     return datetime.datetime.now().strftime(filename_timestamp_format)

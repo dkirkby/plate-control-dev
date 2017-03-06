@@ -51,9 +51,7 @@ class XYTest(object):
         self.starting_loop_number = self.xytest_conf['current_loop_number']
         self.n_loops = self._calculate_and_check_n_loops()
         if self.starting_loop_number == 0:
-            initial_timestamp = pc.timestamp_str_now()
-            traveler_name = pc.xytest_logs_directory + initial_timestamp + '_' + os.path.basename(xytest_conf)
-            self.xytest_conf.filename = traveler_name
+            self.xytest_conf.filename = pc.xytest_logs_directory + pc.filename_timestamp_str_now() + '_' + os.path.basename(xytest_conf)
             self.new_and_changed_files = set()  # start a set to keep track of all files that need to be added / committed to SVN
             self.track_file(self.xytest_conf.filename)
             self.xytest_conf.final_comment.append('\n\n# *** TEST LOG ***') # just for formatting
@@ -197,7 +195,7 @@ class XYTest(object):
             self.logwrite('Starting arc calibration sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             self.m.n_points_full_calib_T = n_pts_calib_T
             self.m.n_points_full_calib_P = n_pts_calib_P
-            files = self.m.calibrate(pos_ids='all', mode='full', save_file_dir=pc.xytest_plots_directory, save_file_timestamp=pc.timestamp_str_now())
+            files = self.m.calibrate(pos_ids='all', mode='full', save_file_dir=pc.xytest_plots_directory, save_file_timestamp=pc.filename_timestamp_str_now())
             for file in files:
                 self.track_file(file)
                 self.logwrite('Calibration plot file: ' + file)
@@ -213,7 +211,7 @@ class XYTest(object):
         
         log_suffix = self.xytest_conf['log_suffix']
         log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
-        log_timestamp = pc.timestamp_str_now()
+        log_timestamp = pc.filename_timestamp_str_now()
         def move_log_name(pos_id):
             return pc.xytest_data_directory  + pos_id + '_' + log_timestamp + log_suffix + '_movedata.csv'
         def summary_plot_name(pos_id):

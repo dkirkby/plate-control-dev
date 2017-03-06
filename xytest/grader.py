@@ -9,43 +9,35 @@ import tkinter.filedialog
 import tkinter.messagebox
 import csv
 import collections
-import datetime
+import summarizer
 
 # grading parameters
 # c.f. DESI-XXXX Fiber Positioner Grades
+# the list specs refer to values at the stat_cuts specified in the summarizer
 grade_specs = collections.OrderedDict()
 grade_spec_headers = ['blind max um','blind max %','corr max um','corr max %','corr rms um','corr rms %','failure current','has extended gearbox']
 
 grade = 'A'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
-grade_specs[grade]['blind max um']         = [ 100]
-grade_specs[grade]['blind max %']          = [1.00]
-grade_specs[grade]['corr max um']          = [  12]
-grade_specs[grade]['corr max %']           = [1.00]
-grade_specs[grade]['corr rms um']          = [   5]
-grade_specs[grade]['corr rms %']           = [1.00]
+grade_specs[grade]['blind max um']         = [ 100, 100]
+grade_specs[grade]['corr max um']          = [  12,  12]
+grade_specs[grade]['corr rms um']          = [   5,   5]
 grade_specs[grade]['failure current']      = 80
 grade_specs[grade]['has extended gearbox'] = False
 
 grade = 'B'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
-grade_specs[grade]['blind max um']         = [ 100]
-grade_specs[grade]['blind max %']          = [1.00]
-grade_specs[grade]['corr max um']          = [  12,   30]
-grade_specs[grade]['corr max %']           = [0.95, 0.05]
-grade_specs[grade]['corr rms um']          = [   5]
-grade_specs[grade]['corr rms %']           = [0.95]
-grade_specs[grade]['failure current']      = 100
+grade_specs[grade]['blind max um']         = [ 100, 100]
+grade_specs[grade]['corr max um']          = [  12,  30]
+grade_specs[grade]['corr rms um']          = [   5,  10]
+grade_specs[grade]['failure current']      = 90
 grade_specs[grade]['has extended gearbox'] = False
 
 grade = 'C'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
-grade_specs[grade]['blind max um']         = [ 100]
-grade_specs[grade]['blind max %']          = [0.95]
-grade_specs[grade]['corr max um']          = [  12,   50]
-grade_specs[grade]['corr max %']           = [0.95, 0.05]
-grade_specs[grade]['corr rms um']          = [   5]
-grade_specs[grade]['corr rms %']           = [0.95]
+grade_specs[grade]['blind max um']         = [ 100, 200]
+grade_specs[grade]['corr max um']          = [  20,  50]
+grade_specs[grade]['corr rms um']          = [  10,  20]
 grade_specs[grade]['failure current']      = 100
 grade_specs[grade]['has extended gearbox'] = False
 
@@ -63,9 +55,9 @@ all_grades = list(grade_specs.keys()) + [fail_grade]
 # get the files list
 filetypes = (('Comma-separated Values','*.csv'),('All Files','*'))
 gui_root = tkinter.Tk()
-process_all_files = tkinter.messagebox.askyesno(title='Batch grade all files?',message='Yes  -->  Process all files in the ' + os.path.relpath(pc.xytest_summaries_directory,pc.all_logs_directory) + ' folder.\n\nNo -->  Process just one file of your choice.')
+process_all_files = tkinter.messagebox.askyesno(title='Batch grade all files?',message='Yes  -->  Process all files in the ' + os.path.relpath(pc.xytest_summaries_directory,pc.all_logs_directory) + ' folder.\n\nNo -->  Process just some file(s) of your choice.')
 if not(process_all_files):
-    files = [tkinter.filedialog.askopenfilename(initialdir=pc.xytest_summaries_directory, filetypes=filetypes, title='Select summary file to proces.')]
+    files = list(tkinter.filedialog.askopenfilenames(initialdir=pc.xytest_summaries_directory, filetypes=filetypes, title='Select summary file(s) to process.'))
 else:
     files = os.listdir(pc.xytest_summaries_directory)
     files = [pc.xytest_summaries_directory + file for file in files]
@@ -103,14 +95,18 @@ with open(motor_types_file,'r',newline='') as csvfile:
             d[row['pos_id']]['has extended gearbox'] = theta_extended or phi_extended
             
 # read data and grade positioners
+# 1. assess failure current
+# 2. ignore all results from tests below failure current
+# 3. do the grading calcs
 for pos_id in d.keys():
     d[pos_id]['grade'] = fail_grade
+    d[pos_id]['failure current'] = 0
 
 # write report
-timestamp = datetime.datetime.now()
-timestamp_str = timestamp.strftime(pc.filename_timestamp_format)
+timestamp_str = pc.timestamp_str_now()
+filename_timestamp_str = pc.filename_timestamp_str_now()
 gui_root = tkinter.Tk()
-report_file = tkinter.filedialog.asksaveasfilename(title='Save grade report as...',initialdir=pc.all_logs_directory,initialfile=timestamp_str + '_positioner_grades_report.csv',filetypes=filetypes)
+report_file = tkinter.filedialog.asksaveasfilename(title='Save grade report as...',initialdir=pc.all_logs_directory,initialfile=filename_timestamp_str + '_positioner_grades_report.csv',filetypes=filetypes)
 if not(report_file):
     tkinter.messagebox.showwarning(title='No report saved.',message='No grade report was saved to disk.')
 gui_root.withdraw()
@@ -118,9 +114,10 @@ if report_file:
     with open(report_file,'w',newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(['REPORT DATE:'])
-        writer.writerow(['',timestamp])
+        writer.writerow(['',timestamp_str])
         writer.writerow([''])
         writer.writerow(['SPECIFICATIONS APPLIED IN THIS REPORT:'])
+        writer.writerow(['statistical cuts at best ' + str([100*x for x in summarizer.stat_cuts])])
         writer.writerow(['','grade'] + grade_spec_headers)
         for key in grade_specs.keys():
             writer.writerow(['',key] + list(grade_specs[key].values()))
@@ -136,6 +133,6 @@ if report_file:
         writer.writerow(['','all',len(d),percent(len(d))])
         writer.writerow([''])
         writer.writerow(['INDIVIDUAL POSITIONER GRADES:'])
-        writer.writerow(['','pos_id','grade'])
+        writer.writerow(['','pos_id','grade','failure current'])
         for pos_id in pos_ids:
-            writer.writerow(['',pos_id,d[pos_id]['grade']])
+            writer.writerow(['', pos_id, d[pos_id]['grade'], d[pos_id]['failure current']])

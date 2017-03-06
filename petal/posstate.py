@@ -52,18 +52,20 @@ class PosState(object):
             self.unit.write()
         else:
             self.unit = configobj.ConfigObj(unit_filename,unrepr=True,encoding='utf-8')
-        self.log_basename = self.unit['CURRENT_LOG_BASENAME']
+        self.log_separator = '_log_'
+        self.log_numformat = '08g'
+        self.log_extension = '.csv'
         if not(self.log_basename):
             all_logs = os.listdir(self.logs_directory)
             unit_logs = [x for x in all_logs if self.unit_basename in x]
             if unit_logs:
                 unit_logs.sort(reverse=True)
-                self.log_basename = os.path.splitext(unit_logs[0])[0]
+                self.log_basename = unit_logs[0]
             else:
-                log_basename = self.unit_basename + '_log_'
-                self.log_basename = PosState.increment_suffix(log_basename)
+                log_basename = self.unit_basename + self.log_separator + format(0,self.log_numformat) + self.log_extension
+                self.log_basename = self.increment_suffix(log_basename)
         self.max_log_length = 10000 # number of rows in log before starting a new file
-        self.curr_log_length = 0
+        self.curr_log_length = self.count_log_length() # keep track of this in a separate variable so don't have to recount every time -- only when necessary
         if self.type == 'pos':
             self.unit['LAST_MOVE_CMD'] = '(software initialization)'
             self.unit['LAST_MOVE_VAL1'] = ''
@@ -111,8 +113,7 @@ class PosState(object):
             if note == '':
                 note = ' ' # just to make csv file cell look blank in excel
             if self.curr_log_length >= self.max_log_length:
-                self.log_basename = PosState.increment_suffix(self.log_basename)
-                self.write('CURRENT_LOG_BASENAME',self.log_basename)
+                self.log_basename = self.increment_suffix(self.log_basename)
                 self.curr_log_length = 0
             if not(os.path.isfile(self.log_path)): # checking whether need to start a new file
                 with open(self.log_path, 'w', newline='') as csvfile:
@@ -125,22 +126,39 @@ class PosState(object):
     def log_path(self):
         """Convenience method for consistent formatting of file path to log file.
         """
-        return self.logs_directory + self.log_basename + '.csv'
+        return self.logs_directory + self.log_basename
 
-    @staticmethod
-    def increment_suffix(s):
+    @property
+    def log_basename(self):
+        '''Property setter used here since the log basename is accessed in a few places,
+        and want to make sure it is consistently tracked in the .conf file.
+        '''
+        return self.unit['CURRENT_LOG_BASENAME']
+    
+    @log_basename.setter
+    def log_basename(self, name):
+        self.unit['CURRENT_LOG_BASENAME'] = name
+
+    def increment_suffix(self,s):
         """Increments the numeric suffix at the end of s. This function was specifically written
         to have a regular method for incrementing the suffix on log filenames.
         """
-        separator = '_'
-        numformat = '%08i'
-        split = s.split(separator)
-        suffix = split[-1]
-        if suffix.isdigit():
-            suffix = numformat % (int(suffix) + 1)
-        else:
-            suffix = numformat % 0
-            if split[-1] != '':
-                split += ['']
-        split[-1] = suffix
-        return separator.join(split)
+        prefix = s.split(self.log_separator)[0]
+        suffix = s.split(self.log_separator)[1]
+        number = suffix.split(self.log_extension)[0]
+        number2 = format(int(number) + 1, self.log_numformat)
+        return prefix + self.log_separator + number2 + self.log_extension
+    
+    def count_log_length(self):
+        '''Counts the number of lines in the current log file.
+        Header row is ignored from count.
+        Returns 0 if no log file exists.
+        '''
+        n_lines = 0
+        if os.path.isfile(self.log_path):
+            with open(self.log_path,'r',newline='') as csvfile:
+                reader = csv.reader(csvfile)
+                for row in reader:
+                    n_lines += 1
+            n_lines -= 1 # to ignore the header row
+        return n_lines
