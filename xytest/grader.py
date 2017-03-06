@@ -11,6 +11,7 @@ import csv
 import collections
 import summarizer
 import numpy as np
+import copy
 
 # grading parameters
 # c.f. DESI-XXXX Fiber Positioner Grades
@@ -20,6 +21,7 @@ grade_spec_headers = ['blind max um','corr max um','corr rms um','failure curren
 grade_spec_err_keys = grade_spec_headers[0:2]
 grading_threshold = summarizer.thresholds_um[0]
 min_num_targets = 24 # a test is not considered valid without at least this many targets
+min_num_concluding_consecutive_tests = 3 # number of tests for valid results
 
 grade = 'A'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
@@ -112,6 +114,8 @@ if ignore_gearbox:
 # read in the summary data
 ask_ignore_unknown_curr = True
 ignore_currents = False
+ask_ignore_min_tests = True
+ignore_min_tests = False
 err_keys = summarizer.Summarizer.make_err_keys()
 err_keys = [s for s in err_keys if 'num' not in s]
 pos_to_delete = set()
@@ -139,6 +143,14 @@ for pos_id in d.keys():
         d[pos_id]['num rows'] = n_rows
         if n_rows == 0:
             pos_to_delete.add(pos_id)
+        if n_rows < min_num_concluding_consecutive_tests:
+            if ask_ignore_min_tests:
+                gui_root = tkinter.Tk()
+                ignore_min_tests = tkinter.messagebox.askyesno(title='Ignore min # tests?',message='Some positioenrs have fewer than the minimum number of tests we typically want. Ignore the minimum # of tests criterion?')
+                ask_ignore_min_tests = False
+                gui_root.withdraw()
+            if ignore_min_tests:
+                min_num_concluding_consecutive_tests = 0
     if ask_ignore_unknown_curr and (None in d[pos_id]['curr cruise'] or None in d[pos_id]['curr creep']):
         gui_root = tkinter.Tk()
         ignore_currents = tkinter.messagebox.askyesno(title='Ignore failure currents?',message='Some current values are not known in the data. (Historically current was not recorded in early test runs.) Ignore the failure current criteria?')
@@ -155,40 +167,60 @@ for pos_id in pos_to_delete:
 for pos_id in d.keys():
     d[pos_id]['grade'] = fail_grade
     for grade in grade_specs.keys():
-        this_grade_valid = True
-        if not(ignore_currents):
-            selection1 = np.array(d[pos_id]['curr cruise']) >= grade_specs[grade]['failure current']
-            selection2 = np.array(d[pos_id]['curr creep']) >= grade_specs[grade]['failure current']
-            selection = selection1 * selection2
-        else:
-            selection = range(d[pos_id]['num rows'])
-        for i in range(len(summarizer.stat_cuts)):
-            cut = summarizer.stat_cuts[i]
-            suffix1 = summarizer.Summarizer.statcut_suffix(cut)
-            suffix2 = summarizer.Summarizer.err_suffix(cut,grading_threshold)
-            blind_max = np.array(d[pos_id]['blind max (um)' + suffix1])[selection]
-            corr_max = np.array(d[pos_id]['corr max (um)' + suffix2])[selection]
-            corr_rms = np.array(d[pos_id]['corr rms (um)' + suffix2])[selection]
-            if max(blind_max) > grade_specs[grade]['blind max um'][i]:
-                this_grade_valid = False
-            if max(corr_max) > grade_specs[grade]['corr max um'][i]:
-                this_grade_valid = False
-            if max(corr_rms) > grade_specs[grade]['corr rms um'][i]:
-                this_grade_valid = False
-        if not(ignore_gearbox):
-            if d[pos_id]['has extended gearbox'] and not(grade_specs[grade]['has extended gearbox']):
-                this_grade_valid = False
-            if not(d[pos_id]['has extended gearbox']) and grade_specs[grade]['has extended gearbox']:
-                this_grade_valid = False
+        D = copy.deepcopy(d[pos_id])
+        while D['num rows'] > min_num_concluding_consecutive_tests:
+            this_grade_valid = True
+            if not(ignore_currents):
+                selection1 = np.array(D['curr cruise']) >= grade_specs[grade]['failure current']
+                selection2 = np.array(D['curr creep']) >= grade_specs[grade]['failure current']
+                selection = selection1 * selection2
+            else:
+                selection = range(D['num rows'])
+            for i in range(len(summarizer.stat_cuts)):
+                cut = summarizer.stat_cuts[i]
+                suffix1 = summarizer.Summarizer.statcut_suffix(cut)
+                suffix2 = summarizer.Summarizer.err_suffix(cut,grading_threshold)
+                blind_max = np.array(D['blind max (um)' + suffix1])[selection]
+                corr_max = np.array(D['corr max (um)' + suffix2])[selection]
+                corr_rms = np.array(D['corr rms (um)' + suffix2])[selection]
+                if max(blind_max) > grade_specs[grade]['blind max um'][i]:
+                    this_grade_valid = False
+                if max(corr_max) > grade_specs[grade]['corr max um'][i]:
+                    this_grade_valid = False
+                if max(corr_rms) > grade_specs[grade]['corr rms um'][i]:
+                    this_grade_valid = False
+            if not(ignore_gearbox):
+                if D['has extended gearbox'] and not(grade_specs[grade]['has extended gearbox']):
+                    this_grade_valid = False
+                if not(D['has extended gearbox']) and grade_specs[grade]['has extended gearbox']:
+                    this_grade_valid = False
+            if this_grade_valid:
+                d[pos_id]['grade'] = grade
+                break
+            else:
+                for key in D.keys():
+                    if isinstance(D[key],list):
+                        D[key].pop(0)
+                D['num rows'] -= 1
         if this_grade_valid:
-            d[pos_id]['grade'] = grade
             break
+    d[pos_id]['num tests proven'] = D['num rows']
+    for curr_text in ['curr cruise','curr creep']:
+        key = 'lowest ' + curr_text + ' proven'
+        if ignore_currents:
+            d[pos_id][key] = 'ignored'
+        elif d[pos_id]['grade'] == fail_grade:
+            d[pos_id][key] = 'n/a'
+        else:
+            d[pos_id][key] = min(D[curr_text])
+proven_keys = [key for key in d[pos_id].keys() if 'proven' in key]
+proven_keys.reverse() # I like this sequence better in the report
 
 # write report
 timestamp_str = pc.timestamp_str_now()
 filename_timestamp_str = pc.filename_timestamp_str_now()
 gui_root = tkinter.Tk()
-report_file = tkinter.filedialog.asksaveasfilename(title='Save grade report as...',initialdir=pc.all_logs_directory,initialfile=filename_timestamp_str + '_positioner_grades_report.csv',filetypes=filetypes)
+report_file = tkinter.filedialog.asksaveasfilename(title='Save grade report as...',initialdir=pc.all_logs_directory + os.path.sep + 'xytest_grades',initialfile=filename_timestamp_str + '_positioner_grades_report.csv',filetypes=filetypes)
 if not(report_file):
     tkinter.messagebox.showwarning(title='No report saved.',message='No grade report was saved to disk.')
 gui_root.withdraw()
@@ -205,6 +237,7 @@ if report_file:
         writer.writerow(['statistical cuts made at [' + stat_cuts_text + ']'])
         writer.writerow(['correction move thresholds at ' + format(grading_threshold,'.1f') + ' um'])
         writer.writerow(['min number of targets per test = ' + str(min_num_targets)])
+        writer.writerow(['min number of consecutive concluding tests to prove grade = ' + str(min_num_concluding_consecutive_tests)])
         writer.writerow(['','grade'] + grade_spec_headers)
         for key in grade_specs.keys():
             writer.writerow(['',key] + list(grade_specs[key].values()))
@@ -220,11 +253,11 @@ if report_file:
         writer.writerow(['','all',len(d),percent(len(d))])
         writer.writerow([''])
         writer.writerow(['INDIVIDUAL POSITIONER GRADES:'])
-        writer.writerow(['','pos_id','grade'])
+        writer.writerow(['','pos_id','grade'] + proven_keys)
         pos_ids_sorted_by_grade = []
         for grade in all_grades:
             for pos_id in d.keys():
                 if d[pos_id]['grade'] == grade:
                     pos_ids_sorted_by_grade.append(pos_id)
         for pos_id in pos_ids_sorted_by_grade:
-            writer.writerow(['', pos_id, d[pos_id]['grade']])
+            writer.writerow(['', pos_id, d[pos_id]['grade']] + [d[pos_id][key] for key in proven_keys])
