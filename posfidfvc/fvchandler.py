@@ -1,6 +1,6 @@
 import os
 import sys
-sys.path.append(os.path.abspath('./SBIG/'))
+sys.path.append(os.path.abspath('../posfidfvc/SBIG/'))
 sys.path.append(os.path.abspath('../petal/'))
 import numpy as np
 import time
