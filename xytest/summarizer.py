@@ -226,19 +226,33 @@ if __name__=="__main__":
                 err_data = [[] for field in err_xy_fields]
                 timestamps = []
                 cycles = []
+                pos_logs = set()
                 for row in reader:
                     for i in range(len(err_xy_fields)):
                         err_data[i].append(row[err_xy_fields[i]])
-                    timestamp = row['timestamp']
-                    if '_' in timestamp: # convert from occasional usage of filename format inside some of the data logs
-                        timestamp = datetime.datetime.strptime(timestamp,pc.filename_timestamp_format)
-                        timestamp = datetime.datetime.strftime(timestamp,pc.timestamp_format)
-                    timestamps.append(timestamp)
-                    cycles.append(row['cycle'])
-                d[pos_id]['start time'] = timestamps[0]
-                d[pos_id]['finish time'] = timestamps[-1]
-                d[pos_id]['total move sequences at finish'] = cycles[-1]
-                d[pos_id]['operator notes'] = [logsuffix]
+                    if 'timestamp' in reader.fieldnames:
+                        timestamp = row['timestamp']
+                        if '_' in timestamp: # convert from occasional usage of filename format inside some of the data logs
+                            timestamp = datetime.datetime.strptime(timestamp,pc.filename_timestamp_format)
+                            timestamp = datetime.datetime.strftime(timestamp,pc.timestamp_format)
+                        timestamps.append(timestamp)
+                    if 'cycle' in reader.fieldnames:
+                        cycles.append(row['cycle'])
+                    if 'move_log' in reader.fieldnames:
+                        pos_logs.add(row['move_log'])
+                if timestamps:
+                    d[pos_id]['start time'] = timestamps[0]
+                    d[pos_id]['finish time'] = timestamps[-1]
+                else:
+                    timestamp = datetime.datetime.strptime(namesplit[1:2],pc.filename_timestamp_format)
+                    timestamp = datetime.datetime.strftime(timestamp,pc.timestamp_format)
+                    d[pos_id]['start time'] = timestamp
+                if cycles:
+                    d[pos_id]['total move sequences at finish'] = cycles[-1]
+                if logsuffix:    
+                    d[pos_id]['operator notes'] = [logsuffix]
+                if pos_logs:
+                    d[pos_id]['pos log files'] = list(pos_logs)
                 e[pos_id] = err_data
     
     # find out where the user wants to save outputs
