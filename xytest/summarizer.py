@@ -208,21 +208,20 @@ if __name__=="__main__":
     gui_root.withdraw()
     files = [file for file in files if 'movedata.csv' in file]
     
-    # gather the data by positioner and data file
-    d = {}
-    e = {}
+    # gather the data by file
+    p = {} # store the pos_ids here
+    d = {} # store the init_data here
+    e = {} # store the err_data here
     for file in files:
-        namesplit = os.path.basename(file).split('_')
-        pos_id = namesplit[0]
-        logsuffix = ''.join(namesplit[3:]).replace('_movedata.csv','')
         with open(file,'r',newline='') as csvfile:
             reader = csv.DictReader(csvfile)
             err_xy_fields = [field for field in reader.fieldnames if 'err_xy' in field]
             if err_xy_fields:
-                if pos_id not in d.keys():
-                    d[pos_id] = {}
-                    e[pos_id] = {}
-                d[pos_id]['test loop data file'] = os.path.basename(file)
+                namesplit = os.path.basename(file).split('_')
+                pos_id = namesplit[0]
+                logsuffix = ''.join(namesplit[3:]).replace('_movedata.csv','')
+                p[file] = pos_id
+                d[file]['test loop data file'] = os.path.basename(file)
                 err_data = [[] for field in err_xy_fields]
                 timestamps = []
                 cycles = []
@@ -241,29 +240,29 @@ if __name__=="__main__":
                     if 'move_log' in reader.fieldnames:
                         pos_logs.add(row['move_log'])
                 if timestamps:
-                    d[pos_id]['start time'] = timestamps[0]
-                    d[pos_id]['finish time'] = timestamps[-1]
+                    d[file]['start time'] = timestamps[0]
+                    d[file]['finish time'] = timestamps[-1]
                 else:
                     timestamp = datetime.datetime.strptime(namesplit[1:2],pc.filename_timestamp_format)
                     timestamp = datetime.datetime.strftime(timestamp,pc.timestamp_format)
-                    d[pos_id]['start time'] = timestamp
+                    d[file]['start time'] = timestamp
                 if cycles:
-                    d[pos_id]['total move sequences at finish'] = cycles[-1]
+                    d[file]['total move sequences at finish'] = cycles[-1]
                 if logsuffix:    
-                    d[pos_id]['operator notes'] = [logsuffix]
+                    d[file]['operator notes'] = [logsuffix]
                 if pos_logs:
-                    d[pos_id]['pos log files'] = list(pos_logs)
-                e[pos_id] = err_data
+                    d[file]['pos log files'] = list(pos_logs)
+                e[file] = err_data
     
     # find out where the user wants to save outputs
     gui_root = tkinter.Tk()
     save_directory = tkinter.filedialog.askdirectory(initialdir='~',title='Folder to save outputs?')
     gui_root.withdraw()
     
-    # run the summarizer
-    for pos_id in d.keys():
-        state = posstate.PosState(pos_id)
-        init_data = d[pos_id]
+    # run the summarizer on all the file data
+    for file in p.keys():
+        state = posstate.PosState(p[file])
+        init_data = d[file]
         for key in init_data.keys():
             if key not in init_data_keys:
                 init_data[key] = 'unknown'
@@ -275,4 +274,4 @@ if __name__=="__main__":
                 already_summarized.add(row['test loop data file'])
         if os.path.basename(summ.filename) not in already_summarized:
             summ.next_row_is_new = True
-            summ.write_row(e[pos_id])
+            summ.write_row(e[file])
