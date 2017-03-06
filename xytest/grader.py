@@ -19,6 +19,7 @@ grade_specs = collections.OrderedDict()
 grade_spec_headers = ['blind max um','corr max um','corr rms um','failure current','has extended gearbox']
 grade_spec_err_keys = grade_spec_headers[0:2]
 grading_threshold = summarizer.thresholds_um[0]
+min_num_targets = 24 # a test is not considered valid without at least this many targets
 
 grade = 'A'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
@@ -85,8 +86,10 @@ for pos_id in pos_ids:
     d[pos_id]['file'] = files[pos_ids.index(pos_id)]
  
 # identify motor types
+ask_ignore_gearbox = True
+ignore_gearbox = False
 for pos_id in d.keys():
-    d[pos_id]['has extended gearbox'] = True # conservatively assume yes until proven otherwise
+    d[pos_id]['has extended gearbox'] = 'unknown'
 motor_types_file = pc.all_logs_directory + os.path.sep + 'as-built_motor_types.csv'
 bool_yes_equivalents = ['y','yes','true','1'] + ['']  # conservatively assume blank means 'yes'
 with open(motor_types_file,'r',newline='') as csvfile:
@@ -96,10 +99,22 @@ with open(motor_types_file,'r',newline='') as csvfile:
         phi_extended   = row['has phi extended gearbox'].lower()   in bool_yes_equivalents
         if row['pos_id'] in d.keys():
             d[row['pos_id']]['has extended gearbox'] = theta_extended or phi_extended
+for pos_id in d.keys():
+    if ask_ignore_gearbox and d[pos_id]['has extended gearbox'] == 'unknown':
+        gui_root = tkinter.Tk()
+        ignore_gearbox = tkinter.messagebox.askyesno(title='Ignore gearbox extensions?',message='Whether the motors have gearbox extensions is not known for all the positioners being graded. Ignore the gearbox extension criteria?')
+        ask_ignore_gearbox = False
+        gui_root.withdraw()
+if ignore_gearbox:
+    for grade in grade_specs.keys():
+        grade_specs[grade]['has extended gearbox'] = 'ignored'
             
 # read in the summary data
+ask_ignore_unknown_curr = True
+ignore_currents = False
 err_keys = summarizer.Summarizer.make_err_keys()
 err_keys = [s for s in err_keys if 'num' not in s]
+pos_to_delete = set()
 for pos_id in d.keys():
     with open(d[pos_id]['file'],'r',newline='') as csvfile:
         reader = csv.DictReader(csvfile)
@@ -108,25 +123,45 @@ for pos_id in d.keys():
             if key in reader.fieldnames:
                 valid_keys.append(key)
                 d[pos_id][key] = []
+        n_rows = 0
         for row in reader:
-            for key in valid_keys:
-                val = row[key]
-                if val.replace('.','').isnumeric():
-                    val = float(val)
-                    if val % 1 == 0:
-                        val = int(val)
-                else:
-                    val = None
-                d[pos_id][key].append(val)
+            if int(row['num targets']) >= min_num_targets:
+                for key in valid_keys:
+                    val = row[key]
+                    if val.replace('.','').isnumeric():
+                        val = float(val)
+                        if val % 1 == 0:
+                            val = int(val)
+                    else:
+                        val = None
+                    d[pos_id][key].append(val)
+                n_rows += 1
+        d[pos_id]['num rows'] = n_rows
+        if n_rows == 0:
+            pos_to_delete.add(pos_id)
+    if ask_ignore_unknown_curr and (None in d[pos_id]['curr cruise'] or None in d[pos_id]['curr creep']):
+        gui_root = tkinter.Tk()
+        ignore_currents = tkinter.messagebox.askyesno(title='Ignore failure currents?',message='Some current values are not known in the data. (Historically current was not recorded in early test runs.) Ignore the failure current criteria?')
+        ask_ignore_unknown_curr = False
+        gui_root.withdraw()
+if ignore_currents:
+    for grade in grade_specs.keys():
+        grade_specs[grade]['failure current'] = 'ignored'
+for pos_id in pos_to_delete:
+    del d[pos_id]
+    del pos_ids[pos_ids.index(pos_id)]
         
 # grade positioners
 for pos_id in d.keys():
     d[pos_id]['grade'] = fail_grade
     for grade in grade_specs.keys():
         this_grade_valid = True
-        selection1 = np.array(d[pos_id]['curr cruise']) >= grade_specs[grade]['failure current']
-        selection2 = np.array(d[pos_id]['curr creep']) >= grade_specs[grade]['failure current']
-        selection = selection1 * selection2
+        if not(ignore_currents):
+            selection1 = np.array(d[pos_id]['curr cruise']) >= grade_specs[grade]['failure current']
+            selection2 = np.array(d[pos_id]['curr creep']) >= grade_specs[grade]['failure current']
+            selection = selection1 * selection2
+        else:
+            selection = range(d[pos_id]['num rows'])
         for i in range(len(summarizer.stat_cuts)):
             cut = summarizer.stat_cuts[i]
             suffix1 = summarizer.Summarizer.statcut_suffix(cut)
@@ -140,10 +175,11 @@ for pos_id in d.keys():
                 this_grade_valid = False
             if max(corr_rms) > grade_specs[grade]['corr rms um'][i]:
                 this_grade_valid = False
-        if d[pos_id]['has extended gearbox'] and not(grade_specs[grade]['has extended gearbox']):
-            this_grade_valid = False
-        if not(d[pos_id]['has extended gearbox']) and grade_specs[grade]['has extended gearbox']:
-            this_grade_valid = False
+        if not(ignore_gearbox):
+            if d[pos_id]['has extended gearbox'] and not(grade_specs[grade]['has extended gearbox']):
+                this_grade_valid = False
+            if not(d[pos_id]['has extended gearbox']) and grade_specs[grade]['has extended gearbox']:
+                this_grade_valid = False
         if this_grade_valid:
             d[pos_id]['grade'] = grade
             break
@@ -167,7 +203,8 @@ if report_file:
         stat_cuts_text = ''.join([s + ',' for s in stat_cuts_text])
         stat_cuts_text = stat_cuts_text[1:-1] # removal of leading whitespace and trailing comma
         writer.writerow(['statistical cuts made at [' + stat_cuts_text + ']'])
-        writer.writerow(['correction moves threshold at ' + format(grading_threshold,'.1f') + ' um'])
+        writer.writerow(['correction move thresholds at ' + format(grading_threshold,'.1f') + ' um'])
+        writer.writerow(['min number of targets per test = ' + str(min_num_targets)])
         writer.writerow(['','grade'] + grade_spec_headers)
         for key in grade_specs.keys():
             writer.writerow(['',key] + list(grade_specs[key].values()))
@@ -184,5 +221,10 @@ if report_file:
         writer.writerow([''])
         writer.writerow(['INDIVIDUAL POSITIONER GRADES:'])
         writer.writerow(['','pos_id','grade'])
-        for pos_id in pos_ids:
+        pos_ids_sorted_by_grade = []
+        for grade in all_grades:
+            for pos_id in d.keys():
+                if d[pos_id]['grade'] == grade:
+                    pos_ids_sorted_by_grade.append(pos_id)
+        for pos_id in pos_ids_sorted_by_grade:
             writer.writerow(['', pos_id, d[pos_id]['grade']])

@@ -230,6 +230,8 @@ if __name__=="__main__":
     files.sort()
     
     # gather the data by file
+    ask_ignore_files_with_logsuffix = True
+    ignore_files_with_logsuffix = False
     d = collections.OrderedDict() # store the data here
     for file in files:
         with open(file,'r',newline='') as csvfile:
@@ -239,12 +241,18 @@ if __name__=="__main__":
                 namesplit = os.path.basename(file).split('_')
                 pos_id = namesplit[0]
                 logsuffix = ''.join(namesplit[3:-1])
+                if logsuffix and ask_ignore_files_with_logsuffix:
+                    gui_root = tkinter.Tk()
+                    ignore_files_with_logsuffix = tkinter.messagebox.askyesno(title='Ignore if log suffix?',message='Ignore any data files that have a log suffix?\n(Historically these are often odd test cases like playing with parameters or running in thermal chamber.)')
+                    gui_root.withdraw()
+                    ask_ignore_files_with_logsuffix = False
                 d[file] = {}
                 d[file]['test loop data file'] = os.path.basename(file)
                 err_data = [[] for field in err_xy_fields]
                 timestamps = []
                 cycles = []
                 pos_logs = set()
+                n_rows_read = 0
                 for row in reader:
                     for i in range(len(err_xy_fields)):
                         err_data[i].append(float(row[err_xy_fields[i]]))
@@ -258,21 +266,30 @@ if __name__=="__main__":
                         cycles.append(row['cycle'])
                     if 'move_log' in reader.fieldnames:
                         pos_logs.add(row['move_log'])
-                if timestamps:
-                    d[file]['start time'] = timestamps[0]
-                    d[file]['finish time'] = timestamps[-1]
+                    n_rows_read += 1
+                if logsuffix and ignore_files_with_logsuffix:
+                    ignore_due_to_logsuffix = True
                 else:
-                    timestamp = datetime.datetime.strptime(namesplit[1:2],pc.filename_timestamp_format)
-                    timestamp = datetime.datetime.strftime(timestamp,pc.timestamp_format)
-                    d[file]['start time'] = timestamp
-                if cycles:
-                    d[file]['total move sequences at finish'] = cycles[-1]
-                if logsuffix:    
-                    d[file]['operator notes'] = [logsuffix]
-                if pos_logs:
-                    d[file]['pos log files'] = list(pos_logs)
-                d[file]['err_data'] = err_data
-                d[file]['pos_id'] = pos_id
+                    ignore_due_to_logsuffix = False
+                if n_rows_read > 0 and not(ignore_due_to_logsuffix):
+                    if timestamps:
+                        d[file]['start time'] = timestamps[0]
+                        d[file]['finish time'] = timestamps[-1]
+                    else:
+                        filename_timestamp = namesplit[1] + '_' + namesplit[2]
+                        timestamp = datetime.datetime.strptime(filename_timestamp,pc.filename_timestamp_format)
+                        timestamp = datetime.datetime.strftime(timestamp,pc.timestamp_format)
+                        d[file]['start time'] = timestamp
+                    if cycles:
+                        d[file]['total move sequences at finish'] = cycles[-1]
+                    if logsuffix and not(ignore_files_with_logsuffix):
+                        d[file]['operator notes'] = [logsuffix]
+                    if pos_logs:
+                        d[file]['pos log files'] = list(pos_logs)
+                    d[file]['err_data'] = err_data
+                    d[file]['pos_id'] = pos_id
+                else:
+                    del d[file]
     
     # find out where the user wants to save outputs
     gui_root = tkinter.Tk()
