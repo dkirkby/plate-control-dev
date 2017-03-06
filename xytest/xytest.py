@@ -15,6 +15,7 @@ import traceback
 import configobj
 import tkinter
 import tkinter.filedialog
+import tkinter.messagebox
 import csv
 import getpass
 import collections
@@ -45,6 +46,10 @@ class XYTest(object):
         if not(xytest_conf):
             message = "Select test configuration file."
             xytest_conf = tkinter.filedialog.askopenfilename(initialdir=pc.test_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
+        if not(hwsetup_conf) or not(xytest_conf):
+            tkinter.messagebox.showwarning(title='Files not found.',message='Not all configuration files specified. Exiting program.')
+            gui_root.withdraw()
+            sys.exit(0)
         gui_root.withdraw()
         self.hwsetup_conf = configobj.ConfigObj(hwsetup_conf,unrepr=True,encoding='utf-8')
         self.xytest_conf = configobj.ConfigObj(xytest_conf,unrepr=True,encoding='utf-8')
