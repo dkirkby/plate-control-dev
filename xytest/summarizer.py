@@ -304,11 +304,25 @@ if __name__=="__main__":
             already_summarized = set()
             for row in reader:
                 already_summarized.add(row['test loop data file'])
-        if os.path.basename(file) not in already_summarized:
+        file_basename = os.path.basename(file)
+        if file_basename not in already_summarized:
             summ.next_row_is_new = True
+            default_summary_row = {} # will search below if there is an existing default summary file from which to pluck any additional data
+            if summ.basename in os.listdir(pc.xytest_summaries_directory):
+                default_summary_file = pc.xytest_summaries_directory + summ.basename
+                with open(default_summary_file,'r',newline='') as csvfile:
+                    reader = csv.DictReader(csvfile)
+                    if 'test loop data file' in reader.fieldnames:
+                        for row in reader:
+                            if row['test loop data file'] == file_basename:
+                                default_summary_row = row
+                                break            
             for key in summ.row_template.keys():
                 if key not in d[file].keys():
-                    summ.row_template[key] = 'unknown'
+                    if key in default_summary_row.keys():
+                        summ.row_template[key] = default_summary_row[key]
+                    else:
+                        summ.row_template[key] = 'unknown'
                 else:
                     summ.row_template[key] = d[file][key]
             summ.write_row(d[file]['err_data'],autogather=False)
