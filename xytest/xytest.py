@@ -387,16 +387,36 @@ class XYTest(object):
                 self.m.rehome(self.pos_ids)
             self.logwrite(str(n_strikes) + ' hardstop strikes completed in ' + self._elapsed_time_str(start_time) + '.')
     
+    def get_svn_credentials(self):
+        '''Query the user for credentials to the SVN.'''
+        if self.xytest_conf['should_auto_commit_logs'] and not(self.simulate):
+            self.logwrite('Querying the user for SVN credentials. These will not be written to the log file.')
+            print('')
+            print('Enter your svn username and password for committing the logs to the server. These will not be saved to the logfile, but will briefly be clear-text in this script\'s memory while it is running.')
+            n_credential_tries = 4
+            while n_credential_tries:
+                self.svn_user = input('svn username: ')
+                self.svn_pass = getpass.getpass('svn password: ')
+                err = os.system('svn --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive list')
+                if err == 0:
+                    self.logwrite('SVN user and pass verified.')
+                    n_credential_tries = 0
+                else:
+                    n_credential_tries -= 1
+                    print('SVN user / pass was not verified. This is the same as your DESI user/pass for DocDB and the Wiki.')
+                    print(str(n_credential_tries) + ' tries remaining.')
+            if err:
+                self.logwrite('SVN credential failure. Logs will have to be manually uploaded to SVN after the test. This is very BAD, and needs to be resolved.')
+                self.svn_user = ''
+                self.svn_pass = ''
+                
     def svn_add_commit(self):
         # Commit logs through SVN
         if self.xytest_conf['should_auto_commit_logs'] and not(self.simulate):
-            if self.new_and_changed_files:
+            if not(self.svn_user and self.svn_pass):
+                self.logwrite('No files were auto-committed to SVN due to lack of user / pass credentials.')
+            elif self.new_and_changed_files:
                 start_time = time.time()
-                print('')
-                print('Enter your svn username and password for committing the logs to the server. These will not be saved to the logfile, but will briefly be clear-text in this script\'s memory while it is running.')
-                svn_user = input('svn username: ')
-                svn_pass = getpass.getpass('svn password: ')
-                print('')
                 print('Will attempt to commit the logs automatically now. This may take a long time. In the messages printed to the screen for each file, a return value of 0 means it was committed to the SVN ok.')
                 err1 = []
                 err2 = []
@@ -404,16 +424,8 @@ class XYTest(object):
                 n_total = len(self.new_and_changed_files)
                 for file in self.new_and_changed_files:
                     n += 1
-                    err1.append(os.system('svn add --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + file))
-                    err2.append(os.system('svn commit --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + file))
-                    if n == 1 and (any(err1) or any(err2)):
-                        print('The first file attempted didn\'t work. Perhaps the user/pass wasn\'t right?')
-                        try_again = input('Try again? (y/n) >> ')
-                        if 'y' in try_again.lower():
-                            self.svn_add_commit()
-                        del svn_user
-                        del svn_pass
-                        return
+                    err1.append(os.system('svn add --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive ' + file))
+                    err2.append(os.system('svn commit --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + file))
                     print('SVN upload of file ' + str(n) + ' of ' + str(n_total) + ' (' + os.path.basename(file) + ') returned: ' + str(err1[-1]) + ' (add) and ' + str(err2[-1]) + ' (commit)')
                 if any(err2):
                     print('Warning: it appears that not all the log or plot files committed ok to SVN. Check through carefully and do this manually. The files that failed were:')
@@ -421,8 +433,8 @@ class XYTest(object):
                         if err:
                             file = self.new_and_changed_files(err2.index(err))
                             print(file)
-                del svn_user
-                del svn_pass
+                del self.svn_user
+                del self.svn_pass
                 print('SVN uploads completed in ' + self._elapsed_time_str(start_time))
                 
     def logwrite(self,text,stdout=True):
@@ -533,6 +545,7 @@ class XYTest(object):
 
 if __name__=="__main__":
     test = XYTest()
+    test.get_svn_credentials()
     test.logwrite('Start of positioner performance test.')
     for loop_num in range(test.starting_loop_number, test.n_loops):
         test.xytest_conf['current_loop_number'] = loop_num
@@ -547,7 +560,6 @@ if __name__=="__main__":
     test.logwrite('All test loops complete.')
     test.m.park(pos_ids='all')
     test.logwrite('Moved positioners into \'parked\' position.')
-    test.get_and_log_comments_from_user()
     test.logwrite('Test complete.')
     test.logwrite('Files changed or generated: ' + str(test.new_and_changed_files))
     test.svn_add_commit()
