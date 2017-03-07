@@ -31,7 +31,7 @@ class FVCHandler(object):
             self.sim_err_max = 0.01 # 2D err max for simulator
             self.printfunc('FVCHandler is in simulator mode with max 2D errors of size ' + str(self.sim_err_max) + '.')
         if 'SBIG' in self.fvc_type:
-            self.exposure_time = 0.25
+            self.exposure_time = 0.22
             self.max_counts = 2**16 - 1
         else:
             self.exposure_time = 1.0
