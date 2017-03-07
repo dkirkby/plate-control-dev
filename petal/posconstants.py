@@ -176,8 +176,23 @@ def is_very_verbose(verbosity_enum):
         boole = True
     return boole
 
+# timestamp functions
 def timestamp_str_now():
     return datetime.datetime.now().strftime(timestamp_format)
 
 def filename_timestamp_str_now():
     return datetime.datetime.now().strftime(filename_timestamp_format)
+
+# other misc functions
+def ordinal_str(number):
+    '''Returns a string of the number plus 'st', 'nd', 'rd', 'th' as appropriate.
+    '''
+    numstr = str(number)
+    last_digit = numstr[-1]
+    if last_digit == 1:
+        return numstr + 'st'
+    if last_digit == 2:
+        return numstr + 'nd'
+    if last_digit == 3:
+        return numstr + 'rd'
+    return numstr + 'th'

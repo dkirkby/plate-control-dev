@@ -65,7 +65,7 @@ class XYTest(object):
             self.logwrite('Test template file: ' + xytest_conf)
             self.logwrite('Test traveler file:' + self.xytest_conf.filename)
         else:
-            self.logwrite('*** RESTARTING TEST AT LOOP ' + str(self.starting_loop_number) + ' ***')
+            self.logwrite('*** RESTARTING TEST AT ' + pc.ordinal_str(self.starting_loop_number + 1).upper() + ' LOOP *** (index ' + str(self.starting_loop_number) + ')')
             self.new_and_changed_files = self.xytest_conf['new_and_changed_files']
         self.logwrite('Total number of test loops: ' + str(self.n_loops))
         self.logwrite('Code version: ' + pc.code_version)
@@ -189,13 +189,13 @@ class XYTest(object):
                 self.logwrite('Starting physical travel range measurement sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
                 self.m.measure_range(pos_ids='all', axis='theta')
                 self.m.measure_range(pos_ids='all', axis='phi')
-                self.m.rehome(pos_ids='all')
                 for pos_id in self.pos_ids:
                     state = self.m.state(pos_id)
                     self.track_file(state.unit.filename)
                     for key in ['PHYSICAL_RANGE_T','PHYSICAL_RANGE_P']:
                         self.logwrite(str(pos_id) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
                 self.logwrite('Calibration of physical travel ranges completed in ' + self._elapsed_time_str(start_time) + '.')
+            self.m.rehome(pos_ids='all')
             start_time = time.time()
             self.logwrite('Starting arc calibration sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             self.m.n_points_full_calib_T = n_pts_calib_T
