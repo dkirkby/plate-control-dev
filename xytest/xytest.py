@@ -463,10 +463,11 @@ class XYTest(object):
                 self.old_currents[pos_id][key] = state.read(key)
                 if curr_val != None:
                     state.write(key,curr_val)
-                    self.logwrite(str(pos_id) + ': Set ' + key + ' to ' + str(curr_val))
+                    self.logwrite(str(pos_id) + ': Setting ' + key + ' to ' + str(curr_val))
                 else:
                     self.logwrite(str(pos_id) + ': ' + key + ' is ' + str(self.old_currents[pos_id][key]))
                     self.old_currents[pos_id][key] = None # indicates later in clear_current_overrides() method whether to do anything
+        self.m.set_motor_parameters()
         
     def clear_current_overrides(self):
         """Restore current settings for each positioner to their original values.
@@ -476,7 +477,8 @@ class XYTest(object):
                 if self.old_currents[pos_id][key] != None:
                     state = self.m.state(pos_id)
                     state.write(key, self.old_currents[pos_id][key])
-                    self.logwrite(str(pos_id) + ': Restored ' + key + ' to ' + str(self.old_currents[pos_id][key]))
+                    self.logwrite(str(pos_id) + ': Restoring ' + key + ' to ' + str(self.old_currents[pos_id][key]))
+        self.m.set_motor_parameters()
 
     def generate_posXY_targets_grid(self, npoints_across_grid):
         """Make rectilinear grid of local (x,y) targets. Returns a list.

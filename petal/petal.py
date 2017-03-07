@@ -315,8 +315,8 @@ class Petal(object):
     def set_motor_parameters(self):
         """Send the current and period parameter settings to the positioners"""
         # Set the duty cycle currents and creep or accel/decel speeds.
-        # Currently this function needs to be called each time parameters change after petal initialization and if a positioner is plugged in/powered on after
-        # petal initialization
+        # Currently this function needs to be called each time parameters change after petal
+        # initialization or if a positioner is plugged in/powered on after petal initialization
         if self.simulator_on:
             if self.verbose:
                 print('Simulator skips sending motor parameters to positioners.')
@@ -333,8 +333,8 @@ class Petal(object):
             self.comm.set_currents(bus_id, can_id, [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]], [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]])
             #syntax for setting periods: comm.set_periods(can_id, creep_period_p, creep_period_t, spin_period)
             self.comm.set_periods(bus_id, can_id, parameter_vals[4], parameter_vals[4], parameter_vals[5])
-            self.printfunc(p.posid + ' (bus=' + str(bus_id) + ', canid=' + str(can_id) + '): motor currents and periods set')
-
+            vals_str =  [' ' + parameter_keys[i] + '=' + str(parameter_vals[i]) for i in range(len(parameter_keys))]
+            self.printfunc(p.posid + ' (bus=' + str(bus_id) + ', canid=' + str(can_id) + '): motor currents and periods set:' + vals_str)
 
     def execute_moves(self):
         """Command the positioners to do the move tables that were sent out to them.

@@ -83,6 +83,12 @@ class PosMoveMeasure(object):
         obsXY = self.fvc.fvcXY_to_obsXY_noplatemaker(fvcXY)
         return obsXY
 
+    def set_motor_parameters(self):
+        '''Tells each petal to send all the latest motor settings out to positioners.
+        '''
+        for petal in self.petals:
+            petal.set_motor_parameters()
+
     def measure(self):
         """Measure positioner locations with the FVC and return the values.
 

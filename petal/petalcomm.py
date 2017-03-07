@@ -193,6 +193,7 @@ class PetalComm(object):
             return self._call_device('move', can_id, direction, mode, str(motor), angle)
         except Exception as e:
             return 'FAILED: Can not execute send_move_excute command. Exception: %s' % str(e)
+        
     def set_currents(self, bus_id, can_id, P_currents, T_currents):
         """
 
