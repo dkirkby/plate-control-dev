@@ -33,6 +33,8 @@ fid_ids = hwsetup['fid_ids']
 ptl = petal.Petal(hwsetup['ptl_id'], pos_ids, fid_ids, simulator_on=sim)
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure([ptl],fvc)
+m.make_plots_during_calib = True
+print('Automatic generation of calibration plots is turned ' + ('ON' if m.make_plots_during_calib else 'OFF') + '.')
 
 # TEMPORARY HACK until individual fiducial dot locations tracking is properly handled
 m.extradots_fid_state = ptl.fidstates[hwsetup['extradots_id']]
