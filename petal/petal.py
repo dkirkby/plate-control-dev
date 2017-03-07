@@ -333,7 +333,7 @@ class Petal(object):
             self.comm.set_currents(bus_id, can_id, [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]], [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]])
             #syntax for setting periods: comm.set_periods(can_id, creep_period_p, creep_period_t, spin_period)
             self.comm.set_periods(bus_id, can_id, parameter_vals[4], parameter_vals[4], parameter_vals[5])
-            vals_str =  [' ' + parameter_keys[i] + '=' + str(parameter_vals[i]) for i in range(len(parameter_keys))]
+            vals_str =  ''.join([' ' + parameter_keys[i] + '=' + str(parameter_vals[i]) for i in range(len(parameter_keys))])
             self.printfunc(p.posid + ' (bus=' + str(bus_id) + ', canid=' + str(can_id) + '): motor currents and periods set:' + vals_str)
 
     def execute_moves(self):
