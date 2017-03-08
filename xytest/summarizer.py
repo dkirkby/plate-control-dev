@@ -169,9 +169,9 @@ class Summarizer(object):
         err_summary['all corr nums'] = np.array(err_summary['all corr nums'])[corr_sort_idxs]
         for cut in stat_cuts:
             if cut >= 1:
-                idxs = range(n)
+                idxs = list(range(n))
             else:
-                idxs = range(int(np.ceil(cut*n)))
+                idxs = list(range(int(np.ceil(cut*n))))
             suffix1 = Summarizer.statcut_suffix(cut)
             err_summary['blind max (um)' + suffix1] = max(err_summary['all blind errs (um)'][idxs])
             suffix2 = Summarizer.err_suffix(cut,threshold_um)
