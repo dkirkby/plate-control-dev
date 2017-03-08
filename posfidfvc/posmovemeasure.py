@@ -8,6 +8,7 @@ import fitcircle
 import posconstants as pc
 import poscalibplot
 import scipy.optimize
+import collections
 
 class PosMoveMeasure(object):
     """Coordinates moving fiber positioners with fiber view camera measurements.
@@ -39,56 +40,6 @@ class PosMoveMeasure(object):
         self.extradots_fid_state = None # TEMPORARY HACK until individual fiducial dot locations tracking is properly handled
         self.make_plots_during_calib = True # whether to automatically generate and save plots of the calibration data
 
-    @property
-    def n_fiducial_dots(self):
-        """Number of fixed reference dots to expect in the field of view.
-        """
-        n_dots = 0
-        for petal in self.petals:
-            n_dots_ptl = petal.n_fiducial_dots
-            n_dots += n_dots_ptl
-        return n_dots
-    
-    def set_fiducials(self, setting='on'):
-        """Apply uniform settings to all fiducials on all petals simultaneously.
-        See set_fiducials() comments in petal for further details on argument and
-        return formats. The typical usage is:
-            set_fiducials('on')
-            set_fiducials('off')
-        """
-        all_settings_done = {}
-        for petal in self.petals:
-            settings_done = petal.set_fiducials(setting=setting)
-            all_settings_done.update(settings_done)
-        return all_settings_done
-            
-    @property
-    def fiducial_dots_fvcXY(self):
-        """List of nominal locations of all fixed reference dots in the FOV. List is
-        of the form [[x1,y1],[x2,y2],...]. All values are in the fvc XY pixel space.
-        """
-        xy = []
-        for petal in self.petals:
-            more_xy = petal.fiducial_dots_fvcXY
-            xy.extend(more_xy)
-        return xy
-    
-    @property
-    def fiducial_dots_obsXY(self):
-        """List of nominal locations of all fixed reference dots in the FOV. List is
-        of the form [[x1,y1],[x2,y2],...]. All values are in the observer XY coordinate
-        system (millimeters).
-        """
-        fvcXY = self.fiducial_dots_fvcXY
-        obsXY = self.fvc.fvcXY_to_obsXY_noplatemaker(fvcXY)
-        return obsXY
-
-    def set_motor_parameters(self):
-        '''Tells each petal to send all the latest motor settings out to positioners.
-        '''
-        for petal in self.petals:
-            petal.set_motor_parameters()
-
     def measure(self):
         """Measure positioner locations with the FVC and return the values.
 
@@ -109,13 +60,22 @@ class PosMoveMeasure(object):
             pos_ids.extend(these_pos_ids)
             petals.extend([petal]*len(these_pos_ids))
             expected_pos_xy = pc.concat_lists_of_lists(expected_pos_xy, petal.expected_current_position(these_pos_ids,'obsXY'))
-        expected_ref_xy = self.fiducial_dots_obsXY
-        measured_pos_xy,measured_ref_xy,imgfiles = self.fvc.measure_and_identify(expected_pos_xy,expected_ref_xy) 
+        expected_ref_xy = self.fiducial_dots_obsXY_ordered_list
+        measured_pos_xy,measured_ref_xy,brightnesses_pos,brightnesses_ref,imgfiles = self.fvc.measure_and_identify(expected_pos_xy,expected_ref_xy) 
         for i in range(len(measured_pos_xy)):
             petals[i].set(pos_ids[i],'LAST_MEAS_OBS_X',measured_pos_xy[i][0])
             petals[i].set(pos_ids[i],'LAST_MEAS_OBS_Y',measured_pos_xy[i][1])
+            petals[i].set(pos_ids[i],'LAST_MEAS_BRIGHTNESS',brightnesses_pos[i])
         for i in range(len(pos_ids)):
             data[pos_ids[i]] = measured_pos_xy[i]
+        for fid_id in self.fiducial_dots_obsXY.keys(): # order of the keys here matters
+            for petal in self.petals:
+                if fid_id in petal.fid_ids:
+                    these_brightnesses = [0]*petal.get_fids_val(fid_id,'N_DOTS')[0]
+                    for i in range(len(these_brightnesses)):
+                        these_brightnesses[i] = brightnesses_ref.pop(0)
+                    petal.save_fid_val(fid_id,'LAST_MEAS_BRIGHTNESSES',these_brightnesses)
+                    break            
         self.last_meas_fiducials_xy = measured_ref_xy
         return data,imgfiles
 
@@ -467,6 +427,88 @@ class PosMoveMeasure(object):
         ptl = self.ptls_of_pos_ids(pos_id)[pos_id]
         return ptl.get_model_for_pos(pos_id)
         
+    @property
+    def n_fiducial_dots(self):
+        """Number of fixed reference dots to expect in the field of view.
+        """
+        n_dots = 0
+        for petal in self.petals:
+            n_dots_ptl = petal.n_fiducial_dots
+            n_dots += n_dots_ptl
+        return n_dots
+    
+    def set_fiducials(self, setting='on'):
+        """Apply uniform settings to all fiducials on all petals simultaneously.
+        See set_fiducials() comments in petal for further details on argument and
+        return formats. The typical usage is:
+            set_fiducials('on')
+            set_fiducials('off')
+        """
+        all_settings_done = {}
+        for petal in self.petals:
+            settings_done = petal.set_fiducials(setting=setting)
+            all_settings_done.update(settings_done)
+        return all_settings_done
+            
+    @property
+    def fiducial_dots_fvcXY(self):
+        """Dict of nominal locations of all fixed reference dots in the FOV.
+        Keys are the fiducial IDs. Values are lists of the form [[x1,y1],[x2,y2],...].
+        All values are in the fvc XY pixel space.
+        """
+        xydata = collections.OrderedDict()
+        for petal in self.petals:
+            more_xy = petal.fiducial_dots_fvcXY
+            xydata.update(more_xy)
+        return xydata
+
+    @property
+    def fiducial_dots_obsXY(self):
+        """Dict of nominal locations of all fixed reference dots in the FOV. Keys are
+        fiducials ids. List is of the form [[x1,y1],[x2,y2],...]. All values are in the
+        observer XY coordinate system (millimeters).
+        """
+        fvcXY = self.fiducial_dots_fvcXY
+        obsXY = fvcXY.copy()
+        for fid_id in fvcXY.keys():
+            obsXY[fid_id] = self.fvc.fvcXY_to_obsXY_noplatemaker(fvcXY[fid_id])
+        return obsXY
+    
+    @property
+    def fiducial_dots_fvcXY_ordered_list(self):
+        '''Returns a list of the all the xy positions contained in the dict that
+        comes from fiducial_dots_fvcXY. The order of the list is guaranteed such
+        that if you iterate over...
+            for fid_id in self.fiducial_dots_fvcXY:
+                for xy in self.fiducial_dots_fvcXY[fid_id]:
+        ...then you would always get the same order of dots in the list.
+        '''
+        xy = []
+        vals = self.fiducial_dots_fvcXY.values()
+        for val in vals:
+            xy.extend(val)
+        return xy    
+    
+    @property
+    def fiducial_dots_obsXY_ordered_list(self):
+        '''Returns a list of the all the xy positions contained in the dict that
+        comes from fiducial_dots_obsXY. The order of the list is guaranteed such
+        that if you iterate over...
+            for fid_id in self.fiducial_dots_obsXY:
+                for xy in self.fiducial_dots_obsXY[fid_id]:
+        ...then you would always get the same order of dots in the list.
+        '''
+        xy = []
+        vals = self.fiducial_dots_obsXY.values()
+        for val in vals:
+            xy.extend(val)
+        return xy   
+
+    def set_motor_parameters(self):
+        '''Tells each petal to send all the latest motor settings out to positioners.
+        '''
+        for petal in self.petals:
+            petal.set_motor_parameters()
 
     def _measure_calibration_grid(self,pos_ids='all',keep_phi_within_Eo=True):
         """Expert usage. Send positioner(s) to a series of commanded (theta,phi) positions. Measure
@@ -857,13 +899,13 @@ class PosMoveMeasure(object):
                     positioners_current = petal.expected_current_position(posid=pos_ids_by_ptl[petal],key='obsXY')
                     positioners_current = self.fvc.obsXY_to_fvcXY_noplatemaker(positioners_current)
                     xy_meas = pc.concat_lists_of_lists(xy_meas,positioners_current)
-                n_new_fiducials = max(self.n_fiducial_dots - len(self.fiducial_dots_fvcXY),0)
+                n_new_fiducials = max(self.n_fiducial_dots - len(self.fiducial_dots_fvcXY_ordered_list),0)
                 if n_new_fiducials:
                     faraway = 2*np.max(np.max(np.abs(xy_meas)))
                     new_fiducials = np.random.uniform(low=faraway,high=2*faraway,size=(n_new_fiducials,2)).tolist()
-                    fiducials_xy = pc.concat_lists_of_lists(self.fiducial_dots_obsXY,new_fiducials)
+                    fiducials_xy = pc.concat_lists_of_lists(self.fiducial_dots_obsXY_ordered_list,new_fiducials)
                     self.set_fiducials_xy_extradots(fiducials_xy) # temporary hack, see function description
-                xy_meas = pc.concat_lists_of_lists(xy_meas,self.fiducial_dots_fvcXY)
+                xy_meas = pc.concat_lists_of_lists(xy_meas,self.fiducial_dots_fvcXY_ordered_list)
             else:
                 xy_meas,brightnesses,imgfiles = self.fvc.measure_fvc_pixels(n_dots)
             if i == 0:

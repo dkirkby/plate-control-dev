@@ -5,6 +5,7 @@ import posstate
 import posconstants as pc
 import numpy as np
 import time
+import collections
 
 class Petal(object):
     """Controls a petal. Communicates with the PetalBox hardware via PetalComm.
@@ -50,7 +51,7 @@ class Petal(object):
         # fiducials setup
         self.fidstates = {}
         for fid_id in fid_ids:
-            state = posstate.PosState(fid_id, logging=False, device_type='fid', printfunc=self.printfunc)
+            state = posstate.PosState(fid_id, logging=True, device_type='fid', printfunc=self.printfunc)
             self.fidstates[fid_id] = state
         
         # power suppliees setup?
@@ -467,17 +468,18 @@ class Petal(object):
     
     @property
     def fiducial_dots_fvcXY(self):
-        """Returns a list of all [x,y] positions of all fiducial dots this petal contributes
-        in the field of view. List is of the form [[x1,y1],[x2,y2],...]. The coordinates
-        are all given in fiber view camera pixel space.
+        """Returns a dict of all [x,y] positions of all fiducial dots this petal contributes
+        in the field of view. Keys are the fiducial IDs. Values are lists of the form
+        [[x1,y1],[x2,y2],...]. The coordinates are all given in fiber view camera pixel space.
         """
-        x = []
-        y = []
+        xydata = collections.OrderedDict()
         for fid_id in self.fid_ids:
+            x = []
+            y = []
             x.extend(self.get_fids_val(fid_id,'DOTS_FVC_X')[0])
             y.extend(self.get_fids_val(fid_id,'DOTS_FVC_Y')[0])
-        xy = [[x[i],y[i]] for i in range(len(x))]
-        return xy
+            xydata[fid_id] = [[x[i],y[i]] for i in range(len(x))]
+        return xydata
 
     @property
     def fid_ids(self):
@@ -512,6 +514,13 @@ class Petal(object):
         for fid_id in fid_ids:
             vals.append(self.fidstates[fid_id].read(key))
         return vals
+    
+    def save_fid_val(self,fid_id,key,value):
+        '''Sets a single value to a fiducial. This does NOT turn the fiducial physically
+        on or off. It only saves a value to the configuration file.
+        '''
+        self.fidstates[fid_id].write(key,value)
+        self.fidstates[fid_id].log_unit()
 
 
 # GETTERS, SETTERS, STATUS METHODS

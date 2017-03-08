@@ -31,7 +31,7 @@ class FVCHandler(object):
             self.sim_err_max = 0.01 # 2D err max for simulator
             self.printfunc('FVCHandler is in simulator mode with max 2D errors of size ' + str(self.sim_err_max) + '.')
         if 'SBIG' in self.fvc_type:
-            self.exposure_time = 0.22
+            self.exposure_time = 0.25
             self.max_counts = 2**16 - 1
         else:
             self.exposure_time = 1.0
@@ -168,12 +168,15 @@ class FVCHandler(object):
         else:
             expected_xy = expected_pos_xy + expected_ref_xy
             num_objects = len(expected_xy)
-            unsorted_xy,brightnesses,imgfiles = self.measure(num_objects)
-            measured_xy = self.sort_by_closeness(unsorted_xy, expected_xy)
+            unsorted_xy,unsorted_brightnesses,imgfiles = self.measure(num_objects)
+            measured_xy,sorted_idxs = self.sort_by_closeness(unsorted_xy, expected_xy)
             measured_pos_xy = measured_xy[:len(expected_pos_xy)]
             measured_ref_xy = measured_xy[len(expected_pos_xy):]
+            brightnesses = np.array(unsorted_brightnesses)[sorted_idxs].tolist()
+            brightnesses_pos = brightnesses[:len(expected_pos_xy)]
+            brightnesses_ref = brightnesses[len(expected_pos_xy):]
             measured_pos_xy = self.correct_using_ref(measured_pos_xy, measured_ref_xy, expected_ref_xy)
-        return measured_pos_xy, measured_ref_xy, imgfiles
+        return measured_pos_xy, measured_ref_xy, brightnesses_pos, brightnesses_ref, imgfiles
 
     def correct_using_ref(self, measured_pos_xy, measured_ref_xy, expected_ref_xy):
         """Evaluates the correction that transforms measured_ref_xy into expected_ref_xy,
@@ -194,6 +197,7 @@ class FVCHandler(object):
         if len(unknown_xy) != len(expected_xy):
             self.printfunc('warning: unknown_xy length = ' + str(len(unknown_xy)) + ' but expected_xy length = ' + str(len(expected_xy)))
         xy = [None]*len(expected_xy)
+        sorted_idxs = [None]*len(expected_xy)
         dist = []
         for e in expected_xy:
             delta = np.array(unknown_xy) - np.array(e)
@@ -204,9 +208,10 @@ class FVCHandler(object):
             unknown_min_idx = np.mod(min_idx_1D,len(unknown_xy))
             expected_min_idx = np.int(np.floor(min_idx_1D/len(expected_xy)))
             xy[expected_min_idx] = unknown_xy[unknown_min_idx]
+            sorted_idxs[expected_min_idx] = unknown_min_idx
             dist[expected_min_idx,:] = np.inf # disable used up "expected" row
             dist[:,unknown_min_idx] = np.inf # disable used up "unknown" column
-        return xy
+        return xy, sorted_idxs
 
     def measure(self, num_objects=1):
         """Calls for an FVC image capture, applies simple transformations to get the
@@ -279,7 +284,7 @@ class FVCHandler(object):
 if __name__ == '__main__':
     f = FVCHandler(fvc_type='SBIG')
     n_objects = 16
-    n_repeats = 1
+    n_repeats = 10
     xy = []
     brightnesses = []
     print('start taking ' + str(n_repeats) + ' images')

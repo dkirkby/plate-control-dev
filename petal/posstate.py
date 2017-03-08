@@ -70,6 +70,13 @@ class PosState(object):
             self.unit['LAST_MOVE_CMD'] = '(software initialization)'
             self.unit['LAST_MOVE_VAL1'] = ''
             self.unit['LAST_MOVE_VAL2'] = ''
+        if os.path.isfile(self.log_path):
+            with open(self.log_path,'r',newline='') as csvfile:
+                headers = csv.DictReader(csvfile).fieldnames
+            for key in self.unit.keys():
+                if key not in headers:
+                    self.log_basename = self.increment_suffix(self.log_basename) # start a new file if headers don't match up anymore with all the data we're trying to store
+                    break
         self.log_unit()
 
     def __str__(self):
@@ -117,11 +124,20 @@ class PosState(object):
                 self.curr_log_length = 0
             if not(os.path.isfile(self.log_path)): # checking whether need to start a new file
                 with open(self.log_path, 'w', newline='') as csvfile:
-                    csv.writer(csvfile).writerow(['TIMESTAMP'] + self.unit.keys() + ['NOTE'])
+                    csv.writer(csvfile).writerow(self.log_fieldnames)
             with open(self.log_path, 'a', newline='') as csvfile: # now append a row of data
-                csv.writer(csvfile).writerow([timestamp] + self.unit.values() + [str(note)])
+                row = self.unit.copy()
+                row.update({'TIMESTAMP':timestamp,'NOTE':str(note)})
+                writer = csv.DictWriter(csvfile,fieldnames=self.log_fieldnames)
+                writer.writerow(row)
             self.curr_log_length += 1
-
+    
+    @property
+    def log_fieldnames(self):
+        '''Returns list of fieldnames we save to the log file.
+        '''
+        return ['TIMESTAMP'] + self.unit.keys() + ['NOTE']
+    
     @property
     def log_path(self):
         """Convenience method for consistent formatting of file path to log file.
