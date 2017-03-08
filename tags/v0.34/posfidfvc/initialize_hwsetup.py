@@ -1,0 +1,148 @@
+# THIS IS THE BEGINNINGS OF A NEW SCRIPT WHICH WE WILL RUN WHENEVER WE SET UP
+# HARDWARE ON A TEST STAND. ALL THE INITIAL CALIBRATIONS AND CHECKS HAPPEN HERE.
+# THEREAFTER, WE DON'T HAVE TO REPEAT THESE ALL THE TIME FOR EVERY XY ACCURACY
+# TEST.
+
+import os
+import sys
+sys.path.append(os.path.abspath('../petal/'))
+import petal
+import posmovemeasure
+import fvchandler
+import posconstants as pc
+import tkinter
+import tkinter.filedialog
+
+# get some identifying info
+station = input('Enter the station name: ')
+extradots_name = 'extradots_' + station
+print('Locate the positioner config files that correspond to each of the positioners that are installed. Hit cancel on the dialog box when done.')
+keep_getting = True
+i = 0
+pos_ids = []
+while keep_getting:
+    message = 'Pick pos file #' + str(i+1) + '. Cancel when done.'
+    gui_root = tkinter.Tk()
+    configfile = tkinter.filedialog.askopenfilename(initialdir=pc.pos_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
+    gui_root.destroy()
+    if not(configfile):
+        keep_getting = False
+    else:
+        pos_id = configfile.split('unit_')[1].split('.conf')[0]
+        if pos_id not in pos_ids:
+            pos_ids.append(pos_id)
+            i += 1
+print('Positioners selected:')
+for pos_id in pos_ids:
+    print('  ' + pos_id)
+ok = input('Is this all correct? (yes/no)')
+if not('y' in ok or 'Y' in ok):
+    # implement an exit here
+    pass
+
+# software initialization and startup
+sim = False
+pos_ids = ['M00108','M00104']
+fid_ids = ['F017']
+ptl_ids = [42]
+fid_ids.append(extradots_name)
+petals = [petal.Petal(ptl_ids[0], pos_ids, fid_ids, simulator_on=sim)] # single-petal placeholder for generality of future implementations, where we could have a list of multiple petals, and need to correlate pos_ids and fid_ids to thier particular petals
+for ptl in petals:
+    ptl.anticollision_default = False
+if sim:
+    fvc = fvchandler.FVCHandler('simulator')
+else:
+    fvc = fvchandler.FVCHandler('SBIG')      
+fvc.rotation = 0 # deg
+fvc.scale = 0.043 # mm/pixel
+m = posmovemeasure.PosMoveMeasure(petals,fvc)
+start_timestamp = pc.timestamp_str_now()
+
+# deal with possible extra fiducial dots
+print('Sometimes there are \'extra\' fixed dots of light in the setup, such as fixed reference fibers. If the test setup is only using standard fiducial devices, hit enter. But if there ARE extra fixed fibers in this test setup, then enter the number of them here.')
+user_val = input('number of extra dots: ')
+if not(user_val):
+    n_extra_dots = 0
+else:
+    n_extra_dots = int(user_val)
+m.petals[0].fidstates[extradots_name].write('N_DOTS',n_extra_dots)
+m.petals[0].fidstates[extradots_name].write('CTRL_ENABLED',False)
+
+# calibration routines
+m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
+m.identify_fiducials() 
+m.identify_positioner_locations()
+m.calibrate(mode='quick', save_file_dir=pc.test_logs_directory, save_file_timestamp=start_timestamp) # need to calibrate prior to measuring  physical travel ranges (where phi arms get extended, and need some reasonable values for theta offsets before doing such extensions)
+m.measure_range(axis='theta')
+m.measure_range(axis='phi')
+m.rehome() # rehome again because range measurements intentionally ran against hardstops, messing up shaft angle counters
+m.one_point_calibration() # do a measurement at one point with fvc after the blind rehome
+m.park() # retract all positioners to their parked positions
+
+# generate the hardware setup file
+# (might start this higher up)
+
+"""EMAIL FROM STEVE ON STARTING POINT FOR INSTRUMENT PARAMETERS CONFIG FILE
+All,
+
+Here is a sample configuration file for an "instrument".  Let us call the instrument "em" for engineering model (or whatever you want).
+Pound sign (#) is a comment line.  Blank lines are OK.  I will need to write up the meaning of fvcrot, fvcxoff, fvcyoff, and fvcflip, since the operations are not commutative.  None of the parameters is mandatory.
+
+Steve
+
+File is called em.par
+
+#First 3 parameters are appropriate for protoDESI FLI camera.
+fvcnrow 6000
+fvcncol 6000
+fvcpixmm .006
+
+#Scale and orientation of FVC camera - these are appropriate for protoDESI
+#fvcmag is demagnification from focal plane to FVC ccd.
+fvcmag 21.842
+fvcrot  0.
+fvcxoff 0.
+fvcyoff 0.
+fvcflip 1
+
+#Flat or aspheric focal plane?
+asphere 1
+"""
+
+
+
+"""HOW TO READ AN FVC IMAGE AND GIVE PLATEMAKER THE RIGHT ORIENTATION / VALUES FOR INSTRUMENT FILE:
+See picture that steve made.
+I posted it at:
+https://desi.lbl.gov/trac/wiki/DOS/PositionerLoop    
+"""
+
+           
+"""COMMENTS FROM ERIC ON FORMAT OF FIDUCIALS DATA FILE FOR PLATEMAKER
+PER EMAIL 2017-02-10, THIS STUFF DOES GO INTO THE .par INSTRUMENT FILE
+
+Internally to Steve, it’s the same format as the files he uses for positioners and positioner_calib. There is an example in $PLATEMAKER_DIR/test/data/testinst1/fiducial-testinst1.dat, which is just a copy of the defualt file in dervishtools, trunk/desi/etc/default/fiducial-default.dat.
+
+It looks like this:
+
+#ProtoDESI - actual Fiducial positions
+#serial   q        s     flags
+1100  201.29864  57.62478  0
+1118  158.65941  57.62944  0
+1102  223.32243  61.13366  0
+1103  136.73378  61.23237  0
+1117  194.16599  37.48592  0
+1106  163.62382  37.03236  0
+1107  247.73668  45.35403  0
+1108  179.81027  17.21309  0
+1116  112.26703  45.38117  0
+1115  270.01638  55.98100  0
+1111  89.97447  56.10901  0
+1112  293.97813  61.37240  0
+1113  57.94744  66.04711  0
+1114  9.49977  60.87482  0
+1101  16.43042  37.25640  0
+1109  263.43168  37.11059  0
+
+(but actually use flag 8 indicating it is a fiducial)
+"""
