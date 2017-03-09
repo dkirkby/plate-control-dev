@@ -11,6 +11,7 @@ import posstate
 init_data_keys = ['test loop data file',
                   'num pts calib T',
                   'num pts calib P',
+                  'ranges remeasured',
                   'xytest log file',
                   'code version',
                   'test operator',
@@ -64,11 +65,30 @@ class Summarizer(object):
         if not directory[-1] == os.path.sep:
             directory += os.path.sep
         self.filename = directory + self.basename
-        if not(os.path.isfile(self.filename)): # checking whether need to start a new file
+        
+        # checking whether need to start a new file because none exist yet
+        if not(os.path.isfile(self.filename)):
             with open(self.filename, 'w', newline='') as csvfile:
                 csv.writer(csvfile).writerow(self.row_template.keys()) # write header row
+                
+        # deal with case where fieldnames have changed since the last time the file was used
+        with open(self.filename, 'r', newline='') as csvfile:
+            reader = csv.DictReader(csvfile)
+            old_fieldnames = reader.fieldnames
+            rows = []
+            for row in reader:
+                rows.append(row)
+        for key in self.row_template.keys():
+            if key not in old_fieldnames:
+                for row in rows:
+                    row[key] = 'unknown'
+        with open(self.filename, 'w', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile,fieldnames=list(self.row_template.keys()))
+            writer.writeheader()
+            for row in rows:
+                writer.writerow(row)
     
-    def update_loop_inits(self, loop_data_file, n_pts_calib_T, n_pts_calib_P):
+    def update_loop_inits(self, loop_data_file, n_pts_calib_T, n_pts_calib_P,ranges_were_remeasured):
         '''At the start of a new loop within an xytest, always run this method
         to update values in the row logging function.
         
@@ -85,6 +105,7 @@ class Summarizer(object):
         self.row_template['start time']          = pc.timestamp_str_now()
         self.row_template['curr cruise']         = self.state.read('CURR_CRUISE')
         self.row_template['curr creep']          = self.state.read('CURR_CREEP')
+        self.row_template['ranges remeasured']   = ranges_were_remeasured
         self.next_row_is_new = True
 
     def write_row(self, err_data_mm, autogather=True):
