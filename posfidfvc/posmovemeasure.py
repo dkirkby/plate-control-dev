@@ -22,16 +22,13 @@ class PosMoveMeasure(object):
         self.ref_dist_tol = 5.0   # [pixels on FVC CCD] used for identifying fiducial dots
         self.nudge_dist   = 10.0  # [deg] used for identifying fiducial dots
         self.last_meas_fiducials_xy = [] # convenient location to store list of measured fiducial dot positions from the most recent FVC measurement
-        self.n_points_full_calib_T = 7 # number of points in a theta calibration arc
-        self.n_points_full_calib_P = 7 # number of points in a phi calibration arc
+        self.n_points_calib_T = 7 # number of points in a theta calibration arc
+        self.n_points_calib_P = 7 # number of points in a phi calibration arc
         self.phi_Eo_margin = 3.0 # [deg] margin on staying within Eo envelope
         self.calib_arc_margin = 3.0 # [deg] margin on calibration arc range
         self.use_current_theta_during_phi_range_meas = False # useful for when theta axis is not installed on certain sample positioners
         self.general_trans = postransforms.PosTransforms() # general transformation object (not specific to calibration of any one positioner), useful for things like obsXY to QS or QS to obsXY coordinate transforms
         self.grid_calib_param_keys = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','OFFSET_X','OFFSET_Y']
-        self.grid_calib_keep_phi_within_Eo = False # during grid calibration method, whether to keep phi axis always within the non-collidable envelope
-        self.n_points_grid_calib_T = 6
-        self.n_points_grid_calib_P = 6
         self.err_level_to_save_move0_img = np.inf # value at which to preserve move 0 fvc images (for debugging if a measurement is off by a lot)
         self.err_level_to_save_moven_img = np.inf # value at which to preserve last corr move fvc images (for debugging if a measurement is off by a lot)
         self.tp_updates_mode = 'posTP' # options are None, 'posTP', 'offsetsTP'. see comments in move_measure() function for explanation
@@ -224,32 +221,57 @@ class PosMoveMeasure(object):
                 requests[pos_id] = {'command':'posTP', 'target':[posT,posP], 'log_note':'parking'}
         self.move(requests)
         
-    def one_point_calibration(self,pos_ids='all'):
+    def one_point_calibration(self, pos_ids='all', mode='posTP'):
         """Goes to a single point, makes measurement with FVC, and re-calibrates the internally-
         tracked angles for the current theta and phi shaft positions.
         
         This method is attractive after steps like rehoming to hardstops, because it is very
         quick to do, and should be fairly accurate in most cases. But will never be as statistically
         robust as a regular calibration routine, which does arcs of multiple points and then takes
-        the best fit circle. And of course, one_point_calibration() does absolutely nothing to
-        calibrate all the mechanical properties of the positioner, like (x,y) offsets, (t,p) offsets,
-        kinematic arm lengths, etc. It just updates our internal counter on where we currently expect
-        the theta and phi shafts to be.
+        the best fit circle.
+        
+          mode ... 'posTP'     --> [common usage] moves positioner to (posT=0,posP=self.phi_clear_angle),
+                                                  and then updates our internal counter on where we currently
+                                                  expect the theta and phi shafts to be
+                                                 
+               ... 'offsetsTP' --> [expert usage] moves to (posT=0,posP=self.phi_clear_angle),
+                                                  and then updates setting for theta and phi physical offsets
+                                                 
+               ... 'offsetsXY' --> [expert usage] moves positioner to (posT=0,posP=180),
+                                                  and then updates setting for x and y physical offsets
+               
+        Prior to calling a mode of 'offsetTP' or 'offsetXY', it is recommended to re-home the positioner
+        if there is any uncertainty as to its current location. This is generally not necessary
+        in the default case, using 'posTP'.
         """
+        self.printfunc('Running one-point calibration of ' + mode)
         posT = 0
-        posP = self.phi_clear_angle
-        old_tp_updates_tol = self.tp_updates_tol
-        old_tp_updates_fraction = self.tp_updates_fraction
-        self.tp_updates_tol = 0.001
-        self.tp_updates_fraction = 1.0
+        if mode == 'posTP' or mode == 'offsetsTP':
+            posP = self.phi_clear_angle
+        else:
+            posP = 180
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids, key='POS_ID')
         requests = {}
         for petal in pos_ids_by_ptl.keys():
             for pos_id in pos_ids_by_ptl[petal]:
-                requests[pos_id] = {'command':'posTP', 'target':[posT,posP], 'log_note':'one point calibration'}
-        self.move_measure(requests,tp_updates='posTP')
-        self.tp_updates_tol = old_tp_updates_tol
-        self.tp_updates_fraction = old_tp_updates_fraction
+                requests[pos_id] = {'command':'posTP', 'target':[posT,posP], 'log_note':'one point calibration of ' + mode}
+        if mode == 'posTP' or mode == 'offsetsTP':
+            old_tp_updates_tol = self.tp_updates_tol
+            old_tp_updates_fraction = self.tp_updates_fraction
+            self.tp_updates_tol = 0.001
+            self.tp_updates_fraction = 1.0
+            self.move_measure(requests,tp_updates=mode)
+            self.tp_updates_tol = old_tp_updates_tol
+            self.tp_updates_fraction = old_tp_updates_fraction
+        else:
+            data,imgfiles = self.move_measure(requests, tp_updates=None)
+            for petal in pos_ids_by_ptl.keys():
+                for pos_id in pos_ids_by_ptl[petal]:
+                    xy = data[pos_id]
+                    petal.set(pos_id,'OFFSET_X',xy[0])
+                    petal.set(pos_id,'OFFSET_Y',xy[1])
+                    self.printfunc(pos_id + ': Set OFFSET_X to ' + self.fmt(xy[0]))
+                    self.printfunc(pos_id + ': Set OFFSET_Y to ' + self.fmt(xy[1]))
 
     def rehome(self,pos_ids='all'):
         """Find hardstops and reset current known positions.
@@ -267,11 +289,8 @@ class PosMoveMeasure(object):
         Calculate the total available travel range. Note that for axis='phi', the
         positioners must enter the collisionable zone, so the range seeking may
         occur in several successive stages.
-
-        Typically one does NOT call measure_range unless the theta offsets are already
-        reasonably well known. That can be achieved by first doing a 'quick' mode
-        calibration.
         """
+        self.calibrate(pos_ids=pos_ids,mode='rough')
         if axis == 'phi':
             axisid = pc.P
             parameter_name = 'PHYSICAL_RANGE_P'
@@ -302,55 +321,64 @@ class PosMoveMeasure(object):
                 total_angle += step_measured
             total_angle = abs(total_angle)
             data[pos_id]['petal'].set(pos_id,parameter_name,total_angle)
+        self.rehome(pos_ids)
+        self.one_point_calibration(pos_ids,mode='posTP')
 
-    def calibrate(self,pos_ids='all',mode='quick',save_file_dir='./',save_file_timestamp='sometime'):
+    def calibrate(self,pos_ids='all',mode='arc',save_file_dir='./',save_file_timestamp='sometime',keep_phi_within_Eo=True):
         """Do a series of test points to measure and calulate positioner center
         locations, R1 and R2 arm lengths, theta and phi offsets, and then set all these
         calibration values for each positioner.
 
         INPUTS:  pos_ids  ... list of pos_ids or 'all'
-                 mode     ... 'full' or 'quick' -- see detailed comments in _measure_calibration_arc method
-                              'grid' -- error minimizer on grid of points to find best fit calibration parameters
+        
+                 mode     ... 'rough' -- very rough calibration using two measured points only, always should be followed by an arc or grid calibration
+                              'arc'   -- best-fit circle to arcs of points on the theta and phi axes
+                              'grid'  -- error minimizer on grid of points to find best fit calibration parameters
+        
+                 keep_phi_within_Eo ... boolean, states whether to never let phi outside the free rotation envelope
 
-        Typically one does NOT call 'full' mode unless the theta offsets are already
-        reasonably well known. That can be achieved by first doing a 'quick' mode
-        calibration.
+        Typically one does NOT call keep_phi_within_Eo = False unless the theta offsets are already
+        reasonably well known. That can be achieved by first doing a 'rough' or other calibration
+        calibration with keep_phi_within_Eo=True.
         
         OUTPUTS:  files  ... set of plot file paths generated by the function
                              (this is an empty set if the parameter make_plots_during_calib == False)
         """
-        # begin from the same clean "blank slate" every time we calibrate
+        files = set()
+
+        # 'rough' calibration is ALWAYS run
         self.rehome(pos_ids)
-        self.identify_positioner_locations()
+        self.one_point_calibration(mode='offsetsXY')
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
         for petal in pos_ids_by_ptl.keys():
             these_pos_ids = pos_ids_by_ptl[petal]
-            keys_to_reset = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','OFFSET_X','OFFSET_Y','GEAR_CALIB_T','GEAR_CALIB_P']
+            keys_to_reset = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P']
             for key in keys_to_reset:
                 petal.set(these_pos_ids,key,pc.nominals[key]['value'])      
+        self.one_point_calibration(mode='offsetsTP')
         
-        # now do the calibration
-        if self.make_plots_during_calib:
-            def save_file(pos_id):
-                return save_file_dir + pos_id + '_' + save_file_timestamp + '_calib_' + mode + '.png'
-        files = set()
+        # now do arc or grid calibrations
+        if mode == 'arc' or mode == 'grid':
+            if self.make_plots_during_calib:
+                def save_file(pos_id):
+                    return save_file_dir + pos_id + '_' + save_file_timestamp + '_calib_' + mode + '.png'
         if mode == 'grid':
             if self.grid_calib_num_DOF >= self.grid_calib_num_constraints: # the '=' in >= comparison is due to some places in the code where I am requiring at least one extra point more than exact constraint 
-                self.printfunc('Not enough points requested to constrain grid calibration. Defaulting to arc calibration method.')
-                return self.calibrate(pos_ids,'quick',save_file_dir,save_file_timestamp)
-            grid_data = self._measure_calibration_grid(pos_ids, keep_phi_within_Eo=self.grid_calib_keep_phi_within_Eo)
+                new_mode = 'arc'    
+                self.printfunc('Not enough points requested to constrain grid calibration. Defaulting to ' + new_mode + ' calibration method.')
+                return self.calibrate(pos_ids,new_mode,save_file_dir,save_file_timestamp)
+            grid_data = self._measure_calibration_grid(pos_ids, keep_phi_within_Eo)
             grid_data = self._calculate_and_set_arms_and_offsets_from_grid_data(grid_data, set_gear_ratios=False)
             if self.make_plots_during_calib:
                 for pos_id in grid_data.keys():
                     file = save_file(pos_id)
                     poscalibplot.plot_grid(file,pos_id, grid_data)
                     files.add(file)
-        else:
-            T = self._measure_calibration_arc(pos_ids,'theta',mode)
-            P = self._measure_calibration_arc(pos_ids,'phi',mode)
-            #set_gear_ratios = False if mode == 'quick' else True
+        elif mode == 'arc':
+            T = self._measure_calibration_arc(pos_ids,'theta', keep_phi_within_Eo)
+            P = self._measure_calibration_arc(pos_ids,'phi', keep_phi_within_Eo)
             set_gear_ratios = False # not sure yet if we really want to adjust gear ratios automatically, hence by default False here
-            self.printfunc("Finished measuring calibration arcs")#,T,P)
+            self.printfunc("Finished measuring calibration arcs.")
             unwrapped_data = self._calculate_and_set_arms_and_offsets_from_arc_data(T,P,set_gear_ratios)
             if self.make_plots_during_calib:
                 for pos_id in T.keys():
@@ -550,9 +578,9 @@ class PosMoveMeasure(object):
                 range_P = posmodel.targetable_range_P
                 if keep_phi_within_Eo:
                     range_P[0] = self.phi_clear_angle
-                t_cmd = np.linspace(min(range_T),max(range_T),self.n_points_grid_calib_T + 1) # the +1 is temporary, remove that extra point in next line
+                t_cmd = np.linspace(min(range_T),max(range_T),self.n_points_calib_T + 1) # the +1 is temporary, remove that extra point in next line
                 t_cmd = t_cmd[:-1] # since theta covers +/-180, it is kind of redundant to hit essentially the same points again
-                p_cmd = np.linspace(min(range_P),max(range_P),self.n_points_grid_calib_P + 1) # the +1 is temporary, remove that extra point in next line
+                p_cmd = np.linspace(min(range_P),max(range_P),self.n_points_calib_P + 1) # the +1 is temporary, remove that extra point in next line
                 p_cmd = p_cmd[:-1] # since there is very little useful data right near the center
                 data[pos_id]['target_posTP'] = [[t,p] for t in t_cmd for p in p_cmd]
                 data[pos_id]['trans'] = posmodel.trans
@@ -572,7 +600,7 @@ class PosMoveMeasure(object):
                 data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
         return data 
 
-    def _measure_calibration_arc(self,pos_ids='all',axis='theta',mode='quick'):
+    def _measure_calibration_arc(self,pos_ids='all',axis='theta',keep_phi_within_Eo=True):
         """Expert usage. Sweep an arc of points about axis ('theta' or 'phi')
         on positioners identified by pos_ids. Measure these points with the FVC
         and do a best fit of them.
@@ -580,12 +608,8 @@ class PosMoveMeasure(object):
         INPUTS:   pos_ids ... list of pos_ids or 'all'
                   axis    ... 'theta' or 'phi'
 
-        'quick' mode: phi never exceeds Eo envelope, 3 points measured on phi axis, 4 points on theta,
-        'full' mode: phi covers full range, n points per parameter 'n_points_full_calib_T' or 'n_points_full_calib_P'
-
-        Full mode assumes all the positioners can be placed such that their phi will not interfere. This means
-        that the theta27s can be made homogenous, which means having reasonably theta offsets already known. Therefore
-        quick mode ought to have been run at least once before full mode, if there is doubt as to approximate theta offsets.
+        keep_phi_within_Eo == True  --> phi never exceeds Eo envelope
+        keep_phi_within_Eo == False --> phi can cover the full range (including collidable territory) during calibration
 
         OUTPUTS:  data ... see comments below
 
@@ -608,15 +632,15 @@ class PosMoveMeasure(object):
             initial_tp = []
             final_tp = []
             if axis == 'theta':
-                n_pts = 4 if mode == 'quick' else self.n_points_full_calib_T
+                n_pts = self.n_points_calib_T
                 for posmodel in posmodels:
                     targetable_range_T = posmodel.targetable_range_T
                     initial_tp = pc.concat_lists_of_lists(initial_tp, [min(targetable_range_T) + self.calib_arc_margin, phi_clear_angle])
                     final_tp   = pc.concat_lists_of_lists(final_tp,   [max(targetable_range_T) - self.calib_arc_margin, initial_tp[-1][1]])
             else:
-                n_pts = 4 if mode == 'quick' else self.n_points_full_calib_P
+                n_pts = self.n_points_calib_P
                 for posmodel in posmodels:
-                    if mode == 'quick':
+                    if keep_phi_within_Eo:
                         phi_min = phi_clear_angle
                         theta = 0
                     else:
@@ -636,7 +660,7 @@ class PosMoveMeasure(object):
             requests = {}
             for pos_id in all_pos_ids:
                 requests[pos_id] = {'command':'posTP', 'target':data[pos_id]['target_posTP'][i], 'log_note':'calib arc on ' + axis + ' point ' + str(i+1)}
-            self.printfunc('\'' + mode + '\' calibration arc on ' + axis + ' axis: point ' + str(i+1) + ' of ' + str(n_pts))
+            self.printfunc('calibration arc on ' + axis + ' axis: point ' + str(i+1) + ' of ' + str(n_pts))
             this_meas_data,imgfiles = self.move_measure(requests, tp_updates=None)
             for p in this_meas_data.keys():
                 data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
@@ -947,8 +971,8 @@ class PosMoveMeasure(object):
                 err_y = measured_obsXY[1] - expected_obsXY[1]
                 prev_offset_x = this_petal.get(posid=pos_id,key='OFFSET_X')
                 prev_offset_y = this_petal.get(posid=pos_id,key='OFFSET_Y')
-                this_petal.set(pos_id,'OFFSET_X', prev_offset_x + err_x) # this works, assuming we have reasonable knowledge of theta and phi (having re-homed or quick-calibrated)
-                this_petal.set(pos_id,'OFFSET_Y', prev_offset_y + err_y) # this works, assuming we have reasonable knowledge of theta and phi (having re-homed or quick-calibrated)
+                this_petal.set(pos_id,'OFFSET_X', prev_offset_x + err_x) # this works, assuming we have already have reasonable knowledge of theta and phi (having re-homed or rough-calibrated)
+                this_petal.set(pos_id,'OFFSET_Y', prev_offset_y + err_y) # this works, assuming we have already have reasonable knowledge of theta and phi (having re-homed or rough-calibrated)
                 this_petal.set(pos_id,'LAST_MEAS_OBS_X',measured_obsXY[0])
                 this_petal.set(pos_id,'LAST_MEAS_OBS_Y',measured_obsXY[1])
     
@@ -1013,10 +1037,16 @@ class PosMoveMeasure(object):
                 old_P = petal.get(pos_id,param + '_P')              
                 new_T = old_T + delta_T
                 new_P = old_P + delta_P
-                posmodel.axis[pc.T].pos = new_T
-                posmodel.axis[pc.P].pos = new_P
-                self.printfunc(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_T from ' + self.fmt(old_T) + ' to ' + self.fmt(new_T))
-                self.printfunc(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
+                if tp_updates == 'offsetsTP':
+                    petal.set(pos_id,'OFFSET_T',new_T)
+                    petal.set(pos_id,'OFFSET_P',new_P)
+                    self.printfunc(pos_id + ': Set OFFSET_T to ' + self.fmt(new_T))
+                    self.printfunc(pos_id + ': Set OFFSET_P to ' + self.fmt(new_P))                    
+                else:
+                    posmodel.axis[pc.T].pos = new_T
+                    posmodel.axis[pc.P].pos = new_P
+                    self.printfunc(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_T from ' + self.fmt(old_T) + ' to ' + self.fmt(new_T))
+                    self.printfunc(pos_id + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
                 delta_TP[pos_id] = [delta_T,delta_P]
                 posmodel.state.log_unit('updated ' + param + '_T and ' + param + '_P after positioning error of ' + self.fmt(err_xy) + ' mm')
         return delta_TP
@@ -1036,7 +1066,7 @@ class PosMoveMeasure(object):
     
     @property
     def grid_calib_num_constraints(self):
-        return self.n_points_full_calib_T * self.n_points_full_calib_P
+        return self.n_points_calib_T * self.n_points_calib_P
     
     @property
     def n_moving_dots(self):

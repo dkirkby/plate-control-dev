@@ -8,19 +8,22 @@ import csv
 import datetime
 import posstate
 
-init_data_keys = ['test loop data file',
-                  'num pts calib T',
-                  'num pts calib P',
-                  'ranges remeasured',
-                  'xytest log file',
-                  'code version',
-                  'test operator',
+auto_init_data_keys = ['test loop data file',
+                       'num pts calib T',
+                       'num pts calib P',
+                       'calib mode',
+                       'ranges remeasured',
+                       'xytest log file',
+                       'code version']
+
+user_data_keys = ['test operator',
                   'test station',
                   'supply voltage',
                   'temperature (C)',
                   'relative humidity',
                   'operator notes']
-user_data_keys = init_data_keys[5:] # subset of init_data_keys that get manually entered by user
+
+init_data_keys = auto_init_data_keys + user_data_keys
 
 # reporting constants
 thresholds_um = [3.0,5.0] # [um] candidate 2D error thresholds to calculate where in real operation on the mountain we would have stopped correcting
@@ -88,7 +91,7 @@ class Summarizer(object):
             for row in rows:
                 writer.writerow(row)
     
-    def update_loop_inits(self, loop_data_file, n_pts_calib_T, n_pts_calib_P,ranges_were_remeasured):
+    def update_loop_inits(self, loop_data_file, n_pts_calib_T, n_pts_calib_P, calib_mode, ranges_were_remeasured):
         '''At the start of a new loop within an xytest, always run this method
         to update values in the row logging function.
         
@@ -102,6 +105,7 @@ class Summarizer(object):
         self.row_template['test loop data file'] = os.path.basename(loop_data_file)
         self.row_template['num pts calib T']     = n_pts_calib_T
         self.row_template['num pts calib P']     = n_pts_calib_P
+        self.row_template['calib mode']          = calib_mode
         self.row_template['start time']          = pc.timestamp_str_now()
         self.row_template['curr cruise']         = self.state.read('CURR_CRUISE')
         self.row_template['curr creep']          = self.state.read('CURR_CREEP')

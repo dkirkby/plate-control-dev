@@ -114,6 +114,8 @@ class XYTest(object):
         summarizer_init_data['test loop data file'] = ''
         summarizer_init_data['num pts calib T']     = None
         summarizer_init_data['num pts calib P']     = None
+        summarizer_init_data['calib mode']          = None
+        summarizer_init_data['ranges remeasured']   = None
         summarizer_init_data['xytest log file']     = self.xytest_conf.filename
         summarizer_init_data['code version']        = pc.code_version
         user_vals = self.intro_questions()
@@ -178,26 +180,6 @@ class XYTest(object):
             print('Thank you, notes entered into log at ' + self.xytest_conf.filename)   
         return notes
 
-    def run_calibration(self, loop_number):
-        """Move positioners through a short sequence to calibrate them.
-        """
-        n_pts_calib_T = self.xytest_conf['n_points_calib_T'][loop_number]
-        n_pts_calib_P = self.xytest_conf['n_points_calib_P'][loop_number]
-        if n_pts_calib_T >= 4 and n_pts_calib_P >= 3:
-            start_time = time.time()
-            self.logwrite('Starting arc calibration sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
-            self.m.n_points_full_calib_T = n_pts_calib_T
-            self.m.n_points_full_calib_P = n_pts_calib_P
-            files = self.m.calibrate(pos_ids='all', mode='full', save_file_dir=pc.xytest_plots_directory, save_file_timestamp=pc.filename_timestamp_str_now())
-            for file in files:
-                self.track_file(file)
-                self.logwrite('Calibration plot file: ' + file)
-            for pos_id in self.pos_ids:
-                state = self.m.state(pos_id)
-                for key in ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']:
-                    self.logwrite(str(pos_id) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
-            self.logwrite('Calibration with ' + str(n_pts_calib_T) + ' theta points and ' + str(n_pts_calib_P) + ' phi points completed in ' + self._elapsed_time_str(start_time) + '.')
-        
     def run_range_measurement(self, loop_number):
         if self.xytest_conf['should_measure_ranges'][loop_number]:
             start_time = time.time()
@@ -210,8 +192,27 @@ class XYTest(object):
                 for key in ['PHYSICAL_RANGE_T','PHYSICAL_RANGE_P']:
                     self.logwrite(str(pos_id) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
             self.logwrite('Calibration of physical travel ranges completed in ' + self._elapsed_time_str(start_time) + '.')
-            self.m.rehome(pos_ids='all')
-            self.m.one_point_calibration(pos_ids='all')
+
+    def run_calibration(self, loop_number):
+        """Move positioners through a short sequence to calibrate them.
+        """
+        n_pts_calib_T = self.xytest_conf['n_points_calib_T'][loop_number]
+        n_pts_calib_P = self.xytest_conf['n_points_calib_P'][loop_number]
+        calib_mode = self.xytest_conf['calib_mode'][loop_number]
+        if n_pts_calib_T >= 4 and n_pts_calib_P >= 3:
+            start_time = time.time()
+            self.logwrite('Starting arc calibration sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
+            self.m.n_points_calib_T = n_pts_calib_T
+            self.m.n_points_calib_P = n_pts_calib_P
+            files = self.m.calibrate(pos_ids='all', mode=calib_mode, save_file_dir=pc.xytest_plots_directory, save_file_timestamp=pc.filename_timestamp_str_now())
+            for file in files:
+                self.track_file(file)
+                self.logwrite('Calibration plot file: ' + file)
+            for pos_id in self.pos_ids:
+                state = self.m.state(pos_id)
+                for key in ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']:
+                    self.logwrite(str(pos_id) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
+            self.logwrite('Calibration with ' + str(n_pts_calib_T) + ' theta points and ' + str(n_pts_calib_P) + ' phi points completed in ' + self._elapsed_time_str(start_time) + '.')
         
     def run_xyaccuracy_test(self, loop_number):
         """Move positioners to a series of xy targets and measure performance.
@@ -227,8 +228,10 @@ class XYTest(object):
 
         n_pts_calib_T = self.xytest_conf['n_points_calib_T'][loop_number]
         n_pts_calib_P = self.xytest_conf['n_points_calib_P'][loop_number]
+        calib_mode = self.xytest_conf['calib_mode'][loop_number]
+        should_measure_ranges = self.xytest_conf['should_measure_ranges'][loop_number]
         for pos_id in self.pos_ids:
-            self.summarizers[pos_id].update_loop_inits(move_log_name(pos_id), n_pts_calib_T, n_pts_calib_P, self.xytest_conf['should_measure_ranges'][loop_number])
+            self.summarizers[pos_id].update_loop_inits(move_log_name(pos_id), n_pts_calib_T, n_pts_calib_P, calib_mode, should_measure_ranges)
 
         local_targets = self.generate_posXY_targets_grid(self.xytest_conf['n_pts_across_grid'][loop_number])
         self.logwrite('Number of local targets = ' + str(len(local_targets)))
@@ -557,8 +560,8 @@ if __name__=="__main__":
         test.xytest_conf.write()
         test.logwrite('Starting xy test in loop ' + str(loop_num + 1) + ' of ' + str(test.n_loops))
         test.set_current_overrides(loop_num)
-        test.run_calibration(loop_num)
         test.run_range_measurement(loop_num)
+        test.run_calibration(loop_num)
         test.run_xyaccuracy_test(loop_num)
         test.run_unmeasured_moves(loop_num)
         test.run_hardstop_strikes(loop_num)
