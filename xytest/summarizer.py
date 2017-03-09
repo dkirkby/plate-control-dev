@@ -72,7 +72,7 @@ class Summarizer(object):
         # checking whether need to start a new file because none exist yet
         if not(os.path.isfile(self.filename)):
             with open(self.filename, 'w', newline='') as csvfile:
-                csv.writer(csvfile).writerow(self.row_template.keys()) # write header row
+                csv.writer(csvfile).writerow(list(self.row_template.keys())) # write header row
                 
         # deal with case where fieldnames have changed since the last time the file was used
         with open(self.filename, 'r', newline='') as csvfile:
