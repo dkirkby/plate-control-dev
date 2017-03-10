@@ -27,6 +27,7 @@ petalbox/drivers/systec-readme.txt -text
 petalbox/drivers/systec_can-V0.9.0.tar.bz2 -text
 petalbox/fw21.hex -text
 petalbox/fw31.hex -text
+petalbox/fw31moved.hex -text
 petalbox/hwlib/dlptemp.py -text
 petalbox/load_firmware.py -text
 petalbox/petalcontroller.py -text
