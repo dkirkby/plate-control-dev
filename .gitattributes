@@ -21,6 +21,7 @@ petal/tests_and_demos/test_interior_unreachable_nan.py -text
 petal/tests_and_demos/test_poscollider.py -text
 petal/tests_and_demos/test_tp_update_transform.py -text
 petalbox/bootloadcontrol.py -text
+petalbox/bootreloader.hex -text
 petalbox/canmap.json -text
 petalbox/docs/systec-readme.txt -text
 petalbox/drivers/systec-readme.txt -text
