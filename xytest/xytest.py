@@ -36,7 +36,7 @@ class XYTest(object):
             https://desi.lbl.gov/svn/code/focalplane/fp_settings/hwsetups/
             https://desi.lbl.gov/svn/code/focalplane/fp_settings/test_settings/
         """
-        
+         
         # set up configuration and traveler files that goes with this test, and begin logging
         os.makedirs(pc.xytest_logs_directory, exist_ok=True)
         gui_root = tkinter.Tk()
