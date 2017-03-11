@@ -62,6 +62,8 @@ class Summarizer(object):
             if 'file' in key:
                 init_data[key] = os.path.basename(init_data[key])
             self.row_template[key] = init_data[key]
+        for calib_key in pc.nominals.keys():
+            self.row_template[calib_key] = None
         self.basename = self.state.read('POS_ID') + '_summary.csv'
         if not(directory):
             directory = pc.xytest_summaries_directory
@@ -110,6 +112,8 @@ class Summarizer(object):
         self.row_template['curr cruise']         = self.state.read('CURR_CRUISE')
         self.row_template['curr creep']          = self.state.read('CURR_CREEP')
         self.row_template['ranges remeasured']   = ranges_were_remeasured
+        for calib_key in pc.nominals.keys():
+            self.row_template[calib_key] = self.state.read(calib_key)
         self.next_row_is_new = True
 
     def write_row(self, err_data_mm, autogather=True):

@@ -57,8 +57,8 @@ class XYTest(object):
         self.n_loops = self._calculate_and_check_n_loops()
         if self.starting_loop_number == 0:
             self.xytest_conf.filename = pc.xytest_logs_directory + pc.filename_timestamp_str_now() + '_' + os.path.basename(xytest_conf)
-            self.new_and_changed_files = set()  # start a set to keep track of all files that need to be added / committed to SVN
-            self.track_file(self.xytest_conf.filename)
+            self.new_and_changed_files = collections.OrderedDict()  # keeps track of all files that need to be added / committed to SVN
+            self.track_file(self.xytest_conf.filename, commit='always')
             self.xytest_conf.final_comment.append('\n\n# *** TEST LOG ***') # just for formatting
             self.xytest_conf.write()
             self.logwrite('Hardware setup file: ' + hwsetup_conf)
@@ -108,6 +108,11 @@ class XYTest(object):
         fid_settings_done = self.m.set_fiducials('on')
         self.logwrite('Fiducials turned on: ' + str(fid_settings_done))
         
+        # calibration settings
+        self.first_calib_only = self.xytest_conf['use_first_calib_only_for_tests']
+        if self.first_calib_only:
+            self.logwrite('Only using first loop calibration settings for xy tests.')
+        
         # set up the test summarizers
         self.summarizers = {}
         summarizer_init_data = {}
@@ -126,7 +131,7 @@ class XYTest(object):
         for pos_id in self.pos_ids:
             state = self.m.petals[0].get(pos_id).state
             self.summarizers[pos_id] = summarizer.Summarizer(state,summarizer_init_data)
-            self.track_file(self.summarizers[pos_id].filename)
+            self.track_file(self.summarizers[pos_id].filename, commit='always')
         self.logwrite('Data summarizers for all positioners initialized.')
         
         # TEMPORARY HACK until individual fiducial dot locations tracking is properly handled
@@ -182,15 +187,20 @@ class XYTest(object):
 
     def run_range_measurement(self, loop_number):
         if self.xytest_conf['should_measure_ranges'][loop_number]:
+            if self.first_calib_only and loop_number > 0:
+                self.collect_calibrations()
             start_time = time.time()
             self.logwrite('Starting physical travel range measurement sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             self.m.measure_range(pos_ids='all', axis='theta')
             self.m.measure_range(pos_ids='all', axis='phi')
             for pos_id in self.pos_ids:
                 state = self.m.state(pos_id)
-                self.track_file(state.unit.filename)
+                self.track_file(state.log_path, commit='once')
+                self.track_file(state.unit.filename, commit='always')
                 for key in ['PHYSICAL_RANGE_T','PHYSICAL_RANGE_P']:
                     self.logwrite(str(pos_id) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
+            if self.first_calib_only and loop_number > 0:
+                self.restore_calibrations()
             self.logwrite('Calibration of physical travel ranges completed in ' + self._elapsed_time_str(start_time) + '.')
 
     def run_calibration(self, loop_number):
@@ -200,18 +210,25 @@ class XYTest(object):
         n_pts_calib_P = self.xytest_conf['n_points_calib_P'][loop_number]
         calib_mode = self.xytest_conf['calib_mode'][loop_number]
         if n_pts_calib_T >= 4 and n_pts_calib_P >= 3:
+            if self.first_calib_only and loop_number > 0:
+                self.collect_calibrations()
             start_time = time.time()
             self.logwrite('Starting arc calibration sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             self.m.n_points_calib_T = n_pts_calib_T
             self.m.n_points_calib_P = n_pts_calib_P
             files = self.m.calibrate(pos_ids='all', mode=calib_mode, save_file_dir=pc.xytest_plots_directory, save_file_timestamp=pc.filename_timestamp_str_now())
             for file in files:
-                self.track_file(file)
+                self.track_file(file, commit='once')
                 self.logwrite('Calibration plot file: ' + file)
-            for pos_id in self.pos_ids:
-                state = self.m.state(pos_id)
-                for key in ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']:
-                    self.logwrite(str(pos_id) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
+            if self.first_calib_only and loop_number > 0:
+                self.restore_calibrations()
+                self.m.one_point_calibration(pos_ids='all',mode='posTP') # since calib sequence may have changed our shaft angle counter
+            else:
+                for pos_id in self.pos_ids:
+                    state = self.m.state(pos_id)
+                    self.track_file(state.log_path, commit='once')
+                    for key in ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']:
+                        self.logwrite(str(pos_id) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
             self.logwrite('Calibration with ' + str(n_pts_calib_T) + ' theta points and ' + str(n_pts_calib_P) + ' phi points completed in ' + self._elapsed_time_str(start_time) + '.')
         
     def run_xyaccuracy_test(self, loop_number):
@@ -221,7 +238,7 @@ class XYTest(object):
         log_suffix = self.xytest_conf['log_suffix']
         log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
         log_timestamp = pc.filename_timestamp_str_now()
-        def move_log_name(pos_id):
+        def movedata_name(pos_id):
             return pc.xytest_data_directory  + pos_id + '_' + log_timestamp + log_suffix + '_movedata.csv'
         def summary_plot_name(pos_id):
             return pc.xytest_plots_directory + pos_id + '_' + log_timestamp + log_suffix + '_xyplot'    
@@ -231,7 +248,7 @@ class XYTest(object):
         calib_mode = self.xytest_conf['calib_mode'][loop_number]
         should_measure_ranges = self.xytest_conf['should_measure_ranges'][loop_number]
         for pos_id in self.pos_ids:
-            self.summarizers[pos_id].update_loop_inits(move_log_name(pos_id), n_pts_calib_T, n_pts_calib_P, calib_mode, should_measure_ranges)
+            self.summarizers[pos_id].update_loop_inits(movedata_name(pos_id), n_pts_calib_T, n_pts_calib_P, calib_mode, should_measure_ranges)
 
         local_targets = self.generate_posXY_targets_grid(self.xytest_conf['n_pts_across_grid'][loop_number])
         self.logwrite('Number of local targets = ' + str(len(local_targets)))
@@ -241,7 +258,7 @@ class XYTest(object):
         submove_idxs = [i for i in range(num_corr_max+1)]
         self.logwrite('Number of corrections max = ' + str(num_corr_max))
         
-        # write headers for move data log files
+        # write headers for move data files
         move_log_header = 'timestamp,cycle,move_log,target_x,target_y'
         submove_fields = ['meas_obsXY','errXY','err2D','posTP']
         for i in submove_idxs: move_log_header += ',meas_x' + str(i) + ',meas_y' + str(i)
@@ -250,8 +267,8 @@ class XYTest(object):
         for i in submove_idxs: move_log_header += ',pos_t'  + str(i) + ',pos_p' + str(i)
         move_log_header += '\n'
         for pos_id in self.pos_ids:
-            filename = move_log_name(pos_id)
-            self.track_file(filename)
+            filename = movedata_name(pos_id)
+            self.track_file(filename, commit='once')
             file = open(filename,'w')
             file.write(move_log_header)
             file.close()
@@ -299,11 +316,11 @@ class XYTest(object):
                 for pos_id in self.pos_ids:
                     self.summarizers[pos_id].write_row(all_data_by_pos_id[pos_id]['err2D'])
         
-                # update test data log
+                # update move data log
                 for pos_id in these_targets.keys():
                     state = self.m.state(pos_id)
-                    self.track_file(state.log_path)
-                    self.track_file(state.unit.filename)
+                    self.track_file(state.log_path, commit='once')
+                    self.track_file(state.unit.filename, commit='always')
                     row = this_timestamp
                     row += ',' + str(state.read('TOTAL_MOVE_SEQUENCES'))
                     row += ',' + str(state.log_basename)
@@ -317,7 +334,7 @@ class XYTest(object):
                             else:
                                 row += ',' + str(submove_data)
                     row += '\n'
-                    file = open(move_log_name(pos_id),'a')
+                    file = open(movedata_name(pos_id),'a')
                     file.write(row)
                     file.close()
             
@@ -334,10 +351,10 @@ class XYTest(object):
                     r2 = posmodel.state.read('LENGTH_R2')
                     filenames = pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_data_by_pos_id[pos_id],center,theta_range,r1,r2,title)
                     self.logwrite(pos_id + ': Summary log file: ' + self.summarizers[pos_id].filename)
-                    self.logwrite(pos_id + ': Full data log file: ' + move_log_name(pos_id))
+                    self.logwrite(pos_id + ': Full data log file: ' + movedata_name(pos_id))
                     for filename in filenames:
                         self.logwrite(pos_id + ': Summary plot file: ' + filename)
-                        self.track_file(filename)
+                        self.track_file(filename, commit='once')
 
             # Test report and email only on certain tests
             if self.xytest_conf['should_email']:
@@ -363,7 +380,7 @@ class XYTest(object):
                 if j % 1000 == 0:
                     for pos_id in self.pos_ids:
                         state = self.m.state(pos_id)
-                        self.track_file(state.log_path)
+                        self.track_file(state.log_path, commit='once')
                     self.logwrite(status_str)
                 elif j % 50 == 0:
                     print(status_str)
@@ -417,7 +434,9 @@ class XYTest(object):
                 self.svn_pass = ''
                 
     def svn_add_commit(self):
-        # Commit logs through SVN
+        '''Commit logs through SVN.
+        '''
+        self.logwrite('Files changed or generated: ' + str(self.new_and_changed_files))
         if self.xytest_conf['should_auto_commit_logs'] and not(self.simulate):
             if not(self.svn_user and self.svn_pass):
                 self.logwrite('No files were auto-committed to SVN due to lack of user / pass credentials.')
@@ -428,11 +447,15 @@ class XYTest(object):
                 err2 = []
                 n = 0
                 n_total = len(self.new_and_changed_files)
-                for file in self.new_and_changed_files:
-                    n += 1
-                    err1.append(os.system('svn add --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive ' + file))
-                    err2.append(os.system('svn commit --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + file))
-                    print('SVN upload of file ' + str(n) + ' of ' + str(n_total) + ' (' + os.path.basename(file) + ') returned: ' + str(err1[-1]) + ' (add) and ' + str(err2[-1]) + ' (commit)')
+                for file in self.new_and_changed_files.keys():
+                    should_commit = self.new_and_changed_files[file]
+                    if should_commit == 'always' or should_commit == 'once':
+                        n += 1
+                        err1.append(os.system('svn add --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive ' + file))
+                        err2.append(os.system('svn commit --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + file))
+                        print('SVN upload of file ' + str(n) + ' of ' + str(n_total) + ' (' + os.path.basename(file) + ') returned: ' + str(err1[-1]) + ' (add) and ' + str(err2[-1]) + ' (commit)')
+                    if should_commit == 'once' and not (err2(-1)):
+                        self.new_and_changed_files[file] = 'do not commit'
                 if any(err2):
                     print('Warning: it appears that not all the log or plot files committed ok to SVN. Check through carefully and do this manually. The files that failed were:')
                     for err in err2:
@@ -466,6 +489,7 @@ class XYTest(object):
                 curr_val = self.xytest_conf['creep_current_override'][loop_number]
             for pos_id in self.pos_ids:
                 state = self.m.state(pos_id)
+                self.track_file(state.log_path, commit='once')
                 self.old_currents[pos_id][key] = state.read(key)
                 if curr_val != None:
                     state.write(key,curr_val)
@@ -482,6 +506,7 @@ class XYTest(object):
             for pos_id in self.pos_ids:
                 if self.old_currents[pos_id][key] != None:
                     state = self.m.state(pos_id)
+                    self.track_file(state.log_path, commit='once')
                     state.write(key, self.old_currents[pos_id][key])
                     self.logwrite(str(pos_id) + ': Restoring ' + key + ' to ' + str(self.old_currents[pos_id][key]))
         self.m.set_motor_parameters()
@@ -522,12 +547,36 @@ class XYTest(object):
             requests.append(these_targets)
         return requests
 
-    def track_file(self,filename):
+    def track_file(self, filename, commit='always'):
         """Use this to put new filenames into the list of new and changed files we keep track of.
         This list gets put into the log later, and is also used for auto-updating of the SVN.
+        
+          commit ... 'always'        --> always commit this file to the SVN upon svn_add_commit
+                 ... 'once'          --> only commit this file to the SVN upon the next svn_add_commit
+                 ... 'do not commit' --> do not commit this file (anymore) to the SVN
         """
-        self.new_and_changed_files.add(filename)
+        self.new_and_changed_files[filename] = commit
         self.xytest_conf['new_and_changed_files'] = self.new_and_changed_files
+
+    def collect_calibrations(self):
+        '''Store all the current positioner calibration values for future use.
+        Restore these with the restore_calibrations() method.
+        '''
+        self.calib_store = {}
+        for pos_id in self.pos_ids:
+            self.calib_store[pos_id] = {}
+            state = self.m.state(pos_id)
+            for calib_key in pc.nominals.keys():
+                self.calib_store[pos_id][calib_key] = state.read(calib_key)
+
+    def restore_calibrations(self):
+        '''Restore all the calibration values previously stored with the
+        collect_calibrations() method.
+        '''
+        for pos_id in self.pos_ids:
+            state = self.m.state(pos_id)
+            for calib_key in pc.nominals.keys():
+                state.write(calib_key, self.calib_store[pos_id][calib_key])
 
     def _calculate_and_check_n_loops(self):
         """Returns total number of loops in test configuration.
@@ -566,9 +615,9 @@ if __name__=="__main__":
         test.run_unmeasured_moves(loop_num)
         test.run_hardstop_strikes(loop_num)
         test.clear_current_overrides()
+        test.svn_add_commit()
     test.logwrite('All test loops complete.')
     test.m.park(pos_ids='all')
     test.logwrite('Moved positioners into \'parked\' position.')
     test.logwrite('Test complete.')
-    test.logwrite('Files changed or generated: ' + str(test.new_and_changed_files))
     test.svn_add_commit()
