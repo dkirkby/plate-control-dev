@@ -130,6 +130,8 @@ class FVCHandler(object):
             sim_errors = sim_error_magnitudes * np.array([np.cos(sim_error_angles),np.sin(sim_error_angles)])
             measured_pos_xy = (expected_pos_xy + np.transpose(sim_errors)).tolist()
             measured_ref_xy = expected_ref_xy
+            brightnesses_pos = np.random.uniform(0.4,0.6,len(measured_pos_xy)).tolist()
+            brightnesses_ref = np.random.uniform(0.4,0.6,len(measured_ref_xy)).tolist()
         elif self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':
             fiber_ctr_flag = 4
             fiduc_ctr_flag = 8
