@@ -373,17 +373,18 @@ class XYTest(object):
         """
         n_moves = self.xytest_conf['n_unmeasured_moves_after_loop'][loop_number]
         if n_moves > 0:
+            self.track_all_poslogs_once()
+            max_log_length = test.m.state(test.pos_ids[0]).max_log_length
             start_time = time.time()
             self.logwrite('Starting unmeasured move sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
+            status_str = lambda j : '... now at move ' + str(j) + ' of ' + str(n_moves) + ' within loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops)
             for j in range(n_moves):
-                status_str = '... now at move ' + str(j+1) + ' of ' + str(n_moves) + ' within loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops)
+                if j % max_log_length == 0:
+                    self.track_all_poslogs_once()
                 if j % 1000 == 0:
-                    for pos_id in self.pos_ids:
-                        state = self.m.state(pos_id)
-                        self.track_file(state.log_path, commit='once')
-                    self.logwrite(status_str)
+                    self.logwrite(status_str(j))
                 elif j % 50 == 0:
-                    print(status_str)
+                    print(status_str(j))
                 targ_xy = [np.Inf,np.Inf]
                 while not(self.target_within_limits(targ_xy)):
                     targ_xy = self.rand_xy_targs_list[self.rand_xy_targs_idx]
@@ -412,7 +413,7 @@ class XYTest(object):
     
     def get_svn_credentials(self):
         '''Query the user for credentials to the SVN.'''
-        if self.xytest_conf['should_auto_commit_logs'] and not(self.simulate):
+        if self.xytest_conf['should_auto_commit_logs']:
             self.logwrite('Querying the user for SVN credentials. These will not be written to the log file.')
             print('')
             print('Enter your svn username and password for committing the logs to the server. These will not be saved to the logfile, but will briefly be clear-text in this script\'s memory while it is running.')
@@ -420,7 +421,10 @@ class XYTest(object):
             while n_credential_tries:
                 self.svn_user = input('svn username: ')
                 self.svn_pass = getpass.getpass('svn password: ')
-                err = os.system('svn --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive list')
+                if self.simulate:
+                    err = 0
+                else:
+                    err = os.system('svn --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive list')
                 if err == 0:
                     self.logwrite('SVN user and pass verified.')
                     n_credential_tries = 0
@@ -433,11 +437,14 @@ class XYTest(object):
                 self.svn_user = ''
                 self.svn_pass = ''
                 
-    def svn_add_commit(self):
+    def svn_add_commit(self, keep_creds=False):
         '''Commit logs through SVN.
+        
+        Optional keep_creds parameter instructs to *not* delete SVN user/pass after
+        this commit is complete. Otherwise they get automatically deleted.
         '''
         self.logwrite('Files changed or generated: ' + str(self.new_and_changed_files))
-        if self.xytest_conf['should_auto_commit_logs'] and not(self.simulate):
+        if self.xytest_conf['should_auto_commit_logs']:
             if not(self.svn_user and self.svn_pass):
                 self.logwrite('No files were auto-committed to SVN due to lack of user / pass credentials.')
             elif self.new_and_changed_files:
@@ -445,25 +452,32 @@ class XYTest(object):
                 print('Will attempt to commit the logs automatically now. This may take a long time. In the messages printed to the screen for each file, a return value of 0 means it was committed to the SVN ok.')
                 err1 = []
                 err2 = []
+                files_attempted = []
                 n = 0
-                n_total = len(self.new_and_changed_files)
+                n_total = len([x for x in test.new_and_changed_files.values() if x =='once' or x == 'always'])
                 for file in self.new_and_changed_files.keys():
                     should_commit = self.new_and_changed_files[file]
                     if should_commit == 'always' or should_commit == 'once':
                         n += 1
-                        err1.append(os.system('svn add --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive ' + file))
-                        err2.append(os.system('svn commit --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + file))
+                        if self.simulate:
+                            err1.append(0)
+                            err2.append(0)
+                        else:
+                            err1.append(os.system('svn add --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive ' + file))
+                            err2.append(os.system('svn commit --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + file))
                         print('SVN upload of file ' + str(n) + ' of ' + str(n_total) + ' (' + os.path.basename(file) + ') returned: ' + str(err1[-1]) + ' (add) and ' + str(err2[-1]) + ' (commit)')
-                    if should_commit == 'once' and not (err2(-1)):
+                        files_attempted.append(os.path.basename(file))
+                    if should_commit == 'once' and not (err2[-1]):
                         self.new_and_changed_files[file] = 'do not commit'
-                if any(err2):
+                add_and_commit_errs = [err1[i] and err2[i] for i in range(len(err1))]
+                if any(add_and_commit_errs):
                     print('Warning: it appears that not all the log or plot files committed ok to SVN. Check through carefully and do this manually. The files that failed were:')
-                    for err in err2:
-                        if err:
-                            file = self.new_and_changed_files(err2.index(err))
-                            print(file)
-                del self.svn_user
-                del self.svn_pass
+                    for i in range(len(add_and_commit_errs)):
+                        if add_and_commit_errs(i):
+                            print(files_attempted[i])
+                if not(keep_creds):
+                    del self.svn_user
+                    del self.svn_pass
                 print('SVN uploads completed in ' + self._elapsed_time_str(start_time))
                 
     def logwrite(self,text,stdout=True):
@@ -557,6 +571,14 @@ class XYTest(object):
         """
         self.new_and_changed_files[filename] = commit
         self.xytest_conf['new_and_changed_files'] = self.new_and_changed_files
+        
+    def track_all_poslogs_once(self):
+        '''Special function to run track_file on all the latest pos logs, since they are kind of
+        a moving target. So it's nice to have a convenience function for that.
+        '''
+        for pos_id in self.pos_ids:
+            state = self.m.state(pos_id)
+            self.track_file(state.log_path, commit='once')
 
     def collect_calibrations(self):
         '''Store all the current positioner calibration values for future use.
@@ -615,9 +637,10 @@ if __name__=="__main__":
         test.run_unmeasured_moves(loop_num)
         test.run_hardstop_strikes(loop_num)
         test.clear_current_overrides()
-        test.svn_add_commit()
+        test.svn_add_commit(keep_creds=True)
     test.logwrite('All test loops complete.')
     test.m.park(pos_ids='all')
     test.logwrite('Moved positioners into \'parked\' position.')
     test.logwrite('Test complete.')
-    test.svn_add_commit()
+    test.track_all_poslogs_once()
+    test.svn_add_commit(keep_creds=False)
