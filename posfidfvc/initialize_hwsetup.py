@@ -2,10 +2,12 @@ import os
 import sys
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
+sys.path.append(os.path.abspath('../xytest/'))
 import petal
 import posmovemeasure
 import fvchandler
 import posconstants as pc
+import xytest
 import tkinter
 import tkinter.filedialog
 import configobj
@@ -13,8 +15,19 @@ import configobj
 # unique timestamp
 start_filename_timestamp = pc.filename_timestamp_str_now()
 
-# update all files from the SVN
-# TO BE IMPLEMENTED
+# update log and settings files from the SVN
+svn_update_dirs = [pc.pos_settings_directory, pc.xytest_logs_directory, pc.xytest_summaries_directory]
+gui_root = tkinter.Tk()
+should_update_from_svn = tkinter.messagebox.askyesno(title='Enable auto-SVN?',message='Download latest positioner logs and settings from SVN first?\n\nThis overwrites existing local files.\n\nUpdated versions will also be automatically committed to SVN at the end.\n\n("Yes" is usually correct.)')
+gui_root.withdraw()
+if should_update_from_svn:
+    svn_user, svn_pass, err = xytest.XYTest.ask_user_for_creds(should_simulate=False)
+    if err:
+        print('Could not validate svn user/password.')
+    else:
+        for d in svn_update_dirs:
+            os.system('svn update --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + d)
+    new_and_changed_files = set()
 
 # get the station config info
 message = 'Pick hardware setup file.'
@@ -22,6 +35,7 @@ gui_root = tkinter.Tk()
 hwsetup_conf = tkinter.filedialog.askopenfilename(initialdir=pc.hwsetups_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
 gui_root.withdraw()
 hwsetup = configobj.ConfigObj(hwsetup_conf,unrepr=True)
+new_and_changed_files.add(hwsetup.filename)
 
 # software initialization and startup
 fvc = fvchandler.FVCHandler(hwsetup['fvc_type'])    
@@ -35,6 +49,13 @@ ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure([ptl],fvc)
 m.make_plots_during_calib = True
 print('Automatic generation of calibration plots is turned ' + ('ON' if m.make_plots_during_calib else 'OFF') + '.')
+for ptl in m.petals:
+    for posmodel in ptl.posmodels:
+        new_and_changed_files.add(posmodel.state.unit.filename)
+        new_and_changed_files.add(posmodel.state.log_path)
+    for fidstate in ptl.fidstates.values():
+        new_and_changed_files.add(fidstate.unit.filename)
+        new_and_changed_files.add(fidstate.log_path)
 
 # TEMPORARY HACK until individual fiducial dot locations tracking is properly handled
 m.extradots_fid_state = ptl.fidstates[hwsetup['extradots_id']]
@@ -58,10 +79,6 @@ while ids_unchecked:
         ids_unchecked = False
     else:
         print('Respond yes or no.')
-        
-# Put here a function to print out a quick table of all the pos_ids and corresponding can_ids,
-# then ask the user if this is correct or not, before proceeding. Probably also include
-# ability to fix those values right there.
 
 # calibration routines
 m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
@@ -69,8 +86,19 @@ m.identify_fiducials()
 m.identify_positioner_locations()
 m.measure_range(axis='theta')
 m.measure_range(axis='phi')
-m.calibrate(mode='small arc', save_file_dir=pc.xytest_plots_directory, save_file_timestamp=start_filename_timestamp)
+plotfiles = m.calibrate(mode='small arc', save_file_dir=pc.xytest_plots_directory, save_file_timestamp=start_filename_timestamp)
+new_and_changed_files.add(plotfiles)
 m.park() # retract all positioners to their parked positions
+
+# commit logs and settings files to the SVN
+if should_update_from_svn:
+    n_total = len(new_and_changed_files)
+    n = 0
+    for file in new_and_changed_files:
+        n += 1
+        err1 = os.system('svn add --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + file)
+        err2 = os.system('svn commit --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive -m "autocommit from initialize_hwsetup script" ' + file)
+        print('SVN upload of file ' + str(n) + ' of ' + str(n_total) + ' (' + os.path.basename(file) + ') returned: ' + str(err1) + ' (add) and ' + str(err2) + ' (commit)')
 
 # COMMENTS ON FUTURE WORK BELOW...
 # --------------------------------
