@@ -25,6 +25,9 @@ user_data_keys = ['test operator',
 
 init_data_keys = auto_init_data_keys + user_data_keys
 
+meas_suffix = ' (meas)'
+used_suffix = ' (used)'
+
 # reporting constants
 thresholds_um = [3.0,5.0] # [um] candidate 2D error thresholds to calculate where in real operation on the mountain we would have stopped correcting
 stat_cuts = [0.95,1.00] # statistical cutoffs for best moves at which to report
@@ -58,12 +61,13 @@ class Summarizer(object):
         self.row_template['total limit seeks T at finish']  = None
         self.row_template['total limit seeks P at finish']  = None
         self.row_template['pos log files']                  = [self.state.log_basename]
+        for suffix in [used_suffix,meas_suffix]:
+            for calib_key in pc.nominals.keys():
+                self.row_template[calib_key + suffix] = None
         for key in init_data_keys:
             if 'file' in key:
                 init_data[key] = os.path.basename(init_data[key])
             self.row_template[key] = init_data[key]
-        for calib_key in pc.nominals.keys():
-            self.row_template[calib_key] = None
         self.basename = self.state.read('POS_ID') + '_summary.csv'
         if not(directory):
             directory = pc.xytest_summaries_directory
@@ -112,9 +116,19 @@ class Summarizer(object):
         self.row_template['curr cruise']         = self.state.read('CURR_CRUISE')
         self.row_template['curr creep']          = self.state.read('CURR_CREEP')
         self.row_template['ranges remeasured']   = ranges_were_remeasured
-        for calib_key in pc.nominals.keys():
-            self.row_template[calib_key] = self.state.read(calib_key)
         self.next_row_is_new = True
+    
+    def update_loop_calibs(self, suffix='', params=list(pc.nominals.keys())):
+        '''Update the row template with the current calibration values, gathered up
+        from the positioner state file.
+        
+        suffix argument is used for example to distinguish between values that were
+        only measured vs those that were actually used in the test.
+        
+        params argument is used to to restrict which parameters are getting upated.
+        '''
+        for calib_key in params:
+            self.row_template[calib_key + suffix] = self.state.read(calib_key)
 
     def write_row(self, err_data_mm, autogather=True):
         '''Makes a row of values and writes them to the csv file.

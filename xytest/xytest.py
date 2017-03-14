@@ -193,14 +193,19 @@ class XYTest(object):
             self.logwrite('Starting physical travel range measurement sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             self.m.measure_range(pos_ids='all', axis='theta')
             self.m.measure_range(pos_ids='all', axis='phi')
+            params = ['PHYSICAL_RANGE_T','PHYSICAL_RANGE_P']
             for pos_id in self.pos_ids:
                 state = self.m.state(pos_id)
                 self.track_file(state.log_path, commit='once')
                 self.track_file(state.unit.filename, commit='always')
-                for key in ['PHYSICAL_RANGE_T','PHYSICAL_RANGE_P']:
+                for key in params:
                     self.logwrite(str(pos_id) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
+            for pos_id in self.pos_ids:
+                self.summarizers[pos_id].update_loop_calibs(summarizer.meas_suffix, params)
             if self.first_calib_only and loop_number > 0:
                 self.restore_calibrations()
+            for pos_id in self.pos_ids:
+                self.summarizers[pos_id].update_loop_calibs(summarizer.used_suffix, params)
             self.logwrite('Calibration of physical travel ranges completed in ' + self._elapsed_time_str(start_time) + '.')
 
     def run_calibration(self, loop_number):
@@ -216,10 +221,13 @@ class XYTest(object):
             self.logwrite('Starting arc calibration sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             self.m.n_points_calib_T = n_pts_calib_T
             self.m.n_points_calib_P = n_pts_calib_P
+            params = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']
             files = self.m.calibrate(pos_ids='all', mode=calib_mode, save_file_dir=pc.xytest_plots_directory, save_file_timestamp=pc.filename_timestamp_str_now())
             for file in files:
                 self.track_file(file, commit='once')
                 self.logwrite('Calibration plot file: ' + file)
+            for pos_id in self.pos_ids:
+                self.summarizers[pos_id].update_loop_calibs(summarizer.meas_suffix, params)
             if self.first_calib_only and loop_number > 0:
                 self.restore_calibrations()
                 self.m.one_point_calibration(pos_ids='all',mode='posTP') # since calib sequence may have changed our shaft angle counter
@@ -227,8 +235,10 @@ class XYTest(object):
                 for pos_id in self.pos_ids:
                     state = self.m.state(pos_id)
                     self.track_file(state.log_path, commit='once')
-                    for key in ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']:
+                    for key in params:
                         self.logwrite(str(pos_id) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
+            for pos_id in self.pos_ids:
+                self.summarizers[pos_id].update_loop_calibs(summarizer.used_suffix, params)
             self.logwrite('Calibration with ' + str(n_pts_calib_T) + ' theta points and ' + str(n_pts_calib_P) + ' phi points completed in ' + self._elapsed_time_str(start_time) + '.')
         
     def run_xyaccuracy_test(self, loop_number):
