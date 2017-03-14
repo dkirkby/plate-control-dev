@@ -132,10 +132,10 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
             print('peak = ' + str(peak) + ' brightness appears out of expected range')
             should_save_sample_image = True
         if FWHMSub[-1] < 0:
-            print('fwhm = ' + str(FWHMSub[-1]) + ' appears invalid, check fitbox size')
+            print('fwhm = ' + str(FWHMSub[-1]) + ' appears invalid, check if fitbox size (' + str(size_fitbox) + ') is appropriate')
             should_save_sample_image = True
         if should_save_sample_image:
-            savefile = 'peak_' + format(peak,'.1f') + '_fwhm_' + format(FWHMSub[-1],'.3f') + '.FITS'
+            savefile = 'peak_' + format(peak,'.1f') + '_fwhm_' + format(FWHMSub[-1],'.3f') + '_sizefitbox_' + str(size_fitbox) + '.FITS'
             sample = pyfits.PrimaryHDU(img)
             sample.writeto(savefile)
             print('wrote a sample image file to ' + savefile)
