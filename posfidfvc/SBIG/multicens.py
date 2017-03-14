@@ -75,7 +75,7 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
 # Output:
 #       returning the centroids and FWHMs as lists (xcen,ycen,fwhm)
 
-    size_fitbox=14 # gaussian fitter box (length of side in pixels)
+    size_fitbox=10 # gaussian fitter box (1/2 length of side in pixels, i.e. 2*size_fitbox X 2*size_fitbox
     img[img<0]=0
     img = img.astype(np.uint16)
     level_fraction_of_peak = 0.1
@@ -127,6 +127,17 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
         FWHMSub.append(2.355*max(params[4],params[5]))
         peak = params[1]
         peaks.append(peak)
+        should_save_sample_image = False
         if peak < 0 or peak > 2**16-1:
             print('peak = ' + str(peak) + ' brightness appears out of expected range')
+            should_save_sample_image = True
+        if FWHMSub[-1] < 0:
+            print('fwhm = ' + str(FWHMSub[-1]) + ' appears invalid, check fitbox size')
+            should_save_sample_image = True
+        if should_save_sample_image:
+            savefile = 'peak_' + format(peak,'.1f') + '_fwhm_' + format(FWHMSub[-1],'.3f') + '.FITS'
+            sample = pyfits.PrimaryHDU(img)
+            sample.writeto(savefile)
+            print('wrote a sample image file to ' + savefile)
+            
     return xCenSub, yCenSub, peaks, FWHMSub, filename
