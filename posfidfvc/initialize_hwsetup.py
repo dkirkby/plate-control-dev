@@ -86,8 +86,8 @@ m.identify_fiducials()
 m.identify_positioner_locations()
 m.measure_range(axis='theta')
 m.measure_range(axis='phi')
-plotfiles = m.calibrate(mode='small arc', save_file_dir=pc.xytest_plots_directory, save_file_timestamp=start_filename_timestamp)
-new_and_changed_files.add(plotfiles)
+plotfiles = m.calibrate(mode='arc', save_file_dir=pc.xytest_plots_directory, save_file_timestamp=start_filename_timestamp)
+new_and_changed_files.update(plotfiles)
 m.park() # retract all positioners to their parked positions
 
 # commit logs and settings files to the SVN
