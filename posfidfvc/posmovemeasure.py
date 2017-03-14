@@ -24,6 +24,7 @@ class PosMoveMeasure(object):
         self.last_meas_fiducials_xy = [] # convenient location to store list of measured fiducial dot positions from the most recent FVC measurement
         self.n_points_calib_T = 7 # number of points in a theta calibration arc
         self.n_points_calib_P = 7 # number of points in a phi calibration arc
+        self.should_set_gear_ratios = False # whether to adjust gear ratios after calibration
         self.phi_Eo_margin = 3.0 # [deg] margin on staying within Eo envelope
         self.calib_arc_margin = 3.0 # [deg] margin on calibration arc range
         self.use_current_theta_during_phi_range_meas = False # useful for when theta axis is not installed on certain sample positioners
@@ -322,7 +323,7 @@ class PosMoveMeasure(object):
             total_angle = abs(total_angle)
             data[pos_id]['petal'].set(pos_id,parameter_name,total_angle)
         self.rehome(pos_ids)
-        self.one_point_calibration(pos_ids,mode='posTP')
+        self.one_point_calibration(pos_ids, mode='posTP')
 
     def calibrate(self,pos_ids='all',mode='arc',save_file_dir='./',save_file_timestamp='sometime',keep_phi_within_Eo=True):
         """Do a series of test points to measure and calulate positioner center
@@ -348,20 +349,14 @@ class PosMoveMeasure(object):
 
         # 'rough' calibration is ALWAYS run
         self.rehome(pos_ids)
-        self.one_point_calibration(mode='offsetsXY')
+        self.one_point_calibration(pos_ids, mode='offsetsXY')
         pos_ids_by_ptl = self.pos_data_listed_by_ptl(pos_ids,'POS_ID')
         for petal in pos_ids_by_ptl.keys():
             these_pos_ids = pos_ids_by_ptl[petal]
             keys_to_reset = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P']
             for key in keys_to_reset:
                 petal.set(these_pos_ids,key,pc.nominals[key]['value'])      
-        self.one_point_calibration(mode='offsetsTP')
-        
-        # decide whether to set gear ratios from calibration data
-        if self.n_points_calib_T >= 7 and self.n_points_calib_P >= 7:
-            should_set_gear_ratios = True
-        else:
-            should_set_gear_ratios = False
+        self.one_point_calibration(pos_ids, mode='offsetsTP')        
             
         # now do arc or grid calibrations
         if mode == 'arc' or mode == 'grid':
@@ -374,7 +369,7 @@ class PosMoveMeasure(object):
                 self.printfunc('Not enough points requested to constrain grid calibration. Defaulting to ' + new_mode + ' calibration method.')
                 return self.calibrate(pos_ids,new_mode,save_file_dir,save_file_timestamp)
             grid_data = self._measure_calibration_grid(pos_ids, keep_phi_within_Eo)
-            grid_data = self._calculate_and_set_arms_and_offsets_from_grid_data(grid_data, set_gear_ratios=should_set_gear_ratios)
+            grid_data = self._calculate_and_set_arms_and_offsets_from_grid_data(grid_data, set_gear_ratios=self.should_set_gear_ratios)
             if self.make_plots_during_calib:
                 for pos_id in grid_data.keys():
                     file = save_file(pos_id)
@@ -384,12 +379,16 @@ class PosMoveMeasure(object):
             T = self._measure_calibration_arc(pos_ids,'theta', keep_phi_within_Eo)
             P = self._measure_calibration_arc(pos_ids,'phi', keep_phi_within_Eo)
             self.printfunc("Finished measuring calibration arcs.")
-            unwrapped_data = self._calculate_and_set_arms_and_offsets_from_arc_data(T,P,set_gear_ratios=should_set_gear_ratios)
+            unwrapped_data = self._calculate_and_set_arms_and_offsets_from_arc_data(T,P,set_gear_ratios=self.should_set_gear_ratios)
             if self.make_plots_during_calib:
                 for pos_id in T.keys():
                     file = save_file(pos_id)
                     poscalibplot.plot_arc(file, pos_id, unwrapped_data)
                     files.add(file)
+                    
+        # lastly update the internally-tracked theta and phi shaft angles
+        self.one_point_calibration(pos_ids, mode='posTP')
+        
         return files
 
     def identify_fiducials(self):
@@ -899,12 +898,13 @@ class PosMoveMeasure(object):
             ratio_T = np.median(ratios_T)
             ratio_P = np.median(ratios_P)
             data[pos_id]['gear_ratio_T'] = ratio_T
-            data[pos_id]['gear_ratio_P'] = ratio_P
-            self.printfunc(pos_id + ': measurement proposes GEAR_CALIB_T = ' + format(ratio_T,'.6f'))
-            self.printfunc(pos_id + ': measurement proposes GEAR_CALIB_P = ' + format(ratio_P,'.6f'))
+            data[pos_id]['gear_ratio_P'] = ratio_P            
             if set_gear_ratios:
                 petal.set(pos_id,'GEAR_CALIB_T',ratio_T)
                 petal.set(pos_id,'GEAR_CALIB_P',ratio_P)
+            else:
+                self.printfunc(pos_id + ': measurement proposed GEAR_CALIB_T = ' + format(ratio_T,'.6f'))
+                self.printfunc(pos_id + ': measurement proposed GEAR_CALIB_P = ' + format(ratio_P,'.6f'))
         return data
 
     def _identify(self, pos_id=None):

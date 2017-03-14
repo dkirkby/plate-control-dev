@@ -230,7 +230,6 @@ class XYTest(object):
                 self.summarizers[pos_id].update_loop_calibs(summarizer.meas_suffix, params)
             if self.first_calib_only and loop_number > 0:
                 self.restore_calibrations()
-                self.m.one_point_calibration(pos_ids='all',mode='posTP') # since calib sequence may have changed our shaft angle counter
             else:
                 for pos_id in self.pos_ids:
                     state = self.m.state(pos_id)
