@@ -357,6 +357,12 @@ class PosMoveMeasure(object):
                 petal.set(these_pos_ids,key,pc.nominals[key]['value'])      
         self.one_point_calibration(mode='offsetsTP')
         
+        # decide whether to set gear ratios from calibration data
+        if self.n_points_calib_T >= 7 and self.n_points_calib_P >= 7:
+            should_set_gear_ratios = True
+        else:
+            should_set_gear_ratios = False
+            
         # now do arc or grid calibrations
         if mode == 'arc' or mode == 'grid':
             if self.make_plots_during_calib:
@@ -368,7 +374,7 @@ class PosMoveMeasure(object):
                 self.printfunc('Not enough points requested to constrain grid calibration. Defaulting to ' + new_mode + ' calibration method.')
                 return self.calibrate(pos_ids,new_mode,save_file_dir,save_file_timestamp)
             grid_data = self._measure_calibration_grid(pos_ids, keep_phi_within_Eo)
-            grid_data = self._calculate_and_set_arms_and_offsets_from_grid_data(grid_data, set_gear_ratios=False)
+            grid_data = self._calculate_and_set_arms_and_offsets_from_grid_data(grid_data, set_gear_ratios=should_set_gear_ratios)
             if self.make_plots_during_calib:
                 for pos_id in grid_data.keys():
                     file = save_file(pos_id)
@@ -377,9 +383,8 @@ class PosMoveMeasure(object):
         elif mode == 'arc':
             T = self._measure_calibration_arc(pos_ids,'theta', keep_phi_within_Eo)
             P = self._measure_calibration_arc(pos_ids,'phi', keep_phi_within_Eo)
-            set_gear_ratios = False # not sure yet if we really want to adjust gear ratios automatically, hence by default False here
             self.printfunc("Finished measuring calibration arcs.")
-            unwrapped_data = self._calculate_and_set_arms_and_offsets_from_arc_data(T,P,set_gear_ratios)
+            unwrapped_data = self._calculate_and_set_arms_and_offsets_from_arc_data(T,P,set_gear_ratios=should_set_gear_ratios)
             if self.make_plots_during_calib:
                 for pos_id in T.keys():
                     file = save_file(pos_id)
