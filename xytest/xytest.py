@@ -422,30 +422,19 @@ class XYTest(object):
             self.logwrite(str(n_strikes) + ' hardstop strikes completed in ' + self._elapsed_time_str(start_time) + '.')
     
     def get_svn_credentials(self):
-        '''Query the user for credentials to the SVN.'''
+        '''Query the user for credentials to the SVN, and store them.'''
         if self.xytest_conf['should_auto_commit_logs']:
             self.logwrite('Querying the user for SVN credentials. These will not be written to the log file.')
             print('')
-            print('Enter your svn username and password for committing the logs to the server. These will not be saved to the logfile, but will briefly be clear-text in this script\'s memory while it is running.')
-            n_credential_tries = 4
-            while n_credential_tries:
-                self.svn_user = input('svn username: ')
-                self.svn_pass = getpass.getpass('svn password: ')
-                if self.simulate:
-                    err = 0
-                else:
-                    err = os.system('svn --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive list')
-                if err == 0:
-                    self.logwrite('SVN user and pass verified.')
-                    n_credential_tries = 0
-                else:
-                    n_credential_tries -= 1
-                    print('SVN user / pass was not verified. This is the same as your DESI user/pass for DocDB and the Wiki.')
-                    print(str(n_credential_tries) + ' tries remaining.')
+            [svn_user, svn_pass, err] = XYTest.ask_user_for_creds(should_simulate=self.simulate)
             if err:
                 self.logwrite('SVN credential failure. Logs will have to be manually uploaded to SVN after the test. This is very BAD, and needs to be resolved.')
                 self.svn_user = ''
                 self.svn_pass = ''
+            else:
+                self.logwrite('SVN user and pass verified.')
+                self.svn_user = svn_user
+                self.svn_pass = svn_pass
                 
     def svn_add_commit(self, keep_creds=False):
         '''Commit logs through SVN.
@@ -631,6 +620,27 @@ class XYTest(object):
         """Standard string for elapsed time.
         """
         return format((time.time()-start_time)/60/60,'.2f') + ' hrs'
+
+    @staticmethod
+    def ask_user_for_creds(should_simulate=False):
+        '''General function to gather SVN username and password from operator.
+        '''
+        print('Enter your svn username and password for committing the logs to the server. These will not be saved to the logfile, but will briefly be clear-text in this script\'s memory while it is running.')
+        n_credential_tries = 4
+        while n_credential_tries:
+            svn_user = input('svn username: ')
+            svn_pass = getpass.getpass('svn password: ')
+            if should_simulate:
+                err = 0
+            else:
+                err = os.system('svn --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive list')
+            if err == 0:
+                n_credential_tries = 0
+            else:
+                n_credential_tries -= 1
+                print('SVN user / pass was not verified. This is the same as your DESI user/pass for DocDB and the Wiki.')
+                print(str(n_credential_tries) + ' tries remaining.')
+        return svn_user, svn_pass, err
 
 if __name__=="__main__":
     test = XYTest()
