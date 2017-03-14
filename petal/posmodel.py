@@ -69,8 +69,6 @@ class PosModel(object):
     def busid(self):
         """Returns the name of the can bus that the positioner belongs to."""
         return self.state.read('BUS_ID')
-        
-
 
     @property
     def expected_current_position(self):
