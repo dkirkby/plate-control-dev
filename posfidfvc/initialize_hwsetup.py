@@ -27,7 +27,7 @@ if should_update_from_svn:
     else:
         for d in svn_update_dirs:
             os.system('svn update --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + d)
-    new_and_changed_files = set()
+new_and_changed_files = set()
 
 # get the station config info
 message = 'Pick hardware setup file.'
