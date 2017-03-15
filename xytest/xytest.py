@@ -441,7 +441,7 @@ class XYTest(object):
         Optional keep_creds parameter instructs to *not* delete SVN user/pass after
         this commit is complete. Otherwise they get automatically deleted.
         '''
-        self.logwrite('Files changed or generated: ' + str(self.new_and_changed_files))
+        self.logwrite('Files changed or generated: ' + str(list(test.new_and_changed_files.keys())))
         if self.xytest_conf['should_auto_commit_logs']:
             if not(self.svn_user and self.svn_pass):
                 self.logwrite('No files were auto-committed to SVN due to lack of user / pass credentials.')
