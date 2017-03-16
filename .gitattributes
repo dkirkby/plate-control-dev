@@ -15,6 +15,7 @@ petal/posschedule.py -text
 petal/posstate.py -text
 petal/postransforms.py -text
 petal/tests_and_demos/demo.py -text
+petal/tests_and_demos/fiberlife.py -text
 petal/tests_and_demos/movetablescr.py -text
 petal/tests_and_demos/power_test.py -text
 petal/tests_and_demos/test_interior_unreachable_nan.py -text
