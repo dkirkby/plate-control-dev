@@ -98,7 +98,7 @@ class PositionerControl(object):
 	
 if __name__ == '__main__':
 	canchan=sys.argv[1]
-	_sel=_read_key()
+	#_sel=_read_key()
 	print("")
 	print(" ID programming requires a single positioner or fiducial on the CAN bus")
 	print("")	
@@ -107,17 +107,18 @@ if __name__ == '__main__':
 
 	loop=True
 	while loop:
-#		print("Select:")
+		print("\nSelect and press enter:")
 		print("[b]link LED (using broadcast address)")
 		print("[r]ead CAN address, silicon ID and software revision")
 		print("[e]xit")
 		print("[p]rogram new CAN address")
-		print("Select: ")
+		print("[123..] enter numeric CAN id to read CAN address, silicon ID and software revision")
+		#print("Select and press enter: ")
 		
-		sel=_sel.__call__()		
+		#sel=_sel.__call__()		
 		#print("sel:",sel)
 
-		sel=sel.lower()
+		sel=input()
 		if sel=='e':
 			print ("Bye...")
 			sys.exit()
@@ -177,3 +178,27 @@ if __name__ == '__main__':
 				print ("Writing new CAN address okay ")
 			except:
 				print ("Writing new CAN address failed ...")
+
+		if sel.isdigit():
+			#print (" Sending command 21 - read CAN address")
+			can_id = int(sel)
+			pmc.set_mode(brdcast_id)
+			time.sleep(sleept)
+			posid, data=pmc.get_can_address(can_id)
+			print ("   CAN ID: ", posid)
+			#print(" Sending command 19 - read sid short")
+			posid,sid=pmc.get_sid(can_id)
+			sid_str= ":".join("{:02x}".format(c) for c in sid)
+			print ("    Si ID: ",sid_str)
+			try:
+				posid,fw=pmc.get_firmware_version(can_id)
+				if len(fw) == 1:
+					fw=str(int(ord(fw))/10)
+				else:
+					fw=str(int(str(fw[1]),16))+"."+str(int(str(fw[0]),16))
+
+			except:
+                                fw='unknown'
+			print ("  FW rev.: ", fw)
+
+
