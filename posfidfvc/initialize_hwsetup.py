@@ -16,7 +16,7 @@ import configobj
 start_filename_timestamp = pc.filename_timestamp_str_now()
 
 # update log and settings files from the SVN
-svn_update_dirs = [pc.pos_settings_directory, pc.xytest_logs_directory, pc.xytest_summaries_directory]
+svn_update_dirs = [pc.pos_logs_directory, pc.pos_settings_directory, pc.xytest_logs_directory, pc.xytest_summaries_directory]
 gui_root = tkinter.Tk()
 should_update_from_svn = tkinter.messagebox.askyesno(title='Enable auto-SVN?',message='Download latest positioner logs and settings from SVN first?\n\nThis overwrites existing local files.\n\nUpdated versions will also be automatically committed to SVN at the end.\n\n("Yes" is usually correct.)')
 gui_root.withdraw()
