@@ -58,7 +58,13 @@ def logwrite(string):
     with open(logfile,'a') as file:
         file.write(stamped + '\n')
     return timestamp_str
-        
+
+# get a little info
+operator = tkinter.simpledialog.askstring('Test operator?','Who is doing this test run?\n\nTest operator:')
+logwrite('Test operator: ' + operator)
+notes = tkinter.simpledialog.askstring('General notes?','Enter any general notes you want to record about this test run here:')
+logwrite('Test notes: ' + notes)
+
 # configure the exposure table writer
 expstampfile = tkinter.filedialog.asksaveasfilename(title='Save exposure timestamps to...', initialdir=os.path.dirname(logfile), initialfile=filename_timestamp_str + '_fiberlife_timestamps.csv', filetypes=(('CSV','.csv'),('All files','.*')))
 fieldnames = ['POS_ID','TIMESTAMP','TARGET THETA','TARGET PHI','NUM LIFE MOVES','NOTES']
