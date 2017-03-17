@@ -16,6 +16,7 @@ import configobj
 import tkinter
 import tkinter.filedialog
 import tkinter.messagebox
+import tkinter.simpledialog
 import csv
 import getpass
 import collections
@@ -624,11 +625,12 @@ class XYTest(object):
     def ask_user_for_creds(should_simulate=False):
         '''General function to gather SVN username and password from operator.
         '''
+        gui_root = tkinter.Tk()
         print('Enter your svn username and password for committing the logs to the server. These will not be saved to the logfile, but will briefly be clear-text in this script\'s memory while it is running.')
         n_credential_tries = 4
         while n_credential_tries:
-            svn_user = input('svn username: ')
-            svn_pass = getpass.getpass('svn password: ')
+            svn_user = tkinter.simpledialog.askstring(title='SVN authentication',prompt='svn username:')
+            svn_pass = tkinter.simpledialog.askstring(title='SVN authentication',prompt='svn password:')
             if should_simulate:
                 err = 0
             else:
@@ -639,6 +641,7 @@ class XYTest(object):
                 n_credential_tries -= 1
                 print('SVN user / pass was not verified. This is the same as your DESI user/pass for DocDB and the Wiki.')
                 print(str(n_credential_tries) + ' tries remaining.')
+        gui_root.withdraw()
         return svn_user, svn_pass, err
 
 if __name__=="__main__":
