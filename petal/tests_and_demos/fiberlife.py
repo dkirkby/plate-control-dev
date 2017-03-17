@@ -92,7 +92,7 @@ if not(should_simulate):
     if err:
         logwrite('Could not validate svn user/password.')
     else:
-        should_update = tkinter.messagebox.askyesno('Update from SVN','Overwrite any local positioner log and settings files to match what is currently in the SVN?')
+        should_update = tkinter.messagebox.askyesno('Update from SVN?','Overwrite any existing local positioner log and settings files to match what is currently in the SVN?')
         if should_update:
             for d in svn_update_dirs:
                 logwrite('Updating SVN directory ' + d)
