@@ -12,16 +12,15 @@ import tkinter
 import tkinter.filedialog
 import configobj
 
-# unique timestamp
+# unique timestamp and fire up the gui
 start_filename_timestamp = pc.filename_timestamp_str_now()
+gui_root = tkinter.Tk()
 
 # update log and settings files from the SVN
+svn_user, svn_pass, err = xytest.XYTest.ask_user_for_creds(should_simulate=False)
 svn_update_dirs = [pc.pos_logs_directory, pc.pos_settings_directory, pc.xytest_logs_directory, pc.xytest_summaries_directory]
-gui_root = tkinter.Tk()
-should_update_from_svn = tkinter.messagebox.askyesno(title='Enable auto-SVN?',message='Download latest positioner logs and settings from SVN first?\n\nThis overwrites existing local files.\n\nUpdated versions will also be automatically committed to SVN at the end.\n\n("Yes" is usually correct.)')
-gui_root.withdraw()
+should_update_from_svn = tkinter.messagebox.askyesno(title='Update from SVN?',message='Overwrite any existing local positioner log and settings files to match what is currently in the SVN?')
 if should_update_from_svn:
-    svn_user, svn_pass, err = xytest.XYTest.ask_user_for_creds(should_simulate=False)
     if err:
         print('Could not validate svn user/password.')
     else:
@@ -32,9 +31,7 @@ new_and_changed_files = set()
 
 # get the station config info
 message = 'Pick hardware setup file.'
-gui_root = tkinter.Tk()
 hwsetup_conf = tkinter.filedialog.askopenfilename(initialdir=pc.hwsetups_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
-gui_root.withdraw()
 hwsetup = configobj.ConfigObj(hwsetup_conf,unrepr=True)
 new_and_changed_files.add(hwsetup.filename)
 
@@ -100,6 +97,9 @@ if should_update_from_svn:
         err1 = os.system('svn add --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + file)
         err2 = os.system('svn commit --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive -m "autocommit from initialize_hwsetup script" ' + file)
         print('SVN upload of file ' + str(n) + ' of ' + str(n_total) + ' (' + os.path.basename(file) + ') returned: ' + str(err1) + ' (add) and ' + str(err2) + ' (commit)')
+
+# close the gui
+gui_root.withdraw()
 
 # COMMENTS ON FUTURE WORK BELOW...
 # --------------------------------
