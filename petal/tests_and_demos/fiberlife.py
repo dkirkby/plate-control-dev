@@ -6,6 +6,7 @@ import os
 import sys
 sys.path.append(os.path.abspath('../../petal/'))
 sys.path.append(os.path.abspath('../../xytest/'))
+sys.path.append(os.path.abspath('../../posfidfvc/'))
 import petal
 import xytest
 import posconstants as pc
@@ -34,9 +35,16 @@ targets = [[t,p] for t in [-180,-90,0,90,180] for p in [180,135,90,45,0]]
 # fire up the gui
 gui_root = tkinter.Tk()
 
+# ask whether it's a simulation run
+should_simulate = tkinter.messagebox.askyesno('Simulate test?','Is this a simulation run?')
+if should_simulate:
+    time_between_exposures = 0.1
+    camera_expose_and_readout_time = 0.01
+    positioner_max_move_time = 0.05
+
 # configure the log writer
 filename_timestamp_str = pc.filename_timestamp_str_now()
-logfile = tkinter.filedialog.asksaveasfilename(title='Save test log as...', initialdir='~', initialfile=filename_timestamp_str + '_fiberlife_log.txt', filetypes='.txt')
+logfile = tkinter.filedialog.asksaveasfilename(title='Save test log as...', initialdir='~', initialfile=filename_timestamp_str + '_fiberlife_log.txt', filetypes=(('Text','.txt'),('All files','.*')))
 if not(logfile):
     tkinter.messagebox.showwarning(title='Quitting.',message='No log file was defined.')
     gui_root.withdraw()
@@ -52,16 +60,16 @@ def logwrite(string):
     return timestamp_str
         
 # configure the exposure table writer
-expstampfile = tkinter.filedialog.asksaveasfilename(title='Save exposure timestamps to...', initialdir=os.path.dirname(logfile), initialfile=filename_timestamp_str + 'fiberlife_timestamps.csv', filtetypes='.csv')
+expstampfile = tkinter.filedialog.asksaveasfilename(title='Save exposure timestamps to...', initialdir=os.path.dirname(logfile), initialfile=filename_timestamp_str + '_fiberlife_timestamps.csv', filetypes=(('CSV','.csv'),('All files','.*')))
 fieldnames = ['POS_ID','TIMESTAMP','TARGET THETA','TARGET PHI','NUM LIFE MOVES','NOTES']
 with open(expstampfile,'w',newline='') as file:
     writer = csv.DictWriter(file,fieldnames)
     writer.writeheader()
 def log_exposure(pos_id, state, note=''):
     n_moves = str(state.read('TOTAL_MOVE_SEQUENCES'))
-    posT = str(state.read('POS_T'))
-    posP = str(state.read('POS_P'))
-    timestamp_str = logwrite(pos_id + ' (n=' + n_moves + '): Camera exposure for target [' + posT + ',' + posP + '] should occur approximately now.')
+    posT = format(state.read('POS_T'),'.1f')
+    posP = format(state.read('POS_P'),'.1f')
+    timestamp_str = logwrite(pos_id + ': Approx time of camera exposure for target [' + posT + ',' + posP + ']  (life=' + n_moves + ')')
     row = {'POS_ID'         : pos_id,
            'TIMESTAMP'      : timestamp_str,
            'TARGET THETA'   : posT,
@@ -75,21 +83,21 @@ def log_exposure(pos_id, state, note=''):
 # log configuration info
 pos_ids.sort()
 logwrite('POSITIONERS: ' + str(pos_ids))
-
-# configure the test
-should_simulate = True
 logwrite('SIMULATION MODE: ' + 'on' if should_simulate else 'off')
 
 # retrieve latest log files and settings from svn
 svn_update_dirs = [pc.pos_logs_directory, pc.pos_settings_directory]
+svn_user, svn_pass, err = xytest.XYTest.ask_user_for_creds(should_simulate=should_simulate)
 if not(should_simulate):
-    svn_user, svn_pass, err = xytest.XYTest.ask_user_for_creds(should_simulate=False)
     if err:
         logwrite('Could not validate svn user/password.')
     else:
-        for d in svn_update_dirs:
-            logwrite('Updating SVN directory ' + d)
-            os.system('svn update --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + d)
+        should_update = tkinter.messagebox.askyesno('Update from SVN','Overwrite any local positioner log and settings files to match what is currently in the SVN?')
+        if should_update:
+            for d in svn_update_dirs:
+                logwrite('Updating SVN directory ' + d)
+                os.system('svn update --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + d)
+                os.system('svn revert --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + d + '*')
 new_and_changed_files = set()
 
 # initialize the "petal" of positioners
@@ -109,7 +117,7 @@ for pos_id in pos_ids:
     pos_params_before_test[pos_id] = {}
     for param in pos_params_during_test.keys():
         pos_params_before_test[pos_id][param] = ptl.get(pos_id, param)
-        ptl.set(pos_id, param, pos_params_during_test[param])
+        states[pos_id].write(param, pos_params_during_test[param])
         logwrite(pos_id + ': Set ' + param + ' = ' + str(ptl.get(pos_id, param)))
 
 # home and center the positioners
@@ -117,13 +125,14 @@ logwrite('Re-homing all positioners to hard stops.')
 ptl.request_homing(pos_ids)
 ptl.schedule_send_and_execute_moves()
 logwrite('Moving all positioners to center positions.')
-ptl.quick_move('all','posTP',[0,180])
+ptl.quick_move(pos_ids,'posTP',[0,180])
 
 # do some functional tests to make sure all the positioners are working
 def functional_tests(pos_ids):
+    failed_pos = set()
     for pos_id in pos_ids:
         keep_asking = True
-        title = 'Functional test: ' + pos_id
+        title = 'Functional test'
         message = 'Ready to try moving positioner ' + pos_id + '?'
         while keep_asking:
             should_move = tkinter.messagebox.askyesno(title, message)
@@ -146,8 +155,8 @@ keep_asking = True
 while failed_pos and keep_asking:
     message = 'The following positioners apparently failed the functional test:\n'
     for pos in failed_pos:
-        message += '\n' + pos
-    message += 'Do you want to retry these positoners?\n'
+        message += '\n   ' + pos
+    message += '\n\nDo you want to retry these positoners?\n\n'
     message += 'YES --> retry\n'
     message += 'NO --> accept these results'
     should_retry = tkinter.messagebox.askyesno('Retry functional tests?',message)
@@ -164,7 +173,7 @@ while failed_pos and keep_asking:
 # run the test points
 options_msg = 'Select which positioner to do the next FRD test on.\n'
 i = 0
-options_msg += '\n   ' + str(i) + ': Quit this round of testing.'
+options_msg += '\n   ' + str(i) + ': Quit this round of FRD testing.'
 for pos_id in pos_ids:
     i += 1
     options_msg += '\n   ' + str(i) + ': ' + pos_id
@@ -178,25 +187,27 @@ while keep_testing:
         pos_id = pos_ids[pos_selection-1]
         usernote = tkinter.simpledialog.askstring(title='Enter user note...',prompt='Optional user note can be typed here and will be included in the log.')
         logwrite(pos_id + ': user note: ' + usernote)
-        targ_idx = 0
-        ptl.quick_move(pos_id,'posTP',targets[targ_idx],'Initial FRD test point for this sequence')
-        logwrite(pos_id + ': placed at first target ' + str(targets[targ_idx]) + ' and ready to start FRD test')
+        ptl.quick_move(pos_id,'posTP',targets[0],'Initial FRD test point for this sequence')
+        logwrite(pos_id + ': placed at first target ' + str(targets[0]) + ' and ready to start FRD test')
         title = 'Ready to start?'
         message = 'Ready to start FRD test on positioner ' + pos_id + '?'
-        message += '\n\n(Camera delay should be set to ' + format(time_between_exposures,'.1f') + ' seconds, and ' + str(len(targets)) + ' number of exposures. Be ready to activate the camera at roughly the same time as you press OK below.)'
+        message += '\n\nMake sure camera software is set to:\n\n'
+        message += '   delay = ' + format(time_between_exposures,'.1f') + ' seconds\n'
+        message += '   num exposures = ' + str(len(targets))
+        message += '\n\n(Be ready to start the camera going at exactly the same time as you press OK below.)'
         tkinter.messagebox.showwarning(title,message)
         start_time = time.time()
         logwrite(pos_id + ': Beginning timed FRD test sequence')
         time.sleep(camera_expose_and_readout_time)
         log_exposure(pos_id, states[pos_id], usernote)
-        while targ_idx < len(targets):
-            targ_idx += 1
+        for i in range(1,len(targets)):
             time.sleep(initial_sleep_time)
-            ptl.quick_move(pos_id,'posTP',targets[targ_idx],log_note='FRD test point')
-            logwrite(pos_id + ': placed at ' + str(targets[targ_idx]) + ' target ' + str(targ_idx + 1) + ' of ' + str(len(targets)))
-            previous_loop_end_time = start_time + targ_idx * (time_between_exposures + camera_expose_and_readout_time)
+            ptl.quick_move(pos_id,'posTP',targets[i],log_note='FRD test point')
+            logwrite(pos_id + ': placed at ' + str(targets[i]) + ' target ' + str(i + 1) + ' of ' + str(len(targets)))
+            previous_loop_end_time = start_time + i * (time_between_exposures + camera_expose_and_readout_time)
             previous_loop_remaining_sleep_time = previous_loop_end_time - time.time()
-            time.sleep(previous_loop_remaining_sleep_time)
+            if previous_loop_remaining_sleep_time > 0:
+                time.sleep(previous_loop_remaining_sleep_time)
             time.sleep(camera_expose_and_readout_time)
             log_exposure(pos_id, states[pos_id], usernote)
         logwrite(pos_id + ': Timed FRD test sequence complete')
@@ -208,14 +219,20 @@ seconds_per_move = 3.6
 while keep_asking:
     n_rand_moves = tkinter.simpledialog.askinteger(title='Specify num of moves',prompt='Enter the number of uninterrupted random moves to do now:', minvalue=0, maxvalue=1000000)
     hours_estimate = seconds_per_move * n_rand_moves / 60 / 60
-    message = 'You requested ' + str(n_rand_moves) + ' to now be done uninterrupted.'
-    message += 'This will take about ' + format(hours_estimate,'.1f') + ' hours, after which the total number of lifetime moves on each positioner will be:\n'
-    for pos_id in pos_ids:
-        message += '\n   ' + pos_id + ': ' + str(states[pos_id].read('TOTAL MOVE SEQUENCES') + n_rand_moves)
-    message += '\n\nBegin move sequence now?\n\nYes --> begin\nNo --> Enter a new number of moves'
-    begin_now = tkinter.askyesno('Begin random moves?',message)
-    if begin_now:
-        keep_asking = False
+    if n_rand_moves != 0:
+        message = 'You requested a sequence of\n\n   ' + str(n_rand_moves) + '\n\nuninterrupted random moves to now be done.'
+        message += ' This will take about\n\n   ' + format(hours_estimate,'.1f') + ' hours\n\nafter which the total number of lifetime moves on each positioner will be:\n'
+        for pos_id in pos_ids:
+            message += '\n   ' + pos_id + ': ' + str(states[pos_id].read('TOTAL_MOVE_SEQUENCES') + n_rand_moves)
+        message += '\n\nBegin move sequence now?\n\nYes --> begin sequence\nNo --> enter different number'
+        begin_now = tkinter.messagebox.askyesno('Begin random moves?',message)
+        if begin_now:
+            keep_asking = False
+    else:
+        message = 'You requested no random moves be done now. Is this right?\n\nYes --> proceed\nNo --> enter different number'
+        just_proceed = tkinter.messagebox.askyesno('No random moves?',message)
+        if just_proceed:
+            keep_asking = False
 
 # initialize the random positions table
 if n_rand_moves > 0:
@@ -235,23 +252,24 @@ if n_rand_moves > 0:
     logwrite('Random targets file length: ' + str(len(rand_xy_targs_list)) + ' targets')
 
 # run the unmeasured random moves
-start_time = time.time()
-max_log_length = states(pos_ids[0]).max_log_length
-logwrite('Starting unmeasured move sequence')
-status_str = lambda j : '... now at move ' + str(j) + ' of ' + str(n_rand_moves)
-def target_within_limits(xytarg):
-    r_min = 0.001
-    r_max = 5.999
-    x = xytarg[0]
-    y = xytarg[1]
-    r = np.sqrt(x**2 + y**2)
-    if r > r_min and r < r_max:
-        return True
-    return False
-for j in range(n_rand_moves):
-    if j % max_log_length == 0:
-        for pos_id in states.keys():
-            new_and_changed_files.add(states[pos_id].log_path)
+if n_rand_moves > 0:
+    start_time = time.time()
+    max_log_length = states[pos_ids[0]].max_log_length
+    logwrite('Starting unmeasured move sequence')
+    status_str = lambda j : '... now at move ' + str(j) + ' of ' + str(n_rand_moves)
+    def target_within_limits(xytarg):
+        r_min = 0.001
+        r_max = 5.999
+        x = xytarg[0]
+        y = xytarg[1]
+        r = np.sqrt(x**2 + y**2)
+        if r > r_min and r < r_max:
+            return True
+        return False
+    for j in range(n_rand_moves):
+        if j % max_log_length == 0:
+            for pos_id in states.keys():
+                new_and_changed_files.add(states[pos_id].log_path)
         if j % 1000 == 0:
             logwrite(status_str(j))
         elif j % 50 == 0:
@@ -263,14 +281,13 @@ for j in range(n_rand_moves):
             if rand_xy_targs_idx >= len(rand_xy_targs_list):
                 rand_xy_targs_idx = 0
         ptl.quick_move(pos_ids,'posXY',targ_xy,log_note='unmeasured move during fiber life test')
-if n_rand_moves:
     elapsed_hours = (time.time() - start_time)/60/60
     logwrite(str(n_rand_moves) + ' moves completed in ' + format(elapsed_hours,'.1f') + ' hours')
-
+    
 # restore old positioner parameters (good housekeeping)
 for pos_id in pos_params_before_test.keys():
     for param in pos_params_before_test[pos_id]:
-        ptl.set(pos_id, param, pos_params_before_test[pos_id][param])
+        states[pos_id].write(param, pos_params_before_test[pos_id][param])
         logwrite(pos_id + ': Restored ' + param + ' to ' + str(ptl.get(pos_id, param)))
 
 # post log files and settings to svn
