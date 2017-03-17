@@ -20,12 +20,13 @@ import csv
 import numpy as np
 
 # set up the hardware configurations
-ptl_id = 10 # pc number of the petal controller
-pos_ids = ['fakepos1','fakepos2'] # list of positioners being tested
+ptl_id = 12 # pc number of the petal controller
+pos_ids = ['M00082','M00063','M00524','M00047','M00084','M00078','M00528','M00118','M00048','M00077','M00049','M00036','M00153','M00214','M00037','M00390','M00162','M00157'] # list of positioners being tested
 
 # set up the timing of the automated FRD tests
 time_between_exposures = 10.0 # seconds to wait between camera exposures
-camera_expose_and_readout_time = 1.0 # approximate # of seconds it takes to do a camera exposure and readout
+camera_expose_time = 0.4 # seconds
+camera_expose_and_readout_time = 1.1 + camera_expose_time # approximate # of seconds it takes to do a camera exposure and readout
 positioner_max_move_time = 5.0 # seconds, generous maximum time to wait for positioner moves to happen
 
 # define the target positions (theta,phi) at which to measure FRD
@@ -46,7 +47,7 @@ if should_simulate:
 filename_timestamp_str = pc.filename_timestamp_str_now()
 logfile = tkinter.filedialog.asksaveasfilename(title='Save test log as...', initialdir='~', initialfile=filename_timestamp_str + '_fiberlife_log.txt', filetypes=(('Text','.txt'),('All files','.*')))
 if not(logfile):
-    tkinter.messagebox.showwarning(title='Quitting.',message='No log file was defined.')
+    tkinter.messagebox.showwarning(title='Quitting.',message='No log file was definedup.')
     gui_root.withdraw()
     sys.exit(0)
 with open(logfile,'w') as file:
@@ -199,8 +200,8 @@ while keep_testing:
         message = 'Ready to start FRD test on positioner ' + pos_id + '?'
         message += '\n\nMake sure camera software is set to:\n\n'
         message += '   delay = ' + format(time_between_exposures,'.1f') + ' seconds\n'
-        message += '   num exposures = ' + str(len(targets))
-        message += '\n\n(Be ready to start the camera going at exactly the same time as you press OK below.)'
+        message += '   exp = ' + format(camera_expose_time,'.1f') + ' seconds\n'
+        message += '\n\nTo time things out right, start the Artemis camera software in autosave mode, and then hit OK here at the same time as a new image happens.'
         tkinter.messagebox.showwarning(title,message)
         start_time = time.time()
         logwrite(pos_id + ': Beginning timed FRD test sequence')
@@ -294,7 +295,7 @@ if n_rand_moves > 0:
 for pos_id in pos_params_before_test.keys():
     for param in pos_params_before_test[pos_id]:
         states[pos_id].write(param, pos_params_before_test[pos_id][param])
-        logwrite(pos_id + ': Restored ' + param + ' to ' + str(ptl.get(pos_id, param)))
+        logwrite(pos_id + ': Restored ' + param + ' to ' + str(states[pos_id].read(param)))
 
 # post log files and settings to svn
 logwrite('Files changed or modified during test: ' + str(new_and_changed_files))
