@@ -39,7 +39,7 @@ class Petal(object):
             state = posstate.PosState(pos_id, logging=True, device_type='pos', printfunc=self.printfunc)
             model = posmodel.PosModel(state)
             self.posmodels.append(model)
-        self.posids = pos_ids
+        self.posids = pos_ids.copy()
         self.schedule = posschedule.PosSchedule(self)
         self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
         self.anticollision_default = True  # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
