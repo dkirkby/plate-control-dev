@@ -71,6 +71,7 @@ posfidfvc/initialize_hwsetup.py -text
 posfidfvc/poscalibplot.py -text
 posfidfvc/posmovemeasure.py -text
 posfirmware/develop/bootloader_description.pdf -text svneol=unset#unset
+posfirmware/develop/bootloadercmdf35.c -text
 posfirmware/develop/bootloadersyncf31.c -text
 posfirmware/develop/fipos_fw_2.0dev.c -text
 posfirmware/develop/fipos_fw_2.1dev.c -text
