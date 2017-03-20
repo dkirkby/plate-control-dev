@@ -3,6 +3,8 @@ import mahotas as mh
 #from pylab import imshow, show
 import pyfits
 from msgfitter import fitgaussian
+from scipy.ndimage.measurements import center_of_mass
+
 import os
 
 
@@ -114,7 +116,10 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
     yCenSub = []        
     peaks = []
     max_sample_files_to_save = 20
-    for spot in good_spot_indexes:
+
+    centers = center_of_mass(labeled, labels=labeled, index=range(1, nr_objects+1))
+
+    """ for spot in good_spot_indexes:
         selected=np.copy(labeled)
         selected[selected!=spot]=0
         xcen,ycen=centroid(img, mask=selected, w=None, x=None, y=None)
@@ -128,6 +133,19 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
         FWHMSub.append(2.355*max(params[4],params[5]))
         peak = params[1]
         peaks.append(peak)
+    """    
+    nbox = size_fitbox
+    for i,x in enumerate(centers):
+        px=int(round(x[1]))
+        py=int(round(x[0]))     
+        data = img[py-nbox:py+nbox,px-nbox:px+nbox]
+        params = fitgaussian(data)
+        xCenSub.append(float(px)-float(nbox)+params[3])
+        yCenSub.append(float(py)-float(nbox)+params[2])
+        FWHMSub.append(2.355*max(params[4],params[5]))
+        peak = params[1]
+        peaks.append(peak)
+
         should_save_sample_image = False
         if peak < 0 or peak > 2**16-1:
             print('peak = ' + str(peak) + ' brightness appears out of expected range')
