@@ -107,7 +107,6 @@ if __name__ == '__main__':
 
 	loop=True
 	while loop:
-		print("\nSelect and press enter:")
 		print("[b]link LED (using broadcast address)")
 		print("[r]ead CAN address, silicon ID and software revision")
 		print("[e]xit")
@@ -116,7 +115,6 @@ if __name__ == '__main__':
 		#print("Select and press enter: ")
 		
 		#sel=_sel.__call__()		
-		#print("sel:",sel)
 
 		sel=input()
 		if sel=='e':
@@ -138,12 +136,12 @@ if __name__ == '__main__':
 				pmc.set_reset_led(brdcast_id,'off')
 
 		if sel=='r':
-		#print (" Sending command 21 - read CAN address")
+		# Sending command 21 - read CAN address
 			pmc.set_mode(brdcast_id)
 			time.sleep(sleept)
 			posid, data=pmc.get_can_address(20000)
 			print ("   CAN ID: ", posid)
-		#print(" Sending command 19 - read sid short")
+		# Sending command 19 - read sid short
 			posid,sid=pmc.get_sid(20000)
 			sid_str= ":".join("{:02x}".format(c) for c in sid)
 			print ("    Si ID: ",sid_str)
@@ -154,7 +152,6 @@ if __name__ == '__main__':
 				else:
 					
 					fw=str(int(str(fw[1]),16))+"."+str(int(str(fw[0]),16))
-		
 			except:
 				fw='unknown'
 			print ("  FW rev.: ", fw)
