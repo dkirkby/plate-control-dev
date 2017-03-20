@@ -21,7 +21,7 @@ import numpy as np
 
 # set up the hardware configurations
 ptl_id = 12 # pc number of the petal controller
-pos_ids = ['M00082','M00063','M00524','M00047','M00084','M00078','M00528','M00118','M00048','M00077','M00049','M00036','M00153','M00214','M00037','M00390','M00162','M00157'] # list of positioners being tested
+pos_ids = ['M00082','M00063','M00524','M00047','M00084','M00078','M00528','M00118','M00048','M00077','M00049','M00153','M00214','M00037','M00390','M00162','M00157'] # list of positioners being tested
 
 # set up the timing of the automated FRD tests
 time_between_exposures = 10.0 # seconds to wait between camera exposures
@@ -144,8 +144,7 @@ def functional_tests(pos_ids):
         while keep_asking:
             should_move = tkinter.messagebox.askyesno(title, message)
             if should_move:
-                ptl.quick_move(pos_id,'posTP',[90,0])
-                ptl.quick_move(pos_id,'posTP',[-90,0])
+                ptl.quick_move(pos_id,'posTP',[90,90])
                 ptl.quick_move(pos_id,'posTP',[0,180])
                 moved = tkinter.messagebox.askyesno(title,'Did you see ' + pos_id + ' move?')
                 if moved:
