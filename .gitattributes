@@ -36,7 +36,6 @@ petalbox/hwlib/dlptemp.py -text
 petalbox/load_firmware.py -text
 petalbox/petalcontroller.py -text
 petalbox/petalcontroller_devel.py -text
-petalbox/pf_utility.py -text
 petalbox/pfp_utility.py -text
 petalbox/poscontrol.conf -text
 petalbox/poscontrol.py -text
