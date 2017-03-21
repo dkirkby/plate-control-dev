@@ -200,9 +200,9 @@ class XYTest(object):
                 self.summarizers[pos_id].update_loop_calibs(summarizer.meas_suffix, params)
             if not(set_as_defaults):
                 self.restore_calibrations()
-            for pos_id in self.pos_ids:
-                self.summarizers[pos_id].update_loop_calibs(summarizer.used_suffix, params)
             self.logwrite('Calibration of physical travel ranges completed in ' + self._elapsed_time_str(start_time) + '.')
+        for pos_id in self.pos_ids:
+            self.summarizers[pos_id].update_loop_calibs(summarizer.used_suffix, params)
 
     def run_calibration(self, loop_number):
         """Move positioners through a short sequence to calibrate them.
