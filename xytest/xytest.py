@@ -18,7 +18,6 @@ import tkinter.filedialog
 import tkinter.messagebox
 import tkinter.simpledialog
 import csv
-import getpass
 import collections
 
 
@@ -109,11 +108,6 @@ class XYTest(object):
         fid_settings_done = self.m.set_fiducials('on')
         self.logwrite('Fiducials turned on: ' + str(fid_settings_done))
         
-        # calibration settings
-        self.first_calib_only = self.xytest_conf['use_first_calib_only_for_tests']
-        if self.first_calib_only:
-            self.logwrite('Only using first loop calibration settings for xy tests.')
-        
         # set up the test summarizers
         self.summarizers = {}
         summarizer_init_data = {}
@@ -187,8 +181,9 @@ class XYTest(object):
         return notes
 
     def run_range_measurement(self, loop_number):
+        set_as_defaults = self.xytest_conf['set_meas_calib_as_new_defaults'][loop_number]
         if self.xytest_conf['should_measure_ranges'][loop_number]:
-            if self.first_calib_only and loop_number > 0:
+            if not(set_as_defaults):
                 self.collect_calibrations()
             start_time = time.time()
             self.logwrite('Starting physical travel range measurement sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
@@ -203,7 +198,7 @@ class XYTest(object):
                     self.logwrite(str(pos_id) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
             for pos_id in self.pos_ids:
                 self.summarizers[pos_id].update_loop_calibs(summarizer.meas_suffix, params)
-            if self.first_calib_only and loop_number > 0:
+            if not(set_as_defaults):
                 self.restore_calibrations()
             for pos_id in self.pos_ids:
                 self.summarizers[pos_id].update_loop_calibs(summarizer.used_suffix, params)
@@ -215,8 +210,9 @@ class XYTest(object):
         n_pts_calib_T = self.xytest_conf['n_points_calib_T'][loop_number]
         n_pts_calib_P = self.xytest_conf['n_points_calib_P'][loop_number]
         calib_mode = self.xytest_conf['calib_mode'][loop_number]
+        set_as_defaults = self.xytest_conf['set_meas_calib_as_new_defaults'][loop_number]
         if n_pts_calib_T >= 4 and n_pts_calib_P >= 3:
-            if self.first_calib_only and loop_number > 0:
+            if not(set_as_defaults):
                 self.collect_calibrations()
             start_time = time.time()
             self.logwrite('Starting arc calibration sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
@@ -229,7 +225,7 @@ class XYTest(object):
                 self.logwrite('Calibration plot file: ' + file)
             for pos_id in self.pos_ids:
                 self.summarizers[pos_id].update_loop_calibs(summarizer.meas_suffix, params)
-            if self.first_calib_only and loop_number > 0:
+            if not(set_as_defaults):
                 self.restore_calibrations()
             else:
                 for pos_id in self.pos_ids:
