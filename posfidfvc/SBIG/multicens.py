@@ -117,8 +117,8 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
     peaks = []
     max_sample_files_to_save = 20
 
-    centers = center_of_mass(labeled, labels=labeled, index=range(1, nr_objects+1))
-
+#    centers = center_of_mass(labeled, labels=labeled, index=range(1, nr_objects+1))
+    centers = center_of_mass(labeled, labels=labeled, index=[good_spot_indexes])
     """ for spot in good_spot_indexes:
         selected=np.copy(labeled)
         selected[selected!=spot]=0
@@ -136,6 +136,7 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
     """    
     nbox = size_fitbox
     for i,x in enumerate(centers):
+        x=x[0]
         px=int(round(x[1]))
         py=int(round(x[0]))     
         data = img[py-nbox:py+nbox,px-nbox:px+nbox]
