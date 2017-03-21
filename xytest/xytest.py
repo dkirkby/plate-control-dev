@@ -182,6 +182,7 @@ class XYTest(object):
 
     def run_range_measurement(self, loop_number):
         set_as_defaults = self.xytest_conf['set_meas_calib_as_new_defaults'][loop_number]
+        params = ['PHYSICAL_RANGE_T','PHYSICAL_RANGE_P']
         if self.xytest_conf['should_measure_ranges'][loop_number]:
             if not(set_as_defaults):
                 self.collect_calibrations()
@@ -189,7 +190,6 @@ class XYTest(object):
             self.logwrite('Starting physical travel range measurement sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             self.m.measure_range(pos_ids='all', axis='theta')
             self.m.measure_range(pos_ids='all', axis='phi')
-            params = ['PHYSICAL_RANGE_T','PHYSICAL_RANGE_P']
             for pos_id in self.pos_ids:
                 state = self.m.state(pos_id)
                 self.track_file(state.log_path, commit='once')
