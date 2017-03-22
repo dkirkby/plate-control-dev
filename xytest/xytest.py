@@ -412,7 +412,7 @@ class XYTest(object):
             for pos_id in self.pos_ids:
                 retract_requests[pos_id] = {'command':'posTP', 'target':[0,90], 'log_note':'retract for hardstop test strike'}
             for j in range(n_strikes):
-                print('... now at strike ' + str(j+1) + ' of ' + str(n_strikes) + ' within loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
+                self.logwrite('... now at strike ' + str(j+1) + ' of ' + str(n_strikes) + ' within loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
                 self.m.move(retract_requests)
                 self.m.rehome(self.pos_ids)
             self.logwrite(str(n_strikes) + ' hardstop strikes completed in ' + self._elapsed_time_str(start_time) + '.')
