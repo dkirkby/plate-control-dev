@@ -191,10 +191,10 @@ def ordinal_str(number):
     '''
     numstr = str(number)
     last_digit = numstr[-1]
-    if last_digit == 1:
+    if last_digit == '1':
         return numstr + 'st'
-    if last_digit == 2:
+    if last_digit == '2':
         return numstr + 'nd'
-    if last_digit == 3:
+    if last_digit == '3':
         return numstr + 'rd'
     return numstr + 'th'
