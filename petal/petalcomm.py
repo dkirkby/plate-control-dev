@@ -290,6 +290,15 @@ class PetalComm(object):
             return self._call_device('set_led',bus_id, id, str(state).lower())
         except Exception as e:
             return 'FAILED: Can not set LED state. Exception: %s' % str(e)
+    
+    def get_nonresponsive_canids(self):
+        """
+        Returns a list of integer canids that correspond to unresponsive positioners, as determined by the petalcontroller.
+        """
+        try:
+            return self._call_device('get_nonresponsive_canids')
+        except Exception as e:
+            return 'FAILED: Can not get list of nonresponsive canids. Exceptions: %s' % str(e)
 
     def get_device_status(self):
         """
