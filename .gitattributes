@@ -5,6 +5,7 @@ mightex/19-mightex_udev.rules -text
 mightex/Makefile -text
 mightex/README.txt -text
 mightex/mightex.py -text
+mightex/mightex_cmd -text
 petal/focal_surface_lookup.csv -text
 petal/petal.py -text
 petal/petalcomm.py -text
