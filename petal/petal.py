@@ -715,6 +715,9 @@ class Petal(object):
         self.clear_schedule()
 
     def _check_and_disable_nonresponsive_pos_and_fid(self):
+        """Asks petalcomm for a list of what can_ids are nonresponsive, and then
+        handles disabling those positioners and/or fiducials.
+        """
         nonresponsives = self.comm.get_nonresponsive_canids()
         for can_id in nonresponsives:
             if can_id not in self.nonresponsive_canids:
@@ -727,6 +730,11 @@ class Petal(object):
                     if self.get_fids_val(fid_id,'CAN_ID') == can_id:
                         self.fidstates[fid_id].write('CTRL_ENABLED', False)
                         self.fidstates[fid_id].log_unit(note='disabled sending control commands because fiducial was detected to be nonresponsive')
+        for can_id in self.nonresponsive_canids:
+            if can_id not in nonresponsives:
+                # placeholder for re-enabling positioners, if they somehow become responsive again
+                # not sure if we actually want this, Joe / Irena / Michael to discuss
+                pass
 
     def _wait_while_moving(self):
         """Blocking implementation, to not send move tables while any positioners are still moving.
