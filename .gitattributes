@@ -1,6 +1,7 @@
 * text=auto !eol
 bin/petal -text
 bin/petalcontroller -text
+mightex/19-mightex_udev.rules -text
 mightex/README.txt -text
 petal/focal_surface_lookup.csv -text
 petal/petal.py -text
