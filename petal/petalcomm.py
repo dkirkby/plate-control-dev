@@ -105,6 +105,7 @@ class PetalComm(object):
                                 del self.device['proxy']
                         self.device.update(dev[key])   # make a copy
                         self.found_controller.set()
+                        
     def _call_device(self, cmd, *args, **kwargs):
         """
         Call remote function
@@ -271,7 +272,6 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not set attributes. Exception: %s' % str(e)
 
-
     def set_led(self, bus_id, can_id, state):
         """
         Set the led on positioner id on or off
@@ -299,6 +299,7 @@ class PetalComm(object):
             return self._call_device('get_nonresponsive_canids')
         except Exception as e:
             return 'FAILED: Can not get list of nonresponsive canids. Exceptions: %s' % str(e)
+
     def reset_nonresponsive_canids(self):
         """
         Resets list of non-responsive canids to being empty.
@@ -307,7 +308,6 @@ class PetalComm(object):
             return self._call_device('reset_nonresponsive_canids')
         except Exception as e:
             return 'FAILED: Can not reset list of nonresponsive canids. Exceptions: %s' % str(e)
-
 
     def get_device_status(self):
         """
