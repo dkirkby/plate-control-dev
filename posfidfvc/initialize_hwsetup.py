@@ -78,6 +78,11 @@ while ids_unchecked:
     else:
         print('Respond yes or no.')
 
+# make sure control is enabled for all positioners
+for ptl in m.petals:
+    for pos_id in ptl.posids:
+        ptl.set(pos_id, 'CTRL_ENABLED', True)
+	
 # calibration routines
 m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
 m.identify_fiducials()
