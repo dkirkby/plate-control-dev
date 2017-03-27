@@ -198,6 +198,9 @@ class PosModel(object):
         """Always perform this after positioner physical moves have been completed,
         to update the internal tracking of shaft positions and variables.
         """
+        if self.state.read('CTRL_ENABLED') == False:
+            return
+
         self.state.write('POS_T', self.state.read('POS_T') + cleanup_table['stats']['net_dT'][-1])
         self.state.write('POS_P', self.state.read('POS_P') + cleanup_table['stats']['net_dP'][-1])
         for axis in self.axis:
