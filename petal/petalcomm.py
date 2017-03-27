@@ -299,6 +299,15 @@ class PetalComm(object):
             return self._call_device('get_nonresponsive_canids')
         except Exception as e:
             return 'FAILED: Can not get list of nonresponsive canids. Exceptions: %s' % str(e)
+    def reset_nonresponsive_canids(self):
+        """
+        Resets list of non-responsive canids to being empty.
+        """
+        try:
+            return self._call_device('reset_nonresponsive_canids')
+        except Exception as e:
+            return 'FAILED: Can not reset list of nonresponsive canids. Exceptions: %s' % str(e)
+
 
     def get_device_status(self):
         """
