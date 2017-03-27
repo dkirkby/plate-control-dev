@@ -6,7 +6,7 @@
 import struct
 import string
 import time
-import sys
+import sys, os
 import posfidcan
 import math
 from intelhex import IntelHex
@@ -18,7 +18,7 @@ class BootLoadControl(object):
 
 	def __init__(self):
 		try:
-			self.verbose = False
+			self.verbose = True
 			self.scan=posfidcan.PosFidCAN('can0')		
 			#part size in bytes, should fit into 64KB buffer
 			self.part_size = 16000 	
@@ -95,14 +95,13 @@ class BootLoadControl(object):
 		except Exception as e:
 			return 'FAILED: Error requesting bootloader verification: %s' % str(e)
 
-	def send_packet(self, pid, partn = 1, packetn = 1, packet = '01234567'):
+	def send_packet(self, pid, partn = 1, packetn = 1, packet = '01234567', chksum = 32):
 		
 		try:
-			checksum = str(bin(int(packet, 16))).replace('0b','').count('1')
-			checksum = str(hex(checksum).replace('0x','')).zfill(2)
+			chksum = str(hex(chksum).replace('0x','')).zfill(2)
 			partn = str(partn).zfill(2)
 			packetn = str(hex(packetn).replace('0x','')).zfill(4)
-			self.scan.send_command(pid, self.data_comnr, str(partn + packetn + packet + checksum))
+			self.scan.send_command(pid, self.data_comnr, str(partn + packetn + packet + chksum))
 			return 'SUCCESS'
 
 		except Exception as e:
@@ -115,16 +114,19 @@ class BootLoadControl(object):
 			packet_addr = self.hexfile.minaddr()+(partn-1)*self.part_size  + 4*packetn		#start address of 4 byte packet
 			packet=''
 			packet_byte=[0,0,0,0]
+			checksum_byte=[0,0,0,0]
 
 			if partn == self.nparts and packetn > self.get_packets_in_n(partn):
 				packet = '00000000'
+				checksum = 0
 	
 			else:
 				for i in range(0,4):
+					checksum_byte[i] = int(hex(self.hexfile[packet_addr + i]),16)
 					packet_byte[i] = str(hex(self.hexfile[packet_addr + i]).replace('0x','')).zfill(2)	
 					packet = packet + packet_byte[i]
-				
-			return packet
+				checksum = checksum_byte[0] ^ checksum_byte[1] ^ checksum_byte[2] ^ checksum_byte[3]
+			return packet, checksum
 
 		except Exception as e:
 			return 'FAILED: Error retrieving packet from hex file: %s' % str(e)
@@ -163,9 +165,9 @@ class BootLoadControl(object):
 				for p in range(0,self.get_packets_in_n(n)):	
 					packet_array=[]
 			
-					packet_np = self.get_packet(n,p)
+					packet_np, chksum = self.get_packet(n,p)
 					packet_array.append(packet_np)
-					self.send_packet(pid, n, p, packet_np)
+					self.send_packet(pid, n, p, packet_np, chksum)
 					time.sleep(pause)
 	
 			return 'SUCCESS'
@@ -176,6 +178,7 @@ class BootLoadControl(object):
 
 if __name__ == '__main__':
 	
+	os.system('cansend can0 004e2080#4d.2e.45.2e.4c.65.76.69')
 
 	hex_file_name = str(sys.argv[2]) #'fw31.hex'
 	bc=BootLoadControl()
