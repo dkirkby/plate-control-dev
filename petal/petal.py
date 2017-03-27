@@ -31,6 +31,7 @@ class Petal(object):
         if not(self.simulator_on):
             import petalcomm
             self.comm = petalcomm.PetalComm(self.petal_id)
+            self.comm.reset_nonresponsive_canids() #reset petalcontroller's list of non-responsive canids
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
 
         # positioners setup
@@ -46,6 +47,7 @@ class Petal(object):
         self.anticollision_override = True # causes the anticollision_default value to be used in all cases
         self.canids_where_tables_were_just_sent = []
         self.busids_where_tables_were_just_sent = []
+        self.nonresponsive_canids = []
         self.set_motor_parameters()
         
         # fiducials setup
@@ -183,6 +185,7 @@ class Petal(object):
         mark_for_delete = set()
         for pos_id in requests.keys():
             if not(self.get(pos_id,'CTRL_ENABLED')):
+                requests[pos_id]['command'] = 'direct_dTdP'
                 self.printfunc(self._request_denied_disabled_str(pos_id,requests[pos_id]))
                 mark_for_delete.add(pos_id)
         for pos_id in mark_for_delete:
@@ -704,11 +707,26 @@ class Petal(object):
         """This always gets called after performing a set of moves, so that PosModel instances
         can be informed that the move was physically done on the hardware.
         """
+        self._check_and_disable_nonresponsive_pos_and_fid()
         for m in self.schedule.move_tables:
             m.posmodel.postmove_cleanup(m.for_cleanup)
         if self.verbose:
             print(self.expected_current_position_str())
         self.clear_schedule()
+
+    def _check_and_disable_nonresponsive_pos_and_fid(self):
+        nonresponsives = self.comm.get_nonresponsive_canids()
+        for can_id in nonresponsives:
+            if can_id not in self.nonresponsive_canids:
+                self.nonresponsive_canids.append(can_id)
+                for p in self.posmodels:
+                    if p.canid == can_id:
+                         p.state.write('CTRL_ENABLED', False)
+                         p.state.log_unit(note='disabled sending control commands because positioner was detected to be nonresponsive')
+                for fid_id in self.fid_ids:
+                    if self.get_fids_val(fid_id,'CAN_ID') == can_id:
+                        self.fidstates[fid_id].write('CTRL_ENABLED', False)
+                        self.fidstates[fid_id].log_unit(note='disabled sending control commands because fiducial was detected to be nonresponsive')
 
     def _wait_while_moving(self):
         """Blocking implementation, to not send move tables while any positioners are still moving.
