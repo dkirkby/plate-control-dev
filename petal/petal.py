@@ -732,8 +732,9 @@ class Petal(object):
                         self.fidstates[fid_id].log_unit(note='disabled sending control commands because fiducial was detected to be nonresponsive')
         for can_id in self.nonresponsive_canids:
             if can_id not in nonresponsives:
-                # placeholder for re-enabling positioners, if they somehow become responsive again
+                # placeholder for re-enabling individual positioners, if they somehow become responsive again
                 # not sure if we actually want this, Joe / Irena / Michael to discuss
+                # (there is also the comm.reset_nonresponsive_canids method)
                 pass
 
     def _wait_while_moving(self):
