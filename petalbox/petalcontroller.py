@@ -39,6 +39,8 @@ except:
 import sys
 import os
 
+nonresponsive_canids = []
+
 def set_bit(value, bit):
     return value | (1<<bit)
 
@@ -76,7 +78,9 @@ class PetalController(Application):
                 'read_switch_ptl',
                 'get_GPIO_names',
                 'read_HRPG600',
-                'read_fan_tach'
+                'read_fan_tach',
+                'get_nonresponsive_canids',
+                'reset_nonresponsive_canids'
                 ]
 
     # Default configuration (can be overwritten by command line or config file)
@@ -160,7 +164,14 @@ class PetalController(Application):
         if self.pmc.get_sids(canbus):
             return self.SUCCESS  
         else:
-            return self.FAILED  
+            return self.FAILED
+
+    def get_nonresponsive_canids(self):
+        return nonresponsive_canids 
+
+    def reset_nonresponsive_canids(self):
+        nonresponsive_canids[:] = []
+        return nonresponsive_canids 
 
     def set_posid(self, canbus, sid, new_posid):
         """
@@ -500,7 +511,7 @@ class PetalController(Application):
      
         # here we need to assemble list of rows and then loop calls to load_rows
         # def load_rows(self, posid, ex_code, mode_select, angle, pause):
-        print("*** tables***")
+        self.info("*** tables***")
         self.info(move_tables)
 
         #reset SYNC line
@@ -528,12 +539,12 @@ class PetalController(Application):
                     if self.verbose: print("send_tables:",  canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause)
                     if not self.pmc.load_table_rows(canbus, posid,xcode,'theta',motor_steps_T,speed_mode_T,post_pause_T):
                         if self.verbose: print('send_tables: Error')
-                        return self.FAILED
+                        #return self.FAILED
                     if row == (nrows - 1):  #last row in move table, xcode = 2
                         xcode='2'
                     if not self.pmc.load_table_rows(canbus, posid,xcode,'phi',motor_steps_P,speed_mode_P,post_pause):
                         if self.verbose: print('send_tables: Error')
-                        return self.FAILED
+                        #return self.FAILED
         else:
             pass                
 
@@ -844,20 +855,19 @@ class PositionerMoveControl(object):
         for id in range(len(posids)):
             posid=posids[id]
             status[posid]='UNKNOWN'
-            try:        
-                canbus = busids[id]
-                print('ABOUT TO SEND get_pos_status command')
-                try:
-                    posid_return,stat=self.pfcan[canbus].send_command_recv(posid,13,'')
-                    print("posid_return,stat: ",posid_return,stat)
-                    stat=ord(stat)
-                except:
-                    return_str = 'ERROR: Unresponsive positioner. CAN_ID = %s  BUS_ID = %s'%(str(posid), canbus)
-                    return return_str
-                if stat: status[posid]='BUSY'
-                if not stat: status[posid]='DONE'
+                 
+            canbus = busids[id]
+            try:
+                posid_return,stat=self.pfcan[canbus].send_command_recv(posid,13,'')
+                print("posid_return,stat: ",posid_return,stat)
+                stat=ord(stat)
             except:
-                return False
+                return_str = 'ERROR: Unresponsive positioner. CAN_ID = %s  BUS_ID = %s'%(str(posid), canbus)
+                if posid not in nonresponsive_canids:
+                    nonresponsive_canids.append(posid)
+                return return_str
+            if stat: status[posid]='BUSY'
+            if not stat: status[posid]='DONE'
         return status        
 
 
@@ -1055,7 +1065,10 @@ class PositionerMoveControl(object):
                 else:
                     return 1
             except:
-                print ("Sending command 9 failed")
+                self.bitsum=0
+                if posid not in nonresponsive_canids:
+                    nonresponsive_canids.append(posid)
+                print ("Sending command 8 failed")
                 return 0
         if xcode == '0':
             return 1
