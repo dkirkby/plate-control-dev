@@ -26,30 +26,34 @@ min_num_concluding_consecutive_tests = 3 # number of tests for valid results
 grade = 'A'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
 grade_specs[grade]['blind max um']         = [ 100, 100]
-grade_specs[grade]['corr max um']          = [  12,  12]
+grade_specs[grade]['corr max um']          = [  15,  15]
 grade_specs[grade]['corr rms um']          = [   5,   5]
 grade_specs[grade]['failure current']      = 80
 grade_specs[grade]['has extended gearbox'] = False
 
 grade = 'B'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
-grade_specs[grade]['blind max um']         = [ 100, 100]
-grade_specs[grade]['corr max um']          = [  12,  30]
-grade_specs[grade]['corr rms um']          = [   5,  10]
-grade_specs[grade]['failure current']      = 90
+grade_specs[grade]['blind max um']         = [ 150, 200]
+grade_specs[grade]['corr max um']          = [  15,  30]
+grade_specs[grade]['corr rms um']          = [   5,   5]
+grade_specs[grade]['failure current']      = 80
 grade_specs[grade]['has extended gearbox'] = False
 
 grade = 'C'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
-grade_specs[grade]['blind max um']         = [ 100, 200]
-grade_specs[grade]['corr max um']          = [  20,  50]
-grade_specs[grade]['corr rms um']          = [  10,  20]
-grade_specs[grade]['failure current']      = 100
+grade_specs[grade]['blind max um']         = [ 250, 250]
+grade_specs[grade]['corr max um']          = [  20,  40]
+grade_specs[grade]['corr rms um']          = [   5,  10]
+grade_specs[grade]['failure current']      = 90
 grade_specs[grade]['has extended gearbox'] = False
 
 grade = 'D'
-grade_specs[grade] = grade_specs['B'].copy()
-grade_specs[grade]['has extended gearbox'] = True
+grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
+grade_specs[grade]['blind max um']         = [ 300, 300]
+grade_specs[grade]['corr max um']          = [  30,  60]
+grade_specs[grade]['corr rms um']          = [  10,  20]
+grade_specs[grade]['failure current']      = 100
+grade_specs[grade]['has extended gearbox'] = False
 
 grade = 'E'
 grade_specs[grade] = grade_specs['C'].copy()
