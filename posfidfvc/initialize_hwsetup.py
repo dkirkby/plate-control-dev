@@ -43,6 +43,12 @@ sim = fvc.fvc_type == 'simulator'
 pos_ids = hwsetup['pos_ids']
 fid_ids = hwsetup['fid_ids']
 ptl = petal.Petal(hwsetup['ptl_id'], pos_ids, fid_ids, simulator_on=sim)
+
+# set CTRL_ENABLED flag to True in the unit config files
+for pos_id in pos_ids:
+    ptl.set(pos_id, 'CTRL_ENABLED', True)
+
+
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure([ptl],fvc)
 m.make_plots_during_calib = True
@@ -54,6 +60,10 @@ for ptl in m.petals:
     for fidstate in ptl.fidstates.values():
         new_and_changed_files.add(fidstate.unit.filename)
         new_and_changed_files.add(fidstate.log_path)
+
+# set CTRL_ENABLED flag to True in the unit config files
+for pos_id in pos_ids:
+    ptl.set(pos_id, 'CTRL_ENABLED', True)
 
 # TEMPORARY HACK until individual fiducial dot locations tracking is properly handled
 m.extradots_fid_state = ptl.fidstates[hwsetup['extradots_id']]
