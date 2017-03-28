@@ -17,11 +17,11 @@ start_filename_timestamp = pc.filename_timestamp_str_now()
 gui_root = tkinter.Tk()
 
 # update log and settings files from the SVN
-svn_user, svn_pass, err = xytest.XYTest.ask_user_for_creds(should_simulate=False)
+svn_user, svn_pass, svn_auth_err = xytest.XYTest.ask_user_for_creds(should_simulate=False)
 svn_update_dirs = [pc.pos_logs_directory, pc.pos_settings_directory, pc.xytest_logs_directory, pc.xytest_summaries_directory]
 should_update_from_svn = tkinter.messagebox.askyesno(title='Update from SVN?',message='Overwrite any existing local positioner log and settings files to match what is currently in the SVN?')
 if should_update_from_svn:
-    if err:
+    if svn_auth_err:
         print('Could not validate svn user/password.')
     else:
         for d in svn_update_dirs:
@@ -78,6 +78,10 @@ while ids_unchecked:
     else:
         print('Respond yes or no.')
 
+# check if auto-svn commit is desired
+if not svn_auth_err:
+    should_commit_to_svn = tkinter.messagebox.askyesno(title='Commit to SVN?',message='Auto-commit files to SVN after script is complete?\n\n(Typically answer "Yes")')
+
 # make sure control is enabled for all positioners
 for ptl in m.petals:
     for pos_id in ptl.posids:
@@ -94,7 +98,7 @@ new_and_changed_files.update(plotfiles)
 m.park() # retract all positioners to their parked positions
 
 # commit logs and settings files to the SVN
-if should_update_from_svn:
+if should_commit_to_svn and not svn_auth_err:
     n_total = len(new_and_changed_files)
     n = 0
     for file in new_and_changed_files:
