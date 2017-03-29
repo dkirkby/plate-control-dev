@@ -150,7 +150,7 @@ for pos_id in d.keys():
         if n_rows < min_num_concluding_consecutive_tests:
             if ask_ignore_min_tests:
                 gui_root = tkinter.Tk()
-                ignore_min_tests = tkinter.messagebox.askyesno(title='Ignore min # tests?',message='Some positioenrs have fewer than the minimum number of tests we typically want. Ignore the minimum # of tests criterion?')
+                ignore_min_tests = tkinter.messagebox.askyesno(title='Ignore min # tests?',message='Some positioners have fewer than the minimum number of tests we typically want. Ignore the minimum # of tests criterion?')
                 ask_ignore_min_tests = False
                 gui_root.withdraw()
             if ignore_min_tests:
