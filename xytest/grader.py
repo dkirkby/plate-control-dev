@@ -116,8 +116,6 @@ if ignore_gearbox:
         grade_specs[grade]['has extended gearbox'] = 'ignored'
             
 # read in the summary data
-ask_ignore_unknown_curr = True
-ignore_currents = False
 ask_ignore_min_tests = True
 ignore_min_tests = False
 err_keys = summarizer.Summarizer.make_err_keys()
@@ -155,14 +153,9 @@ for pos_id in d.keys():
                 gui_root.withdraw()
             if ignore_min_tests:
                 min_num_concluding_consecutive_tests = 0
-    if ask_ignore_unknown_curr and (None in d[pos_id]['curr cruise'] or None in d[pos_id]['curr creep']):
-        gui_root = tkinter.Tk()
-        ignore_currents = tkinter.messagebox.askyesno(title='Ignore failure currents?',message='Some current values are not known in the data. (Historically current was not recorded in early test runs.) Ignore the failure current criteria?')
-        ask_ignore_unknown_curr = False
-        gui_root.withdraw()
-if ignore_currents:
-    for grade in grade_specs.keys():
-        grade_specs[grade]['failure current'] = 'ignored'
+    if (None in d[pos_id]['curr cruise'] or None in d[pos_id]['curr creep']):
+        d[pos_id]['curr cruise'] = 100 # assume max current, lacking data
+        d[pos_id]['curr creep'] = 100 # assum max current, lacking data
 for pos_id in pos_to_delete:
     del d[pos_id]
     del pos_ids[pos_ids.index(pos_id)]
@@ -170,29 +163,43 @@ for pos_id in pos_to_delete:
 # grade positioners
 for pos_id in d.keys():
     d[pos_id]['grade'] = fail_grade
+    proven_selection = []
     for grade in grade_specs.keys():
         D = copy.deepcopy(d[pos_id])
         while D['num rows'] > min_num_concluding_consecutive_tests:
             this_grade_valid = True
-            if not(ignore_currents):
-                selection1 = np.array(D['curr cruise']) >= grade_specs[grade]['failure current']
-                selection2 = np.array(D['curr creep']) >= grade_specs[grade]['failure current']
+            all_currents = set()
+            for i in range(D['num rows']):
+                all_currents.add(D['curr cruise'][i])
+                all_currents.add(D['curr creep'][i])
+            all_currents = list(all_currents)
+            all_currents.sort()
+            failed_currents = set()
+            for current in all_currents:
+                selection1 = np.array(D['curr cruise']) >= current
+                selection2 = np.array(D['curr creep']) >= current
                 selection = selection1 * selection2
+                for i in range(len(summarizer.stat_cuts)):
+                    cut = summarizer.stat_cuts[i]
+                    suffix1 = summarizer.Summarizer.statcut_suffix(cut)
+                    suffix2 = summarizer.Summarizer.err_suffix(cut,grading_threshold)
+                    blind_max = np.array(D['blind max (um)' + suffix1])[selection]
+                    corr_max = np.array(D['corr max (um)' + suffix2])[selection]
+                    corr_rms = np.array(D['corr rms (um)' + suffix2])[selection]
+                    if max(blind_max) > grade_specs[grade]['blind max um'][i]:
+                        failed_currents.add(current)
+                    if max(corr_max) > grade_specs[grade]['corr max um'][i]:
+                        failed_currents.add(current)
+                    if max(corr_rms) > grade_specs[grade]['corr rms um'][i]:
+                        failed_currents.add(current)
+            if not(failed_currents):
+                proven_current = min(all_currents)
+            elif max(failed_currents) > grade_specs[grade]['failure current']:
+                this_grade_valid = False
+                proven_current = None
             else:
-                selection = range(D['num rows'])
-            for i in range(len(summarizer.stat_cuts)):
-                cut = summarizer.stat_cuts[i]
-                suffix1 = summarizer.Summarizer.statcut_suffix(cut)
-                suffix2 = summarizer.Summarizer.err_suffix(cut,grading_threshold)
-                blind_max = np.array(D['blind max (um)' + suffix1])[selection]
-                corr_max = np.array(D['corr max (um)' + suffix2])[selection]
-                corr_rms = np.array(D['corr rms (um)' + suffix2])[selection]
-                if max(blind_max) > grade_specs[grade]['blind max um'][i]:
-                    this_grade_valid = False
-                if max(corr_max) > grade_specs[grade]['corr max um'][i]:
-                    this_grade_valid = False
-                if max(corr_rms) > grade_specs[grade]['corr rms um'][i]:
-                    this_grade_valid = False
+                last_failed_current_idx = all_currents.index(max(failed_currents))
+                proven_current = all_currents[last_failed_current_idx + 1]
             if not(ignore_gearbox):
                 if D['has extended gearbox'] and not(grade_specs[grade]['has extended gearbox']):
                     this_grade_valid = False
@@ -211,12 +218,10 @@ for pos_id in d.keys():
     d[pos_id]['num tests proven'] = D['num rows']
     for curr_text in ['curr cruise','curr creep']:
         key = 'lowest ' + curr_text + ' proven'
-        if ignore_currents:
-            d[pos_id][key] = 'ignored'
-        elif d[pos_id]['grade'] == fail_grade:
+        if d[pos_id]['grade'] == fail_grade:
             d[pos_id][key] = 'n/a'
         else:
-            d[pos_id][key] = min(D[curr_text])
+            d[pos_id][key] = proven_current
 proven_keys = [key for key in d[pos_id].keys() if 'proven' in key]
 proven_keys.reverse() # I like this sequence better in the report
 
