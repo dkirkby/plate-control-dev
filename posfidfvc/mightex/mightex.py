@@ -6,22 +6,13 @@
 #    Revisions:
 #    mm/dd/yyyy who        description
 #    ---------- --------   -----------
-#
+#    03/29/2017 cad        Use instance variables, not Class variables
 # ****************************************************************************
 
 import subprocess
 
 class Mightex_LED_Controller:
     """Class for Mightex LED Controllers"""
-    mlc_initialized=0     # is the Mightex LED Controller initialized
-    mlc_maxChannel=0      # number of channels for the device
-    mlc_currentChannel=1  # default Chanel is 1
-    mlc_serialno=""       # by default, we talk to the first found device
-    mlc_serialno_list=[]
-    mlc_error_msg=""
-    mlc_last_stdout=[]
-    mlc_last_stderr=[]
-    mlc_Debug=0
 
     # Not for external use, sends commands to the Controller via mightex_cmd
     # The initial version of this code takes about 35 seconds to execute 100
@@ -53,9 +44,18 @@ class Mightex_LED_Controller:
     # (i.e., essentially chosen at random since the order on the list is determined by the
     # order of connection/discovery)
     def __init__(self,channel=1,serialno=""):
-        self.mlc_initialized=0
-        self.mlc_maxChannel=0
-        self.mlc_serialno=str(serialno)
+        self.mlc_initialized=0     # is the Mightex LED Controller initialized
+        self.mlc_maxChannel=0      # number of channels for the device
+        self.mlc_currentChannel=1  # default Chanel is 1
+        self.mlc_serialno=""       # by default, talk to the first found device
+        self.mlc_serialno_list=[]
+        self.mlc_error_msg=""
+        self.mlc_last_stdout=[]
+        self.mlc_last_stderr=[]
+        self.mlc_Debug=0
+
+        self.mlc_serialno=str(serialno)  # If the user specified one, talk to it
+
         # query for serial numbers of attached Mightex LED Controllers
         self.mlc_serialno_list=self.__mightexCmd__(['-n']).split(",")
         num_serialno=len(self.mlc_serialno_list)
