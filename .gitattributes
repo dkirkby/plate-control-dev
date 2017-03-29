@@ -98,4 +98,5 @@ xytest/grader.py -text
 xytest/pos_xytest_plot.py -text
 xytest/summarizer.py -text
 xytest/um_test_report.py -text
+xytest/watcher.py -text
 xytest/xytest.py -text
