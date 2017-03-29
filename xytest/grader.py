@@ -162,6 +162,13 @@ for pos_id in pos_to_delete:
         
 # grade positioners
 for pos_id in d.keys():
+    d[pos_id]['grades'] = []
+    for row in range(d[pos_id]['num rows']:
+        for grade in grade_specs.keys():
+            for c in range(len(summarizer.stat_cuts))
+    
+    
+    
     d[pos_id]['grade'] = fail_grade
     proven_selection = []
     for grade in grade_specs.keys():
