@@ -48,7 +48,7 @@ grade_specs[grade]['has extended gearbox'] = False
 
 grade = 'D'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
-grade_specs[grade]['blind max um']         = [ 300, 300]
+grade_specs[grade]['blind max um']         = [ 350, 350]
 grade_specs[grade]['corr max um']          = [  30,  60]
 grade_specs[grade]['corr rms um']          = [  10,  20]
 grade_specs[grade]['failure current']      = 100
@@ -60,7 +60,8 @@ grade_specs[grade]['failure current']      = 100
 grade_specs[grade]['has extended gearbox'] = True
 
 fail_grade = 'F'
-all_grades = list(grade_specs.keys()) + [fail_grade]
+insuff_data_grade = 'insuff data'
+all_grades = list(grade_specs.keys()) + [fail_grade] # intentionally not including ignored in this
 
 # get the files list
 filetypes = (('Comma-separated Values','*.csv'),('All Files','*'))
@@ -228,6 +229,8 @@ for pos_id in d.keys():
                 d[pos_id]['num tests proven'] = min(len(selection), d[pos_id]['num tests proven'])
         if d[pos_id]['grade'] != fail_grade:
             break
+    if d[pos_id]['num tests proven'] == np.Inf:
+        d[pos_id]['grade'] = insuff_data_grade
 proven_keys = [key for key in d[pos_id].keys() if 'proven' in key]
 proven_keys.sort() # I like this sequence better in the report
 proven_keys.reverse() # I like this sequence better in the report
@@ -261,17 +264,21 @@ if report_file:
         writer.writerow([''])
         writer.writerow(['TOTALS FOR EACH GRADE:'])
         writer.writerow(['','grade', 'quantity', 'percent'])
+        num_insuff = len([pos_id for pos_id in d.keys() if d[pos_id]['grade'] == insuff_data_grade])
+        num_suff = len(d) - num_insuff
         def percent(value):
-            return format(value/len(d)*100,'.2f')+'%'
+            return format(value/(num_suff)*100,'.2f')+'%'
         for key in all_grades:
             total_this_grade = len([pos_id for pos_id in d.keys() if d[pos_id]['grade'] == key])
             writer.writerow(['',key,total_this_grade,percent(total_this_grade)])
-        writer.writerow(['','all',len(d),percent(len(d))])
+        writer.writerow(['','all',num_suff,percent(num_suff)])
+        if num_insuff > 0:
+            writer.writerow(['',insuff_data_grade,num_insuff])
         writer.writerow([''])
         writer.writerow(['INDIVIDUAL POSITIONER GRADES:'])
         writer.writerow(['','pos_id','grade'] + proven_keys)
         pos_ids_sorted_by_grade = []
-        for grade in all_grades:
+        for grade in all_grades + [insuff_data_grade]:
             for pos_id in d.keys():
                 if d[pos_id]['grade'] == grade:
                     pos_ids_sorted_by_grade.append(pos_id)
