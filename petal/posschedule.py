@@ -1,6 +1,5 @@
 import posmovetable
 import posconstants as pc
-import posanticollision as anticollision
 
 class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners
@@ -19,9 +18,9 @@ class PosSchedule(object):
         self.move_tables = []
         self.requests = []
 
-	@property
-	def collider(self):
-		return self.petal.collider
+    @property
+    def collider(self):
+        return self.petal.collider
 		
     def request_target(self, pos, uv_type, u, v, log_note=''):
         """Adds a request to the schedule for a given positioner to move to the

@@ -48,9 +48,9 @@ class Petal(object):
         self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
         self.set_motor_parameters()
 		
-		# collider and scheduler setup
-		self.collider = poscollider.PosCollider(configfile='')
-		self.collider.add_positioners(self.posmodels)
+        # collider and scheduler setup
+        self.collider = poscollider.PosCollider(configfile='')
+        self.collider.add_positioners(self.posmodels)
         self.schedule = posschedule.PosSchedule(self)
         self.anticollision_default = True  # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
         self.anticollision_override = True # causes the anticollision_default value to be used in all cases
@@ -61,7 +61,7 @@ class Petal(object):
             state = posstate.PosState(fid_id, logging=True, device_type='fid', printfunc=self.printfunc)
             self.fidstates[fid_id] = state
         
-        # power suppliees setup?
+        # power supplies setup?
         # to-do
         
         # fans setup?
