@@ -468,7 +468,7 @@ class XYTest(object):
                 if any(add_and_commit_errs):
                     print('Warning: it appears that not all the log or plot files committed ok to SVN. Check through carefully and do this manually. The files that failed were:')
                     for i in range(len(add_and_commit_errs)):
-                        if add_and_commit_errs(i):
+                        if add_and_commit_errs[i]:
                             print(files_attempted[i])
                 if not(keep_creds):
                     del self.svn_user
