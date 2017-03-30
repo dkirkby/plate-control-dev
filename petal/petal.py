@@ -2,6 +2,7 @@ import posmodel
 import posschedule
 import posmovetable
 import posstate
+import poscollider
 import posconstants as pc
 import numpy as np
 import time
@@ -41,14 +42,18 @@ class Petal(object):
             model = posmodel.PosModel(state)
             self.posmodels.append(model)
         self.posids = pos_ids.copy()
-        self.schedule = posschedule.PosSchedule(self)
-        self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
-        self.anticollision_default = True  # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
-        self.anticollision_override = True # causes the anticollision_default value to be used in all cases
         self.canids_where_tables_were_just_sent = []
         self.busids_where_tables_were_just_sent = []
         self.nonresponsive_canids = []
+        self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
         self.set_motor_parameters()
+		
+		# collider and scheduler setup
+		self.collider = poscollider.PosCollider(configfile='')
+		self.collider.add_positioners(self.posmodels)
+        self.schedule = posschedule.PosSchedule(self)
+        self.anticollision_default = True  # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
+        self.anticollision_override = True # causes the anticollision_default value to be used in all cases
         
         # fiducials setup
         self.fidstates = {}

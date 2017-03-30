@@ -18,9 +18,11 @@ class PosSchedule(object):
         self.petal = petal
         self.move_tables = []
         self.requests = []
-        self.anticol = anticollision.PosAnticol(avoidance = 'EM',verbose = False)
 
-
+	@property
+	def collider(self):
+		return self.petal.collider
+		
     def request_target(self, pos, uv_type, u, v, log_note=''):
         """Adds a request to the schedule for a given positioner to move to the
         target position (u,v) or by the target distance (du,dv) in the coordinate
