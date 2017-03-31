@@ -25,12 +25,12 @@ class Petal(object):
         fidids       ... list of fiducials unique id strings
         
     Optional initialization inputs:
-        simulator_on   ... boolean, controls whether in software-only simulation mode
-        db_commit_on   ... boolean, controls whether to commit state data to the online system database (can be done with or without conf_commit_on)
-        conf_commit_on ... boolean, controlw whether to commit state data to local .conf files (can be done with or without db_commit_on)
-        printfunc      ... method, used for stdout style printing. we use this for logging during tests
+        simulator_on    ... boolean, controls whether in software-only simulation mode
+        db_commit_on    ... boolean, controls whether to commit state data to the online system database (can be done with or without local_commit_on)
+        local_commit_on ... boolean, controlw whether to commit state data to local log files (can be done with or without db_commit_on)
+        printfunc       ... method, used for stdout style printing. we use this for logging during tests
     """
-    def __init__(self, petal_id, posids, fidids, simulator_on=False, db_commit_on=False, conf_commit_on=True, printfunc=print):
+    def __init__(self, petal_id, posids, fidids, simulator_on=False, db_commit_on=False, local_commit_on=True, printfunc=print):
         # petal setup
         self.petal_id = petal_id
         self.verbose = False # whether to print verbose information at the terminal
@@ -43,7 +43,7 @@ class Petal(object):
 
         # database setup
         self.db_commit_on = db_commit_on
-        self.conf_commit_on = conf_commit_on
+        self.local_commit_on = local_commit_on
         self.altered_states = set()
 
         # positioners setup
@@ -610,7 +610,7 @@ class Petal(object):
             p.state.write(keys[i],values[i])
             self.altered_states.add(p.state)
 
-    def commit(self):
+    def commit(self, *args, **kwargs):
         '''Commit data to the online database.
         '''
         if self.db_commit_on:
@@ -619,7 +619,7 @@ class Petal(object):
                 # gather up the data from this state
                 # do the commit
                 pass
-        if self.conf_commit_on:
+        if self.local_commit_on:
             for state in self.altered_states:
                 state.log_unit()
         self.altered_states = set()
