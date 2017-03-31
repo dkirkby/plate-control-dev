@@ -14,10 +14,10 @@ class PosMoveTable(object):
     instead.
     """
 
-    def __init__(self, posmodel=None):
-        if not(posmodel):
-            posmodel = posmodel.PosModel()
-        self.posmodel = posmodel         # the particular positioner this table applies to
+    def __init__(self, this_posmodel=None):
+        if not(this_posmodel):
+            this_posmodel = posmodel.PosModel()
+        self.posmodel = this_posmodel    # the particular positioner this table applies to
         self.log_note = ''               # optional note string which user can associate with this table, to be stored in any logging
         self.rows = []                   # internal representation of the move data
         self.rows_extra = []             # auto-generated backlash and final creep rows get stored here

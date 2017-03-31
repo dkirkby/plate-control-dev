@@ -282,7 +282,7 @@ if __name__=="__main__":
             err_xy_fields = [field for field in reader.fieldnames if 'err_xy' in field]
             if err_xy_fields:
                 namesplit = os.path.basename(file).split('_')
-                pos_id = namesplit[0]
+                posid = namesplit[0]
                 logsuffix = ''.join(namesplit[3:-1])
                 if logsuffix and ask_ignore_files_with_logsuffix:
                     gui_root = tkinter.Tk()
@@ -330,7 +330,7 @@ if __name__=="__main__":
                     if pos_logs:
                         d[file]['pos log files'] = list(pos_logs)
                     d[file]['err_data'] = err_data
-                    d[file]['pos_id'] = pos_id
+                    d[file]['pos_id'] = posid
                 else:
                     del d[file]
     
@@ -341,10 +341,10 @@ if __name__=="__main__":
         existing_files = os.listdir(save_directory)
         ask_overwrite = True
         should_overwrite = False
-        all_pos_ids = [d[file]['pos_id'] for file in d.keys()]
+        all_posids = [d[file]['pos_id'] for file in d.keys()]
         for file in existing_files:
-            for pos_id in all_pos_ids:
-                if pos_id in file:
+            for posid in all_posids:
+                if posid in file:
                     if ask_overwrite:
                         should_overwrite = tkinter.messagebox.askyesnocancel('Overwrite summaries?',message='Some summary files already exist in that directory. Should we overwrite them?\n\nYes --> overwrite completely\nNo --> attempt to merge data\nCancel --> Do nothing')
                         ask_overwrite = False

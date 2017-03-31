@@ -88,19 +88,19 @@ class XYTest(object):
         self.logwrite('FVC scale: ' + str(fvc.scale))
         
         # set up positioners, fiducials, and petals
-        self.pos_ids = self.hwsetup_conf['pos_ids']
-        self.pos_notes = self.hwsetup_conf['pos_notes'] # notes for report to add about positioner (reported with positioner in same slot as pos_ids list)
-        while len(self.pos_notes) < len(self.pos_ids):
+        self.posids = self.hwsetup_conf['pos_ids']
+        self.pos_notes = self.hwsetup_conf['pos_notes'] # notes for report to add about positioner (reported with positioner in same slot as posids list)
+        while len(self.pos_notes) < len(self.posids):
             self.pos_notes.append('')
-        fid_ids = self.hwsetup_conf['fid_ids']
+        fidids = self.hwsetup_conf['fid_ids']
         ptl_id = self.hwsetup_conf['ptl_id']
-        ptl = petal.Petal(ptl_id, self.pos_ids, fid_ids, simulator_on=self.simulate, printfunc=self.logwrite)
+        ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite)
         ptl.anticollision_default = self.xytest_conf['anticollision']
         self.m = posmovemeasure.PosMoveMeasure([ptl],fvc,printfunc=self.logwrite)
-        self.pos_ids = self.m.all_pos_ids()
-        self.logwrite('Positoners: ' + str(self.pos_ids))
+        self.posids = self.m.all_posids()
+        self.logwrite('Positoners: ' + str(self.posids))
         self.logwrite('Positoner notes: ' + str(self.pos_notes))
-        self.logwrite('Fiducials: ' + str(fid_ids))
+        self.logwrite('Fiducials: ' + str(fidids))
         self.logwrite('Petal: ' + str(ptl_id))
         self.m.make_plots_during_calib = self.xytest_conf['should_make_plots']
         self.logwrite('Automatic generation of calibration and submove plots is turned ' + ('ON' if self.xytest_conf['should_make_plots'] else 'OFF') + '.')
@@ -123,10 +123,10 @@ class XYTest(object):
             self.logwrite('user-entry: ' + key + ': ' + user_vals[key])
             summarizer_init_data[key] = user_vals[key]
         summarizer_init_data['operator notes'] = self.get_and_log_comments_from_user()
-        for pos_id in self.pos_ids:
-            state = self.m.petals[0].get(pos_id).state
-            self.summarizers[pos_id] = summarizer.Summarizer(state,summarizer_init_data)
-            self.track_file(self.summarizers[pos_id].filename, commit='always')
+        for posid in self.posids:
+            state = self.m.state(posid)
+            self.summarizers[posid] = summarizer.Summarizer(state,summarizer_init_data)
+            self.track_file(self.summarizers[posid].filename, commit='always')
         self.logwrite('Data summarizers for all positioners initialized.')
         
         # TEMPORARY HACK until individual fiducial dot locations tracking is properly handled
@@ -188,21 +188,21 @@ class XYTest(object):
                 self.collect_calibrations()
             start_time = time.time()
             self.logwrite('Starting physical travel range measurement sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
-            self.m.measure_range(pos_ids='all', axis='theta')
-            self.m.measure_range(pos_ids='all', axis='phi')
-            for pos_id in self.pos_ids:
-                state = self.m.state(pos_id)
+            self.m.measure_range(posids='all', axis='theta')
+            self.m.measure_range(posids='all', axis='phi')
+            for posid in self.posids:
+                state = self.m.state(posid)
                 self.track_file(state.log_path, commit='once')
                 self.track_file(state.unit.filename, commit='always')
                 for key in params:
-                    self.logwrite(str(pos_id) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
-            for pos_id in self.pos_ids:
-                self.summarizers[pos_id].update_loop_calibs(summarizer.meas_suffix, params)
+                    self.logwrite(str(posid) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
+            for posid in self.posids:
+                self.summarizers[posid].update_loop_calibs(summarizer.meas_suffix, params)
             if not(set_as_defaults):
                 self.restore_calibrations()
             self.logwrite('Calibration of physical travel ranges completed in ' + self._elapsed_time_str(start_time) + '.')
-        for pos_id in self.pos_ids:
-            self.summarizers[pos_id].update_loop_calibs(summarizer.used_suffix, params)
+        for posid in self.posids:
+            self.summarizers[posid].update_loop_calibs(summarizer.used_suffix, params)
 
     def run_calibration(self, loop_number):
         """Move positioners through a short sequence to calibrate them.
@@ -219,22 +219,22 @@ class XYTest(object):
             self.m.n_points_calib_T = n_pts_calib_T
             self.m.n_points_calib_P = n_pts_calib_P
             params = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']
-            files = self.m.calibrate(pos_ids='all', mode=calib_mode, save_file_dir=pc.xytest_plots_directory, save_file_timestamp=pc.filename_timestamp_str_now())
+            files = self.m.calibrate(posids='all', mode=calib_mode, save_file_dir=pc.xytest_plots_directory, save_file_timestamp=pc.filename_timestamp_str_now())
             for file in files:
                 self.track_file(file, commit='once')
                 self.logwrite('Calibration plot file: ' + file)
-            for pos_id in self.pos_ids:
-                self.summarizers[pos_id].update_loop_calibs(summarizer.meas_suffix, params)
+            for posid in self.posids:
+                self.summarizers[posid].update_loop_calibs(summarizer.meas_suffix, params)
             if not(set_as_defaults):
                 self.restore_calibrations()
             else:
-                for pos_id in self.pos_ids:
-                    state = self.m.state(pos_id)
+                for posid in self.posids:
+                    state = self.m.state(posid)
                     self.track_file(state.log_path, commit='once')
                     for key in params:
-                        self.logwrite(str(pos_id) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
-            for pos_id in self.pos_ids:
-                self.summarizers[pos_id].update_loop_calibs(summarizer.used_suffix, params)
+                        self.logwrite(str(posid) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
+            for posid in self.posids:
+                self.summarizers[posid].update_loop_calibs(summarizer.used_suffix, params)
             self.logwrite('Calibration with ' + str(n_pts_calib_T) + ' theta points and ' + str(n_pts_calib_P) + ' phi points completed in ' + self._elapsed_time_str(start_time) + '.')
         
     def run_xyaccuracy_test(self, loop_number):
@@ -244,17 +244,17 @@ class XYTest(object):
         log_suffix = self.xytest_conf['log_suffix']
         log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
         log_timestamp = pc.filename_timestamp_str_now()
-        def movedata_name(pos_id):
-            return pc.xytest_data_directory  + pos_id + '_' + log_timestamp + log_suffix + '_movedata.csv'
-        def summary_plot_name(pos_id):
-            return pc.xytest_plots_directory + pos_id + '_' + log_timestamp + log_suffix + '_xyplot'    
+        def movedata_name(posid):
+            return pc.xytest_data_directory  + posid + '_' + log_timestamp + log_suffix + '_movedata.csv'
+        def summary_plot_name(posid):
+            return pc.xytest_plots_directory + posid + '_' + log_timestamp + log_suffix + '_xyplot'    
 
         n_pts_calib_T = self.xytest_conf['n_points_calib_T'][loop_number]
         n_pts_calib_P = self.xytest_conf['n_points_calib_P'][loop_number]
         calib_mode = self.xytest_conf['calib_mode'][loop_number]
         should_measure_ranges = self.xytest_conf['should_measure_ranges'][loop_number]
-        for pos_id in self.pos_ids:
-            self.summarizers[pos_id].update_loop_inits(movedata_name(pos_id), n_pts_calib_T, n_pts_calib_P, calib_mode, should_measure_ranges)
+        for posid in self.posids:
+            self.summarizers[posid].update_loop_inits(movedata_name(posid), n_pts_calib_T, n_pts_calib_P, calib_mode, should_measure_ranges)
 
         local_targets = self.generate_posXY_targets_grid(self.xytest_conf['n_pts_across_grid'][loop_number])
         self.logwrite('Number of local targets = ' + str(len(local_targets)))
@@ -272,8 +272,8 @@ class XYTest(object):
         for i in submove_idxs: move_log_header += ',err_xy' + str(i)
         for i in submove_idxs: move_log_header += ',pos_t'  + str(i) + ',pos_p' + str(i)
         move_log_header += '\n'
-        for pos_id in self.pos_ids:
-            filename = movedata_name(pos_id)
+        for posid in self.posids:
+            filename = movedata_name(posid)
             self.track_file(filename, commit='once')
             file = open(filename,'w')
             file.write(move_log_header)
@@ -283,21 +283,21 @@ class XYTest(object):
         all_targets = []
         for local_target in local_targets:
             these_targets = {}
-            for pos_id in self.pos_ids:
-                trans = self.m.trans(pos_id)
-                these_targets[pos_id] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(local_target)}
+            for posid in self.posids:
+                trans = self.m.trans(posid)
+                these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(local_target)}
             all_targets.append(these_targets)
             
         # initialize some data structures for storing test data
         targ_num = 0
         all_data_by_target = []
-        all_data_by_pos_id = {}
+        all_data_by_posid = {}
         start_cycles = {}
-        for pos_id in self.pos_ids:
-            all_data_by_pos_id[pos_id] = {'targ_obsXY': []}
+        for posid in self.posids:
+            all_data_by_posid[posid] = {'targ_obsXY': []}
             for key in submove_fields:
-                all_data_by_pos_id[pos_id][key] = [[] for i in submove_idxs]
-            start_cycles[pos_id] = self.m.state(pos_id).read('TOTAL_MOVE_SEQUENCES')
+                all_data_by_posid[posid][key] = [[] for i in submove_idxs]
+            start_cycles[posid] = self.m.state(posid).read('TOTAL_MOVE_SEQUENCES')
         
         # run the test
         try:  
@@ -312,42 +312,42 @@ class XYTest(object):
                 
                 # store this set of measured data
                 all_data_by_target.append(these_meas_data)
-                for pos_id in these_targets.keys():
-                    all_data_by_pos_id[pos_id]['targ_obsXY'].append(these_meas_data[pos_id]['targ_obsXY'])
+                for posid in these_targets.keys():
+                    all_data_by_posid[posid]['targ_obsXY'].append(these_meas_data[posid]['targ_obsXY'])
                     for sub in submove_idxs:
                         for key in submove_fields:
-                            all_data_by_pos_id[pos_id][key][sub].append(these_meas_data[pos_id][key][sub])              
+                            all_data_by_posid[posid][key][sub].append(these_meas_data[posid][key][sub])              
                 
                 # update summary data logs
-                for pos_id in self.pos_ids:
-                    self.summarizers[pos_id].write_row(all_data_by_pos_id[pos_id]['err2D'])
+                for posid in self.posids:
+                    self.summarizers[posid].write_row(all_data_by_posid[posid]['err2D'])
         
                 # update move data log
-                for pos_id in these_targets.keys():
-                    state = self.m.state(pos_id)
+                for posid in these_targets.keys():
+                    state = self.m.state(posid)
                     self.track_file(state.log_path, commit='once')
                     self.track_file(state.unit.filename, commit='always')
                     row = this_timestamp
                     row += ',' + str(state.read('TOTAL_MOVE_SEQUENCES'))
                     row += ',' + str(state.log_basename)
-                    row += ',' + str(these_targets[pos_id]['targ_obsXY'][0])
-                    row += ',' + str(these_targets[pos_id]['targ_obsXY'][1])
+                    row += ',' + str(these_targets[posid]['targ_obsXY'][0])
+                    row += ',' + str(these_targets[posid]['targ_obsXY'][1])
                     for key in submove_fields:
-                        for submove_data in these_targets[pos_id][key]:
+                        for submove_data in these_targets[posid][key]:
                             if isinstance(submove_data,list):
                                 for j in range(len(submove_data)):
                                     row += ',' + str(submove_data[j])
                             else:
                                 row += ',' + str(submove_data)
                     row += '\n'
-                    file = open(movedata_name(pos_id),'a')
+                    file = open(movedata_name(posid),'a')
                     file.write(row)
                     file.close()
             
             # make summary plots showing the targets and measured positions
             if self.xytest_conf['should_make_plots']:
-                for pos_id in all_data_by_pos_id.keys():
-                    posmodel = self.m.posmodel(pos_id)
+                for posid in all_data_by_posid.keys():
+                    posmodel = self.m.posmodel(posid)
                     title = log_timestamp + log_suffix
                     center = [posmodel.state.read('OFFSET_X'),posmodel.state.read('OFFSET_Y')]
                     theta_min = posmodel.trans.posTP_to_obsTP([min(posmodel.targetable_range_T),0])[0]
@@ -355,16 +355,16 @@ class XYTest(object):
                     theta_range = [theta_min,theta_max]
                     r1 = posmodel.state.read('LENGTH_R1')
                     r2 = posmodel.state.read('LENGTH_R2')
-                    filenames = pos_xytest_plot.plot(summary_plot_name(pos_id),pos_id,all_data_by_pos_id[pos_id],center,theta_range,r1,r2,title)
-                    self.logwrite(pos_id + ': Summary log file: ' + self.summarizers[pos_id].filename)
-                    self.logwrite(pos_id + ': Full data log file: ' + movedata_name(pos_id))
+                    filenames = pos_xytest_plot.plot(summary_plot_name(posid),posid,all_data_by_posid[posid],center,theta_range,r1,r2,title)
+                    self.logwrite(posid + ': Summary log file: ' + self.summarizers[posid].filename)
+                    self.logwrite(posid + ': Full data log file: ' + movedata_name(posid))
                     for filename in filenames:
-                        self.logwrite(pos_id + ': Summary plot file: ' + filename)
+                        self.logwrite(posid + ': Summary plot file: ' + filename)
                         self.track_file(filename, commit='once')
 
             # Test report and email only on certain tests
             if self.xytest_conf['should_email']:
-                test_report.do_test_report(self.pos_ids, all_data_by_pos_id, log_timestamp, self.pos_notes, self._elapsed_time_str(start_time), self.xytest_conf['email_list'])
+                test_report.do_test_report(self.posids, all_data_by_posid, log_timestamp, self.pos_notes, self._elapsed_time_str(start_time), self.xytest_conf['email_list'])
         except (KeyboardInterrupt, SystemExit):
             raise
         except:
@@ -380,7 +380,7 @@ class XYTest(object):
         n_moves = self.xytest_conf['n_unmeasured_moves_after_loop'][loop_number]
         if n_moves > 0:
             self.track_all_poslogs_once()
-            max_log_length = test.m.state(test.pos_ids[0]).max_log_length
+            max_log_length = test.m.state(test.posids[0]).max_log_length
             start_time = time.time()
             self.logwrite('Starting unmeasured move sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             status_str = lambda j : '... now at move ' + str(j) + ' of ' + str(n_moves) + ' within loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops)
@@ -409,12 +409,12 @@ class XYTest(object):
             start_time = time.time()
             self.logwrite('Starting hardstop strike sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             retract_requests = {}
-            for pos_id in self.pos_ids:
-                retract_requests[pos_id] = {'command':'posTP', 'target':[0,90], 'log_note':'retract for hardstop test strike'}
+            for posid in self.posids:
+                retract_requests[posid] = {'command':'posTP', 'target':[0,90], 'log_note':'retract for hardstop test strike'}
             for j in range(n_strikes):
                 self.logwrite('... now at strike ' + str(j+1) + ' of ' + str(n_strikes) + ' within loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
                 self.m.move(retract_requests)
-                self.m.rehome(self.pos_ids)
+                self.m.rehome(self.posids)
             self.logwrite(str(n_strikes) + ' hardstop strikes completed in ' + self._elapsed_time_str(start_time) + '.')
     
     def get_svn_credentials(self):
@@ -489,35 +489,37 @@ class XYTest(object):
         for this loop, this method sets that. It also stores the old setting for later restoration.
         """
         self.old_currents = {}
-        for pos_id in self.pos_ids:
-            self.old_currents[pos_id] = {}
+        for posid in self.posids:
+            self.old_currents[posid] = {}
         for key in ['CURR_CRUISE','CURR_CREEP']:
             if key == 'CURR_CRUISE':
                 curr_val = self.xytest_conf['cruise_current_override'][loop_number]
             else:
                 curr_val = self.xytest_conf['creep_current_override'][loop_number]
-            for pos_id in self.pos_ids:
-                state = self.m.state(pos_id)
+            for posid in self.posids:
+                state = self.m.state(posid)
+                ptl = self.m.petal(posid)
                 self.track_file(state.log_path, commit='once')
-                self.old_currents[pos_id][key] = state.read(key)
+                self.old_currents[posid][key] = state.read(key)
                 if curr_val != None:
-                    state.write(key,curr_val)
-                    self.logwrite(str(pos_id) + ': Setting ' + key + ' to ' + str(curr_val))
+                    ptl.set(posid, key, curr_val)
+                    self.logwrite(str(posid) + ': Setting ' + key + ' to ' + str(curr_val))
                 else:
-                    self.logwrite(str(pos_id) + ': ' + key + ' is ' + str(self.old_currents[pos_id][key]))
-                    self.old_currents[pos_id][key] = None # indicates later in clear_current_overrides() method whether to do anything
+                    self.logwrite(str(posid) + ': ' + key + ' is ' + str(self.old_currents[posid][key]))
+                    self.old_currents[posid][key] = None # indicates later in clear_current_overrides() method whether to do anything
         self.m.set_motor_parameters()
         
     def clear_current_overrides(self):
         """Restore current settings for each positioner to their original values.
         """
         for key in ['CURR_CRUISE','CURR_CREEP']:
-            for pos_id in self.pos_ids:
-                if self.old_currents[pos_id][key] != None:
-                    state = self.m.state(pos_id)
+            for posid in self.posids:
+                if self.old_currents[posid][key] != None:
+                    state = self.m.state(posid)
+                    ptl = self.m.petal(posid)
                     self.track_file(state.log_path, commit='once')
-                    state.write(key, self.old_currents[pos_id][key])
-                    self.logwrite(str(pos_id) + ': Restoring ' + key + ' to ' + str(self.old_currents[pos_id][key]))
+                    ptl.set(posid, key, self.old_currents[posid][key])
+                    self.logwrite(str(posid) + ': Restoring ' + key + ' to ' + str(self.old_currents[posid][key]))
         self.m.set_motor_parameters()
 
     def generate_posXY_targets_grid(self, npoints_across_grid):
@@ -551,8 +553,8 @@ class XYTest(object):
         requests = []
         for local_target in xytargets_list:
             these_targets = {}
-            for pos_id in sorted(self.pos_ids):
-                these_targets[pos_id] = {'command':'posXY', 'target':local_target}
+            for posid in sorted(self.posids):
+                these_targets[posid] = {'command':'posXY', 'target':local_target}
             requests.append(these_targets)
         return requests
 
@@ -571,8 +573,8 @@ class XYTest(object):
         '''Special function to run track_file on all the latest pos logs, since they are kind of
         a moving target. So it's nice to have a convenience function for that.
         '''
-        for pos_id in self.pos_ids:
-            state = self.m.state(pos_id)
+        for posid in self.posids:
+            state = self.m.state(posid)
             self.track_file(state.log_path, commit='once')
 
     def collect_calibrations(self):
@@ -580,20 +582,22 @@ class XYTest(object):
         Restore these with the restore_calibrations() method.
         '''
         self.calib_store = {}
-        for pos_id in self.pos_ids:
-            self.calib_store[pos_id] = {}
-            state = self.m.state(pos_id)
+        for posid in self.posids:
+            self.calib_store[posid] = {}
+            ptl = self.m.petal(posid)
             for calib_key in pc.nominals.keys():
-                self.calib_store[pos_id][calib_key] = state.read(calib_key)
+                self.calib_store[posid][calib_key] = ptl.get(posid,calib_key)
 
     def restore_calibrations(self):
         '''Restore all the calibration values previously stored with the
         collect_calibrations() method.
         '''
-        for pos_id in self.pos_ids:
-            state = self.m.state(pos_id)
+        for posid in self.posids:
             for calib_key in pc.nominals.keys():
-                state.write(calib_key, self.calib_store[pos_id][calib_key])
+                ptl = self.m.petal(posid)
+                ptl.set(posid, calib_key, self.calib_store[posid][calib_key])
+        for ptl in self.m.petals:
+            ptl.commit()
 
     def _calculate_and_check_n_loops(self):
         """Returns total number of loops in test configuration.
@@ -657,7 +661,7 @@ if __name__=="__main__":
         test.clear_current_overrides()
         test.svn_add_commit(keep_creds=True)
     test.logwrite('All test loops complete.')
-    test.m.park(pos_ids='all')
+    test.m.park(posids='all')
     test.logwrite('Moved positioners into \'parked\' position.')
     test.logwrite('Test complete.')
     test.track_all_poslogs_once()

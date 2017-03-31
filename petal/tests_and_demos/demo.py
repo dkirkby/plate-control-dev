@@ -6,17 +6,17 @@ import posconstants as pc
 """
 
 # initialization
-#pos_ids = ['UM00014','UM00011']
+#posids = ['UM00014','UM00011']
 # Use same positioners as for demo_dos script (to help with debugging)
-pos_ids = ['UM00013','UM00014','UM00017','UM00022']
-fid_ids = []
+posids = ['UM00013','UM00014','UM00017','UM00022']
+fidids = []
 petal_id = 0
-ptl = petal.Petal(petal_id, pos_ids, fid_ids)
+ptl = petal.Petal(petal_id, posids, fidids)
 ptl.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
 
 print('INITIAL POSITION')
-for pos_id in pos_ids:
-    print(ptl.get(pos_id).expected_current_position_str)
+for posid in posids:
+    print(ptl.posmodel(posid).expected_current_position_str)
 
 # demo script flags
 use_standard_syntax = True # enter False to try out the "quick" move syntax
@@ -41,7 +41,7 @@ if should_flash:
 if should_home:
     print('MOVE: homing')
     # ptl.set(key='CREEP_TO_LIMITS',value=True) # to force only creeping to hard stops
-    ptl.request_homing(pos_ids)
+    ptl.request_homing(posids)
     ptl.schedule_send_and_execute_moves()
 else:
     ptl.set(key=['POS_T','POS_P'],value=[-180,180]) # faking having just homed
@@ -68,8 +68,8 @@ def general_move(command,targets):
                 # It instructs the theta and phis axes to simply rotate by some argued angular distances, with
                 # no regard for anticollision or travel range limits.
 
-                for pos_id in pos_ids:                
-                    requests[pos_id] = {'target':target, 'log_note':log_note}
+                for posid in posids:                
+                    requests[posid] = {'target':target, 'log_note':log_note}
                 ptl.request_direct_dtdp(requests)
 
             else:
@@ -77,8 +77,8 @@ def general_move(command,targets):
                 # Here is the request syntax for general usage.
                 # Any coordinate system can be requested, range limits are respected, and anticollision can be calculated.
 
-                for pos_id in pos_ids: 
-                    requests[pos_id] = {'command':command, 'target':target, 'log_note':log_note}
+                for posid in posids: 
+                    requests[posid] = {'command':command, 'target':target, 'log_note':log_note}
                 ptl.request_targets(requests) # this is the general use function, where 
             
             # For the three steps below, petal.py also provides a wrapper function called 'schedule_send_and_execute_moves'.
@@ -94,13 +94,13 @@ def general_move(command,targets):
         else:
 
             # This 'quick' syntax is mostly intended for manual operations, or simple operations on test stations.
-            # You can send the command to multiple pos_ids simultaneously, but all the positioners receive the same command and target coordinates.
+            # You can send the command to multiple posids simultaneously, but all the positioners receive the same command and target coordinates.
             # (So it generally would make no sense to use these in any global coordinate system, where all the positioners are in different places.)
 
             if command == 'direct_dTdP':
-                ptl.quick_direct_dtdp(pos_ids, target, log_note) # expert, no limits or anticollision
+                ptl.quick_direct_dtdp(posids, target, log_note) # expert, no limits or anticollision
             else:
-                ptl.quick_move(pos_ids, command, target, log_note) # general, with limits and anticollision
+                ptl.quick_move(posids, command, target, log_note) # general, with limits and anticollision
 
 # now do the requested move sequences
 if should_direct_dtdp:

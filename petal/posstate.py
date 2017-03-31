@@ -77,6 +77,8 @@ class PosState(object):
                 if key not in headers:
                     self.log_basename = self.increment_suffix(self.log_basename) # start a new file if headers don't match up anymore with all the data we're trying to store
                     break
+        self.next_log_notes = [] # used for storing specific notes in the next row written to the log
+        self.log_unit_called_yet = False # used for one time check whether need to make a new log file, or whether log file headers have changed since last run
         self.log_unit()
 
     def __str__(self):
@@ -112,25 +114,35 @@ class PosState(object):
         else:
             self.printfunc('value not set, because the key "' + repr(key) + '" was not found')
  
-    def log_unit(self,note=''):
+    def log_unit(self):
         """All current unit parameters are written to the hardware unit's log file.
         """
         if self.logging:
             timestamp = pc.timestamp_str_now()
-            if note == '':
-                note = ' ' # just to make csv file cell look blank in excel
+            start_new_file = False
             if self.curr_log_length >= self.max_log_length:
                 self.log_basename = self.increment_suffix(self.log_basename)
                 self.curr_log_length = 0
-            if not(os.path.isfile(self.log_path)): # checking whether need to start a new file
+                start_new_file = True
+            if not(self.log_unit_called_yet):
+                if not(os.path.isfile(self.log_path)):
+                    start_new_file = True
+                with open(self.log_path, 'r', newline='') as csvfile:
+                    fieldnames_found_in_old_logfile = csv.DictReader(csvfile).fieldnames
+                for key in self.log_fieldnames:
+                    if key not in fieldnames_found_in_old_logfile:
+                        start_new_file = True
+            if start_new_file:
                 with open(self.log_path, 'w', newline='') as csvfile:
                     csv.writer(csvfile).writerow(self.log_fieldnames)
             with open(self.log_path, 'a', newline='') as csvfile: # now append a row of data
                 row = self.unit.copy()
-                row.update({'TIMESTAMP':timestamp,'NOTE':str(note)})
+                row.update({'TIMESTAMP':timestamp,'NOTE':str(self.next_log_notes)})
                 writer = csv.DictWriter(csvfile,fieldnames=self.log_fieldnames)
                 writer.writerow(row)
             self.curr_log_length += 1
+            self.next_log_notes = []
+            self.log_unit_called_yet = True # only need to check this the first time through
     
     @property
     def log_fieldnames(self):

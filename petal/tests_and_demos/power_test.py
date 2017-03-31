@@ -8,10 +8,10 @@ power consumption values.
 """
 
 # initialization
-pos_ids = ['UM00013','UM00014','UM00017','UM00022']
-fid_ids = []
+posids = ['UM00013','UM00014','UM00017','UM00022']
+fidids = []
 petal_id = 0
-ptl = petal.Petal(petal_id, pos_ids, fid_ids)
+ptl = petal.Petal(petal_id, posids, fidids)
 ptl.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
 
 # test settings
@@ -47,7 +47,7 @@ between_TP = [0,90]
 # homing of positioner, if necessary
 if should_home:
     print('Homing...')
-    ptl.request_homing(pos_ids)
+    ptl.request_homing(posids)
     ptl.schedule_send_and_execute_moves()
     print('Homing complete.')
 
@@ -58,15 +58,15 @@ for move in range(len(targets)):
     
     log_note = 'anticollision sim in-between move'
     requests = {}
-    for pos_id in pos_ids: 
-        requests[pos_id] = {'command':'posTP', 'target':between_TP, 'log_note':log_note}
+    for posid in posids: 
+        requests[posid] = {'command':'posTP', 'target':between_TP, 'log_note':log_note}
     ptl.request_targets(requests)
     ptl.schedule_send_and_execute_moves()    
     
     log_note = 'powertest target ' + str(move + 1)
     requests = {}
-    for pos_id in pos_ids: 
-        requests[pos_id] = {'command':'posXY', 'target':target, 'log_note':log_note}
+    for posid in posids: 
+        requests[posid] = {'command':'posXY', 'target':target, 'log_note':log_note}
     ptl.request_targets(requests)
     ptl.schedule_send_and_execute_moves()
     time.sleep(fvc_pause)
@@ -77,8 +77,8 @@ for move in range(len(targets)):
         print('  ... simulated correction move ' + str(corr + 1) + ' of ' + str(range(len(correction))) + ': moving by (dx,dy) = (' + str(dxdy[0]) + ',' + str(dxdy[1]) + ')')
         log_note = 'powertest target ' + str(move + 1) + ' corr ' + str(corr + 1)
         requests = {}
-        for pos_id in pos_ids: 
-            requests[pos_id] = {'command':'dXdY', 'target':dxdy, 'log_note':log_note}
+        for posid in posids: 
+            requests[posid] = {'command':'dXdY', 'target':dxdy, 'log_note':log_note}
         ptl.request_targets(requests)
         ptl.schedule_send_and_execute_moves()
         time.sleep(fvc_pause)

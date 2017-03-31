@@ -20,8 +20,8 @@ import csv
 import numpy as np
 
 # set up the hardware configurations
-ptl_id = 12 # pc number of the petal controller
-pos_ids = ['M00082','M00063','M00524','M00047','M00084','M00078','M00528','M00118','M00048','M00077','M00049','M00153','M00214','M00037','M00390','M00162','M00157'] # list of positioners being tested
+ptlid = 12 # pc number of the petal controller
+posids = ['M00082','M00063','M00524','M00047','M00084','M00078','M00528','M00118','M00048','M00077','M00049','M00153','M00214','M00037','M00390','M00162','M00157'] # list of positioners being tested
 
 # set up the timing of the automated FRD tests
 time_between_exposures = 10.0 # seconds to wait between camera exposures
@@ -72,12 +72,12 @@ fieldnames = ['POS_ID','TIMESTAMP','TARGET THETA','TARGET PHI','NUM LIFE MOVES',
 with open(expstampfile,'w',newline='') as file:
     writer = csv.DictWriter(file,fieldnames)
     writer.writeheader()
-def log_exposure(pos_id, state, note=''):
+def log_exposure(posid, state, note=''):
     n_moves = str(state.read('TOTAL_MOVE_SEQUENCES'))
     posT = format(state.read('POS_T'),'.1f')
     posP = format(state.read('POS_P'),'.1f')
-    timestamp_str = logwrite(pos_id + ': Approx time of camera exposure for target [' + posT + ',' + posP + ']  (life=' + n_moves + ')')
-    row = {'POS_ID'         : pos_id,
+    timestamp_str = logwrite(posid + ': Approx time of camera exposure for target [' + posT + ',' + posP + ']  (life=' + n_moves + ')')
+    row = {'POS_ID'         : posid,
            'TIMESTAMP'      : timestamp_str,
            'TARGET THETA'   : posT,
            'TARGET PHI'     : posP,
@@ -88,8 +88,8 @@ def log_exposure(pos_id, state, note=''):
         writer.writerow(row)
     
 # log configuration info
-pos_ids.sort()
-logwrite('POSITIONERS: ' + str(pos_ids))
+posids.sort()
+logwrite('POSITIONERS: ' + str(posids))
 logwrite('SIMULATION MODE: ' + 'on' if should_simulate else 'off')
 
 # retrieve latest log files and settings from svn
@@ -108,55 +108,55 @@ if not(should_simulate):
 new_and_changed_files = set()
 
 # initialize the "petal" of positioners
-ptl = petal.Petal(ptl_id, pos_ids, fid_ids=[], simulator_on=should_simulate, printfunc=logwrite)
+ptl = petal.Petal(ptlid, posids, fidids=[], simulator_on=should_simulate, printfunc=logwrite)
 ptl.anticollision_default = False
 states = collections.OrderedDict()
-for pos_id in pos_ids:
-    states[pos_id] = ptl.get_model_for_pos(pos_id).state
-    new_and_changed_files.add(states[pos_id].log_path)
-    new_and_changed_files.add(states[pos_id].unit.filename)
-logwrite('Petal ' + str(ptl_id) + ' initialized.')
+for posid in posids:
+    states[posid] = ptl.posmodel(posid).state
+    new_and_changed_files.add(states[posid].log_path)
+    new_and_changed_files.add(states[posid].unit.filename)
+logwrite('Petal ' + str(ptlid) + ' initialized.')
 
 # configure some specific positioner parameters
 pos_params_during_test = {'FINAL_CREEP_ON':False, 'CURR_CRUISE':100, 'CURR_CREEP':100, 'PRINCIPLE_HARDSTOP_CLEARANCE_P':5.0}
 pos_params_before_test = collections.OrderedDict()
-for pos_id in pos_ids:
-    pos_params_before_test[pos_id] = {}
+for posid in posids:
+    pos_params_before_test[posid] = {}
     for param in pos_params_during_test.keys():
-        pos_params_before_test[pos_id][param] = ptl.get(pos_id, param)
-        states[pos_id].write(param, pos_params_during_test[param])
-        logwrite(pos_id + ': Set ' + param + ' = ' + str(ptl.get(pos_id, param)))
+        pos_params_before_test[posid][param] = ptl.get(posid, param)
+        ptl.set(posid, param, pos_params_during_test[param])
+        logwrite(posid + ': Set ' + param + ' = ' + str(ptl.get(posid, param)))
 
 # home and center the positioners
 logwrite('Re-homing all positioners to hard stops.')
-ptl.request_homing(pos_ids)
+ptl.request_homing(posids)
 ptl.schedule_send_and_execute_moves()
 logwrite('Moving all positioners to center positions.')
-ptl.quick_move(pos_ids,'posTP',[0,180])
+ptl.quick_move(posids,'posTP',[0,180])
 
 # do some functional tests to make sure all the positioners are working
-def functional_tests(pos_ids):
+def functional_tests(posids):
     failed_pos = set()
-    for pos_id in pos_ids:
+    for posid in posids:
         keep_asking = True
         title = 'Functional test'
-        message = 'Ready to try moving positioner ' + pos_id + '?'
+        message = 'Ready to try moving positioner ' + posid + '?'
         while keep_asking:
             should_move = tkinter.messagebox.askyesno(title, message)
             if should_move:
-                ptl.quick_move(pos_id,'posTP',[90,90])
-                ptl.quick_move(pos_id,'posTP',[0,180])
-                moved = tkinter.messagebox.askyesno(title,'Did you see ' + pos_id + ' move?')
+                ptl.quick_move(posid,'posTP',[90,90])
+                ptl.quick_move(posid,'posTP',[0,180])
+                moved = tkinter.messagebox.askyesno(title,'Did you see ' + posid + ' move?')
                 if moved:
                     keep_asking = False
-                    logwrite(pos_id + ': PASSED functional test')
+                    logwrite(posid + ': PASSED functional test')
                 else:
-                    message = 'Try moving positioner ' + pos_id + ' again?'
+                    message = 'Try moving positioner ' + posid + ' again?'
             else:
                 keep_asking = False
-                failed_pos.add(pos_id)
+                failed_pos.add(posid)
     return failed_pos
-failed_pos = functional_tests(pos_ids)
+failed_pos = functional_tests(posids)
 keep_asking = True
 while failed_pos and keep_asking:
     message = 'The following positioners apparently failed the functional test:\n'
@@ -170,53 +170,53 @@ while failed_pos and keep_asking:
         failed_pos = functional_tests(list(failed_pos))
     else:
         keep_asking = False
-        for pos_id in failed_pos:
-            ptl.posmodels.pop(ptl.posids.index(pos_id))
-            ptl.posids.pop(ptl.posids.index(pos_id))
-            pos_ids.pop(pos_ids.index(pos_id))
-            logwrite(pos_id + ': FAILED functional test and was disabled for this test run')
+        for posid in failed_pos:
+            ptl.posmodels.pop(ptl.posids.index(posid))
+            ptl.posids.pop(ptl.posids.index(posid))
+            posids.pop(posids.index(posid))
+            logwrite(posid + ': FAILED functional test and was disabled for this test run')
 
 # run the test points
 options_msg = 'Select which positioner to do the next FRD test on.\n'
 i = 0
 options_msg += '\n   ' + str(i) + ': Quit this round of FRD testing.'
-for pos_id in pos_ids:
+for posid in posids:
     i += 1
-    options_msg += '\n   ' + str(i) + ': ' + pos_id
+    options_msg += '\n   ' + str(i) + ': ' + posid
 keep_testing = True
 initial_sleep_time = time_between_exposures - positioner_max_move_time
 while keep_testing:
-    pos_selection = tkinter.simpledialog.askinteger(title='Pick next pos...',prompt=options_msg,minvalue=0,maxvalue=len(pos_ids))
+    pos_selection = tkinter.simpledialog.askinteger(title='Pick next pos...',prompt=options_msg,minvalue=0,maxvalue=len(posids))
     if pos_selection == 0:
         keep_testing = False
     else:
-        pos_id = pos_ids[pos_selection-1]
+        posid = posids[pos_selection-1]
         usernote = tkinter.simpledialog.askstring(title='Enter user note...',prompt='Optional user note can be typed here and will be included in the log.')
-        logwrite(pos_id + ': user note: ' + usernote)
-        ptl.quick_move(pos_id,'posTP',targets[0],'Initial FRD test point for this sequence')
-        logwrite(pos_id + ': placed at first target ' + str(targets[0]) + ' and ready to start FRD test')
+        logwrite(posid + ': user note: ' + usernote)
+        ptl.quick_move(posid,'posTP',targets[0],'Initial FRD test point for this sequence')
+        logwrite(posid + ': placed at first target ' + str(targets[0]) + ' and ready to start FRD test')
         title = 'Ready to start?'
-        message = 'Ready to start FRD test on positioner ' + pos_id + '?'
+        message = 'Ready to start FRD test on positioner ' + posid + '?'
         message += '\n\nMake sure camera software is set to:\n\n'
         message += '   delay = ' + format(time_between_exposures,'.1f') + ' seconds\n'
         message += '   exp = ' + format(camera_expose_time,'.1f') + ' seconds\n'
         message += '\n\nTo time things out right, start the Artemis camera software in autosave mode, and then hit OK here at the same time as a new image happens.'
         tkinter.messagebox.showwarning(title,message)
         start_time = time.time()
-        logwrite(pos_id + ': Beginning timed FRD test sequence')
+        logwrite(posid + ': Beginning timed FRD test sequence')
         time.sleep(camera_expose_and_readout_time)
-        log_exposure(pos_id, states[pos_id], usernote)
+        log_exposure(posid, states[posid], usernote)
         for i in range(1,len(targets)):
             time.sleep(initial_sleep_time)
-            ptl.quick_move(pos_id,'posTP',targets[i],log_note='FRD test point')
-            logwrite(pos_id + ': placed at ' + str(targets[i]) + ' target ' + str(i + 1) + ' of ' + str(len(targets)))
+            ptl.quick_move(posid,'posTP',targets[i],log_note='FRD test point')
+            logwrite(posid + ': placed at ' + str(targets[i]) + ' target ' + str(i + 1) + ' of ' + str(len(targets)))
             previous_loop_end_time = start_time + i * (time_between_exposures + camera_expose_and_readout_time)
             previous_loop_remaining_sleep_time = previous_loop_end_time - time.time()
             if previous_loop_remaining_sleep_time > 0:
                 time.sleep(previous_loop_remaining_sleep_time)
             time.sleep(camera_expose_and_readout_time)
-            log_exposure(pos_id, states[pos_id], usernote)
-        logwrite(pos_id + ': Timed FRD test sequence complete')
+            log_exposure(posid, states[posid], usernote)
+        logwrite(posid + ': Timed FRD test sequence complete')
 logwrite('All FRD test sequences complete')
 
 # ask user how many random moves to do now
@@ -228,8 +228,8 @@ while keep_asking:
     if n_rand_moves != 0:
         message = 'You requested a sequence of\n\n   ' + str(n_rand_moves) + '\n\nuninterrupted random moves to now be done.'
         message += ' This will take about\n\n   ' + format(hours_estimate,'.1f') + ' hours\n\nafter which the total number of lifetime moves on each positioner will be:\n'
-        for pos_id in pos_ids:
-            message += '\n   ' + pos_id + ': ' + str(states[pos_id].read('TOTAL_MOVE_SEQUENCES') + n_rand_moves)
+        for posid in posids:
+            message += '\n   ' + posid + ': ' + str(states[posid].read('TOTAL_MOVE_SEQUENCES') + n_rand_moves)
         message += '\n\nBegin move sequence now?\n\nYes --> begin sequence\nNo --> enter different number'
         begin_now = tkinter.messagebox.askyesno('Begin random moves?',message)
         if begin_now:
@@ -260,7 +260,7 @@ if n_rand_moves > 0:
 # run the unmeasured random moves
 if n_rand_moves > 0:
     start_time = time.time()
-    max_log_length = states[pos_ids[0]].max_log_length
+    max_log_length = states[posids[0]].max_log_length
     logwrite('Starting unmeasured move sequence')
     status_str = lambda j : '... now at move ' + str(j) + ' of ' + str(n_rand_moves)
     def target_within_limits(xytarg):
@@ -274,8 +274,8 @@ if n_rand_moves > 0:
         return False
     for j in range(n_rand_moves):
         if j % max_log_length == 0:
-            for pos_id in states.keys():
-                new_and_changed_files.add(states[pos_id].log_path)
+            for posid in states.keys():
+                new_and_changed_files.add(states[posid].log_path)
         if j % 1000 == 0:
             logwrite(status_str(j))
         elif j % 50 == 0:
@@ -286,15 +286,15 @@ if n_rand_moves > 0:
             rand_xy_targs_idx += 1
             if rand_xy_targs_idx >= len(rand_xy_targs_list):
                 rand_xy_targs_idx = 0
-        ptl.quick_move(pos_ids,'posXY',targ_xy,log_note='unmeasured move during fiber life test')
+        ptl.quick_move(posids,'posXY',targ_xy,log_note='unmeasured move during fiber life test')
     elapsed_hours = (time.time() - start_time)/60/60
     logwrite(str(n_rand_moves) + ' moves completed in ' + format(elapsed_hours,'.1f') + ' hours')
     
 # restore old positioner parameters (good housekeeping)
-for pos_id in pos_params_before_test.keys():
-    for param in pos_params_before_test[pos_id]:
-        states[pos_id].write(param, pos_params_before_test[pos_id][param])
-        logwrite(pos_id + ': Restored ' + param + ' to ' + str(states[pos_id].read(param)))
+for posid in pos_params_before_test.keys():
+    for param in pos_params_before_test[posid]:
+        ptl.set(posid, param, pos_params_before_test[posid][param])
+        logwrite(posid + ': Restored ' + param + ' to ' + str(states[posid].read(param)))
 
 # post log files and settings to svn
 logwrite('Files changed or modified during test: ' + str(new_and_changed_files))

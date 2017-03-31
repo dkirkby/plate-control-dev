@@ -18,8 +18,8 @@ class PosModel(object):
         else:
             self.state = state
         if self.canid == -1 and self.posid not in [None,'None','xxxxx']:
-            print('Positioner ' + str(self.posid) + ' currently shows a can_id of ' + str(self.canid) + ', which often indicates that we haven''t yet put the real can_id into its configuration file. If you know the right can_id, you can enter it now. Otherwise you may need to stop whatever is running right now and fix this issue first.')
-            user_canid = input('Enter can_id number for ' + str(self.posid) + ' here: ')
+            print('Positioner ' + str(self.posid) + ' currently shows a canid of ' + str(self.canid) + ', which often indicates that we haven''t yet put the real canid into its configuration file. If you know the right canid, you can enter it now. Otherwise you may need to stop whatever is running right now and fix this issue first.')
+            user_canid = input('Enter canid number for ' + str(self.posid) + ' here: ')
             self.state.write('CAN_ID',int(user_canid))
         self.trans = postransforms.PosTransforms(self)
 
@@ -230,7 +230,7 @@ class PosModel(object):
         self.state.write('TOTAL_CREEP_MOVES_T', self.state.read('TOTAL_CREEP_MOVES_T') + cleanup_table['stats']['TOTAL_CREEP_MOVES_T'])
         self.state.write('TOTAL_CREEP_MOVES_P', self.state.read('TOTAL_CREEP_MOVES_P') + cleanup_table['stats']['TOTAL_CREEP_MOVES_P'])
         self.state.write('TOTAL_MOVE_SEQUENCES', self.state.read('TOTAL_MOVE_SEQUENCES') + 1)
-        self.state.log_unit(cleanup_table['log_note'])
+        self.state.next_log_notes.append(cleanup_table['log_note'])
 
     def clear_postmove_cleanup_cmds_without_executing(self):
         """Useful for example if a positioner is disabled, and we don't want any false post-move

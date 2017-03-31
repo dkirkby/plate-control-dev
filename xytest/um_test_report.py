@@ -68,7 +68,7 @@ def pass_fail(max0,max1,max2,max3,rms3):
     else:
         return 'PASS'
 
-def email_report(text, timestamp, pos_ids,to='limited'):
+def email_report(text, timestamp, posids,to='limited'):
     if to == 'full':
         recipients = teststand_watcherlist
     else:
@@ -83,20 +83,20 @@ def email_report(text, timestamp, pos_ids,to='limited'):
         message['From'] = 'UM-DESI Test Stand'
         message['To'] = ', '.join(recipients)
         image_types = ['xyplot_submove0.png','xyplot_submove1.png']
-        for pos_id in pos_ids:
+        for posid in posids:
             #Attach movedata
-            movedata = pc.xytest_data_directory + pos_id + '_' + timestamp + '_' + 'movedata.csv'
+            movedata = pc.xytest_data_directory + posid + '_' + timestamp + '_' + 'movedata.csv'
             mvdt = open(movedata)
             attm = MIMEText(mvdt.read())
-            attm.add_header('Content-Disposition', 'attachment', filename=(pos_id + '_' + timestamp + '_' + 'movedata.csv'))
+            attm.add_header('Content-Disposition', 'attachment', filename=(posid + '_' + timestamp + '_' + 'movedata.csv'))
             message.attach(attm)
             #Attach submove images
             for image in image_types:
-                file = pc.xytest_plots_directory + pos_id + '_' + timestamp + '_' + image
+                file = pc.xytest_plots_directory + posid + '_' + timestamp + '_' + image
                 try:
                     fp = open(file, 'rb')
                     img = MIMEImage(fp.read())
-                    img.add_header('Content-Disposition', 'attachment', filename=(pos_id + '_' + timestamp + '_' + image)) 
+                    img.add_header('Content-Disposition', 'attachment', filename=(posid + '_' + timestamp + '_' + image)) 
                     fp.close()
                     message.attach(img)
                 except:
@@ -125,29 +125,29 @@ def email_error(traceback, timestamp): #TODO add helpful interpretation of trace
     except:
         print('Failed to email message')
 
-def do_test_report(pos_ids, all_data_by_pos_id, log_timestamp, pos_notes, time, to='full'):
+def do_test_report(posids, all_data_by_posid, log_timestamp, pos_notes, time, to='full'):
     #Gather Data    
     summary_posids = {}
-    for pos_id in pos_ids:
+    for posid in posids:
         lst = []
         for i in range(4):
-            data = np.array(all_data_by_pos_id[pos_id]['err2D'][i])
+            data = np.array(all_data_by_posid[posid]['err2D'][i])
             min0 = np.min(data)*um_scale
             max0 = np.max(data)*um_scale
             avg0 = np.mean(data)*um_scale
             rms0 = np.sqrt(np.mean(np.array(data)**2)) * um_scale
             lst.append({'max':max0,'min':min0,'avg':avg0,'rms':rms0})
-        summary_posids[pos_id] = lst
+        summary_posids[posid] = lst
      
     #Write email
     email = 'UM Positioner Test Report\n' + 'Test ID: ' + log_timestamp + '\n'+ 'Execute time: ' + str(time) + ' hours\n\n' + 'Positioner status:\n'
-    for pos_id in pos_ids:
-        data = summary_posids[pos_id]
-        email += '\nPositioner: ' + pos_id + ' - ' + pass_fail(data[0]['max'],data[1]['max'],data[2]['max'],data[3]['max'],data[3]['rms']) + '\n'
-        if pos_notes[pos_ids.index(pos_id)] != '':
-            email += pos_notes[pos_ids.index(pos_id)] + '\n'
+    for posid in posids:
+        data = summary_posids[posid]
+        email += '\nPositioner: ' + posid + ' - ' + pass_fail(data[0]['max'],data[1]['max'],data[2]['max'],data[3]['max'],data[3]['rms']) + '\n'
+        if pos_notes[posids.index(posid)] != '':
+            email += pos_notes[posids.index(posid)] + '\n'
         for i in range(len(move_list)):
             email += move_list[i] + ' (max,min,avg,rms): ' + fmt(data[i]['max']) + ', ' + fmt(data[i]['min']) + ', ' + fmt(data[i]['avg']) + ', ' + fmt(data[i]['rms']) + ' (um)\n'
     email += '\n\n'
     email += 'NOTE: This is an automated message sent by the test stand. Please do not reply to this message.'   
-    email_report(email, log_timestamp, pos_ids,to)
+    email_report(email, log_timestamp, posids,to)

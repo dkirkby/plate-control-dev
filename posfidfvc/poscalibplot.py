@@ -3,24 +3,24 @@ import numpy as np
 
 # Functions for plotting calibration arcs of the fiber positioner.
 
-def plot_arc(path, pos_id, data):
+def plot_arc(path, posid, data):
     """See _calculate_and_set_arms_and_offsets() method in posmovemeasure.py for data format.
     """
     plt.ioff() # interactive plotting off
     fig = plt.figure(figsize=(14, 8))
-    state = data[pos_id]['posmodel'].state
+    state = data[posid]['posmodel'].state
 
     for ax in ['T','P']:
         name = 'theta' if ax == 'T' else 'phi'
         other_ax = 'P' if ax == 'T' else 'T'
         other_name = 'phi' if ax == 'T' else 'theta'
         plot_num_base = 0 if ax == 'T' else 3
-        target_angles = np.array(data[pos_id]['targ_pos' + ax + '_during_' + ax + '_sweep'])
-        measured_angles = np.array(data[pos_id]['meas_pos' + ax + '_during_' + ax + '_sweep'])
-        other_axis_angle = data[pos_id]['targ_pos' + other_ax + '_during_' + ax + '_sweep']
-        radius = data[pos_id]['radius_' + ax]
-        center = data[pos_id]['xy_ctr_' + ax]
-        measured_xy = np.array(data[pos_id]['measured_obsXY_' + ax])
+        target_angles = np.array(data[posid]['targ_pos' + ax + '_during_' + ax + '_sweep'])
+        measured_angles = np.array(data[posid]['meas_pos' + ax + '_during_' + ax + '_sweep'])
+        other_axis_angle = data[posid]['targ_pos' + other_ax + '_during_' + ax + '_sweep']
+        radius = data[posid]['radius_' + ax]
+        center = data[posid]['xy_ctr_' + ax]
+        measured_xy = np.array(data[posid]['measured_obsXY_' + ax])
 
         plt.subplot(2,3,plot_num_base+1)
         arc_start = np.arctan2(measured_xy[0,1]-center[1],measured_xy[0,0]-center[0]) * 180/np.pi
@@ -56,7 +56,7 @@ def plot_arc(path, pos_id, data):
             plt.text(min(plt.xlim())+0.2,max(plt.ylim())-0.2,calib_vals_txt,fontsize=6,color='gray',family='monospace',horizontalalignment='left',verticalalignment='top')
         plt.xlabel('x (mm)')
         plt.ylabel('y (mm)')
-        plt.title(pos_id + ' ' + name + ' calibration points')
+        plt.title(posid + ' ' + name + ' calibration points')
         plt.grid(True)
         plt.margins(0.05, 0.05)
         plt.axis('equal')
@@ -91,23 +91,23 @@ def plot_arc(path, pos_id, data):
     plt.savefig(path,dpi=150)
     plt.close(fig)
 
-def plot_grid(path, pos_id, data):
+def plot_grid(path, posid, data):
     """See ___ method in posmovemeasure.py for data format.
     """
     plt.ioff() # interactive plotting off
     fig = plt.figure(figsize=(14, 8))
 
-    target_posTP = np.array(data[pos_id]['target_posTP'])
-    measured_obsXY = np.array(data[pos_id]['measured_obsXY'])
-    expected_obsXY = np.array(data[pos_id]['final_expected_obsXY'])
-    point_nums = np.array(data[pos_id]['point_numbers'])
-    params = {0: {'ERR_NORM':np.array(data[pos_id]['ERR_NORM'])*1000, 'unit':'um', 'title':'error of calibration'},
-              1: {'LENGTH_R1':np.array(data[pos_id]['LENGTH_R1']), 'unit':'mm', 'title':'kinematic arm length'},
-              2: {'LENGTH_R2':np.array(data[pos_id]['LENGTH_R2']), 'unit':'mm', 'title':'kinematic arm length'},
-              3: {'OFFSET_T':np.array(data[pos_id]['OFFSET_T']), 'unit':'deg', 'title':'theta offset angle'},
-    		    4: {'OFFSET_P':np.array(data[pos_id]['OFFSET_P']), 'unit':'deg', 'title':'phi offset angle'},
-		    5: {'OFFSET_X':np.array(data[pos_id]['OFFSET_X']), 'unit':'mm', 'title':'global x offset'},
-		    6: {'OFFSET_Y':np.array(data[pos_id]['OFFSET_Y']), 'unit':'mm', 'title':'global y offset'}}
+    target_posTP = np.array(data[posid]['target_posTP'])
+    measured_obsXY = np.array(data[posid]['measured_obsXY'])
+    expected_obsXY = np.array(data[posid]['final_expected_obsXY'])
+    point_nums = np.array(data[posid]['point_numbers'])
+    params = {0: {'ERR_NORM':np.array(data[posid]['ERR_NORM'])*1000, 'unit':'um', 'title':'error of calibration'},
+              1: {'LENGTH_R1':np.array(data[posid]['LENGTH_R1']), 'unit':'mm', 'title':'kinematic arm length'},
+              2: {'LENGTH_R2':np.array(data[posid]['LENGTH_R2']), 'unit':'mm', 'title':'kinematic arm length'},
+              3: {'OFFSET_T':np.array(data[posid]['OFFSET_T']), 'unit':'deg', 'title':'theta offset angle'},
+    		    4: {'OFFSET_P':np.array(data[posid]['OFFSET_P']), 'unit':'deg', 'title':'phi offset angle'},
+		    5: {'OFFSET_X':np.array(data[posid]['OFFSET_X']), 'unit':'mm', 'title':'global x offset'},
+		    6: {'OFFSET_Y':np.array(data[posid]['OFFSET_Y']), 'unit':'mm', 'title':'global y offset'}}
 
     subplot_num = 1
     plt.subplot(2,4,subplot_num)
@@ -120,7 +120,7 @@ def plot_grid(path, pos_id, data):
                                verticalalignment='center',horizontalalignment='center',fontsize=6,color='gray')
     plt.xlabel('x (mm)')
     plt.ylabel('y (mm)')
-    plt.title(str(pos_id) + ' grid calibration points',fontsize=8)
+    plt.title(str(posid) + ' grid calibration points',fontsize=8)
     plt.margins(0.1, 0.1)
     txt_x = np.min(plt.xlim()) - np.diff(plt.xlim()) * 0.02
     txt_y = np.max(plt.ylim()) - np.diff(plt.ylim()) * 0.05

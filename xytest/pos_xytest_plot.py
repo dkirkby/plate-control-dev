@@ -3,7 +3,7 @@ import numpy as np
 
 # Functions for plotting results of xy_accuracy_test for a fiber positioner.
 
-def plot(path_no_ext, pos_id, data, center, theta_range, r1, r2, title_txt):
+def plot(path_no_ext, posid, data, center, theta_range, r1, r2, title_txt):
     """See xy_accuracy_test.py for format of data dictionary.
     """    
     plt.ioff() # interactive plotting off
@@ -45,7 +45,7 @@ def plot(path_no_ext, pos_id, data, center, theta_range, r1, r2, title_txt):
         plt.text(txt_x,txt_y,summary_txt,horizontalalignment='left',verticalalignment='top',family='monospace',fontsize=10)
         plt.xlabel('x (mm)')
         plt.ylabel('y (mm)')
-        plt.title(str(title_txt) + '\n' + str(pos_id) + ', ' + str(n_targets) + ' targets\n ')
+        plt.title(str(title_txt) + '\n' + str(posid) + ', ' + str(n_targets) + ' targets\n ')
         plt.grid(True)
         plt.margins(0.0, 0.03)
         plt.axis('equal')

@@ -22,12 +22,12 @@ class PosSchedule(object):
     def collider(self):
         return self.petal.collider
 		
-    def request_target(self, pos, uv_type, u, v, log_note=''):
+    def request_target(self, posid, uv_type, u, v, log_note=''):
         """Adds a request to the schedule for a given positioner to move to the
         target position (u,v) or by the target distance (du,dv) in the coordinate
         system indicated by uv_type.
 
-                pos ... posid or posmodel
+              posid ... string, unique id of positioner
             uv_type ... string, 'QS', 'dQdS', 'obsXY', 'posXY', 'dXdY', 'obsTP', 'posTP' or 'dTdP'
                   u ... float, value of q, dq, x, dx, t, or dt
                   v ... float, value of s, ds, y, dy, p, or dp
@@ -35,8 +35,8 @@ class PosSchedule(object):
 
         A schedule can only contain one target request per positioner at a time.
         """
-        posmodel = self.petal.get_model_for_pos(pos)
-        if self.already_requested(posmodel):
+        posmodel = self.petal.posmodel(posid)
+        if self.already_requested(posid):
             print(str(posmodel.state.read('POS_ID')) + ': cannot request more than one target per positioner in a given schedule')
             return
         if self._deny_request_because_disabled(posmodel):
@@ -70,6 +70,7 @@ class PosSchedule(object):
         new_request = {'start_posTP' : start_posTP,
                        'targt_posTP' : targt_posTP,
                           'posmodel' : posmodel,
+                             'posid' : posid,
                            'command' : uv_type,
                           'cmd_val1' : u,
                           'cmd_val2' : v,
@@ -105,11 +106,11 @@ class PosSchedule(object):
         else:
             self._schedule_without_anticollision()
 
-    def total_dtdp(self, pos):
-        """Return as-scheduled total move distance for positioner identified by pos.
+    def total_dtdp(self, posid):
+        """Return as-scheduled total move distance for positioner identified by posid.
         Returns [dt,dp].
         """
-        posmodel = self.petal.get_model_for_pos(pos)
+        posmodel = self.petal.posmodel(posid)
         dtdp = [0,0]
         for tbl in self.move_tables:
             if tbl.posmodel == posmodel:
@@ -129,13 +130,12 @@ class PosSchedule(object):
             if tbl_time > time:
                 time = tbl_time
 
-    def already_requested(self, pos):
+    def already_requested(self, posid):
         """Returns boolean whether a request has already been registered in the
         schedule for the argued positioner.
         """
-        posmodel = self.petal.get_model_for_pos(pos)
-        already_requested_list = [p['posmodel'] for p in self.requests]
-        was_already_requested = posmodel in already_requested_list
+        already_requested_list = [p['posid'] for p in self.requests]
+        was_already_requested = posid in already_requested_list
         return was_already_requested
 
     # internal methods

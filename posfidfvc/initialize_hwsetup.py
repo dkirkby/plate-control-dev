@@ -40,9 +40,9 @@ fvc = fvchandler.FVCHandler(hwsetup['fvc_type'])
 fvc.rotation = hwsetup['rotation']
 fvc.scale = hwsetup['scale']
 sim = fvc.fvc_type == 'simulator'
-pos_ids = hwsetup['pos_ids']
-fid_ids = hwsetup['fid_ids']
-ptl = petal.Petal(hwsetup['ptl_id'], pos_ids, fid_ids, simulator_on=sim)
+posids = hwsetup['pos_ids']
+fidids = hwsetup['fid_ids']
+ptl = petal.Petal(hwsetup['ptl_id'], posids, fidids, simulator_on=sim)
 
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure([ptl],fvc)
@@ -61,12 +61,12 @@ m.extradots_fid_state = ptl.fidstates[hwsetup['extradots_id']]
 
 # check ids with user
 print('\n\nHere are the known positioners and fiducials:\n')
-print(str(len(pos_ids)) + ' POSITIONERS:')
-for pos_id in pos_ids:
-    print('  ' + format(pos_id+':','11s') + 'busid = ' + format(str(ptl.get(pos_id,'BUS_ID')),'5s') + '  canid = ' + format(str(ptl.get(pos_id,'CAN_ID')),'5s'))
-print('\n' + str(len(fid_ids)) + ' FIDUCIALS:')
-for fid_id in fid_ids:
-    print('  ' + format(fid_id+':','11s') + 'busid = ' + format(str(ptl.get_fids_val(fid_id,'BUS_ID')[0]),'5s') + '  canid = ' + format(str(ptl.get_fids_val(fid_id,'CAN_ID')[0]),'5s') + '  ndots = ' + str(ptl.get_fids_val(fid_id,'N_DOTS')[0]))
+print(str(len(posids)) + ' POSITIONERS:')
+for posid in posids:
+    print('  ' + format(posid+':','11s') + 'busid = ' + format(str(ptl.get(posid,'BUS_ID')),'5s') + '  canid = ' + format(str(ptl.get(posid,'CAN_ID')),'5s'))
+print('\n' + str(len(fidids)) + ' FIDUCIALS:')
+for fidid in fidids:
+    print('  ' + format(fidid+':','11s') + 'busid = ' + format(str(ptl.get_fids_val(fidid,'BUS_ID')[0]),'5s') + '  canid = ' + format(str(ptl.get_fids_val(fidid,'CAN_ID')[0]),'5s') + '  ndots = ' + str(ptl.get_fids_val(fidid,'N_DOTS')[0]))
 print('\nPlease check each of these carefully.',end=' ')
 ids_unchecked = True
 while ids_unchecked:
@@ -85,8 +85,8 @@ if not svn_auth_err:
 
 # make sure control is enabled for all positioners
 for ptl in m.petals:
-    for pos_id in ptl.posids:
-        ptl.set(pos_id, 'CTRL_ENABLED', True)
+    for posid in ptl.posids:
+        ptl.set(posid, 'CTRL_ENABLED', True)
 	
 # calibration routines
 m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
@@ -116,7 +116,7 @@ gui_root.withdraw()
 # VERIFICATIONS AND CALIBRATIONS SEQUENCE:
 # (TO IMPLEMENT IN FULLY AUTOMATED FASHION (IN THIS ORDER)
 #   [note, not doing focus here -- too difficult to automate with our astronomy cameras' lack of control over lenses]
-#   - look up the can_ids for all the positioners, and validate that the number of unique can_ids matches the number of positioners
+#   - look up the canids for all the positioners, and validate that the number of unique canids matches the number of positioners
 #   - calibrate each fiducial
 #       - get relative brightness at a standard setting
 #   - calibrate fiber illumination
