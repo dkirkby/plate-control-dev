@@ -469,10 +469,10 @@ class Petal(object):
         self.comm.set_fiducials(busids, canids, duties)
         settings_done = {}
         for i in range(len(fidids)):
-            self.save_fid_val(fidids[i], 'DUTY_STATE', duties[i])
+            self.store_fid_val(fidids[i], 'DUTY_STATE', duties[i])
             settings_done[fidids[i]] = duties[i]
             if save_as_default:
-                self.save_fid_val(fidids[i], 'DUTY_DEFAULT_ON', duties[i])
+                self.store_fid_val(fidids[i], 'DUTY_DEFAULT_ON', duties[i])
         self.commit()
         return settings_done
     
@@ -532,11 +532,11 @@ class Petal(object):
             vals.append(self.fidstates[fidid].read(key))
         return vals
     
-    def save_fid_val(self,fidid,key,value):
+    def store_fid_val(self,fidid,key,value):
         '''Sets a single value to a fiducial. This does NOT turn the fiducial physically
         on or off. It only saves a value.
         '''
-        self.fidstates[fidid].write(key,value)
+        self.fidstates[fidid].store(key,value)
         self.altered_states.add(self.fidstates[fidid])
 
 
@@ -607,7 +607,7 @@ class Petal(object):
         (posids, keys)   = self._equalize_input_list_lengths(posids,keys) # repetition here handles the case where there was 1 posid element, 1 key, but mulitplie elements in value
         for i in range(len(posids)):
             p = self.posmodel(posids[i])
-            p.state.write(keys[i],values[i])
+            p.state.store(keys[i],values[i])
             self.altered_states.add(p.state)
 
     def commit(self, *args, **kwargs):
@@ -621,7 +621,7 @@ class Petal(object):
                 pass
         if self.local_commit_on:
             for state in self.altered_states:
-                state.write()
+                state.store()
                 state.log_unit()
         self.altered_states = set()
 
@@ -758,7 +758,7 @@ class Petal(object):
                             p.state.next_log_notes.append('disabled sending control commands because positioner was detected to be nonresponsive')
                     for fidid in self.fidids:
                         if self.get_fids_val(fidid,'CAN_ID') == canid:
-                            self.save_fid_val(fidid,'CTRL_ENABLED',False)
+                            self.store_fid_val(fidid,'CTRL_ENABLED',False)
                             self.fidstates[fidid].next_log_notes.append('disabled sending control commands because fiducial was detected to be nonresponsive')
             for canid in self.nonresponsive_canids:
                 if canid not in nonresponsives:

@@ -78,7 +78,7 @@ class PosMoveMeasure(object):
                         if len(brightnesses_ref) == 0:
                             self.printfunc('Ran out of reference dots, one thing to check is whether you have run initialize_hwsetup.py yet on this rig? (It auto-identifies fiducials for you.)')
                         these_brightnesses[i] = brightnesses_ref.pop(0)
-                    petal.save_fid_val(fidid,'LAST_MEAS_BRIGHTNESSES',these_brightnesses)
+                    petal.store_fid_val(fidid,'LAST_MEAS_BRIGHTNESSES',these_brightnesses)
                     break            
         self.last_meas_fiducials_xy = measured_ref_xy
         return data,imgfiles
@@ -998,8 +998,9 @@ class PosMoveMeasure(object):
         """
         x = [xy[0] for xy in fvcXY]
         y = [xy[1] for xy in fvcXY]
-        self.extradots_fid_state.write('DOTS_FVC_X',x)
-        self.extradots_fid_state.write('DOTS_FVC_Y',y)
+        self.extradots_fid_state.store('DOTS_FVC_X',x)
+        self.extradots_fid_state.store('DOTS_FVC_Y',y)
+        self.extradots_fid_state.write()
 
     def _test_and_update_TP(self,measured_data,tp_updates='posTP'):
         """Check if errors between measured positions and expected positions exceeds a tolerance

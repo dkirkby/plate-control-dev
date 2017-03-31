@@ -29,10 +29,10 @@ npos = len(xy0[0])
 posmodels = []
 for i in range(npos):
     state = posstate.PosState(unit_id='temp'+str(i).zfill(4), logging=False)
-    state.write('OFFSET_X',xy0[0][i],write_to_disk=False)
-    state.write('OFFSET_Y',xy0[1][i],write_to_disk=False)
-    state.write('OFFSET_T',tp0[0][i],write_to_disk=False)
-    state.write('OFFSET_P',tp0[1][i],write_to_disk=False)
+    state.store('OFFSET_X',xy0[0][i],write_to_disk=False)
+    state.store('OFFSET_Y',xy0[1][i],write_to_disk=False)
+    state.store('OFFSET_T',tp0[0][i],write_to_disk=False)
+    state.store('OFFSET_P',tp0[1][i],write_to_disk=False)
     posmodels.append(posmodel.PosModel(state))
 config = configobj.ConfigObj(pc.pos_settings_directory + '_collision_settings_DEFAULT.conf',unrepr=True)
 config.initial_comment = ['Temporary settings file for software test purposes, not associated with a real focal plate arrangement.','']

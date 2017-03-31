@@ -20,7 +20,7 @@ class PosModel(object):
         if self.canid == -1 and self.posid not in [None,'None','xxxxx']:
             print('Positioner ' + str(self.posid) + ' currently shows a canid of ' + str(self.canid) + ', which often indicates that we haven''t yet put the real canid into its configuration file. If you know the right canid, you can enter it now. Otherwise you may need to stop whatever is running right now and fix this issue first.')
             user_canid = input('Enter canid number for ' + str(self.posid) + ' here: ')
-            self.state.write('CAN_ID',int(user_canid))
+            self.state.store('CAN_ID',int(user_canid))
         self.trans = postransforms.PosTransforms(self)
 
         # axes
@@ -201,35 +201,35 @@ class PosModel(object):
         if self.state.read('CTRL_ENABLED') == False:
             return
 
-        self.state.write('POS_T', self.state.read('POS_T') + cleanup_table['stats']['net_dT'][-1])
-        self.state.write('POS_P', self.state.read('POS_P') + cleanup_table['stats']['net_dP'][-1])
+        self.state.store('POS_T', self.state.read('POS_T') + cleanup_table['stats']['net_dT'][-1])
+        self.state.store('POS_P', self.state.read('POS_P') + cleanup_table['stats']['net_dP'][-1])
         for axis in self.axis:
             exec(axis.postmove_cleanup_cmds)
             axis.postmove_cleanup_cmds = ''
         separator = '; '
         try:
-            self.state.write('LAST_MOVE_CMD',  separator.join(cleanup_table['command']))
+            self.state.store('LAST_MOVE_CMD',  separator.join(cleanup_table['command']))
             value = []
             for x in cleanup_table['cmd_val1']:
                 try:
                     value.append('{0:.6g}'.format(float(x)))
                 except:
                     pass
-            self.state.write('LAST_MOVE_VAL1', separator.join(x for x in value))
+            self.state.store('LAST_MOVE_VAL1', separator.join(x for x in value))
             value = []
             for x in cleanup_table['cmd_val2']:
                 try:
                     value.append('{0:.6g}'.format(float(x)))
                 except:
                     pass
-            self.state.write('LAST_MOVE_VAL2', separator.join(x for x in value))
+            self.state.store('LAST_MOVE_VAL2', separator.join(x for x in value))
         except Exception as e:
             print('postmove_cleanup: %s' % str(e))
-        self.state.write('TOTAL_CRUISE_MOVES_T', self.state.read('TOTAL_CRUISE_MOVES_T') + cleanup_table['stats']['TOTAL_CRUISE_MOVES_T'])
-        self.state.write('TOTAL_CRUISE_MOVES_P', self.state.read('TOTAL_CRUISE_MOVES_P') + cleanup_table['stats']['TOTAL_CRUISE_MOVES_P'])
-        self.state.write('TOTAL_CREEP_MOVES_T', self.state.read('TOTAL_CREEP_MOVES_T') + cleanup_table['stats']['TOTAL_CREEP_MOVES_T'])
-        self.state.write('TOTAL_CREEP_MOVES_P', self.state.read('TOTAL_CREEP_MOVES_P') + cleanup_table['stats']['TOTAL_CREEP_MOVES_P'])
-        self.state.write('TOTAL_MOVE_SEQUENCES', self.state.read('TOTAL_MOVE_SEQUENCES') + 1)
+        self.state.store('TOTAL_CRUISE_MOVES_T', self.state.read('TOTAL_CRUISE_MOVES_T') + cleanup_table['stats']['TOTAL_CRUISE_MOVES_T'])
+        self.state.store('TOTAL_CRUISE_MOVES_P', self.state.read('TOTAL_CRUISE_MOVES_P') + cleanup_table['stats']['TOTAL_CRUISE_MOVES_P'])
+        self.state.store('TOTAL_CREEP_MOVES_T', self.state.read('TOTAL_CREEP_MOVES_T') + cleanup_table['stats']['TOTAL_CREEP_MOVES_T'])
+        self.state.store('TOTAL_CREEP_MOVES_P', self.state.read('TOTAL_CREEP_MOVES_P') + cleanup_table['stats']['TOTAL_CREEP_MOVES_P'])
+        self.state.store('TOTAL_MOVE_SEQUENCES', self.state.read('TOTAL_MOVE_SEQUENCES') + 1)
         self.state.next_log_notes.append(cleanup_table['log_note'])
 
     def clear_postmove_cleanup_cmds_without_executing(self):
@@ -266,9 +266,9 @@ class Axis(object):
     @pos.setter
     def pos(self,value):
         if self.axisid == pc.T:
-            self.posmodel.state.write('POS_T',value)
+            self.posmodel.state.store('POS_T',value)
         else:
-            self.posmodel.state.write('POS_P',value)
+            self.posmodel.state.store('POS_P',value)
 
     @property
     def full_range(self):
@@ -380,9 +380,9 @@ class Axis(object):
     @last_primary_hardstop_dir.setter
     def last_primary_hardstop_dir(self,value):
         if self.axisid == pc.T:
-            self.posmodel.state.write('LAST_PRIMARY_HARDSTOP_DIR_T',value)
+            self.posmodel.state.store('LAST_PRIMARY_HARDSTOP_DIR_T',value)
         else:
-            self.posmodel.state.write('LAST_PRIMARY_HARDSTOP_DIR_P',value)
+            self.posmodel.state.store('LAST_PRIMARY_HARDSTOP_DIR_P',value)
 
     @property
     def total_limit_seeks(self):
@@ -394,9 +394,9 @@ class Axis(object):
     @total_limit_seeks.setter
     def total_limit_seeks(self,value):
         if self.axisid == pc.T:
-            self.posmodel.state.write('TOTAL_LIMIT_SEEKS_T',value)
+            self.posmodel.state.store('TOTAL_LIMIT_SEEKS_T',value)
         else:
-            self.posmodel.state.write('TOTAL_LIMIT_SEEKS_P',value)
+            self.posmodel.state.store('TOTAL_LIMIT_SEEKS_P',value)
 
     @property
     def principle_hardstop_direction(self):
