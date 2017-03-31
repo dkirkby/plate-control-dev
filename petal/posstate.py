@@ -90,17 +90,15 @@ class PosState(object):
 
     def read(self,key):
         """Returns current value for a given key.
-        All sections of all configobj structures are searched to full-depth.
         """
-        # self.unit.reload()
         if key in self.unit.keys():
             return self.unit[key]
         self.printfunc('no key ' + repr(key) + ' found')
         self.printfunc('keys: ' + str(self.unit.keys()))
         return None
 
-    def write(self,key,val):
-        """Set a value.
+    def store(self,key,val):
+        """Store a value to memory.
         """
         if key in pc.nominals.keys():
             nom = pc.nominals[key]['value']
@@ -110,10 +108,14 @@ class PosState(object):
                 val = nom
         if key in self.unit.keys():
             self.unit[key] = val
-            self.unit.write()
         else:
             self.printfunc('value not set, because the key "' + repr(key) + '" was not found')
  
+    def write(self):
+        """Write all values to disk.
+        """
+        self.unit.write()
+    
     def log_unit(self):
         """All current unit parameters are written to the hardware unit's log file.
         """
