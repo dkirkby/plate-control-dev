@@ -119,22 +119,23 @@ class PosState(object):
         """
         if self.logging:
             timestamp = pc.timestamp_str_now()
-            start_new_file = False
+            def start_new_file():
+                with open(self.log_path, 'w', newline='') as csvfile:
+                    csv.writer(csvfile).writerow(self.log_fieldnames)
             if self.curr_log_length >= self.max_log_length:
                 self.log_basename = self.increment_suffix(self.log_basename)
                 self.curr_log_length = 0
-                start_new_file = True
+                start_new_file()
             if not(self.log_unit_called_yet):
                 if not(os.path.isfile(self.log_path)):
-                    start_new_file = True
-                with open(self.log_path, 'r', newline='') as csvfile:
-                    fieldnames_found_in_old_logfile = csv.DictReader(csvfile).fieldnames
-                for key in self.log_fieldnames:
-                    if key not in fieldnames_found_in_old_logfile:
-                        start_new_file = True
-            if start_new_file:
-                with open(self.log_path, 'w', newline='') as csvfile:
-                    csv.writer(csvfile).writerow(self.log_fieldnames)
+                    start_new_file()
+                else:
+                    with open(self.log_path, 'r', newline='') as csvfile:
+                        fieldnames_found_in_old_logfile = csv.DictReader(csvfile).fieldnames
+                    for key in self.log_fieldnames:
+                        if key not in fieldnames_found_in_old_logfile:
+                            start_new_file()
+                            break
             with open(self.log_path, 'a', newline='') as csvfile: # now append a row of data
                 row = self.unit.copy()
                 row.update({'TIMESTAMP':timestamp,'NOTE':str(self.next_log_notes)})

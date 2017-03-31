@@ -599,15 +599,15 @@ class Petal(object):
         if key == None or value == None:
             self.printfunc('either no key or no value was specified to setval')
             return
-        (posid, temp)  = self._posid_listify_and_fill(posid)
-        (key,   temp)  = pc.listify(key,keep_flat=True)
-        (value, temp)  = pc.listify(value,keep_flat=True)
-        (posid, key)   = self._equalize_input_list_lengths(posid,key)
-        (posid, value) = self._equalize_input_list_lengths(posid,value)
-        (posid, key)   = self._equalize_input_list_lengths(posid,key) # repetition here handles the case where there was 1 posid element, 1 key, but mulitplie elements in value
-        for i in range(len(posid)):
-            p = self.posmodel(posid[i])
-            p.state.write(key[i],value[i])
+        (posids, temp)  = self._posid_listify_and_fill(posid)
+        (keys,   temp)  = pc.listify(key,keep_flat=True)
+        (values, temp)  = pc.listify(value,keep_flat=True)
+        (posids, keys)   = self._equalize_input_list_lengths(posids,keys)
+        (posids, values) = self._equalize_input_list_lengths(posids,values)
+        (posids, keys)   = self._equalize_input_list_lengths(posids,keys) # repetition here handles the case where there was 1 posid element, 1 key, but mulitplie elements in value
+        for i in range(len(posids)):
+            p = self.posmodel(posids[i])
+            p.state.write(keys[i],values[i])
             self.altered_states.add(p.state)
 
     def commit(self):
@@ -644,7 +644,7 @@ class Petal(object):
         """
         (posids, was_not_list) = self._posid_listify_and_fill(posid)
         (keys, temp) = pc.listify(key,keep_flat=True)
-        (posids, keys) = self._equalize_input_list_lengths(posid,key)
+        (posids, keys) = self._equalize_input_list_lengths(posids,keys)
         vals = []
         for i in range(len(posids)):
             pidx = self.posids.index(posids[i])
@@ -744,24 +744,28 @@ class Petal(object):
         """Asks petalcomm for a list of what canids are nonresponsive, and then
         handles disabling those positioners and/or fiducials.
         """
-        nonresponsives = self.comm.get_nonresponsive_canids()
-        for canid in nonresponsives:
-            if canid not in self.nonresponsive_canids:
-                self.nonresponsive_canids.append(canid)
-                for p in self.posmodels:
-                    if p.canid == canid:
-                        self.set(p.posid,'CTRL_ENABLED',False)
-                        p.state.next_row_notes.append('disabled sending control commands because positioner was detected to be nonresponsive')
-                for fidid in self.fidids:
-                    if self.get_fids_val(fidid,'CAN_ID') == canid:
-                        self.save_fid_val(fidid,'CTRL_ENABLED',False)
-                        self.fidstates[fidid].next_row_notes.append('disabled sending control commands because fiducial was detected to be nonresponsive')
-        for canid in self.nonresponsive_canids:
-            if canid not in nonresponsives:
-                # placeholder for re-enabling individual positioners, if they somehow become responsive again
-                # not sure if we actually want this, Joe / Irena / Michael to discuss
-                # (there is also the comm.reset_nonresponsive_canids method)
-                pass
+        if self.simulator_on:
+            pass
+        else:
+            nonresponsives = self.comm.get_nonresponsive_canids()
+            for canid in nonresponsives:
+                if canid not in self.nonresponsive_canids:
+                    self.nonresponsive_canids.append(canid)
+                    for p in self.posmodels:
+                        if p.canid == canid:
+                            self.set(p.posid,'CTRL_ENABLED',False)
+                            p.state.next_log_notes.append('disabled sending control commands because positioner was detected to be nonresponsive')
+                    for fidid in self.fidids:
+                        if self.get_fids_val(fidid,'CAN_ID') == canid:
+                            self.save_fid_val(fidid,'CTRL_ENABLED',False)
+                            self.fidstates[fidid].next_log_notes.append('disabled sending control commands because fiducial was detected to be nonresponsive')
+            for canid in self.nonresponsive_canids:
+                if canid not in nonresponsives:
+                    # placeholder for re-enabling individual positioners, if they somehow become responsive again
+                    # not sure if we actually want this, Joe / Irena / Michael to discuss
+                    # (there is also the comm.reset_nonresponsive_canids method)
+                    pass
+            self.commit()
 
     def _wait_while_moving(self):
         """Blocking implementation, to not send move tables while any positioners are still moving.
@@ -796,7 +800,7 @@ class Petal(object):
             was_not_list = False
         else:
             (posids, was_not_list) = pc.listify(posid,keep_flat=True)
-        return posid, was_not_list
+        return posids, was_not_list
 
     def _equalize_input_list_lengths(self,var1,var2):
         """Internally-used in setter and getter methods, to consistently handle varying

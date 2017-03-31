@@ -278,6 +278,7 @@ class PosMoveMeasure(object):
                     petal.set(posid,'OFFSET_Y',xy[1])
                     self.printfunc(posid + ': Set OFFSET_X to ' + self.fmt(xy[0]))
                     self.printfunc(posid + ': Set OFFSET_Y to ' + self.fmt(xy[1]))
+        self.commit()
 
     def rehome(self,posids='all'):
         """Find hardstops and reset current known positions.
@@ -327,6 +328,7 @@ class PosMoveMeasure(object):
                 total_angle += step_measured
             total_angle = abs(total_angle)
             data[posid]['petal'].set(posid,parameter_name,total_angle)
+        self.commit()
         self.rehome(posids)
         self.one_point_calibration(posids, mode='posTP')
 
@@ -360,7 +362,8 @@ class PosMoveMeasure(object):
             these_posids = posids_by_ptl[petal]
             keys_to_reset = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P']
             for key in keys_to_reset:
-                petal.set(these_posids,key,pc.nominals[key]['value'])      
+                petal.set(these_posids,key,pc.nominals[key]['value'])
+        self.commit()
         self.one_point_calibration(posids, mode='offsetsTP')        
             
         # now do arc or grid calibrations
@@ -394,6 +397,8 @@ class PosMoveMeasure(object):
         # lastly update the internally-tracked theta and phi shaft angles
         self.one_point_calibration(posids, mode='posTP')
         
+        # commit data and return
+        self.commit()
         return files
 
     def identify_fiducials(self):
@@ -468,6 +473,12 @@ class PosMoveMeasure(object):
         """
         ptl = self.petal(posid)
         return ptl.posmodel(posid)
+    
+    def commit(self):
+        """Commit state data controlled by all petals to storage.
+        """
+        for ptl in self.petals:
+            ptl.commit()
         
     @property
     def n_fiducial_dots(self):
@@ -1052,8 +1063,6 @@ class PosMoveMeasure(object):
                     self.printfunc(posid + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
                 delta_TP[posid] = [delta_T,delta_P]
                 posmodel.state.next_log_notes.append('updated ' + param + '_T and ' + param + '_P after positioning error of ' + self.fmt(err_xy) + ' mm')
-                self.altered_states.add(posmodel.state)
-        self.commit()
         return delta_TP
 				
     @property
