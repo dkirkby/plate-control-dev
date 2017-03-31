@@ -621,7 +621,7 @@ class Petal(object):
                 pass
         if self.local_commit_on:
             for state in self.altered_states:
-                state.store()
+                state.write()
                 state.log_unit()
         self.altered_states = set()
 
