@@ -7,6 +7,19 @@
 #    mm/dd/yyyy who        description
 #    ---------- --------   -----------
 #    03/29/2017 cad        Use instance variables, not Class variables
+#    03/30/2017 cad        Change max LED current to 999mA rather than 1000
+#                          to deal with maximum length string in hidraw cmd
+#    03/30/2017 cad        Discovered that setting currentLimit to 799 and
+#                          LED current to 789 resulted in the LED current
+#                          being set to 799!  Changed code to specify
+#                          currentLimit with the setCurrentLimit method.
+#                          The default current limit is now 999mA
+#    03/30/2017 cad        Added autopilot mode (on by default)
+#                          Turn it off with m.mlc_autopilot=0
+#                          The autopilot tolerance is m.mlc_autopilot_tolerance
+#                          The default value for the tolerance is 8
+#                          NOTE: autpilot turns off the LED while it's testing
+#                          the settings.
 # ****************************************************************************
 
 import subprocess
@@ -48,10 +61,21 @@ class Mightex_LED_Controller:
         self.mlc_maxChannel=0      # number of channels for the device
         self.mlc_currentChannel=1  # default Chanel is 1
         self.mlc_serialno=""       # by default, talk to the first found device
+        self.mlc_currentLimit=999  # by default, the current limit is set to 999mA
         self.mlc_serialno_list=[]
         self.mlc_error_msg=""
         self.mlc_last_stdout=[]
         self.mlc_last_stderr=[]
+        self.mlc_last_setval=-1
+        self.mlc_last_setmaxval=-1
+        self.mlc_last_setmode=-1
+        self.mlc_device_mA_Limit=-1       # last currentLimit read from the controller
+        self.mlc_device_mA_Setting=-1     # last current Setting read from the controller
+        self.mlc_device_mode=-1           # last mode read from the controller
+        self.mlc_autopilot=1              # by default, auto-correct settings
+        self.mlc_autopilot_tolerance=4    # if the read-back is within this much, it's OK
+        self.mlc_autopilot_iterations=0	  # increments when autpilot is used
+        self.mlc_autopilot_max_iterations=8	  # maximum number of times through autopilot loop
         self.mlc_Debug=0
 
         self.mlc_serialno=str(serialno)  # If the user specified one, talk to it
@@ -121,7 +145,18 @@ class Mightex_LED_Controller:
         if(0!=self.mlc_initialized):
             return int(self.mlc_maxChannel)
         else:
-            return
+            return 0
+
+    # returns the current value for the currentLimit
+    def getCurrentLimit(self):
+        return int(self.mlc_currentLimit)
+
+    # sets the currentLimit, returns 1 on success, 0 on failure
+    def setCurrentLimit(self,currentLimit):
+        if(1000>currentLimit and 0<=currentLimit):
+            self.mlc_currentLimit=currentLimit
+            return 1    # success
+        return 0        # fail
 
     # returns a list of the serial numbers for currently attached Mightex LED Controllers
     def getSerialNos(self):
@@ -134,14 +169,14 @@ class Mightex_LED_Controller:
                 return ans_list
             return []   # return an empty list
         else:
-            return
+            return []
 
     # returns the present mode of the current Channel
     def getMode(self):
         if(0!=self.mlc_initialized):
             ans_Mode=self.__mightexCmd__(['-m']).strip()
             try:
-                int(ans_Mode)
+                self.mlc_device_mode=int(ans_Mode)
                 return int(ans_Mode)
             except:
                 raise IOError("getMode returned '"+str(ans_Mode)+"'")
@@ -155,46 +190,51 @@ class Mightex_LED_Controller:
             if(self.mlc_Debug):
                 print(ans_Mode)
             if("##"==str(ans_Mode)):
+                self.mlc_last_setmode=str(int(mode))
                 return 1
             else:
                 raise IOError("setMode returned '"+str(ans_Mode)+"'")
             return 0
         else:
-            return
+            return 0
 
-    # returns a list of the Maximum and Current milliAmp levels for the current Channel        
+    # returns a list of the Current Limit and Current settings (milliAmps) from the controller
     def getLevels(self):
         if(0!=self.mlc_initialized):
             ans_MaxSet=self.__mightexCmd__(['-c']).strip()
             ans_list=ans_MaxSet.split()
             if(2==len(ans_list)):
                 ans_list[0]=ans_list[0].strip(',')
+                self.mlc_device_mA_Limit=int(ans_list[0])
+                self.mlc_device_mA_Setting=int(ans_list[1])
                 return ans_list
             else:
                 raise IOError("SN='"+str(self.mlc_serialno)+"' Channel="+str(self.mlc_currentChannel))
-            return
+            return [-1,-1]
         else:
-            return
+            return [-2,-2]
 
-    # Set the value of the LED current in milliAmps
-    # Optionally, specify the Mode and the Maximum LED current
+    # Set the level of the LED current in milliAmps
+    # Optionally, specify the Mode 
     # If the Mode is not specified, none will be set (NOTE: no changes to the
     # LED intensity are made until you set Mode 1, even if already in Mode 1)
-    # If the Maximum is not specified, it is set to 10 more than what you specified
-    # (up to a maximum of 1000)
-    def setLevel(self,led_milliamps=0,mode=-1,max_led_milliamps=-1):
+    def __lowsetLevel__(self,led_milliamps=0,mode=-1,new_max_led_milliamps=-1):
         if(0!=self.mlc_initialized):
-            if(-1==max_led_milliamps):
-                max_led_milliamps=10+int(led_milliamps)
-                if(max_led_milliamps>1000):
-                    max_led_milliamps=1000
-            if(1000<int(led_milliamps)):
-                led_milliamps=1000
+            if(-1!=int(new_max_led_milliamps) and int(new_max_led_milliamps)<=self.mlc_currentLimit):
+                max_led_milliamps=int(new_max_led_milliamps)
+            else:
+                max_led_milliamps=int(self.mlc_currentLimit)
+            if(max_led_milliamps>999):    # There is a limit of 3 chars for currentLimit
+                max_led_milliamps=999     # and 3 chars for the current. This enforces that limit
+            if(max_led_milliamps<int(led_milliamps)):
+                led_milliamps=max_led_milliamps    # not allowed to set over the max
             cvals=str(max_led_milliamps)+" "+str(led_milliamps)
             ans_setLevel=self.__mightexCmd__(['-C',cvals]).strip()
             if(self.mlc_Debug):
                 print(ans_setLevel)
             if("##"==str(ans_setLevel)):
+                self.mlc_last_setval=led_milliamps
+                self.mlc_last_setmaxval=max_led_milliamps
                 if(-1!=mode):
                     return self.setMode(int(mode))
                 else:
@@ -203,7 +243,75 @@ class Mightex_LED_Controller:
                 raise IOError("setLevel returned '"+str(ans_setLevel)+"'")
             return 0
         else:
-            return
+            return 0
+
+    # Set the level of the LED current in milliAmps
+    # Optionally, specify the Mode 
+    # If the Mode is not specified, none will be set (NOTE: no changes to the
+    # LED intensity are made until you set Mode 1, even if already in Mode 1)
+    def setLevel(self,led_milliamps=0,mode=-1):
+        if(0!=self.mlc_Debug):
+            print("led_milliamps=",led_milliamps)
+        if(0!=self.mlc_initialized):
+            if(0==self.mlc_autopilot):
+                return self.__lowsetLevel__(self,led_milliamps,mode)
+            else:
+                #autopilot code
+                save_mode=self.getMode()	# save the mode
+                # NOTE: the loop happens with the LED OFF
+                if(0==self.setMode(0)):
+                    return 0	# autopilot failed
+                my_max_milliamps=int(self.mlc_currentLimit)
+                my_led_milliamps=int(led_milliamps)
+                if(0!=self.mlc_Debug):
+                    print("led_milliamps=",int(led_milliamps))
+                    print("my_led_milliamps=",my_led_milliamps)
+                    print("my_max_milliamps=",my_max_milliamps)
+                if(my_max_milliamps<my_led_milliamps):
+                    my_led_milliamps=my_max_milliamps	# no setting over the max!
+                if(0!=self.mlc_Debug):
+                    print("led_milliamps=",int(led_milliamps))
+                    print("my_led_milliamps=",my_led_milliamps)
+                    print("my_max_milliamps=",my_max_milliamps)
+                if(1==self.__lowsetLevel__(my_led_milliamps,-1,my_max_milliamps)):
+                    [junk1,junk2]=self.getLevels()
+                    self.mlc_autopilot_iterations=0
+                    while((self.mlc_autopilot_max_iterations > self.mlc_autopilot_iterations) and 
+                          (abs(int(led_milliamps)-int(self.mlc_device_mA_Setting)) >
+                           self.mlc_autopilot_tolerance)):
+                        # out of tolerance, so try reducing max value to the LED current,
+                        # and if that doesn't work, try reducing the LED current one step
+                        # at a time.
+                        self.mlc_autopilot_iterations+=1
+                        if(my_max_milliamps > my_led_milliamps):
+                            my_max_milliamps = my_led_milliamps
+                        else:
+                            my_max_milliamps-=1
+                            if(0>my_max_milliamps):
+                                my_max_milliamps=0
+                        if(0!=self.mlc_Debug):
+                            print("led_milliamps=",int(led_milliamps))
+                            print("my_led_milliamps=",my_led_milliamps)
+                        if(1!=self.__lowsetLevel__(my_led_milliamps,-1,my_max_milliamps)):
+                            return 0
+                        [junk1,junk2]=self.getLevels()
+                        # end of while loop
+
+                    # test for autopilot success
+                    if(abs(int(led_milliamps)-int(self.mlc_device_mA_Setting)) >
+                       self.mlc_autopilot_tolerance):
+                        # autopilot failed...
+                        return 0
+                    # autopilot succeeded (or was not needed)
+                    if(1==int(mode)):
+                        return self.setMode(1)
+                    if(-1==int(mode)):
+                        return self.setMode(int(save_mode))
+                    return 1	# all is well
+                else:
+                    return 0
+        else:
+            return 0
 
     # Load the Factory Defaults for all settings
     # NOTE: the new settings do not take effect until you set the Mode
