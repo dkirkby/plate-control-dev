@@ -220,15 +220,6 @@ class PosSchedule(object):
             table.log_note += (' ' if table.log_note else '') + req['log_note']
             self.move_tables.append(table)
 
-    def _schedule_with_anticollision(self):
-        """  
-            Call the PosAnticol Class and have it generate 
-            movetables for all requests in self.requests 
-        """
-        if self.verbose:
-            print("You ARE doing anticollisions")
-            print("Number of requests: "+str(len(self.requests)))
-        self.move_tables = self.run_anticol(self.requests,self.petal.posids)
 
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
@@ -242,7 +233,7 @@ class PosSchedule(object):
         return False
 
 
-    def run_anticol(self,requests, posunitids):
+    def _schedule_with_anticollision(self):
         '''
             Primary calling function. Once the PosAnticol is initiated, this is essentially all you need to call.
             This takes in requests with correctly ordered posunitids
@@ -254,6 +245,10 @@ class PosSchedule(object):
                           within posunitids. These will be matched and ordered below.
                       
         '''
+        if self.verbose:
+            print("You ARE doing anticollisions")
+            print("Number of requests: "+str(len(self.requests)))
+
         log_notes = []; commands = []            
         posmodels = []; tpstart = []; tptarg = []
         xoffs = []
@@ -261,8 +256,8 @@ class PosSchedule(object):
         
         # Loop through the posunitids and the requests, and correctly order the request
         # information into the order set by posunitids
-        for posunitid in posunitids:
-            for req in requests:
+        for posunitid in self.petal.posids:
+            for req in self.requests:
                 if req['posmodel'].posid == posunitid:
                     posmodel = req['posmodel']
                     posmodels.append(posmodel)
@@ -290,26 +285,7 @@ class PosSchedule(object):
             movetable.log_note += (' ' if movetable.log_note else '') + log
             
         # return the movetables as a list of movetables
-        return move_tables
-    
-    
-        
-    def _avoid_collisions(self,tables,posmodels,collision_indices,collision_types,\
-                                    pos_collider,tpss = None,\
-                                    tpfs = None, dp_direction = None):
-        '''
-            Wrapper function for correcting collisions. Calls the function 
-            specified by 'avoidance' if it exists. 
-        '''
-        if self.avoidance == 'zeroth_order':
-            return self._avoid_collisions_zerothorder(tables,posmodels,collision_indices)
-        elif self.avoidance == 'EM':
-            return self._avoid_collisions_em(tables,posmodels,collision_indices,collision_types,pos_collider,tpss,tpfs,dp_direction)
-        else:
-            print("Currently EM is our best method. Executing that.")
-            return self._avoid_collisions_em(tables,posmodels,collision_indices,collision_types,pos_collider,tpss,tpfs,dp_direction)
-                                                    
-                                                    
+        self.move_tables = move_tables
                                                     
     def _run_RRE_anticol(self,tps_list,tpf_list,posmodels):
         '''
@@ -448,9 +424,22 @@ class PosSchedule(object):
         return output_tables
     
 
-        
-    
-    
+    def _avoid_collisions(self,tables,posmodels,collision_indices,collision_types,\
+                                    pos_collider,tpss = None,\
+                                    tpfs = None, dp_direction = None):
+        '''
+            Wrapper function for correcting collisions. Calls the function 
+            specified by 'avoidance' if it exists. 
+        '''
+        if self.avoidance == 'zeroth_order':
+            return self._avoid_collisions_zerothorder(tables,posmodels,collision_indices)
+        elif self.avoidance == 'EM':
+            return self._avoid_collisions_em(tables,posmodels,collision_indices,collision_types,pos_collider,tpss,tpfs,dp_direction)
+        else:
+            print("Currently EM is our best method. Executing that.")
+            return self._avoid_collisions_em(tables,posmodels,collision_indices,collision_types,pos_collider,tpss,tpfs,dp_direction)
+                                                    
+                                                    
     def _create_table_RREdict(self,tp_start, tp_final, current_positioner_model):
         '''
             Create the original movetable for the current positioner. This uses 
