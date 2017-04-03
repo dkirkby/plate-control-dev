@@ -76,6 +76,7 @@ posfidfvc/mightex/mightex.py -text
 posfidfvc/mightex/mightex_cmd -text
 posfidfvc/mightex/mightex_cmd.c -text
 posfidfvc/mightex/mightex_cmd.help.txt -text
+posfidfvc/mightex/mightex_test.py -text
 posfidfvc/poscalibplot.py -text
 posfidfvc/posmovemeasure.py -text
 posfirmware/develop/bootloader_description.pdf -text svneol=unset#unset
