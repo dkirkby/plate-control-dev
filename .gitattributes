@@ -1,11 +1,11 @@
 * text=auto !eol
 bin/petal -text
 bin/petalcontroller -text
+petal/deprecated_posanticollision.py -text
 petal/focal_surface_lookup.csv -text
 petal/petal.py -text
 petal/petalcomm.py -text
 petal/petsockcomm.py -text
-petal/posanticollision.py -text
 petal/poscollider.py -text
 petal/posconstants.py -text
 petal/posmodel.py -text
