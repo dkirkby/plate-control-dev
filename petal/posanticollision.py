@@ -47,7 +47,7 @@ class PosAnticol:
         # Assign specified variables
         self.avoidance = avoidance
         self.verbose = verbose
-
+        self.plotting = False
         #############################################
         # Parameters defined by harware or software #
         #############################################
@@ -557,7 +557,7 @@ class PosAnticol:
                         print("Final Loop reached!   Theta =  %f   and phi = %f    nitters = %d" %(theta,phi,i+1))
                     # If desired we can plot the movement and the potential field seen
                     # by the positioner
-                    if self.verbose:
+                    if self.plotting:
                         self._plot_potential(posmodel,target,neighbors)
                         plt.title("Start ts=%d ps=%d tf=%d pf=%d" %    (start[pc.T],start[pc.P],target[pc.T],target[pc.P]))
                         xls,yls = posmodel.trans.obsTP_to_flatXY([np.asarray(thetas),np.asarray(phis)])
@@ -591,7 +591,7 @@ class PosAnticol:
                     
         # If loop is completed or broken and no solution found,
         # we can plot the movements performed and the potential the positioner saw
-        if self.verbose:
+        if self.plotting:
             self._plot_potential(posmodel,target,neighbors)
             plt.title("Start ts=%d ps=%d tf=%d pf=%d" % (start[pc.T],start[pc.P],target[pc.T],target[pc.P]))
             xls,yls = posmodel.trans.obsTP_to_flatXY([np.asarray(thetas),np.asarray(phis)])
