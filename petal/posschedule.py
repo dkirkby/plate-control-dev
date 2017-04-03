@@ -8,7 +8,6 @@ from collections import Counter
 # Temporary Debugging Dependencies
 import matplotlib.pyplot as plt
 import pdb
-import poscollider
 import copy as copymodule
 
 
@@ -320,7 +319,7 @@ class PosSchedule(object):
             one another or a fixed object.
         '''
         # Create a poscollider instance to check collisions in movetable
-        pos_collider = poscollider.PosCollider()
+        pos_collider = self.petal.poscollider
         pos_collider.add_positioners(posmodels)
     
         # Name the three steps in rre (used for dictionary keys)
