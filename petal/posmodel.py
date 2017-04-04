@@ -12,15 +12,16 @@ class PosModel(object):
     One instance of PosModel corresponds to one PosState to physical positioner.
     """
 
-    def __init__(self, state=None):
+    def __init__(self, state=None,is_simulation=False):
         if not(state):
             self.state = posstate.PosState()
         else:
             self.state = state
-        if self.canid == -1 and self.posid not in [None,'None','xxxxx']:
-            print('Positioner ' + str(self.posid) + ' currently shows a canid of ' + str(self.canid) + ', which often indicates that we haven''t yet put the real canid into its configuration file. If you know the right canid, you can enter it now. Otherwise you may need to stop whatever is running right now and fix this issue first.')
-            user_canid = input('Enter canid number for ' + str(self.posid) + ' here: ')
-            self.state.store('CAN_ID',int(user_canid))
+        if not is_simulation:
+            if self.canid == -1 and self.posid not in [None,'None','xxxxx']:
+                print('Positioner ' + str(self.posid) + ' currently shows a canid of ' + str(self.canid) + ', which often indicates that we haven''t yet put the real canid into its configuration file. If you know the right canid, you can enter it now. Otherwise you may need to stop whatever is running right now and fix this issue first.')
+                user_canid = input('Enter canid number for ' + str(self.posid) + ' here: ')
+                self.state.store('CAN_ID',int(user_canid))
         self.trans = postransforms.PosTransforms(self)
 
         # axes

@@ -50,7 +50,7 @@ class Petal(object):
         self.posmodels = []
         for posid in posids:
             state = posstate.PosState(posid, logging=True, device_type='pos', printfunc=self.printfunc)
-            model = posmodel.PosModel(state)
+            model = posmodel.PosModel(state,is_simulation=simulator_on)
             self.posmodels.append(model)
         self.posids = posids.copy()
         self.canids_where_tables_were_just_sent = []
