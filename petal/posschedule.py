@@ -10,11 +10,7 @@ import matplotlib.pyplot as plt
 import pdb
 import copy as copymodule
 
-
-class anticol(object):
-    def __init__(self):
-        pass
-            
+      
             
 class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners
@@ -33,8 +29,11 @@ class PosSchedule(object):
         self.move_tables = []
         self.requests = []
 
+        class anticol:
+            pass
+    
         self.anticol = anticol()
-            
+             
         ##############################
         # User defineable parameters #
         ##############################
@@ -216,7 +215,8 @@ class PosSchedule(object):
             req = self.requests.pop(0)
             posmodel = req['posmodel']
             table = posmovetable.PosMoveTable(posmodel)
-            dtdp = posmodel.trans.delta_posTP(req['targt_posTP'], req['start_posTP'], range_wrap_limits='targetable')
+            dtdp = posmodel.trans.delta_posTP(req['targt_posTP'], \
+                        req['start_posTP'], range_wrap_limits='targetable')
             table.set_move(0, pc.T, dtdp[0])
             table.set_move(0, pc.P, dtdp[1])
             table.set_prepause (0, 0.0)
@@ -231,9 +231,13 @@ class PosSchedule(object):
         consistently take with regard to post-move cleanup, if a request is going to be denied.
         """
         enabled = posmodel.state.read('CTRL_ENABLED')
-        if enabled == False: # this is specifically NOT worded as "if not enabled:", because here we actually do not want a value of None to pass the test, in case the parameter field 'CTRL_ENABLED' has not yet been implemented in the positioner's .conf file
+        if enabled == False: # this is specifically NOT worded as "if not enabled:", 
+                             # because here we actually do not want a value of None 
+                             # to pass the test, in case the parameter field 'CTRL_ENABLED'
+                             # has not yet been implemented in the positioner's .conf file
             posmodel.clear_postmove_cleanup_cmds_without_executing()
-            print(str(posmodel.state.read('POS_ID')) + ': move request denied because CTRL_ENABLED = ' + str(enabled))
+            print(str(posmodel.state.read('POS_ID')) + \
+                    ': move request denied because CTRL_ENABLED = ' + str(enabled))
             return True
         return False
 
@@ -246,7 +250,8 @@ class PosSchedule(object):
             critical to keeping things in a proper order.
             
             requests:  posschedule list of request objects
-            posunitids:  a simple list or numpy array of the unitids. requests[i]['posmodel'].posid should have a location
+            posunitids:  a simple list or numpy array of the unitids. requests[i]['posmodel'].posid should have 
+                        a location
                           within posunitids. These will be matched and ordered below.
                       
         '''
@@ -357,7 +362,8 @@ class PosSchedule(object):
             movetimes[step] = np.asarray(movetimes[step])
             
             # Check for collisions
-            collision_indices, collision_types = self._check_for_collisions(tpstart[step],pos_collider,tabledicts[step])
+            collision_indices, collision_types = \
+                    self._check_for_collisions(tpstart[step],pos_collider,tabledicts[step])
             
  
             # If no collisions, move directly to the next step
@@ -390,7 +396,8 @@ class PosSchedule(object):
                 print("Max times to start are: ",maxtimes)
                 
             # Check for collisions
-            collision_indices, collision_types = self._check_for_collisions(tpstart[step],pos_collider,tabledicts[step])
+            collision_indices, collision_types = \
+                    self._check_for_collisions(tpstart[step],pos_collider,tabledicts[step])
                 
             if self.anticol.verbose:
                 self._printindices('Collisions after Round 1, in Step ',step,collision_indices)        
@@ -398,7 +405,8 @@ class PosSchedule(object):
 
         # The step is extend. If collisions still exist after avoidance,
         # Set that positioner to not move
-        tabledicts['extend'] = self._avoid_collisions_zerothorder(tabledicts['extend'],posmodels,collision_indices)
+        tabledicts['extend'] = \
+                self._avoid_collisions_zerothorder(tabledicts['extend'],posmodels,collision_indices)
         
         # For each positioner, merge the three steps (r,r,e) into a single move table
         output_tables = []
@@ -411,7 +419,8 @@ class PosSchedule(object):
             output_tables.append(newtab)
     
         # Check for collisions in the total rre movetable
-        collision_indices, collision_types = self._check_for_collisions(tpstart['retract'],pos_collider,output_tables)   
+        collision_indices, collision_types = \
+                    self._check_for_collisions(tpstart['retract'],pos_collider,output_tables)   
         itter = 0
         
         # While there are still collisions, keep eliminating the positioners that collide
@@ -420,7 +429,8 @@ class PosSchedule(object):
             if self.anticol.verbose:
                 self._printindices('Collisions before zeroth order run ',itter,collision_indices)
             output_tables = self._avoid_collisions_zerothorder(output_tables,posmodels,collision_indices)
-            collision_indices, collision_types = self._check_for_collisions(tpstart['retract'],pos_collider,output_tables)
+            collision_indices, collision_types = \
+                            self._check_for_collisions(tpstart['retract'],pos_collider,output_tables)
             itter += 1
                    
         if self.anticol.verbose:
@@ -439,10 +449,12 @@ class PosSchedule(object):
         if self.anticol.avoidance == 'zeroth_order':
             return self._avoid_collisions_zerothorder(tables,posmodels,collision_indices)
         elif self.anticol.avoidance == 'EM':
-            return self._avoid_collisions_em(tables,posmodels,collision_indices,collision_types,pos_collider,tpss,tpfs,dp_direction)
+            return self._avoid_collisions_em(tables,posmodels,collision_indices,\
+                                        collision_types,pos_collider,tpss,tpfs,dp_direction)
         else:
             print("Currently EM is our best method. Executing that.")
-            return self._avoid_collisions_em(tables,posmodels,collision_indices,collision_types,pos_collider,tpss,tpfs,dp_direction)
+            return self._avoid_collisions_em(tables,posmodels,collision_indices,\
+                                        collision_types,pos_collider,tpss,tpfs,dp_direction)
                                                     
                                                     
     def _create_table_RREdict(self,tp_start, tp_final, current_positioner_model):
@@ -493,10 +505,12 @@ class PosSchedule(object):
         
        
     
-    def _avoid_collisions_em(self,tables,posmodels,collision_indices,collision_types,pos_collider,tpss,tpfs,dp_direction):
+    def _avoid_collisions_em(self,tables,posmodels,collision_indices,\
+                            collision_types,pos_collider,tpss,tpfs,dp_direction):
         '''
-            Function that is called with a list of collisions that need to be avoided. This uses a 'force law' type approach 
-            to generate moves that avoid neighboring positioners that it would otherwise collide with.
+            Function that is called with a list of collisions that need to be avoided. This uses 
+            a 'force law' type approach to generate moves that avoid neighboring positioners 
+            that it would otherwise collide with.
         '''
         # Unpack the starting and ending theta/phis for all collisions
         tss = tpss[:,0]
@@ -552,7 +566,8 @@ class PosSchedule(object):
             # if we collided with a positioner. Make sure the positioner is a neighbor
             # otherwise something strange has happened
             if unchanging != None:
-                assert unchanging in neighbor_idxs, "Make sure the neighbor includes the position that it supposedly collided with"
+                assert unchanging in neighbor_idxs, \
+                            "Make sure the neighbor includes the position that it supposedly collided with"
 
             # define the beginning and ending locations for the positioner we're moving
             start = self._assign_properly(tss[changing],pss[changing])
@@ -587,8 +602,10 @@ class PosSchedule(object):
                 x2,y2 = neigh.trans.obsTP_to_flatXY(\
                             [neighbors['thetans'][it],180])
                 angle = np.arctan((y1-y2)/(x1-x2))#np.arctan((y2-y1)/(x1-x2))
-                neighbors['theta_body_xns'][it] = neighbors['xoffs'][it] + np.cos(angle)*self.anticol.max_thetabody 
-                neighbors['theta_body_yns'][it] = neighbors['yoffs'][it] + np.sin(angle)*self.anticol.max_thetabody  
+                neighbors['theta_body_xns'][it] = neighbors['xoffs'][it] +\
+                                                np.cos(angle)*self.anticol.max_thetabody 
+                neighbors['theta_body_yns'][it] = neighbors['yoffs'][it] +\
+                                                np.sin(angle)*self.anticol.max_thetabody  
 
             # If we have to avoid the petal, do some work to find the x,y location
             # of the petal and place some 'avoidance' objects along it so that
@@ -697,7 +714,8 @@ class PosSchedule(object):
                 yns = np.concatenate((neighbors['yns'],neighbors['theta_body_yns']))
                 # Calculate the potential surrounding the current point and 
                 # return the direction that minimizes the potential
-                theta_new,phi_new = self._take_step(posmodel,[theta,phi],target,xns,yns,tmin,tmax,pmin,pmax,phi_safe)
+                theta_new,phi_new = self._take_step(posmodel,[theta,phi],target,xns,\
+                                                    yns,tmin,tmax,pmin,pmax,phi_safe)
                 # Save the change in theta and phi and redefine things for the next loop
                 dTs.append(theta_new-theta)
                 dPs.append(phi_new-phi)
@@ -707,7 +725,8 @@ class PosSchedule(object):
                 phis.append(phi)
             wait = False
             # If we are within tolerance of the final target
-            if ((np.abs(phi - target[pc.P]) < self.anticol.ang_threshold) and (np.abs(theta - target[pc.T] < self.anticol.ang_threshold))):
+            if ((np.abs(phi - target[pc.P]) < self.anticol.ang_threshold) and \
+               (np.abs(theta - target[pc.T] < self.anticol.ang_threshold))):
                 xo,yo = posmodel.trans.obsTP_to_flatXY([target[pc.T],target[pc.P]])
                 rhons = np.hypot(xns-xo,yns-yo)
                 # If all of the collideable objects are far enough away, we're done
@@ -744,16 +763,19 @@ class PosSchedule(object):
             # accordingly so we know where they are during the next move
             # The positioners only move when outside safety envelope, so we check that
             if dp_direction == 1:
-                neighbors['phins'][neighbors['phins']<neighbors['phints']] = neighbors['phins'][neighbors['phins']<neighbors['phints']]+self.anticol.angstep
+                neighbors['phins'][neighbors['phins']<neighbors['phints']] = \
+                         neighbors['phins'][neighbors['phins']<neighbors['phints']]+self.anticol.angstep
             elif dp_direction == -1:
-                neighbors['phins'][neighbors['phins']>neighbors['phints']] =  neighbors['phins'][neighbors['phins']>neighbors['phints']]-self.anticol.angstep
+                neighbors['phins'][neighbors['phins']>neighbors['phints']] =  \
+                        neighbors['phins'][neighbors['phins']>neighbors['phints']]-self.anticol.angstep
             # If rotation, the neighbors aren't moving. Say so and continue.
             elif i == 0:
                 print("I'm assuming the phis of neighbors don't change.")
             # For those that are moving, update the neighbor locations.
             if dp_direction != 0:
                 for it,neigh in enumerate(neighbors['posmodels']):
-                    neighbors['xns'][it],neighbors['yns'][it] = neigh.trans.obsTP_to_flatXY([neighbors['thetans'][it],neighbors['phins'][it]])
+                    neighbors['xns'][it],neighbors['yns'][it] = \
+                            neigh.trans.obsTP_to_flatXY([neighbors['thetans'][it],neighbors['phins'][it]])
                     
         # If loop is completed or broken and no solution found,
         # we can plot the movements performed and the potential the positioner saw
