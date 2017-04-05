@@ -11,6 +11,7 @@ import csv
 import collections
 import summarizer
 import numpy as np
+import matplotlib.pyplot as plt
 
 # grading parameters
 # c.f. DESI-XXXX Fiber Positioner Grades
@@ -62,6 +63,11 @@ grade_specs[grade]['has extended gearbox'] = True
 fail_grade = 'F'
 insuff_data_grade = 'insuff data'
 all_grades = list(grade_specs.keys()) + [fail_grade] # intentionally not including ignored in this
+#n = len(all_grades)
+#num_grades = {} # numeric equivalents to grades (for plotting)
+#for grade in all_grades:
+#    num_grades[grade] = n
+#    n -= 1
 
 # get the files list
 filetypes = (('Comma-separated Values','*.csv'),('All Files','*'))
@@ -267,12 +273,12 @@ if report_file:
         writer.writerow([''])
         writer.writerow(['TOTALS FOR EACH GRADE:'])
         writer.writerow(['','grade', 'quantity', 'percent'])
-        num_insuff = len([posid for posid in d.keys() if d[posid]['grade'] == insuff_data_grade])
+        num_insuff = len([posid for posid in d.keys() if d[posid]['grade'][-1] == insuff_data_grade])
         num_suff = len(d) - num_insuff
         def percent(value):
             return format(value/(num_suff)*100,'.2f')+'%'
         for key in all_grades:
-            total_this_grade = len([posid for posid in d.keys() if d[posid]['grade'] == key])
+            total_this_grade = len([posid for posid in d.keys() if d[posid]['grade'][-1] == key])
             writer.writerow(['',key,total_this_grade,percent(total_this_grade)])
         writer.writerow(['','all',num_suff,percent(num_suff)])
         if num_insuff > 0:
@@ -293,3 +299,35 @@ if report_file:
         for posid in posids_sorted_by_grade:
             for row  in range(d[posid]['num rows']):
                 writer.writerow(['', posid] + [d[posid][key][row] for key in ['finish time','total move sequences at finish','grade']])
+
+## write plots
+#plt.ioff()
+#binned = {}
+#for grade in all_grades:
+#    binned[grade]['time stamps']
+#plotdata['grades'] = []
+#plotdata['numeric grades'] = []
+#plotdata['time stamps'] = []
+#plotdata['total moves'] = []
+#for posid in d.keys():
+#    for row in range(d[posid]['num rows']):
+#        this_grade = d[posid]['grade'][row]
+#        plotdata['grades'].append(this_grade)
+#        plotdata['numeric grades'].append(num_grades[this_grade])
+#        plotdata['time stamps'].append(d[posid]['finish time'][row])
+#        plotdata['total moves'].append(d[posid]['total move sequences at finish'][row])
+#
+## example
+#plt.hist(x,bins=len(set(x)),normed=True,histtype='step')
+#        
+#        
+#        plotdata['numeric grades'],bins=len(num_grades.values()),range=(min(num_grades.values()),max(num_grades.values())))
+#fig = plt.figure(figsize=(10, 8))
+#percents = np.divide(plotdata[])
+#plt.plot(plotdata['total moves'],plotdata['numeric grades'],'o')
+#plt.yticks(list(num_grades.values()),list(num_grades.keys()))
+#plt.xlabel('lifetime number of move sequences')
+#plt.ylabel('percentage in each grade')
+#plotname = os.path.splitext(report_file)[0] + '_grades_vs_nmoves.png'
+#plt.savefig(plotname,dpi=150)
+#plt.close(fig)
