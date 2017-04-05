@@ -104,8 +104,8 @@ with open(motor_types_file,'r',newline='') as csvfile:
     for row in reader:
         theta_extended = row['has theta extended gearbox'].lower() in bool_yes_equivalents
         phi_extended   = row['has phi extended gearbox'].lower()   in bool_yes_equivalents
-        if row['pos_id'] in d.keys():
-            d[row['pos_id']]['has extended gearbox'] = theta_extended or phi_extended
+        if row['posid'] in d.keys():
+            d[row['posid']]['has extended gearbox'] = theta_extended or phi_extended
 for posid in d.keys():
     if ask_ignore_gearbox and d[posid]['has extended gearbox'] == 'unknown':
         gui_root = tkinter.Tk()
@@ -126,7 +126,7 @@ for posid in d.keys():
     with open(d[posid]['file'],'r',newline='') as csvfile:
         reader = csv.DictReader(csvfile)
         valid_keys = []
-        for key in err_keys + ['curr cruise','curr creep']:
+        for key in err_keys + ['curr cruise','curr creep','finish time','total move sequences at finish']:
             if key in reader.fieldnames:
                 valid_keys.append(key)
                 d[posid][key] = []
@@ -139,6 +139,8 @@ for posid in d.keys():
                         val = float(val)
                         if val % 1 == 0:
                             val = int(val)
+                    elif key == 'finish time':
+                        val = str(val) # could consider doing date parsing here, but doesn't seem necessary so far
                     else:
                         val = None
                     d[posid][key].append(val)
@@ -191,46 +193,47 @@ for posid in d.keys():
 
 # now apply current specifications, and evaluate across all rows
 for posid in d.keys():
-    for grade in grade_specs.keys():
-        d[posid]['grade'] = fail_grade
-        d[posid]['num tests proven'] = np.Inf
-        for key in ['lowest curr cruise proven','lowest curr creep proven']:
-            d[posid][key] = 'n/a'
-        spec = grade_specs[grade]['failure current']
-        n_max = d[posid]['num rows']
-        for n_rows_considered in range(min_num_concluding_consecutive_tests, n_max + 1):
-            selection = range(n_max - n_rows_considered, n_max)
-            this_selection_and_grade_ok = True
-            failed = []
-            failed_below_spec = []
-            passed_above_spec = []
-            min_cruise_in_selection = np.Inf
-            min_creep_in_selection = np.Inf
-            for row in selection:
-                if grade in d[posid]['failed grades'][row]:
-                    failed.append(row)
-                min_cruise_in_selection = min([min_cruise_in_selection, d[posid]['curr cruise'][row]])
-                min_creep_in_selection = min([min_creep_in_selection, d[posid]['curr creep'][row]])
-                above_spec = d[posid]['curr cruise'][row] > spec and d[posid]['curr creep'][row] > spec
-                if row in failed and not above_spec:
-                    failed_below_spec.append(row)
-                if row not in failed and above_spec:
-                    passed_above_spec.append(row)
-            if failed_below_spec and passed_above_spec: # case where sure, some tests are passing at high current, but we have data at lower currents to prove that it actually didn't do so good at lower current
-                this_selection_and_grade_ok = False
-            elif failed: # case where we didn't have all the data on high vs low current performance, so now we default to just checking for any failures at all
-                this_selection_and_grade_ok = False
-            if this_selection_and_grade_ok:
-                d[posid]['grade'] = grade
-                d[posid]['num tests proven'] = len(selection)
-                d[posid]['lowest curr cruise proven'] = min_cruise_in_selection
-                d[posid]['lowest curr creep proven'] = min_creep_in_selection
-            else:
-                d[posid]['num tests proven'] = min(len(selection), d[posid]['num tests proven'])
-        if d[posid]['grade'] != fail_grade:
-            break
-    if d[posid]['num tests proven'] == np.Inf:
-        d[posid]['grade'] = insuff_data_grade
+    d[posid]['grade'] = [[]]*d[posid]['num rows'] # last one is the true grade, earlier ones show grade progressively row by row
+    for n_max in range(d[posid]['num rows']):
+        for grade in grade_specs.keys():
+            d[posid]['grade'][n_max] = fail_grade
+            d[posid]['num tests proven'] = np.Inf
+            for key in ['lowest curr cruise proven','lowest curr creep proven']:
+                d[posid][key] = 'n/a'
+            spec = grade_specs[grade]['failure current']
+            for n_rows_considered in range(min_num_concluding_consecutive_tests, n_max + 1):
+                selection = range(n_max - n_rows_considered, n_max)
+                this_selection_and_grade_ok = True
+                failed = []
+                failed_below_spec = []
+                passed_above_spec = []
+                min_cruise_in_selection = np.Inf
+                min_creep_in_selection = np.Inf
+                for row in selection:
+                    if grade in d[posid]['failed grades'][row]:
+                        failed.append(row)
+                    min_cruise_in_selection = min([min_cruise_in_selection, d[posid]['curr cruise'][row]])
+                    min_creep_in_selection = min([min_creep_in_selection, d[posid]['curr creep'][row]])
+                    above_spec = d[posid]['curr cruise'][row] > spec and d[posid]['curr creep'][row] > spec
+                    if row in failed and not above_spec:
+                        failed_below_spec.append(row)
+                    if row not in failed and above_spec:
+                        passed_above_spec.append(row)
+                if failed_below_spec and passed_above_spec: # case where sure, some tests are passing at high current, but we have data at lower currents to prove that it actually didn't do so good at lower current
+                    this_selection_and_grade_ok = False
+                elif failed: # case where we didn't have all the data on high vs low current performance, so now we default to just checking for any failures at all
+                    this_selection_and_grade_ok = False
+                if this_selection_and_grade_ok:
+                    d[posid]['grade'][n_max] = grade
+                    d[posid]['num tests proven'] = len(selection)
+                    d[posid]['lowest curr cruise proven'] = min_cruise_in_selection
+                    d[posid]['lowest curr creep proven'] = min_creep_in_selection
+                else:
+                    d[posid]['num tests proven'] = min(len(selection), d[posid]['num tests proven'])
+            if d[posid]['grade'][n_max] != fail_grade:
+                break
+        if d[posid]['num tests proven'] == np.Inf:
+            d[posid]['grade'][-1] = insuff_data_grade
 proven_keys = [key for key in d[posid].keys() if 'proven' in key]
 proven_keys.sort() # I like this sequence better in the report
 proven_keys.reverse() # I like this sequence better in the report
@@ -276,11 +279,17 @@ if report_file:
             writer.writerow(['',insuff_data_grade,num_insuff])
         writer.writerow([''])
         writer.writerow(['INDIVIDUAL POSITIONER GRADES:'])
-        writer.writerow(['','pos_id','grade'] + proven_keys)
+        writer.writerow(['','posid','grade'] + proven_keys)
         posids_sorted_by_grade = []
         for grade in all_grades + [insuff_data_grade]:
             for posid in d.keys():
-                if d[posid]['grade'] == grade:
+                if d[posid]['grade'][-1] == grade:
                     posids_sorted_by_grade.append(posid)
         for posid in posids_sorted_by_grade:
-            writer.writerow(['', posid, d[posid]['grade']] + [d[posid][key] for key in proven_keys])
+            writer.writerow(['', posid, d[posid]['grade'][-1]] + [d[posid][key] for key in proven_keys])
+        writer.writerow([''])
+        writer.writerow(['INDIVIDUAL TEST LOOP GRADES:'])
+        writer.writerow(['','posid','finish time','total move sequences','grade'])
+        for posid in posids_sorted_by_grade:
+            for row  in range(d[posid]['num rows']):
+                writer.writerow(['', posid] + [d[posid][key][row] for key in ['finish time','total move sequences at finish','grade']])
