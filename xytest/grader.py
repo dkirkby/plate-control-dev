@@ -7,6 +7,7 @@ import posconstants as pc
 import tkinter
 import tkinter.filedialog
 import tkinter.messagebox
+import tkinter.simpledialog
 import csv
 import collections
 import summarizer
@@ -300,11 +301,28 @@ if report_file:
             for row  in range(d[posid]['num rows']):
                 writer.writerow(['', posid] + [d[posid][key][row] for key in ['finish time','total move sequences at finish','grade']])
 
-## write plots
-#plt.ioff()
-#binned = {}
-#for grade in all_grades:
-#    binned[grade]['time stamps']
+# write plots
+plt.ioff()
+gui_root = tkinter.Tk()
+keep_asking = True
+plot_types = {0: 'None',
+              1: 'grade vs date tested',
+              2: 'grade vs num moves'}
+plot_select_text = ''.join(['Enter what type of plots to save.\n\n'] + [str(key) + ': ' + plot_types[key] + '\n' for key in plot_types.keys()])
+while keep_asking:
+    response = tkinter.simpledialog.askinteger(title='Select plot type', prompt=plot_select_text, minvalue=min(plot_types.keys()), maxvalue=max(plot_types.keys()))
+    if response == 0:
+        keep_asking = False
+    elif response == 1:
+        pass
+    elif response == 2:
+        total_moves = collections.OrderedDict().fromkeys(all_grades)
+        
+        for posid in d.keys:
+            total_moves[grade] = [d[posid]['total move sequences at finish'] for posid in d.keys() if d[posid]['grade'][-1] == key]
+
+#
+
 #plotdata['grades'] = []
 #plotdata['numeric grades'] = []
 #plotdata['time stamps'] = []
