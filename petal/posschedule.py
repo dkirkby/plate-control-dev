@@ -263,7 +263,6 @@ class PosSchedule(object):
         posmodels = []; tpstart = []; tptarg = []
         xoffs = []
         yoffs = []
-        
         # Loop through the posunitids and the requests, and correctly order the request
         # information into the order set by posunitids
         for posunitid in self.petal.posids:
@@ -303,11 +302,7 @@ class PosSchedule(object):
             and updates move tables such that no collisions will occur.
             It returns the list of all movetables where none collide with
             one another or a fixed object.
-        '''
-        # Create a poscollider instance to check collisions in movetable
-        pos_collider = self.petal.poscollider
-        pos_collider.add_positioners(posmodels)
-    
+        '''   
         # Name the three steps in rre (used for dictionary keys)
         order_of_operations = ['retract','rotate','extend']
     
@@ -363,7 +358,7 @@ class PosSchedule(object):
             
             # Check for collisions
             collision_indices, collision_types = \
-                    self._check_for_collisions(tpstart[step],pos_collider,tabledicts[step])
+                    self._check_for_collisions(tpstart[step],tabledicts[step])
             
  
             # If no collisions, move directly to the next step
@@ -380,7 +375,7 @@ class PosSchedule(object):
 
             # Avoid the collisions that were found
             tabledicts[step] = self._avoid_collisions(tabledicts[step],posmodels,collision_indices,\
-                                    collision_types,pos_collider,\
+                                    collision_types,\
                                     tpstart[step],tpfinal[step],dp_directions[step])
                                  
             # Update the movetimes for every positioner for this step
@@ -397,7 +392,7 @@ class PosSchedule(object):
                 
             # Check for collisions
             collision_indices, collision_types = \
-                    self._check_for_collisions(tpstart[step],pos_collider,tabledicts[step])
+                    self._check_for_collisions(tpstart[step],tabledicts[step])
                 
             if self.anticol.verbose:
                 self._printindices('Collisions after Round 1, in Step ',step,collision_indices)        
@@ -420,7 +415,7 @@ class PosSchedule(object):
     
         # Check for collisions in the total rre movetable
         collision_indices, collision_types = \
-                    self._check_for_collisions(tpstart['retract'],pos_collider,output_tables)   
+                    self._check_for_collisions(tpstart['retract'],output_tables)   
         itter = 0
         
         # While there are still collisions, keep eliminating the positioners that collide
@@ -430,7 +425,7 @@ class PosSchedule(object):
                 self._printindices('Collisions before zeroth order run ',itter,collision_indices)
             output_tables = self._avoid_collisions_zerothorder(output_tables,posmodels,collision_indices)
             collision_indices, collision_types = \
-                            self._check_for_collisions(tpstart['retract'],pos_collider,output_tables)
+                            self._check_for_collisions(tpstart['retract'],output_tables)
             itter += 1
                    
         if self.anticol.verbose:
@@ -440,7 +435,7 @@ class PosSchedule(object):
     
 
     def _avoid_collisions(self,tables,posmodels,collision_indices,collision_types,\
-                                    pos_collider,tpss = None,\
+                                    tpss = None,\
                                     tpfs = None, dp_direction = None):
         '''
             Wrapper function for correcting collisions. Calls the function 
@@ -450,11 +445,11 @@ class PosSchedule(object):
             return self._avoid_collisions_zerothorder(tables,posmodels,collision_indices)
         elif self.anticol.avoidance == 'EM':
             return self._avoid_collisions_em(tables,posmodels,collision_indices,\
-                                        collision_types,pos_collider,tpss,tpfs,dp_direction)
+                                        collision_types,tpss,tpfs,dp_direction)
         else:
             print("Currently EM is our best method. Executing that.")
             return self._avoid_collisions_em(tables,posmodels,collision_indices,\
-                                        collision_types,pos_collider,tpss,tpfs,dp_direction)
+                                        collision_types,tpss,tpfs,dp_direction)
                                                     
                                                     
     def _create_table_RREdict(self,tp_start, tp_final, current_positioner_model):
@@ -506,7 +501,7 @@ class PosSchedule(object):
        
     
     def _avoid_collisions_em(self,tables,posmodels,collision_indices,\
-                            collision_types,pos_collider,tpss,tpfs,dp_direction):
+                            collision_types,tpss,tpfs,dp_direction):
         '''
             Function that is called with a list of collisions that need to be avoided. This uses 
             a 'force law' type approach to generate moves that avoid neighboring positioners 
@@ -558,8 +553,8 @@ class PosSchedule(object):
             # Get the posmodel of the positioner we'll be working with
             # and info about it's neighbors
             changing_posmodel = posmodels[changing]
-            neighbor_idxs = pos_collider.pos_neighbor_idxs[changing]
-            fixed_neighbors = pos_collider.fixed_neighbor_cases[changing]
+            neighbor_idxs = self.collider.pos_neighbor_idxs[changing]
+            fixed_neighbors = self.collider.fixed_neighbor_cases[changing]
             # Set a boolean if the petal is something we need to avoid
             avoid_petal = (pc.case.PTL in fixed_neighbors)
             
@@ -611,8 +606,8 @@ class PosSchedule(object):
             # of the petal and place some 'avoidance' objects along it so that
             # our positioner is repulsed by them and thus the petal edge
             if avoid_petal:
-                petalx = pos_collider.keepout_PTL.points[0]
-                petaly = pos_collider.keepout_PTL.points[1]
+                petalx = self.collider.keepout_PTL.points[0]
+                petaly = self.collider.keepout_PTL.points[1]
                 actual_petal = np.where((petaly > -1.) & (petaly < 249.))
                 petalx = petalx[actual_petal]
                 petaly = petaly[actual_petal]
@@ -810,7 +805,7 @@ class PosSchedule(object):
         thetaa,phia = target[pc.T],target[pc.P]
         angstep = self.anticol.angstep#1. #0.01
         stepper_array = np.array([-1,0,1])*angstep
-      
+
         # If within safety envelope, proceed directly to desired location
         if phi > phi_safe:
             if phia > phi_safe:
@@ -819,12 +814,11 @@ class PosSchedule(object):
         # Initialize the next phi value to old value
         phi_next = phi
         theta_next = theta
-        # Initialize the potential to infinity
-        V_prev = np.inf
         
         # Loop through possible steps and calculate the potential at each.
         # If the angle is outside acceptable limits, we move on to the next without
         # calculating the potential
+        ts,ps = [],[]
         for pstep in stepper_array:
             phi_rw = phi + pstep
             if phi_rw < pmin or phi_rw > pmax:
@@ -833,24 +827,20 @@ class PosSchedule(object):
                 theta_rw = theta+tstep
                 if theta_rw < tmin or theta_rw > tmax:
                     continue
+                ts.append(theta_rw)
+                ps.append(phi_rw)
                 
-                # Calculate the term in the potential for the motor location
-                xo,yo = posmodel.trans.obsTP_to_flatXY([theta_rw,phi_rw])
-                rhoc = np.hypot(xo,yo)
-                
-                # Calculate the potential pieces for the neighbors
-                rhons = np.hypot(xns-xo,yns-yo)
-                
-                # Calculate the potential pieces for the target
-                rhoa = np.hypot(xa-xo,ya-yo)
-    
-                # Calculate the derivative of the potentials
-                V = self._potential(rhoc,rhons,rhoa)
-    
-                if V < V_prev:
-                    V_prev = V
-                    phi_next = phi_rw
-                    theta_next = theta_rw
+        # Calculate the term in the potential for the motor location
+        xos,yos = posmodel.trans.obsTP_to_flatXY([ts,ps])
+
+        # Calculate the derivative of the potentials
+        Vs = self._findpotential(np.asarray(xos),np.asarray(yos),xa,ya,xns,yns)
+
+        #if V < V_prev:
+        min_ind = np.argmin(Vs)
+        phi_next = ps[min_ind]
+        theta_next = ts[min_ind]
+
 
         # Ensure that the moves remain within allowable limits    
         if phi_next > pmax:
@@ -888,21 +878,25 @@ class PosSchedule(object):
         
 
 
-    def _findpotential(self,xo,yo,xa,ya,xns,yns):
+    def _findpotential(self,xos,yos,xa,ya,xns,yns):
         '''
             Calculates the distances from the positioner to all 
             the relevant locations and then returns the potential
             that the positioner 'feels' given all those distances.
         '''
         # Calculate the term in the potential for the motor location
-        rhoc = np.hypot(xo,yo)
+        rhocs = np.hypot(xos,yos)
         # Calculate the potential pieces for the neighbors
-        rhons = np.hypot(xns-xo,yns-yo)    
+        xosT = xos.reshape((1,xos.size))
+        yosT = yos.reshape((1,yos.size))
+        xns = xns.reshape((xns.size),1)
+        yns = yns.reshape((yns.size),1)
+        rhonss = np.hypot(xns-xosT,yns-yosT)    
         # Calculate the potential pieces for the target
-        rhoa = np.hypot(xa-xo,ya-yo)
+        rhoas = np.hypot(xa-xos,ya-yos)
         # Calculate the derivative of the potentials
-        V = self._potential(rhoc,rhons,rhoa)  
-        return V        
+        Vs = self._potential(rhocs,rhonss,rhoas)  
+        return Vs       
       
       
       
@@ -957,7 +951,7 @@ class PosSchedule(object):
         
     
     
-    def _check_for_collisions(self,tps,cur_poscollider,list_tables):
+    def _check_for_collisions(self,tps,list_tables):
         '''
             Find what positioners collide, and who they collide with
             Inputs:
@@ -973,22 +967,22 @@ class PosSchedule(object):
                                     or [*,None] if colliding with a wall of fiducial.
                 collision_types:   Type of collision as specified in the pc class
         '''
-        posmodel_index_iterable = range(len(cur_poscollider.posmodels))
+        posmodel_index_iterable = range(len(self.collider.posmodels))
         sweeps = [[] for i in posmodel_index_iterable]
         collision_index = [[] for i in posmodel_index_iterable]
         collision_type = [pc.case.I for i in posmodel_index_iterable]
         earliest_collision = [np.inf for i in posmodel_index_iterable]
         nontriv = 0
-        colrelations = cur_poscollider.collidable_relations
+        colrelations = self.collider.collidable_relations
         for A, B, B_is_fixed in zip(colrelations['A'],colrelations['B'],colrelations['B_is_fixed']):
             tableA = list_tables[A].for_schedule
             obsTPA = tps[A]
             if B_is_fixed and A in range(len(list_tables)): # might want to replace 2nd test here with one where we look in tables for a specific positioner index
-                these_sweeps = cur_poscollider.spacetime_collision_with_fixed(A, obsTPA, tableA)
+                these_sweeps = self.collider.spacetime_collision_with_fixed(A, obsTPA, tableA)
             elif A in range(len(list_tables)) and B in range(len(list_tables)): # again, might want to look for specific indexes identifying which tables go with which positioners
                 tableB = list_tables[B].for_schedule
                 obsTPB = tps[B]    
-                these_sweeps = cur_poscollider.spacetime_collision_between_positioners(A, obsTPA, tableA, B, obsTPB, tableB)
+                these_sweeps = self.collider.spacetime_collision_between_positioners(A, obsTPA, tableA, B, obsTPB, tableB)
     
             if these_sweeps[0].collision_time <= earliest_collision[A]:
                 nontriv += 1
@@ -1034,7 +1028,7 @@ class PosSchedule(object):
     
         
     
-    def _potential(self,rhoc,rhons,rhoa):
+    def _potential(self,rhocs,rhonss,rhoas):
         '''
             Where the 'forces' the positioner feels are defined. The potential
             acts to attract the positioner to the target, and repel it from the neighbors
@@ -1043,14 +1037,18 @@ class PosSchedule(object):
             and short range repulsion to preferentially 
         '''
         # Avoid divide-by-zero errors by setting 0 valued distances to a very small number
-        if rhoc == 0.:
-            rhoc = 1e-12
-        if np.any(rhons == 0.):
-            rhons[rhons==0.] = 1e-12
-        if rhoa == 0.:
-            rhoa = 1e-12        
+        #if rhoc == 0.:
+        #    rhoc = 1e-12
+        if np.any(rhocs == 0.):
+            rhocs[rhocs==0.] = 1e-12
+        if np.any(rhonss == 0.):
+            rhonss[rhonss==0.] = 1e-12
+        #if rhoa == 0.:
+        #    rhoa = 1e-12      
+        if np.any(rhoas == 0.):
+            rhoas[rhoas==0.] = 1e-12
         # Return the potential given the distances and the class-defined coefficients
-        return ( (self.anticol.coeffn*np.sum((1./(rhons*rhons)))) - (self.anticol.coeffa/(rhoa**0.5))) 
+        return ( (self.anticol.coeffn*np.sum((1./(rhonss*rhonss)),axis=0)) - (self.anticol.coeffa/(rhoas**0.5))) 
                  # (self.anticol.coeffcr/(rhoc**4)) +  - (self.anticol.coeffca/(rhoc**0.25))  #7,3     
         
         

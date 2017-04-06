@@ -30,10 +30,10 @@ class Petal(object):
         local_commit_on ... boolean, controlw whether to commit state data to local log files (can be done with or without db_commit_on)
         printfunc       ... method, used for stdout style printing. we use this for logging during tests
     """
-    def __init__(self, petal_id, posids, fidids, simulator_on=False, db_commit_on=False, local_commit_on=True, printfunc=print):
+    def __init__(self, petal_id, posids, fidids, simulator_on=False, db_commit_on=False, local_commit_on=True, printfunc=print,verbose=False):
         # petal setup
         self.petal_id = petal_id
-        self.verbose = False # whether to print verbose information at the terminal
+        self.verbose = verbose # whether to print verbose information at the terminal
         self.simulator_on = simulator_on
         if not(self.simulator_on):
             import petalcomm
@@ -62,7 +62,7 @@ class Petal(object):
         # collider and scheduler setup
         self.collider = poscollider.PosCollider(configfile='')
         self.collider.add_positioners(self.posmodels)
-        self.schedule = posschedule.PosSchedule(self)
+        self.schedule = posschedule.PosSchedule(self,verbose=self.verbose)
         self.anticollision_default = True  # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
         self.anticollision_override = True # causes the anticollision_default value to be used in all cases
         
