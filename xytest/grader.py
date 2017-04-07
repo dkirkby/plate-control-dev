@@ -321,6 +321,16 @@ while keep_asking:
         if response == 1:
             pass
         elif response == 2:
+#            Gather all data into 3 big matching lists: n cycles, grade, posid
+#            Sort all lists by n cycles
+#            Make a dictionary with key = posid and value = last grade
+#            Make 6 lists to store running totals of each grade
+#            Go thru the 3 lists of all the data, and for each point look up for its posid whether the grade changed.
+#                If so, update the totals accordingly in the 2 of 6 running grade count lists affected. Copy and reappend last value for the unaffected lists.
+#            Plot the running grade counts vs number cycles.
+#            Must handle case where some positioner has no more data
+#            For this, best to have one more dict, indexed by posid, saying cycle # at last row of its data.
+            
 #            n_bins = np.median([d[posid]['num rows'] for posid in d.keys()])
             total_moves = collections.OrderedDict([(grade,[]) for grade in all_grades])
             num_entries_in_bin = {}
