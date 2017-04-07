@@ -302,25 +302,63 @@ if report_file:
                 writer.writerow(['', posid] + [d[posid][key][row] for key in ['finish time','total move sequences at finish','grade']])
 
 # write plots
-plt.ioff()
+
 gui_root = tkinter.Tk()
 keep_asking = True
 plot_types = {0: 'None',
-              1: 'grade vs date tested',
-              2: 'grade vs num moves'}
+              1: 'grade vs date tested (cumulative histogram)',
+              2: 'grade vs num moves (histogram)',
+              3: 'grade vs num moves (lines)'} # won't this just put a bunch of lines over each other? maybe should be corr max, corr rms, and blind max options, so more density visible
 plot_select_text = ''.join(['Enter what type of plots to save.\n\n'] + [str(key) + ': ' + plot_types[key] + '\n' for key in plot_types.keys()])
 while keep_asking:
     response = tkinter.simpledialog.askinteger(title='Select plot type', prompt=plot_select_text, minvalue=min(plot_types.keys()), maxvalue=max(plot_types.keys()))
     if response == 0:
         keep_asking = False
-    elif response == 1:
-        pass
-    elif response == 2:
-        total_moves = collections.OrderedDict().fromkeys(all_grades)
-        
-        for posid in d.keys:
-            total_moves[grade] = [d[posid]['total move sequences at finish'] for posid in d.keys() if d[posid]['grade'][-1] == key]
-
+        gui_root.withdraw()
+    else:
+        plt.ioff()
+        fig = plt.figure(figsize=(10, 8))
+        if response == 1:
+            pass
+        elif response == 2:
+#            n_bins = np.median([d[posid]['num rows'] for posid in d.keys()])
+            total_moves = collections.OrderedDict([(grade,[]) for grade in all_grades])
+            num_entries_in_bin = {}
+            for posid in d.keys():
+                for row in range(len(d[posid]['grade'])):
+                    grade = d[posid]['grade'][row]
+                    moves = d[posid]['total move sequences at finish'][row]
+                    total_moves[grade].append(moves)
+            data = []
+            labels = []
+            for grade in total_moves.keys():
+                data.append(total_moves[grade])
+                labels.append('Grade ' + str(grade))
+            (bin_values,bin_edges,patches) = plt.hist(data)
+            plt.cla()
+            n_bins = len(bin_values[0])
+            bin_totals = [0]*n_bins
+            for values_this_grade in bin_values:
+                for bin_idx in range(len(values_this_grade)):
+                    bin_totals[bin_idx] += values_this_grade[bin_idx]
+            weights = []
+            for data_this_grade in data:
+                these_weights = []
+                for val in data_this_grade:
+                    bin_idx = min(np.flatnonzero(val >= bin_edges)[-1], n_bins-1)
+                    these_weights.append(1 / bin_totals[bin_idx])
+                weights.append(these_weights)
+            plt.hist(data, bins=n_bins, weights=weights, histtype='barstacked', label=labels)
+            plt.xlabel('number of move sequences ("cycles")')
+            plt.ylabel('fraction of tests that achieved each grade')
+        elif response == 3:
+            pass
+        plotname = os.path.splitext(report_file)[0] + '_plot' + str(response) + '.png'
+        plt.title(plot_types[response].upper() + '\nReport file: ' + os.path.basename(report_file))
+        plt.legend(loc='best')
+        plt.savefig(plotname,dpi=150)
+        plt.close(fig)
+        tkinter.messagebox.showinfo(title='Plot saved',message='Plot of ' + plot_types[response] + ' saved to:\n\n' + plotname)
 #
 
 #plotdata['grades'] = []
@@ -340,12 +378,9 @@ while keep_asking:
 #        
 #        
 #        plotdata['numeric grades'],bins=len(num_grades.values()),range=(min(num_grades.values()),max(num_grades.values())))
-#fig = plt.figure(figsize=(10, 8))
+
 #percents = np.divide(plotdata[])
 #plt.plot(plotdata['total moves'],plotdata['numeric grades'],'o')
 #plt.yticks(list(num_grades.values()),list(num_grades.keys()))
 #plt.xlabel('lifetime number of move sequences')
 #plt.ylabel('percentage in each grade')
-#plotname = os.path.splitext(report_file)[0] + '_grades_vs_nmoves.png'
-#plt.savefig(plotname,dpi=150)
-#plt.close(fig)
