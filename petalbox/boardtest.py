@@ -1,11 +1,10 @@
 # boardtest.py
-# This is a script that the FIPOS quality control test interfaces to.  It performs the following functions based on the command sent:
-#'python3 boardtest.py <can_id> program_canid': programs given can_id into the board, returns can_id, sid_short, sid_upper, sid_lower
+# This is a petalbox script that the FIPOS quality control test interfaces to.  It performs the following functions based on the system arguments supplied:
+#'python3 boardtest.py <can_id> program_canid': programs given can_id into the board, returns read back can_id, sid_short, sid_upper, and sid_lower
 #'python3 boardtest.py <can_id> read_temp': read temperature sensor of board with given can_id
-#'python3 boardtest.py <can_id> test_sync': sends move table to given can_id, checks for when sync is set (move table executed)
+#'python3 boardtest.py <can_id> test_sync': sends move table to given can_id, checks sync signal
 #'python3 boardtest.py <can_id> led_seq': sends out led flashing pattern
 #'python3 boardtest.py <can_id> test_seq': sends out command that toggles between normal motor opertion mode and test sequence mode
-
 
 import posfidcan
 import sys
@@ -14,16 +13,6 @@ import math
 import struct
 import string
 import os,sys
-
-
-def hex_to_int(barray):
-	"""
-	Converts byte array to integer
-	"""
-	i=0
-	for j,byte in enumerate(reversed(barray)):
-		i=i+byte*2**(j*8)		
-	return i
 
 def flip_byteorder(barray):
 	"""
@@ -51,8 +40,7 @@ class PositionerControl(object):
 		posid, data = self.scan.send_command_recv(pid, 17, '')
 		return data		
 
-	def check_sid_short(self, spid, sid):
-		pid=spid
+	def check_sid_short(self, pid, sid):
 		status=self.scan.send_command_byte(pid,24,sid)
 		return status
 
@@ -61,23 +49,20 @@ class PositionerControl(object):
 		status=self.scan.send_command(pid,20,new_canid)
 		return status 
 
-	def get_can_address(self, spid):
-		pid=spid
+	def get_can_address(self, pid):
 		posid,data=self.scan.send_command_recv(pid,21, '')
 		return posid,data
 
-	def get_firmware_version(self, spid):
-		pid=spid
+	def get_firmware_version(self, pid):
 		revision,data=self.scan.send_command_recv(pid,11, '')
 		return revision,data
 
-
-	def set_reset_led(self,id, select):
+	def set_reset_led(self,pid, select):
 		if select.lower()=='on':
 			state=1
 		if select.lower()=='off':
 			state=0 
-		self.scan.send_command(id,5,str(state).zfill(2))	
+		self.scan.send_command(pid,5,str(state).zfill(2))	
 	
 	def switch_test_mode(self, pid):
 		self.scan.send_command(pid, 6, '')
@@ -86,10 +71,9 @@ class PositionerControl(object):
 		posid, data = self.scan.send_command_recv(pid, 9, '')	
 		return data
 
-	def load_rows(self,spid, ex_code,select_flags,amount,pause,readback=True):
-
-
-		pid=spid
+	def load_rows(self,pid, ex_code,select_flags,amount,pause,readback=True):
+		checksum_match = False
+		sync_check = False
 		ex_code=str(ex_code)
 		select_flags=str(select_flags)
 		pause = str(hex(pause).replace('0x','')).zfill(4)
@@ -102,47 +86,42 @@ class PositionerControl(object):
 		else:
 			amount=amount*self.Gear_Ratio/3.3
 
-
 		amount=str(hex(int(amount)).replace('0x','').zfill(6))
 		select_flags=str(select[select_flags])
 
 		if(ex_code == '0' or ex_code == '1'):
 
 			try:
-
-				#print('Data sent is: %s (in hex)'%(str(ex_code + select_flags + amount + pause)))
 				self.scan.send_command(pid,4, str(ex_code + select_flags  + amount + pause))
-
-
 				if(ex_code=='1'):
-
-					#print(str(hex(int(ex_code + select_flags,16) + int(amount,16) + int(pause,16) + 4).replace('0x','').zfill(8)))  
 					self.bitsum += int(ex_code + select_flags,16) + int(amount,16) + int(pause,16) + 4
-					#print('Bitsum =', self.bitsum)
-
-				return 0
-
+				return 'SUCCESS'
 			except:
-
-				#print ("Sending command 4 failed")
-				return 1
+				return 'FAILED'
 		else:
                         #Send both last command and bitsum, reset bitsum for next move table    
 			try:
-				#print('Data sent is: %s (in hex)'%(str(ex_code + select_flags + amount + pause)))
 				self.scan.send_command(pid,4, str(ex_code + select_flags  + amount + pause))
 				self.bitsum += int(ex_code + select_flags,16) + int(amount,16) + int(pause,16) + 4
-				#print('Bitsum =', self.bitsum)
 				
 				posid, bitsum_response = self.scan.send_command_recv(pid,8, str(hex(self.bitsum).replace('0x','').zfill(8)))
-				self.execute_move_table(20000)#TEMP
+				if bitsum_response[4] == 1:
+					checksum_match = True
+				time.sleep(.2)
+				os.system('sudo config-pin "P9_12" 1')
+				time.sleep(.2)
 				posid, bitsum_response = self.scan.send_command_recv(pid,8, str(hex(self.bitsum).replace('0x','').zfill(8)))
+				if bitsum_response[4] == 3:
+					sync_check = True
 				self.bitsum=0
-				return bitsum_response
+				if checksum_match and sync_check:
+					return 0
+				elif not checksum_match:
+					return 2
+				else:
+					return 1
 			except:
-				#print ("Sending command 4 or 8 failed")
-				return 1
-
+				return 'FAILED'
 
 	def execute_move_table(self, pid):
 		self.scan.send_command(pid, 7, '')
@@ -171,8 +150,7 @@ if __name__ == '__main__':
 		sid_lower = pmc.get_sid_lower(brdcast_id)
 		sid_lower= "".join("{:02x}".format(c) for c in sid_lower)
 
-
-		print('CAN_ID, S_ID, S_ID upper, S_ID lower: ', read_back_canid, sid_str, sid_upper, sid_lower)
+		print('CAN_ID: %d, SID_short: %s, SID_upper: %s, SID_lower: %s'%(read_back_canid, sid_str, sid_upper, sid_lower))
 
 	elif command == 'test_seq':
 		pmc.switch_test_mode(canid)
@@ -181,12 +159,15 @@ if __name__ == '__main__':
 		for count in range(0,5):
 			pmc.set_reset_led(canid, 'on')
 			time.sleep(.5)
+			pmc.set_reset_led(canid, 'off')
+			time.sleep(.5)
 
 	elif command == 'test_sync':
+		os.system('sudo config-pin "P9_12" 0')
 		pmc.load_rows(canid, 1, 'cw_cruise_0', 45, 0)
 		pmc.load_rows(canid, 1, 'cw_cruise_1', 45, 0)
-		checksum = pmc.load_rows(canid, 2, 'cw_creep_1', 0, 0)
-		print(checksum[4])		
+		status = pmc.load_rows(canid, 2, 'cw_creep_1', 0, 0)
+		print(status)
 
 	elif command == 'read_temp':
 		temp = pmc.get_temperature(canid)
