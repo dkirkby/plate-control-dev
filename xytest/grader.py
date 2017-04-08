@@ -308,7 +308,8 @@ keep_asking = True
 plot_types = {0: 'None',
               1: 'grade vs date tested (cumulative histogram)',
               2: 'grade vs num moves (histogram)',
-              3: 'grade vs num moves (lines)'} # won't this just put a bunch of lines over each other? maybe should be corr max, corr rms, and blind max options, so more density visible
+              3: 'grade vs num moves (running counts)',
+              4: 'grade vs num moves (lines)'} # won't this just put a bunch of lines over each other? maybe should be corr max, corr rms, and blind max options, so more density visible
 plot_select_text = ''.join(['Enter what type of plots to save.\n\n'] + [str(key) + ': ' + plot_types[key] + '\n' for key in plot_types.keys()])
 while keep_asking:
     response = tkinter.simpledialog.askinteger(title='Select plot type', prompt=plot_select_text, minvalue=min(plot_types.keys()), maxvalue=max(plot_types.keys()))
@@ -321,17 +322,8 @@ while keep_asking:
         if response == 1:
             pass
         elif response == 2:
-#            Gather all data into 3 big matching lists: n cycles, grade, posid
-#            Sort all lists by n cycles
-#            Make a dictionary with key = posid and value = last grade
-#            Make 6 lists to store running totals of each grade
-#            Go thru the 3 lists of all the data, and for each point look up for its posid whether the grade changed.
-#                If so, update the totals accordingly in the 2 of 6 running grade count lists affected. Copy and reappend last value for the unaffected lists.
-#            Plot the running grade counts vs number cycles.
-#            Must handle case where some positioner has no more data
-#            For this, best to have one more dict, indexed by posid, saying cycle # at last row of its data.
-            
-#            n_bins = np.median([d[posid]['num rows'] for posid in d.keys()])
+            # PROBABLY DELETE THIS ONE. IT IS A NICE IDEA, BUT A LITTLE DECEPTIVE.
+            n_bins = int(np.median([d[posid]['num rows'] for posid in d.keys()]))
             total_moves = collections.OrderedDict([(grade,[]) for grade in all_grades])
             num_entries_in_bin = {}
             for posid in d.keys():
@@ -344,7 +336,7 @@ while keep_asking:
             for grade in total_moves.keys():
                 data.append(total_moves[grade])
                 labels.append('Grade ' + str(grade))
-            (bin_values,bin_edges,patches) = plt.hist(data)
+            (bin_values,bin_edges,patches) = plt.hist(data,bins=n_bins)
             plt.cla()
             n_bins = len(bin_values[0])
             bin_totals = [0]*n_bins
@@ -362,6 +354,43 @@ while keep_asking:
             plt.xlabel('number of move sequences ("cycles")')
             plt.ylabel('fraction of tests that achieved each grade')
         elif response == 3:
+            alldata = {}
+            alldata['num moves'] = []
+            alldata['grade'] = []
+            alldata['posid'] = []
+            for posid in d.keys():
+                for row in range(d[posid]['num rows']):
+                    num_moves = d[posid]['total move sequences at finish'][row]
+                    alldata['num moves'].append(num_moves)
+                    alldata['grade'].append(d[posid]['grade'][row])
+                    alldata['posid'].append(posid)
+            sorted_idxs = np.argsort(alldata['num moves'])
+            for key in alldata.keys():
+                alldata[key] = np.array(alldata[key])[sorted_idxs].tolist()
+            num_moves = [0]
+            num_pos_in_each_grade = collections.OrderedDict([(grade,[0]) for grade in all_grades])
+            last_grade = dict([(posid,None) for posid in d.keys()])
+            for i in range(len(alldata['num moves'])):
+                this_num_moves = alldata['num moves'][i]
+                if this_num_moves > num_moves[-1]:
+                    num_moves.append(this_num_moves)
+                    for grade in num_pos_in_each_grade.keys():
+                        num_pos_in_each_grade[grade].append(num_pos_in_each_grade[grade][-1])   
+                this_posid = alldata['posid'][i]
+                this_grade = alldata['grade'][i]
+                if last_grade[this_posid] != this_grade:
+                    if last_grade[this_posid] != None:
+                        num_pos_in_each_grade[last_grade[this_posid]][-1] -= 1
+                    num_pos_in_each_grade[this_grade][-1] += 1
+                    last_grade[this_posid] = this_grade
+            del num_moves[0] # remove those pesky initial rows filled with 0
+            for L in num_pos_in_each_grade.values():
+                del L[0] # remove those pesky initial rows filled with 0
+            for grade in all_grades:
+                plt.plot(num_moves,num_pos_in_each_grade[grade],label='Grade ' + str(grade))
+                plt.xlabel('number of move sequences ("cycles")')
+                plt.ylabel('number of positioners of each grade')
+        elif response == 4:
             pass
         plotname = os.path.splitext(report_file)[0] + '_plot' + str(response) + '.png'
         plt.title(plot_types[response].upper() + '\nReport file: ' + os.path.basename(report_file))
