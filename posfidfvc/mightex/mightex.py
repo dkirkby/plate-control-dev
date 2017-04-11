@@ -6,20 +6,21 @@
 #    Revisions:
 #    mm/dd/yyyy who        description
 #    ---------- --------   -----------
-#    03/29/2017 cad        Use instance variables, not Class variables
-#    03/30/2017 cad        Change max LED current to 999mA rather than 1000
-#                          to deal with maximum length string in hidraw cmd
+#    04/11/2017 cad        Changed the autopilot tolerance to 1
+#    03/30/2017 cad        Added autopilot mode (on by default)
+#                          Turn it off with m.mlc_autopilot=0
+#                          The autopilot tolerance is m.mlc_autopilot_tolerance
+#                          The default value for the tolerance is 4
+#                          NOTE: autpilot turns off the LED while it's testing
+#                          the settings.
 #    03/30/2017 cad        Discovered that setting currentLimit to 799 and
 #                          LED current to 789 resulted in the LED current
 #                          being set to 799!  Changed code to specify
 #                          currentLimit with the setCurrentLimit method.
 #                          The default current limit is now 999mA
-#    03/30/2017 cad        Added autopilot mode (on by default)
-#                          Turn it off with m.mlc_autopilot=0
-#                          The autopilot tolerance is m.mlc_autopilot_tolerance
-#                          The default value for the tolerance is 8
-#                          NOTE: autpilot turns off the LED while it's testing
-#                          the settings.
+#    03/30/2017 cad        Change max LED current to 999mA rather than 1000
+#                          to deal with maximum length string in hidraw cmd
+#    03/29/2017 cad        Use instance variables, not Class variables
 # ****************************************************************************
 
 import subprocess
@@ -73,7 +74,7 @@ class Mightex_LED_Controller:
         self.mlc_device_mA_Setting=-1     # last current Setting read from the controller
         self.mlc_device_mode=-1           # last mode read from the controller
         self.mlc_autopilot=1              # by default, auto-correct settings
-        self.mlc_autopilot_tolerance=4    # if the read-back is within this much, it's OK
+        self.mlc_autopilot_tolerance=1    # if the read-back is within this much, it's OK
         self.mlc_autopilot_iterations=0	  # increments when autpilot is used
         self.mlc_autopilot_max_iterations=8	  # maximum number of times through autopilot loop
         self.mlc_Debug=0
