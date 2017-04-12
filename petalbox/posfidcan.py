@@ -103,12 +103,48 @@ class PosFidCAN(object):
 				return('FAILED: can_id, bus_id: ', posID_int, self.channel)
 			can_id, can_dlc, data = self.dissect_can_frame(cf)
 			can_id=can_id-0x80000000				#remove extended id prefix to give just a can id
+			can_id &= 0xEFFFFFFF					#remove MSB 1 that is tacked on to CAN identifiers of positioner responses		
 			intid=str(can_id)			
 			return (int(intid) , data)
 		except socket.error:
 			
 			print('Error sending CAN frame in send_command_recv')
 			return 'FAILED' 
+
+	def send_command_recv_multi(self, n_expected_responses = 5, posID= 20000, ccom=8, data=''):
+		"""
+		Sends a CAN command. Does wait to receive a response from the positioners (as many as n_expected_responses).
+		"""
+
+		try:
+			return_dict = {}
+			posID_int = posID
+			ext_id_prefix = '8'                                             #this is the extended id prefix
+			posID = ext_id_prefix + (hex(posID).replace('0x','')+hex(ccom).replace('0x','').zfill(2)).zfill(7)
+			posID = int(posID,16)
+			data=data.replace(',','')
+
+			self.s.send(self.build_can_frame(posID, bytearray.fromhex(data)))
+
+			time.sleep(self.__sleeptime)
+			try:
+				for responses in range(n_expected_responses):
+					cf, addr = self.s.recvfrom(24)
+					can_id, can_dlc, data = self.dissect_can_frame(cf)
+					can_id=can_id-0x80000000                                #remove extended id prefix to give just a can id
+					can_id &= 0xEFFFFFFF                                    #remove MSB 1 that is tacked on to CAN identifiers of positioner responses
+					intid=str(can_id)
+					print(int(intid), data)
+					return_dict[can_id] = data
+			except socket.timeout:
+				print('Socket timeout error: positioner probably did not respond.  Check that it is connected, power is on, and the CAN id is correct.  Problem with canid, busid: ', posID_int, self.channel)
+				return('FAILED: can_id, bus_id: ', posID_int, self.channel)
+
+			return return_dict
+		except socket.error:
+
+			print('Error sending CAN frame in send_command_recv')
+			return 'FAILED'
 
 
 
