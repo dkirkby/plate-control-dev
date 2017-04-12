@@ -141,7 +141,7 @@ if __name__ == '__main__':
 		pmc.check_sid_short(brdcast_id,sid)
 		pmc.write_can_address(brdcast_id, canid)
 
-		posid,read_back_canid = pmc.get_can_address(canid)
+		posid,read_back_canid = pmc.get_can_address(20000)
 		read_back_canid = int.from_bytes(read_back_canid, byteorder = 'little')
 		
 		sid_upper = pmc.get_sid_upper(brdcast_id)
