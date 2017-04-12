@@ -30,5 +30,5 @@ class SendAlarm(object):
 		server.sendmail(fromaddr, to, msg.as_string())  
 		server.quit()
 if __name__ == "__main__":
-	sendalarm=SendAlarm(['schubnel@umich.edu','7343951248@txt.att.net'])
+	sendalarm=SendAlarm(['schubnel@umich.edu','7343951248@txt.att.net','kfanning@umich.edu','2488187909@messaging.sprintpcs.com'])
 	sendalarm.send ('test stand UM1 alarm','test no longer running')

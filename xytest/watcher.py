@@ -7,7 +7,7 @@ import os
 import time
 import sendalarm
 
-NOTIFY=['schubnel@umich.edu','7343951248@txt.att.net'] 
+NOTIFY=['schubnel@umich.edu','7343951248@txt.att.net','kfanning@umich.edu','2488187909@messaging.sprintpcs.com'] 
 """ Alltel: phonenumber@message.alltel.com.
     AT&T: phonenumber@txt.att.net.
     T-Mobile: phonenumber@tmomail.net.
