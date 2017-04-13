@@ -171,10 +171,11 @@ for posid in pos_to_delete:
     del posids[posids.index(posid)]
         
 # gather up all grades passed for each test loop for each positioner
-# do not yet apply current specifications
+# do not yet apply % current specifications
 for posid in d.keys():
-    d[posid]['failed grades'] = [set() for i in range(d[posid]['num rows'])]
+    d[posid]['grade'] = []
     for row in range(d[posid]['num rows']):
+        passing_grades = set(all_grades)
         for grade in grade_specs.keys():
             failed_this_grade = False
             for c in range(len(summarizer.stat_cuts)):
@@ -196,18 +197,30 @@ for posid in d.keys():
                 if not(d[posid]['has extended gearbox']) and grade_specs[grade]['has extended gearbox']:
                     failed_this_grade = True
             if failed_this_grade:
-                d[posid]['failed grades'][row].add(grade)
+                passing_grades.remove(grade)
+        this_grade = min(passing_grades) # assuming 'A','B','C' etc or 0,1,2 etc -- a grading system where lower value is better
+        d[posid]['grade'].append()
 
-# now apply current specifications, and evaluate across all rows
+# now evaluate across all rows, and also apply % current specifications
 for posid in d.keys():
-    d[posid]['grade'] = [[]]*d[posid]['num rows'] # last one is the true grade, earlier ones show grade progressively row by row
-    for n_max in range(d[posid]['num rows']):
+    
+    for row in range(d[posid]['num rows']):
         for grade in grade_specs.keys():
-            d[posid]['grade'][n_max] = fail_grade
+            spec = grade_specs[grade]['failure current']
+            above_spec = d[posid]['curr cruise'][row] > spec and d[posid]['curr creep'][row] > spec
+            failed = True if grade in d[posid]['failed grades'][row] else False
+            if failed and not above_spec:
+                failed_below_spec.append(row)
+            if row not in failed and above_spec:
+                passed_above_spec.append(row)
+    
+    
+    for n_max in range(d[posid]['num rows']):
+        
             d[posid]['num tests proven'] = np.Inf
             for key in ['lowest curr cruise proven','lowest curr creep proven']:
                 d[posid][key] = 'n/a'
-            spec = grade_specs[grade]['failure current']
+            
             for n_rows_considered in range(min_num_concluding_consecutive_tests, n_max + 1):
                 selection = range(n_max - n_rows_considered, n_max)
                 this_selection_and_grade_ok = True
@@ -217,15 +230,12 @@ for posid in d.keys():
                 min_cruise_in_selection = np.Inf
                 min_creep_in_selection = np.Inf
                 for row in selection:
-                    if grade in d[posid]['failed grades'][row]:
+                    
                         failed.append(row)
-                    min_cruise_in_selection = min([min_cruise_in_selection, d[posid]['curr cruise'][row]])
+                    min_cruise_in_selection = min([min_cruise_in_selection, ])
                     min_creep_in_selection = min([min_creep_in_selection, d[posid]['curr creep'][row]])
-                    above_spec = d[posid]['curr cruise'][row] > spec and d[posid]['curr creep'][row] > spec
-                    if row in failed and not above_spec:
-                        failed_below_spec.append(row)
-                    if row not in failed and above_spec:
-                        passed_above_spec.append(row)
+                    
+
                 if failed_below_spec and passed_above_spec: # case where sure, some tests are passing at high current, but we have data at lower currents to prove that it actually didn't do so good at lower current
                     this_selection_and_grade_ok = False
                 elif failed: # case where we didn't have all the data on high vs low current performance, so now we default to just checking for any failures at all
@@ -241,6 +251,8 @@ for posid in d.keys():
                 break
         if d[posid]['num tests proven'] == np.Inf:
             d[posid]['grade'][-1] = insuff_data_grade
+            
+# now count number of tests that prove the final grade
 proven_keys = [key for key in d[posid].keys() if 'proven' in key]
 proven_keys.sort() # I like this sequence better in the report
 proven_keys.reverse() # I like this sequence better in the report
