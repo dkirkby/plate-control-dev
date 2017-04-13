@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 # c.f. DESI-XXXX Fiber Positioner Grades
 # the list specs refer to values at the stat_cuts specified in the summarizer
 grade_specs = collections.OrderedDict()
-grade_spec_headers = ['blind max um','corr max um','corr rms um','failure current','has extended gearbox']
+grade_spec_headers = ['blind max um','corr max um','corr rms um','has extended gearbox']
 grade_spec_err_keys = grade_spec_headers[0:2]
 grading_threshold = summarizer.thresholds_um[0]
 min_num_targets = 24 # a test is not considered valid without at least this many targets
@@ -29,7 +29,6 @@ grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
 grade_specs[grade]['blind max um']         = [ 100, 100]
 grade_specs[grade]['corr max um']          = [  15,  15]
 grade_specs[grade]['corr rms um']          = [   5,   5]
-grade_specs[grade]['failure current']      = 80
 grade_specs[grade]['has extended gearbox'] = False
 
 grade = 'B'
@@ -37,7 +36,6 @@ grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
 grade_specs[grade]['blind max um']         = [ 150, 200]
 grade_specs[grade]['corr max um']          = [  15,  30]
 grade_specs[grade]['corr rms um']          = [   5,   5]
-grade_specs[grade]['failure current']      = 80
 grade_specs[grade]['has extended gearbox'] = False
 
 grade = 'C'
@@ -45,7 +43,6 @@ grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
 grade_specs[grade]['blind max um']         = [ 250, 250]
 grade_specs[grade]['corr max um']          = [  20,  40]
 grade_specs[grade]['corr rms um']          = [   5,  10]
-grade_specs[grade]['failure current']      = 90
 grade_specs[grade]['has extended gearbox'] = False
 
 grade = 'D'
@@ -53,22 +50,23 @@ grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
 grade_specs[grade]['blind max um']         = [ 350, 350]
 grade_specs[grade]['corr max um']          = [  30,  60]
 grade_specs[grade]['corr rms um']          = [  10,  20]
-grade_specs[grade]['failure current']      = 100
 grade_specs[grade]['has extended gearbox'] = False
 
 grade = 'E'
 grade_specs[grade] = grade_specs['C'].copy()
-grade_specs[grade]['failure current']      = 100
 grade_specs[grade]['has extended gearbox'] = True
 
 fail_grade = 'F'
 insuff_data_grade = 'insuff data'
 all_grades = list(grade_specs.keys()) + [fail_grade] # intentionally not including ignored in this
-#n = len(all_grades)
-#num_grades = {} # numeric equivalents to grades (for plotting)
-#for grade in all_grades:
-#    num_grades[grade] = n
-#    n -= 1
+
+# functions for getting the best or worst grade out of a list or set
+def best(grade):
+    return min(grade)
+def worst(grade):
+    return max(grade)
+def as_good_as(grade1,grade2):
+    return grade1 <= grade2
 
 # get the files list
 filetypes = (('Comma-separated Values','*.csv'),('All Files','*'))
@@ -165,15 +163,14 @@ for posid in d.keys():
                 min_num_concluding_consecutive_tests = 1
     if (None in d[posid]['curr cruise'] or None in d[posid]['curr creep']):
         d[posid]['curr cruise'] = 100 # assume max current, lacking data
-        d[posid]['curr creep'] = 100 # assum max current, lacking data
+        d[posid]['curr creep'] = 100 # assume max current, lacking data
 for posid in pos_to_delete:
     del d[posid]
     del posids[posids.index(posid)]
         
 # gather up all grades passed for each test loop for each positioner
-# do not yet apply % current specifications
 for posid in d.keys():
-    d[posid]['grade'] = []
+    d[posid]['row grade'] = []
     for row in range(d[posid]['num rows']):
         passing_grades = set(all_grades)
         for grade in grade_specs.keys():
@@ -198,64 +195,40 @@ for posid in d.keys():
                     failed_this_grade = True
             if failed_this_grade:
                 passing_grades.remove(grade)
-        this_grade = min(passing_grades) # assuming 'A','B','C' etc or 0,1,2 etc -- a grading system where lower value is better
-        d[posid]['grade'].append()
+        this_grade = best(passing_grades)
+        d[posid]['row grade'].append(this_grade)
 
-# now evaluate across all rows, and also apply % current specifications
+# determine the final grade for each positioner
 for posid in d.keys():
-    
-    for row in range(d[posid]['num rows']):
-        for grade in grade_specs.keys():
-            spec = grade_specs[grade]['failure current']
-            above_spec = d[posid]['curr cruise'][row] > spec and d[posid]['curr creep'][row] > spec
-            failed = True if grade in d[posid]['failed grades'][row] else False
-            if failed and not above_spec:
-                failed_below_spec.append(row)
-            if row not in failed and above_spec:
-                passed_above_spec.append(row)
-    
-    
-    for n_max in range(d[posid]['num rows']):
+    these_grades = []
+    final_row_idx = d[posid]['num rows'] - 1
+    for row in range(final_row_idx, final_row_idx - min_num_concluding_consecutive_tests, -1):
+        these_grades.append(d[posid]['row grade'][row])
+    if len(these_grades) > 0:
+        d[posid]['final grade'] = worst(these_grades)
+    else:
+        d[posid]['final grade'] = insuff_data_grade
         
-            d[posid]['num tests proven'] = np.Inf
-            for key in ['lowest curr cruise proven','lowest curr creep proven']:
-                d[posid][key] = 'n/a'
-            
-            for n_rows_considered in range(min_num_concluding_consecutive_tests, n_max + 1):
-                selection = range(n_max - n_rows_considered, n_max)
-                this_selection_and_grade_ok = True
-                failed = []
-                failed_below_spec = []
-                passed_above_spec = []
-                min_cruise_in_selection = np.Inf
-                min_creep_in_selection = np.Inf
-                for row in selection:
-                    
-                        failed.append(row)
-                    min_cruise_in_selection = min([min_cruise_in_selection, ])
-                    min_creep_in_selection = min([min_creep_in_selection, d[posid]['curr creep'][row]])
-                    
+# count how many test rows prove this grade
+for posid in d.keys():
+    d[posid]['consecutive tests proving grade'] = []
+    d[posid]['all tests proving grade'] = []
+    streak_broken = False
+    final_row_idx = d[posid]['num rows'] - 1
+    for row in range(final_row_idx, -1, -1):
+        if as_good_as(d[posid]['row grade'][row], d[posid]['final grade']) and not(streak_broken):
+            d[posid]['consecutive tests proving grade'].append(row)
+        else:
+            streak_broken = True
+        d[posid]['all tests proving grade'].append(row)
+    d[posid]['num consecutive tests proving grade'] = len(d[posid]['consecutive tests proving grade'])
 
-                if failed_below_spec and passed_above_spec: # case where sure, some tests are passing at high current, but we have data at lower currents to prove that it actually didn't do so good at lower current
-                    this_selection_and_grade_ok = False
-                elif failed: # case where we didn't have all the data on high vs low current performance, so now we default to just checking for any failures at all
-                    this_selection_and_grade_ok = False
-                if this_selection_and_grade_ok:
-                    d[posid]['grade'][n_max] = grade
-                    d[posid]['num tests proven'] = len(selection)
-                    d[posid]['lowest curr cruise proven'] = min_cruise_in_selection
-                    d[posid]['lowest curr creep proven'] = min_creep_in_selection
-                else:
-                    d[posid]['num tests proven'] = min(len(selection), d[posid]['num tests proven'])
-            if d[posid]['grade'][n_max] != fail_grade:
-                break
-        if d[posid]['num tests proven'] == np.Inf:
-            d[posid]['grade'][-1] = insuff_data_grade
-            
-# now count number of tests that prove the final grade
-proven_keys = [key for key in d[posid].keys() if 'proven' in key]
-proven_keys.sort() # I like this sequence better in the report
-proven_keys.reverse() # I like this sequence better in the report
+# find the minimum current at which this grade was proven
+for posid in d.keys():
+    creeps_proven = [d[posid]['curr creep'][row] for row in d[posid]['all tests proving grade']]
+    cruise_proven = [d[posid]['curr cruise'][row] for row in d[posid]['all tests proving grade']]
+    d[posid]['lowest curr creep proven'] = min(creeps_proven)
+    d[posid]['lowest curr cruise proven'] = min(cruise_proven)
 
 # write report
 timestamp_str = pc.timestamp_str_now()
@@ -265,6 +238,7 @@ report_file = tkinter.filedialog.asksaveasfilename(title='Save grade report as..
 if not(report_file):
     tkinter.messagebox.showwarning(title='No report saved.',message='No grade report was saved to disk.')
 gui_root.withdraw()
+proven_keys = ['num consecutive tests proving grade','lowest curr cruise proven','lowest curr creep proven']
 if report_file:
     with open(report_file,'w',newline='') as csvfile:
         writer = csv.writer(csvfile)
@@ -286,12 +260,12 @@ if report_file:
         writer.writerow([''])
         writer.writerow(['TOTALS FOR EACH GRADE:'])
         writer.writerow(['','grade', 'quantity', 'percent'])
-        num_insuff = len([posid for posid in d.keys() if d[posid]['grade'][-1] == insuff_data_grade])
+        num_insuff = len([posid for posid in d.keys() if d[posid]['final grade'] == insuff_data_grade])
         num_suff = len(d) - num_insuff
         def percent(value):
             return format(value/(num_suff)*100,'.2f')+'%'
         for key in all_grades:
-            total_this_grade = len([posid for posid in d.keys() if d[posid]['grade'][-1] == key])
+            total_this_grade = len([posid for posid in d.keys() if d[posid]['final grade'] == key])
             writer.writerow(['',key,total_this_grade,percent(total_this_grade)])
         writer.writerow(['','all',num_suff,percent(num_suff)])
         if num_insuff > 0:
@@ -302,19 +276,18 @@ if report_file:
         posids_sorted_by_grade = []
         for grade in all_grades + [insuff_data_grade]:
             for posid in d.keys():
-                if d[posid]['grade'][-1] == grade:
+                if d[posid]['final grade'] == grade:
                     posids_sorted_by_grade.append(posid)
         for posid in posids_sorted_by_grade:
-            writer.writerow(['', posid, d[posid]['grade'][-1]] + [d[posid][key] for key in proven_keys])
+            writer.writerow(['', posid, d[posid]['final grade']] + [d[posid][key] for key in proven_keys])
         writer.writerow([''])
         writer.writerow(['INDIVIDUAL TEST LOOP GRADES:'])
         writer.writerow(['','posid','finish time','total move sequences','grade'])
         for posid in posids_sorted_by_grade:
             for row  in range(d[posid]['num rows']):
-                writer.writerow(['', posid] + [d[posid][key][row] for key in ['finish time','total move sequences at finish','grade']])
+                writer.writerow(['', posid] + [d[posid][key][row] for key in ['finish time','total move sequences at finish','row grade']])
 
 # write plots
-
 gui_root = tkinter.Tk()
 keep_asking = True
 plot_types = {0: 'None',
@@ -339,8 +312,8 @@ while keep_asking:
             total_moves = collections.OrderedDict([(grade,[]) for grade in all_grades])
             num_entries_in_bin = {}
             for posid in d.keys():
-                for row in range(len(d[posid]['grade'])):
-                    grade = d[posid]['grade'][row]
+                for row in range(len(d[posid]['row grade'])):
+                    grade = d[posid]['row grade'][row]
                     moves = d[posid]['total move sequences at finish'][row]
                     total_moves[grade].append(moves)
             data = []
@@ -368,33 +341,41 @@ while keep_asking:
         elif response == 3:
             alldata = {}
             alldata['num moves'] = []
-            alldata['grade'] = []
+            alldata['row grade'] = []
             alldata['posid'] = []
+            alldata['is last data point'] = []
             for posid in d.keys():
                 for row in range(d[posid]['num rows']):
                     num_moves = d[posid]['total move sequences at finish'][row]
                     alldata['num moves'].append(num_moves)
-                    alldata['grade'].append(d[posid]['grade'][row])
+                    alldata['row grade'].append(d[posid]['row grade'][row])
                     alldata['posid'].append(posid)
+                    alldata['is last data point'].append(row + 1 == d[posid]['num rows'])
             sorted_idxs = np.argsort(alldata['num moves'])
             for key in alldata.keys():
                 alldata[key] = np.array(alldata[key])[sorted_idxs].tolist()
             num_moves = [0]
             num_pos_in_each_grade = collections.OrderedDict([(grade,[0]) for grade in all_grades])
             last_grade = dict([(posid,None) for posid in d.keys()])
-            for i in range(len(alldata['num moves'])):
+            cleanup_posid = None
+            for i in range(len(alldata['num moves'])):                    
                 this_num_moves = alldata['num moves'][i]
                 if this_num_moves > num_moves[-1]:
                     num_moves.append(this_num_moves)
                     for grade in num_pos_in_each_grade.keys():
                         num_pos_in_each_grade[grade].append(num_pos_in_each_grade[grade][-1])   
                 this_posid = alldata['posid'][i]
-                this_grade = alldata['grade'][i]
+                this_grade = alldata['row grade'][i]
                 if last_grade[this_posid] != this_grade:
                     if last_grade[this_posid] != None:
                         num_pos_in_each_grade[last_grade[this_posid]][-1] -= 1
                     num_pos_in_each_grade[this_grade][-1] += 1
                     last_grade[this_posid] = this_grade
+                if cleanup_posid:
+                    num_pos_in_each_grade[last_grade[cleanup_posid]][-1] -= 1
+                    cleanup_posid = None
+                if alldata['is last data point'][i]:
+                    cleanup_posid = this_posid
             del num_moves[0] # remove those pesky initial rows filled with 0
             for L in num_pos_in_each_grade.values():
                 del L[0] # remove those pesky initial rows filled with 0
@@ -418,7 +399,7 @@ while keep_asking:
 #plotdata['total moves'] = []
 #for posid in d.keys():
 #    for row in range(d[posid]['num rows']):
-#        this_grade = d[posid]['grade'][row]
+#        this_grade = d[posid]['row grade'][row]
 #        plotdata['grades'].append(this_grade)
 #        plotdata['numeric grades'].append(num_grades[this_grade])
 #        plotdata['time stamps'].append(d[posid]['finish time'][row])
