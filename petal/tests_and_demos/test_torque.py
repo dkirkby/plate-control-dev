@@ -89,8 +89,8 @@ class Operator_Torque_Test:
         print("CanID=",int(CanID))
         can_ids=[CanID]
         can_bus_ids=[CanBusID]
-        print("Checking pos_status, can_ids="+str(can_ids)) 
-        if(self.pcomm.get_pos_status(can_ids)):
+        print("Checking ready_for_tables, can_bus_ids="+str(can_bus_ids)+", can_ids="+str(can_ids)) 
+        if(self.pcomm.ready_for_tables(can_bus_ids,can_ids)):
             print("Setting current: CanBusID="+str(CanBusID)+", CanID="+str(CanID))
             self.pcomm.set_currents(CanBusID,CanID,Currents,Currents)
             for i in range(len(MoveTable)):
