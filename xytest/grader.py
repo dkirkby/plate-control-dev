@@ -13,6 +13,7 @@ import collections
 import summarizer
 import numpy as np
 import matplotlib.pyplot as plt
+import datetime as dt
 
 # grading parameters
 # c.f. DESI-XXXX Fiber Positioner Grades
@@ -216,12 +217,8 @@ for posid in d.keys():
     streak_broken = False
     final_row_idx = d[posid]['num rows'] - 1
     for row in range(final_row_idx, -1, -1):
-        if as_good_as(d[posid]['row grade'][row], d[posid]['final grade']) and not(streak_broken):
-            d[posid]['consecutive tests proving grade'].append(row)
-        else:
-            streak_broken = True
-        d[posid]['all tests proving grade'].append(row)
-    d[posid]['num consecutive tests proving grade'] = len(d[posid]['consecutive tests proving grade'])
+        if as_good_as(d[posid]['row grade'][row], d[posid]['final grade']):
+            d[posid]['all tests proving grade'].append(row)
 
 # find the minimum current at which this grade was proven
 for posid in d.keys():
@@ -238,7 +235,7 @@ report_file = tkinter.filedialog.asksaveasfilename(title='Save grade report as..
 if not(report_file):
     tkinter.messagebox.showwarning(title='No report saved.',message='No grade report was saved to disk.')
 gui_root.withdraw()
-proven_keys = ['num consecutive tests proving grade','lowest curr cruise proven','lowest curr creep proven']
+proven_keys = ['lowest curr cruise proven','lowest curr creep proven']
 if report_file:
     with open(report_file,'w',newline='') as csvfile:
         writer = csv.writer(csvfile)
@@ -287,75 +284,61 @@ if report_file:
             for row  in range(d[posid]['num rows']):
                 writer.writerow(['', posid] + [d[posid][key][row] for key in ['finish time','total move sequences at finish','row grade']])
 
+# gather some data for plotting
+alldata = {}
+for key in ['num moves','row grade','posid','is last data point','date tested']:
+    alldata[key] = []
+for posid in d.keys():
+    for row in range(d[posid]['num rows']):
+        num_moves = d[posid]['total move sequences at finish'][row]
+        alldata['num moves'].append(num_moves)
+        alldata['row grade'].append(d[posid]['row grade'][row])
+        alldata['posid'].append(posid)
+        alldata['is last data point'].append(row + 1 == d[posid]['num rows'])
+        datetime = dt.datetime.strptime(d[posid]['finish time'][row],pc.timestamp_format)
+        alldata['date tested'].append(datetime)
+def sort_alldata_by(sort_key):
+    sorted_idxs = np.argsort(alldata[sort_key])
+    for key in alldata.keys():
+        alldata[key] = np.array(alldata[key])[sorted_idxs].tolist()   
+
 # write plots
 gui_root = tkinter.Tk()
 keep_asking = True
 plot_types = {0: 'None',
-              1: 'grade vs date tested (cumulative histogram)',
-              2: 'grade vs num moves (histogram)',
-              3: 'grade vs num moves (running counts)',
-              4: 'grade vs num moves (lines)'} # won't this just put a bunch of lines over each other? maybe should be corr max, corr rms, and blind max options, so more density visible
+              1: 'grade vs date tested (cumulative)',
+              2: 'grade vs num moves'}
 plot_select_text = ''.join(['Enter what type of plots to save.\n\n'] + [str(key) + ': ' + plot_types[key] + '\n' for key in plot_types.keys()])
 while keep_asking:
     response = tkinter.simpledialog.askinteger(title='Select plot type', prompt=plot_select_text, minvalue=min(plot_types.keys()), maxvalue=max(plot_types.keys()))
-    if response == 0:
+    if response == 0 or response == None:
         keep_asking = False
-        gui_root.withdraw()
     else:
         plt.ioff()
-        fig = plt.figure(figsize=(10, 8))
+        fig = plt.figure(figsize=(10, 7))
+        num_pos_in_each_grade = collections.OrderedDict([(grade,[0]) for grade in all_grades])
         if response == 1:
-            pass
+            sort_alldata_by('date tested')
+            for i in range(len(alldata['date tested'])):
+                for grade in all_grades:
+                    num_pos_in_each_grade[grade].append(num_pos_in_each_grade[grade][-1])
+                if alldata['is last data point'][i]:
+                    grade = d[alldata['posid'][i]]['final grade']
+                    num_pos_in_each_grade[grade][-1] += 1
+            for grade in all_grades:
+                color = next(plt.gca()._get_lines.prop_cycler)['color']
+                del num_pos_in_each_grade[grade][0] # remove those pesky initial rows filled with 0
+                label = 'Grade ' + str(grade) + ' (' + str(num_pos_in_each_grade[grade][-1]) + ')'
+                plt.plot_date(alldata['date tested'], num_pos_in_each_grade[grade], fmt='-', color=color, label=label)
+                plt.plot_date(alldata['date tested'][-1], num_pos_in_each_grade[grade][-1], fmt='o', color=color)
+            plt.gca().autoscale_view()
+            plt.xlim(xmax=plt.xlim()[1] + 1.0) # add a little padding to the picture
+            plt.xlabel('last date tested')
+            plt.ylabel('cumulative positioners')
+            plt.grid('on')
         elif response == 2:
-            # PROBABLY DELETE THIS ONE. IT IS A NICE IDEA, BUT A LITTLE DECEPTIVE.
-            n_bins = int(np.median([d[posid]['num rows'] for posid in d.keys()]))
-            total_moves = collections.OrderedDict([(grade,[]) for grade in all_grades])
-            num_entries_in_bin = {}
-            for posid in d.keys():
-                for row in range(len(d[posid]['row grade'])):
-                    grade = d[posid]['row grade'][row]
-                    moves = d[posid]['total move sequences at finish'][row]
-                    total_moves[grade].append(moves)
-            data = []
-            labels = []
-            for grade in total_moves.keys():
-                data.append(total_moves[grade])
-                labels.append('Grade ' + str(grade))
-            (bin_values,bin_edges,patches) = plt.hist(data,bins=n_bins)
-            plt.cla()
-            n_bins = len(bin_values[0])
-            bin_totals = [0]*n_bins
-            for values_this_grade in bin_values:
-                for bin_idx in range(len(values_this_grade)):
-                    bin_totals[bin_idx] += values_this_grade[bin_idx]
-            weights = []
-            for data_this_grade in data:
-                these_weights = []
-                for val in data_this_grade:
-                    bin_idx = min(np.flatnonzero(val >= bin_edges)[-1], n_bins-1)
-                    these_weights.append(1 / bin_totals[bin_idx])
-                weights.append(these_weights)
-            plt.hist(data, bins=n_bins, weights=weights, histtype='barstacked', label=labels)
-            plt.xlabel('number of move sequences ("cycles")')
-            plt.ylabel('fraction of tests that achieved each grade')
-        elif response == 3:
-            alldata = {}
-            alldata['num moves'] = []
-            alldata['row grade'] = []
-            alldata['posid'] = []
-            alldata['is last data point'] = []
-            for posid in d.keys():
-                for row in range(d[posid]['num rows']):
-                    num_moves = d[posid]['total move sequences at finish'][row]
-                    alldata['num moves'].append(num_moves)
-                    alldata['row grade'].append(d[posid]['row grade'][row])
-                    alldata['posid'].append(posid)
-                    alldata['is last data point'].append(row + 1 == d[posid]['num rows'])
-            sorted_idxs = np.argsort(alldata['num moves'])
-            for key in alldata.keys():
-                alldata[key] = np.array(alldata[key])[sorted_idxs].tolist()
+            sort_alldata_by('num moves')
             num_moves = [0]
-            num_pos_in_each_grade = collections.OrderedDict([(grade,[0]) for grade in all_grades])
             last_grade = dict([(posid,None) for posid in d.keys()])
             cleanup_posid = None
             for i in range(len(alldata['num moves'])):                    
@@ -381,38 +364,13 @@ while keep_asking:
                 del L[0] # remove those pesky initial rows filled with 0
             for grade in all_grades:
                 plt.plot(num_moves,num_pos_in_each_grade[grade],label='Grade ' + str(grade))
-                plt.xlabel('number of move sequences ("cycles")')
-                plt.ylabel('number of positioners of each grade')
-        elif response == 4:
-            pass
-        plotname = os.path.splitext(report_file)[0] + '_plot' + str(response) + '.png'
-        plt.title(plot_types[response].upper() + '\nReport file: ' + os.path.basename(report_file))
+            plt.xlabel('lifetime moves')
+            plt.ylabel('number of positioners')
+            plt.grid('on')
+        plotname = os.path.splitext(report_file)[0] + '_plot' + str(response) + '.pdf'
+        plt.title(' ' + plot_types[response].upper() + '\n ' + os.path.basename(report_file), loc='left')
         plt.legend(loc='best')
-        plt.savefig(plotname,dpi=150)
+        plt.savefig(plotname)
         plt.close(fig)
         tkinter.messagebox.showinfo(title='Plot saved',message='Plot of ' + plot_types[response] + ' saved to:\n\n' + plotname)
-#
-
-#plotdata['grades'] = []
-#plotdata['numeric grades'] = []
-#plotdata['time stamps'] = []
-#plotdata['total moves'] = []
-#for posid in d.keys():
-#    for row in range(d[posid]['num rows']):
-#        this_grade = d[posid]['row grade'][row]
-#        plotdata['grades'].append(this_grade)
-#        plotdata['numeric grades'].append(num_grades[this_grade])
-#        plotdata['time stamps'].append(d[posid]['finish time'][row])
-#        plotdata['total moves'].append(d[posid]['total move sequences at finish'][row])
-#
-## example
-#plt.hist(x,bins=len(set(x)),normed=True,histtype='step')
-#        
-#        
-#        plotdata['numeric grades'],bins=len(num_grades.values()),range=(min(num_grades.values()),max(num_grades.values())))
-
-#percents = np.divide(plotdata[])
-#plt.plot(plotdata['total moves'],plotdata['numeric grades'],'o')
-#plt.yticks(list(num_grades.values()),list(num_grades.keys()))
-#plt.xlabel('lifetime number of move sequences')
-#plt.ylabel('percentage in each grade')
+gui_root.withdraw()
