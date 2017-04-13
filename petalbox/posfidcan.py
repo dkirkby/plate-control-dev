@@ -125,7 +125,7 @@ class PosFidCAN(object):
 
 	def send_command_recv_multi(self, posID= 20000, ccom=8, data=''):
 		"""
-		Sends a CAN command. Does wait to receive a response from the positioners (as many as n_expected_responses).
+		Sends a CAN command. Does wait to receive a response from the positioners (as many as detected on the canbus).
 		"""
 
 		try:
