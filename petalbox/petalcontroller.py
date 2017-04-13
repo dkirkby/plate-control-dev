@@ -683,7 +683,8 @@ class PetalController(Application):
 
     def get_pos_status(self, busids, posids):
         """
-        Returns positioner movement status.  Input is a dictionary with can id keys and canbus values (eg. {1004: 'can0', 1001: 'can1'})
+        Returns positioner movement status.
+        Output is a dictionary with keys = can ids and values = status
         """
         
         retcode=self.pmc.get_pos_status(busids, posids)
