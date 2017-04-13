@@ -125,7 +125,7 @@ class PetalComm(object):
             # Failed to get status from device
             raise RuntimeError('_call_device: remote device not reachable %s' % '' if 'name' not in self.device else self.device)
 
-    def get_pos_status(self, can_ids):
+    def get_pos_status(self, bus_ids, can_ids):
         """Checks if all the positioners identified by can_id are ready to receive
         move tables.
         """
@@ -133,7 +133,7 @@ class PetalComm(object):
         # can_ids: list of can_ids (list of integers)
         # if everybody is stationary, then true
         try:
-            return self._call_device('get_pos_status',can_ids)
+            return self._call_device('get_pos_status', bus_ids, can_ids)
         except Exception as e:
             return 'FAILED: Can not execute get_pos_status. Exception: %s' % str(e)
 
