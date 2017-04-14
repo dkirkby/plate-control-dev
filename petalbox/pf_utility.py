@@ -1,4 +1,4 @@
-# posfid_utility.py
+# pf_utility.py
 # This script provides some utility and maintenance functions
 # for positioners and fiducials
 # 
@@ -89,6 +89,9 @@ class PositionerControl(object):
 	def get_device_type(self, spid):
 		pass
 
+	def send_command(self, pid, command, data):
+		self.scan.send_command(pid, command, data)
+		
 	def set_reset_led(self,id, select):
 		if select.lower()=='on':
 			state=1
@@ -96,11 +99,28 @@ class PositionerControl(object):
 			state=0 
 		self.scan.send_command(id,5,str(state).zfill(2))	
 	
+	def get_from_all(self, id, command):
+		data = self.scan.send_command_recv_multi(20000, command, '')
+		return data
+
+	def format_sids(self, sid_dict):
+		for key,value in sid_dict.items():
+			sid_dict[key] = ":".join("{:02x}".format(c) for c in value)			
+		return sid_dict
+
+	def format_versions(self, vr_dict):
+		for key,value in vr_dict.items():
+			if len(value) == 1:
+				vr_dict[key] = fw=str(int(ord(value))/10)
+			else:
+				vr_dict[key] = str(int(str(value[1]),16))+"."+str(int(str(value[0]),16))
+		return vr_dict
+
 if __name__ == '__main__':
 	canchan=sys.argv[1]
 	_sel=_read_key()
 	print("")
-	print(" ID programming requires a single positioner or fiducial on the CAN bus")
+	print(" ID programming requires a single positioner or fiducial on the CAN bus, or a known silicon ID")
 	print("")	
 	print(" (Using CANbus "+str(canchan)+")")
 	print("")	
@@ -112,6 +132,8 @@ if __name__ == '__main__':
 		print("[r]ead CAN address, silicon ID and software revision")
 		print("[e]xit")
 		print("[p]rogram new CAN address")
+		print("[l]ist all silicon IDs, software revision numbers, and CAN ids found on the CAN bus")
+		print("[s]id programming - type in silicon ID, then program new CAN id into the corresponding device")
 		print("Select: ")
 		
 		sel=_sel.__call__()		
@@ -177,3 +199,44 @@ if __name__ == '__main__':
 				print ("Writing new CAN address okay ")
 			except:
 				print ("Writing new CAN address failed ...")
+
+
+		if sel=='l':	#list fw versions, sid64, sid96, by can id
+			print("\n\n**Note: CAN ids of the devices on the bus must be unique for this to work properly**\n")
+			fw_vr = pmc.get_from_all(brdcast_id, 11)
+			fw_vr = pmc.format_versions(fw_vr)		
+	
+			bl_vr = pmc.get_from_all(brdcast_id, 15)
+			bl_vr = pmc.format_versions(bl_vr)
+
+			sid64 = pmc.get_from_all(brdcast_id, 19)
+			sid64 = pmc.format_sids(sid64)
+
+			sidupper = pmc.get_from_all(brdcast_id, 18)
+			sidupper = pmc.format_sids(sidupper)
+
+			sidlower = pmc.get_from_all(brdcast_id, 17)
+			sidlower = pmc.format_sids(sidlower)
+
+			sidfull = {}
+			for key,value in sidupper.items():
+				sidfull[key] = sidupper[key] + ':' + sidlower[key]					
+			print('CAN_ID| FW Version| BL Version|' + 'Silicon ID (64-bit)|  '.rjust(27) +'Silicon ID (full)|  '.rjust(37))
+			for key, value in sid64.items():
+				try:
+					bl = bl_vr[key]
+				except:
+					bl = 'too old'
+				print(str(key).rjust(6) + '| ' + fw_vr[key].rjust(10) + '| ' + bl.rjust(10) + '| ' + sid64[key] + '| ' + sidfull[key] + '|')
+			print('\n')
+
+		if sel=='s':   #enter sid, then send new can_id to positioner with this sid
+			sid = input('Enter 64-bit silicon id (xx:xx:xx:xx:xx:xx:xx:xx): ')
+			sid = (sid.split(':'))
+			sid.reverse()
+			sid = "".join(sid)
+			print(sid)
+			pmc.send_command(brdcast_id, 24, sid)
+			id = input('Enter new can id (it will be programmed into the device with the matching silicon id): ')
+			id = (hex(int(id))).replace('0x','').zfill(4)
+			pmc.write_can_address(brdcast_id, id)
