@@ -132,7 +132,7 @@ class PetalController(Application):
                     self.info('init: Configured canbus interface %r. Return code: %r' % (can, retcode))
 
             except Exception as e:
-               print('Error initializing detected CAN channel(s).  Exception: ' + str(e))
+               if self.verbose: print('Error initializing detected CAN channel(s).  Exception: ' + str(e))
         # Bring in the Positioner Move object
         self.pmc=PositionerMoveControl(self.role, self.controller_type, self.canlist) # controller_type is HARDWARE or SIMULATOR
         if not self.simulator and telemetry_available:
@@ -143,7 +143,7 @@ class PetalController(Application):
         # call configure to setup the posid map
         retcode = self.configure('constants = DEFAULT')
 
-        self.verbose=True
+        self.verbose=False
 
     def configure(self, constants = 'DEFAULT'):
         """
@@ -475,7 +475,7 @@ class PetalController(Application):
             else:
                 pass        
 
-            if self.verbose:  print('ID: %s, Percent %s' % (ids[id],percent_duty[id]))
+            if self.verbose: print('ID: %s, Percent %s' % (ids[id],percent_duty[id]))
         return self.SUCCESS
     
     def send_tables(self, move_tables):
@@ -511,8 +511,9 @@ class PetalController(Application):
      
         # here we need to assemble list of rows and then loop calls to load_rows
         # def load_rows(self, posid, ex_code, mode_select, angle, pause):
-        self.info("*** tables***")
-        self.info(move_tables)
+        if self.verbose:
+            self.info("*** tables***")
+            self.info(move_tables)
 
         #reset SYNC line
         self.switch_en_ptl('SYNC', 0)
@@ -523,7 +524,8 @@ class PetalController(Application):
                 canbus = str(table['busid'])
                 nrows=table['nrows']
                 xcode = '1'
-                print("** nrows **"+str(nrows))   #for each table, xcode starts as 1
+                if self.verbose:
+                    print("** nrows **"+str(nrows))   #for each table, xcode starts as 1
                 for row in range(nrows):
                     motor_steps_T=table['motor_steps_T'][row]
                     motor_steps_P=table['motor_steps_P'][row]
@@ -653,7 +655,8 @@ class PetalController(Application):
         Sets positioners identified by ids in the list posids to corresponding
         settings in the (dictionary? list of dicts?) settings.
         """
-        print('set_pos_constants: ids = %s, settings = %s' % (repr(posids), repr(settings)))
+        if self.verbose:
+            print('set_pos_constants: ids = %s, settings = %s' % (repr(posids), repr(settings)))
         return self.SUCCESS
 
     def set_device(self, posid, attributes):
@@ -661,7 +664,8 @@ class PetalController(Application):
         Set a value on a device other than positioners or fiducials. This includes
         fans, power supplies, and sensor
         """
-        print('set_device: ', repr(posid), repr(attributes))
+        if self.verbose:
+            print('set_device: ', repr(posid), repr(attributes))
         return self.SUCCESS
 
     def get_device_status(self,posid):
@@ -693,7 +697,8 @@ class PetalController(Application):
 
     def ready_for_tables(self, busids, posids):
         status=False
-        print('ready_for_tables - BUSIDS POSIDS: ', busids, posids)
+        if self.verbose:
+            print('ready_for_tables - BUSIDS POSIDS: ', busids, posids)
         dev_status=self.get_pos_status(busids, posids)
         
         try:
@@ -712,7 +717,7 @@ class PetalController(Application):
             # Nothing to do
             time.sleep(1)
 
-        print('Device exits')
+        if self.verbose: print('Device exits')
 
 ######################################
 
@@ -736,7 +741,7 @@ class PositionerMoveControl(object):
         else:
             import posfidcansim as posfidcan
 
-        self.verbose=True #False
+        self.verbose=False
         self.role=role
         self.__can_frame_fmt = "=IB3x8s"
         if isinstance(canlist, (list, tuple)) and len(canlist) != 0:
@@ -745,12 +750,13 @@ class PositionerMoveControl(object):
             can_list = [canlist]
       
         self.pfcan={}
-        print("**** canlist ***",can_list)
+        if self.verbose:
+            print("**** canlist ***",can_list)
         for canbus in can_list:
             try:
                 self.pfcan[canbus]=posfidcan.PosFidCAN(canbus)
             except Exception as e:
-                print('ERROR in pmc init: ', str(e))
+                if self.verbose: print('ERROR in pmc init: ', str(e))
         self.Gear_Ratio=(46.0/14.0+1)**4 # gear_ratio for Namiki motors
         self.bitsum=0
         self.cmd={'led':5} # container for the command numbers 'led_cmd':5  etc.
@@ -795,8 +801,8 @@ class PositionerMoveControl(object):
 
         #onoff={'on':1,'off':0}
         select ={'on':1,'off':0}[state]
-
-        print("set leds >>> canbus,posid,select",canbus,posid,select)
+        if self.verbose:
+            print("set leds >>> canbus,posid,select",canbus,posid,select)
         try:        
             self.pfcan[canbus].send_command(posid,5, str(select).zfill(2))
             return True
@@ -824,7 +830,8 @@ class PositionerMoveControl(object):
         #TIMDIV = str(hex(TIMDIVint).replace('0x', '')).zfill(8) 
         #if(TIMDIVint <= 1650):
         #   return False
-        print(canbus, posid, 16, device_type + duty + TIMDIV)
+        if self.verbose:
+            print(canbus, posid, 16, device_type + duty + TIMDIV)
         try:        
             self.pfcan[canbus].send_command(posid, 16, device_type + duty + TIMDIV)
             return True
@@ -852,7 +859,8 @@ class PositionerMoveControl(object):
         Signals the positionrs to start execution of move tables.         
         """
         status={}
-        print('BUSIDS get_pos_status: ',busids) 
+        if self.verbose:
+            print('BUSIDS get_pos_status: ',busids) 
         for id in range(len(posids)):
             posid=posids[id]
             status[posid]='UNKNOWN'
@@ -860,7 +868,7 @@ class PositionerMoveControl(object):
             canbus = busids[id]
             try:
                 posid_return,stat=self.pfcan[canbus].send_command_recv(posid,13,'')
-                print("posid_return,stat: ",posid_return,stat)
+                if self.verbose: print("posid_return,stat: ",posid_return,stat)
                 stat=ord(stat)
             except:
                 return_str = 'ERROR: Unresponsive positioner. CAN_ID = %s  BUS_ID = %s'%(str(posid), canbus)
@@ -909,9 +917,9 @@ class PositionerMoveControl(object):
             spin_period - Number of times to repeat each angular diplacement in spin-up table
         """
 
-        print(posid)
+        if self.verbose:  print(posid)
         posid = int(posid)
-        print('SET_PERIODS CANBUS: ' + canbus)      
+        if self.verbose:  print('SET_PERIODS CANBUS: ' + canbus)      
         creep_period_m0=str(hex(creep_period_m0).replace('0x','')).zfill(2)
         creep_period_m1=str(hex(creep_period_m1).replace('0x','')).zfill(2)
         spin_steps=str(hex(spin_period).replace('0x','')).zfill(2)
@@ -921,7 +929,7 @@ class PositionerMoveControl(object):
             self.pfcan[canbus].send_command(posid,3,creep_period_m0 + creep_period_m1 + spin_steps)
             return True
         except:
-            print ("Sending command 3 failed")
+            if self.verbose: print ("Sending command 3 failed")
             return False
     
 
@@ -955,7 +963,7 @@ class PositionerMoveControl(object):
             else:
                 return 0
         except:
-            print("Error loading table row!")
+            if self.verbose: print("Error loading table row!")
             return 0
 
     def load_rows_angle(self, canbus, posid, xcode, mode, angle, pause):
@@ -1005,7 +1013,7 @@ class PositionerMoveControl(object):
 
         xcode=str(xcode)
         if xcode not in ['0','1','2']:
-            print ("Invalid argument for xcode!")
+            if self.verbose: print ("Invalid argument for xcode!")
             return 1
 
         # TBD: error check select tuple
@@ -1040,7 +1048,7 @@ class PositionerMoveControl(object):
             if self.verbose: print(canbus,posid) 
             self.pfcan[canbus].send_command(posid, 4, hexdata)  
         except:
-            print ("Sending command 4 failed")
+            if self.verbose: print ("Sending command 4 failed")
             return 0
 
         if xcode == '1': # increment bitsum if xcode=1 
@@ -1061,7 +1069,7 @@ class PositionerMoveControl(object):
                 
                 move_table_status = stat[4]
                 if move_table_status != 1:
-                    print("Did not receive checksum match after sending a move table")
+                    if self.verbose: print("Did not receive checksum match after sending a move table")
                     return 0
                 else:
                     return 1
@@ -1069,7 +1077,7 @@ class PositionerMoveControl(object):
                 self.bitsum=0
                 if posid not in nonresponsive_canids:
                     nonresponsive_canids.append(posid)
-                print ("Sending command 8 failed")
+                if self.verbose: print ("Sending command 8 failed")
                 return 0
         if xcode == '0':
             return 1
