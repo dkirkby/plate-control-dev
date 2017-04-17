@@ -63,9 +63,9 @@ class XYTest(object):
             self.new_and_changed_files = collections.OrderedDict()  # keeps track of all files that need to be added / committed to SVN
             self.track_file(self.xytest_logfile, commit='always')
             self.logwrite(' *** BEGIN TEST LOG ***',False) # just for formatting
-            self.logwrite('Hardware setup file: ' + hwsetup_conf)
+            self.logwrite('HARDWARE SETUP FILE: ' + hwsetup_conf)
             self.logwrite_conf(hwsetup_conf)
-            self.logwrite('Test template file: ' + xytest_conf)
+            self.logwrite('TEST TEMPLATE FILE: ' + xytest_conf)
             self.logwrite_conf(xytest_conf)
             self.logwrite('Test traveler file:' + self.xytest_conf.filename)
         else:
