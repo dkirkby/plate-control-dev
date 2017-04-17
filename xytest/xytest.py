@@ -55,13 +55,13 @@ class XYTest(object):
 		self.xytest_conf = configobj.ConfigObj(xytest_conf,unrepr=True,encoding='utf-8')
 		self.starting_loop_number = self.xytest_conf['current_loop_number']
 		self.n_loops = self._calculate_and_check_n_loops()
-		# +MS+ I broke up the .conf file which was used as log file and to maintain status.
-		# I created a pure log file and a separate status file. The status file will be overwritten every time
-		# a new test is started. It is not saved to the SVN. Just serves as a persistent stack.
+
 		if self.starting_loop_number == 0:
 			# The status file is used to maintain status of the test in case of test disruption.
 			self.xytest_conf.filename=pc.test_settings_directory+'xytest_status.conf'
-			self.xytest_logfile = pc.xytest_logs_directory + pc.filename_timestamp_str_now() + '_' + os.path.splitext(os.path.basename(xytest_conf))+'.log'
+
+			self.xytest_logfile = pc.xytest_logs_directory + pc.filename_timestamp_str_now() + '_' + os.path.splitext(os.path.basename(xytest_conf))[1]+'.log'
+			self.xytest_conf['logfile']=self.xytest_logfile
 			self.new_and_changed_files = collections.OrderedDict()  # keeps track of all files that need to be added / committed to SVN
 			self.track_file(self.xytest_logfile, commit='always')
 			self.logwrite(' *** BEGIN TEST LOG ***',False) # just for formatting
@@ -70,6 +70,7 @@ class XYTest(object):
 			self.logwrite('Test traveler file:' + self.xytest_conf.filename)
 		else:
 		# +MS+	end of changed block
+			self.xytest_logfile=self.xytest_conf['logfile']
 			self.logwrite('*** RESTARTING TEST AT ' + pc.ordinal_str(self.starting_loop_number + 1).upper() + ' LOOP *** (index ' + str(self.starting_loop_number) + ')')
 			self.new_and_changed_files = self.xytest_conf['new_and_changed_files']
 		self.logwrite('Total number of test loops: ' + str(self.n_loops))
@@ -479,15 +480,6 @@ class XYTest(object):
 					del self.svn_user
 					del self.svn_pass
 				print('SVN uploads completed in ' + self._elapsed_time_str(start_time))
-	# +MS+ new logwrite function			
-	#def logwrite(self,text,stdout=True):
-	#	"""Standard logging function for writing to the test traveler config file.
-	#	"""
-	#	line = '# ' + pc.timestamp_str_now() + ': ' + text
-	#	self.xytest_conf.final_comment.append(line)
-	#	self.xytest_conf.write()
-	#	if stdout:
-	#		print(line)
 
 	def logwrite(self,text,stdout=True):
 		"""Standard logging function for writing to the test traveler log file.
@@ -497,7 +489,7 @@ class XYTest(object):
 			fh.write(line+'\n')
 		if stdout:
 			print(line)
-	# +MS+ end change block		
+
 	def set_current_overrides(self, loop_number):
 		"""If the test config calls for overriding cruise or creep currents to a particular value
 		for this loop, this method sets that. It also stores the old setting for later restoration.
