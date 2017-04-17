@@ -67,17 +67,18 @@ def im2bw(image,level):
     bw[threshold_indices] = 1
     return bw
 
-def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_otsu=False):
+def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_otsu=False, save_dir='', size_fitbox=10):
 # Computes centroids by finding spots and then fitting 2d gaussian
 #
 # Input 
 #       img: image as numpy array
 #       V: verbose mode
+#       regarding size_fitbox: it's a gaussian fitter box, this value is 1/2 length of side in pixels,
+#                              i.e. the box dimensions are 2*size_fitbox X 2*size_fitbox
 #
 # Output:
 #       returning the centroids and FWHMs as lists (xcen,ycen,fwhm)
 
-    size_fitbox=10 # gaussian fitter box (1/2 length of side in pixels, i.e. 2*size_fitbox X 2*size_fitbox
     img[img<0]=0
     img = img.astype(np.uint16)
     level_fraction_of_peak = 0.1
@@ -90,9 +91,9 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
     bw=im2bw(img,level)
     hdu=pyfits.PrimaryHDU(bw)
     if write_fits:
-        filename = '_binary_image.FITS'
+        filename = 'binary_image.FITS'
         try:
-            os.remove(filename)
+            os.remove(save_dir + filename)
         except:
             pass
         hdu.writeto(filename)
@@ -156,7 +157,7 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
             should_save_sample_image = True
         if should_save_sample_image:
             if len(os.listdir()) < max_sample_files_to_save:
-                savefile = 'peak_' + format(peak,'.1f') + '_fwhm_' + format(FWHMSub[-1],'.3f') + '_sizefitbox_' + str(size_fitbox) + '.FITS'
+                savefile = save_dir + 'peak_' + format(peak,'.1f') + '_fwhm_' + format(FWHMSub[-1],'.3f') + '_sizefitbox_' + str(size_fitbox) + '.FITS'
                 sample = pyfits.PrimaryHDU(img)
                 sample.writeto(savefile)
                 print('wrote a sample image file to ' + savefile)

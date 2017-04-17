@@ -22,8 +22,8 @@ code_version = petal_directory.split(os.path.sep)[-2]
 # For environment paths, set the paths in your .bashrc file, by adding the lines:
 #    export POSITIONER_LOGS_PATH="/my/path/to/positioner_logs"
 #    export FP_SETTINGS_PATH="/my/path/to/fp_settings"
-all_logs_directory           = os.environ.get("POSITIONER_LOGS_PATH") # corresponds to https://desi.lbl.gov/svn/code/focalplane/positioner_logs
-all_settings_directory       = os.environ.get("FP_SETTINGS_PATH") # corresponds to https://desi.lbl.gov/svn/code/focalplane/fp_settings
+all_logs_directory           = os.environ.get('POSITIONER_LOGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/positioner_logs
+all_settings_directory       = os.environ.get('FP_SETTINGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/fp_settings
 pos_logs_directory           = all_logs_directory + os.path.sep + 'pos_logs' + os.path.sep
 fid_logs_directory           = all_logs_directory + os.path.sep + 'fid_logs' + os.path.sep
 xytest_data_directory        = all_logs_directory + os.path.sep + 'xytest_data' + os.path.sep
@@ -35,11 +35,7 @@ fid_settings_directory       = all_settings_directory + os.path.sep + 'fid_setti
 test_settings_directory      = all_settings_directory + os.path.sep + 'test_settings' + os.path.sep
 collision_settings_directory = all_settings_directory + os.path.sep + 'collision_settings' + os.path.sep
 hwsetups_directory           = all_settings_directory + os.path.sep + 'hwsetups' + os.path.sep
-# 2017-02-07, Joe: previously there was a function here called 'set_logs_directory()'. It was for being able
-# to change these paths above at runtime. This is a bad thing to do, because it breaks our assumptions elsewhere
-# about how we are keeping config files and log files up-to-date in the SVN. So I removed that function. We
-# still may need a more mature implementation of storing/retrieving these settings and logs, but *whatever* it is,
-# it has to be thought through clearly and reviewed.
+temp_files_directory         = os.environ.get('HOME') + os.path.sep + 'fp_temp_files' + os.path.sep
 
 # Mapping of radial coordinate R to pseudo-radial coordinate S (distance along focal surface from optical axis)
 R2Spoly = [5.00010E-01,9.99997E-01,1.91532E-07,1.72104E-09,7.31761E-11,-5.78982E-13,3.30271E-15,-1.11245E-17,1.90376E-20,-1.26341E-23]

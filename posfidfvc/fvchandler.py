@@ -22,7 +22,7 @@ class FVCHandler(object):
         self.fvc_type = fvc_type # 'SBIG' or 'SBIG_Yale' or 'FLI' or 'simulator'
         if self.fvc_type == 'SBIG':
             import sbig_grab_cen
-            self.sbig = sbig_grab_cen.SBIG_Grab_Cen()
+            self.sbig = sbig_grab_cen.SBIG_Grab_Cen(save_dir=pc.temp_files_directory)
             self.sbig.take_darks = False # typically we have the test stand in a dark enough enclosure, so False here saves time
         elif self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':   
             self.platemaker_instrument = platemaker_instrument # this setter also initializes self.fvcproxy
@@ -38,8 +38,23 @@ class FVCHandler(object):
         self.trans = postransforms.PosTransforms() # general transformer object -- does not look up specific positioner info, but fine for QS <--> global X,Y conversions
         self.last_sequence_id = ''
         self.rotation = 0        # [deg] rotation angle from image plane to object plane
-        self.scale = 1.0         # scale factor from image plane to object plane
+        self._scale = 1.0        # scale factor from image plane to object plane
         self.translation = [0,0] # translation of origin within the image plane
+        self.fitbox_mm = 0.7     # size of gaussian fitbox at the object plane (note minimum fiducial dot distance is 1.0 mm apart)
+
+    @property
+    def scale(self):
+        '''Return the fiber view camera scale. (scale * image plane --> object plane)
+        '''
+        return self._scale
+
+    @scale.setter
+    def scale(self,scale):
+        '''Set the fiber view camera scale. (scale * image plane --> object plane)
+        '''
+        self._scale = scale
+        if 'SBIG' in self.fvc_type:
+            self.sbig.size_fitbox = int(np.ceil(self.fitbox_mm/2 / scale))
 
     @property
     def platemaker_instrument(self):

@@ -8,7 +8,7 @@ import os
 class SBIG_Grab_Cen(object):
     """Module for grabbing images and calculating centroids using the SBIG camera.
     """
-    def __init__(self):  
+    def __init__(self, save_dir='', size_fitbox=10):  
         self.__exposure_time = 200 # milliseconds, 90 ms is the minimum
         self._cam_init()
         self.min_brightness = 5000
@@ -19,6 +19,8 @@ class SBIG_Grab_Cen(object):
         self.take_darks = True # whether to measure a dark image and subtract it out
         self.flip_horizontal = True # whether to reflect image across y axis
         self.flip_vertical = False # whether to reflect image across x axis
+        self.save_dir = save_dir
+        self.size_fitbox = size_fitbox # gaussian fitter box dimensions are 2*size_fitbox X 2*size_fitbox
 
     def _cam_init(self):
         self.cam=sbigcam.SBIGCam()
@@ -108,7 +110,7 @@ class SBIG_Grab_Cen(object):
 
         # call routine to determine multiple gaussian-fitted centroids
         centroiding_tic = time.time()
-        xcen, ycen, peaks, fwhm, binfile = multicens.multiCens(LD, nWin, self.verbose, self.write_fits)
+        xcen, ycen, peaks, fwhm, binfile = multicens.multiCens(LD, nWin, self.verbose, self.write_fits, save_dir=self.save_dir, size_fitbox=self.size_fitbox)
         if min(peaks) < self.min_brightness and n_retries > 0:
             print('Retrying image grab (' + str(n_retries) + ' attempts remaining) after got back a very low peak brightness value = ' + str(min(peaks)))
             return self.grab(nWin, n_retries-1)
