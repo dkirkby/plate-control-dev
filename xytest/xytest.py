@@ -60,6 +60,7 @@ class XYTest(object):
             self.xytest_conf.filename = pc.temp_files_directory + 'xytest_status.conf'
             self.xytest_logfile = pc.xytest_logs_directory + pc.filename_timestamp_str_now() + '_' + os.path.splitext(os.path.basename(xytest_conf))[1]+'.log'
             self.xytest_conf['logfile']=self.xytest_logfile
+            self.xytest_conf.write()
             self.new_and_changed_files = collections.OrderedDict()  # keeps track of all files that need to be added / committed to SVN
             self.track_file(self.xytest_logfile, commit='always')
             self.logwrite(' *** BEGIN TEST LOG ***',False) # just for formatting
@@ -581,6 +582,7 @@ class XYTest(object):
         """
         self.new_and_changed_files[filename] = commit
         self.xytest_conf['new_and_changed_files'] = self.new_and_changed_files
+        self.xytest_conf.write()
         
     def track_all_poslogs_once(self):
         '''Special function to run track_file on all the latest pos logs, since they are kind of
