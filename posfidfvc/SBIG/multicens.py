@@ -91,9 +91,9 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
     bw=im2bw(img,level)
     hdu=pyfits.PrimaryHDU(bw)
     if write_fits:
-        filename = 'binary_image.FITS'
+        filename = save_dir + 'binary_image.FITS'
         try:
-            os.remove(save_dir + filename)
+            os.remove(filename)
         except:
             pass
         hdu.writeto(filename)
