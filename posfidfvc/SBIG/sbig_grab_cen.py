@@ -63,7 +63,7 @@ class SBIG_Grab_Cen(object):
             D = self.start_exposure()
             D = self.flip(D)
             if self.write_fits:
-                filename = '_SBIG_dark_image.FITS'
+                filename = self.save_dir + 'SBIG_dark_image.FITS'
                 try:
                     os.remove(filename)
                 except:
@@ -80,7 +80,7 @@ class SBIG_Grab_Cen(object):
         L = self.flip(L)
 
         if self.write_fits:
-            filename = '_SBIG_light_image.FITS'
+            filename = self.save_dir + 'SBIG_light_image.FITS'
             try:
                 os.remove(filename)
             except:
@@ -92,7 +92,7 @@ class SBIG_Grab_Cen(object):
             D = np.zeros(np.shape(L), dtype=np.int32)
         LD = np.array(L,dtype = np.int32) - np.array(D,dtype = np.int32)
         if self.write_fits and self.take_darks:
-            filename = '_SBIG_diff_image.FITS'
+            filename = self.save_dir + 'SBIG_diff_image.FITS'
             self.cam.write_fits(LD,filename)
             imgfiles.append(filename)
         del L
