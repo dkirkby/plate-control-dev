@@ -28,7 +28,7 @@ import petalcomm
 # Edit the values below before each test
 Petal_Controller_Number=10
 CanBusID='can0'
-CanID=27
+CanID=20000
 Currents=[100,100,100,0]    # percentages for spin-up,cruise,creep,hold
 Torque_Moves=[
     #'motor','speed','direction','angle','cool_down_seconds'
