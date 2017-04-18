@@ -486,16 +486,17 @@ class XYTest(object):
         """
         line = '# ' + pc.timestamp_str_now() + ': ' + text
         with open(self.xytest_logfile,'a') as fh:
-            fh.write(line+'\n')
+            fh.write(line + '\n')
         if stdout:
             print(line)
             
     def logwrite_conf(self,conf_file):
         """Standard function for copying a config file's contents to the test traveler log file.
         """
-        with open(conf_file, newline='') as file:
+        with open(conf_file, 'r', newline='') as file:
             for line in file:
                 if line[0] != '#' and line[0] != '\n': # skip blank or comment lines
+                    line = line[:-1] if line[-1] == '\n' else line
                     self.logwrite(line)
 
     def set_current_overrides(self, loop_number):
@@ -541,13 +542,7 @@ class XYTest(object):
         """
         r_max = self.xytest_conf['targ_max_radius']
         line = np.linspace(-r_max,r_max,npoints_across_grid)
-        targets = [[x,y] for x in line for y in line]    def logwrite_tracked_files(self,conf_file):
-        """Standard function for writing all the tracked files to the test traveler log file.
-        """
-        self.logwrite()
-        for line in file:
-                if line[0] != '#' and line[0] != '\n': # skip blank or comment lines
-                    self.logwrite(line)
+        targets = [[x,y] for x in line for y in line]
         for i in range(len(targets)-1,-1,-1): # go backwards thru list for popping so indices always work 
             if not(self.target_within_limits(targets[i])):
                 targets.pop(i)
