@@ -114,7 +114,7 @@ class Operator_Torque_Test:
         return 0
 
     def logit(self,themessage):
-        logfile= open( thelogfilename, 'a' )
+        logfile= open( TTLogFile, 'a' )
         logfile.write( time.strftime( "%x %X," ) + themessage + "\n" )
         logfile.close()			# This will flush out the log after every line
 
