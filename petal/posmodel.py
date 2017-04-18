@@ -20,7 +20,15 @@ class PosModel(object):
         if not is_simulation:
             if self.canid == -1 and self.posid not in [None,'None','xxxxx']:
                 print('Positioner ' + str(self.posid) + ' currently shows a canid of ' + str(self.canid) + ', which often indicates that we haven''t yet put the real canid into its configuration file. If you know the right canid, you can enter it now. Otherwise you may need to stop whatever is running right now and fix this issue first.')
-                user_canid = input('Enter canid number for ' + str(self.posid) + ' here: ')
+                keep_asking = True
+                while keep_asking:
+                    user_canid = input('Enter canid number for ' + str(self.posid) + ' here: ')
+                    if not(isinstance(user_canid,int)):
+                        print('Input must be an integer.')
+                    elif user_canid < 0:
+                        print('Input must be > 0.')
+                    else:
+                        keep_asking = False
                 self.state.store('CAN_ID',int(user_canid))
         self.trans = postransforms.PosTransforms(self)
 
