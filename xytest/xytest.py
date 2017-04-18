@@ -686,6 +686,4 @@ if __name__=="__main__":
     test.logwrite('Moved positioners into \'parked\' position.')
     test.logwrite('Test complete.')
     test.track_all_poslogs_once()
-    test.logwrite('*** TRACKED DATA FILES ***')
-    test.logwrite(test.new_and_changed_files)
     test.svn_add_commit(keep_creds=False)
