@@ -26,9 +26,9 @@ print(sys.path)
 import petalcomm
 
 # Edit the values below before each test
-Petal_Controller_Number=20
+Petal_Controller_Number=10
 CanBusID='can0'
-CanID=208
+CanID=27
 Currents=[100,100,100,0]    # percentages for spin-up,cruise,creep,hold
 Torque_Moves=[
     #'motor','speed','direction','angle','cool_down_seconds'
@@ -98,7 +98,7 @@ class Operator_Torque_Test:
             self.pcomm.set_currents(CanBusID,CanID,Currents,Currents)
             for i in range(len(MoveTable)):
                 print("Moving: CanID="+str(CanID))
-                error = self.pcomm.move(CanBusID, CanID,MoveTable[i][iDirection],MoveTable[i][iMode],MoveTable[i][iMotor],MoveTable[i][iAngle])
+                self.pcomm.move(CanID,MoveTable[i][iDirection],MoveTable[i][iMode],MoveTable[i][iMotor],MoveTable[i][iAngle])
                 ready=self.pcomm.ready_for_tables(can_bus_ids,can_ids)
                 while(not ready):
                     time.sleep(1)
