@@ -6,7 +6,7 @@
 #    Revisions:
 #    mm/dd/yyyy who        description
 #    ---------- --------   -----------
-# 
+#    04/18/2017 cad        Added reset_nonresponsive_canids() in init
 # ****************************************************************************
 
 try:
@@ -20,7 +20,7 @@ import time
 import datetime # for the filename timestamp
 
 cwd = os.getcwd()
-sys.path.append(cwd + '/../')
+sys.path.append(cwd + '/../')    # include petal in import path
 print(sys.path)
 
 import petalcomm
@@ -56,6 +56,7 @@ class Operator_Torque_Test:
         self.pcomm=petalcomm.PetalComm(PCnum)
         self.pcnum=PCnum
         self.tkroot=tkroot
+        self.pcomm.reset_nonresponsive_canids()
 
     def check_MoveTable(self,MoveTable):
         if(0==len(MoveTable)):
