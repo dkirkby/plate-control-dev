@@ -184,14 +184,14 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not execute sync command. Exception: %s' % str(e)
 
-    def move(self, can_id, direction, mode, motor, angle):
+    def move(self, bus_id, can_id, direction, mode, motor, angle):
         """
         Low level test command to move a single positioner
         """
         # add parameter checking
         try:
             # Michael's code expects motor as a string
-            return self._call_device('move', can_id, direction, mode, str(motor), angle)
+            return self._call_device('move', bus_id, can_id, direction, mode, str(motor), angle)
         except Exception as e:
             return 'FAILED: Can not execute send_move_excute command. Exception: %s' % str(e)
         
