@@ -38,6 +38,8 @@ class PosState(object):
             comment = 'Settings file for unit: ' + str(unit_id)
         else:
             self.unit_basename = 'unit_TEMP'
+            self.logs_directory = pc.temp_files_directory
+            self.settings_directory = pc.temp_files_directory
             comment = 'Temporary settings file for software test purposes, not associated with a particular unit.'
         unit_filename = self.settings_directory + self.unit_basename + '.conf'
         if not(os.path.isfile(unit_filename)):
