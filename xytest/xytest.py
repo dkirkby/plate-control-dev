@@ -58,7 +58,7 @@ class XYTest(object):
         if self.starting_loop_number == 0:
             # The status file is used to maintain current status of the test in case of test disruption.
             self.xytest_conf.filename = pc.temp_files_directory + 'xytest_status.conf'
-            self.xytest_logfile = pc.xytest_logs_directory + pc.filename_timestamp_str_now() + '_' + os.path.splitext(os.path.basename(xytest_conf))[1]+'.log'
+            self.xytest_logfile = pc.xytest_logs_directory + pc.filename_timestamp_str_now() + '_' + os.path.splitext(os.path.basename(xytest_conf))[0] + '.log'
             self.xytest_conf['logfile']=self.xytest_logfile
             self.xytest_conf.write()
             self.new_and_changed_files = collections.OrderedDict()  # keeps track of all files that need to be added / committed to SVN
@@ -541,7 +541,13 @@ class XYTest(object):
         """
         r_max = self.xytest_conf['targ_max_radius']
         line = np.linspace(-r_max,r_max,npoints_across_grid)
-        targets = [[x,y] for x in line for y in line]
+        targets = [[x,y] for x in line for y in line]    def logwrite_tracked_files(self,conf_file):
+        """Standard function for writing all the tracked files to the test traveler log file.
+        """
+        self.logwrite()
+        for line in file:
+                if line[0] != '#' and line[0] != '\n': # skip blank or comment lines
+                    self.logwrite(line)
         for i in range(len(targets)-1,-1,-1): # go backwards thru list for popping so indices always work 
             if not(self.target_within_limits(targets[i])):
                 targets.pop(i)
@@ -680,4 +686,6 @@ if __name__=="__main__":
     test.logwrite('Moved positioners into \'parked\' position.')
     test.logwrite('Test complete.')
     test.track_all_poslogs_once()
+    test.logwrite('*** TRACKED DATA FILES ***')
+    test.logwrite(test.new_and_changed_files)
     test.svn_add_commit(keep_creds=False)
