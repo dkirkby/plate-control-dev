@@ -59,7 +59,7 @@ class PosState(object):
         self.log_extension = '.csv'
         if not(self.log_basename):
             all_logs = os.listdir(self.logs_directory)
-            unit_logs = [x for x in all_logs if self.unit_basename in x]
+            unit_logs = [x for x in all_logs if self.unit_basename in x and self.log_extension in x]
             if unit_logs:
                 unit_logs.sort(reverse=True)
                 self.log_basename = unit_logs[0]
@@ -166,7 +166,9 @@ class PosState(object):
         '''Property setter used here since the log basename is accessed in a few places,
         and want to make sure it is consistently tracked in the .conf file.
         '''
-        return self.unit['CURRENT_LOG_BASENAME']
+        if 'CURRENT_LOG_BASENAME' in self.unit.keys():
+            return self.unit['CURRENT_LOG_BASENAME']
+        return ''
     
     @log_basename.setter
     def log_basename(self, name):
@@ -195,3 +197,6 @@ class PosState(object):
                     n_lines += 1
             n_lines -= 1 # to ignore the header row
         return n_lines
+
+if __name__=="__main__":
+    state = PosState()
