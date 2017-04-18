@@ -497,7 +497,9 @@ class XYTest(object):
             for line in file:
                 if line[0] != '#' and line[0] != '\n': # skip blank or comment lines
                     line = line[:-1] if line[-1] == '\n' else line
-                    self.logwrite(line)
+                    all_blank = sum([1 for x in line if x == ' ']) == len(line)
+                    if not all_blank:
+                        self.logwrite(line)
 
     def set_current_overrides(self, loop_number):
         """If the test config calls for overriding cruise or creep currents to a particular value
