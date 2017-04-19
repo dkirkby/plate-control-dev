@@ -125,10 +125,13 @@ if ignore_gearbox:
 # read in the summary data
 ask_ignore_min_tests = True
 ignore_min_tests = False
+ask_ignore_manual_bad_data_rows = True
+ignore_manual_bad_data_rows = False
 err_keys = summarizer.Summarizer.make_err_keys()
 err_keys = [s for s in err_keys if 'num' not in s]
 pos_to_delete = set()
 for posid in d.keys():
+    d[posid]['num manually ignored rows'] = 0
     with open(d[posid]['file'],'r',newline='') as csvfile:
         reader = csv.DictReader(csvfile)
         valid_keys = []
@@ -138,7 +141,17 @@ for posid in d.keys():
                 d[posid][key] = []
         n_rows = 0
         for row in reader:
-            if int(row['num targets']) >= min_num_targets:
+            ignore_this_row_manual = False
+            if summarizer.manual_ignore_key in row.keys():
+                if row[summarizer.manual_ignore_key]:
+                    if ask_ignore_manual_bad_data_rows:
+                        gui_root = tkinter.Tk()
+                        ignore_manual_bad_data_rows = tkinter.messagebox.askyesno(title='Ignore manually id\'d rows?',message='Some rows in the summary data files have been marked as bad data that should be ignored. Do you want to do this?\n\nYes --> ignore the data marked bad\nNo --> process all the data')
+                        ask_ignore_manual_bad_data_rows = False
+                        gui_root.withdraw()
+                    ignore_this_row_manual = row[summarizer.manual_ignore_key] and ignore_manual_bad_data_rows
+            ignore_this_row_sparse = int(row['num targets']) < min_num_targets
+            if not(ignore_this_row_manual or ignore_this_row_sparse):
                 for key in valid_keys:
                     val = row[key]
                     if val.replace('.','').isnumeric():
@@ -151,6 +164,8 @@ for posid in d.keys():
                         val = None
                     d[posid][key].append(val)
                 n_rows += 1
+            if ignore_this_row_manual and not(ignore_this_row_sparse):
+                d[posid]['num manually ignored rows'] += 1
         d[posid]['num rows'] = n_rows
         if n_rows == 0:
             pos_to_delete.add(posid)
@@ -269,14 +284,14 @@ if report_file:
             writer.writerow(['',insuff_data_grade,num_insuff])
         writer.writerow([''])
         writer.writerow(['INDIVIDUAL POSITIONER GRADES:'])
-        writer.writerow(['','posid','grade'] + proven_keys)
+        writer.writerow(['','posid','grade'] + proven_keys + ['num manually-ignored bad data rows'])
         posids_sorted_by_grade = []
         for grade in all_grades + [insuff_data_grade]:
             for posid in d.keys():
                 if d[posid]['final grade'] == grade:
                     posids_sorted_by_grade.append(posid)
         for posid in posids_sorted_by_grade:
-            writer.writerow(['', posid, d[posid]['final grade']] + [d[posid][key] for key in proven_keys])
+            writer.writerow(['', posid, d[posid]['final grade']] + [d[posid][key] for key in proven_keys] + [d[posid]['num manually ignored rows']])
         writer.writerow([''])
         writer.writerow(['INDIVIDUAL TEST LOOP GRADES:'])
         writer.writerow(['','posid','finish time','total move sequences','grade'])

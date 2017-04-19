@@ -17,13 +17,14 @@ class FVCHandler(object):
         2. scale
         3. translation
     """
-    def __init__(self, fvc_type='SBIG', platemaker_instrument='em', printfunc=print):
+    def __init__(self, fvc_type='SBIG', platemaker_instrument='em', printfunc=print, save_sbig_fits=True):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.fvc_type = fvc_type # 'SBIG' or 'SBIG_Yale' or 'FLI' or 'simulator'
         if self.fvc_type == 'SBIG':
             import sbig_grab_cen
             self.sbig = sbig_grab_cen.SBIG_Grab_Cen(save_dir=pc.temp_files_directory)
             self.sbig.take_darks = False # typically we have the test stand in a dark enough enclosure, so False here saves time
+            self.sbig.write_fits = save_sbig_fits
         elif self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':   
             self.platemaker_instrument = platemaker_instrument # this setter also initializes self.fvcproxy
             # I think here we would want to set the FVC either in FLI mode or SBIG mode?

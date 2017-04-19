@@ -36,7 +36,7 @@ hwsetup = configobj.ConfigObj(hwsetup_conf,unrepr=True)
 new_and_changed_files.add(hwsetup.filename)
 
 # software initialization and startup
-fvc = fvchandler.FVCHandler(hwsetup['fvc_type'])    
+fvc = fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'])    
 fvc.rotation = hwsetup['rotation']
 fvc.scale = hwsetup['scale']
 sim = fvc.fvc_type == 'simulator'

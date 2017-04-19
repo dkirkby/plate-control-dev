@@ -85,7 +85,7 @@ class XYTest(object):
             fvc_type = 'simulator'
         else:
             fvc_type = self.hwsetup_conf['fvc_type']
-        fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite)       
+        fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=self.hwsetup_conf['save_sbig_fits'])       
         fvc.rotation = self.hwsetup_conf['rotation']
         fvc.scale = self.hwsetup_conf['scale']
         fvc.exposure_time = self.hwsetup_conf['exposure_time']

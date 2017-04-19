@@ -16,6 +16,8 @@ auto_init_data_keys = ['test loop data file',
                        'xytest log file',
                        'code version']
 
+manual_ignore_key = 'bad data ignore this row (enter your initials and justification)'
+
 user_data_keys = ['test operator',
                   'test station',
                   'supply voltage',
@@ -68,6 +70,7 @@ class Summarizer(object):
             if 'file' in key:
                 init_data[key] = os.path.basename(init_data[key])
             self.row_template[key] = init_data[key]
+        self.row_template[manual_ignore_key] = ''
         self.basename = self.state.read('POS_ID') + '_summary.csv'
         if not(directory):
             directory = pc.xytest_summaries_directory
@@ -90,7 +93,10 @@ class Summarizer(object):
         for key in self.row_template.keys():
             if key not in old_fieldnames:
                 for row in rows:
-                    row[key] = 'unknown'
+                    if key == manual_ignore_key:
+                        row[key] = ''
+                    else:
+                        row[key] = 'unknown'
         with open(self.filename, 'w', newline='') as csvfile:
             writer = csv.DictWriter(csvfile,fieldnames=list(self.row_template.keys()))
             writer.writeheader()
@@ -365,6 +371,8 @@ if __name__=="__main__":
         for key in init_data_keys:
             if key not in init_data.keys():
                 init_data[key] = 'unknown'
+            if key == manual_ignore_key:
+                init_data[key] = ''
         summ = Summarizer(state,init_data,save_directory)
         with open(summ.filename,'r',newline='') as csvfile:
             reader = csv.DictReader(csvfile)
