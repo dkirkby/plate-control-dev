@@ -40,8 +40,8 @@ CanID=27
 Currents=[100,100,100,0]    # percentages for spin-up,cruise,creep,hold
 Torque_Moves=[
     #'motor','speed','direction','angle','cool_down_seconds'
-    ['phi'  ,'creep' ,'ccw' ,90,  120],
-    ['phi'  ,'creep' ,'cw'  ,90,  120]
+    ['phi'  ,'creep' ,'ccw' ,90,  90],
+    ['phi'  ,'creep' ,'cw'  ,90,  90]
 ]
 
 # End of normally edited section
