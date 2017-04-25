@@ -421,7 +421,7 @@ class Petal(object):
     def clear_schedule(self):
         """Clear out any existing information in the move schedule.
         """
-        self.schedule = posschedule.PosSchedule(self)
+        self.schedule = posschedule.PosSchedule(self,verbose=self.verbose)
 
 # METHODS FOR FIDUCIAL CONTROL        
     def set_fiducials(self, fidids='all', setting='on', save_as_default=False):

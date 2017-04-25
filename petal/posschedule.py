@@ -837,9 +837,10 @@ class PosSchedule(object):
         Vs = self._findpotential(np.asarray(xos),np.asarray(yos),xa,ya,xns,yns)
 
         #if V < V_prev:
-        min_ind = np.argmin(Vs)
-        phi_next = ps[min_ind]
-        theta_next = ts[min_ind]
+        if len(Vs)>0:
+            min_ind = np.argmin(Vs)
+            phi_next = ps[min_ind]
+            theta_next = ts[min_ind]
 
 
         # Ensure that the moves remain within allowable limits    
