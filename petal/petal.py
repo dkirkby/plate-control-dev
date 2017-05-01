@@ -178,7 +178,7 @@ class Petal(object):
                                     ... if the subdict contains no note field, then '' will be added automatically
             
             cmd_prefix ... Optional argument, allows embedding a descriptive string to the log, embedded
-                           in the 'LAST_MOVE_CMD' field. This is different from log_note. Generally,
+                           in the 'MOVE_CMD' field. This is different from log_note. Generally,
                            log_note is meant for users, whereas cmd_prefix is meant for internal lower-
                            level detailed logging.
 
@@ -417,11 +417,6 @@ class Petal(object):
             requests[posid] = {'target':dtdp, 'log_note':log_note}
         self.request_direct_dtdp(requests)
         self.schedule_send_and_execute_moves()
-
-    def clear_schedule(self):
-        """Clear out any existing information in the move schedule.
-        """
-        self.schedule = posschedule.PosSchedule(self,verbose=self.verbose)
 
 # METHODS FOR FIDUCIAL CONTROL        
     def set_fiducials(self, fidids='all', setting='on', save_as_default=False):
@@ -736,10 +731,12 @@ class Petal(object):
         self._check_and_disable_nonresponsive_pos_and_fid()
         for m in self.schedule.move_tables:
             m.posmodel.postmove_cleanup(m.for_cleanup)
+            self.altered_states.add(m.posmodel.state)
         if self.verbose:
             print(self.expected_current_position_str())
         self.commit()
-        self.clear_schedule()
+        self._clear_temporary_state_values()
+        self._clear_schedule()
 
     def _check_and_disable_nonresponsive_pos_and_fid(self):
         """Asks petalcomm for a list of what canids are nonresponsive, and then
@@ -748,6 +745,7 @@ class Petal(object):
         if self.simulator_on:
             pass
         else:
+            status_updated = False
             nonresponsives = self.comm.get_nonresponsive_canids()
             for canid in nonresponsives:
                 if canid not in self.nonresponsive_canids:
@@ -760,13 +758,30 @@ class Petal(object):
                         if self.get_fids_val(fidid,'CAN_ID') == canid:
                             self.store_fid_val(fidid,'CTRL_ENABLED',False)
                             self.fidstates[fidid].next_log_notes.append('disabled sending control commands because fiducial was detected to be nonresponsive')
+                    status_updated = True
             for canid in self.nonresponsive_canids:
                 if canid not in nonresponsives:
                     # placeholder for re-enabling individual positioners, if they somehow become responsive again
                     # not sure if we actually want this, Joe / Irena / Michael to discuss
                     # (there is also the comm.reset_nonresponsive_canids method)
                     pass
-            self.commit()
+            if status_updated:
+                self.commit()
+                
+    def _clear_temporary_state_values(self):
+        '''Clear out any existing values in the state objects that were only temporarily
+        held until we could get the state committed to the log / db.
+        '''
+        resets = {'MOVE_CMD'  : '',
+                  'MOVE_VAL1' : '',
+                  'MOVE_VAL2' : ''}
+        for k in resets.keys():
+            self.set(key=k,value=resets[k])
+
+    def _clear_schedule(self):
+        """Clear out any existing information in the move schedule.
+        """
+        self.schedule = posschedule.PosSchedule(self,verbose=self.verbose)
 
     def _wait_while_moving(self):
         """Blocking implementation, to not send move tables while any positioners are still moving.

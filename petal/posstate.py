@@ -65,20 +65,21 @@ class PosState(object):
                 self.log_basename = unit_logs[0]
             else:
                 log_basename = self.unit_basename + self.log_separator + format(0,self.log_numformat) + self.log_extension
-                self.log_basename = self.increment_suffix(log_basename)
+                self.log_basename = self._increment_suffix(log_basename)
         self.max_log_length = 10000 # number of rows in log before starting a new file
-        self.curr_log_length = self.count_log_length() # keep track of this in a separate variable so don't have to recount every time -- only when necessary
+        self.curr_log_length = self._count_log_length() # keep track of this in a separate variable so don't have to recount every time -- only when necessary
         if self.type == 'pos':
-            self.unit['LAST_MOVE_CMD'] = '(software initialization)'
-            self.unit['LAST_MOVE_VAL1'] = ''
-            self.unit['LAST_MOVE_VAL2'] = ''
+            self.unit['MOVE_CMD'] = '(software initialization)'
+            self.unit['MOVE_VAL1'] = ''
+            self.unit['MOVE_VAL2'] = ''
         if os.path.isfile(self.log_path):
             with open(self.log_path,'r',newline='') as csvfile:
                 headers = csv.DictReader(csvfile).fieldnames
             for key in self.unit.keys():
                 if key not in headers:
-                    self.log_basename = self.increment_suffix(self.log_basename) # start a new file if headers don't match up anymore with all the data we're trying to store
+                    self.log_basename = self._increment_suffix(self.log_basename) # start a new file if headers don't match up anymore with all the data we're trying to store
                     break
+        self._update_legacy_keys()                
         self.next_log_notes = [] # used for storing specific notes in the next row written to the log
         self.log_unit_called_yet = False # used for one time check whether need to make a new log file, or whether log file headers have changed since last run
         self.log_unit()
@@ -127,7 +128,7 @@ class PosState(object):
                 with open(self.log_path, 'w', newline='') as csvfile:
                     csv.writer(csvfile).writerow(self.log_fieldnames)
             if self.curr_log_length >= self.max_log_length:
-                self.log_basename = self.increment_suffix(self.log_basename)
+                self.log_basename = self._increment_suffix(self.log_basename)
                 self.curr_log_length = 0
                 start_new_file()
             if not(self.log_unit_called_yet):
@@ -174,7 +175,7 @@ class PosState(object):
     def log_basename(self, name):
         self.unit['CURRENT_LOG_BASENAME'] = name
 
-    def increment_suffix(self,s):
+    def _increment_suffix(self,s):
         """Increments the numeric suffix at the end of s. This function was specifically written
         to have a regular method for incrementing the suffix on log filenames.
         """
@@ -184,7 +185,7 @@ class PosState(object):
         number2 = format(int(number) + 1, self.log_numformat)
         return prefix + self.log_separator + number2 + self.log_extension
     
-    def count_log_length(self):
+    def _count_log_length(self):
         '''Counts the number of lines in the current log file.
         Header row is ignored from count.
         Returns 0 if no log file exists.
@@ -197,6 +198,23 @@ class PosState(object):
                     n_lines += 1
             n_lines -= 1 # to ignore the header row
         return n_lines
+    
+    def _update_legacy_keys(self):
+        '''Allows us to replace key labels in the config files with new names, and
+        continue using the old files. We may be able to deprecate this at a later date, when such
+        key labels are really finalized, but anyway it is a pretty low-cost operation since
+        it only happens at initialization.
+        '''
+        #                                       old : new
+        legacy_key_replacements = {'LAST_MOVE_CMD'  : 'MOVE_CMD',
+                                   'LAST_MOVE_VAL1' : 'MOVE_VAL1',
+                                   'LAST_MOVE_VAL2' : 'MOVE_VAL2'}
+        for old_key in legacy_key_replacements.keys():
+            if old_key in self.unit.keys():
+                temp_val = self.unit[old_key]
+                del self.unit[old_key]
+                new_key= legacy_key_replacements[old_key]
+                self.unit[new_key] = temp_val
 
 if __name__=="__main__":
     state = PosState()

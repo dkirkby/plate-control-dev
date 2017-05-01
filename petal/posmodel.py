@@ -217,21 +217,21 @@ class PosModel(object):
             axis.postmove_cleanup_cmds = ''
         separator = '; '
         try:
-            self.state.store('LAST_MOVE_CMD',  separator.join(cleanup_table['command']))
+            self.state.store('MOVE_CMD',  separator.join(cleanup_table['command']))
             value = []
             for x in cleanup_table['cmd_val1']:
                 try:
                     value.append('{0:.6g}'.format(float(x)))
                 except:
                     pass
-            self.state.store('LAST_MOVE_VAL1', separator.join(x for x in value))
+            self.state.store('MOVE_VAL1', separator.join(x for x in value))
             value = []
             for x in cleanup_table['cmd_val2']:
                 try:
                     value.append('{0:.6g}'.format(float(x)))
                 except:
                     pass
-            self.state.store('LAST_MOVE_VAL2', separator.join(x for x in value))
+            self.state.store('MOVE_VAL2', separator.join(x for x in value))
         except Exception as e:
             print('postmove_cleanup: %s' % str(e))
         self.state.store('TOTAL_CRUISE_MOVES_T', self.state.read('TOTAL_CRUISE_MOVES_T') + cleanup_table['stats']['TOTAL_CRUISE_MOVES_T'])
