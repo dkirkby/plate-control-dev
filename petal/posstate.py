@@ -69,7 +69,7 @@ class PosState(object):
         self.max_log_length = 10000 # number of rows in log before starting a new file
         self.curr_log_length = self._count_log_length() # keep track of this in a separate variable so don't have to recount every time -- only when necessary
         if self.type == 'pos':
-            self.unit['MOVE_CMD'] = '(software initialization)'
+            self.unit['MOVE_CMD'] = ''
             self.unit['MOVE_VAL1'] = ''
             self.unit['MOVE_VAL2'] = ''
         if os.path.isfile(self.log_path):
@@ -80,7 +80,7 @@ class PosState(object):
                     self.log_basename = self._increment_suffix(self.log_basename) # start a new file if headers don't match up anymore with all the data we're trying to store
                     break
         self._update_legacy_keys()                
-        self.next_log_notes = [] # used for storing specific notes in the next row written to the log
+        self.next_log_notes = ['software initialization'] # used for storing specific notes in the next row written to the log
         self.log_unit_called_yet = False # used for one time check whether need to make a new log file, or whether log file headers have changed since last run
         self.log_unit()
 
