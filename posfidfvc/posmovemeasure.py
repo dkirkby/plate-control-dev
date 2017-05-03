@@ -278,7 +278,7 @@ class PosMoveMeasure(object):
                     petal.set(posid,'OFFSET_Y',xy[1])
                     self.printfunc(posid + ': Set OFFSET_X to ' + self.fmt(xy[0]))
                     self.printfunc(posid + ': Set OFFSET_Y to ' + self.fmt(xy[1]))
-        self.commit()
+        self.commit() # log note is already handled above
 
     def rehome(self,posids='all'):
         """Find hardstops and reset current known positions.
@@ -328,7 +328,7 @@ class PosMoveMeasure(object):
                 total_angle += step_measured
             total_angle = abs(total_angle)
             data[posid]['petal'].set(posid,parameter_name,total_angle)
-        self.commit()
+        self.commit(log_note='range measurement complete')
         self.rehome(posids)
         self.one_point_calibration(posids, mode='posTP')
 
@@ -363,7 +363,7 @@ class PosMoveMeasure(object):
             keys_to_reset = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P']
             for key in keys_to_reset:
                 petal.set(these_posids,key,pc.nominals[key]['value'])
-        self.commit()
+        self.commit(log_note='rough calibration complete')
         self.one_point_calibration(posids, mode='offsetsTP')        
             
         # now do arc or grid calibrations
@@ -398,7 +398,7 @@ class PosMoveMeasure(object):
         self.one_point_calibration(posids, mode='posTP')
         
         # commit data and return
-        self.commit()
+        self.commit(log_note='full calibration complete')
         return files
 
     def identify_fiducials(self):
@@ -474,11 +474,12 @@ class PosMoveMeasure(object):
         ptl = self.petal(posid)
         return ptl.posmodel(posid)
     
-    def commit(self):
+    def commit(self,log_note=''):
         """Commit state data controlled by all petals to storage.
+        See commit function in petal.py for explanation of optional additional log note.
         """
         for ptl in self.petals:
-            ptl.commit()
+            ptl.commit(log_note=log_note)
         
     @property
     def n_fiducial_dots(self):

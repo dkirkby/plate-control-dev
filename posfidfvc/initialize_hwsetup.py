@@ -81,7 +81,7 @@ while ids_unchecked:
 
 # check if auto-svn commit is desired
 if not svn_auth_err:
-    should_commit_to_svn = tkinter.messagebox.askyesno(title='Commit to SVN?',message='Auto-commit files to SVN after script is complete?\n\n(Typically answer "Yes")')
+    should_commit_to_svn = tkinter.messagebox.askyesno(title='Commit to SVN?',message='Auto-commit files to SVN after script is complete?\n\n(Typically answer "Yes", unless you are running a simulation, in which case "No".)')
 
 # make sure control is enabled for all positioners
 for ptl in m.petals:
