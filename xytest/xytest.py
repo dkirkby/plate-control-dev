@@ -389,12 +389,13 @@ class XYTest(object):
             max_log_length = test.m.state(test.posids[0]).max_log_length
             start_time = time.time()
             self.logwrite('Starting unmeasured move sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
-            status_str = lambda j : '... now at move ' + str(j) + ' of ' + str(n_moves) + ' within loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops)
+            status_str = lambda j : 'move ' + str(j + 1) + ' of ' + str(n_moves) + ' within loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops)
             for j in range(n_moves):
+                this_status_str = status_str(j)
                 if j % max_log_length == 0:
                     self.track_all_poslogs_once()
                 if j % 1000 == 0:
-                    self.logwrite(status_str(j))
+                    self.logwrite('... now at ' + this_status_str)
                 elif j % 50 == 0:
                     print(status_str(j))
                 targ_xy = [np.Inf,np.Inf]
@@ -404,6 +405,8 @@ class XYTest(object):
                     if self.rand_xy_targs_idx >= len(self.rand_xy_targs_list):
                         self.rand_xy_targs_idx = 0
                 requests = self.generate_posXY_move_requests([targ_xy])[0]
+                for posid in requests.keys():
+                    requests[posid]['log_note'] = 'unmeasured ' + this_status_str
                 self.m.move(requests)
             self.logwrite(str(n_moves) + ' moves completed in ' + self._elapsed_time_str(start_time) + '.')
     
@@ -615,7 +618,7 @@ class XYTest(object):
                 ptl = self.m.petal(posid)
                 ptl.set(posid, calib_key, self.calib_store[posid][calib_key])
         for ptl in self.m.petals:
-            ptl.commit()
+            ptl.commit(log_note='xytest restoring old calibration values (if necessary)')
 
     def _calculate_and_check_n_loops(self):
         """Returns total number of loops in test configuration.
