@@ -468,7 +468,7 @@ class Petal(object):
             settings_done[fidids[i]] = duties[i]
             if save_as_default:
                 self.store_fid_val(fidids[i], 'DUTY_DEFAULT_ON', duties[i])
-        self.commit()
+        self.commit(log_note='set fiducial parameters')
         return settings_done
     
     @property
@@ -605,8 +605,9 @@ class Petal(object):
             p.state.store(keys[i],values[i])
             self.altered_states.add(p.state)
 
-    def commit(self, *args, **kwargs):
-        '''Commit data to the online database.
+    def commit(self, log_note='', *args, **kwargs):
+        '''Commit data to the local config and log files, and/or the online database.
+        A note string may optionally be included to go along with this entry in the logs.
         '''
         if self.db_commit_on:
             for state in self.altered_states:
@@ -616,6 +617,8 @@ class Petal(object):
                 pass
         if self.local_commit_on:
             for state in self.altered_states:
+                if log_note:
+                    state.next_log_notes.append(log_note)
                 state.write()
                 state.log_unit()
         self.altered_states = set()
@@ -766,7 +769,7 @@ class Petal(object):
                     # (there is also the comm.reset_nonresponsive_canids method)
                     pass
             if status_updated:
-                self.commit()
+                self.commit(log_note='device status updated')
                 
     def _clear_temporary_state_values(self):
         '''Clear out any existing values in the state objects that were only temporarily
