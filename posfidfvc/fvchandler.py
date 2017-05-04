@@ -120,6 +120,12 @@ class FVCHandler(object):
                 for params in self.centroids.values():
                     xy.append(params['x'],params['y'])
                     brightnesses.append(self.mag_to_brightness(params['mag']))
+					# Per David R email 2017-05-04, his FVC code's returned magnitude is:
+					#   "The magnitude is close to 25.0 - 2.5*log10(peak signal in ADU)
+					#   It's actually calculated using a more complicated Gaussian fit to
+					#   each spot profile. The details are buried in the centroiding code
+					#   I inherited from T. Girard."
+					# Also note that he returns FWHM as params['fwhm'].
         return xy,brightnesses,imgfiles
 
     def measure_and_identify(self,expected_pos_xy,expected_ref_xy):
