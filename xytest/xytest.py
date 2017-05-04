@@ -122,7 +122,7 @@ class XYTest(object):
         summarizer_init_data['num pts calib P']     = None
         summarizer_init_data['calib mode']          = None
         summarizer_init_data['ranges remeasured']   = None
-        summarizer_init_data['xytest log file']     = self.xytest_conf.filename
+        summarizer_init_data['xytest log file']     = os.path.basename(self.xytest_logfile)
         summarizer_init_data['code version']        = pc.code_version
         user_vals = self.intro_questions()
         for key in user_vals.keys():
