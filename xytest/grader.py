@@ -24,6 +24,9 @@ grade_spec_err_keys = grade_spec_headers[0:2]
 grading_threshold = summarizer.thresholds_um[0]
 min_num_targets = 24 # a test is not considered valid without at least this many targets
 min_num_concluding_consecutive_tests = 3 # number of tests for valid results
+num_moves_infant_mortality = 5000 # a final grade is not proven until after this many cycles on positioner
+important_lifetimes = list(set([num_moves_infant_mortality, 0, 5000, 10000, 25000, 50000, 107000, 215000, np.inf]))
+important_lifetimes.sort()
 
 grade = 'A'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
@@ -34,26 +37,34 @@ grade_specs[grade]['has extended gearbox'] = False
 
 grade = 'B'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
-grade_specs[grade]['blind max um']         = [ 150, 200]
-grade_specs[grade]['corr max um']          = [  15,  30]
-grade_specs[grade]['corr rms um']          = [   5,   5]
+grade_specs[grade]['blind max um']         = [ 200, 200]
+grade_specs[grade]['corr max um']          = [  15,  25]
+grade_specs[grade]['corr rms um']          = [   5,  10]
 grade_specs[grade]['has extended gearbox'] = False
 
 grade = 'C'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
-grade_specs[grade]['blind max um']         = [ 250, 250]
-grade_specs[grade]['corr max um']          = [  20,  40]
-grade_specs[grade]['corr rms um']          = [   5,  10]
+grade_specs[grade]['blind max um']         = [ 300, 300]
+grade_specs[grade]['corr max um']          = [  25,  50]
+grade_specs[grade]['corr rms um']          = [  10,  20]
 grade_specs[grade]['has extended gearbox'] = False
 
 grade = 'D'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
-grade_specs[grade]['blind max um']         = [ 350, 350]
-grade_specs[grade]['corr max um']          = [  30,  60]
-grade_specs[grade]['corr rms um']          = [  10,  20]
+grade_specs[grade]['blind max um']         = [ 400, 400]
+grade_specs[grade]['corr max um']          = [  50, 100]
+grade_specs[grade]['corr rms um']          = [  20,  40]
 grade_specs[grade]['has extended gearbox'] = False
 
-grade = 'E'
+grade = 'EA'
+grade_specs[grade] = grade_specs['A'].copy()
+grade_specs[grade]['has extended gearbox'] = True
+
+grade = 'EB'
+grade_specs[grade] = grade_specs['B'].copy()
+grade_specs[grade]['has extended gearbox'] = True
+
+grade = 'EC'
 grade_specs[grade] = grade_specs['C'].copy()
 grade_specs[grade]['has extended gearbox'] = True
 
@@ -217,13 +228,26 @@ for posid in d.keys():
 # determine the final grade for each positioner
 for posid in d.keys():
     these_grades = []
-    final_row_idx = d[posid]['num rows'] - 1
+    highest_row_idx = d[posid]['num rows'] - 1
+    final_row_idx = highest_row_idx
+    d[posid]['num moves at failure'] = np.Inf
+    while d[posid]['row grade'][final_row_idx] == fail_grade and final_row_idx > 0:
+        d[posid]['num moves at failure'] = d[posid]['total move sequences at finish'][final_row_idx]
+        final_row_idx -= 1
     for row in range(final_row_idx, final_row_idx - min_num_concluding_consecutive_tests, -1):
         these_grades.append(d[posid]['row grade'][row])
-    if len(these_grades) > 0:
+    if d[posid]['num moves at failure'] < num_moves_infant_mortality:
+        d[posid]['final grade'] = fail_grade
+    elif len(these_grades) > 0:
         d[posid]['final grade'] = worst(these_grades)
     else:
         d[posid]['final grade'] = insuff_data_grade
+    if final_row_idx == 0 and d[posid]['final grade'] == fail_grade:
+        d[posid]['num moves passing'] = 0
+    else:
+        d[posid]['num moves passing'] = d[posid]['total move sequences at finish'][final_row_idx]
+    if d[posid]['num moves at failure'] == np.Inf:
+        d[posid]['num moves at failure'] = 'n/a' # for formatting in report
         
 # count how many test rows prove this grade
 for posid in d.keys():
@@ -265,6 +289,7 @@ if report_file:
         writer.writerow(['correction move thresholds at ' + format(grading_threshold,'.1f') + ' um'])
         writer.writerow(['min number of targets per test = ' + str(min_num_targets)])
         writer.writerow(['min number of consecutive concluding tests to prove grade = ' + str(min_num_concluding_consecutive_tests)])
+        writer.writerow(['min number of moves to weed out infant mortality = ' + str(num_moves_infant_mortality)])
         writer.writerow(['','grade'] + grade_spec_headers)
         for key in grade_specs.keys():
             writer.writerow(['',key] + list(grade_specs[key].values()))
@@ -275,7 +300,7 @@ if report_file:
         num_insuff = len([posid for posid in d.keys() if d[posid]['final grade'] == insuff_data_grade])
         num_suff = len(d) - num_insuff
         def percent(value):
-            return format(value/(num_suff)*100,'.2f')+'%'
+            return format(value/num_suff*100,'.1f')+'%'
         for key in all_grades:
             total_this_grade = len([posid for posid in d.keys() if d[posid]['final grade'] == key])
             writer.writerow(['',key,total_this_grade,percent(total_this_grade)])
@@ -283,15 +308,31 @@ if report_file:
         if num_insuff > 0:
             writer.writerow(['',insuff_data_grade,num_insuff])
         writer.writerow([''])
+        writer.writerow(['FAILURES DURING LIFETIME:'])
+        writer.writerow(['','how many fail between ...','number that fail here','number tested this long','% tested that fail here','cumulative % fails'])
+        cumulative_fraction_fails = 0.0
+        for i in range(len(important_lifetimes)-1):
+            prefix = '' if i == 0 else ''
+            low = important_lifetimes[i]
+            high = important_lifetimes[i+1]
+            bin_text = str(low) + ' and ' + str(high) + ' moves'
+            num_fails_this_bin = sum([isinstance(d[posid]['num moves at failure'],int) and d[posid]['num moves at failure'] >= low and d[posid]['num moves at failure'] <= high for posid in d.keys()])
+            num_with_this_many_moves = sum([d[posid]['total move sequences at finish'][-1] >= low for posid in d.keys()])
+            this_bin_fraction_fails = num_fails_this_bin / num_with_this_many_moves
+            cumulative_fraction_fails += this_bin_fraction_fails # yes, this is intentional to just add percents, so that we are dealing with normalized data, since different #s of test cycles on the various positioners
+            def percent2(value):
+                return format(value*100,'.1f')+'%'
+            writer.writerow([prefix,bin_text,str(num_fails_this_bin),str(num_with_this_many_moves),percent2(this_bin_fraction_fails),percent2(cumulative_fraction_fails)])
+        writer.writerow([''])
         writer.writerow(['INDIVIDUAL POSITIONER GRADES:'])
-        writer.writerow(['','posid','grade'] + proven_keys + ['num manually-ignored bad data rows'])
+        writer.writerow(['','posid','grade'] + proven_keys + ['num moves passing','num moves at failure','num manually-ignored bad data rows'])
         posids_sorted_by_grade = []
         for grade in all_grades + [insuff_data_grade]:
             for posid in d.keys():
                 if d[posid]['final grade'] == grade:
                     posids_sorted_by_grade.append(posid)
         for posid in posids_sorted_by_grade:
-            writer.writerow(['', posid, d[posid]['final grade']] + [d[posid][key] for key in proven_keys] + [d[posid]['num manually ignored rows']])
+            writer.writerow(['', posid, d[posid]['final grade']] + [d[posid][key] for key in proven_keys + ['num moves passing','num moves at failure','num manually ignored rows']])
         writer.writerow([''])
         writer.writerow(['INDIVIDUAL TEST LOOP GRADES:'])
         writer.writerow(['','posid','finish time','total move sequences','grade'])
