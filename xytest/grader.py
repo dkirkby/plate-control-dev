@@ -25,7 +25,7 @@ grading_threshold = summarizer.thresholds_um[0]
 min_num_targets = 24 # a test is not considered valid without at least this many targets
 min_num_concluding_consecutive_tests = 3 # number of tests for valid results
 num_moves_infant_mortality = 5000 # a final grade is not proven until after this many cycles on positioner
-important_lifetimes = list(set([num_moves_infant_mortality, 0, 5000, 10000, 25000, 50000, 107000, 215000, np.inf]))
+important_lifetimes = list(set([num_moves_infant_mortality, 0, 5000, 10000, 25000, 50000, 107000, 150000, 215000, np.inf]))
 important_lifetimes.sort()
 
 grade = 'A'
@@ -308,29 +308,34 @@ if report_file:
         if num_insuff > 0:
             writer.writerow(['',insuff_data_grade,num_insuff])
         writer.writerow([''])
-        writer.writerow(['LIFETIME STATISTICS:'])
-        def flatten(list2d):
-            return [item for sublist in list2d for item in sublist]
-        writer.writerow(['',''] + flatten([['Grade ' + grade,''] for grade in all_grades]))
-        writer.writerow(['range','number tested in this bin'] + flatten([['Qty','%'] for grade in all_grades]))
+        writer.writerow(['LIFETIME STATISTICS:'])         
+        lifestats = collections.OrderedDict()
+        for key in ['ranges','num tested'] + ['Qty ' + grade for grade in all_grades] + ['% ' + grade for grade in all_grades]:            
+            lifestats[key] = []
         for i in range(len(important_lifetimes)-1):
             low = important_lifetimes[i]
             high = important_lifetimes[i+1]
-            bin_range_text = str(low) + ' to ' + str(high) + ' moves ...'
-            bin_data_text = []
-            num_with_this_many_moves = sum([d[posid]['total move sequences at finish'][-1] >= low for posid in d.keys()])
+            lifestats['ranges'].append(str(low) + ' to ' + str(high) + ' moves')
+            num_all_grades_this_bin = 0
             for grade in all_grades:
                 num_this_grade_this_bin = 0
                 for posid in d.keys():
-                    for row in range(d[posid]['num rows']):
-                        num_moves = d[posid]['total move sequences at finish'][row]
-                        if d[posid]['row grade'][row] == grade and num_moves >= low and num_moves < high:
-                            num_this_grade_this_bin += 1
-                            break
-                bin_data_text.append(num_this_grade_this_bin)
-                fraction_with_this_many_moves = num_this_grade_this_bin / num_with_this_many_moves
-                bin_data_text.append(format(fraction_with_this_many_moves*100,'.1f')+'%')
-            writer.writerow([bin_range_text,str(num_with_this_many_moves)] + bin_data_text)
+                    this_pos_all_grades_this_bin = [d[posid]['row grade'][row] for row in range(d[posid]['num rows']) if d[posid]['total move sequences at finish'][row] >= low and d[posid]['total move sequences at finish'][row] < high]
+                    if any(this_pos_all_grades_this_bin) and grade == worst(this_pos_all_grades_this_bin):
+                        num_this_grade_this_bin += 1
+                        num_all_grades_this_bin += 1
+                lifestats['Qty ' + grade].append(num_this_grade_this_bin)
+            for grade in all_grades:
+                num_this_grade_this_bin = lifestats['Qty ' + grade][-1]
+                fraction_with_this_many_moves = num_this_grade_this_bin / num_all_grades_this_bin
+                lifestats['% ' + grade].append(format(fraction_with_this_many_moves*100,'.1f')+'%')
+            lifestats['num tested'].append(num_all_grades_this_bin)
+        writer.writerow(['',''] + [r for r in lifestats['ranges']])
+        writer.writerow(['','num pos tested within this range'] + [str(n) for n in lifestats['num tested']])
+        for prefix in ['Qty ','% ']:
+            for grade in all_grades:
+                key = prefix + grade
+                writer.writerow(['',key] + [str(val) for val in lifestats[key]])
         writer.writerow([''])
         writer.writerow(['INDIVIDUAL POSITIONER GRADES:'])
         writer.writerow(['','posid','grade'] + proven_keys + ['num moves passing','num moves at failure','num manually-ignored bad data rows'])
