@@ -36,23 +36,23 @@ grade_specs[grade]['has extended gearbox'] = False
 
 grade = 'B'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
-grade_specs[grade]['blind max um']         = [ 200, 200]
+grade_specs[grade]['blind max um']         = [ 250, 250]
 grade_specs[grade]['corr max um']          = [  15,  25]
 grade_specs[grade]['corr rms um']          = [   5,  10]
 grade_specs[grade]['has extended gearbox'] = False
 
 grade = 'C'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
-grade_specs[grade]['blind max um']         = [ 300, 300]
+grade_specs[grade]['blind max um']         = [ 250, 250]
 grade_specs[grade]['corr max um']          = [  25,  50]
 grade_specs[grade]['corr rms um']          = [  10,  20]
 grade_specs[grade]['has extended gearbox'] = False
 
 grade = 'D'
 grade_specs[grade] = collections.OrderedDict().fromkeys(grade_spec_headers)
-grade_specs[grade]['blind max um']         = [ 400, 400]
-grade_specs[grade]['corr max um']          = [  50, 100]
-grade_specs[grade]['corr rms um']          = [  20,  40]
+grade_specs[grade]['blind max um']         = [ 500, 500]
+grade_specs[grade]['corr max um']          = [  25,  50]
+grade_specs[grade]['corr rms um']          = [  10,  20]
 grade_specs[grade]['has extended gearbox'] = False
 
 grade = 'EA'
@@ -402,7 +402,7 @@ while keep_asking:
                 for grade in all_grades:
                     num_pos_in_each_grade[grade].append(num_pos_in_each_grade[grade][-1])
                 if alldata['is last data point'][i]:
-                    grade = d[alldata['posid'][i]]['start grade']
+                    grade = d[alldata['posid'][i]]['final grade']
                     num_pos_in_each_grade[grade][-1] += 1
             for grade in all_grades:
                 if any(num_pos_in_each_grade[grade]):
