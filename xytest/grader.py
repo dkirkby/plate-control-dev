@@ -234,7 +234,8 @@ for posid in d.keys():
     while d[posid]['row grade'][final_row_idx] == fail_grade and final_row_idx > 0:
         d[posid]['num moves at failure'] = d[posid]['total move sequences at finish'][final_row_idx]
         final_row_idx -= 1
-    for row in range(final_row_idx, final_row_idx - min_num_concluding_consecutive_tests, -1):
+    row_set_begin = max(-1,final_row_idx - min_num_concluding_consecutive_tests)
+    for row in range(final_row_idx, row_set_begin, -1):
         these_grades.append(d[posid]['row grade'][row])
     if d[posid]['num moves at failure'] < num_moves_infant_mortality:
         d[posid]['final grade'] = fail_grade
