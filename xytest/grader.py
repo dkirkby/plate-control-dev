@@ -308,21 +308,29 @@ if report_file:
         if num_insuff > 0:
             writer.writerow(['',insuff_data_grade,num_insuff])
         writer.writerow([''])
-        writer.writerow(['FAILURES DURING LIFETIME:'])
-        writer.writerow(['','how many fail between ...','number that fail here','number tested this long','% tested that fail here','cumulative % fails'])
-        cumulative_fraction_fails = 0.0
+        writer.writerow(['LIFETIME STATISTICS:'])
+        def flatten(list2d):
+            return [item for sublist in list2d for item in sublist]
+        writer.writerow(['',''] + flatten([['Grade ' + grade,''] for grade in all_grades]))
+        writer.writerow(['range','number tested in this bin'] + flatten([['Qty','%'] for grade in all_grades]))
         for i in range(len(important_lifetimes)-1):
-            prefix = '' if i == 0 else ''
             low = important_lifetimes[i]
             high = important_lifetimes[i+1]
-            bin_text = str(low) + ' and ' + str(high) + ' moves'
-            num_fails_this_bin = sum([isinstance(d[posid]['num moves at failure'],int) and d[posid]['num moves at failure'] >= low and d[posid]['num moves at failure'] <= high for posid in d.keys()])
+            bin_range_text = str(low) + ' to ' + str(high) + ' moves ...'
+            bin_data_text = []
             num_with_this_many_moves = sum([d[posid]['total move sequences at finish'][-1] >= low for posid in d.keys()])
-            this_bin_fraction_fails = num_fails_this_bin / num_with_this_many_moves
-            cumulative_fraction_fails += this_bin_fraction_fails # yes, this is intentional to just add percents, so that we are dealing with normalized data, since different #s of test cycles on the various positioners
-            def percent2(value):
-                return format(value*100,'.1f')+'%'
-            writer.writerow([prefix,bin_text,str(num_fails_this_bin),str(num_with_this_many_moves),percent2(this_bin_fraction_fails),percent2(cumulative_fraction_fails)])
+            for grade in all_grades:
+                num_this_grade_this_bin = 0
+                for posid in d.keys():
+                    for row in range(d[posid]['num rows']):
+                        num_moves = d[posid]['total move sequences at finish'][row]
+                        if d[posid]['row grade'][row] == grade and num_moves >= low and num_moves < high:
+                            num_this_grade_this_bin += 1
+                            break
+                bin_data_text.append(num_this_grade_this_bin)
+                fraction_with_this_many_moves = num_this_grade_this_bin / num_with_this_many_moves
+                bin_data_text.append(format(fraction_with_this_many_moves*100,'.1f')+'%')
+            writer.writerow([bin_range_text,str(num_with_this_many_moves)] + bin_data_text)
         writer.writerow([''])
         writer.writerow(['INDIVIDUAL POSITIONER GRADES:'])
         writer.writerow(['','posid','grade'] + proven_keys + ['num moves passing','num moves at failure','num manually-ignored bad data rows'])
@@ -336,7 +344,7 @@ if report_file:
         writer.writerow([''])
         writer.writerow(['INDIVIDUAL TEST LOOP GRADES:'])
         writer.writerow(['','posid','finish time','total move sequences','grade'])
-        for posid in posids_sorted_by_grade:
+        for posid in d.keys():
             for row  in range(d[posid]['num rows']):
                 writer.writerow(['', posid] + [d[posid][key][row] for key in ['finish time','total move sequences at finish','row grade']])
 
