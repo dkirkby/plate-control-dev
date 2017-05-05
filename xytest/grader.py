@@ -267,6 +267,29 @@ for posid in d.keys():
     d[posid]['lowest curr creep proven'] = min(creeps_proven)
     d[posid]['lowest curr cruise proven'] = min(cruise_proven)
 
+# gather up lifetime statistics
+lifestats = collections.OrderedDict()
+for key in ['ranges','num tested'] + ['Qty ' + grade for grade in all_grades] + ['% ' + grade for grade in all_grades]:            
+    lifestats[key] = []
+for i in range(len(important_lifetimes)-1):
+    low = important_lifetimes[i]
+    high = important_lifetimes[i+1]
+    lifestats['ranges'].append(str(low) + ' to ' + str(high) + ' moves')
+    num_all_grades_this_bin = 0
+    for grade in all_grades:
+        num_this_grade_this_bin = 0
+        for posid in d.keys():
+            this_pos_all_grades_this_bin = [d[posid]['row grade'][row] for row in range(d[posid]['num rows']) if d[posid]['total move sequences at finish'][row] >= low and d[posid]['total move sequences at finish'][row] < high]
+            if any(this_pos_all_grades_this_bin) and grade == this_pos_all_grades_this_bin[-1]:
+                num_this_grade_this_bin += 1
+                num_all_grades_this_bin += 1
+        lifestats['Qty ' + grade].append(num_this_grade_this_bin)
+    for grade in all_grades:
+        num_this_grade_this_bin = lifestats['Qty ' + grade][-1]
+        fraction_with_this_many_moves = num_this_grade_this_bin / num_all_grades_this_bin
+        lifestats['% ' + grade].append(fraction_with_this_many_moves)
+    lifestats['num tested'].append(num_all_grades_this_bin)
+
 # write report
 timestamp_str = pc.timestamp_str_now()
 filename_timestamp_str = pc.filename_timestamp_str_now()
@@ -310,33 +333,17 @@ if report_file:
             writer.writerow(['',insuff_data_grade,num_insuff])
         writer.writerow([''])
         writer.writerow(['LIFETIME STATISTICS:'])         
-        lifestats = collections.OrderedDict()
-        for key in ['ranges','num tested'] + ['Qty ' + grade for grade in all_grades] + ['% ' + grade for grade in all_grades]:            
-            lifestats[key] = []
-        for i in range(len(important_lifetimes)-1):
-            low = important_lifetimes[i]
-            high = important_lifetimes[i+1]
-            lifestats['ranges'].append(str(low) + ' to ' + str(high) + ' moves')
-            num_all_grades_this_bin = 0
-            for grade in all_grades:
-                num_this_grade_this_bin = 0
-                for posid in d.keys():
-                    this_pos_all_grades_this_bin = [d[posid]['row grade'][row] for row in range(d[posid]['num rows']) if d[posid]['total move sequences at finish'][row] >= low and d[posid]['total move sequences at finish'][row] < high]
-                    if any(this_pos_all_grades_this_bin) and grade == worst(this_pos_all_grades_this_bin):
-                        num_this_grade_this_bin += 1
-                        num_all_grades_this_bin += 1
-                lifestats['Qty ' + grade].append(num_this_grade_this_bin)
-            for grade in all_grades:
-                num_this_grade_this_bin = lifestats['Qty ' + grade][-1]
-                fraction_with_this_many_moves = num_this_grade_this_bin / num_all_grades_this_bin
-                lifestats['% ' + grade].append(format(fraction_with_this_many_moves*100,'.1f')+'%')
-            lifestats['num tested'].append(num_all_grades_this_bin)
         writer.writerow(['',''] + [r for r in lifestats['ranges']])
-        writer.writerow(['','num pos tested within this range'] + [str(n) for n in lifestats['num tested']])
+        writer.writerow(['','num pos with test results in this range'] + [str(n) for n in lifestats['num tested']])
         for prefix in ['Qty ','% ']:
             for grade in all_grades:
                 key = prefix + grade
-                writer.writerow(['',key] + [str(val) for val in lifestats[key]])
+                if any(lifestats[key]):
+                    if '%' in prefix:
+                        val_strs = [format(val*100,'.1f')+'%' for val in lifestats[key]]
+                    else:
+                        val_strs = [str(val) for val in lifestats[key]]
+                    writer.writerow(['',key] + val_strs)
         writer.writerow([''])
         writer.writerow(['INDIVIDUAL POSITIONER GRADES:'])
         writer.writerow(['','posid','grade'] + proven_keys + ['num moves passing','num moves at failure','num manually-ignored bad data rows'])
@@ -396,11 +403,12 @@ while keep_asking:
                     grade = d[alldata['posid'][i]]['final grade']
                     num_pos_in_each_grade[grade][-1] += 1
             for grade in all_grades:
-                color = next(plt.gca()._get_lines.prop_cycler)['color']
-                del num_pos_in_each_grade[grade][0] # remove those pesky initial rows filled with 0
-                label = 'Grade ' + str(grade) + ' (' + str(num_pos_in_each_grade[grade][-1]) + ')'
-                plt.plot_date(alldata['date tested'], num_pos_in_each_grade[grade], fmt='-', color=color, label=label)
-                plt.plot_date(alldata['date tested'][-1], num_pos_in_each_grade[grade][-1], fmt='o', color=color)
+                if any(num_pos_in_each_grade[grade]):
+                    color = next(plt.gca()._get_lines.prop_cycler)['color']
+                    del num_pos_in_each_grade[grade][0] # remove those pesky initial rows filled with 0
+                    label = 'Grade ' + str(grade) + ' (' + str(num_pos_in_each_grade[grade][-1]) + ')'
+                    plt.plot_date(alldata['date tested'], num_pos_in_each_grade[grade], fmt='-', color=color, label=label)
+                    plt.plot_date(alldata['date tested'][-1], num_pos_in_each_grade[grade][-1], fmt='o', color=color)
             plt.gca().autoscale_view()
             plt.xlim(xmax=plt.xlim()[1] + 1.0) # add a little padding to the picture
             plt.xlabel('last date tested')
@@ -433,7 +441,8 @@ while keep_asking:
             for L in num_pos_in_each_grade.values():
                 del L[0] # remove those pesky initial rows filled with 0
             for grade in all_grades:
-                plt.plot(num_moves,num_pos_in_each_grade[grade],label='Grade ' + str(grade))
+                if any(num_pos_in_each_grade[grade]):
+                    plt.plot(num_moves,num_pos_in_each_grade[grade],label='Grade ' + str(grade))
             plt.xlabel('lifetime moves')
             plt.ylabel('number of positioners')
             plt.grid('on')
