@@ -23,8 +23,7 @@ grade_spec_headers = ['blind max um','corr max um','corr rms um','has extended g
 grade_spec_err_keys = grade_spec_headers[0:2]
 grading_threshold = summarizer.thresholds_um[0]
 min_num_targets = 24 # a test is not considered valid without at least this many targets
-min_num_concluding_consecutive_tests = 3 # number of tests for valid results
-num_moves_infant_mortality = 5000 # a final grade is not proven until after this many cycles on positioner
+num_moves_infant_mortality = 5000 # a start grade is not proven until after this many cycles on positioner
 important_lifetimes = list(set([num_moves_infant_mortality, 0, 5000, 10000, 25000, 50000, 107000, 150000, 215000, np.inf]))
 important_lifetimes.sort()
 
@@ -180,14 +179,6 @@ for posid in d.keys():
         d[posid]['num rows'] = n_rows
         if n_rows == 0:
             pos_to_delete.add(posid)
-        if n_rows < min_num_concluding_consecutive_tests:
-            if ask_ignore_min_tests:
-                gui_root = tkinter.Tk()
-                ignore_min_tests = tkinter.messagebox.askyesno(title='Ignore min # tests?',message='Some positioners have fewer than the minimum number of tests we typically want.\n\nIgnore the minimum # of tests criterion?')
-                ask_ignore_min_tests = False
-                gui_root.withdraw()
-            if ignore_min_tests:
-                min_num_concluding_consecutive_tests = 1
     if (None in d[posid]['curr cruise'] or None in d[posid]['curr creep']):
         d[posid]['curr cruise'] = 100 # assume max current, lacking data
         d[posid]['curr creep'] = 100 # assume max current, lacking data
@@ -225,8 +216,20 @@ for posid in d.keys():
         this_grade = best(passing_grades)
         d[posid]['row grade'].append(this_grade)
 
-# determine the final grade for each positioner
+# determine the starting grade for each positioner
+start_grade_min_current = 100
 for posid in d.keys():
+    d[posid]['start grade'] = None
+    for row in range(d[posid]['num rows']):
+        if d[posid]['curr creep'][row] >= start_grade_min_current and d[posid]['curr cruise'][row] >= start_grade_min_current:
+            d[posid]['start grade'] = d[posid]['row grade'][row]
+        if d[posid]['total move sequences at finish'][row] >= num_moves_infant_mortality and d[posid]['start grade'] != None:
+            break
+
+# determine the final grade for each positioner
+final_grade_min_current = start_grade_min_current
+for posid in d.keys():
+    d[posid]['final grade'] = None
     these_grades = []
     highest_row_idx = d[posid]['num rows'] - 1
     final_row_idx = highest_row_idx
@@ -234,9 +237,9 @@ for posid in d.keys():
     while d[posid]['row grade'][final_row_idx] == fail_grade and final_row_idx > 0:
         d[posid]['num moves at failure'] = d[posid]['total move sequences at finish'][final_row_idx]
         final_row_idx -= 1
-    row_set_begin = max(-1,final_row_idx - min_num_concluding_consecutive_tests)
-    for row in range(final_row_idx, row_set_begin, -1):
-        these_grades.append(d[posid]['row grade'][row])
+    for row in range(final_row_idx, -1, -1):
+        if d[posid]['curr creep'][row] >= final_grade_min_current and d[posid]['curr cruise'][row] >= final_grade_min_current:
+            these_grades.append(d[posid]['row grade'][row])
     if d[posid]['num moves at failure'] < num_moves_infant_mortality:
         d[posid]['final grade'] = fail_grade
     elif len(these_grades) > 0:
@@ -257,7 +260,7 @@ for posid in d.keys():
     streak_broken = False
     final_row_idx = d[posid]['num rows'] - 1
     for row in range(final_row_idx, -1, -1):
-        if as_good_as(d[posid]['row grade'][row], d[posid]['final grade']):
+        if as_good_as(d[posid]['row grade'][row], d[posid]['start grade']):
             d[posid]['all tests proving grade'].append(row)
 
 # find the minimum current at which this grade was proven
@@ -312,21 +315,20 @@ if report_file:
         writer.writerow(['statistical cuts made at [' + stat_cuts_text + ']'])
         writer.writerow(['correction move thresholds at ' + format(grading_threshold,'.1f') + ' um'])
         writer.writerow(['min number of targets per test = ' + str(min_num_targets)])
-        writer.writerow(['min number of consecutive concluding tests to prove grade = ' + str(min_num_concluding_consecutive_tests)])
-        writer.writerow(['min number of moves to weed out infant mortality = ' + str(num_moves_infant_mortality)])
+        writer.writerow(['min moves burn-in infant mortality = ' + str(num_moves_infant_mortality)])
         writer.writerow(['','grade'] + grade_spec_headers)
         for key in grade_specs.keys():
             writer.writerow(['',key] + list(grade_specs[key].values()))
         writer.writerow(['',fail_grade + ' ... does not meet any of the above grades.'])
         writer.writerow([''])
         writer.writerow(['TOTALS FOR EACH GRADE:'])
-        writer.writerow(['','grade', 'quantity', 'percent'])
-        num_insuff = len([posid for posid in d.keys() if d[posid]['final grade'] == insuff_data_grade])
+        writer.writerow(['(at burn-in >= '+str(num_moves_infant_mortality)+' moves)','grade', 'quantity', 'percent'])
+        num_insuff = len([posid for posid in d.keys() if d[posid]['start grade'] == insuff_data_grade])
         num_suff = len(d) - num_insuff
         def percent(value):
             return format(value/num_suff*100,'.1f')+'%'
         for key in all_grades:
-            total_this_grade = len([posid for posid in d.keys() if d[posid]['final grade'] == key])
+            total_this_grade = len([posid for posid in d.keys() if d[posid]['start grade'] == key])
             writer.writerow(['',key,total_this_grade,percent(total_this_grade)])
         writer.writerow(['','all',num_suff,percent(num_suff)])
         if num_insuff > 0:
@@ -346,14 +348,14 @@ if report_file:
                     writer.writerow(['',key] + val_strs)
         writer.writerow([''])
         writer.writerow(['INDIVIDUAL POSITIONER GRADES:'])
-        writer.writerow(['','posid','grade'] + proven_keys + ['num moves passing','num moves at failure','num manually-ignored bad data rows'])
+        writer.writerow(['','posid','initial grade'] + proven_keys + ['num moves passing','num moves at failure','num manually-ignored bad data rows'])
         posids_sorted_by_grade = []
         for grade in all_grades + [insuff_data_grade]:
             for posid in d.keys():
-                if d[posid]['final grade'] == grade:
+                if d[posid]['start grade'] == grade:
                     posids_sorted_by_grade.append(posid)
         for posid in posids_sorted_by_grade:
-            writer.writerow(['', posid, d[posid]['final grade']] + [d[posid][key] for key in proven_keys + ['num moves passing','num moves at failure','num manually ignored rows']])
+            writer.writerow(['', posid, d[posid]['start grade']] + [d[posid][key] for key in proven_keys + ['num moves passing','num moves at failure','num manually ignored rows']])
         writer.writerow([''])
         writer.writerow(['INDIVIDUAL TEST LOOP GRADES:'])
         writer.writerow(['','posid','finish time','total move sequences','grade'])
@@ -400,7 +402,7 @@ while keep_asking:
                 for grade in all_grades:
                     num_pos_in_each_grade[grade].append(num_pos_in_each_grade[grade][-1])
                 if alldata['is last data point'][i]:
-                    grade = d[alldata['posid'][i]]['final grade']
+                    grade = d[alldata['posid'][i]]['start grade']
                     num_pos_in_each_grade[grade][-1] += 1
             for grade in all_grades:
                 if any(num_pos_in_each_grade[grade]):
