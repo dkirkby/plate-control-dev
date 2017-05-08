@@ -23,13 +23,15 @@ class PosModel(object):
                 keep_asking = True
                 while keep_asking:
                     user_canid = input('Enter canid number for ' + str(self.posid) + ' here: ')
-                    if not(isinstance(user_canid,int)):
+                    if not(user_canid.isnumeric()) or '.' in user_canid:
                         print('Input must be an integer.')
-                    elif user_canid < 0:
-                        print('Input must be > 0.')
                     else:
-                        keep_asking = False
-                self.state.store('CAN_ID',int(user_canid))
+                        user_canid = int(user_canid)
+                        if user_canid < 0:
+                            print('Input must be > 0.')
+                        else:
+                            keep_asking = False
+                    self.state.store('CAN_ID',int(user_canid))
         self.trans = postransforms.PosTransforms(self)
 
         # axes
