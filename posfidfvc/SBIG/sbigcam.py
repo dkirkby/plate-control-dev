@@ -4,10 +4,6 @@ March 2016
 
 Author: Kevin Fanning (kfanning@umich.edu) referencing sbigudrv.h
 
-KH: This is modeled after the chimera sbig driver. Only a subset of the functions are implemented here.
-    For more information see the chimera software on github at
-    https://github.com/astroufsc/chimera-sbig/tree/master/chimera_sbig/instruments
-
 Requires: ctypes*, platform*, numpy, pyfits, time*
 *Refers to packages in Python's Standard Library
 
@@ -94,6 +90,10 @@ Changelog:
 161107-KF  Added initialize_shutter to allow one to "click" the shutter without
            needing to power cycle the camera. Added error handling using this
            function to start_exposure to avoid shutter errors.
+           
+170508-KF  Added barebones support for STXL-6303E cameras. Might need more
+           wrestling to actually get it functioning but none are on hand.
+           Added function headers to comply with DESI standards.
 
 '''
 
@@ -260,7 +260,13 @@ class SBIGCam(object):
         self.keepShutterOpen = False
 
     def keep_shutter_open(self, keepShutterOpen = False):
-        
+        """
+        Set self.keepShutterOpen
+        Input:
+            Bool
+        Returns:
+            self.keepShutterOpen
+        """
         if isinstance(keepShutterOpen, bool):
             self.keepShutterOpen = keepShutterOpen
         else:
@@ -269,7 +275,14 @@ class SBIGCam(object):
         return self.keepShutterOpen
 
     def set_shutter(self, shutterState):
-        
+        """
+        opens or closes shutter
+        Input:
+            'open' or 'closed'
+        Returns:
+            True if success
+            False if failed
+        """
         shutterState = str(shutterState)
         if shutterState in ['open', 'closed']:
             if shutterState == 'open':
@@ -329,7 +342,7 @@ class SBIGCam(object):
         Default CCD size is for the SBIG STF-8300M
         """
 
-        if name in ['ST8300', 'STi']:
+        if name in ['ST8300', 'STi', 'STXL6303E']:
             try:
                 if name == 'ST8300': 
                     self.cameraName = 'ST8300'
@@ -337,22 +350,36 @@ class SBIGCam(object):
                 if name == 'STi':
                     self.cameraName = 'STi'
                     self.set_image_size(648,484)
+                if name == 'STXL6303E':
+                    self.cameraName = 'STXL6303E'
+                    self.set_image_size(3072,2048)
                 return True
             except:
                 print('could not select camera: ' + name)
                 return False    
         else:
-            print('Not a valid camera name (use "ST8300" or "STi") ')
+            print('Not a valid camera name (use "ST8300" or "STi" or "STXL6303E") ')
             return False
 
     def set_resolution(self, width,height):
         """
         wrapper for legacy method
+        Input:
+            int, int
+        Returns:
+            None
         """
         self.set_image_size(width,height)
         return
 
     def set_fast_mode(self, fast_mode=False):
+        """
+        Enables fast mode (only for STF-8300!)
+        Input:
+            Bool
+        Return:
+            None
+        """
         if fast_mode:
             self.FAST=self.EXP_FAST_READOUT
         return
@@ -377,8 +404,13 @@ class SBIGCam(object):
 
     def set_dark(self, x=False):
         """
+        Setter function
         Dark Frame:
         if x == True then shutter stays closed during exposure
+        Input:
+            Bool
+        Return:
+            None
 
         """
         self.DARK = bool(x)
@@ -411,7 +443,13 @@ class SBIGCam(object):
 
     def open_camera(self):
         """
-        initializes driver and camera
+        initializes driver and camera, must be called before any other camera
+        command
+        Input:
+            None
+        Return:
+            True if success
+            False if failed
         """
         # Open Driver
         Error = self.SBIG.SBIGUnivDrvCommand(self.CC_OPEN_DRIVER, None, None)
@@ -555,8 +593,11 @@ class SBIGCam(object):
         Writes out image to a FITS file with name 'name'
         Input:
             image: numpy array
-            name: string, filename 
-        """
+            name: string, filename
+        Return:
+            True if success (Image is saved to disk as fits)
+            False if failed
+          """
         # image = np.ctypeslib.as_array(cameraData)
         # retrieve current CCD temperature
 
@@ -569,6 +610,14 @@ class SBIGCam(object):
             return False
             
     def close_camera(self):
+        """
+        Closes camera and driver software. Should always be called when finished
+        with the camera (leave it open for several images in squence).
+        Input:
+            None
+        Return:
+            None
+        """
         return_val = True        
         
          # Close Device
@@ -595,7 +644,7 @@ class SBIGCam(object):
 
     def set_temperature_regulation(self, regulationInput, ccdSetpoint=None):
         """
-        This is actually CC_SET_TEMPERATURE_REGULATION2, in degree celcius,
+        This is actually CC_SET_TEMPERATURE_REGULATION2, in degree celsius,
         not the legacy method in A/D units
 
         Requires camera to be open (open_camera())
@@ -608,6 +657,9 @@ class SBIGCam(object):
         5 - 'enable_autofreeze' - enable auto-freeze
         6 - 'disable_autofreeze' - disable auto-freeze
         temp is the CCD temperature in celsius to activate regulation
+        
+        Input:
+            Command value (int), temperature in celsius
         
         """
         # check input
@@ -634,7 +686,14 @@ class SBIGCam(object):
         return True
     
     def set_ccd_setpoint(self, ccdSetpoint):
-
+        """
+        Sets ccd temperature for TEC cooler
+        Input:
+            Setpoint temperature
+        Return:
+            True if success
+            False if fail
+        """
         regulation = self.query_tec_enabled()
         if regulation:
             regulation = 'on'
@@ -650,7 +709,14 @@ class SBIGCam(object):
             return False
     
     def set_fan(self, fanState):
-        
+        """
+        Sets fan on or off
+        Input:
+            bool
+        Return:
+            True if success
+            False if fail
+        """
         # does not seem to be supported by STF-8300
         fanState = str(fanState)
         if fanState in ['on', 'off']:
@@ -677,6 +743,14 @@ class SBIGCam(object):
             return False
         
     def set_tec(self, tecState):
+        """
+        Sets TEC on or off
+        Input:
+            bool
+        Return:
+            True if success
+            False if fail
+        """
         # set thermoelectric cooler, status indicated by 'coolingEnabled'
         tecState = str(tecState)
         if tecState in ['on', 'off']:
@@ -694,7 +768,14 @@ class SBIGCam(object):
             return False
             
     def freeze_tec(self):
-        
+        """
+        Freezes TEC
+        Input:
+            None
+        Return:
+            True if success
+            False if fail
+        """
         trp2 = self.SetTemperatureRegulationParams2(
                     regulation = self.tempRegulationDict['freeze'])
         Error = self.SBIG.SBIGUnivDrvCommand(
@@ -707,7 +788,14 @@ class SBIGCam(object):
         return True
         
     def unfreeze_tec(self):
-        
+        """
+        Unfreezes TEX
+        Input:
+            None
+        Return:
+            True if success
+            False if fail
+        """
         trp2 = self.SetTemperatureRegulationParams2(
                     regulation = self.tempRegulationDict['unfreeze'])
         Error = self.SBIG.SBIGUnivDrvCommand(
@@ -720,7 +808,14 @@ class SBIGCam(object):
         return True
                     
     def set_autofreeze(self, autofreezeState):
-        
+        """
+        Sets autofreeze on of off for TEC
+        Input:
+            bool
+        Return:
+            True if success
+            False if fail
+        """
         autofreezeState = str(autofreezeState)
         if autofreezeState in ['on', 'off']:
             try:
@@ -742,8 +837,12 @@ class SBIGCam(object):
     def query_temperature_status(self):
         
         '''
-        standard request returns temperature status in A/D units
-        advanced request returns degree celsius, recommended, request=2
+        Internal function for use in following funtions
+        Input:
+            None
+        Return:
+            standard request returns temperature status in A/D units
+            advanced request returns degree celsius, recommended, request=2
         '''
 
         tsp = self.QueryTemperatureStatusParams(request = c_int(2))
@@ -802,27 +901,60 @@ class SBIGCam(object):
             return tempStatusDict
 
     def query_tec_enabled(self):
-        
+        """
+        Finds if TEC (cooling unit) is enabled
+        Input:
+            None
+        Return:
+            True if enabled
+            False if disabled
+        """
         results = self.query_temperature_status()
         return bool(results['cooling_enabled'] & self.REGULATION_ENABLE_MASK)
         
     def query_tec_frozen(self):
-        
+        """
+        Finds if TEC (cooling unit) is frozen
+        Input:
+            None
+        Return:
+            True if frozen
+            False if frozen
+        """
         results = self.query_temperature_status()
         return bool(results['cooling_enabled'] & self.REGULATION_FROZEN_MASK)
         
     def query_fan_enabled(self):
-        
+        """
+        Finds if fan is enabled
+        Input:
+            None
+        Return:
+            True if enabled
+            False if disabled
+        """
         results = self.query_temperature_status()
         return results['fan_enabled']
     
     def query_ccd_setpoint(self):
-        
+        """
+        Finds ccd temperature setpoint
+        Input:
+            None
+        Return:
+            setpoint temperature for ccd
+        """        
         results = self.query_temperature_status()
         return results['ccd_setpoint']
         
     def query_imaging_ccd_temperature(self):
-        
+        """
+        Finds ccd imaging temperature 
+        Input:
+            None
+        Return:
+            Imaging temperature for ccd
+        """
         results = self.query_temperature_status()
         return results['imaging_ccd_temperature']
     
