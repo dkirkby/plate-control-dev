@@ -703,14 +703,14 @@ class PetalController(Application):
         
         try:
             for posid in dev_status:
-                if dev_status[posid] == 'DONE':
+                if dev_status[posid] != 'BUSY':
                     status=True
                 else:
                     status=False
                     return status
             return status
         except:
-            return dev_status
+            return True
     
     def main(self):
         while not self.shutdown_event.is_set():
@@ -815,25 +815,19 @@ class PositionerMoveControl(object):
             This also sets the device mode to fiducial (rather than positioner) in the firmware.
 
             INPUTS
-                canbus:         string, can bus (example 'can2')        
-                posids:         int, positioner id (example 1008)
+                canbus:         list of strings, can bus (example 'can2')        
+                posids:         list of ints, positioner id (example 1008)
                 percent_dutys:  list of floats, percent duty cycle of waveforms going to the 
                                 theta/phi pads (example .5)
-                duty_periods:   list of float or int, period of waveforms going to theta/phi 
-                                pads in ms (example 20 or 0.05)
         """
 
         device_type = '01'  #fiducial = 01, positioner = 00
         duty = str(hex(int(65535.*percent_duty/100)).replace('0x','')).zfill(4)
-        TIMDIV = '0FA0'
-        #TIMDIVint = int(duty_period*72000.)
-        #TIMDIV = str(hex(TIMDIVint).replace('0x', '')).zfill(8) 
-        #if(TIMDIVint <= 1650):
-        #   return False
         if self.verbose:
-            print(canbus, posid, 16, device_type + duty + TIMDIV)
+            print(canbus, posid, 16, duty)
         try:        
-            self.pfcan[canbus].send_command(posid, 16, device_type + duty + TIMDIV)
+            self.pfcan[canbus].send_command(posid, 25, device_type)
+            self.pfcan[canbus].send_command(posid, 16, duty)
             return True
         except:
             return False 
