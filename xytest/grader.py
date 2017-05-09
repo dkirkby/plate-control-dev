@@ -55,21 +55,21 @@ grade_specs[grade]['corr max um']          = [  25,  50]
 grade_specs[grade]['corr rms um']          = [  10,  20]
 grade_specs[grade]['has extended gearbox'] = False
 
-grade = 'EA'
-grade_specs[grade] = grade_specs['A'].copy()
-grade_specs[grade]['has extended gearbox'] = True
+regular_grades = list(grade_specs.keys())
 
-grade = 'EB'
-grade_specs[grade] = grade_specs['B'].copy()
-grade_specs[grade]['has extended gearbox'] = True
+for grade in ['A','B','C','D']:
+    e_grade = 'E' + grade
+    grade_specs[e_grade] = grade_specs[grade].copy()
+    grade_specs[e_grade]['has extended gearbox'] = True
 
-grade = 'EC'
-grade_specs[grade] = grade_specs['C'].copy()
-grade_specs[grade]['has extended gearbox'] = True
+ext_grades = [key for key in grade_specs.keys() if key not in regular_grades]
 
 fail_grade = 'F'
+fail_grade_ext = 'EF'
 insuff_data_grade = 'insuff data'
-all_grades = list(grade_specs.keys()) + [fail_grade] # intentionally not including ignored in this
+all_grades_regular = regular_grades + [fail_grade]
+all_grades_ext = ext_grades + [fail_grade_ext]
+all_grades = all_grades_regular + all_grades_ext # intentionally not including ignored in this
 
 # functions for getting the best or worst grade out of a list or set
 def best(grade):
@@ -131,6 +131,10 @@ for posid in d.keys():
 if ignore_gearbox:
     for grade in grade_specs.keys():
         grade_specs[grade]['has extended gearbox'] = 'ignored'
+else:
+    for posid in d.keys():
+        if d[posid]['has extended gearbox'] == 'unknown':
+            d[posid]['has extended gearbox'] = False # assume non-extension in unknown cases (conservative representation of yields, since extended is generally worse-performing)
             
 # read in the summary data
 ask_ignore_min_tests = True
@@ -185,13 +189,20 @@ for posid in d.keys():
 for posid in pos_to_delete:
     del d[posid]
     del posids[posids.index(posid)]
+    
+# establish the type of fail grade (non-extension vs extension)
+for posid in d.keys():
+    if d[posid]['has extended gearbox']:
+        d[posid]['fail grade label'] = fail_grade
+    else:
+        d[posid]['fail grade label'] = fail_grade_ext
         
 # gather up all grades passed for each test loop for each positioner
 for posid in d.keys():
     d[posid]['row grade'] = []
     for row in range(d[posid]['num rows']):
-        passing_grades = set(all_grades)
-        for grade in grade_specs.keys():
+        passing_grades = set(regular_grades + [fail_grade])
+        for grade in regular_grades:
             failed_this_grade = False
             for c in range(len(summarizer.stat_cuts)):
                 cut = summarizer.stat_cuts[c]
@@ -206,23 +217,23 @@ for posid in d.keys():
                     failed_this_grade = True
                 if corr_rms > grade_specs[grade]['corr rms um'][c]:
                     failed_this_grade = True
-            if not(ignore_gearbox):
-                if d[posid]['has extended gearbox'] and not(grade_specs[grade]['has extended gearbox']):
-                    failed_this_grade = True
-                if not(d[posid]['has extended gearbox']) and grade_specs[grade]['has extended gearbox']:
-                    failed_this_grade = True
             if failed_this_grade:
                 passing_grades.remove(grade)
         this_grade = best(passing_grades)
+        if not(ignore_gearbox) and d[posid]['has extended gearbox']:
+            this_grade = 'E' + this_grade
         d[posid]['row grade'].append(this_grade)
+            
 
 # determine the starting grade for each positioner
 start_grade_min_current = 100
 for posid in d.keys():
     d[posid]['start grade'] = None
+    d[posid]['start grade date'] = None
     for row in range(d[posid]['num rows']):
         if d[posid]['curr creep'][row] >= start_grade_min_current and d[posid]['curr cruise'][row] >= start_grade_min_current:
             d[posid]['start grade'] = d[posid]['row grade'][row]
+            d[posid]['start grade date'] = dt.datetime.strptime(d[posid]['finish time'][row],pc.timestamp_format)
         if d[posid]['total move sequences at finish'][row] >= num_moves_infant_mortality and d[posid]['start grade'] != None:
             break
 
@@ -230,28 +241,30 @@ for posid in d.keys():
 final_grade_min_current = start_grade_min_current
 for posid in d.keys():
     d[posid]['final grade'] = None
+    d[posid]['final grade date'] = None
     these_grades = []
     highest_row_idx = d[posid]['num rows'] - 1
     final_row_idx = highest_row_idx
     d[posid]['num moves at failure'] = np.Inf
-    while d[posid]['row grade'][final_row_idx] == fail_grade and final_row_idx > 0:
+    while d[posid]['row grade'][final_row_idx] == d[posid]['fail grade label'] and final_row_idx > 0:
         d[posid]['num moves at failure'] = d[posid]['total move sequences at finish'][final_row_idx]
         final_row_idx -= 1
     for row in range(final_row_idx, -1, -1):
         if d[posid]['curr creep'][row] >= final_grade_min_current and d[posid]['curr cruise'][row] >= final_grade_min_current:
             these_grades.append(d[posid]['row grade'][row])
     if d[posid]['num moves at failure'] < num_moves_infant_mortality:
-        d[posid]['final grade'] = fail_grade
+        d[posid]['final grade'] = d[posid]['fail grade label']
     elif len(these_grades) > 0:
         d[posid]['final grade'] = worst(these_grades)
     else:
         d[posid]['final grade'] = insuff_data_grade
-    if final_row_idx == 0 and d[posid]['final grade'] == fail_grade:
+    if final_row_idx == 0 and d[posid]['final grade'] == d[posid]['fail grade label']:
         d[posid]['num moves passing'] = 0
     else:
         d[posid]['num moves passing'] = d[posid]['total move sequences at finish'][final_row_idx]
     if d[posid]['num moves at failure'] == np.Inf:
         d[posid]['num moves at failure'] = 'n/a' # for formatting in report
+    d[posid]['final grade date'] = dt.datetime.strptime(d[posid]['finish time'][final_row_idx],pc.timestamp_format)
         
 # count how many test rows prove this grade
 for posid in d.keys():
@@ -272,26 +285,29 @@ for posid in d.keys():
 
 # gather up lifetime statistics
 lifestats = collections.OrderedDict()
-for key in ['ranges','num tested'] + ['Qty ' + grade for grade in all_grades] + ['% ' + grade for grade in all_grades]:            
+for key in ['ranges','num tested regular','num tested ext'] + ['Qty ' + grade for grade in all_grades] + ['% ' + grade for grade in all_grades]:            
     lifestats[key] = []
 for i in range(len(important_lifetimes)-1):
     low = important_lifetimes[i]
     high = important_lifetimes[i+1]
     lifestats['ranges'].append(str(low) + ' to ' + str(high) + ' moves')
-    num_all_grades_this_bin = 0
-    for grade in all_grades:
-        num_this_grade_this_bin = 0
-        for posid in d.keys():
-            this_pos_all_grades_this_bin = [d[posid]['row grade'][row] for row in range(d[posid]['num rows']) if d[posid]['total move sequences at finish'][row] >= low and d[posid]['total move sequences at finish'][row] < high]
-            if any(this_pos_all_grades_this_bin) and grade == this_pos_all_grades_this_bin[-1]:
-                num_this_grade_this_bin += 1
-                num_all_grades_this_bin += 1
-        lifestats['Qty ' + grade].append(num_this_grade_this_bin)
-    for grade in all_grades:
-        num_this_grade_this_bin = lifestats['Qty ' + grade][-1]
-        fraction_with_this_many_moves = num_this_grade_this_bin / num_all_grades_this_bin
-        lifestats['% ' + grade].append(fraction_with_this_many_moves)
-    lifestats['num tested'].append(num_all_grades_this_bin)
+    for has_ext in [False,True]:
+        num_all_grades_this_bin = 0
+        these_all_grades = all_grades_regular if not(has_ext) else all_grades_ext
+        for grade in these_all_grades:
+            num_this_grade_this_bin = 0
+            for posid in d.keys():
+                this_pos_all_grades_this_bin = [d[posid]['row grade'][row] for row in range(d[posid]['num rows']) if d[posid]['total move sequences at finish'][row] >= low and d[posid]['total move sequences at finish'][row] < high]
+                if any(this_pos_all_grades_this_bin) and grade == this_pos_all_grades_this_bin[-1]:
+                    num_this_grade_this_bin += 1
+                    num_all_grades_this_bin += 1                  
+            lifestats['Qty ' + grade].append(num_this_grade_this_bin)
+        for grade in these_all_grades:
+            num_this_grade_this_bin = lifestats['Qty ' + grade][-1]
+            fraction_with_this_many_moves = num_this_grade_this_bin / num_all_grades_this_bin
+            lifestats['% ' + grade].append(fraction_with_this_many_moves)
+        key = 'num tested regular' if not(has_ext) else 'num tested ext'
+        lifestats[key].append(num_all_grades_this_bin)
 
 # write report
 timestamp_str = pc.timestamp_str_now()
@@ -319,34 +335,41 @@ if report_file:
         writer.writerow(['','grade'] + grade_spec_headers)
         for key in grade_specs.keys():
             writer.writerow(['',key] + list(grade_specs[key].values()))
-        writer.writerow(['',fail_grade + ' ... does not meet any of the above grades.'])
+        writer.writerow(['',fail_grade + ' or ' + fail_grade_ext + ' ... does not meet any of the above grades.'])
         writer.writerow([''])
-        writer.writerow(['TOTALS FOR EACH GRADE:'])
-        writer.writerow(['(at burn-in >= '+str(num_moves_infant_mortality)+' moves)','grade', 'quantity', 'percent'])
-        num_insuff = len([posid for posid in d.keys() if d[posid]['start grade'] == insuff_data_grade])
-        num_suff = len(d) - num_insuff
-        def percent(value):
-            return format(value/num_suff*100,'.1f')+'%'
-        for key in all_grades:
-            total_this_grade = len([posid for posid in d.keys() if d[posid]['start grade'] == key])
-            writer.writerow(['',key,total_this_grade,percent(total_this_grade)])
-        writer.writerow(['','all',num_suff,percent(num_suff)])
-        if num_insuff > 0:
-            writer.writerow(['',insuff_data_grade,num_insuff])
-        writer.writerow([''])
+        writer.writerow(['TOTALS FOR EACH GRADE:   ** at burn-in >= '+str(num_moves_infant_mortality)+' moves **'])
+        writer.writerow(['','grade', 'quantity', 'percent'])
+        for has_ext in [False,True]:
+            these_posids = [posid for posid in d.keys() if d[posid]['has extended gearbox'] == has_ext]
+            these_all_grades = all_grades_regular if not(has_ext) else all_grades_ext
+            num_insuff = len([posid for posid in these_posids if d[posid]['start grade'] == insuff_data_grade])
+            num_suff = len(these_posids) - num_insuff
+            def percent(value):
+                return format(value/num_suff*100,'.1f')+'%'
+            for key in these_all_grades:
+                total_this_grade = len([posid for posid in these_posids if d[posid]['start grade'] == key])
+                writer.writerow(['',key,total_this_grade,percent(total_this_grade)])
+            all_text = 'all non-extension' if not(has_ext) else 'all extension'
+            writer.writerow(['',all_text,num_suff,percent(num_suff)])
+            if num_insuff > 0:
+                writer.writerow(['',insuff_data_grade,num_insuff])
+            writer.writerow([''])
         writer.writerow(['LIFETIME STATISTICS:'])         
         writer.writerow(['',''] + [r for r in lifestats['ranges']])
-        writer.writerow(['','num pos with test results in this range'] + [str(n) for n in lifestats['num tested']])
-        for prefix in ['Qty ','% ']:
-            for grade in all_grades:
-                key = prefix + grade
-                if any(lifestats[key]):
-                    if '%' in prefix:
-                        val_strs = [format(val*100,'.1f')+'%' for val in lifestats[key]]
-                    else:
-                        val_strs = [str(val) for val in lifestats[key]]
-                    writer.writerow(['',key] + val_strs)
-        writer.writerow([''])
+        for has_ext in [False,True]:
+            label = 'regular' if not(has_ext) else 'ext'
+            writer.writerow(['','num ' + label + ' pos with test results in this range'] + [str(n) for n in lifestats['num tested ' + label]])
+            for prefix in ['Qty ','% ']:
+                these_all_grades = all_grades_regular if not(has_ext) else all_grades_ext
+                for grade in these_all_grades:
+                    key = prefix + grade
+                    if any(lifestats[key]):
+                        if '%' in prefix:
+                            val_strs = [format(val*100,'.1f')+'%' for val in lifestats[key]]
+                        else:
+                            val_strs = [str(val) for val in lifestats[key]]
+                        writer.writerow(['',key] + val_strs)
+            writer.writerow([''])
         writer.writerow(['INDIVIDUAL POSITIONER GRADES:'])
         writer.writerow(['','posid','initial grade'] + proven_keys + ['num moves passing','num moves at failure','num manually-ignored bad data rows'])
         posids_sorted_by_grade = []
@@ -385,9 +408,14 @@ def sort_alldata_by(sort_key):
 gui_root = tkinter.Tk()
 keep_asking = True
 plot_types = {0: 'None',
-              1: 'grade vs date tested (cumulative)',
-              2: 'grade vs num moves'}
+              1: 'initial grades vs test dates (cumulative)',
+              2: 'present grades vs latest test dates (cumulative)',
+              3: 'grade vs num moves'}
 plot_select_text = ''.join(['Enter what type of plots to save.\n\n'] + [str(key) + ': ' + plot_types[key] + '\n' for key in plot_types.keys()])
+extra_title_text = {0: '',
+                    1: '(after burn-in testing only)\n',
+                    2: '(including lifetime or other extra testing / wear)\n',
+                    3: ''}
 while keep_asking:
     response = tkinter.simpledialog.askinteger(title='Select plot type', prompt=plot_select_text, minvalue=min(plot_types.keys()), maxvalue=max(plot_types.keys()))
     if response == 0 or response == None:
@@ -396,14 +424,20 @@ while keep_asking:
         plt.ioff()
         fig = plt.figure(figsize=(10, 7))
         num_pos_in_each_grade = collections.OrderedDict([(grade,[0]) for grade in all_grades])
-        if response == 1:
+        if response == 1 or response == 2:
             sort_alldata_by('date tested')
             for i in range(len(alldata['date tested'])):
+                posid = alldata['posid'][i]
                 for grade in all_grades:
                     num_pos_in_each_grade[grade].append(num_pos_in_each_grade[grade][-1])
-                if alldata['is last data point'][i]:
-                    grade = d[alldata['posid'][i]]['final grade']
-                    num_pos_in_each_grade[grade][-1] += 1
+                if response == 1:
+                    compare_date = d[posid]['start grade date']
+                    this_grade = d[posid]['start grade']
+                else:
+                    compare_date = d[posid]['final grade date']
+                    this_grade = d[posid]['final grade']
+                if alldata['date tested'] == compare_date:
+                    num_pos_in_each_grade[this_grade][-1] += 1
             for grade in all_grades:
                 if any(num_pos_in_each_grade[grade]):
                     color = next(plt.gca()._get_lines.prop_cycler)['color']
@@ -413,10 +447,10 @@ while keep_asking:
                     plt.plot_date(alldata['date tested'][-1], num_pos_in_each_grade[grade][-1], fmt='o', color=color)
             plt.gca().autoscale_view()
             plt.xlim(xmax=plt.xlim()[1] + 1.0) # add a little padding to the picture
-            plt.xlabel('last date tested')
+            plt.xlabel('date tested')
             plt.ylabel('cumulative positioners')
             plt.grid('on')
-        elif response == 2:
+        elif response == 3:
             sort_alldata_by('num moves')
             num_moves = [0]
             last_grade = dict([(posid,None) for posid in d.keys()])
@@ -449,7 +483,7 @@ while keep_asking:
             plt.ylabel('number of positioners')
             plt.grid('on')
         plotname = os.path.splitext(report_file)[0] + '_plot' + str(response) + '.pdf'
-        plt.title(' ' + plot_types[response].upper() + '\n ' + os.path.basename(report_file), loc='left')
+        plt.title(' ' + plot_types[response].upper() + '\n ' + extra_title_text[response] + os.path.basename(report_file), loc='left')
         plt.legend(loc='best')
         plt.savefig(plotname)
         plt.close(fig)
