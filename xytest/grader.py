@@ -418,82 +418,110 @@ keep_asking = True
 plot_types = {0: 'None',
               1: 'initial grades vs test dates (cumulative)',
               2: 'present grades vs latest test dates (cumulative)',
-              3: 'grade vs num moves'}
+              3: 'grade vs num moves (qty)',
+              4: 'grade vs num moves (%)',
+              5: 'all plots, then quit'}
 plot_select_text = ''.join(['Enter what type of plots to save.\n\n'] + [str(key) + ': ' + plot_types[key] + '\n' for key in plot_types.keys()])
 extra_title_text = {0: '',
                     1: ' (after burn-in testing only)\n',
                     2: ' (including lifetime or other extra testing / wear)\n',
-                    3: ''}
+                    3: '',
+                    4: '',
+                    5: ''}
 while keep_asking:
-    response = tkinter.simpledialog.askinteger(title='Select plot type', prompt=plot_select_text, minvalue=min(plot_types.keys()), maxvalue=max(plot_types.keys()))
-    if response == 0 or response == None:
+    user_response = tkinter.simpledialog.askinteger(title='Select plot type', prompt=plot_select_text, minvalue=min(plot_types.keys()), maxvalue=max(plot_types.keys()))
+    if user_response == 5:
+        responses = [1,2,3,4]
+        plotnames = set()
         keep_asking = False
     else:
-        plt.ioff()
-        fig = plt.figure(figsize=(10, 7))
-        num_pos_in_each_grade = collections.OrderedDict([(grade,[0]) for grade in all_grades])
-        if response == 1 or response == 2:
-            sort_alldata_by('date tested')
-            for i in range(len(alldata['date tested'])):
-                posid = alldata['posid'][i]
+        responses = [user_response]
+    for response in responses:
+        if response == 0 or response == None:
+            keep_asking = False
+        else:
+            plt.ioff()
+            fig = plt.figure(figsize=(10, 7))
+            num_pos_in_each_grade = collections.OrderedDict([(grade,[0]) for grade in all_grades])
+            if response == 1 or response == 2:
+                sort_alldata_by('date tested')
+                for i in range(len(alldata['date tested'])):
+                    posid = alldata['posid'][i]
+                    for grade in all_grades:
+                        num_pos_in_each_grade[grade].append(num_pos_in_each_grade[grade][-1])
+                    if response == 1:
+                        compare_date = d[posid]['start grade date']
+                        this_grade = d[posid]['start grade']
+                    else:
+                        compare_date = d[posid]['final grade date']
+                        this_grade = d[posid]['final grade']
+                    if alldata['date tested'][i] == compare_date:
+                        num_pos_in_each_grade[this_grade][-1] += 1
                 for grade in all_grades:
-                    num_pos_in_each_grade[grade].append(num_pos_in_each_grade[grade][-1])
-                if response == 1:
-                    compare_date = d[posid]['start grade date']
-                    this_grade = d[posid]['start grade']
-                else:
-                    compare_date = d[posid]['final grade date']
-                    this_grade = d[posid]['final grade']
-                if alldata['date tested'][i] == compare_date:
-                    num_pos_in_each_grade[this_grade][-1] += 1
-            for grade in all_grades:
-                if any(num_pos_in_each_grade[grade]):
-                    color = next(plt.gca()._get_lines.prop_cycler)['color']
-                    del num_pos_in_each_grade[grade][0] # remove those pesky initial rows filled with 0
-                    label = 'Grade ' + str(grade) + ' (' + str(num_pos_in_each_grade[grade][-1]) + ')'
-                    plt.plot_date(alldata['date tested'], num_pos_in_each_grade[grade], fmt='-', color=color, label=label)
-                    plt.plot_date(alldata['date tested'][-1], num_pos_in_each_grade[grade][-1], fmt='o', color=color)
-            plt.gca().autoscale_view()
-            plt.xlim(xmax=plt.xlim()[1] + 1.0) # add a little padding to the picture
-            plt.xlabel('date tested')
-            plt.ylabel('cumulative positioners')
-            plt.grid('on')
-        elif response == 3:
-            sort_alldata_by('num moves')
-            num_moves = [0]
-            last_grade = dict([(posid,None) for posid in d.keys()])
-            cleanup_posid = None
-            for i in range(len(alldata['num moves'])):                    
-                this_num_moves = alldata['num moves'][i]
-                if this_num_moves > num_moves[-1]:
-                    num_moves.append(this_num_moves)
-                    for grade in num_pos_in_each_grade.keys():
-                        num_pos_in_each_grade[grade].append(num_pos_in_each_grade[grade][-1])   
-                this_posid = alldata['posid'][i]
-                this_grade = alldata['row grade'][i]
-                if last_grade[this_posid] != this_grade:
-                    if last_grade[this_posid] != None:
-                        num_pos_in_each_grade[last_grade[this_posid]][-1] -= 1
-                    num_pos_in_each_grade[this_grade][-1] += 1
-                    last_grade[this_posid] = this_grade
-                if cleanup_posid:
-                    num_pos_in_each_grade[last_grade[cleanup_posid]][-1] -= 1
-                    cleanup_posid = None
-                if alldata['is last data point'][i]:
-                    cleanup_posid = this_posid
-            del num_moves[0] # remove those pesky initial rows filled with 0
-            for L in num_pos_in_each_grade.values():
-                del L[0] # remove those pesky initial rows filled with 0
-            for grade in all_grades:
-                if any(num_pos_in_each_grade[grade]):
-                    plt.plot(num_moves,num_pos_in_each_grade[grade],label='Grade ' + str(grade))
-            plt.xlabel('lifetime moves')
-            plt.ylabel('number of positioners')
-            plt.grid('on')
-        plotname = os.path.splitext(report_file)[0] + '_plot' + str(response) + '.pdf'
-        plt.title(' ' + plot_types[response].upper() + '\n ' + extra_title_text[response] + ' ' + os.path.basename(report_file), loc='left')
-        plt.legend(loc='best')
-        plt.savefig(plotname)
-        plt.close(fig)
-        tkinter.messagebox.showinfo(title='Plot saved',message='Plot of ' + plot_types[response] + ' saved to:\n\n' + plotname)
+                    if any(num_pos_in_each_grade[grade]):
+                        color = next(plt.gca()._get_lines.prop_cycler)['color']
+                        del num_pos_in_each_grade[grade][0] # remove those pesky initial rows filled with 0
+                        label = 'Grade ' + str(grade) + ' (' + str(num_pos_in_each_grade[grade][-1]) + ')'
+                        plt.plot_date(alldata['date tested'], num_pos_in_each_grade[grade], fmt='-', color=color, label=label)
+                        plt.plot_date(alldata['date tested'][-1], num_pos_in_each_grade[grade][-1], fmt='o', color=color)
+                plt.gca().autoscale_view()
+                plt.xlim(xmax=plt.xlim()[1] + 1.0) # add a little padding to the picture
+                plt.xlabel('date tested')
+                plt.ylabel('cumulative positioners')
+                plt.grid('on')
+            elif response == 3 or response == 4:
+                sort_alldata_by('num moves')
+                num_moves = [0]
+                last_grade = dict([(posid,None) for posid in d.keys()])
+                cleanup_posid = None
+                for i in range(len(alldata['num moves'])):                    
+                    this_num_moves = alldata['num moves'][i]
+                    if this_num_moves > num_moves[-1]:
+                        num_moves.append(this_num_moves)
+                        for grade in num_pos_in_each_grade.keys():
+                            num_pos_in_each_grade[grade].append(num_pos_in_each_grade[grade][-1])   
+                    this_posid = alldata['posid'][i]
+                    this_grade = alldata['row grade'][i]
+                    if last_grade[this_posid] != this_grade:
+                        if last_grade[this_posid] != None:
+                            num_pos_in_each_grade[last_grade[this_posid]][-1] -= 1
+                        num_pos_in_each_grade[this_grade][-1] += 1
+                        last_grade[this_posid] = this_grade
+                    if cleanup_posid:
+                        num_pos_in_each_grade[last_grade[cleanup_posid]][-1] -= 1
+                        cleanup_posid = None
+                    if alldata['is last data point'][i]:
+                        cleanup_posid = this_posid
+                del num_moves[0] # remove those pesky initial rows filled with 0
+                for L in num_pos_in_each_grade.values():
+                    del L[0] # remove those pesky initial rows filled with 0
+                if response == 4:
+                    divisors = [1e-10]*len(num_moves) # small number avoids divide-by-zero later
+                    for grade in all_grades:
+                        divisors = [divisors[i] + num_pos_in_each_grade[grade][i] for i in range(len(num_moves))]
+                for grade in all_grades:
+                    if any(num_pos_in_each_grade[grade]):
+                        if response == 3:
+                            y_vals = num_pos_in_each_grade[grade]
+                            ylabel_prefix = 'number'
+                        else:
+                            y_vals = [num_pos_in_each_grade[grade][i]/divisors[i]*100 for i in range(len(divisors))]
+                            ylabel_prefix = '%'
+                        plt.plot(num_moves,y_vals,label='Grade ' + str(grade))
+                plt.xlabel('lifetime moves')
+                plt.ylabel(ylabel_prefix + ' of positioners')
+                from matplotlib.ticker import FormatStrFormatter
+                plt.gca().yaxis.set_major_formatter(FormatStrFormatter('%d%%'))
+                plt.grid('on')
+            plotname = os.path.splitext(report_file)[0] + '_plot' + str(response) + '.pdf'
+            plt.title(' ' + plot_types[response].upper() + '\n ' + extra_title_text[response] + ' ' + os.path.basename(report_file), loc='left')
+            plt.legend(loc='best')
+            plt.savefig(plotname)
+            plt.close(fig)
+            if user_response == 5:
+                plotnames.add(plotname)
+            else:
+                tkinter.messagebox.showinfo(title='Plot saved',message='Plot of ' + plot_types[response] + ' saved to:\n\n' + plotname)
+    if user_response == 5:
+        tkinter.messagebox.showinfo(title='Plot saved',message='Plots saved to:\n' + ''.join(['\n' + s for s in plotnames]))
 gui_root.withdraw()
