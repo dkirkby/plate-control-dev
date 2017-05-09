@@ -24,7 +24,7 @@ grade_spec_err_keys = grade_spec_headers[0:2]
 grading_threshold = summarizer.thresholds_um[0]
 min_num_targets = 24 # a test is not considered valid without at least this many targets
 num_moves_infant_mortality = 5000 # a start grade is not proven until after this many cycles on positioner
-important_lifetimes = list(set([num_moves_infant_mortality, 0, 5000, 10000, 25000, 50000, 107000, 150000, 215000, np.inf]))
+important_lifetimes = list(set([num_moves_infant_mortality, 0, 5000, 10000, 25000, 50000, 75000, 107000, 125000, 150000, 215000, np.inf]))
 important_lifetimes.sort()
 
 grade = 'A'
@@ -304,7 +304,10 @@ for i in range(len(important_lifetimes)-1):
             lifestats['Qty ' + grade].append(num_this_grade_this_bin)
         for grade in these_all_grades:
             num_this_grade_this_bin = lifestats['Qty ' + grade][-1]
-            fraction_with_this_many_moves = num_this_grade_this_bin / num_all_grades_this_bin
+            if num_this_grade_this_bin == 0:
+                fraction_with_this_many_moves = 0 # avoids case of divide by zero
+            else:
+                fraction_with_this_many_moves = num_this_grade_this_bin / num_all_grades_this_bin
             lifestats['% ' + grade].append(fraction_with_this_many_moves)
         key = 'num tested regular' if not(has_ext) else 'num tested ext'
         lifestats[key].append(num_all_grades_this_bin)
@@ -345,7 +348,11 @@ if report_file:
             num_insuff = len([posid for posid in these_posids if d[posid]['start grade'] == insuff_data_grade])
             num_suff = len(these_posids) - num_insuff
             def percent(value):
-                return format(value/num_suff*100,'.1f')+'%'
+                if value == 0 and num_suff == 0:
+                    frac = 0
+                else:
+                    frac = value/num_suff*100
+                return format(frac,'.1f')+'%'
             for key in these_all_grades:
                 total_this_grade = len([posid for posid in these_posids if d[posid]['start grade'] == key])
                 writer.writerow(['',key,total_this_grade,percent(total_this_grade)])
@@ -413,8 +420,8 @@ plot_types = {0: 'None',
               3: 'grade vs num moves'}
 plot_select_text = ''.join(['Enter what type of plots to save.\n\n'] + [str(key) + ': ' + plot_types[key] + '\n' for key in plot_types.keys()])
 extra_title_text = {0: '',
-                    1: '(after burn-in testing only)\n',
-                    2: '(including lifetime or other extra testing / wear)\n',
+                    1: ' (after burn-in testing only)\n',
+                    2: ' (including lifetime or other extra testing / wear)\n',
                     3: ''}
 while keep_asking:
     response = tkinter.simpledialog.askinteger(title='Select plot type', prompt=plot_select_text, minvalue=min(plot_types.keys()), maxvalue=max(plot_types.keys()))
@@ -436,7 +443,7 @@ while keep_asking:
                 else:
                     compare_date = d[posid]['final grade date']
                     this_grade = d[posid]['final grade']
-                if alldata['date tested'] == compare_date:
+                if alldata['date tested'][i] == compare_date:
                     num_pos_in_each_grade[this_grade][-1] += 1
             for grade in all_grades:
                 if any(num_pos_in_each_grade[grade]):
@@ -483,7 +490,7 @@ while keep_asking:
             plt.ylabel('number of positioners')
             plt.grid('on')
         plotname = os.path.splitext(report_file)[0] + '_plot' + str(response) + '.pdf'
-        plt.title(' ' + plot_types[response].upper() + '\n ' + extra_title_text[response] + os.path.basename(report_file), loc='left')
+        plt.title(' ' + plot_types[response].upper() + '\n ' + extra_title_text[response] + ' ' + os.path.basename(report_file), loc='left')
         plt.legend(loc='best')
         plt.savefig(plotname)
         plt.close(fig)
