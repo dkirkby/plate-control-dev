@@ -225,46 +225,47 @@ for posid in d.keys():
         d[posid]['row grade'].append(this_grade)
             
 
-# determine the starting grade for each positioner
+# determine the starting and finishing grades for each positioner
 start_grade_min_current = 100
+final_grade_min_current = start_grade_min_current
 for posid in d.keys():
     d[posid]['start grade'] = None
     d[posid]['start grade date'] = None
-    for row in range(d[posid]['num rows']):
-        if d[posid]['curr creep'][row] >= start_grade_min_current and d[posid]['curr cruise'][row] >= start_grade_min_current:
-            d[posid]['start grade'] = d[posid]['row grade'][row]
-            d[posid]['start grade date'] = dt.datetime.strptime(d[posid]['finish time'][row],pc.timestamp_format)
-        if d[posid]['total move sequences at finish'][row] >= num_moves_infant_mortality and d[posid]['start grade'] != None:
-            break
-
-# determine the final grade for each positioner
-final_grade_min_current = start_grade_min_current
-for posid in d.keys():
     d[posid]['final grade'] = None
     d[posid]['final grade date'] = None
-    these_grades = []
+    for grade_label in ['start grade','final grade']:
+        d[posid][grade_label] = None
+        d[posid][grade_label + ' date'] = None
+        if grade_label == 'start grade':
+            iter_range = range(d[posid]['num rows'])
+            min_current = start_grade_min_current
+        else:
+            iter_range = range(d[posid]['num rows']-1,-1,-1)
+            min_current = final_grade_min_current
+        for row in iter_range:
+            if d[posid]['curr creep'][row] >= min_current and d[posid]['curr cruise'][row] >= min_current:
+                d[posid][grade_label] = d[posid]['row grade'][row]
+                d[posid][grade_label + ' date'] = dt.datetime.strptime(d[posid]['finish time'][row],pc.timestamp_format)
+            if d[posid]['total move sequences at finish'][row] >= num_moves_infant_mortality and d[posid][grade_label] != None:
+                break
+        if d[posid][grade_label] == None:
+            d[posid][grade_label] = insuff_data_grade
+
+# determine at how many moves the positioner failed (if it did)
+for posid in d.keys():
     highest_row_idx = d[posid]['num rows'] - 1
     final_row_idx = highest_row_idx
     d[posid]['num moves at failure'] = np.Inf
-    while d[posid]['row grade'][final_row_idx] == d[posid]['fail grade label'] and final_row_idx > 0:
-        d[posid]['num moves at failure'] = d[posid]['total move sequences at finish'][final_row_idx]
+    while final_row_idx > 0 and d[posid]['row grade'][final_row_idx] == d[posid]['fail grade label']:
+        if d[posid]['curr creep'][final_row_idx] >= final_grade_min_current and d[posid]['curr cruise'][final_row_idx] >= final_grade_min_current:
+            d[posid]['num moves at failure'] = d[posid]['total move sequences at finish'][final_row_idx]
         final_row_idx -= 1
-    for row in range(final_row_idx, -1, -1):
-        if d[posid]['curr creep'][row] >= final_grade_min_current and d[posid]['curr cruise'][row] >= final_grade_min_current:
-            these_grades.append(d[posid]['row grade'][row])
-    if d[posid]['num moves at failure'] < num_moves_infant_mortality:
-        d[posid]['final grade'] = d[posid]['fail grade label']
-    elif len(these_grades) > 0:
-        d[posid]['final grade'] = worst(these_grades)
-    else:
-        d[posid]['final grade'] = insuff_data_grade
     if final_row_idx == 0 and d[posid]['final grade'] == d[posid]['fail grade label']:
         d[posid]['num moves passing'] = 0
     else:
         d[posid]['num moves passing'] = d[posid]['total move sequences at finish'][final_row_idx]
     if d[posid]['num moves at failure'] == np.Inf:
         d[posid]['num moves at failure'] = 'n/a' # for formatting in report
-    d[posid]['final grade date'] = dt.datetime.strptime(d[posid]['finish time'][final_row_idx],pc.timestamp_format)
         
 # count how many test rows prove this grade
 for posid in d.keys():
