@@ -193,15 +193,15 @@ for posid in pos_to_delete:
 # establish the type of fail grade (non-extension vs extension)
 for posid in d.keys():
     if d[posid]['has extended gearbox']:
-        d[posid]['fail grade label'] = fail_grade
-    else:
         d[posid]['fail grade label'] = fail_grade_ext
+    else:
+        d[posid]['fail grade label'] = fail_grade
         
 # gather up all grades passed for each test loop for each positioner
 for posid in d.keys():
     d[posid]['row grade'] = []
     for row in range(d[posid]['num rows']):
-        passing_grades = set(regular_grades + [fail_grade])
+        passing_grades = set(regular_grades + [fail_grade]) # specifically use the non-extension criteria here, and will add on a prefix later if extension
         for grade in regular_grades:
             failed_this_grade = False
             for c in range(len(summarizer.stat_cuts)):
