@@ -5,7 +5,7 @@
   Author:	Carl Dobson
   Date:		03/02/2017
   Synopsis:	Send commands to MIGHTEX Universal LED Controller (SLC-MA series) and gets replies
-  Usage:	mightex_cmd [-acdehimnrvFRS] [-C "Max Set"] [-D device_path] [-H channel_num] [-M mode_num] [-N serial_no]
+  Usage:	mightex_cmd [-acdehimnrvVFRS] [-C "Max Set"] [-D device_path] [-H channel_num] [-M mode_num] [-N serial_no]
   Options:
 		-a		Show information for all Mightex devices (note, no settings will be read,
 				and no commands will be sent to the controller)
@@ -27,10 +27,12 @@
 		-S		Save the active settings to NVRAM (after power cycle,
 				the controller will turn on with the active settings loaded)
 		-v		Verbose (output written to stderr)
+		-V		Even more Verbose (output written to stderr)
 
   Revisions:
   mm/dd/yyyy who       description
   ---------- --------  ------------------------------------------
+  05/10/2017 cad       Cleared out all incoming data before first real query
 
  H-
 *******************************************/
@@ -66,16 +68,6 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <ctype.h>
-
-/*
- * Ugly hack to work around failing compilation on systems that don't
- * yet populate new version of hidraw.h to userspace.
- */
-#ifndef HIDIOCSFEATURE
-#warning Please have your distro update the userspace kernel headers
-#define HIDIOCSFEATURE(len)    _IOC(_IOC_WRITE|_IOC_READ, 'H', 0x06, len)
-#define HIDIOCGFEATURE(len)    _IOC(_IOC_WRITE|_IOC_READ, 'H', 0x07, len)
-#endif
 
 static char *mightex_cmd_version="1.00";
 
@@ -130,7 +122,7 @@ static int print_debug_output=0;
 void print_usage(FILE *fp)
 {
 	fprintf(fp,
-	  "Usage: mightex_cmd [-acdehimnrvFRS] [-C \042Max Set\042] [-D device_path] [-H channel_num] [-M mode_num] [-N serial_no]\n");
+	  "Usage: mightex_cmd [-acdehimnrvFRSV] [-C \042Max Set\042] [-D device_path] [-H channel_num] [-M mode_num] [-N serial_no]\n");
 }
 
 void usage(void)
@@ -167,6 +159,7 @@ void help(void)
 	fprintf(stdout,"	-S		Save the active settings to NVRAM (after power cycle,\n");
 	fprintf(stdout,"			the controller will turn on with the active settings loaded)\n");
 	fprintf(stdout,"	-v		Verbose (output written to stderr)\n");
+	fprintf(stdout,"	-V		Even more Verbose (output written to stderr)\n");
 	prev_stdout=1;
 }
 
@@ -187,11 +180,15 @@ int main (int argc, char **argv)
 	mystrSZcpy(use_device,"");
 
 	/* read command line options and set up appropriate actions */
-	while((c = getopt(argc, argv, "acdehimnrvFRSC:D:H:M:N:")) != -1)
+	while((c = getopt(argc, argv, "acdehimnrvVFRSC:D:H:M:N:")) != -1)
 	{
 		switch(c)
 		{
 			case 'v':
+				verbose=1;
+				break;
+			case 'V':
+				print_debug_output=1;
 				verbose=1;
 				break;
 			case 'a':
@@ -631,16 +628,47 @@ void print_hexascii(FILE *fp,char *buf, int bufsz)
 	return;
 }
 
-void set_buf_cmd(char *buf,int j,char *command)
+void set_buf_cmd(char *buf,int irpt_num,char *command)
 {
 	int i=0;
 
-	buf[i++] = j;
+	buf[i++] = irpt_num;
 	buf[i++] = strlen(command)+2;
 	strcpy(&buf[i],command);
 	strcat(&buf[i],"\n\r");
+
+	if(verbose)
+		fprintf(stderr,"; sent: %s\n", command);
 	return;
 }
+
+int my_getFeature(int fd, int ireport, char *buf, int bufsz, int feature_size)
+{
+	int res,i;
+
+	if(feature_size>bufsz)
+		feature_size=bufsz;
+
+	for(i=0;i<bufsz;i++) buf[i]='\0';
+	buf[0] = ireport; /* Report Number */
+	res = ioctl(fd, HIDIOCGFEATURE(feature_size), buf);
+	if (res < 0) 
+	{
+		perror("HIDIOCGFEATURE");
+	} 
+	else 
+	{
+		if(print_debug_output)
+		{
+		  fprintf(stderr,"ioctl HIDIOCGFEATURE returned: %d\n", res);
+		  fprintf(stderr,"Report data (not containing the report number):\n");
+		  print_hexascii(stderr,(char *)buf,res);
+		}
+	}
+	return res;
+}
+
+#define MAX_MIGHTEX_REPLY_RETRIES	1
 
 // Do NOT make MAX_RESPONSE_TRIES less than 6, or the DEVICEINFO command will not complete
 #define MAX_RESPONSE_TRIES 10
@@ -653,6 +681,7 @@ char *get_mightex_response(int fd, int ireport,int *response_size)
 	int need_more=1;
 	int tries=0;
 	int a_ndx=0;
+	int fsize=18;
 
 	answer[a_ndx]='\0';
 	*response_size=RESPONSE_SIZE;
@@ -662,23 +691,12 @@ char *get_mightex_response(int fd, int ireport,int *response_size)
 		tries++;
 
 		/* Get Feature */
-		buf[0] = ireport; /* Report Number */
-		res = ioctl(fd, HIDIOCGFEATURE(18), buf);
-		if (res < 0) 
+		res = my_getFeature(fd, ireport, buf, sizeof(buf), fsize);
+		if (res >= 0) 
 		{
-			perror("HIDIOCGFEATURE");
-		} 
-		else 
-		{
-			if(print_debug_output)
-			{
-			  fprintf(stderr,"ioctl HIDIOCGFEATURE returned: %d\n", res);
-			  fprintf(stderr,"Report data (not containing the report number):\n");
-			  print_hexascii(stderr,(char *)buf,res);
-			}
 			if(res && buf[0]==0x01 && buf[1]==0x00)
 				usleep(10000L);	// sleep 0.01 sec waiting for more
-			if(res && buf[0]==0x01 && buf[1]<=0x10)
+			if(res && buf[0]==0x01 && buf[1]<=(fsize-2))
 			{
 				int i;
 				for(i=0;i<buf[1];i++)
@@ -701,15 +719,15 @@ char *get_mightex_response(int fd, int ireport,int *response_size)
 	return (char *)answer;
 }
 
-
-#define MAX_MIGHTEX_REPLY_RETRIES	1
 int hidmain(char *use_device)
 {
 	int fd;
-	int i,j,ireport;
+	int j;
 	int res;
 	char ibuf[256];
 	char buf[256];
+	int ireport=1;
+	int fsize=18;
 #if 0
 	int desc_size = 0;
 	struct hidraw_report_descriptor rpt_desc;
@@ -803,39 +821,46 @@ int hidmain(char *use_device)
 #endif // 0
 
 	/* This first loop gets us in sync with the device */
-	ireport=1;
 	for(j=1;j<20;j++)
 	{
-		for(i=0;i<256;i++) ibuf[i]='\0';
-		set_buf_cmd(ibuf,ireport,"?MODE 1 ");
-		if(print_debug_output)
-			printf("ioctl HIDIOCSFEATURE #: %d, %s\n", ireport,"?MODE 1 ");
+		/* Get Feature */
+		res=my_getFeature(fd,ireport,buf,sizeof(buf),fsize);
+		if(buf[0]==ireport && buf[1]==0x00 )
+			break;	// now the input queue is clear
+	}
 
-		res = ioctl(fd, HIDIOCSFEATURE(18), ibuf);
+	/* Make sure we can ask for the mode on channel 1 and get a good answer */
+	for(j=1;j<20;j++)
+	{
+		char *mode_cmd="?MODE 1 ";
+
+		memset(ibuf,'\0',sizeof(ibuf));
+		set_buf_cmd(ibuf,ireport,mode_cmd);
+		if(print_debug_output)
+			fprintf(stderr,"ioctl HIDIOCSFEATURE #: %d, %s\n", ireport,mode_cmd);
+
+		/* Set Feature */
+		res = ioctl(fd, HIDIOCSFEATURE(fsize), ibuf);
 		if (res < 0)
 			perror("HIDIOCSFEATURE");
 		else
 			if(print_debug_output)
-			  printf("ioctl HIDIOCSFEATURE returned: %d\n", res);
+			  fprintf(stderr,"ioctl HIDIOCSFEATURE returned: %d\n", res);
 	
+		usleep(10000L);	// sleep 0.01 sec before checking for response
 		/* Get Feature */
-		buf[0] = ireport; /* Report Number */
-		res = ioctl(fd, HIDIOCGFEATURE(18), buf);
-		if (res < 0) 
-		{
-			perror("HIDIOCGFEATURE");
-		} 
-		else 
-		{
-			if(print_debug_output)
-			{
-			  fprintf(stderr,"ioctl HIDIOCGFEATURE returned: %d\n", res);
-			  fprintf(stderr,"Report data (not containing the report number):\n");
-			  print_hexascii(stderr,(char *)buf,res);
-			}
-			if(buf[0]==0x01 && buf[1]==0x05 && buf[2]=='#' && buf[3]>='0' && buf[3]<='3')
-				break;	// got the expected answer
-		}
+		res=my_getFeature(fd,ireport,buf,sizeof(buf),fsize);
+		if(buf[0]==0x01 && buf[1]==0x05 && buf[2]=='#' && buf[3]>='0' && buf[3]<='3')
+			break;	// got the expected answer
+	}
+
+	/* Clear out all input again */
+	for(j=1;j<20;j++)
+	{
+		/* Get Feature */
+		res=my_getFeature(fd,ireport,buf,sizeof(buf),fsize);
+		if(buf[0]==ireport && buf[1]==0x00 )
+			break;	// now the input queue is clear
 	}
 
 	for(j=0;j<MAX_CMD_QUEUE && *Command_Queue[j]!='\0';j++)
@@ -850,15 +875,16 @@ int hidmain(char *use_device)
 		if(verbose)
 			fprintf(stderr,"; sent: %s\n", Command_Queue[j]);
 
-		res = ioctl(fd, HIDIOCSFEATURE(18), ibuf);
+		res = ioctl(fd, HIDIOCSFEATURE(fsize), ibuf);
 		if (res < 0)
 			perror("HIDIOCSFEATURE");
 		else
 		{
 			if(print_debug_output)
-				printf("ioctl HIDIOCSFEATURE returned: %d\n", res);
+				fprintf(stderr,"ioctl HIDIOCSFEATURE returned: %d\n", res);
 		}
 	
+		usleep(10000L);	// sleep 0.01 sec before checking for response
 		resp_retries=0;
 		response=get_mightex_response(fd,ireport,&response_size);
 		while( (0==strlen(response)) && (MAX_MIGHTEX_REPLY_RETRIES>(++resp_retries)) )
@@ -866,12 +892,12 @@ int hidmain(char *use_device)
 		if(MAX_MIGHTEX_REPLY_RETRIES==resp_retries && 0==strlen(response) && '?'!=*Command_Queue[j])
 		{
 			// no answer from command, so send a query
-			for(i=0;i<256;i++) ibuf[i]='\0';
+			memset(ibuf,'\0',sizeof(ibuf));
 			set_buf_cmd(ibuf,ireport,"?MODE 1 ");
 			if(verbose)
 				fprintf(stderr,"sent: %s\n", "?MODE 1 ");
 
-			res = ioctl(fd, HIDIOCSFEATURE(18), ibuf);
+			res = ioctl(fd, HIDIOCSFEATURE(fsize), ibuf);
 			if (res < 0)
 				perror("HIDIOCSFEATURE");
 			else
@@ -880,6 +906,7 @@ int hidmain(char *use_device)
 					fprintf(stderr,"ioctl HIDIOCSFEATURE returned: %d\n", res);
 			}
 
+			usleep(10000L);	// sleep 0.01 sec before checking for response
 			resp_retries=0;
 			response=get_mightex_response(fd,ireport,&response_size);
 			while( (0==strlen(response)) && (MAX_MIGHTEX_REPLY_RETRIES>(++resp_retries)) )

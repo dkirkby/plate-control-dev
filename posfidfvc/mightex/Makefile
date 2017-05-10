@@ -4,7 +4,7 @@
 ###	mightex_cmd
 ###
 
-VERSION= 1.00.00
+VERSION= 1.01.00
 
 CC=gcc
 CFLAGS=-Wall -O2 -DVERSION=\"$(VERSION)\"

@@ -24,3 +24,4 @@ Options:
 	-S		Save the active settings to NVRAM (after power cycle,
 			the controller will turn on with the active settings loaded)
 	-v		Verbose (output written to stderr)
+	-V		Even more Verbose (output written to stderr)
