@@ -33,6 +33,7 @@ class PosState(object):
         else:
             self.settings_directory = pc.fid_settings_directory
             self.logs_directory = pc.fid_logs_directory
+        template_directory = self.settings_directory
         if unit_id != None:
             self.unit_basename = 'unit_' + str(unit_id)
             comment = 'Settings file for unit: ' + str(unit_id)
@@ -43,7 +44,7 @@ class PosState(object):
             comment = 'Temporary settings file for software test purposes, not associated with a particular unit.'
         unit_filename = self.settings_directory + self.unit_basename + '.conf'
         if not(os.path.isfile(unit_filename)):
-            temp_filename = self.settings_directory + '_unit_settings_DEFAULT.conf' # read in the template file
+            temp_filename = template_directory + '_unit_settings_DEFAULT.conf' # read in the template file
             self.unit = configobj.ConfigObj(temp_filename,unrepr=True,encoding='utf-8')
             self.unit.initial_comment = [comment,'']
             self.unit.filename = unit_filename
