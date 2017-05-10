@@ -510,8 +510,9 @@ while keep_asking:
                         plt.plot(num_moves,y_vals,label='Grade ' + str(grade))
                 plt.xlabel('lifetime moves')
                 plt.ylabel(ylabel_prefix + ' of positioners')
-                from matplotlib.ticker import FormatStrFormatter
-                plt.gca().yaxis.set_major_formatter(FormatStrFormatter('%d%%'))
+                if response == 4:
+                    from matplotlib.ticker import FormatStrFormatter
+                    plt.gca().yaxis.set_major_formatter(FormatStrFormatter('%d%%'))
                 plt.grid('on')
             plotname = os.path.splitext(report_file)[0] + '_plot' + str(response) + '.pdf'
             plt.title(' ' + plot_types[response].upper() + '\n ' + extra_title_text[response] + ' ' + os.path.basename(report_file), loc='left')
