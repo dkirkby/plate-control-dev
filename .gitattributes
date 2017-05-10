@@ -28,6 +28,7 @@ petalbox/bootloader38.hex -text
 petalbox/bootloadertoreload.hex -text
 petalbox/bootreloader.hex -text
 petalbox/bootreloader38.hex -text
+petalbox/bootreplace.py -text
 petalbox/canmap.json -text
 petalbox/docs/systec-readme.txt -text
 petalbox/drivers/systec-readme.txt -text
