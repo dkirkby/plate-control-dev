@@ -77,6 +77,7 @@ class PosMoveMeasure(object):
                     for i in range(len(these_brightnesses)):
                         if len(brightnesses_ref) == 0:
                             self.printfunc('Ran out of reference dots, one thing to check is whether you have run initialize_hwsetup.py yet on this rig? (It auto-identifies fiducials for you.)')
+                            break
                         these_brightnesses[i] = brightnesses_ref.pop(0)
                     petal.store_fid_val(fidid,'LAST_MEAS_BRIGHTNESSES',these_brightnesses)
                     break            
