@@ -107,6 +107,8 @@ class FVCHandler(object):
         if self.fvc_type == 'SBIG':
             xy,peaks,t,imgfiles = self.sbig.grab(num_objects)
             brightnesses = [x/self.max_counts for x in peaks]
+        elif self.fvc_type == 'simulator':
+            pass # do nothing here -- random returns would break the identify fiducials and identify positioners methods
         else:
             zeros_dict = {}
             for i in range(num_objects):
