@@ -35,7 +35,7 @@ fid_settings_directory       = all_settings_directory + os.path.sep + 'fid_setti
 test_settings_directory      = all_settings_directory + os.path.sep + 'test_settings' + os.path.sep
 collision_settings_directory = all_settings_directory + os.path.sep + 'collision_settings' + os.path.sep
 hwsetups_directory           = all_settings_directory + os.path.sep + 'hwsetups' + os.path.sep
-othersetups_directory        = all_settings_directory + os.path.sep + 'othersetups' + os.path.sep
+other_settings_directory        = all_settings_directory + os.path.sep + 'other_settings' + os.path.sep
 temp_files_directory         = os.environ.get('HOME') + os.path.sep + 'fp_temp_files' + os.path.sep
 if not(os.path.exists(temp_files_directory)):
     os.mkdir(temp_files_directory)
