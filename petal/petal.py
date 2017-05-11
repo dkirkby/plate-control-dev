@@ -422,7 +422,8 @@ class Petal(object):
     def set_fiducials(self, fidids='all', setting='on', save_as_default=False):
         """Set a list of specific fiducials on or off.
         
-        fidids ... 1 fiducial id string, or a list of fiducial id strings, or 'all'
+        fidids ... one fiducial id string, or a list of fiducial id strings, or 'all'
+		           (this is the string given by DEVICE_ID in DESI-2724)
         
         setting ... what to set the fiducials to, as described below:
             'on'         ... turns each fiducial to its default on value
