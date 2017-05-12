@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import datetime as dt
 
 # grading parameters
-# c.f. DESI-XXXX Fiber Positioner Grades
+# c.f. DESI-2735 Fiber Positioner Grades
 # the list specs refer to values at the stat_cuts specified in the summarizer
 grade_specs = collections.OrderedDict()
 grade_spec_headers = ['blind max um','corr max um','corr rms um','has extended gearbox']
