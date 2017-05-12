@@ -428,7 +428,7 @@ class XYTest(object):
     
     def get_svn_credentials(self):
         '''Query the user for credentials to the SVN, and store them.'''
-        if self.xytest_conf['should_auto_commit_logs']:
+        if not self.simulate:
             self.logwrite('Querying the user for SVN credentials. These will not be written to the log file.')
             print('')
             [svn_user, svn_pass, err] = XYTest.ask_user_for_creds(should_simulate=self.simulate)
@@ -440,6 +440,8 @@ class XYTest(object):
                 self.logwrite('SVN user and pass verified.')
                 self.svn_user = svn_user
                 self.svn_pass = svn_pass
+        else:
+            self.logwrite('Skipped querying user for SVN credentials in simulation mode.')
                 
     def svn_add_commit(self, keep_creds=False):
         '''Commit logs through SVN.
@@ -448,7 +450,7 @@ class XYTest(object):
         this commit is complete. Otherwise they get automatically deleted.
         '''
         self.logwrite('Files changed or generated: ' + str(list(test.new_and_changed_files.keys())))
-        if self.xytest_conf['should_auto_commit_logs']:
+        if not self.simulate:
             if not(self.svn_user and self.svn_pass):
                 self.logwrite('No files were auto-committed to SVN due to lack of user / pass credentials.')
             elif self.new_and_changed_files:
@@ -483,6 +485,8 @@ class XYTest(object):
                     del self.svn_user
                     del self.svn_pass
                 print('SVN uploads completed in ' + self._elapsed_time_str(start_time))
+        else:
+            self.logwrite('Skipped committing files to SVN in simulation mode.')
 
     def logwrite(self,text,stdout=True):
         """Standard logging function for writing to the test traveler log file.
