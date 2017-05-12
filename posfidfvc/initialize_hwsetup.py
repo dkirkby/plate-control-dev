@@ -16,17 +16,7 @@ import configobj
 start_filename_timestamp = pc.filename_timestamp_str_now()
 gui_root = tkinter.Tk()
 
-# update log and settings files from the SVN
-svn_user, svn_pass, svn_auth_err = xytest.XYTest.ask_user_for_creds(should_simulate=False)
-svn_update_dirs = [pc.pos_logs_directory, pc.pos_settings_directory, pc.xytest_logs_directory, pc.xytest_summaries_directory]
-should_update_from_svn = tkinter.messagebox.askyesno(title='Update from SVN?',message='Overwrite any existing local positioner log and settings files to match what is currently in the SVN?')
-if should_update_from_svn:
-    if svn_auth_err:
-        print('Could not validate svn user/password.')
-    else:
-        for d in svn_update_dirs:
-            os.system('svn update --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + d)
-            os.system('svn revert --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + d + '*')
+# start set of new and changed files
 new_and_changed_files = set()
 
 # get the station config info
@@ -35,15 +25,29 @@ hwsetup_conf = tkinter.filedialog.askopenfilename(initialdir=pc.hwsetups_directo
 hwsetup = configobj.ConfigObj(hwsetup_conf,unrepr=True)
 new_and_changed_files.add(hwsetup.filename)
 
+# are we in simulation mode?
+sim = hwsetup['fvc_type'] == 'simulator'
+
+# update log and settings files from the SVN
+if not(sim):
+    svn_user, svn_pass, svn_auth_err = xytest.XYTest.ask_user_for_creds(should_simulate=sim)
+    svn_update_dirs = [pc.pos_logs_directory, pc.pos_settings_directory, pc.xytest_logs_directory, pc.xytest_summaries_directory]
+    should_update_from_svn = tkinter.messagebox.askyesno(title='Update from SVN?',message='Overwrite any existing local positioner log and settings files to match what is currently in the SVN?')
+    if should_update_from_svn:
+        if svn_auth_err:
+            print('Could not validate svn user/password.')
+        else:
+            for d in svn_update_dirs:
+                os.system('svn update --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + d)
+                os.system('svn revert --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + d + '*')
+
 # software initialization and startup
 fvc = fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'])    
 fvc.rotation = hwsetup['rotation']
 fvc.scale = hwsetup['scale']
-sim = fvc.fvc_type == 'simulator'
 posids = hwsetup['pos_ids']
 fidids = hwsetup['fid_ids']
 ptl = petal.Petal(hwsetup['ptl_id'], posids, fidids, simulator_on=sim)
-
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure([ptl],fvc)
 m.make_plots_during_calib = True
@@ -80,8 +84,10 @@ while ids_unchecked:
         print('Respond yes or no.')
 
 # check if auto-svn commit is desired
-if not svn_auth_err:
-    should_commit_to_svn = tkinter.messagebox.askyesno(title='Commit to SVN?',message='Auto-commit files to SVN after script is complete?\n\n(Typically answer "Yes", unless you are running a simulation, in which case "No".)')
+if not sim and not svn_auth_err:
+    should_commit_to_svn = tkinter.messagebox.askyesno(title='Commit to SVN?',message='Auto-commit files to SVN after script is complete?\n\n(Typically answer "Yes")')
+else:
+    should_commit_to_svn = False
 
 # make sure control is enabled for all positioners
 for ptl in m.petals:
@@ -99,7 +105,7 @@ new_and_changed_files.update(plotfiles)
 m.park() # retract all positioners to their parked positions
 
 # commit logs and settings files to the SVN
-if should_commit_to_svn and not svn_auth_err:
+if should_commit_to_svn:
     n_total = len(new_and_changed_files)
     n = 0
     for file in new_and_changed_files:
