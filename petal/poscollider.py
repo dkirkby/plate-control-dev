@@ -15,7 +15,7 @@ class PosCollider(object):
         # load up a configobj from _collision_settings_DEFAULT.conf, in pc.settings_directory
         if not(configfile):
             configfile = '_collision_settings_DEFAULT.conf'
-        filename = pc.collision_settings_directory + configfile
+        filename = pc.dirs['collision_settings'] + configfile
         self.config = configobj.ConfigObj(filename,unrepr=True)
         self.posmodels = []
         self.pos_neighbor_idxs = [] # indexes of all the positioners surround a given positioner

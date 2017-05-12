@@ -22,23 +22,18 @@ code_version = petal_directory.split(os.path.sep)[-2]
 # For environment paths, set the paths in your .bashrc file, by adding the lines:
 #    export POSITIONER_LOGS_PATH="/my/path/to/positioner_logs"
 #    export FP_SETTINGS_PATH="/my/path/to/fp_settings"
-all_logs_directory           = os.environ.get('POSITIONER_LOGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/positioner_logs
-all_settings_directory       = os.environ.get('FP_SETTINGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/fp_settings
-pos_logs_directory           = all_logs_directory + os.path.sep + 'pos_logs' + os.path.sep
-fid_logs_directory           = all_logs_directory + os.path.sep + 'fid_logs' + os.path.sep
-xytest_data_directory        = all_logs_directory + os.path.sep + 'xytest_data' + os.path.sep
-xytest_logs_directory        = all_logs_directory + os.path.sep + 'xytest_logs' + os.path.sep
-xytest_plots_directory       = all_logs_directory + os.path.sep + 'xytest_plots' + os.path.sep
-xytest_summaries_directory   = all_logs_directory + os.path.sep + 'xytest_summaries' + os.path.sep
-pos_settings_directory       = all_settings_directory + os.path.sep + 'pos_settings' + os.path.sep
-fid_settings_directory       = all_settings_directory + os.path.sep + 'fid_settings' + os.path.sep
-test_settings_directory      = all_settings_directory + os.path.sep + 'test_settings' + os.path.sep
-collision_settings_directory = all_settings_directory + os.path.sep + 'collision_settings' + os.path.sep
-hwsetups_directory           = all_settings_directory + os.path.sep + 'hwsetups' + os.path.sep
-other_settings_directory        = all_settings_directory + os.path.sep + 'other_settings' + os.path.sep
-temp_files_directory         = os.environ.get('HOME') + os.path.sep + 'fp_temp_files' + os.path.sep
-if not(os.path.exists(temp_files_directory)):
-    os.mkdir(temp_files_directory)
+dirs = {}
+dirs['all_logs']     = os.environ.get('POSITIONER_LOGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/positioner_logs
+dirs['all_settings'] = os.environ.get('FP_SETTINGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/fp_settings
+dirs['temp_files']   = os.environ.get('HOME') + os.path.sep + 'fp_temp_files' + os.path.sep
+dir_keys_logs        = ['pos_logs','fid_logs','xytest_data','xytest_logs','xytest_plots','xytest_summaries'] 
+dir_keys_settings    = ['pos_settings','fid_settings','test_settings','collision_settings','hwsetups','other_settings']
+for key in dir_keys_logs:
+    dirs[key] = dirs['all_logs'] + os.path.sep + key + os.path.sep
+for key in dir_keys_settings:
+    dirs[key] = dirs['all_settings'] + os.path.sep + key + os.path.sep
+for directory in dirs.values():    
+    os.makedirs(directory,exist_ok=True)
 
 # Mapping of radial coordinate R to pseudo-radial coordinate S (distance along focal surface from optical axis)
 R2Spoly = [5.00010E-01,9.99997E-01,1.91532E-07,1.72104E-09,7.31761E-11,-5.78982E-13,3.30271E-15,-1.11245E-17,1.90376E-20,-1.26341E-23]

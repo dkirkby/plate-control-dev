@@ -21,7 +21,7 @@ new_and_changed_files = set()
 
 # get the station config info
 message = 'Pick hardware setup file.'
-hwsetup_conf = tkinter.filedialog.askopenfilename(initialdir=pc.hwsetups_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
+hwsetup_conf = tkinter.filedialog.askopenfilename(initialdir=pc.dirs['hwsetups'], filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
 hwsetup = configobj.ConfigObj(hwsetup_conf,unrepr=True)
 new_and_changed_files.add(hwsetup.filename)
 
@@ -31,7 +31,7 @@ sim = hwsetup['fvc_type'] == 'simulator'
 # update log and settings files from the SVN
 if not(sim):
     svn_user, svn_pass, svn_auth_err = xytest.XYTest.ask_user_for_creds(should_simulate=sim)
-    svn_update_dirs = [pc.pos_logs_directory, pc.pos_settings_directory, pc.xytest_logs_directory, pc.xytest_summaries_directory]
+    svn_update_dirs = [pc.dirs[key] for key in ['pos_logs','pos_settings','xytest_logs','xytest_summaries']]
     should_update_from_svn = tkinter.messagebox.askyesno(title='Update from SVN?',message='Overwrite any existing local positioner log and settings files to match what is currently in the SVN?')
     if should_update_from_svn:
         if svn_auth_err:
@@ -100,7 +100,7 @@ m.identify_fiducials()
 m.identify_positioner_locations()
 m.measure_range(axis='theta')
 m.measure_range(axis='phi')
-plotfiles = m.calibrate(mode='arc', save_file_dir=pc.xytest_plots_directory, save_file_timestamp=start_filename_timestamp)
+plotfiles = m.calibrate(mode='arc', save_file_dir=pc.dirs['xytest_plots'], save_file_timestamp=start_filename_timestamp)
 new_and_changed_files.update(plotfiles)
 m.park() # retract all positioners to their parked positions
 

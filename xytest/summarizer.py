@@ -73,7 +73,7 @@ class Summarizer(object):
         self.row_template[manual_ignore_key] = ''
         self.basename = self.state.read('POS_ID') + '_summary.csv'
         if not(directory):
-            directory = pc.xytest_summaries_directory
+            directory = pc.dirs['xytest_summaries']
         if not directory[-1] == os.path.sep:
             directory += os.path.sep
         self.filename = directory + self.basename
@@ -267,7 +267,7 @@ if __name__=="__main__":
     filetypes = (('Comma-separated Values','*movedata.csv'),('All Files','*'))
     gui_root = tkinter.Tk()
     process_all_files = tkinter.messagebox.askyesno(title='Batch summarize directory?',message='Yes  -->  Process all files in the folder of your choice.\n\nNo -->  Process just one or multiple file(s) of your choice.')
-    start_dir = pc.all_logs_directory + os.path.sep + '..'
+    start_dir = pc.dirs['all_logs'] + os.path.sep + '..'
     if not(process_all_files):
         files = list(tkinter.filedialog.askopenfilenames(initialdir=start_dir, filetypes=filetypes, title='Select movedata file(s) to process.'))
     else:
@@ -383,8 +383,8 @@ if __name__=="__main__":
         if file_basename not in already_summarized:
             summ.next_row_is_new = True
             default_summary_row = {} # will search below if there is an existing default summary file from which to pluck any additional data
-            if summ.basename in os.listdir(pc.xytest_summaries_directory):
-                default_summary_file = pc.xytest_summaries_directory + summ.basename
+            if summ.basename in os.listdir(pc.dirs['xytest_summaries']):
+                default_summary_file = pc.dirs['xytest_summaries'] + summ.basename
                 with open(default_summary_file,'r',newline='') as csvfile:
                     reader = csv.DictReader(csvfile)
                     if 'test loop data file' in reader.fieldnames:

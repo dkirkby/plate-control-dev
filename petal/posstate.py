@@ -27,20 +27,17 @@ class PosState(object):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.logging = logging
         self.type = device_type
-        if self.type == 'pos':
-            self.settings_directory = pc.pos_settings_directory
-            self.logs_directory = pc.pos_logs_directory
-        else:
-            self.settings_directory = pc.fid_settings_directory
-            self.logs_directory = pc.fid_logs_directory
+        if self.type in ['pos','fid']:
+            self.settings_directory = pc.dirs[self.type + '_settings']
+            self.logs_directory = pc.dirs[self.type + '_logs']
         template_directory = self.settings_directory
         if unit_id != None:
             self.unit_basename = 'unit_' + str(unit_id)
             comment = 'Settings file for unit: ' + str(unit_id)
         else:
             self.unit_basename = 'unit_TEMP'
-            self.logs_directory = pc.temp_files_directory
-            self.settings_directory = pc.temp_files_directory
+            self.logs_directory = pc.dirs['temp_files']
+            self.settings_directory = pc.dirs['temp_files']
             comment = 'Temporary settings file for software test purposes, not associated with a particular unit.'
         unit_filename = self.settings_directory + self.unit_basename + '.conf'
         if not(os.path.isfile(unit_filename)):

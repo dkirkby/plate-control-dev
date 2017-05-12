@@ -93,7 +93,7 @@ logwrite('POSITIONERS: ' + str(posids))
 logwrite('SIMULATION MODE: ' + 'on' if should_simulate else 'off')
 
 # retrieve latest log files and settings from svn
-svn_update_dirs = [pc.pos_logs_directory, pc.pos_settings_directory]
+svn_update_dirs = [pc.dirs['pos_logs'], pc.dirs['pos_settings']]
 svn_user, svn_pass, err = xytest.XYTest.ask_user_for_creds(should_simulate=should_simulate)
 if not(should_simulate):
     if err:
@@ -245,7 +245,7 @@ if n_rand_moves > 0:
     rand_xy_targs_idx = 0 # where we are in the random targets list
     rand_xy_targs_list = []
     rand_targs_basename = 'xytargs_n10000_seed1486847599.csv'
-    rand_targs_file = pc.test_settings_directory + rand_targs_basename
+    rand_targs_file = pc.dirs['test_settings'] + rand_targs_basename
     with open(rand_targs_file, 'r', newline='') as csvfile:
         reader = csv.reader(csvfile)
         header_rows_remaining = 1

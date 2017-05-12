@@ -38,14 +38,13 @@ class XYTest(object):
         """
          
         # set up configuration and traveler files that goes with this test, and begin logging
-        os.makedirs(pc.xytest_logs_directory, exist_ok=True)
         gui_root = tkinter.Tk()
         if not(hwsetup_conf):
             message = "Select hardware setup file."
-            hwsetup_conf = tkinter.filedialog.askopenfilename(initialdir=pc.hwsetups_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
+            hwsetup_conf = tkinter.filedialog.askopenfilename(initialdir=pc.dirs['hwsetups'], filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
         if not(xytest_conf):
             message = "Select test configuration file."
-            xytest_conf = tkinter.filedialog.askopenfilename(initialdir=pc.test_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
+            xytest_conf = tkinter.filedialog.askopenfilename(initialdir=pc.dirs['test_settings'], filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
         if not(hwsetup_conf) or not(xytest_conf):
             tkinter.messagebox.showwarning(title='Files not found.',message='Not all configuration files specified. Exiting program.')
             gui_root.withdraw()
@@ -57,8 +56,8 @@ class XYTest(object):
         self.n_loops = self._calculate_and_check_n_loops()
         if self.starting_loop_number == 0:
             # The status file is used to maintain current status of the test in case of test disruption.
-            self.xytest_conf.filename = pc.temp_files_directory + 'xytest_status.conf'
-            self.xytest_logfile = pc.xytest_logs_directory + pc.filename_timestamp_str_now() + '_' + os.path.splitext(os.path.basename(xytest_conf))[0] + '.log'
+            self.xytest_conf.filename = pc.dirs['temp_files'] + 'xytest_status.conf'
+            self.xytest_logfile = pc.dirs['xytest_logs'] + pc.filename_timestamp_str_now() + '_' + os.path.splitext(os.path.basename(xytest_conf))[0] + '.log'
             self.xytest_conf['logfile']=self.xytest_logfile
             self.xytest_conf.write()
             self.new_and_changed_files = collections.OrderedDict()  # keeps track of all files that need to be added / committed to SVN
@@ -141,7 +140,7 @@ class XYTest(object):
         # set up lookup table for random targets
         self.rand_xy_targs_idx = 0 # where we are in the random targets list
         self.rand_xy_targs_list = []
-        targs_file = pc.test_settings_directory + self.xytest_conf['rand_xy_targs_file']
+        targs_file = pc.dirs['test_settings'] + self.xytest_conf['rand_xy_targs_file']
         with open(targs_file, newline='') as csvfile:
             reader = csv.reader(csvfile)
             header_rows_remaining = 1
@@ -225,7 +224,7 @@ class XYTest(object):
             self.m.n_points_calib_T = n_pts_calib_T
             self.m.n_points_calib_P = n_pts_calib_P
             params = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']
-            files = self.m.calibrate(posids='all', mode=calib_mode, save_file_dir=pc.xytest_plots_directory, save_file_timestamp=pc.filename_timestamp_str_now())
+            files = self.m.calibrate(posids='all', mode=calib_mode, save_file_dir=pc.dirs['xytest_plots'], save_file_timestamp=pc.filename_timestamp_str_now())
             for file in files:
                 self.track_file(file, commit='once')
                 self.logwrite('Calibration plot file: ' + file)
@@ -251,9 +250,9 @@ class XYTest(object):
         log_suffix = ('_' + log_suffix) if log_suffix else '' # automatically add an underscore if necessary
         log_timestamp = pc.filename_timestamp_str_now()
         def movedata_name(posid):
-            return pc.xytest_data_directory  + posid + '_' + log_timestamp + log_suffix + '_movedata.csv'
+            return pc.dirs['xytest_data']  + posid + '_' + log_timestamp + log_suffix + '_movedata.csv'
         def summary_plot_name(posid):
-            return pc.xytest_plots_directory + posid + '_' + log_timestamp + log_suffix + '_xyplot'    
+            return pc.dirs['xytest_plots'] + posid + '_' + log_timestamp + log_suffix + '_xyplot'    
 
         n_pts_calib_T = self.xytest_conf['n_points_calib_T'][loop_number]
         n_pts_calib_P = self.xytest_conf['n_points_calib_P'][loop_number]

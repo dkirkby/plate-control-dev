@@ -82,12 +82,12 @@ def as_good_as(grade1,grade2):
 # get the files list
 filetypes = (('Comma-separated Values','*.csv'),('All Files','*'))
 gui_root = tkinter.Tk()
-process_all_files = tkinter.messagebox.askyesno(title='Batch grade all files?',message='Yes  -->  Process all files in the ' + os.path.relpath(pc.xytest_summaries_directory,pc.all_logs_directory) + ' folder.\n\nNo -->  Process just some file(s) of your choice.')
+process_all_files = tkinter.messagebox.askyesno(title='Batch grade all files?',message='Yes  -->  Process all files in the ' + os.path.relpath(pc.dirs['xytest_summaries'],pc.dirs['all_logs']) + ' folder.\n\nNo -->  Process just some file(s) of your choice.')
 if not(process_all_files):
-    files = list(tkinter.filedialog.askopenfilenames(initialdir=pc.xytest_summaries_directory, filetypes=filetypes, title='Select summary file(s) to process.'))
+    files = list(tkinter.filedialog.askopenfilenames(initialdir=pc.dirs['xytest_summaries'], filetypes=filetypes, title='Select summary file(s) to process.'))
 else:
-    files = os.listdir(pc.xytest_summaries_directory)
-    files = [pc.xytest_summaries_directory + file for file in files]
+    files = os.listdir(pc.dirs['xytest_summaries'])
+    files = [pc.dirs['xytest_summaries'] + file for file in files]
 gui_root.withdraw()
 
 # parse and validate the file names
@@ -113,7 +113,7 @@ ask_ignore_gearbox = True
 ignore_gearbox = False
 for posid in d.keys():
     d[posid]['has extended gearbox'] = 'unknown'
-motor_types_file = pc.all_logs_directory + os.path.sep + 'as-built_motor_types.csv'
+motor_types_file = pc.dirs['all_logs'] + os.path.sep + 'as-built_motor_types.csv'
 bool_yes_equivalents = ['y','yes','true','1'] + ['']  # conservatively assume blank means 'yes'
 with open(motor_types_file,'r',newline='') as csvfile:
     reader = csv.DictReader(csvfile)
@@ -317,7 +317,7 @@ for i in range(len(important_lifetimes)-1):
 timestamp_str = pc.timestamp_str_now()
 filename_timestamp_str = pc.filename_timestamp_str_now()
 gui_root = tkinter.Tk()
-report_file = tkinter.filedialog.asksaveasfilename(title='Save grade report as...',initialdir=pc.all_logs_directory + os.path.sep + 'xytest_grades',initialfile=filename_timestamp_str + '_positioner_grades_report.csv',filetypes=filetypes)
+report_file = tkinter.filedialog.asksaveasfilename(title='Save grade report as...',initialdir=pc.dirs['all_logs'] + os.path.sep + 'xytest_grades',initialfile=filename_timestamp_str + '_positioner_grades_report.csv',filetypes=filetypes)
 if not(report_file):
     tkinter.messagebox.showwarning(title='No report saved.',message='No grade report was saved to disk.')
 gui_root.withdraw()

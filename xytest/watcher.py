@@ -8,7 +8,8 @@ import sendalarm
 import configobj
 
 sys.path.append(os.path.abspath('../petal/'))
-from posconstants import hwsetups_directory as hwdir
+import posconstants as pc
+hwdir = pc.dirs['hwsetups']
 
 i_conf = configobj.ConfigObj(hwdir+'local_identity.conf',unrepr=True,encoding='utf-8')
 this_site=i_conf['site']
