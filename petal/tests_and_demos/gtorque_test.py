@@ -13,6 +13,11 @@
 #    Revisions:
 #    mm/dd/yyyy who        description
 #    ---------- --------   -----------
+#    05/12/2017 cad        Fixed set_currents and move commands to use single ints, 
+#                          not lists, just like in test_torque.py
+#                          Disable manual control buttons during cool-down.
+#                          Validate user inputs
+#                          Removed logging pkg initialization since it doesn't grok ~ pathnames
 # 
 # ****************************************************************************
 
@@ -31,8 +36,7 @@ import logging
 import configobj
 
 # This is a hack to get the folder with petalcomm.py into the path
-cwd = os.getcwd()
-sys.path.append(cwd + '/../')
+sys.path.append('../../petal')
 # print(sys.path)
 
 import petalcomm
@@ -42,9 +46,9 @@ prog_name="Torque Test"
 
 # Configuration Values
 
-TTConfFile="./torque_test.conf"
-TTLogFile="./torque_test.log"
-TTCSVFile="./torque_test.csv"
+TTConfFile="~/torque_test.conf"
+TTLogFile="~/torque_test.log"
+TTCSVFile="~/torque_test.csv"
 Petal_Controller_Number=43
 CanBusID='can0'
 CanID=20000
@@ -79,7 +83,7 @@ class Torque_Test_GUI:
         self.parent = tkroot
         self.logging_level = logging_level
 
-        logging.basicConfig(filename=TTLogFile,level=logging_level)
+#       logging.basicConfig(filename=TTLogFile,level=logging_level)
 
         self.gui_initialized=0
         self.logprint("Logging level set to "+str(logging_level))
@@ -103,23 +107,24 @@ class Torque_Test_GUI:
         self.tt_state=0
         self.move_count=0
         self.cool_countdown=0
-        self.simulate=1         # 1 for simulation, 0 for the real thing
+        self.simulate=0         # 1 for simulation, 0 for the real thing
         self.delay=1000         # 1000 ms = 1 sec
+        self.sVoltage=""	# string version of Voltage saved by get_gui_results
 
         # define internal variables connected to GUI
         self.config_file=StringVar()
         self.log_file=StringVar()
         self.csv_file=StringVar()
 
-        self.petal_controller=IntVar()
+        self.petal_controller=StringVar()
         self.canbus=StringVar()
-        self.canid=IntVar()
+        self.canid=StringVar()
         self.motor_type=IntVar()
         self.operator_name=StringVar()
         self.motor_sn=StringVar()
-        self.voltage=DoubleVar()
-        self.maxTorque=DoubleVar()
-        self.settledTorque=DoubleVar()
+        self.voltage=StringVar()
+        self.maxTorque=StringVar()
+        self.settledTorque=StringVar()
         self.user_notes=StringVar()
         self.Connect_Button_Text=StringVar()
         self.Run_Button_Text=StringVar()
@@ -130,9 +135,9 @@ class Torque_Test_GUI:
         self.config_file.set(TTConfFile)
         self.log_file.set(TTLogFile)
         self.csv_file.set(TTCSVFile)
-        self.petal_controller.set(int(Petal_Controller_Number))
+        self.petal_controller.set(str(Petal_Controller_Number))
         self.canbus.set(CanBusID)
-        self.canid.set(int(CanID))
+        self.canid.set(str(CanID))
         self.motor_type.set(Initial_Motor_Type)	# 0 for phi, 1 for theta
         self.Connect_Button_Text.set("Connect")
         self.Run_Button_Text.set("Apply Torque")
@@ -395,7 +400,7 @@ class Torque_Test_GUI:
         y = (screen_height/2) - (height/2)
         self.parent.geometry('%dx%d+%d+%d' % (width, height, x, y))
         debug_msg='geometry='+'%dx%d+%d+%d' % (width, height, x, y)
-        logging.info(debug_msg)
+#       logging.info(debug_msg)
         return
 
     # load the configuration from a file
@@ -407,14 +412,14 @@ class Torque_Test_GUI:
         global CanID
         global Initial_Motor_Type
         # read_config reads into the global values
-        if(read_config(self.config_file.get())):
+        if(0==read_config(self.config_file.get())):
             return
         # Now set GUI values to be the same as the global values
         self.log_file.set(TTLogFile)
         self.csv_file.set(TTCSVFile)
-        self.petal_controller.set(int(Petal_Controller_Number))
+        self.petal_controller.set(str(Petal_Controller_Number))
         self.canbus.set(CanBusID)
-        self.canid.set(int(CanID))
+        self.canid.set(str(CanID))
         self.motor_type.set(Initial_Motor_Type)	# 0 for phi, 1 for theta
         self.logprint("Configuration loaded from "+self.config_file.get())
         return
@@ -428,13 +433,22 @@ class Torque_Test_GUI:
         global CanBusID
         global CanID
         global Initial_Motor_Type
+
+        retval=0
+        try:
+            lPC_num=int(self.petal_controller.get())
+            lCanID=int(self.canid.get())
+        except ValueError as ve:
+            messagebox.showerror(prog_name+" - Fix Entry", ve )
+            return retval
+
         # Set globals to the values of their GUI counterparts
+        Petal_Controller_Number=lPC_num
+        CanID=lCanID
         TTConfFile=self.config_file.get()
         TTLogFile=self.log_file.get()
         TTCSVFile=self.csv_file.get()
-        Petal_Controller_Number=int(self.petal_controller.get())
         CanBusID=self.canbus.get()
-        CanID=int(self.canid.get())
         Initial_Motor_Type=self.motor_type.get()	# 0 for phi, 1 for theta
         # Now, save in config file
         my_config = configobj.ConfigObj(unrepr=True,encoding='utf-8')
@@ -450,7 +464,8 @@ class Torque_Test_GUI:
         my_config.filename=TTConfFile
         my_config.write()
         self.logprint("Configuration saved to "+self.config_file.get())
-        return
+        retval=1
+        return retval
 
     # if anything has changed since the last load/save, return 1 otherwise 0
     def check_config_changed(self):
@@ -468,20 +483,24 @@ class Torque_Test_GUI:
             retval=1
         if(TTCSVFile!=self.csv_file.get()):
             retval=1
-        if(Petal_Controller_Number!=int(self.petal_controller.get())):
+        if(str(Petal_Controller_Number)!=self.petal_controller.get()):
             retval=1
         if(CanBusID!=self.canbus.get()):
             retval=1
-        if(CanID!=int(self.canid.get())):
+        if(str(CanID)!=self.canid.get()):
             retval=1
         if(Initial_Motor_Type!=self.motor_type.get()):	# 0 for phi, 1 for theta
             retval=1
         return retval;
 
     def Connect_to_PC(self):
-        lPetal_Controller_Number=self.petal_controller.get()
+        try:
+            lPetal_Controller_Number=int(self.petal_controller.get())
+            lCanID=int(self.canid.get())
+        except ValueError as ve:
+            messagebox.showerror(prog_name+" - Fix Entry", ve )
+            return 
         lCanBusID=self.canbus.get()
-        lCanID=self.canid.get()
         self.pcomm=petalcomm.PetalComm(lPetal_Controller_Number)
         if(self.pcomm.is_connected()):
             print("Connected")
@@ -523,20 +542,55 @@ class Torque_Test_GUI:
                 return 1,"Cool_down_seconds must be between 0 and 600"+str(MoveTable[i][iCoolSecs])
         return 0,"" # all is well
 
-    def get_results(self):
-        retval=0
-        if(0.0 == self.maxTorque.get() or 0.0 == self.settledTorque.get()): # no value?
+    # return 0 on fail, 1 on success
+    def get_gui_results(self):
+        retval=0	# assume failure
+        sVoltage=self.voltage.get()
+        sMaxTorque=self.maxTorque.get()
+        sSettledTorque=self.settledTorque.get()
+        if(""==sMaxTorque or ""==sSettledTorque): # no value?
             messagebox.showerror(prog_name, 'Please enter both Maximum and Settled Torque values')
         else:
-            if(""==str(self.motor_sn.get()) or ""==str(self.operator_name.get()) or 0.0==self.voltage.get()):
+            if(""==str(self.motor_sn.get()) or ""==str(self.operator_name.get()) or ""==sVoltage):
                 messagebox.showerror(prog_name, 'Please enter Operator Name, Motor Serial Number, and Voltage')
             else:
-                self.max_torque.append(self.maxTorque.get())
-                self.res_torque.append(self.settledTorque.get())
-                self.maxTorque.set(0.0)
-                self.settledTorque.set(0.0)
+                try:
+                    dVoltage=float(self.voltage.get())
+                    dMaxTorque=float(self.maxTorque.get())
+                    dSettledTorque=float(self.settledTorque.get())
+                except ValueError as ve:
+                    messagebox.showerror(prog_name+" - Fix Entry", ve )
+                    return retval
+                if(0.0>=dMaxTorque or 0.0>=dSettledTorque or 0.0>=dVoltage):
+                    messagebox.showerror(prog_name, "Please enter only positive values" )
+                    return retval
+                if(3.0<dMaxTorque):
+                    messagebox.showerror(prog_name, "Max Torque value is out of range" )
+                    return retval
+                if(3.0<dSettledTorque):
+                    messagebox.showerror(prog_name, "Res Torque value is out of range" )
+                    return retval
+                if(15.0<dVoltage):
+                    messagebox.showerror(prog_name, "Test Voltage value is out of range" )
+                    return retval
+
+                self.max_torque.append(dMaxTorque)
+                self.res_torque.append(dSettledTorque)
+                self.sVoltage=sVoltage
+                self.maxTorque.set("")
+                self.settledTorque.set("")
                 retval=1
         return retval
+
+    def disable_Run_button(self):
+        self.button_Run.config(state=DISABLED)
+        self.Lrg_CCW_button.config(state=DISABLED)
+        self.Med_CCW_button.config(state=DISABLED)
+        self.Sml_CCW_button.config(state=DISABLED)
+        self.Sml_CW_button.config(state=DISABLED)
+        self.Med_CW_button.config(state=DISABLED)
+        self.Lrg_CW_button.config(state=DISABLED)
+        return
 
     def enable_Run_button(self):
         self.button_Run.config(state=NORMAL)
@@ -549,21 +603,33 @@ class Torque_Test_GUI:
         return
 
     def tt_state_machine(self):
-        self.button_Run.config(state=DISABLED)
+        self.disable_Run_button()
         if(0==self.tt_state):
             if(0 != self.move_count):   #   First must save the previous results
-                if(0==self.get_results()):
+                if(0==self.get_gui_results()):
                     self.enable_Run_button()
                     return
-            self.wait_for_FIPOS_ready()
-            self.tt_state+=1
+            if(self.wait_for_FIPOS_ready()):
+                self.tt_state+=1
+            else:
+                self.reset_torque_test_state()
+                messagebox.showerror(prog_name, "Aborting Torque Test" )
+                return
         if(1==self.tt_state):
-            self.set_FIPOS_currents()
-            self.tt_state+=1
+            if(self.set_FIPOS_currents()):
+                self.tt_state+=1
+            else:
+                self.reset_torque_test_state()
+                messagebox.showerror(prog_name, "Aborting Torque Test" )
+                return
         if(2==self.tt_state):
-            self.apply_FIPOS_torque(Torque_Moves)
-            self.Run_Button_Text.set("Apply Next Torque")
-            # apply_FIPOS_torque determines the next state
+            if(self.apply_FIPOS_torque(Torque_Moves)):
+                self.Run_Button_Text.set("Apply Next Torque")
+                # apply_FIPOS_torque determines the next state
+            else:
+                self.reset_torque_test_state()
+                messagebox.showerror(prog_name, "Aborting Torque Test" )
+                return
         if(3==self.tt_state):
             self.cool_down()
             # cool_down determines the next state
@@ -574,29 +640,36 @@ class Torque_Test_GUI:
             else:
                 self.tt_state=5    # wait for user to save results
                 self.Run_Button_Text.set("Save Results")
-            self.button_Run.config(state=NORMAL)
+            self.enable_Run_button()
             return
         if(5==self.tt_state):
-            if(0==self.get_results()):
-                self.button_Run.config(state=NORMAL)
+            if(0==self.get_gui_results()):
+                self.enable_Run_button()
                 return
-            self.save_results(Torque_Moves)
-            # Reset indexes so user can run another test
-            self.tt_state=0
-            self.move_count=0
-            self.max_torque=[]
-            self.res_torque=[]
-            self.maxTorque.set(0.0)
-            self.settledTorque.set(0.0)
-            self.motor_sn.set("")
-            self.Run_Button_Text.set("Apply Torque")
-            self.button_Run.config(state=NORMAL)
+            if(self.save_results(Torque_Moves)):
+                self.enable_Run_button()
+                return
+            # Reset indexes and values so user can run another motor test
+            self.reset_torque_test_state()
             answer=messagebox.askokcancel(prog_name, 'Do you want to test another motor?')
             if(False==answer):
                 self.quit()
             return  # wait for user to run test again, or to quit
 
         self.parent.after(self.delay,self.tt_state_machine)
+        return
+
+    def reset_torque_test_state(self):
+        self.tt_state=0
+        self.move_count=0
+        self.max_torque=[]
+        self.res_torque=[]
+        self.maxTorque.set("")
+        self.settledTorque.set("")
+        self.motor_sn.set("")
+        self.user_notes.set("")
+        self.Run_Button_Text.set("Apply Torque")
+        self.enable_Run_button()
         return
 
     def cool_down(self):
@@ -609,30 +682,43 @@ class Torque_Test_GUI:
             self.status_str.set("")
             self.tt_state+=1
 
+    # returns 0 on failure, 1 on success
     def wait_for_FIPOS_ready(self):
-        can_ids=[self.canbus.get()]
-        can_bus_ids=[self.canid.get()]
+        retval=0	# assume failure
+        try:
+           lCanID=int(self.canid.get())
+        except ValueError as ve:
+            messagebox.showerror(prog_name+" - Fix CanID", ve )
+            return retval
+        lCanBusID=self.canbus.get()
+        can_bus_ids=[lCanBusID]
+        can_ids=[lCanID]
         if(self.simulate):
             bool_val=True
         else:
             bool_val=self.pcomm.ready_for_tables(can_bus_ids,can_ids)
-        print("ready_for_tables returned "+str(bool_val))
+        msg="Ready for Tables: CanBusID="+str(lCanBusID)+", CanID="+str(lCanID)+" returned "+str(bool_val)
+        self.logprint(msg)
         if(bool_val):
-            self.tt_state+=1    # go to next state
-        return
+            retval=1		# success
+        return retval
 
+    # returns 0 on failure, 1 on success
     def set_FIPOS_currents(self):
-        can_ids=[self.canbus.get()]
-        can_bus_ids=[self.canid.get()]
+        retval=0	# assume failure
+        try:
+           lCanID=int(self.canid.get())
+        except ValueError as ve:
+            messagebox.showerror(prog_name+" - Fix CanID", ve )
+            return retval
         lCanBusID=self.canbus.get()
-        lCanID=self.canid.get()
         self.logprint("Setting current: CanBusID="+str(lCanBusID)+", CanID="+str(lCanID))
         if(self.simulate):
             bool_val=True
         else:
-            self.pcomm.set_currents(can_bus_ids,can_ids,Currents,Currents)
-        self.tt_state+=1        # go to next state
-        return;
+            self.pcomm.set_currents(lCanBusID,lCanID,Currents,Currents)
+        retval=1
+        return retval
 
     def motor_type_to_str(self,motor_type):
         if(0==self.motor_type.get()):
@@ -641,11 +727,15 @@ class Torque_Test_GUI:
           pt="Theta"
         return pt
 
+    # returns 0 on failure, 1 on success
     def apply_FIPOS_torque(self,MoveTable):
-        can_ids=[self.canbus.get()]
-        can_bus_ids=[self.canid.get()]
+        retval=0	# assume failure
+        try:
+           lCanID=int(self.canid.get())
+        except ValueError as ve:
+            messagebox.showerror(prog_name+" - Fix CanID", ve )
+            return retval
         lCanBusID=self.canbus.get()
-        lCanID=self.canid.get()
         i=self.move_count
         pt=self.motor_type_to_str(self.motor_type.get())
         if(i < len(MoveTable)):
@@ -658,7 +748,7 @@ class Torque_Test_GUI:
             if(self.simulate):
                 error=0
             else:
-                error = self.pcomm.move(can_bus_ids, can_ids,
+                error = self.pcomm.move(lCanBusID, lCanID,
                                         MoveTable[i][iDirection],
                                         MoveTable[i][iMode],
                                         pt,
@@ -673,13 +763,16 @@ class Torque_Test_GUI:
             self.tt_state+=1    # Wait for Cool Down
         else:
             self.tt_state+=2    # Wait for final values
-        return
+        retval=1	# success
+        return retval;
 
     def my_cruise(self,direction,angle):
-        can_ids=[self.canbus.get()]
-        can_bus_ids=[self.canid.get()]
+        try:
+           lCanID=int(self.canid.get())
+        except ValueError as ve:
+            messagebox.showerror(prog_name+" - Fix CanID", ve )
+            return
         lCanBusID=self.canbus.get()
-        lCanID=self.canid.get()
         pt=self.motor_type_to_str(self.motor_type.get())
         move_str="Moving: CanID="+str(lCanID)
         move_str+=" "+pt+" "+direction+" "+str(angle)+" deg at cruise"
@@ -687,7 +780,7 @@ class Torque_Test_GUI:
         if(self.simulate):
             error=0
         else:
-            error = self.pcomm.move(can_bus_ids, can_ids, direction, "cruise", pt, angle)
+            error = self.pcomm.move(lCanBusID, lCanID, direction, "cruise", pt, angle)
         return
 
     def cw_big(self):
@@ -725,9 +818,10 @@ class Torque_Test_GUI:
         return header_str
 
     def save_results(self,MoveTable):
+        retval=0	# assume success
         spreadsheet_str =str(self.motor_sn.get())+"," 		   # motor serial number
         spreadsheet_str+=str(self.operator_name.get())+","         # operator id
-        spreadsheet_str+=str(self.voltage.get())+","               # test_voltage
+        spreadsheet_str+=str(self.sVoltage)+","                    # test_voltage
         pt=self.motor_type_to_str(self.motor_type.get())
         spreadsheet_str+=pt+","                                    # phi or theta
         spreadsheet_str+=str(MoveTable[0][iMode])+","              # creep or cruise
@@ -758,7 +852,10 @@ class Torque_Test_GUI:
 
     def logfile(self,themessage,which):
         if(0==which):
-            logf= open( TTLogFile, 'a' )
+            try:
+                logf= open( TTLogFile, 'a+' )	# if log file exists, open for appending
+            except FileNotFoundError:		# no, it doesn't
+                logf=open( TTLogFile, 'w+')	# create it
         else:
             try:
                 logf=open( TTCSVFile, 'r')	# See if csv file exists
@@ -796,7 +893,8 @@ class Torque_Test_GUI:
         if(self.check_config_changed()):
             answer=messagebox.askyesno(prog_name, 'Configuration has changed, do you want to save it?')
             if(answer):
-                self.save_config()
+                if(0==self.save_config()):
+                    messagebox.showerror(prog_name, 'Save Config failed, no changes were made')
                 ask_quit=False
         if(ask_quit):
             answer=messagebox.askokcancel(prog_name, 'Do you really want to quit?')
@@ -811,6 +909,7 @@ class Torque_Test_GUI:
         return
 
 
+# return 0 on failure, 1 on success
 def read_config(cfg_fname):
     global TTConfFile
     global TTLogFile
@@ -819,7 +918,7 @@ def read_config(cfg_fname):
     global CanBusID
     global CanID
     global Initial_Motor_Type
-    retval=0	# success is assumed
+    retval=1	# success is assumed
     my_config = configobj.ConfigObj(cfg_fname,unrepr=True,encoding='utf-8')
     MotorType = my_config['MotorType']
     if('phi' == str(MotorType).lower()):
@@ -829,8 +928,8 @@ def read_config(cfg_fname):
             Initial_Motor_Type=1
         else:
             messagebox.showerror(prog_name, 'MotorType in config file is not "phi" or "theta":'+str(MotorType))
-            retval=1
-    if(0==retval):
+            retval=0
+    if(1==retval):
         TTLogFile = my_config['Logfile']
         TTCSVFile = my_config['CSVfile']
         Petal_Controller_Number = int(my_config['Petal_Controller_Number'])
@@ -846,7 +945,7 @@ def main(logging_level):
         root.messagebox.showerror(prog_name, 'Cannot run without a config file')
         self.parent.quit()
         sys.exit(0)
-    if(read_config(TTConfFile)):
+    if(0==read_config(TTConfFile)):
         root.quit()
         sys.exit(0)
     my_ttg = Torque_Test_GUI(root,logging_level)
