@@ -1,5 +1,5 @@
-setupOptiona(DOSlib)
-setupOptiona(fp_settings)
+setupOptional(DOSlib)
+setupOptional(fp_settings)
 envSet(PETAL_PATH, ${PRODUCT_DIR}/petal)
 envSet(POSITIONER_LOGS_PATH, /data/logs/petal)
 pathPrepend(PATH, ${PRODUCT_DIR}/bin)
