@@ -25,6 +25,7 @@ petal/tests_and_demos/test_torque.py -text
 petal/tests_and_demos/test_tp_update_transform.py -text
 petalbox/boardtest.py -text
 petalbox/bootloadcontrol.py -text
+petalbox/bootloadcontrol_multi.py -text
 petalbox/bootloader38.hex -text
 petalbox/bootloadertoreload.hex -text
 petalbox/bootreloader.hex -text
