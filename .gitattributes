@@ -23,24 +23,7 @@ petal/tests_and_demos/test_interior_unreachable_nan.py -text
 petal/tests_and_demos/test_poscollider.py -text
 petal/tests_and_demos/test_torque.py -text
 petal/tests_and_demos/test_tp_update_transform.py -text
-petalbox/bootloadcontrol.py -text
-petalbox/bootloadcontrol_multi.py -text
-petalbox/bootloader38.hex -text
-petalbox/bootloadertoreload.hex -text
-petalbox/bootreloader.hex -text
-petalbox/bootreloader38.hex -text
-petalbox/bootreplace.py -text
-petalbox/fw21.hex -text
-petalbox/fw31.hex -text
-petalbox/fw31moved.hex -text
-petalbox/fw32page4.hex -text
 petalbox/petalcontroller.py -text
-petalbox/pf_info.py -text
-petalbox/pf_utility.py -text
-petalbox/poscontrol.conf -text
-petalbox/poscontrol.py -text
-petalbox/poscontrol.sh -text
-petalbox/poscontrol2.gif -text svneol=unset#image/gif
 petalbox/posfidcan.py -text
 petalbox/posfidcansim.py -text
 petalbox/ptltel.py -text
