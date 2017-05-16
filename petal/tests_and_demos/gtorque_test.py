@@ -13,11 +13,13 @@
 #    Revisions:
 #    mm/dd/yyyy who        description
 #    ---------- --------   -----------
+#    05/16/2017 cad        Minor UI changes, added test to prevent multiple instances from running,
+#                          Fixed the code which wrote a header to CSV file if the file didn't exist,
+#                          Change any commas in user notes to "_"
 #    05/12/2017 cad        Fixed set_currents and move commands to use single ints, 
 #                          not lists, just like in test_torque.py
 #                          Disable manual control buttons during cool-down.
 #                          Validate user inputs
-#                          Removed logging pkg initialization since it doesn't grok ~ pathnames
 # 
 # ****************************************************************************
 
@@ -30,6 +32,7 @@ from tkinter.ttk import *
 
 import os
 import sys
+import fcntl
 import time
 import datetime # for the filename timestamp
 import logging
@@ -46,9 +49,9 @@ prog_name="Torque Test"
 
 # Configuration Values
 
-TTConfFile="~/torque_test.conf"
-TTLogFile="~/torque_test.log"
-TTCSVFile="~/torque_test.csv"
+TTConfFile="./torque_test.conf"
+TTLogFile="./torque_test.log"
+TTCSVFile="./torque_test.csv"
 Petal_Controller_Number=43
 CanBusID='can0'
 CanID=20000
@@ -83,7 +86,7 @@ class Torque_Test_GUI:
         self.parent = tkroot
         self.logging_level = logging_level
 
-#       logging.basicConfig(filename=TTLogFile,level=logging_level)
+        logging.basicConfig(filename=TTLogFile,level=logging_level)
 
         self.gui_initialized=0
         self.logprint("Logging level set to "+str(logging_level))
@@ -237,15 +240,30 @@ class Torque_Test_GUI:
         
         self.frame_hw_5 = Frame(self.frame_hw)
         self.frame_hw_5.pack(fill=X,padx=5,pady=3,side=RIGHT)
-        self.button_LoadConf = Button(self.frame_hw_5, width=9, text="Load Config", command=self.load_config)
-        self.button_SaveConf = Button(self.frame_hw_5, width=9, text="Save Config", command=self.save_config)
+
+        self.frame_hw_5a = Frame(self.frame_hw_5,relief="groove",borderwidth=2)
+        self.frame_hw_5b = Frame(self.frame_hw_5)
+
+        self.button_LoadConf = Button(self.frame_hw_5a, width=9, text="Load Config")
+        self.button_LoadConf["command"]=self.load_config
+        self.button_SaveConf = Button(self.frame_hw_5a, width=9, text="Save Config")
+        self.button_SaveConf["command"]=self.save_config
+
+        self.label_nada = Label(self.frame_hw_5b, text=" ", width=4)
+
         self.button_Connect = Button(self.frame_hw_5, width=9)
         self.button_Connect["command"]=self.Connect_to_PC
         self.button_Connect["textvariable"]=self.Connect_Button_Text
 
+        self.frame_hw_5a.grid(column=0,row=0,sticky="w",padx=2,pady=2)
+#       self.frame_hw_5a.pack(fill=X,side=LEFT)
         self.button_LoadConf.grid(column=0,row=0,sticky="w",padx=2,pady=2)
         self.button_SaveConf.grid(column=1,row=0,sticky="w",padx=2,pady=2)
+        self.frame_hw_5b.grid(column=1,row=0,sticky="w",padx=2,pady=2)
+        self.label_nada.pack(fill=X)
+#       self.frame_hw_5b.pack(fill=X)
         self.button_Connect.grid(column=2,row=0,sticky="e",padx=2,pady=2)
+#       self.button_Connect.pack(fill=X,side=RIGHT)
 
 #       ********************** TST Frame *****************
 
@@ -291,7 +309,7 @@ class Torque_Test_GUI:
 
         self.frame_Tstl = Frame(self.frame_tst)
         self.frame_Tstl.pack(fill=X)
-        self.label_Tstl = Label(self.frame_Tstl, text="Res Torque", width=11)
+        self.label_Tstl = Label(self.frame_Tstl, text="Settled Torque", width=11)
         self.label_Tstl.pack(side=LEFT, anchor=N, padx=5, pady=5)        
         self.entry_Tstl = Entry(self.frame_Tstl,
                           textvariable=self.settledTorque)
@@ -807,7 +825,7 @@ class Torque_Test_GUI:
         self.my_cruise("CCW",1)
         return
 
-    def get_csv_header(self):
+    def getCSVheader(self):
         header_str ="Time,"
         header_str+="Motor_SN,Operator,Test_Voltage,MotorType,Speed,Cooldown_Sec,"
         header_str+="Max_CCW_Torque_(oz-in),Max_CCW_Torque_(n-mm),"
@@ -844,7 +862,8 @@ class Torque_Test_GUI:
             spreadsheet_str+=str(format(float(self.max_torque[0])/n_mm_to_oz_in,'.3f'))+","	# max cw torque in n-mm
             spreadsheet_str+=str(self.res_torque[0])+","			# settled cw torque in oz-in
             spreadsheet_str+=str(format(float(self.res_torque[0])/n_mm_to_oz_in,'.3f'))+","	# settled cw torque in n-mm
-        spreadsheet_str+=str(self.user_notes.get())
+        # Make sure not to add any extra commas to the CSV file
+        spreadsheet_str+=str(self.user_notes.get()).replace(",","_")
         self.log(spreadsheet_str,which=1)
         self.logprint(spreadsheet_str)
         return
@@ -901,7 +920,7 @@ class Torque_Test_GUI:
             if(answer):
                 self.top_fr.destroy()	# destroy window
                 self.parent.quit()
-                exit()
+                sys.exit(0)
         return
 
     def runGUI(self):
@@ -938,18 +957,35 @@ def read_config(cfg_fname):
         TTConfFile=cfg_fname
     return retval
 
+fh=0
+def another_instance():
+    global fh
+    retval=0
+    fh=open(os.path.realpath(__file__),'r')
+    try:
+        fcntl.flock(fh,fcntl.LOCK_EX|fcntl.LOCK_NB)
+    except:
+        retval=1
+    return retval
+
 def main(logging_level):
     root = Tk()
-    TTConfFile = filedialog.askopenfilename(initialdir=pc.other_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title="Select Torque Test Config File")
-    if(""==TTConfFile):
-        root.messagebox.showerror(prog_name, 'Cannot run without a config file')
-        self.parent.quit()
-        sys.exit(0)
-    if(0==read_config(TTConfFile)):
+    if(not another_instance()):
+        TTConfFile = filedialog.askopenfilename(initialdir=pc.other_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title="Select Torque Test Config File")
+        if(""==TTConfFile):
+            messagebox.showerror(prog_name, 'Cannot run without a config file')
+            root.quit()
+            sys.exit(0)
+        if(0==read_config(TTConfFile)):
+            root.quit()
+            sys.exit(0)
+        my_ttg = Torque_Test_GUI(root,logging_level)
+        my_ttg.runGUI()
+        return
+    else:
+        messagebox.showerror(prog_name, 'Another instance is already running')
         root.quit()
         sys.exit(0)
-    my_ttg = Torque_Test_GUI(root,logging_level)
-    my_ttg.runGUI()
     return
 
 
@@ -960,6 +996,7 @@ if __name__ == '__main__':
         if len(sys.argv) == 2:
             if sys.argv[1].upper() == 'DEBUG':
                 logging_level=logging.DEBUG
+                Torque_Moves[0][iCoolSecs]=20
             if sys.argv[1].upper() == 'INFO':
                 logging_level=logging.INFO
             if sys.argv[1].upper() == 'WARNING':
