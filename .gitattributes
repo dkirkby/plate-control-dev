@@ -5,6 +5,7 @@ petal/deprecated_posanticollision.py -text
 petal/focal_surface_lookup.csv -text
 petal/petal.py -text
 petal/petalcomm.py -text
+petal/petaltransforms.py -text
 petal/petsockcomm.py -text
 petal/poscollider.py -text
 petal/posconstants.py -text
