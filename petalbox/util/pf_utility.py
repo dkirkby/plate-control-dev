@@ -5,7 +5,6 @@
 # Revision History
 # 
 # 160418 created MS based on mvtest.py (by IG)
-# tested with FW 2.1
 
 import posfidcan
 import sys
@@ -127,14 +126,15 @@ if __name__ == '__main__':
 
 	loop=True
 	while loop:
-#		print("Select:")
+		print("\n\n")
 		print("[b]link LED (using broadcast address)")
 		print("[r]ead CAN address, silicon ID and software revision")
 		print("[e]xit")
 		print("[p]rogram new CAN address")
-		print("[l]ist all silicon IDs, software revision numbers, and CAN ids found on the CAN bus")
+		print("[l]ist all silicon IDs, software revision numbers, and CAN ids found on the CAN bus. If more than one device on bus FW vr >= 4.0 needed.")
 		print("[s]id programming - type in silicon ID, then program new CAN id into the corresponding device")
-		print("Select: ")
+		print("[i]ndividually address a pos/fid by CAN address and ask for its fw version and silicon ID")
+		print("Select: \n")
 		
 		sel=_sel.__call__()		
 		#print("sel:",sel)
@@ -240,3 +240,33 @@ if __name__ == '__main__':
 			id = input('Enter new can id (it will be programmed into the device with the matching silicon id): ')
 			id = (hex(int(id))).replace('0x','').zfill(4)
 			pmc.write_can_address(brdcast_id, id)
+		
+		if sel=='i':   #individially read back pos/fid info, loops but breaks out if non-numeric entry is given
+			while loop:
+				id = input('Enter numeric CAN id of the device that you would like to read and press enter (or just press enter to return to main menu): ')
+				if not id.isdigit():
+					print('CAN id must be a number, returning to main menu')
+					break
+
+				if id.isdigit():
+					can_id = int(id)
+					posid, data=pmc.get_can_address(can_id)
+					print ("   CAN ID: ", posid)
+					posid,sid=pmc.get_sid(can_id)
+					sid_str= ":".join("{:02x}".format(c) for c in sid)
+					print ("    Si ID: ",sid_str)
+					try:
+						posid,fw=pmc.get_firmware_version(can_id)
+						if len(fw) == 1:
+							fw=str(int(ord(fw))/10)
+						else:
+							fw=str(int(str(fw[1]),16))+"."+str(int(str(fw[0]),16))
+
+					except:
+						fw='unknown'
+					print ("  FW rev.: ", fw)
+					print('\n')
+	
+	
+				
+	
