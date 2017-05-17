@@ -35,14 +35,23 @@ for key in dir_keys_settings:
 for directory in dirs.values():    
     os.makedirs(directory,exist_ok=True)
 
+# Lookup tables for focal plane coordinate conversions
+R_lookup_path = petal_directory + os.path.sep + 'focal_surface_lookup.csv'
+R_lookup_data = np.genfromtxt(R_lookup_path,comments="#",delimiter=",")
+
 # Mapping of radial coordinate R to pseudo-radial coordinate S (distance along focal surface from optical axis)
-R2Spoly = [5.00010E-01,9.99997E-01,1.91532E-07,1.72104E-09,7.31761E-11,-5.78982E-13,3.30271E-15,-1.11245E-17,1.90376E-20,-1.26341E-23]
-R2S_lookup_path = petal_directory + os.path.sep + 'focal_surface_lookup.csv'
-R2S_lookup_data = np.genfromtxt(R2S_lookup_path,comments="#",delimiter=",")
+R2S_poly = [-1.26341e-23,1.90376e-20,-1.11245e-17,3.30271e-15,-5.78982e-13,7.31761e-11,1.72104e-09,1.91532e-07,0.999997,0.50001]
 def R2S_lookup(R):
-    return np.interp(R,R2S_lookup_data[:,0],R2S_lookup_data[:,2],left=float('nan'))
+    return np.interp(R,R_lookup_data[:,0],R_lookup_data[:,2],left=float('nan'))
 def S2R_lookup(S):
-    return np.interp(S,R2S_lookup_data[:,2],R2S_lookup_data[:,0],left=float('nan'))
+    return np.interp(S,R_lookup_data[:,2],R_lookup_data[:,0],left=float('nan'))
+
+# Mapping of radial coordinate R to Z5 coordinate on the nominal asphere
+R2Z_poly = [6.74215e-23,-7.75243e-20,2.9168e-17,-5.23944e-15,1.61621e-12,-4.82781e-10,1.24578e-08,-0.000100884,6.63924e-06,-2.33702e-05]
+def R2Z_lookup(R):
+    return np.interp(R,R_lookup_data[:,0],R_lookup_data[:,1],left=float('nan'))
+def Z2R_lookup(S):
+    return np.interp(S,R_lookup_data[:,1],R_lookup_data[:,0],left=float('nan'))
 
 # Constants
 deg = '\u00b0'
