@@ -13,6 +13,7 @@
 #    Revisions:
 #    mm/dd/yyyy who        description
 #    ---------- --------   -----------
+#    05/18/2017 cad        Changed to version 1.01, deal with changes to 'other_settings' in posconstants.py
 #    05/17/2017 cad        Added prog_version, display it in the Title Bar
 #    05/16/2017 cad        Minor UI changes, added test to prevent multiple instances from running,
 #                          Fixed the code which wrote a header to CSV file if the file didn't exist,
@@ -47,7 +48,7 @@ import petalcomm
 import posconstants as pc
 
 prog_name="Torque Test"
-prog_version="1.00"
+prog_version="1.01"
 
 # Configuration Values
 
@@ -973,7 +974,7 @@ def another_instance():
 def main(logging_level):
     root = Tk()
     if(not another_instance()):
-        TTConfFile = filedialog.askopenfilename(initialdir=pc.other_settings_directory, filetypes=(("Config file","*.conf"),("All Files","*")), title="Select Torque Test Config File")
+        TTConfFile = filedialog.askopenfilename(initialdir=pc.dirs["other_settings"], filetypes=(("Config file","*.conf"),("All Files","*")), title="Select Torque Test Config File")
         if(""==TTConfFile):
             messagebox.showerror(prog_name, 'Cannot run without a config file')
             root.quit()
