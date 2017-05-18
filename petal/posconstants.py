@@ -32,9 +32,11 @@ for key in dir_keys_logs:
     dirs[key] = dirs['all_logs'] + os.path.sep + key + os.path.sep
 for key in dir_keys_settings:
     dirs[key] = dirs['all_settings'] + os.path.sep + key + os.path.sep
-for directory in dirs.values():    
-    os.makedirs(directory,exist_ok=True)
-
+try:
+    for directory in dirs.values():    
+        os.makedirs(directory,exist_ok=True)
+except:
+    pass
 # Lookup tables for focal plane coordinate conversions
 R_lookup_path = petal_directory + os.path.sep + 'focal_surface_lookup.csv'
 R_lookup_data = np.genfromtxt(R_lookup_path,comments="#",delimiter=",")
