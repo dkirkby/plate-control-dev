@@ -13,6 +13,7 @@
 #    Revisions:
 #    mm/dd/yyyy who        description
 #    ---------- --------   -----------
+#    05/17/2017 cad        Added prog_version, display it in the Title Bar
 #    05/16/2017 cad        Minor UI changes, added test to prevent multiple instances from running,
 #                          Fixed the code which wrote a header to CSV file if the file didn't exist,
 #                          Change any commas in user notes to "_"
@@ -46,6 +47,7 @@ import petalcomm
 import posconstants as pc
 
 prog_name="Torque Test"
+prog_version="1.00"
 
 # Configuration Values
 
@@ -149,7 +151,7 @@ class Torque_Test_GUI:
 
 
     def initUI(self):
-        self.parent.title(prog_name)
+        self.parent.title(prog_name+" - Vers. "+prog_version)
 
         self.top_fr=Frame(self.parent)
         self.top_fr.pack(fill=BOTH, expand=True)
