@@ -30,7 +30,7 @@ class Petal(object):
         local_commit_on ... boolean, controlw whether to commit state data to local log files (can be done with or without db_commit_on)
         printfunc       ... method, used for stdout style printing. we use this for logging during tests
     """
-    def __init__(self, petal_id, posids, fidids, simulator_on=False, db_commit_on=False, local_commit_on=True, printfunc=print,verbose=False):
+    def __init__(self, petal_id, posids, fidids, simulator_on=False, db_commit_on=False, local_commit_on=True, printfunc=print, verbose=False, user_interactions_enabled=False):
         # petal setup
         self.petal_id = petal_id
         self.verbose = verbose # whether to print verbose information at the terminal
@@ -50,7 +50,7 @@ class Petal(object):
         self.posmodels = []
         for posid in posids:
             state = posstate.PosState(posid, logging=True, device_type='pos', printfunc=self.printfunc)
-            model = posmodel.PosModel(state,is_simulation=simulator_on)
+            model = posmodel.PosModel(state,is_simulation=simulator_on,user_interactions_enabled=user_interactions_enabled)
             self.posmodels.append(model)
         self.posids = posids.copy()
         self.canids_where_tables_were_just_sent = []

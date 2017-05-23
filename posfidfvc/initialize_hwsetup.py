@@ -52,7 +52,7 @@ fvc.rotation = hwsetup['rotation']
 fvc.scale = hwsetup['scale']
 posids = hwsetup['pos_ids']
 fidids = hwsetup['fid_ids']
-ptl = petal.Petal(hwsetup['ptl_id'], posids, fidids, simulator_on=sim)
+ptl = petal.Petal(hwsetup['ptl_id'], posids, fidids, simulator_on=sim, user_interactions_enabled=True)
 ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure([ptl],fvc)
 m.make_plots_during_calib = True
