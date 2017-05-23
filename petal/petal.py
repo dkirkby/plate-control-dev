@@ -37,7 +37,7 @@ class Petal(object):
         self.simulator_on = simulator_on
         if not(self.simulator_on):
             import petalcomm
-            self.comm = petalcomm.PetalComm(self.petal_id)
+            self.comm = petalcomm.PetalComm(self.petal_id, user_interactions_enabled=user_interactions_enabled)
             self.comm.reset_nonresponsive_canids() #reset petalcontroller's list of non-responsive canids
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
 

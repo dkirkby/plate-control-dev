@@ -11,7 +11,7 @@ class PetalComm(object):
     and petalbox software running on the petal.
     """
 
-    def __init__(self, petal_id, controller = None):
+    def __init__(self, petal_id, controller = None, user_interactions_enabled = False):
         """
         Initialize the object and connect to the petal controller
 
@@ -59,8 +59,11 @@ class PetalComm(object):
 
         # Connect to the device (if we found anything)
         while self.device == {}:
-            err_question = 'Petal Controller ' + str(self.petal_id) + ' was not discovered. Do you want to:\n  1: try again now\n  2: quit now\n  3: continue anyway (not recommended)\nEnter 1, 2, or 3 >> '
-            answer = input(err_question)
+            if user_interactions_enabled:
+                err_question = 'Petal Controller ' + str(self.petal_id) + ' was not discovered. Do you want to:\n  1: try again now\n  2: quit now\n  3: continue anyway (not recommended)\nEnter 1, 2, or 3 >> '
+                answer = input(err_question)
+            else:
+                answer = '2'
             if '1' in answer:
                 time.sleep(2)
             elif '2' in answer:
