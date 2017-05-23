@@ -10,6 +10,7 @@ import posconstants as pc
 import xytest
 import tkinter
 import tkinter.filedialog
+import tkinter.messagebox
 import configobj
 
 # unique timestamp and fire up the gui
@@ -24,6 +25,10 @@ message = 'Pick hardware setup file.'
 hwsetup_conf = tkinter.filedialog.askopenfilename(initialdir=pc.dirs['hwsetups'], filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
 hwsetup = configobj.ConfigObj(hwsetup_conf,unrepr=True)
 new_and_changed_files.add(hwsetup.filename)
+
+# ask user whether to auto-generate a platemaker instrument file
+message = 'Should we auto-generate a platemaker instrument file?'
+should_make_instrfile = tkinter.messagebox.askyesno(title='Make PM file?',message=message)
 
 # are we in simulation mode?
 sim = hwsetup['fvc_type'] == 'simulator'
@@ -93,13 +98,39 @@ else:
 for ptl in m.petals:
     for posid in ptl.posids:
         ptl.set(posid, 'CTRL_ENABLED', True)
-	
+
+# disable certain features if anticollision is turned off yet it is also a true petal (with close-packed positioenrs)
+if hwsetup['plate_type'] == 'petal' and not ptl.anticollision_default:
+    should_limit_range = True
+else:
+    should_limit_range = False
+
+# define function for making platemaker instrument file
+def make_instrfile():
+    # 1. extract positioner locations that we just measured with FVC
+    # 2. read file with nominal locations from metrology data (see DESI-2850 for format)
+    # 3. compare FVC measurements with metrology, to calculate:
+    #       fvcmag  ... scale in pixels at FVC per mm at positioners
+    #       fvcrot  ... rotation in degrees of the field
+    #       fvcxoff ... x offset (in pixels) of the field
+    #       fvcyoff ... y offset (in pixels) of the field
+    #       fvcflip ... either 1 or 0, says whether it image is a mirror (probably 0 in EM petal)
+    #    (see DESI-1416 for defining the geometry)
+    # 4. write the instrument file to disk (simple text file, named "something.par" including the above params as well as:
+    #       fvcnrow  6000
+    #       fvcncol  6000
+    #       fvcpixmm 0.006
+    pass
+
 # calibration routines
 m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
 m.identify_fiducials()
 m.identify_positioner_locations()
-m.measure_range(axis='theta')
-m.measure_range(axis='phi')
+if should_make_instrfile:
+    make_instrfile()
+if should_limit_range:
+    m.measure_range(axis='theta')
+    m.measure_range(axis='phi')
 plotfiles = m.calibrate(mode='arc', save_file_dir=pc.dirs['xytest_plots'], save_file_timestamp=start_filename_timestamp)
 new_and_changed_files.update(plotfiles)
 m.park() # retract all positioners to their parked positions
