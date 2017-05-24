@@ -13,10 +13,17 @@
 #    Revisions:
 #    mm/dd/yyyy who        description
 #    ---------- --------   -----------
-#    05/18/2017 cad        Changed to version 1.01, deal with changes to 'other_settings' in posconstants.py
+#    05/24/2017 cad        Version 1.02.  Changed to individual constants for cool down time, and
+#                          torque angle. Removed Torque Moves.  Restructured code to allow multiple
+#                          CW and CCW torques.
+#                          The "Next Motor" button saves the last results and aborts the current
+#                          wait for cool down (if any)
+#                          Changed get_gui_results to return 1 on error, 0 otherwise
+#    05/18/2017 cad        Changed to version 1.01, deal with changes to 'other_settings' 
+#                          in posconstants.py
 #    05/17/2017 cad        Added prog_version, display it in the Title Bar
 #    05/16/2017 cad        Minor UI changes, added test to prevent multiple instances from running,
-#                          Fixed the code which wrote a header to CSV file if the file didn't exist,
+#                          Fixed the code which wrote a header to CSV file if the file didn't exist.
 #                          Change any commas in user notes to "_"
 #    05/12/2017 cad        Fixed set_currents and move commands to use single ints, 
 #                          not lists, just like in test_torque.py
@@ -48,7 +55,7 @@ import petalcomm
 import posconstants as pc
 
 prog_name="Torque Test"
-prog_version="1.01"
+prog_version="1.02"
 
 # Configuration Values
 
@@ -68,11 +75,10 @@ Initial_Motor_Type=0
 n_mm_to_oz_in = 0.1416119
 
 Currents=[100,100,100,0]    # percentages for spin-up,cruise,creep,hold
-Torque_Moves=[
-    #'motor','speed','direction','angle','cool_down_seconds'
-    ['phi'  ,'creep' ,'ccw' ,90,  120],
-    ['phi'  ,'creep' ,'cw'  ,90,    0]
-]
+
+torque_angle=65		# degrees
+torque_cool_down=90	# seconds
+torque_mode='creep'
 
 # indices into MoveTable list
 iMotor=0     # 'phi' or 'theta'
@@ -108,14 +114,18 @@ class Torque_Test_GUI:
         global CanID
         global Initial_Motor_Type
 
-        self.max_torque=[]
-        self.res_torque=[]
+        self.max_torque=0.0
+        self.res_torque=0.0
         self.tt_state=0
         self.move_count=0
         self.cool_countdown=0
         self.simulate=0         # 1 for simulation, 0 for the real thing
         self.delay=1000         # 1000 ms = 1 sec
         self.sVoltage=""	# string version of Voltage saved by get_gui_results
+        self.move_direction="ccw"
+        self.torque_angle=torque_angle
+        self.cool_down_sec=torque_cool_down
+        self.torque_mode=torque_mode
 
         # define internal variables connected to GUI
         self.config_file=StringVar()
@@ -132,8 +142,6 @@ class Torque_Test_GUI:
         self.maxTorque=StringVar()
         self.settledTorque=StringVar()
         self.user_notes=StringVar()
-        self.Connect_Button_Text=StringVar()
-        self.Run_Button_Text=StringVar()
         self.status_str=StringVar()
         self.progress_val=IntVar()
 
@@ -145,8 +153,6 @@ class Torque_Test_GUI:
         self.canbus.set(CanBusID)
         self.canid.set(str(CanID))
         self.motor_type.set(Initial_Motor_Type)	# 0 for phi, 1 for theta
-        self.Connect_Button_Text.set("Connect")
-        self.Run_Button_Text.set("Apply Torque")
         self.progress_val.set(0)
         return;
 
@@ -254,9 +260,8 @@ class Torque_Test_GUI:
 
         self.label_nada = Label(self.frame_hw_5b, text=" ", width=4)
 
-        self.button_Connect = Button(self.frame_hw_5, width=9)
+        self.button_Connect = Button(self.frame_hw_5, width=9, text="Connect")
         self.button_Connect["command"]=self.Connect_to_PC
-        self.button_Connect["textvariable"]=self.Connect_Button_Text
 
         self.frame_hw_5a.grid(column=0,row=0,sticky="w",padx=2,pady=2)
 #       self.frame_hw_5a.pack(fill=X,side=LEFT)
@@ -319,19 +324,34 @@ class Torque_Test_GUI:
 #       self.entry_Tstl["textvariable"]=self.settledTorque
         self.entry_Tstl.pack(fill=BOTH, pady=5, padx=5, expand=True)           
 
-        self.progress = Progressbar(self.frame_tst, orient="horizontal", 
+        self.frame_prog = Frame(self.frame_tst)
+        self.frame_prog.pack(fill=X)
+        self.label_Tstl = Label(self.frame_prog, text="Cool Down", width=11)
+        self.label_Tstl.pack(side=LEFT, anchor=N, padx=5, pady=5)        
+        self.progress = Progressbar(self.frame_prog, orient="horizontal", 
                                     length=200, mode="determinate", value=0, 
                                     variable=self.progress_val)
-        self.progress.pack(fill=X,padx=5)
+        self.progress.pack(fill=BOTH, pady=5, padx=5, expand=True)           
+#       self.progress.pack(fill=X,padx=5)
 
-        self.frame_btn_run = Frame(self.frame_tst)
-        self.frame_btn_run.pack(fill=X)
-        self.button_Run = Button(self.frame_btn_run, width=16, state=DISABLED,
-                          command=self.tt_state_machine,
-                          textvariable=self.Run_Button_Text)
-#       self.button_Run["command"]=self.tt_state_machine
-#       self.button_Run["textvariable"]=self.Run_Button_Text
-        self.button_Run.pack(padx=5,pady=2,side=RIGHT)
+        self.frame_tst_btn = Frame(self.frame_tst)
+        self.frame_tst_btn.pack(fill=X,pady=9)
+
+        self.button_CCW = Button(self.frame_tst_btn, width=10, state=DISABLED,
+                          command=self.do_ccw_torque,
+                          text="CCW Torque")
+        self.button_CW  = Button(self.frame_tst_btn, width=10, state=DISABLED,
+                          command=self.do_cw_torque,
+                          text="CW Torque")
+        self.label_nada2 = Label(self.frame_tst_btn, text=" ", width=3)
+        self.button_Nxt = Button(self.frame_tst_btn, width=9, state=DISABLED,
+                          command=self.do_next_motor,
+                          text="Next Motor")
+
+        self.button_CCW.grid(column=0,row=0,sticky="w",padx=2,pady=2)
+        self.button_CW.grid(column=1,row=0,sticky="w",padx=2,pady=2)
+        self.label_nada2.grid(column=2,row=0,sticky="w",padx=2,pady=2)
+        self.button_Nxt.grid(column=3,row=0,sticky="e",padx=2,pady=2)
         
 #       **************** TWK Frame *****************
         self.frame_twk1 = Frame(self.frame_twk)
@@ -528,10 +548,6 @@ class Torque_Test_GUI:
             print("CanBus=",lCanBusID)
             print("CanID =",lCanID)
             self.logprint("Connected")
-            err,errmsg = self.check_MoveTable(Torque_Moves)
-            if(err):
-                messagebox.showerror(prog_name+' Error', errmsg)
-                return
             if(4!=len(Currents)):
                 messagebox.showerror(prog_name+' Error', 'Currents should be a list of 4 values!')
                 return
@@ -542,30 +558,9 @@ class Torque_Test_GUI:
             self.status_str.set("Not Connected")
         return
 
-
-    def check_MoveTable(self,MoveTable):
-        if(0==len(MoveTable)):
-            return 1,"Empty MoveTable"
-        prev_lenMT=5    # set to correct value
-        for i in range(len(MoveTable)):
-            lenMT=len(MoveTable[i])
-            if(prev_lenMT!=lenMT):
-                return 1,"Wrong length list: "+str(MoveTable[i])
-            if('phi'!=MoveTable[i][iMotor] and 'theta'!=MoveTable[i][iMotor]):
-                return 1,"Motor must be either 'phi' or 'theta': "+str(MoveTable[i][iMotor])
-            if('creep'!=MoveTable[i][iMode] and 'cruise'!=MoveTable[i][iMode]):
-                return 1,"Speed must be either 'creep' or 'cruise': "+str(MoveTable[i][iMode])
-            if('ccw'!=MoveTable[i][iDirection] and 'cw'!=MoveTable[i][iDirection]):
-                return 1,"Direction must be either 'cw' or 'ccw': "+str(MoveTable[i][iDirection])
-            if(359<int(MoveTable[i][iAngle]) or 0>MoveTable[i][iAngle]):
-                return 1,"Angle must be between 0 and 359"+str(MoveTable[i][iAngle])
-            if(600<int(MoveTable[i][iCoolSecs]) or 0>MoveTable[i][iCoolSecs]):
-                return 1,"Cool_down_seconds must be between 0 and 600"+str(MoveTable[i][iCoolSecs])
-        return 0,"" # all is well
-
-    # return 0 on fail, 1 on success
+    # return 1 on fail, 0 on success
     def get_gui_results(self):
-        retval=0	# assume failure
+        retval=1	# assume failure
         sVoltage=self.voltage.get()
         sMaxTorque=self.maxTorque.get()
         sSettledTorque=self.settledTorque.get()
@@ -595,16 +590,18 @@ class Torque_Test_GUI:
                     messagebox.showerror(prog_name, "Test Voltage value is out of range" )
                     return retval
 
-                self.max_torque.append(dMaxTorque)
-                self.res_torque.append(dSettledTorque)
+                self.max_torque=dMaxTorque
+                self.res_torque=dSettledTorque
                 self.sVoltage=sVoltage
                 self.maxTorque.set("")
                 self.settledTorque.set("")
-                retval=1
+                retval=0
         return retval
 
     def disable_Run_button(self):
-        self.button_Run.config(state=DISABLED)
+        self.button_CCW.config(state=DISABLED)
+        self.button_CW.config(state=DISABLED)
+#       self.button_Nxt.config(state=DISABLED)
         self.Lrg_CCW_button.config(state=DISABLED)
         self.Med_CCW_button.config(state=DISABLED)
         self.Sml_CCW_button.config(state=DISABLED)
@@ -614,7 +611,9 @@ class Torque_Test_GUI:
         return
 
     def enable_Run_button(self):
-        self.button_Run.config(state=NORMAL)
+        self.button_CCW.config(state=NORMAL)
+        self.button_CW.config(state=NORMAL)
+        self.button_Nxt.config(state=NORMAL)
         self.Lrg_CCW_button.config(state=NORMAL)
         self.Med_CCW_button.config(state=NORMAL)
         self.Sml_CCW_button.config(state=NORMAL)
@@ -623,30 +622,57 @@ class Torque_Test_GUI:
         self.Lrg_CW_button.config(state=NORMAL)
         return
 
+    def do_ccw_torque(self):
+        self.tt_state=0
+        self.move_direction="ccw"
+        self.tt_state_machine()
+        return
+
+    def do_cw_torque(self):
+        self.tt_state=0
+        self.move_direction="cw"
+        self.tt_state_machine()
+        return
+
+    def do_next_motor(self):
+#       self.tt_state=5
+#       self.tt_state_machine()
+        if(self.get_gui_results()):
+            return
+        if(self.save_results()):
+            return
+        # Reset indexes and values so user can run another motor test
+        self.reset_torque_test_state()
+        self.enable_Run_button()
+        return
+
     def tt_state_machine(self):
         self.disable_Run_button()
         if(0==self.tt_state):
-            if(0 != self.move_count):   #   First must save the previous results
-                if(0==self.get_gui_results()):
+            if(0 != self.move_count):   #   First must save the previous results, if any
+                if(self.get_gui_results()):
+                    self.enable_Run_button()
+                    return
+                if(self.save_results()):
                     self.enable_Run_button()
                     return
             if(self.wait_for_FIPOS_ready()):
-                self.tt_state+=1
+                self.tt_state+=1	# set currents next
             else:
                 self.reset_torque_test_state()
                 messagebox.showerror(prog_name, "Aborting Torque Test" )
                 return
         if(1==self.tt_state):
             if(self.set_FIPOS_currents()):
-                self.tt_state+=1
+                self.tt_state+=1	# apply torque next
             else:
                 self.reset_torque_test_state()
                 messagebox.showerror(prog_name, "Aborting Torque Test" )
                 return
         if(2==self.tt_state):
-            if(self.apply_FIPOS_torque(Torque_Moves)):
-                self.Run_Button_Text.set("Apply Next Torque")
-                # apply_FIPOS_torque determines the next state
+            if(self.apply_FIPOS_torque()):
+                self.tt_state+=1	# wait for cool-down next
+                self.move_count=self.move_count
             else:
                 self.reset_torque_test_state()
                 messagebox.showerror(prog_name, "Aborting Torque Test" )
@@ -655,41 +681,37 @@ class Torque_Test_GUI:
             self.cool_down()
             # cool_down determines the next state
         if(4==self.tt_state):
-            if(self.move_count < len(Torque_Moves)):
-                self.tt_state=0    # wait for user to apply next torque in sequence
-#               self.Run_Button_Text.set("Apply Torque")
-            else:
-                self.tt_state=5    # wait for user to save results
-                self.Run_Button_Text.set("Save Results")
+            self.tt_state=0    # wait for user to apply next torque in sequence
             self.enable_Run_button()
             return
-        if(5==self.tt_state):
-            if(0==self.get_gui_results()):
+        if(5==self.tt_state):	# State 5 is no longer used -cad 05/24/2017
+            if(self.get_gui_results()):
                 self.enable_Run_button()
                 return
-            if(self.save_results(Torque_Moves)):
+            if(self.save_results()):
                 self.enable_Run_button()
                 return
             # Reset indexes and values so user can run another motor test
             self.reset_torque_test_state()
-            answer=messagebox.askokcancel(prog_name, 'Do you want to test another motor?')
-            if(False==answer):
-                self.quit()
+            return  # wait for user to run test again, or to quit
+        if(6==self.tt_state):
+            self.enable_Run_button()
             return  # wait for user to run test again, or to quit
 
         self.parent.after(self.delay,self.tt_state_machine)
         return
 
     def reset_torque_test_state(self):
-        self.tt_state=0
+        self.tt_state=6	# abort state machine
         self.move_count=0
-        self.max_torque=[]
-        self.res_torque=[]
+        self.max_torque=0.0
+        self.res_torque=0.0
         self.maxTorque.set("")
         self.settledTorque.set("")
         self.motor_sn.set("")
         self.user_notes.set("")
-        self.Run_Button_Text.set("Apply Torque")
+        self.cool_countdown=0
+        self.progress_val.set(self.cool_countdown)
         self.enable_Run_button()
         return
 
@@ -749,7 +771,7 @@ class Torque_Test_GUI:
         return pt
 
     # returns 0 on failure, 1 on success
-    def apply_FIPOS_torque(self,MoveTable):
+    def apply_FIPOS_torque(self):
         retval=0	# assume failure
         try:
            lCanID=int(self.canid.get())
@@ -757,33 +779,27 @@ class Torque_Test_GUI:
             messagebox.showerror(prog_name+" - Fix CanID", ve )
             return retval
         lCanBusID=self.canbus.get()
-        i=self.move_count
         pt=self.motor_type_to_str(self.motor_type.get())
-        if(i < len(MoveTable)):
-            self.move_count+=1
-            move_str="Moving: CanID="+str(lCanID)
-            move_str+=" "+pt+" "+MoveTable[i][iDirection]
-            move_str+=" "+str(MoveTable[i][iAngle])+" deg at "
-            move_str+=str(MoveTable[i][iMode])
-            self.logprint(move_str)
-            if(self.simulate):
-                error=0
-            else:
-                error = self.pcomm.move(lCanBusID, lCanID,
-                                        MoveTable[i][iDirection],
-                                        MoveTable[i][iMode],
-                                        pt,
-                                        MoveTable[i][iAngle])
-        if(self.move_count < len(MoveTable)):
-            self.cool_countdown=MoveTable[i][iCoolSecs]
-            self.progress["maximum"]=self.cool_countdown
-            self.progress_val.set(self.cool_countdown)
-            cool_msg="Waiting "+str(int(self.cool_countdown))+" seconds to cool down"
-            self.logprint(cool_msg)
-            self.status_str.set(cool_msg)
-            self.tt_state+=1    # Wait for Cool Down
+        self.move_count+=1
+        move_str="Moving: CanID="+str(lCanID)
+        move_str+=" "+pt+" "+str(self.move_direction)
+        move_str+=" "+str(self.torque_angle)+" deg at "
+        move_str+=str(self.torque_mode)
+        self.logprint(move_str)
+        if(self.simulate):
+            error=0
         else:
-            self.tt_state+=2    # Wait for final values
+            error = self.pcomm.move(lCanBusID, lCanID,
+                                    self.move_direction,
+                                    self.torque_mode,
+                                    pt,
+                                    self.torque_angle)
+        self.cool_countdown=self.cool_down_sec
+        self.progress["maximum"]=self.cool_countdown
+        self.progress_val.set(self.cool_countdown)
+        cool_msg="Waiting "+str(int(self.cool_countdown))+" seconds to cool down"
+        self.logprint(cool_msg)
+        self.status_str.set(cool_msg)
         retval=1	# success
         return retval;
 
@@ -830,46 +846,35 @@ class Torque_Test_GUI:
 
     def getCSVheader(self):
         header_str ="Time,"
-        header_str+="Motor_SN,Operator,Test_Voltage,MotorType,Speed,Cooldown_Sec,"
-        header_str+="Max_CCW_Torque_(oz-in),Max_CCW_Torque_(n-mm),"
-        header_str+="Settled_CCW_Torque_(oz-in),Settled_CCW_Torque_(n-mm),"
-        header_str+="Max_CW_Torque_(oz-in),Max_CW_Torque_(n-mm),"
-        header_str+="Settled_CW_Torque_(oz-in),Settled_CW_Torque_(n-mm),"
+        header_str+="Motor_SN,Operator,Test_Voltage,MotorType,Speed,"
+        header_str+="Direction,Torque_Angle,Cooldown_Sec,"
+        header_str+="Max_Torque_(oz-in),Max_Torque_(n-mm),"
+        header_str+="Settled_Torque_(oz-in),Settled_Torque_(n-mm),"
         header_str+="Notes"
         return header_str
 
-    def save_results(self,MoveTable):
+    # return 1 on fail, 0 on success
+    def save_results(self):
         retval=0	# assume success
         spreadsheet_str =str(self.motor_sn.get())+"," 		   # motor serial number
         spreadsheet_str+=str(self.operator_name.get())+","         # operator id
         spreadsheet_str+=str(self.sVoltage)+","                    # test_voltage
         pt=self.motor_type_to_str(self.motor_type.get())
         spreadsheet_str+=pt+","                                    # phi or theta
-        spreadsheet_str+=str(MoveTable[0][iMode])+","              # creep or cruise
-        spreadsheet_str+=str(MoveTable[0][iCoolSecs])+","          # cooldown seconds
-        if(str(MoveTable[0][iDirection]).lower()=='ccw'):
-            spreadsheet_str+=str(self.max_torque[0])+","			# max ccw torque in oz-in
-            spreadsheet_str+=str(format(float(self.max_torque[0])/n_mm_to_oz_in,'.3f'))+","	# max ccw torque in n-mm
-            spreadsheet_str+=str(self.res_torque[0])+","			# settled ccw torque in oz-in
-            spreadsheet_str+=str(format(float(self.res_torque[0])/n_mm_to_oz_in,'.3f'))+","	# settled ccw torque in n-mm
-            spreadsheet_str+=str(self.max_torque[1])+","			# max cw torque in oz-in
-            spreadsheet_str+=str(format(float(self.max_torque[1])/n_mm_to_oz_in,'.3f'))+","	# max cw torque in n-mm
-            spreadsheet_str+=str(self.res_torque[1])+","			# settled cw torque in oz-in
-            spreadsheet_str+=str(format(float(self.res_torque[1])/n_mm_to_oz_in,'.3f'))+","	# settled cw torque in n-mm
-        else:
-            spreadsheet_str+=str(self.max_torque[1])+","			# max ccw torque in oz-in
-            spreadsheet_str+=str(format(float(self.max_torque[1])/n_mm_to_oz_in,'.3f'))+","	# max ccw torque in n-mm
-            spreadsheet_str+=str(self.res_torque[1])+","			# settled ccw torque in oz-in
-            spreadsheet_str+=str(format(float(self.res_torque[1])/n_mm_to_oz_in,'.3f'))+","	# settled ccw torque in n-mm
-            spreadsheet_str+=str(self.max_torque[0])+","			# max cw torque in oz-in
-            spreadsheet_str+=str(format(float(self.max_torque[0])/n_mm_to_oz_in,'.3f'))+","	# max cw torque in n-mm
-            spreadsheet_str+=str(self.res_torque[0])+","			# settled cw torque in oz-in
-            spreadsheet_str+=str(format(float(self.res_torque[0])/n_mm_to_oz_in,'.3f'))+","	# settled cw torque in n-mm
+        spreadsheet_str+=str(self.torque_mode)+","                 # creep or cruise
+        spreadsheet_str+=str(self.move_direction)+","              # ccw or cw
+        spreadsheet_str+=str(self.torque_angle)+","                # torque angle
+        spreadsheet_str+=str(self.cool_down_sec)+","               # cooldown seconds
+        spreadsheet_str+=str(self.max_torque)+","               # max ccw torque in oz-in
+        spreadsheet_str+=str(format(float(self.max_torque)/n_mm_to_oz_in,'.3f'))+","	# max ccw torque in n-mm
+        spreadsheet_str+=str(self.res_torque)+","		   # settled ccw torque in oz-in
+        spreadsheet_str+=str(format(float(self.res_torque)/n_mm_to_oz_in,'.3f'))+","	# settled ccw torque in n-mm
+
         # Make sure not to add any extra commas to the CSV file
         spreadsheet_str+=str(self.user_notes.get()).replace(",","_")
         self.log(spreadsheet_str,which=1)
         self.logprint(spreadsheet_str)
-        return
+        return retval
 
 
     def logfile(self,themessage,which):
@@ -999,7 +1004,7 @@ if __name__ == '__main__':
         if len(sys.argv) == 2:
             if sys.argv[1].upper() == 'DEBUG':
                 logging_level=logging.DEBUG
-                Torque_Moves[0][iCoolSecs]=20
+                torque_cool_down=20
             if sys.argv[1].upper() == 'INFO':
                 logging_level=logging.INFO
             if sys.argv[1].upper() == 'WARNING':
