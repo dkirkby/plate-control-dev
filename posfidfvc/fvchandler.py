@@ -37,7 +37,6 @@ class FVCHandler(object):
             self.exposure_time = 1.0
             self.max_counts = 2**16 - 1 # FLI camera ADU max
         self.trans = postransforms.PosTransforms() # general transformer object -- does not look up specific positioner info, but fine for QS <--> global X,Y conversions
-        self.last_sequence_id = ''
         self.rotation = 0        # [deg] rotation angle from image plane to object plane
         self._scale = 1.0        # scale factor from image plane to object plane
         self.translation = [0,0] # translation of origin within the image plane
@@ -85,11 +84,6 @@ class FVCHandler(object):
             self.sbig.exposure_time = value*1000 # sbig_grab_cen thinks in milliseconds
         elif self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':
             self.fvcproxy.send_fvc_command('set',exptime=value)
-    
-    @property
-    def next_sequence_id(self):
-        self.last_sequence_id = pc.timestamp_str_now()
-        return self.last_sequence_id
         
     def measure_fvc_pixels(self, num_objects):
         """Gets a measurement from the fiber view camera of the centroid positions
@@ -114,8 +108,7 @@ class FVCHandler(object):
         else:
             zeros_dict = {i:{'x':0.0, 'y':0.0, 'mag':0.0, 'meas_err':1.0, 'flags':4} for i in range(num_objects)}
             self.fvcproxy.set_targets(zeros_dict)
-            sequence_id = self.next_sequence_id
-            centroids = self.fvcproxy.send_fvc_command('locate', expid=sequence_id, send_centroids=True)
+            centroids = self.fvcproxy.locate('locate', send_centroids=True)
             if centroids == 'FAILED':
                 self.printfunc('Failed to locate centroids using FVC.')
             else:
@@ -195,10 +188,12 @@ class FVCHandler(object):
                     peaks_pos[index] = self.normalize_mag(qs_dict['mag'])
                     fwhms_pos[index] = qs_dict['fwhm']
                 else:
-                    index = indices_ref.index(qs_dict['id'])
-                    measured_ref_xy[index] = xy
-                    peaks_ref[index] = self.normalize_mag(qs_dict['mag'])
-                    fwhms_ref[index] = qs_dict['fwhm']
+                    # As of 2017-05-25, FLI/platemaker sadly still do not support returning ref dot positions or any other data.
+                    # index = indices_ref.index(qs_dict['id'])
+                    # measured_ref_xy[index] = xy
+                    # peaks_ref[index] = self.normalize_mag(qs_dict['mag'])
+                    # fwhms_ref[index] = qs_dict['fwhm']
+                    pass
             return measured_pos_xy, measured_ref_xy, peaks_pos, peaks_ref, fwhms_pos, fwhms_ref, imgfiles
         else:
             expected_xy = expected_pos_xy + expected_ref_xy
