@@ -12,6 +12,12 @@ import tkinter
 import tkinter.filedialog
 import tkinter.messagebox
 import configobj
+import scipy
+import math
+import astropy
+import numpy as np
+from lmfit import minimize, Parameters
+
 
 # unique timestamp and fire up the gui
 start_filename_timestamp = pc.filename_timestamp_str_now()
@@ -107,6 +113,47 @@ else:
 
 # define function for making platemaker instrument file
 def make_instrfile():
+    status = ptl.get(posid=posids)
+    obsX_arr=[]
+    obsY_arr=[]
+    length_r1_arr=ptl.get(posid=posids,key='LENGTH_R1')
+    length_r2_arr=ptl.get(posid=posids,key='LENGTH_R2')
+    for i in range(len(posids)):
+        obsX_arr.append(status[i].expected_current_position.get('obsX'))
+        obsY_arr.append(status[i].expected_current_position.get('obsY'))       
+    obsX_arr=np.array(obsX_arr)
+    obsY_arr=np.array(obsY_arr)
+    XY_arr = np.array([obsX_arr,obsY_arr])
+    pars0=np.array([1.2,1,1,30.])
+    test=pars0[0]*(rot(obsX_arr+pars0[1],obsY_arr+pars0[2],pars0[3]))
+    metroX_arr=test[0,:]
+    metroY_arr=test[1,:]
+    pars = Parameters()
+    pars.add('scale', value=pars0[0])
+    pars.add('offx', value=pars0[1])
+    pars.add('offy', value=pars0[2])
+    pars.add('angle', value=pars0[3])
+#    out = minimize(residual, pars, args=(metroX_arr,metroY_arr, obsX_arr,obsY_arr))
+
+
+def rot(x,y,angle):
+    theta=np.radians(angle)
+    c,s=np.cos(theta),np.sin(theta)
+    R=np.matrix([[c,-s],[s,c]])
+    rr=np.dot(np.array([x,y]).T,R)
+    return rr.T
+
+
+def residual(pars,x,y,x_data,y_data):
+    xy_model=pars['scale']*(rot(x+pars['offx'],y+pars['offy'],pars['angle']))
+    x_model=np.array(xy_model[0,:])
+    y_model=np.array(xy_model[1,:])
+    print(xy_model)
+    print(x_data)
+    print(x_model-x_data)
+    res=np.array((x_model-x_data))**2+np.array((y_model-y_data))**2
+    return res
+
     # 1. extract positioner locations that we just measured with FVC
     # 2. read file with nominal locations from metrology data (see DESI-2850 for format)
     # 3. compare FVC measurements with metrology, to calculate:
@@ -118,9 +165,8 @@ def make_instrfile():
     #    (see DESI-1416 for defining the geometry)
     # 4. write the instrument file to disk (simple text file, named "something.par" including the above params as well as:
     #       fvcnrow  6000
-    #       fvcncol  6000
+    #       fvcncol  6000 'obsX_arr',obsX_arr
     #       fvcpixmm 0.006
-    pass
 
 # calibration routines
 m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
