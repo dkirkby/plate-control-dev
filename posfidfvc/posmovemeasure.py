@@ -63,23 +63,27 @@ class PosMoveMeasure(object):
             petals.extend([petal]*len(these_posids))
             expected_pos_xy = pc.concat_lists_of_lists(expected_pos_xy, petal.expected_current_position(these_posids,'obsXY'))
         expected_ref_xy = self.fiducial_dots_obsXY_ordered_list
-        measured_pos_xy,measured_ref_xy,brightnesses_pos,brightnesses_ref,imgfiles = self.fvc.measure_and_identify(expected_pos_xy,expected_ref_xy) 
+        measured_pos_xy,measured_ref_xy,peaks_pos,peaks_ref,fwhms_pos,fwhms_ref,imgfiles = self.fvc.measure_and_identify(expected_pos_xy,expected_ref_xy) 
         for i in range(len(measured_pos_xy)):
             petals[i].set(posids[i],'LAST_MEAS_OBS_X',measured_pos_xy[i][0])
             petals[i].set(posids[i],'LAST_MEAS_OBS_Y',measured_pos_xy[i][1])
-            petals[i].set(posids[i],'LAST_MEAS_BRIGHTNESS',brightnesses_pos[i])
+            petals[i].set(posids[i],'LAST_MEAS_PEAK',peaks_pos[i])
+            petals[i].set(posids[i],'LAST_MEAS_FWHM',fwhms_pos[i])
         for i in range(len(posids)):
             data[posids[i]] = measured_pos_xy[i]
         for fidid in self.fiducial_dots_obsXY.keys(): # order of the keys here matters
             for petal in self.petals:
                 if fidid in petal.fidids:
-                    these_brightnesses = [0]*petal.get_fids_val(fidid,'N_DOTS')[0]
-                    for i in range(len(these_brightnesses)):
-                        if len(brightnesses_ref) == 0:
+                    these_peaks = [0]*petal.get_fids_val(fidid,'N_DOTS')[0]
+                    these_fwhms = [0]*len(these_peaks)
+                    for i in range(len(these_peaks)):
+                        if len(peaks_ref) == 0:
                             self.printfunc('Ran out of reference dots, one thing to check is whether you have run initialize_hwsetup.py yet on this rig? (It auto-identifies fiducials for you.)')
                             break
-                        these_brightnesses[i] = brightnesses_ref.pop(0)
-                    petal.store_fid_val(fidid,'LAST_MEAS_BRIGHTNESSES',these_brightnesses)
+                        these_peaks[i] = peaks_ref.pop(0)
+                        these_fwhms[i] = fwhms_ref.pop(0)
+                    petal.store_fid_val(fidid,'LAST_MEAS_PEAKS',these_peaks)
+                    petal.store_fid_val(fidid,'LAST_MEAS_FWHMS',these_fwhms)
                     break            
         self.last_meas_fiducials_xy = measured_ref_xy
         return data,imgfiles
@@ -959,7 +963,7 @@ class PosMoveMeasure(object):
                     self.set_fiducials_xy_extradots(fiducials_xy) # temporary hack, see function description
                 xy_meas = pc.concat_lists_of_lists(xy_meas,self.fiducial_dots_fvcXY_ordered_list)
             else:
-                xy_meas,brightnesses,imgfiles = self.fvc.measure_fvc_pixels(n_dots)
+                xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_dots)
             if i == 0:
                 xy_init = xy_meas
             else:

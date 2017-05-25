@@ -46,13 +46,11 @@ class SBIG_Grab_Cen(object):
             n_retries  ... integer, max number of recursive retries in certain cases of getting an error
     
         RETURNS
-            xywin      ... list of centroid coordinates and fwhms for each spot in window ('list of lists')
-            brightness ... value of brightest pixel (dark subtracted)
+            xy         ... list of centroid coordinates for each spot
+            peaks      ... list of values of peak brightness for each spot
+            fwhms      ... list of values of fwhm for each spot
             time       ... elapsed time in seconds
             imgfiles   ... filenames of images produced
-            
-        Sample call:
-        	xywin, brightness, time = sbig_grab_cen_instance.grab(1)
          """
         imgfiles = []
         tic = time.time()
@@ -110,7 +108,7 @@ class SBIG_Grab_Cen(object):
 
         # call routine to determine multiple gaussian-fitted centroids
         centroiding_tic = time.time()
-        xcen, ycen, peaks, fwhm, binfile = multicens.multiCens(LD, nWin, self.verbose, self.write_fits, save_dir=self.save_dir, size_fitbox=self.size_fitbox)
+        xcen, ycen, peaks, fwhms, binfile = multicens.multiCens(LD, nWin, self.verbose, self.write_fits, save_dir=self.save_dir, size_fitbox=self.size_fitbox)
         if min(peaks) < self.min_brightness and n_retries > 0:
             print('Retrying image grab (' + str(n_retries) + ' attempts remaining) after got back a very low peak brightness value = ' + str(min(peaks)))
             return self.grab(nWin, n_retries-1)
@@ -126,7 +124,7 @@ class SBIG_Grab_Cen(object):
         if self.verbose:
             print("Time used: "+str(toc-tic)+"\n")
         
-        return xy,peaks,tic-toc,imgfiles
+        return xy,peaks,fwhms,tic-toc,imgfiles
         
     def open_camera(self):
         self.cam.open_camera()

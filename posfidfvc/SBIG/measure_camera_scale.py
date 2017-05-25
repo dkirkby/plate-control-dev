@@ -65,9 +65,9 @@ while keep_measuring:
 #        xy.append(fvc.fvc_measure_with_ref([])) #no xy_ref output for fvc; Mx2 values
 #          don't really need fvc_measure_with_ref here. mMaybe want to resurrect this later.  
         sbig = sbig_grab_cen.SBIG_Grab_Cen()
-        xywin,brightness,t = sbig.grab(2)
-        print("centroids measured: ",xywin)
-        measurement.append(xywin)
+        xy,peaks,fwhms,t = sbig.grab(2)
+        print("centroids measured: ",xy)
+        measurement.append(xy)
     else:
         print ("Didn't recognize input.\n")
         
