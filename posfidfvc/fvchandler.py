@@ -27,15 +27,15 @@ class FVCHandler(object):
             self.sbig.write_fits = save_sbig_fits
         elif self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':   
             self.platemaker_instrument = platemaker_instrument # this setter also initializes self.fvcproxy
-            # I think here we would want to set the FVC either in FLI mode or SBIG mode?
         elif self.fvc_type == 'simulator':
             self.sim_err_max = 0.01 # 2D err max for simulator
             self.printfunc('FVCHandler is in simulator mode with max 2D errors of size ' + str(self.sim_err_max) + '.')
         if 'SBIG' in self.fvc_type:
             self.exposure_time = 0.20
-            self.max_counts = 2**16 - 1
+            self.max_counts = 2**16 - 1 # SBIC camera ADU max
         else:
             self.exposure_time = 1.0
+            self.max_counts = 2**16 - 1 # FLI camera ADU max
         self.trans = postransforms.PosTransforms() # general transformer object -- does not look up specific positioner info, but fine for QS <--> global X,Y conversions
         self.last_sequence_id = ''
         self.rotation = 0        # [deg] rotation angle from image plane to object plane
@@ -98,37 +98,32 @@ class FVCHandler(object):
         INPUTS:  num_objects  ... integer, number of dots FVC should look for
         
         OUTPUT:  xy           ... list of measured dot positions in FVC pixel coordinates, of the form [[x1,y1],[x2,y2],...]
-                 brightnesses ... list of the brightness values for each dot, in the same order
+                 peaks        ... list of the peak brightness values for each dot, in the same order
+                 fwhms        ... list of the fwhm for each dot, in the same order
                  imgfiles     ... list of image filenames that were produced
         """
         xy = []
-        brightnesses = []
+        peaks = []
+        fwhms = []
         imgfiles = []
         if self.fvc_type == 'SBIG':
-            xy,peaks,t,imgfiles = self.sbig.grab(num_objects)
-            brightnesses = [x/self.max_counts for x in peaks]
+            xy,peaks,fwhms,elapsed_time,imgfiles = self.sbig.grab(num_objects)
+            peaks = [x/self.max_counts for x in peaks]
         elif self.fvc_type == 'simulator':
             pass # do nothing here -- random returns would break the identify fiducials and identify positioners methods
         else:
-            zeros_dict = {}
-            for i in range(num_objects):
-                zeros_dict[i] = {'x':0.0, 'y':0.0, 'mag':0.0, 'meas_err':1.0, 'flags':4}
+            zeros_dict = {i:{'x':0.0, 'y':0.0, 'mag':0.0, 'meas_err':1.0, 'flags':4} for i in range(num_objects)}
             self.fvcproxy.set_targets(zeros_dict)
             sequence_id = self.next_sequence_id
-            centroids = self.fvcproxy.send_fvc_command('locate',expid=sequence_id, send_centroids=True)
+            centroids = self.fvcproxy.send_fvc_command('locate', expid=sequence_id, send_centroids=True)
             if centroids == 'FAILED':
                 self.printfunc('Failed to locate centroids using FVC.')
             else:
                 for params in self.centroids.values():
-                    xy.append(params['x'],params['y'])
-                    brightnesses.append(self.mag_to_brightness(params['mag']))
-					# Per David R email 2017-05-04, his FVC code's returned magnitude is:
-					#   "The magnitude is close to 25.0 - 2.5*log10(peak signal in ADU)
-					#   It's actually calculated using a more complicated Gaussian fit to
-					#   each spot profile. The details are buried in the centroiding code
-					#   I inherited from T. Girard."
-					# Also note that he returns FWHM as params['fwhm'].
-        return xy,brightnesses,imgfiles
+                    xy.append([params['x'],params['y']])
+                    peaks.append(self.normalize_mag(params['mag']))
+                    fwhms.append(params['fwhm'])
+        return xy,peaks,fwhms,imgfiles
 
     def measure_and_identify(self,expected_pos_xy,expected_ref_xy):
         """Calls for an FVC measurement, and returns a list of measured centroids.
@@ -141,7 +136,11 @@ class FVCHandler(object):
                 expected_ref_xy ... list of expected fiducial positions
 
         OUTPUT: measured_pos_xy ... list of measured positioner fiber locations
-                measured_ref_xy ... list of measured fiducial positions
+                measured_ref_xy ... list of measured fiducial dot positions
+                peaks_pos       ... list of peak brightnesses of positioners (same order)
+                peaks_ref       ... list of peak brightnesses of fiducials dots (same order)
+                fwhms_pos       ... list of fwhms of positioners (same order)
+                fwhms_ref       ... list of fwhms of fiducial dots (same order)
 
         Lists of xy coordinates are of the form [[x1,y1],[x2,y2],...]
         
@@ -154,8 +153,10 @@ class FVCHandler(object):
             sim_errors = sim_error_magnitudes * np.array([np.cos(sim_error_angles),np.sin(sim_error_angles)])
             measured_pos_xy = (expected_pos_xy + np.transpose(sim_errors)).tolist()
             measured_ref_xy = expected_ref_xy
-            brightnesses_pos = np.random.uniform(0.4,0.6,len(measured_pos_xy)).tolist()
-            brightnesses_ref = np.random.uniform(0.4,0.6,len(measured_ref_xy)).tolist()
+            peaks_pos = np.random.uniform(0.4,0.6,len(measured_pos_xy)).tolist()
+            peaks_ref = np.random.uniform(0.4,0.6,len(measured_ref_xy)).tolist()
+            fwhms_pos = np.random.uniform(0.4,0.6,len(measured_pos_xy)).tolist()
+            fwhms_ref = np.random.uniform(0.4,0.6,len(measured_ref_xy)).tolist()
         elif self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':
             fiber_ctr_flag = 4
             fiduc_ctr_flag = 8
@@ -163,7 +164,7 @@ class FVCHandler(object):
             index_ref = -1
             indices_pos = []
             indices_ref = []
-            expected_xy = []
+            expected_qs = []
             for xylist in [expected_pos_xy,expected_ref_xy]:
                 if xylist == expected_pos_xy:
                     flag = fiber_ctr_flag
@@ -177,32 +178,44 @@ class FVCHandler(object):
                     index = index_ref
                 for xy in xylist:
                     qs = self.trans.obsXY_to_QS(xy)
-                    expected_xy.append({'id':index, 'q':qs[0], 's':qs[1], 'flags':flag})
-            measured_xy = self.fvcproxy.measure(expected_xy)
+                    expected_qs.append({'id':index, 'q':qs[0], 's':qs[1], 'flags':flag})
+            measured_qs = self.fvcproxy.measure(expected_qs)
             measured_pos_xy = [None]*len(indices_pos)
             measured_ref_xy = [None]*len(indices_ref)
-            for xydict in measured_xy:
-                qs = [xydict['q'],xydict['s']]
+            peaks_pos = [None]*len(indices_pos)
+            peaks_ref = [None]*len(indices_ref)
+            fwhms_pos = [None]*len(indices_pos)
+            fwhms_ref = [None]*len(indices_ref)
+            for qs_dict in measured_qs:
+                qs = [qs_dict['q'], qs_dict['s']]
                 xy = self.trans.QS_to_obsXY(qs)
-                if xydict['flags'] == fiber_ctr_flag:
-                    index = indices_pos.index(xydict['id'])
+                if qs_dict['flags'] == fiber_ctr_flag:
+                    index = indices_pos.index(qs_dict['id'])
                     measured_pos_xy[index] = xy
+                    peaks_pos[index] = self.normalize_mag(qs_dict['mag'])
+                    fwhms_pos[index] = qs_dict['fwhm']
                 else:
-                    index = indices_ref.index(xydict['id'])
+                    index = indices_ref.index(qs_dict['id'])
                     measured_ref_xy[index] = xy
-            return measured_pos_xy, measured_ref_xy
+                    peaks_ref[index] = self.normalize_mag(qs_dict['mag'])
+                    fwhms_ref[index] = qs_dict['fwhm']
+            return measured_pos_xy, measured_ref_xy, peaks_pos, peaks_ref, fwhms_pos, fwhms_ref, imgfiles
         else:
             expected_xy = expected_pos_xy + expected_ref_xy
             num_objects = len(expected_xy)
-            unsorted_xy,unsorted_brightnesses,imgfiles = self.measure(num_objects)
+            unsorted_xy,unsorted_peaks,unsorted_fwhms,imgfiles = self.measure(num_objects)
             measured_xy,sorted_idxs = self.sort_by_closeness(unsorted_xy, expected_xy)
             measured_pos_xy = measured_xy[:len(expected_pos_xy)]
             measured_ref_xy = measured_xy[len(expected_pos_xy):]
-            brightnesses = np.array(unsorted_brightnesses)[sorted_idxs].tolist()
-            brightnesses_pos = brightnesses[:len(expected_pos_xy)]
-            brightnesses_ref = brightnesses[len(expected_pos_xy):]
+            peaks = np.array(unsorted_peaks)[sorted_idxs].tolist()
+            fwhms = np.array(unsorted_fwhms)[sorted_idxs].tolist()
+            split = len(expected_pos_xy)
+            peaks_pos = peaks[:split]
+            peaks_ref = peaks[split:]
+            fwhms_pos = fwhms[:split]
+            fwhms_ref = fwhms[split:]
             measured_pos_xy = self.correct_using_ref(measured_pos_xy, measured_ref_xy, expected_ref_xy)
-        return measured_pos_xy, measured_ref_xy, brightnesses_pos, brightnesses_ref, imgfiles
+        return measured_pos_xy, measured_ref_xy, peaks_pos, peaks_ref, fwhms_pos, fwhms_ref, imgfiles
 
     def correct_using_ref(self, measured_pos_xy, measured_ref_xy, expected_ref_xy):
         """Evaluates the correction that transforms measured_ref_xy into expected_ref_xy,
@@ -251,16 +264,17 @@ class FVCHandler(object):
         start to use platemaker.
             num_objects     ... number of dots to look for in the captured image
         """
-        fvcXY,brightnesses,imgfiles = self.measure_fvc_pixels(num_objects)
+        fvcXY,peaks,fwhms,imgfiles = self.measure_fvc_pixels(num_objects)
         obsXY = self.fvcXY_to_obsXY_noplatemaker(fvcXY)
-        return obsXY,brightnesses,imgfiles
+        return obsXY,peaks,fwhms,imgfiles
 
-    def mag_to_brightness(self,value):
+    def normalize_mag(self,value):
         """Convert magnitude values coming from Rabinowitz code to a normalized
-        brightness value in the range 0.0 to 1.0. Would prefer if Rabinowitz can
-        modify his code later on to just give us the counts from the camera.
+        brightness value in the range 0.0 to 1.0.
+        25.0 - 2.5*log10(peak signal in ADU)
         """
-        newval = 10**(value/-2.5)
+        newval = 10**((25.0 - value)/2.5)
+        newval = newval / self.max_counts
         newval = min(newval,1.0)
         newval = max(newval,0.0)
         return newval
@@ -312,20 +326,27 @@ if __name__ == '__main__':
     n_objects = 5
     n_repeats = 1
     xy = []
-    brightnesses = []
+    peaks = []
+    fwhms = []
     print('start taking ' + str(n_repeats) + ' images')
     start_time = time.time()
     for i in range(n_repeats):
-        these_xy,these_brightnesses,imgfiles = f.measure(n_objects)
+        these_xy,these_peaks,these_fwhms,imgfiles = f.measure(n_objects)
         xy.append(these_xy)
-        brightnesses.append(these_brightnesses)
+        peaks.append(these_peaks)
+        fwhms.append(these_fwhms)
         print('ndots: ' + str(len(xy[i])))
         print('measured xy positions:')
         print(xy[i])
-        print('measured brightnesses:')
-        print(brightnesses[i])
-        print('dimmest (scale 0 to 1): ' + str(min(brightnesses[i])))
-        print('brightest (scale 0 to 1): ' + str(max(brightnesses[i])))
+        print('measured peak brightnesses:')
+        print(peaks[i])
+        print('dimmest (scale 0 to 1): ' + str(min(peaks[i])))
+        print('brightest (scale 0 to 1): ' + str(max(peaks[i])))
+        print('')
+        print('measured full width half maxes:')
+        print(fwhms[i])
+        print('dimmest (scale 0 to 1): ' + str(min(fwhms[i])))
+        print('brightest (scale 0 to 1): ' + str(max(fwhms[i])))
         print('')
     total_time = time.time() - start_time
     print('total time = ' + str(total_time) + ' (' + str(total_time/n_repeats) + ' per image)')
