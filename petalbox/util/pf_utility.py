@@ -6,14 +6,14 @@
 # 
 # 160418 created MS based on mvtest.py (by IG)
 
-import posfidcan
+import os
 import sys
+sys.path.append(os.getcwd() + os.path.sep + '..')
+import posfidcan
 import time
 import math
 import struct
 import string
-import os
-
 
 can_frame_fmt = "=IB3x8s"
 os.system('cansend ' + str(sys.argv[1]) + ' 004e2080#00')
