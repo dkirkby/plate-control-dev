@@ -203,16 +203,25 @@ class PosState(object):
         key labels are really finalized, but anyway it is a pretty low-cost operation since
         it only happens at initialization.
         '''
-        #                                       old : new
-        legacy_key_replacements = {'LAST_MOVE_CMD'  : 'MOVE_CMD',
-                                   'LAST_MOVE_VAL1' : 'MOVE_VAL1',
-                                   'LAST_MOVE_VAL2' : 'MOVE_VAL2'}
+        #                                               old : new
+        legacy_key_replacements = {'LAST_MOVE_CMD'          : 'MOVE_CMD',
+                                   'LAST_MOVE_VAL1'         : 'MOVE_VAL1',
+                                   'LAST_MOVE_VAL2'         : 'MOVE_VAL2',
+                                   'LAST_MEAS_BRIGHTNESS'   : 'LAST_MEAS_PEAK',
+                                   'LAST_MEAS_BRIGHTNESSES' : 'LAST_MEAS_PEAKS'}
         for old_key in legacy_key_replacements.keys():
             if old_key in self.unit.keys():
                 temp_val = self.unit[old_key]
                 del self.unit[old_key]
-                new_key= legacy_key_replacements[old_key]
+                new_key = legacy_key_replacements[old_key]
                 self.unit[new_key] = temp_val
+        # also insert any missing entirely new keys
+        if self.type == 'pos':
+            if 'LAST_MEAS_FWHM' not in self.unit.keys():
+                self.unit['LAST_MEAS_FWHM'] = None
+        elif self.type == 'fid':
+            if 'LAST_MEAS_FWHMS' not in self.unit.keys():
+                self.unit['LAST_MEAS_FWHMS'] = None
 
 if __name__=="__main__":
     state = PosState()
