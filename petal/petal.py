@@ -481,18 +481,26 @@ class Petal(object):
     
     @property
     def fiducial_dots_fvcXY(self):
-        """Returns a dict of all [x,y] positions of all fiducial dots this petal contributes
-        in the field of view. Keys are the fiducial IDs. Values are lists of the form
-        [[x1,y1],[x2,y2],...]. The coordinates are all given in fiber view camera pixel space.
+        """Returns an ordered dict of ordered dicts of all [x,y] positions of all
+        fiducial dots this petal contributes in the field of view.
+        
+        Primary keys are the fiducial dot ids, formatted like:
+            'F001.0', 'F001.1', etc...
+        
+        Returned values are accessed with the sub-key 'fvcXY'. So that:
+            data['F001.1']['fvcXY'] --> [x,y] floats giving location of dot #1 in fiducial #F001
+            
+        The coordinates are all given in fiber view camera pixel space.
         """
-        xydata = collections.OrderedDict()
+        data = collections.OrderedDict()
         for fidid in self.fidids:
-            x = []
-            y = []
-            x.extend(self.get_fids_val(fidid,'DOTS_FVC_X')[0])
-            y.extend(self.get_fids_val(fidid,'DOTS_FVC_Y')[0])
-            xydata[fidid] = [[x[i],y[i]] for i in range(len(x))]
-        return xydata
+            for i in range(len(self.get_fids_val(fidid,'N_DOTS'))):
+                dotid = fidid + '.' + str(i)
+                data[dotid] = collections.OrderedDict()
+                x = self.get_fids_val(fidid,'DOTS_FVC_X')[0][i]
+                y = self.get_fids_val(fidid,'DOTS_FVC_Y')[0][i]
+                data[dotid]['fvcXY'] = [x,y]
+        return data
 
     @property
     def fidids(self):
