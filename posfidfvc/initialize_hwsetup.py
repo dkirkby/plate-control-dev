@@ -13,8 +13,8 @@ import tkinter.filedialog
 import tkinter.messagebox
 import configobj
 import scipy
-import math
 import astropy
+import csv
 import numpy as np
 from lmfit import minimize, Parameters
 
@@ -113,8 +113,8 @@ else:
 
 # define function for making platemaker instrument file
 def make_instrfile():
-    status = ptl.get(posid=posids)
-    obsX_arr=[]
+    status = ptl.get(posid=posids) # Read the calibration data
+    obsX_arr=[] # Measured position of each FP
     obsY_arr=[]
     length_r1_arr=ptl.get(posid=posids,key='LENGTH_R1')
     length_r2_arr=ptl.get(posid=posids,key='LENGTH_R2')
@@ -123,20 +123,39 @@ def make_instrfile():
         obsY_arr.append(status[i].expected_current_position.get('obsY'))       
     obsX_arr=np.array(obsX_arr)
     obsY_arr=np.array(obsY_arr)
-    XY_arr = np.array([obsX_arr,obsY_arr])
-    pars0=np.array([1.2,1,1,30.])
-    test=pars0[0]*(rot(obsX_arr+pars0[1],obsY_arr+pars0[2],pars0[3]))
-    metroX_arr=test[0,:]
-    metroY_arr=test[1,:]
-    pars = Parameters()
-    pars.add('scale', value=pars0[0])
-    pars.add('offx', value=pars0[1])
-    pars.add('offy', value=pars0[2])
-    pars.add('angle', value=pars0[3])
-#    out = minimize(residual, pars, args=(metroX_arr,metroY_arr, obsX_arr,obsY_arr))
+    # This is fake test data for now. Just input scale, x and y offset, and rotation angle, generate new positions.
+    # Should read the metrology data eventually    
+    pars0=np.array([20,1,1,30.])
+    test=(rot(obsX_arr-pars0[1],obsY_arr-pars0[2],-pars0[3]))/pars0[0]
+    metroX_arr=test[0,:]+np.random.normal(scale=5,size=len(test[0,:]))
+    metroY_arr=test[1,:]+np.random.normal(scale=5,size=len(test[0,:]))
+    
+    #Mread the Metrology Data
+    metro_list=[]
+    csvfile=open(pc.dirs['hwsetups']+os.path.sep+'EMPetal_XY.csv')
+    metro=csv.DictReader(csvfile)
+    for row in metro:
+        metro_list.append(row)
+        
+    
+    # metroX_arr= , metroY_arr= 
+    
+    pars = Parameters() # Input parameters model and initial guess
+    pars.add('scale', value=10.)
+    pars.add('offx', value=0.)
+    pars.add('offy', value=0.)
+    pars.add('angle', value=0.)
+    out = minimize(residual, pars, args=(metroX_arr,metroY_arr, obsX_arr,obsY_arr)) # Find the minimum chi2
+    # Write the output
+    f = open(hwsetup_conf+'_instr_file','w')
+    output_lines='fvcmag  '+str(out.params['scale'].value)+'\n'+'fvcrot  '+str(out.params['angle'].value % 360)+'\n' \
+                +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(out.params['offy'].value)+'\n' \
+                +'fvcflip  0\n'+'fvcnrow  6000 \n'+'fvcncol  6000 \n'+'fvcpixmm  0.006' 
+    f.write(output_lines)
+    return out,metro_list
 
 
-def rot(x,y,angle):
+def rot(x,y,angle): # A rotation matrix to rotate the coordiantes by a certain angle
     theta=np.radians(angle)
     c,s=np.cos(theta),np.sin(theta)
     R=np.matrix([[c,-s],[s,c]])
@@ -145,12 +164,15 @@ def rot(x,y,angle):
 
 
 def residual(pars,x,y,x_data,y_data):
+    # Code to calculate the Chi2 that quantify the difference between data and model
+    # x, y are the metrology data that specify where each fiber positioner is located on the petal (in mm)
+    # x_data and y_data is the X and Y measured by the FVC (in pixel)
+    # The pars contains the scale, offx, offy, and angle that transform fiber positioner focal plane coordinate (mm) 
+    # to FVC coordinate (in pixel)
+    
     xy_model=pars['scale']*(rot(x+pars['offx'],y+pars['offy'],pars['angle']))
     x_model=np.array(xy_model[0,:])
     y_model=np.array(xy_model[1,:])
-    print(xy_model)
-    print(x_data)
-    print(x_model-x_data)
     res=np.array((x_model-x_data))**2+np.array((y_model-y_data))**2
     return res
 
@@ -165,7 +187,7 @@ def residual(pars,x,y,x_data,y_data):
     #    (see DESI-1416 for defining the geometry)
     # 4. write the instrument file to disk (simple text file, named "something.par" including the above params as well as:
     #       fvcnrow  6000
-    #       fvcncol  6000 'obsX_arr',obsX_arr
+    #       fvcncol  6000 
     #       fvcpixmm 0.006
 
 # calibration routines
@@ -173,7 +195,7 @@ m.rehome() # start out rehoming to hardstops because no idea if last recorded ax
 m.identify_fiducials()
 m.identify_positioner_locations()
 if should_make_instrfile:
-    make_instrfile()
+    instr_par,metro = make_instrfile()
 if should_limit_range:
     m.measure_range(axis='theta')
     m.measure_range(axis='phi')
