@@ -102,7 +102,6 @@ posfirmware/release/fipos_fw_2.1.c -text
 posfirmware/release/fipos_fw_3.0.c -text
 posfirmware/release/fw21.hex -text
 ups/plate_control.table -text
-xytest/FullRangeTest.py -text
 xytest/grader.py -text
 xytest/pos_xytest_plot.py -text
 xytest/posdance.py -text
