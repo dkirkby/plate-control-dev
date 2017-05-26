@@ -54,12 +54,12 @@ class PosMoveMeasure(object):
         """        
         data = {}
         expected_pos = collections.OrderedDict()
-        expected_ref = []
+        expected_ref = collections.OrderedDict()
         for posid in self.all_posids:
             petal = self.petal(posid)
-            expected_pos[posid] = {'xy':petal.expected_current_position(posid,'obsXY')}
-        expected_ref = self.fiducial_dots_obsXY_ordered_list
-        measured_pos,measured_ref_list,peaks_pos,peaks_ref,fwhms_pos,fwhms_ref,imgfiles = self.fvc.measure_and_identify(expected_pos,expected_ref) 
+            expected_pos[posid] = {'obsXY':petal.expected_current_position(posid,'obsXY')}
+        expected_ref = self.fiducial_dots_XY
+        measured_pos,measured_ref,imgfiles = self.fvc.measure_and_identify(expected_pos,expected_ref) 
         for posid in measured_pos.keys():
             petal = self.petal(posid)
             petal.set(posid,'LAST_MEAS_OBS_X',measured_pos[posid]['xy'][0])
@@ -67,6 +67,8 @@ class PosMoveMeasure(object):
             petal.set(posid,'LAST_MEAS_PEAK',measured_pos[posid]['peak'])
             petal.set(posid,'LAST_MEAS_FWHM',measured_pos[posid]['fwhm'])
             data[posid] = measured_pos[posid]['xy']
+        for refid in measured_ref.keys():
+            
             
         # continue in-progress changes here    
         for fidid in self.fiducial_dots_obsXY.keys(): # order of the keys here matters
@@ -508,28 +510,20 @@ class PosMoveMeasure(object):
         return all_settings_done
             
     @property
-    def fiducial_dots_fvcXY(self):
-        """Dict of nominal locations of all fixed reference dots in the FOV.
-        Keys are the fiducial IDs. Values are lists of the form [[x1,y1],[x2,y2],...].
-        All values are in the fvc XY pixel space.
+    def fiducial_dots_XY(self):
+        """Ordered dict of ordered dicts of nominal locations of all fixed reference dots in the FOV.
+        Primary keys are the fiducial dot ids. See petal.py similarly named function's comments.
+        Sub-keys are:
+            'fvcXY' --> [x,y] values in the FVC coordinate system (pixels)
+            'obsXY' --> [x,y] values in the observer coordinate system (millimeters)
         """
-        xydata = collections.OrderedDict()
+        data = collections.OrderedDict()
         for petal in self.petals:
-            more_xy = petal.fiducial_dots_fvcXY
-            xydata.update(more_xy)
-        return xydata
-
-    @property
-    def fiducial_dots_obsXY(self):
-        """Dict of nominal locations of all fixed reference dots in the FOV. Keys are
-        fiducials ids. List is of the form [[x1,y1],[x2,y2],...]. All values are in the
-        observer XY coordinate system (millimeters).
-        """
-        fvcXY = self.fiducial_dots_fvcXY
-        obsXY = fvcXY.copy()
-        for fidid in fvcXY.keys():
-            obsXY[fidid] = self.fvc.fvcXY_to_obsXY_noplatemaker(fvcXY[fidid])
-        return obsXY
+            more_data = petal.fiducial_dots_fvcXY
+            for dotid in more_data.keys():
+                more_data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY_noplatemaker(more_data[dotid]['fvcXY'])
+            data.update(more_data)
+        return data
     
     @property
     def fiducial_dots_fvcXY_ordered_list(self):
@@ -541,9 +535,8 @@ class PosMoveMeasure(object):
         ...then you would always get the same order of dots in the list.
         '''
         xy = []
-        vals = self.fiducial_dots_fvcXY.values()
-        for val in vals:
-            xy.extend(val)
+        for val in self.fiducial_dots_XY.values():
+            xy.extend(val['fvcXY'])
         return xy    
     
     @property
@@ -556,9 +549,8 @@ class PosMoveMeasure(object):
         ...then you would always get the same order of dots in the list.
         '''
         xy = []
-        vals = self.fiducial_dots_obsXY.values()
-        for val in vals:
-            xy.extend(val)
+        for val in self.fiducial_dots_XY.values():
+            xy.extend(val['obsXY'])
         return xy   
 
     def set_motor_parameters(self):
