@@ -1,4 +1,6 @@
-
+'''
+Used to test the full range of motion for both arms of every positioner in a CAN bus.
+'''
 import sys, os
 sys.path.append(os.path.abspath('../petal/'))
 
