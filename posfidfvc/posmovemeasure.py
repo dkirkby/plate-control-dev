@@ -22,6 +22,10 @@ class PosMoveMeasure(object):
         for petal in self.petals:
             for posid in petal.posids:
                 self._petals_map[posid] = petal
+            for fidid in petal.fidids:
+                self._petals_map[fidid] = petal
+                for dotid in petal.fid_dotids(fidid):
+                    self._petals_map[dotid] = petal
         self.fvc = fvc # fvchandler object
         self.ref_dist_tol = 5.0   # [pixels on FVC CCD] used for identifying fiducial dots
         self.nudge_dist   = 10.0  # [deg] used for identifying fiducial dots
@@ -68,6 +72,7 @@ class PosMoveMeasure(object):
             petal.set(posid,'LAST_MEAS_FWHM',measured_pos[posid]['fwhm'])
             data[posid] = measured_pos[posid]['xy']
         for refid in measured_ref.keys():
+            petal = self.petal(refid)
             
             
         # continue in-progress changes here    
@@ -458,10 +463,10 @@ class PosMoveMeasure(object):
             all_posids.extend(posids_by_ptl[petal])
         return all_posids
 
-    def petal(self, posid):
-        """Returns the petal object associated with a single posid.
+    def petal(self, posid_or_fidid_or_dotid):
+        """Returns the petal object associated with a single id key.
         """
-        return self._petals_map[posid]
+        return self._petals_map[posid_or_fidid_or_dotid]
 
     def state(self, posid):
         """Returns the posstate object associated with a single posid.
