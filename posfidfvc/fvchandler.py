@@ -6,6 +6,7 @@ import numpy as np
 import time
 import postransforms
 import posconstants as pc
+import collections
 
 class FVCHandler(object):
     """Provides a generic interface to the Fiber View Camera. Can support different
@@ -118,91 +119,105 @@ class FVCHandler(object):
                     fwhms.append(params['fwhm'])
         return xy,peaks,fwhms,imgfiles
 
-    def measure_and_identify(self,expected_pos_xy,expected_ref_xy):
+    def measure_and_identify(self,expected_pos,expected_ref):
         """Calls for an FVC measurement, and returns a list of measured centroids.
         The centroids are in order according to their closeness to the list of
         expected xy values.
 
         If the expected xy are unknown, then use the measure method instead.
 
-        INPUT:  expected_pos_xy ... list of expected positioner fiber locations
-                expected_ref_xy ... list of expected fiducial positions
+        INPUT:  expected_pos ... dict of dicts giving expected positioner fiber locations
+                expected_ref ... dict of dicts giving expected fiducial dot positions
+                
+                The expected_pos and expected ref dot dicts should have primary keys
+                be the posid or sub-fidid (of each dot), and the sub-keys should include
+                'obsXY'. So that this function can access the expected positions with
+                calls like:
+                    expected_pos['M00001']['obsXY']
+                    expected_ref['F001.0']['obsXY']
 
-        OUTPUT: measured_pos_xy ... list of measured positioner fiber locations
-                measured_ref_xy ... list of measured fiducial dot positions
-                peaks_pos       ... list of peak brightnesses of positioners (same order)
-                peaks_ref       ... list of peak brightnesses of fiducials dots (same order)
-                fwhms_pos       ... list of fwhms of positioners (same order)
-                fwhms_ref       ... list of fwhms of fiducial dots (same order)
-
-        Lists of xy coordinates are of the form [[x1,y1],[x2,y2],...]
+        OUTPUT: measured_pos ... list of measured positioner fiber locations
+                measured_ref ... list of measured fiducial dot positions
+                imgfiles     ... list of image file names (if any) that were given back by fvc
+                
+                The measured_pos and measured_ref returned are similarly shaped
+                dicts of dicts. They are ordered dicts, so that they will preserve
+                any ordering of the expected_pos and expected_ref, if applicable.
+                
+                They include the sub-keys:
+                    'obsXY' ... measured [x,y] in the observer coordinate system (mm at the focal plane)
+                    'peak'  ... peak brightness of the measured dot
+                    'fwhm'  ... fwhm of the measured dot
         
-        All coordinates are in obsXY space (mm at the focal plane).
-        
-        None of the "_ref_" are used in FLI mode. The expected_ref_xy argument
-        is ignored, and the returned measured_ref_xy, peaks_ref, and fwhms_ref
-        lists will all be empty. This is because the platemaker / FVC implementations
-        do not support providing this information.
+        The argument 'expected_ref' is currently (as of May 26, 2017) ignored when
+        operating in FLI mode. This is because the platemaker / FVC implementations
+        do not currently support providing this information. The return value for
+        measured_ref in this mode is an empty dict.
         """
-        imgfiles = []        
-        if self.fvc_type == 'simulator':
-            sim_error_magnitudes = np.random.uniform(-self.sim_err_max,self.sim_err_max,len(expected_pos_xy))
-            sim_error_angles = np.random.uniform(-np.pi,np.pi,len(expected_pos_xy))
-            sim_errors = sim_error_magnitudes * np.array([np.cos(sim_error_angles),np.sin(sim_error_angles)])
-            measured_pos_xy = (expected_pos_xy + np.transpose(sim_errors)).tolist()
-            measured_ref_xy = expected_ref_xy
-            peaks_pos = np.random.uniform(0.4,0.6,len(measured_pos_xy)).tolist()
-            peaks_ref = np.random.uniform(0.4,0.6,len(measured_ref_xy)).tolist()
-            fwhms_pos = np.random.uniform(0.4,0.6,len(measured_pos_xy)).tolist()
-            fwhms_ref = np.random.uniform(0.4,0.6,len(measured_ref_xy)).tolist()
-        elif self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':
-
-            expected_qs = []
-            flag = 8 # only send positioner centers
-            xy_transposed = np.transpose(expected_pos_xy).tolist()
-            qs_vals = self.trans.obsXY_to_QS(xy_transposed)
-            qs_vals = np.transpose()
-            expected_qs = [{'id'}]
-            expected_qs.append({'id':index, 'q':qs[0], 's':qs[1], 'flags':flag})
+        measured_pos = collections.OrderedDict.fromkeys(expected_pos.keys())
+        measured_ref = collections.OrderedDict.fromkeys(expected_ref.keys()) if expected_ref else collections.OrderedDict()
+        posids = measured_pos.keys()
+        refids = measured_ref.keys()
+        imgfiles = []
+        if self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':
+            expected_qs = [] # this is what will be provided to platemaker
+            fiber_ctr_flag = 4 # this enumeration is specific to Yale/FLI FVC interface
+            fiduc_ctr_flag = 8 # this enumeration is specific to Yale/FLI FVC interface
+            for posid in posids:
+                qs = self.trans.obsXY_to_QS(expected_pos[posid]['obsXY'])
+                expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':fiber_ctr_flag})
             measured_qs = self.fvcproxy.measure(expected_qs)
-            measured_pos_xy = [None]*len(indices_pos)
-            measured_ref_xy = [None]*len(indices_ref)
-            peaks_pos = [None]*len(indices_pos)
-            peaks_ref = [None]*len(indices_ref)
-            fwhms_pos = [None]*len(indices_pos)
-            fwhms_ref = [None]*len(indices_ref)
             for qs_dict in measured_qs:
                 qs = [qs_dict['q'], qs_dict['s']]
+                dqds = [qs_dict['dq'],qs_dict['ds']]
                 xy = self.trans.QS_to_obsXY(qs)
                 if qs_dict['flags'] == fiber_ctr_flag:
-                    index = indices_pos.index(qs_dict['id'])
-                    measured_pos_xy[index] = xy
-                    peaks_pos[index] = self.normalize_mag(qs_dict['mag'])
-                    fwhms_pos[index] = qs_dict['fwhm']
-                else:
-                    # As of 2017-05-25, FLI/platemaker sadly still do not support returning ref dot positions or any other data.
-                    # index = indices_ref.index(qs_dict['id'])
-                    # measured_ref_xy[index] = xy
-                    # peaks_ref[index] = self.normalize_mag(qs_dict['mag'])
-                    # fwhms_ref[index] = qs_dict['fwhm']
+                    posid = qs_dict['id']
+                    measured_pos[posid] = {'obsXY':xy, 'peak':self.normalize_mag(qs_dict['mag']), 'fwhm':qs_dict['fwhm'], 'qs':qs, 'dqds':dqds}
+                elif qs_dict['flags'] == fiduc_ctr_flag: 
+                    # This is a placeholder implementation. Details may vary later on. But
+                    # as of 2017-05-25, FLI/platemaker do not yet support returning ref data,
+                    # and so this section won't be used (yet).
+                    refid = qs_dict['id']
+                    measured_ref[refid] = {'obsXY':xy, 'peak':self.normalize_mag(qs_dict['mag']), 'fwhm':qs_dict['fwhm'], 'qs':qs}
                     pass
-            return measured_pos_xy, measured_ref_xy, peaks_pos, peaks_ref, fwhms_pos, fwhms_ref, imgfiles
         else:
-            expected_xy = expected_pos_xy + expected_ref_xy
-            num_objects = len(expected_xy)
-            unsorted_xy,unsorted_peaks,unsorted_fwhms,imgfiles = self.measure(num_objects)
-            measured_xy,sorted_idxs = self.sort_by_closeness(unsorted_xy, expected_xy)
-            measured_pos_xy = measured_xy[:len(expected_pos_xy)]
-            measured_ref_xy = measured_xy[len(expected_pos_xy):]
-            peaks = np.array(unsorted_peaks)[sorted_idxs].tolist()
-            fwhms = np.array(unsorted_fwhms)[sorted_idxs].tolist()
-            split = len(expected_pos_xy)
-            peaks_pos = peaks[:split]
-            peaks_ref = peaks[split:]
-            fwhms_pos = fwhms[:split]
-            fwhms_ref = fwhms[split:]
-            measured_pos_xy = self.correct_using_ref(measured_pos_xy, measured_ref_xy, expected_ref_xy)
-        return measured_pos_xy, measured_ref_xy, peaks_pos, peaks_ref, fwhms_pos, fwhms_ref, imgfiles
+            expected_pos_xy = [expected_pos[posid]['obsXY'] for posid in posids]
+            expected_ref_xy = [expected_ref[refid]['obsXY'] for refid in refids]
+            if self.fvc_type == 'simulator':
+                sim_error_magnitudes = np.random.uniform(-self.sim_err_max,self.sim_err_max,len(expected_pos_xy))
+                sim_error_angles = np.random.uniform(-np.pi,np.pi,len(expected_pos_xy))
+                sim_errors = sim_error_magnitudes * np.array([np.cos(sim_error_angles),np.sin(sim_error_angles)])
+                measured_pos_xy = (expected_pos_xy + np.transpose(sim_errors)).tolist()
+                for posid in posids:    
+                    measured_pos[posid] = {'obsXY':measured_pos_xy[posids.index(posid)]}
+                for refid in refids:
+                    measured_ref[refid] = {'obsXY':expected_ref[refid]['obsXY']} # just copy the old vals
+                for item in [measured_pos,measured_ref]:
+                    for key1 in item.keys():
+                        for key2 in ['peak','fwhm']:
+                            item[key1][key2] = np.random.uniform(0.4,0.6)            
+            else:
+                expected_xy = expected_pos_xy + expected_ref_xy
+                num_objects = len(expected_xy)
+                unsorted_xy,unsorted_peaks,unsorted_fwhms,imgfiles = self.measure(num_objects)
+                measured_xy,sorted_idxs = self.sort_by_closeness(unsorted_xy, expected_xy)
+                sorted_posids_range = range(0,len(expected_pos_xy))
+                sorted_refids_range = range(len(expected_pos_xy),len(sorted_idxs))
+                sorted_posids = [sorted_idxs[i] for i in sorted_posids_range]
+                sorted_refids = [sorted_idxs[i] for i in sorted_refids_range]
+                measured_pos_xy = [measured_xy[i] for i in sorted_posids_range]
+                measured_ref_xy = [measured_xy[i] for i in sorted_refids_range]
+                measured_pos_xy = self.correct_using_ref(measured_pos_xy, measured_ref_xy, expected_ref_xy)
+                sorted_peaks = np.array(unsorted_peaks)[sorted_idxs].tolist()
+                sorted_fwhms = np.array(unsorted_fwhms)[sorted_idxs].tolist()
+                for posid in sorted_posids:
+                    idx = sorted_posids.index(posid)
+                    measured_pos[posid] = {'obsXY':measured_pos_xy[idx], 'peak':sorted_peaks[idx], 'fwhm':sorted_fwhms[idx]}
+                for refid in sorted_refids:
+                    idx = len(sorted_posids) + sorted_refids.index(refid)
+                    measured_ref[refid] = {'obsXY':measured_xy[idx], 'peak':sorted_peaks[idx], 'fwhm':sorted_fwhms[idx]}
+        return measured_pos, measured_ref, imgfiles
 
     def correct_using_ref(self, measured_pos_xy, measured_ref_xy, expected_ref_xy):
         """Evaluates the correction that transforms measured_ref_xy into expected_ref_xy,
