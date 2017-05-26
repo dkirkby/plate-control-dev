@@ -494,12 +494,12 @@ class Petal(object):
         """
         data = collections.OrderedDict()
         for fidid in self.fidids:
-            for i in range(len(self.get_fids_val(fidid,'N_DOTS'))):
-                dotid = fidid + '.' + str(i)
-                data[dotid] = collections.OrderedDict()
+            dotids = self.fid_dotids(fidid)
+            for i in range(len(dotids)):
+                data[dotids[i]] = collections.OrderedDict()
                 x = self.get_fids_val(fidid,'DOTS_FVC_X')[0][i]
                 y = self.get_fids_val(fidid,'DOTS_FVC_Y')[0][i]
-                data[dotid]['fvcXY'] = [x,y]
+                data[dotids[i]]['fvcXY'] = [x,y]
         return data
 
     @property
@@ -507,6 +507,11 @@ class Petal(object):
         """Returns a list of all the fiducial ids on the petal.
         """
         return list(self.fidstates.keys())
+    
+    def fid_dotids(self,fidid):
+        """Returns a list (in a standard order) of the dot id strings for a particular fiducial.
+        """
+        return [fidid + '.' + str(i) for i in range(len(self.get_fids_val(fidid,'N_DOTS')))]
 
     def fid_busids(self,fidids):
         """Returns a list of bus ids where you find each of the fiducials (identified
