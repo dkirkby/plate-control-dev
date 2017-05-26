@@ -138,6 +138,11 @@ class FVCHandler(object):
         Lists of xy coordinates are of the form [[x1,y1],[x2,y2],...]
         
         All coordinates are in obsXY space (mm at the focal plane).
+        
+        None of the "_ref_" are used in FLI mode. The expected_ref_xy argument
+        is ignored, and the returned measured_ref_xy, peaks_ref, and fwhms_ref
+        lists will all be empty. This is because the platemaker / FVC implementations
+        do not support providing this information.
         """
         imgfiles = []        
         if self.fvc_type == 'simulator':
@@ -151,27 +156,14 @@ class FVCHandler(object):
             fwhms_pos = np.random.uniform(0.4,0.6,len(measured_pos_xy)).tolist()
             fwhms_ref = np.random.uniform(0.4,0.6,len(measured_ref_xy)).tolist()
         elif self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':
-            fiber_ctr_flag = 4
-            fiduc_ctr_flag = 8
-            index_pos = -1  # future implementation: use positioner/fiducial index mapping module
-            index_ref = -1
-            indices_pos = []
-            indices_ref = []
+
             expected_qs = []
-            for xylist in [expected_pos_xy,expected_ref_xy]:
-                if xylist == expected_pos_xy:
-                    flag = fiber_ctr_flag
-                    index_pos += 1
-                    indices_pos.append[index_pos]
-                    index = index_pos
-                else:
-                    flag = fiduc_ctr_flag
-                    index_ref += 1
-                    indices_ref.append[index_ref]
-                    index = index_ref
-                for xy in xylist:
-                    qs = self.trans.obsXY_to_QS(xy)
-                    expected_qs.append({'id':index, 'q':qs[0], 's':qs[1], 'flags':flag})
+            flag = 8 # only send positioner centers
+            xy_transposed = np.transpose(expected_pos_xy).tolist()
+            qs_vals = self.trans.obsXY_to_QS(xy_transposed)
+            qs_vals = np.transpose()
+            expected_qs = [{'id'}]
+            expected_qs.append({'id':index, 'q':qs[0], 's':qs[1], 'flags':flag})
             measured_qs = self.fvcproxy.measure(expected_qs)
             measured_pos_xy = [None]*len(indices_pos)
             measured_ref_xy = [None]*len(indices_ref)

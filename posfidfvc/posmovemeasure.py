@@ -51,26 +51,24 @@ class PosMoveMeasure(object):
         (In a future revision, if useful we may consider having fiducial ids (and dot sub-ids)
         returned also as keys, with corresponding measured values. As of April 2016, only
         positioner measurements are currently returned by this method.)
-        """
+        """        
         data = {}
-        expected_pos_xy = []
-        expected_ref_xy = []
-        petals = []
-        posids = []
-        for petal in self.petals:
-            these_posids = petal.posids
-            posids.extend(these_posids)
-            petals.extend([petal]*len(these_posids))
-            expected_pos_xy = pc.concat_lists_of_lists(expected_pos_xy, petal.expected_current_position(these_posids,'obsXY'))
-        expected_ref_xy = self.fiducial_dots_obsXY_ordered_list
-        measured_pos_xy,measured_ref_xy,peaks_pos,peaks_ref,fwhms_pos,fwhms_ref,imgfiles = self.fvc.measure_and_identify(expected_pos_xy,expected_ref_xy) 
-        for i in range(len(measured_pos_xy)):
-            petals[i].set(posids[i],'LAST_MEAS_OBS_X',measured_pos_xy[i][0])
-            petals[i].set(posids[i],'LAST_MEAS_OBS_Y',measured_pos_xy[i][1])
-            petals[i].set(posids[i],'LAST_MEAS_PEAK',peaks_pos[i])
-            petals[i].set(posids[i],'LAST_MEAS_FWHM',fwhms_pos[i])
-        for i in range(len(posids)):
-            data[posids[i]] = measured_pos_xy[i]
+        expected_pos = collections.OrderedDict()
+        expected_ref = []
+        for posid in self.all_posids:
+            petal = self.petal(posid)
+            expected_pos[posid] = {'xy':petal.expected_current_position(posid,'obsXY')}
+        expected_ref = self.fiducial_dots_obsXY_ordered_list
+        measured_pos,measured_ref_list,peaks_pos,peaks_ref,fwhms_pos,fwhms_ref,imgfiles = self.fvc.measure_and_identify(expected_pos,expected_ref) 
+        for posid in measured_pos.keys():
+            petal = self.petal(posid)
+            petal.set(posid,'LAST_MEAS_OBS_X',measured_pos[posid]['xy'][0])
+            petal.set(posid,'LAST_MEAS_OBS_Y',measured_pos[posid]['xy'][1])
+            petal.set(posid,'LAST_MEAS_PEAK',measured_pos[posid]['peak'])
+            petal.set(posid,'LAST_MEAS_FWHM',measured_pos[posid]['fwhm'])
+            data[posid] = measured_pos[posid]['xy']
+            
+        # continue in-progress changes here    
         for fidid in self.fiducial_dots_obsXY.keys(): # order of the keys here matters
             for petal in self.petals:
                 if fidid in petal.fidids:
