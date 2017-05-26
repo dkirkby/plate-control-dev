@@ -29,7 +29,6 @@ class PosMoveMeasure(object):
         self.fvc = fvc # fvchandler object
         self.ref_dist_tol = 5.0   # [pixels on FVC CCD] used for identifying fiducial dots
         self.nudge_dist   = 10.0  # [deg] used for identifying fiducial dots
-        self.last_meas_fiducials_xy = [] # convenient location to store list of measured fiducial dot positions from the most recent FVC measurement
         self.n_points_calib_T = 7 # number of points in a theta calibration arc
         self.n_points_calib_P = 7 # number of points in a phi calibration arc
         self.should_set_gear_ratios = False # whether to adjust gear ratios after calibration
@@ -51,46 +50,38 @@ class PosMoveMeasure(object):
 
         Return data is a dictionary with:   keys ... posid
                                           values ... [measured_obs_x, measured_obs_y]
-
-        (In a future revision, if useful we may consider having fiducial ids (and dot sub-ids)
-        returned also as keys, with corresponding measured values. As of April 2016, only
-        positioner measurements are currently returned by this method.)
         """        
         data = {}
         expected_pos = collections.OrderedDict()
         expected_ref = collections.OrderedDict()
         for posid in self.all_posids:
-            petal = self.petal(posid)
-            expected_pos[posid] = {'obsXY':petal.expected_current_position(posid,'obsXY')}
+            ptl = self.petal(posid)
+            expected_pos[posid] = {'obsXY':ptl.expected_current_position(posid,'obsXY')}
         expected_ref = self.fiducial_dots_XY
         measured_pos,measured_ref,imgfiles = self.fvc.measure_and_identify(expected_pos,expected_ref) 
         for posid in measured_pos.keys():
-            petal = self.petal(posid)
-            petal.set(posid,'LAST_MEAS_OBS_X',measured_pos[posid]['xy'][0])
-            petal.set(posid,'LAST_MEAS_OBS_Y',measured_pos[posid]['xy'][1])
-            petal.set(posid,'LAST_MEAS_PEAK',measured_pos[posid]['peak'])
-            petal.set(posid,'LAST_MEAS_FWHM',measured_pos[posid]['fwhm'])
+            ptl = self.petal(posid)
+            ptl.set(posid,'LAST_MEAS_OBS_X',measured_pos[posid]['obsXY'][0])
+            ptl.set(posid,'LAST_MEAS_OBS_Y',measured_pos[posid]['obsXY'][1])
+            ptl.set(posid,'LAST_MEAS_PEAK',measured_pos[posid]['peak'])
+            ptl.set(posid,'LAST_MEAS_FWHM',measured_pos[posid]['fwhm'])
             data[posid] = measured_pos[posid]['xy']
+        fid_data = {}
         for refid in measured_ref.keys():
-            petal = self.petal(refid)
-            
-            
-        # continue in-progress changes here    
-        for fidid in self.fiducial_dots_obsXY.keys(): # order of the keys here matters
-            for petal in self.petals:
-                if fidid in petal.fidids:
-                    these_peaks = [0]*petal.get_fids_val(fidid,'N_DOTS')[0]
-                    these_fwhms = [0]*len(these_peaks)
-                    for i in range(len(these_peaks)):
-                        if len(peaks_ref) == 0:
-                            self.printfunc('Ran out of reference dots, one thing to check is whether you have run initialize_hwsetup.py yet on this rig? (It auto-identifies fiducials for you.)')
-                            break
-                        these_peaks[i] = peaks_ref.pop(0)
-                        these_fwhms[i] = fwhms_ref.pop(0)
-                    petal.store_fid_val(fidid,'LAST_MEAS_PEAKS',these_peaks)
-                    petal.store_fid_val(fidid,'LAST_MEAS_FWHMS',these_fwhms)
-                    break            
-        self.last_meas_fiducials_xy = measured_ref_xy
+            ptl = self.petal(refid)
+            fidid = ptl.extract_fidid(refid)
+            if fidid not in fid_data.keys():
+                fid_data[fidid] = {key:[] for key in ['obsX','obsY','peaks','fwhms']}
+            fid_data[fidid]['obsX'].append(measured_ref[refid]['obsXY'][0])
+            fid_data[fidid]['obsY'].append(measured_ref[refid]['obsXY'][1])
+            fid_data[fidid]['peaks'].append(measured_ref[refid]['peak'])
+            fid_data[fidid]['fwhms'].append(measured_ref[refid]['fwhm'])
+        for fidid in fid_data.keys():
+            ptl = self.petal(fidid)
+            ptl.store_fid_val(fidid,'LAST_MEAS_OBS_X',fid_data[fidid]['obsX'])
+            ptl.store_fid_val(fidid,'LAST_MEAS_OBS_Y',fid_data[fidid]['obsY'])
+            ptl.store_fid_val(fidid,'LAST_MEAS_PEAKS',fid_data[fidid]['peaks'])
+            ptl.store_fid_val(fidid,'LAST_MEAS_FWHMS',fid_data[fidid]['fwhms'])
         return data,imgfiles
 
     def move(self, requests):
