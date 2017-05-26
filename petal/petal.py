@@ -511,7 +511,19 @@ class Petal(object):
     def fid_dotids(self,fidid):
         """Returns a list (in a standard order) of the dot id strings for a particular fiducial.
         """
-        return [fidid + '.' + str(i) for i in range(len(self.get_fids_val(fidid,'N_DOTS')))]
+        return [self.dotid_str(fidid,i) for i in range(len(self.get_fids_val(fidid,'N_DOTS')))]
+      
+    @staticmethod
+    def dotid_str(fidid,dotnumber):
+        return fidid + '.' + str(dotnumber)
+
+    @staticmethod
+    def extract_fidid(dotid):
+        return dotid.split('.')[0]
+    
+    @staticmethod
+    def extract_dotnumber(dotid):
+        return dotid.split('.')[1]
 
     def fid_busids(self,fidids):
         """Returns a list of bus ids where you find each of the fiducials (identified
