@@ -217,11 +217,14 @@ class PosState(object):
                 self.unit[new_key] = temp_val
         # also insert any missing entirely new keys
         if self.type == 'pos':
-            if 'LAST_MEAS_FWHM' not in self.unit.keys():
-                self.unit['LAST_MEAS_FWHM'] = None
+            possible_new_keys_and_defaults = {'LAST_MEAS_FWHM':None}
         elif self.type == 'fid':
-            if 'LAST_MEAS_FWHMS' not in self.unit.keys():
-                self.unit['LAST_MEAS_FWHMS'] = None
+            possible_new_keys_and_defaults = {'LAST_MEAS_OBS_X':[],
+                                              'LAST_MEAS_OBS_Y':[],
+                                              'LAST_MEAS_FWHMS':[]}
+        for key in possible_new_keys_and_defaults:
+            if key not in self.unit.keys():
+                self.unit[key] = possible_new_keys_and_defaults[key]
 
 if __name__=="__main__":
     state = PosState()
