@@ -91,6 +91,9 @@ if not sim and not svn_auth_err:
 else:
     should_commit_to_svn = False
 
+# close the gui
+gui_root.withdraw()
+
 # make sure control is enabled for all positioners
 for ptl in m.petals:
     for posid in ptl.posids:
@@ -204,8 +207,6 @@ if should_commit_to_svn:
         err2 = os.system('svn commit --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive -m "autocommit from initialize_hwsetup script" ' + file)
         print('SVN upload of file ' + str(n) + ' of ' + str(n_total) + ' (' + os.path.basename(file) + ') returned: ' + str(err1) + ' (add) and ' + str(err2) + ' (commit)')
 
-# close the gui
-gui_root.withdraw()
 
 # COMMENTS ON FUTURE WORK BELOW...
 # --------------------------------
