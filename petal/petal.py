@@ -438,8 +438,7 @@ class Petal(object):
         Fiducials that do not have control enabled would not be in this dictionary.
         """
         if self.simulator_on:
-            if self.verbose:
-                print('Simulator skips sending out set_fiducials commands.')
+            print('Simulator skips sending out set_fiducials commands on petal ' + str(self.petal_id) + '.')
             return {}
         fidids = pc.listify(fidids,keep_flat=True)[0]
         if fidids[0] == 'all':
@@ -514,7 +513,7 @@ class Petal(object):
     def fid_dotids(self,fidid):
         """Returns a list (in a standard order) of the dot id strings for a particular fiducial.
         """
-        return [self.dotid_str(fidid,i) for i in range(len(self.get_fids_val(fidid,'N_DOTS')))]
+        return [self.dotid_str(fidid,i) for i in range(self.get_fids_val(fidid,'N_DOTS')[0])]
       
     @staticmethod
     def dotid_str(fidid,dotnumber):
@@ -787,7 +786,7 @@ class Petal(object):
                             self.set(p.posid,'CTRL_ENABLED',False)
                             p.state.next_log_notes.append('disabled sending control commands because positioner was detected to be nonresponsive')
                     for fidid in self.fidids:
-                        if self.get_fids_val(fidid,'CAN_ID') == canid:
+                        if self.get_fids_val(fidid,'CAN_ID')[0] == canid:
                             self.store_fid_val(fidid,'CTRL_ENABLED',False)
                             self.fidstates[fidid].next_log_notes.append('disabled sending control commands because fiducial was detected to be nonresponsive')
                     status_updated = True
