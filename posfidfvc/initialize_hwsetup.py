@@ -130,24 +130,24 @@ def make_instrfile():
     metroX_arr=test[0,:]+np.random.normal(scale=5,size=len(test[0,:]))
     metroY_arr=test[1,:]+np.random.normal(scale=5,size=len(test[0,:]))
     
-    #Mread the Metrology Data
+    # read the Metrology Data
     metro_list=[]
     csvfile=open(pc.dirs['hwsetups']+os.path.sep+'EMPetal_XY.csv')
     metro=csv.DictReader(csvfile)
     for row in metro:
         metro_list.append(row)
-        
     
     # metroX_arr= , metroY_arr= 
-    
     pars = Parameters() # Input parameters model and initial guess
     pars.add('scale', value=10.)
     pars.add('offx', value=0.)
     pars.add('offy', value=0.)
     pars.add('angle', value=0.)
     out = minimize(residual, pars, args=(metroX_arr,metroY_arr, obsX_arr,obsY_arr)) # Find the minimum chi2
+    
     # Write the output
-    f = open(hwsetup_conf+'_instr_file','w')
+    filename = os.path.splitext(hwsetup.filename)[0] + '_instr.par'
+    f = open(filename,'w')
     output_lines='fvcmag  '+str(out.params['scale'].value)+'\n'+'fvcrot  '+str(out.params['angle'].value % 360)+'\n' \
                 +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(out.params['offy'].value)+'\n' \
                 +'fvcflip  0\n'+'fvcnrow  6000 \n'+'fvcncol  6000 \n'+'fvcpixmm  0.006' 
