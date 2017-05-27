@@ -70,6 +70,7 @@ for ptl in m.petals:
     for fidstate in ptl.fidstates.values():
         new_and_changed_files.add(fidstate.unit.filename)
         new_and_changed_files.add(fidstate.log_path)
+m.n_extradots_expected = hwsetup['num_extra_dots']
 
 # check ids with user
 text = '\n\nHere are the known positioners and fiducials:\n\n'
@@ -79,6 +80,7 @@ for posid in posids:
 text += '\n\n' + str(len(fidids)) + ' FIDUCIALS:'
 for fidid in fidids:
     text += '\n  ' + format(fidid+':','11s') + 'busid = ' + format(str(ptl.get_fids_val(fidid,'BUS_ID')[0]),'5s') + '  canid = ' + format(str(ptl.get_fids_val(fidid,'CAN_ID')[0]),'5s') + '  ndots = ' + str(ptl.get_fids_val(fidid,'N_DOTS')[0])
+text += '\n  num extra dots = ' + str(m.n_extradots_expected) + '\n'
 print(text)
 if not tkinter.messagebox.askyesno(title='IDs correct?',message='A list of all the positioner and fiducials has been printed to the stdout text console.\n\nPlease check each of these carefully.\n\nAre they all correct?'):
     tkinter.messagebox.showinfo(title='Quitting',message='Ok, will quit now so the IDs can be fixed.')
@@ -93,6 +95,10 @@ else:
 
 # close the gui
 gui_root.withdraw()
+
+# fire up the fiducials
+fid_settings_done = m.set_fiducials('on')
+print('Fiducials turned on: ' + str(fid_settings_done))
 
 # make sure control is enabled for all positioners
 for ptl in m.petals:
