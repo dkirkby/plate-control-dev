@@ -58,7 +58,7 @@ class PosMoveMeasure(object):
         for posid in self.all_posids:
             ptl = self.petal(posid)
             expected_pos[posid] = {'obsXY':ptl.expected_current_position(posid,'obsXY')}
-        expected_ref = self.fiducial_dots_XY
+        expected_ref = self.ref_dots_XY
         measured_pos,measured_ref,imgfiles = self.fvc.measure_and_identify(expected_pos,expected_ref) 
         for posid in measured_pos.keys():
             ptl = self.petal(posid)
@@ -494,7 +494,7 @@ class PosMoveMeasure(object):
             ptl.commit(log_note=log_note)
         
     @property
-    def n_fiducial_dots(self):
+    def n_ref_dots(self):
         """Number of fixed reference dots to expect in the field of view.
         """
         n_dots = 0
@@ -518,9 +518,9 @@ class PosMoveMeasure(object):
         return all_settings_done
             
     @property
-    def fiducial_dots_XY(self):
+    def ref_dots_XY(self):
         """Ordered dict of ordered dicts of nominal locations of all fixed reference dots in the FOV.
-        Primary keys are the fiducial dot ids. See petal.py similarly named function's comments.
+        Primary keys are the dot id strings. See petal.py similarly named function's comments.
         Sub-keys are:
             'fvcXY' --> [x,y] values in the FVC coordinate system (pixels)
             'obsXY' --> [x,y] values in the observer coordinate system (millimeters)
@@ -901,7 +901,7 @@ class PosMoveMeasure(object):
         """Generic function for identifying either all fiducials or a single positioner's location.
         """
         posids_by_ptl = self.pos_data_listed_by_ptl('all','POS_ID')
-        n_dots = len(self.all_posids) + self.n_fiducial_dots
+        n_dots = len(self.all_posids) + self.n_ref_dots
         nudges = [-self.nudge_dist, self.nudge_dist]
         for i in range(len(nudges)):
             dtdp = [0,nudges[i]]
@@ -929,10 +929,8 @@ class PosMoveMeasure(object):
                     positioners_current = petal.expected_current_position(posid=posids_by_ptl[petal],key='obsXY')
                     positioners_current = self.fvc.obsXY_to_fvcXY_noplatemaker(positioners_current)
                     xy_meas = pc.concat_lists_of_lists(xy_meas,positioners_current)
-                fiducials_xy = [dot['fvcXY'][i] for dot in self.fiducial_dots_XY.values() for i in range(len(dot['fvcXY']))]
-                xy_meas.extend(fiducials_xy)
-                for i in range(len(self.n_extradots_expected)):
-                    faraway = 2*np.max(np.max(np.abs(xy_meas)))
+                for j in range(self.n_ref_dots):
+                    faraway = 2*np.max(np.abs(xy_meas))
                     new_xy = np.random.uniform(low=faraway,high=2*faraway,size=2).tolist()
                     xy_meas.append(new_xy)
             if i == 0:
@@ -949,8 +947,8 @@ class PosMoveMeasure(object):
             else:
                 xy_pos.append(this_xy)
         if identify_fiducials:
-            if len(xy_ref) != self.n_fiducial_dots:
-                self.printfunc('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_fiducial_dots) + ')')
+            if len(xy_ref) != self.n_ref_dots:
+                self.printfunc('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_ref_dots) + ')')
             all_xy_detected = []
             for fidid in self.all_fidids:
                 self.printfunc('Temporarily turning off fiducial ' + fidid + ' to determine which dots belonged to it.')
@@ -998,7 +996,7 @@ class PosMoveMeasure(object):
                 self.printfunc('Extra reference dots detected at FVC pixel coordinates: ' + str(self.extradots_fvcXY))
         else:
             if len(xy_pos) > 1:
-                self.printfunc('warning: more than one moving dots (' + len(xy_pos) + ' detected when trying to identify positioner ' + posid)
+                self.printfunc('warning: more than one moving dots (' + str(len(xy_pos)) + ' detected when trying to identify positioner ' + posid)
             elif len(xy_pos) < 1:
                 self.printfunc('warning: no moving dots detected when trying to identify positioner ' + posid)
             else:
