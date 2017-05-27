@@ -30,6 +30,7 @@ class PosMoveMeasure(object):
         self.ref_dist_tol = 2.0   # [pixels on FVC CCD] used for identifying fiducial dots
         self.nudge_dist   = 10.0  # [deg] used for identifying fiducial dots
         self.extradots_fvcXY = [] # stores [x,y] pixel locations of any "extra" fiducial dots in the field (used for fixed ref fibers in laboratory test stands)
+        self.extradots_id = 'EXTRA' # identifier to use in extra dots id string
         self.n_extradots_expected = 0 # number of extra dots to look for in the field of view
         self.n_points_calib_T = 7 # number of points in a theta calibration arc
         self.n_points_calib_P = 7 # number of points in a phi calibration arc
@@ -54,7 +55,6 @@ class PosMoveMeasure(object):
         """        
         data = {}
         expected_pos = collections.OrderedDict()
-        expected_ref = collections.OrderedDict()
         for posid in self.all_posids:
             ptl = self.petal(posid)
             expected_pos[posid] = {'obsXY':ptl.expected_current_position(posid,'obsXY')}
@@ -66,17 +66,18 @@ class PosMoveMeasure(object):
             ptl.set(posid,'LAST_MEAS_OBS_Y',measured_pos[posid]['obsXY'][1])
             ptl.set(posid,'LAST_MEAS_PEAK',measured_pos[posid]['peak'])
             ptl.set(posid,'LAST_MEAS_FWHM',measured_pos[posid]['fwhm'])
-            data[posid] = measured_pos[posid]['xy']
+            data[posid] = measured_pos[posid]['obsXY']
         fid_data = {}
         for refid in measured_ref.keys():
-            ptl = self.petal(refid)
-            fidid = ptl.extract_fidid(refid)
-            if fidid not in fid_data.keys():
-                fid_data[fidid] = {key:[] for key in ['obsX','obsY','peaks','fwhms']}
-            fid_data[fidid]['obsX'].append(measured_ref[refid]['obsXY'][0])
-            fid_data[fidid]['obsY'].append(measured_ref[refid]['obsXY'][1])
-            fid_data[fidid]['peaks'].append(measured_ref[refid]['peak'])
-            fid_data[fidid]['fwhms'].append(measured_ref[refid]['fwhm'])
+            if self.extradots_id not in refid:
+                ptl = self.petal(refid)
+                fidid = ptl.extract_fidid(refid)
+                if fidid not in fid_data.keys():
+                    fid_data[fidid] = {key:[] for key in ['obsX','obsY','peaks','fwhms']}
+                fid_data[fidid]['obsX'].append(measured_ref[refid]['obsXY'][0])
+                fid_data[fidid]['obsY'].append(measured_ref[refid]['obsXY'][1])
+                fid_data[fidid]['peaks'].append(measured_ref[refid]['peak'])
+                fid_data[fidid]['fwhms'].append(measured_ref[refid]['fwhm'])
         for fidid in fid_data.keys():
             ptl = self.petal(fidid)
             ptl.store_fid_val(fidid,'LAST_MEAS_OBS_X',fid_data[fidid]['obsX'])
@@ -287,7 +288,7 @@ class PosMoveMeasure(object):
         INPUTS:     posids ... 'all' or a list of specific posids
         """
         posids_by_ptl = self.pos_data_listed_by_ptl(posids,'POS_ID')
-        self.printfunc('rehoming', repr(posids_by_ptl))
+        self.printfunc('rehoming', str({'petal ' + str(ptl.petal_id):posids_by_ptl[ptl] for ptl in posids_by_ptl.keys()}))
         for petal in posids_by_ptl.keys():
             petal.request_homing(posids_by_ptl[petal])
             petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
@@ -492,17 +493,6 @@ class PosMoveMeasure(object):
         """
         for ptl in self.petals:
             ptl.commit(log_note=log_note)
-        
-    @property
-    def n_ref_dots(self):
-        """Number of fixed reference dots to expect in the field of view.
-        """
-        n_dots = 0
-        for petal in self.petals:
-            n_dots_ptl = petal.n_fiducial_dots
-            n_dots += n_dots_ptl
-        n_dots += self.n_extradots_expected
-        return n_dots
     
     def set_fiducials(self, setting='on'):
         """Apply uniform settings to all fiducials on all petals simultaneously.
@@ -529,12 +519,12 @@ class PosMoveMeasure(object):
         for ptl in self.petals:
             more_data = ptl.fiducial_dots_fvcXY
             for dotid in more_data.keys():
-                more_data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY_noplatemaker(more_data[dotid]['fvcXY'])
+                more_data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY_noplatemaker(more_data[dotid]['fvcXY'])[0]
             data.update(more_data)
         for i in range(len(self.extradots_fvcXY)):
-            dotid = ptl.dotid_str('EXTRA',i) # any petal instance is fine here (static method)
+            dotid = ptl.dotid_str(self.extradots_id,i) # any petal instance is fine here (static method)
             data[dotid] = collections.OrderedDict()
-            data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY_noplatemaker(self.extradots_fvcXY[i])
+            data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY_noplatemaker(self.extradots_fvcXY[i])[0]
         return data
 
     def set_motor_parameters(self):
@@ -944,47 +934,38 @@ class PosMoveMeasure(object):
         if identify_fiducials:
             if len(xy_ref) != self.n_ref_dots:
                 self.printfunc('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_ref_dots) + ')')
-            all_xy_detected = []
+            all_xyref_detected = []
             for fidid in self.all_fidids:
                 self.printfunc('Temporarily turning off fiducial ' + fidid + ' to determine which dots belonged to it.')
                 ptl = self.petal(fidid)
                 ptl.set_fiducials(fidid,'off')
-                ptl.store_fid_val(fidid,'DOTS_FVC_X',[])
-                ptl.store_fid_val(fidid,'DOTS_FVC_Y',[])
-                xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_dots)
+                num_expected = ptl.get_fids_val(fidid,'N_DOTS')[0]
+                xy_meas = self.fvc.measure_fvc_pixels(n_dots - num_expected)[0]
                 if self.fvc.fvc_type == 'simulator':
                     xy_meas = self._simulate_measured_pixel_locations(xy_ref)
-                xy_detected = []
-                these_peaks = []
-                these_fwhms = []
+                    for j in range(num_expected):
+                        for k in range(len(self.all_posids),len(xy_meas)):
+                            if xy_meas[k] not in all_xyref_detected:
+                                del xy_meas[k] # this is faking turning off that dot
+                                break
+                these_xyref = []
                 for this_xy in xy_ref:
                     test_delta = np.array(this_xy) - np.array(xy_meas)
                     test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
-                    matches = [xy_meas[i] for i in range(len(xy_meas)) if test_dist[i] < self.ref_dist_tol]
-                    if len(matches) < 1:
-                        self.printfunc('warning: no match found for ref dot')
-                    elif len(matches) > 1:
-                        self.printfunc('warning: multiple matches found for ref dot')
-                    else:
-                        xy_detected.append(this_xy)
-                        match_idx = xy_meas.index(matches[0])
-                        these_peaks.append(peaks[match_idx])
-                        these_fwhms.append(fwhms[match_idx])
-                num_detected = len(xy_detected)
-                num_expected = ptl.get_fids_val(fidid,'N_DOTS')
+                    matches = [dist < self.ref_dist_tol for dist in test_dist]
+                    if not any(matches):
+                        these_xyref.append(this_xy)
+                        self.printfunc('Ref dot ' + str(len(these_xyref)-1) + ' identified for fiducial ' + fidid + ' at fvc coordinates ' + str(this_xy))
+                num_detected = len(these_xyref)
                 if num_detected != num_expected:
                     self.printfunc('warning: expected ' + str(num_expected) + ' dots for fiducial ' + fidid + ', but detected ' + str(num_detected))
-                else:
-                    self.printfunc('Dots of fiducial ' + fidid + ' detected at FVC pixel coordinates: ' + str(xy_detected))
-                ptl.store_fid_val(fidid,'DOTS_FVC_X',[xy_detected[i][0] for i in range(num_detected)])
-                ptl.store_fid_val(fidid,'DOTS_FVC_Y',[xy_detected[i][1] for i in range(num_detected)])
-                ptl.store_fid_val(fidid,'LAST_MEAS_OBS_X',[xy_detected[i][0] for i in range(num_detected)])
-                ptl.store_fid_val(fidid,'LAST_MEAS_OBS_Y',[xy_detected[i][1] for i in range(num_detected)])
-                ptl.store_fid_val(fidid,'LAST_MEAS_PEAKS',these_peaks)
-                ptl.store_fid_val(fidid,'LAST_MEAS_FWHMS',these_fwhms)
-                all_xy_detected += xy_detected
+                ptl.store_fid_val(fidid,'DOTS_FVC_X',[these_xyref[i][0] for i in range(num_detected)])
+                ptl.store_fid_val(fidid,'DOTS_FVC_Y',[these_xyref[i][1] for i in range(num_detected)])
+                ptl.store_fid_val(fidid,'LAST_MEAS_OBS_X',[these_xyref[i][0] for i in range(num_detected)])
+                ptl.store_fid_val(fidid,'LAST_MEAS_OBS_Y',[these_xyref[i][1] for i in range(num_detected)])
+                all_xyref_detected += these_xyref
                 ptl.set_fiducials(fidid,'on')
-            self.extradots_fvcXY = [xy for xy in xy_ref if xy not in all_xy_detected]
+            self.extradots_fvcXY = [xy for xy in xy_ref if xy not in all_xyref_detected]
             if self.extradots_fvcXY:
                 self.printfunc('Extra reference dots detected at FVC pixel coordinates: ' + str(self.extradots_fvcXY))
         else:
@@ -1003,13 +984,12 @@ class PosMoveMeasure(object):
                 this_petal.set(posid,'OFFSET_Y', prev_offset_y + err_y) # this works, assuming we have already have reasonable knowledge of theta and phi (having re-homed or rough-calibrated)
                 this_petal.set(posid,'LAST_MEAS_OBS_X',measured_obsXY[0])
                 this_petal.set(posid,'LAST_MEAS_OBS_Y',measured_obsXY[1])
-                match_idx = xy_test.index(xy_pos[0])
 
     def _simulate_measured_pixel_locations(self,xy_ref=[]):
         """Generates simulated locations in fvcXY space.
         Positioner locations are generated by simply looking up current expected positions.
         The optional argument xy_ref allows you to specify a list of [x,y] locations of
-        reference points near which to generate the ref points.
+        reference points to repeat.
         """
         xy_meas = []
         posids_by_ptl = self.pos_data_listed_by_ptl('all','POS_ID')
@@ -1023,9 +1003,7 @@ class PosMoveMeasure(object):
                 new_xy = np.random.uniform(low=faraway,high=2*faraway,size=2).tolist()
                 xy_meas.append(new_xy)
         else:
-            for old_xy in xy_ref:
-                new_xy = (np.array(old_xy) + np.random.uniform(-self.ref_dist_tol,self.ref_dist_tol,size=2)/2).tolist()
-                xy_meas.append(new_xy)
+            xy_meas.extend(xy_ref)
         return xy_meas
 
     def _test_and_update_TP(self,measured_data,tp_updates='posTP'):
@@ -1108,6 +1086,17 @@ class PosMoveMeasure(object):
     @property
     def grid_calib_num_constraints(self):
         return self.n_points_calib_T * self.n_points_calib_P
+
+    @property
+    def n_ref_dots(self):
+        """Number of reference dots to expect in the field of view.
+        """
+        n_dots = 0
+        for petal in self.petals:
+            n_dots_ptl = petal.n_fiducial_dots
+            n_dots += n_dots_ptl
+        n_dots += self.n_extradots_expected
+        return n_dots
     
     @property
     def n_moving_dots(self):
