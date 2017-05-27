@@ -491,6 +491,9 @@ class Petal(object):
             data['F001.1']['fvcXY'] --> [x,y] floats giving location of dot #1 in fiducial #F001
             
         The coordinates are all given in fiber view camera pixel space.
+        
+        In some laboratory setups, we have a "extra" fixed reference fibers. These
+        are not provided here (instead they are handled in posmovemeasure.py).
         """
         data = collections.OrderedDict()
         for fidid in self.fidids:
