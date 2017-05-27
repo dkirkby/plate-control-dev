@@ -45,6 +45,8 @@ class PtlTelemetry(object):
 			self.pins["GFAPWR_EN"] = "P8_15"
 			self.pins["CANBRD1_EN"] = "P8_9"
 			self.pins["CANBRD2_EN"] = "P8_11"			
+			self.pins["BUFF_EN1"] = "P8_10"
+			self.pins["BUFF_EN2"] = "P8_8"
 
 			#Inputs
 			self.pins["GFA_TACH1"] = "P8_16"
@@ -65,7 +67,9 @@ class PtlTelemetry(object):
 			GPIO.setup(self.pins["GFA_FAN2"], GPIO.OUT)
 			GPIO.setup(self.pins["GFAPWR_EN"], GPIO.OUT)
 			GPIO.setup(self.pins["CANBRD1_EN"], GPIO.OUT)
-			GPIO.setup(self.pins["CANBRD2_EN"], GPIO.OUT)			
+			GPIO.setup(self.pins["CANBRD2_EN"], GPIO.OUT)
+			GPIO.setup(self.pins["BUFF_EN1"], GPIO.OUT)
+			GPIO.setup(self.pins["BUFF_EN2"], GPIO.OUT)			
 
 			GPIO.setup(self.pins["GFA_TACH1"], GPIO.IN)
 			GPIO.setup(self.pins["GFA_TACH2"], GPIO.IN)
@@ -114,6 +118,8 @@ class PtlTelemetry(object):
 			pin_info["GFA_PWM2"] = 'Output (PWM) for controlling GFA_FAN2 speed'
 			pin_info["GFA_TACH1"] = 'Input (pulsed) connected to GFA_FAN1 tachometer sensor'
 			pin_info["GFA_TACH2"] = 'Input (pulsed) connected to GFA_FAN2 tachometer sensor'
+			pin_info["BUFF_EN1"] = 'Output (active low) for enabling the hardware SYNC'
+			pin_info["BUFF_EN2"] = 'Output (active low) for enabling the hardware SYNC'
 			return pin_info
 
 		except Exception as e:
