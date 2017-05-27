@@ -105,7 +105,10 @@ class FVCHandler(object):
             xy,peaks,fwhms,elapsed_time,imgfiles = self.sbig.grab(num_objects)
             peaks = [x/self.max_counts for x in peaks]
         elif self.fvc_type == 'simulator':
-            pass # do nothing here -- random returns would break the identify fiducials and identify positioners methods
+            xy = np.random.uniform(low=0,high=1000,size=(num_objects,2)).tolist()
+            peaks = np.random.uniform(low=0,high=1,size=num_objects).tolist()
+            fwhms = np.random.uniform(low=0,high=1,size=num_objects).tolist()
+            imgfiles = ['fake1.FITS','fake2.FITS']
         else:
             zeros_dict = {i:{'x':0.0, 'y':0.0, 'mag':0.0, 'meas_err':1.0, 'flags':4} for i in range(num_objects)}
             self.fvcproxy.set_targets(zeros_dict)
@@ -194,9 +197,9 @@ class FVCHandler(object):
                 for refid in refids:
                     measured_ref[refid] = {'obsXY':expected_ref[refid]['obsXY']} # just copy the old vals
                 for item in [measured_pos,measured_ref]:
-                    for key1 in item.keys():
-                        for key2 in ['peak','fwhm']:
-                            item[key1][key2] = np.random.uniform(0.4,0.6)            
+                    for key in item.keys():
+                        item[key]['peak'] = np.random.uniform(0,1)  
+                        item[key]['fwhm'] = np.random.uniform(0,1)
             else:
                 expected_xy = expected_pos_xy + expected_ref_xy
                 num_objects = len(expected_xy)
