@@ -923,14 +923,12 @@ class PosMoveMeasure(object):
             else:
                 xy_test = xy_meas
         xy_ref = []
-        xy_pos = []
         for this_xy in xy_test:
             test_delta = np.array(this_xy) - np.array(xy_init)
             test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
             if any(test_dist < self.ref_dist_tol):
                 xy_ref.append(this_xy)
-            else:
-                xy_pos.append(this_xy)
+        xy_pos = [xy for xy in xy_test if xy not in xy_ref]
         if identify_fiducials:
             if len(xy_ref) != self.n_ref_dots:
                 self.printfunc('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_ref_dots) + ')')
@@ -996,6 +994,20 @@ class PosMoveMeasure(object):
         for petal in self.petals:
             positioners_current = petal.expected_current_position(posid=posids_by_ptl[petal],key='obsXY')
             positioners_current = self.fvc.obsXY_to_fvcXY_noplatemaker(positioners_current)
+            if len(positioners_current) > 1:
+                i = 0
+                while i < len(positioners_current):
+                    this_xy = positioners_current[i]
+                    other_xys = positioners_current.copy()
+                    other_xys.remove(this_xy)
+                    test_delta = np.array(this_xy) - np.array(other_xys)
+                    test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
+                    matches = [dist < self.ref_dist_tol for dist in test_dist]
+                    if any(matches):
+                        this_xy[0] += self.ref_dist_tol*10*(i+1)
+                        this_xy[1] += self.ref_dist_tol*10*(i+1)
+                        positioners_current[i] = this_xy
+                    i += 1
             xy_meas = pc.concat_lists_of_lists(xy_meas,positioners_current)
         if not xy_ref:
             for i in range(self.n_ref_dots):
