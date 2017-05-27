@@ -159,8 +159,8 @@ class FVCHandler(object):
         """
         measured_pos = collections.OrderedDict.fromkeys(expected_pos.keys())
         measured_ref = collections.OrderedDict.fromkeys(expected_ref.keys()) if expected_ref else collections.OrderedDict()
-        posids = measured_pos.keys()
-        refids = measured_ref.keys()
+        posids = list(measured_pos.keys())
+        refids = list(measured_ref.keys())
         imgfiles = []
         if self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':
             expected_qs = [] # this is what will be provided to platemaker
