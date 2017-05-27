@@ -72,24 +72,18 @@ for ptl in m.petals:
         new_and_changed_files.add(fidstate.log_path)
 
 # check ids with user
-print('\n\nHere are the known positioners and fiducials:\n')
-print(str(len(posids)) + ' POSITIONERS:')
+text = '\n\nHere are the known positioners and fiducials:\n\n'
+text += str(len(posids)) + ' POSITIONERS:'
 for posid in posids:
-    print('  ' + format(posid+':','11s') + 'busid = ' + format(str(ptl.get(posid,'BUS_ID')),'5s') + '  canid = ' + format(str(ptl.get(posid,'CAN_ID')),'5s'))
-print('\n' + str(len(fidids)) + ' FIDUCIALS:')
+    text += '\n  ' + format(posid+':','11s') + 'busid = ' + format(str(ptl.get(posid,'BUS_ID')),'5s') + '  canid = ' + format(str(ptl.get(posid,'CAN_ID')),'5s')
+text += '\n\n' + str(len(fidids)) + ' FIDUCIALS:'
 for fidid in fidids:
-    print('  ' + format(fidid+':','11s') + 'busid = ' + format(str(ptl.get_fids_val(fidid,'BUS_ID')[0]),'5s') + '  canid = ' + format(str(ptl.get_fids_val(fidid,'CAN_ID')[0]),'5s') + '  ndots = ' + str(ptl.get_fids_val(fidid,'N_DOTS')[0]))
-print('\nPlease check each of these carefully.',end=' ')
-ids_unchecked = True
-while ids_unchecked:
-    response = input('Are these all correct (yes/no): ')
-    if 'n' in response.lower():
-        print('Exiting, to give user a chance to fix the problem(s).\n\n')
-        sys.exit(0)
-    elif 'y' in response.lower():
-        ids_unchecked = False
-    else:
-        print('Respond yes or no.')
+    text += '\n  ' + format(fidid+':','11s') + 'busid = ' + format(str(ptl.get_fids_val(fidid,'BUS_ID')[0]),'5s') + '  canid = ' + format(str(ptl.get_fids_val(fidid,'CAN_ID')[0]),'5s') + '  ndots = ' + str(ptl.get_fids_val(fidid,'N_DOTS')[0])
+print(text)
+if not tkinter.messagebox.askyesno(title='IDs correct?',message='A list of all the positioner and fiducials has been printed to the stdout text console.\n\nPlease check each of these carefully.\n\nAre they all correct?'):
+    tkinter.messagebox.showinfo(title='Quitting',message='Ok, will quit now so the IDs can be fixed.')
+    gui_root.withdraw()    
+    sys.exit(0)
 
 # check if auto-svn commit is desired
 if not sim and not svn_auth_err:
