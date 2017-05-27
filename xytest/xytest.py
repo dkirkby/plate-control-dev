@@ -106,6 +106,8 @@ class XYTest(object):
         self.logwrite('Positoners: ' + str(self.posids))
         self.logwrite('Positoner notes: ' + str(self.pos_notes))
         self.logwrite('Fiducials: ' + str(fidids))
+        self.m.n_extradots_expected = self.hwsetup_conf['num_extra_dots']
+        self.logwrite('Number of extra fiducial dots: ' + str(self.m.n_extradots_expected))
         self.logwrite('Petal: ' + str(ptl_id))
         self.m.make_plots_during_calib = self.xytest_conf['should_make_plots']
         self.logwrite('Automatic generation of calibration and submove plots is turned ' + ('ON' if self.xytest_conf['should_make_plots'] else 'OFF') + '.')
@@ -133,9 +135,6 @@ class XYTest(object):
             self.summarizers[posid] = summarizer.Summarizer(state,summarizer_init_data)
             self.track_file(self.summarizers[posid].filename, commit='always')
         self.logwrite('Data summarizers for all positioners initialized.')
-        
-        # TEMPORARY HACK until individual fiducial dot locations tracking is properly handled
-        self.m.extradots_fid_state = ptl.fidstates[self.hwsetup_conf['extradots_id']]
 
         # set up lookup table for random targets
         self.rand_xy_targs_idx = 0 # where we are in the random targets list

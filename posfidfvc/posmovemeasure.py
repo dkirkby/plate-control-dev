@@ -27,8 +27,10 @@ class PosMoveMeasure(object):
                 for dotid in petal.fid_dotids(fidid):
                     self._petals_map[dotid] = petal
         self.fvc = fvc # fvchandler object
-        self.ref_dist_tol = 5.0   # [pixels on FVC CCD] used for identifying fiducial dots
+        self.ref_dist_tol = 2.0   # [pixels on FVC CCD] used for identifying fiducial dots
         self.nudge_dist   = 10.0  # [deg] used for identifying fiducial dots
+        self.extradots_fvcXY = [] # stores [x,y] pixel locations of any "extra" fiducial dots in the field (used for fixed ref fibers in laboratory test stands)
+        self.n_extradots_expected = 0 # number of extra dots to look for in the field of view
         self.n_points_calib_T = 7 # number of points in a theta calibration arc
         self.n_points_calib_P = 7 # number of points in a phi calibration arc
         self.should_set_gear_ratios = False # whether to adjust gear ratios after calibration
@@ -42,7 +44,6 @@ class PosMoveMeasure(object):
         self.tp_updates_mode = 'posTP' # options are None, 'posTP', 'offsetsTP'. see comments in move_measure() function for explanation
         self.tp_updates_tol = 0.065 # [mm] tolerance on error between requested and measured positions, above which to update the POS_T,POS_P or OFFSET_T,OFFSET_P parameters
         self.tp_updates_fraction = 0.8 # fraction of error distance by which to adjust POS_T,POS_P or OFFSET_T,OFFSET_P parameters after measuring an excessive error with FVC
-        self.extradots_fid_state = None # TEMPORARY HACK until individual fiducial dot locations tracking is properly handled
         self.make_plots_during_calib = True # whether to automatically generate and save plots of the calibration data
 
     def measure(self):
@@ -407,7 +408,7 @@ class PosMoveMeasure(object):
         """
         self.printfunc('Nudging positioners to identify reference dots.')
         requests = {}
-        for posid in self.all_posids():
+        for posid in self.all_posids:
             requests[posid] = {'command':'posTP', 'target':[0,180], 'log_note':'identify fiducials starting point'}
         self.move(requests) # go to starting point
         self._identify(None)
@@ -417,10 +418,10 @@ class PosMoveMeasure(object):
         """
         self.printfunc('Nudging positioners to identify their starting locations.')
         requests = {}
-        for posid in self.all_posids():
+        for posid in self.all_posids:
             requests[posid] = {'command':'posTP', 'target':[0,180], 'log_note':'identify positioners starting point'}
         self.move(requests) # go to starting point
-        for posid in self.all_posids():
+        for posid in self.all_posids:
             self.printfunc('Identifying location of positioner ' + posid)
             self._identify(posid)
 
@@ -445,6 +446,7 @@ class PosMoveMeasure(object):
             data_by_ptl[petal] = this_data
         return data_by_ptl
     
+    @property
     def all_posids(self):
         """Returns a list of all the posids on all the petals.
         """
@@ -453,6 +455,15 @@ class PosMoveMeasure(object):
         for petal in posids_by_ptl.keys():
             all_posids.extend(posids_by_ptl[petal])
         return all_posids
+    
+    @property
+    def all_fidids(self):
+        """Returns a list of all the fidids on all the petals.
+        """
+        all_fidids = []
+        for ptl in self.petals:
+            all_fidids.extend(ptl.fidids)
+        return all_fidids
 
     def petal(self, posid_or_fidid_or_dotid):
         """Returns the petal object associated with a single id key.
@@ -490,6 +501,7 @@ class PosMoveMeasure(object):
         for petal in self.petals:
             n_dots_ptl = petal.n_fiducial_dots
             n_dots += n_dots_ptl
+        n_dots += self.n_extradots_expected
         return n_dots
     
     def set_fiducials(self, setting='on'):
@@ -514,40 +526,16 @@ class PosMoveMeasure(object):
             'obsXY' --> [x,y] values in the observer coordinate system (millimeters)
         """
         data = collections.OrderedDict()
-        for petal in self.petals:
-            more_data = petal.fiducial_dots_fvcXY
+        for ptl in self.petals:
+            more_data = ptl.fiducial_dots_fvcXY
             for dotid in more_data.keys():
                 more_data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY_noplatemaker(more_data[dotid]['fvcXY'])
             data.update(more_data)
+        for i in range(len(self.extradots_fvcXY)):
+            dotid = ptl.dotid_str('EXTRA',i) # any petal instance is fine here (static method)
+            data[dotid] = collections.OrderedDict()
+            data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY_noplatemaker(self.extradots_fvcXY[i])
         return data
-    
-    @property
-    def fiducial_dots_fvcXY_ordered_list(self):
-        '''Returns a list of the all the xy positions contained in the dict that
-        comes from fiducial_dots_fvcXY. The order of the list is guaranteed such
-        that if you iterate over...
-            for fidid in self.fiducial_dots_fvcXY:
-                for xy in self.fiducial_dots_fvcXY[fidid]:
-        ...then you would always get the same order of dots in the list.
-        '''
-        xy = []
-        for val in self.fiducial_dots_XY.values():
-            xy.extend(val['fvcXY'])
-        return xy    
-    
-    @property
-    def fiducial_dots_obsXY_ordered_list(self):
-        '''Returns a list of the all the xy positions contained in the dict that
-        comes from fiducial_dots_obsXY. The order of the list is guaranteed such
-        that if you iterate over...
-            for fidid in self.fiducial_dots_obsXY:
-                for xy in self.fiducial_dots_obsXY[fidid]:
-        ...then you would always get the same order of dots in the list.
-        '''
-        xy = []
-        for val in self.fiducial_dots_XY.values():
-            xy.extend(val['obsXY'])
-        return xy   
 
     def set_motor_parameters(self):
         '''Tells each petal to send all the latest motor settings out to positioners.
@@ -913,9 +901,8 @@ class PosMoveMeasure(object):
         """Generic function for identifying either all fiducials or a single positioner's location.
         """
         posids_by_ptl = self.pos_data_listed_by_ptl('all','POS_ID')
-        n_dots = len(self.all_posids()) + self.n_fiducial_dots
+        n_dots = len(self.all_posids) + self.n_fiducial_dots
         nudges = [-self.nudge_dist, self.nudge_dist]
-        xy_ref = []
         for i in range(len(nudges)):
             dtdp = [0,nudges[i]]
             if posid == None:
@@ -935,45 +922,88 @@ class PosMoveMeasure(object):
                 this_petal = self.petal(posid)
                 this_petal.request_direct_dtdp(request)
                 this_petal.schedule_send_and_execute_moves()
+            xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_dots)
             if self.fvc.fvc_type == 'simulator':
-                xy_meas = []
+                xy_meas = [] # need to replace the xy_meas, since FVC simulator doesn't know any reasonable expected positions
                 for petal in self.petals:
                     positioners_current = petal.expected_current_position(posid=posids_by_ptl[petal],key='obsXY')
                     positioners_current = self.fvc.obsXY_to_fvcXY_noplatemaker(positioners_current)
                     xy_meas = pc.concat_lists_of_lists(xy_meas,positioners_current)
-                n_new_fiducials = max(self.n_fiducial_dots - len(self.fiducial_dots_fvcXY_ordered_list),0)
-                if n_new_fiducials:
+                fiducials_xy = [dot['fvcXY'][i] for dot in self.fiducial_dots_XY.values() for i in range(len(dot['fvcXY']))]
+                xy_meas.extend(fiducials_xy)
+                for i in range(len(self.n_extradots_expected)):
                     faraway = 2*np.max(np.max(np.abs(xy_meas)))
-                    new_fiducials = np.random.uniform(low=faraway,high=2*faraway,size=(n_new_fiducials,2)).tolist()
-                    fiducials_xy = pc.concat_lists_of_lists(self.fiducial_dots_obsXY_ordered_list,new_fiducials)
-                    self.set_fiducials_xy_extradots(fiducials_xy) # temporary hack, see function description
-                xy_meas = pc.concat_lists_of_lists(xy_meas,self.fiducial_dots_fvcXY_ordered_list)
-            else:
-                xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_dots)
+                    new_xy = np.random.uniform(low=faraway,high=2*faraway,size=2).tolist()
+                    xy_meas.append(new_xy)
             if i == 0:
                 xy_init = xy_meas
             else:
                 xy_test = xy_meas
-        ref_idxs = []
-        for i in range(len(xy_test)):
-            test_delta = np.array(xy_test[i]) - np.array(xy_init)
+        xy_ref = []
+        xy_pos = []
+        for this_xy in xy_test:
+            test_delta = np.array(this_xy) - np.array(xy_init)
             test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
             if any(test_dist < self.ref_dist_tol):
-                xy_ref = pc.concat_lists_of_lists(xy_ref,xy_test[i])
-                ref_idxs.append(i)
+                xy_ref.append(this_xy)
+            else:
+                xy_pos.append(this_xy)
         if identify_fiducials:
             if len(xy_ref) != self.n_fiducial_dots:
                 self.printfunc('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_fiducial_dots) + ')')
-            self.set_fiducials_xy_extradots(xy_ref)  # temporary hack, see function description
+            all_xy_detected = []
+            for fidid in self.all_fidids:
+                self.printfunc('Temporarily turning off fiducial ' + fidid + ' to determine which dots belonged to it.')
+                ptl = self.petal(fidid)
+                ptl.set_fiducials(fidid,'off')
+                ptl.store_fid_val(fidid,'DOTS_FVC_X',[])
+                ptl.store_fid_val(fidid,'DOTS_FVC_Y',[])
+                xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_dots)[0]
+                xy_detected = []
+                these_peaks = []
+                these_fwhms = []
+                for this_xy in xy_ref:
+                    test_delta = np.array(this_xy) - np.array(xy_meas)
+                    test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
+                    matches = [xy_meas[i] for i in range(len(xy_meas)) if test_dist[i] < self.ref_dist_tol]
+                    if len(matches) < 1:
+                        self.printfunc('warning: no match found for ref dot')
+                    elif len(matches) > 1:
+                        self.printfunc('warning: multiple matches found for ref dot')
+                    else:
+                        old_dots_x = ptl.get_fids_val(fidid,'DOTS_FVC_X')
+                        old_dots_y = ptl.get_fids_val(fidid,'DOTS_FVC_Y')
+                        ptl.store_fid_val(fidid,'DOTS_FVC_X',old_dots_x + this_xy[0])
+                        ptl.store_fid_val(fidid,'DOTS_FVC_Y',old_dots_y + this_xy[1])
+                        xy_detected.append(this_xy)
+                        match_idx = xy_meas.index(matches[0])
+                        these_peaks.append(peaks[match_idx])
+                        these_fwhms.append(fwhms[match_idx])
+                num_detected = len(xy_detected)
+                num_expected = ptl.get_fids_val(fidid,'N_DOTS')
+                if num_detected != num_expected:
+                    self.printfunc('warning: expected ' + str(num_expected) + ' dots for fiducial ' + fidid + ', but detected ' + str(num_detected))
+                else:
+                    self.printfunc('Dots of fiducial ' + fidid + ' detected at FVC pixel coordinates: ' + str(xy_detected))
+                ptl.store_fid_val(fidid,'DOTS_FVC_X',[xy_detected[i][0] for i in range(num_detected)])
+                ptl.store_fid_val(fidid,'DOTS_FVC_y',[xy_detected[i][1] for i in range(num_detected)])
+                ptl.store_fid_val(fidid,'LAST_MEAS_OBS_X',[xy_detected[i][0] for i in range(num_detected)])
+                ptl.store_fid_val(fidid,'LAST_MEAS_OBS_Y',[xy_detected[i][1] for i in range(num_detected)])
+                ptl.store_fid_val(fidid,'LAST_MEAS_PEAKS',these_peaks)
+                ptl.store_fid_val(fidid,'LAST_MEAS_FWHMS',these_fwhms)
+                all_xy_detected += xy_detected
+                ptl.set_fiducials(fidid,'on')
+            self.extradots_fvcXY = [xy for xy in xy_ref if xy not in all_xy_detected]
+            if self.extradots_fvcXY:
+                self.printfunc('Extra reference dots detected at FVC pixel coordinates: ' + str(self.extradots_fvcXY))
         else:
-            if n_dots - len(ref_idxs) != 1:
-                self.printfunc('warning: more than one moving dots detected')
+            if len(xy_pos) > 1:
+                self.printfunc('warning: more than one moving dots (' + len(xy_pos) + ' detected when trying to identify positioner ' + posid)
+            elif len(xy_pos) < 1:
+                self.printfunc('warning: no moving dots detected when trying to identify positioner ' + posid)
             else:
-                ref_idxs.sort(reverse=True)
-                for i in ref_idxs:
-                    xy_test.pop(i) # get rid of all but the moving pos
                 expected_obsXY = this_petal.expected_current_position(posid,'obsXY')
-                measured_obsXY = self.fvc.fvcXY_to_obsXY_noplatemaker(xy_test[0])[0]
+                measured_obsXY = self.fvc.fvcXY_to_obsXY_noplatemaker(xy_pos[0])[0]
                 err_x = measured_obsXY[0] - expected_obsXY[0]
                 err_y = measured_obsXY[1] - expected_obsXY[1]
                 prev_offset_x = this_petal.get(posid,'OFFSET_X')
@@ -982,17 +1012,7 @@ class PosMoveMeasure(object):
                 this_petal.set(posid,'OFFSET_Y', prev_offset_y + err_y) # this works, assuming we have already have reasonable knowledge of theta and phi (having re-homed or rough-calibrated)
                 this_petal.set(posid,'LAST_MEAS_OBS_X',measured_obsXY[0])
                 this_petal.set(posid,'LAST_MEAS_OBS_Y',measured_obsXY[1])
-    
-    def set_fiducials_xy_extradots(self,fvcXY):
-        """THIS IS A TEMPORARY HACK until individual fiducial dot locations tracking is properly handled.
-        Other files touched by this hack are xytest.py and the hwsetup .conf files.
-        This function puts all the argued xy dots into a special "extradots" fiducial config file.
-        """
-        x = [xy[0] for xy in fvcXY]
-        y = [xy[1] for xy in fvcXY]
-        self.extradots_fid_state.store('DOTS_FVC_X',x)
-        self.extradots_fid_state.store('DOTS_FVC_Y',y)
-        self.extradots_fid_state.write()
+                match_idx = xy_test.index(xy_pos[0])
 
     def _test_and_update_TP(self,measured_data,tp_updates='posTP'):
         """Check if errors between measured positions and expected positions exceeds a tolerance
