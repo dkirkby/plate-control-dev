@@ -201,7 +201,7 @@ class PtlTelemetry(object):
 		except Exception as e:
 			rstring = modulename + 'Error reading temp sensors: %s' % str(e)
 			#self.error(rstring)
-			return 'FAILED: ' + rstring
+			return 'FAILED: no temperature sensors detected'
 
 
 	def control_pwm(self, fan= 'GFA_FAN1', duty_cycle=50):
