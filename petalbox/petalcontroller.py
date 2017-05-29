@@ -30,6 +30,7 @@ import time
 import threading
 import subprocess
 import netifaces
+import configobj
 
 try:
     import ptltel
@@ -40,6 +41,7 @@ import sys
 import os
 
 nonresponsive_canids = []
+pc_defaults = '/home/msdos/dos_home/dos_products/petalbox/pc_safe_settings.conf'
 
 def set_bit(value, bit):
     return value | (1<<bit)
@@ -80,7 +82,9 @@ class PetalController(Application):
                 'read_HRPG600',
                 'read_fan_tach',
                 'get_nonresponsive_canids',
-                'reset_nonresponsive_canids'
+                'reset_nonresponsive_canids',
+                'pbset',
+                'pbget'
                 ]
 
     # Default configuration (can be overwritten by command line or config file)
@@ -95,6 +99,7 @@ class PetalController(Application):
         """
         self.info('INITIALIZING Device %s' % self.role)
         self.loglevel('INFO')
+        self.verbose=False
         # Get configuration information (add more configuration variables as needed)
         try:
             self.default_petal_id = int(self.config['default_petal_id'])
@@ -102,10 +107,12 @@ class PetalController(Application):
             self.default_petal_id = self.default['default_petal_id']
         self.autoconf = True if 'T' in str(self.config['autoconf']).upper() else False
         self.controller_type = self.config['controller_type']
+        self.pc_defaults = configobj.ConfigObj(pc_defaults, unrepr=True, encoding='utf-8')
         self.simulator=False
         self.simulated_switch = {}
         self.simulated_pwm = {}
         self.fidstatus = {}
+        self.pb_statuses = {}
 
         if self.controller_type =='SIMULATOR':
             self.simulator=True
@@ -133,6 +140,10 @@ class PetalController(Application):
 
             except Exception as e:
                if self.verbose: print('Error initializing detected CAN channel(s).  Exception: ' + str(e))
+
+        #communicate only with list of canbuses that have been both detected and configured
+        self.canlist = self.canlist and self.pc_defaults[str(self.role)]['can_bus_list']
+
         # Bring in the Positioner Move object
         self.pmc=PositionerMoveControl(self.role, self.controller_type, self.canlist) # controller_type is HARDWARE or SIMULATOR
         if not self.simulator and telemetry_available:
@@ -143,18 +154,180 @@ class PetalController(Application):
         # call configure to setup the posid map
         retcode = self.configure('constants = DEFAULT')
 
-        self.verbose=False
 
     def configure(self, constants = 'DEFAULT'):
         """
         configure petal controller,
-        scan canbus to setup posid map
+        load safe fan/power supply values
         """
         self.info('configuring...')
+        #read power supply settings from config file and set accordingly
+        self.switch_en_ptl("PS1_EN", 1 if self.pc_defaults[str(self.role)]['supply_power'][0] == 'on' else 0)
+        self.switch_en_ptl("PS2_EN", 1 if self.pc_defaults[str(self.role)]['supply_power'][1] == 'on' else 0)
+        self.switch_en_ptl("GFAPWR_EN", 1 if self.pc_defaults[str(self.role)]['supply_power'][2] == 'on' else 0)
+
+        #read back default fan settings from config file and set accordingly
+        self.switch_en_ptl("GFA_FAN1", 1 if self.pc_defaults[str(self.role)]['fan_power'][0] == 'on' else 0)
+        self.switch_en_ptl("GFA_FAN2", 1 if self.pc_defaults[str(self.role)]['fan_power'][1] == 'on' else 0)
+        self.fan_pwm_ptl("GFA_FAN1", self.pc_defaults[str(self.role)]['fan_duty'][0])
+        self.fan_pwm_ptl("GFA_FAN2", self.pc_defaults[str(self.role)]['fan_duty'][1])
+
+        #read back default sync/buffer enable settings from config file and set accordingly
+        self.switch_en_ptl("BUFF_EN1", 0 if self.pc_defaults[str(self.role)]['buffer_enables'][0] == 'on' else 1)
+        self.switch_en_ptl("BUFF_EN2", 0 if self.pc_defaults[str(self.role)]['buffer_enables'][1] == 'on' else 1)
+        self.switch_en_ptl("SYNC", 1 if self.pc_defaults[str(self.role)]['sync'] == 'on' else 0)
+
+        #read back default CAN board enable settings from config file and set accordingly
+        self.switch_en_ptl("CANBRD1_EN", 1 if self.pc_defaults[str(self.role)]['can_power'][0] == 'on' else 0)
+        self.switch_en_ptl("CANBRD2_EN", 1 if self.pc_defaults[str(self.role)]['can_power'][1] == 'on' else 0)
+
+        #read back stop mode value and set
+        if(self.pc_defaults[str(self.role)]['stop_mode'] == 'on'):
+            self.pmc.enter_stop_mode(self.canlist)
+        
+        #read back fiducial initial settings and set
+        self.fids = self.pc_defaults[str(self.role)]['fid_settings']
+        self.can_map = self.pc_defaults[str(self.role)]['can_map']
+        
+        for key,value in self.fids.items():
+            canbus = self.can_map[key]
+            self.set_fiducials([canbus], [key], [value])
+
         self.status = 'READY'
+
+        #initialize self.pb_statuses dictionary
+        self.pb_statuses['all'] = 'return dictionary of all petalbox settings available'
+        self.pb_statuses['power'] = [self.pc_defaults[str(self.role)]['supply_power'][0] , self.pc_defaults[str(self.role)]['supply_power'][1], self.pc_defaults[str(self.role)]['supply_power'][2]]
+        self.pb_statuses['gfa_fan'] = {'inlet': [self.pc_defaults[str(self.role)]['fan_power'][0], self.pc_defaults[str(self.role)]['fan_duty'][0]], 'outlet': [self.pc_defaults[str(self.role)]['fan_power'][1], self.pc_defaults[str(self.role)]['fan_duty'][1]]}
+        self.pb_statuses['sync'] = self.pc_defaults[str(self.role)]['sync']
+        self.pb_statuses['buffers'] = [self.pc_defaults[str(self.role)]['buffer_enables'][0], self.pc_defaults[str(self.role)]['buffer_enables'][1]]
+        self.pb_statuses['can_en'] = [self.pc_defaults[str(self.role)]['can_power'][0], self.pc_defaults[str(self.role)]['can_power'][1]]
+        self.pb_statuses['temp'] = self.read_temp_ptl()
+        self.pb_statuses['stop_mode'] = self.pc_defaults[str(self.role)]['stop_mode']
+        self.pb_statuses['can_map'] = self.pc_defaults[str(self.role)]['can_map']
+        self.pb_statuses['fids'] = self.pc_defaults[str(self.role)]['fid_settings']
         return self.SUCCESS
     
 # PML functions (functions that can be accessed remotely)
+    def pbset(self, key, value):
+        """
+        Setter for various petalbox telemetry and positioner variables.
+        """
+        if key not in ['power', 'gfa_fan', 'can_en', 'sync', 'buffers', 'stop_mode', 'can_map', 'fids']:  #setable keys
+            return 'INVALID KEY' 
+        if key == 'power': #[pos1pwr = 'on'/'off', pos2pwr = 'on'/'off', gfapwr = 'on'/'off'], or 'on', 'off' (turns all power supplies 'on'/'off')
+            if not isinstance(value, list):
+                if value not in ['on', 'off']:
+                    return 'INVALID VALUE'
+                else:
+                    for pwrsupply in ["PS1_EN", "PS2_EN", "GFAPWR_EN"]:
+                        pwr = 1 if value == 'on' else 0
+                        self.switch_en_ptl(pwrsupply, pwr)
+                    self.pb_statuses[key] = [value, value, value]
+            else:
+                for idx, pwrsupply in enumerate(["PS1_EN", "PS2_EN", "GFAPWR_EN"]):
+                    pwr = 1 if value[idx] == 'on' else 0
+                    self.switch_en_ptl(pwrsupply, pwr)
+                self.pb_statuses[key] = value
+
+        elif key == 'gfa_fan': #set enables and speed in format {'inlet': ['on'/'off', 50], 'outlet': ['on'/'off', 75]}
+            if not isinstance(value, dict):
+                return 'INVALID VALUE'
+            self.switch_en_ptl("GFA_FAN1", 1 if value['inlet'][0] == 'on' else 0)
+            self.switch_en_ptl("GFA_FAN2", 1 if value['outlet'][0] == 'on' else 0)
+            self.fan_pwm_ptl("GFA_FAN1", int(value['inlet'][1]))
+            self.fan_pwm_ptl("GFA_FAN2", int(value['outlet'][1]))
+            self.pb_statuses[key] = value
+
+        elif key == 'sync':
+            if value not in ['on', 'off']:
+                return 'INVALID VALUE'
+            self.switch_en_ptl("SYNC", 1 if value == 'on' else 0)
+            self.pb_statuses[key] = value
+
+        elif key == 'buffers':
+            if not isinstance(value, list):
+                if value not in ['on', 'off']:
+                    return 'INVALID VALUE'
+                else:
+                    for buffer in ["BUFF_EN1", "BUFF_EN2"]:
+                        buff = 0 if value == 'on' else 1
+                        self.switch_en_ptl(buffer, buff)
+                    self.pb_statuses[key] = [value, value]
+            else:
+                for idx, buffer in enumerate(["BUFF_EN1", "BUFF_EN2"]):
+                    buff = 0 if value[idx] == 'on' else 1
+                    self.switch_en_ptl(buffer, buff)
+                self.pb_statuses[key] = value
+
+        elif key == 'can_en':
+            if not isinstance(value, list):
+                if value not in ['on', 'off']:
+                    return 'INVALID VALUE'
+                else:
+                    for canbrd in ["CANBRD1_EN", "CANBRD2_EN"]:
+                        en = 1 if value == 'on' else 0
+                        self.switch_en_ptl(canbrd, en)
+                    self.pb_statuses[key] = [value, value]
+            else:
+                for idx, canbrd in enumerate(["CANBRD1_EN", "CANBRD2_EN"]):
+                    en = 1 if value[idx] == 'on' else 0
+                    self.switch_en_ptl(canbrd, en)
+                self.pb_statuses[key] = value
+        
+        elif key == 'fids':
+            if not isinstance(value, list):
+                return 'INVALID VALUE'
+            else:
+                self.set_fiducials(value[0], value[1], value[2])
+
+        elif key == 'pbdefaults':
+            #update config file from petal              
+            pass
+
+        elif key == 'stop_mode':
+            if value not in ['on', 'off']:
+                return 'INVALID VALUE'
+            if value == 'on':
+                self.enter_stop_mode(self.canlist)
+            else:
+                self.exit_stop_mode()
+            self.pb_statuses[key] = value
+
+        return self.SUCCESS
+
+    def pbget(self, key):
+        """
+        Returns petal box statuses in format listed below.  Returns 'INVALID KEY' string if queried for non-existant status key.
+        """
+        if key == 'all':
+            return self.pb_statuses
+        if key == 'pos_temp':
+            #self.pmc.get_pos_temp()
+            pass
+        if key == 'temp':
+            self.pb_statuses[key] = self.read_temp_ptl()
+        #if key = 'gfa_fan':
+        #    pb_statuses[key] = self.read_fan_tach()
+        if key == 'posfid_info':  #returns dict  {can_id: [s_id, can_bus, fw_vr, bl_vr]} 
+            pass
+        if key == 'fids':
+            self.pb_statuses[key] = self.get_fid_status()
+        if key == 'power':
+            #pb_statuses[key] = self.read_HRPG600()
+            pass
+        if key == 'can_en':
+            pass
+
+        return self.pb_statuses.get(key, 'INVALID KEY')
+
+    def enter_stop_mode(self, canbuses):
+        for canbus in canbuses:
+            self.pmc.enter_stop_mode(canbus)
+
+    def exit_stop_mode(self):
+        self.switch_en_ptl("SYNC", 1)
+        self.pb_statuses['sync'] = 'on'
 
     def get_sids(self, canbus):
         """
@@ -193,7 +366,7 @@ class PetalController(Application):
                 return self.FAILED
         else:
             if self.simulator:
-                names_desc = {'PS1_OK': 'Input for reading back feedback signal from positioner power supply 1', 'PS2_EN': 'Output pin that enables positioner power supply 1 when set high', 'GFA_FAN1': 'Output for enabling power to GFA fan 1', 'GFAPWR_OK': 'Input for reading back feedback signal from GFA power supply', 'PS2_OK': 'Input for reading back feedback signal from positioner power supply 2', 'CANBRD2_EN': 'Output for switching power to SYSTEC CAN board 2', 'CANBRD1_EN': 'Output for switching power to SYSTEC CAN board 1', 'GFAPWR_EN': 'Output for enabling GFA power supply', 'GFA_PWM2': 'Output (PWM) for controlling GFA_FAN2 speed', 'GFA_TACH2': 'Input (pulsed) connected to GFA_FAN2 tachometer sensor', 'W1': 'Input (1-wire) pin to which all temperature sensors are connected', 'GFA_TACH1': 'Input (pulsed) connected to GFA_FAN1 tachometer sensor', 'SYNC': 'Output pin for sending synchronization signal to positioners', 'GFA_FAN2': 'Output for enabling power to GFA fan 2', 'GFA_PWM1': 'Output (PWM) for controlling GFA_FAN1 speed', 'PS1_EN': 'Output pin that enables positioner power supply 1 when set high'}
+                names_desc = {'PS1_OK': 'Input for reading back feedback signal from positioner power supply 1', 'PS2_EN': 'Output pin that enables positioner power supply 1 when set high', 'GFA_FAN1': 'Output for enabling power to GFA fan 1', 'GFAPWR_OK': 'Input for reading back feedback signal from GFA power supply', 'PS2_OK': 'Input for reading back feedback signal from positioner power supply 2', 'CANBRD2_EN': 'Output for switching power to SYSTEC CAN board 2', 'CANBRD1_EN': 'Output for switching power to SYSTEC CAN board 1', 'GFAPWR_EN': 'Output for enabling GFA power supply', 'GFA_PWM2': 'Output (PWM) for controlling GFA_FAN2 speed', 'GFA_TACH2': 'Input (pulsed) connected to GFA_FAN2 tachometer sensor', 'W1': 'Input (1-wire) pin to which all temperature sensors are connected', 'BUFF_EN1': 'Active low enable for SYNC', 'BUFF_EN2': 'Active low enable for SYNC','GFA_TACH1': 'Input (pulsed) connected to GFA_FAN1 tachometer sensor', 'SYNC': 'Output pin for sending synchronization signal to positioners', 'GFA_FAN2': 'Output for enabling power to GFA fan 2', 'GFA_PWM1': 'Output (PWM) for controlling GFA_FAN1 speed', 'PS1_EN': 'Output pin that enables positioner power supply 1 when set high'}
             else:
                 return 'FAILED: No GPIO name information available'
         return names_desc
@@ -273,8 +446,8 @@ class PetalController(Application):
         if telemetry_available:
             try:    
                 temps = self.pt.read_temp_sensors()
-            except:
-                return self.FAILED
+            except IOError:
+                return 'FAILED: no temperature sensors detected'
         else:
             if self.simulator:
                 temps =  {'28-000003f9c7c0': 22.812, '28-0000075c977a': 22.562}
@@ -383,6 +556,8 @@ class PetalController(Application):
                         "GFAPWR_EN" = "P8_15"
 			"CANBRD1_EN" = "P8_9"
 			"CANBRD2_EN" = "P8_11"
+			"BUFF_EN1" = "8_10"
+			"BUFF_EN2" = "8_8"
         """
        
         if telemetry_available:
@@ -446,18 +621,24 @@ class PetalController(Application):
     
     def set_fiducials(self, canbuses, ids, percent_duty):
         """
-        Set the ficucial power levels and period
-        Inputs include list with percentages, periods and ids
+        Set the ficucial power levels (by setting the duty percentage)
+        Inputs include list with canbuses, percentages, periods and ids
         Returns SUCCESS or error message.
-        canbus       ... string that specifies the can bus number, eg. 'can2'
-        ids          ... list of fiducial ids
+        canbuses     ... list of strings that specify the can bus number, eg. ['can2', 'can3']
+        ids          ... list of fiducial can ids
         percent_duty ... list of values, 0-100, 0 means off
         
         """
-        if not isinstance(ids, list) or not isinstance(percent_duty,list):
-            rstring = 'set_fiducials: Invalid arguments'
-            self.error(rstring)
-            return 'FAILED: ' + rstring
+        #set single fiducial without having to use list notation on the console
+        if not isinstance(ids, list) and not isinstance(percent_duty,list) and not isinstance(canbuses, list):
+            canbuses = [canbuses]
+            ids = [ids]
+            percent_duty = [percent_duty]
+
+        #set list of fiducials on single canbus to the same duty cycle, this operation is assumed if canbus and duty != list, but ids is a list
+        if isinstance(ids, list) and not isinstance(percent_duty, list) and not isinstance(canbuses, list):
+            canbuses = [canbuses] * len(ids)
+            percent_duty = [percent_duty] * len(ids)
     
         for id in range(len(ids)):
             # assemble arguments for canbus/firmware function
@@ -517,7 +698,8 @@ class PetalController(Application):
 
         #reset SYNC line
         self.switch_en_ptl('SYNC', 0)
- 
+        self.pb_statuses['sync'] = 'off'
+
         if not self.simulator:
             for table in move_tables:  # each table is a dictionary
                 posid=int(table['canid'])
@@ -610,10 +792,9 @@ class PetalController(Application):
             return 'FAILED: ' + rstring
         if mode == 'hard':
             self.switch_en_ptl('SYNC', 1)
-           
-        if mode == 'soft':	#send soft sync command to all detected CAN buses
-            for canbus in ['can0']: #self.canlist: removed entire canlist since other buses are not terminated and cause crashing
-             
+            self.pb_statuses['sync'] = 'on'
+        if mode == 'soft':	#send soft sync command to all CAN buses that have been both detected and configured
+            for canbus in self.canlist:     
                 self.pmc.send_soft_sync(canbus , 20000)
 
         return self.SUCCESS
@@ -732,10 +913,10 @@ class PositionerMoveControl(object):
         INPUTS
             role: device (role) name for this petal controller (string)
             controller_type:  either HARDWARE or SIMULATOR  (string)
-            canlist: list of canbuses (strings). Example: canlist=['can0','can2']
+            can_list: list of canbuses (strings). Example: canlist=['can0','can2']
     """
 
-    def __init__(self,role,controller_type, canlist):
+    def __init__(self,role,controller_type, can_list):
         if controller_type == 'HARDWARE':
             import posfidcan
         else:
@@ -744,10 +925,10 @@ class PositionerMoveControl(object):
         self.verbose=False
         self.role=role
         self.__can_frame_fmt = "=IB3x8s"
-        if isinstance(canlist, (list, tuple)) and len(canlist) != 0:
-            can_list = canlist
-        elif isinstance(canlist,str):
-            can_list = [canlist]
+        if isinstance(can_list, (list, tuple)) and len(can_list) != 0:
+            can_list = can_list
+        elif isinstance(can_list,str):
+            can_list = [can_list]
       
         self.pfcan={}
         if self.verbose:
@@ -762,6 +943,8 @@ class PositionerMoveControl(object):
         self.cmd={'led':5} # container for the command numbers 'led_cmd':5  etc.
         self.posid_all=20000
 
+    def enter_stop_mode(self, canbus):
+        self.pfcan[canbus].send_command(20000, 40, '')
    
     def get_sids(self, canbus):
         """
