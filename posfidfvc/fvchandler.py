@@ -207,19 +207,17 @@ class FVCHandler(object):
                 measured_xy,sorted_idxs = self.sort_by_closeness(unsorted_xy, expected_xy)
                 sorted_posids_range = range(0,len(expected_pos_xy))
                 sorted_refids_range = range(len(expected_pos_xy),len(sorted_idxs))
-                sorted_posids = [sorted_idxs[i] for i in sorted_posids_range]
-                sorted_refids = [sorted_idxs[i] for i in sorted_refids_range]
                 measured_pos_xy = [measured_xy[i] for i in sorted_posids_range]
                 measured_ref_xy = [measured_xy[i] for i in sorted_refids_range]
                 measured_pos_xy = self.correct_using_ref(measured_pos_xy, measured_ref_xy, expected_ref_xy)
+                measured_xy[:sorted_posids_range.stop] = measured_pos_xy
                 sorted_peaks = np.array(unsorted_peaks)[sorted_idxs].tolist()
                 sorted_fwhms = np.array(unsorted_fwhms)[sorted_idxs].tolist()
-                for posid in sorted_posids:
-                    idx = sorted_posids.index(posid)
-                    measured_pos[posid] = {'obsXY':measured_pos_xy[idx], 'peak':sorted_peaks[idx], 'fwhm':sorted_fwhms[idx]}
-                for refid in sorted_refids:
-                    idx = len(sorted_posids) + sorted_refids.index(refid)
-                    measured_ref[refid] = {'obsXY':measured_xy[idx], 'peak':sorted_peaks[idx], 'fwhm':sorted_fwhms[idx]}
+                for i in range(len(posids)):
+                    measured_pos[posids[i]] = {'obsXY':measured_xy[i], 'peak':sorted_peaks[i], 'fwhm':sorted_fwhms[i]}
+                for i in range(len(refids)):
+                    j = i + sorted_posids_range.stop
+                    measured_ref[refids[i]] = {'obsXY':measured_xy[j], 'peak':sorted_peaks[j], 'fwhm':sorted_fwhms[j]}
         return measured_pos, measured_ref, imgfiles
 
     def correct_using_ref(self, measured_pos_xy, measured_ref_xy, expected_ref_xy):
