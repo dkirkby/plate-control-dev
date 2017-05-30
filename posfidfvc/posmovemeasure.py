@@ -59,8 +59,17 @@ class PosMoveMeasure(object):
             ptl = self.petal(posid)
             expected_pos[posid] = {'obsXY':ptl.expected_current_position(posid,'obsXY')}
         expected_ref = self.ref_dots_XY
-        measured_pos,measured_ref,imgfiles = self.fvc.measure_and_identify(expected_pos,expected_ref) 
-        for posid in measured_pos.keys():
+        if self.fvc.fvc_type == 'FLI' or self.fvc.fvc_type == 'SBIG_Yale':
+            # Consider replacing this implementation with one where instead of "extra dots", we
+            # differentiate positioners by their CTRL_ENABLED flag instead. This means doing
+            # some detail rework in xytest.py, to make sure we are choosing the correct actions
+            # at each step for each positioner, depending on whether it is in fact enabled or not.
+            # (Long term, this work is the right thing to do, because we certainly expect that
+            # dead positioners will occur on the instrument.)
+            extra_dots = {refid:{'obsXY':expected_ref[refid]['obsXY']} for refid in expected_ref.keys() if self.extradots_id in refid}
+            expected_pos.update(extra_dots)
+        measured_pos,measured_ref,imgfiles = self.fvc.measure_and_identify(expected_pos,expected_ref)            
+        for posid in self.all_posids:
             ptl = self.petal(posid)
             ptl.set(posid,'LAST_MEAS_OBS_X',measured_pos[posid]['obsXY'][0])
             ptl.set(posid,'LAST_MEAS_OBS_Y',measured_pos[posid]['obsXY'][1])
@@ -422,8 +431,11 @@ class PosMoveMeasure(object):
         for posid in self.all_posids:
             requests[posid] = {'command':'posTP', 'target':[0,180], 'log_note':'identify positioners starting point'}
         self.move(requests) # go to starting point
+        total = len(self.all_posids)
+        n = 0
         for posid in self.all_posids:
-            self.printfunc('Identifying location of positioner ' + posid)
+            n += 1
+            self.printfunc('Identifying location of positioner ' + posid + ' (' + str(n) + ' of ' + str(total) + ')')
             self._identify(posid)
 
     def pos_data_listed_by_ptl(self, posids='all', key=''):
@@ -934,38 +946,39 @@ class PosMoveMeasure(object):
                 self.printfunc('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_ref_dots) + ')')
             all_xyref_detected = []
             for fidid in self.all_fidids:
-                self.printfunc('Temporarily turning off fiducial ' + fidid + ' to determine which dots belonged to it.')
                 ptl = self.petal(fidid)
-                ptl.set_fiducials(fidid,'off')
                 num_expected = ptl.get_fids_val(fidid,'N_DOTS')[0]
-                xy_meas = self.fvc.measure_fvc_pixels(n_dots - num_expected)[0]
-                if self.fvc.fvc_type == 'simulator':
-                    xy_meas = self._simulate_measured_pixel_locations(xy_ref)
-                    for j in range(num_expected):
-                        for k in range(len(self.all_posids),len(xy_meas)):
-                            if xy_meas[k] not in all_xyref_detected:
-                                del xy_meas[k] # this is faking turning off that dot
-                                break
-                these_xyref = []
-                for this_xy in xy_ref:
-                    test_delta = np.array(this_xy) - np.array(xy_meas)
-                    test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
-                    matches = [dist < self.ref_dist_tol for dist in test_dist]
-                    if not any(matches):
-                        these_xyref.append(this_xy)
-                        self.printfunc('Ref dot ' + str(len(these_xyref)-1) + ' identified for fiducial ' + fidid + ' at fvc coordinates ' + str(this_xy))
-                num_detected = len(these_xyref)
-                if num_detected != num_expected:
-                    self.printfunc('warning: expected ' + str(num_expected) + ' dots for fiducial ' + fidid + ', but detected ' + str(num_detected))
-                ptl.store_fid_val(fidid,'DOTS_FVC_X',[these_xyref[i][0] for i in range(num_detected)])
-                ptl.store_fid_val(fidid,'DOTS_FVC_Y',[these_xyref[i][1] for i in range(num_detected)])
-                ptl.store_fid_val(fidid,'LAST_MEAS_OBS_X',[these_xyref[i][0] for i in range(num_detected)])
-                ptl.store_fid_val(fidid,'LAST_MEAS_OBS_Y',[these_xyref[i][1] for i in range(num_detected)])
-                all_xyref_detected += these_xyref
-                ptl.set_fiducials(fidid,'on')
+                if num_expected > 0:
+                    self.printfunc('Temporarily turning off fiducial ' + fidid + ' to determine which dots belonged to it.')
+                    ptl.set_fiducials(fidid,'off')
+                    xy_meas = self.fvc.measure_fvc_pixels(n_dots - num_expected)[0]
+                    if self.fvc.fvc_type == 'simulator':
+                        xy_meas = self._simulate_measured_pixel_locations(xy_ref)
+                        for j in range(num_expected):
+                            for k in range(len(self.all_posids),len(xy_meas)):
+                                if xy_meas[k] not in all_xyref_detected:
+                                    del xy_meas[k] # this is faking turning off that dot
+                                    break
+                    these_xyref = []
+                    for this_xy in xy_ref:
+                        test_delta = np.array(this_xy) - np.array(xy_meas)
+                        test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
+                        matches = [dist < self.ref_dist_tol for dist in test_dist]
+                        if not any(matches):
+                            these_xyref.append(this_xy)
+                            self.printfunc('Ref dot ' + str(len(these_xyref)-1) + ' identified for fiducial ' + fidid + ' at fvc coordinates ' + str(this_xy))
+                    num_detected = len(these_xyref)
+                    if num_detected != num_expected:
+                        self.printfunc('warning: expected ' + str(num_expected) + ' dots for fiducial ' + fidid + ', but detected ' + str(num_detected))
+                    ptl.store_fid_val(fidid,'DOTS_FVC_X',[these_xyref[i][0] for i in range(num_detected)])
+                    ptl.store_fid_val(fidid,'DOTS_FVC_Y',[these_xyref[i][1] for i in range(num_detected)])
+                    ptl.store_fid_val(fidid,'LAST_MEAS_OBS_X',[these_xyref[i][0] for i in range(num_detected)])
+                    ptl.store_fid_val(fidid,'LAST_MEAS_OBS_Y',[these_xyref[i][1] for i in range(num_detected)])
+                    all_xyref_detected += these_xyref
+                    ptl.set_fiducials(fidid,'on')
             self.extradots_fvcXY = [xy for xy in xy_ref if xy not in all_xyref_detected]
             if self.extradots_fvcXY:
-                self.printfunc('Extra reference dots detected at FVC pixel coordinates: ' + str(self.extradots_fvcXY))
+                self.printfunc(str(len(self.extradots_fvcXY)) + ' extra reference dots detected at FVC pixel coordinates: ' + str(self.extradots_fvcXY))
         else:
             if len(xy_pos) > 1:
                 self.printfunc('warning: more than one moving dots (' + str(len(xy_pos)) + ') detected when trying to identify positioner ' + posid)
