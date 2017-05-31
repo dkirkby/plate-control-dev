@@ -131,6 +131,7 @@ def make_instrfile():
     test=(rot(obsX_arr-pars0[1],obsY_arr-pars0[2],-pars0[3]))/pars0[0]
     metroX_arr=test[0,:]# Fake data 
     metroY_arr=test[1,:]#+np.random.normal(scale=5,size=len(test[0,:]))
+
     metro_X_arr=[] # Real data
     metro_Y_arr=[]
     # read the Metrology Data
@@ -139,7 +140,8 @@ def make_instrfile():
     metro=csv.DictReader(csvfile)
     for row in metro:
         metro_list.append(row)
-    device_select=('155','171','184','201','214','232','247','266','282','302')
+    m_select=('M00096','M00044','M00043','M00069','M00224','M00086','M00074','M00302','M00091','M00088',)
+    device_select=('155','171','184',    '201',    '214',   '232',   '247',   '266',   '282',   '302')
     for row in metro_list:
         if row['device_loc'] in device_select:
             metro_X_arr.append(row['X'])
@@ -160,6 +162,22 @@ def make_instrfile():
     model_x=np.array(model[0,:]).ravel()
     model_y=np.array(model[1,:]).ravel()
     print(model_x)
+    plt.figure(1,figsize=(15,15))
+    plt.subplot(221)
+    plt.plot(obsX_arr,obsY_arr,'ko',label='fvcmag '+str(out.params['scale'].value)+'\n' +'fvcmag  '+str(out.params['scale'].value)+'\n'+'fvcrot  '+str(out.params['angle'].value % 360)+'\n' \
+                                     +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(out.params['offy'].value)+'\n')
+    plt.plot(model_x,model_y,'b')
+    plt.xlabel('obsX')
+    plt.ylabel('obsY')
+    plt.legend(loc=2)
+    plt.plot()    
+    
+    plt.subplot(222)
+    plt.plot(metro_X_arr,metro_Y_arr,'ko',label='')
+    plt.xlabel('metroX')
+    plt.ylabel('metroY')
+    plt.legend(loc=2)
+    plt.plot()    
     
     # Write the output
 
@@ -169,7 +187,7 @@ def make_instrfile():
                 +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(out.params['offy'].value)+'\n' \
                 +'fvcflip  0\n'+'fvcnrow  6000 \n'+'fvcncol  6000 \n'+'fvcpixmm  0.006' 
     f.write(output_lines)
-    return out,metro_list,obsX_arr,obsY_arr,model_x,model_y
+    return out,metro_list
 
 
 def rot(x,y,angle): # A rotation matrix to rotate the coordiantes by a certain angle
@@ -212,14 +230,8 @@ m.rehome() # start out rehoming to hardstops because no idea if last recorded ax
 m.identify_fiducials()
 m.identify_positioner_locations()
 if should_make_instrfile:
-    instr_par,metro ,obsX_arr,obsY_arr,model_x,model_y = make_instrfile()
-    plt.figure(1,figsize=(15,15))
-    plt.subplot(221)
-    plt.plot(obsX_arr,obsY_arr,'ko')
-    plt.plot(model_x,model_y,'b')
-    plt.xlabel('obsX')
-    plt.ylabel('obsY')
-    plt.plot()
+    instr_par,metro  = make_instrfile()
+
     
 if should_limit_range:
     m.measure_range(axis='theta')
