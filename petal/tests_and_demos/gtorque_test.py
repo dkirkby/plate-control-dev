@@ -13,6 +13,7 @@
 #    Revisions:
 #    mm/dd/yyyy who        description
 #    ---------- --------   -----------
+#    05/25/2017 cad        Version 1.03.  Add Test Jig type, UM or LBL
 #    05/24/2017 cad        Version 1.02.  Changed to individual constants for cool down time, and
 #                          torque angle. Removed Torque Moves.  Restructured code to allow multiple
 #                          CW and CCW torques.
@@ -77,7 +78,7 @@ n_mm_to_oz_in = 0.1416119
 Currents=[100,100,100,0]    # percentages for spin-up,cruise,creep,hold
 
 torque_angle=65		# degrees
-torque_cool_down=90	# seconds
+torque_cool_down=60	# seconds
 torque_mode='creep'
 
 # indices into MoveTable list
