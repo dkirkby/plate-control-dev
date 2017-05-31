@@ -114,6 +114,7 @@ else:
 
 # define function for making platemaker instrument file
 def make_instrfile():
+    import matplotlib.pyplot as plt
     status = ptl.get(posid=posids) # Read the calibration data
     obsX_arr=[] # Measured position of each FP
     obsY_arr=[]
@@ -160,13 +161,6 @@ def make_instrfile():
     model_y=np.array(model[1,:]).ravel()
     print(model_x)
     
-    plt.figure(1,figsize=(15,15))
-    plt.subplot(221)
-    plt.plot(obsX_arr,obsY_arr,'ko')
-    plt.plot(model_x,model_y,'b')
-    plt.xlabel('obsX')
-    plt.ylabel('obsY')
-    plt.plot()
     # Write the output
 
     filename = os.path.splitext(hwsetup.filename)[0] + '_instr.par'
@@ -175,7 +169,7 @@ def make_instrfile():
                 +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(out.params['offy'].value)+'\n' \
                 +'fvcflip  0\n'+'fvcnrow  6000 \n'+'fvcncol  6000 \n'+'fvcpixmm  0.006' 
     f.write(output_lines)
-    return out,metro_list,obs
+    return out,metro_list,obsX_arr,obsY_arr,model_x,model_y
 
 
 def rot(x,y,angle): # A rotation matrix to rotate the coordiantes by a certain angle
@@ -218,7 +212,15 @@ m.rehome() # start out rehoming to hardstops because no idea if last recorded ax
 m.identify_fiducials()
 m.identify_positioner_locations()
 if should_make_instrfile:
-    instr_par,metro = make_instrfile()
+    instr_par,metro ,obsX_arr,obsY_arr,model_x,model_y = make_instrfile()
+    plt.figure(1,figsize=(15,15))
+    plt.subplot(221)
+    plt.plot(obsX_arr,obsY_arr,'ko')
+    plt.plot(model_x,model_y,'b')
+    plt.xlabel('obsX')
+    plt.ylabel('obsY')
+    plt.plot()
+    
 if should_limit_range:
     m.measure_range(axis='theta')
     m.measure_range(axis='phi')
