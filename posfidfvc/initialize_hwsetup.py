@@ -17,6 +17,7 @@ import astropy
 import csv
 import numpy as np
 from lmfit import minimize, Parameters
+import matplotlib.pyplot as plt
 
 
 # unique timestamp and fire up the gui
@@ -127,16 +128,23 @@ def make_instrfile():
     # Should read the metrology data eventually    
     pars0=np.array([20,1,1,30.])
     test=(rot(obsX_arr-pars0[1],obsY_arr-pars0[2],-pars0[3]))/pars0[0]
-    metroX_arr=test[0,:]+np.random.normal(scale=5,size=len(test[0,:]))
-    metroY_arr=test[1,:]+np.random.normal(scale=5,size=len(test[0,:]))
-    
+    metroX_arr=test[0,:]# Fake data 
+    metroY_arr=test[1,:]#+np.random.normal(scale=5,size=len(test[0,:]))
+    metro_X_arr=[] # Real data
+    metro_Y_arr=[]
     # read the Metrology Data
     metro_list=[]
     csvfile=open(pc.dirs['hwsetups']+os.path.sep+'EMPetal_XY.csv')
     metro=csv.DictReader(csvfile)
     for row in metro:
         metro_list.append(row)
-    
+    device_select=('155','171','184','201','214','232','247','266','282','302')
+    for row in metro_list:
+        if row['device_loc'] in device_select:
+            metro_X_arr.append(row['X'])
+            metro_Y_arr.append(row['Y'])
+    print(metro_X_arr)
+    print(metro_Y_arr)        
     # metroX_arr= , metroY_arr= 
     pars = Parameters() # Input parameters model and initial guess
     pars.add('scale', value=10.)
@@ -144,15 +152,30 @@ def make_instrfile():
     pars.add('offy', value=0.)
     pars.add('angle', value=0.)
     out = minimize(residual, pars, args=(metroX_arr,metroY_arr, obsX_arr,obsY_arr)) # Find the minimum chi2
+ #  Plots
+    par_out=[out.params['scale'].value,out.params['offx'].value,out.params['offy'].value,out.params['angle'].value]
+    pars_out=out.params
+    model=pars_out['scale']*(rot(metroX_arr+pars_out['offx'],metroY_arr+pars_out['offy'],pars_out['angle']))
+    model_x=np.array(model[0,:]).ravel()
+    model_y=np.array(model[1,:]).ravel()
+    print(model_x)
     
+    plt.figure(1,figsize=(15,15))
+    plt.subplot(221)
+    plt.plot(obsX_arr,obsY_arr,'ko')
+    plt.plot(model_x,model_y,'b')
+    plt.xlabel('obsX')
+    plt.ylabel('obsY')
+    plt.plot()
     # Write the output
+
     filename = os.path.splitext(hwsetup.filename)[0] + '_instr.par'
     f = open(filename,'w')
     output_lines='fvcmag  '+str(out.params['scale'].value)+'\n'+'fvcrot  '+str(out.params['angle'].value % 360)+'\n' \
                 +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(out.params['offy'].value)+'\n' \
                 +'fvcflip  0\n'+'fvcnrow  6000 \n'+'fvcncol  6000 \n'+'fvcpixmm  0.006' 
     f.write(output_lines)
-    return out,metro_list
+    return out,metro_list,obs
 
 
 def rot(x,y,angle): # A rotation matrix to rotate the coordiantes by a certain angle
