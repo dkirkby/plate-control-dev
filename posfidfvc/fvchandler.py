@@ -292,19 +292,23 @@ class FVCHandler(object):
         """
         if xy != []:
             if self.fvcproxy:
-                fvcXY_dict = {}
-                qs = self.fvcproxy.fvcXY_to_QS(xy_dict)
-                xy = self.trans.QS_to_obsXY(qs)
+                spotids = [i for i in range(len(xy))]
+                fvcXY_dicts = [{'spotid':spotids[i],'x_pix':xy[i][0],'y_pix':xy[i][1]} for i in range(len(spotids))]
+                qs_dicts = self.fvcproxy.fvcXY_to_QS(fvcXY_dicts)
+                return_order = [spotids.index(d['spotid']) for d in qs_dicts]
+                qs = [[qs_dicts[i]['q'],qs_dicts[i]['s']] for i in return_order]
+                xy = self.trans.QS_to_obsXY(np.transpose(qs).tolist())
+                xy = np.transpose(xy).tolist()
             else:
                 xy = pc.listify2d(xy)
-                xy_np = np.array(xy).transpose()
+                xy_np = np.transpose(xy)
                 rot = FVCHandler.rotmat2D_deg(self.rotation)
                 xy_np = np.dot(rot, xy_np)
                 xy_np *= self.scale
                 translation_x = self.translation[0] * np.ones(np.shape(xy_np)[1])
                 translation_y = self.translation[1] * np.ones(np.shape(xy_np)[1])
                 xy_np += [translation_x,translation_y]
-                xy = xy_np.transpose().tolist()       
+                xy = np.transpose(xy_np).tolist()       
         return xy
     
     def obsXY_to_fvcXY(self,xy):
@@ -316,19 +320,23 @@ class FVCHandler(object):
         """
         if xy != []:
             if self.fvcproxy:
-                qs = self.trans.obsXY_to_QS(xy)
-                qs_dict = {}
-                xy = self.fvcproxy.QS_to_fvcXY(qs_dict)              
+                spotids = [i for i in range(len(xy))]
+                qs = self.trans.obsXY_to_QS(np.tranpose(xy).tolist())
+                qs = np.transpose(qs).tolist()
+                qs_dicts = [{'spotid':spotids[i],'q':qs[i][0],'s':qs[i][1]} for i in range(len(spotids))]
+                fvcXY_dicts = self.fvcproxy.QS_to_fvcXY(qs_dicts)
+                return_order = [spotids.index(d['spotid']) for d in fvcXY_dicts]
+                xy = [[fvcXY_dicts[i]['x_pix'],fvcXY_dicts[i]['y_pix']] for i in return_order]
             else:
                 xy = pc.listify2d(xy)
-                xy_np = np.array(xy).transpose()
+                xy_np = np.transpose(xy)
                 translation_x = self.translation[0] * np.ones(np.shape(xy_np)[1])
                 translation_y = self.translation[1] * np.ones(np.shape(xy_np)[1])
                 xy_np -= [translation_x,translation_y]
                 xy_np /= self.scale
                 rot = FVCHandler.rotmat2D_deg(-self.rotation)
                 xy_np = np.dot(rot, xy_np)
-                xy = xy_np.transpose().tolist() 
+                xy = np.transpose(xy_np).tolist() 
         return xy
     
     @staticmethod
