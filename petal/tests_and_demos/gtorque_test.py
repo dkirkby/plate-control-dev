@@ -13,6 +13,7 @@
 #    Revisions:
 #    mm/dd/yyyy who        description
 #    ---------- --------   -----------
+#    06/01/2017 cad        Version 1.03.  Extra error checking on connect
 #    05/25/2017 cad        Version 1.03.  Add Test Jig type, UM or LBL
 #    05/24/2017 cad        Version 1.02.  Changed to individual constants for cool down time, and
 #                          torque angle. Removed Torque Moves.  Restructured code to allow multiple
@@ -56,7 +57,7 @@ import petalcomm
 import posconstants as pc
 
 prog_name="Torque Test"
-prog_version="1.02"
+prog_version="1.03"
 
 # Configuration Values
 
@@ -543,20 +544,24 @@ class Torque_Test_GUI:
             messagebox.showerror(prog_name+" - Fix Entry", ve )
             return 
         lCanBusID=self.canbus.get()
-        self.pcomm=petalcomm.PetalComm(lPetal_Controller_Number)
-        if(self.pcomm.is_connected()):
-            print("Connected")
-            print("CanBus=",lCanBusID)
-            print("CanID =",lCanID)
-            self.logprint("Connected")
-            if(4!=len(Currents)):
-                messagebox.showerror(prog_name+' Error', 'Currents should be a list of 4 values!')
-                return
-            # enable button_Run here
-            self.enable_Run_button()
-        else:
-            print("Not Connected")
-            self.status_str.set("Not Connected")
+        try:
+            self.pcomm=petalcomm.PetalComm(lPetal_Controller_Number)
+            if(self.pcomm.is_connected()):
+                print("Connected")
+                print("CanBus=",lCanBusID)
+                print("CanID =",lCanID)
+                self.logprint("Connected")
+                if(4!=len(Currents)):
+                    messagebox.showerror(prog_name+' Error', 'Currents should be a list of 4 values!')
+                    return
+                # enable button_Run here
+                self.enable_Run_button()
+            else:
+                print("Not Connected")
+                self.status_str.set("Not Connected")
+        except:
+            print("Not Connected, PetalComm init failed")
+            self.status_str.set("Not Connected, PetalComm init failed")
         return
 
     # return 1 on fail, 0 on success
