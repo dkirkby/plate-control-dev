@@ -1,7 +1,8 @@
 setupOptional(DOSlib)
 setupOptional(fp_settings)
 envSet(PETAL_PATH, ${PRODUCT_DIR}/petal)
-envSet(POSITIONER_LOGS_PATH, /data/logs/petal)
+#Below now in SiteLite product
+#envSet(POSITIONER_LOGS_PATH, /home/msdos/logs/petal)
 pathPrepend(PATH, ${PRODUCT_DIR}/bin)
 pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/petal)
 pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/petalbox)

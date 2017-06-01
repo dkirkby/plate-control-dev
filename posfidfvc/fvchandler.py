@@ -110,13 +110,12 @@ class FVCHandler(object):
             fwhms = np.random.uniform(low=0,high=1,size=num_objects).tolist()
             imgfiles = ['fake1.FITS','fake2.FITS']
         else:
-            zeros_dict = {i:{'x':0.0, 'y':0.0, 'mag':0.0, 'meas_err':1.0, 'flags':4} for i in range(num_objects)}
-            self.fvcproxy.set_targets(zeros_dict)
-            centroids = self.fvcproxy.locate('locate', send_centroids=True)
+            self.fvcproxy.send_fvc_command('make_targets',num_spots=num_objects)
+            centroids = self.fvcproxy.locate(send_centroids=True)
             if centroids == 'FAILED':
                 self.printfunc('Failed to locate centroids using FVC.')
             else:
-                for params in self.centroids.values():
+                for params in centroids.values():
                     xy.append([params['x'],params['y']])
                     peaks.append(self.normalize_mag(params['mag']))
                     fwhms.append(params['fwhm'])
@@ -325,8 +324,8 @@ class FVCHandler(object):
         return np.array([[np.cos(radians), -np.sin(radians)], [np.sin(radians), np.cos(radians)]])
 
 if __name__ == '__main__':
-    f = FVCHandler(fvc_type='SBIG')
-    n_objects = 5
+    f = FVCHandler(fvc_type='FLI')
+    n_objects = 65
     n_repeats = 1
     xy = []
     peaks = []
