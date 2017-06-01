@@ -94,6 +94,25 @@ if not sim and not svn_auth_err:
 else:
     should_commit_to_svn = False
 
+# determine if we need to identify fiducials and positioners this run
+should_identify_fiducials = True
+should_identify_positioners = True
+extradots_filename = pc.dirs['temp_files'] + os.path.sep + 'extradots.csv'
+extradots_existing_data = []
+if m.n_extradots_expected > 0 and os.path.isfile(extradots_filename):
+    if tkinter.messagebox.askyesno(title='Load extra dots data?',message='An existing extra dots data file was found at ' + extradots_filename + '. Load it and skip re-identification of fiducials?'):
+        should_identify_fiducials = False
+        with open(extradots_filename,'r',newline='') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                extradots_existing_data.append([row['x_pix'],row['y_pix']])
+        if tkinter.messagebox.askyesno(title='Skip id of positioners?',message='Also skip identification of positioner locations?\n\n(Say "YES" only if you are confident of their stored locations from a previous run.)'):
+            should_identify_positioners = False
+else:
+    if tkinter.messagebox.askyesno(title='Skip identification?',message='Skip identification of fiducial and positioner locations?\n\n(Say "YES" only if you are confident of their stored locations from a previous run.)'):
+        should_identify_fiducials = False
+        should_identify_positioners = False
+
 # close the gui
 gui_root.withdraw()
 
@@ -225,14 +244,22 @@ def residual(pars,x,y,x_data,y_data):
     #       fvcncol  6000 
     #       fvcpixmm 0.006
 
+
 # calibration routines
 m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
-m.identify_fiducials()
-m.identify_positioner_locations()
+if should_identify_fiducials:
+    m.identify_fiducials()
+    with open(extradots_filename,'w',newline='') as file:
+        writer = csv.DictWriter(file,fieldnames=['x_pix','y_pix'])
+        writer.writeheader()
+        for xy in m.extradots_fvcXY:
+            writer.writerow({'x_pix':xy[0],'y_pix':xy[1]})
+else:
+    m.extradots_fvcXY = extradots_existing_data
+if should_identify_positioners:
+    m.identify_positioner_locations()
 if should_make_instrfile:
     instr_par,metro  = make_instrfile()
-
-    
 if should_limit_range:
     m.measure_range(axis='theta')
     m.measure_range(axis='phi')
