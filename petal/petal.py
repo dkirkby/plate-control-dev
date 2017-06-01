@@ -7,6 +7,8 @@ import posconstants as pc
 import numpy as np
 import time
 import collections
+import os
+from DBSingleton import * 
 
 class Petal(object):
     """Controls a petal. Communicates with the PetalBox hardware via PetalComm.
@@ -30,27 +32,30 @@ class Petal(object):
         local_commit_on ... boolean, controlw whether to commit state data to local log files (can be done with or without db_commit_on)
         printfunc       ... method, used for stdout style printing. we use this for logging during tests
     """
-    def __init__(self, petal_id, posids, fidids, simulator_on=False, db_commit_on=False, local_commit_on=True, printfunc=print,verbose=False):
+    def __init__(self, petal_id, posids, fidids, simulator_on=False, db_commit_on=False, local_commit_on=True, printfunc=print, verbose=False, user_interactions_enabled=False):
         # petal setup
         self.petal_id = petal_id
         self.verbose = verbose # whether to print verbose information at the terminal
         self.simulator_on = simulator_on
         if not(self.simulator_on):
             import petalcomm
-            self.comm = petalcomm.PetalComm(self.petal_id)
+            self.comm = petalcomm.PetalComm(self.petal_id, user_interactions_enabled=user_interactions_enabled)
             self.comm.reset_nonresponsive_canids() #reset petalcontroller's list of non-responsive canids
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
 
         # database setup
         self.db_commit_on = db_commit_on
+        if self.db_commit_on:
+            os.environ['DOS_POSMOVE_WRITE_TO_DB'] = 'True'
+            self.posmoveDB = DBSingleton(petal_id=self.petal_id)
         self.local_commit_on = local_commit_on
         self.altered_states = set()
 
         # positioners setup
         self.posmodels = []
         for posid in posids:
-            state = posstate.PosState(posid, logging=True, device_type='pos', printfunc=self.printfunc)
-            model = posmodel.PosModel(state,is_simulation=simulator_on)
+            state = posstate.PosState(posid, logging=True, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
+            model = posmodel.PosModel(state,is_simulation=simulator_on,user_interactions_enabled=user_interactions_enabled)
             self.posmodels.append(model)
         self.posids = posids.copy()
         self.canids_where_tables_were_just_sent = []
@@ -69,7 +74,7 @@ class Petal(object):
         # fiducials setup
         self.fidstates = {}
         for fidid in fidids:
-            state = posstate.PosState(fidid, logging=True, device_type='fid', printfunc=self.printfunc)
+            state = posstate.PosState(fidid, logging=True, device_type='fid', printfunc=self.printfunc,petal_id=self.petal_id)
             self.fidstates[fidid] = state
         
         # power supplies setup?
@@ -422,7 +427,8 @@ class Petal(object):
     def set_fiducials(self, fidids='all', setting='on', save_as_default=False):
         """Set a list of specific fiducials on or off.
         
-        fidids ... 1 fiducial id string, or a list of fiducial id strings, or 'all'
+        fidids ... one fiducial id string, or a list of fiducial id strings, or 'all'
+		           (this is the string given by DEVICE_ID in DESI-2724)
         
         setting ... what to set the fiducials to, as described below:
             'on'         ... turns each fiducial to its default on value
@@ -437,8 +443,7 @@ class Petal(object):
         Fiducials that do not have control enabled would not be in this dictionary.
         """
         if self.simulator_on:
-            if self.verbose:
-                print('Simulator skips sending out set_fiducials commands.')
+            print('Simulator skips sending out set_fiducials commands on petal ' + str(self.petal_id) + '.')
             return {}
         fidids = pc.listify(fidids,keep_flat=True)[0]
         if fidids[0] == 'all':
@@ -480,24 +485,52 @@ class Petal(object):
     
     @property
     def fiducial_dots_fvcXY(self):
-        """Returns a dict of all [x,y] positions of all fiducial dots this petal contributes
-        in the field of view. Keys are the fiducial IDs. Values are lists of the form
-        [[x1,y1],[x2,y2],...]. The coordinates are all given in fiber view camera pixel space.
+        """Returns an ordered dict of ordered dicts of all [x,y] positions of all
+        fiducial dots this petal contributes in the field of view.
+        
+        Primary keys are the fiducial dot ids, formatted like:
+            'F001.0', 'F001.1', etc...
+        
+        Returned values are accessed with the sub-key 'fvcXY'. So that:
+            data['F001.1']['fvcXY'] --> [x,y] floats giving location of dot #1 in fiducial #F001
+            
+        The coordinates are all given in fiber view camera pixel space.
+        
+        In some laboratory setups, we have a "extra" fixed reference fibers. These
+        are not provided here (instead they are handled in posmovemeasure.py).
         """
-        xydata = collections.OrderedDict()
+        data = collections.OrderedDict()
         for fidid in self.fidids:
-            x = []
-            y = []
-            x.extend(self.get_fids_val(fidid,'DOTS_FVC_X')[0])
-            y.extend(self.get_fids_val(fidid,'DOTS_FVC_Y')[0])
-            xydata[fidid] = [[x[i],y[i]] for i in range(len(x))]
-        return xydata
+            dotids = self.fid_dotids(fidid)
+            for i in range(len(dotids)):
+                data[dotids[i]] = collections.OrderedDict()
+                x = self.get_fids_val(fidid,'DOTS_FVC_X')[0][i]
+                y = self.get_fids_val(fidid,'DOTS_FVC_Y')[0][i]
+                data[dotids[i]]['fvcXY'] = [x,y]
+        return data
 
     @property
     def fidids(self):
         """Returns a list of all the fiducial ids on the petal.
         """
         return list(self.fidstates.keys())
+    
+    def fid_dotids(self,fidid):
+        """Returns a list (in a standard order) of the dot id strings for a particular fiducial.
+        """
+        return [self.dotid_str(fidid,i) for i in range(self.get_fids_val(fidid,'N_DOTS')[0])]
+      
+    @staticmethod
+    def dotid_str(fidid,dotnumber):
+        return fidid + '.' + str(dotnumber)
+
+    @staticmethod
+    def extract_fidid(dotid):
+        return dotid.split('.')[0]
+    
+    @staticmethod
+    def extract_dotnumber(dotid):
+        return dotid.split('.')[1]
 
     def fid_busids(self,fidids):
         """Returns a list of bus ids where you find each of the fiducials (identified
@@ -610,10 +643,22 @@ class Petal(object):
         A note string may optionally be included to go along with this entry in the logs.
         '''
         if self.db_commit_on:
+            pos_commit_list = []
+            fid_commit_list = []
             for state in self.altered_states:
                 # determine whether it's a positioner state or a fiducial state (these have different data)
                 # gather up the data from this state
+                if 'POS_ID' in state.unit:
+                    pos_commit_list.append(state)
+                elif 'FID_ID' in state.unit:
+                    fid_commit_list.append(state)
+                state.log_unit()
                 # do the commit
+            if len(pos_commit_list) != 0:
+                self.posmoveDB.WriteToDB(pos_commit_list,self.petal_id,'move')
+                self.posmoveDB.WriteToDB(pos_commit_list,self.petal_id,'calib')
+            if len(fid_commit_list) != 0:
+                self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid')
                 pass
         if self.local_commit_on:
             for state in self.altered_states:
@@ -758,7 +803,7 @@ class Petal(object):
                             self.set(p.posid,'CTRL_ENABLED',False)
                             p.state.next_log_notes.append('disabled sending control commands because positioner was detected to be nonresponsive')
                     for fidid in self.fidids:
-                        if self.get_fids_val(fidid,'CAN_ID') == canid:
+                        if self.get_fids_val(fidid,'CAN_ID')[0] == canid:
                             self.store_fid_val(fidid,'CTRL_ENABLED',False)
                             self.fidstates[fidid].next_log_notes.append('disabled sending control commands because fiducial was detected to be nonresponsive')
                     status_updated = True
