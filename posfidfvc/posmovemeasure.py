@@ -541,7 +541,7 @@ class PosMoveMeasure(object):
         for ptl in self.petals:
             more_data = ptl.fiducial_dots_fvcXY
             for dotid in more_data.keys():
-                more_data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY(more_data[dotid]['fvcXY'])[0]
+                more_data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY([more_data[dotid]['fvcXY']])[0]
             data.update(more_data)
         for i in range(len(self.extradots_fvcXY)):
             if not self.fvc.fvcproxy:
@@ -551,7 +551,7 @@ class PosMoveMeasure(object):
                 # The ids assigned here do NOT correspond to physical reality of which dot is generated at which particular device.
                 dotid = self.extradot_ids[i]
             data[dotid] = collections.OrderedDict()
-            data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY(self.extradots_fvcXY[i])[0]
+            data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY([self.extradots_fvcXY[i]])[0]
         return data
 
     def set_motor_parameters(self):
@@ -1001,7 +1001,7 @@ class PosMoveMeasure(object):
                 self.printfunc('warning: no moving dots detected when trying to identify positioner ' + posid)
             else:
                 expected_obsXY = this_petal.expected_current_position(posid,'obsXY')
-                measured_obsXY = self.fvc.fvcXY_to_obsXY(xy_pos[0])[0]
+                measured_obsXY = self.fvc.fvcXY_to_obsXY(xy_pos)[0]
                 err_x = measured_obsXY[0] - expected_obsXY[0]
                 err_y = measured_obsXY[1] - expected_obsXY[1]
                 prev_offset_x = this_petal.get(posid,'OFFSET_X')
