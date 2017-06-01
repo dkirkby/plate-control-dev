@@ -294,7 +294,7 @@ class FVCHandler(object):
             if self.fvcproxy:
                 spotids = [i for i in range(len(xy))]
                 fvcXY_dicts = [{'spotid':spotids[i],'x_pix':xy[i][0],'y_pix':xy[i][1]} for i in range(len(spotids))]
-                qs_dicts = self.fvcproxy.fvcXY_to_QS(fvcXY_dicts)
+                qs_dicts = self.fvcproxy.fvcxy_to_qs(fvcXY_dicts)
                 return_order = [spotids.index(d['spotid']) for d in qs_dicts]
                 qs = [[qs_dicts[i]['q'],qs_dicts[i]['s']] for i in return_order]
                 xy = self.trans.QS_to_obsXY(np.transpose(qs).tolist())
@@ -323,7 +323,7 @@ class FVCHandler(object):
                 spotids = [i for i in range(len(xy))]
                 qs = self.trans.obsXY_to_QS(np.tranpose(xy).tolist())
                 qs_dicts = [{'spotid':spotids[i],'q':qs[0,i],'s':qs[1,i]} for i in range(len(spotids))]
-                fvcXY_dicts = self.fvcproxy.QS_to_fvcXY(qs_dicts)
+                fvcXY_dicts = self.fvcproxy.qs_to_fvcxy(qs_dicts)
                 return_order = [spotids.index(d['spotid']) for d in fvcXY_dicts]
                 xy = [[fvcXY_dicts[i]['x_pix'],fvcXY_dicts[i]['y_pix']] for i in return_order]
             else:
