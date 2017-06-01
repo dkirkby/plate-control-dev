@@ -32,7 +32,7 @@ class PosMoveMeasure(object):
         self.extradots_fvcXY = [] # stores [x,y] pixel locations of any "extra" fiducial dots in the field (used for fixed ref fibers in laboratory test stands)
         self.extradots_id = 'EXTRA' # identifier to use in extra dots id string
         self.n_extradots_expected = 0 # number of extra dots to look for in the field of view
-        if self.fvc.fvc_type != 'SBIG':
+        if self.fvc.fvcproxy:
             from DOSlib.positioner_index import PositionerIndex
             posindex = PositionerIndex()
             devices = []
