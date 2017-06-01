@@ -33,6 +33,8 @@ class PosMoveMeasure(object):
         self.extradots_id = 'EXTRA' # identifier to use in extra dots id string
         self.n_extradots_expected = 0 # number of extra dots to look for in the field of view
         if self.fvc.fvcproxy:
+            # This is a temporary hack, since we don't yet support arbitrary device ids in the proxy.
+            # The ids assigned here do NOT correspond to physical reality of which dot is generated at which particular device.
             from DOSlib.positioner_index import PositionerIndex
             posindex = PositionerIndex()
             devices = []
@@ -545,8 +547,8 @@ class PosMoveMeasure(object):
             if not self.fvc.fvcproxy:
                 dotid = ptl.dotid_str(self.extradots_id,i) # any petal instance is fine here (static method)
             else:
-                # this is a temporary hack, since we don't support arbitrary device ids in the proxy
-                # the ids assigned here do NOT correspond to physical reality of which dot is generated in which particular device
+                # This is a temporary hack, since we don't yet support arbitrary device ids in the proxy.
+                # The ids assigned here do NOT correspond to physical reality of which dot is generated at which particular device.
                 dotid = self.extradot_ids[i]
             data[dotid] = collections.OrderedDict()
             data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY(self.extradots_fvcXY[i])[0]
