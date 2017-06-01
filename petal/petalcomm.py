@@ -453,6 +453,29 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not select mode.  Exception: %s' % str(e)
 
+    def pbget(self, key):
+        """
+        Request telemetry, positioner and fiducial settings from the petal controller.
+        """
+        try:
+            return self._call_device('pbget', key)
+        except Exception as e:
+            return 'FAILED: Can not retrieve petalbox setting with pbget.  Exception: %s' % str(e)
+
+    def pbset(self, key, value):
+        """
+        Set telemetry, positioner and fiducial settings from the petal controller.
+        """
+        try:
+            return self._call_device('pbset', key, value)
+        except Exception as e:
+            return 'FAILED: Can not set petalbox setting with pbset.  Exception: %s' % str(e)
+
+
+
+
+
+
 
 
 
