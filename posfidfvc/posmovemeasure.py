@@ -32,6 +32,14 @@ class PosMoveMeasure(object):
         self.extradots_fvcXY = [] # stores [x,y] pixel locations of any "extra" fiducial dots in the field (used for fixed ref fibers in laboratory test stands)
         self.extradots_id = 'EXTRA' # identifier to use in extra dots id string
         self.n_extradots_expected = 0 # number of extra dots to look for in the field of view
+        if self.fvc.fvc_type != 'SBIG':
+            from DOSlib.positioner_index import PositionerIndex
+            posindex = PositionerIndex()
+            devices = []
+            for ptl in self.petals:
+                devices += posindex.find_by_arbitrary_keys(PETAL_ID=ptl.petal_id)
+            all_device_ids = self.all_posids + self.all_fidids
+            self.extradot_ids = [device['DEVICE_ID'] for device in devices if device['DEVICE_ID'] not in all_device_ids]
         self.n_points_calib_T = 7 # number of points in a theta calibration arc
         self.n_points_calib_P = 7 # number of points in a phi calibration arc
         self.should_set_gear_ratios = False # whether to adjust gear ratios after calibration
@@ -66,7 +74,7 @@ class PosMoveMeasure(object):
             # at each step for each positioner, depending on whether it is in fact enabled or not.
             # (Long term, this work is the right thing to do, because we certainly expect that
             # dead positioners will occur on the instrument.)
-            extra_dots = {refid:{'obsXY':expected_ref[refid]['obsXY']} for refid in expected_ref.keys() if self.extradots_id in refid}
+            extra_dots = {refid:{'obsXY':expected_ref[refid]['obsXY']} for refid in expected_ref.keys() if refid in self.extradot_ids}
             expected_pos.update(extra_dots)
         measured_pos,measured_ref,imgfiles = self.fvc.measure_and_identify(expected_pos,expected_ref)            
         for posid in self.all_posids:
@@ -534,7 +542,11 @@ class PosMoveMeasure(object):
                 more_data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY_noplatemaker(more_data[dotid]['fvcXY'])[0]
             data.update(more_data)
         for i in range(len(self.extradots_fvcXY)):
-            dotid = ptl.dotid_str(self.extradots_id,i) # any petal instance is fine here (static method)
+            if self.fvc.fvc_type == 'SBIG':
+                dotid = ptl.dotid_str(self.extradots_id,i) # any petal instance is fine here (static method)
+            else:
+                # this is a temporary hack, since we don't support arbitrary device ids in the proxy
+                dotid = self.extradot_ids[i]
             data[dotid] = collections.OrderedDict()
             data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY_noplatemaker(self.extradots_fvcXY[i])[0]
         return data
