@@ -8,6 +8,7 @@ import postransforms
 import posconstants as pc
 import collections
 
+
 class FVCHandler(object):
     """Provides a generic interface to the Fiber View Camera. Can support different
     particular FVC implementations, providing a common set of functions to call
@@ -18,9 +19,10 @@ class FVCHandler(object):
         2. scale
         3. translation
     """
-    def __init__(self, fvc_type='SBIG', platemaker_instrument='em', printfunc=print, save_sbig_fits=True):
+    def __init__(self, fvc_type='FLI', platemaker_instrument='em', printfunc=print, save_sbig_fits=True):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.fvc_type = fvc_type # 'SBIG' or 'SBIG_Yale' or 'FLI' or 'simulator'
+        self.fvcproxy = None
         if self.fvc_type == 'SBIG':
             import sbig_grab_cen
             self.sbig = sbig_grab_cen.SBIG_Grab_Cen(save_dir=pc.dirs['temp_files'])
@@ -83,7 +85,7 @@ class FVCHandler(object):
         self.__exposure_time = value
         if self.fvc_type == 'SBIG':
             self.sbig.exposure_time = value*1000 # sbig_grab_cen thinks in milliseconds
-        elif self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':
+        elif self.fvcproxy:
             self.fvcproxy.send_fvc_command('set',exptime=value)
         
     def measure_fvc_pixels(self, num_objects):
@@ -161,7 +163,7 @@ class FVCHandler(object):
         posids = list(measured_pos.keys())
         refids = list(measured_ref.keys())
         imgfiles = []
-        if self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':
+        if self.fvcproxy:
             expected_qs = [] # this is what will be provided to platemaker
             fiber_ctr_flag = 4 # this enumeration is specific to Yale/FLI FVC interface
             fiduc_ctr_flag = 8 # this enumeration is specific to Yale/FLI FVC interface
@@ -267,7 +269,7 @@ class FVCHandler(object):
             num_objects     ... number of dots to look for in the captured image
         """
         fvcXY,peaks,fwhms,imgfiles = self.measure_fvc_pixels(num_objects)
-        obsXY = self.fvcXY_to_obsXY_noplatemaker(fvcXY)
+        obsXY = self.fvcXY_to_obsXY(fvcXY)
         return obsXY,peaks,fwhms,imgfiles
 
     def normalize_mag(self,value):
@@ -281,40 +283,52 @@ class FVCHandler(object):
         newval = max(newval,0.0)
         return newval
 
-    def fvcXY_to_obsXY_noplatemaker(self,xy):
-        """Convert a list of xy values in fvc pixel space to obsXY coordinates,
-        using a simple rotation, scale, translate sequence rather than platemaker.
+    def fvcXY_to_obsXY(self,xy):
+        """Convert a list of xy values in fvc pixel space to obsXY coordinates.
+        If there is no platemaker available, then it uses a simple rotation, scale,
+        translate sequence instead.
           INPUT:  [[x1,y1],[x2,y2],...]  fvcXY (pixels on the CCD)
           OUTPUT: [[x1,y1],[x2,y2],...]  obsXY (mm at the focal plane)
         """
         if xy != []:
-            xy = pc.listify2d(xy)
-            xy_np = np.array(xy).transpose()
-            rot = FVCHandler.rotmat2D_deg(self.rotation)
-            xy_np = np.dot(rot, xy_np)
-            xy_np *= self.scale
-            translation_x = self.translation[0] * np.ones(np.shape(xy_np)[1])
-            translation_y = self.translation[1] * np.ones(np.shape(xy_np)[1])
-            xy_np += [translation_x,translation_y]
-            xy = xy_np.transpose().tolist()       
+            if self.fvcproxy:
+                fvcXY_dict = {}
+                qs = self.fvcproxy.fvcXY_to_QS(xy_dict)
+                xy = self.trans.QS_to_obsXY(qs)
+            else:
+                xy = pc.listify2d(xy)
+                xy_np = np.array(xy).transpose()
+                rot = FVCHandler.rotmat2D_deg(self.rotation)
+                xy_np = np.dot(rot, xy_np)
+                xy_np *= self.scale
+                translation_x = self.translation[0] * np.ones(np.shape(xy_np)[1])
+                translation_y = self.translation[1] * np.ones(np.shape(xy_np)[1])
+                xy_np += [translation_x,translation_y]
+                xy = xy_np.transpose().tolist()       
         return xy
     
-    def obsXY_to_fvcXY_noplatemaker(self,xy):
-        """Convert a list of xy values in obsXY coordinates to fvc pixel space,
-        using a simple rotation, scale, translate sequence rather than platemaker.
+    def obsXY_to_fvcXY(self,xy):
+        """Convert a list of xy values in obsXY coordinates to fvc pixel space.
+        If there is no platemaker available, then it uses a simple rotation, scale,
+        translate sequence instead.
           INPUT:  [[x1,y1],[x2,y2],...]  obsXY (mm at the focal plane)
           OUTPUT: [[x1,y1],[x2,y2],...]  fvcXY (pixels on the CCD)
         """
         if xy != []:
-            xy = pc.listify2d(xy)
-            xy_np = np.array(xy).transpose()
-            translation_x = self.translation[0] * np.ones(np.shape(xy_np)[1])
-            translation_y = self.translation[1] * np.ones(np.shape(xy_np)[1])
-            xy_np -= [translation_x,translation_y]
-            xy_np /= self.scale
-            rot = FVCHandler.rotmat2D_deg(-self.rotation)
-            xy_np = np.dot(rot, xy_np)
-            xy = xy_np.transpose().tolist() 
+            if self.fvcproxy:
+                qs = self.trans.obsXY_to_QS(xy)
+                qs_dict = {}
+                xy = self.fvcproxy.QS_to_fvcXY(qs_dict)              
+            else:
+                xy = pc.listify2d(xy)
+                xy_np = np.array(xy).transpose()
+                translation_x = self.translation[0] * np.ones(np.shape(xy_np)[1])
+                translation_y = self.translation[1] * np.ones(np.shape(xy_np)[1])
+                xy_np -= [translation_x,translation_y]
+                xy_np /= self.scale
+                rot = FVCHandler.rotmat2D_deg(-self.rotation)
+                xy_np = np.dot(rot, xy_np)
+                xy = xy_np.transpose().tolist() 
         return xy
     
     @staticmethod

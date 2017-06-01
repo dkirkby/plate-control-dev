@@ -67,7 +67,7 @@ class PosMoveMeasure(object):
             ptl = self.petal(posid)
             expected_pos[posid] = {'obsXY':ptl.expected_current_position(posid,'obsXY')}
         expected_ref = self.ref_dots_XY
-        if self.fvc.fvc_type == 'FLI' or self.fvc.fvc_type == 'SBIG_Yale':
+        if self.fvc.fvc_type in ['FLI','SBIG_Yale']:
             # Consider replacing this implementation with one where instead of "extra dots", we
             # differentiate positioners by their CTRL_ENABLED flag instead. This means doing
             # some detail rework in xytest.py, to make sure we are choosing the correct actions
@@ -539,16 +539,17 @@ class PosMoveMeasure(object):
         for ptl in self.petals:
             more_data = ptl.fiducial_dots_fvcXY
             for dotid in more_data.keys():
-                more_data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY_noplatemaker(more_data[dotid]['fvcXY'])[0]
+                more_data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY(more_data[dotid]['fvcXY'])[0]
             data.update(more_data)
         for i in range(len(self.extradots_fvcXY)):
-            if self.fvc.fvc_type == 'SBIG':
+            if not self.fvc.fvcproxy:
                 dotid = ptl.dotid_str(self.extradots_id,i) # any petal instance is fine here (static method)
             else:
                 # this is a temporary hack, since we don't support arbitrary device ids in the proxy
+                # the ids assigned here do NOT correspond to physical reality of which dot is generated in which particular device
                 dotid = self.extradot_ids[i]
             data[dotid] = collections.OrderedDict()
-            data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY_noplatemaker(self.extradots_fvcXY[i])[0]
+            data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY(self.extradots_fvcXY[i])[0]
         return data
 
     def set_motor_parameters(self):
@@ -998,7 +999,7 @@ class PosMoveMeasure(object):
                 self.printfunc('warning: no moving dots detected when trying to identify positioner ' + posid)
             else:
                 expected_obsXY = this_petal.expected_current_position(posid,'obsXY')
-                measured_obsXY = self.fvc.fvcXY_to_obsXY_noplatemaker(xy_pos[0])[0]
+                measured_obsXY = self.fvc.fvcXY_to_obsXY(xy_pos[0])[0]
                 err_x = measured_obsXY[0] - expected_obsXY[0]
                 err_y = measured_obsXY[1] - expected_obsXY[1]
                 prev_offset_x = this_petal.get(posid,'OFFSET_X')
@@ -1018,7 +1019,7 @@ class PosMoveMeasure(object):
         posids_by_ptl = self.pos_data_listed_by_ptl('all','POS_ID')
         for petal in self.petals:
             positioners_current = petal.expected_current_position(posid=posids_by_ptl[petal],key='obsXY')
-            positioners_current = self.fvc.obsXY_to_fvcXY_noplatemaker(positioners_current)
+            positioners_current = self.fvc.obsXY_to_fvcXY(positioners_current)
             if len(positioners_current) > 1:
                 i = 0
                 while i < len(positioners_current):
