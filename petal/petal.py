@@ -7,6 +7,8 @@ import posconstants as pc
 import numpy as np
 import time
 import collections
+import os
+from DBSingleton import * 
 
 class Petal(object):
     """Controls a petal. Communicates with the PetalBox hardware via PetalComm.
@@ -43,13 +45,16 @@ class Petal(object):
 
         # database setup
         self.db_commit_on = db_commit_on
+        if self.db_commit_on:
+            os.environ['DOS_POSMOVE_WRITE_TO_DB'] = 'True'
+            self.posmoveDB = DBSingleton(petal_id=self.petal_id)
         self.local_commit_on = local_commit_on
         self.altered_states = set()
 
         # positioners setup
         self.posmodels = []
         for posid in posids:
-            state = posstate.PosState(posid, logging=True, device_type='pos', printfunc=self.printfunc)
+            state = posstate.PosState(posid, logging=True, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
             model = posmodel.PosModel(state,is_simulation=simulator_on,user_interactions_enabled=user_interactions_enabled)
             self.posmodels.append(model)
         self.posids = posids.copy()
@@ -69,7 +74,7 @@ class Petal(object):
         # fiducials setup
         self.fidstates = {}
         for fidid in fidids:
-            state = posstate.PosState(fidid, logging=True, device_type='fid', printfunc=self.printfunc)
+            state = posstate.PosState(fidid, logging=True, device_type='fid', printfunc=self.printfunc,petal_id=self.petal_id)
             self.fidstates[fidid] = state
         
         # power supplies setup?
@@ -638,10 +643,22 @@ class Petal(object):
         A note string may optionally be included to go along with this entry in the logs.
         '''
         if self.db_commit_on:
+            pos_commit_list = []
+            fid_commit_list = []
             for state in self.altered_states:
                 # determine whether it's a positioner state or a fiducial state (these have different data)
                 # gather up the data from this state
+                if 'POS_ID' in state.unit:
+                    pos_commit_list.append(state)
+                elif 'FID_ID' in state.unit:
+                    fid_commit_list.append(state)
+                state.log_unit()
                 # do the commit
+            if len(pos_commit_list) != 0:
+                self.posmoveDB.WriteToDB(pos_commit_list,self.petal_id,'move')
+                self.posmoveDB.WriteToDB(pos_commit_list,self.petal_id,'calib')
+            if len(fid_commit_list) != 0:
+                self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid')
                 pass
         if self.local_commit_on:
             for state in self.altered_states:

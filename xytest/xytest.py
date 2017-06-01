@@ -93,13 +93,19 @@ class XYTest(object):
         self.logwrite('FVC scale: ' + str(fvc.scale))
         
         # set up positioners, fiducials, and petals
+
         self.posids = self.hwsetup_conf['pos_ids']
         self.pos_notes = self.hwsetup_conf['pos_notes'] # notes for report to add about positioner (reported with positioner in same slot as posids list)
         while len(self.pos_notes) < len(self.posids):
             self.pos_notes.append('')
         fidids = self.hwsetup_conf['fid_ids']
         ptl_id = self.hwsetup_conf['ptl_id']
-        ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+        self.store_mode = self.hwsetup_conf['store_mode']
+        if self.store_mode == 'db':
+            ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite,db_commit_on=True,local_commit_on=False)
+        elif store_mode == 'local':
+            ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+
         ptl.anticollision_default = self.xytest_conf['anticollision']
         self.m = posmovemeasure.PosMoveMeasure([ptl],fvc,printfunc=self.logwrite)
         self.posids = self.m.all_posids
@@ -197,7 +203,8 @@ class XYTest(object):
             for posid in self.posids:
                 state = self.m.state(posid)
                 self.track_file(state.log_path, commit='once')
-                self.track_file(state.unit.filename, commit='always')
+                if self.store_mode != 'db':
+                    self.track_file(state.unit.filename, commit='always')
                 for key in params:
                     self.logwrite(str(posid) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
             for posid in self.posids:
@@ -330,7 +337,8 @@ class XYTest(object):
                 for posid in these_targets.keys():
                     state = self.m.state(posid)
                     self.track_file(state.log_path, commit='once')
-                    self.track_file(state.unit.filename, commit='always')
+                    if self.store_mode != 'db':
+                        self.track_file(state.unit.filename, commit='always')
                     row = this_timestamp
                     row += ',' + str(state.read('TOTAL_MOVE_SEQUENCES'))
                     row += ',' + str(state.log_basename)

@@ -3,6 +3,7 @@ import configobj
 import csv
 import pprint
 import posconstants as pc
+from DBSingleton import *
 
 class PosState(object):
     """Variables for the positioner are generally stored, accessed,
@@ -23,9 +24,11 @@ class PosState(object):
         unit) and general parameters (settings which apply uniformly to many units).
     """
 
-    def __init__(self, unit_id=None, logging=False, device_type='pos', printfunc=print):
+    def __init__(self, unit_id=None, logging=False, device_type='pos', printfunc=print, petal_id=None):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.logging = logging
+        self.petal_id = petal_id
+        self.write_to_DB = os.getenv('DOS_POSMOVE_WRITE_TO_DB')
         self.type = device_type
         if self.type in ['pos','fid']:
             self.settings_directory = pc.dirs[self.type + '_settings']
@@ -39,19 +42,45 @@ class PosState(object):
             self.logs_directory = pc.dirs['temp_files']
             self.settings_directory = pc.dirs['temp_files']
             comment = 'Temporary settings file for software test purposes, not associated with a particular unit.'
-        unit_filename = self.settings_directory + self.unit_basename + '.conf'
-        if not(os.path.isfile(unit_filename)):
-            temp_filename = template_directory + '_unit_settings_DEFAULT.conf' # read in the template file
-            self.unit = configobj.ConfigObj(temp_filename,unrepr=True,encoding='utf-8')
-            self.unit.initial_comment = [comment,'']
-            self.unit.filename = unit_filename
-            if self.type == 'pos':
-                self.unit['POS_ID'] = str(unit_id)
+
+        if self.write_to_DB != None:
+            if unit_id != None:
+                self.posmoveDB = DBSingleton(self.petal_id)
+                if self.type == 'pos':
+                    self.unit = self.posmoveDB.get_pos_constants(unit_id)
+                    self.unit.update(self.posmoveDB.get_genl_constants())
+                    self.unit.update(self.posmoveDB.get_pos_data(unit_id))
+                    self.unit.update(self.posmoveDB.get_calib(unit_id))
+                    print(self.unit)
+                else:
+                    self.unit = self.posmoveDB.get_fid_constants(unit_id)
+                    self.unit.update(self.posmoveDB.get_fid_data(unit_id))
+                    print(self.unit)
             else:
-                self.unit['FID_ID'] = str(unit_id)
-            self.unit.write()
+                self.posmoveDB = DBSingleton()
+                if self.type == 'pos':
+                    self.unit = self.posmoveDB.get_pos_def_constants()
+                    self.unit.update(self.posmoveDB.get_genl_constants())
+                    print(self.unit)
+                else:
+                    self.unit = self.posmoveDB.get_fid_def_constants()
+                    print(self.unit)
+
         else:
-            self.unit = configobj.ConfigObj(unit_filename,unrepr=True,encoding='utf-8')
+            unit_filename = self.settings_directory + self.unit_basename + '.conf'
+            if not(os.path.isfile(unit_filename)):
+                temp_filename = template_directory + '_unit_settings_DEFAULT.conf' # read in the template file
+                self.unit = configobj.ConfigObj(temp_filename,unrepr=True,encoding='utf-8')
+                self.unit.initial_comment = [comment,'']
+                self.unit.filename = unit_filename
+                if self.type == 'pos':
+                    self.unit['POS_ID'] = str(unit_id)
+                else:
+                    self.unit['FID_ID'] = str(unit_id)
+                    self.unit.write()
+            else:
+                self.unit = configobj.ConfigObj(unit_filename,unrepr=True,encoding='utf-8')
+
         self.log_separator = '_log_'
         self.log_numformat = '08g'
         self.log_extension = '.csv'
@@ -70,6 +99,7 @@ class PosState(object):
             self.unit['MOVE_CMD'] = ''
             self.unit['MOVE_VAL1'] = ''
             self.unit['MOVE_VAL2'] = ''
+
         if os.path.isfile(self.log_path):
             with open(self.log_path,'r',newline='') as csvfile:
                 headers = csv.DictReader(csvfile).fieldnames
@@ -152,7 +182,7 @@ class PosState(object):
     def log_fieldnames(self):
         '''Returns list of fieldnames we save to the log file.
         '''
-        return ['TIMESTAMP'] + self.unit.keys() + ['NOTE']
+        return ['TIMESTAMP'] + list(self.unit.keys()) + ['NOTE']
     
     @property
     def log_path(self):
