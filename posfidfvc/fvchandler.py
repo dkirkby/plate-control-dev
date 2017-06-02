@@ -177,7 +177,10 @@ class FVCHandler(object):
                 xy = self.trans.QS_to_obsXY(qs)
                 if True: # later may check something like qs_dict['flags'] == successful match bits:
                     posid = qs_dict['id']
-                    measured_pos[posid] = {'obsXY':xy, 'peak':self.normalize_mag(qs_dict['mag']), 'fwhm':qs_dict['fwhm'], 'qs':qs, 'dqds':dqds}
+                    if True: # temporary, until return of 'mag' and 'fwhm' are implemented
+                        measured_pos[posid] = {'obsXY':xy, 'peak':0, 'fwhm':0, 'qs':qs, 'dqds':dqds}
+                    else:
+                        measured_pos[posid] = {'obsXY':xy, 'peak':self.normalize_mag(qs_dict['mag']), 'fwhm':qs_dict['fwhm'], 'qs':qs, 'dqds':dqds}
                 elif qs_dict['flags'] == fiduc_ctr_flag: 
                     # This is a placeholder implementation. Details may vary later on. But
                     # as of 2017-05-25, FLI/platemaker do not yet support returning ref data,
