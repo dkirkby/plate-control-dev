@@ -175,7 +175,7 @@ class FVCHandler(object):
                 qs = [qs_dict['q'], qs_dict['s']]
                 dqds = [qs_dict['dq'],qs_dict['ds']]
                 xy = self.trans.QS_to_obsXY(qs)
-                if qs_dict['flags'] == fiber_ctr_flag:
+                if True: # later may check something like qs_dict['flags'] == successful match bits:
                     posid = qs_dict['id']
                     measured_pos[posid] = {'obsXY':xy, 'peak':self.normalize_mag(qs_dict['mag']), 'fwhm':qs_dict['fwhm'], 'qs':qs, 'dqds':dqds}
                 elif qs_dict['flags'] == fiduc_ctr_flag: 
