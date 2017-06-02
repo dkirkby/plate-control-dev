@@ -103,7 +103,7 @@ class XYTest(object):
         self.store_mode = self.hwsetup_conf['store_mode']
         if self.store_mode == 'db':
             ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite,db_commit_on=True,local_commit_on=False)
-        elif store_mode == 'local':
+        elif self.store_mode == 'local':
             ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite)
 
         ptl.anticollision_default = self.xytest_conf['anticollision']
