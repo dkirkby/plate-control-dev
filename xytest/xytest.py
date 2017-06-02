@@ -108,6 +108,16 @@ class XYTest(object):
         self.logwrite('Fiducials: ' + str(fidids))
         self.m.n_extradots_expected = self.hwsetup_conf['num_extra_dots']
         self.logwrite('Number of extra fiducial dots: ' + str(self.m.n_extradots_expected))
+        extradots_filename = pc.dirs['temp_files'] + os.path.sep + 'extradots.csv'
+        if self.m.n_extradots_expected > 0 and os.path.isfile(extradots_filename):
+            with open(extradots_filename,'r',newline='') as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                    self.m.extradots_fvcXY.append([row['x_pix'],row['y_pix']])
+                self.logwrite('Read ' + str(len(self.m.extradots_fvcXY)) + ' from csv file.')
+        else:
+            self.logwrite('Re-identifying fiducial locations.')
+            self.m.identify_fiducials()
         self.logwrite('Petal: ' + str(ptl_id))
         self.m.make_plots_during_calib = self.xytest_conf['should_make_plots']
         self.logwrite('Automatic generation of calibration and submove plots is turned ' + ('ON' if self.xytest_conf['should_make_plots'] else 'OFF') + '.')
