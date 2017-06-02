@@ -84,7 +84,8 @@ class PetalController(Application):
                 'get_nonresponsive_canids',
                 'reset_nonresponsive_canids',
                 'pbset',
-                'pbget'
+                'pbget',
+                'get_posfid_info'
                 ]
 
     # Default configuration (can be overwritten by command line or config file)
@@ -161,6 +162,7 @@ class PetalController(Application):
         load safe fan/power supply values
         """
         self.info('configuring...')
+        self.pc_defaults.reload()
         #read power supply settings from config file and set accordingly
         self.switch_en_ptl("PS1_EN", 1 if self.pc_defaults[str(self.role)]['supply_power'][0] == 'on' else 0)
         self.switch_en_ptl("PS2_EN", 1 if self.pc_defaults[str(self.role)]['supply_power'][1] == 'on' else 0)
@@ -197,7 +199,7 @@ class PetalController(Application):
 
         #initialize self.pb_statuses dictionary
         self.pb_statuses['all'] = 'return dictionary of all petalbox settings available'
-        self.pb_statuses['power'] = [self.pc_defaults[str(self.role)]['supply_power'][0] , self.pc_defaults[str(self.role)]['supply_power'][1], self.pc_defaults[str(self.role)]['supply_power'][2]]
+        self.pb_statuses['power'] = [[self.pc_defaults[str(self.role)]['supply_power'][0] , self.pc_defaults[str(self.role)]['supply_power'][1], self.pc_defaults[str(self.role)]['supply_power'][2]], self.read_HRPG600()]
         self.pb_statuses['gfa_fan'] = {'inlet': [self.pc_defaults[str(self.role)]['fan_power'][0], self.pc_defaults[str(self.role)]['fan_duty'][0]], 'outlet': [self.pc_defaults[str(self.role)]['fan_power'][1], self.pc_defaults[str(self.role)]['fan_duty'][1]]}
         self.pb_statuses['sync'] = self.pc_defaults[str(self.role)]['sync']
         self.pb_statuses['buffers'] = [self.pc_defaults[str(self.role)]['buffer_enables'][0], self.pc_defaults[str(self.role)]['buffer_enables'][1]]
@@ -223,12 +225,12 @@ class PetalController(Application):
                     for pwrsupply in ["PS1_EN", "PS2_EN", "GFAPWR_EN"]:
                         pwr = 1 if value == 'on' else 0
                         self.switch_en_ptl(pwrsupply, pwr)
-                    self.pb_statuses[key] = [value, value, value]
+                    self.pb_statuses[key][0] = [value, value, value]
             else:
                 for idx, pwrsupply in enumerate(["PS1_EN", "PS2_EN", "GFAPWR_EN"]):
                     pwr = 1 if value[idx] == 'on' else 0
                     self.switch_en_ptl(pwrsupply, pwr)
-                self.pb_statuses[key] = value
+                self.pb_statuses[key][0] = value
 
         elif key == 'gfa_fan': #set enables and speed in format {'inlet': ['on'/'off', 50], 'outlet': ['on'/'off', 75]}
             if not isinstance(value, dict):
@@ -307,14 +309,17 @@ class PetalController(Application):
             pass
         if key == 'temp':
             self.pb_statuses[key] = self.read_temp_ptl()
-        #if key = 'gfa_fan':
-        #    pb_statuses[key] = self.read_fan_tach()
-        if key == 'posfid_info':  #returns dict  {can_id: [s_id, can_bus, fw_vr, bl_vr]} 
-            pass
+        if key == 'fan_tach':
+            pb_statuses[key] = self.read_fan_tach()
+        if key == 'posfid_info':  #returns dict  {can_id: [s_id, can_bus, fw_vr, bl_vr]}
+            info_list = [] 
+            for canbus in self.canlist:
+                info_list.append(self.get_posfid_info(canbus))
+            return info_list
         if key == 'fids':
             self.pb_statuses[key] = self.get_fid_status()
         if key == 'power':
-            #pb_statuses[key] = self.read_HRPG600()
+            self.pb_statuses[key] = [self.pb_statuses[key], self.read_HRPG600()]
             pass
         if key == 'can_en':
             pass
@@ -328,6 +333,34 @@ class PetalController(Application):
     def exit_stop_mode(self):
         self.switch_en_ptl("SYNC", 1)
         self.pb_statuses['sync'] = 'on'
+
+    def get_posfid_info(self, canbus):
+        pos_info = {}
+        fw_vr = self.pmc.get_from_all(canbus, 20000, 11)
+        fw_vr = self.pmc.format_versions(fw_vr)
+
+        bl_vr = self.pmc.get_from_all(canbus, 20000, 15)
+        bl_vr = self.pmc.format_versions(bl_vr)
+
+        sid64 = self.pmc.get_from_all(canbus, 19)
+        sid64 = self.pmc.format_sids(sid64)
+
+        sidupper = self.pmc.get_from_all(canbus, 20000, 18)
+        sidupper = self.pmc.format_sids(sidupper)
+
+        sidlower = self.pmc.get_from_all(canbus, 20000, 17)
+        sidlower = self.pmc.format_sids(sidlower)
+
+        sidfull = {}
+        for key,value in sidupper.items():
+            sidfull[key] = sidupper[key] + ':' + sidlower[key]
+
+        for key, value in sid64.items():
+            try:
+                bl = bl_vr[key]
+            except:
+                bl = 'too old'
+            pos_info[key] = [fw_vr[key], bl, sidfull[key], sid64[key]]
 
     def get_sids(self, canbus):
         """
@@ -946,6 +979,19 @@ class PositionerMoveControl(object):
     def enter_stop_mode(self, canbus):
         self.pfcan[canbus].send_command(20000, 40, '')
    
+    def format_sids(self, sid_dict):
+        for key,value in sid_dict.items():
+            sid_dict[key] = ":".join("{:02x}".format(c) for c in value)
+        return sid_dict
+
+    def format_versions(self, vr_dict):
+        for key,value in vr_dict.items():
+            if len(value) == 1:
+                vr_dict[key] = fw=str(int(ord(value))/10)
+            else:
+                vr_dict[key] = str(int(str(value[1]),16))+"."+str(int(str(value[0]),16))
+        return vr_dict
+
     def get_sids(self, canbus):
         """
             Reads and returns silicon ID from microcontroller. 
@@ -1028,6 +1074,10 @@ class PositionerMoveControl(object):
             return True
         except:
             return False        
+
+    def get_from_all(self, canbus, command):
+        data = self.pfcan[canbus].send_command_recv_multi(20000, command, '')
+        return data
 
 
     def get_pos_status(self, busids, posids):
