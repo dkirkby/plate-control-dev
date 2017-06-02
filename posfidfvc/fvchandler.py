@@ -188,6 +188,7 @@ class FVCHandler(object):
                     refid = qs_dict['id']
                     measured_ref[refid] = {'obsXY':xy, 'peak':self.normalize_mag(qs_dict['mag']), 'fwhm':qs_dict['fwhm'], 'qs':qs}
                     pass
+            measured_ref = {} # set as empty, since don't support returning ref data from fvc proxy
         else:
             expected_pos_xy = [expected_pos[posid]['obsXY'] for posid in posids]
             expected_ref_xy = [expected_ref[refid]['obsXY'] for refid in refids]
