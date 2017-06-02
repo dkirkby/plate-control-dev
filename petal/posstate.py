@@ -51,20 +51,16 @@ class PosState(object):
                     self.unit.update(self.posmoveDB.get_genl_constants())
                     self.unit.update(self.posmoveDB.get_pos_data(unit_id))
                     self.unit.update(self.posmoveDB.get_calib(unit_id))
-                    print(self.unit)
                 else:
                     self.unit = self.posmoveDB.get_fid_constants(unit_id)
                     self.unit.update(self.posmoveDB.get_fid_data(unit_id))
-                    print(self.unit)
             else:
                 self.posmoveDB = DBSingleton()
                 if self.type == 'pos':
                     self.unit = self.posmoveDB.get_pos_def_constants()
                     self.unit.update(self.posmoveDB.get_genl_constants())
-                    print(self.unit)
                 else:
                     self.unit = self.posmoveDB.get_fid_def_constants()
-                    print(self.unit)
 
         else:
             unit_filename = self.settings_directory + self.unit_basename + '.conf'
