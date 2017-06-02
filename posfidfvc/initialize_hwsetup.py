@@ -260,7 +260,7 @@ if should_identify_positioners:
     m.identify_positioner_locations()
 if should_make_instrfile:
     instr_par,metro  = make_instrfile()
-if should_limit_range:
+if not should_limit_range:
     m.measure_range(axis='theta')
     m.measure_range(axis='phi')
 plotfiles = m.calibrate(mode='arc', save_file_dir=pc.dirs['xytest_plots'], save_file_timestamp=start_filename_timestamp)
