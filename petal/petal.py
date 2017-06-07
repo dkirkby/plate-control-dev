@@ -29,8 +29,9 @@ class Petal(object):
         db_commit_on    ... boolean, controls whether to commit state data to the online system database (can be done with or without local_commit_on)
         local_commit_on ... boolean, controlw whether to commit state data to local log files (can be done with or without db_commit_on)
         printfunc       ... method, used for stdout style printing. we use this for logging during tests
+        collider_file   ... string, file name of collider configuration file, no directory loction. If left blank will use default.
     """
-    def __init__(self, petal_id, posids, fidids, simulator_on=False, db_commit_on=False, local_commit_on=True, printfunc=print, verbose=False, user_interactions_enabled=False):
+    def __init__(self, petal_id, posids, fidids, simulator_on=False, db_commit_on=False, local_commit_on=True, printfunc=print, verbose=False, user_interactions_enabled=False, collider_file=''):
         # petal setup
         self.petal_id = petal_id
         self.verbose = verbose # whether to print verbose information at the terminal
@@ -60,7 +61,7 @@ class Petal(object):
         self.set_motor_parameters()
 		
         # collider and scheduler setup
-        self.collider = poscollider.PosCollider(configfile='')
+        self.collider = poscollider.PosCollider(configfile=collider_file)
         self.collider.add_positioners(self.posmodels)
         self.schedule = posschedule.PosSchedule(self,verbose=self.verbose)
         self.anticollision_default = True  # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise

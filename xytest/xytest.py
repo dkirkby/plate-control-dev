@@ -99,7 +99,7 @@ class XYTest(object):
             self.pos_notes.append('')
         fidids = self.hwsetup_conf['fid_ids']
         ptl_id = self.hwsetup_conf['ptl_id']
-        ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+        ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite, collider_file=self.xytest_conf['collider_file'])
         ptl.anticollision_default = self.xytest_conf['anticollision']
         self.m = posmovemeasure.PosMoveMeasure([ptl],fvc,printfunc=self.logwrite)
         self.posids = self.m.all_posids
