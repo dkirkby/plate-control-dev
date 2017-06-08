@@ -667,7 +667,8 @@ class PetalController(Application):
             canbuses = [canbuses]
             ids = [ids]
             percent_duty = [percent_duty]
-
+        if 20000 in ids:
+            return 'FAILED: Cannot send set_fiducials to broadcast address 20000'
         #set list of fiducials on single canbus to the same duty cycle, this operation is assumed if canbus and duty != list, but ids is a list
         if isinstance(ids, list) and not isinstance(percent_duty, list) and not isinstance(canbuses, list):
             canbuses = [canbuses] * len(ids)
