@@ -37,6 +37,7 @@ petalbox/util/bootloader38.hex -text
 petalbox/util/bootloadertoreload.hex -text
 petalbox/util/bootreloader.hex -text
 petalbox/util/bootreloader38.hex -text
+petalbox/util/bootreloader38wrp.hex -text
 petalbox/util/bootreplace.py -text
 petalbox/util/docs/systec-readme.txt -text
 petalbox/util/dotprofile -text
