@@ -239,10 +239,10 @@ if __name__ == '__main__':
 
 	os.system('sudo config-pin "P9_11" 0')
 	os.system('sudo config-pin "P9_13" 0')
-	time.sleep(0.5)
+	time.sleep(0.2)
 	os.system('sudo config-pin "P9_11" 1')
 	os.system('sudo config-pin "P9_13" 1')
-	time.sleep(0.5)
+	time.sleep(0.2)
 
 	for can_id in canids:
 		can_id = int(can_id)
