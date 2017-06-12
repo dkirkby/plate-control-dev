@@ -143,7 +143,7 @@ class PetalController(Application):
                if self.verbose: print('Error initializing detected CAN channel(s).  Exception: ' + str(e))
 
         #communicate only with list of canbuses that have been both detected and configured
-        self.canlist = self.canlist and self.pc_defaults[str(self.role)]['can_bus_list']
+        self.canlist = self.canlist and self.pc_defaults['can_bus_list']
 
         # Bring in the Positioner Move object
         self.pmc=PositionerMoveControl(self.role, self.controller_type, self.canlist) # controller_type is HARDWARE or SIMULATOR
@@ -164,32 +164,32 @@ class PetalController(Application):
         self.info('configuring...')
         self.pc_defaults.reload()
         #read power supply settings from config file and set accordingly
-        self.switch_en_ptl("PS1_EN", 1 if self.pc_defaults[str(self.role)]['supply_power'][0] == 'on' else 0)
-        self.switch_en_ptl("PS2_EN", 1 if self.pc_defaults[str(self.role)]['supply_power'][1] == 'on' else 0)
-        self.switch_en_ptl("GFAPWR_EN", 1 if self.pc_defaults[str(self.role)]['supply_power'][2] == 'on' else 0)
+        self.switch_en_ptl("PS1_EN", 1 if self.pc_defaults['supply_power'][0] == 'on' else 0)
+        self.switch_en_ptl("PS2_EN", 1 if self.pc_defaults['supply_power'][1] == 'on' else 0)
+        self.switch_en_ptl("GFAPWR_EN", 1 if self.pc_defaults['supply_power'][2] == 'on' else 0)
 
         #read back default fan settings from config file and set accordingly
-        self.switch_en_ptl("GFA_FAN1", 1 if self.pc_defaults[str(self.role)]['fan_power'][0] == 'on' else 0)
-        self.switch_en_ptl("GFA_FAN2", 1 if self.pc_defaults[str(self.role)]['fan_power'][1] == 'on' else 0)
-        self.fan_pwm_ptl("GFA_FAN1", self.pc_defaults[str(self.role)]['fan_duty'][0])
-        self.fan_pwm_ptl("GFA_FAN2", self.pc_defaults[str(self.role)]['fan_duty'][1])
+        self.switch_en_ptl("GFA_FAN1", 1 if self.pc_defaults['fan_power'][0] == 'on' else 0)
+        self.switch_en_ptl("GFA_FAN2", 1 if self.pc_defaults['fan_power'][1] == 'on' else 0)
+        self.fan_pwm_ptl("GFA_FAN1", self.pc_defaults['fan_duty'][0])
+        self.fan_pwm_ptl("GFA_FAN2", self.pc_defaults['fan_duty'][1])
 
         #read back default sync/buffer enable settings from config file and set accordingly
-        self.switch_en_ptl("BUFF_EN1", 0 if self.pc_defaults[str(self.role)]['buffer_enables'][0] == 'on' else 1)
-        self.switch_en_ptl("BUFF_EN2", 0 if self.pc_defaults[str(self.role)]['buffer_enables'][1] == 'on' else 1)
-        self.switch_en_ptl("SYNC", 1 if self.pc_defaults[str(self.role)]['sync'] == 'on' else 0)
+        self.switch_en_ptl("BUFF_EN1", 0 if self.pc_defaults['buffer_enables'][0] == 'on' else 1)
+        self.switch_en_ptl("BUFF_EN2", 0 if self.pc_defaults['buffer_enables'][1] == 'on' else 1)
+        self.switch_en_ptl("SYNC", 1 if self.pc_defaults['sync'] == 'on' else 0)
 
         #read back default CAN board enable settings from config file and set accordingly
-        self.switch_en_ptl("CANBRD1_EN", 1 if self.pc_defaults[str(self.role)]['can_power'][0] == 'on' else 0)
-        self.switch_en_ptl("CANBRD2_EN", 1 if self.pc_defaults[str(self.role)]['can_power'][1] == 'on' else 0)
+        self.switch_en_ptl("CANBRD1_EN", 1 if self.pc_defaults['can_power'][0] == 'on' else 0)
+        self.switch_en_ptl("CANBRD2_EN", 1 if self.pc_defaults['can_power'][1] == 'on' else 0)
 
         #read back stop mode value and set
-        if(self.pc_defaults[str(self.role)]['stop_mode'] == 'on'):
+        if(self.pc_defaults['stop_mode'] == 'on'):
             self.pmc.enter_stop_mode(self.canlist)
         
         #read back fiducial initial settings and set
-        self.fids = self.pc_defaults[str(self.role)]['fid_settings']
-        self.can_map = self.pc_defaults[str(self.role)]['can_map']
+        self.fids = self.pc_defaults['fid_settings']
+        self.can_map = self.pc_defaults['can_map']
         
         for key,value in self.fids.items():
             canbus = self.can_map[key]
@@ -199,15 +199,15 @@ class PetalController(Application):
 
         #initialize self.pb_statuses dictionary
         self.pb_statuses['all'] = 'return dictionary of all petalbox settings available'
-        self.pb_statuses['power'] = [[self.pc_defaults[str(self.role)]['supply_power'][0] , self.pc_defaults[str(self.role)]['supply_power'][1], self.pc_defaults[str(self.role)]['supply_power'][2]], self.read_HRPG600()]
-        self.pb_statuses['gfa_fan'] = {'inlet': [self.pc_defaults[str(self.role)]['fan_power'][0], self.pc_defaults[str(self.role)]['fan_duty'][0]], 'outlet': [self.pc_defaults[str(self.role)]['fan_power'][1], self.pc_defaults[str(self.role)]['fan_duty'][1]]}
-        self.pb_statuses['sync'] = self.pc_defaults[str(self.role)]['sync']
-        self.pb_statuses['buffers'] = [self.pc_defaults[str(self.role)]['buffer_enables'][0], self.pc_defaults[str(self.role)]['buffer_enables'][1]]
-        self.pb_statuses['can_en'] = [self.pc_defaults[str(self.role)]['can_power'][0], self.pc_defaults[str(self.role)]['can_power'][1]]
+        self.pb_statuses['power'] = [[self.pc_defaults['supply_power'][0] , self.pc_defaults['supply_power'][1], self.pc_defaults['supply_power'][2]], self.read_HRPG600()]
+        self.pb_statuses['gfa_fan'] = {'inlet': [self.pc_defaults['fan_power'][0], self.pc_defaults['fan_duty'][0]], 'outlet': [self.pc_defaults['fan_power'][1], self.pc_defaults['fan_duty'][1]]}
+        self.pb_statuses['sync'] = self.pc_defaults['sync']
+        self.pb_statuses['buffers'] = [self.pc_defaults['buffer_enables'][0], self.pc_defaults['buffer_enables'][1]]
+        self.pb_statuses['can_en'] = [self.pc_defaults['can_power'][0], self.pc_defaults['can_power'][1]]
         self.pb_statuses['temp'] = self.read_temp_ptl()
-        self.pb_statuses['stop_mode'] = self.pc_defaults[str(self.role)]['stop_mode']
-        self.pb_statuses['can_map'] = self.pc_defaults[str(self.role)]['can_map']
-        self.pb_statuses['fids'] = self.pc_defaults[str(self.role)]['fid_settings']
+        self.pb_statuses['stop_mode'] = self.pc_defaults['stop_mode']
+        self.pb_statuses['can_map'] = self.pc_defaults['can_map']
+        self.pb_statuses['fids'] = self.pc_defaults['fid_settings']
         return self.SUCCESS
     
 # PML functions (functions that can be accessed remotely)
