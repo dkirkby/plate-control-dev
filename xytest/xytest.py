@@ -225,6 +225,7 @@ class XYTest(object):
         n_pts_calib_P = self.xytest_conf['n_points_calib_P'][loop_number]
         calib_mode = self.xytest_conf['calib_mode'][loop_number]
         set_as_defaults = self.xytest_conf['set_meas_calib_as_new_defaults'][loop_number]
+        params = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']
         if n_pts_calib_T >= 4 and n_pts_calib_P >= 3:
             if not(set_as_defaults):
                 self.collect_calibrations()
@@ -232,7 +233,6 @@ class XYTest(object):
             self.logwrite('Starting arc calibration sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             self.m.n_points_calib_T = n_pts_calib_T
             self.m.n_points_calib_P = n_pts_calib_P
-            params = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']
             files = self.m.calibrate(posids='all', mode=calib_mode, save_file_dir=pc.dirs['xytest_plots'], save_file_timestamp=pc.filename_timestamp_str_now())
             for file in files:
                 self.track_file(file, commit='once')
@@ -247,9 +247,9 @@ class XYTest(object):
                     self.track_file(state.log_path, commit='once')
                     for key in params:
                         self.logwrite(str(posid) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
-            for posid in self.posids:
-                self.summarizers[posid].update_loop_calibs(summarizer.used_suffix, params)
             self.logwrite('Calibration with ' + str(n_pts_calib_T) + ' theta points and ' + str(n_pts_calib_P) + ' phi points completed in ' + self._elapsed_time_str(start_time) + '.')
+        for posid in self.posids:
+            self.summarizers[posid].update_loop_calibs(summarizer.used_suffix, params)
         
     def run_xyaccuracy_test(self, loop_number):
         """Move positioners to a series of xy targets and measure performance.
