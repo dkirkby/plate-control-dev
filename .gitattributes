@@ -49,6 +49,7 @@ petalbox/util/fw31moved.hex -text
 petalbox/util/fw32page4.hex -text
 petalbox/util/fw40page4.hex -text
 petalbox/util/fw43page4.hex -text
+petalbox/util/fw44page4.hex -text
 petalbox/util/fw_upload.py -text
 petalbox/util/fw_upload_canids -text
 petalbox/util/hwlib/dlptemp.py -text
