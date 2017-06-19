@@ -109,8 +109,9 @@ class SBIG_Grab_Cen(object):
         # call routine to determine multiple gaussian-fitted centroids
         centroiding_tic = time.time()
         xcen, ycen, peaks, fwhms, binfile = multicens.multiCens(LD, nWin, self.verbose, self.write_fits, save_dir=self.save_dir, size_fitbox=self.size_fitbox)
-        if min(peaks) < self.min_brightness and n_retries > 0:
-            print('Retrying image grab (' + str(n_retries) + ' attempts remaining) after got back a very low peak brightness value = ' + str(min(peaks)))
+        minimum = min(peaks)        
+        if minimum < self.min_brightness and n_retries > 0:
+            print('Retrying image grab (' + str(n_retries) + ' attempts remaining) after got back a very low peak brightness value = ' + str(minimum) + ' at (' + str(xcen[peaks.index(minimum)]) +', ' + str(ycen[peaks.index(minimum)]) + ')')
             return self.grab(nWin, n_retries-1)
             
         if binfile:
