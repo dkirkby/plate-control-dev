@@ -90,6 +90,9 @@ class PositionerControl(object):
 
 	def send_command(self, pid, command, data):
 		self.scan.send_command(pid, command, data)
+
+	def set_device(self, pid, data):
+		self.scan.send_command(pid, 25,  data)
 		
 	def set_reset_led(self,id, select):
 		if select.lower()=='on':
@@ -119,21 +122,26 @@ if __name__ == '__main__':
 	canchan=sys.argv[1]
 	_sel=_read_key()
 	print("")
-	print(" ID programming requires a single positioner or fiducial on the CAN bus, or a known silicon ID")
+	print(" NOTE: ID programming requires a single positioner or fiducial on the CAN bus, or a known silicon ID")
 	print("")	
 	print(" (Using CANbus "+str(canchan)+")")
 	print("")	
 
 	loop=True
 	while loop:
-		print("\n\n")
+		print("\n")
 		print("[b]link LED (using broadcast address)")
-		print("[r]ead CAN address, silicon ID and software revision")
-		print("[e]xit")
 		print("[p]rogram new CAN address")
-		print("[l]ist all silicon IDs, software revision numbers, and CAN ids found on the CAN bus. If more than one device on bus FW vr >= 4.0 needed.")
-		print("[s]id programming - type in silicon ID, then program new CAN id into the corresponding device")
+		print("[l]ist all silicon IDs, software revision numbers, and CAN ids found on the CAN bus. If more than one device on bus FW version >= 4.0 is needed.")
+		print("[s]id programming - type in silicon ID, then program new CAN id into the corresponding device (works when multiple devices are attached to bus)")
 		print("[i]ndividually address a pos/fid by CAN address and ask for its fw version and silicon ID")
+		print("\nThe following settings are used to set/read motor and fiducial parameters that are stored in flash.  This is relevant for FW version 4.4 and beyond.")
+		print("----------------------------------------------------------------------------------------------------------------------------------------------------")
+		print("[d]evice - set device flag in flash (fiducial or positioner)")
+		print("[c]currents/periods - set currents and periods to be used as defaults in flash")
+		print("[g]et motor and device settings")
+		print("----------------------------------------------------------------------------------------------------------------------------------------------------")
+		print("\n[e]xit\n")
 		print("Select: \n")
 		
 		sel=_sel.__call__()		
@@ -270,3 +278,61 @@ if __name__ == '__main__':
 	
 				
 	
+		if sel=='d':
+			id=input('Enter CAN id of device to set: ')
+			if not id.isdigit():
+				print('CAN id must be a number, returning to main menu')
+	
+			if id.isdigit():
+				can_id = int(id)
+				dev_type = input('Enter f to set as fiducial or p to set as positioner: ')
+				if dev_type == 'f':
+					pmc.set_device(can_id, '01')
+					print('Device flag set to fiducial.')
+				elif dev_type == 'p':
+					pmc.set_device(can_id, '00')
+					print('Device flag set to positioner.')
+				else:
+					print('Invalid device type, must be either f or p!')
+				
+					
+		if sel=='c':
+			can_id = input('Enter CAN id for which to set currents/periods in flash (enter 20000 if setting all devices to same values): ')
+			can_id = int(can_id)
+			
+			currents = input('Enter current percentages as a list (eg. 100, 75, 50, 0 for spin, cruise, creep, hold): ')
+			currents = currents.split(',')
+			currents_hex_string = ''
+			for current in currents:
+				currents_hex_string = currents_hex_string + str(hex(int(current)).replace('0x','').zfill(2))
+			currents_hex_string = currents_hex_string*2
+			pmc.send_command(can_id, 26, currents_hex_string)
+
+			periods = input('Enter periods as a list (eg. 2, 12 for creep period, spin period): ')
+			periods = periods.split(',')
+			periods.insert(0, periods[0])
+			periods_hex_string = ''
+			for period in periods:
+				periods_hex_string = periods_hex_string + str(hex(int(period)).replace('0x','').zfill(2))
+			pmc.send_command(can_id, 27, periods_hex_string)
+
+		if sel=='g':
+			devices = pmc.get_from_all(brdcast_id, 12)
+			currents = pmc.get_from_all(brdcast_id, 41)
+			periods = pmc.get_from_all(brdcast_id, 29)
+			for key,value in devices.items():
+				devices[key] = 'fid' if value == b'\x01' else 'pos'
+			for key,value in currents.items():
+				if devices[key] == 'fid':
+					currents[key] = 'n/a'
+				else:
+					currents[key] = str(value[0])+', ' + str(value[1]) + ', ' + str(value[2]) +', ' + str(value[3])
+			for key,value in periods.items():
+				if devices[key] == 'fid':
+					periods[key] = ['n/a' for i in range(len(periods[key]))]
+	
+			print('CAN_ID| Device Type| Creep Period|' + 'Spin Up/Down Period|  '.rjust(27) +'Currents (spin, cruise, creep, hold)|  '.rjust(37))
+			for key, value in devices.items():
+				print(str(key).rjust(6) + '| ' + str(devices[key]).rjust(11) + '| ' + str(periods[key][0]).rjust(12) + '| ' + str(periods[key][2]).rjust(23) + '| ' + str(currents[key]).rjust(37) + '|')
+			print('\n')
+
