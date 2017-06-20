@@ -243,7 +243,6 @@ if __name__ == '__main__':
 			sid = (sid.split(':'))
 			sid.reverse()
 			sid = "".join(sid)
-			print(sid)
 			pmc.send_command(brdcast_id, 24, sid)
 			id = input('Enter new can id (it will be programmed into the device with the matching silicon id): ')
 			id = (hex(int(id))).replace('0x','').zfill(4)
