@@ -11,6 +11,10 @@ sys.path.append(os.path.abspath('../petal/'))
 import posconstants as pc
 hwdir = pc.dirs['hwsetups']
 
+poslogsdir = pc.dirs['xytest_logs']
+alltestlogs = [os.path.join(poslogsdir, logname) for logname in os.listdir(poslogsdir)]
+newestfile = max(alltestlogs, key = os.path.getctime)
+
 i_conf = configobj.ConfigObj(hwdir+'local_identity.conf',unrepr=True,encoding='utf-8')
 this_site=i_conf['site']
 hw_conf=configobj.ConfigObj(hwdir+'hwsetup_'+this_site+'.conf',unrepr=True,encoding='utf-8')
@@ -26,7 +30,7 @@ NOTIFY=hw_conf['watcher']['notify']
     Nextel: phonenumber@messaging.nextel.com.
 """
 INTERVAL=hw_conf['watcher']['interval']
-PROCNAME=hw_conf['watcher']['procname'] 
+PROCNAME=hw_conf['watcher']['procname']
 SUBJECT='Test stand '+str(this_site)+' alarm'
 
 def getpids(procname='xytest.py'):
@@ -45,8 +49,21 @@ if __name__=="__main__":
 		sys.exit()
 
 	run=True
-	while run:		 		
-		if (len(pids) !=1) or ( not os.path.exists("/proc/"+pids[0])):
-			alarm.send (SUBJECT,'xytest no longer running')
-			sys.exit()
-		sleep(INTERVAL)
+	if PROCNAME == 'xytest.py':
+		while run:		 		
+			if (len(pids) !=1) or ( not os.path.exists("/proc/"+pids[0])):
+				finishcheck = list(open(newestfile, 'r'))[-2]
+				if finishcheck[-15:-1] == "Test complete.":                        
+					alarm.send (SUBJECT,'xytest is complete')
+				else:
+					alarm.send (SUBJECT,'xytest has crashed')
+				sys.exit()
+			sleep(INTERVAL)
+	else:
+		while run:
+			if (len(pids) !=1) or ( not os.path.exists("/proc/"+pids[0])):
+				alarm.send (SUBJECT,'xytest no longer running')
+				sys.exit()
+			sleep(INTERVAL)
+			
+
