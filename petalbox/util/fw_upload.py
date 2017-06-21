@@ -191,6 +191,7 @@ if __name__ == '__main__':
 	fw = False
 	list_flag = False
 	file_flag = False
+	autosw_flag = False
 
 	for arg in sys.argv:
 		if 'can' in arg:
@@ -202,13 +203,15 @@ if __name__ == '__main__':
 			list_flag = True
 		if arg == '-f':
 			file_flag = True
-
+		if arg == '-autosw':
+			autosw_flag = True
 	print('------------------------------------------------')
 	print('\n   Welcome to the Firmware Upload Utility   \n')
 	print('------------------------------------------------')
 	print('\nNOTES: If entering a list of CAN ids on the command line (flag -l), enter them last separated by commas (eg. python3 fw_upload.py -l can0 fw40page4.hex 1,2,3,4,5)')
 	print('       If entering CAN ids into file (./fw_upload_canids, flag -f):  python3 fw_upload.py -f can0 fw40page4.hex')
 	print('       This script can also be run without command line arguments (just python3 fw_upload.py).  It will then prompt you for the necessary arguments as it runs.')
+	print('       Add the -autosw flag if your power supply is connected to the BBB (eg. python3 fw_upload.py -l -autosw can0 fw44page3.hex 1,2,3)')
 
 	if not canbus:
 		canbus = input('\nPlease enter the canbus that you are using (eg. can0):  ')
@@ -235,14 +238,21 @@ if __name__ == '__main__':
 
 		
 	bc=BootLoadControl(canbus)
-	answer = input('\nIf your power supply is not automated (connected to the BBB), please power cycle your supply and press enter within 2 seconds, otherwise just press enter.  The upload process will begin.')
+	if not autosw_flag:
+		answer = input('\nIs your power supply automated (hooked up to BBB)?\nType y or n: ')
+		if answer == 'y' or answer == 'yes':
+			autosw_flag = True
+		else:
+			answer = input('\nPower supply not automated.  Power cycle your supply and press enter within 2 seconds.  The upload process will begin.')
 
-	os.system('sudo config-pin "P9_11" 0')
-	os.system('sudo config-pin "P9_13" 0')
-	time.sleep(0.2)
-	os.system('sudo config-pin "P9_11" 1')
-	os.system('sudo config-pin "P9_13" 1')
-	time.sleep(0.2)
+	if autosw_flag:
+		print('\nSwitching the power supply....\n')
+		os.system('sudo config-pin "P9_11" 0')
+		os.system('sudo config-pin "P9_13" 0')
+		time.sleep(0.2)
+		os.system('sudo config-pin "P9_11" 1')
+		os.system('sudo config-pin "P9_13" 1')
+		time.sleep(0.2)
 
 	for can_id in canids:
 		can_id = int(can_id)
