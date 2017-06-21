@@ -219,8 +219,13 @@ if __name__ == '__main__':
 			print('Invalid can bus name.')
 			sys.exit()
 	if not fw:
+		file_list = os.popen('ls fw*.hex').readlines()
+		file_list = [str(file).replace('\n','') for file in file_list]
+		print('\nAvailable hex files (svn up if you do not see what you need): \n|' + ' | '.join(str(file) for file in file_list))
 		fw = input('\nEnter name of hex file that you would like to upload: ')
-
+	if fw not in file_list:
+		print('Hex file does not exist!')
+		sys.exit()
 	if not list_flag | file_flag:
 		answer = input('\nHave you entered the can ids of the devices that you would like to upload firmware to in ./fw_upload_canids?\nIf not, you will be given a chance to type your list in here. \nType y or n: ')
 		if answer == 'y' or answer == 'yes':
@@ -229,13 +234,11 @@ if __name__ == '__main__':
                 	list = input('\nPlease enter a list of canids separated by commas now (eg. 1, 41, 66): ')
                 	canids = list.split(',')
 
-
 	if file_flag:
 		with open('fw_upload_canids', 'r') as file:
 			for line in file:
 				if line[0] != '#':
 					canids.append(line)
-
 		
 	bc=BootLoadControl(canbus)
 	if not autosw_flag:
