@@ -218,9 +218,10 @@ if __name__ == '__main__':
 		if canbus not in ['can0', 'can1', 'can2', 'can3', 'can4', 'can5', 'can6', 'can7']:
 			print('Invalid can bus name.')
 			sys.exit()
+	
+	file_list = os.popen('ls fw*.hex').readlines()
+	file_list = [str(file).replace('\n','') for file in file_list]
 	if not fw:
-		file_list = os.popen('ls fw*.hex').readlines()
-		file_list = [str(file).replace('\n','') for file in file_list]
 		print('\nAvailable hex files (svn up if you do not see what you need): \n|' + ' | '.join(str(file) for file in file_list))
 		fw = input('\nEnter name of hex file that you would like to upload: ')
 	if fw not in file_list:
