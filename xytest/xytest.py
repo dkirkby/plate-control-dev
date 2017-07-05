@@ -102,10 +102,9 @@ class XYTest(object):
         ptl_id = self.hwsetup_conf['ptl_id']
         self.store_mode = self.hwsetup_conf['store_mode']
         if self.store_mode == 'db':
-            ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite,db_commit_on=True,local_commit_on=False)
+            ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite,db_commit_on=True)
         elif self.store_mode == 'local':
             ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite)
-
         ptl.anticollision_default = self.xytest_conf['anticollision']
         self.m = posmovemeasure.PosMoveMeasure([ptl],fvc,printfunc=self.logwrite)
         self.posids = self.m.all_posids
@@ -203,8 +202,7 @@ class XYTest(object):
             for posid in self.posids:
                 state = self.m.state(posid)
                 self.track_file(state.log_path, commit='once')
-                if self.store_mode != 'db':
-                    self.track_file(state.unit.filename, commit='always')
+                self.track_file(state.unit.filename, commit='always')
                 for key in params:
                     self.logwrite(str(posid) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
             for posid in self.posids:
@@ -337,8 +335,7 @@ class XYTest(object):
                 for posid in these_targets.keys():
                     state = self.m.state(posid)
                     self.track_file(state.log_path, commit='once')
-                    if self.store_mode != 'db':
-                        self.track_file(state.unit.filename, commit='always')
+                    self.track_file(state.unit.filename, commit='always')
                     row = this_timestamp
                     row += ',' + str(state.read('TOTAL_MOVE_SEQUENCES'))
                     row += ',' + str(state.log_basename)
