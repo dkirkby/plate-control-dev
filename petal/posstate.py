@@ -43,39 +43,41 @@ class PosState(object):
             self.settings_directory = pc.dirs['temp_files']
             comment = 'Temporary settings file for software test purposes, not associated with a particular unit.'
 
+       
+        
+        unit_filename = self.settings_directory + self.unit_basename + '.conf'
+        if not(os.path.isfile(unit_filename)):
+            temp_filename = template_directory + '_unit_settings_DEFAULT.conf' # read in the template file
+            self.unit = configobj.ConfigObj(temp_filename,unrepr=True,encoding='utf-8')
+            self.unit.initial_comment = [comment,'']
+            self.unit.filename = unit_filename
+            if self.type == 'pos':
+                self.unit['POS_ID'] = str(unit_id)
+            else:
+                self.unit['FID_ID'] = str(unit_id)
+                self.unit.write()
+        else:
+            self.unit = configobj.ConfigObj(unit_filename,unrepr=True,encoding='utf-8')
+
         if self.write_to_DB != None:
             if unit_id != None:
                 self.posmoveDB = DBSingleton(self.petal_id)
                 if self.type == 'pos':
-                    self.unit = self.posmoveDB.get_pos_constants(unit_id)
+                    self.unit.update(self.posmoveDB.get_pos_constants(unit_id))
                     self.unit.update(self.posmoveDB.get_genl_constants())
                     self.unit.update(self.posmoveDB.get_pos_data(unit_id))
                     self.unit.update(self.posmoveDB.get_calib(unit_id))
                 else:
-                    self.unit = self.posmoveDB.get_fid_constants(unit_id)
+                    self.unit.update(self.posmoveDB.get_fid_constants(unit_id))
                     self.unit.update(self.posmoveDB.get_fid_data(unit_id))
             else:
                 self.posmoveDB = DBSingleton()
                 if self.type == 'pos':
-                    self.unit = self.posmoveDB.get_pos_def_constants()
+                    self.unit.update(self.posmoveDB.get_pos_def_constants())
                     self.unit.update(self.posmoveDB.get_genl_constants())
                 else:
-                    self.unit = self.posmoveDB.get_fid_def_constants()
+                    self.unit.update(self.posmoveDB.get_fid_def_constants())
 
-        else:
-            unit_filename = self.settings_directory + self.unit_basename + '.conf'
-            if not(os.path.isfile(unit_filename)):
-                temp_filename = template_directory + '_unit_settings_DEFAULT.conf' # read in the template file
-                self.unit = configobj.ConfigObj(temp_filename,unrepr=True,encoding='utf-8')
-                self.unit.initial_comment = [comment,'']
-                self.unit.filename = unit_filename
-                if self.type == 'pos':
-                    self.unit['POS_ID'] = str(unit_id)
-                else:
-                    self.unit['FID_ID'] = str(unit_id)
-                    self.unit.write()
-            else:
-                self.unit = configobj.ConfigObj(unit_filename,unrepr=True,encoding='utf-8')
 
         self.log_separator = '_log_'
         self.log_numformat = '08g'
