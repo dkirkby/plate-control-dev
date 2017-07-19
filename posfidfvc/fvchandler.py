@@ -24,7 +24,7 @@ class FVCHandler(object):
         self.fvc_type = fvc_type # 'SBIG' or 'SBIG_Yale' or 'FLI' or 'simulator'
         self.fvcproxy = None
         self.min_energy = 0.25 * 1.0 # this is the minimum allowed value for the product peak*fwhm for any given dot
-        self.max_attempts = 10 # max number of times to retry an image measurement (if poor dot quality) before quitting hard
+        self.max_attempts = 5 # max number of times to retry an image measurement (if poor dot quality) before quitting hard
         if self.fvc_type == 'SBIG':
             import sbig_grab_cen
             self.sbig = sbig_grab_cen.SBIG_Grab_Cen(save_dir=pc.dirs['temp_files'])
