@@ -35,7 +35,7 @@ class FVCHandler(object):
             self.sim_err_max = 0.01 # 2D err max for simulator
             self.printfunc('FVCHandler is in simulator mode with max 2D errors of size ' + str(self.sim_err_max) + '.')
         if 'SBIG' in self.fvc_type:
-            self.exposure_time = 0.20
+            self.exposure_time = 0.25
             self.max_counts = 2**16 - 1 # SBIC camera ADU max
         else:
             self.exposure_time = 1.0
@@ -370,8 +370,10 @@ if __name__ == '__main__':
         fwhms.append(these_fwhms)
         energies.append([these_peaks[i]*these_fwhms[i] for i in range(len(these_peaks))])
         print('ndots: ' + str(len(xy[i])))
+        print('')
         print('measured xy positions:')
         print(xy[i])
+        print('')
         print('measured peak brightnesses:')
         print(peaks[i])
         print('dimmest (scale 0 to 1): ' + str(min(peaks[i])))
