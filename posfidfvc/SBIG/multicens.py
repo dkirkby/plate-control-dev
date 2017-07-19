@@ -153,7 +153,7 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
             print('peak = ' + str(peak) + ' brightness appears out of expected range')
             should_save_sample_image = True
         if FWHMSub[-1] < 0.5:
-            print('fwhm = ' + str(FWHMSub[-1]) + ' appears invalid, check if fitbox size (' + str(size_fitbox) + ') is appropriate')
+            print('fwhm = ' + str(FWHMSub[-1]) + ' appears invalid, check if fitbox size (' + str(size_fitbox) + ') is appropriate and dots are sufficiently illuminated')
             should_save_sample_image = True
         if should_save_sample_image:
             if len(os.listdir()) < max_sample_files_to_save:
