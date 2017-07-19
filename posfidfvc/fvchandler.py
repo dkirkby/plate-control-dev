@@ -28,6 +28,7 @@ class FVCHandler(object):
             self.sbig = sbig_grab_cen.SBIG_Grab_Cen(save_dir=pc.dirs['temp_files'])
             self.sbig.take_darks = False # typically we have the test stand in a dark enough enclosure, so False here saves time
             self.sbig.write_fits = save_sbig_fits
+            self.min_energy = 0.25 * 1.0 # this is the minimum allowed value for the product peak*fwhm for any given dot
         elif self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':   
             self.platemaker_instrument = platemaker_instrument # this setter also initializes self.fvcproxy
         elif self.fvc_type == 'simulator':
@@ -88,7 +89,7 @@ class FVCHandler(object):
         elif self.fvcproxy:
             self.fvcproxy.send_fvc_command('set',exptime=value)
         
-    def measure_fvc_pixels(self, num_objects):
+    def measure_fvc_pixels(self, num_objects, attempt=1):
         """Gets a measurement from the fiber view camera of the centroid positions
         of all the dots of light landing on the CCD.
         
@@ -103,13 +104,14 @@ class FVCHandler(object):
         peaks = []
         fwhms = []
         imgfiles = []
+        max_repeats = 5
         if self.fvc_type == 'SBIG':
             xy,peaks,fwhms,elapsed_time,imgfiles = self.sbig.grab(num_objects)
             peaks = [x/self.max_counts for x in peaks]
         elif self.fvc_type == 'simulator':
             xy = np.random.uniform(low=0,high=1000,size=(num_objects,2)).tolist()
-            peaks = np.random.uniform(low=0,high=1,size=num_objects).tolist()
-            fwhms = np.random.uniform(low=0,high=1,size=num_objects).tolist()
+            peaks = np.random.uniform(low=0.25,high=1.0,size=num_objects).tolist()
+            fwhms = np.random.uniform(low=1.0,high=2.0,size=num_objects).tolist()
             imgfiles = ['fake1.FITS','fake2.FITS']
         else:
             self.fvcproxy.send_fvc_command('make_targets',num_spots=num_objects)
@@ -121,6 +123,11 @@ class FVCHandler(object):
                     xy.append([params['x'],params['y']])
                     peaks.append(self.normalize_mag(params['mag']))
                     fwhms.append(params['fwhm'])
+        energies = [peaks[i]*fwhms[i] for i in range(len(peaks))]
+        if any([e < self.min_energy for e in energies]):
+            self.printfunc('Poor dot quality found on image attempt ' + str(attempt) + ' of ' + str(max_repeats) + '. Gaussian fit peak * energy was ' + str(min(energies)) + ' which is less than the minimum threshold (' + str(self.min_energy) + ')')
+            if attempt < max_repeats:
+                return self.measure_fvc_pixels(num_objects, attempt + 1)
         return xy,peaks,fwhms,imgfiles
 
     def measure_and_identify(self,expected_pos,expected_ref):
@@ -346,12 +353,14 @@ class FVCHandler(object):
         return np.array([[np.cos(radians), -np.sin(radians)], [np.sin(radians), np.cos(radians)]])
 
 if __name__ == '__main__':
-    f = FVCHandler(fvc_type='FLI')
-    n_objects = 65
+    f = FVCHandler(fvc_type='SBIG')
+    n_objects = 16
     n_repeats = 1
+    f.min_energy = -np.Inf
     xy = []
     peaks = []
     fwhms = []
+    energies = []
     print('start taking ' + str(n_repeats) + ' images')
     start_time = time.time()
     for i in range(n_repeats):
@@ -359,6 +368,7 @@ if __name__ == '__main__':
         xy.append(these_xy)
         peaks.append(these_peaks)
         fwhms.append(these_fwhms)
+        energies.append([these_peaks[i]*these_fwhms[i] for i in range(len(these_peaks))])
         print('ndots: ' + str(len(xy[i])))
         print('measured xy positions:')
         print(xy[i])
@@ -371,6 +381,11 @@ if __name__ == '__main__':
         print(fwhms[i])
         print('dimmest (scale 0 to 1): ' + str(min(fwhms[i])))
         print('brightest (scale 0 to 1): ' + str(max(fwhms[i])))
+        print('')
+        print('measured energies = peaks * fwhms:')
+        print(energies[i])
+        print('dimmest (scale 0 to 1): ' + str(min(energies[i])))
+        print('brightest (scale 0 to 1): ' + str(max(energies[i])))
         print('')
     total_time = time.time() - start_time
     print('total time = ' + str(total_time) + ' (' + str(total_time/n_repeats) + ' per image)')
