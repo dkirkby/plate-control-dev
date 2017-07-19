@@ -23,12 +23,13 @@ class FVCHandler(object):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.fvc_type = fvc_type # 'SBIG' or 'SBIG_Yale' or 'FLI' or 'simulator'
         self.fvcproxy = None
+        self.min_energy = 0.25 * 1.0 # this is the minimum allowed value for the product peak*fwhm for any given dot
+        self.max_attempts = 10 # max number of times to retry an image measurement (if poor dot quality) before quitting hard
         if self.fvc_type == 'SBIG':
             import sbig_grab_cen
             self.sbig = sbig_grab_cen.SBIG_Grab_Cen(save_dir=pc.dirs['temp_files'])
             self.sbig.take_darks = False # typically we have the test stand in a dark enough enclosure, so False here saves time
             self.sbig.write_fits = save_sbig_fits
-            self.min_energy = 0.25 * 1.0 # this is the minimum allowed value for the product peak*fwhm for any given dot
         elif self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':   
             self.platemaker_instrument = platemaker_instrument # this setter also initializes self.fvcproxy
         elif self.fvc_type == 'simulator':
@@ -104,7 +105,6 @@ class FVCHandler(object):
         peaks = []
         fwhms = []
         imgfiles = []
-        max_repeats = 5
         if self.fvc_type == 'SBIG':
             xy,peaks,fwhms,elapsed_time,imgfiles = self.sbig.grab(num_objects)
             peaks = [x/self.max_counts for x in peaks]
@@ -125,9 +125,16 @@ class FVCHandler(object):
                     fwhms.append(params['fwhm'])
         energies = [peaks[i]*fwhms[i] for i in range(len(peaks))]
         if any([e < self.min_energy for e in energies]):
-            self.printfunc('Poor dot quality found on image attempt ' + str(attempt) + ' of ' + str(max_repeats) + '. Gaussian fit peak * energy was ' + str(min(energies)) + ' which is less than the minimum threshold (' + str(self.min_energy) + ')')
-            if attempt < max_repeats:
+            self.printfunc('Poor dot quality found on image attempt ' + str(attempt) + ' of ' + str(self.max_attempts) + '. Gaussian fit peak * energy was ' + str(min(energies)) + ' which is less than the minimum threshold (' + str(self.min_energy) + ')')
+            if attempt < self.max_attempts:
                 return self.measure_fvc_pixels(num_objects, attempt + 1)
+            else:
+                if self.fvc_type == 'FLI':
+                    pass
+                    # Ought to throw some kind of an error to allert the user that something is bad in the image.
+                    # I don't know the best way to handle this at the moment. - Joe
+                else:
+                    sys.exit(0) # on the test stand, we definitely want to hard quit in this case
         return xy,peaks,fwhms,imgfiles
 
     def measure_and_identify(self,expected_pos,expected_ref):
