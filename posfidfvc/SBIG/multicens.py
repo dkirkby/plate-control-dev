@@ -102,8 +102,9 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
     labeled, nr_objects = mh.label(bw)
     sizes = mh.labeled.labeled_size(labeled) # size[0] is the background size, sizes[1 and greater] are number of pixels in each region
     sorted_sizes_indexes = np.argsort(sizes)[::-1] # return in descending order
-    good_spot_indexes = sorted_sizes_indexes[1:n_centroids_to_keep+1] # avoiding the background regions entry at the beginning
-
+    n_centroids_to_select=min(len(sorted_sizes_indexes),n_centroids_to_keep+3)
+    #good_spot_indexes = sorted_sizes_indexes[1:n_centroids_to_keep+1] # avoiding the background regions entry at the beginning
+    good_spot_indexes = sorted_sizes_indexes[1:n_centroids_to_select+1] # modified by KZ, select more sources in the beginning, avoiding the background regions entry at the beginning
     # In rare cases of having many bright spots and just a small # of dimmer (but still
     # usable) spots, then the otsu level is too high. In that case, we can retry, forcing
     # the more simplistic level_frac.
@@ -142,11 +143,12 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
         py=int(round(x[0]))     
         data = img[py-nbox:py+nbox,px-nbox:px+nbox]
         params = fitgaussian(data)
-        xCenSub.append(float(px)-float(nbox)+params[3])
-        yCenSub.append(float(py)-float(nbox)+params[2])
-        FWHMSub.append(2.355*max(params[4],params[5]))
-        peak = params[1]
-        peaks.append(peak)
+        if (2.355*max(params[4],params[5])) >1.:  #Added by KZ, to reject fake detection
+            xCenSub.append(float(px)-float(nbox)+params[3])
+            yCenSub.append(float(py)-float(nbox)+params[2])
+            FWHMSub.append(2.355*max(params[4],params[5]))
+            peak = params[1]
+            peaks.append(peak)
 
         should_save_sample_image = False
         if peak < 0 or peak > 2**16-1:
@@ -161,5 +163,9 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
                 sample = pyfits.PrimaryHDU(img)
                 sample.writeto(savefile)
                 print('wrote a sample image file to ' + savefile)
-            
+        if len(peaks) > n_centroids_to_keep:
+           print('Find more dots than expected')
+           should_save_sample_image = True
+            #sorted_energy_indexes = np.argsort(np.array(peaks)*np.array(FWHMSub)[::-1]
+           #XcenSub=XcenSub[sorted_energy_indexes]
     return xCenSub, yCenSub, peaks, FWHMSub, filename
