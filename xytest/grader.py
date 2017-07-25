@@ -223,7 +223,6 @@ for posid in d.keys():
         if not(ignore_gearbox) and d[posid]['has extended gearbox']:
             this_grade = 'E' + this_grade
         d[posid]['row grade'].append(this_grade)
-            
 
 # determine the starting and finishing grades for each positioner
 start_grade_min_current = 100
@@ -341,27 +340,33 @@ if report_file:
             writer.writerow(['',key] + list(grade_specs[key].values()))
         writer.writerow(['',fail_grade + ' or ' + fail_grade_ext + ' ... does not meet any of the above grades.'])
         writer.writerow([''])
-        writer.writerow(['TOTALS FOR EACH GRADE:   ** at burn-in >= '+str(num_moves_infant_mortality)+' moves **'])
-        writer.writerow(['','grade', 'quantity', 'percent'])
-        for has_ext in [False,True]:
-            these_posids = [posid for posid in d.keys() if d[posid]['has extended gearbox'] == has_ext]
-            these_all_grades = all_grades_regular if not(has_ext) else all_grades_ext
-            num_insuff = len([posid for posid in these_posids if d[posid]['start grade'] == insuff_data_grade])
-            num_suff = len(these_posids) - num_insuff
-            def percent(value):
-                if value == 0 and num_suff == 0:
-                    frac = 0
-                else:
-                    frac = value/num_suff*100
-                return format(frac,'.1f')+'%'
-            for key in these_all_grades:
-                total_this_grade = len([posid for posid in these_posids if d[posid]['start grade'] == key])
-                writer.writerow(['',key,total_this_grade,percent(total_this_grade)])
-            all_text = 'all non-extension' if not(has_ext) else 'all extension'
-            writer.writerow(['',all_text,num_suff,percent(num_suff)])
-            if num_insuff > 0:
-                writer.writerow(['',insuff_data_grade,num_insuff])
-            writer.writerow([''])
+        for stage in ['final','start']:
+            header_text = 'TOTALS FOR EACH GRADE:  '
+            if stage == 'start':
+                header_text += '** INITIAL (at burn-in >= ' + str(num_moves_infant_mortality) + ' moves) **' 
+            else:
+                header_text += '** FINAL (latest values) **'
+            writer.writerow([header_text])
+            writer.writerow(['','grade', 'quantity', 'percent'])
+            for has_ext in [False,True]:
+                these_posids = [posid for posid in d.keys() if d[posid]['has extended gearbox'] == has_ext]
+                these_all_grades = all_grades_regular if not(has_ext) else all_grades_ext
+                num_insuff = len([posid for posid in these_posids if d[posid][stage + ' grade'] == insuff_data_grade])
+                num_suff = len(these_posids) - num_insuff
+                def percent(value):
+                    if value == 0 and num_suff == 0:
+                        frac = 0
+                    else:
+                        frac = value/num_suff*100
+                    return format(frac,'.1f')+'%'
+                for key in these_all_grades:
+                    total_this_grade = len([posid for posid in these_posids if d[posid][stage + ' grade'] == key])
+                    writer.writerow(['',key,total_this_grade,percent(total_this_grade)])
+                all_text = 'all non-extension' if not(has_ext) else 'all extension'
+                writer.writerow(['',all_text,num_suff,percent(num_suff)])
+                if num_insuff > 0:
+                    writer.writerow(['',insuff_data_grade,num_insuff])
+                writer.writerow([''])
         writer.writerow(['LIFETIME STATISTICS:'])         
         writer.writerow(['',''] + [r for r in lifestats['ranges']])
         for has_ext in [False,True]:
@@ -379,14 +384,14 @@ if report_file:
                         writer.writerow(['',key] + val_strs)
             writer.writerow([''])
         writer.writerow(['INDIVIDUAL POSITIONER GRADES:'])
-        writer.writerow(['','posid','initial grade'] + proven_keys + ['num moves passing','num moves at failure','num manually-ignored bad data rows'])
+        writer.writerow(['','posid','final grade','initial grade'] + proven_keys + ['num moves passing','num moves at failure','num manually-ignored bad data rows'])
         posids_sorted_by_grade = []
         for grade in all_grades + [insuff_data_grade]:
             for posid in d.keys():
-                if d[posid]['start grade'] == grade:
+                if d[posid]['final grade'] == grade:
                     posids_sorted_by_grade.append(posid)
         for posid in posids_sorted_by_grade:
-            writer.writerow(['', posid, d[posid]['start grade']] + [d[posid][key] for key in proven_keys + ['num moves passing','num moves at failure','num manually ignored rows']])
+            writer.writerow(['', posid, d[posid]['final grade'], d[posid]['start grade']] + [d[posid][key] for key in proven_keys + ['num moves passing','num moves at failure','num manually ignored rows']])
         writer.writerow([''])
         writer.writerow(['INDIVIDUAL TEST LOOP GRADES:'])
         writer.writerow(['','posid','finish time','total move sequences','grade'])
