@@ -215,7 +215,20 @@ class PetalComm(object):
             return self._call_device('set_periods', bus_id, can_id, creep_period_m0, creep_period_m1, spin_steps)
         except Exception as e:
             return 'FAILED: Can not set periods. Exception: %s' % str(e)
-
+    
+    def set_bump_flags(self, bus_id, can_id, curr_hold, bump_cw_flg, bump_ccw_flg):
+        """
+        Set motor CW/CCW bump flags and hold current.
+        bus_id       ... bus id string (eg. 'can0')
+        can_id       ... positioner can id
+        curr_hold    ... hold current, int between 0 and 100
+        bump_cw_flg  ... flag for switching CW bump, bool, on if True
+        bump_ccw_flg ... flag for switching CCW bump, bool, on if True     
+        """
+        try:
+            return self._call_device('set_bump_flags', bus_id, can_id, curr_hold, bump_cw_flg, bump_ccw_flg)
+        except Exception as e:
+            return 'FAILED: Can not set bump flags. Exception: %s' % str(e)
 
     def set_pos_constants(self, can_ids, settings):
         """
@@ -432,24 +445,6 @@ class PetalComm(object):
         """
         try:
             return self._call_device('select_mode', pid, mode)
-        except Exception as e:
-            return 'FAILED: Can not select mode.  Exception: %s' % str(e)
-
-    def program(self, pid, hex_file = 'fw21.hex'):
-        """
-        Sends specified hex_file to specified pid 
-        """
-        try:
-            return self._call_device('program', pid, hex_file)
-        except Exception as e:
-            return 'FAILED: Can not select mode.  Exception: %s' % str(e)
-
-    def request_verification(self, can_ids = [3001, 3002]):
-        """
-        Requests verification that bootloader programming was successful, returns dictionary of can_ids and statuses ('OK' or 'ERROR' strings as dict values)
-        """
-        try:
-            return self._call_device('request_verification', can_ids)
         except Exception as e:
             return 'FAILED: Can not select mode.  Exception: %s' % str(e)
 
