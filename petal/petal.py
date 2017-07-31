@@ -340,7 +340,7 @@ class Petal(object):
             if self.verbose:
                 print('Simulator skips sending motor parameters to positioners.')
             return
-        parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
+        parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD', 'BUMP_CW_FLG', 'BUMP_CCW_FLG']
         for p in self.posmodels:
             state = p.state
             canid = p.canid
@@ -348,10 +348,12 @@ class Petal(object):
             parameter_vals = []
             for parameter_key in parameter_keys:
                 parameter_vals.append(state.read(parameter_key))
-            #syntax for setting currents: comm.set_currents(canid, [curr_spin_p, curr_cruise_p, curr_creep_p, curr_hold_p], [curr_spin_t, curr_cruise_t, curr_creep_t, curr_hold_t])
+            #syntax for setting currents: comm.set_currents(busid, canid, [curr_spin_p, curr_cruise_p, curr_creep_p, curr_hold_p], [curr_spin_t, curr_cruise_t, curr_creep_t, curr_hold_t])
             self.comm.set_currents(busid, canid, [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]], [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]])
-            #syntax for setting periods: comm.set_periods(canid, creep_period_p, creep_period_t, spin_period)
+            #syntax for setting periods: comm.set_periods(busid, canid, creep_period_p, creep_period_t, spin_period)
             self.comm.set_periods(busid, canid, parameter_vals[4], parameter_vals[4], parameter_vals[5])
+            #syntax for setting bump flags: comm.set_bump_flags(busid, canid, curr_hold, bump_cw_flg, bump_ccw_flg)
+            self.comm.set_bump_flags(busid, canid, parameter_vals[3], parameter_vals[6], parameter_vals[7])
             vals_str =  ''.join([' ' + parameter_keys[i] + '=' + str(parameter_vals[i]) for i in range(len(parameter_keys))])
             self.printfunc(p.posid + ' (bus=' + str(busid) + ', canid=' + str(canid) + '): motor currents and periods set:' + vals_str)
 
