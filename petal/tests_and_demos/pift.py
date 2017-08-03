@@ -13,6 +13,7 @@
 #    Revisions:
 #    mm/dd/yyyy who        description
 #    ---------- --------   -----------
+#    08/03/2017 cad        Version 1.01  Added Fiducial control
 #    07/25/2017 cad        Version 1.00.  Initial version
 # 
 # ****************************************************************************
@@ -39,7 +40,7 @@ import posconstants as pc
 
 prog_name="PIFT"
 prog_long_name="Positioner Installation Functional Test"
-prog_version="1.00"
+prog_version="1.01"
 
 # Configuration Values
 
@@ -88,6 +89,7 @@ class Torque_Test_GUI:
         self.initVars()
         self.initUI()
         self.gui_initialized=1
+        tkroot.protocol("WM_DELETE_WINDOW", self.quit)
         return
 
     def initVars(self):
@@ -126,6 +128,8 @@ class Torque_Test_GUI:
         self.motor_sn=tk.StringVar()
         self.user_notes=tk.StringVar()
         self.status_str=tk.StringVar()
+        self.fid_pct=tk.IntVar()
+    
  
         # Now set the default values
         self.config_file.set(PIFTConfFile)
@@ -148,93 +152,95 @@ class Torque_Test_GUI:
         # 4 tk.Frames defining the overall geometry
 
         # Hardware settings and Connection button
-        self.frame_top_left=tk.Frame(self.top_fr)
+        self.frame_top_left=ttk.Frame(self.top_fr)
         self.frame_top_left.grid(column=0,row=0,rowspan=3,sticky="ns",padx=2,pady=2)
-        self.frame_hw = tk.Frame(self.frame_top_left,relief="groove",borderwidth=2)
+        self.frame_hw = ttk.Frame(self.frame_top_left,relief="groove",borderwidth=2)
         self.frame_hw.pack(fill=tk.BOTH,expand=True)
 
         # Test settings and Apply Torque button
-        self.frame_top_mid=tk.Frame(self.top_fr)
+        self.frame_top_mid=ttk.Frame(self.top_fr)
         self.frame_top_mid.grid(column=1,row=0,rowspan=3,sticky="n",padx=2,pady=2)
-        self.frame_tst = tk.Frame(self.frame_top_mid,relief="groove",borderwidth=2)
+        self.frame_tst = ttk.Frame(self.frame_top_mid,relief="groove",borderwidth=2)
         self.frame_tst.pack(fill=tk.BOTH,expand=True)
+        self.frame_top_fid=ttk.Frame(self.frame_top_mid,relief="groove",borderwidth=2)
+        self.frame_top_fid.pack(fill=tk.BOTH,expand=True,pady=10)
         
         # Tweak Motor Position
-        self.frame_top_right=tk.Frame(self.top_fr)
+        self.frame_top_right=ttk.Frame(self.top_fr)
         self.frame_top_right.grid(column=2,row=0,rowspan=3,sticky="ns",padx=2,pady=2)
-        self.frame_twk = tk.Frame(self.frame_top_right,relief="groove",borderwidth=2)
+        self.frame_twk = ttk.Frame(self.frame_top_right,relief="groove",borderwidth=2)
         self.frame_twk.pack(fill=tk.BOTH,expand=True)
         
         # Quit button and Status
-        self.frame_bot_right=tk.Frame(self.top_fr)
+        self.frame_bot_right=ttk.Frame(self.top_fr)
         self.frame_bot_right.grid(column=0,row=3,columnspan=3,sticky="ew",padx=2,pady=2)
-        self.frame_qst = tk.Frame(self.frame_bot_right,relief="groove",borderwidth=2)
+        self.frame_qst = ttk.Frame(self.frame_bot_right,relief="groove",borderwidth=2)
         self.frame_qst.pack(fill=tk.BOTH,expand=True,ipadx=2,ipady=2)
 
         
 #       ************ HW tk.Frame **********************
-        self.frame_hw_1 = tk.Frame(self.frame_hw)
+        self.frame_hw_1 = ttk.Frame(self.frame_hw)
         self.frame_hw_1.pack(fill=tk.X)
-        self.label_PC =tk.Label(self.frame_hw_1, text="PetalController", width=11)
+        self.label_PC =ttk.Label(self.frame_hw_1, text="PetalController", width=11)
         self.label_PC.pack(side=tk.LEFT, padx=5, pady=5)        
-        self.entry_PC = tk.Entry(self.frame_hw_1)
+        self.entry_PC = ttk.Entry(self.frame_hw_1)
         self.entry_PC["textvariable"]=self.petal_controller
         self.entry_PC.pack(fill=tk.X, padx=5, expand=True)
         
-        self.frame_hw_2 = tk.Frame(self.frame_hw)
+        self.frame_hw_2 = ttk.Frame(self.frame_hw)
         self.frame_hw_2.pack(fill=tk.X)
-        self.label_CB = tk.Label(self.frame_hw_2, text="Can Bus", width=11)
+        self.label_CB = ttk.Label(self.frame_hw_2, text="Can Bus", width=11)
         self.label_CB.pack(side=tk.LEFT, padx=5, pady=5)        
-        self.entry_CB = tk.Entry(self.frame_hw_2)
+        self.entry_CB = ttk.Entry(self.frame_hw_2)
         self.entry_CB["textvariable"]=self.canbus
         self.entry_CB.pack(fill=tk.X, padx=5, expand=True)
         
-        self.frame_hw_3 = tk.Frame(self.frame_hw)
+        self.frame_hw_3 = ttk.Frame(self.frame_hw)
         self.frame_hw_3.pack(fill=tk.X)
-        self.label_CI = tk.Label(self.frame_hw_3, text="Can ID", width=11)
+        self.label_CI = ttk.Label(self.frame_hw_3, text="Can ID", width=11)
         self.label_CI.pack(side=tk.LEFT, padx=5, pady=5)        
-        self.entry_CI = tk.Entry(self.frame_hw_3)
+        self.entry_CI = ttk.Entry(self.frame_hw_3)
         self.entry_CI["textvariable"]=self.canid
         self.entry_CI.pack(fill=tk.X, padx=5, expand=True)
         
-        self.frame_hw_6 = tk.Frame(self.frame_hw)
+        self.frame_hw_6 = ttk.Frame(self.frame_hw)
         self.frame_hw_6.pack(fill=tk.X)
-        self.label_CF = tk.Label(self.frame_hw_6, text="Config File", width=11)
+        self.label_CF = ttk.Label(self.frame_hw_6, text="Config File", width=11)
         self.label_CF.pack(side=tk.LEFT, padx=5, pady=5)        
-        self.entry_CF = tk.Entry(self.frame_hw_6)
+        self.entry_CF = ttk.Entry(self.frame_hw_6)
         self.entry_CF["textvariable"]=self.config_file
         self.entry_CF.pack(fill=tk.X, padx=5, expand=True)
         
-        self.frame_hw_7 = tk.Frame(self.frame_hw)
+        self.frame_hw_7 = ttk.Frame(self.frame_hw)
         self.frame_hw_7.pack(fill=tk.X)
-        self.label_LF = tk.Label(self.frame_hw_7, text="Log File", width=11)
+        self.label_LF = ttk.Label(self.frame_hw_7, text="Log File", width=11)
         self.label_LF.pack(side=tk.LEFT, padx=5, pady=5)        
-        self.entry_LF = tk.Entry(self.frame_hw_7)
+        self.entry_LF = ttk.Entry(self.frame_hw_7)
         self.entry_LF["textvariable"]=self.log_file
         self.entry_LF.pack(fill=tk.X, padx=5, expand=True)
         
-        self.frame_hw_8 = tk.Frame(self.frame_hw)
+        self.frame_hw_8 = ttk.Frame(self.frame_hw)
         self.frame_hw_8.pack(fill=tk.X)
-        self.label_DF = tk.Label(self.frame_hw_8, text="Data File", width=11)
+        self.label_DF = ttk.Label(self.frame_hw_8, text="Data File", width=11)
         self.label_DF.pack(side=tk.LEFT, padx=5, pady=5)        
-        self.entry_DF = tk.Entry(self.frame_hw_8)
+        self.entry_DF = ttk.Entry(self.frame_hw_8)
         self.entry_DF["textvariable"]=self.csv_file
         self.entry_DF.pack(fill=tk.X, padx=5, expand=True)
         
-        self.frame_hw_5 = tk.Frame(self.frame_hw)
+        self.frame_hw_5 = ttk.Frame(self.frame_hw)
         self.frame_hw_5.pack(fill=tk.X,padx=5,pady=3,side=tk.RIGHT)
 
-        self.frame_hw_5a = tk.Frame(self.frame_hw_5,relief="groove",borderwidth=2)
-        self.frame_hw_5b = tk.Frame(self.frame_hw_5)
+        self.frame_hw_5a = ttk.Frame(self.frame_hw_5,relief="groove",borderwidth=2)
+        self.frame_hw_5b = ttk.Frame(self.frame_hw_5)
 
-        self.button_LoadConf = tk.Button(self.frame_hw_5a, width=9, text="Load Config")
+        self.button_LoadConf = ttk.Button(self.frame_hw_5a, width=9, text="Load Config")
         self.button_LoadConf["command"]=self.load_config
-        self.button_SaveConf = tk.Button(self.frame_hw_5a, width=9, text="Save Config")
+        self.button_SaveConf = ttk.Button(self.frame_hw_5a, width=9, text="Save Config")
         self.button_SaveConf["command"]=self.save_config
 
-        self.label_nada = tk.Label(self.frame_hw_5b, text=" ", width=4)
+        self.label_nada = ttk.Label(self.frame_hw_5b, text=" ", width=4)
 
-        self.button_Connect = tk.Button(self.frame_hw_5, width=9, text="Connect")
+        self.button_Connect = ttk.Button(self.frame_hw_5, width=9, text="Connect")
         self.button_Connect["command"]=self.Connect_to_PC
 
         self.frame_hw_5a.grid(column=0,row=0,sticky="w",padx=2,pady=2)
@@ -246,87 +252,98 @@ class Torque_Test_GUI:
 
 #       ********************** TST tk.Frame *****************
 
-        self.frame_op = tk.Frame(self.frame_tst)
+        self.frame_op = ttk.Frame(self.frame_tst)
         self.frame_op.pack(fill=tk.X,pady=1)
-        self.label_op = tk.Label(self.frame_op, text="Operator", width=11)
+        self.label_op = ttk.Label(self.frame_op, text="Operator", width=11)
         self.label_op.pack(side=tk.LEFT, padx=5, pady=5)           
-        self.entry_op = tk.Entry(self.frame_op)
+        self.entry_op = ttk.Entry(self.frame_op)
         self.entry_op["textvariable"]=self.operator_name
         self.entry_op.pack(fill=tk.X, padx=5, expand=True)
         
-        self.frame_sn = tk.Frame(self.frame_tst)
+        self.frame_sn = ttk.Frame(self.frame_tst)
         self.frame_sn.pack(fill=tk.X,pady=1)
-        self.label_sn = tk.Label(self.frame_sn, text="Positioner", width=11)
+        self.label_sn = ttk.Label(self.frame_sn, text="Positioner", width=11)
         self.label_sn.pack(side=tk.LEFT, padx=5, pady=5)           
-        self.entry_sn = tk.Entry(self.frame_sn)
+        self.entry_sn = ttk.Entry(self.frame_sn)
         self.entry_sn["textvariable"]=self.motor_sn
         self.entry_sn.pack(fill=tk.X, padx=5, expand=True)
         
-        self.frame_note = tk.Frame(self.frame_tst)
+        self.frame_note = ttk.Frame(self.frame_tst)
         self.frame_note.pack(fill=tk.X)
-        self.label_note = tk.Label(self.frame_note, text="Notes", width=11)
+        self.label_note = ttk.Label(self.frame_note, text="Notes", width=11)
         self.label_note.pack(side=tk.LEFT, anchor=tk.N, padx=5, pady=5)        
-        self.entry_note = tk.Entry(self.frame_note)
+        self.entry_note = ttk.Entry(self.frame_note)
         self.entry_note["textvariable"]=self.user_notes
         self.entry_note.pack(fill=tk.BOTH, pady=5, padx=5, expand=True)           
 
-        self.frame_tst_btn = tk.Frame(self.frame_tst)
+        self.frame_tst_btn = ttk.Frame(self.frame_tst)
         self.frame_tst_btn.pack(fill=tk.X,pady=9)
 
-        self.label_nada2 = tk.Label(self.frame_tst_btn, text="        ", width=10)
-        self.button_next = tk.Button(self.frame_tst_btn, width=9, text="Next Motor",
+        self.label_nada2 = ttk.Label(self.frame_tst_btn, text="        ", width=10)
+        self.button_next = ttk.Button(self.frame_tst_btn, width=9, text="Next Motor",
                                      state=tk.DISABLED,command=self.do_next_motor)
 
         self.label_nada2.grid(column=2,row=0,sticky="w",padx=2,pady=2)
         self.button_next.grid(column=3,row=0,sticky="e",padx=2,pady=2)
         
-#       **************** TWK tk.Frame *****************
-        self.frame_twk1 = tk.Frame(self.frame_twk)
+        self.frame_fid = ttk.Frame(self.frame_top_fid)
+        self.label_fid = ttk.Label(self.frame_fid, text="Fiducial %", width=11)
+        self.entry_fidpct = ttk.Entry(self.frame_fid)
+        self.entry_fidpct["textvariable"]=self.fid_pct
+        self.button_setfid = ttk.Button(self.frame_fid, width=9, text="Set",
+                                     state=tk.DISABLED,command=self.set_fipos_led)
+        self.frame_fid.pack(fill=tk.X,pady=10)
+        self.label_fid.grid(column=0,row=0,sticky="w",padx=2,pady=2)           
+        self.entry_fidpct.grid(column=1,row=0,sticky="ew",padx=2,pady=2)
+        self.button_setfid.grid(column=2,row=0,sticky="w",padx=2,pady=2)
+
+        #       **************** TWK tk.Frame *****************
+        self.frame_twk1 = ttk.Frame(self.frame_twk)
         self.frame_twk1.pack(fill=tk.X,pady=1,expand=True)
-        self.label_ManTwk=tk.Label(self.frame_twk1, text="  Manual Control", width=13)
+        self.label_ManTwk=ttk.Label(self.frame_twk1, text="  Manual Control", width=13)
         self.label_ManTwk.grid(padx=6,pady=2)
 
-        self.frame_twk_3 = tk.Frame(self.frame_twk)
+        self.frame_twk_3 = ttk.Frame(self.frame_twk)
         self.frame_twk_3.pack(fill=tk.X, padx=5, pady=3)
-        self.frame_rb = tk.Frame(self.frame_twk_3,relief="groove",borderwidth=2)
+        self.frame_rb = ttk.Frame(self.frame_twk_3,relief="groove",borderwidth=2)
         self.frame_rb.pack(side=tk.RIGHT,fill=tk.X,pady=3)
-        self.button_Phi = tk.Radiobutton(self.frame_rb, width=7, text="Phi", variable=self.motor_type, value=0).pack(side=tk.LEFT,padx=2)
-        self.button_Theta = tk.Radiobutton(self.frame_rb, width=7, text="Theta", variable=self.motor_type, value=1).pack(side=tk.RIGHT,padx=2)
+        self.button_Phi = ttk.Radiobutton(self.frame_rb, width=7, text="Phi", variable=self.motor_type, value=0).pack(side=tk.LEFT,padx=2)
+        self.button_Theta = ttk.Radiobutton(self.frame_rb, width=7, text="Theta", variable=self.motor_type, value=1).pack(side=tk.RIGHT,padx=2)
         self.motor_type.set(Initial_Motor_Type)
         
         self.frame_twk_4 = tk.Frame(self.frame_twk)
         self.frame_twk_4.pack(fill=tk.X, padx=5, pady=3)
-        self.frame_rb = tk.Frame(self.frame_twk_4,relief="groove",borderwidth=2)
+        self.frame_rb = ttk.Frame(self.frame_twk_4,relief="groove",borderwidth=2)
         self.frame_rb.pack(side=tk.RIGHT,fill=tk.X,pady=3)
-        self.button_creep = tk.Radiobutton(self.frame_rb, width=7, text="Creep", variable=self.motor_speed, value=0, state=tk.DISABLED).pack(side=tk.LEFT,padx=2)
-        self.button_cruise = tk.Radiobutton(self.frame_rb, width=7, text="Cruise", variable=self.motor_speed, value=1, state=tk.DISABLED).pack(side=tk.RIGHT,padx=2)
+        self.button_creep = ttk.Radiobutton(self.frame_rb, width=7, text="Creep", variable=self.motor_speed, value=0, state=tk.DISABLED).pack(side=tk.LEFT,padx=2)
+        self.button_cruise = ttk.Radiobutton(self.frame_rb, width=7, text="Cruise", variable=self.motor_speed, value=1, state=tk.DISABLED).pack(side=tk.RIGHT,padx=2)
         self.motor_speed.set(1)
         
-        self.frame_twk2 = tk.Frame(self.frame_twk)
+        self.frame_twk2 = ttk.Frame(self.frame_twk)
         self.frame_twk2.pack(fill=tk.BOTH,expand=True,pady=1)
 
 #       self.label_ManTwk1=tk.Label(self.frame_twk2, text=" Manual", width=7)
 #       self.label_ManTwk2=tk.Label(self.frame_twk2, text="Control", width=7)
 
-        self.Lrg_CCW_button = tk.Button(self.frame_twk2, width=4, text="<<<",
+        self.Lrg_CCW_button = ttk.Button(self.frame_twk2, width=4, text="<<<",
                                      state=tk.DISABLED,command=self.ccw_big)
-        self.Med_CCW_button = tk.Button(self.frame_twk2, width=4, text="<< ",
+        self.Med_CCW_button = ttk.Button(self.frame_twk2, width=4, text="<< ",
                                      state=tk.DISABLED,command=self.ccw_med)
-        self.Sml_CCW_button = tk.Button(self.frame_twk2, width=4, text="<  ",
+        self.Sml_CCW_button = ttk.Button(self.frame_twk2, width=4, text="<  ",
                                      state=tk.DISABLED,command=self.ccw_sml)
-        self.Sml_CW_button  = tk.Button(self.frame_twk2, width=4, text=">  ",
+        self.Sml_CW_button  = ttk.Button(self.frame_twk2, width=4, text=">  ",
                                      state=tk.DISABLED,command=self.cw_sml)
-        self.Med_CW_button  = tk.Button(self.frame_twk2, width=4, text=">> ",
+        self.Med_CW_button  = ttk.Button(self.frame_twk2, width=4, text=">> ",
                                      state=tk.DISABLED,command=self.cw_med)
-        self.Lrg_CW_button  = tk.Button(self.frame_twk2, width=4, text=">>>",
+        self.Lrg_CW_button  = ttk.Button(self.frame_twk2, width=4, text=">>>",
                                      state=tk.DISABLED,command=self.cw_big)
 
-        self.label_LCCW = tk.Label(self.frame_twk2, text="CCW "+str(self.big_move)+"deg", width=12)
-        self.label_MCCW = tk.Label(self.frame_twk2, text="CCW  "+str(self.med_move)+"deg", width=12)
-        self.label_SCCW = tk.Label(self.frame_twk2, text="CCW  "+str(self.small_move)+"deg", width=12)
-        self.label_SCW  = tk.Label(self.frame_twk2, text="CW    "+str(self.small_move)+"deg", width=12)
-        self.label_MCW  = tk.Label(self.frame_twk2, text="CW    "+str(self.med_move)+"deg", width=12)
-        self.label_LCW  = tk.Label(self.frame_twk2, text="CW   "+str(self.big_move)+"deg", width=12)
+        self.label_LCCW = ttk.Label(self.frame_twk2, text="CCW "+str(self.big_move)+"deg", width=12)
+        self.label_MCCW = ttk.Label(self.frame_twk2, text="CCW  "+str(self.med_move)+"deg", width=12)
+        self.label_SCCW = ttk.Label(self.frame_twk2, text="CCW  "+str(self.small_move)+"deg", width=12)
+        self.label_SCW  = ttk.Label(self.frame_twk2, text="CW    "+str(self.small_move)+"deg", width=12)
+        self.label_MCW  = ttk.Label(self.frame_twk2, text="CW    "+str(self.med_move)+"deg", width=12)
+        self.label_LCW  = ttk.Label(self.frame_twk2, text="CW   "+str(self.big_move)+"deg", width=12)
 
 #       self.label_ManTwk1.grid(row=0,column=0,pady=2,sticky="e")
 #       self.label_ManTwk2.grid(row=0,column=1,pady=2,sticky="w")
@@ -344,19 +361,19 @@ class Torque_Test_GUI:
         self.Lrg_CW_button.grid(column=1,row=5,padx=2,pady=2)
 
 #       **************** QST tk.Frame *****************
-        self.frame_quit = tk.Frame(self.frame_qst)
+        self.frame_quit = ttk.Frame(self.frame_qst)
         self.frame_quit.pack(fill=tk.X,padx=10,pady=3)
-        self.quitButton = tk.Button(self.frame_quit, text="Quit",command=self.quit)
+        self.quitButton = ttk.Button(self.frame_quit, text="Quit",command=self.quit)
         self.quitButton.pack(side=tk.RIGHT, pady=5, padx=5)
 
-        self.label_status  = tk.Label(self.frame_quit, text="Status", width=9)
+        self.label_status  = ttk.Label(self.frame_quit, text="Status", width=9)
         self.label_status.pack(fill=tk.X,side=tk.LEFT,padx=5,pady=5)
 
-        self.frame_stat = tk.Frame(self.frame_qst)
+        self.frame_stat = ttk.Frame(self.frame_qst)
         self.frame_stat.pack(fill=tk.X,padx=10,pady=3)
-        self.frame_status = tk.Frame(self.frame_stat)
+        self.frame_status = ttk.Frame(self.frame_stat)
         self.frame_status.pack(fill=tk.X)
-        self.entry_status = tk.Entry(self.frame_status, textvariable=self.status_str, state="readonly")
+        self.entry_status = ttk.Entry(self.frame_status, textvariable=self.status_str, state="readonly")
         self.entry_status.pack(fill=tk.BOTH, pady=5, padx=5, expand=True)           
 
         self.top_fr.pack()
@@ -542,6 +559,7 @@ class Torque_Test_GUI:
         self.Sml_CW_button.config(state=tk.DISABLED)
         self.Med_CW_button.config(state=tk.DISABLED)
         self.Lrg_CW_button.config(state=tk.DISABLED)
+        self.button_setfid.config(state=tk.DISABLED)
         return
 
     def enable_Run_button(self):
@@ -552,6 +570,7 @@ class Torque_Test_GUI:
         self.Med_CW_button.config(state=tk.NORMAL)
         self.Lrg_CW_button.config(state=tk.NORMAL)
         self.button_next.config(state=tk.NORMAL)
+        self.button_setfid.config(state=tk.NORMAL)
         return
 
     def do_next_motor(self):
@@ -653,6 +672,29 @@ class Torque_Test_GUI:
         if(self.save_results(speed,direction,angle)):
             self.logprint("save failed")
         return
+
+    def set_fipos_led(self):
+        try:
+           LED_pct=int(self.fid_pct.get())
+        except ValueError as ve:
+            messagebox.showerror(prog_name+" - Fix LED_pct", ve )
+            return
+        try:
+           iCanID=int(self.canid.get())
+        except ValueError as ve:
+            messagebox.showerror(prog_name+" - Fix CanID", ve )
+            return
+        if(self.get_gui_results()):
+            return
+        iCanBusID=self.canbus.get()
+        lCanID=[iCanID]
+        lCanBusID=[iCanBusID]
+        LED_pcts=[LED_pct]
+        bool_val=self.pcomm.set_fiducials(lCanBusID,lCanID,LED_pcts)
+        if(bool_val):
+            self.logprint("Success LED_pct="+str(LED_pct))
+        else:
+            self.logprint("Fail    LED_pct="+str(LED_pct))
 
     def cw_big(self):
         self.my_travel("CW",self.big_move)
