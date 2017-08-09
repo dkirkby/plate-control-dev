@@ -106,12 +106,11 @@ if m.n_extradots_expected > 0 and os.path.isfile(extradots_filename):
             reader = csv.DictReader(file)
             for row in reader:
                 extradots_existing_data.append([row['x_pix'],row['y_pix']])
-        if tkinter.messagebox.askyesno(title='Skip id of positioners?',message='Also skip identification of positioner locations?\n\n(Say "YES" only if you are confident of their stored locations from a previous run.)'):
-            should_identify_positioners = False
+        should_identify_positioners = tkinter.messagebox.askyesno(title='Identify positioners?',message='Identify positioner locations?\n\n(Say "NO" only if you are confident of their stored locations from a previous run.)'):
 else:
-    if tkinter.messagebox.askyesno(title='Skip identification?',message='Skip identification of fiducial and positioner locations?\n\n(Say "YES" only if you are confident of their stored locations from a previous run.)'):
-        should_identify_fiducials = False
-        should_identify_positioners = False
+    response = tkinter.messagebox.askyesno(title='Identify fid and pos?',message='Identify fiducial and positioner locations?\n\n(Say "NO" only if you are confident of their stored locations from a previous run.)'):
+    should_identify_fiducials = response
+    should_identify_positioners = response
 
 # close the gui
 gui_root.withdraw()
