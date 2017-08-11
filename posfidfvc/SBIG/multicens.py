@@ -8,6 +8,30 @@ from scipy.ndimage.measurements import center_of_mass
 import os
 
 
+def remove_hot_pixels(image,nsigma=5):
+    """
+    Remove isolated hot pixels in the image. The mean value of the original image is
+    calculated and a mean + nsigma threshold cut is applied. Hot pixels receive a new value of
+    the average of their 4 next neighbors.
+    """
+    im_mean=np.mean(image)
+    im_sig=np.std(image)
+    hot_thresh=im_mean+nsigma*im_sig
+
+    hp_img = np.copy(image)
+    hp_img = hp_img.astype(np.uint32)
+    low_values_indices = hp_img < hot_thresh  # Where values are low
+    
+    hp_img[low_values_indices] = 0
+    ind = zip(*np.where(hp_img > hot_thresh))
+
+    for i in ind:
+        neighborsum=hp_img[i[0]+1,i[1]]+hp_img[i[0]-1,i[1]]+hp_img[i[0],i[1]-1]+hp_img[i[0],i[1]+1]
+        if neighborsum == 0:
+            image[i[0],i[1]] = (image[i[0]+1,i[1]]+image[i[0]-1,i[1]]+image[i[0],i[1]-1]+image[i[0],i[1]+1])/4.
+    del hp_img        
+    return image 
+
 def centroid(im, mask=None, w=None, x=None, y=None):
     """Compute the centroid of an image with a specified binary mask projected upon it.
     
@@ -80,6 +104,9 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
 #       returning the centroids and FWHMs as lists (xcen,ycen,fwhm)
 
     img[img<0]=0
+
+    img=remove_hot_pixels(img,7)
+
     img = img.astype(np.uint16)
     level_fraction_of_peak = 0.1
     level_frac = int(level_fraction_of_peak*np.max(np.max(img)))
@@ -89,13 +116,14 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
         level_otsu = mh.thresholding.otsu(img)
         level = max(level_otsu,level_frac)
     bw=im2bw(img,level)
-    hdu=pyfits.PrimaryHDU(bw)
+
     if write_fits:
         filename = save_dir + 'binary_image.FITS'
         try:
             os.remove(filename)
         except:
             pass
+        hdu=pyfits.PrimaryHDU(bw)    
         hdu.writeto(filename)
     else:
         filename = []
@@ -144,7 +172,10 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
         params = fitgaussian(data)
         xCenSub.append(float(px)-float(nbox)+params[3])
         yCenSub.append(float(py)-float(nbox)+params[2])
-        FWHMSub.append(2.355*max(params[4],params[5]))
+        FWHMSub.append(abs(2.355*max(params[4],params[5])))
+		
+		
+
         peak = params[1]
         peaks.append(peak)
 
