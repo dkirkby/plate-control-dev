@@ -97,137 +97,262 @@ Changelog:
 
 '''
 
-from ctypes import CDLL, byref, Structure, c_bool, c_ushort, c_ulong, c_double, c_int
+from ctypes import CDLL, byref, Structure, c_bool, c_ushort, c_ulong, c_double, c_int, c_char, POINTER
 from platform import system
 import numpy as np
 from astropy.io import fits
 import time
 import sys
+import math
+import pprint
+
+CAMERA_TYPE = {4 : 'ST7',
+               5 : 'ST8',
+               6 : 'ST5C',
+               7 : 'TCE_CONTROLLER',
+               8 : 'ST237',
+               9 : 'STK',
+               10: 'ST9',
+               11: 'STV',
+               12: 'ST10',
+               13: 'ST1K',
+               14: 'ST2K',
+               15: 'STL',
+               16: 'ST402',
+               17: 'STX',
+               18: 'ST4K',
+               19: 'STT',
+               20: 'STI',
+               21: 'STF',
+               22: 'NEXT',
+               0xFFFF : 'NO_CAMERA'}
+
+class GetCCDInfoParams(Structure):
+    _fields_ = [('request',                     c_ushort)]
+        
+# pixelWidth and Height are BCD encoded (n.mm)
+# For example, for the STXL6303 the value returned is 2304 corresponding to 0x900 for the 0.0 micron pixels
+class ReadoutInfo(Structure):
+    _fields_ = [('mode',                            c_ushort),
+                ('width',                           c_ushort),
+                ('height',                          c_ushort),
+                ('pixelWidth',                      c_ulong),
+                ('pixelHeight',                     c_ulong)]
+
+ReadoutInfoArray = (ReadoutInfo * 20)
+class GetCCDInfoResults01(Structure):
+    _fields_ = [('firmwareVersion',                 c_ushort),
+                ('cameraType',                      c_ushort),
+                ('name',                            c_char * 64),
+                ('readoutModes',                    c_ushort),
+                ('readoutInfo',                     ReadoutInfoArray)]
+
+class GetCCDInfoResults2(Structure):
+    _fields_ = [('badColumns',                 c_ushort),
+                ('columns',                    c_ushort * 4),
+                ('imagingABG',                 c_ushort),
+                ('serialNumber',               c_char * 10)]
+
+class GetCCDInfoResults3(Structure):
+    _fields_ = [('adSize',                 c_ushort),
+                ('FilterType',             c_ushort)]
+
+class GetCCDInfoResults45(Structure):
+    _fields_ = [('capabilitiesBits',      c_ushort),
+                ('dumpExtra',             c_ushort)]
+
+class GetCCDInfoResults6(Structure):
+    _fields_ = [('cameraBits',                 c_ushort),
+                ('ccdBits',                    c_ushort),
+                ('extraBits',                  c_ushort)]
+
+class GetErrorStringParams(Structure):
+    _fields_ = [('errorNo',                          c_ushort)]
+
+class GetErrorStringResults(Structure):
+    _fields_ = [('errorString',                      c_char * 64)]
+
+class USBInfo(Structure):
+    _fields_ = [('cameraFound',                     c_bool),
+                ('cameraType',                      c_ushort),
+                ('name',                            c_char * 64),
+                ('serialNumber',                    c_char * 10)]
+
+USBInfoArray = (USBInfo * 4)
+class QueryUSBResults(Structure):
+    _fields_ = [('camerasFound',                 c_ushort),
+                ('usbInfo',                      USBInfoArray)]
+    
+# Structures defined in sbigudrv.h
+class OpenDeviceParams(Structure):
+    _fields_ = [('deviceType',                      c_ushort),
+                ('lptBaseAddress',                  c_ushort),
+                ('ipAddress',                       c_ulong)]
+                
+class EstablishLinkResults(Structure):
+    _fields_ = [('cameraType',                      c_ushort)]
+    
+class EstablishLinkParams(Structure):
+    _fields_ = [('sbigUseOnly',                     c_ushort)]
+                
+class StartExposureParams2(Structure):
+    _fields_ = [('ccd',                             c_ushort),
+                ('exposureTime',                    c_ulong),
+                ('abgState',                        c_ushort),
+                ('openShutter',                     c_ushort),
+                ('readoutMode',                     c_ushort),
+                ('top',                             c_ushort),
+                ('left',                            c_ushort),
+                ('height',                          c_ushort),
+                ('width',                           c_ushort)]
+                
+class EndExposureParams(Structure):
+    _fields_ = [('ccd',                             c_ushort)]
+    
+class StartReadoutParams(Structure):
+    _fields_ = [('ccd',                             c_ushort),
+                ('readoutMode',                     c_ushort),
+                ('top',                             c_ushort),
+                ('left',                            c_ushort),
+                ('height',                          c_ushort),
+                ('width',                           c_ushort)]
+                
+class ReadoutLinesParams(Structure):
+    _fields_ = [('ccd',                             c_ushort),
+                ('readoutMode',                     c_ushort),
+                ('pixelStart',                      c_ushort),
+                ('pixelLength',                     c_ushort)]
+
+class EndReadoutParams(Structure):
+    _fields_ = [('ccd',                             c_ushort)]
+
+class QueryCommandStatusParams(Structure):
+    _fields_ = [('command',                         c_ushort)]
+
+class QueryCommandStatusResults(Structure):
+    _fields_ = [('status',                          c_ushort)]
+  
+# Temperature Regulation Commands
+# regulation - 0=regulation off, 1=regulation on, 2=regulation override,
+#              3=freeze TE cooler, 4=unfreeze TE cooler,
+#              5=enable auto-freeze, 6=disable auto-freeze
+# ccdSetpoint - CCD temperature setpoint in degrees Celsius.
+
+
+class SetTemperatureRegulationParams2(Structure):
+    _fields_ = [('regulation',                      c_int),
+                ('ccdSetpoint',                     c_double)]
+
+class QueryTemperatureStatusParams(Structure):
+    _fields_ = [('request',                         c_int)]
+
+class QueryTemperatureStatusResults(Structure):
+    _fields_ = [('enabled',                  c_ushort),
+                ('ccdSetpoint',              c_ushort),
+                ('power',                    c_ushort),
+                ('ccdThermistor',            c_ushort),
+                ('ambientThermistor',        c_ushort)]
+
+class QueryTemperatureStatusResults2(Structure):
+    _fields_ = [('coolingEnabled',                  c_bool),
+                ('fanEnabled',                      c_ushort),
+                ('ccdSetpoint',                     c_double),
+                ('imagingCCDTemperature',           c_double),
+                ('trackingCCDTemperature',          c_double),
+                ('externalTrackingCCDTemperature',  c_double),
+                ('ambientTemperature',              c_double),
+                ('imagingCCDPower',                 c_double),
+                ('trackingCCDPower',                c_double),
+                ('externalTrackingCCDPower',        c_double),
+                ('heatsinkTemperature',             c_double),
+                ('fanPower',                        c_double),
+                ('fanSpeed',                        c_double),
+                ('trackingCCDSetpoint',             c_double)]
+					
+class QueryTemperatureStatusResults1(Structure):
+    _fields_ = [('coolingEnabled',                  c_bool),
+                ('fanEnabled',                      c_ushort),
+                ('ccdSetpoint',                     c_double),
+                ('imagingCCDTemperature',           c_double),
+                ('trackingCCDTemperature',          c_double),
+                ('externalTrackingCCDTemperature',  c_double),
+                ('ambientTemperature',              c_double),
+                ('imagingCCDPower',                 c_double),
+                ('trackingCCDPower',                c_double),
+                ('externalTrackingCCDPower',        c_double),
+                ('heatsinkTemperature',             c_double),
+                ('fanPower',                        c_double)]
+
+# struct MiscellaneousControlParams
+#
+#    fanEnable - set TRUE to turn on the Fan
+#                On the STX/STT setting the fanEnable field to 0 turns off the fan. Setting fanEnable to 1 (or
+#                greater than 100) sets the fan to Auto-Speed Control where the fan speed is determined by the
+#                STX/STT firmware. Setting fanEnable to 2 through 100 sets the fan to manual control at 2 to
+#                100% speed. Note that effective manual speed control is achieved with values between 20 and
+#                100 as the fan doesn’t really start spinning at manual speeds below 20.
+#    shutterCommand – 0=leave shutter alone, 1=open shutter, 2=close shutter, 3=reinitialize shutter, 4=open STL
+#                     (STX) external shutter, 5=close ST-L (STX) external shutter
+#    ledState – 0=LED off, 1=LED on, 2=LED blink at low rate, 3=LED blink at high rate
+class MiscellaneousControlParams(Structure):
+    _fields_ = [('fanEnable',                       c_bool),
+                ('shutterCommand',                  c_ushort),
+                ('ledState',                        c_ushort)]
+
+# Enumerated codes taken from sbigudrv.h
+# general use camera commands
+CC_END_EXPOSURE                 = 2
+CC_READOUT_LINE                 = 3
+CC_QUERY_TEMPERATURE_STATUS     = 6
+CC_ESTABLISH_LINK               = 9
+CC_GET_CCD_INFO                 = 11
+CC_QUERY_COMMAND_STATUS         = 12
+CC_MISCELLANEOUS_CONTROL        = 13
+CC_OPEN_DRIVER                  = 17
+CC_CLOSE_DRIVER                 = 18
+CC_END_READOUT                  = 25
+CC_OPEN_DEVICE                  = 27
+CC_CLOSE_DEVICE                 = 28
+CC_START_READOUT                = 35
+CC_GET_ERROR_STRING             = 36
+CC_QUERY_USB                    = 40
+CC_START_EXPOSURE2              = 50
+CC_SET_TEMPERATURE_REGULATION2  = 51
+# camera error base
+CE_NO_ERROR                     = 0
+CE_DEVICE_NOT_CLOSED            = 29
+# CCD request
+CCD_IMAGING                     = 0
+# shutter command
+SC_LEAVE_SHUTTER                = 0
+SC_OPEN_SHUTTER                 = 1
+SC_CLOSE_SHUTTER                = 2
+SC_INITIALIZE_SHUTTER           = 3
+# readout binning mode
+RM_1X1                          = 0
+# ABG_STATE7 - Passed to Start Exposure Command
+ABG_LOW7                        = 0
+# activate the fast readout mode of the STF-8300, etc.
+EXP_FAST_READOUT                = 0x08000000
+# LED State
+LED_OFF                         = 0
+LED_ON                          = 1
+LED_BLINK_LOW                   = 2
+LED_BLINK_HIGH                  = 3
+# temperature regulation codes
+REGULATION_OFF                  = 0
+REGULATION_ON                   = 1
+REGULATION_OVERRIDE             = 2
+REGULATION_FREEZE               = 3
+REGULATION_UNFREEZE             = 4
+REGULATION_ENABLE_AUTOFREEZE    = 5
+REGULATION_DISABLE_AUTOFREEZE   = 6
+REGULATION_ENABLE_MASK          = 0x0001
+REGULATION_FROZEN_MASK          = 0x8000
 
 class SBIGCam(object):
 
-    # Structures defined in sbigudrv.h
-    class OpenDeviceParams(Structure):
-        _fields_ = [('deviceType',                      c_ushort),
-                    ('lptBaseAddress',                  c_ushort),
-                    ('ipAddress',                       c_ulong)]
-                    
-    class EstablishLinkResults(Structure):
-        _fields_ = [('cameraType',                      c_ushort)]
-        
-    class EstablishLinkParams(Structure):
-        _fields_ = [('sbigUseOnly',                     c_ushort)]
-                    
-    class StartExposureParams2(Structure):
-        _fields_ = [('ccd',                             c_ushort),
-                    ('exposureTime',                    c_ulong),
-                    ('abgState',                        c_ushort),
-                    ('openShutter',                     c_ushort),
-                    ('readoutMode',                     c_ushort),
-                    ('top',                             c_ushort),
-                    ('left',                            c_ushort),
-                    ('height',                          c_ushort),
-                    ('width',                           c_ushort)]
-                    
-    class EndExposureParams(Structure):
-        _fields_ = [('ccd',                             c_ushort)]
-        
-    class StartReadoutParams(Structure):
-        _fields_ = [('ccd',                             c_ushort),
-                    ('readoutMode',                     c_ushort),
-                    ('top',                             c_ushort),
-                    ('left',                            c_ushort),
-                    ('height',                          c_ushort),
-                    ('width',                           c_ushort)]
-                    
-    class ReadoutLinesParams(Structure):
-        _fields_ = [('ccd',                             c_ushort),
-                    ('readoutMode',                     c_ushort),
-                    ('pixelStart',                      c_ushort),
-                    ('pixelLength',                     c_ushort)]
-
-    class EndReadoutParams(Structure):
-        _fields_ = [('ccd',                             c_ushort)]
-    
-    class QueryCommandStatusParams(Structure):
-        _fields_ = [('command',                         c_ushort)]
-    
-    class QueryCommandStatusResults(Structure):
-        _fields_ = [('status',                          c_ushort)]
-  
-    class SetTemperatureRegulationParams2(Structure):
-        _fields_ = [('regulation',                      c_int),
-                    ('ccdSetpoint',                     c_double)]
-    
-    class QueryTemperatureStatusParams(Structure):
-        _fields_ = [('request',                         c_int)]
-
-    class QueryTemperatureStatusResults2(Structure):
-        _fields_ = [('coolingEnabled',                  c_int),
-                    ('fanEnabled',                      c_ushort),
-                    ('ccdSetpoint',                     c_double),
-                    ('imagingCCDTemperature',           c_double),
-                    ('trackingCCDTemperature',          c_double),
-                    ('externalTrackingCCDTemperature',  c_double),
-                    ('ambientTemperature',              c_double),
-                    ('imagingCCDPower',                 c_double),
-                    ('trackingCCDPower',                c_double),
-                    ('externalTrackingCCDPower',        c_double),
-                    ('heatsinkTemperature',             c_double),
-                    ('fanPower',                        c_double),
-                    ('fanSpeed',                        c_double),
-                    ('trackingCCDSetpoint',             c_double)]
-    class MiscellaneousControlParams(Structure):
-        _fields_ = [('fanEnable',                       c_bool),
-                    ('shutterCommand',                  c_ushort),
-                    ('ledState',                        c_ushort)]
-
-    # Enumerated codes taken from sbigudrv.h
-    # general use camera commands
-    CC_END_EXPOSURE                 = 2
-    CC_READOUT_LINE                 = 3
-    CC_QUERY_TEMPERATURE_STATUS     = 6
-    CC_ESTABLISH_LINK               = 9
-    CC_QUERY_COMMAND_STATUS         = 12
-    CC_MISCELLANEOUS_CONTROL        = 13
-    CC_OPEN_DRIVER                  = 17
-    CC_CLOSE_DRIVER                 = 18
-    CC_END_READOUT                  = 25
-    CC_OPEN_DEVICE                  = 27
-    CC_CLOSE_DEVICE                 = 28
-    CC_START_READOUT                = 35
-    CC_START_EXPOSURE2              = 50
-    CC_SET_TEMPERATURE_REGULATION2  = 51
-    # camera error base
-    CE_NO_ERROR                     = 0
-    # CCD request
-    CCD_IMAGING                     = 0
-    # shutter command
-    SC_LEAVE_SHUTTER                = 0
-    SC_OPEN_SHUTTER                 = 1
-    SC_CLOSE_SHUTTER                = 2
-    SC_INITIALIZE_SHUTTER           = 3
-    # readout binning mode
-    RM_1X1                          = 0
-    # ABG_STATE7 - Passed to Start Exposure Command
-    ABG_LOW7                        = 1
-    # activate the fast readout mode of the STF-8300, etc.
-    EXP_FAST_READOUT                = 0x08000000
-    # LED State
-    LED_OFF                         = 0
-    LED_ON                          = 1
-    LED_BLINK_LOW                   = 2
-    LED_BLINK_HIGH                  = 3
-    # temperature regulation codes
-    REGULATION_OFF                  = 0
-    REGULATION_ON                   = 1
-    REGULATION_OVERRIDE             = 2
-    REGULATION_FREEZE               = 3
-    REGULATION_UNFREEZE             = 4
-    REGULATION_ENABLE_AUTOFREEZE    = 5
-    REGULATION_DISABLE_AUTOFREEZE   = 6
-    REGULATION_ENABLE_MASK          = 0x0001
-    REGULATION_FROZEN_MASK          = 0x8000
+   
     # prebuild dictionaries to avoid rebuilding upon each regulation call
     tempRegulationDict = {'off':                REGULATION_OFF,
                           'on':                 REGULATION_ON,
@@ -258,6 +383,10 @@ class SBIGCam(object):
             self.SBIG = CDLL("/usr/local/lib/libsbigudrv.so")
         self.verbose = verbose
         self.keepShutterOpen = False
+        self.setpoint = 0.0
+        self.usb_info = {}   # cache USB info (can only be called when device is closed)
+
+    ### SETTERS ###
 
     def keep_shutter_open(self, keepShutterOpen = False):
         """
@@ -286,16 +415,16 @@ class SBIGCam(object):
         shutterState = str(shutterState)
         if shutterState in ['open', 'closed']:
             if shutterState == 'open':
-                mcp = self.MiscellaneousControlParams(
-                        shutterCommand = self.SC_OPEN_SHUTTER,
+                mcp = MiscellaneousControlParams(
+                        shutterCommand = SC_OPEN_SHUTTER,
                         ledState = c_ushort(1))
             elif shutterState == 'closed':
-                mcp = self.MiscellaneousControlParams(
-                        shutterCommand = self.SC_CLOSE_SHUTTER,
+                mcp = MiscellaneousControlParams(
+                        shutterCommand = SC_CLOSE_SHUTTER,
                         ledState = c_ushort(1))
             Error = self.SBIG.SBIGUnivDrvCommand(
-                       self.CC_MISCELLANEOUS_CONTROL, byref(mcp), None)
-            if Error != self.CE_NO_ERROR:
+                       CC_MISCELLANEOUS_CONTROL, byref(mcp), None)
+            if Error != CE_NO_ERROR:
                 print("Setting shutter returned error:", Error)
                 return False
             elif self.verbose:
@@ -342,7 +471,7 @@ class SBIGCam(object):
         Default CCD size is for the SBIG STF-8300M
         """
 
-        if name in ['ST8300', 'STi', 'STXL6303E']:
+        if name in ['ST8300', 'STi', 'STX']:   #L6303E']:
             try:
                 if name == 'ST8300': 
                     self.cameraName = 'ST8300'
@@ -350,15 +479,16 @@ class SBIGCam(object):
                 if name == 'STi':
                     self.cameraName = 'STi'
                     self.set_image_size(648,484)
-                if name == 'STXL6303E':
-                    self.cameraName = 'STXL6303E'
+                if name in 'STXL6303E':
+                    self.cameraName = 'STX'  #L6303E'
                     self.set_image_size(3072,2048)
+                    self.set_window_mode(3,16) #Prevents readout of the buffer
                 return True
             except:
                 print('could not select camera: ' + name)
                 return False    
         else:
-            print('Not a valid camera name (use "ST8300" or "STi" or "STXL6303E") ')
+            print('Not a valid camera name (use "ST8300" or "STi" or "STX") ')
             return False
 
     def set_resolution(self, width,height):
@@ -381,7 +511,7 @@ class SBIGCam(object):
             None
         """
         if fast_mode:
-            self.FAST=self.EXP_FAST_READOUT
+            self.FAST=EXP_FAST_READOUT
         return
 
     def set_exposure_time(self, exp_time=90):
@@ -426,63 +556,236 @@ class SBIGCam(object):
         Returns
             True if success, False otherwise
         """    
-        mcp = self.MiscellaneousControlParams(True,self.SC_INITIALIZE_SHUTTER,self.LED_ON)
-        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_MISCELLANEOUS_CONTROL,byref(mcp),None)
-        if Error != self.CE_NO_ERROR:
+        mcp = MiscellaneousControlParams(True,SC_INITIALIZE_SHUTTER,LED_ON)
+        Error = self.SBIG.SBIGUnivDrvCommand(CC_MISCELLANEOUS_CONTROL,byref(mcp),None)
+        if Error != CE_NO_ERROR:
             print ('Attempt to open initialize shutter returned error:', Error)
             return False
         elif self.verbose:
             print ('Shutter initialized.')
         # Wait for shutter to initialize
-        qcspar = self.QueryCommandStatusParams(command = self.CC_MISCELLANEOUS_CONTROL)
-        qcsres = self.QueryCommandStatusResults(status = 6)
-        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_QUERY_COMMAND_STATUS, byref(qcspar), byref(qcsres))
+        qcspar = QueryCommandStatusParams(command = CC_MISCELLANEOUS_CONTROL)
+        qcsres = QueryCommandStatusResults(status = 6)
+        Error = self.SBIG.SBIGUnivDrvCommand(CC_QUERY_COMMAND_STATUS, byref(qcspar), byref(qcsres))
         while qcsres.status == 2:
-            Error = self.SBIG.SBIGUnivDrvCommand(self.CC_QUERY_COMMAND_STATUS, byref(qcspar), byref(qcsres))
+            Error = self.SBIG.SBIGUnivDrvCommand(CC_QUERY_COMMAND_STATUS, byref(qcspar), byref(qcsres))
         return True
 
-    def open_camera(self):
+    ### CAMERA COMMANDS ###
+
+    def open_camera(self, deviceType = 'USB'):
         """
         initializes driver and camera, must be called before any other camera
         command
         Input:
-            None
+            deviceType (USB (== next available USB camera), USB1, 2, 3, 4 (other types are not supported)
         Return:
             True if success
             False if failed
         """
+        devicetypes = {'USB' : 0x7F00, 'USB1' : 0x7F02, 'USB2' : 0x7F03, 'USB3' : 0x7F04, 'USB4' : 0x7F05}
+        assert deviceType in devicetypes,'Invalid device type requested'
+        dt = devicetypes[deviceType]
+
         # Open Driver
-        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_OPEN_DRIVER, None, None)
+        Error = self.SBIG.SBIGUnivDrvCommand(CC_OPEN_DRIVER, None, None)
         if Error == 21:
             print ('Code 21: driver already opened.')
-        elif Error != self.CE_NO_ERROR:
+        elif Error != CE_NO_ERROR:
             print ('Attempt to open driver returned error:', Error)
             return False
         elif self.verbose:
             print ('Driver successfully opened.')
      
+        # Query USB bus
+        try:
+            info = self.query_usb()
+            pprint.pprint(info)
+        except Exception as e:            
+            raise RuntimeError('Exception calling query_usb: %s' % str(e))
+
+        found_camera = False
+        if len(info['usbInfo']) == 0:
+            raise RuntimeError('No USB camera found')
+        if deviceType == 'USB':
+            found_camera = True
+        else:
+            for i in range(len(info['usbInfo'])):
+                if info['usbInfo'][i]['deviceType'] == deviceType:
+                    if self.verbose:
+                        print('Requested USB camera found')
+                    found_camera = True
+                    break
+        if not found_camera:
+            raise RuntimeError('Requsted USB camera not found (%r)' % deviceType)
+
         # Open Device
-        odp = self.OpenDeviceParams(deviceType = 0x7F00)
-        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_OPEN_DEVICE, byref(odp), None)
+        odp = OpenDeviceParams(deviceType = dt)
+        Error = self.SBIG.SBIGUnivDrvCommand(CC_OPEN_DEVICE, byref(odp), None)
         if Error == 29:
             print ('Code 29: device already opened.')
-        elif Error != self.CE_NO_ERROR:
+        elif Error != CE_NO_ERROR:
             print ('Attempt to open device returned error:', Error)
             return False
         elif self.verbose:
             print ('Device successfully opened.')
         
         # Establish Link
-        elp = self.EstablishLinkParams(sbigUseOnly = 0)
-        elr = self.EstablishLinkResults()
-        self.SBIG.SBIGUnivDrvCommand(self.CC_ESTABLISH_LINK, byref(elp), byref(elr))
+        elp = EstablishLinkParams(sbigUseOnly = 0)
+        elr = EstablishLinkResults()
+        self.SBIG.SBIGUnivDrvCommand(CC_ESTABLISH_LINK, byref(elp), byref(elr))
         if elr.cameraType == 0xFFFF:
             print ('No camera found.')
             return False
         elif self.verbose:
-            print ('Link successfully established.')
+            print ('Link successfully established. Camera type %r' % elr.cameraType)
+        
+        # Get CCD Info (tbd - use results to setup camera type, pixel array size etc)
+        # info = self.get_camera_info()
         return True
         
+    def query_usb(self):
+        """
+        Query the USB bus to detect up to 4 cameras.
+        To Establish a link to a specific camera specify DEV_USB1, DEV_USB2, DEV_USB3 or
+        DEV_USB4 in the device field of the Open Device command. DEV_USB1 corresponds to the
+        camera described in usbInfo[0], DEV_USB2 corresponds to usbInfo[1], etc. If you specify
+        USB_DEV in Open Device it opens the next available device.
+        """
+        qusbr = QueryUSBResults()
+        Error = self.SBIG.SBIGUnivDrvCommand(CC_QUERY_USB, None, byref(qusbr))
+        if Error != CE_NO_ERROR:
+            if Error == CE_DEVICE_NOT_CLOSED:
+                self.usb_info['updated'] = False
+                return self.usb_info     # return cached information
+            else:
+                raise RuntimeError('Attempt to query USB us returned error: %r' % Error)
+        elif self.verbose:
+            print ('USB bus information successfully retrieved.')
+        info = {'camerasFound' : qusbr.camerasFound, 'usbInfo' : []}
+        for i in range(min(4, qusbr.camerasFound)):
+            ui = {}
+            ui['cameraFound'] = qusbr.usbInfo[i].cameraFound
+            ct = qusbr.usbInfo[i].cameraType
+            ui['cameraType'] = str(ct) if ct not in CAMERA_TYPE else CAMERA_TYPE[ct]
+            ui['deviceType'] = 'USB%d' % (i+1)
+            ui['name'] = qusbr.usbInfo[i].name.decode('utf-8')
+            ui['serialNumber'] = qusbr.usbInfo[i].serialNumber.decode('utf-8')
+            info['usbInfo'].append(ui)
+        info['updated'] = True
+        self.usb_info = info      # cache information
+        return info
+
+    def get_error_string(self, err):
+        """
+        Returns a string describing driver error "err"
+        """
+        gesp = GetErrorStringParams(errorNo = err)
+        gesr = GetErrorStringResults()
+        Error = self.SBIG.SBIGUnivDrvCommand(CC_GET_ERROR_STRING, byref(gesp), byref(gesr))
+        if Error != CE_NO_ERROR:
+            raise RuntimeError('Attempt to retrieve Error String (error = %r) returned error: %r' % (err, Error))
+        elif self.verbose:
+            print ('Driver Error String (error = %r) successfully retrieved.' % err)
+        return gesr.errorString.decode('utf-8')
+
+    def get_camera_info(self, request = 0):
+        """
+        Retrieve information about the camera and the CCD from the driver (and firmware)
+        The function returns a dictionary but the key/values depend on what is requested.
+        For the default, request = 0, the following is returned:
+        {'firmwareVersion' : <integer>,
+         'cameraType' : string,
+         'name'  : string,
+         'readoutInfo' [ modeInfo_0, modeInfo_1...]
+        }
+
+        Where modeInfo is a dictionary with these keys:
+        mode : index (integer)
+        width : number of pixels (width)
+        height : number of pixels (height)
+        pixelWidth : pixel size (width) in microns
+        pixelHeight : pixel size (height) in microns
+
+        The length of the readoutInfo list depends on the camera
+        """
+        
+        # setup control structures
+        gcip = GetCCDInfoParams(request = request)
+        if request in  [0, 1]:
+            gcir = GetCCDInfoResults01()        
+        elif request in  [2]:
+            gcir = GetCCDInfoResults2()
+        elif request in  [3]:
+            gcir = GetCCDInfoResults3()
+        elif request in  [4, 5]:
+            gcir = GetCCDInfoResults45()
+        elif request in  [6]:
+            gcir = GetCCDInfoResults6()
+        else:
+            raise RuntimeError('request type %r for get_camera_info command not yet implemented' % request)
+
+        Error = self.SBIG.SBIGUnivDrvCommand(CC_GET_CCD_INFO, byref(gcip), byref(gcir))
+        if Error != CE_NO_ERROR:
+            raise RuntimeError('Attempt to retrieve CCD INFO (request = %r) returned error: %r' % (request, Error))
+        elif self.verbose:
+            print ('CCD INFO (request = %r) successfully retrieved.' % request)
+
+        # support for different request modes
+        info = {}
+        if request in [0, 1]:
+            info['firmwareVersion'] = gcir.firmwareVersion
+            info['cameraType'] = str(gcir.cameraType) if gcir.cameraType not in CAMERA_TYPE else CAMERA_TYPE[gcir.cameraType]
+            info['name'] = gcir.name.decode('utf-8')
+            info['readoutInfo'] = []
+            def tofloat(bcd):
+                h = hex(bcd).lstrip('0x')
+                return float(h[:-2]) + int(h[-2:])/100.0
+
+            for i in range(gcir.readoutModes):
+                im = {'mode' : gcir.readoutInfo[i].mode,
+                      'width' : gcir.readoutInfo[i].width,
+                      'height' : gcir.readoutInfo[i].height,
+                      'pixelWidth' : tofloat(gcir.readoutInfo[i].pixelWidth),
+                      'pixelHeight' : float(hex(gcir.readoutInfo[i].pixelHeight).lstrip('0x').rstrip('00'))}
+                info['readoutInfo'].append(im)
+            return info
+        elif request == 2:
+            info['badColumns'] = gcir.badColumns
+            info['columns'] = []
+            for i in range(min(4, gcir.badColumns)):
+                info['columns'].append(gcir.columns[i])
+            info['imagingABG'] = gcir.imagingABG
+            info['serialNumber'] = gcir.serialNumber
+            return info
+        elif request == 3:
+            adSize = gcir.adSize
+            if adSize == 1:
+                info['adSize'] = 12
+            elif adSize == 2:
+                info['adSize'] = 16
+            else:
+                info['adSize'] = 'unknown'
+            info['FilterType'] = gcir.FilterType   # 0 unknown, 1 External, 2 2-position, 3 - 5 position
+            return info
+        elif request in [4, 5]:
+            bits = gcir.capabilitiesBits
+            info['FrameTransferDevice'] = True if (bits & 1) else False
+            info['HasElectronicShutter'] = True if (bits & 2) else False
+            info['HasFrameBuffer'] = True if (bits & 32) else False
+            info['dumpExtra'] = gcir.dumpExtra
+            return info
+        elif request == 6:
+            bits = gcir.cameraBits
+            info['STX'] = True if not (bits & 1) else False
+            info['STXL'] = True if (bits & 1) else False
+            info['HasMechanicalShutter'] = True if not (bits & 2) else False
+            bits = gcir.ccdBits
+            info['ColorCCD'] = True if (bits  & 1) else False
+            info['BayerColorMatrix'] = True if not (bits & 2) else False
+            return info
+        raise RuntimeError('get_camera_info: Invalid request type')
+
     def start_exposure(self): 
         """
         starts the exposure
@@ -493,41 +796,43 @@ class SBIGCam(object):
         """    
         # Take Image  
         exposure = c_ulong(self.exposure + self.FAST)
-        sep2 = self.StartExposureParams2(
-                    ccd = self.CCD_IMAGING, 
+        sep2 = StartExposureParams2(
+                    ccd = CCD_IMAGING, 
                     exposureTime = exposure, 
-                    abgState = self.ABG_LOW7, 
-                    readoutMode = self.RM_1X1,
+                    abgState = ABG_LOW7, 
+                    readoutMode = RM_1X1,
                     top = self.TOP, 
                     left = self.LEFT, 
                     height = self.HEIGHT,
                     width = self.WIDTH)
         if self.DARK:
-            sep2.openShutter = self.SC_CLOSE_SHUTTER
+            sep2.openShutter = SC_CLOSE_SHUTTER
         else:
-            sep2.openShutter = self.SC_OPEN_SHUTTER
-        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_START_EXPOSURE2, byref(sep2), None)
-        if Error != self.CE_NO_ERROR:
+            sep2.openShutter = SC_OPEN_SHUTTER
+
+        Error = self.SBIG.SBIGUnivDrvCommand(CC_START_EXPOSURE2, byref(sep2), None)
+        if Error != CE_NO_ERROR:
             print ('Attempt to start exposure returned error:', Error)
             self.initialize_shutter()
-            Error = self.SBIG.SBIGUnivDrvCommand(self.CC_START_EXPOSURE2, byref(sep2), None)
-            if Error != self.CE_NO_ERROR:
+            Error = self.SBIG.SBIGUnivDrvCommand(CC_START_EXPOSURE2, byref(sep2), None)
+            if Error != CE_NO_ERROR:
                 print ('Attempt to start exposure returned error:', Error)
                 return False
             elif self.verbose:
-                print ('Exposure successfully initiated.') 
+                print ('Exposure successfully initiated.')
         elif self.verbose:
-            print ('Exposure successfully initiated.')       
+            print ('Exposure successfully initiated.')
+
         # Wait for exposure to end
-        qcspar = self.QueryCommandStatusParams(command = self.CC_START_EXPOSURE2)
-        qcsres = self.QueryCommandStatusResults(status = 6)
-        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_QUERY_COMMAND_STATUS, byref(qcspar), byref(qcsres))
+        qcspar = QueryCommandStatusParams(command = CC_START_EXPOSURE2)
+        qcsres = QueryCommandStatusResults(status = 6)
+        Error = self.SBIG.SBIGUnivDrvCommand(CC_QUERY_COMMAND_STATUS, byref(qcspar), byref(qcsres))
         while qcsres.status == 2:
-            Error = self.SBIG.SBIGUnivDrvCommand(self.CC_QUERY_COMMAND_STATUS, byref(qcspar), byref(qcsres))
+            Error = self.SBIG.SBIGUnivDrvCommand(CC_QUERY_COMMAND_STATUS, byref(qcspar), byref(qcsres))
         # End Exposure
-        eep = self.EndExposureParams(ccd = self.CCD_IMAGING)
-        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_END_EXPOSURE, byref(eep), None)
-        if Error != self.CE_NO_ERROR:
+        eep = EndExposureParams(ccd = CCD_IMAGING)
+        Error = self.SBIG.SBIGUnivDrvCommand(CC_END_EXPOSURE, byref(eep), None)
+        if Error != CE_NO_ERROR:
             print ('Attempt to end exposure returned error:', Error)
             return False
         elif self.verbose:
@@ -543,29 +848,29 @@ class SBIGCam(object):
                 print('Could not close ST-i shutter.')
          
         # Start Readout
-        srp = self.StartReadoutParams(ccd = self.CCD_IMAGING, readoutMode = self.RM_1X1,
+        srp = StartReadoutParams(ccd = CCD_IMAGING, readoutMode = RM_1X1,
                                  top = self.TOP, left = self.LEFT, height = self.HEIGHT,
                                  width = self.WIDTH)
-        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_START_READOUT, byref(srp), None)
-        if Error != self.CE_NO_ERROR:
+        Error = self.SBIG.SBIGUnivDrvCommand(CC_START_READOUT, byref(srp), None)
+        if Error != CE_NO_ERROR:
             print ('Attempt to initialise readout returned error:', Error)
             return False
         elif self.verbose:
             print ('Readout initiated.')
           
         # Readout
-        rlp = self.ReadoutLinesParams(ccd = self.CCD_IMAGING, readoutMode = self.RM_1X1,
-                                 pixelStart = 0, pixelLength = self.WIDTH)
+        rlp = ReadoutLinesParams(ccd = CCD_IMAGING, readoutMode = RM_1X1,
+                                 pixelStart = self.LEFT, pixelLength = self.WIDTH)
         cameraData = ((c_ushort*(self.WIDTH.value))*self.HEIGHT.value)()
         for i in range(self.HEIGHT.value):
-            Error = self.SBIG.SBIGUnivDrvCommand(self.CC_READOUT_LINE, byref(rlp), byref(cameraData, i*self.WIDTH.value*2)) # the 2 is essential
-            if Error != self.CE_NO_ERROR:
+            Error = self.SBIG.SBIGUnivDrvCommand(CC_READOUT_LINE, byref(rlp), byref(cameraData, i*self.WIDTH.value*2)) # the 2 is essential
+            if Error != CE_NO_ERROR:
                 print ('Readout failed with error ' + str(Error) + '. Writing readout then closing device and driver.')
                 if Error == 8:
                     print('(Error 8 means CE_RX_TIMEOUT, "Receive (Rx) timeout error")')
                 break
         image = np.ctypeslib.as_array(cameraData)
-        if Error == self.CE_NO_ERROR and self.verbose:
+        if Error == CE_NO_ERROR and self.verbose:
             print ('Readout successful.')
 
         # End readout in any case for autofreeze to function proper
@@ -575,9 +880,9 @@ class SBIGCam(object):
         command are complete. Several End Readout commands can be issued 
         without generating an error.
         '''
-        erp = self.EndReadoutParams(cd = self.CCD_IMAGING)
-        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_END_READOUT, byref(erp), None)
-        if Error != self.CE_NO_ERROR:
+        erp = EndReadoutParams(cd = CCD_IMAGING)
+        Error = self.SBIG.SBIGUnivDrvCommand(CC_END_READOUT, byref(erp), None)
+        if Error != CE_NO_ERROR:
             print ('End readout failed with error code: ', Error)
         elif self.verbose:
             print ('Readout session was ended.')
@@ -585,8 +890,6 @@ class SBIGCam(object):
         # name = time.strftime("%Y-%m-%d-%H%M%S") + '.fits' # Saves file with timestamp
         # hdu.writeto(name)
         return image
-        
-        return True
        
     def write_fits(self, image, name):
         """
@@ -621,26 +924,28 @@ class SBIGCam(object):
         return_val = True        
         
          # Close Device
-        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_CLOSE_DEVICE, None, None)
+        Error = self.SBIG.SBIGUnivDrvCommand(CC_CLOSE_DEVICE, None, None)
         if Error == 20:
             print ('Code 20: device already closed.')
-        elif Error != self.CE_NO_ERROR:
+        elif Error != CE_NO_ERROR:
             print ('Closing device returned error:', Error)
             return_val = False
         elif self.verbose:
             print ('Device successfully closed.')
         
         # Close Driver
-        Error = self.SBIG.SBIGUnivDrvCommand(self.CC_CLOSE_DRIVER, None, None)
+        Error = self.SBIG.SBIGUnivDrvCommand(CC_CLOSE_DRIVER, None, None)
         if Error == 20:
             print ('Code 20: driver already closed.')
-        elif Error != self.CE_NO_ERROR:
+        elif Error != CE_NO_ERROR:
             print ('Attempt to close driver returned error:', Error)
             return_val = False
         elif self.verbose:
             print ('Driver successfully closed.')
         
         return return_val
+
+    ### TEMPERATURE COMMANDS ###
 
     def set_temperature_regulation(self, regulationInput, ccdSetpoint=None):
         """
@@ -649,17 +954,17 @@ class SBIGCam(object):
 
         Requires camera to be open (open_camera())
         Command values:
-        0 - 'off' - regulation off
-        1 - 'on' - regulation on
-        2 - 'override' - regulation override
-        3 - 'freeze' - freeze TE cooler (ST-8/7 cameras)
-        4 - 'unfreeze' - unfreeze TE cooler
-        5 - 'enable_autofreeze' - enable auto-freeze
-        6 - 'disable_autofreeze' - disable auto-freeze
-        temp is the CCD temperature in celsius to activate regulation
+        'off' - regulation off (0)
+        'on' - regulation on (1)
+        'override' - regulation override (2)
+        'freeze' - freeze TE cooler (ST-8/7 cameras) (3)
+        'unfreeze' - unfreeze TE cooler (4)
+        'enable_autofreeze' - enable auto-freeze (5)
+        'disable_autofreeze' - disable auto-freeze (6)
+        ccdSetpoint is the CCD temperature in celsius to activate regulation
         
         Input:
-            Command value (int), temperature in celsius
+            Command value (string)), temperature in celsius
         
         """
         # check input
@@ -668,16 +973,22 @@ class SBIGCam(object):
         else:
             print('Invalid temperature regulation command.')
             return False
+                           
         if ccdSetpoint is None:
             # query current setpoint from driver
             ccdSetpoint = self.query_ccd_setpoint()    
+        else:
+            # get setpoint in A/D units
+            r = 3.0 * math.exp(math.log(2.57)*(25.0 - ccdSetpoint)/25.0)
+            self.setpoint = int(4096/(10.0/r + 1.0))
+            print('Setpoint: %f (%d)' % (ccdSetpoint, self.setpoint))
         # send driver command
         trp2 = self.SetTemperatureRegulationParams2(
-                    regulation  = c_int(regulation),
-                    ccdSetpoint = c_double(ccdSetpoint))
+                    regulation  = regulation,
+                    ccdSetpoint = ccdSetpoint)
         Error = self.SBIG.SBIGUnivDrvCommand(
-                    self.CC_SET_TEMPERATURE_REGULATION2, byref(trp2), None)
-        if Error != self.CE_NO_ERROR:
+                    CC_SET_TEMPERATURE_REGULATION2, byref(trp2), None)
+        if Error != CE_NO_ERROR:
             print('Temperature regulation returned error: ', Error)
             return False
         elif self.verbose:
@@ -687,6 +998,7 @@ class SBIGCam(object):
     
     def set_ccd_setpoint(self, ccdSetpoint):
         """
+        Convenience function to set the temperature set point 
         Sets ccd temperature for TEC cooler
         Input:
             Setpoint temperature
@@ -722,17 +1034,17 @@ class SBIGCam(object):
         if fanState in ['on', 'off']:
             
             if fanState == 'on':                
-                mcp = self.MiscellaneousControlParams(
+                mcp = MiscellaneousControlParams(
                         fanEnable = c_bool(True),
                         ledState = c_ushort(1))
             elif fanState == 'off':
-                mcp = self.MiscellaneousControlParams(
+                mcp = MiscellaneousControlParams(
                         fanEnable = c_bool(False),
                         ledState = c_ushort(1))
                 
             Error = self.SBIG.SBIGUnivDrvCommand(
-                   self.CC_MISCELLANEOUS_CONTROL, byref(mcp), None)
-            if Error != self.CE_NO_ERROR:
+                   CC_MISCELLANEOUS_CONTROL, byref(mcp), None)
+            if Error != CE_NO_ERROR:
                 print("Setting fan returned error:", Error)
                 return False
             elif self.verbose:
@@ -779,8 +1091,8 @@ class SBIGCam(object):
         trp2 = self.SetTemperatureRegulationParams2(
                     regulation = self.tempRegulationDict['freeze'])
         Error = self.SBIG.SBIGUnivDrvCommand(
-                    self.CC_SET_TEMPERATURE_REGULATION2, byref(trp2), None)
-        if Error != self.CE_NO_ERROR:
+                    CC_SET_TEMPERATURE_REGULATION2, byref(trp2), None)
+        if Error != CE_NO_ERROR:
             print('Freezing TEC returned error: ', Error)
             return False
         elif self.verbose:
@@ -796,11 +1108,11 @@ class SBIGCam(object):
             True if success
             False if fail
         """
-        trp2 = self.SetTemperatureRegulationParams2(
+        trp2 = SetTemperatureRegulationParams2(
                     regulation = self.tempRegulationDict['unfreeze'])
         Error = self.SBIG.SBIGUnivDrvCommand(
-                    self.CC_SET_TEMPERATURE_REGULATION2, byref(trp2), None)
-        if Error != self.CE_NO_ERROR:
+                    CC_SET_TEMPERATURE_REGULATION2, byref(trp2), None)
+        if Error != CE_NO_ERROR:
             print('Unfreezing TEC returned error: ', Error)
             return False
         elif self.verbose:
@@ -834,7 +1146,8 @@ class SBIGCam(object):
             print('Invalid autofreeze state, on or off only.')
             return False
     
-    def query_temperature_status(self):
+
+    def query_temperature_status(self, request = 2):
         
         '''
         Internal function for use in following funtions
@@ -844,61 +1157,75 @@ class SBIGCam(object):
             standard request returns temperature status in A/D units
             advanced request returns degree celsius, recommended, request=2
         '''
-
-        tsp = self.QueryTemperatureStatusParams(request = c_int(2))
-        qtsr2 = self.QueryTemperatureStatusResults2()
-        Error = self.SBIG.SBIGUnivDrvCommand(
-            self.CC_QUERY_TEMPERATURE_STATUS, byref(tsp), byref(qtsr2))
+        if 'STX' in self.cameraName: 
+            request = 0 # 1 and 2 doesn't seem to work for the STX
+        qtsp = QueryTemperatureStatusParams(request = request)
+        if request == 1:
+            qtsr = QueryTemperatureStatusResults1()
+        elif request == 2:
+            qtsr = QueryTemperatureStatusResults2()
+        else:
+            qtsr = QueryTemperatureStatusResults()
+        Error = self.SBIG.SBIGUnivDrvCommand(CC_QUERY_TEMPERATURE_STATUS, byref(qtsp), byref(qtsr))
             
-        if Error != self.CE_NO_ERROR:
+        if Error != CE_NO_ERROR:
             print ('Temperature status query returned error:', Error)
             return False
-        else:
-            if self.verbose:
-                results_text = ('Temperature status query results: '     +'\n'
-                    +'Cooling Enabled: ' 
-                        + repr(hex(qtsr2.coolingEnabled))                +'\n'
-                    +'Fan Enabled: ' 
-                        + repr(qtsr2.fanEnabled)                         +'\n'
-                    +'CCD Setpoint: ' 
-                        + repr(qtsr2.ccdSetpoint)                        +'\n'
-                    +'Imaging CCD Temperature: '
-                        +repr(qtsr2.imagingCCDTemperature)               +'\n'
-                    +'Tracking CCD Temperature: '
-                        +repr(qtsr2.trackingCCDTemperature)              +'\n'
-                    +'External Tracking CCD Temperature: '
-                        +repr(qtsr2.externalTrackingCCDTemperature)      +'\n'
-                    +'Ambient Temperature: '
-                        +repr(qtsr2.ambientTemperature)                  +'\n'
-                    +'Imaging CCD Power: '
-                        +repr(qtsr2.imagingCCDPower)                     +'\n'
-                    +'Tracking CCD Power: '
-                        +repr(qtsr2.trackingCCDPower)                    +'\n'
-                    +'External Tracking CCD Power: '
-                        +repr(qtsr2.externalTrackingCCDPower)            +'\n'
-                    +'Heatsink Temperature: '
-                        +repr(qtsr2.heatsinkTemperature)                 +'\n'
-                    +'Fan Power: '
-                        +repr(qtsr2.fanPower)                            +'\n'
-                    +'Fan Speed: '
-                        +repr(qtsr2.fanSpeed))
-                print (results_text)
-                
+        if request == 2:
             tempStatusDict = {
-                'cooling_enabled':                  qtsr2.coolingEnabled,
-                'fan_enabled':                      qtsr2.fanEnabled,
-                'ccd_setpoint':                     qtsr2.ccdSetpoint,
-                'imaging_ccd_temperature':          qtsr2.imagingCCDTemperature,
-                'tracking_ccd_temperature':         qtsr2.trackingCCDTemperature,
-                'external_tracking_ccd_temperature':qtsr2.externalTrackingCCDTemperature,
-                'ambient_temperature':              qtsr2.ambientTemperature,
-                'imaging_ccd_power':                qtsr2.imagingCCDPower,
-                'tracking_ccd_power':               qtsr2.trackingCCDPower,
-                'external_tracking_ccd_power':      qtsr2.externalTrackingCCDPower,
-                'heatsink_temperature':             qtsr2.heatsinkTemperature,
-                'fan_power':                        qtsr2.fanPower,
-                'fan_speed':                        qtsr2.fanSpeed}
-            return tempStatusDict
+                'cooling_enabled':                  True if qtsr.coolingEnabled != 0 else False,
+                'fan_enabled':                      True if qtsr.fanEnabled != 0 else False,
+                'ccd_setpoint':                     qtsr.ccdSetpoint,
+                'imaging_ccd_temperature':          qtsr.imagingCCDTemperature,
+                'tracking_ccd_temperature':         qtsr.trackingCCDTemperature,
+                'external_tracking_ccd_temperature':qtsr.externalTrackingCCDTemperature,
+                'ambient_temperature':              qtsr.ambientTemperature,
+                'imaging_ccd_power':                qtsr.imagingCCDPower,
+                'tracking_ccd_power':               qtsr.trackingCCDPower,
+                'external_tracking_ccd_power':      qtsr.externalTrackingCCDPower,
+                'heatsink_temperature':             qtsr.heatsinkTemperature,
+                'fan_power':                        qtsr.fanPower,
+                'fan_speed':                        qtsr.fanSpeed}
+        elif request == 1:
+            tempStatusDict = {
+                'cooling_enabled':                  True if qtsr.coolingEnabled != 0 else False,
+                'fan_enabled':                      True if qtsr.fanEnabled != 0 else False,
+                'ccd_setpoint':                     qtsr.ccdSetpoint,
+                'imaging_ccd_temperature':          qtsr.imagingCCDTemperature,
+                'tracking_ccd_temperature':         qtsr.trackingCCDTemperature,
+                'external_tracking_ccd_temperature':qtsr.externalTrackingCCDTemperature,
+                'ambient_temperature':              qtsr.ambientTemperature,
+                'imaging_ccd_power':                qtsr.imagingCCDPower,
+                'tracking_ccd_power':               qtsr.trackingCCDPower,
+                'external_tracking_ccd_power':      qtsr.externalTrackingCCDPower,
+                'heatsink_temperature':             qtsr.heatsinkTemperature,
+                'fan_power':                        qtsr.fanPower,
+                'fan_speed':                        None}
+        else:
+            r = 10.0/(4096/qtsr.ccdThermistor -1)
+            ccdTemperature = 25.0 - 25.0*(math.log(r/3.0)/math.log(2.57))
+            r = 3.0/(4096/qtsr.ambientThermistor -1)
+            ambientTemperature = 25.0 - 45.0*(math.log(r/3.0)/math.log(7.791))
+            r = 10.0/(4096/qtsr.ccdSetpoint -1)
+            ccdSetpoint = 25.0 - 25.0*(math.log(r/3.0)/math.log(2.57))
+            tempStatusDict = {
+                'cooling_enabled':                  True if qtsr.enabled != 0 else False,
+                'fan_enabled':                      None,
+                'ccd_setpoint':                     round(ccdSetpoint,3),
+                'imaging_ccd_temperature':          round(ccdTemperature,3),
+                'tracking_ccd_temperature':         None,
+                'external_tracking_ccd_temperature':None,
+                'ambient_temperature':              round(ambientTemperature,3),
+                'imaging_ccd_power':                round(float(qtsr.power/255.0),3),
+                'tracking_ccd_power':               None,
+                'external_tracking_ccd_power':      None,
+                'heatsink_temperature':             None,
+                'fan_power':                        None,
+                'fan_speed':                        None}
+
+        if self.verbose:
+            pprint.pprint(tempStatusDict)
+        return tempStatusDict
 
     def query_tec_enabled(self):
         """
@@ -910,7 +1237,7 @@ class SBIGCam(object):
             False if disabled
         """
         results = self.query_temperature_status()
-        return bool(results['cooling_enabled'] & self.REGULATION_ENABLE_MASK)
+        return bool(results['cooling_enabled'] & REGULATION_ENABLE_MASK)
         
     def query_tec_frozen(self):
         """
@@ -922,7 +1249,7 @@ class SBIGCam(object):
             False if frozen
         """
         results = self.query_temperature_status()
-        return bool(results['cooling_enabled'] & self.REGULATION_FROZEN_MASK)
+        return bool(results['cooling_enabled'] & REGULATION_FROZEN_MASK)
         
     def query_fan_enabled(self):
         """
