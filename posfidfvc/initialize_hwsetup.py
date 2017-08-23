@@ -106,9 +106,9 @@ if m.n_extradots_expected > 0 and os.path.isfile(extradots_filename):
             reader = csv.DictReader(file)
             for row in reader:
                 extradots_existing_data.append([row['x_pix'],row['y_pix']])
-        should_identify_positioners = tkinter.messagebox.askyesno(title='Identify positioners?',message='Identify positioner locations?\n\n(Say "NO" only if you are confident of their stored locations from a previous run.)'):
+        should_identify_positioners = tkinter.messagebox.askyesno(title='Identify positioners?',message='Identify positioner locations?\n\n(Say "NO" only if you are confident of their stored locations from a previous run.)')
 else:
-    response = tkinter.messagebox.askyesno(title='Identify fid and pos?',message='Identify fiducial and positioner locations?\n\n(Say "NO" only if you are confident of their stored locations from a previous run.)'):
+    response = tkinter.messagebox.askyesno(title='Identify fid and pos?',message='Identify fiducial and positioner locations?\n\n(Say "NO" only if you are confident of their stored locations from a previous run.)')
     should_identify_fiducials = response
     should_identify_positioners = response
 
