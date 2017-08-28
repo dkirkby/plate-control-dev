@@ -343,23 +343,24 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not get fiducial status. Exception: %s' % str(e)
 
-    def get_sids(self,canbus):
+    def get_posfid_info(self,canbus):
         """
-        Returns a list of silicon IDs on CANbus <canbus>.
+        Retrieves CAN ids found on the canbus with corresponding sids and software versions.
         """
         try:
-            return self._call_device('get_sids',canbus)
+            return self._call_device('get_posfid_info',canbus)
         except Exception as e:
-            return 'FAILED: Can not get silicon IDs. Exception: %s' % str(e)
+            return 'FAILED: Can not read devices. Exception: %s' % str(e)
 
-    def set_posid(self,canbus, sid, new_posid):
+
+    def set_canid(self,canbus, sid, new_posid):
         """
         Sets the positioner ID (= CAN address) for positioner identified by sid to new_posid.
         """
         try:
-            return self._call_device('set_posid',canbus, sid, new_posid)
+            return self._call_device('set_canid',canbus, sid, new_posid)
         except Exception as e:
-            return 'FAILED: Can not set posID. Exception: %s' % str(e)
+            return 'FAILED: Can not set CAN id. Exception: %s' % str(e)
 
     def read_temp_ptl(self):
         """
