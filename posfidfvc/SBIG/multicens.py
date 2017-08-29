@@ -24,11 +24,17 @@ def remove_hot_pixels(image,nsigma=5):
     
     hp_img[low_values_indices] = 0
     ind = zip(*np.where(hp_img > hot_thresh))
-
+    xlimit=len(hp_img[0])
+    ylimit=len(hp_img)
+        
     for i in ind:
-        neighborsum=hp_img[i[0]+1,i[1]]+hp_img[i[0]-1,i[1]]+hp_img[i[0],i[1]-1]+hp_img[i[0],i[1]+1]
-        if neighborsum == 0:
-            image[i[0],i[1]] = (image[i[0]+1,i[1]]+image[i[0]-1,i[1]]+image[i[0],i[1]-1]+image[i[0],i[1]+1])/4.
+        if i[0] == 0 or i[0]==ylimit-1 or i[1]==0 or i[1]==xlimit-1:
+            print('Edge hot spot')
+            image[i[0],i[1]] =np.median(image)
+        else:
+            neighborsum=hp_img[i[0]+1,i[1]] + hp_img[i[0]-1,i[1]] + hp_img[i[0],i[1]-1] + hp_img[i[0],i[1]+1]
+            if neighborsum == 0:
+                image[i[0],i[1]] = (image[i[0]+1,i[1]]+image[i[0]-1,i[1]]+image[i[0],i[1]-1]+image[i[0],i[1]+1])/4.
     del hp_img        
     return image 
 
