@@ -463,32 +463,26 @@ class XYTest(object):
                 self.logwrite('No files were auto-committed to SVN due to lack of user / pass credentials.')
             elif self.new_and_changed_files:
                 start_time = time.time()
-                print('Will attempt to commit the logs automatically now. This may take a long time. In the messages printed to the screen for each file, a return value of 0 means it was committed to the SVN ok.')
-                err1 = []
-                err2 = []
-                files_attempted = []
-                n = 0
-                n_total = len([x for x in test.new_and_changed_files.values() if x =='once' or x == 'always'])
+                print('Will attempt to commit the logs automatically now. This may take a while.')
+                n_total = 0
+                these_files_to_commit = ''
                 for file in self.new_and_changed_files.keys():
                     should_commit = self.new_and_changed_files[file]
                     if should_commit == 'always' or should_commit == 'once':
-                        n += 1
-                        if self.simulate:
-                            err1.append(0)
-                            err2.append(0)
-                        else:
-                            err1.append(os.system('svn add --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive ' + file))
-                            err2.append(os.system('svn commit --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + file))
-                        print('SVN upload of file ' + str(n) + ' of ' + str(n_total) + ' (' + os.path.basename(file) + ') returned: ' + str(err1[-1]) + ' (add) and ' + str(err2[-1]) + ' (commit)')
-                        files_attempted.append(os.path.basename(file))
-                    if should_commit == 'once' and not (err2[-1]):
+                        these_files_to_commit += ' ' + file
+                        n_total += 1
+                self.logwrite('Beginning add + commit of ' + str(n_total) + ' data files to SVN.')
+                err_add = os.system('svn add --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive ' + these_files_to_commit)
+                err_commit = os.system('svn commit --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + these_files_to_commit)
+                print('SVN upload attempt of ' + str(n_total) + ' data files returned: ' + str(err_add) + ' for ADD and ' + str(err_commit) + ' for COMMIT. (Return value of 0 means it was added/committed to the SVN ok.)')
+                for file in self.new_and_changed_files.keys():
+                    should_commit = self.new_and_changed_files[file]
+                    if should_commit == 'once' and err_add == 0 and err_commit == 0:
                         self.new_and_changed_files[file] = 'do not commit'
-                add_and_commit_errs = [err1[i] and err2[i] for i in range(len(err1))]
-                if any(add_and_commit_errs):
-                    print('Warning: it appears that not all the log or plot files committed ok to SVN. Check through carefully and do this manually. The files that failed were:')
-                    for i in range(len(add_and_commit_errs)):
-                        if add_and_commit_errs[i]:
-                            print(files_attempted[i])
+                if err_add != 0:
+                    print('Warning: not all data files ADDED correctly to SVN. Check through carefully and do this manually.')
+                if err_commit != 0:
+                    print('Warning: not all data files COMMITTED correctly to SVN. Check through carefully and do this manually.')
                 if not(keep_creds):
                     del self.svn_user
                     del self.svn_pass
