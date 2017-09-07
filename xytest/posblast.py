@@ -16,71 +16,74 @@ if __name__ == '__main__':
     pcomm = petalcomm.PetalComm(ptlID)
     while loop:
         print("[a]uto CAN ID programming")
-	print("[m]anual CAN ID programming")
-	print("[h]ardware setup update")
+        print("[m]anual CAN ID programming")
+        print("[h]ardware setup update")
         print("[e]xit")
-	print("Select: ")
+        print("Select: ")
 
         choice = _sel.__call__()
         choice = choice.lower()
+      
+        if choice == 'e':
+            sys.exit()
 
         if choice == 'a':
             boardIDs = googlesheets.connect_to_sheet('SiliconIDs')
             eshop = googlesheets.connect_to_sheet('FIPOS Board Production Log')
-            infodict = pc.get_posfid_info(canbus)
+            infodict = pcomm.get_posfid_info(canbus)
 
             for info in infodict.values():
-                sid = info[3]
-                sid = sid.split(':')
+                readable_sid = info[3]
+                sid = readable_sid.split(':')
                 sid = ''.join(sid)
-                sid_found = True
                 if googlesheets.check_for_value(boardIDs, "\"" + sid + "\""):
                     boardID = googlesheets.read(boardIDs, "\"" + sid + "\"", "Board ID")
-                    desiredCAN = googlesheets.read(eshop, str(boardID), "Serial #")
-                    pc.set_canid(canbus, sid, desiredCAN)
+                    eshoprow = googlesheets.read_col(eshop, 1, False).index(str(boardID)) + 1
+                    desiredCAN = googlesheets.read(eshop, eshoprow, "Serial #", False)
+                    pcomm.set_canid(canbus, readable_sid, desiredCAN)
                     print("Programmed CAN ID " + str(desiredCAN))
                 else:
                     print("Could not find " + sid + " in silicon ID log")
 
-       if choice == 'm':
-           poslist = []
-           print('Input all positioner IDs that you wish to go into the summary, and type \'done\' when finished')
+        if choice == 'm':
+            poslist = []
+            print('Input all positioner IDs that you wish to go into the summary, and type \'done\' when finished')
            
-           while posinput != 'done':
-               posinput = input('Positioner ID: ')
-               if len(posinput) < 6 and not posinput == 'done':
-                   newinput = 'M'
-                   for x in range(5 - len(posinput)):
-                       newinput += '0'
-                   posinput = newinput + posinput
-               elif not posinput == 'done':
-                   poslist.append(posinput)
+            while posinput != 'done':
+                posinput = input('Positioner ID: ')
+                if len(posinput) < 6 and not posinput == 'done':
+                    newinput = 'M'
+                    for x in range(5 - len(posinput)):
+                        newinput += '0'
+                    posinput = newinput + posinput
+                elif not posinput == 'done':
+                    poslist.append(posinput)
 
-           sidlist = []
+            sidlist = []
 
-           for posid in poslist:
+            for posid in poslist:
                
-               input("Please plug in positioner " + posid + " and press Enter.")
+                input("Please plug in positioner " + posid + " and press Enter.")
            
-               for x in range(len(posid)):
-                   if not (posid[x] == 'M' or posid[x] == '0'):
-                       posid = str(posid[x+1::])
-                       break
+                for x in range(len(posid)):
+                    if not (posid[x] == 'M' or posid[x] == '0'):
+                        posid = str(posid[x+1::])
+                        break
                
-               newsids = []
-               infodict = pc.get_posid_info(canbus)
+                newsids = []
+                infodict = pc.get_posid_info(canbus)
 
-               for info in infodict.values():
-                   sid = info[3]
-                   sid = sid.split(':')
-                   sid = ''.join(sid)
-                   newsids.append(sid)
-                   for sid in sidlist:
-                       newsids.pop(sid)
-                   if len(newsids) == 1:
-                       sidlist.append(newsids[0])
-                   else:
-                       print('Error - expected . . .')
+                for info in infodict.values():
+                    sid = info[3]
+                    sid = sid.split(':')
+                    sid = ''.join(sid)
+                    newsids.append(sid)
+                    for sid in sidlist:
+                        newsids.pop(sid)
+                    if len(newsids) == 1:
+                        sidlist.append(newsids[0])
+                    else:
+                        print('Error - expected . . .')
 
 
 
