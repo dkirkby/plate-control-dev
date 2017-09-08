@@ -49,6 +49,7 @@ if __name__ == '__main__':
             poslist = []
             print('Input all positioner IDs that you wish to go into the summary, and type \'done\' when finished')
            
+            posinput = ''
             while posinput != 'done':
                 posinput = input('Positioner ID: ')
                 if len(posinput) < 6 and not posinput == 'done':
@@ -56,6 +57,7 @@ if __name__ == '__main__':
                     for x in range(5 - len(posinput)):
                         newinput += '0'
                     posinput = newinput + posinput
+                    poslist.append(posinput)
                 elif not posinput == 'done':
                     poslist.append(posinput)
 
@@ -67,23 +69,25 @@ if __name__ == '__main__':
            
                 for x in range(len(posid)):
                     if not (posid[x] == 'M' or posid[x] == '0'):
-                        posid = str(posid[x+1::])
+                        posid = str(posid[x::])
                         break
                
                 newsids = []
-                infodict = pc.get_posid_info(canbus)
+                infodict = pcomm.get_posfid_info(canbus)
 
                 for info in infodict.values():
                     sid = info[3]
-                    sid = sid.split(':')
-                    sid = ''.join(sid)
                     newsids.append(sid)
-                    for sid in sidlist:
-                        newsids.pop(sid)
-                    if len(newsids) == 1:
-                        sidlist.append(newsids[0])
-                    else:
-                        print('Error - expected . . .')
+                    
+                for oldsid in sidlist:
+                    newsids.pop(newsids.index(oldsid))
+                
+                if len(newsids) == 1:
+                    sidlist.append(newsids[0])
+                    pcomm.set_canid(canbus, newsids[0], posid) 
+                else:
+                    print('Error - expected one new silicon ID but detected either none or more than this:' + str(newsids))
+                    break
 
 
 
