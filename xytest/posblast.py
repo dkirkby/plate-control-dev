@@ -45,7 +45,7 @@ if __name__ == '__main__':
                 else:
                     print("Could not find " + sid + " in silicon ID log")
 
-        if choice == 'm':
+        if choice == 'm': 
             poslist = []
             print('Input all positioner IDs that you wish to go into the summary, and type \'done\' when finished')
            
