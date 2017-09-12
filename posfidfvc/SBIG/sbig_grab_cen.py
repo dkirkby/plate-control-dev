@@ -22,13 +22,13 @@ class SBIG_Grab_Cen(object):
         self.save_dir = save_dir
         self.size_fitbox = size_fitbox # gaussian fitter box dimensions are 2*size_fitbox X 2*size_fitbox
 
-    def _cam_init(self, temperature):
+    def _cam_init(self, temperature=10):
         self.cam=sbigcam.SBIGCam()
         self.cam.select_camera('ST8300')
         self.close_camera() # in case driver was previously left in "open" state
         self.open_camera()      
         self.cam.set_exposure_time(self.exposure_time)
-        self.cam.set_temperature_regulation('on', 10) #turning on regulation to 10 degrees celsius
+        self.cam.set_temperature_regulation('on', temperature) #turning on regulation to 10 degrees celsius
 
     @property
     def exposure_time(self):
