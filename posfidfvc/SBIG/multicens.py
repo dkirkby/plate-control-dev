@@ -165,7 +165,7 @@ def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_ots
         params = fitgaussian(data)
         xCenSub.append(float(px)-float(nbox)+params[3])
         yCenSub.append(float(py)-float(nbox)+params[2])
-        FWHMSub.append(abs(2.355*max(params[4],params[5])))
+        FWHMSub.append(2.355*max(params[4],params[5]))
         peak = params[1]
         peaks.append(peak)
     """    
