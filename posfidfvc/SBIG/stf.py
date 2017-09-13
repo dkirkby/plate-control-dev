@@ -22,7 +22,7 @@ except:
 	pass	
 cam.verbose=True
 cam.open_camera()   
-cam.set_exposure_time(200)
+cam.set_exposure_time(175)
 cam.set_dark(False)
 cam.start_exposure
 start = time.time()

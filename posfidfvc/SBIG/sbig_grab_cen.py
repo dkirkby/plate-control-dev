@@ -15,7 +15,7 @@ class SBIG_Grab_Cen(object):
         self.max_brightness = 60000
         self.min_num_nonzero_pixels = 100
         self.verbose = False
-        self.write_fits = True
+        self.write_fits = False
         self.take_darks = True # whether to measure a dark image and subtract it out
         self.flip_horizontal = True # whether to reflect image across y axis
         self.flip_vertical = False # whether to reflect image across x axis
@@ -28,7 +28,7 @@ class SBIG_Grab_Cen(object):
         self.close_camera() # in case driver was previously left in "open" state
         self.open_camera()      
         self.cam.set_exposure_time(self.exposure_time)
-        self.cam.set_temperature_regulation('on', temperature) #turning on regulation to 10 degrees celsius
+        self.cam.set_temperature_regulation('on', ccdSetpoint=temperature) #turning on regulation to 10 degrees celsius
 
     @property
     def exposure_time(self):

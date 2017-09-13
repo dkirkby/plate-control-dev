@@ -983,7 +983,7 @@ class SBIGCam(object):
             self.setpoint = int(4096/(10.0/r + 1.0))
             print('Setpoint: %f (%d)' % (ccdSetpoint, self.setpoint))
         # send driver command
-        trp2 = self.SetTemperatureRegulationParams2(
+        trp2 = SetTemperatureRegulationParams2(
                     regulation  = regulation,
                     ccdSetpoint = ccdSetpoint)
         Error = self.SBIG.SBIGUnivDrvCommand(
