@@ -63,6 +63,11 @@ if __name__ == '__main__':
 
             sidlist = []
 
+            infodict = pcomm.get_posfid_info(canbus)
+            for info in infodict.values():
+                sid = info[3]
+                sidlist.append(sid)
+
             for posid in poslist:
                
                 input("Please plug in positioner " + posid + " and press Enter.")
