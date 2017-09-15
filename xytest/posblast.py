@@ -2,6 +2,7 @@ import sys
 import os 
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
+
 import petalcomm
 import googlesheets
 import posdance
@@ -93,6 +94,14 @@ if __name__ == '__main__':
                 else:
                     print('Error - expected one new silicon ID but detected either none or more than this:' + str(newsids))
                     break
+
+        if choice == 'h':            
+            
+            infodict = pcomm.get_posfid_info(canbus)
+            poslist = list(infodict.keys())
+
+            print(poslist)
+
 
 
 
