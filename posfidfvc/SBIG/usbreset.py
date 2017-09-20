@@ -27,6 +27,7 @@
     $ sudo ./usbreset /dev/bus/usb/002/003  
 
 '''
+
 import subprocess
 import re
 
