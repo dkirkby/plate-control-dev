@@ -6,6 +6,7 @@ import numpy as np
 import sbigcam
 import os
 
+
 def flip_horizontal(img):
 	img = np.fliplr(img)
 	return img
