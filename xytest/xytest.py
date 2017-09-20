@@ -225,10 +225,14 @@ class XYTest(object):
         n_pts_calib_P = self.xytest_conf['n_points_calib_P'][loop_number]
         calib_mode = self.xytest_conf['calib_mode'][loop_number]
         set_as_defaults = self.xytest_conf['set_meas_calib_as_new_defaults'][loop_number]
+        keepR1R2 = self.xytest_conf['keep_arm_old_armlengths'][loop_number]
         params = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']
         if n_pts_calib_T >= 4 and n_pts_calib_P >= 3:
             if not(set_as_defaults):
                 self.collect_calibrations()
+            elif keepR1R2:
+                self.collect_calibrations()
+                params = ['OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']
             start_time = time.time()
             self.logwrite('Starting arc calibration sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             self.m.n_points_calib_T = n_pts_calib_T
@@ -242,6 +246,8 @@ class XYTest(object):
             if not(set_as_defaults):
                 self.restore_calibrations()
             else:
+                if keepR1R2:
+                    self.restore_calibrations(keys = ['LENGTH_R1','LENGTH_R2'])
                 for posid in self.posids:
                     state = self.m.state(posid)
                     self.track_file(state.log_path, commit='once')
@@ -615,12 +621,14 @@ class XYTest(object):
             for calib_key in pc.nominals.keys():
                 self.calib_store[posid][calib_key] = ptl.get(posid,calib_key)
 
-    def restore_calibrations(self):
+    def restore_calibrations(self, keys = None):
         '''Restore all the calibration values previously stored with the
-        collect_calibrations() method.
+        collect_calibrations() method. Can argue which calib keys to reset.
         '''
+        if not(keys):
+            keys = pc.nominals.keys()
         for posid in self.posids:
-            for calib_key in pc.nominals.keys():
+            for calib_key in keys:
                 ptl = self.m.petal(posid)
                 ptl.set(posid, calib_key, self.calib_store[posid][calib_key])
         for ptl in self.m.petals:
