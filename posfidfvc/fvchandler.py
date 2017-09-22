@@ -59,7 +59,7 @@ class FVCHandler(object):
         '''
         self._scale = scale
         if 'SBIG' in self.fvc_type:
-            self.sbig.size_fitbox = int(np.ceil(self.fitbox_mm/2 / scale))
+            self.sbig.size_fitbox = int(np.ceil(self.fitbox_mm/2.3 / scale))
 
     @property
     def platemaker_instrument(self):
