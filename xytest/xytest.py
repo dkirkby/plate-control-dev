@@ -665,7 +665,7 @@ class XYTest(object):
         n_credential_tries = 4
         while n_credential_tries:
             svn_user = tkinter.simpledialog.askstring(title='SVN authentication',prompt='svn username:')
-            svn_pass = tkinter.simpledialog.askstring(title='SVN authentication',prompt='svn password:')
+            svn_pass = tkinter.simpledialog.askstring(title='SVN authentication',prompt='svn password:',show="*")
             if should_simulate:
                 err = 0
             else:
