@@ -58,6 +58,7 @@ posfidfvc/mightex/mightex_test.py -text
 posfidfvc/poscalibplot.py -text
 posfidfvc/posmovemeasure.py -text
 svntest/2017-09-11_T111954_xytest_status.log -text
+svntest/2017-09-11_T132712_xytest_lifetest2.log -text
 svntest/2017-09-12_T171949_xytest_burnin.log -text
 svntest/2017-09-12_T175141_xytest_burnin.log -text
 svntest/2017-09-14_T201638_xytest_status.log -text
