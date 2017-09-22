@@ -57,6 +57,7 @@ posfidfvc/mightex/mightex_cmd.help.txt -text
 posfidfvc/mightex/mightex_test.py -text
 posfidfvc/poscalibplot.py -text
 posfidfvc/posmovemeasure.py -text
+svntest/y.y -text
 ups/plate_control.table -text
 xytest/grader.py -text
 xytest/pos_xytest_plot.py -text
