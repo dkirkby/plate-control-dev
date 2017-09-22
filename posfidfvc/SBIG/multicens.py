@@ -97,7 +97,7 @@ def im2bw(image,level):
     bw[threshold_indices] = 1
     return bw
 
-def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_otsu=False, save_dir='', size_fitbox=10):
+def multiCens(img, n_centroids_to_keep=2, verbose=False, write_fits=True, no_otsu=True, save_dir='', size_fitbox=10):
 # Computes centroids by finding spots and then fitting 2d gaussian
 #
 # Input 
