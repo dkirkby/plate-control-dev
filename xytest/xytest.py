@@ -789,8 +789,8 @@ if __name__=="__main__":
 			if not CONTINUE_TEST:
 				xytest_conf=test_base_path+'/fp_settings/test_settings/'+xytest_conf
 			else:
-				xytest_conf=temp_file_path+xytest_conf
-		
+				xytest_conf=temp_file_path+'/'+xytest_conf
+
 	test = XYTest(hwsetup_conf=hwsetup_conf,xytest_conf=xytest_conf,USE_LOCAL_PRESETS=USE_LOCAL_PRESETS)
 	test.get_svn_credentials()
 	test.logwrite('Start of positioner performance test.')
