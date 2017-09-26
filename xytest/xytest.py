@@ -738,6 +738,7 @@ if __name__=="__main__":
 	USE_LOCAL_PRESETS=False
 	CONTINUE_TEST=False
 	arguments = sys.argv[1:]
+
 	try:
 		if len(arguments) > 0:
 			if arguments[0].lower()=='uselocal': USE_LOCAL_PRESETS=True
@@ -746,7 +747,9 @@ if __name__=="__main__":
 			if arguments[1].lower()[0:4]=='cont': CONTINUE_TEST=True	
 	except:
 		pass
-	
+	hwsetup_conf=''
+	xytest_conf=''	
+
 	if USE_LOCAL_PRESETS:
 		try:
 			presets_file=os.environ['TEST_PRESETS_CONFIG']
@@ -765,6 +768,7 @@ if __name__=="__main__":
 		except:
 			print("Can not use local presets.")
 			USE_LOCAL_PRESETS=False
+
 
 	if USE_LOCAL_PRESETS:
 		print("")
