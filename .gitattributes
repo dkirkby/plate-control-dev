@@ -71,6 +71,7 @@ svntest/2017-09-18_T121422_xytest_double.log -text
 svntest/2017-09-18_T182147_xytest_burnin.log -text
 svntest/2017-09-19_T164637_xytest_double.log -text
 svntest/2017-09-19_T175725_xytest_burnin.log -text
+svntest/w.w -text
 ups/plate_control.table -text
 xytest/grader.py -text
 xytest/pos_xytest_plot.py -text
