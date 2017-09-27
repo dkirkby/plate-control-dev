@@ -74,7 +74,6 @@ class SBIG_Grab_Cen(object):
         if self.verbose:
             print("Taking light image...")
         self.cam.set_dark(False)
-
         L = self.start_exposure()
         L = self.flip(L)
 

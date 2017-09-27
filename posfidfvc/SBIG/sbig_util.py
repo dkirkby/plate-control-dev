@@ -22,7 +22,16 @@ cam.set_exposure_time(90)
 cam.set_dark(False)
 cam.set_fast_mode(fast_mode=False)
 
-n_dots = int(sys.argv[1])
+nargs=len(sys.argv)
+if nargs < 2:
+    print("Usage: puython3 sbig_util.py <nspots_expected>")
+    sys.exit()
+try:
+    n_dots = int(sys.argv[1])
+except:
+    print("<ndots_expected> has to be an integer")
+    sys.exit()
+    
 margin = 25
 ready_for_centroiding = False
 run_thread = True
