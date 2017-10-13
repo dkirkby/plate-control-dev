@@ -10,6 +10,11 @@ def magnitude(p,b):
 	m=25.0 - 2.5*np.log10(p-b)
 	return m
 
+
+# the numbers below are from fvchandler
+max_counts = 2**16 - 1 # SBIC camera ADU max
+min_energy = 0.3 * 1.0 # this is the minimum allowed value for the product peak*fwhm for any given dot
+#
 arguments = sys.argv[1:]
 nargs = len(arguments)
 try:
@@ -33,15 +38,20 @@ img=pyfits.getdata(fname)
 
 #t0=time.time()
 xCenSub, yCenSub, peaks, FWHMSub, filename =multicens.multiCens(img, n_centroids_to_keep=nspots, verbose=False, write_fits=False,size_fitbox=fboxsize)
-#t=time.time()-t0
+# we are calculating the quantity 'FWHM*peak' with peak normalized to the maximum peak level. This is
+# esentially a linear light density. We will call this quantity 'energy' to match Joe's naming in fvchandler.
+# We verified that the linear light density is insensitive to spot position whereas the measured peak is not.
+energy=[FWHMSub[i]*(peaks[i]/max_counts) for i in range(len(peaks))]
 print(" File: "+str(fname))
 print(" Number of centroids requested: "+str(nspots))
 print(" Fitboxsize: "+str(fboxsize))
 print(" Centroid list:")  
-print(" Spot  x         y          FWHM    Peak      ")
+print(" Spot  x         y          FWHM    Peak     LD  ")
 for i, x in enumerate(xCenSub):
-	print("{:5d} {:9.3f} {:9.3f} {:7.3f}   {:9.3f} ".format(i, x, yCenSub[i], FWHMSub[i], peaks[i]))
-
+	line=("{:5d} {:9.3f} {:9.3f} {:6.2f}  {:7.0f} {:7.2f} ".format(i, x, yCenSub[i], FWHMSub[i], peaks[i], energy[i]))
+	if energy[i] < min_energy:
+		line=line+'*'
+	print(line)	
 #print(" Spot  x         y          FWHM    Peak       Bias        Mag")
 #for i, x in enumerate(xCenSub):
 #	print("{:5d} {:9.3f} {:9.3f} {:7.3f}   {:9.3f} {:9.3f}   {:7.3f} ".format(i, x, yCenSub[i], FWHMSub[i], peaks[i], bias[i],magnitude(peaks[i],bias[i])))
