@@ -15,6 +15,7 @@ MoveGUI
 # If we want to use it for other testing purpose, for example, move positioners on petals, we should add a select petal function. 
 # The google sheet url is now hard-coded too. Can be a variable if needed for other purpose. 
 # If you want to edit other googlesheet, the write_googlesheet method should be modified correspondingly. 
+# On different computers, you probably need to set the path differently. Search all the os.path in this code and modify them. 
 # History: V1.0   Kai Zhang @LBNL  2017-10-17   Contact: zkdtckk@gmail.com
 
 
