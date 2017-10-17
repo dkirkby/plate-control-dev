@@ -61,6 +61,7 @@ posfidfvc/poscalibplot.py -text
 posfidfvc/posmovemeasure.py -text
 ups/plate_control.table -text
 xytest/grader.py -text
+xytest/movegui.py -text
 xytest/pos_xytest_plot.py -text
 xytest/posblast.py -text
 xytest/posdance.py -text

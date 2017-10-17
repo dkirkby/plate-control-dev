@@ -1,0 +1,224 @@
+"""
+MoveGUI
+
+#A GUI to make positioner movement check easier.
+# This GUI can move a single/all positioners by sending can command (quick) or talking to the conf file for each positioner first (slow). 
+# The differece is: if the wiring is flipped, sending can command will have the rotation direction flipped, but the non-can method will fix it. 
+# Use the 'CAN' checkbox to enable can command mode. 
+# Select 'ALL' or a specific positioner before making movement. 
+# Show INFO  will show the positioner Silicon ID, Full Sillicon ID, and firmware version
+# Write Sheet will write the short and full SiID and firmware version to google sheet. 
+# Center will center the positioner so that the installation of fibers will be easier. 
+# Refresh/Restart will restart the GUI. After plugging/unplugging positioners, you should click this botton. 
+# Update petalcontroller.py on beaglebone before using this code. 
+# Petal ID is now hard-coded, I think this is fine because a computer is usually tied to a beaglebone for now. 
+# If we want to use it for other testing purpose, for example, move positioners on petals, we should add a select petal function. 
+# The google sheet url is now hard-coded too. Can be a variable if needed for other purpose. 
+# If you want to edit other googlesheet, the write_googlesheet method should be modified correspondingly. 
+# History: V1.0   Kai Zhang @LBNL  2017-10-17   Contact: zkdtckk@gmail.com
+
+
+"""
+import os
+import sys
+sys.path.append(os.path.abspath('../petal/'))
+sys.path.append(os.path.abspath('../posfidfvc/'))
+sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
+import fvchandler
+import petal
+import petalcomm
+import posmovemeasure
+import posconstants as pc
+import summarizer
+import numpy as np
+import time
+import pos_xytest_plot
+import um_test_report as test_report
+import traceback
+import configobj
+import tkinter
+import tkinter.filedialog
+import tkinter.messagebox
+import tkinter.simpledialog
+import csv
+import collections
+from tkinter import *
+import googlesheets
+
+
+class MoveGUI(object):
+    def __init__(self,hwsetup_conf='',xytest_conf=''):
+        global gui_root
+        gui_root = tkinter.Tk()
+        self.simulate = False
+        self.logfile='MoveGUI.log'
+        fvc_type='simulator'
+        fidids=['F021']   
+        ptl_id = 40
+        gui_root.title='Move Controll for Petal '+str(ptl_id)
+        self.pcomm=petalcomm.PetalComm(ptl_id)
+        self.mode = IntVar()
+        #petalcomm.
+   #     info=self.petalcomm.get_device_status()
+        canbus='can0'
+        self.info = self.pcomm.get_posfid_info(canbus)
+        print(self.info)
+        self.posids = []
+        for key in self.info.keys():
+            if len(str(key))==3:
+                self.posids.append('M00'+str(key)) 
+            elif len(str(key))==4:
+                self.posids.append('M0'+str(key))
+            elif len(str(key))==5:
+                self.posids.append('M'+str(key))
+        print(self.posids)
+        self.ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+        self.fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
+        self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
+        
+# GUI input       
+        w=1000
+        h=600
+        ws=gui_root.winfo_screenwidth()
+        hs=gui_root.winfo_screenheight()
+        x=(ws/2)-(w/2)
+        y=(hs/2)-(h/2)
+        gui_root.geometry('%dx%d+%d+%d' % (w,h,x,y))
+
+        self.e1=Entry(gui_root)
+        self.e1.grid(row=0,column=1)
+        Label(gui_root,text="Rotation Angel").grid(row=0)
+
+        Button(gui_root,text='Theta CW',width=10,command=self.theta_cw_degree).grid(row=4,column=1,sticky=W,pady=4)
+        Button(gui_root,text='Theta CCW',width=10,command=self.theta_ccw_degree).grid(row=5,column=1,sticky=W,pady=4)
+        Checkbutton(gui_root, text='CAN', variable=self.mode).grid(row=4,column=3,sticky=W,pady=4)
+        Button(gui_root,text='Phi CW',width=10,command=self.phi_cw_degree).grid(row=4,column=0,sticky=W,pady=4)
+        Button(gui_root,text='Phi CCW',width=10,command=self.phi_ccw_degree).grid(row=5,column=0,sticky=W,pady=4)
+        Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=6,column=0,sticky=W,pady=4)
+        Button(gui_root,text='Write Sheet',width=10,command=self.write_googlesheet).grid(row=6,column=4,sticky=W,pady=4)
+        Button(gui_root,text='Center',width=10,command=self.center).grid(row=6,column=5,sticky=W,pady=4)                
+        self.listbox1 = Listbox(gui_root, width=20, height=20)
+        self.listbox1.grid(row=7, column=0)
+        # create a vertical scrollbar to the right of the listbox
+        yscroll = Scrollbar(command=self.listbox1.yview, orient=tkinter.VERTICAL)
+        yscroll.grid(row=7, column=1, sticky=tkinter.N+tkinter.S)
+        self.listbox1.configure(yscrollcommand=yscroll.set)
+        self.listbox1.insert(tkinter.END,'ALL')
+        for key in self.info.keys():
+            if len(str(key))==3:
+                self.listbox1.insert(tkinter.END,'M00'+str(key)) 
+            elif len(str(key))==4:
+                self.listbox1.insert(tkinter.END,'M0'+str(key))
+            elif len(str(key))==5:
+                self.listbox1.insert(tkinter.END,'M'+str(key))
+                
+        self.listbox1.bind('<ButtonRelease-1>', self.get_list)
+
+            
+        self.text1=Text(gui_root,height=30,width=100)
+        self.text1.grid(row=7,column=2,columnspan=4,sticky=W,pady=4)
+#        Button(gui_root,text='Plot List',width=10,command=click_plot_list).grid(row=4,column=2,sticky=W,pady=4)
+        Button(gui_root,text='Refresh/Restart',width=15,command=self.clear).grid(row=2,column=5,sticky=W,pady=4)
+
+        mainloop()
+    def get_list(self,event):
+        # get selected line index
+        index = self.listbox1.curselection()[0]
+        # get the line's text
+        self.selected=self.listbox1.get(index)        
+        if self.selected == 'ALL':
+            self.selected_posid=self.posids
+            self.selected_can=20000
+        else:
+            self.selected_posid=self.selected
+            self.selected_can=int(str(self.selected[1:6]))
+        
+        
+    def format_sids(self, sid_dict):
+        for key,value in sid_dict.items():
+            sid_dict[key] = ":".join("{:02x}".format(c) for c in value)
+        return sid_dict
+            
+    def show_info(self):
+        for key in self.info.keys():
+            self.text1.insert(END,str(key)+' '+str(self.info[key])+'\n')
+            
+        
+    def theta_cw_degree(self):
+        degree=float(self.e1.get())
+        dtdp=[-degree,0]
+
+        if self.mode.get()==1:
+            self.pcomm.move('can0', self.selected_can, 'cw', 'cruise', 'theta', degree)
+        else:
+            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
+        
+    def theta_ccw_degree(self):
+        degree=float(self.e1.get())
+        dtdp=[degree,0]
+        if self.mode.get()==1:
+            self.pcomm.move('can0', self.selected_can, 'ccw', 'cruise', 'theta', degree)
+        else:
+            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
+  
+    def phi_cw_degree(self):
+        degree=float(self.e1.get())
+        dtdp=[0,-degree]
+        if self.mode.get()==1:
+            self.pcomm.move('can0', self.selected_can, 'cw', 'cruise', 'phi', degree)
+        else:
+            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
+        
+    def phi_ccw_degree(self):
+        degree=float(self.e1.get())
+        dtdp=[0,degree]
+        if self.mode.get()==1:
+            self.pcomm.move('can0', self.selected_can, 'ccw', 'cruise', 'phi', degree)
+        else:
+            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
+    
+    def center(self):
+        dtdp=[-400,200]
+        self.ptl.quick_direct_dtdp(self.posids,dtdp)       
+        dtdp=[195,0]
+        self.ptl.quick_direct_dtdp(self.posids,dtdp)   
+        self.text1.insert(END,'Centering Done \n')
+        
+    def write_googlesheet(self):
+        self.text1.insert(END,'Writing Sheets \n')
+        url='https://docs.google.com/spreadsheets/d/1lJ9GjhUUsK2SIvXeerpGW7664OFKQWAlPqpgxgevvl8/edit#gid=0'
+        sheet=googlesheets.connect_by_url(url,credentials = '../../../positioner_logs/data_processing_scripts/google_access_account.json')
+        for key in self.info.keys():
+            info_this=self.info[key]
+            pos_this=googlesheets.read(sheet,20+int(key),1,False,False)
+            if (float(key)<7000 and float(pos_this)== float(key)):
+                googlesheets.write(sheet,int(key)+20,5,str(key),False,False) # POSID
+                googlesheets.write(sheet,int(key)+20,6,info_this[3],False,False) # SI_ID
+                googlesheets.write(sheet,int(key)+20,7,info_this[2],False,False) # Full SI_ID
+                googlesheets.write(sheet,int(key)+20,15,info_this[0],False,False) # Firmware_ver
+                test=googlesheets.read(sheet,int(key)+20,6,False,False)
+                if test == info_this[3]:
+                    self.text1.insert(END,'Writing '+str(key)+' successfully \n')
+                else:
+                    self.text1.insert(END,'Writing '+str(key)+' failed. \n Check doc '+url+'\n')
+            elif float(key)>7000:
+                self.text1.insert(END,'Is '+str(key)+' a fiducial? Not writing. \n')
+            else:
+                self.text1.insert(END,'Posid and RowID are not consistent. Check the integrity of the file. \n Go to '+url+' \n' )
+        self.text1.insert(END,'Writing Sheets Done \n')
+    
+    def clear(self):
+        gui_root.destroy()
+        MoveGUI()
+     
+    def logwrite(self,text,stdout=True):
+        """Standard logging function for writing to the test traveler log file.
+        """
+        line = '# ' + pc.timestamp_str_now() + ': ' + text
+        with open(self.logfile,'a') as fh:
+            fh.write(line + '\n')
+        if stdout:
+            print(line)
+            
+if __name__=="__main__":
+    gui = MoveGUI()
