@@ -47,6 +47,7 @@ import csv
 import collections
 from tkinter import *
 import googlesheets
+import time
 
 
 class MoveGUI(object):
@@ -219,9 +220,11 @@ class MoveGUI(object):
     def center(self):
         if self.mode.get()==1:
             self.pcomm.move('can0', 20000, 'cw', 'cruise', 'theta', 400)
-            self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'theta', 195)
+            time.sleep(4)
             self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)
-            
+            time.sleep(2)
+            self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'theta', 195)
+       #     self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)            
         else:
             dtdp=[-400,200]
             self.ptl.quick_direct_dtdp(self.posids,dtdp)       
