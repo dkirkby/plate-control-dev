@@ -70,7 +70,6 @@ class MoveGUI(object):
         
         mainloop()
         
-        global gui_root
         gui_root = tkinter.Tk()
         
         self.simulate = False
