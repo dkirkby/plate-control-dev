@@ -82,6 +82,7 @@ class MoveGUI(object):
         #petalcomm.
    #     info=self.petalcomm.get_device_status()
         canbus='can0'
+        self.bus_id=canbus
         self.info = self.pcomm.get_posfid_info(canbus)
         print(self.info)
         self.posids = []
@@ -108,8 +109,13 @@ class MoveGUI(object):
 
         self.e1=Entry(gui_root)
         self.e1.grid(row=0,column=1)
-        Label(gui_root,text="Rotation Angel").grid(row=0)
-
+        self.e2=Entry(gui_root)
+        self.e2.grid(row=0,column=3)
+        Button(gui_root,text='Set',width=10,command=self.set_fiducial).grid(row=0,column=4,sticky=W,pady=4)
+        
+        
+        Label(gui_root,text="Rotation Angel").grid(row=0,column=0)
+        Label(gui_root,text="Set Fiducial").grid(row=0,column=2)
         Button(gui_root,text='Theta CW',width=10,command=self.theta_cw_degree).grid(row=4,column=1,sticky=W,pady=4)
         Button(gui_root,text='Theta CCW',width=10,command=self.theta_ccw_degree).grid(row=5,column=1,sticky=W,pady=4)
         Checkbutton(gui_root, text='CAN', variable=self.mode).grid(row=4,column=3,sticky=W,pady=4)
@@ -145,6 +151,14 @@ class MoveGUI(object):
     def set_ptl_id(self):
         self.ptl_id=self.e1.get()
         gui_root.destroy()
+    def set_fiducial(self):
+        if self.selected_can == 20000:
+            self.text1.insert(END,'No, you cannot set all positioners as fiducials, this will burn the motor! \n')
+        elif self.selected_can<7000:
+            self.text1.insert(END,'No, you cannot set a positioners as a fiducial, this will burn the motor! \n')
+        else:
+            self.pcomm.set_fiducials(['can0'], [self.selected_can], [self.e2.get()])
+            self.text1.insert(END,'Set Fiducial '+str(self.selected_can)+' to '+str(self.e2.get())+' successfully! \n')
         
     def get_list(self,event):
         # get selected line index
