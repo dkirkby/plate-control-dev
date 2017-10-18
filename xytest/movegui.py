@@ -217,11 +217,17 @@ class MoveGUI(object):
             self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
     
     def center(self):
-        dtdp=[-400,200]
-        self.ptl.quick_direct_dtdp(self.posids,dtdp)       
-        dtdp=[195,0]
-        self.ptl.quick_direct_dtdp(self.posids,dtdp)   
-        self.text1.insert(END,'Centering Done \n')
+        if self.mode.get()==1:
+            self.pcomm.move('can0', 20000, 'cw', 'cruise', 'theta', 400)
+            self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'theta', 195)
+            self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)
+            
+        else:
+            dtdp=[-400,200]
+            self.ptl.quick_direct_dtdp(self.posids,dtdp)       
+            dtdp=[195,0]
+            self.ptl.quick_direct_dtdp(self.posids,dtdp)   
+            self.text1.insert(END,'Centering Done \n')
         
     def write_googlesheet(self):
         self.text1.insert(END,'Writing Sheets \n')
