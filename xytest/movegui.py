@@ -221,9 +221,12 @@ class MoveGUI(object):
         if self.mode.get()==1:
             self.pcomm.move('can0', 20000, 'cw', 'cruise', 'theta', 400)
             time.sleep(4)
-            self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)
+            self.pcomm.move('can0', 20000, 'cw', 'cruise', 'phi', 200)
             time.sleep(2)
             self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'theta', 195)
+            time.sleep(2)
+            self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)
+            
        #     self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)            
         else:
             dtdp=[-400,200]
