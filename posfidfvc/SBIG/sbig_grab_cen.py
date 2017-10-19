@@ -137,12 +137,15 @@ class SBIG_Grab_Cen(object):
     def start_exposure(self):
         '''Wraps the usual start_exposure function with some mild error handling.
         '''
-        img = self.cam.start_exposure()
-        no_img = not(isinstance(img,np.ndarray))
-        num_nonzero_pixels = np.count_nonzero(img)
-        all_black = num_nonzero_pixels == 0
-        nearly_all_black = num_nonzero_pixels < self.min_num_nonzero_pixels
-        if no_img or all_black or nearly_all_black:
+        def expose():
+			img = self.cam.start_exposure()
+        	no_img = not(isinstance(img,np.ndarray))
+        	num_nonzero_pixels = np.count_nonzero(img)
+        	all_black = num_nonzero_pixels == 0
+        	nearly_all_black = num_nonzero_pixels < self.min_num_nonzero_pixels
+        	return img,no_img,all_black,nearly_all_black
+		img,no_img,all_black,nearly_all_black=expose()	
+		if no_img or all_black or nearly_all_black:
             if no_img:
                 desc = 'no image'
             elif all_black:
@@ -151,11 +154,7 @@ class SBIG_Grab_Cen(object):
                 desc = 'an image with only ' + str(num_nonzero_pixels) + ' non-black pixels'
             print('The camera returned ' + desc + ', indicating a possible readout failure. Will attempt to re-initialize the camera and keep going.')
             self._cam_init()
-            img = self.cam.start_exposure()
-            no_img = not(isinstance(img,np.ndarray))
-            num_nonzero_pixels = np.count_nonzero(img)
-            all_black = num_nonzero_pixels == 0
-            nearly_all_black = num_nonzero_pixels < self.min_num_nonzero_pixels
+			img,no_img,all_black,nearly_all_black=expose()
             if no_img or all_black or nearly_all_black:
                 raise ValueError('Image not good, try restarting the camera.')
         return img
