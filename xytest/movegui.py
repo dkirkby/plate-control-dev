@@ -79,60 +79,60 @@ class MoveGUI(object):
         fidids=['F021']   
         gui_root.title='Move Controll for Petal '+str(self.ptl_id)
         self.pcomm=petalcomm.PetalComm(self.ptl_id)
-        self.mode = IntVar()
+        self.mode = 0
         #petalcomm.
    #     info=self.petalcomm.get_device_status()
         canbus='can0'
         self.bus_id=canbus
         self.info = self.pcomm.get_posfid_info(canbus)
-        print(self.info)
         self.posids = []
-        for key in self.info.keys():
+        for key in sorted(self.info.keys()):
             if len(str(key))==3:
                 self.posids.append('M00'+str(key)) 
             elif len(str(key))==4:
                 self.posids.append('M0'+str(key))
             elif len(str(key))==5:
                 self.posids.append('M'+str(key))
-        print(self.posids)
         self.ptl = petal.Petal(self.ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite)
         self.fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
         
 # GUI input       
-        w=1000
-        h=600
+        w=1600
+        h=700
         ws=gui_root.winfo_screenwidth()
         hs=gui_root.winfo_screenheight()
         x=(ws/2)-(w/2)
         y=(hs/2)-(h/2)
         gui_root.geometry('%dx%d+%d+%d' % (w,h,x,y))
-
-        self.e1=Entry(gui_root)
-        self.e1.grid(row=0,column=1)
-        self.e2=Entry(gui_root)
-        self.e2.grid(row=0,column=3)
+        
         Button(gui_root,text='Set',width=10,command=self.set_fiducial).grid(row=0,column=4,sticky=W,pady=4)
         
-        
         Label(gui_root,text="Rotation Angel").grid(row=0,column=0)
+        self.e1=Entry(gui_root)
+        self.e1.grid(row=0,column=1)
         Label(gui_root,text="Set Fiducial").grid(row=0,column=2)
+        self.e2=Entry(gui_root)
+        self.e2.grid(row=0,column=3)
+
         Button(gui_root,text='Theta CW',width=10,command=self.theta_cw_degree).grid(row=4,column=1,sticky=W,pady=4)
         Button(gui_root,text='Theta CCW',width=10,command=self.theta_ccw_degree).grid(row=5,column=1,sticky=W,pady=4)
-        Checkbutton(gui_root, text='CAN', variable=self.mode).grid(row=4,column=3,sticky=W,pady=4)
+        self.mode=IntVar(gui_root)
+        self.mode.set(1)
+        Checkbutton(gui_root, text='CAN', variable=self.mode).grid(row=4,column=2,sticky=W,pady=4)
         Button(gui_root,text='Phi CW',width=10,command=self.phi_cw_degree).grid(row=4,column=0,sticky=W,pady=4)
         Button(gui_root,text='Phi CCW',width=10,command=self.phi_ccw_degree).grid(row=5,column=0,sticky=W,pady=4)
         Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=6,column=0,sticky=W,pady=4)
-        Button(gui_root,text='Write Sheet',width=10,command=self.write_googlesheet).grid(row=6,column=4,sticky=W,pady=4)
-        Button(gui_root,text='Center',width=10,command=self.center).grid(row=6,column=5,sticky=W,pady=4)                
+        Button(gui_root,text='Write SiID',width=10,command=self.write_siid).grid(row=6,column=4,sticky=W,pady=4)
+        Button(gui_root,text='Center',width=10,command=self.center).grid(row=6,column=2,sticky=W,pady=4)                
         self.listbox1 = Listbox(gui_root, width=20, height=20)
-        self.listbox1.grid(row=7, column=0)
+        self.listbox1.grid(row=7, column=0,rowspan=10)
         # create a vertical scrollbar to the right of the listbox
         yscroll = Scrollbar(command=self.listbox1.yview, orient=tkinter.VERTICAL)
-        yscroll.grid(row=7, column=1, sticky=tkinter.N+tkinter.S)
+        yscroll.grid(row=7, column=1, rowspan=10,sticky=tkinter.N+tkinter.S)
         self.listbox1.configure(yscrollcommand=yscroll.set)
         self.listbox1.insert(tkinter.END,'ALL')
-        for key in self.info.keys():
+        for key in sorted(self.info.keys()):
             if len(str(key))==3:
                 self.listbox1.insert(tkinter.END,'M00'+str(key)) 
             elif len(str(key))==4:
@@ -143,11 +143,55 @@ class MoveGUI(object):
         self.listbox1.bind('<ButtonRelease-1>', self.get_list)
 
             
-        self.text1=Text(gui_root,height=30,width=100)
-        self.text1.grid(row=7,column=2,columnspan=4,sticky=W,pady=4)
-#        Button(gui_root,text='Plot List',width=10,command=click_plot_list).grid(row=4,column=2,sticky=W,pady=4)
-        Button(gui_root,text='Refresh/Restart',width=15,command=self.clear).grid(row=2,column=5,sticky=W,pady=4)
+        self.text1=Text(gui_root,height=30,width=95)
+        self.text1.grid(row=7,column=2,columnspan=4,rowspan=20,sticky=W,pady=4)
+        
+# Right part of the GUI to write to Acceptance Traveller
 
+#       Load the information 
+        Button(gui_root,text='Load Acceptance Traveller',width=20,command=self.load_acceptance_traveller).grid(row=3,column=6,sticky=W,pady=4)
+        Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=3,column=7,sticky=W,pady=4)
+        
+        self.text2=Text(gui_root,height=30,width=30)
+        self.text2.grid(row=5,column=6,columnspan=2,rowspan=20,sticky=W+E+N+S,pady=4)
+        self.text2.tag_configure('bold_italics', font=('Arial', 10, 'bold', 'italic'))
+        self.text2.tag_configure('big', font=('Verdana', 10, 'bold','bold'))
+        self.text2.tag_configure('color', foreground='#476042', font=('Tempus Sans ITC', 10, 'bold'))
+        self.plug=IntVar(gui_root)
+        self.entered=IntVar(gui_root)
+        self.theta_work=IntVar(gui_root)
+        self.phi_work=IntVar(gui_root)
+        Checkbutton(gui_root, text='Plug?', variable=self.plug).grid(row=4,column=8,sticky=W,pady=4)
+        Checkbutton(gui_root, text='POS INFO Entered?', variable=self.entered).grid(row=5,column=8,sticky=W,pady=4)
+        Checkbutton(gui_root, text='Theta Work?', variable=self.theta_work).grid(row=6,column=8,sticky=W,pady=4)
+        Checkbutton(gui_root, text='Phi Work?', variable=self.phi_work).grid(row=7,column=8,sticky=W,pady=4)
+        
+        Label(gui_root,text="Note").grid(row=8,column=8)
+        self.e3=Entry(gui_root)
+        self.e3.grid(row=8,column=9)
+        Label(gui_root,text="Send PFA Date").grid(row=9,column=8)
+        self.e4=Entry(gui_root)
+        self.e4.grid(row=9,column=9)
+        Label(gui_root,text="Send PFA Name").grid(row=10,column=8)
+        self.e5=Entry(gui_root)
+        self.e5.grid(row=10,column=9)
+        Label(gui_root,text="Tote").grid(row=11,column=8)
+        self.box_options = [    "GREY TOTE\n---------\nREADY FOR PFA INSTALL",    "GREY TOTE\n---------\nINCOMING INSPECTION IN PROGRESS",    "LARGE TOTE\n--------\nFAIL REVIEW LATER", "LARGE TOTE\n--------\nFAIL PERMANENT"]
+        self.box_goto = StringVar(gui_root)
+        self.box_goto.set("Where will you put me?") # default value
+        self.drop1 = OptionMenu(gui_root, self.box_goto, *self.box_options)
+        self.drop1.grid(row=11,column=9)
+
+        Label(gui_root,text="Update DB?, your init").grid(row=12,column=8)
+        self.e6=Entry(gui_root)
+        self.e6.grid(row=12,column=9)
+        
+
+        
+#        Button(gui_root,text='Plot List',width=10,command=click_plot_list).grid(row=4,column=2,sticky=W,pady=4)
+        Button(gui_root,text='Refresh/Restart',width=15,command=self.restart).grid(row=2,column=5,sticky=W,pady=4)
+        Button(gui_root,text='Clear',width=15,command=self.clear1).grid(row=6,column=5,sticky=W,pady=4)
+        Button(gui_root,text='Clear',width=15,command=self.clear2).grid(row=4,column=7,sticky=W,pady=4)
         mainloop()
     def set_ptl_id(self):
         self.ptl_id=self.e1.get()
@@ -180,7 +224,7 @@ class MoveGUI(object):
         return sid_dict
             
     def show_info(self):
-        for key in self.info.keys():
+        for key in sorted(self.info.keys()):
             self.text1.insert(END,str(key)+' '+str(self.info[key])+'\n')
             
         
@@ -235,11 +279,11 @@ class MoveGUI(object):
             self.ptl.quick_direct_dtdp(self.posids,dtdp)   
             self.text1.insert(END,'Centering Done \n')
         
-    def write_googlesheet(self):
-        self.text1.insert(END,'Writing Sheets \n')
+    def write_siid(self):
+        self.text1.insert(END,'Writing SiID \n')
         url='https://docs.google.com/spreadsheets/d/1lJ9GjhUUsK2SIvXeerpGW7664OFKQWAlPqpgxgevvl8/edit#gid=0'
         sheet=googlesheets.connect_by_url(url,credentials = '../../../positioner_logs/data_processing_scripts/google_access_account.json')
-        for key in self.info.keys():
+        for key in sorted(self.info.keys()):
             info_this=self.info[key]
             pos_this=googlesheets.read(sheet,20+int(key),1,False,False)
             if (float(key)<7000 and float(pos_this)== float(key)):
@@ -257,11 +301,91 @@ class MoveGUI(object):
             else:
                 self.text1.insert(END,'Posid and RowID are not consistent. Check the integrity of the file. \n Go to '+url+' \n' )
         self.text1.insert(END,'Writing Sheets Done \n')
+
+    def load_acceptance_traveller(self):
+        self.text2.delete('1.0', '2.0')
+        if self.selected_can == 20000:
+            self.text1.insert(END,'Cannot load all positioners simultaneously. \n Select one positioner.\n')
+        else: 
+            url='https://docs.google.com/spreadsheets/d/19Aq-28qgODaaX9wH-NMsX_GiuNyXG_6rjIjPVLb8aYw/edit#gid=795996596'
+            sheet=googlesheets.connect_by_url(url,credentials = '../../../positioner_logs/data_processing_scripts/google_access_account.json')
+            # Find the column we want first
+            pos_list=googlesheets.read_row(sheet,6,False)
+            column_skip=6 # Skip the first 6 description columns
+            pos_list=np.array(pos_list[column_skip:])
+            selected_can_str=str(self.selected_can)
+            selected_can_str.strip()
+            ind=np.where(pos_list == selected_can_str)          
+            if not ind[0]:
+                self.text2.insert(END,'Cannot find this positioner')
+            else:
+                col_id=ind[0][0]+column_skip+1
+                column_info=googlesheets.read_col(sheet,col_id,False)
+                column_info_title=googlesheets.read_col(sheet,2,False)
+                for i in range(len(column_info)):
+                    self.text2.insert(END,str(column_info_title[i])+': ','big')
+                    self.text2.insert(END,str(column_info[i])+'\n','color')
+            
+        
+        
+        
+    def write_acceptance_traveller(self):
+        self.text2.delete('1.0', '2.0')
+        if self.selected_can == 20000:
+            self.text1.insert(END,'Cannot write all positioners simultaneously for safety reason. \n Select one positioner.\n')
+        else: 
+            url='https://docs.google.com/spreadsheets/d/19Aq-28qgODaaX9wH-NMsX_GiuNyXG_6rjIjPVLb8aYw/edit#gid=795996596'
+            sheet=googlesheets.connect_by_url(url,credentials = '../../../positioner_logs/data_processing_scripts/google_access_account.json')
+            # Find the column we want first
+            pos_list=googlesheets.read_row(sheet,6,False)
+            column_skip=6 # Skip the first 6 description columns
+            pos_list=np.array(pos_list[column_skip:])
+            selected_can_str=str(self.selected_can)
+            selected_can_str.strip()
+            ind=np.where(pos_list == selected_can_str)          
+            if not ind[0]:
+                self.text2.insert(END,'Cannot find this positioner')
+            else:
+                col_id=ind[0][0]+column_skip+1
+                if self.plug.get()==1:
+                    googlesheets.write(sheet,49,col_id,'Y',False,False)
+                else:
+                    googlesheets.write(sheet,49,col_id,'N',False,False)
+                if self.entered.get()==1:
+                    googlesheets.write(sheet,50,col_id,'Y',False,False)
+                else:
+                    googlesheets.write(sheet,50,col_id,'N',False,False)
+                if self.theta_work.get()==1:
+                    googlesheets.write(sheet,51,col_id,'Y',False,False)
+                else:
+                    googlesheets.write(sheet,51,col_id,'N',False,False)
+                if self.phi_work.get()==1:
+                    googlesheets.write(sheet,52,col_id,'Y',False,False)
+                else:
+                    googlesheets.write(sheet,52,col_id,'N',False,False)
+                googlesheets.write(sheet,53,col_id,self.e3.get(),False,False)
+                if self.box_goto.get() == self.box_options[0]:   # If accept for PFA installation
+                    googlesheets.write(sheet,63,col_id,self.e4.get(),False,False)
+                    googlesheets.write(sheet,64,col_id,self.e5.get(),False,False)
+                    googlesheets.write(sheet,65,col_id,self.box_goto.get(),False,False)
+                    googlesheets.write(sheet,66,col_id,self.e6.get(),False,False)
+                else:
+                    googlesheets.write(sheet,63,col_id,'No',False,False)
+                    googlesheets.write(sheet,64,col_id,'No',False,False)
+                    googlesheets.write(sheet,65,col_id,self.box_goto.get(),False,False)
+                    googlesheets.write(sheet,66,col_id,self.e6.get(),False,False)
+                column_info=googlesheets.read_col(sheet,col_id,False)
+                self.text2.insert(END,str(column_info))
     
-    def clear(self):
+    
+    def restart(self):
         gui_root.destroy()
         MoveGUI()
-     
+    def clear1(self):
+        self.text1.delete('1.0', '2.0')
+    def clear2(self):
+        self.text2.delete('1.0','2.0')
+        
     def logwrite(self,text,stdout=True):
         """Standard logging function for writing to the test traveler log file.
         """
