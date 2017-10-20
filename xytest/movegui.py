@@ -119,18 +119,18 @@ class MoveGUI(object):
         Button(gui_root,text='Theta CCW',width=10,command=self.theta_ccw_degree).grid(row=5,column=1,sticky=W,pady=4)
         self.mode=IntVar(gui_root)
         self.mode.set(1)
-        Checkbutton(gui_root, text='CAN', variable=self.mode).grid(row=4,column=2,sticky=W,pady=4)
+        Checkbutton(gui_root, text='CAN', variable=self.mode).grid(row=3,column=2,sticky=W,pady=4)
         Button(gui_root,text='Phi CW',width=10,command=self.phi_cw_degree).grid(row=4,column=0,sticky=W,pady=4)
         Button(gui_root,text='Phi CCW',width=10,command=self.phi_ccw_degree).grid(row=5,column=0,sticky=W,pady=4)
         Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=6,column=0,sticky=W,pady=4)
-        Button(gui_root,text='Write SiID',width=10,command=self.write_siid).grid(row=6,column=4,sticky=W,pady=4)
-        Button(gui_root,text='Center',width=10,command=self.center).grid(row=6,column=2,sticky=W,pady=4)                
+        Button(gui_root,text='Write SiID',width=10,command=self.write_siid).grid(row=5,column=4,sticky=W,pady=4)
+        Button(gui_root,text='Center',width=10,command=self.center).grid(row=5,column=2,sticky=W,pady=4)                
         self.listbox1 = Listbox(gui_root, width=20, height=20)
         self.listbox1.grid(row=7, column=0,rowspan=10)
         # create a vertical scrollbar to the right of the listbox
-        yscroll = Scrollbar(command=self.listbox1.yview, orient=tkinter.VERTICAL)
-        yscroll.grid(row=7, column=1, rowspan=10,sticky=tkinter.N+tkinter.S)
-        self.listbox1.configure(yscrollcommand=yscroll.set)
+        yscroll_listbox1 = Scrollbar(command=self.listbox1.yview, orient=tkinter.VERTICAL)
+        yscroll_listbox1.grid(row=7, column=0, rowspan=10,sticky=tkinter.E+tkinter.N+tkinter.S)
+        self.listbox1.configure(yscrollcommand=yscroll_listbox1.set)
         self.listbox1.insert(tkinter.END,'ALL')
         for key in sorted(self.info.keys()):
             if len(str(key))==3:
@@ -142,18 +142,26 @@ class MoveGUI(object):
                 
         self.listbox1.bind('<ButtonRelease-1>', self.get_list)
 
-            
-        self.text1=Text(gui_root,height=30,width=95)
-        self.text1.grid(row=7,column=2,columnspan=4,rowspan=20,sticky=W,pady=4)
+        yscroll_text1 = Scrollbar(gui_root, orient=tkinter.VERTICAL)
+        yscroll_text1.grid(row=6, column=6, rowspan=20,sticky=tkinter.W+tkinter.N+tkinter.S)
+
         
+        self.text1=Text(gui_root,height=30,width=90,wrap=WORD)
+        self.text1.grid(row=6,column=2,columnspan=4,rowspan=20,sticky=W,pady=4)
+        self.text1.configure(yscrollcommand=yscroll_text1.set)
+        
+        yscroll_text1.config(command=self.text1.yview)
 # Right part of the GUI to write to Acceptance Traveller
 
 #       Load the information 
         Button(gui_root,text='Load Acceptance Traveller',width=20,command=self.load_acceptance_traveller).grid(row=3,column=6,sticky=W,pady=4)
         Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=3,column=7,sticky=W,pady=4)
         
+        yscroll_text2 = Scrollbar(gui_root, orient=tkinter.VERTICAL)
+        yscroll_text2.grid(row=6, column=6, rowspan=20,sticky=tkinter.W+tkinter.N+tkinter.S)
+        
         self.text2=Text(gui_root,height=30,width=30)
-        self.text2.grid(row=5,column=6,columnspan=2,rowspan=20,sticky=W+E+N+S,pady=4)
+        self.text2.grid(row=5,column=6,columnspan=2,rowspan=20,sticky=W+E+N+S,pady=4,padx=10)
         self.text2.tag_configure('bold_italics', font=('Arial', 10, 'bold', 'italic'))
         self.text2.tag_configure('big', font=('Verdana', 10, 'bold','bold'))
         self.text2.tag_configure('color', foreground='#476042', font=('Tempus Sans ITC', 10, 'bold'))
@@ -190,7 +198,7 @@ class MoveGUI(object):
         
 #        Button(gui_root,text='Plot List',width=10,command=click_plot_list).grid(row=4,column=2,sticky=W,pady=4)
         Button(gui_root,text='Refresh/Restart',width=15,command=self.restart).grid(row=2,column=5,sticky=W,pady=4)
-        Button(gui_root,text='Clear',width=15,command=self.clear1).grid(row=6,column=5,sticky=W,pady=4)
+        Button(gui_root,text='Clear',width=15,command=self.clear1).grid(row=5,column=5,sticky=W,pady=4)
         Button(gui_root,text='Clear',width=15,command=self.clear2).grid(row=4,column=7,sticky=W,pady=4)
         mainloop()
     def set_ptl_id(self):
@@ -265,11 +273,10 @@ class MoveGUI(object):
         if self.mode.get()==1:
             self.pcomm.move('can0', 20000, 'cw', 'cruise', 'theta', 400)
             time.sleep(4)
-            self.pcomm.move('can0', 20000, 'cw', 'cruise', 'phi', 200)
+            self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)
             time.sleep(2)
             self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'theta', 195)
-            time.sleep(2)
-            self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)
+
             
        #     self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)            
         else:
