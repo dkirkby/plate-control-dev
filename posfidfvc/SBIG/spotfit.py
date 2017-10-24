@@ -4,6 +4,7 @@ import pyfits
 import time
 import sys
 import numpy as np
+import matplotlib as plt
 
 def magnitude(p,b):
 
@@ -47,14 +48,27 @@ print(" Number of centroids requested: "+str(nspots))
 print(" Fitboxsize: "+str(fboxsize))
 print(" Centroid list:")  
 print(" Spot  x         y          FWHM    Peak     LD  ")
-for i, x in enumerate(xCenSub):
-	line=("{:5d} {:9.3f} {:9.3f} {:6.2f}  {:7.0f} {:7.2f} ".format(i, x, yCenSub[i], FWHMSub[i], peaks[i], energy[i]))
+
+# sort by peak value
+
+sindex=sorted(range(len(peaks)), key=lambda k: peaks[k])
+
+peaks_sorted=[peaks[i] for i in sindex]
+x_sorted=[xCenSub[i] for i in sindex]
+y_sorted=[yCenSub[i] for i in sindex]
+fwhm_sorted=[FWHMSub[i] for i in sindex]
+energy_sorted=[energy[i] for i in sindex]
+
+for i, x in enumerate(x_sorted):
+	line=("{:5d} {:9.3f} {:9.3f} {:6.2f}  {:7.0f} {:7.2f} ".format(i, x, y_sorted[i], fwhm_sorted[i], peaks_sorted[i], energy_sorted[i]))
 	if energy[i] < min_energy:
 		line=line+'*'
-	print(line)	
-#print(" Spot  x         y          FWHM    Peak       Bias        Mag")
-#for i, x in enumerate(xCenSub):
-#	print("{:5d} {:9.3f} {:9.3f} {:7.3f}   {:9.3f} {:9.3f}   {:7.3f} ".format(i, x, yCenSub[i], FWHMSub[i], peaks[i], bias[i],magnitude(peaks[i],bias[i])))
+	print(line)
+
+print("Min peak   : {:8.2f} ".format(min(peaks_sorted)))
+print("Max peak   : {:8.2f} ".format(max(peaks_sorted)))
+print("Mean peak  : {:8.2f} ".format(np.mean(peaks_sorted)))
+print("Sigma peak : {:8.2f} ".format(np.std(peaks_sorted)))
 
 # write region file
 with open('region.reg','w') as fp:
