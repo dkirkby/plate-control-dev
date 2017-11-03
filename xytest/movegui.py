@@ -24,6 +24,7 @@ MoveGUI
 """
 import os
 import sys
+import datetime
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
@@ -119,7 +120,7 @@ class MoveGUI(object):
         Label(gui_root,text="Rotation Angel").grid(row=0,column=0)
         self.e1=Entry(gui_root)
         self.e1.grid(row=0,column=1)
-        self.e1.insert(0,'180')
+        self.e1.insert(0,'190')
         
         Label(gui_root,text="Set Fiducial").grid(row=0,column=2)
         self.e2=Entry(gui_root)
@@ -174,9 +175,11 @@ class MoveGUI(object):
         yscroll_text2.grid(row=6, column=6, rowspan=20,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)     
         self.text2=Text(gui_root,height=30,width=38)
         self.text2.grid(row=6,column=5,columnspan=2,rowspan=20,sticky=W+E+N+S,pady=4,padx=15)
-        self.text2.tag_configure('bold_italics', font=('Arial', 10, 'bold', 'italic'))
-        self.text2.tag_configure('big', font=('Verdana', 10, 'bold','bold'))
-        self.text2.tag_configure('color', foreground='#476042', font=('Tempus Sans ITC', 10, 'bold'))
+        self.text2.tag_configure('bold_italics', font=('Arial', 12, 'bold', 'italic'))
+        self.text2.tag_configure('big', font=('Verdana', 12, 'bold','bold'))
+        self.text2.tag_configure('green', foreground='#476042', font=('Tempus Sans ITC', 12, 'bold'))
+        self.text2.tag_configure('red', foreground='#ff0000', font=('Tempus Sans ITC', 12, 'bold'))
+        self.text2.tag_configure('yellow', foreground='#ffff00', font=('Tempus Sans ITC', 12, 'bold'))
         self.text2.configure(yscrollcommand=yscroll_text2.set)   
         yscroll_text2.config(command=self.text2.yview)
         
@@ -203,6 +206,7 @@ class MoveGUI(object):
         self.e3.grid(row=8,column=column_entry+1)
         Label(gui_root,text="Send PFA Date").grid(row=9,column=column_entry)
         self.e4=Entry(gui_root)
+        self.e4.insert(END,'{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
         self.e4.grid(row=9,column=column_entry+1)
         Label(gui_root,text="Send PFA Name").grid(row=10,column=column_entry)
         self.e5=Entry(gui_root)
@@ -343,6 +347,8 @@ class MoveGUI(object):
 
     def load_acceptance_traveller(self):
         self.text2.delete('0.0', END)
+        self.e4.delete(0, END)
+        self.e4.insert(END,'{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
         if self.selected_can == 20000:
             self.text2.insert('0.0','Cannot load all positioners simultaneously. \nSelect one positioner.\n')
         else: 
@@ -359,15 +365,41 @@ class MoveGUI(object):
                 col_id=ind[0][0]+column_skip+1
                 column_info=googlesheets.read_col(self.sheet2,col_id,False)
                 column_info_title=googlesheets.read_col(self.sheet2,2,False)
+                ref_list=['', '', '', '', '', '', '', '', '', '', '', '', '', 'A', '', 'A', '', '', '', '', '', 'Y', 'Y', 'Y', 'B', 'B', 'N', 'Y', 'N', 'Y', 'N', 'Y', 'N', 'N', 'Y', 'Y', 'A', '', '', '', '', 'P', '', '', '', '', '', '', 'Y', 'Y', 'Y', 'Y', '', '', '', '', '', '', '', '', '', '', '', '', '', '','']
+                #['', '', '', '2017-10-23', '', '1748', '5899', '', '', 'John Mourelatos', '2017-10-23', '', '1.15', 'A', '4.3', 'A', '', '', '', 'John Mourelatos', '2017-10-23', 'Y', 'Y', 'Y', 'B', 'B', 'N', 'Y', 'N', 'Y', 'N', 'Y', 'N', 'N', 'Y', 'Y', 'A', '', '', 'John Mourelatos', '2017-10-23', 'P', '0.00997', '0.12588', 'SKIP', 'SKIP', '', '', 'Y', 'Y', 'Y', 'Y', '', '', '', '', '0.13585', '', 'YES', '', '', '', '2017-11-03', 'KAI ZHANG', 'GREY TOTE\n---------\nREADY FOR PFA INSTALL', 'KZ']
+                 
                 for i in range(len(column_info)):
-                    self.text2.insert(END,str(column_info_title[i])+': ','big')
-                    self.text2.insert(END,str(column_info[i])+'\n','color')
-            
+                    if ref_list[i] == '' or column_info[i] == ref_list[i]:
+                        if column_info_title[i] == 'DOCUMENT_DEVIATION' and column_info[i] != '':
+                            self.text2.insert(END,str(column_info_title[i])+': ','big')
+                            self.text2.insert(END,str(column_info[i])+'\n','yellow')
+                        elif column_info_title[i] == 'ENVELOPE_GAGE' and column_info[i] in ['C','D']:
+                            self.text2.insert(END,str(column_info_title[i])+': ','big')
+                            self.text2.insert(END,str(column_info[i])+'\n','red')
+                        elif column_info_title[i] == 'ENVELOPE_GAGE' and column_info[i] == '':
+                            self.text2.insert(END,str(column_info_title[i])+': ','yellow')                        
+                        elif column_info_title[i] == 'THETA_PHI_ANGLE' and float(column_info[i])>0.5:
+                            self.text2.insert(END,str(column_info_title[i])+': ','big')
+                            self.text2.insert(END,str(column_info[i])+'\n','red')
+                        elif column_info_title[i] == 'FERRULE_PHI_ANGLE' and float(column_info[i])>0.5:
+                            self.text2.insert(END,str(column_info_title[i])+': ','big')
+                            self.text2.insert(END,str(column_info[i])+'\n','red')
+                        elif column_info_title[i] == 'COMBINED_ANGLE' and float(column_info[i])>0.5:
+                            self.text2.insert(END,str(column_info_title[i])+': ','big')
+                            self.text2.insert(END,str(column_info[i])+'\n','red')
+                        else:
+                            self.text2.insert(END,str(column_info_title[i])+': ','big')
+                            self.text2.insert(END,str(column_info[i])+'\n','green')
+                    else:
+                        self.text2.insert(END,str(column_info_title[i])+': ','big')
+                        self.text2.insert(END,str(column_info[i])+'\n','red')
         
         
         
     def write_acceptance_traveller(self):
         self.text2.delete('0.0', END)
+        self.e4.delete(0, END)
+        self.e4.insert(END,'{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
         if self.selected_can == 20000:
             self.text2.insert('0.0','Cannot write all positioners simultaneously for safety reason. \nSelect one positioner.\n')
         else: 
@@ -409,11 +441,7 @@ class MoveGUI(object):
                     googlesheets.write(self.sheet2,64,col_id,'No',False,False)
                     googlesheets.write(self.sheet2,65,col_id,self.box_goto.get(),False,False)
                     googlesheets.write(self.sheet2,66,col_id,self.e6.get(),False,False)
-                column_info=googlesheets.read_col(self.sheet2,col_id,False)
-                column_info_title=googlesheets.read_col(self.sheet2,2,False)
-                for i in range(len(column_info)):
-                    self.text2.insert(END,str(column_info_title[i])+': ','big')
-                    self.text2.insert(END,str(column_info[i])+'\n','color')
+                self.load_acceptance_traveller()
     
     
     def restart(self):
