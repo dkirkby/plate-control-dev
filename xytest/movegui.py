@@ -179,7 +179,7 @@ class MoveGUI(object):
         self.text2.tag_configure('big', font=('Verdana', 12, 'bold','bold'))
         self.text2.tag_configure('green', foreground='#476042', font=('Tempus Sans ITC', 12, 'bold'))
         self.text2.tag_configure('red', foreground='#ff0000', font=('Tempus Sans ITC', 12, 'bold'))
-        self.text2.tag_configure('yellow', foreground='#ffff00', font=('Tempus Sans ITC', 12, 'bold'))
+        self.text2.tag_configure('yellow', background='#ffff00', font=('Tempus Sans ITC', 12, 'bold'))
         self.text2.configure(yscrollcommand=yscroll_text2.set)   
         yscroll_text2.config(command=self.text2.yview)
         
@@ -390,6 +390,9 @@ class MoveGUI(object):
                             elif float(column_info[i])>0.5:
                                 self.text2.insert(END,str(column_info_title[i])+': ','big')
                                 self.text2.insert(END,str(column_info[i])+'\n','red')
+                            else:
+                                self.text2.insert(END,str(column_info_title[i])+': ','big')
+                                self.text2.insert(END,str(column_info[i])+'\n','green')
                         else:
                             self.text2.insert(END,str(column_info_title[i])+': ','big')
                             self.text2.insert(END,str(column_info[i])+'\n','green')
