@@ -385,8 +385,8 @@ class MoveGUI(object):
                             self.text2.insert(END,str(column_info_title[i])+': ','big')
                             self.text2.insert(END,str(column_info[i])+'\n','red')
                         elif column_info_title[i] == 'COMBINED_ANGLE':
-                            if column_info == '':
-                               self.text2.insert(END,str(column_info_title[i])+': ','yellow') 
+                            if column_info[i] == '':
+                               self.text2.insert(END,str(column_info_title[i])+': \n','yellow') 
                             elif float(column_info[i])>0.5:
                                 self.text2.insert(END,str(column_info_title[i])+': ','big')
                                 self.text2.insert(END,str(column_info[i])+'\n','red')
