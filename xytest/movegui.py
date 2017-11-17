@@ -27,7 +27,7 @@ import sys
 import datetime
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
-sys.path.append(os.path.abspath('../../positioner_logs/data_processing_scripts/'))
+sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
 import fvchandler
 import petal
 import petalcomm
@@ -72,10 +72,10 @@ class MoveGUI(object):
 
         # Load Travellers
         url1='https://docs.google.com/spreadsheets/d/1lJ9GjhUUsK2SIvXeerpGW7664OFKQWAlPqpgxgevvl8/edit#gid=0' # PosID, SiID database
-        self.sheet1=googlesheets.connect_by_url(url1,credentials = '../../positioner_logs/data_processing_scripts/google_access_account.json')
+        self.sheet1=googlesheets.connect_by_url(url1,credentials = '../../../positioner_logs/data_processing_scripts/google_access_account.json')
      
         url2='https://docs.google.com/spreadsheets/d/19Aq-28qgODaaX9wH-NMsX_GiuNyXG_6rjIjPVLb8aYw/edit#gid=795996596' # Acceptance Traveller
-        self.sheet2=googlesheets.connect_by_url(url2,credentials = '../../positioner_logs/data_processing_scripts/google_access_account.json')
+        self.sheet2=googlesheets.connect_by_url(url2,credentials = '../../../positioner_logs/data_processing_scripts/google_access_account.json')
         
         
         mainloop()
@@ -95,10 +95,11 @@ class MoveGUI(object):
         self.bus_id=canbus
         self.info = self.pcomm.get_posfid_info(canbus)
         self.posids = []
+        print(self.info)
         for key in sorted(self.info.keys()):
             if len(str(key))==2:
                 self.posids.append('M000'+str(key)) 
-	    elif len(str(key))==3:
+            elif len(str(key))==3:
                 self.posids.append('M00'+str(key))
             elif len(str(key))==4:
                 self.posids.append('M0'+str(key))
