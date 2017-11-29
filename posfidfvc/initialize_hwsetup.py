@@ -390,7 +390,7 @@ if should_commit_to_svn:
 			loc_repo.commit(commit_message,flist)
 		except:
 			import datetime
-			today = datetime.datetime.now()
+			now = datetime.datetime.now()
 			datestr= now.strftime('%y%m%d:%H:%M')
 			xfer_file=	'svnxfer_'+datestr+'.lst'
 			print("Automated SVN commit failed - please transfer files manually.")
