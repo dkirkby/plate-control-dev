@@ -72,9 +72,9 @@ print("Sigma peak : {:8.2f} ".format(np.std(peaks_sorted)))
 
 # write region file
 with open('region.reg','w') as fp:
-	for i, x in enumerate(xCenSub):
+	for i, x in enumerate(x_sorted):
 		#print("{:5d} {:9.3f} {:9.3f} {:7.3f}   {:9.3f} {:9.3f}   {:7.3f} ".format(i, x, yCenSub[i], FWHMSub[i], peaks[i], bias[i],magnitude(peaks[i],bias[i])))
-		fp.write('circle '+ "{:9.3f} {:9.3f} {:7.3f} \n".format(x+1, yCenSub[i]+1, FWHMSub[i]/2.))
+		fp.write('circle '+ "{:9.3f} {:9.3f} {:7.3f} \n".format(x+1, y_sorted[i]+1, fwhm_sorted[i]/2.))
 		text='"'+str(i)+'"'
-		fp.write('text '+ "{:9.3f} {:9.3f} {:s} \n".format(x+1+5, yCenSub[i]+1+5, text))
+		fp.write('text '+ "{:9.3f} {:9.3f} {:s} \n".format(x+1+5, y_sorted[i]+1+5, text))
 #print("time: "+str(t))
