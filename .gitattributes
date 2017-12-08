@@ -1,20 +1,27 @@
 * text=auto !eol
 bin/petal -text
 bin/petalcontroller -text
+petal/bidirect_astar.py -text
+petal/create_locations.py -text
 petal/deprecated_posanticollision.py -text
 petal/focal_surface_lookup.csv -text
 petal/petal.py -text
 petal/petalcomm.py -text
 petal/petaltransforms.py -text
 petal/petsockcomm.py -text
+petal/playground.py -text
+petal/posanticol_aux.py -text
 petal/poscollider.py -text
 petal/posconstants.py -text
 petal/posmodel.py -text
 petal/posmovetable.py -text
 petal/posplot.py -text
 petal/posschedule.py -text
+petal/posschedule_test.py -text
 petal/posstate.py -text
 petal/postransforms.py -text
+petal/simple_anticoltest.py -text
+petal/test_graph.py -text
 petal/tests_and_demos/demo.py -text
 petal/tests_and_demos/fiberlife.py -text
 petal/tests_and_demos/gtorque_test.py -text
