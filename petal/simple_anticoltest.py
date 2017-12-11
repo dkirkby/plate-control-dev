@@ -3,6 +3,9 @@ import os
 basepath = os.path.abspath('../')
 logdir = os.path.abspath(os.path.join(basepath,'positioner_logs'))
 allsetdir = os.path.abspath(os.path.join(basepath,'fp_settings'))
+if 'HOME' not in os.environ.keys():
+    os.environ['HOME'] = basepath
+tempdir = os.environ.get('HOME') + os.path.sep + 'fp_temp_files' + os.path.sep
 if not os.path.exists(logdir):
     os.makedirs(logdir)
     os.makedirs(os.path.join(logdir,'move_logs'))
@@ -10,6 +13,8 @@ if not os.path.exists(logdir):
     os.makedirs(os.path.join(logdir,'pos_logs'))
 if not os.path.exists(allsetdir):
     os.makedirs(allsetdir)
+if not os.path.exists(tempdir):
+    os.makedirs(tempdir)
 if 'POSITIONER_LOGS_PATH' not in os.environ:
     os.environ['POSITIONER_LOGS_PATH'] = logdir
 if 'PETAL_PATH' not in os.environ:
