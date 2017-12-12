@@ -40,6 +40,7 @@ class PosState(object):
             self.settings_directory = pc.dirs['temp_files']
             comment = 'Temporary settings file for software test purposes, not associated with a particular unit.'
         unit_filename = self.settings_directory + self.unit_basename + '.conf'
+        print(self.settings_directory,self.logs_directory,self.unit_basename,template_directory,unit_filename)
         if not(os.path.isfile(unit_filename)):
             temp_filename = template_directory + '_unit_settings_DEFAULT.conf' # read in the template file
             self.unit = configobj.ConfigObj(temp_filename,unrepr=True,encoding='utf-8')

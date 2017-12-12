@@ -503,9 +503,16 @@ class PosSchedule(object):
         tss = np.asarray(tpss[:,pc.T])
         pss = np.asarray(tpss[:,pc.P])
         tfs = np.asarray(tpfs[:,pc.T])
-        pfs = np.asarray(tpfs[:,pc.P]) 
+        pfs = np.asarray(tpfs[:,pc.P])
 
-        col_ind_array = np.sort(np.unique(collision_indices))
+        all_numeric_indices = []
+        for a,b in collision_indices:
+            if a is not None:
+                all_numeric_indices.append(a)
+            if b is not None:
+                all_numeric_indices.append(b)
+
+        col_ind_array = np.sort(np.unique(all_numeric_indices))
         #pdb.set_trace()
         starting_anticol_theta = tfs.copy()
         starting_anticol_phi = pfs.copy()

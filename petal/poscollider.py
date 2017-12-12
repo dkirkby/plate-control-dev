@@ -3,6 +3,7 @@ import posconstants as pc
 import postransforms
 import posplot
 import configobj
+import os
 
 class PosCollider(object):
     """PosCollider contains geometry definitions for mechanical components of the
@@ -11,11 +12,14 @@ class PosCollider(object):
 
     See DESI-0899 for geometry specifications, illustrations, and kinematics.
     """
-    def __init__(self, configfile=''):
+    def __init__(self, configfile=None):
         # load up a configobj from _collision_settings_DEFAULT.conf, in pc.settings_directory
-        if not(configfile):
-            configfile = '_collision_settings_DEFAULT.conf'
-        filename = pc.dirs['collision_settings'] + configfile
+        if configfile is None:
+            defaultconfigfile = '_collision_settings_DEFAULT.conf'
+            filename = os.path.join(pc.dirs['collision_settings'],defaultconfigfile)
+        else:
+            filename = os.path.join(pc.dirs['collision_settings'],configfile)
+        print(filename)
         self.config = configobj.ConfigObj(filename,unrepr=True)
         self.posmodels = []
         self.pos_neighbor_idxs = [] # indexes of all the positioners surround a given positioner
