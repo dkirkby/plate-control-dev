@@ -590,6 +590,10 @@ class PosSchedule(object):
                 unchangings =[None]
                 
             for changing, unchanging in zip(changings,unchangings):
+                if len(tpfs[changing])< 2:
+                    print(tpfs[changing])
+                elif len(tpss[unchanging])<2:
+                    print(tpss[unchanging])
                 if self.collider.spatial_collision_between_positioners(changing, unchanging, \
                         tpfs[changing], tpss[unchanging]) != pc.case.I:
                     if self.anticol.verbose:
@@ -848,7 +852,7 @@ class PosSchedule(object):
             print("Max times to start are: ",maxtime)
                 # After all collision avoidances attempted. Return the new list of movetables
         import time
-        with open('../../outputs/run_results__{0}.csv'.format(str(time.time()).split('.')[0]),'w') as runresultsfile:
+        with open('../outputs/run_results__{0}.csv'.format(str(time.time()).split('.')[0]),'w') as runresultsfile:
             keys = np.sort(list(run_results.keys()))
             line = ''
             for key in keys:

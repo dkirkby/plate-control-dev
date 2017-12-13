@@ -3,6 +3,8 @@ import os
 basepath = os.path.abspath('../')
 logdir = os.path.abspath(os.path.join(basepath,'positioner_logs'))
 allsetdir = os.path.abspath(os.path.join(basepath,'fp_settings'))
+outputsdir = os.path.abspath(os.path.join(basepath,'outputs'))
+figdir = os.path.abspath(os.path.join(basepath,'figures'))
 if 'HOME' not in os.environ.keys():
     os.environ['HOME'] = basepath
 tempdir = os.environ.get('HOME') + os.path.sep + 'fp_temp_files' + os.path.sep
@@ -11,10 +13,10 @@ if not os.path.exists(logdir):
     os.makedirs(os.path.join(logdir,'move_logs'))
     os.makedirs(os.path.join(logdir,'test_logs'))
     os.makedirs(os.path.join(logdir,'pos_logs'))
-if not os.path.exists(allsetdir):
-    os.makedirs(allsetdir)
-if not os.path.exists(tempdir):
-    os.makedirs(tempdir)
+for direct in [allsetdir,tempdir,outputsdir,figdir]:
+    if not os.path.exists(direct):
+        os.makedirs(direct)
+
 if 'POSITIONER_LOGS_PATH' not in os.environ:
     os.environ['POSITIONER_LOGS_PATH'] = logdir
 if 'PETAL_PATH' not in os.environ:
@@ -33,91 +35,82 @@ from astropy.table import Table
 import pdb
 
 import pickle as pkl
-curnposs = 100#120  
+curnposs = 20#120
 #np_fil = 500
 size_vals = np.asarray([100,200,300,400,500])
 nrandtploops = 1#30
 nloops = 1#4 # warning that the npos will go as ( ( nloop_iter + 1 ) * curnposs )!!!
 
 def run_random_example(nposs):
-    # hack
-    #if nposs in size_vals:
-    #    justload = True
-    #elif nposs < 100:
-    #    justload = False
-    #else:
-    #    nposs = size_vals[np.argmin(np.abs(size_vals-nposs))]
-    #    justload = True
-    justload = False    
-    pos_locs = os.path.join(os.path.abspath(os.path.curdir),'positioner_locations.csv')
-    locs = Table.read(pos_locs,format='ascii.csv')
-    positioners = locs[((locs['type']!='NON')&(locs['type']!='OPT'))]
+    #files_exist = os.path.exists(os.path.join(logdir,'pos_logs','unit_temp0'+('%03d' % (nposs-1))+'_log_00000001.csv'))
+    if os.sys.platform == 'win32' or os.sys.platform == 'win64':
+        delcom = 'del'
+    else:
+        delcom = 'rm'
+    for subdir in ['pos_logs','fid_logs']:
+        os.system('{} {}'.format(delcom, os.path.join(logdir, subdir, 'unit_temp0*')))
+    for subdir in ['pos_settings','fid_settings']:
+        os.system('{} {}'.format(delcom, os.path.join(allsetdir, subdir, 'unit_temp0*')))
 
-    postype = np.asarray(positioners['type'])#[:nposs])
-    idnams = np.asarray(['temp'+str(i).zfill(4) for i in range(postype.size)])
-    pos_idnams = idnams[postype=='POS'][:nposs].tolist()
-    last_ind = np.where(idnams == pos_idnams[-1])[0][0]
-    fid_idnams = idnams[((postype=='FIF')|(postype=='GIF'))][:last_ind].tolist()
+    justload = False
+    platenum = 3
+    pos_locs = os.path.join(allsetdir,'positioner_locations_0530v12.csv')
+    positioners = Table.read(pos_locs,format='ascii.csv',header_start=2,data_start=3)
+    #positioners = locs[((locs['device_type']=='POS')|(locs['device_type']=='FIF')|(locs['type']=='GIF'))]
 
-    #files_exist = os.path.exists(os.path.join(logdir,'pos_logs','unit_temp0'+('%03d' % (nposs-1))+'_log_00000001.csv'))     
-    os.system('rm ../positioner_logs/pos_logs/unit_temp0*')
-    os.system('rm ../positioner_logs/fid_logs/unit_temp0*')
-    os.system('rm ../fp_settings/pos_settings/unit_temp0*')
-    os.system('rm ../fp_settings/fid_settings/unit_temp0*')
-    curpetal = petal.Petal(petal_id='1',posids=pos_idnams,fidids=fid_idnams,simulator_on=True,verbose=True)  
+    postype = np.asarray(positioners['device_type'])#[:nposs])
+    last_posid = positioners['device_location_id'][postype == 'POS'][:nposs][-1]
+    last_ind = np.where(positioners['device_location_id'] == last_posid)[0][0]
+    cutlist_positioners = positioners[:(last_ind+1)]
+    del postype,last_posid,last_ind
+
+    temproot = 'temp{}'.format(platenum)
+    idnams = np.asarray(['{}{:03d}'.format(temproot,int(nam)) for nam in cutlist_positioners['device_location_id']])
+    cutpostype = cutlist_positioners['device_type']
+    pos_idnams = idnams[cutpostype=='POS']
+    fid_idnams = idnams[((cutpostype=='FIF')|(cutpostype=='GIF'))]
+
+    curpetal = petal.Petal(petal_id=str(platenum),posids=pos_idnams.tolist(),fidids=fid_idnams.tolist(),simulator_on=True,verbose=True)
        
     #if not files_exist:
     pit = 0
     for row in positioners:
-        idnam,typ,xloc,yloc = row
         if pit == nposs:
             break
+        idnam, typ, xloc, yloc, zloc, qloc, rloc, sloc = row
         if typ == 'POS':
-            state = curpetal.posmodels[pit].state
+            model = curpetal.posmodels[pit]
+            transform = model.trans
+            x_off,y_off = transform.QS_to_obsXY([float(qloc),float(sloc)])
+            #print(x_off,x_off-float(xloc),y_off,y_off-float(yloc))
+            state = model.state
             state.store('OFFSET_X',xloc)
             state.store('OFFSET_Y',yloc)
             state.store('OFFSET_T',0)
             state.store('OFFSET_P',0)
             state.write()  
             pit += 1
-        elif typ == 'FIF' and typ == 'GIF':
-            fidnam = idnams[int(idnam)]
-            state = curpetal.fidstates[fidnam]
-            state.store('OFFSET_X',xloc)
-            state.store('OFFSET_Y',yloc)
-            state.store('OFFSET_T',0)
-            state.store('OFFSET_P',0)
+        elif typ == 'FIF' or typ == 'GIF':
+            fidid = '{}{:03d}'.format(temproot,int(idnam))
+            state = curpetal.fidstates[fidid]
+            state.store('Q',float(qloc))
+            state.store('S',float(sloc))
             state.write()  
         else:
-            print("The type didn't match fiducial or positioner!")
+            print("Type {} didn't match fiducial or positioner!".format(typ))
 
-        
-    #if not justload:
-    collider = poscollider.PosCollider()
-    collider.add_positioners(curpetal.posmodels)
-    curpetal.collider = collider
-    #xvals = np.array([curpetal.collider.posmodels[i].state.read('OFFSET_X') for i in range(len(curpetal.collider.posmodels))])
-    #yvals = np.array([curpetal.collider.posmodels[i].state.read('OFFSET_Y') for i in range(len(curpetal.collider.posmodels))])
-    #xv = xvals.reshape(xvals.shape[0],1)
-    #xg = xv-xv.T
-    #xg[np.diag_indices(xvals.shape[0])] = 99
-    #xlocs = np.where(xg==0)
-    #yv = yvals.reshape(yvals.shape[0],1)
-    #yg = yv-yv.T
-    #yg[np.diag_indices(yvals.shape[0])] = 99
-    #ylocs = np.where(yg==0)    
-    #pdb.set_trace()
-    #pdb.set_trace()
-    #keep_going = 'T'
-    #while (keep_going.upper() == 'T' or keep_going.upper() == 'Y'):
+    #collider = poscollider.PosCollider()
+    #collider.add_positioners(curpetal.posmodels)
+    #curpetal.collider = collider
+
     for i in range(nrandtploops): 
         if justload:
             rand2 = np.random.randint(low=0,high=19,size=1)[0]
             rand3 = np.random.randint(low=0,high=9,size=1)[0]
             tpstarts,tpfins = load_random_state('./tpsets/randomtpsets_nps-'+str(nposs)+'__'+str(rand2)+'.pkl',rand3)
         else:
-            tpstarts = create_random_state_opt(collider,curpetal.posmodels,typ= 'posTP')
-            tpfins = create_random_state_opt(collider,curpetal.posmodels,typ= 'obsTP')
+            tpstarts = create_random_state_opt(curpetal.collider,curpetal.posmodels,typ= 'posTP')
+            tpfins = create_random_state_opt(curpetal.collider,curpetal.posmodels,typ= 'obsTP')
             
         if len(tpstarts) != len(pos_idnams):
             print("ID names should be same length as generated tpstarts")
@@ -126,12 +119,14 @@ def run_random_example(nposs):
         #commands = ['obsTP']*itternum#len(pos_idnams)
         request_dict = {}
         for itter,idn in enumerate(pos_idnams):
-            curpetal.posmodels[itter].state.store('POS_T',tpstarts[itter][0])
-            curpetal.posmodels[itter].state.store('POS_P',tpstarts[itter][1])
-            curpetal.posmodels[itter].state.write()
+            state = curpetal.posmodels[itter].state
+            state.store('POS_T',tpstarts[itter][0])
+            state.store('POS_P',tpstarts[itter][1])
+            state.write()
             #request_dict[idn] = {'command':commands[itter],'target':tpfins[itter]}
             request_dict[idn] = {'command':'obsTP','target':tpfins[itter]}
         #pdb.set_trace()
+        print(pos_idnams,fid_idnams)
         curpetal._clear_schedule()
         curpetal.request_targets(request_dict)
         

@@ -19,7 +19,6 @@ class PosCollider(object):
             filename = os.path.join(pc.dirs['collision_settings'],defaultconfigfile)
         else:
             filename = os.path.join(pc.dirs['collision_settings'],configfile)
-        print(filename)
         self.config = configobj.ConfigObj(filename,unrepr=True)
         self.posmodels = []
         self.pos_neighbor_idxs = [] # indexes of all the positioners surround a given positioner
