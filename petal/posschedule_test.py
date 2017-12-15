@@ -549,7 +549,8 @@ class PosSchedule(object):
         # self.collider.ferrule_poly
 
 
-        run_results = {'tpstart':[],'tpgoal':[],'idx_changing':[],'idx_unchanging':[],'case':[],'movetype':[],'heuristic':[],'weight':[],'pathlength_full':[np.nan],'pathlength_condensed':[],'found_path':[]}#'avoided_collision':[]                 
+        run_results = {'tpstart':[],'tpgoal':[],'idx_changing':[],'idx_unchanging':[],'case':[],'movetype':[],\
+                       'heuristic':[],'weight':[],'pathlength_full':[np.nan],'pathlength_condensed':[],'found_path':[]}#'avoided_collision':[]
 
         ## For each collision, check what type it is and try to resolve it
         for current_collision_indices,collision_type in zip(collision_indices,collision_types):
@@ -564,62 +565,85 @@ class PosSchedule(object):
                 if self.anticol.verbose:
                     print("\n\nCollision was claimed, but case is non-collision Case I")
                 continue
-            elif collision_type == pc.case.II:
-                if self.anticol.verbose:
-                    print("\n\nSolving phi-phi collision!\n")
-                ## change larger phi since it has less distance to travel before safety
-                if starting_anticol_phi[A] > starting_anticol_phi[B]:
-                    changings = [A,B]
-                    unchangings = [B,A]
-                else:
-                    changings = [B,A]
-                    unchangings = [A,B]              
-            elif collision_type == pc.case.IIIA:
-                if self.anticol.verbose:
-                    print("\n\nSolving phi-theta collision!\n")
+            elif collision_type in [pc.case.II,pc.case.IIIA,pc.case.IIIB]:
+                if collision_type == pc.case.II:
+                    if self.anticol.verbose:
+                        print("\n\nSolving phi-phi collision!\n")
+                    ## change larger phi since it has less distance to travel before safety
+                    if starting_anticol_phi[A] > starting_anticol_phi[B]:
+                        changings = [A,B]
+                        unchangings = [B,A]
+                    else:
+                        changings = [B,A]
+                        unchangings = [A,B]
+                elif collision_type == pc.case.IIIA:
+                    if self.anticol.verbose:
+                        print("\n\nSolving phi-theta collision!\n")
+                    changings = [A]
+                    unchangings = [B] ## Theta Fiber
+                elif collision_type == pc.case.IIIB:
+                    if self.anticol.verbose:
+                        print("\n\nSolving theta-phi collision!\n")
+                    changings = [B]
+                    unchangings = [A] ## Theta fiber
+                init_type = self.collider.spatial_collision_between_positioners(A, B, tpss[A], tpss[B])
+                if init_type != pc.case.I:
+                    if self.anticol.verbose:
+                        print("The current situation can't be resolved in this configuration, as the initial " + \
+                              "location overlaps with a neighboring positioner.")
+                    continue
+                for changing, unchanging in zip(changings, unchangings):
+                    fin_type = self.collider.spatial_collision_between_positioners(changing, unchanging, tpfs[changing], tpss[unchanging])
+                    if fin_type != pc.case.I:
+                        if self.anticol.verbose:
+                            print("The current situation can't be resolved in this configuration, as the final " + \
+                                  "goal overlaps with a neighboring positioner.")
+                        changings.remove(changing)
+                        unchangings.remove(unchanging)
+                if len(changings) == 0:
+                    continue
+            elif collision_type in [pc.case.GFA,pc.case.PTL]:
+                ## Test for problems in starting or finishing location
+                init_type = self.collider.spatial_collision_with_fixed(A, tpss[A])
+                fin_type = self.collider.spatial_collision_with_fixed(A, tpfs[A])
+                if init_type != pc.case.I:
+                    if self.anticol.verbose:
+                        print("The current situation can't be resolved in this configuration, as the initial " + \
+                              "location overlaps with a GFA or petal boundary")
+                    continue
+                elif fin_type != pc.case.I:
+                    if self.anticol.verbose:
+                        print("The current situation can't be resolved in this configuration, as the final " + \
+                              "goal overlaps with a GFA or petal boundary")
+                    continue
+                ## Verbosely tell what kind of collision we're about to resolve
+                if collision_type == pc.case.GFA:
+                    if self.anticol.verbose:
+                        print("\n\nSolving GFA\n")
+                elif collision_type == pc.case.PTL:
+                    if self.anticol.verbose:
+                        print("\n\nSolving Petal\n")
+                ## Assign lists of indices for use in upcoming for loop
                 changings = [A]
-                unchangings = [B]
-            elif collision_type == pc.case.IIIB:
-                if self.anticol.verbose:
-                    print("\n\nSolving theta-phi collision!\n")
-                changings = [B]
-                unchangings = [A]
-            elif collision_type == pc.case.GFA:
-                print("\n\nSolving GFA\n")
-                changings = [A]
-                unchangings = [B]
-            elif collision_type == pc.case.PTL:
-                print("\n\nSolving Petal\n")
-                changings = [A]
-                unchangings =[None]
-                
+                unchangings =[B] ## B is None
+
+            ## Loop over posibilities of which positioner moves and which is stationary
             for changing, unchanging in zip(changings,unchangings):
                 if changing in neighbor_ofaltered:
                     continue
-                elif len(tpfs[changing])< 2:
-                    print(tpfs[changing])
-                    #continue
-                elif len(tpss[unchanging])<2:
-                    print(tpss[unchanging])
-                    #continue
-                elif self.collider.spatial_collision_between_positioners(changing, unchanging, \
-                        tpfs[changing], tpss[unchanging]) != pc.case.I:
-                    if self.anticol.verbose:
-                        print("The current situation can't be resolved in this configuration, as the final goal overlaps with the colliding positioners current place")
-                    continue
+
                 ## Get the posmodel of the positioner we'll be working with
                 ## and info about it's neighbors
                 changing_posmodel = posmodels[changing]
                 neighbor_idxs = self.collider.pos_neighbor_idxs[changing]
                 fixed_neighbors = self.collider.fixed_neighbor_cases[changing]
 
-                skip_this_loop = False
-                for pos_neighb in neighbor_idxs:
-                    if pos_neighb in altered_pos:
-                        skip_this_loop = True
-                        break
-                if skip_this_loop:
+                posit_neighs = set(neighbor_idxs)
+                altered_posits = set(altered_pos)
+                intersection = posit_neighs.intersection(altered_posits)
+                if len(intersection)>0:
                     continue
+                del posit_neighs, altered_posits, intersection
     
                 ## Set a boolean if the petal is something we need to avoid
                 avoid_petal = (pc.case.PTL in fixed_neighbors)
@@ -627,11 +651,15 @@ class PosSchedule(object):
                 ## if we collided with a positioner. Make sure the positioner is a neighbor
                 ## otherwise something strange has happened
                 if unchanging != None and unchanging not in neighbor_idxs:
-                    print("Make sure the neighbor includes the position that it supposedly collided with")
+                    if self.anticol.verbose:
+                        print("Make sure the neighbors include the the positioner that it supposedly collided with. Adding posnum {}".format(unchanging))
                     neighbor_idxs = np.append(neighbor_idxs,unchanging)
                 if changing in neighbor_idxs:
-                    print('The positioner claims to have itself as a neighbor?')
-                    pdb.set_trace()
+                    if self.anticol.verbose:
+                        print('The positioner claims to have itself as a neighbor? posnum {}'.format(changing))
+                        pdb.set_trace()
+                    else:
+                        continue
                 #nidxs = neighbor_idxs
                 #for i,idx in enumerate(neighbor_idxs[:-1]):
                 #    for j,idx2 in enumerate(neighbor_idxs[i+1:]):
@@ -783,18 +811,8 @@ class PosSchedule(object):
     
                 ## Convert steps into a new movetable
                 new_changing_table = posmovetable.PosMoveTable(changing_posmodel)
-                new_unchange_table = posmovetable.PosMoveTable(posmodels[unchanging])
                 old_changing_table = tables[changing]
-                old_unchange_table = tables[unchanging]
-                #new_table.set_move(0, pc.T, 0)
-                #new_table.set_move(0, pc.P, 0)
-                #new_table.set_prepause(0, maxtimes)
-                #new_table.set_postpause(0,0)               
-                #new_unchange_table.set_move(0,pc.T,0)
-                #new_unchange_table.set_prepause(0, maxtimes)
-                #new_unchange_table.extend(old_unchange_table)
-                new_unchange_table.rows = old_unchange_table.rows.copy()
-                new_unchange_table.set_prepause(0,new_unchange_table.rows[0].data['prepause']+maxtimes)
+
                 ## if length 1, create with one step.
                 ## else length > 1, add all steps
                 if np.isscalar(dts):
@@ -804,6 +822,7 @@ class PosSchedule(object):
                     new_changing_table.set_move(0, pc.P, dps)
                     new_changing_table.set_prepause(0, 0)
                     new_changing_table.set_postpause(0,times)
+                    itter = 1
                 else:
                     if self.anticol.verbose:
                         print("Number of rows in the new version of the table is: %d" % dts.size)
@@ -814,12 +833,16 @@ class PosSchedule(object):
                         new_changing_table.set_postpause(itter,time)
                         new_changing_table.set_prepause(itter, 0.0)
                         itter += 1
-                new_changing_table.set_prepause(0, maxtimes)        
+
                 ## Replace the old table with the newly created one
                 newmovetime = new_changing_table.for_schedule['move_time'][dts.size-1]
+                maxstalltime = np.max(stallmovetimes)
+
                 tables[changing] = new_changing_table
-                tables[unchanging] = new_unchange_table
-                
+
+                for i, table in zip(np.arange(len(neighbor_idxs)),tables[neighbor_idxs]):
+                    table.set_prepause(0, newmovetime)
+
                 indices, coltype = self._check_single_positioner_for_collisions(tpss,tables,changing)
                 if coltype == pc.case.I:
                     stallmovetimes.append(newmovetime)
@@ -831,7 +854,7 @@ class PosSchedule(object):
                 else:
                     tables[changing] = old_changing_table
                     tables[unchanging] = old_unchange_table
-            ## end of for loop over moveable colliding positioners
+            ## end of for loop over movable colliding positioners
         ## end of while loop over all collisions
             
         ## Correct timing so everything is in sync again
