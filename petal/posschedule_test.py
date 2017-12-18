@@ -228,8 +228,9 @@ class PosSchedule(object):
                 if req['posmodel'].posid == posunitid:
                     posmodel = req['posmodel']
                     posmodels.append(posmodel)
-                    xoffs.append(posmodel.state.read('OFFSET_X'))
-                    yoffs.append(posmodel.state.read('OFFSET_Y'))
+                    flatxy = posmodel.trans.obsTP_to_flatXY([posmodel.state.read('OFFSET_X'),posmodel.state.read('OFFSET_Y')])
+                    xoffs.append(flatxy[0])
+                    yoffs.append(flatxy[1])
                     tpstart.append(posmodel.trans.posTP_to_obsTP(req['start_posTP']))
                     tptarg.append(posmodel.trans.posTP_to_obsTP(req['targt_posTP']))
                     log_notes.append(req['log_note'])
@@ -365,18 +366,23 @@ class PosSchedule(object):
         ## by setting them so that they don't move
         itter = 0
         ncols = len(collision_indices)
-        while len(collision_indices)>0:
+        zeroed = []
+        while ncols>0 and itter < 2*len(tps_list):
             if self.anticol.verbose:
                 self._printindices('Collisions before zeroth order run ',itter,collision_indices)
-            merged_tables, moved_poss = self._avoid_collisions(merged_tables,posmodels,collision_indices,algorithm='zeroth_order')
+            merged_tables, indices_affected = self._avoid_collisions(merged_tables,posmodels,collision_indices,algorithm='zeroth_order')
             collision_indices, collision_types = self._check_for_collisions(tps_list,merged_tables)
+            zeroed.extend(indices_affected)
             if self.anticol.verbose:
                 print("\nNumber corrected: {}\n\n\n\n".format(ncols - len(collision_indices)))
             ncols = len(collision_indices)
             itter += 1
                    
         if self.anticol.verbose:
-            self._printindices('Collisions after completion of anticollision ','',collision_indices)           
+            self._printindices('Collisions after completion of anticollision ','',collision_indices)
+            nzero =len(np.unique(zeroed))
+            ntot = len(tps_list)
+            print("Number of zerod positioners: {}, total number of targets: {}, successes: {}%".format(nzero,ntot,100*(1-(float(nzero)/float(ntot)))))
         return merged_tables
                                                 
                                                     
@@ -836,7 +842,6 @@ class PosSchedule(object):
 
                 ## Replace the old table with the newly created one
                 newmovetime = new_changing_table.for_schedule['move_time'][dts.size-1]
-                maxstalltime = np.max(stallmovetimes)
 
                 tables[changing] = new_changing_table
 
@@ -853,7 +858,6 @@ class PosSchedule(object):
                     break
                 else:
                     tables[changing] = old_changing_table
-                    tables[unchanging] = old_unchange_table
             ## end of for loop over movable colliding positioners
         ## end of while loop over all collisions
             
@@ -1025,7 +1029,6 @@ class PosSchedule(object):
             phi_next = ps[min_ind]
             theta_next = ts[min_ind]
 
-            
         ## If the best move is to do nothing, random walk by 2*stepsize
         ## so long as the random walk is within allowable angle constraints
         if phi_next == phi and theta_next == theta:
@@ -1093,10 +1096,24 @@ class PosSchedule(object):
         '''
         ## Get a unique list of all indices causing problems
         unique_indices = self._unique_inds(collision_indices)
+
+        ## Create list of indices we'll set to zero
+        indices_to_zero = []
         ## Remove "None" cases corresponding to fixed collisions
         if None in unique_indices.keys():
+            ## Remove None from possible positioners
             unique_indices.pop(None)
+            ## Set all positioners that collide with none to be zeroed
+            for a,b in collision_indices:
+                if b is None:
+                    indices_to_zero.append(a)
 
+        max_collisions = max(unique_indices.values())
+        for posindex,ncollisions in unique_indices.items():
+            if ncollisions == max_collisions:
+                indices_to_zero.append(posindex)
+
+        print(max_collisions, indices_to_zero)
         ## Find out how long the longest move takes to execute
         movetimes = np.asarray([table.for_schedule['move_time'][-1] for table in tables])
         if self.anticol.verbose:
@@ -1107,7 +1124,7 @@ class PosSchedule(object):
         max_time = np.max(movetimes)
                     
         ## For the colliding indices, simply don't move them
-        for index in unique_indices.keys():
+        for index in np.unique(indices_to_zero):
             table = posmovetable.PosMoveTable(posmodels[index])
             table.set_move(0, pc.T, 0.)
             table.set_move(0, pc.P, 0.)
@@ -1115,7 +1132,7 @@ class PosSchedule(object):
             table.set_postpause(0, 0.0)
             tables[index] = table
         #pdb.set_trace()
-        return tables,collision_indices.tolist()
+        return tables, indices_to_zero
         
         
         
@@ -1297,6 +1314,10 @@ class PosSchedule(object):
             into a single longer step
             This reduces the number of final steps in the movetable
             If both dt and dp for a step is 0, wait time is added after the previous move
+
+            * Note that we assume neighbors are fixed, so we ignore waittimes in our movements
+            as they are meaningless *
+
             input:
                 dts:    np.array  each value is the amount of change in theta
                                   for that timestep
@@ -1315,16 +1336,16 @@ class PosSchedule(object):
         current_column = 0
         ## Loop through the given array of dthetas,dphis
         for i in range(1,dts.size):
+            ## If we're not moving, we don't make a new move, we only add waittime
+            ## after the current move
+            if dts[i]==0 and dps[i]==0:
+                output_times[current_column] += self.anticol.dt
             ## If the change in theta and phi is the same as before,
             ## We don't need a new step, just increase the time we perform
             ## the previous step
-            if dts[i]==dts[i-1] and dps[i]==dps[i-1]:
+            elif dts[i]==dts[i-1] and dps[i]==dps[i-1]:
                 output_t[current_column] += dts[i]
                 output_p[current_column] += dps[i]
-            ## If we're not moving, we don't make a new move, we only add waittime
-            ## after the current move
-            elif dts[i]==0 and dps[i]==0:
-                output_times[current_column] += self.anticol.dt
             ## if none of the cases above, add a new move in the movetable
             ## for the given dtheta, dphi, with no waittime
             else:
@@ -1456,7 +1477,7 @@ class Anticol:
         self.plotting = True           
 
         ## Define the phi position in degrees at which the positioner is safe
-        self.phisafe = 144.
+        self.phisafe = collider.Ei_phi
         
         ## Some convenience definitions regarding the size of positioners
         motor_width = 1.58
@@ -1486,16 +1507,16 @@ class Anticol:
         self.coeffa = 10.0  ## attractive force amplitude of the target location
         
         ##** aSTAR PARAMS **##
-        self.astar_tolerance_xy = 0.4 #3
+        self.astar_tolerance_xy = 0.2 #3
         self.multitest = False
-        self.astar_verbose = False
+        self.astar_verbose = True
         self.astar_plotting = True
         self.astar_heuristic = 'euclidean'
         self.astar_weight = 1.2
         
-        #############################################
-        # Parameters defined by harware or software #
-        #############################################
+        ##############################################
+        # Parameters defined by hardware or software #
+        ##############################################
         ## Create an outlines class object with spacing comparable to the tolerance
         ## of the search
         self.posoutlines = PosOutlines(collider, spacing=self.astar_tolerance_xy)
