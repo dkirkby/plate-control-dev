@@ -37,6 +37,11 @@ class LoadPetal(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
         global gui_root
         gui_root = tkinter.Tk()
+        
+        self.simulate = False
+        self.logfile='MoveGUI.log'
+        fvc_type='simulator'
+
         self.ptl_id=13
         fidids=['F021']   
         gui_root.title='Move Controll for Petal '+str(self.ptl_id)
