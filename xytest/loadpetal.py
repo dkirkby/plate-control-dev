@@ -67,4 +67,13 @@ class LoadPetal(object):
         self.fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
        
-        
+
+    def logwrite(self,text,stdout=True):
+        """Standard logging function for writing to the test traveler log file.
+        """
+        line = '# ' + pc.timestamp_str_now() + ': ' + text
+        with open(self.logfile,'a') as fh:
+            fh.write(line + '\n')
+        if stdout:
+            print(line)
+            
