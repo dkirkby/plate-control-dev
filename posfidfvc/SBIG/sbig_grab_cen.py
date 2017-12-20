@@ -143,8 +143,8 @@ class SBIG_Grab_Cen(object):
             num_nonzero_pixels = np.count_nonzero(img)
             all_black = num_nonzero_pixels == 0
             nearly_all_black = num_nonzero_pixels < self.min_num_nonzero_pixels
-            return img,no_img,all_black,nearly_all_black
-        img,no_img,all_black,nearly_all_black=expose()  
+            return img,no_img,all_black,nearly_all_black,num_nonzero_pixels
+        img,no_img,all_black,nearly_all_black,num_nonzero_pixels=expose()
         if no_img or all_black or nearly_all_black:
             if no_img:
                 desc = 'no image'
