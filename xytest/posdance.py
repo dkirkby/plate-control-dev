@@ -2,28 +2,32 @@
 Used to test the full range of motion for both arms of every positioner in a CAN bus.
 '''
 import sys, os
-sys.path.append(os.path.abspath('../petal/'))
+if "TEST_LOCATION" in os.environ and os.environ['TEST_LOCATION']=='Michigan':
+	basepath=os.environ['TEST_BASE_PATH']+'plate_control/'+os.environ['TEST_TAG']
+	sys.path.append(os.path.abspath(basepath+'/petal/'))
+else:
+	sys.path.append(os.path.abspath('../petal/'))
 
 import petalcomm
 import time 
 
 class _read_key:
-    def __init__(self):
-        import tty, sys
+	def __init__(self):
+		import tty, sys
 
-    def __call__(self):
-        '''
-        A function for single character input, copied directly from pf_utility.py
-        '''
-        import sys, tty, termios
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setraw(sys.stdin.fileno())
-            ch = sys.stdin.read(1)
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-        return ch
+	def __call__(self):
+		'''
+		A function for single character input, copied directly from pf_utility.py
+		'''
+		import sys, tty, termios
+		fd = sys.stdin.fileno()
+		old_settings = termios.tcgetattr(fd)
+		try:
+			tty.setraw(sys.stdin.fileno())
+			ch = sys.stdin.read(1)
+		finally:
+			termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+		return ch
 	
 def MoveAllandWait(direction, motor, angle):
 	'''

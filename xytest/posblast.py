@@ -2,7 +2,6 @@ import sys
 import os 
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
-
 import petalcomm
 import googlesheets
 import posdance
@@ -19,6 +18,7 @@ if __name__ == '__main__':
         print("[a]uto CAN ID programming")
         print("[m]anual CAN ID programming")
         print("[h]ardware setup update")
+        print("[s]ingle manual CAN ID programming")
         print("[e]xit")
         print("Select: ")
 
@@ -98,9 +98,49 @@ if __name__ == '__main__':
         if choice == 'h':            
             
             infodict = pcomm.get_posfid_info(canbus)
-            poslist = list(infodict.keys())
+            poslist = sorted(list(infodict.keys()))
 
             print(poslist)
+
+        if choice == 'c':
+            
+            print('Would you like to log the following posids and silicon ids to a particular traveler? [y/n]')
+            choice2 = _sel.__call__()
+            choice2 = choice.lower()
+
+            if choice2 == 'y':
+                travelerurl = input('Please provide the traveler url:')
+                traveler = googlesheets.connect_by_url(travelerurl, credentials = os.path.abspath('../../../positioner_logs/data_processing_scripts/google_access_account.json')
+                used_spaces = googlesheets.read_row(traveler, 'POS_ID').col)
+                next_empty_col = 7     #hard coded for now
+                while used_spaces[next_empty_col-1] != '':
+                    next_empty_col += 1
+                                             
+            posinput = input('Positioner ID: ')
+            while posinput != 'done':
+                firstchar = posinput[0]
+
+                while firstchar == '0' or firstchar == 'M'
+                    posinput = posinput[1:]
+                    firstchar = posinput[0]
+
+                input("Plug this positioner into the board and press Enter")
+                infodict = pcomm.get_posid_info(canbus)
+                if len(infodict) == 1:
+                    sid = infodict[0][3]
+                    pcomm.set_canid(canbus, sid, posinput)
+                    googlesheets.write(traveler, 'CAN_ID', next_empty_col, posinput, ID_col_with_data = False)
+                    if len(posinput) < 6:
+                        newinput = 'M'
+                        for x in range(5 - len(posinput)):
+                            newinput += '0'
+                        posinput = newinput + posinput
+                    googlesheets.write(traveler, 'POS_ID', next_empty_col, posinput, ID_col_with_data = False)
+                    googlesheets.write(traveler, 'SI_ID',  next_empty_col, sid, ID_col_with_data = False)
+                 
+                else:
+                    print("The wrong number of positioners is currently plugged in")
+                posinput = input("Programmed CAN ID " + posinput + " .\nUnplug the positioner and input the next ID (type 'done' when finished):")
 
 
 

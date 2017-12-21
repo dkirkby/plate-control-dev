@@ -1,7 +1,12 @@
 import os
 import sys
-sys.path.append(os.path.abspath('../petal/'))
-sys.path.append(os.path.abspath('../posfidfvc/'))
+if "TEST_LOCATION" in os.environ and os.environ['TEST_LOCATION']=='Michigan':
+	basepath=os.environ['TEST_BASE_PATH']+'plate_control/'+os.environ['TEST_TAG']
+	sys.path.append(os.path.abspath(basepath+'/petal/'))
+	sys.path.append(os.path.abspath(basepath+'/posfidfvc/'))
+else:
+	sys.path.append(os.path.abspath('../petal/'))
+	sys.path.append(os.path.abspath('../posfidfvc/'))
 import fvchandler
 import petal
 import posmovemeasure
