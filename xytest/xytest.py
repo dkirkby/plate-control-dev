@@ -15,7 +15,7 @@ import summarizer
 import numpy as np
 import time
 import pos_xytest_plot
-import um_test_report as test_report
+#import um_test_report as test_report
 import traceback
 import configobj
 import tkinter
@@ -426,13 +426,15 @@ class XYTest(object):
 
 			# Test report and email only on certain tests
 			if self.xytest_conf['should_email']:
-				test_report.do_test_report(self.posids, all_data_by_posid, log_timestamp, self.pos_notes, self._elapsed_time_str(start_time), self.xytest_conf['email_list'])
+				pass
+				#test_report.do_test_report(self.posids, all_data_by_posid, log_timestamp, self.pos_notes, self._elapsed_time_str(start_time), self.xytest_conf['email_list'])
 		except (KeyboardInterrupt, SystemExit):
 			raise
 		except:
 			# Email traceback to alert that test failed and why
 			if self.xytest_conf['should_email']:
-				test_report.email_error(traceback.format_exc(),log_timestamp)
+				pass
+				#test_report.email_error(traceback.format_exc(),log_timestamp)
 			raise            
 		self.logwrite(str(len(all_data_by_target)) + ' targets measured in ' + self._elapsed_time_str(start_time) + '.')
 
