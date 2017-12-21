@@ -7,6 +7,7 @@ if "TEST_LOCATION" in os.environ and os.environ['TEST_LOCATION']=='Michigan':
 else:
 	sys.path.append(os.path.abspath('../petal/'))
 	sys.path.append(os.path.abspath('../posfidfvc/SBIG'))
+import numpy as np
 import time
 import postransforms
 import posconstants as pc
