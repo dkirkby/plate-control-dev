@@ -23,7 +23,9 @@ import fvchandler
 import petal
 import petalcomm
 import posmovemeasure
+import posschedule
 import posconstants as pc
+import poscollider
 import summarizer
 import numpy as np
 import time
@@ -57,24 +59,44 @@ class LoadPetal(object):
 		self.mode = 0
 		#petalcomm.
    #     info=self.petalcomm.get_device_status()
-		canbus='can0'
-		self.bus_id=canbus
-		self.info = self.pcomm.get_posfid_info(canbus)
-		self.posids = []
-		print(self.info)
-		for key in sorted(self.info.keys()):
-			if len(str(key))==2:
-				self.posids.append('M000'+str(key)) 
-			elif len(str(key))==3:
-				self.posids.append('M00'+str(key))
-			elif len(str(key))==4:
-				self.posids.append('M0'+str(key))
-			elif len(str(key))==5:
-				self.posids.append('M'+str(key))
-		self.ptl = petal.Petal(self.ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite)
-		self.fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
-		self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
-	   
+        canbus='can0'
+        self.bus_id=canbus
+        self.info = self.pcomm.get_posfid_info(canbus)
+        self.posids = []
+        print(self.info)
+        for key in sorted(self.info.keys()):
+            if len(str(key))==2:
+                self.posids.append('M000'+str(key)) 
+            elif len(str(key))==3:
+                self.posids.append('M00'+str(key))
+            elif len(str(key))==4:
+                self.posids.append('M0'+str(key))
+            elif len(str(key))==5:
+                self.posids.append('M'+str(key))
+        self.ptl = petal.Petal(self.ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+        self.fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
+        self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
+        self.posschedule=posschedule.PosSchedule(self.ptl)
+        # Add target for each positioner
+        self.posmodels=self.ptl.posmodels
+        for posid in self.posids:
+            self.posschedule.request_target(posid, 'posTP', 0., 180., log_note='') # extend every positioner
+        # rotate one positioner, check if it can avoid the obstacle?
+        for i in range(36):
+            self.posschedule.request_target(posid, 'posTP', (i+1)*10., 180., log_note='')
+        self.posschedule._schedule_with_anticollision() # Make move_tables
+        
+        move_tables=self.posschedule.move_tables()
+        
+        print(move_tables)
+        self.ptl.send_move_tables()
+        
+        # Make an animation
+        self.ptl.collider.add_positioners(self.posmodels)
+        self.ptl.collider.posmodels=self.posmodels
+        possweep=poscollider.PosSweep()
+        possweep.fill_exact(init_obsTP,move_tables)
+        
 
 	def logwrite(self,text,stdout=True):
 		"""Standard logging function for writing to the test traveler log file.
