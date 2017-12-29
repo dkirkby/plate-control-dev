@@ -12,6 +12,7 @@ address for sending emails. Currently only implemented into UM_accuracy_test.py
 
 import numpy as np
 import sys
+import os
 if "TEST_LOCATION" in os.environ and os.environ['TEST_LOCATION']=='Michigan':
 	basepath=os.environ['TEST_BASE_PATH']+'plate_control/'+os.environ['TEST_TAG']
 	sys.path.append(os.path.abspath(basepath+'/petal/'))
