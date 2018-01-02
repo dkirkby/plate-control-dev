@@ -10,7 +10,7 @@ else:
 	sys.path.append(os.path.abspath('../posfidfvc/'))
 	sys.path.append(os.path.abspath('../xytest/'))
 
-
+import petal
 import posmovemeasure
 import fvchandler
 import posconstants as pc
@@ -75,6 +75,8 @@ if USE_LOCAL_PRESETS:
 		USE_LOCAL_PRESETS=False
 if USE_LOCAL_PRESETS:
 	print("")
+	print("  Using code tag: "+os.environ['TEST_TAG'])
+	print("")	
 	print("The following presets will be used:")
 	print("")
 	print("  Hardware setup file: "+str(hwsetup_conf))
