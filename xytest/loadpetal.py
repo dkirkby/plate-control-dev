@@ -53,11 +53,10 @@ class LoadPetal(object):
         self.logfile='LoadPetal.log'
         fvc_type='simulator'
 
-        self.ptl_id=13
+        self.ptl_id=40
 #        fidids=['F021']   
         self.pcomm=petalcomm.PetalComm(self.ptl_id)
         self.mode = 0
-	#petalcomm.
    #     info=self.petalcomm.get_device_status()
         canbus='can0'
         self.bus_id=canbus
@@ -65,37 +64,44 @@ class LoadPetal(object):
         self.posids = []
         self.fidids = []
         print(self.info)
-        for key in sorted(self.info.keys()):
+        for key in sorted(self.info.keys()):            
             if len(str(key))==2:
-                self.posids.append('M000'+str(key)) 
+                self.posids.append('M000'+str(key))
             elif len(str(key))==3:
                 self.posids.append('M00'+str(key))
             elif len(str(key))==4:
                 self.posids.append('M0'+str(key))
             elif len(str(key))==5:
                 self.fidids.append('M'+str(key))
-
+        
         self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+        self.ptl.set(self.posids,'CTRL_ENABLED',True)
+        self.ptl.request_homing(self.posids)
+        self.ptl.send_and_execute_moves()
+#        self.ptl._postmove_cleanup()
+        self.ptl.set(self.posids,'CTRL_ENABLED',True)
+
         self.fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
 
-#        self.posschedule=posschedule.PosSchedule(self.ptl)
        # Add target for each positioner
         self.posmodels=self.ptl.posmodels
         for posid in self.posids:
             print('\n',posid)
-            self.ptl.schedule.request_target(posid, 'dTdP', 30, 180., log_note='') # extend every positioner
+            self.ptl.schedule.request_target(posid, 'dTdP', 30, -50., log_note='') # extend every positioner
             print(len(self.ptl.schedule.requests))
-        self.ptl.schedule._schedule_without_anticollision() # Make move_tables
+#        self.ptl.schedule_moves()
+        self.ptl.schedule._schedule_with_anticollision() # Make move_tables
        
         move_tables=self.ptl.schedule.move_tables
-        
-#        self.ptl.send_and_execute_moves()
-
+        print('move_tables','\n',move_tables[0].for_schedule)       
+        self.ptl.send_and_execute_moves()
+#        self.ptl._postmove_cleanup()
         # rotate one positioner, check if it can avoid the obstacle?
         for i in range(36): # cannot request more than one target per positioner in a given schedule
-            self.ptl.schedule.request_target('M00160', 'dTdP', 10., 0., log_note='')
-            self.ptl.schedule._schedule_with_anticollision() # Make move_tables
+            pass
+#            self.ptl.schedule.request_target('M00160', 'dTdP', 10., 0., log_note='')
+#            self.ptl.schedule._schedule_with_anticollision() # Make move_tables
 #            self.ptl.send_and_execute_moves() 
 #        # Make an animation
 #        self.ptl.collider.add_positioners(self.posmodels)
