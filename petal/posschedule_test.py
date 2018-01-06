@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import pdb
 import copy as copymodule
 from bidirect_astar import bidirectional_astar_pathfinding
+import datetime
 
 class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners
@@ -228,7 +229,7 @@ class PosSchedule(object):
                 if req['posmodel'].posid == posunitid:
                     posmodel = req['posmodel']
                     posmodels.append(posmodel)
-                    flatxy = posmodel.trans.obsTP_to_flatXY([posmodel.state.read('OFFSET_X'),posmodel.state.read('OFFSET_Y')])
+                    flatxy = posmodel.trans.obsXY_to_flatXY([posmodel.state.read('OFFSET_X'),posmodel.state.read('OFFSET_Y')])
                     xoffs.append(flatxy[0])
                     yoffs.append(flatxy[1])
                     tpstart.append(posmodel.trans.posTP_to_obsTP(req['start_posTP']))
@@ -238,7 +239,21 @@ class PosSchedule(object):
                     break
         self.anticol.xoffs = np.asarray(xoffs)
         self.anticol.yoffs = np.asarray(yoffs)
-        
+
+        plt.figure()
+        radians = np.arange(0,2*np.pi,np.pi/200)
+        xcirc = 6*np.cos(radians)
+        ycirc = 6*np.sin(radians)
+        petal_coords = self.collider.keepout_PTL.points
+        petal_x = petal_coords[0].tolist()
+        petal_y = petal_coords[1].tolist()
+        petal_x.append(petal_x[0])
+        petal_y.append(petal_y[0])
+        plt.plot(petal_x,petal_y,'k-')
+        plt.plot(xoffs,yoffs,'k.')
+        for xoff,yoff in zip(xoffs,yoffs):
+            plt.plot(xoff+xcirc,yoff+ycirc,'r-')
+        plt.show()
         ## Now that we have the requests curated and sorted. Lets do anticollision
         ## using the PosAnticol.avoidance method specified
         move_tables = self._run_RRE_anticol(tpstart,tptarg,posmodels)
@@ -328,6 +343,10 @@ class PosSchedule(object):
 
         for step in order_of_operations:
             oper_info = relevant_info[step]
+
+            ## animate
+            self._animate_movetables(oper_info['movetables'], oper_info['tpstarts'])
+
             ## Check for collisions   oper_info['
             collision_indices, collision_types = \
                     self._check_for_collisions(oper_info['tpstarts'],oper_info['movetables'])
@@ -355,34 +374,31 @@ class PosSchedule(object):
                 self._printindices('Collisions after Round 1, in Step ',step,collision_indices)        
                 print("\nNumber corrected: {}\n\n\n\n".format(ncols-len(collision_indices)))
 
+            ## animate
+            self._animate_movetables(oper_info['movetables'], oper_info['tpstarts'])
+
         output_tables = {key: relevant_info[key]['movetables'] for key in order_of_operations[:2]}
         output_tables['extend'] = self._reverse_for_extension(relevant_info['extend']['movetables'])
         merged_tables = self._combine_tables(output_tables)
-    
-        ## Check for collisions in the total rre movetable
-        collision_indices, collision_types = self._check_for_collisions(tps_list,merged_tables)
-        
-        ## While there are still collisions, keep eliminating the positioners that collide
-        ## by setting them so that they don't move
-        itter = 0
-        ncols = len(collision_indices)
-        zeroed = []
-        while ncols>0 and itter < 2*len(tps_list):
-            if self.anticol.verbose:
-                self._printindices('Collisions before zeroth order run ',itter,collision_indices)
-            merged_tables, indices_affected = self._avoid_collisions(merged_tables,posmodels,collision_indices,algorithm='zeroth_order')
-            collision_indices, collision_types = self._check_for_collisions(tps_list,merged_tables)
-            zeroed.extend(indices_affected)
-            if self.anticol.verbose:
-                print("\nNumber corrected: {}\n\n\n\n".format(ncols - len(collision_indices)))
-            ncols = len(collision_indices)
-            itter += 1
-                   
+
+        ## animate
+        self._animate_movetables(merged_tables, tps_list)
+
+        collision_indices, collision_types = self._check_for_collisions(tps_list, merged_tables)
+        merged_tables, zeroed = self._avoid_collisions(merged_tables,posmodels,collision_indices,tpss=tps_list,algorithm='zeroth_order')
+
+        ## animate
+        self._animate_movetables(merged_tables, tps_list)
+
         if self.anticol.verbose:
+            collision_indices, collision_types = self._check_for_collisions(tps_list, merged_tables)
             self._printindices('Collisions after completion of anticollision ','',collision_indices)
             nzero =len(np.unique(zeroed))
             ntot = len(tps_list)
             print("Number of zerod positioners: {}, total number of targets: {}, successes: {}%".format(nzero,ntot,100*(1-(float(nzero)/float(ntot)))))
+            ## animate
+            self._animate_movetables(merged_tables, tps_list)
+
         return merged_tables
                                                 
                                                     
@@ -490,20 +506,37 @@ class PosSchedule(object):
             a 'force law' type approach to generate moves that avoid neighboring positioners 
             that it would otherwise collide with.
         '''
+        # if algorithm.lower() in ['zeroth_order','zeroth order','zeroeth_order','zeroeth order']:
+        #     return self._avoid_collisions_zerothorder(tables,posmodels,collision_indices,tpss)
+        # else:
+        #     return self._avoid_collisions_astar(tables, posmodels, collision_indices, \
+        #                                     collision_types, tpss, tpfs, \
+        #                                     step, maxtimes, algorithm)
         if algorithm.lower() in ['zeroth_order','zeroth order','zeroeth_order','zeroeth order']:
-            return self._avoid_collisions_zerothorder(tables,posmodels,collision_indices)
+            return self._avoid_collisions_zerothorder(tables,posmodels,collision_indices,tpss)
+        # Larger phis are more tucked in, check if they are all tucked in enough
+        # Ei is the more tucked in, extremem case
         phis = np.asarray([tp[pc.P] for tp in tpss])
-        ## Larger phis are more tucked in, check if they are all tucked in enough
-        ## Ei is the more tucked in, extremem case
-        if step == 'rotate' and np.all(phis>=self.collider.Eo_phi):
-            print("You want me to correct rotational collisions when all the phi motors are tucked in.")
-            print("Sorry I can't help")
-            return tables, []
-        elif step == 'rotate':
-            print("It appears that some of your initial phis are not tucked in far enough, and you are trying to rotate.")
-            print("We currently don't have programming for rotation avoidance, as you should retract all positioners before this move")
-            print("Phi values that conflict: {}".format(phis[phis<self.collider.Eo_phi]))
-            return tables, []
+        if step.lower() == 'rotate' and np.all(phis>=self.collider.Eo_phi):
+           print("You want me to correct rotational collisions when all the phi motors are tucked in.")
+           print("Sorry I can't help")
+           return tables, []
+        elif step.lower() == 'rotate':
+           print("It appears that some of your initial phis are not tucked in far enough, and you are trying to rotate.")
+           print("We currently don't have programming for rotation avoidance, as you should retract all positioners before this move")
+           print("Phi values that conflict: {}".format(phis[phis<self.collider.Eo_phi]))
+           return tables, []
+        elif algorithm.lower() == 'astar':
+            #if algorithm.lower() == 'astar':
+            return self._avoid_collisions_astar(tables, posmodels, collision_indices, \
+                          collision_types, tpss, tpfs, \
+                          step, maxtimes, algorithm)
+        else:
+            return self._avoid_collisions_zerothorder(tables,posmodels,collision_indices,tpss)
+
+    def _avoid_collisions_astar(self, tables, posmodels, collision_indices, \
+                          collision_types, tpss, tpfs, \
+                          step, maxtimes, algorithm):
         ## Create a set that contains all positioners involved in corrections. \
         ## Only one alteration to a positioner neighborhood
         ## per function call
@@ -718,10 +751,10 @@ class PosSchedule(object):
                     xns.extend(petalxys[0,:])
                     yns.extend(petalxys[1,:])
 
-                xyns = changing_posmodel.trans.obsXY_to_flatXY([xns,yns])
+                #xyns = changing_posmodel.trans.obsXY_to_flatXY([xns,yns])
             
-                neighbors['xns'] = np.asarray(xyns[0])
-                neighbors['yns'] = np.asarray(xyns[1])
+                neighbors['xns'] = np.asarray(xns)
+                neighbors['yns'] = np.asarray(yns)
 
                 ### check for the consistancy of the x and y values. Make sure they don't overlap
                 #testxns = np.asarray(xns).reshape((len(xns),1))
@@ -981,9 +1014,7 @@ class PosSchedule(object):
         ## If the loop didn't converge or we broke, return None's since we didn't have success
         return None,None,None
     
-    
-    
-    
+
     def _take_step(self,posmodel,current,target,xns,yns,tmin,tmax,pmin,pmax,phi_safe):
         '''
         A single step within the em_resolution function. This attempts to move a distance
@@ -1050,7 +1081,6 @@ class PosSchedule(object):
         return theta_next,phi_next
         
 
-
     def _findpotential(self,xos,yos,xa,ya,xns,yns):
         '''
             Calculates the distances from the positioner to all 
@@ -1071,9 +1101,8 @@ class PosSchedule(object):
         Vs = self._potential(rhocs,rhonss,rhoas)  
         return Vs       
       
-      
-      
-    def _avoid_collisions_zerothorder(self,tables,posmodels,collision_indices):
+
+    def _avoid_collisions_zerothorder(self,tables,posmodels,collision_indices,tpss):
         '''
             The original, and simplest method of avoiding collisions.
             This just prevents the positioners that would collide from moving, 
@@ -1095,10 +1124,12 @@ class PosSchedule(object):
                             by collision_indices have been prevented from moving.
         '''
         ## Get a unique list of all indices causing problems
+        ## Check for collisions in the total rre movetable
         unique_indices = self._unique_inds(collision_indices)
+        max_time = self._get_max_time(tables)
 
         ## Create list of indices we'll set to zero
-        indices_to_zero = []
+        zerod= []
         ## Remove "None" cases corresponding to fixed collisions
         if None in unique_indices.keys():
             ## Remove None from possible positioners
@@ -1106,38 +1137,114 @@ class PosSchedule(object):
             ## Set all positioners that collide with none to be zeroed
             for a,b in collision_indices:
                 if b is None:
-                    indices_to_zero.append(a)
+                    zerod.append(a)
+            if self.anticol.verbose:
+                print("Zerod 'None' colliders: {}".format(zerod))
+            for index in np.unique(zerod):
+                table = posmovetable.PosMoveTable(posmodels[index])
+                table.set_move(0, pc.T, 0.)
+                table.set_move(0, pc.P, 0.)
+                table.set_prepause(0, max_time)
+                table.set_postpause(0, 0.0)
+                tables[index] = table
 
+        ## Iteratively zero the tables until no collisions remain
+        ## While there are still collisions, keep eliminating the positioners that collide
+        ## by setting them so that they don't move
+        collision_indices, collision_types = self._check_for_collisions(tpss, tables)
+        itter = 0
+        ncols = len(collision_indices)
+        while ncols > 0 and itter < 2 * len(tables):
+            if self.anticol.verbose:
+                self._printindices('Collisions before zeroth order run ', itter, collision_indices)
+            tables, zeroed_poss = self._zerothorder_avoidance_iteration(tables, posmodels, collision_indices, tpss, zerod)
+            if np.isscalar(zeroed_poss):
+                zerod.append(zeroed_poss)
+                if self.anticol.verbose:
+                    print("\nNumber zeroed: {}\n\n\n\n".format(1))
+            else:
+                zerod.extend(list(zeroed_poss))
+                if self.anticol.verbose:
+                    print("\nNumber zeroed: {}\n\n\n\n".format(len(zeroed_poss)))
+            collision_indices, collision_types = self._check_for_collisions(tpss, tables)
+            ncols = len(collision_indices)
+            itter += 1
+        return tables, zerod
+
+
+    def _zerothorder_avoidance_iteration(self,tables, posmodels, collision_indices, tpss, zerod):
+        unique_indices = self._unique_inds(collision_indices)
+        possits_to_zero = []
+        max_time = self._get_max_time(tables)
         max_collisions = max(unique_indices.values())
         for posindex,ncollisions in unique_indices.items():
             if ncollisions == max_collisions:
-                indices_to_zero.append(posindex)
+                possits_to_zero.append(posindex)
 
-        print(max_collisions, indices_to_zero)
-        ## Find out how long the longest move takes to execute
-        movetimes = np.asarray([table.for_schedule['move_time'][-1] for table in tables])
-        if self.anticol.verbose:
-            try:
-                print("std of movetimes was: ",np.std(movetimes))
-            except:
-                pass
-        max_time = np.max(movetimes)
-                    
-        ## For the colliding indices, simply don't move them
-        for index in np.unique(indices_to_zero):
-            table = posmovetable.PosMoveTable(posmodels[index])
+        possits_to_zero = np.unique(possits_to_zero)
+        print(max_collisions, possits_to_zero)
+
+        nonzero = set(possits_to_zero).difference(set(zerod))
+        if len(possits_to_zero)==1:
+            best_pos = possits_to_zero[0]
+            table = posmovetable.PosMoveTable(posmodels[best_pos])
             table.set_move(0, pc.T, 0.)
             table.set_move(0, pc.P, 0.)
             table.set_prepause (0, max_time)
             table.set_postpause(0, 0.0)
-            tables[index] = table
-        #pdb.set_trace()
-        return tables, indices_to_zero
-        
-        
-        
-    
-    
+            tables[best_pos] = table
+        elif len(nonzero)== 1:
+            best_pos = nonzero.pop()
+            table = posmovetable.PosMoveTable(posmodels[best_pos])
+            table.set_move(0, pc.T, 0.)
+            table.set_move(0, pc.P, 0.)
+            table.set_prepause(0, max_time)
+            table.set_postpause(0, 0.0)
+            tables[best_pos] = table
+        else:
+            ## For the colliding indices, simply don't move them
+            dn_colls = []
+            for index in possits_to_zero:
+                if index in zerod:
+                    dn_colls.append(-99)
+                    continue
+                ninit_collisions = unique_indices[index]
+                old_table = tables[index]
+                table = posmovetable.PosMoveTable(posmodels[index])
+                table.set_move(0, pc.T, 0.)
+                table.set_move(0, pc.P, 0.)
+                table.set_prepause (0, max_time)
+                table.set_postpause(0, 0.0)
+                tables[index] = table
+                itter_collinds, itter_colltypes = self._check_single_positioner_for_collisions(tpss,tables,index)
+                raveled_inds = np.ravel(itter_collinds)
+                fin_collisions = np.unique(raveled_inds[raveled_inds != None])
+                nfin_collisions = len(fin_collisions)-1
+                dn_colls.append(ninit_collisions-nfin_collisions)
+                tables[index] = old_table
+                del table
+            best_choice = np.argmax(dn_colls)
+            best_pos = possits_to_zero[best_choice]
+            table = posmovetable.PosMoveTable(posmodels[best_pos])
+            table.set_move(0, pc.T, 0.)
+            table.set_move(0, pc.P, 0.)
+            table.set_prepause(0, max_time)
+            table.set_postpause(0, 0.0)
+            tables[best_pos] = table
+        return tables, best_pos
+
+
+    def _get_max_time(self,tables):
+        ## Find out how long the longest move takes to execute
+        movetimes = np.asarray([table.for_schedule['move_time'][-1] for table in tables])
+        if self.anticol.verbose:
+            try:
+                print("std of movetimes was: ", np.std(movetimes))
+            except:
+                pass
+        max_time = np.max(movetimes)
+        return max_time
+
     def _check_for_collisions(self,tps,list_tables):
         '''
             Find what positioners collide, and who they collide with
@@ -1268,12 +1375,60 @@ class PosSchedule(object):
                         collision_index = [A,B]
                     collision_type = these_sweeps[i].collision_case
 
-
-        
         ## return the earliest collision time and collision indices
         return np.asarray(collision_index), np.asarray(collision_type)
-    
-        
+
+    def _animate_movetables(self,movetables, tps):
+        '''
+            Find what positioners collide, and who they collide with
+            Inputs:
+                tps:  list or numpy array of theta,phi pairs that specify the location
+                        of every positioner
+                cur_poscollider:  poscollider object used to find the actual collisions
+                list_tables:   list of all the movetables
+
+            Outputs:
+               All 3 are numpy arrays giving information about every collision that occurs.
+                collision_indices: list index which identifies the positioners that collide
+                                    this has 2 indices in a pair [*,*] if 2 positioners collided
+                                    or [*,None] if colliding with a wall of fiducial.
+                collision_types:   Type of collision as specified in the pc class
+        '''
+        collider = self.collider
+        list_tables = list(movetables)
+        posmodel_index_iterable = range(len(collider.posmodels))
+        sweeps = [[] for i in posmodel_index_iterable]
+        earliest_collision = [np.inf for i in posmodel_index_iterable]
+        nontriv = 0
+        colrelations = collider.collidable_relations
+        for A, B, B_is_fixed in zip(colrelations['A'], colrelations['B'], colrelations['B_is_fixed']):
+            tableA = list_tables[A].for_schedule
+            obsTPA = tps[A]
+            if B_is_fixed and A in range(len(
+                    list_tables)):  ## might want to replace 2nd test here with one where we look in tables for a specific positioner index
+                these_sweeps = collider.spacetime_collision_with_fixed(A, obsTPA, tableA)
+            elif A in range(len(list_tables)) and B in range(len(
+                    list_tables)):  ## again, might want to look for specific indexes identifying which tables go with which positioners
+                tableB = list_tables[B].for_schedule
+                obsTPB = tps[B]
+                these_sweeps = collider.spacetime_collision_between_positioners(A, obsTPA, tableA, B, obsTPB,
+                                                                                tableB)
+            if these_sweeps[0].collision_time <= earliest_collision[A]:
+                nontriv += 1
+                sweeps[A] = these_sweeps[0]
+                earliest_collision[A] = these_sweeps[0].collision_time
+                if these_sweeps[0].collision_time < np.inf:
+                    earliest_collision[A] = these_sweeps[0].collision_time
+            for i in range(1, len(these_sweeps)):
+                if these_sweeps[i].collision_time < earliest_collision[B]:
+                    nontriv += 1
+                    sweeps[B] = these_sweeps[i]
+                    earliest_collision[B] = these_sweeps[i].collision_time
+
+        ## animate
+        collider.animate(sweeps,self.anticol.anim_save_name)
+        self.anticol.anim_save_number += 1
+        self.anticol.anim_save_name = self.anticol.anim_save_prefix + str(self.anticol.anim_save_number)
     
     def _potential(self,rhocs,rhonss,rhoas):
         '''
@@ -1314,9 +1469,6 @@ class PosSchedule(object):
             into a single longer step
             This reduces the number of final steps in the movetable
             If both dt and dp for a step is 0, wait time is added after the previous move
-
-            * Note that we assume neighbors are fixed, so we ignore waittimes in our movements
-            as they are meaningless *
 
             input:
                 dts:    np.array  each value is the amount of change in theta
@@ -1476,6 +1628,11 @@ class Anticol:
         self.verbose = verbose
         self.plotting = True           
 
+        ##** Animation Params **##
+        self.anim_save_prefix = 'anim_' + datetime.datetime.now().strftime('%Y%m%d%H%M')
+        self.anim_save_number = 0
+        self.anim_save_name = self.anim_save_prefix + '_' + str(self.anim_save_number)
+
         ## Define the phi position in degrees at which the positioner is safe
         self.phisafe = collider.Ei_phi
         
@@ -1507,7 +1664,7 @@ class Anticol:
         self.coeffa = 10.0  ## attractive force amplitude of the target location
         
         ##** aSTAR PARAMS **##
-        self.astar_tolerance_xy = 0.2 #3
+        self.astar_tolerance_xy = 0.15 #3
         self.multitest = False
         self.astar_verbose = True
         self.astar_plotting = True

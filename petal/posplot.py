@@ -14,7 +14,7 @@ class PosPlot(object):
     binaries of ffmpeg are available at: http://ffmpeg.zeranoe.com/builds
     """
     def __init__(self, fignum=0, timestep=0.1):
-        self.live_animate = True # whether to plot the animation live
+        self.live_animate = False#True # whether to plot the animation live
         self.save_movie = True # whether to write out a movie file of animation
         self.save_dir_prefix = 'anim'
         self.framefile_prefix = 'frame'
@@ -165,7 +165,7 @@ class PosPlot(object):
             if frame <= item['last_frame']:
                 self.set_patch(self.patches[i], item, frame)
 
-    def animate(self):
+    def animate(self,datestamp=None):
         self.anim_init()
         plt.ion()
         start_end_still_time = 0.5
@@ -174,7 +174,8 @@ class PosPlot(object):
             plt.show()
         if self.save_movie:
             fps = 1/self.timestep
-            datestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+            if datestamp is None:
+                datestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
             self.save_dir = os.path.join(os.getcwd(), self.save_dir_prefix + '_' + datestamp)
             if not(os.path.exists(self.save_dir)):
                 os.mkdir(self.save_dir)

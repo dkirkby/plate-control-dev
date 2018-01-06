@@ -1,38 +1,11 @@
 import os
-
-basepath = os.path.abspath('../')
-logdir = os.path.abspath(os.path.join(basepath,'positioner_logs'))
-allsetdir = os.path.abspath(os.path.join(basepath,'fp_settings'))
-if not os.path.exists(logdir):
-    os.makedirs(logdir)
-    os.makedirs(os.path.join(logdir,'move_logs'))
-    os.makedirs(os.path.join(logdir,'test_logs'))
-    os.makedirs(os.path.join(logdir,'pos_logs'))
-if not os.path.exists(allsetdir):
-    os.makedirs(allsetdir)
-if 'POSITIONER_LOGS_PATH' not in os.environ:
-    os.environ['POSITIONER_LOGS_PATH'] = logdir
-if 'PETAL_PATH' not in os.environ:
-    os.environ['PETAL_PATH'] = basepath
-if 'FP_SETTINGS_PATH' not in os.environ:
-    os.environ['FP_SETTINGS_PATH'] = allsetdir
 import time
 import numpy as np
-import pickle as pkl
-import posmodel
 import matplotlib.pyplot as plt
 import pdb
 from itertools import count
 # speciality
-#from collections import deque
-#import heapq
 from heapq import heappush, heappop
-
-# Which file to load
-#vers = int(np.random.randint(1,3,1))
-#tolerance_xy = 1
-
-#heuristic = 'euclidean'#'phi
 
 
 ###########################
@@ -59,29 +32,18 @@ def get_tp_distance(tgrid,pgrid,target,heuristic='phi'):
         return np.zeros(tgrid.shape)
 
 
-
 def build_bool_grid(xs,ys,xns,yns,tbods,pbods,tolerance):
     bool_map = np.zeros(xs.size).astype(bool)
     is_bad_row = np.zeros(xs.shape[0]).astype(bool)
 
     tbodxs = tbods[:,0,:]
     tbodys = tbods[:,1,:]
-    #pbodxs = pbods[:,:,0,:]
-    #pbodys = pbods[:,:,1,:]    
     
     pbod_xravels = []
     pbod_yravels = []
     for i in range(pbods.shape[3]):
         pbod_xravels.append(pbods[:,:,0,i].ravel())
         pbod_yravels.append(pbods[:,:,1,i].ravel())
-        
-    #xravel = xs.ravel()
-    #yravel = ys.ravel()
-    #theta_tolerance = 0.1*tolerance
-    #pbod_xravels.append(xravel)
-    #pbod_yravels.append(yravel)
-    #all_xravels = np.asarray(pbod_xravels)
-    #all_yravels = np.asarray(pbod_yravels)
 
     for x,y in zip(xns,yns): 
         for xrav,yrav in zip(pbod_xravels,pbod_yravels):
@@ -95,7 +57,6 @@ def build_bool_grid(xs,ys,xns,yns,tbods,pbods,tolerance):
     outmap = bool_map.reshape(xs.shape)
     outmap[is_bad_row,:] = True#False
     return outmap
-
 
 
 def build_adjlist(boolgrid,distances_tp_start,distances_tp_goal):
@@ -114,11 +75,14 @@ def build_adjlist(boolgrid,distances_tp_start,distances_tp_goal):
     adj_list = {}
     # Do the loop, assign neighbors to each node with node index tup as key    
     for i,j in zip(allis.ravel(),alljs.ravel()):
+        # If bool is set, don't use that point
         if expanded_bool[i+1,j+1]:
             continue
+        # Write out all possible neighbors
         possible_neighbors = [ (i-1, j-1) ,  (i-1,j) , (i-1, j+1) ,\
                                (i,   j-1) ,            (i,   j+1) ,\
                                (i+1, j-1) ,  (i+1,j) , (i+1, j+1)  ]
+        # For all neighbors, if they aren't excluded by the bool map, include them in the available neighbors list
         adj_list[(i,j)] = [ ((ip,jp),{'dist_to_start':dtps[ip,jp],'dist_to_goal':dtpg[ip,jp]}) \
                                         for ip,jp in possible_neighbors \
                                             if not expanded_bool[ip+1,jp+1]   ]                          
@@ -138,21 +102,24 @@ def get_final_path(visited,beginning,intersecting_node,orientation='start'):
     return path
 
 
-
-
 def find_path(graph, start, goal,start_to_goal_dist,weight_multiplier,verbose=False):
+    # Assign starting and ending nodes
     node_s = start
     node_g = goal
+    # Make sure that the starting and ending nodes exist in our list of nodes
     if node_s == node_g or node_s not in graph.keys() or node_g not in graph.keys():
         print("Something wrong with nodes, so returning without performing pathfinding")
         #pdb.set_trace()
         return []
 
     # All nodes cost just 1 to move to
-    #move_cost = 0.2
+    # move_cost = 0.2
+
     # visited node                                                                                                                                          
     visited =  [{},{}]
+    # Next up queue
     enqueued = [{},{}]
+    # Count steps (useful to make unique tuples, which are needed for priority tie-breakers)
     c = count()
     # frontier                                                                                                                                              
     # each queue is ( priority, counter (in case of degeneracy in priority), curnode, dist, parent)
@@ -163,27 +130,40 @@ def find_path(graph, start, goal,start_to_goal_dist,weight_multiplier,verbose=Fa
     # Define weigh dictionary keywords for each direction
     ind[0] = 'dist_to_goal'
     ind[1] = 'dist_to_start'
+    # Define 'frontiers' from which we search out from
     frontiers = [[],[]]
+    # Push the start and final positions to the two frontiers
     heappush(frontiers[ind['from_start_search']],(start_to_goal_dist, next(c), node_s, 0, None))
     heappush(frontiers[ind['from_goal_search']],(start_to_goal_dist, next(c), node_g, 0, None))
+    # while we still have things to search, keep searching on both frontiers
     while frontiers[0] and frontiers[1]:
+        # Remove the next node from each frontier
         current = [heappop(frontiers[0]),heappop(frontiers[1])]
         # stopping criterion: min(forward) + min(reverse) > shortest_path_in_graph                                                                          
         for direction_name in ['from_start_search','from_goal_search']:
+            # Get simple, shorthand variables to work with
             i = ind[direction_name]
+            # Unpack the current node
             tr1,tr2, node,cost_to_here,parent = current[i]
+            # If we've already visited the node, skip it
+            # If not, assign it's parent as the node we just came from
             if node in visited[i]:
                 continue
             else:
                 visited[i][node] = parent
+            # cleanup variables
             del tr1,tr2
+            # Calculate the direction of "Momentum" from last move to this move
             if parent == None:
                 last_move_direction = (2,2)  # All moves will get the same weight
             else:
                 last_move_direction = (parent[0]-node[0],parent[1]-node[1])
+            # Look at the weighted cost (including edgec costs and momentum costs) to move to each neighbor
             for neighbor,weights in graph[node]:
+                # Disregard neighbors we've visited
                 if neighbor in visited[i]:
                     continue
+                # Assign lower cost for same direction to incentivize "momentum"
                 if (node[0]-neighbor[0],node[1]-neighbor[1]) == last_move_direction:
                     move_cost = 1
                 else:
@@ -194,11 +174,16 @@ def find_path(graph, start, goal,start_to_goal_dist,weight_multiplier,verbose=Fa
                     saved_cost, saved_move_cost = enqueued[i][neighbor]
                     if (saved_cost+saved_move_cost) <= current_cost:
                         continue
-                
+                    # implied else here
+                    # If any of the neighbors already had a lower cost to go to it, we don't change anything
+                    # But if this is the lowest cost we've found so far, we assign the cost to the neighbor
+                    # and put it in out queue
                 enqueued[i][neighbor] = cost_to_here, move_cost
+                # Push the neighbors into the frontier heap to be looked at
                 heappush(frontiers[i], (current_cost+distance, next(c), neighbor, current_cost, node))
-
+        # Check to see if our two paths have crossed yet
         intersection = set(visited[0]).intersection(set(visited[1]))
+        # If they have crossed, we're done
         if len(intersection)>0:
             intersecting_node = intersection.pop()
             finalpath = get_final_path(visited[0],node_s,intersecting_node,'start')
@@ -362,7 +347,6 @@ def plot_comparison_weight_and_heur(paths,boolgrid,xgrid,ygrid,xns,yns,weights,h
 def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys, phixys,\
                                     anticol_params, heuristics=[], weights=[]):
 
-    
     if anticol_params is None:
         verbose = False
         plotting = True
@@ -386,35 +370,21 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
 
     # Assign the max and min angles for theta and phi, quantized to integers
     post_minmax = curmodel.targetable_range_T
-    posp_minpmax = curmodel.targetable_range_P
-    obst_minmax,obsp_minmax = np.asarray(curmodel.trans.posTP_to_obsTP([post_minmax,posp_minpmax])).astype(np.int)
-
-    tmin, tmax = obst_minmax[0], obst_minmax[1]
-    pmin, pmax = obsp_minmax[0], obsp_minmax[1]
-    #postmin,postmax = curmodel.targetable_range_T
-    #pospmin,pospmax = curmodel.targetable_range_P
-    #tpmin = curmodel.trans.posTP_to_obsTP([postmin,pospmin])
-    #tpmax = curmodel.trans.posTP_to_obsTP([postmax,pospmax])
-    ##phi_safe = curmodel.trans.posTP_to_obsTP([tmin+10,144])[1]
-    #tmin,tmax = int(tpmin[0]),int(tpmax[0])
-    #pmin,pmax = int(tpmin[1]),int(tpmax[1])
-
+    posp_minmax = curmodel.targetable_range_P
+    tmin,pmin = curmodel.trans.posTP_to_obsTP([post_minmax[0],posp_minmax[0]])
+    tmax,pmax = curmodel.trans.posTP_to_obsTP([post_minmax[1],posp_minmax[1]])
+    tmin,pmin,tmax,pmax = int(tmin),int(pmin),int(tmax),int(pmax)
     # Create a grid of theta, phi values (optimized)
     # When turned into 1d arrays, we can loop over them in a single for loop
     # as though it were a double for loop
     true_pgrid,true_tgrid = np.meshgrid(np.arange(pmin,pmax+1),np.arange(tmin,tmax+1))
     
-    assert true_pgrid.shape[0] == phixys.shape[0], "Theta and phi grids aren't the same dimensions as the input matrix of positions!" 
-    assert true_pgrid.shape[1] == phixys.shape[1], "Theta and phi grids aren't the same dimensions as the input matrix of positions!" 
-
-    # Create an equally shaped grid of positive integers. Essentially the indices of the above grid
-    #index_pgrid,index_tgrid = np.meshgrid(np.arange(0,pmax-pmin+1),np.arange(0,tmax-tmin+1))
+    if true_pgrid.shape[0] != phixys.shape[0]:
+        print("Theta and phi grids aren't the same dimensions as the input matrix of positions!")
+    if true_pgrid.shape[1] != phixys.shape[1]:
+        print("Theta and phi grids aren't the same dimensions as the input matrix of positions!")
 
     # Get the obsXY values for all of the grid points
-    #pos_tps = curmodel.trans.obsTP_to_posTP([true_tgrid.ravel(),true_pgrid.ravel()])
-    #xvect,yvect = curmodel.trans.posTP_to_obsXY(pos_tps)
-    #xgrid = np.asarray(xvect).reshape(true_tgrid.shape)
-    #ygrid = np.asarray(yvect).reshape(true_tgrid.shape)
     xvect,yvect = curmodel.trans.obsTP_to_flatXY([true_tgrid.ravel(),true_pgrid.ravel()])
     xgrid = np.asarray(xvect).reshape(true_tgrid.shape)
     ygrid = np.asarray(yvect).reshape(true_tgrid.shape)
@@ -449,7 +419,6 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
         unique_moves = []
         outline_xs = []
         outline_ys = []
-    # Loop over the specified heuristics
 
     # Find the distances from every grid point to the starting point and goal point
     distances_tp_start = get_tp_distance(true_tgrid,true_pgrid,true_starttp,heuristic)
@@ -464,6 +433,7 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
     if index_starttp not in graph.keys() or index_goaltp not in graph.keys():
         multitest_results = {'heuristic':[heuristic],'weight':[weight],'pathlength_full':[np.nan],'pathlength_condensed':[np.nan],'found_path':[2]}
         print("It looks like the start or end point wasn't allowed in my astar bool map")
+        print("My information shows that start tp=({},{}), final tp=({},{})".format(index_starttp[0],index_starttp[1],index_goaltp[0],index_goaltp[1]))
         # Now lets save the theta body locations for 4 points along the path for plotting purposes
         if plotting:
             true_path_samps = [true_starttp,true_goaltp]
@@ -499,7 +469,7 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
             # 2 intermediate, and end moves
             plot_result(index_path_samps,boolgrid,xgrid,ygrid,xns,yns,'Failed',outline_xs,outline_ys)
             
-            plt.savefig('../../figures/nopath_weight-{0}_and_heuristics-th-euc_comp_{1}.png'.format(weight,str(time.time()).split('.')[0]),dpi=600)
+            plt.savefig('../figures/nopath_weight-{0}_and_heuristics-th-euc_comp_{1}.png'.format(weight,str(time.time()).split('.')[0]),dpi=600)
             plt.close()
     else:
         true_path = [(i+tmin,j+pmin) for i,j in ind_path]

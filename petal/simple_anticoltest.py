@@ -35,7 +35,7 @@ from astropy.table import Table
 import pdb
 
 import pickle as pkl
-curnposs = 20#120
+curnposs = 20
 #np_fil = 500
 size_vals = np.asarray([100,200,300,400,500])
 nrandtploops = 1#30
@@ -134,8 +134,6 @@ def run_random_example(nposs):
         curpetal.schedule_moves(anticollision=True)
         print("Anticollision took: %0.2f seconds" %(time.time()-stime))
         #keep_going = str(input('\n\n\n\nKeep going? '))
-    
-
 
 
 def load_random_state(pkl_file,index):
@@ -168,7 +166,7 @@ def create_random_state_opt(poscols,posmodels,typ= 'obsTP'):
             if iterations > nattempts:
                 print("Breaking because 2000 iterations were peformed unsuccessfully for index %d" %i)
                 tp_obs.append([randtheta,phi_max])
-                if typ == 'obsTP':
+                if typ == 'posTP':
                     tp_pos.append(posmod.trans.obsTP_to_posTP([randtheta,phi_max]))
             avoid_thetaphi_collisions = False
             iterations += 1
@@ -198,10 +196,59 @@ def create_random_state_opt(poscols,posmodels,typ= 'obsTP'):
         return tp_obs
         
         
-        
+def animate_table(curpetal,tps):
+    '''
+        Find what positioners collide, and who they collide with
+        Inputs:
+            tps:  list or numpy array of theta,phi pairs that specify the location
+                    of every positioner
+            cur_poscollider:  poscollider object used to find the actual collisions
+            list_tables:   list of all the movetables
+
+        Outputs:
+           All 3 are numpy arrays giving information about every collision that occurs.
+            collision_indices: list index which identifies the positioners that collide
+                                this has 2 indices in a pair [*,*] if 2 positioners collided
+                                or [*,None] if colliding with a wall of fiducial.
+            collision_types:   Type of collision as specified in the pc class
+    '''
+    collider = curpetal.collider
+    list_tables = list(curpetal.schedule.move_tables)
+    posmodel_index_iterable = range(len(collider.posmodels))
+    sweeps = [[] for i in posmodel_index_iterable]
+    earliest_collision = [np.inf for i in posmodel_index_iterable]
+    nontriv = 0
+    colrelations = collider.collidable_relations
+    for A, B, B_is_fixed in zip(colrelations['A'], colrelations['B'], colrelations['B_is_fixed']):
+        tableA = list_tables[A].for_schedule
+        obsTPA = tps[A]
+        if B_is_fixed and A in range(len(
+                list_tables)):  ## might want to replace 2nd test here with one where we look in tables for a specific positioner index
+            these_sweeps = collider.spacetime_collision_with_fixed(A, obsTPA, tableA)
+        elif A in range(len(list_tables)) and B in range(len(
+                list_tables)):  ## again, might want to look for specific indexes identifying which tables go with which positioners
+            tableB = list_tables[B].for_schedule
+            obsTPB = tps[B]
+            these_sweeps = collider.spacetime_collision_between_positioners(A, obsTPA, tableA, B, obsTPB,
+                                                                                 tableB)
+        if these_sweeps[0].collision_time <= earliest_collision[A]:
+            nontriv += 1
+            sweeps[A] = these_sweeps[0]
+            earliest_collision[A] = these_sweeps[0].collision_time
+            if these_sweeps[0].collision_time < np.inf:
+                earliest_collision[A] = these_sweeps[0].collision_time
+        for i in range(1, len(these_sweeps)):
+            if these_sweeps[i].collision_time < earliest_collision[B]:
+                nontriv += 1
+                sweeps[B] = these_sweeps[i]
+                earliest_collision[B] = these_sweeps[i].collision_time
+
+    ## return the earliest collision time and collision indices
+    return sweeps
+
 if __name__ == '__main__':
     #import cProfile
     #cProfile.run('run_random_example(curnposs)')
-    for i in range(nloops):
-        run_random_example(curnposs*(i+1))
+    for loopitter in range(nloops):
+        run_random_example(curnposs)
         
