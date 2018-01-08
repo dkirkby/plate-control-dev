@@ -27,7 +27,7 @@ import sys
 import datetime
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
-sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
+sys.path.append(os.path.abspath('../../positioner_logs/data_processing_scripts/'))
 import fvchandler
 import petal
 import petalcomm
@@ -72,10 +72,10 @@ class MoveGUI(object):
 
         # Load Travellers
         url1='https://docs.google.com/spreadsheets/d/1lJ9GjhUUsK2SIvXeerpGW7664OFKQWAlPqpgxgevvl8/edit#gid=0' # PosID, SiID database
-        self.sheet1=googlesheets.connect_by_url(url1,credentials = '../../../positioner_logs/data_processing_scripts/google_access_account.json')
+        self.sheet1=googlesheets.connect_by_url(url1,credentials = '../../positioner_logs/data_processing_scripts/google_access_account.json')
      
         url2='https://docs.google.com/spreadsheets/d/19Aq-28qgODaaX9wH-NMsX_GiuNyXG_6rjIjPVLb8aYw/edit#gid=795996596' # Acceptance Traveller
-        self.sheet2=googlesheets.connect_by_url(url2,credentials = '../../../positioner_logs/data_processing_scripts/google_access_account.json')
+        self.sheet2=googlesheets.connect_by_url(url2,credentials = '../../positioner_logs/data_processing_scripts/google_access_account.json')
         
         
         mainloop()
@@ -358,19 +358,19 @@ class MoveGUI(object):
             self.text2.insert('0.0','Cannot load all positioners simultaneously. \nSelect one positioner.\n')
         else: 
             # Find the column we want first
-            pos_list=googlesheets.read_row(self.sheet2,6,False)
+            pos_list=googlesheets.read_row(self.sheet2,2,False)
             column_skip=6 # Skip the first 6 description columns
             pos_list=np.array(pos_list[column_skip:])
             selected_can_str=str(self.selected_can)
             selected_can_str.strip()
             ind=np.where(pos_list == selected_can_str)          
             if not ind[0]:
-                self.text2.insert('0.0','Cannot find this positioner... \n')
+                self.text2.insert('0.0','Cannot find this positioner while loading... \n')
             else:
                 col_id=ind[0][0]+column_skip+1
                 column_info=googlesheets.read_col(self.sheet2,col_id,False)
                 column_info_title=googlesheets.read_col(self.sheet2,2,False)
-                ref_list=['', '', '', '', '', '', '', '', '', '', '', '', '', 'A', '', 'A', '', '', '', '', '', 'Y', 'Y', 'Y', 'B', 'B', 'N', 'Y', 'N', 'Y', 'N', 'Y', 'N', 'N', 'Y', 'Y', 'A', '', '', '', '', 'P', '', '', '', '', '', '', 'Y', 'Y', 'Y', 'Y', '', '', '', '', '', '', '', '', '', '', '', '', '', '','']
+                ref_list=['', '', '', '', '', '', '', '',  'A','','', '', '', '', '','','Y', 'Y', 'Y', 'B', 'B', 'N', 'Y', 'N', 'Y', 'N', 'Y', 'N', 'N', 'Y', 'Y', 'A', 'P', '', '', '', '', 'Y', 'Y', 'Y', 'Y', '', '', '', '', '', '', '', '', '', '', '', '', '', '','','','','','']
                 #['', '', '', '2017-10-23', '', '1748', '5899', '', '', 'John Mourelatos', '2017-10-23', '', '1.15', 'A', '4.3', 'A', '', '', '', 'John Mourelatos', '2017-10-23', 'Y', 'Y', 'Y', 'B', 'B', 'N', 'Y', 'N', 'Y', 'N', 'Y', 'N', 'N', 'Y', 'Y', 'A', '', '', 'John Mourelatos', '2017-10-23', 'P', '0.00997', '0.12588', 'SKIP', 'SKIP', '', '', 'Y', 'Y', 'Y', 'Y', '', '', '', '', '0.13585', '', 'YES', '', '', '', '2017-11-03', 'KAI ZHANG', 'GREY TOTE\n---------\nREADY FOR PFA INSTALL', 'KZ']
                  
                 for i in range(len(column_info)):
@@ -415,7 +415,7 @@ class MoveGUI(object):
             self.text2.insert('0.0','Cannot write all positioners simultaneously for safety reason. \nSelect one positioner.\n')
         else: 
             # Find the column we want first
-            pos_list=googlesheets.read_row(self.sheet2,6,False)
+            pos_list=googlesheets.read_row(self.sheet2,2,False)
             column_skip=6 # Skip the first 6 description columns
             pos_list=np.array(pos_list[column_skip:])
             selected_can_str=str(self.selected_can)
@@ -426,32 +426,32 @@ class MoveGUI(object):
             else:
                 col_id=ind[0][0]+column_skip+1
                 if self.plug.get()==1:
-                    googlesheets.write(self.sheet2,49,col_id,'Y',False,False)
+                    googlesheets.write(self.sheet2,38,col_id,'Y',False,False)
                 else:
-                    googlesheets.write(self.sheet2,49,col_id,'N',False,False)
+                    googlesheets.write(self.sheet2,38,col_id,'N',False,False)
                 if self.entered.get()==1:
-                    googlesheets.write(self.sheet2,50,col_id,'Y',False,False)
+                    googlesheets.write(self.sheet2,39,col_id,'Y',False,False)
                 else:
-                    googlesheets.write(self.sheet2,50,col_id,'N',False,False)
+                    googlesheets.write(self.sheet2,39,col_id,'N',False,False)
                 if self.theta_work.get()==1:
-                    googlesheets.write(self.sheet2,51,col_id,'Y',False,False)
+                    googlesheets.write(self.sheet2,40,col_id,'Y',False,False)
                 else:
-                    googlesheets.write(self.sheet2,51,col_id,'N',False,False)
+                    googlesheets.write(self.sheet2,40,col_id,'N',False,False)
                 if self.phi_work.get()==1:
-                    googlesheets.write(self.sheet2,52,col_id,'Y',False,False)
+                    googlesheets.write(self.sheet2,41,col_id,'Y',False,False)
                 else:
-                    googlesheets.write(self.sheet2,52,col_id,'N',False,False)
-                googlesheets.write(self.sheet2,53,col_id,self.e3.get(),False,False)
+                    googlesheets.write(self.sheet2,41,col_id,'N',False,False)
+                googlesheets.write(self.sheet2,42,col_id,self.e3.get(),False,False)  #53 before
                 if self.box_goto.get() == self.box_options[0]:   # If accept for PFA installation
-                    googlesheets.write(self.sheet2,63,col_id,self.e4.get(),False,False)
-                    googlesheets.write(self.sheet2,64,col_id,self.e5.get(),False,False)
-                    googlesheets.write(self.sheet2,65,col_id,self.box_goto.get(),False,False)
-                    googlesheets.write(self.sheet2,66,col_id,self.e6.get(),False,False)
+                    googlesheets.write(self.sheet2,58,col_id,self.e4.get(),False,False)
+                    googlesheets.write(self.sheet2,59,col_id,self.e5.get(),False,False)
+                    googlesheets.write(self.sheet2,60,col_id,self.box_goto.get(),False,False)
+                    googlesheets.write(self.sheet2,61,col_id,self.e6.get(),False,False)
                 else:
-                    googlesheets.write(self.sheet2,63,col_id,'No',False,False)
-                    googlesheets.write(self.sheet2,64,col_id,'No',False,False)
-                    googlesheets.write(self.sheet2,65,col_id,self.box_goto.get(),False,False)
-                    googlesheets.write(self.sheet2,66,col_id,self.e6.get(),False,False)
+                    googlesheets.write(self.sheet2,58,col_id,'No',False,False)
+                    googlesheets.write(self.sheet2,59,col_id,'No',False,False)
+                    googlesheets.write(self.sheet2,60,col_id,self.box_goto.get(),False,False)
+                    googlesheets.write(self.sheet2,61,col_id,self.e6.get(),False,False)
                 self.load_acceptance_traveller()
     
     
