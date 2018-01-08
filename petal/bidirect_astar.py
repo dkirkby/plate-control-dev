@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pdb
 from itertools import count
+import datetime
 # speciality
 from heapq import heappush, heappop
 
@@ -445,7 +446,7 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
             # The boolean avoidance grid, and the positioner body for the start, 
             # 2 intermediate, and end moves
             plot_result(index_path_samps,boolgrid,xgrid,ygrid,xns,yns,'Non-Starter',outline_xs,outline_ys)
-            plt.savefig('../figures/start_or_end_unaccessible_{}.png'.format(np.random.randint(low=0,high=2**31,size=1)),dpi=600)
+            plt.savefig('../figures/start_or_end_unaccessible_{}.png'.format(datetime.datetime.now().strftime('%Y%m%d%H%M')),dpi=600)
             plt.close()
         #pdb.set_trace()
         return None,None,None, multitest_results
@@ -469,7 +470,7 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
             # 2 intermediate, and end moves
             plot_result(index_path_samps,boolgrid,xgrid,ygrid,xns,yns,'Failed',outline_xs,outline_ys)
             
-            plt.savefig('../figures/nopath_weight-{0}_and_heuristics-th-euc_comp_{1}.png'.format(weight,str(time.time()).split('.')[0]),dpi=600)
+            plt.savefig('../figures/nopath_weight-{0}_and_heuristics-th-euc_comp_{1}.png'.format(weight,datetime.datetime.now().strftime('%Y%m%d%H%M')),dpi=600)
             plt.close()
     else:
         true_path = [(i+tmin,j+pmin) for i,j in ind_path]
@@ -495,7 +496,7 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
             #                        [weight],[heuristic],unique_moves,outline_xs,outline_ys)
             plot_result(ind_path,boolgrid,xgrid,ygrid,xns,yns,\
                                     heuristic,outline_xs,outline_ys)
-            plt.savefig('../figures/weight-{0}_and_heuristics-th-euc_comp_{1}.png'.format(weight,str(time.time()).split('.')[0]),dpi=600)
+            plt.savefig('../figures/weight-{0}_and_heuristics-th-euc_comp_{1}.png'.format(weight,datetime.datetime.now().strftime('%Y%m%d%H%M')),dpi=600)
             plt.close()
     
         # If testing out multiple heuristics and or weights, loop over them.

@@ -1,16 +1,17 @@
 import posmovetable
 import posconstants as pc
+from bidirect_astar import bidirectional_astar_pathfinding
 
 ## External Dependencies
 import numpy as np
 from collections import Counter
+import datetime
+import os
 
 ## Temporary Debugging Dependencies
 import matplotlib.pyplot as plt
 import pdb
 import copy as copymodule
-from bidirect_astar import bidirectional_astar_pathfinding
-import datetime
 
 class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners
@@ -240,7 +241,7 @@ class PosSchedule(object):
         self.anticol.xoffs = np.asarray(xoffs)
         self.anticol.yoffs = np.asarray(yoffs)
 
-        plt.figure()
+        #plt.figure()
         radians = np.arange(0,2*np.pi,np.pi/200)
         xcirc = 6*np.cos(radians)
         ycirc = 6*np.sin(radians)
@@ -249,11 +250,11 @@ class PosSchedule(object):
         petal_y = petal_coords[1].tolist()
         petal_x.append(petal_x[0])
         petal_y.append(petal_y[0])
-        plt.plot(petal_x,petal_y,'k-')
-        plt.plot(xoffs,yoffs,'k.')
-        for xoff,yoff in zip(xoffs,yoffs):
-            plt.plot(xoff+xcirc,yoff+ycirc,'r-')
-        plt.show()
+        #plt.plot(petal_x,petal_y,'k-')
+        #plt.plot(xoffs,yoffs,'k.')
+        #for xoff,yoff in zip(xoffs,yoffs):
+        #    plt.plot(xoff+xcirc,yoff+ycirc,'r-')
+        #plt.show()
         ## Now that we have the requests curated and sorted. Lets do anticollision
         ## using the PosAnticol.avoidance method specified
         move_tables = self._run_RRE_anticol(tpstart,tptarg,posmodels)
@@ -345,7 +346,8 @@ class PosSchedule(object):
             oper_info = relevant_info[step]
 
             ## animate
-            self._animate_movetables(oper_info['movetables'], oper_info['tpstarts'])
+            if self.anticol.plotting == True:
+                self._animate_movetables(oper_info['movetables'], oper_info['tpstarts'])
 
             ## Check for collisions   oper_info['
             collision_indices, collision_types = \
@@ -375,20 +377,23 @@ class PosSchedule(object):
                 print("\nNumber corrected: {}\n\n\n\n".format(ncols-len(collision_indices)))
 
             ## animate
-            self._animate_movetables(oper_info['movetables'], oper_info['tpstarts'])
+            if self.anticol.plotting == True:
+                self._animate_movetables(oper_info['movetables'], oper_info['tpstarts'])
 
         output_tables = {key: relevant_info[key]['movetables'] for key in order_of_operations[:2]}
         output_tables['extend'] = self._reverse_for_extension(relevant_info['extend']['movetables'])
         merged_tables = self._combine_tables(output_tables)
 
         ## animate
-        self._animate_movetables(merged_tables, tps_list)
+        if self.anticol.plotting == True:
+            self._animate_movetables(merged_tables, tps_list)
 
         collision_indices, collision_types = self._check_for_collisions(tps_list, merged_tables)
         merged_tables, zeroed = self._avoid_collisions(merged_tables,posmodels,collision_indices,tpss=tps_list,algorithm='zeroth_order')
 
         ## animate
-        self._animate_movetables(merged_tables, tps_list)
+        if self.anticol.plotting == True:
+            self._animate_movetables(merged_tables, tps_list)
 
         if self.anticol.verbose:
             collision_indices, collision_types = self._check_for_collisions(tps_list, merged_tables)
@@ -396,8 +401,10 @@ class PosSchedule(object):
             nzero =len(np.unique(zeroed))
             ntot = len(tps_list)
             print("Number of zerod positioners: {}, total number of targets: {}, successes: {}%".format(nzero,ntot,100*(1-(float(nzero)/float(ntot)))))
+
             ## animate
-            self._animate_movetables(merged_tables, tps_list)
+            if self.anticol.plotting == True:
+                self._animate_movetables(merged_tables, tps_list)
 
         return merged_tables
                                                 
@@ -918,7 +925,8 @@ class PosSchedule(object):
             print("Max times to start are: ",maxtime)
                 ## After all collision avoidances attempted. Return the new list of movetables
         import time
-        with open('../outputs/run_results__{0}.csv'.format(str(time.time()).split('.')[0]),'w') as runresultsfile:
+
+        with open(os.path.join(self.anticol.anim_save_folder,'run_results__{0}.csv'.format(self.anticol.anim_save_number)),'w') as runresultsfile:
             keys = np.sort(list(run_results.keys()))
             line = ''
             for key in keys:
@@ -928,7 +936,8 @@ class PosSchedule(object):
                 line = ''
                 for key in keys:
                     line += str(run_results[key][itt])+','
-                runresultsfile.write(line[:-1]+'\n')    
+                runresultsfile.write(line[:-1]+'\n')
+        self.anticol.anim_save_number += 1
         return tables, altered_pos
         
  
@@ -1399,7 +1408,6 @@ class PosSchedule(object):
         posmodel_index_iterable = range(len(collider.posmodels))
         sweeps = [[] for i in posmodel_index_iterable]
         earliest_collision = [np.inf for i in posmodel_index_iterable]
-        nontriv = 0
         colrelations = collider.collidable_relations
         for A, B, B_is_fixed in zip(colrelations['A'], colrelations['B'], colrelations['B_is_fixed']):
             tableA = list_tables[A].for_schedule
@@ -1414,21 +1422,28 @@ class PosSchedule(object):
                 these_sweeps = collider.spacetime_collision_between_positioners(A, obsTPA, tableA, B, obsTPB,
                                                                                 tableB)
             if these_sweeps[0].collision_time <= earliest_collision[A]:
-                nontriv += 1
                 sweeps[A] = these_sweeps[0]
-                earliest_collision[A] = these_sweeps[0].collision_time
                 if these_sweeps[0].collision_time < np.inf:
                     earliest_collision[A] = these_sweeps[0].collision_time
             for i in range(1, len(these_sweeps)):
                 if these_sweeps[i].collision_time < earliest_collision[B]:
-                    nontriv += 1
                     sweeps[B] = these_sweeps[i]
                     earliest_collision[B] = these_sweeps[i].collision_time
 
         ## animate
-        collider.animate(sweeps,self.anticol.anim_save_name)
+        #for sweep in sweeps:
+        #    print('\ntpdots:{}\n'.format(sweep.tp_dot))
+        #    #print('id:{}\ntimes:{}\ntps:{}\ntpdots:{}\ncollision case: {} collision time: {}'.format(sweep.posidx,sweep.time,\
+        #    #      sweep.tp,sweep.tp_dot ,sweep.collision_case,sweep.collision_time))
+        collider.animate(sweeps=sweeps,savedir=self.anticol.anim_save_folder,\
+                         vidname=self.anticol.anim_template.format(savenum=self.anticol.anim_save_number))
+        if os.sys.platform == 'win32' or os.sys.platform == 'win64':
+            delcom = 'del'
+        else:
+            delcom = 'rm'
+        os.system('{delcommand} {savedir}*.png'.format(delcommand=delcom, savedir=os.path.join(self.anticol.anim_save_folder,'frame')))
         self.anticol.anim_save_number += 1
-        self.anticol.anim_save_name = self.anticol.anim_save_prefix + str(self.anticol.anim_save_number)
+
     
     def _potential(self,rhocs,rhonss,rhoas):
         '''
@@ -1629,9 +1644,13 @@ class Anticol:
         self.plotting = True           
 
         ##** Animation Params **##
-        self.anim_save_prefix = 'anim_' + datetime.datetime.now().strftime('%Y%m%d%H%M')
+        self.anim_save_folder = os.path.join('..','figures',datetime.datetime.now().strftime('%Y%m%d%H%M'))
+        anim_save_prefix = 'anim_'
+        #anim_beginning = os.path.join(anim_save_folder,anim_save_prefix)
+        self.anim_template = anim_save_prefix + '{savenum}.mp4'
         self.anim_save_number = 0
-        self.anim_save_name = self.anim_save_prefix + '_' + str(self.anim_save_number)
+        if self.plotting == True and not os.path.exists(self.anim_save_folder):
+            os.makedirs(self.anim_save_folder)
 
         ## Define the phi position in degrees at which the positioner is safe
         self.phisafe = collider.Ei_phi

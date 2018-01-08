@@ -1,4 +1,5 @@
 import os
+import os
 
 basepath = os.path.abspath('../')
 logdir = os.path.abspath(os.path.join(basepath,'positioner_logs'))

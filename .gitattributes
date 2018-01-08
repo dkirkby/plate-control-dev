@@ -1,6 +1,7 @@
 * text=auto !eol
 bin/petal -text
 bin/petalcontroller -text
+petal/anticol_sim.py -text
 petal/bidirect_astar.py -text
 petal/create_locations.py -text
 petal/deprecated_posanticollision.py -text

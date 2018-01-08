@@ -49,11 +49,12 @@ class PosCollider(object):
             self._identify_neighbors(p)
         self._update_collidable_relations()
 
-    def animate(self, sweeps,savename=None):
+    def animate(self, sweeps,savedir=None,vidname=None):
         """Makes an animation of positioners moving about the petal.
             sweeps ... list of PosSweep instances describing positioners' real-time moves
         """
-        self.plotter.clear()
+        self.plotter = posplot.PosPlot(fignum=0, timestep=self.timestep)
+        #self.plotter.clear()
         all_times = [s.time for s in sweeps]
         global_start = np.min([np.min(t) for t in all_times])
         self.plotter.add_or_change_item('GFA', '', global_start, self.keepout_GFA.points)
@@ -74,7 +75,7 @@ class PosCollider(object):
                     self.plotter.add_or_change_item('GFA', '', s.time[i], self.keepout_GFA.points, s.collision_time)
                 elif s.collision_case == pc.case.PTL:
                     self.plotter.add_or_change_item('PTL', '', s.time[i], self.keepout_PTL.points, s.collision_time)
-        self.plotter.animate(savename)
+        self.plotter.animate(savedir,vidname)
 
     def spacetime_collision_between_positioners(self, idxA, init_obsTP_A, tableA, idxB, init_obsTP_B, tableB):
         """Wrapper for spacetime_collision method, specifically for checking two positioners
