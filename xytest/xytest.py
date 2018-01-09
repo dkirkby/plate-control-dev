@@ -634,12 +634,26 @@ class XYTest(object):
 		location in their respective patrol disks.
 		"""
 		requests = []
-		for local_target in xytargets_list:
-			these_targets = {}
+		if not(self.xytest_conf['shuffle_targets']):
+			for local_target in xytargets_list:
+				these_targets = {}
+				for posid in sorted(self.posids):
+					these_targets[posid] = {'command':'posXY', 'target':local_target}
+				requests.append(these_targets)
+			return requests
+		else:
+			xytargets_dict = {}
 			for posid in sorted(self.posids):
-				these_targets[posid] = {'command':'posXY', 'target':local_target}
-			requests.append(these_targets)
-		return requests
+				np.random.seed(int(posid[1:]))
+				shuffled_targets = list(xytargets_list)
+				np.random.shuffle(shuffled_targets)
+				xytargets_dict[posid] = shuffled_targets
+			for i in range(len(xytargets_list)):
+				these_targets = {}
+				for posid in sorted(self.posids):
+					these_targets[posid] = {'command':'posXY', 'target':xytargets_dict[posid][i]}
+				requests.append(these_targets)
+			return requests
 
 	def track_file(self, filename, commit='always'):
 		"""Use this to put new filenames into the list of new and changed files we keep track of.
