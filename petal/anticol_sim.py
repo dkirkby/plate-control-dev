@@ -1,5 +1,25 @@
+################
+## Parameters ##
+################
+
+## How many positioners would you like to use?
+curnposs = 400
+## How many times should this run iteratively with new positions?
+nloops = 1
+## Whether to delete the old temporary files with the same names that will be generated upon execution of this script
+delete_prev_tempfiles = False
+
+
+##############################
+####  Imports and setup   ####
+##############################
+
 ## Need os so that we can define all the environment variables appropriately prior to loading focalplane-specific code
 import os
+import numpy as np
+import time
+from astropy.table import Table
+import pdb
 
 ## Define the locations in the environment so other modules can find them
 ## Define pythonically all the locations for the desi files
@@ -13,8 +33,6 @@ if 'POSITIONER_LOGS_PATH' in os.environ:
 else:
     logdir = os.path.abspath(os.path.join(basepath, 'positioner_logs'))
     os.environ['POSITIONER_LOGS_PATH'] = logdir
-
-
 if 'PETAL_PATH' in os.environ:
     pass
 else:
@@ -26,7 +44,7 @@ else:
     allsetdir = os.path.abspath(os.path.join(basepath, 'fp_settings'))
     os.environ['FP_SETTINGS_PATH'] = allsetdir
 
-
+## Define other useful directories and make them if they don't exist
 outputsdir = os.path.abspath(os.path.join(basepath,'outputs'))
 figdir = os.path.abspath(os.path.join(basepath,'figures'))
 tempdir = os.path.join(os.environ['HOME'],'fp_temp_files','')
@@ -35,28 +53,18 @@ if not os.path.exists(logdir):
     for dirname in ['move','test','pos']:
         fullpath = os.path.join(logdir,'{}_logs'.format(dirname))
         os.makedirs(fullpath)
-for direct in [allsetdir,tempdir,outputsdir,figdir]:
-    if not os.path.exists(direct):
-        os.makedirs(direct)
+for dirname in [allsetdir,tempdir,outputsdir,figdir]:
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
 
-
-import numpy as np
-import posconstants as pc
+## Make the last imports, desi specific code
 import petal
-import time
-from astropy.table import Table
-import pdb
-import pickle as pkl
+import posconstants as pc
 
-################
-## Parameters ##
-################
-## How many positioners would you like to use?
-curnposs = 400
-## How many times should this run iteratively with new positions?
-nloops = 1
-## Whether to delete the old temporary files with the same names that will be generated upon execution of this script
-delete_prev_tempfiles = False
+
+###########################
+####  Main Code Body   ####
+###########################
 
 def run_random_example(nposs,deltemps=False):
     '''
