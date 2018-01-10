@@ -890,19 +890,19 @@ class PosSchedule(object):
                     print("Failed to find a solution. Nothing has been changed for positioners {} and {}".format(A,B))
         ## end of while loop over all collisions
 
-        with open(os.path.join(self.anticol.anim_save_folder,
-                               'run_results__{0}.csv'.format(self.anticol.anim_save_number)), 'w') as runresultsfile:
-            keys = np.sort(list(run_results.keys()))
-            line = ''
-            for key in keys:
-                line += key + ','
-            runresultsfile.write(line[:-1] + '\n')
-            for itt in range(len(run_results['heuristic'])):
-                line = ''
-                for key in keys:
-                    line += str(run_results[key][itt]) + ','
-                runresultsfile.write(line[:-1] + '\n')
-        self.anticol.anim_save_number += 1
+        # with open(os.path.join(self.anticol.anim_save_folder,
+        #                        'run_results__{0}.csv'.format(self.anticol.anim_save_number)), 'w') as runresultsfile:
+        #     keys = np.sort(list(run_results.keys()))
+        #     line = ''
+        #     for key in keys:
+        #         line += key + ','
+        #     runresultsfile.write(line[:-1] + '\n')
+        #     for itt in range(len(run_results['heuristic'])):
+        #         line = ''
+        #         for key in keys:
+        #             line += str(run_results[key][itt]) + ','
+        #         runresultsfile.write(line[:-1] + '\n')
+        # self.anticol.anim_save_number += 1
 
         if len(altered_pos) > 0:
             ## Correct timing so everything is in sync again
