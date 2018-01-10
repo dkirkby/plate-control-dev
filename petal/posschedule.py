@@ -705,8 +705,8 @@ class PosSchedule(object):
                 if self.anticol.verbose:
                     print("Trying to correct indices ",A,B," with ",algorithm," avoidance")
                 ## If the target is where we start, something weird is up
-                if target[0] == start[0] and target[1]==start[1] and self.anticol.verbose:
-                    #pdb.set_trace()
+                #if target[0] == start[0] and target[1]==start[1] and self.anticol.verbose:
+                #    pdb.set_trace()
                     
                 ## Create a dictionary called neighbors with all useful information of the neighbors
                 neighbors = {}
