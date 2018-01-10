@@ -286,12 +286,7 @@ class PosSchedule(object):
 
         for oper in order_of_operations:
             relevant_info[oper] = { 'movetables':[], 'movetimes':[], 'maxtime':[], 'tpstarts':[], 'tpfinals':[] }
-        #tabledicts = {item:[] for item in order_of_operations}
-        #movetimes = {item:[] for item in order_of_operations}
-        #maxtimes = {item:0. for item in order_of_operations}
-        #tpstart = {item:[] for item in order_of_operations}
-        #tpfinal = {item:[] for item in order_of_operations}
-        
+
         ## Loops through the requests
         ## Each request must have retract, rotate, and extend moves
         ## Which each have different start and end theta/phis
@@ -529,6 +524,7 @@ class PosSchedule(object):
         else:
             return self._avoid_collisions_zerothorder(tables,posmodels,collision_indices,tpss)
 
+    # todo-anthony split this into algorithm generic and specific, move generic to above function
     def _avoid_collisions_astar(self, tables, posmodels, collision_indices, \
                           collision_types, tpss, tpfs, \
                           step, maxtimes, algorithm):
@@ -935,7 +931,7 @@ class PosSchedule(object):
         return tables, altered_pos
         
  
-       
+    # todo-anthony get this back to a functional state
     def _em_resolution(self,posmodel,start,target,neighbors=None,dp_direction = 0):
         '''
             Avoids the neightbors for the currenct posmodel and gets the positioner from the 
@@ -1104,7 +1100,9 @@ class PosSchedule(object):
         Vs = self._potential(rhocs,rhonss,rhoas)  
         return Vs       
       
+    # iidea - zero the top percent instead of 1 at a time (quicker for large positioner numbers)
 
+    # fbug understand why a zeroed positioner is still occasionally selected
     def _avoid_collisions_zerothorder(self,tables,posmodels,collision_indices,tpss):
         '''
             The original, and simplest method of avoiding collisions.
@@ -1177,7 +1175,6 @@ class PosSchedule(object):
             self._animate_movetables(tables, tpss)
         return tables, zerod
 
-
     def _zerothorder_avoidance_iteration(self,tables, posmodels, collision_indices, tpss, zerod):
         unique_indices = self._unique_inds(collision_indices)
         possits_to_zero = []
@@ -1239,7 +1236,7 @@ class PosSchedule(object):
             tables[best_pos] = table
         return tables, best_pos
 
-
+    # todo-anthony is this still most efficient and accurate way?
     def _get_max_time(self,tables):
         ## Find out how long the longest move takes to execute
         movetimes = np.asarray([table.for_schedule['move_time'][-1] for table in tables])
@@ -1251,6 +1248,7 @@ class PosSchedule(object):
         max_time = np.max(movetimes)
         return max_time
 
+    # todo-anthony double check this code
     def _check_for_collisions(self,tps,list_tables):
         '''
             Find what positioners collide, and who they collide with
@@ -1326,7 +1324,7 @@ class PosSchedule(object):
         ## return the earliest collision time and collision indices
         return collision_indices, collision_types
     
-
+    # todo-anthony double check this code
     def _check_single_positioner_for_collisions(self,tps,list_tables,index):
         '''
             Find what positioners collide, and who they collide with
@@ -1472,7 +1470,7 @@ class PosSchedule(object):
                 newtab.extend(tabledicts[step][tablenum])
             output_tables.append(newtab)
         return output_tables
-        
+
     def _condense(self,dts,dps):
         '''
             Important routine. Goes through a newly created set of moves and 
@@ -1515,10 +1513,12 @@ class PosSchedule(object):
             else:
                 output_t.append(dts[i])
                 output_p.append(dps[i])
+                # note the 0 here. wait times aren't considered
                 output_times.append(0.)
                 current_column += 1
         return np.asarray(output_t),np.asarray(output_p),np.asarray(output_times)
 
+    # todo-anthony double check this function
     def _reverse_for_extension(self,tables):
         ## For each positioner, merge the three steps (r,r,e) into a single move table
         output_tables = []
@@ -1538,7 +1538,7 @@ class PosSchedule(object):
         return output_tables        
 
         
-        
+    # todo-anthony what should we do with this?
     def _assign_properly(self,theta,phi):
         '''
          Helper function that takes two variables theta and phi and returns a list pair of 
@@ -1695,6 +1695,7 @@ class Anticol:
         ##############################################
         ## Create an outlines class object with spacing comparable to the tolerance
         ## of the search
+        # iidea - higher res on non-rotating neighbors ? 
         self.posoutlines = PosOutlines(collider, spacing=self.astar_tolerance_xy)
         ##Note the approximation here
         r1 = np.mean(collider.R1)         
@@ -1707,6 +1708,7 @@ class Anticol:
      
         
 #from poscollider import PosPoly
+# iidea inherit from pospoly?
 class PosOutlines:#(PosPoly):
     """Represents a higher resolution version of the collidable polygonal 
     envelope definition for a mechanical component of the fiber positioner."""

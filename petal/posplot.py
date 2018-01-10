@@ -14,6 +14,8 @@ class PosPlot(object):
     the executable file 'ffmpeg.exe' into the working directory. As of 2016-01-31,
     binaries of ffmpeg are available at: http://ffmpeg.zeranoe.com/builds
     """
+    # iidea - use desi environ variables for file locs
+    # iidea - pass savename prefix
     def __init__(self, fignum=0, timestep=0.1):
         self.live_animate = False # whether to plot the animation live
         self.save_movie = True # whether to write out a movie file of animation

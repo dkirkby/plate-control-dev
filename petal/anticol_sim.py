@@ -1,7 +1,7 @@
 ################
 ## Parameters ##
 ################
-
+# iidea - use argv imports
 ## How many positioners would you like to use?
 curnposs = 400
 ## How many times should this run iteratively with new positions?

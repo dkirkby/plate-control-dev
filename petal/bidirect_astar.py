@@ -8,7 +8,7 @@ import datetime
 # speciality
 from heapq import heappush, heappop
 
-
+# iidea - build adj list on the fly as region is searched?
 ###########################
 # Actual Code
 ###########################
