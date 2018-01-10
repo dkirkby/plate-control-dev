@@ -3,6 +3,7 @@ import posconstants as pc
 import postransforms
 import posplot
 import configobj
+import os
 
 class PosCollider(object):
     """PosCollider contains geometry definitions for mechanical components of the
@@ -11,11 +12,13 @@ class PosCollider(object):
 
     See DESI-0899 for geometry specifications, illustrations, and kinematics.
     """
-    def __init__(self, configfile=''):
+    def __init__(self, configfile=None):
         # load up a configobj from _collision_settings_DEFAULT.conf, in pc.settings_directory
-        if not(configfile):
-            configfile = '_collision_settings_DEFAULT.conf'
-        filename = pc.dirs['collision_settings'] + configfile
+        if configfile is None:
+            defaultconfigfile = '_collision_settings_DEFAULT.conf'
+            filename = os.path.join(pc.dirs['collision_settings'],defaultconfigfile)
+        else:
+            filename = os.path.join(pc.dirs['collision_settings'],configfile)
         self.config = configobj.ConfigObj(filename,unrepr=True)
         self.posmodels = []
         self.pos_neighbor_idxs = [] # indexes of all the positioners surround a given positioner
@@ -46,11 +49,12 @@ class PosCollider(object):
             self._identify_neighbors(p)
         self._update_collidable_relations()
 
-    def animate(self, sweeps):
+    def animate(self, sweeps,savedir=None,vidname=None):
         """Makes an animation of positioners moving about the petal.
             sweeps ... list of PosSweep instances describing positioners' real-time moves
         """
-        self.plotter.clear()
+        self.plotter = posplot.PosPlot(fignum=0, timestep=self.timestep)
+        #self.plotter.clear()
         all_times = [s.time for s in sweeps]
         global_start = np.min([np.min(t) for t in all_times])
         self.plotter.add_or_change_item('GFA', '', global_start, self.keepout_GFA.points)
@@ -71,7 +75,7 @@ class PosCollider(object):
                     self.plotter.add_or_change_item('GFA', '', s.time[i], self.keepout_GFA.points, s.collision_time)
                 elif s.collision_case == pc.case.PTL:
                     self.plotter.add_or_change_item('PTL', '', s.time[i], self.keepout_PTL.points, s.collision_time)
-        self.plotter.animate()
+        self.plotter.animate(savedir,vidname)
 
     def spacetime_collision_between_positioners(self, idxA, init_obsTP_A, tableA, idxB, init_obsTP_B, tableB):
         """Wrapper for spacetime_collision method, specifically for checking two positioners
@@ -241,14 +245,9 @@ class PosCollider(object):
         self.keepout_P = PosPoly(self.config['KEEPOUT_PHI'], self.config['KEEPOUT_PHI_PT0'])
         self.keepout_T = PosPoly(self.config['KEEPOUT_THETA'], self.config['KEEPOUT_THETA_PT0'])
         self.keepout_PTL = PosPoly(self.config['KEEPOUT_PTL'], self.config['KEEPOUT_PTL_PT0'])
-        self.keepout_PTL = self.keepout_PTL.rotated(self.config['KEEPOUT_PTL_ROT'])
-        self.keepout_PTL = self.keepout_PTL.translated(self.config['KEEPOUT_PTL_X0'],self.config['KEEPOUT_PTL_Y0'])
         self.keepout_GFA = PosPoly(self.config['KEEPOUT_GFA'], self.config['KEEPOUT_GFA_PT0'])
         self.keepout_GFA = self.keepout_GFA.rotated(self.config['KEEPOUT_GFA_ROT'])
         self.keepout_GFA = self.keepout_GFA.translated(self.config['KEEPOUT_GFA_X0'],self.config['KEEPOUT_GFA_Y0'])
-        # Now also apply petal rotation and translation to GFA, because GFA moves with the petal
-        self.keepout_GFA = self.keepout_GFA.rotated(self.config['KEEPOUT_PTL_ROT'])
-        self.keepout_GFA = self.keepout_GFA.translated(self.config['KEEPOUT_PTL_X0'],self.config['KEEPOUT_PTL_Y0'])
         self.fixed_neighbor_keepouts = {pc.case.PTL : self.keepout_PTL, pc.case.GFA : self.keepout_GFA}
 
     def _load_positioner_params(self):

@@ -2,6 +2,7 @@ import numpy as np
 import posconstants as pc
 import matplotlib.pyplot as plt
 import os
+import subprocess
 import time
 import datetime
 
@@ -14,7 +15,7 @@ class PosPlot(object):
     binaries of ffmpeg are available at: http://ffmpeg.zeranoe.com/builds
     """
     def __init__(self, fignum=0, timestep=0.1):
-        self.live_animate = True # whether to plot the animation live
+        self.live_animate = False # whether to plot the animation live
         self.save_movie = True # whether to write out a movie file of animation
         self.save_dir_prefix = 'anim'
         self.framefile_prefix = 'frame'
@@ -162,10 +163,10 @@ class PosPlot(object):
         """
         for item in self.items.values():
             i = item['patch_idx']
-            if frame <= item['last_frame']:
+            if frame <= item['last_frame'] and len(item['poly'])>frame:
                 self.set_patch(self.patches[i], item, frame)
 
-    def animate(self):
+    def animate(self,savedir=None,vidname=None):
         self.anim_init()
         plt.ion()
         start_end_still_time = 0.5
@@ -174,8 +175,11 @@ class PosPlot(object):
             plt.show()
         if self.save_movie:
             fps = 1/self.timestep
-            datestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
-            self.save_dir = os.path.join(os.getcwd(), self.save_dir_prefix + '_' + datestamp)
+            if savedir is None:
+                datestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+                self.save_dir = os.path.join(os.getcwd(), self.save_dir_prefix + '_' + datestamp)
+            else:
+                self.save_dir = savedir
             if not(os.path.exists(self.save_dir)):
                 os.mkdir(self.save_dir)
             for i in range(round(start_end_still_time/self.timestep)):
@@ -197,7 +201,12 @@ class PosPlot(object):
             quality = 1
             codec = 'mpeg4'
             input_file = os.path.join(self.save_dir, self.framefile_prefix + '%' + str(self.n_framefile_digits) + 'd' + self.framefile_extension)
-            output_file = os.path.join(self.save_dir,'animation.mp4')
+            if vidname is None:
+                output_file = os.path.join(self.save_dir,'animation.mp4')
+            elif vidname[-3:] == 'mp4':
+                output_file = os.path.join(self.save_dir, vidname)
+            else:
+                output_file = os.path.join(self.save_dir, vidname+'.mp4')
             #ffmpeg_cmd = 'ffmpeg' + ' -y ' + ' -r ' + str(fps) + ' -i ' + input_file + ' -q:v ' + str(quality) + ' -vcodec ' + codec + ' ' + output_file
             ffmpeg_cmd = 'ffmpeg' + ' -y ' + ' -r ' + str(fps) + ' -i ' + input_file + ' -vcodec ' + codec + ' ' + output_file
             os.system(ffmpeg_cmd)
@@ -218,9 +227,9 @@ class PosPlot(object):
 
     @staticmethod
     def set_patch(patch,item,index):
-        if len(item['poly'])>index:
-            patch.set_xy(item['poly'][index].transpose().tolist())
-            #patch.set_linestyle(item['style'][index]['linestyle'])
-            patch.set_linewidth(item['style'][index]['linewidth'])
-            patch.set_edgecolor(item['style'][index]['edgecolor'])
-            patch.set_facecolor(item['style'][index]['facecolor'])
+        #if len(item['poly'])>index:
+        patch.set_xy(item['poly'][index].transpose().tolist())
+        #patch.set_linestyle(item['style'][index]['linestyle'])
+        patch.set_linewidth(item['style'][index]['linewidth'])
+        patch.set_edgecolor(item['style'][index]['edgecolor'])
+        patch.set_facecolor(item['style'][index]['facecolor'])
