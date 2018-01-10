@@ -241,6 +241,8 @@ class PosCollider(object):
         self.keepout_P = PosPoly(self.config['KEEPOUT_PHI'], self.config['KEEPOUT_PHI_PT0'])
         self.keepout_T = PosPoly(self.config['KEEPOUT_THETA'], self.config['KEEPOUT_THETA_PT0'])
         self.keepout_PTL = PosPoly(self.config['KEEPOUT_PTL'], self.config['KEEPOUT_PTL_PT0'])
+        self.keepout_PTL = self.keepout_PTL.rotated(self.config['KEEPOUT_PTL_ROT'])
+        self.keepout_PTL = self.keepout_PTL.translated(self.config['KEEPOUT_PTL_X0'],self.config['KEEPOUT_PTL_Y0'])
         self.keepout_GFA = PosPoly(self.config['KEEPOUT_GFA'], self.config['KEEPOUT_GFA_PT0'])
         self.keepout_GFA = self.keepout_GFA.rotated(self.config['KEEPOUT_GFA_ROT'])
         self.keepout_GFA = self.keepout_GFA.translated(self.config['KEEPOUT_GFA_X0'],self.config['KEEPOUT_GFA_Y0'])
