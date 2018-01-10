@@ -1,6 +1,7 @@
 * text=auto !eol
 bin/petal -text
 bin/petalcontroller -text
+petal/_deprecated_posschedule.py -text
 petal/anticol_sim.py -text
 petal/bidirect_astar.py -text
 petal/focal_surface_lookup.csv -text
@@ -13,7 +14,6 @@ petal/posconstants.py -text
 petal/posmodel.py -text
 petal/posmovetable.py -text
 petal/posplot.py -text
-petal/posschedule.py -text
 petal/posschedule_test.py -text
 petal/posstate.py -text
 petal/postransforms.py -text
