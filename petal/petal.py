@@ -1,5 +1,5 @@
 import posmodel
-import posschedule_test as posschedule
+import posschedule
 import posmovetable
 import posstate
 import poscollider
