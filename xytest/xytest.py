@@ -343,12 +343,26 @@ class XYTest(object):
 		
 		# transform test grid to each positioner's global position, and create all the move request dictionaries
 		all_targets = []
+		if not(self.xytest_conf['shuffle_targets']):
 		for local_target in local_targets:
-			these_targets = {}
+				these_targets = {}
+				for posid in self.posids:
+					trans = self.m.trans(posid)
+					these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(local_target)}
+				all_targets.append(these_targets)
+		else:
+			xytargets_dict = {}
 			for posid in self.posids:
-				trans = self.m.trans(posid)
-				these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(local_target)}
-			all_targets.append(these_targets)
+				np.random.seed(int(posid[1:]))
+				shuffled_targets = list(xytargets_list)
+				np.random.shuffle(shuffled_targets)
+				xytargets_dict[posid] = shuffled_targets
+			for i in range(len(xytargets_list)):
+				these_targets = {}
+				for posid in self.posids:
+					trans = self.m.trans(posid)
+					these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(xytargets_dict[posid][i])}
+				all_targets.append(these_targets)
 			
 		# initialize some data structures for storing test data
 		targ_num = 0
@@ -368,7 +382,8 @@ class XYTest(object):
 				targ_num += 1
 				print('')
 				self.logwrite('MEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets)))
-				self.logwrite('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
+				if not(self.xytest_conf['shuffle_targets']):
+					self.logwrite('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
 				this_timestamp = pc.timestamp_str_now()
 				these_meas_data = self.m.move_and_correct(these_targets, num_corr_max)
 				
