@@ -1,34 +1,44 @@
 ## Need os so that we can define all the environment variables appropriately prior to loading focalplane-specific code
 import os
 
+## Define the locations in the environment so other modules can find them
 ## Define pythonically all the locations for the desi files
-basepath = os.path.abspath('../')
-logdir = os.path.abspath(os.path.join(basepath,'positioner_logs'))
-allsetdir = os.path.abspath(os.path.join(basepath,'fp_settings'))
+if 'HOME' in os.environ:
+    basepath = os.environ['HOME']
+else:
+    basepath = os.path.abspath('../')
+    os.environ['HOME'] = basepath
+if 'POSITIONER_LOGS_PATH' in os.environ:
+    logdir = os.environ['POSITIONER_LOGS_PATH']
+else:
+    logdir = os.path.abspath(os.path.join(basepath, 'positioner_logs'))
+    os.environ['POSITIONER_LOGS_PATH'] = logdir
+
+
+if 'PETAL_PATH' in os.environ:
+    pass
+else:
+    basepath = os.path.abspath('../')
+    os.environ['PETAL_PATH'] = basepath
+if 'FP_SETTINGS_PATH' in os.environ:
+    allsetdir = os.environ['FP_SETTINGS_PATH']
+else:
+    allsetdir = os.path.abspath(os.path.join(basepath, 'fp_settings'))
+    os.environ['FP_SETTINGS_PATH'] = allsetdir
+
+
 outputsdir = os.path.abspath(os.path.join(basepath,'outputs'))
 figdir = os.path.abspath(os.path.join(basepath,'figures'))
-
-## Define the locations in the environment so other modules can find them
-if 'HOME' not in os.environ.keys():
-    os.environ['HOME'] = basepath
-tempdir = os.environ.get('HOME') + os.path.sep + 'fp_temp_files' + os.path.sep
+tempdir = os.path.join(os.environ['HOME'],'fp_temp_files','')
 if not os.path.exists(logdir):
     os.makedirs(logdir)
-    os.makedirs(os.path.join(logdir,'move_logs'))
-    os.makedirs(os.path.join(logdir,'test_logs'))
-    os.makedirs(os.path.join(logdir,'pos_logs'))
+    for dirname in ['move','test','pos']:
+        fullpath = os.path.join(logdir,'{}_logs'.format(dirname))
+        os.makedirs(fullpath)
 for direct in [allsetdir,tempdir,outputsdir,figdir]:
     if not os.path.exists(direct):
         os.makedirs(direct)
 
-if 'POSITIONER_LOGS_PATH' not in os.environ:
-    os.environ['POSITIONER_LOGS_PATH'] = logdir
-if 'PETAL_PATH' not in os.environ:
-    os.environ['PETAL_PATH'] = basepath
-if 'FP_SETTINGS_PATH' not in os.environ:
-    os.environ['FP_SETTINGS_PATH'] = allsetdir
-#if 'CURRENT_LOG_BASENAME' not in os.environ:
-#    os.environ['CURRENT_LOG_BASENAME'] = logdir
 
 import numpy as np
 import posconstants as pc
@@ -42,11 +52,11 @@ import pickle as pkl
 ## Parameters ##
 ################
 ## How many positioners would you like to use?
-curnposs = 40
+curnposs = 400
 ## How many times should this run iteratively with new positions?
 nloops = 1
 ## Whether to delete the old temporary files with the same names that will be generated upon execution of this script
-delete_prev_tempfiles = True
+delete_prev_tempfiles = False
 
 def run_random_example(nposs,deltemps=False):
     '''
@@ -60,26 +70,6 @@ def run_random_example(nposs,deltemps=False):
     :param deltemps: Whether to delete the old temporary positioner configurations files before regenerating them,
         as opposed to overwriting them
     '''
-    ## If we want ot cleanup old files before writing new ones, lets tell code how the system deletes the files and
-    ## then delete them if they exist
-    if deltemps:
-        files_exist = os.path.exists(os.path.join(logdir,'pos_logs','unit_temp0'+('%03d' % (nposs-1))+'_log_00000001.csv'))
-        if os.sys.platform == 'win32' or os.sys.platform == 'win64':
-            delcom = 'del'
-        else:
-            delcom = 'rm'
-        if files_exist:
-            for subdir in ['pos_logs','fid_logs']:
-                try:
-                    os.system('{} {}'.format(delcom, os.path.join(logdir, subdir, 'unit_temp0*')))
-                except:
-                    pass
-            for subdir in ['pos_settings','fid_settings']:
-                try:
-                    os.system('{} {}'.format(delcom, os.path.join(allsetdir, subdir, 'unit_temp0*')))
-                except:
-                    pass
-
     ## Define Plate Number
     platenum = 3
     ## Load positioner locations (see docdb 0530
@@ -100,6 +90,27 @@ def run_random_example(nposs,deltemps=False):
     cutpostype = cutlist_positioners['device_type']
     pos_idnams = idnams[cutpostype=='POS']
     fid_idnams = idnams[((cutpostype=='FIF')|(cutpostype=='GIF'))]
+
+    ## If we want ot cleanup old files before writing new ones, lets tell code how the system deletes the files and
+    ## then delete them if they exist
+    if deltemps:
+        files_exist = os.path.exists(os.path.join(logdir,'pos_logs','unit_{}{:03d}{}'.format(temproot,nposs-1,'_log_00000001.csv')))
+        if os.sys.platform == 'win32' or os.sys.platform == 'win64':
+            delcom = 'del'
+        else:
+            delcom = 'rm'
+        if files_exist:
+            locdict = {'logs':logdir, 'settings':allsetdir}
+            for dirtype,rootdir in locdict.items():
+                for subdirtype in ['pos','fid']:
+                    subdir = '{}_{}'.format(subdirtype,dirtype)
+                    fullpath = os.path.join(rootdir, subdir)
+                    filenames = '{}{}unit_{}*'.format(fullpath,os.path.sep,temproot)
+                    print("Removing {}".format(filenames))
+                    try:
+                        os.system('{} {}'.format(delcom,filenames))
+                    except:
+                        pass
 
     ## Create the petal with given positioners and fiducials
     curpetal = petal.Petal(petal_id=str(platenum),posids=pos_idnams.tolist(),fidids=fid_idnams.tolist(),simulator_on=True,verbose=True)
