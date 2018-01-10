@@ -344,7 +344,7 @@ class XYTest(object):
 		# transform test grid to each positioner's global position, and create all the move request dictionaries
 		all_targets = []
 		if not(self.xytest_conf['shuffle_targets']):
-		for local_target in local_targets:
+			for local_target in local_targets:
 				these_targets = {}
 				for posid in self.posids:
 					trans = self.m.trans(posid)
