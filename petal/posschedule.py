@@ -1638,7 +1638,7 @@ class Anticol:
         ##** General PARAMS **##
         self.avoidance = 'astar' ## avoidance
         self.verbose = verbose
-        self.plotting = True
+        self.plotting = False
 
         ## Define the phi position in degrees at which the positioner is safe
         self.phisafe = collider.Ei_phi
