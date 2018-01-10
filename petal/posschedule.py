@@ -687,7 +687,7 @@ class PosSchedule(object):
                 if changing in neighbor_idxs:
                     if self.anticol.verbose:
                         print('The positioner claims to have itself as a neighbor? posnum {}'.format(changing))
-                        pdb.set_trace()
+                        #pdb.set_trace()
                     else:
                         continue
                 #nidxs = neighbor_idxs
@@ -706,7 +706,7 @@ class PosSchedule(object):
                     print("Trying to correct indices ",A,B," with ",algorithm," avoidance")
                 ## If the target is where we start, something weird is up
                 if target[0] == start[0] and target[1]==start[1] and self.anticol.verbose:
-                    pdb.set_trace() 
+                    #pdb.set_trace()
                     
                 ## Create a dictionary called neighbors with all useful information of the neighbors
                 neighbors = {}
@@ -757,7 +757,7 @@ class PosSchedule(object):
                
                 if np.any( np.hypot(neighbors['xns']-self.anticol.xoffs[changing],neighbors['yns']-self.anticol.yoffs[changing] ) < 0.3):
                     print('A neighbor is within 0.3 millimeters of the center of the changing positioner')
-                    pdb.set_trace()
+                    #pdb.set_trace()
 
                 #plt.plot(testxns,testyns,'b.'); plt.show()
                 #pdb.set_trace() 
@@ -1620,7 +1620,7 @@ class PosSchedule(object):
         plt.pcolormesh(xs,ys,np.sign(Vlocs)*np.log(np.abs(Vlocs)))
         plt.colorbar()
         plt.show()
-        pdb.set_trace()
+        #pdb.set_trace()
 
         
 class Anticol:

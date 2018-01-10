@@ -400,10 +400,10 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
     # Ensure that our assumption about goal and start locations match up with reality
     if true_tgrid[index_goaltp] != true_goaltp[0] or true_pgrid[index_goaltp] != true_goaltp[1]:
         print("Indices of the true goal and index grids didn't match up in bidirectional astar")
-        pdb.set_trace()
+        #pdb.set_trace()
     if true_tgrid[index_starttp] != true_starttp[0] or true_pgrid[index_starttp] != true_starttp[1]:
         print("Indices of the true start and index grids didn't match up in bidirectional astar")
-        pdb.set_trace()
+        #pdb.set_trace()
 
     # Create a boolean grid of allowable points. False = can't move to it
     boolgrid = build_bool_grid(xgrid,ygrid,xns,yns,thetaxys, phixys,tolerance_xy)
