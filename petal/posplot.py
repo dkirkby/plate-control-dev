@@ -2,6 +2,7 @@ import numpy as np
 import posconstants as pc
 import matplotlib.pyplot as plt
 import os
+import subprocess
 import time
 import datetime
 
@@ -208,7 +209,7 @@ class PosPlot(object):
                 output_file = os.path.join(self.save_dir, vidname+'.mp4')
             #ffmpeg_cmd = 'ffmpeg' + ' -y ' + ' -r ' + str(fps) + ' -i ' + input_file + ' -q:v ' + str(quality) + ' -vcodec ' + codec + ' ' + output_file
             ffmpeg_cmd = 'ffmpeg' + ' -y ' + ' -r ' + str(fps) + ' -i ' + input_file + ' -vcodec ' + codec + ' ' + output_file
-            os.system(ffmpeg_cmd)
+            dummy = subprocess.check_output(ffmpeg_cmd,shell=True)#,stdout=None)#subprocess.PIPE)
 
     def grab_frame(self, frame_number):
         """Saves current figure to an image file. Returns next frame number."""

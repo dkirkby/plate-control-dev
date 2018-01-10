@@ -376,10 +376,6 @@ class PosSchedule(object):
                 self._printindices('Collisions after Round 1, in Step ',step,collision_indices)        
                 print("\nNumber corrected: {}\n\n\n\n".format(ncols-len(collision_indices)))
 
-            ## animate
-            if self.anticol.plotting == True:
-                self._animate_movetables(oper_info['movetables'], oper_info['tpstarts'])
-
         output_tables = {key: relevant_info[key]['movetables'] for key in order_of_operations[:2]}
         output_tables['extend'] = self._reverse_for_extension(relevant_info['extend']['movetables'])
         merged_tables = self._combine_tables(output_tables)
@@ -391,20 +387,12 @@ class PosSchedule(object):
         collision_indices, collision_types = self._check_for_collisions(tps_list, merged_tables)
         merged_tables, zeroed = self._avoid_collisions(merged_tables,posmodels,collision_indices,tpss=tps_list,algorithm='zeroth_order')
 
-        ## animate
-        if self.anticol.plotting == True:
-            self._animate_movetables(merged_tables, tps_list)
-
         if self.anticol.verbose:
             collision_indices, collision_types = self._check_for_collisions(tps_list, merged_tables)
             self._printindices('Collisions after completion of anticollision ','',collision_indices)
             nzero =len(np.unique(zeroed))
             ntot = len(tps_list)
             print("Number of zerod positioners: {}, total number of targets: {}, successes: {}%".format(nzero,ntot,100*(1-(float(nzero)/float(ntot)))))
-
-            ## animate
-            if self.anticol.plotting == True:
-                self._animate_movetables(merged_tables, tps_list)
 
         return merged_tables
                                                 
@@ -897,47 +885,53 @@ class PosSchedule(object):
                         print("Successfully found a schedule that avoids the collision!")
                     break
                 else:
+                    if self.anticol.verbose:
+                        print("Failed to find a valid avoidance movetable!")
                     tables[changing] = old_changing_table
             ## end of for loop over movable colliding positioners
+            if self.anticol.verbose:
+                if A not in altered_pos and B not in altered_pos:
+                    print("Failed to find a solution. Nothing has been changed for positioners {} and {}".format(A,B))
         ## end of while loop over all collisions
-            
-        ## Correct timing so everything is in sync again
-        maxstalltime = np.max(stallmovetimes)
-        movetimes = np.zeros(len(tables))
-        ## Update the movetimes for every positioner for this step
-        for i,table in enumerate(tables):
-            if i in altered_pos:
-                tempmovetime = stallmovetimes[altered_pos==i]
-                try:
-                    table.set_postpause(len(table.rows)-1, maxstalltime-tempmovetime)
-                except:
-                    pdb.set_trace()
-            else:
-                table.set_postpause(len(table.rows)-1, maxstalltime-table.for_schedule['move_time'][-1])
-            movetimes[i] = table.for_schedule['move_time'][-1]
-        ## Just double check for good measure
-        ## Find the new max time for this step, and update the pospauses
-        maxtime = np.max(movetimes)
-        #for table,movetime in zip(tables,movetimes): 
-        #    if movetime<maxtime:
-        #        table.set_postpause(len(table.rows)-1,maxtime-movetime)
-        if self.anticol.verbose:
-            print("Max times to start are: ",maxtime)
-                ## After all collision avoidances attempted. Return the new list of movetables
-        import time
 
-        with open(os.path.join(self.anticol.anim_save_folder,'run_results__{0}.csv'.format(self.anticol.anim_save_number)),'w') as runresultsfile:
+        with open(os.path.join(self.anticol.anim_save_folder,
+                               'run_results__{0}.csv'.format(self.anticol.anim_save_number)), 'w') as runresultsfile:
             keys = np.sort(list(run_results.keys()))
             line = ''
             for key in keys:
-                line += key+','
-            runresultsfile.write(line[:-1]+'\n')
+                line += key + ','
+            runresultsfile.write(line[:-1] + '\n')
             for itt in range(len(run_results['heuristic'])):
                 line = ''
                 for key in keys:
-                    line += str(run_results[key][itt])+','
-                runresultsfile.write(line[:-1]+'\n')
+                    line += str(run_results[key][itt]) + ','
+                runresultsfile.write(line[:-1] + '\n')
         self.anticol.anim_save_number += 1
+
+        if len(altered_pos) > 0:
+            ## Correct timing so everything is in sync again
+            maxstalltime = np.max(stallmovetimes)
+            movetimes = np.zeros(len(tables))
+            ## Update the movetimes for every positioner for this step
+            for i,table in enumerate(tables):
+                if i in altered_pos:
+                    tempmovetime = stallmovetimes[altered_pos==i]
+                    table.set_postpause(len(table.rows)-1, maxstalltime-tempmovetime)
+                else:
+                    table.set_postpause(len(table.rows)-1, maxstalltime-table.for_schedule['move_time'][-1])
+                movetimes[i] = table.for_schedule['move_time'][-1]
+
+            if self.anticol.verbose:
+                ## Just double check for good measure
+                ## Find the new max time for this step, and update the pospauses
+                maxtime = np.max(movetimes)
+                print("Max time after anticollisions is: {}".format(maxtime))
+
+            ## animate
+            if self.anticol.plotting == True:
+                self._animate_movetables(tables, tpss)
+
+        ## After all collision avoidances attempted. Return the new list of movetables
         return tables, altered_pos
         
  
@@ -1178,6 +1172,9 @@ class PosSchedule(object):
             collision_indices, collision_types = self._check_for_collisions(tpss, tables)
             ncols = len(collision_indices)
             itter += 1
+        ## animate
+        if self.anticol.plotting == True:
+            self._animate_movetables(tables, tpss)
         return tables, zerod
 
 
@@ -1641,16 +1638,7 @@ class Anticol:
         ##** General PARAMS **##
         self.avoidance = 'astar' ## avoidance
         self.verbose = verbose
-        self.plotting = True           
-
-        ##** Animation Params **##
-        self.anim_save_folder = os.path.join('..','figures',datetime.datetime.now().strftime('%Y%m%d%H%M'))
-        anim_save_prefix = 'anim_'
-        #anim_beginning = os.path.join(anim_save_folder,anim_save_prefix)
-        self.anim_template = anim_save_prefix + '{savenum}.mp4'
-        self.anim_save_number = 0
-        if self.plotting == True and not os.path.exists(self.anim_save_folder):
-            os.makedirs(self.anim_save_folder)
+        self.plotting = True
 
         ## Define the phi position in degrees at which the positioner is safe
         self.phisafe = collider.Ei_phi
@@ -1674,7 +1662,7 @@ class Anticol:
         self.ang_threshold = max(self.tolerance, self.angstep)
 
         ## to get accurate timestep information, we use a dummy posmodel
-        self.dt = self.angstep/petal.posmodels[0].axis[0].motor_to_shaft(petal.posmodels[0]._motor_speed_cruise)
+        self.dt = np.abs(self.angstep/petal.posmodels[0].axis[0].motor_to_shaft(petal.posmodels[0]._motor_speed_cruise))
            
         ## em potential computation coefficients
         self.coeffcr = 0.#10.0  ## central repulsive force, currently unused
@@ -1683,13 +1671,25 @@ class Anticol:
         self.coeffa = 10.0  ## attractive force amplitude of the target location
         
         ##** aSTAR PARAMS **##
-        self.astar_tolerance_xy = 0.15 #3
+        self.astar_tolerance_xy = 0.28 #3
         self.multitest = False
         self.astar_verbose = True
         self.astar_plotting = True
         self.astar_heuristic = 'euclidean'
         self.astar_weight = 1.2
-        
+
+        ##** Animation Params **##
+        self.anim_save_folder = os.path.join('..','figures',datetime.datetime.now().strftime('%Y%m%d%H%M'))
+        if self.avoidance != 'astar':
+            anim_save_prefix = 'anim_'
+        else:
+            anim_save_prefix = 'anim_hr-{}_tol-{}_wt-{}_'.format(self.astar_heuristic,self.astar_tolerance_xy,self.astar_weight)
+        #anim_beginning = os.path.join(anim_save_folder,anim_save_prefix)
+        self.anim_template = anim_save_prefix + '{savenum}.mp4'
+        self.anim_save_number = 0
+        if self.plotting == True and not os.path.exists(self.anim_save_folder):
+            os.makedirs(self.anim_save_folder)
+
         ##############################################
         # Parameters defined by hardware or software #
         ##############################################

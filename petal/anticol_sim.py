@@ -42,12 +42,11 @@ import pickle as pkl
 ## Parameters ##
 ################
 ## How many positioners would you like to use?
-curnposs = 20
+curnposs = 40
 ## How many times should this run iteratively with new positions?
 nloops = 1
 ## Whether to delete the old temporary files with the same names that will be generated upon execution of this script
 delete_prev_tempfiles = True
-
 
 def run_random_example(nposs,deltemps=False):
     '''
@@ -63,7 +62,7 @@ def run_random_example(nposs,deltemps=False):
     '''
     ## If we want ot cleanup old files before writing new ones, lets tell code how the system deletes the files and
     ## then delete them if they exist
-    if delete_prev_tempfiles:
+    if deltemps:
         files_exist = os.path.exists(os.path.join(logdir,'pos_logs','unit_temp0'+('%03d' % (nposs-1))+'_log_00000001.csv'))
         if os.sys.platform == 'win32' or os.sys.platform == 'win64':
             delcom = 'del'
