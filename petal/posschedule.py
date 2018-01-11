@@ -29,7 +29,8 @@ class PosSchedule(object):
         self.petal = petal
         self.move_tables = []
         self.requests = []
-        
+
+        # todo-anthony make compatible with various tp offsets and tp ranges
         thetas = np.arange(-200,200,1)
         phis = np.arange(0,200,1)
         self.anticol = Anticol(self.collider,self.petal,verbose, thetas,phis)       
@@ -341,7 +342,7 @@ class PosSchedule(object):
             oper_info = relevant_info[step]
 
             ## animate
-            if self.anticol.plotting == True:
+            if self.anticol.make_animations == True:
                 self._animate_movetables(oper_info['movetables'], oper_info['tpstarts'])
 
             ## Check for collisions   oper_info['
@@ -376,7 +377,7 @@ class PosSchedule(object):
         merged_tables = self._combine_tables(output_tables)
 
         ## animate
-        if self.anticol.plotting == True:
+        if self.anticol.make_animations == True:
             self._animate_movetables(merged_tables, tps_list)
 
         collision_indices, collision_types = self._check_for_collisions(tps_list, merged_tables)
@@ -723,7 +724,8 @@ class PosSchedule(object):
                 neighbors['thetans'] = starting_anticol_theta[neighbor_idxs]
                 neighbors['thetants'] = goal_anticol_theta[neighbor_idxs]
                 neighbors['phints'] = goal_anticol_theta[neighbor_idxs]
-                
+
+                # todo-anthony make compatible with various tp offsets and tp ranges
                 ## Loop through the neighbors and calculate the x,y's for each
                 for thit,pit,idxit in zip(neighbors['thetans'],neighbors['phins'],neighbors['idxs']):
                     theta_bods = self.anticol.posoutlines.central_body_outline([thit,pit],[self.anticol.xoffs[idxit],self.anticol.yoffs[idxit]])
@@ -1171,7 +1173,7 @@ class PosSchedule(object):
             ncols = len(collision_indices)
             itter += 1
         ## animate
-        if self.anticol.plotting == True:
+        if self.anticol.make_animations == True:
             self._animate_movetables(tables, tpss)
         return tables, zerod
 
@@ -1625,13 +1627,6 @@ class PosSchedule(object):
         
 class Anticol:
     def __init__(self,collider,petal,verbose, thetas=None,phis=None):
-        if thetas is None:
-            thetas = np.arange(-200,200,1)
-        if phis is None:
-            phis = np.arange(0,200,1)
-            
-        self.thetas = thetas
-        self.phis = phis
         ##############################
         # User defineable parameters #
         ##############################
@@ -1639,10 +1634,23 @@ class Anticol:
         self.avoidance = 'astar' ## avoidance
         self.verbose = verbose
         self.plotting = False
+        self.make_animations = False
+        self.create_debug_outputs = False
+        self.use_pdb = False
 
         ## Define the phi position in degrees at which the positioner is safe
         self.phisafe = collider.Ei_phi
-        
+
+        # todo-anthony make compatible with various tp offsets and tp ranges
+        ## If thetas and phis aren't defined, define them to defaults
+        if thetas is None:
+            thetas = np.arange(-200, 200, 1)
+        if phis is None:
+            phis = np.arange(0, 200, 1)
+
+        self.thetas = thetas
+        self.phis = phis
+
         ## Some convenience definitions regarding the size of positioners
         motor_width = 1.58
         self.rtol = 2*motor_width
@@ -1673,8 +1681,8 @@ class Anticol:
         ##** aSTAR PARAMS **##
         self.astar_tolerance_xy = 0.28 #3
         self.multitest = False
-        self.astar_verbose = True
-        self.astar_plotting = True
+        self.astar_verbose = verbose
+        self.astar_plotting = False
         self.astar_heuristic = 'euclidean'
         self.astar_weight = 1.2
 
@@ -1695,7 +1703,8 @@ class Anticol:
         ##############################################
         ## Create an outlines class object with spacing comparable to the tolerance
         ## of the search
-        # iidea - higher res on non-rotating neighbors ? 
+        # iidea - higher res on non-rotating neighbors ?
+        # todo-anthony make compatible with various tp offsets and tp ranges
         self.posoutlines = PosOutlines(collider, spacing=self.astar_tolerance_xy)
         ##Note the approximation here
         r1 = np.mean(collider.R1)         

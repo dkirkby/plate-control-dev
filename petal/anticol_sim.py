@@ -3,12 +3,13 @@
 ################
 # iidea - use argv imports
 ## How many positioners would you like to use?
-curnposs = 400
+curnposs = 40
 ## How many times should this run iteratively with new positions?
 nloops = 1
 ## Whether to delete the old temporary files with the same names that will be generated upon execution of this script
 delete_prev_tempfiles = False
-
+## Define a seed
+sim_seed = 103950  # None for 'true' random
 
 ##############################
 ####  Imports and setup   ####
@@ -66,7 +67,7 @@ import posconstants as pc
 ####  Main Code Body   ####
 ###########################
 
-def run_random_example(nposs,deltemps=False):
+def run_random_example(nposs,deltemps=False,seed=None):
     '''
     Main calling function that generates random locations for positioners in true petal locations
     in a formation that is tightly packed such that anticollision is necessary
@@ -77,9 +78,16 @@ def run_random_example(nposs,deltemps=False):
     :param nposs: Number of positioners to 'load into the petal'
     :param deltemps: Whether to delete the old temporary positioner configurations files before regenerating them,
         as opposed to overwriting them
+    :param seed: Seed given to randomization functions for reproducibility. (Set to none for non-reproducible)
     '''
     ## Define Plate Number
     platenum = 3
+
+    ## if seed is defined, create the random state
+    if seed is not None:
+        rand = np.random.RandomState(seed)
+    else:
+        rand = np.random.RandomState()
     ## Load positioner locations (see docdb 0530
     pos_locs = os.path.join(allsetdir,'positioner_locations_0530v12.csv')
     positioners = Table.read(pos_locs,format='ascii.csv',header_start=2,data_start=3)
@@ -122,9 +130,19 @@ def run_random_example(nposs,deltemps=False):
 
     ## Create the petal with given positioners and fiducials
     curpetal = petal.Petal(petal_id=str(platenum),posids=pos_idnams.tolist(),fidids=fid_idnams.tolist(),simulator_on=True,verbose=True)
+    curpetal.schedule.anticol.make_animations = True
+    curpetal.schedule.anticol.plotting = True
+    curpetal.schedule.anticol.create_debug_outputs = True
+    curpetal.schedule.anticol.astar_plotting = True
+
        
     ## Loop over positioners, load x,y position and save to config file
     pit = 0
+
+    ## Randomize arm lengths based on empirical data
+    r1s,r2s = get_arm_lengths(nposs,rand)
+    ## Randomized tp offsets
+    toffs,poffs = get_tpoffsets(nposs,rand)
     for row in positioners:
         if pit == nposs:
             break
@@ -137,8 +155,12 @@ def run_random_example(nposs,deltemps=False):
             state = model.state
             state.store('OFFSET_X',xloc)
             state.store('OFFSET_Y',yloc)
-            state.store('OFFSET_T',0)
-            state.store('OFFSET_P',0)
+            ## store randomized tp offsets
+            state.store('OFFSET_T',toffs[pit])
+            state.store('OFFSET_P',poffs[pit])
+            ## Stored randomized arm lengths
+            state.store('LENGTH_R1',r1s[pit])
+            state.store('LENGTH_R2',r2s[pit])
             state.write()  
             pit += 1
         elif typ == 'FIF' or typ == 'GIF':
@@ -151,8 +173,8 @@ def run_random_example(nposs,deltemps=False):
             print("Type {} didn't match fiducial or positioner!".format(typ))
 
     ## Find tp combinations that don't initially collide for start and end locations
-    tpstarts = create_random_state_opt(curpetal.collider,curpetal.posmodels,typ= 'posTP')
-    tpfins = create_random_state_opt(curpetal.collider,curpetal.posmodels,typ= 'obsTP')
+    tpstarts = create_random_state_opt(curpetal.collider,curpetal.posmodels,typ= 'posTP',randomizer=rand)
+    tpfins = create_random_state_opt(curpetal.collider,curpetal.posmodels,typ= 'obsTP',randomizer=rand)
 
     ## Double check everything is the same length
     if len(tpstarts) != len(pos_idnams):
@@ -184,7 +206,7 @@ def run_random_example(nposs,deltemps=False):
     print("Anticollision took: %0.2f seconds" %(time.time()-stime))
 
 
-def create_random_state_opt(poscols,posmodels,typ= 'obsTP'):
+def create_random_state_opt(poscols,posmodels,typ= 'obsTP',randomizer=np.random.RandomState()):
     '''
     Function that selects theta,phi pairs for each positioner that do not overlap with neighbors
     :param poscols: poscollider class instance with positioners loaded
@@ -209,8 +231,8 @@ def create_random_state_opt(poscols,posmodels,typ= 'obsTP'):
         theta_max,phi_max = posmod.trans.posTP_to_obsTP(pos_maxs)
 
         ## Generate nattempts worth of random positions to try
-        randobsthetas = np.random.randint(low=theta_min,high=theta_max,size=nattempts)
-        randobsphis = np.random.randint(low=phi_min,high=phi_max,size=nattempts)
+        randobsthetas = randomizer.randint(low=theta_min,high=theta_max,size=nattempts)
+        randobsphis = randomizer.randint(low=phi_min,high=phi_max,size=nattempts)
 
         ## Set success flag to true to start (initialized here for domain purposes)
         solution_found = True
@@ -279,6 +301,24 @@ def create_random_state_opt(poscols,posmodels,typ= 'obsTP'):
     else:
         return tp_obs
         
+def get_arm_lengths(nvals,rand):
+    ## Empirical data based on first ~2000 positioners
+    r1mean = 3.018
+    r2mean = 3.053626
+    r1std = 0.083
+    r2std = 0.055065
+    r1s = rand.normal(r1mean, r1std, nvals)
+    r2s = rand.normal(r2mean, r2std, nvals)
+    return r1s,r2s
+
+# todo-anthony make this more realistic
+def get_tpoffsets(nvals,rand):
+    ## Completely madeup params
+    tlow,thigh = -100,100
+    plow,phigh = -40,40
+    toffs = rand.uniform(tlow, thigh, nvals)
+    poffs = rand.uniform(plow, phigh, nvals)
+    return toffs,poffs
 
 if __name__ == '__main__':
     ## Profile the code to see where things are running slow, etc
@@ -287,5 +327,5 @@ if __name__ == '__main__':
 
     ## For itteration in nloops, run the code for the given number of positioners
     for loopitter in range(nloops):
-        run_random_example(nposs=curnposs,deltemps=delete_prev_tempfiles)
+        run_random_example(nposs=curnposs,deltemps=delete_prev_tempfiles,seed=sim_seed)
         

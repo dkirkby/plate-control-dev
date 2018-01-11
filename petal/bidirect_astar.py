@@ -344,7 +344,7 @@ def plot_comparison_weight_and_heur(paths,boolgrid,xgrid,ygrid,xns,yns,weights,h
     #plt.show()
 
     
-
+# todo-anthony make compatible with various tp offsets and tp ranges
 def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys, phixys,\
                                     anticol_params, heuristics=[], weights=[]):
 
@@ -365,19 +365,19 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
         heuristic = anticol_params.astar_heuristic
         weight = anticol_params.astar_weight
         
-    # Quantize the start and end targets to integers    
+    ## Quantize the start and end targets to integers
     true_goaltp = (int(target[0]),int(target[1]))
     true_starttp = (int(start[0]),int(start[1]))
 
-    # Assign the max and min angles for theta and phi, quantized to integers
+    ## Assign the max and min angles for theta and phi, quantized to integers
     post_minmax = curmodel.targetable_range_T
     posp_minmax = curmodel.targetable_range_P
     tmin,pmin = curmodel.trans.posTP_to_obsTP([post_minmax[0],posp_minmax[0]])
     tmax,pmax = curmodel.trans.posTP_to_obsTP([post_minmax[1],posp_minmax[1]])
     tmin,pmin,tmax,pmax = int(tmin),int(pmin),int(tmax),int(pmax)
-    # Create a grid of theta, phi values (optimized)
-    # When turned into 1d arrays, we can loop over them in a single for loop
-    # as though it were a double for loop
+    ## Create a grid of theta, phi values (optimized)
+    ## When turned into 1d arrays, we can loop over them in a single for loop
+    ## as though it were a double for loop
     true_pgrid,true_tgrid = np.meshgrid(np.arange(pmin,pmax+1),np.arange(tmin,tmax+1))
     
     if true_pgrid.shape[0] != phixys.shape[0]:
@@ -385,7 +385,7 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
     if true_pgrid.shape[1] != phixys.shape[1]:
         print("Theta and phi grids aren't the same dimensions as the input matrix of positions!")
 
-    # Get the obsXY values for all of the grid points
+    ## Get the obsXY values for all of the grid points
     xvect,yvect = curmodel.trans.obsTP_to_flatXY([true_tgrid.ravel(),true_pgrid.ravel()])
     xgrid = np.asarray(xvect).reshape(true_tgrid.shape)
     ygrid = np.asarray(yvect).reshape(true_tgrid.shape)
@@ -445,9 +445,9 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
             # Plot the neighboring positioners, the fiber movement throughout the move,
             # The boolean avoidance grid, and the positioner body for the start, 
             # 2 intermediate, and end moves
-            #plot_result(index_path_samps,boolgrid,xgrid,ygrid,xns,yns,'Non-Starter',outline_xs,outline_ys)
-            #plt.savefig('../figures/start_or_end_unaccessible_{}.png'.format(datetime.datetime.now().strftime('%Y%m%d%H%M')),dpi=600)
-            #plt.close()
+            plot_result(index_path_samps,boolgrid,xgrid,ygrid,xns,yns,'Non-Starter',outline_xs,outline_ys)
+            plt.savefig('../figures/start_or_end_unaccessible_{}.png'.format(datetime.datetime.now().strftime('%Y%m%d%H%M')),dpi=600)
+            plt.close()
         #pdb.set_trace()
         return None,None,None, multitest_results
 
@@ -468,10 +468,10 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
             # Plot the neighboring positioners, the fiber movement throughout the move,
             # The boolean avoidance grid, and the positioner body for the start, 
             # 2 intermediate, and end moves
-            #plot_result(index_path_samps,boolgrid,xgrid,ygrid,xns,yns,'Failed',outline_xs,outline_ys)
+            plot_result(index_path_samps,boolgrid,xgrid,ygrid,xns,yns,'Failed',outline_xs,outline_ys)
             
-            #plt.savefig('../figures/nopath_weight-{0}_and_heuristics-th-euc_comp_{1}.png'.format(weight,datetime.datetime.now().strftime('%Y%m%d%H%M')),dpi=600)
-            #plt.close()
+            plt.savefig('../figures/nopath_weight-{0}_and_heuristics-th-euc_comp_{1}.png'.format(weight,datetime.datetime.now().strftime('%Y%m%d%H%M')),dpi=600)
+            plt.close()
     else:
         true_path = [(i+tmin,j+pmin) for i,j in ind_path]
         fin_path_t, fin_path_p, fin_path_time = condense(true_path)
@@ -492,12 +492,12 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
             # Plot the neighboring positioners, the fiber movement throughout the move,
             # The boolean avoidance grid, and the positioner body for the start, 
             # 2 intermediate, and end moves
-            #plot_comparison_weight_and_heur([ind_path],boolgrid,xgrid,ygrid,xns,yns,\
-            #                        [weight],[heuristic],unique_moves,outline_xs,outline_ys)
-            #plot_result(ind_path,boolgrid,xgrid,ygrid,xns,yns,\
-            #                        heuristic,outline_xs,outline_ys)
-            #plt.savefig('../figures/weight-{0}_and_heuristics-th-euc_comp_{1}.png'.format(weight,datetime.datetime.now().strftime('%Y%m%d%H%M')),dpi=600)
-            #plt.close()
+            plot_comparison_weight_and_heur([ind_path],boolgrid,xgrid,ygrid,xns,yns,\
+                                   [weight],[heuristic],unique_moves,outline_xs,outline_ys)
+            plot_result(ind_path,boolgrid,xgrid,ygrid,xns,yns,\
+                                   heuristic,outline_xs,outline_ys)
+            plt.savefig('../figures/weight-{0}_and_heuristics-th-euc_comp_{1}.png'.format(weight,datetime.datetime.now().strftime('%Y%m%d%H%M')),dpi=600)
+            plt.close()
     
         # If testing out multiple heuristics and or weights, loop over them.
         # They aren't plotted but their parameters are stored
