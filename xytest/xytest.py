@@ -352,12 +352,14 @@ class XYTest(object):
 				all_targets.append(these_targets)
 		else:
 			xytargets_dict = {}
+			np.random.seed(int(self.xytest_conf['shuffle_seed'][loop_number]))
 			for posid in self.posids:
-				np.random.seed(int(posid[1:]))
-				shuffled_targets = list(xytargets_list)
+				if not(int(self.xytest_conf['shuffle_seed'][loop_number])):
+					np.random.seed(int(posid[1:]))
+				shuffled_targets = list(local_targets)
 				np.random.shuffle(shuffled_targets)
 				xytargets_dict[posid] = shuffled_targets
-			for i in range(len(xytargets_list)):
+			for i in range(len(local_targets)):
 				these_targets = {}
 				for posid in self.posids:
 					trans = self.m.trans(posid)
@@ -658,8 +660,10 @@ class XYTest(object):
 			return requests
 		else:
 			xytargets_dict = {}
+			np.random.seed(int(self.xytest_conf['shuffle_seed'][loop_number]))
 			for posid in sorted(self.posids):
-				np.random.seed(int(posid[1:]))
+				if not(int(self.xytest_conf['shuffle_seed'][loop_number])):
+					np.random.seed(int(posid[1:]))
 				shuffled_targets = list(xytargets_list)
 				np.random.shuffle(shuffled_targets)
 				xytargets_dict[posid] = shuffled_targets
