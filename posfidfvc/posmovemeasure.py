@@ -123,7 +123,7 @@ class PosMoveMeasure(object):
 			petal.request_targets(these_requests)            
 			petal.schedule_send_and_execute_moves() # in future, may do this in a different thread for each petal
 
-	def move_measure(self, requests, tp_updates=None):
+	def move_measure(self, requests, tp_updates=None, posids = 'all'):
 		"""Move positioners and measure output with FVC.
 		See comments on inputs from move method.
 		See comments on outputs from measure method.
@@ -148,7 +148,7 @@ class PosMoveMeasure(object):
 		self.move(requests)
 		data,imgfiles = self.measure()
 		if tp_updates == 'posTP' or tp_updates =='offsetsTP':
-			self._test_and_update_TP(data, tp_updates)
+			self._test_and_update_TP(data, tp_updates,posids=posids)
 		return data,imgfiles
 
 	def move_and_correct(self, requests, num_corr_max=2):
@@ -255,7 +255,7 @@ class PosMoveMeasure(object):
 				requests[posid] = {'command':'posTP', 'target':[posT,posP], 'log_note':'parking'}
 		self.move(requests)
 		
-	def one_point_calibration(self, posids='all', mode='posTP'):
+	def one_point_calibration(self, posids='all', mode='posTP', posids = 'all'):
 		"""Goes to a single point, makes measurement with FVC, and re-calibrates the internally-
 		tracked angles for the current theta and phi shaft positions.
 		
@@ -294,14 +294,14 @@ class PosMoveMeasure(object):
 			old_tp_updates_fraction = self.tp_updates_fraction
 			self.tp_updates_tol = 0.001
 			self.tp_updates_fraction = 1.0
-			self.move_measure(requests,tp_updates=mode)
+			self.move_measure(requests,tp_updates=mode, posids=posids)
 			self.tp_updates_tol = old_tp_updates_tol
 			self.tp_updates_fraction = old_tp_updates_fraction
 		else:
 			data,imgfiles = self.move_measure(requests, tp_updates=None)
 			for petal in posids_by_ptl.keys():
 				for posid in posids_by_ptl[petal]:
-					if posid in posids:
+					if posid in posids: #Needed If posids != self.posids, move_measure returns data on all positioners.
 						xy = data[posid]
 						petal.set(posid,'OFFSET_X',xy[0])
 						petal.set(posid,'OFFSET_Y',xy[1])
@@ -385,7 +385,7 @@ class PosMoveMeasure(object):
 
 		# 'rough' calibration is ALWAYS run
 		self.rehome(posids)
-		self.one_point_calibration(posids, mode='offsetsXY')
+		self.one_point_calibration(posids, mode='offsetsXY',posids=posids)
 		posids_by_ptl = self.pos_data_listed_by_ptl(posids,'POS_ID')
 		for petal in posids_by_ptl.keys():
 			these_posids = posids_by_ptl[petal]
@@ -393,7 +393,7 @@ class PosMoveMeasure(object):
 			for key in keys_to_reset:
 				petal.set(these_posids,key,pc.nominals[key]['value'])
 		self.commit(log_note='rough calibration complete')
-		self.one_point_calibration(posids, mode='offsetsTP')        
+		self.one_point_calibration(posids, mode='offsetsTP', posids=posids)        
 			
 		# now do arc or grid calibrations
 		if mode == 'arc' or mode == 'grid':
@@ -424,7 +424,7 @@ class PosMoveMeasure(object):
 					files.add(file)
 					
 		# lastly update the internally-tracked theta and phi shaft angles
-		self.one_point_calibration(posids, mode='posTP')
+		self.one_point_calibration(posids, mode='posTP', posids=posids)
 		
 		# commit data and return
 		self.commit(log_note='full calibration complete')
@@ -615,7 +615,8 @@ class PosMoveMeasure(object):
 			self.printfunc('calibration grid point ' + str(i+1) + ' of ' + str(n_pts))
 			this_meas_data,imgfiles = self.move_measure(requests, tp_updates=None)
 			for p in this_meas_data.keys():
-				data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
+				if p in all_posids: #Needed If all_posids != self.posids, move_measure returns data on all positioners.
+					data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
 		return data 
 
 	def _measure_calibration_arc(self,posids='all',axis='theta',keep_phi_within_Eo=True):
@@ -681,7 +682,7 @@ class PosMoveMeasure(object):
 			self.printfunc('calibration arc on ' + axis + ' axis: point ' + str(i+1) + ' of ' + str(n_pts))
 			this_meas_data,imgfiles = self.move_measure(requests, tp_updates=None)
 			for p in this_meas_data.keys():
-				if p in all_posids:
+				if p in all_posids: #Needed If all_posids != self.posids, move_measure returns data on all positioners.
 					data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
 
 		# circle fits
@@ -754,7 +755,8 @@ class PosMoveMeasure(object):
 			petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
 		meas_data,imgfiles = self.measure()
 		for p in meas_data.keys():
-			data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],meas_data[p])
+			if p in all_posids: #Needed If all_posids != self.posids, move_measure returns data on all positioners.
+				data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],meas_data[p])
 
 		# intermediate points
 		for i in range(n_intermediate_pts):
@@ -770,7 +772,8 @@ class PosMoveMeasure(object):
 				petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
 			meas_data,imgfiles = self.measure()
 			for p in meas_data.keys():
-				data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],meas_data[p])
+				if p in all_posids: #Needed If all_posids != self.posids, move_measure returns data on all positioners.
+					data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],meas_data[p])
 
 		# seek second limit
 		self.printfunc(prefix + ': seeking second limit')
@@ -780,7 +783,8 @@ class PosMoveMeasure(object):
 			petal.schedule_send_and_execute_moves()
 		meas_data,imgfiles = self.measure()
 		for p in meas_data.keys():
-			data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],meas_data[p])
+			if p in all_posids: #Needed If all_posids != self.posids, move_measure returns data on all positioners.
+				data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],meas_data[p])
 
 		# circle fits
 		for posid in all_posids:
@@ -1054,7 +1058,7 @@ class PosMoveMeasure(object):
 			xy_meas.extend(xy_ref)
 		return xy_meas
 
-	def _test_and_update_TP(self,measured_data,tp_updates='posTP'):
+	def _test_and_update_TP(self,measured_data,tp_updates='posTP',posids='all'):
 		"""Check if errors between measured positions and expected positions exceeds a tolerance
 		value, and if so, then adjust parameters in the direction of the measured error.
 		
@@ -1081,41 +1085,42 @@ class PosMoveMeasure(object):
 		"""
 		delta_TP = {}
 		for posid in measured_data.keys():
-			delta_TP[posid] = [0,0]
-			ptl = self.petal(posid)
-			measured_obsXY = measured_data[posid]
-			expected_obsXY = ptl.expected_current_position(posid,'obsXY')
-			err_xy = ((measured_obsXY[0]-expected_obsXY[0])**2 + (measured_obsXY[1]-expected_obsXY[1])**2)**0.5
-			if err_xy > self.tp_updates_tol:
-				posmodel = ptl.posmodel(posid)
-				expected_posTP = ptl.expected_current_position(posid,'posTP')
-				measured_posTP = posmodel.trans.obsXY_to_posTP(measured_data[posid],range_limits='full')[0]
-				T_options = measured_posTP[0] + np.array([0,360,-360])
-				T_diff = np.abs(T_options - expected_posTP[0])
-				T_best = T_options[np.argmin(T_diff)]
-				measured_posTP[0] = T_best
-				delta_T = (measured_posTP[0] - expected_posTP[0]) * self.tp_updates_fraction
-				delta_P = (measured_posTP[1] - expected_posTP[1]) * self.tp_updates_fraction
-				if tp_updates == 'offsetsTP':
-					param = 'OFFSET'
-				else:
-					param = 'POS'
-				old_T = ptl.get(posid,param + '_T')
-				old_P = ptl.get(posid,param + '_P')              
-				new_T = old_T + delta_T
-				new_P = old_P + delta_P
-				if tp_updates == 'offsetsTP':
-					ptl.set(posid,'OFFSET_T',new_T)
-					ptl.set(posid,'OFFSET_P',new_P)
-					self.printfunc(posid + ': Set OFFSET_T to ' + self.fmt(new_T))
-					self.printfunc(posid + ': Set OFFSET_P to ' + self.fmt(new_P))                    
-				else:
-					posmodel.axis[pc.T].pos = new_T
-					posmodel.axis[pc.P].pos = new_P
-					self.printfunc(posid + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_T from ' + self.fmt(old_T) + ' to ' + self.fmt(new_T))
-					self.printfunc(posid + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
-				delta_TP[posid] = [delta_T,delta_P]
-				posmodel.state.next_log_notes.append('updated ' + param + '_T and ' + param + '_P after positioning error of ' + self.fmt(err_xy) + ' mm')
+			if (posid in posids) or posids == 'all': #Needed to allow one to limit calibration proccedures to a subset of positioners.
+				delta_TP[posid] = [0,0]
+				ptl = self.petal(posid)
+				measured_obsXY = measured_data[posid]
+				expected_obsXY = ptl.expected_current_position(posid,'obsXY')
+				err_xy = ((measured_obsXY[0]-expected_obsXY[0])**2 + (measured_obsXY[1]-expected_obsXY[1])**2)**0.5
+				if err_xy > self.tp_updates_tol:
+					posmodel = ptl.posmodel(posid)
+					expected_posTP = ptl.expected_current_position(posid,'posTP')
+					measured_posTP = posmodel.trans.obsXY_to_posTP(measured_data[posid],range_limits='full')[0]
+					T_options = measured_posTP[0] + np.array([0,360,-360])
+					T_diff = np.abs(T_options - expected_posTP[0])
+					T_best = T_options[np.argmin(T_diff)]
+					measured_posTP[0] = T_best
+					delta_T = (measured_posTP[0] - expected_posTP[0]) * self.tp_updates_fraction
+					delta_P = (measured_posTP[1] - expected_posTP[1]) * self.tp_updates_fraction
+					if tp_updates == 'offsetsTP':
+						param = 'OFFSET'
+					else:
+						param = 'POS'
+					old_T = ptl.get(posid,param + '_T')
+					old_P = ptl.get(posid,param + '_P')              
+					new_T = old_T + delta_T
+					new_P = old_P + delta_P
+					if tp_updates == 'offsetsTP':
+						ptl.set(posid,'OFFSET_T',new_T)
+						ptl.set(posid,'OFFSET_P',new_P)
+						self.printfunc(posid + ': Set OFFSET_T to ' + self.fmt(new_T))
+						self.printfunc(posid + ': Set OFFSET_P to ' + self.fmt(new_P))                    
+					else:
+						posmodel.axis[pc.T].pos = new_T
+						posmodel.axis[pc.P].pos = new_P
+						self.printfunc(posid + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_T from ' + self.fmt(old_T) + ' to ' + self.fmt(new_T))
+						self.printfunc(posid + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
+					delta_TP[posid] = [delta_T,delta_P]
+					posmodel.state.next_log_notes.append('updated ' + param + '_T and ' + param + '_P after positioning error of ' + self.fmt(err_xy) + ' mm')
 		return delta_TP
 				
 	@property
