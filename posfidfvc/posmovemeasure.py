@@ -301,11 +301,12 @@ class PosMoveMeasure(object):
 			data,imgfiles = self.move_measure(requests, tp_updates=None)
 			for petal in posids_by_ptl.keys():
 				for posid in posids_by_ptl[petal]:
-					xy = data[posid]
-					petal.set(posid,'OFFSET_X',xy[0])
-					petal.set(posid,'OFFSET_Y',xy[1])
-					self.printfunc(posid + ': Set OFFSET_X to ' + self.fmt(xy[0]))
-					self.printfunc(posid + ': Set OFFSET_Y to ' + self.fmt(xy[1]))
+					if posid in posids:
+						xy = data[posid]
+						petal.set(posid,'OFFSET_X',xy[0])
+						petal.set(posid,'OFFSET_Y',xy[1])
+						self.printfunc(posid + ': Set OFFSET_X to ' + self.fmt(xy[0]))
+						self.printfunc(posid + ': Set OFFSET_Y to ' + self.fmt(xy[1]))
 		self.commit() # log note is already handled above
 
 	def rehome(self,posids='all'):
@@ -680,7 +681,8 @@ class PosMoveMeasure(object):
 			self.printfunc('calibration arc on ' + axis + ' axis: point ' + str(i+1) + ' of ' + str(n_pts))
 			this_meas_data,imgfiles = self.move_measure(requests, tp_updates=None)
 			for p in this_meas_data.keys():
-				data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
+				if p in all_posids:
+					data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
 
 		# circle fits
 		for posid in all_posids:
