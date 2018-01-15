@@ -31,9 +31,7 @@ class PosSchedule(object):
         self.requests = []
 
         # todo-anthony make compatible with various tp offsets and tp ranges
-        thetas = np.arange(-200,200,1)
-        phis = np.arange(0,200,1)
-        self.anticol = Anticol(self.collider,self.petal,verbose, thetas,phis)       
+        self.anticol = Anticol(self.collider,self.petal,verbose)
 
     @property
     def collider(self):
@@ -454,8 +452,14 @@ class PosSchedule(object):
         ## Get a table class instantiation
         table = {}
         table['retract'] = posmovetable.PosMoveTable(current_positioner_model)
+        table['retract'].should_antibacklash = False
+        table['retract'].should_final_creep  = False
         table['rotate'] = posmovetable.PosMoveTable(current_positioner_model)
+        table['rotate'].should_antibacklash = False
+        table['rotate'].should_final_creep  = False
         table['extend'] = posmovetable.PosMoveTable(current_positioner_model)
+        table['extend'].should_antibacklash = False
+        table['extend'].should_final_creep  = False
         ##redefine phi inner:
         phi_inner = max(self.anticol.phisafe,tp_start[pc.P])
         ## Find the theta and phi movements for the retract move
@@ -478,6 +482,7 @@ class PosSchedule(object):
         table['rotate'].set_postpause(0, 0.0)
         del dtdp
         ## Find the theta and phi movements for the phi extension movement
+        ## This is reversed!!
         tpff = tp_final
         dtdp = current_positioner_model.trans.delta_obsTP(tpfi,\
                             tpff, range_wrap_limits='targetable')
@@ -688,7 +693,8 @@ class PosSchedule(object):
                 if changing in neighbor_idxs:
                     if self.anticol.verbose:
                         print('The positioner claims to have itself as a neighbor? posnum {}'.format(changing))
-                        #pdb.set_trace()
+                        if self.anticol.use_pdb:
+                            pdb.set_trace()
                     else:
                         continue
                 #nidxs = neighbor_idxs
@@ -706,8 +712,8 @@ class PosSchedule(object):
                 if self.anticol.verbose:
                     print("Trying to correct indices ",A,B," with ",algorithm," avoidance")
                 ## If the target is where we start, something weird is up
-                #if target[0] == start[0] and target[1]==start[1] and self.anticol.verbose:
-                #    pdb.set_trace()
+                if target[0] == start[0] and target[1]==start[1] and self.anticol.verbose and self.anticol.use_pdb:
+                    pdb.set_trace()
                     
                 ## Create a dictionary called neighbors with all useful information of the neighbors
                 neighbors = {}
@@ -759,10 +765,8 @@ class PosSchedule(object):
                
                 if np.any( np.hypot(neighbors['xns']-self.anticol.xoffs[changing],neighbors['yns']-self.anticol.yoffs[changing] ) < 0.3):
                     print('A neighbor is within 0.3 millimeters of the center of the changing positioner')
-                    #pdb.set_trace()
-
-                #plt.plot(testxns,testyns,'b.'); plt.show()
-                #pdb.set_trace() 
+                    if self.anticol.use_pdb:
+                        pdb.set_trace()
                 
                 ## tbody_corner_locations has the xy coordinates of tracer points
                 ## around the central body of the positioner at ALL theta rotations
@@ -794,9 +798,10 @@ class PosSchedule(object):
                 cut_phi_arm_matrix = phi_arm_matrix_locations[good_thetas,:,:,:]
                 cut_phi_arm_matrix = cut_phi_arm_matrix[:,good_phis,:,:]
                 
-                assert cut_cent_bod_matrix.shape[0] == cut_phi_arm_matrix.shape[0],\
-                "The theta dimensions of the xyrot_matrices are not the same for theta and phi"
-                #pdb.set_trace()
+                if cut_cent_bod_matrix.shape[0] != cut_phi_arm_matrix.shape[0]:
+                    print("The theta dimensions of the xyrot_matrices are not the same for theta and phi")
+                    if self.anticol.use_pdb:
+                        pdb.set_trace()
                 for i in range(cut_cent_bod_matrix.shape[0]):
                     cut_cent_bod_matrix[i,:,:] = np.asarray(changing_posmodel.trans.obsXY_to_flatXY([cut_cent_bod_matrix[i,0,:],cut_cent_bod_matrix[i,1,:]]))
                     for j in range(cut_phi_arm_matrix.shape[1]):
@@ -843,6 +848,8 @@ class PosSchedule(object):
     
                 ## Convert steps into a new movetable
                 new_changing_table = posmovetable.PosMoveTable(changing_posmodel)
+                new_changing_table.should_antibacklash = False
+                new_changing_table.should_final_creep = False
                 old_changing_table = tables[changing]
 
                 ## if length 1, create with one step.
@@ -852,8 +859,8 @@ class PosSchedule(object):
                         print("Number of rows in the new version of the table is: %d" % 1)       
                     new_changing_table.set_move(0, pc.T, dts)
                     new_changing_table.set_move(0, pc.P, dps)
-                    new_changing_table.set_prepause(0, 0)
-                    new_changing_table.set_postpause(0,times)
+                    new_changing_table.set_prepause(0, times)
+                    new_changing_table.set_postpause(0,0.0)
                     itter = 1
                 else:
                     if self.anticol.verbose:
@@ -862,8 +869,8 @@ class PosSchedule(object):
                     for dt, dp, time in zip(dts,dps,times):
                         new_changing_table.set_move(itter, pc.T, dt)
                         new_changing_table.set_move(itter, pc.P, dp)
-                        new_changing_table.set_postpause(itter,time)
-                        new_changing_table.set_prepause(itter, 0.0)
+                        new_changing_table.set_postpause(itter,0.0)
+                        new_changing_table.set_prepause(itter, time)
                         itter += 1
 
                 ## Replace the old table with the newly created one
@@ -871,14 +878,23 @@ class PosSchedule(object):
 
                 tables[changing] = new_changing_table
 
-                for i, table in zip(np.arange(len(neighbor_idxs)),tables[neighbor_idxs]):
-                    table.set_prepause(0, newmovetime)
+                prepauses = []
+                for table in tables[neighbor_idxs]:
+                    prepauses.append(table.rows[0].data['prepause'])
+                    prepause = max(newmovetime, table.rows[0].data['prepause'])
+                    table.set_prepause(0, prepause)
 
                 indices, coltype = self._check_single_positioner_for_collisions(tpss,tables,changing)
                 if coltype == pc.case.I:
                     stallmovetimes.append(newmovetime)
                     altered_pos.append(changing)
                     neighbor_ofaltered.union(set(neighbor_idxs))
+                    for tabitter,table in enumerate(tables):
+                        if tabitter == changing or tabitter in neighbor_idxs:
+                            continue
+                        else:
+                            prepause = max(newmovetime,table.rows[0].data['prepause'])
+                            table.set_prepause(0, prepause)
                     if self.anticol.verbose:
                         print("Successfully found a schedule that avoids the collision!")
                     break
@@ -886,25 +902,28 @@ class PosSchedule(object):
                     if self.anticol.verbose:
                         print("Failed to find a valid avoidance movetable!")
                     tables[changing] = old_changing_table
+                    for prepause, table in zip(prepauses, tables[neighbor_idxs]):
+                        table.set_prepause(0, prepause)
             ## end of for loop over movable colliding positioners
             if self.anticol.verbose:
                 if A not in altered_pos and B not in altered_pos:
                     print("Failed to find a solution. Nothing has been changed for positioners {} and {}".format(A,B))
         ## end of while loop over all collisions
 
-        # with open(os.path.join(self.anticol.anim_save_folder,
-        #                        'run_results__{0}.csv'.format(self.anticol.anim_save_number)), 'w') as runresultsfile:
-        #     keys = np.sort(list(run_results.keys()))
-        #     line = ''
-        #     for key in keys:
-        #         line += key + ','
-        #     runresultsfile.write(line[:-1] + '\n')
-        #     for itt in range(len(run_results['heuristic'])):
-        #         line = ''
-        #         for key in keys:
-        #             line += str(run_results[key][itt]) + ','
-        #         runresultsfile.write(line[:-1] + '\n')
-        # self.anticol.anim_save_number += 1
+        if self.anticol.create_debug_outputs:
+            with open(os.path.join(self.anticol.anim_save_folder,
+                                   'run_results__{0}.csv'.format(self.anticol.anim_save_number)), 'w') as runresultsfile:
+                keys = np.sort(list(run_results.keys()))
+                line = ''
+                for key in keys:
+                    line += key + ','
+                runresultsfile.write(line[:-1] + '\n')
+                for itt in range(len(run_results['heuristic'])):
+                    line = ''
+                    for key in keys:
+                        line += str(run_results[key][itt]) + ','
+                    runresultsfile.write(line[:-1] + '\n')
+            self.anticol.anim_save_number += 1
 
         if len(altered_pos) > 0:
             ## Correct timing so everything is in sync again
@@ -912,12 +931,14 @@ class PosSchedule(object):
             movetimes = np.zeros(len(tables))
             ## Update the movetimes for every positioner for this step
             for i,table in enumerate(tables):
+                movetimes[i] = table.for_schedule['move_time'][-1]
                 if i in altered_pos:
                     tempmovetime = stallmovetimes[altered_pos==i]
                     table.set_postpause(len(table.rows)-1, maxstalltime-tempmovetime)
                 else:
-                    table.set_postpause(len(table.rows)-1, maxstalltime-table.for_schedule['move_time'][-1])
-                movetimes[i] = table.for_schedule['move_time'][-1]
+                    prepause = max(table.rows[0].data['prepause'],maxstalltime-movetimes[i])
+                    table.set_prepause(0, prepause)
+
 
             if self.anticol.verbose:
                 ## Just double check for good measure
@@ -1464,12 +1485,15 @@ class PosSchedule(object):
         output_tables = []
         for tablenum in range(len(tabledicts['retract'])):
             ## start with copy of the retract step table
+            ## Note that we don't change final_creep or backlash for this final table
             newtab = posmovetable.PosMoveTable(tabledicts['retract'][tablenum].posmodel)
-            newtab.rows = tabledicts['retract'][tablenum].rows.copy()
-            #newtab = copymodule.deepcopy(tabledicts['retract'][tablenum])
-            ## append the rotate and extend moves onto the end of the retract table
-            for step in ['rotate','extend']:
-                newtab.extend(tabledicts[step][tablenum])
+            for step in ['retract','rotate','extend']:
+                table = tabledicts[step][tablenum]
+                sched = table.for_schedule
+                if sched['nrows']==1 and sched['dT']==0.0 and sched['dP']==0.0:
+                    continue
+                else:
+                    newtab.extend(table)
             output_tables.append(newtab)
         return output_tables
 
@@ -1530,7 +1554,7 @@ class PosSchedule(object):
             rows = table.rows.copy()
             rows = rows[::-1]
             for i,row in enumerate(rows):
-                dt, dp = row.data['dT_ideal'], row.data['dP_ideal'],
+                dt, dp = row.data['dT_ideal'], row.data['dP_ideal']
                 pre, post = row.data['prepause'], row.data['postpause']
                 newtab.set_move(i, pc.T, -1*dt)
                 newtab.set_move(i, pc.P, -1*dp)
@@ -1644,9 +1668,9 @@ class Anticol:
         # todo-anthony make compatible with various tp offsets and tp ranges
         ## If thetas and phis aren't defined, define them to defaults
         if thetas is None:
-            thetas = np.arange(-200, 200, 1)
+            thetas = np.arange(-400, 400, 1)
         if phis is None:
-            phis = np.arange(0, 200, 1)
+            phis = np.arange(0, 400, 1)
 
         self.thetas = thetas
         self.phis = phis

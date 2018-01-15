@@ -3,13 +3,13 @@
 ################
 # iidea - use argv imports
 ## How many positioners would you like to use?
-curnposs = 40
+curnposs = 60
 ## How many times should this run iteratively with new positions?
 nloops = 1
 ## Whether to delete the old temporary files with the same names that will be generated upon execution of this script
 delete_prev_tempfiles = False
 ## Define a seed
-sim_seed = 103950  # None for 'true' random
+sim_seed = None#103950  # None for 'true' random
 
 ##############################
 ####  Imports and setup   ####
@@ -130,12 +130,7 @@ def run_random_example(nposs,deltemps=False,seed=None):
 
     ## Create the petal with given positioners and fiducials
     curpetal = petal.Petal(petal_id=str(platenum),posids=pos_idnams.tolist(),fidids=fid_idnams.tolist(),simulator_on=True,verbose=True)
-    curpetal.schedule.anticol.make_animations = True
-    curpetal.schedule.anticol.plotting = True
-    curpetal.schedule.anticol.create_debug_outputs = True
-    curpetal.schedule.anticol.astar_plotting = True
 
-       
     ## Loop over positioners, load x,y position and save to config file
     pit = 0
 
@@ -197,6 +192,14 @@ def run_random_example(nposs,deltemps=False,seed=None):
     curpetal._clear_schedule()
     ## Request targets
     curpetal.request_targets(request_dict)
+
+    ## Several things set to False by default but useful for debugging
+    ## This is hackey but keeps us from propogating a bunch of function parameters
+    curpetal.schedule.anticol.make_animations = True
+    curpetal.schedule.anticol.plotting = True
+    curpetal.schedule.anticol.create_debug_outputs = True
+    curpetal.schedule.anticol.astar_plotting = True
+    curpetal.schedule.anticol.use_pdb = True
 
     ## Start Timer
     stime = time.time()
@@ -314,8 +317,8 @@ def get_arm_lengths(nvals,rand):
 # todo-anthony make this more realistic
 def get_tpoffsets(nvals,rand):
     ## Completely madeup params
-    tlow,thigh = -100,100
-    plow,phigh = -40,40
+    tlow,thigh = -180,180
+    plow,phigh = 0,180
     toffs = rand.uniform(tlow, thigh, nvals)
     poffs = rand.uniform(plow, phigh, nvals)
     return toffs,poffs

@@ -33,7 +33,7 @@ def get_tp_distance(tgrid,pgrid,target,heuristic='phi'):
         return np.zeros(tgrid.shape)
 
 
-def build_bool_grid(xs,ys,xns,yns,tbods,pbods,tolerance):
+def build_bool_grid(xs,ys,xns,yns,tbods,pbods,tolerance,use_pdb=False):
     bool_map = np.zeros(xs.size).astype(bool)
     is_bad_row = np.zeros(xs.shape[0]).astype(bool)
 
@@ -49,7 +49,8 @@ def build_bool_grid(xs,ys,xns,yns,tbods,pbods,tolerance):
     for x,y in zip(xns,yns): 
         for xrav,yrav in zip(pbod_xravels,pbod_yravels):
             bool_temp = (  np.hypot(xrav-x,yrav-y) < tolerance  )
-            #pdb.set_trace()
+            if bool_map.size != bool_temp.size and use_pdb:
+                pdb.set_trace()
             bool_map = ( bool_map | bool_temp )
         for i in range(tbodxs.shape[-1]):
             temp_rows = ( np.hypot( tbodxs[:,i]-x, tbodys[:,i]-y ) < tolerance )
@@ -103,14 +104,15 @@ def get_final_path(visited,beginning,intersecting_node,orientation='start'):
     return path
 
 
-def find_path(graph, start, goal,start_to_goal_dist,weight_multiplier,verbose=False):
+def find_path(graph, start, goal,start_to_goal_dist,weight_multiplier,verbose=False,use_pdb=False):
     # Assign starting and ending nodes
     node_s = start
     node_g = goal
     # Make sure that the starting and ending nodes exist in our list of nodes
     if node_s == node_g or node_s not in graph.keys() or node_g not in graph.keys():
         print("Something wrong with nodes, so returning without performing pathfinding")
-        #pdb.set_trace()
+        if use_pdb:
+            pdb.set_trace()
         return []
 
     # All nodes cost just 1 to move to
@@ -382,8 +384,12 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
     
     if true_pgrid.shape[0] != phixys.shape[0]:
         print("Theta and phi grids aren't the same dimensions as the input matrix of positions!")
+        if anticol_params.use_pdb:
+            pdb.set_trace()
     if true_pgrid.shape[1] != phixys.shape[1]:
         print("Theta and phi grids aren't the same dimensions as the input matrix of positions!")
+        if anticol_params.use_pdb:
+            pdb.set_trace()
 
     ## Get the obsXY values for all of the grid points
     xvect,yvect = curmodel.trans.obsTP_to_flatXY([true_tgrid.ravel(),true_pgrid.ravel()])
@@ -400,13 +406,15 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
     # Ensure that our assumption about goal and start locations match up with reality
     if true_tgrid[index_goaltp] != true_goaltp[0] or true_pgrid[index_goaltp] != true_goaltp[1]:
         print("Indices of the true goal and index grids didn't match up in bidirectional astar")
-        #pdb.set_trace()
+        if anticol_params.use_pdb:
+            pdb.set_trace()
     if true_tgrid[index_starttp] != true_starttp[0] or true_pgrid[index_starttp] != true_starttp[1]:
         print("Indices of the true start and index grids didn't match up in bidirectional astar")
-        #pdb.set_trace()
+        if anticol_params.use_pdb:
+            pdb.set_trace()
 
     # Create a boolean grid of allowable points. False = can't move to it
-    boolgrid = build_bool_grid(xgrid,ygrid,xns,yns,thetaxys, phixys,tolerance_xy)
+    boolgrid = build_bool_grid(xgrid,ygrid,xns,yns,thetaxys, phixys,tolerance_xy,use_pdb=anticol_params.use_pdb)
     
     # if verbose, print useful information
     if verbose:
@@ -452,7 +460,7 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
         return None,None,None, multitest_results
 
     # Run the bidirectional astar pathfinder (with multiplicative inertial parameter = weight)
-    ind_path = find_path(graph, index_starttp, index_goaltp,distances_tp_goal[index_starttp], weight,verbose)
+    ind_path = find_path(graph, index_starttp, index_goaltp,distances_tp_goal[index_starttp], weight,verbose,use_pdb=anticol_params.use_pdb)
     
     # Assuming we found a path, clean it up and save it, otherwise return Nones
     if len(ind_path) == 0:
