@@ -241,14 +241,14 @@ class PosSchedule(object):
         self.anticol.yoffs = np.asarray(yoffs)
 
         #plt.figure()
-        radians = np.arange(0,2*np.pi,np.pi/200)
-        xcirc = 6*np.cos(radians)
-        ycirc = 6*np.sin(radians)
-        petal_coords = self.collider.keepout_PTL.points
-        petal_x = petal_coords[0].tolist()
-        petal_y = petal_coords[1].tolist()
-        petal_x.append(petal_x[0])
-        petal_y.append(petal_y[0])
+        # radians = np.arange(0,2*np.pi,np.pi/200)
+        # xcirc = 6*np.cos(radians)
+        # ycirc = 6*np.sin(radians)
+        # petal_coords = self.collider.keepout_PTL.points
+        # petal_x = petal_coords[0].tolist()
+        # petal_y = petal_coords[1].tolist()
+        # petal_x.append(petal_x[0])
+        # petal_y.append(petal_y[0])
         #plt.plot(petal_x,petal_y,'k-')
         #plt.plot(xoffs,yoffs,'k.')
         #for xoff,yoff in zip(xoffs,yoffs):
