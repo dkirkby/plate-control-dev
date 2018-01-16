@@ -318,7 +318,7 @@ def get_arm_lengths(nvals,rand):
 def get_tpoffsets(nvals,rand):
     ## Completely madeup params
     tlow,thigh = -180,180
-    plow,phigh = 0,180
+    plow,phigh = -50,50
     toffs = rand.uniform(tlow, thigh, nvals)
     poffs = rand.uniform(plow, phigh, nvals)
     return toffs,poffs

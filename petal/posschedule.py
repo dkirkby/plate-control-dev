@@ -780,25 +780,29 @@ class PosSchedule(object):
 
                 ## Assign the max and min angles for theta and phi, quantized to integers
                 obs_tp_minmax = self.get_targetable_obstp(posmodels[changing]).astype(int)
-                dtheta = obs_tp_minmax[0][1]-obs_tp_minmax[0][0]
-                dphi = obs_tp_minmax[1][1]-obs_tp_minmax[1][0]
-                actual_thetas = np.arange(obs_tp_minmax[0][1],obs_tp_minmax[0][0])
-                actual_phis = np.arange(obs_tp_minmax[1][1],obs_tp_minmax[1][0])
-                rotated_thetas = (obs_tp_minmax[0,:]+540)%360 - 180
-                rotated_phis =(obs_tp_minmax[1,:]+540)%360 - 180
-                if np.any(rotated_phis<0):
+                #dtheta = obs_tp_minmax[0][1]-obs_tp_minmax[0][0]
+                #dphi = obs_tp_minmax[1][1]-obs_tp_minmax[1][0]
+                #actual_thetas = (np.arange(obs_tp_minmax[0][0],obs_tp_minmax[0][1]+1)
+                #actual_phis = np.arange(obs_tp_minmax[1][0],obs_tp_minmax[1][1]+1)
+                theta_indices = (np.arange(obs_tp_minmax[0][0],obs_tp_minmax[0][1]+1)- self.anticol.min_theta) % 360
+                phi_indices = np.arange(obs_tp_minmax[1][0],obs_tp_minmax[1][1]+1)- self.anticol.min_phi
+                #rotated_thetas = (actual_thetas+540)%360 - 180
+                #rotated_phis =(actual_phis+540)%360 - 180
+                #theta_indices = rotated_thetas - self.anticol.min_theta
+                #phi_indices = rotated_phis - self.anticol.min_phi
+                if np.any(theta_indices<0):
                     if self.anticol.verbose:
-                        print("rotated phis in avoid_collisions_astar include negatives")
+                        print("theta indices in avoid_collisions_astar include negatives")
                         if self.anticol.use_pdb:
                             pdb.set_trace()
-                if np.any(rotated_thetas<0):
+                if np.any(phi_indices<0):
                     if self.anticol.verbose:
-                        print("rotated thetas in avoid_collisions_astar include negatives")
+                        print("phi indices in avoid_collisions_astar include negatives")
                         if self.anticol.use_pdb:
                             pdb.set_trace()
 
-                cut_cent_bod_matrix = np.ndarray((dtheta,central_body_matrix_locations.shape[1],central_body_matrix_locations.shape[2]))
-                cut_phi_arm_matrix = np.ndarray((dtheta,dphi,phi_arm_matrix_locations.shape[2],phi_arm_matrix_locations.shape[3]))
+                cut_cent_bod_matrix = np.ndarray((len(theta_indices),central_body_matrix_locations.shape[1],central_body_matrix_locations.shape[2]))
+                cut_phi_arm_matrix = np.ndarray((len(theta_indices),len(phi_indices),phi_arm_matrix_locations.shape[2],phi_arm_matrix_locations.shape[3]))
 
                 #alt_obs_tp_minmax = (obs_tp_minmax+540)%360 - 180
                 ## Find the locations where we can actually target with this positioner
@@ -817,11 +821,11 @@ class PosSchedule(object):
                 #    print("The theta dimensions of the xyrot_matrices are not the same for theta and phi")
                 #    if self.anticol.use_pdb:
                 #        pdb.set_trace()
-                for i in range(actual_thetas.size):
-                    rot_obs_t_index = rotated_thetas[i]
+                for i in range(theta_indices.size):
+                    rot_obs_t_index = theta_indices[i]
                     cut_cent_bod_matrix[i,:,:] = np.asarray(changing_posmodel.trans.obsXY_to_flatXY([central_body_matrix_locations[rot_obs_t_index,0,:],central_body_matrix_locations[rot_obs_t_index,1,:]]))
-                    for j in range(actual_phis.size):
-                        rot_obs_j_index = rotated_phis[j]
+                    for j in range(phi_indices.size):
+                        rot_obs_j_index = phi_indices[j]
                         cut_phi_arm_matrix[i,j,:,:] = np.asarray(changing_posmodel.trans.obsXY_to_flatXY([phi_arm_matrix_locations[rot_obs_t_index,rot_obs_j_index,0,:],phi_arm_matrix_locations[rot_obs_t_index,rot_obs_j_index,1,:]]))
 
                 ## With the positioner and neighbors setup, resolve the specific scenario and
@@ -1691,9 +1695,15 @@ class Anticol:
         # todo-anthony make compatible with various tp offsets and tp ranges
         ## If thetas and phis aren't defined, define them to defaults
         if thetas is None:
-            thetas = np.arange(-180, 180, 1)
+            self.min_theta = -180
+            thetas = np.arange(self.min_theta, 180, 1)
+        else:
+            self.min_theta = np.min(thetas)
         if phis is None:
-            phis = np.arange(0, 180, 1)
+            self.min_phi = -50
+            phis = np.arange(self.min_phi, 180, 1)
+        else:
+            self.min_phi = np.min(phis)
 
         self.thetas = thetas
         self.phis = phis
