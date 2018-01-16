@@ -779,33 +779,50 @@ class PosSchedule(object):
                 phi_arm_matrix_locations[:,:,1,:] += self.anticol.yoffs[changing]
 
                 ## Assign the max and min angles for theta and phi, quantized to integers
-                postmin,postmax = changing_posmodel.targetable_range_T
-                pospmin,pospmax = changing_posmodel.targetable_range_P
-                tpmin = changing_posmodel.trans.posTP_to_obsTP([postmin,pospmin])
-                tpmax = changing_posmodel.trans.posTP_to_obsTP([postmax,pospmax])
-                obs_tmin,obs_tmax = int(tpmin[0]),int(tpmax[0])
-                obs_pmin,obs_pmax = int(tpmin[1]),int(tpmax[1])
+                obs_tp_minmax = self.get_targetable_obstp(posmodels[changing]).astype(int)
+                dtheta = obs_tp_minmax[0][1]-obs_tp_minax[0][0]
+                dphi = obs_tp_minmax[1][1]-obs_tp_minax[1][0]
+                actual_thetas = np.arange(obs_tp_minmax[0][1],obs_tp_minax[0][0])
+                actual_phis = np.arange(obs_tp_minmax[1][1],obs_tp_minax[1][0])
+                rotated_thetas = (obs_tp_minmax[0,:]+540)%360 - 180
+                rotated_phis =(obs_tp_minmax[1,:]+540)%360 - 180
+                if np.any(rotated_phis<0):
+                    if self.anticol.verbose:
+                        print("rotated phis in avoid_collisions_astar include negatives")
+                        if self.anticol.use_pdb:
+                            pdb.set_trace()
+                if np.any(rotated_thetas<0):
+                    if self.anticol.verbose:
+                        print("rotated thetas in avoid_collisions_astar include negatives")
+                        if self.anticol.use_pdb:
+                            pdb.set_trace()
+                            
+                cut_cent_bod_matrix = np.ndarray((dtheta,central_body_matrix_locations.shape[1],central_body_matrix_locations.shape[2]))
+                cut_phi_arm_matrix = np.ndarray((dtheta,dphi,phi_arm_matrix_locations.shape[2],phi_arm_matrix_locations.shape[3]))
 
+                #alt_obs_tp_minmax = (obs_tp_minmax+540)%360 - 180
                 ## Find the locations where we can actually target with this positioner
-                good_thetas = np.where( ( (self.anticol.thetas >= obs_tmin) & (self.anticol.thetas <= obs_tmax) ) )[0]
-                good_phis = np.where( ( (self.anticol.phis >= obs_pmin) & (self.anticol.phis <= obs_pmax) ) )[0]
+                #good_thetas = np.where( ( (self.anticol.thetas >= obs_tmin) & (self.anticol.thetas <= obs_tmax) ) )[0]
+                #good_phis = np.where( ( (self.anticol.phis >= obs_pmin) & (self.anticol.phis <= obs_pmax) ) )[0]
 
                 ## Make bad xy values of the theta body in same grid coordinates
                 ## thetaxys have shape theta_ind, x/y as 0/1 ind, point_ind
-                cut_cent_bod_matrix = central_body_matrix_locations[good_thetas,:,:]
+                #cut_cent_bod_matrix = central_body_matrix_locations[good_thetas,:,:]
             
                 ## phixys has shape theta_ind, phi_ind, x/y as 0/1 ind, point_ind
-                cut_phi_arm_matrix = phi_arm_matrix_locations[good_thetas,:,:,:]
-                cut_phi_arm_matrix = cut_phi_arm_matrix[:,good_phis,:,:]
+                #cut_phi_arm_matrix = phi_arm_matrix_locations[good_thetas,:,:,:]
+                #cut_phi_arm_matrix = cut_phi_arm_matrix[:,good_phis,:,:]
                 
-                if cut_cent_bod_matrix.shape[0] != cut_phi_arm_matrix.shape[0]:
-                    print("The theta dimensions of the xyrot_matrices are not the same for theta and phi")
-                    if self.anticol.use_pdb:
-                        pdb.set_trace()
-                for i in range(cut_cent_bod_matrix.shape[0]):
-                    cut_cent_bod_matrix[i,:,:] = np.asarray(changing_posmodel.trans.obsXY_to_flatXY([cut_cent_bod_matrix[i,0,:],cut_cent_bod_matrix[i,1,:]]))
-                    for j in range(cut_phi_arm_matrix.shape[1]):
-                        cut_phi_arm_matrix[i,j,:,:] = np.asarray(changing_posmodel.trans.obsXY_to_flatXY([cut_phi_arm_matrix[i,j,0,:],cut_phi_arm_matrix[i,j,1,:]]))
+                #if cut_cent_bod_matrix.shape[0] != cut_phi_arm_matrix.shape[0]:
+                #    print("The theta dimensions of the xyrot_matrices are not the same for theta and phi")
+                #    if self.anticol.use_pdb:
+                #        pdb.set_trace()
+                for i in range(actual_thetas.size):
+                    rot_obs_t_index = rotated_thetas[i]
+                    cut_cent_bod_matrix[i,:,:] = np.asarray(changing_posmodel.trans.obsXY_to_flatXY([central_body_matrix_locations[rot_obs_t_index,0,:],central_body_matrix_locations[rot_obs_t_index,1,:]]))
+                    for j in range(actual_phis.size):
+                        rot_obs_j_index = rotated_phis[j]
+                        cut_phi_arm_matrix[i,j,:,:] = np.asarray(changing_posmodel.trans.obsXY_to_flatXY([phi_arm_matrix_locations[rot_obs_t_index,rot_obs_j_index,0,:],phi_arm_matrix_locations[rot_obs_t_index,rot_obs_j_index,1,:]]))
 
                 ## With the positioner and neighbors setup, resolve the specific scenario and
                 ## return dt,dp,pausetime  lists that I can convert into a new movetable
@@ -1578,7 +1595,13 @@ class PosSchedule(object):
         tp[pc.T] = theta
         tp[pc.P] = phi
         return tp            
-        
+
+    def get_targetable_obstp(self,posmodel):
+        post_minmax = posmodel.targetable_range_T
+        posp_minmax = posmodel.targetable_range_P
+        tmin, pmin = posmodel.trans.posTP_to_obsTP([post_minmax[0], posp_minmax[0]])
+        tmax, pmax = posmodel.trans.posTP_to_obsTP([post_minmax[1], posp_minmax[1]])
+        return np.asarray([[tmin,tmax],[pmin,pmax]])
         
     def _printindices(self,statement,step,indices):
         '''
@@ -1668,9 +1691,9 @@ class Anticol:
         # todo-anthony make compatible with various tp offsets and tp ranges
         ## If thetas and phis aren't defined, define them to defaults
         if thetas is None:
-            thetas = np.arange(-400, 400, 1)
+            thetas = np.arange(-180, 180, 1)
         if phis is None:
-            phis = np.arange(0, 400, 1)
+            phis = np.arange(0, 180, 1)
 
         self.thetas = thetas
         self.phis = phis
@@ -1850,7 +1873,7 @@ class PosOutlines:#(PosPoly):
             xs.extend(np.linspace(closed_endpts[0,i],closed_endpts[0,i+1],npts[i]))
             ys.extend(np.linspace(closed_endpts[1,i],closed_endpts[1,i+1],npts[i]))
         return np.asarray([xs,ys])
-       
+
     def _rotate(self, points, angle):
         """Returns a copy of the polygon object, with points rotated by angle (unit degrees)."""
         return np.dot(self._rotmat2D_deg(angle), points)
