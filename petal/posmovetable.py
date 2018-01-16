@@ -28,12 +28,26 @@ class PosMoveTable(object):
 
     # getters
     @property
-    def for_schedule(self):
+    def for_schedule(self, suppress_any_finalcreep_and_antibacklash=True):
         """Version of the table suitable for move scheduling.
         Distances are given at the output shafts, in degrees.
         Times are given in seconds.
+        
+        An option is provided to select whether final creep and antibacklash
+        moves should be suppressed from the schedule-formatted output table.
+        Typically this option is left as True, since margin space for these moves
+        is included in the geometric envelope of the positioner.
         """
-        return self._for_output_type('schedule')
+        if suppress_any_finalcreep_and_antibacklash:
+            old_finalcreep = self.should_final_creep
+            old_antibacklash = self.should_antibacklash
+            self.should_final_creep = False
+            self.should_antibacklash = False
+        output = self._for_output_type('schedule')
+        if suppress_any_finalcreep_and_antibacklash:
+            self.should_final_creep = old_finalcreep
+            self.should_antibacklash = old_antibacklash
+        return output
 
     @property
     def for_hardware(self):

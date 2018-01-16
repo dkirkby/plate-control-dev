@@ -452,14 +452,14 @@ class PosSchedule(object):
         ## Get a table class instantiation
         table = {}
         table['retract'] = posmovetable.PosMoveTable(current_positioner_model)
-        table['retract'].should_antibacklash = False
-        table['retract'].should_final_creep  = False
+        #table['retract'].should_antibacklash = False
+        #table['retract'].should_final_creep  = False
         table['rotate'] = posmovetable.PosMoveTable(current_positioner_model)
-        table['rotate'].should_antibacklash = False
-        table['rotate'].should_final_creep  = False
+        #table['rotate'].should_antibacklash = False
+        #table['rotate'].should_final_creep  = False
         table['extend'] = posmovetable.PosMoveTable(current_positioner_model)
-        table['extend'].should_antibacklash = False
-        table['extend'].should_final_creep  = False
+        #table['extend'].should_antibacklash = False
+        #table['extend'].should_final_creep  = False
         ##redefine phi inner:
         phi_inner = max(self.anticol.phisafe,tp_start[pc.P])
         ## Find the theta and phi movements for the retract move
@@ -869,8 +869,8 @@ class PosSchedule(object):
     
                 ## Convert steps into a new movetable
                 new_changing_table = posmovetable.PosMoveTable(changing_posmodel)
-                new_changing_table.should_antibacklash = False
-                new_changing_table.should_final_creep = False
+                #new_changing_table.should_antibacklash = False
+                #new_changing_table.should_final_creep = False
                 old_changing_table = tables[changing]
 
                 ## if length 1, create with one step.
