@@ -780,10 +780,10 @@ class PosSchedule(object):
 
                 ## Assign the max and min angles for theta and phi, quantized to integers
                 obs_tp_minmax = self.get_targetable_obstp(posmodels[changing]).astype(int)
-                dtheta = obs_tp_minmax[0][1]-obs_tp_minax[0][0]
-                dphi = obs_tp_minmax[1][1]-obs_tp_minax[1][0]
-                actual_thetas = np.arange(obs_tp_minmax[0][1],obs_tp_minax[0][0])
-                actual_phis = np.arange(obs_tp_minmax[1][1],obs_tp_minax[1][0])
+                dtheta = obs_tp_minmax[0][1]-obs_tp_minmax[0][0]
+                dphi = obs_tp_minmax[1][1]-obs_tp_minmax[1][0]
+                actual_thetas = np.arange(obs_tp_minmax[0][1],obs_tp_minmax[0][0])
+                actual_phis = np.arange(obs_tp_minmax[1][1],obs_tp_minmax[1][0])
                 rotated_thetas = (obs_tp_minmax[0,:]+540)%360 - 180
                 rotated_phis =(obs_tp_minmax[1,:]+540)%360 - 180
                 if np.any(rotated_phis<0):
@@ -796,7 +796,7 @@ class PosSchedule(object):
                         print("rotated thetas in avoid_collisions_astar include negatives")
                         if self.anticol.use_pdb:
                             pdb.set_trace()
-                            
+
                 cut_cent_bod_matrix = np.ndarray((dtheta,central_body_matrix_locations.shape[1],central_body_matrix_locations.shape[2]))
                 cut_phi_arm_matrix = np.ndarray((dtheta,dphi,phi_arm_matrix_locations.shape[2],phi_arm_matrix_locations.shape[3]))
 
