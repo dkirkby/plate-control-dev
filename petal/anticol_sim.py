@@ -317,10 +317,10 @@ def get_arm_lengths(nvals,rand):
 # todo-anthony make this more realistic
 def get_tpoffsets(nvals,rand):
     ## Completely madeup params
-    tlow,thigh = -180,180
-    plow,phigh = -50,50
+    tlow,thigh = -180,180 # degrees
+    pmean,pstd = 0, 3 # degrees
     toffs = rand.uniform(tlow, thigh, nvals)
-    poffs = rand.uniform(plow, phigh, nvals)
+    poffs = rand.normal(0, 3, nvals)
     return toffs,poffs
 
 if __name__ == '__main__':

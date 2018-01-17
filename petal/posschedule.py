@@ -784,8 +784,8 @@ class PosSchedule(object):
                 #dphi = obs_tp_minmax[1][1]-obs_tp_minmax[1][0]
                 #actual_thetas = (np.arange(obs_tp_minmax[0][0],obs_tp_minmax[0][1]+1)
                 #actual_phis = np.arange(obs_tp_minmax[1][0],obs_tp_minmax[1][1]+1)
-                theta_indices = (np.arange(obs_tp_minmax[0][0],obs_tp_minmax[0][1]+1)- self.anticol.min_theta) % 360
-                phi_indices = np.arange(obs_tp_minmax[1][0],obs_tp_minmax[1][1]+1)- self.anticol.min_phi
+                theta_indices = (np.arange(obs_tp_minmax[0][0],obs_tp_minmax[0][1]+1) - self.anticol.min_theta)% 360
+                phi_indices = (np.arange(obs_tp_minmax[1][0],obs_tp_minmax[1][1]+1) - self.anticol.min_phi)
                 #rotated_thetas = (actual_thetas+540)%360 - 180
                 #rotated_phis =(actual_phis+540)%360 - 180
                 #theta_indices = rotated_thetas - self.anticol.min_theta
@@ -825,8 +825,8 @@ class PosSchedule(object):
                     rot_obs_t_index = theta_indices[i]
                     cut_cent_bod_matrix[i,:,:] = np.asarray(changing_posmodel.trans.obsXY_to_flatXY([central_body_matrix_locations[rot_obs_t_index,0,:],central_body_matrix_locations[rot_obs_t_index,1,:]]))
                     for j in range(phi_indices.size):
-                        rot_obs_j_index = phi_indices[j]
-                        cut_phi_arm_matrix[i,j,:,:] = np.asarray(changing_posmodel.trans.obsXY_to_flatXY([phi_arm_matrix_locations[rot_obs_t_index,rot_obs_j_index,0,:],phi_arm_matrix_locations[rot_obs_t_index,rot_obs_j_index,1,:]]))
+                        rot_obs_p_index = phi_indices[j]
+                        cut_phi_arm_matrix[i,j,:,:] = np.asarray(changing_posmodel.trans.obsXY_to_flatXY([phi_arm_matrix_locations[rot_obs_t_index,rot_obs_p_index,0,:],phi_arm_matrix_locations[rot_obs_t_index,rot_obs_p_index,1,:]]))
 
                 ## With the positioner and neighbors setup, resolve the specific scenario and
                 ## return dt,dp,pausetime  lists that I can convert into a new movetable
@@ -1695,18 +1695,15 @@ class Anticol:
         # todo-anthony make compatible with various tp offsets and tp ranges
         ## If thetas and phis aren't defined, define them to defaults
         if thetas is None:
-            self.min_theta = -180
-            thetas = np.arange(self.min_theta, 180, 1)
+            self.min_defined_theta = -180
+            self.max_defined_theta = 180
+            self.theta_inds = np.arange(self.min_defined_theta,self.max_defined_theta, 1)
         else:
             self.min_theta = np.min(thetas)
         if phis is None:
-            self.min_phi = -50
-            phis = np.arange(self.min_phi, 180, 1)
-        else:
-            self.min_phi = np.min(phis)
-
-        self.thetas = thetas
-        self.phis = phis
+            self.min_defined_phi = -20
+            self.max_defined_phi = 211
+            self.phi_inds = np.arange(self.min_defined_phi, self.max_defined_phi, 1)
 
         ## Some convenience definitions regarding the size of positioners
         motor_width = 1.58
@@ -1765,8 +1762,8 @@ class Anticol:
         self.posoutlines = PosOutlines(collider, spacing=self.astar_tolerance_xy)
         ##Note the approximation here
         r1 = np.mean(collider.R1)         
-        self.central_body_matrix = self.posoutlines.central_body_outline_matrix(thetas)
-        self.phi_arm_matrix = self.posoutlines.phi_arm_outline_matrix(thetas=thetas,phis=phis,xoff=r1,yoff=0)
+        self.central_body_matrix = self.posoutlines.central_body_outline_matrix(self.theta_inds)
+        self.phi_arm_matrix = self.posoutlines.phi_arm_outline_matrix(theta_inds=self.theta_inds,phi_inds=self.phi_inds,xoff=r1,yoff=0)
 
         
 
@@ -1833,11 +1830,13 @@ class PosOutlines:#(PosPoly):
         nearby = np.where(np.hypot(dx,dy) < radius)[0]
         return self.petalpoints[:,nearby]
 
-    def central_body_outline_matrix(self,thetas):
+    def central_body_outline_matrix(self,theta_inds):
         #all_theta_points = self.collider.keepout_T.points.copy()
         #theta_corner_locs = np.argsort(all_theta_points[0])[-4:]
         #theta_corner_locs = np.array([2,3,4])
         #theta_pts = all_theta_points[:,theta_corner_locs]
+        all_angles = np.arange(360)
+        thetas = all_angles[theta_inds]
         nthetas = len(thetas)
         theta_pts = np.asarray(self.thetapoints)
         rotation_matrices = self._rotmat2D_deg(thetas)
@@ -1850,17 +1849,24 @@ class PosOutlines:#(PosPoly):
         return np.asarray(theta_corner_xyarray)
 
         
-    def phi_arm_outline_matrix(self,thetas,phis,xoff=0., yoff=0.):
+    def phi_arm_outline_matrix(self,theta_inds,phi_inds,xoff=0., yoff=0.):
         #all_phi_points = self.collider.keepout_P.points.copy()
         #phi_corner_locs = np.arange(7)
         #phi_pts = all_phi_points[:,phi_corner_locs]
         phi_pts = np.asarray(self.phipoints)
+
+        all_angles = np.arange(360) # degrees around circle
+        thetas = all_angles[theta_inds]
+        phis = all_angles[phi_inds]
         phi_theta_offset = phis[0]-thetas[0]
+        phi_inds_for_theta = (phis + phi_theta_offset) % 360
         nphis = len(phis)
         nthetas = len(thetas)
         ## Assume mean arm length in order to perform these calculations only once
-        t_rotation_matrices = self._rotmat2D_deg(thetas)
-        p_rotation_matrices = t_rotation_matrices[:,:,phi_theta_offset:]
+        rotation_matrices = self._rotmat2D_deg(all_angles)
+        p_rotation_matrices = rotation_matrices.copy()[:,:,phi_inds]
+        t_rotation_matrices = rotation_matrices[:,:,theta_inds]
+
         #phi_corners_rot1_transr1 = np.asarray([np.dot(rotation_matrices[:,:,i+phi_theta_offset], phi_pts)+[[r1],[0]] for i in range(nphis)])        
         phi_corner_xyarray = np.zeros((nthetas,nphis,2,phi_pts.shape[1])) 
         for j,phi in enumerate(phis):
