@@ -3,13 +3,17 @@
 ################
 # iidea - use argv imports
 ## How many positioners would you like to use?
-curnposs = 60
+curnposs = 10
 ## How many times should this run iteratively with new positions?
 nloops = 1
 ## Whether to delete the old temporary files with the same names that will be generated upon execution of this script
 delete_prev_tempfiles = False
 ## Define a seed
-sim_seed = None#103950  # None for 'true' random
+sim_seed = 1036#103950  # None for 'true' random
+
+make_animations = False
+
+
 
 ##############################
 ####  Imports and setup   ####
@@ -67,7 +71,7 @@ import posconstants as pc
 ####  Main Code Body   ####
 ###########################
 
-def run_random_example(nposs,deltemps=False,seed=None):
+def run_random_example(nposs,deltemps=False,seed=None,do_anims=False):
     '''
     Main calling function that generates random locations for positioners in true petal locations
     in a formation that is tightly packed such that anticollision is necessary
@@ -195,7 +199,7 @@ def run_random_example(nposs,deltemps=False,seed=None):
 
     ## Several things set to False by default but useful for debugging
     ## This is hackey but keeps us from propogating a bunch of function parameters
-    curpetal.schedule.anticol.make_animations = True
+    curpetal.schedule.anticol.make_animations = do_anims
     curpetal.schedule.anticol.plotting = True
     curpetal.schedule.anticol.create_debug_outputs = True
     curpetal.schedule.anticol.astar_plotting = True
@@ -330,5 +334,5 @@ if __name__ == '__main__':
 
     ## For itteration in nloops, run the code for the given number of positioners
     for loopitter in range(nloops):
-        run_random_example(nposs=curnposs,deltemps=delete_prev_tempfiles,seed=sim_seed)
+        run_random_example(nposs=curnposs,deltemps=delete_prev_tempfiles,seed=sim_seed,do_anims = make_animations)
         

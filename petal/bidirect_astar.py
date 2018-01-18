@@ -454,6 +454,7 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
             # The boolean avoidance grid, and the positioner body for the start, 
             # 2 intermediate, and end moves
             plot_result(index_path_samps,boolgrid,xgrid,ygrid,xns,yns,'Non-Starter',outline_xs,outline_ys)
+            plt.axis('equal')
             plt.savefig('../figures/start_or_end_unaccessible_{}.png'.format(datetime.datetime.now().strftime('%Y%m%d%H%M')),dpi=600)
             plt.close()
         #pdb.set_trace()
@@ -477,7 +478,7 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
             # The boolean avoidance grid, and the positioner body for the start, 
             # 2 intermediate, and end moves
             plot_result(index_path_samps,boolgrid,xgrid,ygrid,xns,yns,'Failed',outline_xs,outline_ys)
-            
+            plt.axis('equal')
             plt.savefig('../figures/nopath_weight-{0}_and_heuristics-th-euc_comp_{1}.png'.format(weight,datetime.datetime.now().strftime('%Y%m%d%H%M')),dpi=600)
             plt.close()
     else:
@@ -504,6 +505,7 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
                                    [weight],[heuristic],unique_moves,outline_xs,outline_ys)
             plot_result(ind_path,boolgrid,xgrid,ygrid,xns,yns,\
                                    heuristic,outline_xs,outline_ys)
+            plt.axis('equal')
             plt.savefig('../figures/weight-{0}_and_heuristics-th-euc_comp_{1}.png'.format(weight,datetime.datetime.now().strftime('%Y%m%d%H%M')),dpi=600)
             plt.close()
     

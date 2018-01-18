@@ -220,7 +220,7 @@ class PosSchedule(object):
 
         log_notes, commands, posmodels = [], [], []
         tpstart, tptarg = [], []
-        xoffs, yoffs = [], []
+        self.anticol._update_positioner_properties(self.petal.posmodels)
 
         ## Loop through the posunitids and the requests, and correctly order the request
         ## information into the order set by posunitids
@@ -229,16 +229,11 @@ class PosSchedule(object):
                 if req['posmodel'].posid == posunitid:
                     posmodel = req['posmodel']
                     posmodels.append(posmodel)
-                    flatxy = posmodel.trans.obsXY_to_flatXY([posmodel.state.read('OFFSET_X'),posmodel.state.read('OFFSET_Y')])
-                    xoffs.append(flatxy[0])
-                    yoffs.append(flatxy[1])
                     tpstart.append(posmodel.trans.posTP_to_obsTP(req['start_posTP']))
                     tptarg.append(posmodel.trans.posTP_to_obsTP(req['targt_posTP']))
                     log_notes.append(req['log_note'])
                     commands.append((0,req['command'],req['cmd_val1'],req['cmd_val2']))
                     break
-        self.anticol.xoffs = np.asarray(xoffs)
-        self.anticol.yoffs = np.asarray(yoffs)
 
         #plt.figure()
         # radians = np.arange(0,2*np.pi,np.pi/200)
@@ -266,7 +261,15 @@ class PosSchedule(object):
             assert pmod.posid == movetable.posmodel.posid, "Ensure the movetable and posmodel match"
             movetable.store_orig_command(*coms)
             movetable.log_note += (' ' if movetable.log_note else '') + log
-            
+
+        # for tablenum, table in enumerate(move_tables):
+        #     posmodel = table.posmodel
+        #     print(posmodel == posmodels[tablenum])
+        #     dp = posmodel.trans.delta_obsTP(tptarg[tablenum],tpstart[tablenum],range_wrap_limits='targetable')
+        #     print(dp[0],dp[1])
+        #     print(table.rows[1].data['dT_ideal'],table.rows[0].data['dP_ideal']+table.rows[2].data['dP_ideal'])
+        #     print(table.rows[0].data['dP_ideal'],table.rows[1].data['dT_ideal'], table.rows[2].data['dP_ideal'],len(table.rows))
+        #     print("\n")
         ## return the movetables as a list of movetables
         self.move_tables = move_tables
                                                     
@@ -309,7 +312,7 @@ class PosSchedule(object):
             ## a seperate list for that movetype
             ## Also append the movetime for that move to a list
             for key in order_of_operations:
-                movetime = current_tables_dict[key].for_schedule['move_time']
+                movetime = current_tables_dict[key].for_schedule['stats']['net_time']
                 relevant_info[key]['movetables'].append(current_tables_dict[key])
                 relevant_info[key]['movetimes'].append(movetime[0])
                 
@@ -370,7 +373,7 @@ class PosSchedule(object):
                 self._printindices('Collisions after Round 1, in Step ',step,collision_indices)        
                 print("\nNumber corrected: {}\n\n\n\n".format(ncols-len(collision_indices)))
 
-        output_tables = {key: relevant_info[key]['movetables'] for key in order_of_operations[:2]}
+        output_tables = {key: relevant_info[key]['movetables'] for key in ['retract','rotate']}
         output_tables['extend'] = self._reverse_for_extension(relevant_info['extend']['movetables'])
         merged_tables = self._combine_tables(output_tables)
 
@@ -379,6 +382,7 @@ class PosSchedule(object):
             self._animate_movetables(merged_tables, tps_list)
 
         collision_indices, collision_types = self._check_for_collisions(tps_list, merged_tables)
+
         merged_tables, zeroed = self._avoid_collisions(merged_tables,posmodels,collision_indices,tpss=tps_list,algorithm='zeroth_order')
 
         if self.anticol.verbose:
@@ -388,6 +392,12 @@ class PosSchedule(object):
             ntot = len(tps_list)
             print("Number of zerod positioners: {}, total number of targets: {}, successes: {}%".format(nzero,ntot,100*(1-(float(nzero)/float(ntot)))))
 
+        #for tablenum, table in enumerate(merged_tables):
+        #    print(relevant_info['retract']['movetables'][tablenum].rows[0].data['dP_ideal'], table.rows[0].data['dP_ideal'])
+        #    print(relevant_info['rotate']['movetables'][tablenum].rows[0].data['dT_ideal'], table.rows[1].data['dT_ideal'])
+        #    print(relevant_info['extend']['movetables'][tablenum].rows[0].data['dP_ideal'], table.rows[2].data['dP_ideal'])
+        #    print(len(relevant_info['retract']['movetables'][tablenum].rows), len(relevant_info['rotate']['movetables'][tablenum].rows),
+        #          len(relevant_info['extend']['movetables'][tablenum].rows), len(table.rows))
         return merged_tables
                                                 
                                                     
@@ -482,7 +492,7 @@ class PosSchedule(object):
         table['rotate'].set_postpause(0, 0.0)
         del dtdp
         ## Find the theta and phi movements for the phi extension movement
-        ## This is reversed!!
+        ## This is reversed on purpose!!
         tpff = tp_final
         dtdp = current_positioner_model.trans.delta_obsTP(tpfi,\
                             tpff, range_wrap_limits='targetable')
@@ -729,13 +739,13 @@ class PosSchedule(object):
                 neighbors['phins'] = starting_anticol_phi[neighbor_idxs]
                 neighbors['thetans'] = starting_anticol_theta[neighbor_idxs]
                 neighbors['thetants'] = goal_anticol_theta[neighbor_idxs]
-                neighbors['phints'] = goal_anticol_theta[neighbor_idxs]
+                neighbors['phints'] = goal_anticol_phi[neighbor_idxs]
 
                 # todo-anthony make compatible with various tp offsets and tp ranges
                 ## Loop through the neighbors and calculate the x,y's for each
                 for thit,pit,idxit in zip(neighbors['thetans'],neighbors['phins'],neighbors['idxs']):
-                    theta_bods = self.anticol.posoutlines.central_body_outline([thit,pit],[self.anticol.xoffs[idxit],self.anticol.yoffs[idxit]])
-                    phi_arms = self.anticol.posoutlines.phi_arm_outline([thit,pit],self.collider.R1[idxit], [self.anticol.xoffs[idxit],self.anticol.yoffs[idxit]])
+                    theta_bods = self.anticol.ultra_highres_posoutlines.central_body_outline([thit,pit],[self.anticol.xoffs[idxit],self.anticol.yoffs[idxit]])
+                    phi_arms = self.anticol.ultra_highres_posoutlines.phi_arm_outline([thit,pit],self.collider.R1[idxit], [self.anticol.xoffs[idxit],self.anticol.yoffs[idxit]])
                     xns.extend(theta_bods[0,:])
                     xns.extend(phi_arms[0,:])
                     yns.extend(theta_bods[1,:])
@@ -745,7 +755,7 @@ class PosSchedule(object):
                 ## of the petal and place some 'avoidance' objects along it so that
                 ## our positioner is repulsed by them and thus the petal edge
                 if avoid_petal:
-                    petalxys = self.anticol.posoutlines.petal_outline(self.anticol.xoffs[changing],self.anticol.yoffs[changing],\
+                    petalxys = self.anticol.ultra_highres_posoutlines.petal_outline(self.anticol.xoffs[changing],self.anticol.yoffs[changing],\
                                             self.anticol.neighborhood_radius)
                     xns.extend(petalxys[0,:])
                     yns.extend(petalxys[1,:])
@@ -784,8 +794,8 @@ class PosSchedule(object):
                 #dphi = obs_tp_minmax[1][1]-obs_tp_minmax[1][0]
                 #actual_thetas = (np.arange(obs_tp_minmax[0][0],obs_tp_minmax[0][1]+1)
                 #actual_phis = np.arange(obs_tp_minmax[1][0],obs_tp_minmax[1][1]+1)
-                theta_indices = (np.arange(obs_tp_minmax[0][0],obs_tp_minmax[0][1]+1) - self.anticol.min_theta)% 360
-                phi_indices = (np.arange(obs_tp_minmax[1][0],obs_tp_minmax[1][1]+1) - self.anticol.min_phi)
+                theta_indices = (np.arange(obs_tp_minmax[0][0],obs_tp_minmax[0][1]+1) - self.anticol.min_default_theta)% 360
+                phi_indices = (np.arange(obs_tp_minmax[1][0],obs_tp_minmax[1][1]+1) - self.anticol.min_default_phi)
                 #rotated_thetas = (actual_thetas+540)%360 - 180
                 #rotated_phis =(actual_phis+540)%360 - 180
                 #theta_indices = rotated_thetas - self.anticol.min_theta
@@ -821,12 +831,19 @@ class PosSchedule(object):
                 #    print("The theta dimensions of the xyrot_matrices are not the same for theta and phi")
                 #    if self.anticol.use_pdb:
                 #        pdb.set_trace()
+                # print("Range of obsTP was {}".format(obs_tp_minmax))
+                # for tobs,tind in zip(np.arange(obs_tp_minmax[0][0],obs_tp_minmax[0][1]+1),theta_indices):
+                #     print(tobs,tind)
+                # for pobs,pind in zip(np.arange(obs_tp_minmax[1][0],obs_tp_minmax[1][1]+1),phi_indices):
+                #     print(pobs,pind)
                 for i in range(theta_indices.size):
                     rot_obs_t_index = theta_indices[i]
-                    cut_cent_bod_matrix[i,:,:] = np.asarray(changing_posmodel.trans.obsXY_to_flatXY([central_body_matrix_locations[rot_obs_t_index,0,:],central_body_matrix_locations[rot_obs_t_index,1,:]]))
+                    #cut_cent_bod_matrix[i,:,:] = np.asarray(changing_posmodel.trans.obsXY_to_flatXY([central_body_matrix_locations[rot_obs_t_index,0,:],central_body_matrix_locations[rot_obs_t_index,1,:]]))
+                    cut_cent_bod_matrix[i,:,:] = np.asarray([central_body_matrix_locations[rot_obs_t_index,0,:],central_body_matrix_locations[rot_obs_t_index,1,:]])
                     for j in range(phi_indices.size):
                         rot_obs_p_index = phi_indices[j]
-                        cut_phi_arm_matrix[i,j,:,:] = np.asarray(changing_posmodel.trans.obsXY_to_flatXY([phi_arm_matrix_locations[rot_obs_t_index,rot_obs_p_index,0,:],phi_arm_matrix_locations[rot_obs_t_index,rot_obs_p_index,1,:]]))
+                        #cut_phi_arm_matrix[i,j,:,:] = np.asarray(changing_posmodel.trans.obsXY_to_flatXY([phi_arm_matrix_locations[rot_obs_t_index,rot_obs_p_index,0,:],phi_arm_matrix_locations[rot_obs_t_index,rot_obs_p_index,1,:]]))
+                        cut_phi_arm_matrix[i,j,:,:] = np.asarray([phi_arm_matrix_locations[rot_obs_t_index,rot_obs_p_index,0,:],phi_arm_matrix_locations[rot_obs_t_index,rot_obs_p_index,1,:]])
 
                 ## With the positioner and neighbors setup, resolve the specific scenario and
                 ## return dt,dp,pausetime  lists that I can convert into a new movetable
@@ -895,8 +912,7 @@ class PosSchedule(object):
                         itter += 1
 
                 ## Replace the old table with the newly created one
-                newmovetime = new_changing_table.for_schedule['move_time'][dts.size-1]
-
+                newmovetime = new_changing_table.for_schedule['stats']['net_time'][dts.size-1]
                 tables[changing] = new_changing_table
 
                 prepauses = []
@@ -952,7 +968,7 @@ class PosSchedule(object):
             movetimes = np.zeros(len(tables))
             ## Update the movetimes for every positioner for this step
             for i,table in enumerate(tables):
-                movetimes[i] = table.for_schedule['move_time'][-1]
+                movetimes[i] = table.for_schedule['stats']['net_time'][-1]
                 if i in altered_pos:
                     tempmovetime = stallmovetimes[altered_pos==i]
                     table.set_postpause(len(table.rows)-1, maxstalltime-tempmovetime)
@@ -973,8 +989,7 @@ class PosSchedule(object):
 
         ## After all collision avoidances attempted. Return the new list of movetables
         return tables, altered_pos
-        
- 
+
     # todo-anthony get this back to a functional state
     def _em_resolution(self,posmodel,start,target,neighbors=None,dp_direction = 0):
         '''
@@ -1283,7 +1298,7 @@ class PosSchedule(object):
     # todo-anthony is this still most efficient and accurate way?
     def _get_max_time(self,tables):
         ## Find out how long the longest move takes to execute
-        movetimes = np.asarray([table.for_schedule['move_time'][-1] for table in tables])
+        movetimes = np.asarray([table.for_schedule['stats']['net_time'][-1] for table in tables])
         if self.anticol.verbose:
             try:
                 print("std of movetimes was: ", np.std(movetimes))
@@ -1510,12 +1525,17 @@ class PosSchedule(object):
             newtab = posmovetable.PosMoveTable(tabledicts['retract'][tablenum].posmodel)
             for step in ['retract','rotate','extend']:
                 table = tabledicts[step][tablenum]
-                sched = table.for_schedule
-                if sched['nrows']==1 and sched['dT']==0.0 and sched['dP']==0.0:
-                    continue
-                else:
-                    newtab.extend(table)
+                #sched = table.for_schedule
+                #if len(table.rows)==1 and table.rows[0].data['dT_ideal']==0.0 and table.rows[0].data['dP_ideal']==0.0:
+                #    continue
+                #else:
+                #    newtab.extend(table)
+                newtab.extend(table)
             output_tables.append(newtab)
+            #print(tabledicts['retract'][tablenum].rows[0].data['dP_ideal'], newtab.rows[0].data['dP_ideal'])
+            #print(tabledicts['rotate'][tablenum].rows[0].data['dT_ideal'], newtab.rows[1].data['dT_ideal'])
+            #print(tabledicts['extend'][tablenum].rows[0].data['dP_ideal'], newtab.rows[2].data['dP_ideal'])
+            #print(len(tabledicts['extend'][tablenum].rows),len(tabledicts['extend'][tablenum].rows),len(tabledicts['extend'][tablenum].rows),len(newtab.rows))
         return output_tables
 
     def _condense(self,dts,dps):
@@ -1565,8 +1585,8 @@ class PosSchedule(object):
                 current_column += 1
         return np.asarray(output_t),np.asarray(output_p),np.asarray(output_times)
 
-    # todo-anthony double check this function
     def _reverse_for_extension(self,tables):
+
         ## For each positioner, merge the three steps (r,r,e) into a single move table
         output_tables = []
         for table in tables:
@@ -1574,18 +1594,23 @@ class PosSchedule(object):
             newtab = posmovetable.PosMoveTable(table.posmodel)
             rows = table.rows.copy()
             rows = rows[::-1]
+            #stats = {key:[table.rows[ind].data[key] for ind in range(len(table.rows))] for key in ['dT_ideal','dP_ideal','move_time' ]}
+            #print("Before, Net time:{} t:{} p:{}".format(stats['move_time'], stats['dT_ideal'], stats['dP_ideal']))
             for i,row in enumerate(rows):
                 dt, dp = row.data['dT_ideal'], row.data['dP_ideal']
                 pre, post = row.data['prepause'], row.data['postpause']
                 newtab.set_move(i, pc.T, -1*dt)
                 newtab.set_move(i, pc.P, -1*dp)
                 newtab.set_prepause(i, post)
-                newtab.set_postpause(i, pre)    
+                newtab.set_postpause(i, pre)
+            #newstats = { key:[newtab.rows[ind].data[key] for ind in range(len(newtab.rows))] for key in ['dT_ideal','dP_ideal','move_time' ]}
+            # print("After, Net time:{} t:{} p:{}\n".format(stats['move_time'], stats['dT_ideal'], stats['dP_ideal']))
             output_tables.append(newtab)
         return output_tables        
 
         
     # todo-anthony what should we do with this?
+
     def _assign_properly(self,theta,phi):
         '''
          Helper function that takes two variables theta and phi and returns a list pair of 
@@ -1689,21 +1714,23 @@ class Anticol:
         self.create_debug_outputs = False
         self.use_pdb = False
 
+        self._update_positioner_properties(petal.posmodels)
+
         ## Define the phi position in degrees at which the positioner is safe
         self.phisafe = collider.Ei_phi
 
         # todo-anthony make compatible with various tp offsets and tp ranges
         ## If thetas and phis aren't defined, define them to defaults
         if thetas is None:
-            self.min_defined_theta = -180
-            self.max_defined_theta = 180
-            self.theta_inds = np.arange(self.min_defined_theta,self.max_defined_theta, 1)
+            self.min_default_theta = -180
+            self.max_default_theta = 180
+            self.theta_inds = np.arange(self.min_default_theta,self.max_default_theta, 1)
         else:
             self.min_theta = np.min(thetas)
         if phis is None:
-            self.min_defined_phi = -20
-            self.max_defined_phi = 211
-            self.phi_inds = np.arange(self.min_defined_phi, self.max_defined_phi, 1)
+            self.min_default_phi = -20
+            self.max_default_phi = 211
+            self.phi_inds = np.arange(self.min_default_phi, self.max_default_phi, 1)
 
         ## Some convenience definitions regarding the size of positioners
         motor_width = 1.58
@@ -1733,7 +1760,7 @@ class Anticol:
         self.coeffa = 10.0  ## attractive force amplitude of the target location
         
         ##** aSTAR PARAMS **##
-        self.astar_tolerance_xy = 0.28 #3
+        self.astar_tolerance_xy = 0.2 #3
         self.multitest = False
         self.astar_verbose = verbose
         self.astar_plotting = False
@@ -1759,14 +1786,37 @@ class Anticol:
         ## of the search
         # iidea - higher res on non-rotating neighbors ?
         # todo-anthony make compatible with various tp offsets and tp ranges
-        self.posoutlines = PosOutlines(collider, spacing=self.astar_tolerance_xy)
+        posoutlines = PosOutlines(collider, spacing=2.0*self.astar_tolerance_xy)
+        self.ultra_highres_posoutlines = PosOutlines(collider, spacing=0.5*self.astar_tolerance_xy)
         ##Note the approximation here
-        r1 = np.mean(collider.R1)         
-        self.central_body_matrix = self.posoutlines.central_body_outline_matrix(self.theta_inds)
-        self.phi_arm_matrix = self.posoutlines.phi_arm_outline_matrix(theta_inds=self.theta_inds,phi_inds=self.phi_inds,xoff=r1,yoff=0)
-
+        r1 = np.max(self.r1s)
+        self.central_body_matrix = posoutlines.central_body_outline_matrix(self.theta_inds)
+        self.phi_arm_matrix = posoutlines.phi_arm_outline_matrix(theta_inds=self.theta_inds,phi_inds=self.phi_inds,xoff=r1,yoff=0)
+        del posoutlines
         
-
+    def _update_positioner_properties(self,posmodels):
+        xoffs = []
+        yoffs = []
+        toffs = []
+        poffs = []
+        r1s = []
+        r2s = []
+        ## Loop through the posunitids and the requests, and correctly order the request
+        ## information into the order set by posunitids
+        for posmodel in posmodels:
+            flatxy = posmodel.trans.obsXY_to_flatXY([posmodel.state.read('OFFSET_X'),posmodel.state.read('OFFSET_Y')])
+            xoffs.append(flatxy[0])
+            yoffs.append(flatxy[1])
+            toffs.append(posmodel.state.read('OFFSET_T'))
+            poffs.append(posmodel.state.read('OFFSET_P'))
+            r1s.append(posmodel.state.read('LENGTH_R1'))
+            r2s.append(posmodel.state.read('LENGTH_R2'))
+        self.xoffs = np.asarray(xoffs)
+        self.yoffs = np.asarray(yoffs)
+        self.toffs = np.asarray(toffs)
+        self.poffs = np.asarray(poffs)
+        self.r1s = np.asarray(r1s)
+        self.r2s = np.asarray(r2s)
         
      
         
