@@ -183,11 +183,15 @@ def run_random_example(nposs,deltemps=False,seed=None,do_anims=False):
     ## Store initial locations and create request for final locations
     request_dict = {}
     for itter,idn in enumerate(pos_idnams):
-        state = curpetal.posmodels[itter].state
+        posmodel = curpetal.posmodels[itter]
+        state = posmodel.state
         state.store('POS_T',tpstarts[itter][0])
         state.store('POS_P',tpstarts[itter][1])
         state.write()
-        request_dict[idn] = {'command':'obsTP','target':tpfins[itter]}
+        posTP = posmodel.trans.obsTP_to_posTP(tpfins[itter])
+        posXY = posmodel.trans.posTP_to_posXY(posTP)
+
+        request_dict[idn] = {'command':'posXY','target':posXY}
 
     ## Print for our information
     print(pos_idnams,fid_idnams)
@@ -204,11 +208,46 @@ def run_random_example(nposs,deltemps=False,seed=None,do_anims=False):
     curpetal.schedule.anticol.create_debug_outputs = True
     curpetal.schedule.anticol.astar_plotting = True
     curpetal.schedule.anticol.use_pdb = True
-
+    curpetal.anticollision_override = False
     ## Start Timer
     stime = time.time()
     ## Schedule moves with anticollision
-    curpetal.schedule_moves(anticollision=True)
+    curpetal.schedule_moves(anticollision=False)
+    # for tablenum, table in enumerate(curpetal.schedule.move_tables):
+    #     posmodel = table.posmodel
+    #     print(posmodel == curpetal.posmodels[tablenum])
+    #     dp = posmodel.trans.delta_posTP(tpfins[tablenum],tpstarts[tablenum],range_wrap_limits='targetable')
+    #     print("Requested dt,dp: ",dp[0],dp[1])
+    #     sched = table.for_hardware
+    #     #sched = table.for_schedule
+    #     stats = sched['stats']
+    #     print("Stats dt,dp: ",stats['net_dT'][-1],stats['net_dP'][-1])
+    #     if len(table.rows) > 2:
+    #         print("Ideal table dtdp: ", table.rows[1].data['dT_ideal'],
+    #               table.rows[0].data['dP_ideal'] + table.rows[2].data['dP_ideal'])
+    #         print("rre dp,dt,dp,nmoves: ",table.rows[0].data['dP_ideal'],table.rows[1].data['dT_ideal'], table.rows[2].data['dP_ideal'],len(table.rows))
+    #     else:
+    #         print("direct dt,dp,nmoves: ", table.rows[0].data['dT_ideal'], table.rows[0].data['dP_ideal'],len(table.rows))
+    #     print("\n")
+    for tablenum, table in enumerate(curpetal.schedule.move_tables):
+        posmodel = table.posmodel
+        dp = posmodel.trans.delta_posTP(tpfins[tablenum],tpstarts[tablenum],range_wrap_limits='targetable')
+        print(posmodel.posid)
+        print("Requested dt,dp: ",dp[0],dp[1])
+        sched = table.for_hardware
+
+        if len(sched['motor_steps_T']) == 6:
+            tstep = sched['motor_steps_T'][2]
+            pstep = sched['motor_steps_P'][1]+sched['motor_steps_P'][3]
+            print([sched['motor_steps_T'][i] for i in range(len(sched['motor_steps_T']))])
+            print([sched['motor_steps_P'][i] for i in range(len(sched['motor_steps_P']))])
+            #print([tstep,sched['motor_steps_T'][4],sched['motor_steps_T'][5]])
+            #print([pstep, sched['motor_steps_P'][4], sched['motor_steps_P'][5]])
+        else:
+            print([sched['motor_steps_T'][i] for i in range(len(sched['motor_steps_T']))])
+            print([sched['motor_steps_P'][i] for i in range(len(sched['motor_steps_P']))])
+
+    # return the movetables as a list of movetables
     ## Print out the total time the last step took
     print("Anticollision took: %0.2f seconds" %(time.time()-stime))
 
@@ -239,7 +278,7 @@ def create_random_state_opt(poscols,posmodels,typ= 'obsTP',randomizer=np.random.
 
         ## Generate nattempts worth of random positions to try
         randobsthetas = randomizer.randint(low=theta_min,high=theta_max,size=nattempts)
-        randobsphis = randomizer.randint(low=phi_min,high=phi_max,size=nattempts)
+        randobsphis = randomizer.randint(low=144,high=phi_max,size=nattempts) # phi_min
 
         ## Set success flag to true to start (initialized here for domain purposes)
         solution_found = True

@@ -234,7 +234,8 @@ class PosSchedule(object):
                     log_notes.append(req['log_note'])
                     commands.append((0,req['command'],req['cmd_val1'],req['cmd_val2']))
                     break
-
+        for posmodel,pet_posmodel in zip(posmodels,self.petal.posmodels):
+            print(posmodel == pet_posmodel)
         #plt.figure()
         # radians = np.arange(0,2*np.pi,np.pi/200)
         # xcirc = 6*np.cos(radians)
