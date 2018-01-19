@@ -189,9 +189,9 @@ def run_random_example(nposs,deltemps=False,seed=None,do_anims=False):
         state.store('POS_P',tpstarts[itter][1])
         state.write()
         posTP = posmodel.trans.obsTP_to_posTP(tpfins[itter])
-        posXY = posmodel.trans.posTP_to_posXY(posTP)
+        obsXY = posmodel.trans.posTP_to_obsXY(posTP)
 
-        request_dict[idn] = {'command':'posXY','target':posXY}
+        request_dict[idn] = {'command':'obsXY','target':obsXY}
 
     ## Print for our information
     print(pos_idnams,fid_idnams)

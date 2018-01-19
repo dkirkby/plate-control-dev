@@ -126,14 +126,14 @@ class PosSchedule(object):
         else:
             antstr += 'w/o'
         for table in self.move_tables:
-            if table.posid == 'M00100':
+            if table.posmodel.posid == 'M00100':
                 print('Schedule - Move tables {} anticollision \n{}\n\n'.format(antstr,table.for_schedule))
                 print('Hardware - Move tables {} anticollision \n{}\n\n'.format(antstr,table.for_hardware))
-        print('Petal posids: {}'.format(petal.posids))
-        print('Table posids: {}'.format([table.posid for table in self.move_tables]))
-        print('Requests posids: {}'.format(self.request.keys()))
-        print("Starts: {}".format([self.requests[posid]['start_posTP'] for posid in self.requests.keys()])
-        print("Targets: {}".format([self.requests[posid]['targt_posTP'] for posid in self.requests.keys()]))
+        print('Petal posids: {}'.format([posmodel.posid for posmodel in self.collider.posmodels]))
+        print('Table posids: {}'.format([table.posmodel.posid for table in self.move_tables]))
+        #print('Requests posids: {}'.format(self.requests.keys()))
+        #print("Starts: {}".format([self.requests[posid]['start_posTP'] for posid in self.requests.keys()]))
+        #print("Targets: {}".format([self.requests[posid]['targt_posTP'] for posid in self.requests.keys()]))
 
 
     def total_dtdp(self, posid):
@@ -190,6 +190,7 @@ class PosSchedule(object):
         while(self.requests):
             req = self.requests.pop(0)
             posmodel = req['posmodel']
+            #print(posmodel.posstate.get('LENGTH_R1'))
             table = posmovetable.PosMoveTable(posmodel)
             dtdp = posmodel.trans.delta_posTP(req['targt_posTP'], \
                         req['start_posTP'], range_wrap_limits='targetable')
