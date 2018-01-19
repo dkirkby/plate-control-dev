@@ -148,7 +148,7 @@ class XYTest(object):
 			with open(extradots_filename,'r',newline='') as file:
 				reader = csv.DictReader(file)
 				for row in reader:
-					self.m.extradots_fvcXY.append([row['x_pix'],row['y_pix']])
+					self.m.extradots_fvcXY.append([float(row['x_pix']),float(row['y_pix'])])
 				self.logwrite('Read ' + str(len(self.m.extradots_fvcXY)) + ' from csv file.')
 		else:
 			self.logwrite('Re-identifying fiducial locations.')
