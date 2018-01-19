@@ -52,7 +52,7 @@ if __name__=="__main__":
 	if PROCNAME == 'xytest.py':
 		while run:		 		
 			if (len(pids) !=1) or ( not os.path.exists("/proc/"+pids[0])):
-				finishcheck = list(open(newestfile, 'r'))[-2]
+				finishcheck = list(open(newestfile, 'r'))[-3]
 				if finishcheck[-15:-1] == "Test complete.":                        
 					alarm.send (SUBJECT,'xytest is complete')
 				else:
