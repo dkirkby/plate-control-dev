@@ -117,7 +117,7 @@ class PosSchedule(object):
         if self.move_tables:
             return
         elif anticollision:
-            self._schedule_with_anticollision()
+            self._schedule_with_simple_anticollision()
         else:
             self._schedule_without_anticollision()
         antstr = ''
@@ -201,6 +201,27 @@ class PosSchedule(object):
             table.store_orig_command(0, req['command'], req['cmd_val1'], req['cmd_val2'])
             table.log_note += (' ' if table.log_note else '') + req['log_note']
             self.move_tables.append(table)
+
+    def _schedule_with_simple_anticollision(self):
+        while(self.requests):
+            req = self.requests.pop(0)
+            posmodel = req['posmodel']
+            #print(posmodel.posstate.get('LENGTH_R1'))
+            table = posmovetable.PosMoveTable(posmodel)
+            #dtdp = posmodel.trans.delta_posTP(req['targt_posTP'], \
+            #            req['start_posTP'], range_wrap_limits='targetable')
+            tps = posmodel.trans.posTP_to_obsTP(req['start_posTP'])
+            tpf = posmodel.trans.posTP_to_obsTP(req['targt_posTP'])
+            RRrE = self._create_table_RRrEdict(tps, tpf, posmodel)
+            RRrE['extend'] = self._reverse_for_extension([RRrE['extend']])[0]
+            #out = {}
+            #for key in ['retract','rotate','extend']:
+            #    out[key] = [RRrE[key]]
+            table = self._combine_single_table(RRrE)
+            table.store_orig_command(0, req['command'], req['cmd_val1'], req['cmd_val2'])
+            table.log_note += (' ' if table.log_note else '') + req['log_note']
+            self.move_tables.append(table)
+
 
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
@@ -1554,6 +1575,20 @@ class PosSchedule(object):
             #print(tabledicts['extend'][tablenum].rows[0].data['dP_ideal'], newtab.rows[2].data['dP_ideal'])
             #print(len(tabledicts['extend'][tablenum].rows),len(tabledicts['extend'][tablenum].rows),len(tabledicts['extend'][tablenum].rows),len(newtab.rows))
         return output_tables
+
+    def _combine_single_table(self,tabledicts):
+        ## start with copy of the retract step table
+        ## Note that we don't change final_creep or backlash for this final table
+        newtab = posmovetable.PosMoveTable(tabledicts['retract'].posmodel)
+        for step in ['retract','rotate','extend']:
+            table = tabledicts[step]
+            #sched = table.for_schedule
+            #if len(table.rows)==1 and table.rows[0].data['dT_ideal']==0.0 and table.rows[0].data['dP_ideal']==0.0:
+            #    continue
+            #else:
+            #    newtab.extend(table)
+            newtab.extend(table)
+        return newtab
 
     def _condense(self,dts,dps):
         '''
