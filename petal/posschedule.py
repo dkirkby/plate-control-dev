@@ -1884,11 +1884,12 @@ class PosOutlines:#(PosPoly):
         self.thetapoints = self._highres(collider.keepout_T.points.copy())
         self.phipoints = self._highres(collider.keepout_P.points.copy())
         self.ferrulepoints = self._highres(collider.ferrule_poly.points.copy())
-        possible_petal_pts = collider.keepout_PTL.points.copy()
-        petaly = possible_petal_pts[1,:]
-        actual_petal = np.where((petaly > -1.) & (petaly < 249.))[0]
-        true_petal_pts = possible_petal_pts[:,actual_petal]
-        self.petalpoints = self._highres(true_petal_pts)
+#        possible_petal_pts = collider.keepout_PTL.points.copy()
+#        petaly = possible_petal_pts[1,:]
+#        actual_petal = np.where((petaly > -1.) & (petaly < 249.))[0]
+#        true_petal_pts = possible_petal_pts[:,actual_petal]
+#        self.petalpoints = self._highres(true_petal_pts)
+        self.petalpoints = collider.keepout_PTL.points.copy()
         self._rotmat2D_deg = collider.keepout_T._rotmat2D_deg
         #super(PosOutlines, self).__init__(self,collider,spacing=0.4)
    
