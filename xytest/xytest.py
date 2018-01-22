@@ -79,10 +79,18 @@ class XYTest(object):
 				presets = configobj.ConfigObj(presets_file,unrepr=True)
 				self.presets['supply voltage']=presets['supply_voltage']
 				self.presets['relative humidity']=presets['relative_humidity']
-				self.presets['test station']=os.environ['TEST_STAND_NAME']
+				# prioritize environment definitions but allow conf file definitions
+				if 'TEST_STAND_NAME' in os.environ.keys():
+					self.presets['test station'] = os.environ['TEST_STAND_NAME']
+				elif 'test station' in presets.keys():
+					self.presets['test station'] = presets['test station']
+				if 'TEST_OPERATOR_NAME' in os.environ.keys():
+					self.presets['test operator'] = os.environ['TEST_OPERATOR_NAME']
+				elif 'test operator' in presets.keys():
+					self.presets['test operator'] = presets['test operator']
 			except:
 				USE_LOCAL_PRESETS=False
-				
+
 
 		self.use_local_presets=	USE_LOCAL_PRESETS
 		self.hwsetup_conf = configobj.ConfigObj(hwsetup_conf,unrepr=True,encoding='utf-8')

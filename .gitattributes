@@ -76,3 +76,4 @@ xytest/um_test_report.py -text
 xytest/update_location.py -text
 xytest/watcher.py -text
 xytest/xytest.py -text
+xytest/xytest_simple_sim.py -text
