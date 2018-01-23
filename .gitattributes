@@ -34,6 +34,7 @@ posfidfvc/SBIG/SBIG_dev/arm/libsbigudrv.so -text
 posfidfvc/SBIG/SBIG_dev/lib32/libsbigudrv.so -text
 posfidfvc/SBIG/SBIG_dev/lib64/libsbigudrv.so -text
 posfidfvc/SBIG/SBIG_dev/sbigudrv.h -text
+posfidfvc/SBIG/adjust_light.py -text
 posfidfvc/SBIG/camtest.py -text
 posfidfvc/SBIG/cool_cam.py -text
 posfidfvc/SBIG/led_illuminator.py -text
