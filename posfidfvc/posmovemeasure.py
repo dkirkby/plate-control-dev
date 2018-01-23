@@ -210,7 +210,7 @@ class PosMoveMeasure(object):
 				correction[posid]['command'] = 'dXdY'
 				correction[posid]['target'] = dxdy
 				correction[posid]['log_note'] = 'correction move ' + str(i)
-				self.printfunc(str(posid) + ': correction move ' + str(i) + ' of ' + str(num_corr_max) + ' by (dx,dy)=(' + self.fmt(dxdy[0]) + ',' + self.fmt(dxdy[1]) + '), \u221A(dx\u00B2+dy\u00B2)=' + self.fmt(data[posid]['err2D'][-1]))
+				self.printfunc(str(posid) + ': correction move ' + str(i) + ' of ' + str(num_corr_max) + ' by (dx,dy)=(' + self.fmt(dxdy[0]) + ',' + self.fmt(dxdy[1]) + '), (dx+dy)=' + self.fmt(data[posid]['err2D'][-1]))
 			this_meas,imgfiles = self.move_measure(correction, tp_updates=self.tp_updates_mode)
 			for posid in this_meas.keys():
 				m = data[posid] # again, for terseness
@@ -255,7 +255,7 @@ class PosMoveMeasure(object):
 				requests[posid] = {'command':'posTP', 'target':[posT,posP], 'log_note':'parking'}
 		self.move(requests)
 		
-	def one_point_calibration(self, posids='all', mode='posTP', posids = 'all'):
+	def one_point_calibration(self, mode='posTP', posids = 'all'):
 		"""Goes to a single point, makes measurement with FVC, and re-calibrates the internally-
 		tracked angles for the current theta and phi shaft positions.
 		
