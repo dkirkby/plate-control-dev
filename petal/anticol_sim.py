@@ -182,7 +182,7 @@ def run_random_example(nposs,deltemps=False,seed=None,do_anims=False):
 
     ## Store initial locations and create request for final locations
     request_dict = {}
-    for itter,idn in enumerate(pos_idnams):
+    for itter,idn in zip(np.arange(len(pos_idnams))[::-1],pos_idnams[::-1]):
         posmodel = curpetal.posmodels[itter]
         state = posmodel.state
         state.store('POS_T',tpstarts[itter][0])
@@ -190,7 +190,6 @@ def run_random_example(nposs,deltemps=False,seed=None,do_anims=False):
         state.write()
         posTP = posmodel.trans.obsTP_to_posTP(tpfins[itter])
         obsXY = posmodel.trans.posTP_to_obsXY(posTP)
-
         request_dict[idn] = {'command':'obsXY','target':obsXY}
 
     ## Print for our information
@@ -212,7 +211,7 @@ def run_random_example(nposs,deltemps=False,seed=None,do_anims=False):
     ## Start Timer
     stime = time.time()
     ## Schedule moves with anticollision
-    curpetal.schedule_moves(anticollision=False)
+    curpetal.schedule_moves(anticollision=True)
     # for tablenum, table in enumerate(curpetal.schedule.move_tables):
     #     posmodel = table.posmodel
     #     print(posmodel == curpetal.posmodels[tablenum])
