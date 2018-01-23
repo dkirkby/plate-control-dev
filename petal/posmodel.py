@@ -13,7 +13,7 @@ class PosModel(object):
     """
 
     def __init__(self, state=None,is_simulation=False,user_interactions_enabled=False):
-        if not(state):
+        if state is None:
             self.state = posstate.PosState()
         else:
             self.state = state
@@ -253,6 +253,9 @@ class PosModel(object):
         """
         for axis in self.axis:
             axis.postmove_cleanup_cmds = ''
+
+    def __hash__(self):
+        return hash(self.posid)
 
 class Axis(object):
     """Handler for a motion axis. Provides move syntax and keeps tracks of position.

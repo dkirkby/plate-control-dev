@@ -23,6 +23,8 @@ class PosCollider(object):
         self.pos_neighbors = {} # all the positioners that surround a given positioner. key is a posmodel, value is a list of neighbor posmodels
         self.fixed_neighbor_cases = {} # all the fixed neighbors that apply to a given positioner. key is a posmodel, value is a list of the fixed neighbor cases
         self.collidable_relations = {'A':[],'B':[],'B_is_fixed':[]} # every unique pair of geometry that can collide
+        self.R1, self.R2, self.x0, self.y0, self.t0, self.p0 = {}, {}, {}, {}, {}, {}
+
         self.plotting_on = True
         self.timestep = self.config['TIMESTEP']
         self.plotter = posplot.PosPlot(fignum=0, timestep=self.timestep)
@@ -114,17 +116,25 @@ class PosCollider(object):
         The return is a list of instances of PosSweep, containing the theta and phi rotations
         in real time, and when if any collision, and the collision type.
         """
-        pospos = True if posB else False # whether this is checking collisions between two positioners (or if false, between one positioner and fixed keepouts)
-        init_obsTPs = [init_obsTP_A,init_obsTP_B] if pospos else [init_obsTP_A]
-        tables = [tableA,tableB] if pospos else [tableA]
-        sweeps = [PosSweep(posA),PosSweep(posB)] if pospos else [PosSweep(posA)]
-        steps_remaining = [0]*2 if pospos else [0]
+        pospos = posB is not None # whether this is checking collisions between two positioners (or if false, between one positioner and fixed keepouts)
+        if pospos:
+            init_obsTPs = [init_obsTP_A,init_obsTP_B]
+            tables = [tableA,tableB]
+            sweeps = [PosSweep(posA),PosSweep(posB)]
+            steps_remaining = [0]*2
+            check_collision_this_loop = [False] * 2
+            step = [0] * 2
+        else:
+            init_obsTPs = [init_obsTP_A]
+            tables = [tableA]
+            sweeps = [PosSweep(posA)]
+            steps_remaining = [0]
+            check_collision_this_loop = [False]
+            step = [0]
         for i in range(len(tables)):
             sweeps[i].fill_exact(init_obsTPs[i], tables[i])
             sweeps[i].quantize(self.timestep)
             steps_remaining[i] = len(sweeps[i].time)
-        step = [0]*2 if pospos else [0]
-        check_collision_this_loop = [False]*2 if pospos else [False]
         while any(steps_remaining):
             check_collision_this_loop = False
             for i in range(len(sweeps)):
@@ -140,9 +150,12 @@ class PosCollider(object):
                         sweeps[i].collision_case = collision_case
                         sweeps[i].collision_time = sweeps[i].time[step[i]]
                         steps_remaining[i] = 0 # halt the sweep here
-            steps_remaining = [max(0,s-1) for s in steps_remaining]
+            steps_remaining = np.clip(steps_remaining,0,np.inf)
             for i in range(len(sweeps)):
-                step[i] += 1 if steps_remaining[i] else 0
+                if steps_remaining[i]:
+                    step[i] += 1
+                else:
+                    pass
         return sweeps
 
     def spatial_collision_between_positioners(self, posA, posB, obsTP_A, obsTP_B):

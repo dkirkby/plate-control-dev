@@ -28,7 +28,7 @@ class PosSchedule(object):
     def __init__(self, petal,avoidance='EM',verbose=False):
         self.petal = petal
         self.move_tables = []
-        self.requests = []
+        self.requests = {}
 
         # todo-anthony make compatible with various tp offsets and tp ranges
         self.anticol = Anticol(self.collider,self.petal,verbose)
@@ -90,7 +90,7 @@ class PosSchedule(object):
                           'cmd_val1' : u,
                           'cmd_val2' : v,
                           'log_note' : log_note}
-        self.requests.append(new_request)
+        self.requests[posid] = new_request
 
     def add_table(self, move_table):
         """Adds an externally-constructed move table to the schedule. If there
@@ -123,20 +123,7 @@ class PosSchedule(object):
             #self._schedule_with_anticollision()
         else:
             self._schedule_without_anticollision()
-        antstr = ''
-        if anticollision:
-            antstr += 'with'
-        else:
-            antstr += 'w/o'
-        for table in self.move_tables:
-            if table.posmodel.posid == 'M00100':
-                print('Schedule - Move tables {} anticollision \n{}\n\n'.format(antstr,table.for_schedule))
-                print('Hardware - Move tables {} anticollision \n{}\n\n'.format(antstr,table.for_hardware))
-        print('Petal posids: {}'.format([posmodel.posid for posmodel in self.collider.posmodels]))
-        print('Table posids: {}'.format([table.posmodel.posid for table in self.move_tables]))
-        #print('Requests posids: {}'.format(self.requests.keys()))
-        #print("Starts: {}".format([self.requests[posid]['start_posTP'] for posid in self.requests.keys()]))
-        #print("Targets: {}".format([self.requests[posid]['targt_posTP'] for posid in self.requests.keys()]))
+
 
     def total_dtdp(self, posid):
         """Return as-scheduled total move distance for positioner identified by posid.
@@ -166,8 +153,7 @@ class PosSchedule(object):
         """Returns boolean whether a request has already been registered in the
         schedule for the argued positioner.
         """
-        already_requested_list = [p['posid'] for p in self.requests]
-        was_already_requested = posid in already_requested_list
+        was_already_requested = posid in self.requests
         return was_already_requested
 
     ## internal methods
@@ -204,8 +190,9 @@ class PosSchedule(object):
         return False
 
     def _schedule_without_anticollision(self):
-        while(self.requests):
-            req = self.requests.pop(0)
+        posids = list(self.requests.keys())
+        for posid in posids:
+            req = self.requests.pop(posid)
             posmodel = req['posmodel']
             #print(posmodel.posstate.get('LENGTH_R1'))
             table = posmovetable.PosMoveTable(posmodel)
@@ -220,20 +207,16 @@ class PosSchedule(object):
             self.move_tables.append(table)
 
     def _schedule_with_simple_anticollision(self):
-        while(self.requests):
-            req = self.requests.pop(0)
+        posids = list(self.requests.keys())
+        for posid in posids:
+            req = self.requests.pop(posid)
             posmodel = req['posmodel']
-            #print(posmodel.posstate.get('LENGTH_R1'))
-            table = posmovetable.PosMoveTable(posmodel)
-            #dtdp = posmodel.trans.delta_posTP(req['targt_posTP'], \
-            #            req['start_posTP'], range_wrap_limits='targetable')
+
             tps = posmodel.trans.posTP_to_obsTP(req['start_posTP'])
             tpf = posmodel.trans.posTP_to_obsTP(req['targt_posTP'])
-            RRrE = self._create_table_RRrEdict(tps, tpf, posmodel)
+            RRrE, phi_inner = self._create_table_RRrEdict(tps, tpf, posmodel)
             RRrE['extend'] = self._reverse_for_extension([RRrE['extend']])[0]
-            #out = {}
-            #for key in ['retract','rotate','extend']:
-            #    out[key] = [RRrE[key]]
+
             table = self._combine_single_table(RRrE)
             table.store_orig_command(0, req['command'], req['cmd_val1'], req['cmd_val2'])
             table.log_note += (' ' if table.log_note else '') + req['log_note']
@@ -256,49 +239,37 @@ class PosSchedule(object):
             print("You ARE doing anticollisions")
             print("Number of requests: "+str(len(self.requests)))
 
-        log_notes, commands, posmodels = [], [], []
-        tpstart, tptarg = [], []
-        self.anticol._update_positioner_properties(self.petal.posmodels)
-
-        ## Loop through the posunitids and the requests, and correctly order the request
-        ## information into the order set by posunitids
-        for posunitid in self.petal.posids:
-            for req in self.requests:
-                if req['posmodel'].posid == posunitid:
-                    posmodel = req['posmodel']
-                    posmodels.append(posmodel)
-                    tpstart.append(posmodel.trans.posTP_to_obsTP(req['start_posTP']))
-                    tptarg.append(posmodel.trans.posTP_to_obsTP(req['targt_posTP']))
-                    log_notes.append(req['log_note'])
-                    commands.append((0,req['command'],req['cmd_val1'],req['cmd_val2']))
-                    break
-        for posmodel,pet_posmodel in zip(posmodels,self.petal.posmodels):
-            print(posmodel == pet_posmodel)
+        self.anticol._update_positioner_properties()
 
         ## Now that we have the requests curated and sorted. Lets do anticollision
         ## using the PosAnticol.avoidance method specified
-        move_tables = self._run_RRE_anticol(tpstart,tptarg,posmodels)
+        move_tables = self._run_RRE_anticol()
 
         ## Write a comment in each movetable
-        for movetable,log,coms,pmod in zip(move_tables,log_notes,commands,posmodels):
-            ## Make sure that the ordering of everything is still correct by asserting
-            ## that the positioner id of the movetable matches the one defined originally
-            ## this throws an error if the two are not the same
-            assert pmod.posid == movetable.posmodel.posid, "Ensure the movetable and posmodel match"
-            movetable.store_orig_command(*coms)
-            movetable.log_note += (' ' if movetable.log_note else '') + log
+        for posid, movetable in move_tables.items():
+            if posid != movetable.posmodel.posid:
+                if self.anticol.verbose:
+                    print("In anticollsion code the returned table didn't have the same posid as the key it had")
+            req = self.requests.pop(posid)
+            # Add the original commands and log notes to the move tables
+            movetable.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2'])
+            movetable.log_note += (' ' if movetable.log_note else '') + req['log_note']
 
-        ## return the movetables as a list of movetables
-        self.requests = []
         self.move_tables = move_tables
+
                                                     
-    def _run_RRE_anticol(self,tps_list,tpf_list,posmodels):
+    def _run_RRE_anticol(self):
         '''
             Code that generates move tables, finds the collisions,
             and updates move tables such that no collisions will occur.
             It returns the list of all movetables where none collide with
             one another or a fixed object.
-        '''   
+        '''
+        ## Declare the dictionaries (and list of posids,
+        ## which ideally won't need to be used since it's analogous to *.keys())
+        tp_starts, tp_finals = {}, {}
+        posmodels, posids = {}, []
+
         ## Name the three steps in rre (used for dictionary keys)
         order_of_operations = ['retract','rotate','extend']
     
@@ -306,34 +277,47 @@ class PosSchedule(object):
         relevant_info = {}
 
         for oper in order_of_operations:
-            relevant_info[oper] = { 'movetables':[], 'movetimes':[], 'maxtime':[], 'tpstarts':[], 'tpfinals':[] }
+            relevant_info[oper] = { 'movetables':{}, 'movetimes':{}, 'maxtime':{}, 'tpstarts':{}, 'tpfinals':{} }
 
-        ## Loops through the requests
+        ## Unpack the requests into seperate dictionaries (using the same keys!)
         ## Each request must have retract, rotate, and extend moves
         ## Which each have different start and end theta/phis
-        for tps, tpf, cur_posmodel in zip(tps_list, tpf_list, posmodels):
-            current_tables_dict = self._create_table_RRrEdict(tps, tpf,cur_posmodel)
-            phi_inner = max(self.anticol.phisafe,tps[pc.P])
+        for posid, req in self.requests.items():
+            posmodel = req['posmodel']
+            if posid != posmodel.posid:
+                if self.anticol.verbose:
+                    print("The posmodel posid didn't match the posid key used in the request in run_rre_anticol")
+            posmodels[posid] = posmodel
+            posids.append(posid)
+
+            tps = posmodel.trans.posTP_to_obsTP(req['start_posTP'])
+            tpf = posmodel.trans.posTP_to_obsTP(req['targt_posTP'])
+
+            tp_starts[posid] = tps
+            tp_finals[posid] = tpf
+
+            current_tables_dict, phi_inner = self._create_table_RRrEdict(tps, tpf, posmodel)
+
             ## retraction tps
-            relevant_info['retract']['tpstarts'].append(tps)
-            relevant_info['retract']['tpfinals'].append([tps[0],phi_inner])
+            relevant_info['retract']['tpstarts'][posid] = tps
+            relevant_info['retract']['tpfinals'][posid] = [tps[0],phi_inner]
 
             ## rotation tps
-            relevant_info['rotate']['tpstarts'].append([tps[0],phi_inner])
-            relevant_info['rotate']['tpfinals'].append([tpf[0],phi_inner])
+            relevant_info['rotate']['tpstarts'][posid] = [tps[0],phi_inner]
+            relevant_info['rotate']['tpfinals'][posid] = [tpf[0],phi_inner]
 
             ## **note extend is flipped (unflipped at end of anticol)** ##
             ## extention tps
-            relevant_info['extend']['tpstarts'].append(tpf)
-            relevant_info['extend']['tpfinals'].append([tpf[0],phi_inner])
+            relevant_info['extend']['tpstarts'][posid] = tpf
+            relevant_info['extend']['tpfinals'][posid] = [tpf[0],phi_inner]
 
             ## Unwrap the three movetables and add each of r,r,and e to
             ## a seperate list for that movetype
             ## Also append the movetime for that move to a list
             for key in order_of_operations:
                 movetime = current_tables_dict[key].for_schedule['stats']['net_time']
-                relevant_info[key]['movetables'].append(current_tables_dict[key])
-                relevant_info[key]['movetimes'].append(movetime[0])
+                relevant_info[key]['movetables'][posid] = current_tables_dict[key]
+                relevant_info[key]['movetimes'][posid] = movetime[0]
                 
         ## For each of r, r, and e, find the maximum time that
         ## any positioner takes. The rest will be assigned to wait
@@ -342,19 +326,15 @@ class PosSchedule(object):
         for oper in order_of_operations:
             oper_info = relevant_info[oper]
             oper_info['maxtime'] = max(oper_info['movetimes'])
-            for table,movetime in zip(oper_info['movetables'],oper_info['movetimes']):
-                if movetime<oper_info['maxtime']:
+            for posid in posids:
+                table, movetime = oper_info['movetables'][posid],oper_info['movetimes'][posid]
+                if movetime<oper_info['maxtime'][posid]:
                     table.set_postpause(0,oper_info['maxtime']-movetime)
-            for key in oper_info.keys():
-                if key != 'maxtime':
-                    oper_info[key] = np.asarray(oper_info[key])
+
 
         if self.anticol.verbose:
             print("Max times to start are: ret={:.4f},rot={:.4f},ext={:.4f}".format( *(relevant_info[key]['maxtime'] for key in order_of_operations) ))
-        
-        ## Define whether phi increases, decreases, or stays static
-        #dp_directions = {'rotate':0,'retract':-1,'extend':1}
-        
+
         ## Redefine list as numpy arrays
         posmodels = np.asarray(posmodels)
 
@@ -463,7 +443,7 @@ class PosSchedule(object):
         table['extend'].set_prepause(0, 0.0)
         table['extend'].set_postpause(0, 0.0)
         ## return this positioners rre movetable
-        return table
+        return table, phi_inner
         
     def _create_table_RRrEdict(self,tp_start, tp_final, current_positioner_model):
         '''
@@ -519,11 +499,11 @@ class PosSchedule(object):
         table['extend'].set_prepause(0, 0.0)
         table['extend'].set_postpause(0, 0.0)
         ## return this positioners rre movetable
-        return table
+        return table, phi_inner
        
     
     def _avoid_collisions(self, tables, posmodels, collision_indices, \
-                          collision_types=[], tpss=[], tpfs=[], \
+                          collision_types={}, tpss={}, tpfs={}, \
                           step='retract', maxtimes=np.inf, algorithm='astar'):
         '''
             Function that is called with a list of collisions that need to be avoided. This uses 
@@ -1467,8 +1447,9 @@ class Anticol:
         self.make_animations = False
         self.create_debug_outputs = False
         self.use_pdb = False
+        self.collider = collider
 
-        self._update_positioner_properties(petal.posmodels)
+        self._update_positioner_properties()
 
         ## Define the phi position in degrees at which the positioner is safe
         self.phisafe = collider.Ei_phi
@@ -1543,38 +1524,20 @@ class Anticol:
         posoutlines = PosOutlines(collider, spacing=2.0*self.astar_tolerance_xy)
         self.ultra_highres_posoutlines = PosOutlines(collider, spacing=0.5*self.astar_tolerance_xy)
         ##Note the approximation here
-        r1 = np.max(self.r1s)
+        ## Todo - anthony make this work with new dictionary structure
+        r1 = np.max(list(self.r1s.values()))
         self.central_body_matrix = posoutlines.central_body_outline_matrix(self.theta_inds)
         self.phi_arm_matrix = posoutlines.phi_arm_outline_matrix(theta_inds=self.theta_inds,phi_inds=self.phi_inds,xoff=r1,yoff=0)
         del posoutlines
         
-    def _update_positioner_properties(self,posmodels):
-        xoffs = []
-        yoffs = []
-        toffs = []
-        poffs = []
-        r1s = []
-        r2s = []
-        ## Loop through the posunitids and the requests, and correctly order the request
-        ## information into the order set by posunitids
-        for posmodel in posmodels:
-            flatxy = posmodel.trans.obsXY_to_flatXY([posmodel.state.read('OFFSET_X'),posmodel.state.read('OFFSET_Y')])
-            xoffs.append(flatxy[0])
-            yoffs.append(flatxy[1])
-            toffs.append(posmodel.state.read('OFFSET_T'))
-            poffs.append(posmodel.state.read('OFFSET_P'))
-            r1s.append(posmodel.state.read('LENGTH_R1'))
-            r2s.append(posmodel.state.read('LENGTH_R2'))
-        self.xoffs = np.asarray(xoffs)
-        self.yoffs = np.asarray(yoffs)
-        self.toffs = np.asarray(toffs)
-        self.poffs = np.asarray(poffs)
-        self.r1s = np.asarray(r1s)
-        self.r2s = np.asarray(r2s)
-        
-     
-        
-#from poscollider import PosPoly
+    def _update_positioner_properties(self):
+        self.xoffs = self.collider.x0
+        self.yoffs = self.collider.y0
+        self.toffs = self.collider.t0
+        self.poffs = self.collider.p0
+        self.r1s = self.collider.R1
+        self.r2s = self.collider.R2
+
 # iidea inherit from pospoly?
 class PosOutlines:#(PosPoly):
     """Represents a higher resolution version of the collidable polygonal 
