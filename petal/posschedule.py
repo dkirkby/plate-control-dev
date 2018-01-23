@@ -117,7 +117,10 @@ class PosSchedule(object):
         if self.move_tables:
             return
         elif anticollision:
+            ## Note the use of non-functioning anticollision code! Only for testing purposes
+            ## Note the Positioners COULD collide using this function
             self._schedule_with_simple_anticollision()
+            #self._schedule_with_anticollision()
         else:
             self._schedule_without_anticollision()
         antstr = ''
@@ -134,7 +137,6 @@ class PosSchedule(object):
         #print('Requests posids: {}'.format(self.requests.keys()))
         #print("Starts: {}".format([self.requests[posid]['start_posTP'] for posid in self.requests.keys()]))
         #print("Targets: {}".format([self.requests[posid]['targt_posTP'] for posid in self.requests.keys()]))
-
 
     def total_dtdp(self, posid):
         """Return as-scheduled total move distance for positioner identified by posid.
@@ -186,6 +188,21 @@ class PosSchedule(object):
                 self.move_tables[i].extend(e)
             i += 1
 
+    def _deny_request_because_disabled(self, posmodel):
+        """This is a special function specifically because there is a bit of care we need to
+        consistently take with regard to post-move cleanup, if a request is going to be denied.
+        """
+        enabled = posmodel.state.read('CTRL_ENABLED')
+        if enabled == False:  ## this is specifically NOT worded as "if not enabled:",
+            ## because here we actually do not want a value of None
+            ## to pass the test, in case the parameter field 'CTRL_ENABLED'
+            ## has not yet been implemented in the positioner's .conf file
+            posmodel.clear_postmove_cleanup_cmds_without_executing()
+            print(str(posmodel.state.read('POS_ID')) + \
+                  ': move request denied because CTRL_ENABLED = ' + str(enabled))
+            return True
+        return False
+
     def _schedule_without_anticollision(self):
         while(self.requests):
             req = self.requests.pop(0)
@@ -222,22 +239,6 @@ class PosSchedule(object):
             table.log_note += (' ' if table.log_note else '') + req['log_note']
             self.move_tables.append(table)
 
-
-    def _deny_request_because_disabled(self, posmodel):
-        """This is a special function specifically because there is a bit of care we need to
-        consistently take with regard to post-move cleanup, if a request is going to be denied.
-        """
-        enabled = posmodel.state.read('CTRL_ENABLED')
-        if enabled == False: ## this is specifically NOT worded as "if not enabled:",
-                             ## because here we actually do not want a value of None
-                             ## to pass the test, in case the parameter field 'CTRL_ENABLED'
-                             ## has not yet been implemented in the positioner's .conf file
-            posmodel.clear_postmove_cleanup_cmds_without_executing()
-            print(str(posmodel.state.read('POS_ID')) + \
-                    ': move request denied because CTRL_ENABLED = ' + str(enabled))
-            return True
-        return False
-
     def _schedule_with_anticollision(self):
         '''
             Primary calling function. Once the PosAnticol is initiated, this is essentially all you need to call.
@@ -273,20 +274,7 @@ class PosSchedule(object):
                     break
         for posmodel,pet_posmodel in zip(posmodels,self.petal.posmodels):
             print(posmodel == pet_posmodel)
-        #plt.figure()
-        # radians = np.arange(0,2*np.pi,np.pi/200)
-        # xcirc = 6*np.cos(radians)
-        # ycirc = 6*np.sin(radians)
-        # petal_coords = self.collider.keepout_PTL.points
-        # petal_x = petal_coords[0].tolist()
-        # petal_y = petal_coords[1].tolist()
-        # petal_x.append(petal_x[0])
-        # petal_y.append(petal_y[0])
-        #plt.plot(petal_x,petal_y,'k-')
-        #plt.plot(xoffs,yoffs,'k.')
-        #for xoff,yoff in zip(xoffs,yoffs):
-        #    plt.plot(xoff+xcirc,yoff+ycirc,'r-')
-        #plt.show()
+
         ## Now that we have the requests curated and sorted. Lets do anticollision
         ## using the PosAnticol.avoidance method specified
         move_tables = self._run_RRE_anticol(tpstart,tptarg,posmodels)
@@ -300,15 +288,8 @@ class PosSchedule(object):
             movetable.store_orig_command(*coms)
             movetable.log_note += (' ' if movetable.log_note else '') + log
 
-        # for tablenum, table in enumerate(move_tables):
-        #     posmodel = table.posmodel
-        #     print(posmodel == posmodels[tablenum])
-        #     dp = posmodel.trans.delta_obsTP(tptarg[tablenum],tpstart[tablenum],range_wrap_limits='targetable')
-        #     print(dp[0],dp[1])
-        #     print(table.rows[1].data['dT_ideal'],table.rows[0].data['dP_ideal']+table.rows[2].data['dP_ideal'])
-        #     print(table.rows[0].data['dP_ideal'],table.rows[1].data['dT_ideal'], table.rows[2].data['dP_ideal'],len(table.rows))
-        #     print("\n")
         ## return the movetables as a list of movetables
+        self.requests = []
         self.move_tables = move_tables
                                                     
     def _run_RRE_anticol(self,tps_list,tpf_list,posmodels):
@@ -437,8 +418,7 @@ class PosSchedule(object):
         #    print(len(relevant_info['retract']['movetables'][tablenum].rows), len(relevant_info['rotate']['movetables'][tablenum].rows),
         #          len(relevant_info['extend']['movetables'][tablenum].rows), len(table.rows))
         return merged_tables
-                                                
-                                                    
+
     def _create_table_RREdict(self,tp_start, tp_final, current_positioner_model):
         '''
             Create the original movetable for the current positioner. This uses 
@@ -804,13 +784,6 @@ class PosSchedule(object):
                 neighbors['yns'] = np.asarray(yns)
 
                 ### check for the consistancy of the x and y values. Make sure they don't overlap
-                #testxns = np.asarray(xns).reshape((len(xns),1))
-                #testyns = np.asarray(yns).reshape((len(yns),1))
-                #dxs = testxns-testxns.T
-                #dys = testyns-testyns.T
-                #dists = np.hypot(dxs,dys)
-                #dists[np.diag_indices(dists.shape[0])] = 99
-               
                 if np.any( np.hypot(neighbors['xns']-self.anticol.xoffs[changing],neighbors['yns']-self.anticol.yoffs[changing] ) < 0.3):
                     print('A neighbor is within 0.3 millimeters of the center of the changing positioner')
                     if self.anticol.use_pdb:
@@ -828,16 +801,9 @@ class PosSchedule(object):
 
                 ## Assign the max and min angles for theta and phi, quantized to integers
                 obs_tp_minmax = self.get_targetable_obstp(posmodels[changing]).astype(int)
-                #dtheta = obs_tp_minmax[0][1]-obs_tp_minmax[0][0]
-                #dphi = obs_tp_minmax[1][1]-obs_tp_minmax[1][0]
-                #actual_thetas = (np.arange(obs_tp_minmax[0][0],obs_tp_minmax[0][1]+1)
-                #actual_phis = np.arange(obs_tp_minmax[1][0],obs_tp_minmax[1][1]+1)
                 theta_indices = (np.arange(obs_tp_minmax[0][0],obs_tp_minmax[0][1]+1) - self.anticol.min_default_theta)% 360
                 phi_indices = (np.arange(obs_tp_minmax[1][0],obs_tp_minmax[1][1]+1) - self.anticol.min_default_phi)
-                #rotated_thetas = (actual_thetas+540)%360 - 180
-                #rotated_phis =(actual_phis+540)%360 - 180
-                #theta_indices = rotated_thetas - self.anticol.min_theta
-                #phi_indices = rotated_phis - self.anticol.min_phi
+
                 if np.any(theta_indices<0):
                     if self.anticol.verbose:
                         print("theta indices in avoid_collisions_astar include negatives")
@@ -852,28 +818,6 @@ class PosSchedule(object):
                 cut_cent_bod_matrix = np.ndarray((len(theta_indices),central_body_matrix_locations.shape[1],central_body_matrix_locations.shape[2]))
                 cut_phi_arm_matrix = np.ndarray((len(theta_indices),len(phi_indices),phi_arm_matrix_locations.shape[2],phi_arm_matrix_locations.shape[3]))
 
-                #alt_obs_tp_minmax = (obs_tp_minmax+540)%360 - 180
-                ## Find the locations where we can actually target with this positioner
-                #good_thetas = np.where( ( (self.anticol.thetas >= obs_tmin) & (self.anticol.thetas <= obs_tmax) ) )[0]
-                #good_phis = np.where( ( (self.anticol.phis >= obs_pmin) & (self.anticol.phis <= obs_pmax) ) )[0]
-
-                ## Make bad xy values of the theta body in same grid coordinates
-                ## thetaxys have shape theta_ind, x/y as 0/1 ind, point_ind
-                #cut_cent_bod_matrix = central_body_matrix_locations[good_thetas,:,:]
-            
-                ## phixys has shape theta_ind, phi_ind, x/y as 0/1 ind, point_ind
-                #cut_phi_arm_matrix = phi_arm_matrix_locations[good_thetas,:,:,:]
-                #cut_phi_arm_matrix = cut_phi_arm_matrix[:,good_phis,:,:]
-                
-                #if cut_cent_bod_matrix.shape[0] != cut_phi_arm_matrix.shape[0]:
-                #    print("The theta dimensions of the xyrot_matrices are not the same for theta and phi")
-                #    if self.anticol.use_pdb:
-                #        pdb.set_trace()
-                # print("Range of obsTP was {}".format(obs_tp_minmax))
-                # for tobs,tind in zip(np.arange(obs_tp_minmax[0][0],obs_tp_minmax[0][1]+1),theta_indices):
-                #     print(tobs,tind)
-                # for pobs,pind in zip(np.arange(obs_tp_minmax[1][0],obs_tp_minmax[1][1]+1),phi_indices):
-                #     print(pobs,pind)
                 for i in range(theta_indices.size):
                     rot_obs_t_index = theta_indices[i]
                     #cut_cent_bod_matrix[i,:,:] = np.asarray(changing_posmodel.trans.obsXY_to_flatXY([central_body_matrix_locations[rot_obs_t_index,0,:],central_body_matrix_locations[rot_obs_t_index,1,:]]))
@@ -914,7 +858,7 @@ class PosSchedule(object):
                     run_results['movetype'].extend([step]*nresult_rows)
                     run_results['case'].extend([collision_type]*nresult_rows)
                 else:
-                    dts,dps,times = self._em_resolution(changing_posmodel,start,target,neighbors,step)
+                    continue
     
                 ## If length 0, don't create.
                 if dts is None:
@@ -924,8 +868,6 @@ class PosSchedule(object):
     
                 ## Convert steps into a new movetable
                 new_changing_table = posmovetable.PosMoveTable(changing_posmodel)
-                #new_changing_table.should_antibacklash = False
-                #new_changing_table.should_final_creep = False
                 old_changing_table = tables[changing]
 
                 ## if length 1, create with one step.
@@ -1027,175 +969,6 @@ class PosSchedule(object):
 
         ## After all collision avoidances attempted. Return the new list of movetables
         return tables, altered_pos
-
-    # todo-anthony get this back to a functional state
-    def _em_resolution(self,posmodel,start,target,neighbors=None,dp_direction = 0):
-        '''
-            Avoids the neightbors for the currenct posmodel and gets the positioner from the 
-            start t,p to the target t,p without hitting the neighbors using a 'force law' repulsion/attraction
-            type of avoidance.
-        '''
-        ## Define a few constants
-        nsteps = 10000
-        
-        ## Intialize values
-        theta,phi = start[pc.T],start[pc.P]    
-        dTs,dPs = [],[]
-
-        ## Find the xy of the starting position and get the theta and phi ranges
-        ## we are allowed to move to
-        xstart,ystart = posmodel.trans.obsTP_to_flatXY(start)
-        postmin,postmax = posmodel.targetable_range_T
-        pospmin,pospmax = posmodel.targetable_range_P
-        tmin,pmin = posmodel.trans.posTP_to_obsTP([postmin,pospmin])
-        tmax,pmax = posmodel.trans.posTP_to_obsTP([postmax,pospmax])
-        phi_safe = posmodel.trans.posTP_to_obsTP([theta,self.anticol.phisafe])[1]
-
-        ## Create huge list of neighboring positioner locations
-        ## Figure out if we're extending or retracting, and move the theta/phis of neighbors
-        ## If rotation, the neighbors aren't moving. Say so and continue.
-        print("I'm making neighbors static until we move the problematic positioners.")
-        xns = np.concatenate((neighbors['xns'],neighbors['theta_body_xns']))
-        yns = np.concatenate((neighbors['yns'],neighbors['theta_body_yns']))
-        ## Move without waiting unless specific criteria in the loop are met
-        for i in range(nsteps):       
-            ## Calculate the potential surrounding the current point and
-            ## return the direction that minimizes the potential
-            theta_new,phi_new = self._take_step(posmodel,[theta,phi],target,xns,\
-                                                yns,tmin,tmax,pmin,pmax,phi_safe)
-            ## Save the change in theta and phi and redefine things for the next loop
-            dTs.append(theta_new-theta)
-            dPs.append(phi_new-phi)
-            theta,phi = theta_new,phi_new
-            ## If we are within tolerance of the final target
-            if ( (np.abs(phi - target[pc.P]) < self.anticol.ang_threshold) and \
-                 (np.abs(theta - target[pc.T]) < self.anticol.ang_threshold) ):
-                xo,yo = posmodel.trans.obsTP_to_flatXY([target[pc.T],target[pc.P]])
-                rhons = np.hypot(xns-xo,yns-yo)
-                ## If all of the collideable objects are far enough away, we're done
-                ## Move to the final location and exit
-                if np.all(rhons>self.anticol.rtol):
-                    dTs.append(target[pc.T]-theta)
-                    dPs.append(target[pc.P]-phi)
-                    theta,phi = target[pc.T],target[pc.P]
-                    if self.anticol.verbose:
-                        print("Final Loop reached!   Theta =  %f   and phi = %f    nitters = %d" %(theta,phi,i+1))
-                    ## If desired we can plot the movement and the potential field seen
-                    ## by the positioner
-                    if self.anticol.plotting:
-                        self._plot_potential(posmodel,target,neighbors)
-                        plt.title("Start ts=%d ps=%d tf=%d pf=%d" %    (start[pc.T],start[pc.P],target[pc.T],target[pc.P]))
-                        xls,yls = posmodel.trans.obsTP_to_flatXY([start[pc.T]+np.cumsum(dTs),start[pc.P]+np.cumsum(dPs)])
-                        plt.plot(xls,yls,'g.',markersize=8)
-                        plt.plot(xstart,ystart,'k^',markersize=10)
-                        plt.show()
-                        plt.close()
-                    return self._condense(np.asarray(dTs),np.asarray(dPs))
-                ## If neighbors won't move out of the way, give up as we can't get there
-                else:
-                    break
-                
-                    
-        ## If loop is completed or broken and no solution found,
-        ## we can plot the movements performed and the potential the positioner saw
-        if self.anticol.plotting:
-            self._plot_potential(posmodel,target,neighbors)
-            plt.title("Start ts=%d ps=%d tf=%d pf=%d" % (start[pc.T],start[pc.P],target[pc.T],target[pc.P]))
-            xls,yls = posmodel.trans.obsTP_to_flatXY([start[pc.T]+np.cumsum(dTs),start[pc.P]+np.cumsum(dPs)])
-            plt.plot(xls,yls,'g.',markersize=8)        
-            plt.plot(xstart,ystart,'k^',markersize=10)
-            plt.show()
-            plt.close()
-            
-        ## If the loop didn't converge or we broke, return None's since we didn't have success
-        return None,None,None
-    
-
-    def _take_step(self,posmodel,current,target,xns,yns,tmin,tmax,pmin,pmax,phi_safe):
-        '''
-        A single step within the em_resolution function. This attempts to move a distance
-        self.angstep in both the positive and negative theta and phi directions
-        and calculates the potential at all 9 possibilities (no movement is an option)
-        It selects the option that minimizes the potential and returns the final location
-        of that minimizing movement in local theta,phi 
-        '''
-        ## Get the xy location of the target
-        xa,ya = posmodel.trans.obsTP_to_flatXY(target)
-        
-        ## Define the current and desired locations, and the angular steps to use
-        theta, phi = current[pc.T],current[pc.P]
-        thetaa,phia = target[pc.T],target[pc.P]
-        angstep = self.anticol.angstep#1. #0.01
-        stepper_array = np.array([-1,0,1])*angstep
-
-        ## If within safety envelope, proceed directly to desired location
-        if phi > phi_safe and phia > phi_safe:
-            return thetaa,phia
-    
-        ## Initialize the next phi value to old value
-        phi_next = phi
-        theta_next = theta
-        
-        ## Loop through possible steps and calculate the potential at each.
-        ## If the angle is outside acceptable limits, we move on to the next without
-        ## calculating the potential
-        psteps = np.clip(phi + stepper_array, pmin, pmax)
-        tsteps = np.clip(theta + stepper_array, tmin, tmax)
-        ts,ps = np.meshgrid(tsteps,psteps)
-        ts = ts.ravel()
-        ps = ps.ravel()
-        ## Calculate the term in the potential for the motor location
-        xos,yos = posmodel.trans.obsTP_to_flatXY([ts.tolist(),ps.tolist()])
-
-        ## Calculate the derivative of the potentials
-        Vs = self._findpotential(np.asarray(xos),np.asarray(yos),xa,ya,xns,yns)
-
-        #if V < V_prev:
-        if len(Vs)>0:
-            min_ind = np.argmin(Vs)
-            phi_next = ps[min_ind]
-            theta_next = ts[min_ind]
-
-        ## If the best move is to do nothing, random walk by 2*stepsize
-        ## so long as the random walk is within allowable angle constraints
-        if phi_next == phi and theta_next == theta:
-            if theta >= (tmin + 5):
-                if theta <= (tmax - 5):
-                    theta_next += np.random.randint(-1,2)*2*angstep
-                else:
-                    theta_next += np.random.randint(-1,1)*2*angstep   
-            else:
-                theta_next += np.random.randint(0,2)*2*angstep
-            if phi >= (pmin+5):
-                if phi <= (pmin-5):
-                    phi_next += np.random.randint(-1,2)*2*angstep
-                else:
-                    phi_next += np.random.randint(-1,1)*2*angstep
-            else:
-                phi_next += np.random.randint(0,2)*2*angstep           
-                
-        return theta_next,phi_next
-        
-
-    def _findpotential(self,xos,yos,xa,ya,xns,yns):
-        '''
-            Calculates the distances from the positioner to all 
-            the relevant locations and then returns the potential
-            that the positioner 'feels' given all those distances.
-        '''
-        ## Calculate the term in the potential for the motor location
-        rhocs = np.hypot(xos,yos)
-        ## Calculate the potential pieces for the neighbors
-        xosT = xos.reshape((1,xos.size))
-        yosT = yos.reshape((1,yos.size))
-        xns = xns.reshape((xns.size),1)
-        yns = yns.reshape((yns.size),1)
-        rhonss = np.hypot(xns-xosT,yns-yosT)    
-        ## Calculate the potential pieces for the target
-        rhoas = np.hypot(xa-xos,ya-yos)
-        ## Calculate the derivative of the potentials
-        Vs = self._potential(rhocs,rhonss,rhoas)  
-        return Vs       
       
     # iidea - zero the top percent instead of 1 at a time (quicker for large positioner numbers)
 
@@ -1536,24 +1309,6 @@ class PosSchedule(object):
         os.system('{delcommand} {savedir}*.png'.format(delcommand=delcom, savedir=os.path.join(self.anticol.anim_save_folder,'frame')))
         self.anticol.anim_save_number += 1
 
-    
-    def _potential(self,rhocs,rhonss,rhoas):
-        '''
-            Where the 'forces' the positioner feels are defined. The potential
-            acts to attract the positioner to the target, and repel it from the neighbors
-            and walls.
-            It can also give long range attraction to the center of the posioner range
-            and short range repulsion to preferentially 
-        '''
-        ## Avoid divide-by-zero errors by setting 0 valued distances to a very small number
-        np.clip(rhocs,1e-12,np.inf,out=rhocs)
-        np.clip(rhonss,1e-12,np.inf,out=rhonss)
-        np.clip(rhoas,1e-12,np.inf,out=rhoas)  
-
-        ## Return the potential given the distances and the class-defined coefficients
-        return ( (self.anticol.coeffn*np.sum((1./(rhonss*rhonss)),axis=0)) - (self.anticol.coeffa/(rhoas**0.5))) 
-                 # (self.anticol.coeffcr/(rhoc**4)) +  - (self.anticol.coeffca/(rhoc**0.25))  #7,3 
-        
     def _combine_tables(self,tabledicts):
         ## For each positioner, merge the three steps (r,r,e) into a single move table
         output_tables = []
@@ -1692,67 +1447,14 @@ class PosSchedule(object):
         unique = self._unique_inds(indices)
         print('{} {}   at indices:    {}'.format(statement,step,unique))
 
-        
-        
     def _unique_inds(self,indices):
         '''
           Counts the indices in the list and returns a Counter object
           that holds information about the number of times each index appears
         '''         
         return Counter(np.ravel(indices))
-        
-        
-    def _plot_potential(self,posmodel,target,neighbors):
-        '''
-            Loops through all possible positions of the posmodel
-            and calculates the observed potential the positioner
-            would see give the target location and neighbors
-            
-            Inputs:
-                posmodel:  the posmodel of the positioner of interest
-                target:  [theta,phi]  where you want the positioner to go
-                neighbors:   dictionary of lists containing information on the 
-                            positioner's neighbor
-        '''
-        ## Define the range of angles we want to look at
-        thetas = np.arange(*posmodel.targetable_range_T,1)
-        phis = np.arange(*posmodel.targetable_range_P,1)
-        thetagrid, phigrid = np.meshgrid(thetas,phis)
-        
-        ## The target x,y coordinates
-        xa,ya = posmodel.trans.obsTP_to_flatXY(target)
-        ## Pull the neighbor x's and y's from the neighbors dictionary
-        xns = np.concatenate((neighbors['xns'],neighbors['theta_body_xns']))
-        yns = np.concatenate((neighbors['yns'],neighbors['theta_body_yns']))
-        
-        ## For every angle we're interested in, calculate the x,y locations and then
-        ## the potential at that location
-        xs,ys = posmodel.trans.obsTP_to_flatXY([thetagrid.ravel(), phigrid.ravel()])
-        xs, ys = np.asarray(xs),np.asarray(ys)
-        Vlocs = self._findpotential(xs,ys,xa,ya,xns,yns).reshape(thetagrid.shape)  
-        xs = xs.reshape(thetagrid.shape)
-        ys = ys.reshape(thetagrid.shape)
-        ## Find the theta=360 boundary  (relevant because pts on one side are not
-        ## readily connected to the otherside of the boundary)
-        crossover_x = []
-        crossover_y = []
-        for i in range(0,181,6):
-            x_tax, y_tax = posmodel.trans.obsTP_to_flatXY([360,i])
-            crossover_x.append(x_tax)
-            crossover_y.append(y_tax)
 
-        ## plot the potential
-        plt.figure()
-        plt.title('Potential')
-        plt.plot(xa,ya,'b*',markersize=12)
-        plt.plot(crossover_x,crossover_y,'w-',linewidth=1)
-        Vlocs[Vlocs>1000]=1000
-        plt.pcolormesh(xs,ys,np.sign(Vlocs)*np.log(np.abs(Vlocs)))
-        plt.colorbar()
-        plt.show()
-        #pdb.set_trace()
 
-        
 class Anticol:
     def __init__(self,collider,petal,verbose, thetas=None,phis=None):
         ##############################
@@ -1884,11 +1586,11 @@ class PosOutlines:#(PosPoly):
         self.thetapoints = self._highres(collider.keepout_T.points.copy())
         self.phipoints = self._highres(collider.keepout_P.points.copy())
         self.ferrulepoints = self._highres(collider.ferrule_poly.points.copy())
-#        possible_petal_pts = collider.keepout_PTL.points.copy()
-#        petaly = possible_petal_pts[1,:]
-#        actual_petal = np.where((petaly > -1.) & (petaly < 249.))[0]
-#        true_petal_pts = possible_petal_pts[:,actual_petal]
-#        self.petalpoints = self._highres(true_petal_pts)
+        possible_petal_pts = collider.keepout_PTL.points.copy()
+        petaly = possible_petal_pts[1,:]
+        actual_petal = np.where((petaly > np.min(petaly) + 1) & (petaly < np.max(petaly) - 1.))[0]
+        true_petal_pts = possible_petal_pts[:,actual_petal]
+        self.petalpoints = self._highres(true_petal_pts)
         self.petalpoints = collider.keepout_PTL.points.copy()
         self._rotmat2D_deg = collider.keepout_T._rotmat2D_deg
         #super(PosOutlines, self).__init__(self,collider,spacing=0.4)
@@ -1951,7 +1653,6 @@ class PosOutlines:#(PosPoly):
          
         return np.asarray(theta_corner_xyarray)
 
-        
     def phi_arm_outline_matrix(self,theta_inds,phi_inds,xoff=0., yoff=0.):
         #all_phi_points = self.collider.keepout_P.points.copy()
         #phi_corner_locs = np.arange(7)
@@ -1980,7 +1681,6 @@ class PosOutlines:#(PosPoly):
          
         return np.asarray(phi_corner_xyarray)
 
-        
     def _highres(self,endpts):
         closed_endpts = np.hstack([endpts,endpts[:,0].reshape(2,1)])
         diffs = np.diff(closed_endpts,axis=1)
