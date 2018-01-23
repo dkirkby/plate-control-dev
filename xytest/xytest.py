@@ -343,27 +343,27 @@ class XYTest(object):
 		
 		# transform test grid to each positioner's global position, and create all the move request dictionaries
 		all_targets = []
-		if not(self.xytest_conf['shuffle_targets']):
-			for local_target in local_targets:
-				these_targets = {}
-				for posid in self.posids:
-					trans = self.m.trans(posid)
-					these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(local_target)}
-				all_targets.append(these_targets)
-		else:
-			xytargets_dict = {}
+		if self.xytest_conf['shuffle_targets']:
+			xytargets_dict = {} #Different targets for different positioners
 			np.random.seed(int(self.xytest_conf['shuffle_seed'][loop_number]))
-			for posid in self.posids:
+			for posid in self.posids: #Loop through posids to generate unique targets to positioners
 				if not(int(self.xytest_conf['shuffle_seed'][loop_number])):
 					np.random.seed(int(posid[1:]))
 				shuffled_targets = list(local_targets)
 				np.random.shuffle(shuffled_targets)
 				xytargets_dict[posid] = shuffled_targets
-			for i in range(len(local_targets)):
+			for i in range(len(local_targets)): #Build these_targets to assign targets to positoners
 				these_targets = {}
 				for posid in self.posids:
 					trans = self.m.trans(posid)
 					these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(xytargets_dict[posid][i])}
+				all_targets.append(these_targets)
+		else:
+			for local_target in local_targets:
+				these_targets = {}
+				for posid in self.posids:
+					trans = self.m.trans(posid)
+					these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(local_target)}
 				all_targets.append(these_targets)
 			
 		# initialize some data structures for storing test data
@@ -384,7 +384,7 @@ class XYTest(object):
 				targ_num += 1
 				print('')
 				self.logwrite('MEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets)))
-				if not(self.xytest_conf['shuffle_targets']):
+				if not(self.xytest_conf['shuffle_targets']): #Only write this line if not shuffling
 					self.logwrite('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
 				this_timestamp = pc.timestamp_str_now()
 				these_meas_data = self.m.move_and_correct(these_targets, num_corr_max)
@@ -651,28 +651,27 @@ class XYTest(object):
 		location in their respective patrol disks.
 		"""
 		requests = []
-		if not(self.xytest_conf['shuffle_targets']):
-			for local_target in xytargets_list:
-				these_targets = {}
-				for posid in sorted(self.posids):
-					these_targets[posid] = {'command':'posXY', 'target':local_target}
-				requests.append(these_targets)
-			return requests
-		else:
-			xytargets_dict = {}
+		if self.xytest_conf['shuffle_targets']:
+			xytargets_dict = {} #Different targets for different positioners
 			np.random.seed(int(self.xytest_conf['shuffle_seed'][loop_number]))
-			for posid in sorted(self.posids):
+			for posid in sorted(self.posids): #Loop through posids to generate unique targets to positioners
 				if not(int(self.xytest_conf['shuffle_seed'][loop_number])):
 					np.random.seed(int(posid[1:]))
 				shuffled_targets = list(xytargets_list)
 				np.random.shuffle(shuffled_targets)
 				xytargets_dict[posid] = shuffled_targets
-			for i in range(len(xytargets_list)):
+			for i in range(len(xytargets_list)): #Build these_targets to assign targets to positoners
 				these_targets = {}
 				for posid in sorted(self.posids):
 					these_targets[posid] = {'command':'posXY', 'target':xytargets_dict[posid][i]}
 				requests.append(these_targets)
-			return requests
+		else:
+			for local_target in xytargets_list:
+				these_targets = {}
+				for posid in sorted(self.posids):
+					these_targets[posid] = {'command':'posXY', 'target':local_target}
+				requests.append(these_targets)
+		return requests
 
 	def track_file(self, filename, commit='always'):
 		"""Use this to put new filenames into the list of new and changed files we keep track of.
