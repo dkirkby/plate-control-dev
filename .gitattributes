@@ -36,6 +36,7 @@ posfidfvc/SBIG/SBIG_dev/lib64/libsbigudrv.so -text
 posfidfvc/SBIG/SBIG_dev/sbigudrv.h -text
 posfidfvc/SBIG/camtest.py -text
 posfidfvc/SBIG/cool_cam.py -text
+posfidfvc/SBIG/led_illuminator.py -text
 posfidfvc/SBIG/measure_camera_scale.conf -text
 posfidfvc/SBIG/measure_camera_scale.py -text
 posfidfvc/SBIG/msgfitter.py -text
