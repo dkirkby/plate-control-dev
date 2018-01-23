@@ -1,5 +1,7 @@
-import os
+# -*- coding: UTF-8 -*-
+
 import sys
+import os
 if "TEST_LOCATION" in os.environ and os.environ['TEST_LOCATION']=='Michigan':
 	basepath=os.environ['TEST_BASE_PATH']+'plate_control/'+os.environ['TEST_TAG']
 	sys.path.append(os.path.abspath(basepath+'/petal/'))
@@ -10,6 +12,7 @@ elif 'USERNAME' in os.environ.keys() and os.environ['USERNAME'] == 'kremin':
 	else:
 		basepath = os.path.abspath('../')
 		os.environ['HOME'] = basepath
+	#basepath = os.path.abspath('../')
 	if 'POSITIONER_LOGS_PATH' in os.environ:
 		logdir = os.environ['POSITIONER_LOGS_PATH']
 	else:
@@ -18,8 +21,7 @@ elif 'USERNAME' in os.environ.keys() and os.environ['USERNAME'] == 'kremin':
 	if 'PETAL_PATH' in os.environ:
 		pass
 	else:
-		basepath = os.path.abspath('../')
-		os.environ['PETAL_PATH'] = basepath
+		os.environ['PETAL_PATH'] = os.path.abspath('../petal')
 	if 'FP_SETTINGS_PATH' in os.environ:
 		allsetdir = os.environ['FP_SETTINGS_PATH']
 	else:
@@ -40,7 +42,7 @@ elif 'USERNAME' in os.environ.keys() and os.environ['USERNAME'] == 'kremin':
 			os.makedirs(dirname)
 	sys.path.append(os.path.abspath('../petal/'))
 	sys.path.append(os.path.abspath('../posfidfvc/'))
-	os.environ['TEST_PRESETS_CONFIG'] = '../fp_settings/sim_anticol_presets.conf'
+	os.environ['TEST_PRESETS_CONFIG'] = '../fp_settings/other_settings/sim_anticol_presets.conf'
 	os.environ['TEST_BASE_PATH'] = './'
 	os.environ['TEST_TEMP_PATH'] = '../fp_settings'
 else:
@@ -63,7 +65,7 @@ if __name__=="__main__":
 	# added optional use of local presets
 	USE_LOCAL_PRESETS = True
 	if 'TEST_PRESETS_CONFIF' not in os.environ:
-		os.environ['TEST_PRESETS_CONFIG'] = os.path.abspath('../fp_settings/other_settings/defaults_xysim.conf')
+		os.environ['TEST_PRESETS_CONFIG'] = os.path.abspath('../fp_settings/other_settings/sim_anticol_presets.conf')
 	if 'TEST_BASE_PATH' not in os.environ:
 		os.environ['TEST_BASE_PATH'] = os.path.abspath('./')
 	if 'TEST_TEMP_PATH' not in os.environ:
@@ -78,6 +80,23 @@ if __name__=="__main__":
 	print("  Hardware setup file: "+str(hwsetup_conf))
 	print("  XYtest config file: "+str(xytest_conf))
 	print("")
-	print("  Is this correct? (hit 'y' for yes or any key otherwise)")
 
 	test = XYTest(hwsetup_conf=hwsetup_conf,xytest_conf=xytest_conf,USE_LOCAL_PRESETS=USE_LOCAL_PRESETS)
+
+	test.logwrite('Start of positioner performance test.')
+	for loop_num in range(test.starting_loop_number, test.n_loops):
+		test.xytest_conf['current_loop_number'] = loop_num
+		test.xytest_conf.write()
+		test.logwrite('Starting xy test in loop ' + str(loop_num + 1) + ' of ' + str(test.n_loops))
+		test.set_current_overrides(loop_num)
+		test.run_range_measurement(loop_num)
+		test.run_calibration(loop_num)
+		test.run_xyaccuracy_test(loop_num)
+		test.run_unmeasured_moves(loop_num)
+		test.run_hardstop_strikes(loop_num)
+		test.clear_current_overrides()
+	test.logwrite('All test loops complete.')
+	test.m.park(posids='all')
+	test.logwrite('Moved positioners into \'parked\' position.')
+	test.logwrite('Test complete.')
+	test.track_all_poslogs_once()

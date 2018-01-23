@@ -77,17 +77,19 @@ class XYTest(object):
 			try:
 				presets_file=os.environ['TEST_PRESETS_CONFIG']
 				presets = configobj.ConfigObj(presets_file,unrepr=True)
-				self.presets['supply voltage']=presets['supply_voltage']
-				self.presets['relative humidity']=presets['relative_humidity']
+				self.presets['supply voltage']=presets['supply voltage']
+				self.presets['relative humidity']=presets['relative humidity']
 				# prioritize environment definitions but allow conf file definitions
-				if 'TEST_STAND_NAME' in os.environ.keys():
+				if 'TEST_STAND_NAME' in os.environ:
 					self.presets['test station'] = os.environ['TEST_STAND_NAME']
-				elif 'test station' in presets.keys():
+				elif 'test station' in presets:
 					self.presets['test station'] = presets['test station']
-				if 'TEST_OPERATOR_NAME' in os.environ.keys():
+				if 'TEST_OPERATOR_NAME' in os.environ:
 					self.presets['test operator'] = os.environ['TEST_OPERATOR_NAME']
-				elif 'test operator' in presets.keys():
+				elif 'test operator' in presets:
 					self.presets['test operator'] = presets['test operator']
+				self.presets['temperature (C)'] = presets['temperature (C)']
+				self.presets['operator notes'] = presets['operator notes']
 			except:
 				USE_LOCAL_PRESETS=False
 
@@ -180,7 +182,7 @@ class XYTest(object):
 		summarizer_init_data['code version']        = pc.code_version
 		user_vals = self.intro_questions()
 		for key in user_vals.keys():
-			self.logwrite('user-entry: ' + key + ': ' + user_vals[key])
+			self.logwrite('user-entry: ' + key + ': ' + str(user_vals[key]))
 			summarizer_init_data[key] = user_vals[key]
 		summarizer_init_data['operator notes'] = self.get_and_log_comments_from_user()
 		for posid in self.posids:
@@ -209,18 +211,22 @@ class XYTest(object):
 		keys = summarizer.user_data_keys.copy()
 		keys.remove('operator notes') # this one is handled separately in get_and_log_comments_from_user()
 		user_vals = collections.OrderedDict.fromkeys(keys)
+		n_user_defined = 0
 		for key in user_vals.keys():
 			if self.use_local_presets and key in self.presets:
 				user_vals[key]=self.presets[key]
 			else:	
 				user_vals[key] = input(key + ': ')
+				n_user_defined += 1
 		print('')
 		print('You entered:')
 		nchar = max([len(key) for key in user_vals.keys()])
 		for key in user_vals.keys():
-			print('  ' + format(key + ':',str(nchar + 2) + 's') + user_vals[key])
+			print('  ' + format(key + ':',str(nchar + 2) + 's') + str(user_vals[key]))
 		print('')
-		try_again = input('If this is ok, hit enter to continue. Otherwise, type any character and enter to start over: ')
+		try_again = False
+		if n_user_defined > 0:
+			try_again = input('If this is ok, hit enter to continue. Otherwise, type any character and enter to start over: ')
 		if try_again:
 			self.use_local_presets=False
 			return self.intro_questions()
@@ -231,14 +237,19 @@ class XYTest(object):
 		print('\nPlease enter any specific observations or notes about this test. These will be recorded into the test log. You can keep on entering notes until you hit enter on a blank line.',end=' ')
 		thanks_msg = False
 		notes = []
-		note = input('observation/note: ')
-		while note:
+		if self.use_local_presets and 'operator notes' in self.presets:
+			note = self.presets['operator notes']
 			self.logwrite('user-entry: OBSERVATION/NOTE: ' + note)
 			notes.append(note)
+		else:
 			note = input('observation/note: ')
-			thanks_msg = True
-		if thanks_msg:
-			print('Thank you, notes entered into log at ' + self.xytest_conf.filename)   
+			while note:
+				self.logwrite('user-entry: OBSERVATION/NOTE: ' + note)
+				notes.append(note)
+				note = input('observation/note: ')
+				thanks_msg = True
+			if thanks_msg:
+				print('Thank you, notes entered into log at ' + self.xytest_conf.filename)
 		return notes
 
 	def run_range_measurement(self, loop_number):
