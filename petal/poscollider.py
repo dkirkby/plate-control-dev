@@ -19,9 +19,10 @@ class PosCollider(object):
         else:
             filename = os.path.join(pc.dirs['collision_settings'],configfile)
         self.config = configobj.ConfigObj(filename,unrepr=True)
-        self.posmodels = []
+        self.posids = [] # list of posid strings for all the positioners
+        self.posmodels = {} # key: posid string, value: posmodel instance
         self.pos_neighbors = {} # all the positioners that surround a given positioner. key is a posmodel, value is a list of neighbor posmodels
-        self.fixed_neighbor_cases = {} # all the fixed neighbors that apply to a given positioner. key is a posmodel, value is a list of the fixed neighbor cases
+        self.fixed_neighbor_cases = {} # all the fixed neighbors that apply to a given positioner. key is a posid, value is a list of the fixed neighbor cases
         self.collidable_relations = {'A':[],'B':[],'B_is_fixed':[]} # every unique pair of geometry that can collide
         self.R1, self.R2, self.x0, self.y0, self.t0, self.p0 = {}, {}, {}, {}, {}, {}
 
@@ -33,10 +34,13 @@ class PosCollider(object):
         """Add a positioner or multiple positioners to the collider object.
         """
         (pm, was_not_list) = pc.listify(posmodels, keep_flat=True)
-        self.posmodels.extend(pm)
         for posmodel in pm:
-            self.pos_neighbors[posmodel] = []
-            self.fixed_neighbor_cases[posmodel] = []
+            posid = posmodel.posid
+            self.posids.append(posid)
+            self.posmodels[posid] = posmodel
+            self.pos_neighbors[posid] = []
+            self.fixed_neighbor_cases[posid] = []
+            
         self.load_config_data()
 
     def load_config_data(self):
@@ -47,8 +51,8 @@ class PosCollider(object):
         self._load_keepouts()
         self._load_positioner_params()
         self._load_circle_envelopes()
-        for p in self.posmodels:
-            self._identify_neighbors(p)
+        for p in self.posids:
+            self._identify_neighbors(self.posmodels[p])
         self._update_collidable_relations()
 
     def animate(self, sweeps,savedir=None,vidname=None):
@@ -62,40 +66,40 @@ class PosCollider(object):
         self.plotter.add_or_change_item('GFA', '', global_start, self.keepout_GFA.points)
         self.plotter.add_or_change_item('PTL', '', global_start, self.keepout_PTL.points)            
         for s in sweeps:
-            posmodel = s.posmodel
-            posidx = self.posmodels.index(posmodel)
-            self.plotter.add_or_change_item('Eo', posidx, global_start, self.Eo_polys[posmodel].points)
-            self.plotter.add_or_change_item('Ei', posidx, global_start, self.Ei_polys[posmodel].points)
-            self.plotter.add_or_change_item('Ee', posidx, global_start, self.Ee_polys[posmodel].points)
-            self.plotter.add_or_change_item('line at 180', posidx, global_start, self.line180_polys[posmodel].points)
+            posid = s.posmodel.posid
+            posidx = self.posids.index(posid)
+            self.plotter.add_or_change_item('Eo', posidx, global_start, self.Eo_polys[posid].points)
+            self.plotter.add_or_change_item('Ei', posidx, global_start, self.Ei_polys[posid].points)
+            self.plotter.add_or_change_item('Ee', posidx, global_start, self.Ee_polys[posid].points)
+            self.plotter.add_or_change_item('line at 180', posidx, global_start, self.line180_polys[posid].points)
             for i in range(len(s.time)):
                 if s.collision_case != pc.case.I:
                     pass
-                self.plotter.add_or_change_item('central body', posidx, s.time[i], self.place_central_body(s.posmodel, s.tp[0,i]).points, s.collision_time)
-                self.plotter.add_or_change_item('phi arm',      posidx, s.time[i], self.place_phi_arm(s.posmodel, s.tp[:,i]).points,      s.collision_time)
-                self.plotter.add_or_change_item('ferrule',      posidx, s.time[i], self.place_ferrule(s.posmodel, s.tp[:,i]).points,      s.collision_time)
+                self.plotter.add_or_change_item('central body', posidx, s.time[i], self.place_central_body(posid, s.tp[0,i]).points, s.collision_time)
+                self.plotter.add_or_change_item('phi arm',      posidx, s.time[i], self.place_phi_arm(posid, s.tp[:,i]).points,      s.collision_time)
+                self.plotter.add_or_change_item('ferrule',      posidx, s.time[i], self.place_ferrule(posid, s.tp[:,i]).points,      s.collision_time)
                 if s.collision_case == pc.case.GFA:
                     self.plotter.add_or_change_item('GFA', '', s.time[i], self.keepout_GFA.points, s.collision_time)
                 elif s.collision_case == pc.case.PTL:
                     self.plotter.add_or_change_item('PTL', '', s.time[i], self.keepout_PTL.points, s.collision_time)
         self.plotter.animate(savedir,vidname)
 
-    def spacetime_collision_between_positioners(self, posmodelA, init_obsTP_A, tableA, posmodelB, init_obsTP_B, tableB):
+    def spacetime_collision_between_positioners(self, posid_A, init_obsTP_A, tableA, posid_B, init_obsTP_B, tableB):
         """Wrapper for spacetime_collision method, specifically for checking two positioners
         against each other."""
-        return self.spacetime_collision(posmodelA, init_obsTP_A, tableA, posmodelB, init_obsTP_B, tableB)
+        return self.spacetime_collision(posid_A, init_obsTP_A, tableA, posid_B, init_obsTP_B, tableB)
 
-    def spacetime_collision_with_fixed(self, posmodel, init_obsTP, table):
+    def spacetime_collision_with_fixed(self, posid, init_obsTP, table):
         """Wrapper for spacetime_collision method, specifically for checking one positioner
         against the fixed keepouts.
         """
-        return self.spacetime_collision(posmodel, init_obsTP, table)
+        return self.spacetime_collision(posid, init_obsTP, table)
 
-    def spacetime_collision(self, posA, init_obsTP_A, tableA, posB=None, init_obsTP_B=None, tableB=None):
+    def spacetime_collision(self, posid_A, init_obsTP_A, tableA, posid_B=None, init_obsTP_B=None, tableB=None):
         """Searches for collisions in time and space between two positioners
         which are rotating according to the argued tables.
 
-            posA, posB                  ...  posmodels of the positioners to check against each other
+            posid_A, posid_B            ...  posid strings of the two positioners to check against each other
             init_obsTP_A, init_obsTP_B  ...  starting (theta,phi) positions, in the obsTP coordinate systems
             tableA, tableB              ...  dictionaries defining rotation schedules as described below
 
@@ -116,18 +120,18 @@ class PosCollider(object):
         The return is a list of instances of PosSweep, containing the theta and phi rotations
         in real time, and when if any collision, and the collision type.
         """
-        pospos = posB is not None # whether this is checking collisions between two positioners (or if false, between one positioner and fixed keepouts)
+        pospos = posid_B is not None # whether this is checking collisions between two positioners (or if false, between one positioner and fixed keepouts)
         if pospos:
             init_obsTPs = [init_obsTP_A,init_obsTP_B]
             tables = [tableA,tableB]
-            sweeps = [PosSweep(posA),PosSweep(posB)]
+            sweeps = [PosSweep(self.posmodels[posid_A]),PosSweep(self.posmodels[posid_B])]
             steps_remaining = [0]*2
             check_collision_this_loop = [False] * 2
             step = [0] * 2
         else:
             init_obsTPs = [init_obsTP_A]
             tables = [tableA]
-            sweeps = [PosSweep(posA)]
+            sweeps = [PosSweep(self.posmodels[posid_A])]
             steps_remaining = [0]
             check_collision_this_loop = [False]
             step = [0]
@@ -142,9 +146,9 @@ class PosCollider(object):
                     check_collision_this_loop = True
             if check_collision_this_loop:
                 if pospos:
-                    collision_case = self.spatial_collision_between_positioners(posA, posB, sweeps[0].tp[:,step[0]], sweeps[1].tp[:,step[1]])
+                    collision_case = self.spatial_collision_between_positioners(posid_A, posid_B, sweeps[0].tp[:,step[0]], sweeps[1].tp[:,step[1]])
                 else:
-                    collision_case = self.spatial_collision_with_fixed(posA, sweeps[0].tp[:,step[0]])
+                    collision_case = self.spatial_collision_with_fixed(posid_A, sweeps[0].tp[:,step[0]])
                 if collision_case != pc.case.I:
                     for i in range(len(sweeps)):
                         sweeps[i].collision_case = collision_case
@@ -158,11 +162,11 @@ class PosCollider(object):
                     pass
         return sweeps
 
-    def spatial_collision_between_positioners(self, posA, posB, obsTP_A, obsTP_B):
+    def spatial_collision_between_positioners(self, posid_A, posid_B, obsTP_A, obsTP_B):
         """Searches for collisions in space between two fiber positioners.
 
-            posA, posB        ...  posmodels of the positioners to check against each other
-            obsTP_A, obsTP_B  ...  (theta,phi) positions of the axes for positioners 1 and 2
+            posid_A, posid_B  ...  posid strings of the two positioners to check against each other
+            obsTP_A, obsTP_B  ...  (theta,phi) positions of the axes for the two positioners
 
         obsTP_A and obsTP_B are in the (obsT,obsP) coordinate system, as defined in
         PosTransforms.
@@ -173,31 +177,31 @@ class PosCollider(object):
         if obsTP_A[1] >= self.Eo_phi and obsTP_B[1] >= self.Eo_phi:
             return pc.case.I
         elif obsTP_A[1] < self.Eo_phi and obsTP_B[1] >= self.Ei_phi: # check case IIIA
-            if self._case_III_collision(posA, posB, obsTP_A, obsTP_B[0]):
+            if self._case_III_collision(posid_A, posid_B, obsTP_A, obsTP_B[0]):
                 return pc.case.IIIA
             else:
                 return pc.case.I
         elif obsTP_B[1] < self.Eo_phi and obsTP_A[1] >= self.Ei_phi: # check case IIIB
-            if self._case_III_collision(posA, posB, obsTP_B, obsTP_A[0]):
+            if self._case_III_collision(posid_A, posid_B, obsTP_B, obsTP_A[0]):
                 return pc.case.IIIB
             else:
                 return pc.case.I
         else: # check cases II and III
-            if self._case_III_collision(posA, posB, obsTP_A, obsTP_B[0]):
+            if self._case_III_collision(posid_A, posid_B, obsTP_A, obsTP_B[0]):
                 return pc.case.IIIA
-            elif self._case_III_collision(posA, posB, obsTP_B, obsTP_A[0]):
+            elif self._case_III_collision(posid_A, posid_B, obsTP_B, obsTP_A[0]):
                 return pc.case.IIIB
-            elif self._case_II_collision(posA, posB, obsTP_A, obsTP_B):
+            elif self._case_II_collision(posid_A, posid_B, obsTP_A, obsTP_B):
                 return pc.case.II
             else:
                 return pc.case.I
 
-    def spatial_collision_with_fixed(self, posmodel, obsTP):
+    def spatial_collision_with_fixed(self, posid, obsTP):
         """Searches for collisions in space between a fiber positioner and all
         fixed keepout envelopes.
 
-            posmodel    ...  positioner to check
-            obsTP       ...  (theta,phi) position of the axes of the positioner
+            posid    ...  positioner to check
+            obsTP    ...  (theta,phi) position of the axes of the positioner
 
         obsTP is in the (obsT,obsP) coordinate system, as defined in
         PosTransforms.
@@ -205,53 +209,53 @@ class PosCollider(object):
         The return is an enumeration of type "case", indicating what kind of collision
         was first detected, if any.
         """
-        if self.fixed_neighbor_cases[posmodel]:
-            poly1 = self.place_phi_arm(posmodel,obsTP)
-            for fixed_case in self.fixed_neighbor_cases[posmodel]:
+        if self.fixed_neighbor_cases[posid]:
+            poly1 = self.place_phi_arm(posid,obsTP)
+            for fixed_case in self.fixed_neighbor_cases[posid]:
                 poly2 = self.fixed_neighbor_keepouts[fixed_case]
                 if poly1.collides_with(poly2):
                     return fixed_case
         return pc.case.I
 
-    def place_phi_arm(self, posmodel, obsTP):
+    def place_phi_arm(self, posid, obsTP):
         """Rotates and translates the phi arm to position defined by the positioner's
         (x0,y0) and the argued obsTP (theta,phi) angles.
         """
         poly = self.keepout_P.rotated(obsTP[1])
-        poly = poly.translated(self.R1[posmodel], 0)
+        poly = poly.translated(self.R1[posid], 0)
         poly = poly.rotated(obsTP[0])
-        poly = poly.translated(self.x0[posmodel], self.y0[posmodel])
+        poly = poly.translated(self.x0[posid], self.y0[posid])
         return poly
 
-    def place_central_body(self, posmodel, obsT):
+    def place_central_body(self, posid, obsT):
         """Rotates and translates the central body of positioner
         to its (x0,y0) and the argued obsT theta angle.
         """
         poly = self.keepout_T.rotated(obsT)
-        poly = poly.translated(self.x0[posmodel], self.y0[posmodel])
+        poly = poly.translated(self.x0[posid], self.y0[posid])
         return poly
 
-    def place_ferrule(self, posmodel, obsTP):
+    def place_ferrule(self, posid, obsTP):
         """Rotates and translates the ferrule to position defined by the positioner's
         (x0,y0) and the argued obsTP (theta,phi) angles.
         """
-        poly = self.ferrule_poly.translated(self.R2[posmodel], 0)
+        poly = self.ferrule_poly.translated(self.R2[posid], 0)
         poly = poly.rotated(obsTP[1])
-        poly = poly.translated(self.R1[posmodel],0)
+        poly = poly.translated(self.R1[posid],0)
         poly = poly.rotated(obsTP[0])
-        poly = poly.translated(self.x0[posmodel], self.y0[posmodel])
+        poly = poly.translated(self.x0[posid], self.y0[posid])
         return poly
 
-    def _case_II_collision(self, posmodel1, posmodel2, tp1, tp2):
+    def _case_II_collision(self, posid1, posid2, tp1, tp2):
         """Search for case II collision, positioner 1 arm against positioner 2 arm."""
-        poly1 = self.place_phi_arm(posmodel1, tp1)
-        poly2 = self.place_phi_arm(posmodel2, tp2)
+        poly1 = self.place_phi_arm(posid1, tp1)
+        poly2 = self.place_phi_arm(posid2, tp2)
         return poly1.collides_with(poly2)
 
-    def _case_III_collision(self, posmodel1, posmodel2, tp1, t2):
+    def _case_III_collision(self, posid1, posid2, tp1, t2):
         """Search for case III collision, positioner 1 arm against positioner 2 central body."""
-        poly1 = self.place_phi_arm(posmodel1, tp1)
-        poly2 = self.place_central_body(posmodel2, t2)
+        poly1 = self.place_phi_arm(posid1, tp1)
+        poly2 = self.place_central_body(posid2, t2)
         return poly1.collides_with(poly2)
 
     def _load_keepouts(self):
@@ -266,13 +270,14 @@ class PosCollider(object):
 
     def _load_positioner_params(self):
         """Read latest versions of all positioner parameters."""
-        for posmodel in self.posmodels:
-            self.R1[posmodel] = posmodel.state.read('LENGTH_R1')
-            self.R2[posmodel] = posmodel.state.read('LENGTH_R2')
-            self.x0[posmodel] = posmodel.state.read('OFFSET_X')
-            self.y0[posmodel] = posmodel.state.read('OFFSET_Y')
-            self.t0[posmodel] = posmodel.state.read('OFFSET_T')
-            self.p0[posmodel] = posmodel.state.read('OFFSET_P')
+        for posid in self.posids:
+            posmodel = self.posmodels[posid]
+            self.R1[posid] = posmodel.state.read('LENGTH_R1')
+            self.R2[posid] = posmodel.state.read('LENGTH_R2')
+            self.x0[posid] = posmodel.state.read('OFFSET_X')
+            self.y0[posid] = posmodel.state.read('OFFSET_Y')
+            self.t0[posid] = posmodel.state.read('OFFSET_T')
+            self.p0[posid] = posmodel.state.read('OFFSET_P')
 
     def _load_circle_envelopes(self):
         """Read latest versions of all circular envelopes, including outer clear rotation
@@ -292,46 +297,46 @@ class PosCollider(object):
         self.Ei_polys = {}
         self.Ee_polys = {}
         self.line180_polys = {}
-        for posmodel in self.posmodels:
-            x = self.x0[posmodel]
-            y = self.y0[posmodel]
-            self.Eo_polys[posmodel] = self.Eo_poly.translated(x,y)
-            self.Ei_polys[posmodel] = self.Ei_poly.translated(x,y)
-            self.Ee_polys[posmodel] = self.Ee_poly.translated(x,y)
-            self.line180_polys[posmodel] = self.line180_poly.rotated(self.t0[posmodel]).translated(x,y)
+        for posid in self.posids:
+            x = self.x0[posid]
+            y = self.y0[posid]
+            self.Eo_polys[posid] = self.Eo_poly.translated(x,y)
+            self.Ei_polys[posid] = self.Ei_poly.translated(x,y)
+            self.Ee_polys[posid] = self.Ee_poly.translated(x,y)
+            self.line180_polys[posid] = self.line180_poly.rotated(self.t0[posid]).translated(x,y)
         self.ferrule_diam = self.config['FERRULE_DIAM']
         self.ferrule_poly = PosPoly(self._circle_poly_points(self.ferrule_diam, self.config['FERRULE_RESLN']))
 
-    def _identify_neighbors(self, posmodel):
-        """Find all neighbors which can possibly collide with a given posmodel."""
-        p1 = posmodel
-        Ee1 = self.Ee_poly.translated(self.x0[p1], self.y0[p1])
-        for p2 in self.posmodels:
-            Ee2 = self.Ee_poly.translated(self.x0[p2], self.y0[p2])
-            if not(p1 == p2) and Ee1.collides_with(Ee2):
-                self.pos_neighbors[p1].append(p2)
-        for p2 in self.fixed_neighbor_keepouts.keys():
-            if Ee1.collides_with(self.fixed_neighbor_keepouts[p2]):
-                self.fixed_neighbor_cases[p1].append(p2)
+    def _identify_neighbors(self, posid):
+        """Find all neighbors which can possibly collide with a given positioner."""
+        Ee = self.Ee_poly.translated(self.x0[posid], self.y0[posid])
+        for possible_neighbor in self.posids:
+            Ee_neighbor = self.Ee_poly.translated(self.x0[possible_neighbor], self.y0[possible_neighbor])
+            if not(posid == possible_neighbor) and Ee.collides_with(Ee_neighbor):
+                self.pos_neighbors[posid].append(possible_neighbor)
+        for possible_neighbor in self.fixed_neighbor_keepouts.keys():
+            EE_neighbor = self.fixed_neighbor_keepouts[possible_neighbor]
+            if Ee.collides_with(EE_neighbor):
+                self.fixed_neighbor_cases[posid].append(possible_neighbor)
 
     def _update_collidable_relations(self):
         """Update the list of all possible collisions."""
         A = []
         B = []
         B_is_fixed = []
-        for posmodel in self.posmodels:
-            for neighbor in self.pos_neighbors[posmodel]:
-                if posmodel in A and neighbor in B and A.index(posmodel) == B.index(neighbor):
+        for posid in self.posids:
+            for neighbor in self.pos_neighbors[posid]:
+                if posid in A and neighbor in B and A.index(posid) == B.index(neighbor):
                     pass
-                elif neighbor in A and posmodel in B and A.index(neighbor) == B.index(posmodel):
+                elif neighbor in A and posid in B and A.index(neighbor) == B.index(posid):
                     pass
                 else:
-                    A.append(posmodel)
+                    A.append(posid)
                     B.append(neighbor)
                     B_is_fixed.append(False)
-        for posmodel in self.posmodels:
-            for case in self.fixed_neighbor_cases[posmodel]:
-                A.append(posmodel)
+        for posid in self.posids:
+            for case in self.fixed_neighbor_cases[posid]:
+                A.append(posid)
                 B.append(case)
                 B_is_fixed.append(True)
         self.collidable_relations['A'] = A
@@ -365,13 +370,13 @@ class PosSweep(object):
     """Contains a real-time description of the sweep of positioner mechanical
     geometries through space.
     """
-    def __init__(self, posmodel=None):
-        self.posmodel  = posmodel           # posmodel object for the positioner
+    def __init__(self, posid=None):
+        self.posid     = posid              # unique posid string of the positioner
         self.time      = np.array([])       # real time at which each TP position value occurs
         self.tp        = np.array([[],[]])  # theta,phi angles as function of time (sign indicates direction)
         self.tp_dot    = np.array([[],[]])  # theta,phi rotation speeds as function of time (sign indicates direction)
-        self.collision_case = pc.case.I   # enumeration of type "case", indicating what kind of collision first detected, if any
-        self.collision_time = np.inf      # time at which collision occurs. if no collision, the time is inf
+        self.collision_case = pc.case.I     # enumeration of type "case", indicating what kind of collision first detected, if any
+        self.collision_time = np.inf        # time at which collision occurs. if no collision, the time is inf
 
     def fill_exact(self, init_obsTP, table, start_time=0):
         """Fills in a sweep object based on the input table. Time and position
