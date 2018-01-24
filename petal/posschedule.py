@@ -119,11 +119,10 @@ class PosSchedule(object):
         elif anticollision:
             ## Note the use of non-functioning anticollision code! Only for testing purposes
             ## Note the Positioners COULD collide using this function
-            self._schedule_with_simple_anticollision()
-            #self._schedule_with_anticollision()
+            #self._schedule_without_anticollision_butwith_RRrE()
+            self._schedule_with_anticollision()
         else:
             self._schedule_without_anticollision()
-
 
     def total_dtdp(self, posid):
         """Return as-scheduled total move distance for positioner identified by posid.
@@ -206,7 +205,7 @@ class PosSchedule(object):
             table.log_note += (' ' if table.log_note else '') + req['log_note']
             self.move_tables.append(table)
 
-    def _schedule_with_simple_anticollision(self):
+    def _schedule_without_anticollision_butwith_RRrE(self):
         posids = list(self.requests.keys())
         for posid in posids:
             req = self.requests.pop(posid)
@@ -254,10 +253,8 @@ class PosSchedule(object):
             # Add the original commands and log notes to the move tables
             movetable.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2'])
             movetable.log_note += (' ' if movetable.log_note else '') + req['log_note']
+            self.move_tables.append(movetable)
 
-        self.move_tables = move_tables
-
-                                                    
     def _run_RRE_anticol(self):
         '''
             Code that generates move tables, finds the collisions,
@@ -325,10 +322,10 @@ class PosSchedule(object):
         ## the next move
         for stage in order_of_operations:
             stage_info = relevant_info[stage]
-            stage_info['maxtime'] = np.max(stage_info['movetimes'].values())
+            stage_info['maxtime'] = max(stage_info['movetimes'].values())
             for posid in posids:
                 table, movetime = stage_info['movetables'][posid],stage_info['movetimes'][posid]
-                if movetime<stage_info['maxtime'][posid]:
+                if movetime<stage_info['maxtime']:
                     table.set_postpause(0,stage_info['maxtime']-movetime)
 
         if self.anticol.verbose:
@@ -339,14 +336,19 @@ class PosSchedule(object):
 
         for stage in order_of_operations:
             stage_info = relevant_info[stage]
+            tpstarts = stage_info['tpstarts']
+            tpfinals = stage_info['tpfinals']
+            movetables = stage_info['movetables']
+            movetimes = stage_info['movetimes']
+            maxtime = stage_info['maxtime']
 
             ## animate
             if self.anticol.make_animations == True:
-                self._animate_movetables(stage_info['movetables'], stage_info['tpstarts'])
+                self._animate_movetables(movetables, tpstarts)
 
             ## Check for collisions   oper_info['
             collision_indices, collision_types = \
-                    self._check_for_collisions(stage_info['tpstarts'],stage_info['movetables'])
+                    self._check_for_collisions(tpstarts,movetables)
 
             ## If no collisions, move directly to the next step
             if len(collision_indices) == 0:
@@ -359,17 +361,24 @@ class PosSchedule(object):
             ncols = len(collision_indices)
   
             ## Avoid the collisions that were found
-            stage_info['movetables'],moved_poss = self._avoid_collisions(stage_info['movetables'],posmodels, \
-                                    collision_indices, collision_types, stage_info['tpstarts'], \
-                                    stage_info['tpfinals'], stage, stage_info['maxtime'], \
+            movetables,moved_poss = self._avoid_collisions(movetables,posmodels, \
+                                    collision_indices, collision_types, tpstarts, \
+                                    tpfinals, stage, maxtime, \
                                     algorithm=self.anticol.avoidance)
 
             if self.anticol.verbose:
                 ## Check for collisions
                 collision_indices, collision_types = \
-                        self._check_for_collisions(stage_info['tpstarts'],stage_info['movetables'])
+                        self._check_for_collisions(tpstarts,movetables)
                 self._printindices('Collisions after Round 1, in Step ',stage,collision_indices)
                 print("\nNumber corrected: {}\n\n\n\n".format(ncols-len(collision_indices)))
+
+            if movetables is not stage_info['movetables']:
+                if self.anticol.verbose:
+                    print('Movetables are not the same between movetables and the stage movetable')
+            if stage_info['movetables'] is not relevant_info[stage]['movetabkes']:
+                if self.anticol.verbose:
+                    print('Movetables are not the same between stage_info and relevant_info')
 
         output_tables = {key: relevant_info[key]['movetables'] for key in ['retract','rotate']}
         output_tables['extend'] = self._reverse_for_extension(relevant_info['extend']['movetables'])
@@ -377,17 +386,17 @@ class PosSchedule(object):
 
         ## animate
         if self.anticol.make_animations == True:
-            self._animate_movetables(merged_tables, tps_list)
+            self._animate_movetables(merged_tables, tp_starts)
 
-        collision_indices, collision_types = self._check_for_collisions(tps_list, merged_tables)
+        collision_indices, collision_types = self._check_for_collisions(tp_starts, merged_tables)
 
-        merged_tables, zeroed = self._avoid_collisions(merged_tables,posmodels,collision_indices,tpss=tps_list,algorithm='zeroth_order')
+        merged_tables, zeroed = self._avoid_collisions(merged_tables,posmodels,collision_indices,tpss=tp_starts,algorithm='zeroth_order')
 
         if self.anticol.verbose:
-            collision_indices, collision_types = self._check_for_collisions(tps_list, merged_tables)
+            collision_indices, collision_types = self._check_for_collisions(tp_starts, merged_tables)
             self._printindices('Collisions after completion of anticollision ','',collision_indices)
             nzero =len(np.unique(zeroed))
-            ntot = len(tps_list)
+            ntot = len(tp_starts)
             print("Number of zerod positioners: {}, total number of targets: {}, successes: {}%".format(nzero,ntot,100*(1-(float(nzero)/float(ntot)))))
 
         return merged_tables
@@ -453,14 +462,8 @@ class PosSchedule(object):
         ## Get a table class instantiation
         table = {}
         table['retract'] = posmovetable.PosMoveTable(current_positioner_model)
-        #table['retract'].should_antibacklash = False
-        #table['retract'].should_final_creep  = False
         table['rotate'] = posmovetable.PosMoveTable(current_positioner_model)
-        #table['rotate'].should_antibacklash = False
-        #table['rotate'].should_final_creep  = False
         table['extend'] = posmovetable.PosMoveTable(current_positioner_model)
-        #table['extend'].should_antibacklash = False
-        #table['extend'].should_final_creep  = False
         ##redefine phi inner:
         phi_inner = max(self.anticol.phisafe,tp_start[pc.P])
         ## Find the theta and phi movements for the retract move
@@ -1080,26 +1083,23 @@ class PosSchedule(object):
         return tables, best_pos
 
     # todo-anthony is this still most efficient and accurate way?
-    def _get_max_time(self,tables):
+    def _get_max_time(self,tabledicts):
         ## Find out how long the longest move takes to execute
-        movetimes = np.asarray([table.for_schedule['stats']['net_time'][-1] for table in tables])
+        movetimes = np.asarray([table.for_schedule['stats']['net_time'][-1] for table in tabledicts.values()])
         if self.anticol.verbose:
-            try:
-                print("std of movetimes was: ", np.std(movetimes))
-            except:
-                pass
+            print("std of movetimes was: ", np.std(movetimes))
         max_time = np.max(movetimes)
         return max_time
 
     # todo-anthony double check this code
-    def _check_for_collisions(self,tps,list_tables):
+    def _check_for_collisions(self,tps,tables):
         '''
             Find what positioners collide, and who they collide with
             Inputs:
                 tps:  list or numpy array of theta,phi pairs that specify the location
                         of every positioner
                 cur_poscollider:  poscollider object used to find the actual collisions
-                list_tables:   list of all the movetables
+                tables:   dict of all the movetables with posid's as keys
                 
             Outputs:
                All 3 are numpy arrays giving information about every collision that occurs.
@@ -1108,64 +1108,65 @@ class PosSchedule(object):
                                     or [*,None] if colliding with a wall of fiducial.
                 collision_types:   Type of collision as specified in the pc class
         '''
-        posmodel_index_iterable = range(len(self.collider.posmodels))
-        sweeps = [[] for i in posmodel_index_iterable]
-        collision_index = [[] for i in posmodel_index_iterable]
-        collision_type = [pc.case.I for i in posmodel_index_iterable]
-        earliest_collision = [np.inf for i in posmodel_index_iterable]
+        all_posids = self.collider.posids
+        sweeps = {posid:[] for posid in all_posids}
+        collision_index = {posid:[] for posid in all_posids}
+        collision_type = {posid:pc.case.I for posid in all_posids}
+        earliest_collision = {posid:np.inf for posid in all_posids}
         nontriv = 0
         colrelations = self.collider.collidable_relations
-        for A, B, B_is_fixed in zip(colrelations['A'],colrelations['B'],colrelations['B_is_fixed']):
-            tableA = list_tables[A].for_schedule
-            obsTPA = tps[A]
-            if B_is_fixed and A in range(len(list_tables)): ## might want to replace 2nd test here with one where we look in tables for a specific positioner index
-                these_sweeps = self.collider.spacetime_collision_with_fixed(A, obsTPA, tableA)
-            elif A in range(len(list_tables)) and B in range(len(list_tables)): ## again, might want to look for specific indexes identifying which tables go with which positioners
-                tableB = list_tables[B].for_schedule
-                obsTPB = tps[B]    
-                these_sweeps = self.collider.spacetime_collision_between_positioners(A, obsTPA, tableA, B, obsTPB, tableB)
+        for Aid, Bid, B_is_fixed in zip(colrelations['A'],colrelations['B'],colrelations['B_is_fixed']):
+            if Aid not in tables.keys():
+                continue
+            if (not B_is_fixed) and (Bid not in all_posids):
+                continue
+            tableA = tables[Aid].for_schedule
+            obsTPA = tps[Aid]
+            if B_is_fixed:
+                these_sweeps = self.collider.spacetime_collision_with_fixed(Aid, obsTPA, tableA)
+            else:
+                tableB = tables[Bid].for_schedule
+                obsTPB = tps[Bid]
+                these_sweeps = self.collider.spacetime_collision_between_positioners(Aid, obsTPA, tableA, Bid, obsTPB, tableB)
     
-            if these_sweeps[0].collision_time <= earliest_collision[A]:
+            if these_sweeps[0].collision_time <= earliest_collision[Aid]:
                 nontriv += 1
-                sweeps[A] = these_sweeps[0]
-                earliest_collision[A] = these_sweeps[0].collision_time
+                sweeps[Aid] = these_sweeps[0]
+                collision_type[Aid] = these_sweeps[0].collision_case
                 if B_is_fixed:
-                    collision_index[A] = [A,None]
+                    collision_index[Aid] = [Aid,None]
                 else:
-                    collision_index[A] = [A,B]
-                collision_type[A] = these_sweeps[0].collision_case
+                    collision_index[Aid] = [Aid,Bid]
                 if these_sweeps[0].collision_time < np.inf:
-                    earliest_collision[A] = these_sweeps[0].collision_time
-            for i in range(1,len(these_sweeps)):
-                if these_sweeps[i].collision_time < earliest_collision[B]:
-                    nontriv += 1
-                    sweeps[B] = these_sweeps[i]
-                    earliest_collision[B] = these_sweeps[i].collision_time
-                    if B_is_fixed:
-                        collision_index[B] = [A,None]
-                    else:
-                        collision_index[B] = [A,B]
-                    collision_type[B] = these_sweeps[i].collision_case
+                    earliest_collision[Aid] = these_sweeps[0].collision_time
 
-        collision_indices = np.asarray(collision_index)
-        collision_types = np.asarray(collision_type)
-        collision_indices = collision_indices[collision_types != pc.case.I]
-        collision_types = collision_types[collision_types != pc.case.I]
-        
-        collision_mask = np.ones(len(collision_indices)).astype(bool)
-        for i in range(len(collision_indices)):
-            for j in np.arange(i+1,len(collision_indices)):
-                if collision_mask[i]:
-                    if np.all(collision_indices[i] == collision_indices[j]):
-                        collision_mask[j]=False
-                    elif np.all(collision_indices[i] == list(reversed(collision_indices[j]))):
-                        collision_mask[j]=False
-    
-        collision_indices = collision_indices[collision_mask]
-        collision_types = collision_types[collision_mask]
+            if len(these_sweeps) == 1 or B_is_fixed:
+                contine
+
+            for i in range(1,len(these_sweeps)):
+                if these_sweeps[i].collision_time < earliest_collision[Bid]:
+                    nontriv += 1
+                    sweeps[Bid] = these_sweeps[i]
+                    earliest_collision[Bid] = these_sweeps[i].collision_time
+                    if B_is_fixed:
+                        collision_index[Bid] = [Aid,None]
+                    else:
+                        collision_index[Bid] = [Aid,Bid]
+                    collision_type[Bid] = these_sweeps[i].collision_case
+
+        collision_id_pairs = []
+        collision_types = []
+        posids_accounted_for = set()
+        for posid,posid_collisions in collision_index.items():
+            if collision_type[posid] != pc.case.I:
+                if posid_collisions[0] not in posids_accounted_for:
+                    collision_id_pairs.append(posid_collisions)
+                    posids_accounted_for.add(posid_collisions[0])
+                    posids_accounted_for.add(posid_collisions[1])
+                    collision_types.append(collision_type[posid])
         
         ## return the earliest collision time and collision indices
-        return collision_indices, collision_types
+        return np.asarray(collision_id_pairs), np.asarray(collision_types)
     
     # todo-anthony double check this code
     def _check_single_positioner_for_collisions(self,tps,list_tables,index):
@@ -1284,24 +1285,17 @@ class PosSchedule(object):
 
     def _combine_tables(self,tabledicts):
         ## For each positioner, merge the three steps (r,r,e) into a single move table
-        output_tables = []
-        for tablenum in range(len(tabledicts['retract'])):
+        output_tables = {}
+        for posid,retract_table in tabledicts['retract'].items():
             ## start with copy of the retract step table
             ## Note that we don't change final_creep or backlash for this final table
-            newtab = posmovetable.PosMoveTable(tabledicts['retract'][tablenum].posmodel)
+            newtab = posmovetable.PosMoveTable(retract_table.posmodel)
+
             for step in ['retract','rotate','extend']:
-                table = tabledicts[step][tablenum]
-                #sched = table.for_schedule
-                #if len(table.rows)==1 and table.rows[0].data['dT_ideal']==0.0 and table.rows[0].data['dP_ideal']==0.0:
-                #    continue
-                #else:
-                #    newtab.extend(table)
+                table = tabledicts[step][posid]
                 newtab.extend(table)
-            output_tables.append(newtab)
-            #print(tabledicts['retract'][tablenum].rows[0].data['dP_ideal'], newtab.rows[0].data['dP_ideal'])
-            #print(tabledicts['rotate'][tablenum].rows[0].data['dT_ideal'], newtab.rows[1].data['dT_ideal'])
-            #print(tabledicts['extend'][tablenum].rows[0].data['dP_ideal'], newtab.rows[2].data['dP_ideal'])
-            #print(len(tabledicts['extend'][tablenum].rows),len(tabledicts['extend'][tablenum].rows),len(tabledicts['extend'][tablenum].rows),len(newtab.rows))
+
+            output_tables[posid] = newtab
         return output_tables
 
     def _combine_single_table(self,tabledicts):
@@ -1310,11 +1304,6 @@ class PosSchedule(object):
         newtab = posmovetable.PosMoveTable(tabledicts['retract'].posmodel)
         for step in ['retract','rotate','extend']:
             table = tabledicts[step]
-            #sched = table.for_schedule
-            #if len(table.rows)==1 and table.rows[0].data['dT_ideal']==0.0 and table.rows[0].data['dP_ideal']==0.0:
-            #    continue
-            #else:
-            #    newtab.extend(table)
             newtab.extend(table)
         return newtab
 
@@ -1368,8 +1357,8 @@ class PosSchedule(object):
     def _reverse_for_extension(self,tables):
 
         ## For each positioner, merge the three steps (r,r,e) into a single move table
-        output_tables = []
-        for table in tables:
+        output_tables = {}
+        for posid,table in tables.items():
             ## start with copy of the retract step table
             newtab = posmovetable.PosMoveTable(table.posmodel)
             rows = table.rows.copy()
@@ -1385,7 +1374,7 @@ class PosSchedule(object):
                 newtab.set_postpause(i, pre)
             #newstats = { key:[newtab.rows[ind].data[key] for ind in range(len(newtab.rows))] for key in ['dT_ideal','dP_ideal','move_time' ]}
             # print("After, Net time:{} t:{} p:{}\n".format(stats['move_time'], stats['dT_ideal'], stats['dP_ideal']))
-            output_tables.append(newtab)
+            output_tables[posid] = newtab
         return output_tables        
 
         

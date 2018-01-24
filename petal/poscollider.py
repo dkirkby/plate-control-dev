@@ -124,16 +124,14 @@ class PosCollider(object):
         if pospos:
             init_obsTPs = [init_obsTP_A,init_obsTP_B]
             tables = [tableA,tableB]
-            sweeps = [PosSweep(self.posmodels[posid_A]),PosSweep(self.posmodels[posid_B])]
+            sweeps = [PosSweep(posid_A),PosSweep(posid_B)]
             steps_remaining = [0]*2
-            check_collision_this_loop = [False] * 2
             step = [0] * 2
         else:
             init_obsTPs = [init_obsTP_A]
             tables = [tableA]
-            sweeps = [PosSweep(self.posmodels[posid_A])]
+            sweeps = [PosSweep(posid_A)]
             steps_remaining = [0]
-            check_collision_this_loop = [False]
             step = [0]
         for i in range(len(tables)):
             sweeps[i].fill_exact(init_obsTPs[i], tables[i])
@@ -154,7 +152,7 @@ class PosCollider(object):
                         sweeps[i].collision_case = collision_case
                         sweeps[i].collision_time = sweeps[i].time[step[i]]
                         steps_remaining[i] = 0 # halt the sweep here
-            steps_remaining = np.clip(steps_remaining,0,np.inf)
+            steps_remaining = np.clip(np.asarray(steps_remaining)-1,0,np.inf)
             for i in range(len(sweeps)):
                 if steps_remaining[i]:
                     step[i] += 1
