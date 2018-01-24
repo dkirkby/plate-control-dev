@@ -214,7 +214,7 @@ class PosSchedule(object):
 
             tps = posmodel.trans.posTP_to_obsTP(req['start_posTP'])
             tpf = posmodel.trans.posTP_to_obsTP(req['targt_posTP'])
-            RRrE, phi_inner = self._create_table_RRrEdict(tps, tpf, posmodel)
+            RRrE, tpsi, tpfi = self._create_table_RRrEdict(tps, tpf, posmodel)
             RRrE['extend'] = self._reverse_for_extension([RRrE['extend']])[0]
 
             table = self._combine_single_table(RRrE)
@@ -273,7 +273,7 @@ class PosSchedule(object):
         ## Name the three steps in rre (used for dictionary keys)
         order_of_operations = ['retract','rotate','extend']
     
-        ## Generate complete movetables under RRE method
+        ## Generate complete movetables under RRE method. Each stage gets it's own named dictionary
         relevant_info = {}
 
         for oper in order_of_operations:
@@ -296,20 +296,7 @@ class PosSchedule(object):
             tp_starts[posid] = tps
             tp_finals[posid] = tpf
 
-            current_tables_dict, phi_inner = self._create_table_RRrEdict(tps, tpf, posmodel)
-
-            ## retraction tps
-            relevant_info['retract']['tpstarts'][posid] = tps
-            relevant_info['retract']['tpfinals'][posid] = [tps[0],phi_inner]
-
-            ## rotation tps
-            relevant_info['rotate']['tpstarts'][posid] = [tps[0],phi_inner]
-            relevant_info['rotate']['tpfinals'][posid] = [tpf[0],phi_inner]
-
-            ## **note extend is flipped (unflipped at end of anticol)** ##
-            ## extention tps
-            relevant_info['extend']['tpstarts'][posid] = tpf
-            relevant_info['extend']['tpfinals'][posid] = [tpf[0],phi_inner]
+            current_tables_dict, tpsi, tpfi = self._create_table_RRrEdict(tps, tpf, posmodel)
 
             ## Unwrap the three movetables and add each of r,r,and e to
             ## a seperate list for that movetype
@@ -318,19 +305,31 @@ class PosSchedule(object):
                 movetime = current_tables_dict[key].for_schedule['stats']['net_time']
                 relevant_info[key]['movetables'][posid] = current_tables_dict[key]
                 relevant_info[key]['movetimes'][posid] = movetime[0]
+
+            ## retraction tps
+            relevant_info['retract']['tpstarts'][posid] = tps
+            relevant_info['retract']['tpfinals'][posid] = tpsi
+
+            ## rotation tps
+            relevant_info['rotate']['tpstarts'][posid] = tpsi
+            relevant_info['rotate']['tpfinals'][posid] = tpfi
+
+            ## **note extend is flipped (unflipped at end of anticol)** ##
+            ## extention tps
+            relevant_info['extend']['tpstarts'][posid] = tpf
+            relevant_info['extend']['tpfinals'][posid] = tpfi
                 
         ## For each of r, r, and e, find the maximum time that
         ## any positioner takes. The rest will be assigned to wait
         ## until that slowest positioner is done moving before going to
         ## the next move
-        for oper in order_of_operations:
-            oper_info = relevant_info[oper]
-            oper_info['maxtime'] = max(oper_info['movetimes'])
+        for stage in order_of_operations:
+            stage_info = relevant_info[stage]
+            stage_info['maxtime'] = np.max(stage_info['movetimes'].values())
             for posid in posids:
-                table, movetime = oper_info['movetables'][posid],oper_info['movetimes'][posid]
-                if movetime<oper_info['maxtime'][posid]:
-                    table.set_postpause(0,oper_info['maxtime']-movetime)
-
+                table, movetime = stage_info['movetables'][posid],stage_info['movetimes'][posid]
+                if movetime<stage_info['maxtime'][posid]:
+                    table.set_postpause(0,stage_info['maxtime']-movetime)
 
         if self.anticol.verbose:
             print("Max times to start are: ret={:.4f},rot={:.4f},ext={:.4f}".format( *(relevant_info[key]['maxtime'] for key in order_of_operations) ))
@@ -338,38 +337,38 @@ class PosSchedule(object):
         ## Redefine list as numpy arrays
         posmodels = np.asarray(posmodels)
 
-        for step in order_of_operations:
-            oper_info = relevant_info[step]
+        for stage in order_of_operations:
+            stage_info = relevant_info[stage]
 
             ## animate
             if self.anticol.make_animations == True:
-                self._animate_movetables(oper_info['movetables'], oper_info['tpstarts'])
+                self._animate_movetables(stage_info['movetables'], stage_info['tpstarts'])
 
             ## Check for collisions   oper_info['
             collision_indices, collision_types = \
-                    self._check_for_collisions(oper_info['tpstarts'],oper_info['movetables'])
+                    self._check_for_collisions(stage_info['tpstarts'],stage_info['movetables'])
 
             ## If no collisions, move directly to the next step
             if len(collision_indices) == 0:
                 continue
             
             if self.anticol.verbose:
-                print('\n\n\n\nStep: {}    Round: 1/1:\n'.format(step))
+                print('\n\n\n\nStep: {}    Round: 1/1:\n'.format(stage))
                 self._printindices('Collisions before iteration ',1,collision_indices)  
 
             ncols = len(collision_indices)
   
             ## Avoid the collisions that were found
-            oper_info['movetables'],moved_poss = self._avoid_collisions(oper_info['movetables'],posmodels, \
-                                    collision_indices, collision_types, oper_info['tpstarts'], \
-                                    oper_info['tpfinals'], step, oper_info['maxtime'], \
+            stage_info['movetables'],moved_poss = self._avoid_collisions(stage_info['movetables'],posmodels, \
+                                    collision_indices, collision_types, stage_info['tpstarts'], \
+                                    stage_info['tpfinals'], stage, stage_info['maxtime'], \
                                     algorithm=self.anticol.avoidance)
 
             if self.anticol.verbose:
                 ## Check for collisions
                 collision_indices, collision_types = \
-                        self._check_for_collisions(oper_info['tpstarts'],oper_info['movetables'])
-                self._printindices('Collisions after Round 1, in Step ',step,collision_indices)        
+                        self._check_for_collisions(stage_info['tpstarts'],stage_info['movetables'])
+                self._printindices('Collisions after Round 1, in Step ',stage,collision_indices)
                 print("\nNumber corrected: {}\n\n\n\n".format(ncols-len(collision_indices)))
 
         output_tables = {key: relevant_info[key]['movetables'] for key in ['retract','rotate']}
@@ -391,12 +390,6 @@ class PosSchedule(object):
             ntot = len(tps_list)
             print("Number of zerod positioners: {}, total number of targets: {}, successes: {}%".format(nzero,ntot,100*(1-(float(nzero)/float(ntot)))))
 
-        #for tablenum, table in enumerate(merged_tables):
-        #    print(relevant_info['retract']['movetables'][tablenum].rows[0].data['dP_ideal'], table.rows[0].data['dP_ideal'])
-        #    print(relevant_info['rotate']['movetables'][tablenum].rows[0].data['dT_ideal'], table.rows[1].data['dT_ideal'])
-        #    print(relevant_info['extend']['movetables'][tablenum].rows[0].data['dP_ideal'], table.rows[2].data['dP_ideal'])
-        #    print(len(relevant_info['retract']['movetables'][tablenum].rows), len(relevant_info['rotate']['movetables'][tablenum].rows),
-        #          len(relevant_info['extend']['movetables'][tablenum].rows), len(table.rows))
         return merged_tables
 
     def _create_table_RREdict(self,tp_start, tp_final, current_positioner_model):
@@ -443,7 +436,7 @@ class PosSchedule(object):
         table['extend'].set_prepause(0, 0.0)
         table['extend'].set_postpause(0, 0.0)
         ## return this positioners rre movetable
-        return table, phi_inner
+        return table, tpsi, tpfi
         
     def _create_table_RRrEdict(self,tp_start, tp_final, current_positioner_model):
         '''
@@ -499,7 +492,7 @@ class PosSchedule(object):
         table['extend'].set_prepause(0, 0.0)
         table['extend'].set_postpause(0, 0.0)
         ## return this positioners rre movetable
-        return table, phi_inner
+        return table, tpsi, tpfi
        
     
     def _avoid_collisions(self, tables, posmodels, collision_indices, \

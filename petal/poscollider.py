@@ -52,7 +52,7 @@ class PosCollider(object):
         self._load_positioner_params()
         self._load_circle_envelopes()
         for p in self.posids:
-            self._identify_neighbors(self.posmodels[p])
+            self._identify_neighbors(p)
         self._update_collidable_relations()
 
     def animate(self, sweeps,savedir=None,vidname=None):
@@ -270,8 +270,9 @@ class PosCollider(object):
 
     def _load_positioner_params(self):
         """Read latest versions of all positioner parameters."""
-        for posid in self.posids:
-            posmodel = self.posmodels[posid]
+        for posid, posmodel in self.posmodels.items():
+            if posid != posmodel.posid:
+                print("PosID's didn't match in poscollider load_positioner_params")
             self.R1[posid] = posmodel.state.read('LENGTH_R1')
             self.R2[posid] = posmodel.state.read('LENGTH_R2')
             self.x0[posid] = posmodel.state.read('OFFSET_X')
