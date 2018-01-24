@@ -1,6 +1,6 @@
 import posmovetable
 import posconstants as pc
-from bidirect_astar import bidirectional_astar_pathfinding
+from bidirect_astar import inertial_bidirectional_astar_pathfinding
 
 ## External Dependencies
 import numpy as np
@@ -376,7 +376,7 @@ class PosSchedule(object):
             if movetables is not stage_info['movetables']:
                 if self.anticol.verbose:
                     print('Movetables are not the same between movetables and the stage movetable')
-            if stage_info['movetables'] is not relevant_info[stage]['movetabkes']:
+            if stage_info['movetables'] is not relevant_info[stage]['movetables']:
                 if self.anticol.verbose:
                     print('Movetables are not the same between stage_info and relevant_info')
 
@@ -544,29 +544,30 @@ class PosSchedule(object):
         neighbor_ofaltered = set()
 
         ## Unpack the starting and ending theta/phis for all collisions
-        tss = np.asarray(tpss[:,pc.T])
-        pss = np.asarray(tpss[:,pc.P])
-        tfs = np.asarray(tpfs[:,pc.T])
-        pfs = np.asarray(tpfs[:,pc.P])
+        # tss = np.asarray(tpss[:,pc.T])
+        # pss = np.asarray(tpss[:,pc.P])
+        # tfs = np.asarray(tpfs[:,pc.T])
+        # pfs = np.asarray(tpfs[:,pc.P])
 
         all_numeric_indices = []
-        for a,b in collision_indices:
-            if a is not None:
-                all_numeric_indices.append(a)
-            if b is not None:
-                all_numeric_indices.append(b)
+        for ab in collision_indices:
+            all_numeric_indices.extend(ab)
 
-        col_ind_array = np.sort(np.unique(all_numeric_indices))
+        all_numeric_indices = np.unique(all_numeric_indices)
+        if None in all_numeric_indices:
+            all_numeric_indices.pop(all_numeric_indices.index(None))
+
+        col_ind_array = np.sort(all_numeric_indices)
         #pdb.set_trace()
-        starting_anticol_theta = tfs.copy()
-        starting_anticol_phi = pfs.copy()
-        goal_anticol_theta = tfs.copy()
-        goal_anticol_phi = pfs.copy()
-        for ind in col_ind_array:
-            starting_anticol_theta[ind] = tss[ind]
-            starting_anticol_phi[ind] = pss[ind]
-            goal_anticol_theta[ind] = tfs[ind]
-            goal_anticol_phi[ind] = pfs[ind]  
+        # starting_anticol_theta = tfs.copy()
+        # starting_anticol_phi = pfs.copy()
+        # goal_anticol_theta = tfs.copy()
+        # goal_anticol_phi = pfs.copy()
+        # for ind in col_ind_array:
+        #     starting_anticol_theta[ind] = tss[ind]
+        #     starting_anticol_phi[ind] = pss[ind]
+        #     goal_anticol_theta[ind] = tfs[ind]
+        #     goal_anticol_phi[ind] = pfs[ind]
         #max_stall_time = 0
         altered_pos = [-99]
         stallmovetimes = [0]
@@ -610,7 +611,7 @@ class PosSchedule(object):
                     if self.anticol.verbose:
                         print("\n\nSolving phi-phi collision!\n")
                     ## change larger phi since it has less distance to travel before safety
-                    if starting_anticol_phi[A] > starting_anticol_phi[B]:
+                    if tpss[A] > tpss[B]:
                         changings = [A,B]
                         unchangings = [B,A]
                     else:
@@ -626,6 +627,7 @@ class PosSchedule(object):
                         print("\n\nSolving theta-phi collision!\n")
                     changings = [B]
                     unchangings = [A] ## Theta fiber
+                # No need to loop over changing unchanging because its the same spatial collision between the two
                 init_type = self.collider.spatial_collision_between_positioners(A, B, tpss[A], tpss[B])
                 if init_type != pc.case.I:
                     if self.anticol.verbose:
@@ -674,72 +676,75 @@ class PosSchedule(object):
 
                 ## Get the posmodel of the positioner we'll be working with
                 ## and info about it's neighbors
-                changing_posmodel = posmodels[changing]
-                neighbor_idxs = self.collider.pos_neighbor_idxs[changing]
+                changing_posmodel = self.collider.posmodels[changing]
+                neighbor_ids = self.collider.pos_neighbors[changing]
                 fixed_neighbors = self.collider.fixed_neighbor_cases[changing]
 
-                posit_neighs = set(neighbor_idxs)
-                altered_posits = set(altered_pos)
-                intersection = posit_neighs.intersection(altered_posits)
-                if len(intersection)>0:
+                if len(set(neighbor_ids).intersection(altered_pos))>0:
                     continue
-                del posit_neighs, altered_posits, intersection
     
                 ## Set a boolean if the petal is something we need to avoid
                 avoid_petal = (pc.case.PTL in fixed_neighbors)
                 
                 ## if we collided with a positioner. Make sure the positioner is a neighbor
                 ## otherwise something strange has happened
-                if unchanging != None and unchanging not in neighbor_idxs:
+                if unchanging != None and unchanging not in neighbor_ids:
                     if self.anticol.verbose:
                         print("Make sure the neighbors include the the positioner that it supposedly collided with. Adding posnum {}".format(unchanging))
-                    neighbor_idxs = np.append(neighbor_idxs,unchanging)
-                if changing in neighbor_idxs:
+                    neighbor_ids = np.append(neighbor_ids,unchanging)
+                if changing in neighbor_ids:
                     if self.anticol.verbose:
                         print('The positioner claims to have itself as a neighbor? posnum {}'.format(changing))
                         if self.anticol.use_pdb:
                             pdb.set_trace()
                     else:
                         continue
-                #nidxs = neighbor_idxs
-                #for i,idx in enumerate(neighbor_idxs[:-1]):
-                #    for j,idx2 in enumerate(neighbor_idxs[i+1:]):
-                #        if idx==idx2:
-                #            print('Two indices have the same value')
-                #            nidxs.pop(i+1+j)
-                #neighbor_idxs = np.array(nidxs)
-                ## define the beginning and ending locations for the positioner we're moving
-                ## If we are
-                start = [starting_anticol_theta[changing],starting_anticol_phi[changing]]
-                target = [goal_anticol_theta[changing],goal_anticol_phi[changing]]
+
+                start = tpss[changing]
+                target = tpfs[changing]
 
                 if self.anticol.verbose:
-                    print("Trying to correct indices ",A,B," with ",algorithm," avoidance")
+                    print("Trying to correct positioners {},{} with {} avoidance".format(A,B,algorithm))
                 ## If the target is where we start, something weird is up
                 if target[0] == start[0] and target[1]==start[1] and self.anticol.verbose and self.anticol.use_pdb:
+                    print("target and start are identical for id {}".format(A))
                     pdb.set_trace()
                     
                 ## Create a dictionary called neighbors with all useful information of the neighbors
                 neighbors = {}
-                neighbors['posmodels'] = np.asarray(posmodels[neighbor_idxs])
                 xns = []
-                yns = [] 
-                neighbors['theta_body_xns'] = np.zeros(len(neighbor_idxs))
-                neighbors['theta_body_yns'] = np.zeros(len(neighbor_idxs))
-                neighbors['xoffs'] = self.anticol.xoffs[neighbor_idxs]
-                neighbors['yoffs'] = self.anticol.yoffs[neighbor_idxs]
-                neighbors['idxs'] = neighbor_idxs
-                
-                neighbors['phins'] = starting_anticol_phi[neighbor_idxs]
-                neighbors['thetans'] = starting_anticol_theta[neighbor_idxs]
-                neighbors['thetants'] = goal_anticol_theta[neighbor_idxs]
-                neighbors['phints'] = goal_anticol_phi[neighbor_idxs]
+                yns = []
+                nids = len(neighbor_ids)
+                neighbors['theta_body_xns'] = np.ndarray(nids)
+                neighbors['theta_body_yns'] = np.ndarray(nids)
+                neighbors['xoffs'] = np.ndarray(nids)
+                neighbors['yoffs'] = np.ndarray(nids)
+                neighbors['ids'] = neighbor_ids
 
-                # todo-anthony make compatible with various tp offsets and tp ranges
+                neighbors['phins'] = np.ndarray(nids)
+                neighbors['R1s'] = np.ndarray(nids)
+                neighbors['R2s'] = np.ndarray(nids)
+                neighbors['thetans'] = np.ndarray(nids)
+                neighbors['thetants'] = np.ndarray(nids)
+                neighbors['phints'] = np.ndarray(nids)
+                neighbors['posmodels'] = np.ndarray(nids).astype(type(changing_posmodel))
+
+                for i,posid in enumerate(neighbor_ids):
+                    neighbors['posmodels'][i] = self.collider.posmodels[posid]
+                    neighbors['xoffs'][i] = self.anticol.xoffs[posid]
+                    neighbors['yoffs'][i] = self.anticol.yoffs[posid]
+                    neighbors['R1s'][i] = self.anticol.r1s[posid]
+                    neighbors['R2s'][i] = self.anticol.r2s[posid]
+                    neighbors['phins'][i] = tpss[posid][pc.P]
+                    neighbors['thetans'][i] = tpss[posid][pc.T]
+                    neighbors['thetants'][i] = tpfs[posid][pc.T]
+                    neighbors['phints'][i] = tpfs[posid][pc.P]
+
+                # todo-anthony make compatible with various tp offsets and tp ranges, and use proper transforms instead of saved values
                 ## Loop through the neighbors and calculate the x,y's for each
-                for thit,pit,idxit in zip(neighbors['thetans'],neighbors['phins'],neighbors['idxs']):
-                    theta_bods = self.anticol.ultra_highres_posoutlines.central_body_outline([thit,pit],[self.anticol.xoffs[idxit],self.anticol.yoffs[idxit]])
-                    phi_arms = self.anticol.ultra_highres_posoutlines.phi_arm_outline([thit,pit],self.collider.R1[idxit], [self.anticol.xoffs[idxit],self.anticol.yoffs[idxit]])
+                for thit,pit,xoff,yoff,r1 in zip(neighbors['thetans'],neighbors['phins'],neighbors['xoffs'],neighbors['xoffs'],neighbors['R1s']):
+                    theta_bods = self.anticol.ultra_highres_posoutlines.central_body_outline([thit,pit],[xoff,yoff])
+                    phi_arms = self.anticol.ultra_highres_posoutlines.phi_arm_outline([thit,pit],r1, [xoff,yoff])
                     xns.extend(theta_bods[0,:])
                     xns.extend(phi_arms[0,:])
                     yns.extend(theta_bods[1,:])
@@ -760,7 +765,7 @@ class PosSchedule(object):
                 neighbors['yns'] = np.asarray(yns)
 
                 ### check for the consistancy of the x and y values. Make sure they don't overlap
-                if np.any( np.hypot(neighbors['xns']-self.anticol.xoffs[changing],neighbors['yns']-self.anticol.yoffs[changing] ) < 0.3):
+                if np.any( np.hypot(neighbors['xns']-self.anticol.xoffs[changing], neighbors['yns']-self.anticol.yoffs[changing] ) < 0.3):
                     print('A neighbor is within 0.3 millimeters of the center of the changing positioner')
                     if self.anticol.use_pdb:
                         pdb.set_trace()
@@ -776,7 +781,7 @@ class PosSchedule(object):
                 phi_arm_matrix_locations[:,:,1,:] += self.anticol.yoffs[changing]
 
                 ## Assign the max and min angles for theta and phi, quantized to integers
-                obs_tp_minmax = self.get_targetable_obstp(posmodels[changing]).astype(int)
+                obs_tp_minmax = self.get_targetable_obstp(changing_posmodel).astype(int)
                 theta_indices = (np.arange(obs_tp_minmax[0][0],obs_tp_minmax[0][1]+1) - self.anticol.min_default_theta)% 360
                 phi_indices = (np.arange(obs_tp_minmax[1][0],obs_tp_minmax[1][1]+1) - self.anticol.min_default_phi)
 
@@ -807,20 +812,13 @@ class PosSchedule(object):
                 ## return dt,dp,pausetime  lists that I can convert into a new movetable
                 #pdb.set_trace()
                 if algorithm == 'astar':
-                    if self.anticol.multitest:
-                        heuristics = ['euclidean','theta','phi','manhattan']
-                        weights = [1,1.2,1.4,1.6,1.8,2]
-                    else:
-                        heuristics = []
-                        weights = []    
+                    dts,dps,times, test_outputs = inertial_bidirectional_astar_pathfinding(\
+                                                     curmodel=changing_posmodel,start=start,\
+                                                     target=target, neighbors=neighbors, \
+                                                     thetaxys=cut_cent_bod_matrix, \
+                                                     phixys=cut_phi_arm_matrix, \
+                                                     anticol_params=self.anticol)
 
-                    dts,dps,times, test_outputs = bidirectional_astar_pathfinding(\
-                                                     changing_posmodel,start,\
-                                                     target, neighbors, \
-                                                     cut_cent_bod_matrix, \
-                                                     cut_phi_arm_matrix, \
-                                                     self.anticol,heuristics,weights
-                                                     )
                     nresult_rows = len(test_outputs['heuristic'])
                     for key,val in test_outputs.items():
                         if key in run_results.keys():
@@ -837,7 +835,7 @@ class PosSchedule(object):
                     continue
     
                 ## If length 0, don't create.
-                if dts is None:
+                if dts is None or len(dts)==0:
                     if self.anticol.verbose:
                         print("Number of rows in the new version of the table is: %d" % 0)
                     continue
@@ -872,7 +870,8 @@ class PosSchedule(object):
                 tables[changing] = new_changing_table
 
                 prepauses = []
-                for table in tables[neighbor_idxs]:
+                for posid in neighbor_ids:
+                    table = tables[posid]
                     prepauses.append(table.rows[0].data['prepause'])
                     prepause = max(newmovetime, table.rows[0].data['prepause'])
                     table.set_prepause(0, prepause)
@@ -881,9 +880,9 @@ class PosSchedule(object):
                 if coltype == pc.case.I:
                     stallmovetimes.append(newmovetime)
                     altered_pos.append(changing)
-                    neighbor_ofaltered.union(set(neighbor_idxs))
-                    for tabitter,table in enumerate(tables):
-                        if tabitter == changing or tabitter in neighbor_idxs:
+                    neighbor_ofaltered.union(set(neighbor_ids))
+                    for posid,table in tables.items():
+                        if posid == changing or posid in neighbor_ids:
                             continue
                         else:
                             prepause = max(newmovetime,table.rows[0].data['prepause'])
@@ -895,7 +894,9 @@ class PosSchedule(object):
                     if self.anticol.verbose:
                         print("Failed to find a valid avoidance movetable!")
                     tables[changing] = old_changing_table
-                    for prepause, table in zip(prepauses, tables[neighbor_idxs]):
+                    for prep_itter, posid in enumerate(neighbor_ids):
+                        prepause = prepauses[prep_itter]
+                        table = tables[posid]
                         table.set_prepause(0, prepause)
             ## end of for loop over movable colliding positioners
             if self.anticol.verbose:
@@ -921,15 +922,16 @@ class PosSchedule(object):
         if len(altered_pos) > 0:
             ## Correct timing so everything is in sync again
             maxstalltime = np.max(stallmovetimes)
-            movetimes = np.zeros(len(tables))
+            movetimes = []
             ## Update the movetimes for every positioner for this step
-            for i,table in enumerate(tables):
-                movetimes[i] = table.for_schedule['stats']['net_time'][-1]
-                if i in altered_pos:
-                    tempmovetime = stallmovetimes[altered_pos==i]
+            for posid,table in tables.items():
+                movetime = table.for_schedule['stats']['net_time'][-1]
+                movetimes.append(movetime)
+                if posid in altered_pos:
+                    tempmovetime = stallmovetimes[altered_pos==posid]
                     table.set_postpause(len(table.rows)-1, maxstalltime-tempmovetime)
                 else:
-                    prepause = max(table.rows[0].data['prepause'],maxstalltime-movetimes[i])
+                    prepause = max(table.rows[0].data['prepause'],maxstalltime-movetime)
                     table.set_prepause(0, prepause)
 
 
@@ -1023,58 +1025,61 @@ class PosSchedule(object):
 
     def _zerothorder_avoidance_iteration(self,tables, posmodels, collision_indices, tpss, zerod):
         unique_indices = self._unique_inds(collision_indices)
+        raveled_inds = np.ravel(collision_indices)
+        init_collisions = np.unique(raveled_inds[raveled_inds != None])
+        ninit_collisions = len(init_collisions) - 1
         possits_to_zero = []
         max_time = self._get_max_time(tables)
         max_collisions = max(unique_indices.values())
-        for posindex,ncollisions in unique_indices.items():
+        for posid,ncollisions in unique_indices.items():
             if ncollisions == max_collisions:
-                possits_to_zero.append(posindex)
+                possits_to_zero.append(posid)
 
         possits_to_zero = np.unique(possits_to_zero)
         print(max_collisions, possits_to_zero)
 
         nonzero = set(possits_to_zero).difference(set(zerod))
-        if len(possits_to_zero)==1:
-            best_pos = possits_to_zero[0]
-            table = posmovetable.PosMoveTable(posmodels[best_pos])
-            table.set_move(0, pc.T, 0.)
-            table.set_move(0, pc.P, 0.)
-            table.set_prepause (0, max_time)
-            table.set_postpause(0, 0.0)
-            tables[best_pos] = table
-        elif len(nonzero)== 1:
+        if len(nonzero)==1:
             best_pos = nonzero.pop()
-            table = posmovetable.PosMoveTable(posmodels[best_pos])
+            table = posmovetable.PosMoveTable(tables[best_pos].posmodel)
             table.set_move(0, pc.T, 0.)
             table.set_move(0, pc.P, 0.)
             table.set_prepause(0, max_time)
             table.set_postpause(0, 0.0)
             tables[best_pos] = table
+        elif len(possits_to_zero)==1:
+            best_pos = possits_to_zero[0]
+            table = posmovetable.PosMoveTable(tables[best_pos].posmodel)
+            table.set_move(0, pc.T, 0.)
+            table.set_move(0, pc.P, 0.)
+            table.set_prepause (0, max_time)
+            table.set_postpause(0, 0.0)
+            tables[best_pos] = table
         else:
             ## For the colliding indices, simply don't move them
             dn_colls = []
-            for index in possits_to_zero:
-                if index in zerod:
+            for id in possits_to_zero:
+                if id in zerod:
                     dn_colls.append(-99)
                     continue
-                ninit_collisions = unique_indices[index]
-                old_table = tables[index]
-                table = posmovetable.PosMoveTable(posmodels[index])
+                #ninit_collisions = unique_indices[index]
+                old_table = tables[id]
+                table = posmovetable.PosMoveTable(old_table.posmodel)
                 table.set_move(0, pc.T, 0.)
                 table.set_move(0, pc.P, 0.)
                 table.set_prepause (0, max_time)
                 table.set_postpause(0, 0.0)
-                tables[index] = table
-                itter_collinds, itter_colltypes = self._check_single_positioner_for_collisions(tpss,tables,index)
+                tables[id] = table
+                itter_collinds, itter_colltypes = self._check_single_positioner_for_collisions(tpss,tables,id)
                 raveled_inds = np.ravel(itter_collinds)
                 fin_collisions = np.unique(raveled_inds[raveled_inds != None])
                 nfin_collisions = len(fin_collisions)-1
                 dn_colls.append(ninit_collisions-nfin_collisions)
-                tables[index] = old_table
+                tables[id] = old_table
                 del table
             best_choice = np.argmax(dn_colls)
             best_pos = possits_to_zero[best_choice]
-            table = posmovetable.PosMoveTable(posmodels[best_pos])
+            table = posmovetable.PosMoveTable(tables[best_pos].posmodel)
             table.set_move(0, pc.T, 0.)
             table.set_move(0, pc.P, 0.)
             table.set_prepause(0, max_time)
@@ -1169,14 +1174,14 @@ class PosSchedule(object):
         return np.asarray(collision_id_pairs), np.asarray(collision_types)
     
     # todo-anthony double check this code
-    def _check_single_positioner_for_collisions(self,tps,list_tables,index):
+    def _check_single_positioner_for_collisions(self,tps,tablesdict,posid):
         '''
             Find what positioners collide, and who they collide with
             Inputs:
                 tps:  list or numpy array of theta,phi pairs that specify the location
                         of every positioner
-                cur_poscollider:  poscollider object used to find the actual collisions
-                list_tables:   list of all the movetables
+                tablesdict:  dictionary of all tables
+                posid:  posid of the single positioner we want to check neighbors of
                 
             Outputs:
                All 3 are numpy arrays giving information about every collision that occurs.
@@ -1185,46 +1190,14 @@ class PosSchedule(object):
                                     or [*,None] if colliding with a wall of fiducial.
                 collision_types:   Type of collision as specified in the pc class
         '''
-        collision_index,collision_type,earliest_collision = [],pc.case.I,np.inf
-        nontriv = 0
-        colrelations = self.collider.collidable_relations
-        colrelA = np.asarray(colrelations['A'])
-        colrelB = np.asarray(colrelations['B'])
-        colrelBfixd = np.asarray(colrelations['B_is_fixed'])
-        iteration_relation = np.where(colrelA==index)[0]
-        for A, B, B_is_fixed in zip(colrelA[iteration_relation],colrelB[iteration_relation],\
-                                colrelBfixd[iteration_relation]):
-            tableA = list_tables[A].for_schedule
-            obsTPA = tps[A]
-            if B_is_fixed and A in range(len(list_tables)): ## might want to replace 2nd test here with one where we look in tables for a specific positioner index
-                these_sweeps = self.collider.spacetime_collision_with_fixed(A, obsTPA, tableA)
-            elif A in range(len(list_tables)) and B in range(len(list_tables)): ## again, might want to look for specific indexes identifying which tables go with which positioners
-                tableB = list_tables[B].for_schedule
-                obsTPB = tps[B]    
-                these_sweeps = self.collider.spacetime_collision_between_positioners(A, obsTPA, tableA, B, obsTPB, tableB)
-    
-            if these_sweeps[0].collision_time <= earliest_collision:
-                nontriv += 1
-                earliest_collision = these_sweeps[0].collision_time
-                if B_is_fixed:
-                    collision_index = [A,None]
-                else:
-                    collision_index = [A,B]
-                collision_type = these_sweeps[0].collision_case
-                if these_sweeps[0].collision_time < np.inf:
-                    earliest_collision = these_sweeps[0].collision_time
-            for i in range(1,len(these_sweeps)):
-                if these_sweeps[i].collision_time < earliest_collision:
-                    nontriv += 1
-                    earliest_collision = these_sweeps[i].collision_time
-                    if B_is_fixed:
-                        collision_index = [A,None]
-                    else:
-                        collision_index = [A,B]
-                    collision_type = these_sweeps[i].collision_case
+        #colrelations = self.collider.collidable_relations
+        pos_neighbors = self.collider.pos_neighbors
+        local_radius_tables = {key:tablesdict[key] for key in pos_neighbors}
+        local_radius_tables[posid] = tablesdict[posid]
+        local_radius_tps = {key:tps[key] for key in pos_neighbors}
+        local_radius_tps[posid] = tps[posid]
+        return self._check_for_collisions(local_radius_tps,local_radius_tables)
 
-        ## return the earliest collision time and collision indices
-        return np.asarray(collision_index), np.asarray(collision_type)
 
     def _animate_movetables(self,movetables, tps):
         '''

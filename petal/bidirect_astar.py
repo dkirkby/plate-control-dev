@@ -347,8 +347,7 @@ def plot_comparison_weight_and_heur(paths,boolgrid,xgrid,ygrid,xns,yns,weights,h
 
     
 # todo-anthony make compatible with various tp offsets and tp ranges
-def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys, phixys,\
-                                    anticol_params, heuristics=[], weights=[]):
+def inertial_bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys, phixys, anticol_params):
 
     if anticol_params is None:
         verbose = False
@@ -364,8 +363,12 @@ def bidirectional_astar_pathfinding(curmodel, start, target, neighbors,thetaxys,
         tolerance_xy = anticol_params.astar_tolerance_xy  
         multitest = anticol_params.multitest
         #posoutlines = anticol_params.posoutlines
-        heuristic = anticol_params.astar_heuristic
-        weight = anticol_params.astar_weight
+        if multitest:
+            heuristics = ['euclidean', 'theta', 'phi', 'manhattan']
+            weights = [1, 1.2, 1.4, 1.6, 1.8, 2]
+        else:
+            heuristic = anticol_params.astar_heuristic
+            weight = anticol_params.astar_weight
         
     ## Quantize the start and end targets to integers
     true_goaltp = (int(target[0]),int(target[1]))
