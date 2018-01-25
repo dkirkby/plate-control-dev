@@ -77,22 +77,29 @@ class XYTest(object):
 			try:
 				presets_file=os.environ['TEST_PRESETS_CONFIG']
 				presets = configobj.ConfigObj(presets_file,unrepr=True)
-				self.presets['supply voltage']=presets['supply voltage']
-				self.presets['relative humidity']=presets['relative humidity']
+				if 'supply voltage' in presets.keys():
+					self.presets['supply voltage']=presets['supply voltage']
+				elif 'supply_voltage' in presets.keys():
+					self.presets['supply voltage'] = presets['supply_voltage']
+				if 'relative humidity' in presets.keys():
+					self.presets['relative humidity']=presets['relative humidity']
+				elif 'relative_humidity' in presets.keys():
+					self.presets['relative humidity'] = presets['relative_humidity']
 				# prioritize environment definitions but allow conf file definitions
-				if 'TEST_STAND_NAME' in os.environ:
+				if 'TEST_STAND_NAME' in os.environ.keys():
 					self.presets['test station'] = os.environ['TEST_STAND_NAME']
-				elif 'test station' in presets:
+				elif 'test station' in presets.keys():
 					self.presets['test station'] = presets['test station']
-				if 'TEST_OPERATOR_NAME' in os.environ:
+				if 'TEST_OPERATOR_NAME' in os.environ.keys():
 					self.presets['test operator'] = os.environ['TEST_OPERATOR_NAME']
-				elif 'test operator' in presets:
+				elif 'test operator' in presets.keys():
 					self.presets['test operator'] = presets['test operator']
-				self.presets['temperature (C)'] = presets['temperature (C)']
-				self.presets['operator notes'] = presets['operator notes']
+				if 'temperature (C)' in presets.keys():
+					self.presets['temperature (C)'] = presets['temperature (C)']
+				if 'operator notes' in presets.keys():
+					self.presets['operator notes'] = presets['operator notes']
 			except:
 				USE_LOCAL_PRESETS=False
-
 
 		self.use_local_presets=	USE_LOCAL_PRESETS
 		self.hwsetup_conf = configobj.ConfigObj(hwsetup_conf,unrepr=True,encoding='utf-8')
