@@ -1,5 +1,6 @@
 import posmovetable
 import posconstants as pc
+from poscollider import PosSweep
 from bidirect_astar import inertial_bidirectional_astar_pathfinding
 
 ## External Dependencies
@@ -516,7 +517,7 @@ class PosSchedule(object):
             return self._avoid_collisions_zerothorder(tables,posmodels,collision_indices,tpss)
         # Larger phis are more tucked in, check if they are all tucked in enough
         # Ei is the more tucked in, extremem case
-        phis = np.asarray([tp[pc.P] for tp in tpss])
+        phis = np.asarray([tp[pc.P] for tp in tpss.values()])
         if step.lower() == 'rotate' and np.all(phis>=self.collider.Eo_phi):
            print("You want me to correct rotational collisions when all the phi motors are tucked in.")
            print("Sorry I can't help")
@@ -557,26 +558,12 @@ class PosSchedule(object):
         if None in all_numeric_indices:
             all_numeric_indices.pop(all_numeric_indices.index(None))
 
-        col_ind_array = np.sort(all_numeric_indices)
-        #pdb.set_trace()
-        # starting_anticol_theta = tfs.copy()
-        # starting_anticol_phi = pfs.copy()
-        # goal_anticol_theta = tfs.copy()
-        # goal_anticol_phi = pfs.copy()
-        # for ind in col_ind_array:
-        #     starting_anticol_theta[ind] = tss[ind]
-        #     starting_anticol_phi[ind] = pss[ind]
-        #     goal_anticol_theta[ind] = tfs[ind]
-        #     goal_anticol_phi[ind] = pfs[ind]
-        #max_stall_time = 0
         altered_pos = [-99]
         stallmovetimes = [0]
         
         ### R1 and R2 parameters and their theta/phi and x/y offsets
         # self.collider.R1 
         # self.collider.R2     <- arrays for each positiner
-        # self.collider.xy0
-        # self.collider.tp0 
         
         ### Targetable theta_phi positions for all positioners
         # self.collider.tp_ranges 
@@ -588,7 +575,6 @@ class PosSchedule(object):
         # self.collider.place_central_body(idx, t)
         # self.collider.keepout_GFA
         # self.collider.ferrule_poly
-
 
         run_results = {'tpstart':[],'tpgoal':[],'idx_changing':[],'idx_unchanging':[],'case':[],'movetype':[],\
                        'heuristic':[],'weight':[],'pathlength_full':[np.nan],'pathlength_condensed':[],'found_path':[]}#'avoided_collision':[]
@@ -1103,7 +1089,6 @@ class PosSchedule(object):
             Inputs:
                 tps:  list or numpy array of theta,phi pairs that specify the location
                         of every positioner
-                cur_poscollider:  poscollider object used to find the actual collisions
                 tables:   dict of all the movetables with posid's as keys
                 
             Outputs:
@@ -1113,56 +1098,13 @@ class PosSchedule(object):
                                     or [*,None] if colliding with a wall of fiducial.
                 collision_types:   Type of collision as specified in the pc class
         '''
-        all_posids = self.collider.posids
-        sweeps = {posid:[] for posid in all_posids}
-        collision_index = {posid:[] for posid in all_posids}
-        collision_type = {posid:pc.case.I for posid in all_posids}
-        earliest_collision = {posid:np.inf for posid in all_posids}
-        nontriv = 0
-        colrelations = self.collider.collidable_relations
-        for Aid, Bid, B_is_fixed in zip(colrelations['A'],colrelations['B'],colrelations['B_is_fixed']):
-            if Aid not in tables.keys():
-                continue
-            if (not B_is_fixed) and (Bid not in all_posids):
-                continue
-            tableA = tables[Aid].for_schedule
-            obsTPA = tps[Aid]
-            if B_is_fixed:
-                these_sweeps = self.collider.spacetime_collision_with_fixed(Aid, obsTPA, tableA)
-            else:
-                tableB = tables[Bid].for_schedule
-                obsTPB = tps[Bid]
-                these_sweeps = self.collider.spacetime_collision_between_positioners(Aid, obsTPA, tableA, Bid, obsTPB, tableB)
-    
-            if these_sweeps[0].collision_time <= earliest_collision[Aid]:
-                nontriv += 1
-                sweeps[Aid] = these_sweeps[0]
-                collision_type[Aid] = these_sweeps[0].collision_case
-                if B_is_fixed:
-                    collision_index[Aid] = [Aid,None]
-                else:
-                    collision_index[Aid] = [Aid,Bid]
-                if these_sweeps[0].collision_time < np.inf:
-                    earliest_collision[Aid] = these_sweeps[0].collision_time
-
-            if len(these_sweeps) == 1 or B_is_fixed:
-                contine
-
-            for i in range(1,len(these_sweeps)):
-                if these_sweeps[i].collision_time < earliest_collision[Bid]:
-                    nontriv += 1
-                    sweeps[Bid] = these_sweeps[i]
-                    earliest_collision[Bid] = these_sweeps[i].collision_time
-                    if B_is_fixed:
-                        collision_index[Bid] = [Aid,None]
-                    else:
-                        collision_index[Bid] = [Aid,Bid]
-                    collision_type[Bid] = these_sweeps[i].collision_case
+        sweeps, collisions_ids, collision_type, earliest_collision = \
+            self._get_sweeps_and_collision_info(tps, tables)
 
         collision_id_pairs = []
         collision_types = []
         posids_accounted_for = set()
-        for posid,posid_collisions in collision_index.items():
+        for posid,posid_collisions in collisions_ids.items():
             if collision_type[posid] != pc.case.I:
                 if posid_collisions[0] not in posids_accounted_for:
                     collision_id_pairs.append(posid_collisions)
@@ -1198,15 +1140,14 @@ class PosSchedule(object):
         local_radius_tps[posid] = tps[posid]
         return self._check_for_collisions(local_radius_tps,local_radius_tables)
 
-
-    def _animate_movetables(self,movetables, tps):
+    def _get_sweeps_and_collision_info(self, tps, tables):
         '''
             Find what positioners collide, and who they collide with
             Inputs:
                 tps:  list or numpy array of theta,phi pairs that specify the location
                         of every positioner
                 cur_poscollider:  poscollider object used to find the actual collisions
-                list_tables:   list of all the movetables
+                tables:   dict of all the movetables with posid's as keys
 
             Outputs:
                All 3 are numpy arrays giving information about every collision that occurs.
@@ -1215,40 +1156,81 @@ class PosSchedule(object):
                                     or [*,None] if colliding with a wall of fiducial.
                 collision_types:   Type of collision as specified in the pc class
         '''
-        collider = self.collider
-        list_tables = list(movetables)
-        posmodel_index_iterable = range(len(collider.posmodels))
-        sweeps = [[] for i in posmodel_index_iterable]
-        earliest_collision = [np.inf for i in posmodel_index_iterable]
-        colrelations = collider.collidable_relations
-        for A, B, B_is_fixed in zip(colrelations['A'], colrelations['B'], colrelations['B_is_fixed']):
-            tableA = list_tables[A].for_schedule
-            obsTPA = tps[A]
-            if B_is_fixed and A in range(len(
-                    list_tables)):  ## might want to replace 2nd test here with one where we look in tables for a specific positioner index
-                these_sweeps = collider.spacetime_collision_with_fixed(A, obsTPA, tableA)
-            elif A in range(len(list_tables)) and B in range(len(
-                    list_tables)):  ## again, might want to look for specific indexes identifying which tables go with which positioners
-                tableB = list_tables[B].for_schedule
-                obsTPB = tps[B]
-                these_sweeps = collider.spacetime_collision_between_positioners(A, obsTPA, tableA, B, obsTPB,
-                                                                                tableB)
-            if these_sweeps[0].collision_time <= earliest_collision[A]:
-                sweeps[A] = these_sweeps[0]
+        all_posids = self.collider.posids
+        sweeps = {posid: PosSweep(posid) for posid in all_posids}
+        collision_ids = {posid: [] for posid in all_posids}
+        collision_type = {posid: pc.case.I for posid in all_posids}
+        earliest_collision = {posid: np.inf for posid in all_posids}
+        nontriv = 0
+        colrelations = self.collider.collidable_relations
+        for Aid, Bid, B_is_fixed in zip(colrelations['A'], colrelations['B'], colrelations['B_is_fixed']):
+            if Aid not in tables.keys():
+                continue
+            if (not B_is_fixed) and (Bid not in all_posids):
+                continue
+            tableA = tables[Aid].for_schedule
+            obsTPA = tps[Aid]
+            if B_is_fixed:
+                these_sweeps = self.collider.spacetime_collision_with_fixed(Aid, obsTPA, tableA)
+            else:
+                tableB = tables[Bid].for_schedule
+                obsTPB = tps[Bid]
+                these_sweeps = self.collider.spacetime_collision_between_positioners(Aid, obsTPA, tableA, \
+                                                                                     Bid, obsTPB, tableB)
+            if these_sweeps[0].collision_time <= earliest_collision[Aid]:
+                nontriv += 1
+                sweeps[Aid] = these_sweeps[0]
+                collision_type[Aid] = these_sweeps[0].collision_case
+                if B_is_fixed:
+                    collision_ids[Aid] = [Aid, None]
+                else:
+                    collision_ids[Aid] = [Aid, Bid]
                 if these_sweeps[0].collision_time < np.inf:
-                    earliest_collision[A] = these_sweeps[0].collision_time
+                    earliest_collision[Aid] = these_sweeps[0].collision_time
+
+            if len(these_sweeps) == 1 or B_is_fixed:
+                continue
+
             for i in range(1, len(these_sweeps)):
-                if these_sweeps[i].collision_time < earliest_collision[B]:
-                    sweeps[B] = these_sweeps[i]
-                    earliest_collision[B] = these_sweeps[i].collision_time
+                if these_sweeps[i].collision_time < earliest_collision[Bid]:
+                    nontriv += 1
+                    sweeps[Bid] = these_sweeps[i]
+                    earliest_collision[Bid] = these_sweeps[i].collision_time
+                    if B_is_fixed:
+                        collision_ids[Bid] = [Aid, None]
+                    else:
+                        collision_ids[Bid] = [Aid, Bid]
+                    collision_type[Bid] = these_sweeps[i].collision_case
+
+        return sweeps, collision_ids, collision_type, earliest_collision
+
+    def _animate_movetables(self,tables, tps):
+        '''
+            Find what positioners collide, and who they collide with
+            Inputs:
+                tps:  list or numpy array of theta,phi pairs that specify the location
+                        of every positioner
+                tables:   movetable dict
+
+            Outputs:
+               All 3 are numpy arrays giving information about every collision that occurs.
+                collision_indices: list index which identifies the positioners that collide
+                                    this has 2 indices in a pair [*,*] if 2 positioners collided
+                                    or [*,None] if colliding with a wall of fiducial.
+                collision_types:   Type of collision as specified in the pc class
+        '''
+        sweeps, collisions_ids, collision_type, earliest_collision = \
+            self._get_sweeps_and_collision_info(tps, tables)
+
+        ## dict to list
+        #sweeps_list = [sweep for sweep in list(sweeps.values()) if sweep != []]
+        sweeps_list = list(sweeps.values())
+
 
         ## animate
-        #for sweep in sweeps:
-        #    print('\ntpdots:{}\n'.format(sweep.tp_dot))
-        #    #print('id:{}\ntimes:{}\ntps:{}\ntpdots:{}\ncollision case: {} collision time: {}'.format(sweep.posidx,sweep.time,\
-        #    #      sweep.tp,sweep.tp_dot ,sweep.collision_case,sweep.collision_time))
-        collider.animate(sweeps=sweeps,savedir=self.anticol.anim_save_folder,\
+        self.collider.animate(sweeps=sweeps_list,savedir=self.anticol.anim_save_folder,\
                          vidname=self.anticol.anim_template.format(savenum=self.anticol.anim_save_number))
+
         if os.sys.platform == 'win32' or os.sys.platform == 'win64':
             delcom = 'del'
         else:

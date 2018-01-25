@@ -62,11 +62,11 @@ class PosCollider(object):
         self.plotter = posplot.PosPlot(fignum=0, timestep=self.timestep)
         #self.plotter.clear()
         all_times = [s.time for s in sweeps]
-        global_start = np.min([np.min(t) for t in all_times])
+        global_start = np.min([np.min(t) for t in all_times if len(t)>0])
         self.plotter.add_or_change_item('GFA', '', global_start, self.keepout_GFA.points)
         self.plotter.add_or_change_item('PTL', '', global_start, self.keepout_PTL.points)            
         for s in sweeps:
-            posid = s.posmodel.posid
+            posid = s.posid
             posidx = self.posids.index(posid)
             self.plotter.add_or_change_item('Eo', posidx, global_start, self.Eo_polys[posid].points)
             self.plotter.add_or_change_item('Ei', posidx, global_start, self.Ei_polys[posid].points)
