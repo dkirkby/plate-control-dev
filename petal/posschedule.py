@@ -976,7 +976,7 @@ class PosSchedule(object):
             if self.anticol.verbose:
                 print("Zerod 'None' colliders: {}".format(zerod))
             for index in np.unique(zerod):
-                table = posmovetable.PosMoveTable(posmodels[index])
+                table = posmovetable.PosMoveTable(tables[index].posmodel)
                 table.set_move(0, pc.T, 0.)
                 table.set_move(0, pc.P, 0.)
                 table.set_prepause(0, max_time)
