@@ -7,12 +7,9 @@ if "TEST_LOCATION" in os.environ and os.environ['TEST_LOCATION']=='Michigan':
 	sys.path.append(os.path.abspath(basepath+'/petal/'))
 	sys.path.append(os.path.abspath(basepath+'/posfidfvc/'))
 elif 'USERNAME' in os.environ.keys() and os.environ['USERNAME'] == 'kremin':
-	if 'HOME' in os.environ:
-		basepath = os.environ['HOME']
-	else:
-		basepath = os.path.abspath('../')
-		os.environ['HOME'] = basepath
-	#basepath = os.path.abspath('../')
+	#if 'OSTYPE' in os.environ and os.environ['OSTYPE'] == 'linux-gnu':
+	basepath = os.path.abspath('../')
+	os.environ['DESI_HOME'] = basepath
 	if 'POSITIONER_LOGS_PATH' in os.environ:
 		logdir = os.environ['POSITIONER_LOGS_PATH']
 	else:
@@ -31,7 +28,7 @@ elif 'USERNAME' in os.environ.keys() and os.environ['USERNAME'] == 'kremin':
 	## Define other useful directories and make them if they don't exist
 	outputsdir = os.path.abspath(os.path.join(basepath, 'outputs'))
 	figdir = os.path.abspath(os.path.join(basepath, 'figures'))
-	tempdir = os.path.join(os.environ['HOME'], 'fp_temp_files', '')
+	tempdir = os.path.join(basepath, 'fp_temp_files', '')
 	if not os.path.exists(logdir):
 		os.makedirs(logdir)
 		for dirname in ['move', 'test', 'pos']:
@@ -82,6 +79,14 @@ if __name__=="__main__":
 	print("")
 
 	test = XYTest(hwsetup_conf=hwsetup_conf,xytest_conf=xytest_conf,USE_LOCAL_PRESETS=USE_LOCAL_PRESETS)
+	test.m.petals[0].collider.keepout_PTL.points = test.m.petals[0].collider.keepout_PTL.points / 9
+	anticol = test.m.petals[0].schedule.anticol
+	anticol.make_animations = True
+	anticol.plotting = True
+	anticol.verbose = True
+	anticol.create_debug_outputs = False
+	anticol.astar_plotting = True
+	anticol.use_pdb = True
 
 	test.logwrite('Start of positioner performance test.')
 	for loop_num in range(test.starting_loop_number, test.n_loops):
