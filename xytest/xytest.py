@@ -71,19 +71,6 @@ class XYTest(object):
 				sys.exit(0)
 			gui_root.withdraw()
 
-	
-		if USE_LOCAL_PRESETS:
-			self.presets={}
-			try:
-				presets_file=os.environ['TEST_PRESETS_CONFIG']
-				presets = configobj.ConfigObj(presets_file,unrepr=True)
-				self.presets['supply voltage']=presets['supply_voltage']
-				self.presets['relative humidity']=presets['relative_humidity']
-				self.presets['test station']=os.environ['TEST_STAND_NAME']
-			except:
-				USE_LOCAL_PRESETS=False
-				
-
 		self.use_local_presets=	USE_LOCAL_PRESETS
 		self.hwsetup_conf = configobj.ConfigObj(hwsetup_conf,unrepr=True,encoding='utf-8')
 		self.xytest_conf = configobj.ConfigObj(xytest_conf,unrepr=True,encoding='utf-8')
@@ -117,8 +104,47 @@ class XYTest(object):
 		# set up fvc and platemaker
 		if self.simulate:
 			fvc_type = 'simulator'
+			if USE_LOCAL_PRESETS:
+				self.presets = {}
+				try:
+					presets_file = os.environ['TEST_PRESETS_CONFIG']
+					presets = configobj.ConfigObj(presets_file, unrepr=True)
+					if 'supply voltage' in presets.keys():
+						self.presets['supply voltage'] = presets['supply voltage']
+					elif 'supply_voltage' in presets.keys():
+						self.presets['supply voltage'] = presets['supply_voltage']
+					if 'relative humidity' in presets.keys():
+						self.presets['relative humidity'] = presets['relative humidity']
+					elif 'relative_humidity' in presets.keys():
+						self.presets['relative humidity'] = presets['relative_humidity']
+					# prioritize environment definitions but allow conf file definitions
+					if 'TEST_STAND_NAME' in os.environ.keys():
+						self.presets['test station'] = os.environ['TEST_STAND_NAME']
+					elif 'test station' in presets.keys():
+						self.presets['test station'] = presets['test station']
+					if 'TEST_OPERATOR_NAME' in os.environ.keys():
+						self.presets['test operator'] = os.environ['TEST_OPERATOR_NAME']
+					elif 'test operator' in presets.keys():
+						self.presets['test operator'] = presets['test operator']
+					if 'temperature (C)' in presets.keys():
+						self.presets['temperature (C)'] = presets['temperature (C)']
+					if 'operator notes' in presets.keys():
+						self.presets['operator notes'] = presets['operator notes']
+				except:
+					USE_LOCAL_PRESETS = False
 		else:
 			fvc_type = self.hwsetup_conf['fvc_type']
+			if USE_LOCAL_PRESETS:
+				self.presets = {}
+				try:
+					presets_file = os.environ['TEST_PRESETS_CONFIG']
+					presets = configobj.ConfigObj(presets_file, unrepr=True)
+					self.presets['supply voltage'] = presets['supply_voltage']
+					self.presets['relative humidity'] = presets['relative_humidity']
+					self.presets['test station'] = os.environ['TEST_STAND_NAME']
+				except:
+					USE_LOCAL_PRESETS = False
+
 		fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=self.hwsetup_conf['save_sbig_fits'])       
 		fvc.rotation = self.hwsetup_conf['rotation']
 		fvc.scale = self.hwsetup_conf['scale']
@@ -171,9 +197,14 @@ class XYTest(object):
 		summarizer_init_data['xytest log file']     = os.path.basename(self.xytest_logfile)
 		summarizer_init_data['code version']        = pc.code_version
 		user_vals = self.intro_questions()
-		for key in user_vals.keys():
-			self.logwrite('user-entry: ' + key + ': ' + user_vals[key])
-			summarizer_init_data[key] = user_vals[key]
+		if self.simulate:
+			for key in user_vals.keys():
+				self.logwrite('user-entry: ' + key + ': ' + str(user_vals[key]))
+				summarizer_init_data[key] = user_vals[key]
+		else:
+			for key in user_vals.keys():
+				self.logwrite('user-entry: ' + key + ': ' + user_vals[key])
+				summarizer_init_data[key] = user_vals[key]
 		summarizer_init_data['operator notes'] = self.get_and_log_comments_from_user()
 		for posid in self.posids:
 			state = self.m.state(posid)
@@ -209,10 +240,16 @@ class XYTest(object):
 		print('')
 		print('You entered:')
 		nchar = max([len(key) for key in user_vals.keys()])
-		for key in user_vals.keys():
-			print('  ' + format(key + ':',str(nchar + 2) + 's') + user_vals[key])
-		print('')
-		try_again = input('If this is ok, hit enter to continue. Otherwise, type any character and enter to start over: ')
+		if self.simulate:
+			for key in user_vals.keys():
+				print('  ' + format(key + ':', str(nchar + 2) + 's') + str(user_vals[key]))
+			print('')
+			try_again = False
+		else:
+			for key in user_vals.keys():
+				print('  ' + format(key + ':',str(nchar + 2) + 's') + user_vals[key])
+			print('')
+			try_again = input('If this is ok, hit enter to continue. Otherwise, type any character and enter to start over: ')
 		if try_again:
 			self.use_local_presets=False
 			return self.intro_questions()
@@ -220,17 +257,26 @@ class XYTest(object):
 			return user_vals
 		
 	def get_and_log_comments_from_user(self):
-		print('\nPlease enter any specific observations or notes about this test. These will be recorded into the test log. You can keep on entering notes until you hit enter on a blank line.',end=' ')
-		thanks_msg = False
-		notes = []
-		note = input('observation/note: ')
-		while note:
-			self.logwrite('user-entry: OBSERVATION/NOTE: ' + note)
-			notes.append(note)
+		if self.simulate:
+			print('\nPlease enter any specific observations or notes about this test. These will be recorded into the test log. You can keep on entering notes until you hit enter on a blank line.',end=' ')
+			notes = []
+			if self.use_local_presets and 'operator notes' in self.presets:
+				note = self.presets['operator notes']
+				self.logwrite('user-entry: OBSERVATION/NOTE: ' + note)
+				notes.append(note)
+		else:
+			print('\nPlease enter any specific observations or notes about this test. These will be recorded into the test log. You can keep on entering notes until you hit enter on a blank line.',end=' ')
+			thanks_msg = False
+			notes = []
 			note = input('observation/note: ')
-			thanks_msg = True
-		if thanks_msg:
-			print('Thank you, notes entered into log at ' + self.xytest_conf.filename)   
+			while note:
+				self.logwrite('user-entry: OBSERVATION/NOTE: ' + note)
+				notes.append(note)
+				note = input('observation/note: ')
+				thanks_msg = True
+			if thanks_msg:
+				print('Thank you, notes entered into log at ' + self.xytest_conf.filename)
+
 		return notes
 
 	def run_range_measurement(self, loop_number):
