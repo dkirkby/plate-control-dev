@@ -51,7 +51,7 @@ else:
 # import posmovemeasure
 # import posconstants as pc
 # import summarizer
-# import numpy as np
+import numpy as np
 # import time
 # import pos_xytest_plot
 import configobj
@@ -68,7 +68,7 @@ if __name__=="__main__":
 	if 'TEST_TEMP_PATH' not in os.environ:
 		os.environ['TEST_TEMP_PATH'] = os.path.abspath('../fp_temp_files/')
 
-	hwsetup_conf = os.path.abspath('../fp_settings/hwsetups/hwsetup_LBNL0_sim.conf')
+	hwsetup_conf = os.path.abspath('../fp_settings/hwsetups/hwsetup_UM3.conf')
 	xytest_conf = os.path.abspath('../fp_settings/test_settings/xytest_lbnl3_anticol.conf')
 
 	print("")
@@ -79,14 +79,16 @@ if __name__=="__main__":
 	print("")
 
 	test = XYTest(hwsetup_conf=hwsetup_conf,xytest_conf=xytest_conf,USE_LOCAL_PRESETS=USE_LOCAL_PRESETS)
-	test.m.petals[0].collider.keepout_PTL.points = test.m.petals[0].collider.keepout_PTL.points / 9
+	test.m.petals[0].collider.keepout_PTL.points =  (test.m.petals[0].collider.keepout_PTL.points / 20) + 50
+	test.m.petals[0].collider.keepout_GFA.points = test.m.petals[0].collider.keepout_GFA.points - np.asarray([[200],[70]])
 	anticol = test.m.petals[0].schedule.anticol
-	anticol.make_animations = True
-	anticol.plotting = True
+	anticol.make_animations = False
+	anticol.plotting = False
 	anticol.verbose = True
 	anticol.create_debug_outputs = False
-	anticol.astar_plotting = True
+	anticol.astar_plotting = False
 	anticol.use_pdb = True
+	anticol.debug = True
 
 	test.logwrite('Start of positioner performance test.')
 	for loop_num in range(test.starting_loop_number, test.n_loops):
