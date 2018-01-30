@@ -359,7 +359,7 @@ class PosMoveMeasure(object):
 			data[posid]['petal'].set(posid,parameter_name,total_angle)
 		self.commit(log_note='range measurement complete')
 		self.rehome(posids)
-		self.one_point_calibration(posids, mode='posTP')
+		self.one_point_calibration(posids=posids, mode='posTP')
 
 	def calibrate(self,posids='all',mode='arc',save_file_dir='./',save_file_timestamp='sometime',keep_phi_within_Eo=True):
 		"""Do a series of test points to measure and calulate positioner center
@@ -385,7 +385,7 @@ class PosMoveMeasure(object):
 
 		# 'rough' calibration is ALWAYS run
 		self.rehome(posids)
-		self.one_point_calibration(posids, mode='offsetsXY',posids=posids)
+		self.one_point_calibration(mode='offsetsXY',posids=posids)
 		posids_by_ptl = self.pos_data_listed_by_ptl(posids,'POS_ID')
 		for petal in posids_by_ptl.keys():
 			these_posids = posids_by_ptl[petal]
@@ -393,7 +393,7 @@ class PosMoveMeasure(object):
 			for key in keys_to_reset:
 				petal.set(these_posids,key,pc.nominals[key]['value'])
 		self.commit(log_note='rough calibration complete')
-		self.one_point_calibration(posids, mode='offsetsTP', posids=posids)        
+		self.one_point_calibration(mode='offsetsTP', posids=posids)        
 			
 		# now do arc or grid calibrations
 		if mode == 'arc' or mode == 'grid':
@@ -424,7 +424,7 @@ class PosMoveMeasure(object):
 					files.add(file)
 					
 		# lastly update the internally-tracked theta and phi shaft angles
-		self.one_point_calibration(posids, mode='posTP', posids=posids)
+		self.one_point_calibration(mode='posTP', posids=posids)
 		
 		# commit data and return
 		self.commit(log_note='full calibration complete')
