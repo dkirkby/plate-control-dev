@@ -123,8 +123,8 @@ class PosSchedule(object):
         elif anticollision:
             ## Note the use of non-functioning anticollision code! Only for testing purposes
             ## Note the Positioners COULD collide using this function
-            #self._schedule_without_anticollision_butwith_RRrE()
-            self._schedule_with_anticollision()
+            self._schedule_without_anticollision_butwith_RRrE()
+            #self._schedule_with_anticollision()
         else:
             self._schedule_without_anticollision()
         if self.anticol.debug:
@@ -564,6 +564,9 @@ class PosSchedule(object):
         # Larger phis are more tucked in, check if they are all tucked in enough
         # Ei is the more tucked in, extremem case
         phis = np.asarray([tp[pc.P] for tp in tpss.values()])
+        # BUG ALERT #
+        # phis is an array of None's
+        # BUG AlERT
         if step.lower() == 'rotate' and np.all(phis>=self.collider.Eo_phi):
            print("You want me to correct rotational collisions when all the phi motors are tucked in.")
            print("Sorry I can't help")
@@ -599,10 +602,11 @@ class PosSchedule(object):
         all_numeric_indices = []
         for ab in collision_indices:
             all_numeric_indices.extend(ab)
-
-        all_numeric_indices = np.unique(all_numeric_indices)
-        if None in all_numeric_indices:
-            all_numeric_indices.pop(all_numeric_indices.index(None))
+        ### MS 180124: fixed the problem of multiple 'None' in list
+        all_numeric_indices=[e for e in all_numeric_indices if e is not None]
+        all_numeric_indices = np.unique(all_numeric_indices)    
+        #if None in all_numeric_indices:
+        #    all_numeric_indices.pop(all_numeric_indices.index(None))
 
         altered_pos = [-99]
         stallmovetimes = [0]
@@ -1429,7 +1433,7 @@ class Anticol:
         self.plotting = False
         self.make_animations = False
         self.use_pdb = False
-        self.debug = False
+        self.debug = True
         self.collider = collider
 
         self._update_positioner_properties()

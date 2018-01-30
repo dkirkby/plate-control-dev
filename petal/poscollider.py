@@ -18,6 +18,7 @@ class PosCollider(object):
             filename = os.path.join(pc.dirs['collision_settings'],defaultconfigfile)
         else:
             filename = os.path.join(pc.dirs['collision_settings'],configfile)
+        print("Filename", filename)    
         self.config = configobj.ConfigObj(filename,unrepr=True)
         self.posids = [] # list of posid strings for all the positioners
         self.posmodels = {} # key: posid string, value: posmodel instance
