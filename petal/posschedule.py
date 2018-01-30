@@ -115,6 +115,9 @@ class PosSchedule(object):
         If there were ANY pre-existing move tables in the list, then ALL the target
         requests are ignored, and the anticollision algorithm is NOT performed.
         """
+        if self.anticol.debug:
+            reqs = self.requests.copy()
+
         if self.move_tables:
             return
         elif anticollision:
@@ -124,6 +127,49 @@ class PosSchedule(object):
             self._schedule_with_anticollision()
         else:
             self._schedule_without_anticollision()
+        if self.anticol.debug:
+            print("\n\n\nResulting Schedules:")
+            for table in self.move_tables:
+                schedule = table.full_table
+                posid = table.posmodel.posid
+
+                req = reqs[posid]
+                posmodel = req['posmodel']
+
+                if posmodel != table.posmodel:
+                    print('Posmodels didnt match for posid: {}'.format(posid))
+
+                start_obsTP = posmodel.trans.posTP_to_obsTP(req['start_posTP'])
+                final_obsTP = posmodel.trans.posTP_to_obsTP(req['targt_posTP'])
+                start_flatXY = posmodel.trans.posTP_to_flatXY(req['start_posTP'])
+                final_flatXY = posmodel.trans.posTP_to_flatXY(req['targt_posTP'])
+
+                stats = schedule['stats']
+                beginning = posmodel.expected_current_position
+                begin_posTP = [beginning['posT'],beginning['posP']]
+                begin_obsTP = [beginning['obsT'],beginning['obsP']] #posmodel.trans.posTP_to_obsTP(begin_posTP)
+                begin_flatXY = posmodel.trans.posTP_to_flatXY(begin_posTP)
+                end_posTP = posmodel.trans.addto_posTP(begin_posTP,[stats['net_dT'][-1],stats['net_dP'][-1]],range_wrap_limits='targetable')
+                end_flatXY = posmodel.trans.posTP_to_flatXY(end_posTP)
+                end_obsTP = posmodel.trans.posTP_to_obsTP(end_posTP)
+
+                #dt,dp = stats['net_dT'][-1],stats['net_dP'][-1]
+                # stats = {
+                #     'net_time': [], 'net_dT': [], 'net_dP': [], 'Q': [], 'S': [], 'obsX': [], 'obsY': [], 'posX': [],
+                #     'posY': [], 'obsT': [], 'obsP': [], 'posT': [], 'posP': [],
+                #     'TOTAL_CRUISE_MOVES_T': 0, 'TOTAL_CRUISE_MOVES_P': 0, 'TOTAL_CREEP_MOVES_T': 0,
+                #     'TOTAL_CREEP_MOVES_P': 0
+
+                print('  posid: {}'.format(posid))
+                print('\tRequested start: obstp=({:0.04f},{:0.04f}) flatxy=({:0.04f},{:0.04f})'.format( start_obsTP[0],start_obsTP[1], \
+                                                                                    start_flatXY[0],start_flatXY[1]))
+                print('\tScheduled start: obstp=({:0.04f},{:0.04f}) flatxy=({:0.04f},{:0.04f})'.format( begin_obsTP[0],begin_obsTP[1], \
+                                                                                    begin_flatXY[0],begin_flatXY[1]))
+                print('\tRequested end  : obstp=({:0.04f},{:0.04f}) flatxy=({:0.04f},{:0.04f})'.format(final_obsTP[0],final_obsTP[1], \
+                                                                                   final_flatXY[0],final_flatXY[1]))
+                print('\tScheduled end  : obstp=({:0.04f},{:0.04f}) flatxy=({:0.04f},{:0.04f})'.format(end_obsTP[0],end_obsTP[1], \
+                                                                                   end_flatXY[0],end_flatXY[1]))
+            print("\n\n\n\n")
 
     def total_dtdp(self, posid):
         """Return as-scheduled total move distance for positioner identified by posid.
@@ -215,7 +261,7 @@ class PosSchedule(object):
             tps = posmodel.trans.posTP_to_obsTP(req['start_posTP'])
             tpf = posmodel.trans.posTP_to_obsTP(req['targt_posTP'])
             RRrE, tpsi, tpfi = self._create_table_RRrEdict(tps, tpf, posmodel)
-            RRrE['extend'] = self._reverse_for_extension([RRrE['extend']])[0]
+            RRrE['extend'] = self._reverse_for_extension({posmodel.posid: RRrE['extend']})[posmodel.posid]
 
             table = self._combine_single_table(RRrE)
             table.store_orig_command(0, req['command'], req['cmd_val1'], req['cmd_val2'])
@@ -890,7 +936,7 @@ class PosSchedule(object):
                     print("Failed to find a solution. Nothing has been changed for positioners {} and {}".format(A,B))
         ## end of while loop over all collisions
 
-        if self.anticol.create_debug_outputs:
+        if self.anticol.debug:
             with open(os.path.join(self.anticol.anim_save_folder,
                                    'run_results__{0}.csv'.format(self.anticol.anim_save_number)), 'w') as runresultsfile:
                 keys = np.sort(list(run_results.keys()))
@@ -1382,8 +1428,8 @@ class Anticol:
         self.verbose = verbose
         self.plotting = False
         self.make_animations = False
-        self.create_debug_outputs = False
         self.use_pdb = False
+        self.debug = False
         self.collider = collider
 
         self._update_positioner_properties()
