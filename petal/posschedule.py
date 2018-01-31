@@ -123,12 +123,15 @@ class PosSchedule(object):
         elif anticollision:
             ## Note the use of non-functioning anticollision code! Only for testing purposes
             ## Note the Positioners COULD collide using this function
-            self._schedule_without_anticollision_butwith_RRrE()
-            #self._schedule_with_anticollision()
+            #self._schedule_without_anticollision_butwith_RRrE()
+            self._schedule_with_anticollision()
         else:
             self._schedule_without_anticollision()
         if self.anticol.debug:
             print("\n\n\nResulting Schedules:")
+            #for i in range(len(self.move_tables)):
+            #    #self.move_tables[i].set_postpause(0, 1.29848972)
+            #    self.move_tables[i].set_prepause(0, 0.00523 )
             for table in self.move_tables:
                 schedule = table.full_table
                 posid = table.posmodel.posid
@@ -141,40 +144,40 @@ class PosSchedule(object):
 
                 start_obsTP = posmodel.trans.posTP_to_obsTP(req['start_posTP'])
                 final_obsTP = posmodel.trans.posTP_to_obsTP(req['targt_posTP'])
-                start_flatXY = posmodel.trans.posTP_to_flatXY(req['start_posTP'])
-                final_flatXY = posmodel.trans.posTP_to_flatXY(req['targt_posTP'])
+                start_obsXY = posmodel.trans.posTP_to_obsXY(req['start_posTP'])
+                final_obsXY = posmodel.trans.posTP_to_obsXY(req['targt_posTP'])
 
                 stats = schedule['stats']
                 beginning = posmodel.expected_current_position
                 begin_posTP = [beginning['posT'],beginning['posP']]
                 begin_obsTP = [beginning['obsT'],beginning['obsP']] #posmodel.trans.posTP_to_obsTP(begin_posTP)
-                begin_flatXY = posmodel.trans.posTP_to_flatXY(begin_posTP)
+                begin_obsXY = posmodel.trans.posTP_to_obsXY(begin_posTP)
                 end_posTP = posmodel.trans.addto_posTP(begin_posTP,[stats['net_dT'][-1],stats['net_dP'][-1]],range_wrap_limits='targetable')
-                end_flatXY = posmodel.trans.posTP_to_flatXY(end_posTP)
+                end_obsXY = posmodel.trans.posTP_to_obsXY(end_posTP)
                 end_obsTP = posmodel.trans.posTP_to_obsTP(end_posTP)
                 print('  posid: {}'.format(posid))
-                print('\tRequested start: obstp=({:0.04f},{:0.04f}) flatxy=({:0.04f},{:0.04f})'.format( start_obsTP[0],start_obsTP[1], \
-                                                                                    start_flatXY[0],start_flatXY[1]))
-                print('\tScheduled start: obstp=({:0.04f},{:0.04f}) flatxy=({:0.04f},{:0.04f})'.format( begin_obsTP[0],begin_obsTP[1], \
-                                                                                    begin_flatXY[0],begin_flatXY[1]))
-                print('\tRequested end  : obstp=({:0.04f},{:0.04f}) flatxy=({:0.04f},{:0.04f})'.format(final_obsTP[0],final_obsTP[1], \
-                                                                                   final_flatXY[0],final_flatXY[1]))
-                print('\tScheduled end  : obstp=({:0.04f},{:0.04f}) flatxy=({:0.04f},{:0.04f})'.format(end_obsTP[0],end_obsTP[1], \
-                                                                                   end_flatXY[0],end_flatXY[1]))
-
-                # table['motor_steps_T'],
-                # table['motor_steps_P'],
-                # table['speed_mode_T'],
-                # table['speed_mode_P'],
+                print('\tRequested start: obstp=({:0.04f},{:0.04f}) obsxy=({:0.04f},{:0.04f})'.format( start_obsTP[0],start_obsTP[1], \
+                                                                                    start_obsXY[0],start_obsXY[1]))
+                print('\tScheduled start: obstp=({:0.04f},{:0.04f}) obsxy=({:0.04f},{:0.04f})'.format( begin_obsTP[0],begin_obsTP[1], \
+                                                                                    begin_obsXY[0],begin_obsXY[1]))
+                print('\tRequested end  : obstp=({:0.04f},{:0.04f}) obsxy=({:0.04f},{:0.04f})'.format(final_obsTP[0],final_obsTP[1], \
+                                                                                   final_obsXY[0],final_obsXY[1]))
+                print('\tScheduled end  : obstp=({:0.04f},{:0.04f}) obsxy=({:0.04f},{:0.04f})'.format(end_obsTP[0],end_obsTP[1], \
+                                                                                   end_obsXY[0],end_obsXY[1]))
                 print("\tTable Data:")
-                for i in range(schedule['nrows']):
-                    if i == 0:
-                        print("\t\tCommands: {}  val1:{:.06f} val2:{:.06f}".format(schedule['command'][i],schedule['cmd_val1'][i],schedule['cmd_val2'][i]))
+                print("\t\tCommands: {}  val1:{:.06f} val2:{:.06f}".format(schedule['command'][0],schedule['cmd_val1'][0],schedule['cmd_val2'][0]))
+                print("\t\tIn scheduler:")
+                for i in range(schedule['nrows']):    
                     angle_tup = (schedule[key][i] for key in ['dT', 'dP', 'Tdot', 'Pdot'])
-                    motor_tup = (schedule[key][i] for key in ['motor_steps_T', 'motor_steps_P', 'speed_mode_T', 'speed_mode_P'])
                     timing_tup = (schedule[key][i] for key in ['prepause','move_time','postpause'])
                     print("\t\tRow {}: dT={:.04f}   dP={:.04f}   Tdot={:.02f}   Pdot={:.02f}".format(i,*angle_tup))
                     print("\t\t       Prepause={:.04f}   movetime={:.04f}   Postpause={:.04f}".format(*timing_tup))
+                schedule = table.for_hardware
+                print("\t\tFor Hardware:")
+                for i in range(schedule['nrows']):    
+                    motor_tup = (schedule[key][i] for key in ['motor_steps_T', 'motor_steps_P', 'speed_mode_T', 'speed_mode_P'])
+                    timing_tup = (schedule[key][i] for key in ['move_time','postpause'])
+                    print("\t\tRow {}: movetime={:.04f}   Postpause={:.04f}".format(i,*timing_tup))
                     print("\t\t       Tmotsteps={}   Pmotsteps={}   Tspeedmode={}   Pspeedmode={}".format(*motor_tup))
 
             print("\n\n\n\n")

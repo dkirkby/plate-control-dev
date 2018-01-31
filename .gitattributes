@@ -4,6 +4,8 @@ bin/petalcontroller -text
 petal/_deprecated_posschedule.py -text
 petal/anticol_sim.py -text
 petal/bidirect_astar.py -text
+petal/extra_debug_acnopauses.txt -text
+petal/extra_debug_noacmultistep.txt -text
 petal/focal_surface_lookup.csv -text
 petal/petal.py -text
 petal/petalcomm.py -text
