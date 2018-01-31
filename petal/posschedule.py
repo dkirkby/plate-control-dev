@@ -152,14 +152,6 @@ class PosSchedule(object):
                 end_posTP = posmodel.trans.addto_posTP(begin_posTP,[stats['net_dT'][-1],stats['net_dP'][-1]],range_wrap_limits='targetable')
                 end_flatXY = posmodel.trans.posTP_to_flatXY(end_posTP)
                 end_obsTP = posmodel.trans.posTP_to_obsTP(end_posTP)
-
-                #dt,dp = stats['net_dT'][-1],stats['net_dP'][-1]
-                # stats = {
-                #     'net_time': [], 'net_dT': [], 'net_dP': [], 'Q': [], 'S': [], 'obsX': [], 'obsY': [], 'posX': [],
-                #     'posY': [], 'obsT': [], 'obsP': [], 'posT': [], 'posP': [],
-                #     'TOTAL_CRUISE_MOVES_T': 0, 'TOTAL_CRUISE_MOVES_P': 0, 'TOTAL_CREEP_MOVES_T': 0,
-                #     'TOTAL_CREEP_MOVES_P': 0
-
                 print('  posid: {}'.format(posid))
                 print('\tRequested start: obstp=({:0.04f},{:0.04f}) flatxy=({:0.04f},{:0.04f})'.format( start_obsTP[0],start_obsTP[1], \
                                                                                     start_flatXY[0],start_flatXY[1]))
@@ -169,6 +161,22 @@ class PosSchedule(object):
                                                                                    final_flatXY[0],final_flatXY[1]))
                 print('\tScheduled end  : obstp=({:0.04f},{:0.04f}) flatxy=({:0.04f},{:0.04f})'.format(end_obsTP[0],end_obsTP[1], \
                                                                                    end_flatXY[0],end_flatXY[1]))
+
+                # table['motor_steps_T'],
+                # table['motor_steps_P'],
+                # table['speed_mode_T'],
+                # table['speed_mode_P'],
+                print("\tTable Data:")
+                for i in range(schedule['nrows']):
+                    if i == 0:
+                        print("\t\tCommands: {}  val1:{:.06f} val2:{:.06f}".format(schedule['command'][i],schedule['cmd_val1'][i],schedule['cmd_val2'][i]))
+                    angle_tup = (schedule[key][i] for key in ['dT', 'dP', 'Tdot', 'Pdot'])
+                    motor_tup = (schedule[key][i] for key in ['motor_steps_T', 'motor_steps_P', 'speed_mode_T', 'speed_mode_P'])
+                    timing_tup = (schedule[key][i] for key in ['prepause','move_time','postpause'])
+                    print("\t\tRow {}: dT={:.04f}   dP={:.04f}   Tdot={:.02f}   Pdot={:.02f}".format(i,*angle_tup))
+                    print("\t\t       Prepause={:.04f}   movetime={:.04f}   Postpause={:.04f}".format(*timing_tup))
+                    print("\t\t       Tmotsteps={}   Pmotsteps={}   Tspeedmode={}   Pspeedmode={}".format(*motor_tup))
+
             print("\n\n\n\n")
 
     def total_dtdp(self, posid):
@@ -1498,7 +1506,7 @@ class Anticol:
         #anim_beginning = os.path.join(anim_save_folder,anim_save_prefix)
         self.anim_template = anim_save_prefix + '{savenum}.mp4'
         self.anim_save_number = 0
-        if self.plotting == True and not os.path.exists(self.anim_save_folder):
+        if self.make_animations == True and not os.path.exists(self.anim_save_folder):
             os.makedirs(self.anim_save_folder)
 
         ##############################################
