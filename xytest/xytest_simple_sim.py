@@ -2,6 +2,8 @@
 
 import sys
 import os
+import datetime
+
 if "TEST_LOCATION" in os.environ and os.environ['TEST_LOCATION']=='Michigan':
 	basepath=os.environ['TEST_BASE_PATH']+'plate_control/'+os.environ['TEST_TAG']
 	sys.path.append(os.path.abspath(basepath+'/petal/'))
@@ -81,15 +83,7 @@ if __name__=="__main__":
 	test = XYTest(hwsetup_conf=hwsetup_conf,xytest_conf=xytest_conf,USE_LOCAL_PRESETS=USE_LOCAL_PRESETS)
 	test.m.petals[0].collider.keepout_PTL.points =  (test.m.petals[0].collider.keepout_PTL.points / 20) + 50
 	test.m.petals[0].collider.keepout_GFA.points = test.m.petals[0].collider.keepout_GFA.points - np.asarray([[200],[70]])
-	anticol = test.m.petals[0].schedule.anticol
-	anticol.make_animations = False
-	anticol.plotting = False
-	anticol.verbose = True
-	anticol.create_debug_outputs = False
-	anticol.astar_plotting = False
-	anticol.use_pdb = True
-	anticol.debug = True
-
+	anim_save_folder = os.path.abspath(os.path.join('..', 'figures', datetime.datetime.now().strftime('%Y%m%d%H%M')))
 	test.logwrite('Start of positioner performance test.')
 	for loop_num in range(test.starting_loop_number, test.n_loops):
 		test.xytest_conf['current_loop_number'] = loop_num
@@ -98,6 +92,17 @@ if __name__=="__main__":
 		test.set_current_overrides(loop_num)
 		test.run_range_measurement(loop_num)
 		test.run_calibration(loop_num)
+		anticol = test.m.petals[0].schedule.anticol
+		anticol.make_animations = False
+		anticol.plotting = False
+		anticol.verbose = True
+		anticol.astar_plotting = True
+		anticol.use_pdb = True
+		anticol.debug = True
+		anticol.anim_save_folder = os.path.join(anim_save_folder,'movenumber_{}'.format(loop_num))
+		test.m.petals[0].schedule.anticol = anticol
+		if not os.path.exists(anticol.anim_save_folder):
+			os.makedirs(anticol.anim_save_folder)
 		test.run_xyaccuracy_test(loop_num)
 		test.run_unmeasured_moves(loop_num)
 		test.run_hardstop_strikes(loop_num)

@@ -388,32 +388,9 @@ class XYTest(object):
 			file.close()
 		
 		# transform test grid to each positioner's global position, and create all the move request dictionaries
-		all_targets = []
-		if self.xytest_conf['shuffle_targets']:
-			xytargets_dict = {} #Different targets for different positioners
-			np.random.seed(int(self.xytest_conf['shuffle_seed'][loop_number]))
-			for posid in self.posids: #Loop through posids to generate unique targets to positioners
-				if not(int(self.xytest_conf['shuffle_seed'][loop_number])):
-					np.random.seed(int(posid[1:]))
-				shuffled_targets = list(local_targets)
-				np.random.shuffle(shuffled_targets)
-				xytargets_dict[posid] = shuffled_targets
-			for i in range(len(local_targets)): #Build these_targets to assign targets to positoners
-				these_targets = {}
-				for posid in self.posids:
-					trans = self.m.trans(posid)
-					these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(xytargets_dict[posid][i])}
-				all_targets.append(these_targets)
-		else:
-			for local_target in local_targets:
-				these_targets = {}
-				for posid in self.posids:
-					trans = self.m.trans(posid)
-					these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(local_target)}
-				all_targets.append(these_targets)
+		all_targets = self.generate_move_requests(local_targets, loop_number, move_coords='obsXY')
 			
 		# initialize some data structures for storing test data
-		targ_num = 0
 		all_data_by_target = []
 		all_data_by_posid = {}
 		start_cycles = {}
@@ -426,12 +403,11 @@ class XYTest(object):
 		# run the test
 		try:  
 			start_time = time.time()
-			for these_targets in all_targets:
-				targ_num += 1
+			for targ_num, these_targets in enumerate(all_targets):
 				print('')
-				self.logwrite('MEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets)))
+				self.logwrite('MEASURING TARGET ' + str(targ_num+1) + ' OF ' + str(len(all_targets)))
 				if not(self.xytest_conf['shuffle_targets']): #Only write this line if not shuffling
-					self.logwrite('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
+					self.logwrite('Local target (posX,posY)=(' + format(local_targets[targ_num][0],'.3f') + ',' + format(local_targets[targ_num][1],'.3f') + ') for each positioner.')
 				this_timestamp = pc.timestamp_str_now()
 				these_meas_data = self.m.move_and_correct(these_targets, num_corr_max)
 				
@@ -691,7 +667,7 @@ class XYTest(object):
 			return True
 		return False
 	
-	def generate_posXY_move_requests(self, xytargets_list):
+	def generate_move_requests(self, xytargets_list, loop_number=0, move_coords='obsXY'):
 		"""For a list of local xy targets, make a list of move request dictionaries.
 		Each dictionary contains the move requests to move all the positioners to that
 		location in their respective patrol disks.
@@ -699,25 +675,129 @@ class XYTest(object):
 		requests = []
 		if self.xytest_conf['shuffle_targets']:
 			xytargets_dict = {} #Different targets for different positioners
-			np.random.seed(int(self.xytest_conf['shuffle_seed'][loop_number]))
+			randomizer = np.random.RandomState(self.xytest_conf['shuffle_seed'][loop_number])
+			#np.random.seed(int(self.xytest_conf['shuffle_seed'][loop_number]))
 			for posid in sorted(self.posids): #Loop through posids to generate unique targets to positioners
 				if not(int(self.xytest_conf['shuffle_seed'][loop_number])):
 					np.random.seed(int(posid[1:]))
 				shuffled_targets = list(xytargets_list)
-				np.random.shuffle(shuffled_targets)
+				randomizer.shuffle(shuffled_targets)
 				xytargets_dict[posid] = shuffled_targets
 			for i in range(len(xytargets_list)): #Build these_targets to assign targets to positoners
-				these_targets = {}
-				for posid in sorted(self.posids):
-					these_targets[posid] = {'command':'posXY', 'target':xytargets_dict[posid][i]}
-				requests.append(these_targets)
+				xytargets_dict, new_request_set, solutions = self.create_noncolliding_random_state(xytargets_dict, typ=move_coords)
+				if np.all(solutions):
+					requests.append(new_request_set)
+				else:
+					pass
+			if self.m.petals[0].schedule.anticol.debug:
+				xtargs,ytargs = {},{}
+				for posid in requests[0].keys():
+					xtargs[posid] = []
+					ytargs[posid] = []
+				for request in requests:
+					for posid,req in request.items():
+						xtargs[posid].append(req['target'][0])
+						ytargs[posid].append(req['target'][1])
+				import matplotlib.pyplot as plt
+				plt.figure()
+				plt.axis('equal')
+				for posid in xtargs.keys():
+					plt.plot(xtargs[posid],ytargs[posid],'.',label=posid)
+				plt.legend(loc='best')
+				plt.axis('equal')
+				plt.show()
 		else:
 			for local_target in xytargets_list:
 				these_targets = {}
 				for posid in sorted(self.posids):
-					these_targets[posid] = {'command':'posXY', 'target':local_target}
+					posmod_trans = self.petals[0].collider.posmodels[posid].trans
+					obsXY = posmod_trans.posXY_to_obsXY(local_target)
+					#these_targets[posid] = {'command':'posXY', 'target':local_target}
+					these_targets[posid] = {'command': 'obsXY', 'target': obsXY}
 				requests.append(these_targets)
 		return requests
+
+	def create_noncolliding_random_state(self, remaining_targets, typ='obsXY'):
+		'''
+        Function that selects theta,phi pairs for each positioner that do not overlap with neighbors
+        :param poscols: poscollider class instance with positioners loaded
+        :param posmodels: posmodels corresponding to all the positioners
+        :param typ: whether you want obsTP coordinate system or posTP
+
+        :return:  tp array where each index corresponds to a tp value in 'typ' coordinate system for
+                    the positioner defined by the posmodel at the same index
+        '''
+		## Choose the number of attempts to try
+		poscols = self.m.petals[0].collider
+		posmodels = poscols.posmodels
+		posids = self.m.petals[0].posids
+		used_posids = set()
+		solutions = []
+		tp_obs = {}
+		## Loop over posmodels. Iterative since we need to add positioners one at a time
+		## to ensure they won't collider
+		for posid, target_options in remaining_targets.items():
+			posmod = posmodels[posid]
+			used_posids.add(posid)
+			for i, xytarg in enumerate(target_options):
+				solution_found = True
+
+				## Get targetable ranges and convert to obsTP coordinate system
+				tppos, unreachable = posmod.trans.posXY_to_posTP(xytarg,range_limits='targetable')
+				if unreachable:
+					continue
+				tpobs = posmod.trans.posTP_to_obsTP(tppos)
+
+				## Check if current position is safe with respect to fixed targets
+				result_fixed = poscols.spatial_collision_with_fixed(posid, tpobs)
+				## If collision occurs, try next location in new iteration of loop
+				if result_fixed != pc.case.I:
+					solution_found = False
+					continue
+
+				## Get id's of positioners that would have been assigned earlier
+				neigh_ids = set(poscols.pos_neighbors[posid])
+				ids_to_check = used_posids.intersection(neigh_ids)
+				## Loop over already assigned positioners to test for collisions
+				for posid2 in ids_to_check:
+					result = poscols.spatial_collision_between_positioners(posid, posid2, tpobs, tp_obs[posid2])
+					## If collision occurs, try next location in new iteration of loop
+					if result != pc.case.I:
+						solution_found = False
+						break
+				## If the flag hasn't been changed, then no collisions exist,
+				## we've found our solution, and we can break this loop.
+				if solution_found:
+					tp_obs[posid] = tpobs
+					remaining_targets[posid].pop(i)
+					break
+				else:
+					continue
+			solutions.append(solution_found)
+
+		## If either of the above loops has found a solution, append it to the results and continue to the next positioners
+		## Else raise an error because we can't proceed
+		if not np.all(solutions):
+			import pdb
+			pdb.set_trace()
+
+		new_requests = {}
+		for posid, obstp in tp_obs.items():
+			posmod = poscols.posmodels[posid]
+			out = []
+			if typ == 'obsTP':
+				out = obstp
+			else:
+				postp = posmod.trans.obsTP_to_posTP(obstp)
+				if typ == 'posTP':
+					out = postp
+				elif typ == 'posXY':
+					out = posmod.trans.posTP_to_posXY(postp)
+				elif typ == 'obsXY':
+					out = posmod.trans.posTP_to_obsXY(postp)
+			new_requests[posid] = {'command': typ, 'target': out}
+
+		return remaining_targets, new_requests, solutions
 
 	def track_file(self, filename, commit='always'):
 		"""Use this to put new filenames into the list of new and changed files we keep track of.
