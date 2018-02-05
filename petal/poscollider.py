@@ -126,8 +126,8 @@ class PosCollider(object):
             init_obsTPs = [init_obsTP_A,init_obsTP_B]
             tables = [tableA,tableB]
             sweeps = [PosSweep(posid_A),PosSweep(posid_B)]
-            steps_remaining = [0]*2
-            step = [0] * 2
+            steps_remaining = [0,0]
+            step = [0,0]
         else:
             init_obsTPs = [init_obsTP_A]
             tables = [tableA]
@@ -175,20 +175,21 @@ class PosCollider(object):
         """
         if obsTP_A[1] >= self.Eo_phi and obsTP_B[1] >= self.Eo_phi:
             return pc.case.I
+        ### Note to check to make sure A and B are asigned to correct case, had to swap inds to correct bug
         elif obsTP_A[1] < self.Eo_phi and obsTP_B[1] >= self.Ei_phi: # check case IIIA
             if self._case_III_collision(posid_A, posid_B, obsTP_A, obsTP_B[0]):
                 return pc.case.IIIA
             else:
                 return pc.case.I
         elif obsTP_B[1] < self.Eo_phi and obsTP_A[1] >= self.Ei_phi: # check case IIIB
-            if self._case_III_collision(posid_A, posid_B, obsTP_B, obsTP_A[0]):
+            if self._case_III_collision(posid_B, posid_A, obsTP_B, obsTP_A[0]):
                 return pc.case.IIIB
             else:
                 return pc.case.I
         else: # check cases II and III
             if self._case_III_collision(posid_A, posid_B, obsTP_A, obsTP_B[0]):
                 return pc.case.IIIA
-            elif self._case_III_collision(posid_A, posid_B, obsTP_B, obsTP_A[0]):
+            elif self._case_III_collision(posid_B, posid_A, obsTP_B, obsTP_A[0]):
                 return pc.case.IIIB
             elif self._case_II_collision(posid_A, posid_B, obsTP_A, obsTP_B):
                 return pc.case.II

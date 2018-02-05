@@ -127,60 +127,60 @@ class PosSchedule(object):
             self._schedule_with_anticollision()
         else:
             self._schedule_without_anticollision()
-        if self.anticol.debug:
-            print("\n\n\nResulting Schedules:")
-            #for i in range(len(self.move_tables)):
-            #    #self.move_tables[i].set_postpause(0, 1.29848972)
-            #    self.move_tables[i].set_prepause(0, 0.00523 )
-            for table in self.move_tables:
-                schedule = table.full_table
-                posid = table.posmodel.posid
-
-                req = reqs[posid]
-                posmodel = req['posmodel']
-
-                if posmodel != table.posmodel:
-                    print('Posmodels didnt match for posid: {}'.format(posid))
-
-                start_obsTP = posmodel.trans.posTP_to_obsTP(req['start_posTP'])
-                final_obsTP = posmodel.trans.posTP_to_obsTP(req['targt_posTP'])
-                start_obsXY = posmodel.trans.posTP_to_obsXY(req['start_posTP'])
-                final_obsXY = posmodel.trans.posTP_to_obsXY(req['targt_posTP'])
-
-                stats = schedule['stats']
-                beginning = posmodel.expected_current_position
-                begin_posTP = [beginning['posT'],beginning['posP']]
-                begin_obsTP = [beginning['obsT'],beginning['obsP']] #posmodel.trans.posTP_to_obsTP(begin_posTP)
-                begin_obsXY = posmodel.trans.posTP_to_obsXY(begin_posTP)
-                end_posTP = posmodel.trans.addto_posTP(begin_posTP,[stats['net_dT'][-1],stats['net_dP'][-1]],range_wrap_limits='targetable')
-                end_obsXY = posmodel.trans.posTP_to_obsXY(end_posTP)
-                end_obsTP = posmodel.trans.posTP_to_obsTP(end_posTP)
-                print('  posid: {}'.format(posid))
-                print('\tRequested start: obstp=({:0.04f},{:0.04f}) obsxy=({:0.04f},{:0.04f})'.format( start_obsTP[0],start_obsTP[1], \
-                                                                                    start_obsXY[0],start_obsXY[1]))
-                print('\tScheduled start: obstp=({:0.04f},{:0.04f}) obsxy=({:0.04f},{:0.04f})'.format( begin_obsTP[0],begin_obsTP[1], \
-                                                                                    begin_obsXY[0],begin_obsXY[1]))
-                print('\tRequested end  : obstp=({:0.04f},{:0.04f}) obsxy=({:0.04f},{:0.04f})'.format(final_obsTP[0],final_obsTP[1], \
-                                                                                   final_obsXY[0],final_obsXY[1]))
-                print('\tScheduled end  : obstp=({:0.04f},{:0.04f}) obsxy=({:0.04f},{:0.04f})'.format(end_obsTP[0],end_obsTP[1], \
-                                                                                   end_obsXY[0],end_obsXY[1]))
-                print("\tTable Data:")
-                print("\t\tCommands: {}  val1:{:.06f} val2:{:.06f}".format(schedule['command'][0],schedule['cmd_val1'][0],schedule['cmd_val2'][0]))
-                print("\t\tIn scheduler:")
-                for i in range(schedule['nrows']):    
-                    angle_tup = (schedule[key][i] for key in ['dT', 'dP', 'Tdot', 'Pdot'])
-                    timing_tup = (schedule[key][i] for key in ['prepause','move_time','postpause'])
-                    print("\t\tRow {}: dT={:.04f}   dP={:.04f}   Tdot={:.02f}   Pdot={:.02f}".format(i,*angle_tup))
-                    print("\t\t       Prepause={:.04f}   movetime={:.04f}   Postpause={:.04f}".format(*timing_tup))
-                schedule = table.for_hardware
-                print("\t\tFor Hardware:")
-                for i in range(schedule['nrows']):    
-                    motor_tup = (schedule[key][i] for key in ['motor_steps_T', 'motor_steps_P', 'speed_mode_T', 'speed_mode_P'])
-                    timing_tup = (schedule[key][i] for key in ['move_time','postpause'])
-                    print("\t\tRow {}: movetime={:.04f}   Postpause={:.04f}".format(i,*timing_tup))
-                    print("\t\t       Tmotsteps={}   Pmotsteps={}   Tspeedmode={}   Pspeedmode={}".format(*motor_tup))
-
-            print("\n\n\n\n")
+        # if self.anticol.debug:
+        #     print("\n\n\nResulting Schedules:")
+        #     #for i in range(len(self.move_tables)):
+        #     #    #self.move_tables[i].set_postpause(0, 1.29848972)
+        #     #    self.move_tables[i].set_prepause(0, 0.00523 )
+        #     for table in self.move_tables:
+        #         schedule = table.full_table
+        #         posid = table.posmodel.posid
+        #
+        #         req = reqs[posid]
+        #         posmodel = req['posmodel']
+        #
+        #         if posmodel != table.posmodel:
+        #             print('Posmodels didnt match for posid: {}'.format(posid))
+        #
+        #         start_obsTP = posmodel.trans.posTP_to_obsTP(req['start_posTP'])
+        #         final_obsTP = posmodel.trans.posTP_to_obsTP(req['targt_posTP'])
+        #         start_obsXY = posmodel.trans.posTP_to_obsXY(req['start_posTP'])
+        #         final_obsXY = posmodel.trans.posTP_to_obsXY(req['targt_posTP'])
+        #
+        #         stats = schedule['stats']
+        #         beginning = posmodel.expected_current_position
+        #         begin_posTP = [beginning['posT'],beginning['posP']]
+        #         begin_obsTP = [beginning['obsT'],beginning['obsP']] #posmodel.trans.posTP_to_obsTP(begin_posTP)
+        #         begin_obsXY = posmodel.trans.posTP_to_obsXY(begin_posTP)
+        #         end_posTP = posmodel.trans.addto_posTP(begin_posTP,[stats['net_dT'][-1],stats['net_dP'][-1]],range_wrap_limits='targetable')
+        #         end_obsXY = posmodel.trans.posTP_to_obsXY(end_posTP)
+        #         end_obsTP = posmodel.trans.posTP_to_obsTP(end_posTP)
+        #         print('  posid: {}'.format(posid))
+        #         print('\tRequested start: obstp=({:0.04f},{:0.04f}) obsxy=({:0.04f},{:0.04f})'.format( start_obsTP[0],start_obsTP[1], \
+        #                                                                             start_obsXY[0],start_obsXY[1]))
+        #         print('\tScheduled start: obstp=({:0.04f},{:0.04f}) obsxy=({:0.04f},{:0.04f})'.format( begin_obsTP[0],begin_obsTP[1], \
+        #                                                                             begin_obsXY[0],begin_obsXY[1]))
+        #         print('\tRequested end  : obstp=({:0.04f},{:0.04f}) obsxy=({:0.04f},{:0.04f})'.format(final_obsTP[0],final_obsTP[1], \
+        #                                                                            final_obsXY[0],final_obsXY[1]))
+        #         print('\tScheduled end  : obstp=({:0.04f},{:0.04f}) obsxy=({:0.04f},{:0.04f})'.format(end_obsTP[0],end_obsTP[1], \
+        #                                                                            end_obsXY[0],end_obsXY[1]))
+        #         print("\tTable Data:")
+        #         print("\t\tCommands: {}  val1:{:.06f} val2:{:.06f}".format(schedule['command'][0],schedule['cmd_val1'][0],schedule['cmd_val2'][0]))
+        #         print("\t\tIn scheduler:")
+        #         for i in range(schedule['nrows']):
+        #             angle_tup = (schedule[key][i] for key in ['dT', 'dP', 'Tdot', 'Pdot'])
+        #             timing_tup = (schedule[key][i] for key in ['prepause','move_time','postpause'])
+        #             print("\t\tRow {}: dT={:.04f}   dP={:.04f}   Tdot={:.02f}   Pdot={:.02f}".format(i,*angle_tup))
+        #             print("\t\t       Prepause={:.04f}   movetime={:.04f}   Postpause={:.04f}".format(*timing_tup))
+        #         schedule = table.for_hardware
+        #         print("\t\tFor Hardware:")
+        #         for i in range(schedule['nrows']):
+        #             motor_tup = (schedule[key][i] for key in ['motor_steps_T', 'motor_steps_P', 'speed_mode_T', 'speed_mode_P'])
+        #             timing_tup = (schedule[key][i] for key in ['move_time','postpause'])
+        #             print("\t\tRow {}: movetime={:.04f}   Postpause={:.04f}".format(i,*timing_tup))
+        #             print("\t\t       Tmotsteps={}   Pmotsteps={}   Tspeedmode={}   Pspeedmode={}".format(*motor_tup))
+        #
+        #     print("\n\n\n\n")
 
     def total_dtdp(self, posid):
         """Return as-scheduled total move distance for positioner identified by posid.
@@ -250,34 +250,32 @@ class PosSchedule(object):
         posids = list(self.requests.keys())
         for posid in posids:
             req = self.requests.pop(posid)
-            posmodel = req['posmodel']
-            #print(posmodel.posstate.get('LENGTH_R1'))
-            table = posmovetable.PosMoveTable(posmodel)
-            dtdp = posmodel.trans.delta_posTP(req['targt_posTP'], \
-                        req['start_posTP'], range_wrap_limits='targetable')
-            table.set_move(0, pc.T, dtdp[0])
-            table.set_move(0, pc.P, dtdp[1])
-            table.set_prepause (0, 0.0)
-            table.set_postpause(0, 0.0)
-            table.store_orig_command(0, req['command'], req['cmd_val1'], req['cmd_val2'])
-            table.log_note += (' ' if table.log_note else '') + req['log_note']
+            table = self._create_direct_movetable(req)
             self.move_tables.append(table)
 
-    def _schedule_without_anticollision_butwith_RRrE(self):
-        posids = list(self.requests.keys())
-        for posid in posids:
-            req = self.requests.pop(posid)
-            posmodel = req['posmodel']
 
-            tps = posmodel.trans.posTP_to_obsTP(req['start_posTP'])
-            tpf = posmodel.trans.posTP_to_obsTP(req['targt_posTP'])
-            RRrE, tpsi, tpfi = self._create_table_RRrEdict(tps, tpf, posmodel)
-            RRrE['extend'] = self._reverse_for_extension({posmodel.posid: RRrE['extend']})[posmodel.posid]
+    def _create_direct_movetable(self,request):
+        posmodel = request['posmodel']
+        # print(posmodel.posstate.get('LENGTH_R1'))
+        table = posmovetable.PosMoveTable(posmodel)
+        dtdp = posmodel.trans.delta_posTP(request['targt_posTP'], \
+                                          request['start_posTP'], range_wrap_limits='targetable')
+        table.set_move(0, pc.T, dtdp[0])
+        table.set_move(0, pc.P, dtdp[1])
+        table.set_prepause(0, 0.0)
+        table.set_postpause(0, 0.0)
+        table.store_orig_command(0, request['command'], request['cmd_val1'], request['cmd_val2'])
+        table.log_note += (' ' if table.log_note else '') + request['log_note']
+        return table
 
-            table = self._combine_single_table(RRrE)
-            table.store_orig_command(0, req['command'], req['cmd_val1'], req['cmd_val2'])
-            table.log_note += (' ' if table.log_note else '') + req['log_note']
-            self.move_tables.append(table)
+
+    def _schedule_with_anticollision_direct(self):
+        tables = []
+        for posid,req in self.requests.items():
+            table = self._create_direct_movetable(req)
+            tables.append(table)
+
+        self.move_tables = tables
 
     def _schedule_with_anticollision(self):
         '''
@@ -448,7 +446,11 @@ class PosSchedule(object):
 
         collision_indices, collision_types = self._check_for_collisions(tp_starts, merged_tables)
 
-        merged_tables, zeroed = self._avoid_collisions(merged_tables,posmodels,collision_indices,tpss=tp_starts,algorithm='zeroth_order')
+        ## If no collisions, move directly to the next step
+        if len(collision_indices) > 0:
+            merged_tables, zeroed = self._avoid_collisions(merged_tables,posmodels,collision_indices,tpss=tp_starts,algorithm='zeroth_order')
+        else:
+            zeroed = []
 
         if self.anticol.verbose:
             collision_indices, collision_types = self._check_for_collisions(tp_starts, merged_tables)
@@ -952,19 +954,21 @@ class PosSchedule(object):
         ## end of while loop over all collisions
 
         if self.anticol.debug:
-            with open(os.path.join(self.anticol.anim_save_folder,
-                                   'run_results__{0}.csv'.format(self.anticol.anim_save_number)), 'w') as runresultsfile:
-                keys = np.sort(list(run_results.keys()))
-                line = ''
-                for key in keys:
-                    line += key + ','
-                runresultsfile.write(line[:-1] + '\n')
-                for itt in range(len(run_results['heuristic'])):
+            try:
+                with open(os.path.join(self.anticol.anim_save_folder,'run_results__{0}.csv'.format(self.anticol.anim_save_number)), 'w') as runresultsfile:
+                    keys = np.sort(list(run_results.keys()))
                     line = ''
                     for key in keys:
-                        line += str(run_results[key][itt]) + ','
+                        line += key + ','
                     runresultsfile.write(line[:-1] + '\n')
-            self.anticol.anim_save_number += 1
+                    for itt in range(len(run_results['heuristic'])):
+                        line = ''
+                        for key in keys:
+                            line += str(run_results[key][itt]) + ','
+                        runresultsfile.write(line[:-1] + '\n')
+                self.anticol.anim_save_number += 1
+            except:
+                pass
 
         if len(altered_pos) > 0:
             ## Correct timing so everything is in sync again
@@ -1440,7 +1444,7 @@ class Anticol:
         ##############################
         ##** General PARAMS **##
         self.avoidance = 'astar' ## avoidance
-        self.verbose = verbose
+        self.verbose = True#verbose
         self.plotting = False
         self.make_animations = False
         self.use_pdb = False
