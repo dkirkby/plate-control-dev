@@ -2,11 +2,9 @@
 bin/petal -text
 bin/petalcontroller -text
 petal/_deprecated_posschedule.py -text
-petal/anticol_sim.py -text
 petal/bidirect_astar.py -text
 petal/extra_debug_acnopauses.txt -text
 petal/extra_debug_noacmultistep.txt -text
-petal/focal_surface_lookup.csv -text
 petal/petal.py -text
 petal/petalcomm.py -text
 petal/petaltransforms.py -text
@@ -20,8 +18,10 @@ petal/posschedule.py -text
 petal/posstate.py -text
 petal/postransforms.py -text
 petal/scheduling_outputs_hardwaretest_fail.txt -text
+petal/tests_and_demos/anticol_sim.py -text
 petal/tests_and_demos/demo.py -text
 petal/tests_and_demos/fiberlife.py -text
+petal/tests_and_demos/focal_surface_lookup.csv -text
 petal/tests_and_demos/gtorque_test.py -text
 petal/tests_and_demos/movetablescr.py -text
 petal/tests_and_demos/pift.py -text
