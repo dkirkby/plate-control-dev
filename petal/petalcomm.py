@@ -63,9 +63,9 @@ class PetalComm(object):
                 err_question = 'Petal Controller ' + str(self.petal_id) + ' was not discovered. Do you want to:\n  1: try again now\n  2: quit now\n  3: continue anyway (not recommended)\nEnter 1, 2, or 3 >> '
                 answer = input(err_question)
             else:
-                answer = '2'
+                answer = '1'
             if '1' in answer:
-                time.sleep(2)
+                time.sleep(1)
             elif '2' in answer:
                 sys.exit(0)
             elif '3' in answer:
