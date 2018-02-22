@@ -23,9 +23,9 @@ use_standard_syntax = True # enter False to try out the "quick" move syntax
 should_flash        = False
 should_home         = True
 should_direct_dtdp  = False
-should_move_xy      = True
+should_move_xy      = False
 should_move_dxdy    = False
-should_move_tp      = False
+should_move_tp      = True
 should_move_dtdp    = False
 
 # flash the LEDs
@@ -113,7 +113,7 @@ if should_move_dxdy:
     general_move('dXdY',[[2.5,0], [2.5,0], [-10,0], [5,-5], [0,5]])
 
 if should_move_tp:
-    general_move('posTP',[[-90,90], [0,90], [90,90], [0,180]])
+    general_move('posTP',[[-90,120], [0,120], [90,120], [0,180]])
 
 if should_move_dtdp:
     general_move('dTdP',[[180,0], [-90,-90],[180,60],[-90,30]]) # this is different from 'direct' dTdP. here, the dtdp is treated like any other general move, and anticollision calculations are allowed
