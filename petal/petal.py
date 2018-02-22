@@ -501,8 +501,11 @@ class Petal(object):
         """
         data = collections.OrderedDict()
         for fidid in self.fidids:
+            print(fidid)
             dotids = self.fid_dotids(fidid)
+            print(dotids)
             for i in range(len(dotids)):
+                print(i)
                 data[dotids[i]] = collections.OrderedDict()
                 x = self.get_fids_val(fidid,'DOTS_FVC_X')[0][i]
                 y = self.get_fids_val(fidid,'DOTS_FVC_Y')[0][i]
@@ -655,17 +658,19 @@ class Petal(object):
                 state.log_unit()
                 # do the commit
             if len(pos_commit_list) != 0:
-                self.posmoveDB.WriteToDB(pos_commit_list,self.petal_id,'move')
-                self.posmoveDB.WriteToDB(pos_commit_list,self.petal_id,'calib')
+                self.posmoveDB.WriteToDB(pos_commit_list,self.petal_id,'pos_move')
+                self.posmoveDB.WriteToDB(pos_commit_list,self.petal_id,'pos_calib')
             if len(fid_commit_list) != 0:
-                self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid')
+                self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid_data')
+                self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid_calib')
                 pass
         if self.local_commit_on:
             for state in self.altered_states:
                 if log_note:
                     state.next_log_notes.append(log_note)
-                    if 'TIME_RECORDED' in state.unit:
-                        del state.unit['TIME_RECORDED']
+                if 'TIME_RECORDED' in state.unit:
+                    del state.unit['TIME_RECORDED']
+                    print(state.unit)
                 state.write()
                 state.log_unit()
         self.altered_states = set()

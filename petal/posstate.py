@@ -63,18 +63,20 @@ class PosState(object):
             if unit_id != None:
                 self.posmoveDB = DBSingleton(self.petal_id)
                 if self.type == 'pos':
+                    self.unit.update(self.posmoveDB.get_pos_id_info(unit_id))
                     self.unit.update(self.posmoveDB.get_pos_constants(unit_id))
-                    self.unit.update(self.posmoveDB.get_genl_constants())
-                    self.unit.update(self.posmoveDB.get_pos_data(unit_id))
-                    self.unit.update(self.posmoveDB.get_calib(unit_id))
+                    self.unit.update(self.posmoveDB.get_pos_move(unit_id))
+                    self.unit.update(self.posmoveDB.get_pos_calib(unit_id))
                 else:
+                    self.unit.update(self.posmoveDB.get_fid_id_info(unit_id))
                     self.unit.update(self.posmoveDB.get_fid_constants(unit_id))
                     self.unit.update(self.posmoveDB.get_fid_data(unit_id))
+                    print(self.unit)
+                    self.unit.update(self.posmoveDB.get_fid_calib(unit_id))
             else:
                 self.posmoveDB = DBSingleton()
                 if self.type == 'pos':
                     self.unit.update(self.posmoveDB.get_pos_def_constants())
-                    self.unit.update(self.posmoveDB.get_genl_constants())
                 else:
                     self.unit.update(self.posmoveDB.get_fid_def_constants())
 
