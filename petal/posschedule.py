@@ -371,8 +371,7 @@ class PosSchedule(object):
                 try:
                     self._printindices('Collisions before iteration ',1,collision_indices)  
                 except:
-                    #pdb.set_trace()
-                    pass
+                    pdb.set_trace()
             ncols = len(collision_indices)
             # Avoid the collisions that were found
             tabledicts[step] = self._avoid_collisions(tabledicts[step],posmodels,collision_indices,\
@@ -421,7 +420,7 @@ class PosSchedule(object):
                     self._check_for_collisions(tpstart['retract'],output_tables)   
         itter = 0
 
-#        pdb.set_trace()
+        pdb.set_trace()
         # While there are still collisions, keep eliminating the positioners that collide
         # by setting them so that they don't move
         ncols = len(collision_indices)
@@ -578,8 +577,8 @@ class PosSchedule(object):
                 print("Trying to correct indices ",A,B," with em avoidance")
             # If the target is where we start, something weird is up
             if target[0] == start[0] and target[1]==start[1] and self.anticol.verbose:
-                #pdb.set_trace() 
-                pass
+                pdb.set_trace() 
+                
             # Create a dictionary called neighbors with all useful information of the neighbors
             neighbors = {}
             neighbors['posmodels'] = np.asarray(posmodels[neighbor_idxs])
