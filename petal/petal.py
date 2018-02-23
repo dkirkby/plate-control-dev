@@ -90,7 +90,7 @@ class Petal(object):
  
 # METHODS FOR POSITIONER CONTROL
 
-    def request_targets(self, requests):
+    def request_targets(self, requests, allow_objects = True):
         """Put in requests to the scheduler for specific positioners to move to specific targets.
         
         This method is for requesting that each robot does a complete repositioning sequence to get
@@ -139,7 +139,7 @@ class Petal(object):
         """
         mark_for_delete = set()
         for posid in requests.keys():
-            requests[posid]['posmodel'] = self.posmodel(posid)
+            requests[posid]['posmodel'] = self.posmodel(posid) if allow_objects else posid
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
             if not(self.get(posid,'CTRL_ENABLED')):

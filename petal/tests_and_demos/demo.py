@@ -8,10 +8,12 @@ import posconstants as pc
 # initialization
 #posids = ['UM00014','UM00011']
 # Use same positioners as for demo_dos script (to help with debugging)
-posids = ['UM00013','UM00014','UM00017','UM00022']
-fidids = []
-petal_id = 0
-ptl = petal.Petal(petal_id, posids, fidids)
+#posids = ['UM00013','UM00014','UM00017','UM00022']
+# petal48
+posids = ['M00160', 'M00165', 'M00529', 'M00131', 'M00137', 'M00138', 'M00100', 'M00104', 'M00108']
+fidids = ['P022', 'P057', 'P077']
+petal_id = 48
+ptl = petal.Petal(petal_id, posids, fidids,db_commit_on = True)
 ptl.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
 
 print('INITIAL POSITION')
@@ -23,9 +25,9 @@ use_standard_syntax = True # enter False to try out the "quick" move syntax
 should_flash        = False
 should_home         = True
 should_direct_dtdp  = False
-should_move_xy      = True
+should_move_xy      = False
 should_move_dxdy    = False
-should_move_tp      = False
+should_move_tp      = True
 should_move_dtdp    = False
 
 # flash the LEDs
@@ -113,7 +115,7 @@ if should_move_dxdy:
     general_move('dXdY',[[2.5,0], [2.5,0], [-10,0], [5,-5], [0,5]])
 
 if should_move_tp:
-    general_move('posTP',[[-90,90], [0,90], [90,90], [0,180]])
+    general_move('posTP',[[-90,120], [0,120], [90,120], [0,180]])
 
 if should_move_dtdp:
     general_move('dTdP',[[180,0], [-90,-90],[180,60],[-90,30]]) # this is different from 'direct' dTdP. here, the dtdp is treated like any other general move, and anticollision calculations are allowed

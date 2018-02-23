@@ -63,9 +63,9 @@ class PetalComm(object):
                 err_question = 'Petal Controller ' + str(self.petal_id) + ' was not discovered. Do you want to:\n  1: try again now\n  2: quit now\n  3: continue anyway (not recommended)\nEnter 1, 2, or 3 >> '
                 answer = input(err_question)
             else:
-                answer = '2'
+                answer = '1'
             if '1' in answer:
-                time.sleep(2)
+                time.sleep(1)
             elif '2' in answer:
                 sys.exit(0)
             elif '3' in answer:
@@ -215,7 +215,20 @@ class PetalComm(object):
             return self._call_device('set_periods', bus_id, can_id, creep_period_m0, creep_period_m1, spin_steps)
         except Exception as e:
             return 'FAILED: Can not set periods. Exception: %s' % str(e)
-
+    
+    def set_bump_flags(self, bus_id, can_id, curr_hold, bump_cw_flg, bump_ccw_flg):
+        """
+        Set motor CW/CCW bump flags and hold current.
+        bus_id       ... bus id string (eg. 'can0')
+        can_id       ... positioner can id
+        curr_hold    ... hold current, int between 0 and 100
+        bump_cw_flg  ... flag for switching CW bump, bool, on if True
+        bump_ccw_flg ... flag for switching CCW bump, bool, on if True     
+        """
+        try:
+            return self._call_device('set_bump_flags', bus_id, can_id, curr_hold, bump_cw_flg, bump_ccw_flg)
+        except Exception as e:
+            return 'FAILED: Can not set bump flags. Exception: %s' % str(e)
 
     def set_pos_constants(self, can_ids, settings):
         """
@@ -330,23 +343,24 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not get fiducial status. Exception: %s' % str(e)
 
-    def get_sids(self,canbus):
+    def get_posfid_info(self,canbus):
         """
-        Returns a list of silicon IDs on CANbus <canbus>.
+        Retrieves CAN ids found on the canbus with corresponding sids and software versions.
         """
         try:
-            return self._call_device('get_sids',canbus)
+            return self._call_device('get_posfid_info',canbus)
         except Exception as e:
-            return 'FAILED: Can not get silicon IDs. Exception: %s' % str(e)
+            return 'FAILED: Can not read devices. Exception: %s' % str(e)
 
-    def set_posid(self,canbus, sid, new_posid):
+
+    def set_canid(self,canbus, sid, new_posid):
         """
         Sets the positioner ID (= CAN address) for positioner identified by sid to new_posid.
         """
         try:
-            return self._call_device('set_posid',canbus, sid, new_posid)
+            return self._call_device('set_canid',canbus, sid, new_posid)
         except Exception as e:
-            return 'FAILED: Can not set posID. Exception: %s' % str(e)
+            return 'FAILED: Can not set CAN id. Exception: %s' % str(e)
 
     def read_temp_ptl(self):
         """
@@ -432,24 +446,6 @@ class PetalComm(object):
         """
         try:
             return self._call_device('select_mode', pid, mode)
-        except Exception as e:
-            return 'FAILED: Can not select mode.  Exception: %s' % str(e)
-
-    def program(self, pid, hex_file = 'fw21.hex'):
-        """
-        Sends specified hex_file to specified pid 
-        """
-        try:
-            return self._call_device('program', pid, hex_file)
-        except Exception as e:
-            return 'FAILED: Can not select mode.  Exception: %s' % str(e)
-
-    def request_verification(self, can_ids = [3001, 3002]):
-        """
-        Requests verification that bootloader programming was successful, returns dictionary of can_ids and statuses ('OK' or 'ERROR' strings as dict values)
-        """
-        try:
-            return self._call_device('request_verification', can_ids)
         except Exception as e:
             return 'FAILED: Can not select mode.  Exception: %s' % str(e)
 
