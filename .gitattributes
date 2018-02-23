@@ -109,8 +109,12 @@ posfirmware/release/fipos_fw_2.1.c -text
 posfirmware/release/fipos_fw_3.0.c -text
 posfirmware/release/fw21.hex -text
 ups/plate_control.table -text
+xytest/desi_logo.gif -text
 xytest/grader.py -text
+xytest/loadpetal.py -text
+xytest/movegui.py -text
 xytest/pos_xytest_plot.py -text
+xytest/posblast.py -text
 xytest/posdance.py -text
 xytest/sendalarm.py -text
 xytest/summarizer.py -text
