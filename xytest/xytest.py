@@ -134,7 +134,11 @@ class XYTest(object):
 			self.pos_notes.append('')
 		fidids = self.hwsetup_conf['fid_ids']
 		ptl_id = self.hwsetup_conf['ptl_id']
-		ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite, collider_file=self.xytest_conf['collider_file'])
+		self.store_mode = self.hwsetup_conf['store_mode']
+		if self.store_mode == db:
+			ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite, collider_file=self.xytest_conf['collider_file'],db_commit_on=True)
+		elif self.store_mode == local:
+			ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite, collider_file=self.xytest_conf['collider_file'])
 		ptl.anticollision_default = self.xytest_conf['anticollision']
 		self.m = posmovemeasure.PosMoveMeasure([ptl],fvc,printfunc=self.logwrite)
 		self.posids = self.m.all_posids
