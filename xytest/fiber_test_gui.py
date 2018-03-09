@@ -319,7 +319,7 @@ class Fiber_Test_GUI(object):
             self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'theta', 400) 
             time.sleep(4)
             self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)
-
+            time.sleep(2)
             
     def write_siid(self):
         self.text1.insert(END,'Writing SiID \n')
