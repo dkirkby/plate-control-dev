@@ -62,6 +62,7 @@ posfidfvc/poscalibplot.py -text
 posfidfvc/posmovemeasure.py -text
 ups/plate_control.table -text
 xytest/desi_logo.gif -text
+xytest/fiber_test_gui.py -text
 xytest/grader.py -text
 xytest/loadpetal.py -text
 xytest/movegui.py -text
