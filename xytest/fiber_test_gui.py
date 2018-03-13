@@ -309,17 +309,27 @@ class Fiber_Test_GUI(object):
             self.ptl.quick_direct_dtdp(self.posids,dtdp)   
             self.text1.insert(END,'Centering Done \n')
     def start_test(self):
-         for i in range(self.num_sim):
-            print(i,'th move in '+str(self.num_sim))
-            self.text2.insert('0.0',str(i)+'th move in '+str(self.num_sim)+' \n')
-            self.pcomm.move('can0', 20000, 'cw', 'cruise', 'phi', 200)
-            time.sleep(2)
-            self.pcomm.move('can0', 20000, 'cw', 'cruise', 'theta', 400)
-            time.sleep(4)
-            self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'theta', 400) 
-            time.sleep(4)
-            self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)
-            time.sleep(2)
+        if self.mode.get()==1:
+            for i in range(self.num_sim):
+                print(i,'th move in '+str(self.num_sim))
+                for posid in self.posids:
+                    print('\n',posid)
+                    self.ptl.schedule.request_target(posid, 'posTP',  random.uniform(0, 360), random.uniform(0,190), log_note='')
+                self.ptl.schedule._schedule_without_anticollision() # Make move_tables
+                self.ptl.send_move_tables()
+                 
+        else:        
+            for i in range(self.num_sim):
+                print(i,'th move in '+str(self.num_sim))
+                self.text2.insert('0.0',str(i)+'th move in '+str(self.num_sim)+' \n')
+                self.pcomm.move('can0', 20000, 'cw', 'cruise', 'phi', 200)
+                time.sleep(2)
+                self.pcomm.move('can0', 20000, 'cw', 'cruise', 'theta', 400)
+                time.sleep(4)
+                self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'theta', 400) 
+                time.sleep(4)
+                self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)
+                time.sleep(2)
             
     def write_siid(self):
         self.text1.insert(END,'Writing SiID \n')
