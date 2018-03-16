@@ -8,7 +8,11 @@ import numpy as np
 import time
 import collections
 import os
-from DBSingleton import * 
+try:
+    from DBSingleton import * 
+    DB_COMMIT_AVAILABLE = True
+except:
+    DB_COMMIT_AVAILABLE = False
 
 class Petal(object):
     """Controls a petal. Communicates with the PetalBox hardware via PetalComm.
@@ -28,7 +32,7 @@ class Petal(object):
         
     Optional initialization inputs:
         simulator_on    ... boolean, controls whether in software-only simulation mode
-        db_commit_on    ... boolean, controls whether to commit state data to the online system database (can be done with or without local_commit_on)
+        db_commit_on    ... boolean, controls whether to commit state data to the online system database (can be done with or without local_commit_on (available only if DB_COMMIT_AVAILABLE == True))
         local_commit_on ... boolean, controlw whether to commit state data to local log files (can be done with or without db_commit_on)
         printfunc       ... method, used for stdout style printing. we use this for logging during tests
         collider_file   ... string, file name of collider configuration file, no directory loction. If left blank will use default.
@@ -45,7 +49,7 @@ class Petal(object):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
 
         # database setup
-        self.db_commit_on = db_commit_on
+        self.db_commit_on = db_commit_on if DB_COMMIT_AVAILABLE else False
         if self.db_commit_on:
             os.environ['DOS_POSMOVE_WRITE_TO_DB'] = 'True'
             self.posmoveDB = DBSingleton(petal_id=self.petal_id)

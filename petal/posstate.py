@@ -3,7 +3,11 @@ import configobj
 import csv
 import pprint
 import posconstants as pc
-from DBSingleton import *
+try:
+    from DBSingleton import *
+    DB_COMMIT_AVAILABLE = True
+except:
+    DB_COMMIT_AVAILABLE = False
 
 class PosState(object):
     """Variables for the positioner are generally stored, accessed,
@@ -28,7 +32,7 @@ class PosState(object):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.logging = logging
         self.petal_id = petal_id
-        self.write_to_DB = os.getenv('DOS_POSMOVE_WRITE_TO_DB')
+        self.write_to_DB = os.getenv('DOS_POSMOVE_WRITE_TO_DB') if DB_COMMIT_AVAILABLE else False
         self.type = device_type
         if self.type in ['pos','fid']:
             self.settings_directory = pc.dirs[self.type + '_settings']
