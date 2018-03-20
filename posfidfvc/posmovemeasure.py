@@ -398,7 +398,11 @@ class PosMoveMeasure(object):
 			for key in keys_to_reset:
 				petal.set(these_posids,key,pc.nominals[key]['value'])
 		self.commit(log_note='rough calibration complete')
-		self.one_point_calibration(posids, mode='offsetsTP')        
+		if self.fvc.fvcproxy:
+                        self.one_point_calibration(posids, mode='offsetsTP_close')
+                        self.one_point_calibration(posids, mode='offsetsTP')
+                else:
+                        self.one_point_calibration(posids, mode='offsetsTP')        
 			
 		# now do arc or grid calibrations
 		if mode == 'arc' or mode == 'grid':
