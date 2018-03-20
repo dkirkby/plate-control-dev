@@ -52,7 +52,7 @@ class PosMoveMeasure(object):
 		self.n_points_calib_P = 7 # number of points in a phi calibration arc
 		self.should_set_gear_ratios = False # whether to adjust gear ratios after calibration
 		self.phi_Eo_margin = 3.0 # [deg] margin on staying within Eo envelope
-		self.phi_close_angle = 165.0 # [deg] phi angle where fiber is quite close to the center, within the spot-matching radius tolerance of the fiber view camera. Consider at a later date moving this parameter out into a settings file such as the collider .conf file.
+		self.phi_close_angle = 135.0 # [deg] phi angle where fiber is quite close to the center, within the spot-matching radius tolerance of the fiber view camera. Consider at a later date moving this parameter out into a settings file such as the collider .conf file.
 		self.calib_arc_margin = 3.0 # [deg] margin on calibration arc range
 		self.use_current_theta_during_phi_range_meas = False # useful for when theta axis is not installed on certain sample positioners
 		self.general_trans = postransforms.PosTransforms() # general transformation object (not specific to calibration of any one positioner), useful for things like obsXY to QS or QS to obsXY coordinate transforms
@@ -300,7 +300,7 @@ class PosMoveMeasure(object):
 			old_tp_updates_fraction = self.tp_updates_fraction
 			self.tp_updates_tol = 0.001
 			self.tp_updates_fraction = 1.0
-			self.move_measure(requests,tp_updates=mode)
+			data,imgfiles = self.move_measure(requests,tp_updates=mode)
 			self.tp_updates_tol = old_tp_updates_tol
 			self.tp_updates_fraction = old_tp_updates_fraction
 		else:
@@ -400,8 +400,8 @@ class PosMoveMeasure(object):
 		self.commit(log_note='rough calibration complete')
 		if self.fvc.fvcproxy:
                         self.one_point_calibration(posids, mode='offsetsTP_close')
-                        self.one_point_calibration(posids, mode='offsetsTP')
-                else:
+                #        self.one_point_calibration(posids, mode='offsetsTP')
+		else:
                         self.one_point_calibration(posids, mode='offsetsTP')        
 			
 		# now do arc or grid calibrations
