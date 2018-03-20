@@ -52,6 +52,7 @@ class PosMoveMeasure(object):
 		self.n_points_calib_P = 7 # number of points in a phi calibration arc
 		self.should_set_gear_ratios = False # whether to adjust gear ratios after calibration
 		self.phi_Eo_margin = 3.0 # [deg] margin on staying within Eo envelope
+		self.phi_close_angle = 165.0 # [deg] phi angle where fiber is quite close to the center, within the spot-matching radius tolerance of the fiber view camera. Consider at a later date moving this parameter out into a settings file such as the collider .conf file.
 		self.calib_arc_margin = 3.0 # [deg] margin on calibration arc range
 		self.use_current_theta_during_phi_range_meas = False # useful for when theta axis is not installed on certain sample positioners
 		self.general_trans = postransforms.PosTransforms() # general transformation object (not specific to calibration of any one positioner), useful for things like obsXY to QS or QS to obsXY coordinate transforms
@@ -264,13 +265,16 @@ class PosMoveMeasure(object):
 		robust as a regular calibration routine, which does arcs of multiple points and then takes
 		the best fit circle.
 		
-		  mode ... 'posTP'     --> [common usage] moves positioner to (posT=0,posP=self.phi_clear_angle),
+		  mode ... 'posTP'     		 --> [common usage] moves positioner to (posT=0,posP=self.phi_clear_angle),
 												  and then updates our internal counter on where we currently
 												  expect the theta and phi shafts to be
 												 
-			   ... 'offsetsTP' --> [expert usage] moves to (posT=0,posP=self.phi_clear_angle),
+			   ... 'offsetsTP' 		 --> [expert usage] moves to (posT=0,posP=self.phi_clear_angle),
 												  and then updates setting for theta and phi physical offsets
 												 
+			   ... 'offsetsTP_close' --> [expert usage] moves to (posT=0,posP=self.phi_close_angle),
+												  and then updates setting for theta and phi physical offsets
+												  
 			   ... 'offsetsXY' --> [expert usage] moves positioner to (posT=0,posP=180),
 												  and then updates setting for x and y physical offsets
 			   
@@ -282,6 +286,8 @@ class PosMoveMeasure(object):
 		posT = 0
 		if mode == 'posTP' or mode == 'offsetsTP':
 			posP = self.phi_clear_angle
+		elif mode == 'offsetsTP_close':
+			posP = self.phi_close_angle
 		else:
 			posP = 180
 		posids_by_ptl = self.pos_data_listed_by_ptl(posids, key='POS_ID')
@@ -289,7 +295,7 @@ class PosMoveMeasure(object):
 		for petal in posids_by_ptl.keys():
 			for posid in posids_by_ptl[petal]:
 				requests[posid] = {'command':'posTP', 'target':[posT,posP], 'log_note':'one point calibration of ' + mode}
-		if mode == 'posTP' or mode == 'offsetsTP':
+		if mode == 'posTP' or mode == 'offsetsTP' or mode == 'offsetsTP_close':
 			old_tp_updates_tol = self.tp_updates_tol
 			old_tp_updates_fraction = self.tp_updates_fraction
 			self.tp_updates_tol = 0.001
