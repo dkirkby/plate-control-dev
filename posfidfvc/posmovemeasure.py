@@ -303,6 +303,14 @@ class PosMoveMeasure(object):
 			data,imgfiles = self.move_measure(requests,tp_updates=mode)
 			self.tp_updates_tol = old_tp_updates_tol
 			self.tp_updates_fraction = old_tp_updates_fraction
+			if mode == 'offsetsTP' or mode == 'offsetsTP_close':
+				for petal in posids_by_ptl.keys():
+                                	for posid in posids_by_ptl[petal]:
+                                        	xy = data[posid]
+                                        	petal.set(posid,'OFFSET_X',xy[0])
+                                        	petal.set(posid,'OFFSET_Y',xy[1])
+                                        	self.printfunc(posid + ': Set OFFSET_X to ' + self.fmt(xy[0]))
+                                        	self.printfunc(posid + ': Set OFFSET_Y to ' + self.fmt(xy[1]))
 		else:
 			data,imgfiles = self.move_measure(requests, tp_updates=None)
 			for petal in posids_by_ptl.keys():
