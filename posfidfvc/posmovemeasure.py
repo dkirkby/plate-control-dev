@@ -134,6 +134,7 @@ class PosMoveMeasure(object):
 						
 							tp_updates='posTP'     ... updates will be made to the internally-tracked shaft positions, POS_T and POS_P
 							tp_updates='offsetsTP' ... updates will be made to the calibration values OFFSET_T and OFFSET_P
+							tp_updates='offsetsTP_close' ... updates will be made to the calibration values OFFSET_T and OFFSET_P. The difference with 'offsetTP' is that the phi is opend to phi_close_angle instead of the E0 angle specified in poscollider. 
 							tp_updates=None        ... no updating (this is the default)
 						
 						The intention of the 'posTP' option is that if the physical motor shaft hangs up slightly and loses
@@ -148,7 +149,7 @@ class PosMoveMeasure(object):
 		"""
 		self.move(requests)
 		data,imgfiles = self.measure()
-		if tp_updates == 'posTP' or tp_updates =='offsetsTP':
+		if tp_updates == 'posTP' or tp_updates =='offsetsTP' or tp_updates == 'offsetsTP_close':
 			self._test_and_update_TP(data, tp_updates)
 		return data,imgfiles
 
@@ -303,14 +304,6 @@ class PosMoveMeasure(object):
 			data,imgfiles = self.move_measure(requests,tp_updates=mode)
 			self.tp_updates_tol = old_tp_updates_tol
 			self.tp_updates_fraction = old_tp_updates_fraction
-			if mode == 'offsetsTP' or mode == 'offsetsTP_close':
-				for petal in posids_by_ptl.keys():
-                                	for posid in posids_by_ptl[petal]:
-                                        	xy = data[posid]
-                                        	petal.set(posid,'OFFSET_X',xy[0])
-                                        	petal.set(posid,'OFFSET_Y',xy[1])
-                                        	self.printfunc(posid + ': Set OFFSET_X to ' + self.fmt(xy[0]))
-                                        	self.printfunc(posid + ': Set OFFSET_Y to ' + self.fmt(xy[1]))
 		else:
 			data,imgfiles = self.move_measure(requests, tp_updates=None)
 			for petal in posids_by_ptl.keys():
@@ -408,7 +401,7 @@ class PosMoveMeasure(object):
 		self.commit(log_note='rough calibration complete')
 		if self.fvc.fvcproxy:
                         self.one_point_calibration(posids, mode='offsetsTP_close')
-                #        self.one_point_calibration(posids, mode='offsetsTP')
+                        self.one_point_calibration(posids, mode='offsetsTP')
 		else:
                         self.one_point_calibration(posids, mode='offsetsTP')        
 			
@@ -1112,7 +1105,7 @@ class PosMoveMeasure(object):
 				measured_posTP[0] = T_best
 				delta_T = (measured_posTP[0] - expected_posTP[0]) * self.tp_updates_fraction
 				delta_P = (measured_posTP[1] - expected_posTP[1]) * self.tp_updates_fraction
-				if tp_updates == 'offsetsTP':
+				if tp_updates == 'offsetsTP' or tp_updates == 'offsetsTP_close':
 					param = 'OFFSET'
 				else:
 					param = 'POS'
@@ -1120,7 +1113,7 @@ class PosMoveMeasure(object):
 				old_P = ptl.get(posid,param + '_P')              
 				new_T = old_T + delta_T
 				new_P = old_P + delta_P
-				if tp_updates == 'offsetsTP':
+				if tp_updates == 'offsetsTP' or tp_updates == 'offsetsTP_close' :
 					ptl.set(posid,'OFFSET_T',new_T)
 					ptl.set(posid,'OFFSET_P',new_P)
 					self.printfunc(posid + ': Set OFFSET_T to ' + self.fmt(new_T))
