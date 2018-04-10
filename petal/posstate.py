@@ -63,7 +63,7 @@ class PosState(object):
         else:
             self.unit = configobj.ConfigObj(unit_filename,unrepr=True,encoding='utf-8')
 
-        if self.write_to_DB != None:
+        if self.write_to_DB:
             if unit_id != None:
                 self.posmoveDB = DBSingleton(self.petal_id)
                 if self.type == 'pos':
