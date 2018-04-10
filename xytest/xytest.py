@@ -557,7 +557,7 @@ class XYTest(object):
         """Standard logging function for writing to the test traveler log file.
         """
         line = '# ' + pc.timestamp_str_now() + ': ' + text
-        with open(self.xytest_logfile,'a') as fh:
+        with open(self.xytest_logfile,'a',encoding='utf8') as fh:            
             fh.write(line + '\n')
         if stdout:
             print(line)
