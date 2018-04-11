@@ -73,9 +73,9 @@ with open(expstampfile,'w',newline='') as file:
     writer = csv.DictWriter(file,fieldnames)
     writer.writeheader()
 def log_exposure(posid, state, note=''):
-    n_moves = str(state.read('TOTAL_MOVE_SEQUENCES'))
-    posT = format(state.read('POS_T'),'.1f')
-    posP = format(state.read('POS_P'),'.1f')
+    n_moves = str(state._val['TOTAL_MOVE_SEQUENCES'])
+    posT = format(state._val['POS_T'],'.1f')
+    posP = format(state._val['POS_P'],'.1f')
     timestamp_str = logwrite(posid + ': Approx time of camera exposure for target [' + posT + ',' + posP + ']  (life=' + n_moves + ')')
     row = {'POS_ID'         : posid,
            'TIMESTAMP'      : timestamp_str,
@@ -114,7 +114,7 @@ states = collections.OrderedDict()
 for posid in posids:
     states[posid] = ptl.posmodel(posid).state
     new_and_changed_files.add(states[posid].log_path)
-    new_and_changed_files.add(states[posid].unit.filename)
+    new_and_changed_files.add(states[posid].conf.filename)
 logwrite('Petal ' + str(ptlid) + ' initialized.')
 
 # configure some specific positioner parameters
@@ -229,7 +229,7 @@ while keep_asking:
         message = 'You requested a sequence of\n\n   ' + str(n_rand_moves) + '\n\nuninterrupted random moves to now be done.'
         message += ' This will take about\n\n   ' + format(hours_estimate,'.1f') + ' hours\n\nafter which the total number of lifetime moves on each positioner will be:\n'
         for posid in posids:
-            message += '\n   ' + posid + ': ' + str(states[posid].read('TOTAL_MOVE_SEQUENCES') + n_rand_moves)
+            message += '\n   ' + posid + ': ' + str(states[posid]._val['TOTAL_MOVE_SEQUENCES'] + n_rand_moves)
         message += '\n\nBegin move sequence now?\n\nYes --> begin sequence\nNo --> enter different number'
         begin_now = tkinter.messagebox.askyesno('Begin random moves?',message)
         if begin_now:
@@ -294,7 +294,7 @@ if n_rand_moves > 0:
 for posid in pos_params_before_test.keys():
     for param in pos_params_before_test[posid]:
         ptl.set(posid, param, pos_params_before_test[posid][param])
-        logwrite(posid + ': Restored ' + param + ' to ' + str(states[posid].read(param)))
+        logwrite(posid + ': Restored ' + param + ' to ' + str(states[posid]._val[param]))
 
 # post log files and settings to svn
 logwrite('Files changed or modified during test: ' + str(new_and_changed_files))

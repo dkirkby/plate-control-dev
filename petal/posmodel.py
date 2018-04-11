@@ -57,7 +57,7 @@ class PosModel(object):
 	@property
 	def _motor_speed_creep(self):
 		"""Returns motor creep speed (which depends on the creep period) in deg/sec."""
-		return self._timer_update_rate * self._stepsize_creep / self.state.read('CREEP_PERIOD')  # deg/sec
+		return self._timer_update_rate * self._stepsize_creep / self.state._val['CREEP_PERIOD']  # deg/sec
 
 	@property
 	def _spinupdown_distance(self):
@@ -65,22 +65,22 @@ class PosModel(object):
 		if self._legacy_spinupdown:
 			return 628.2  # deg
 		else:
-			return sum(range(round(self._stepsize_cruise/self._stepsize_creep) + 1))*self._stepsize_creep * self.state.read('SPINUPDOWN_PERIOD')
+			return sum(range(round(self._stepsize_cruise/self._stepsize_creep) + 1))*self._stepsize_creep * self.state._val['SPINUPDOWN_PERIOD']
 
 	@property
 	def posid(self):
 		"""Returns the positioner id string."""
-		return self.state.read('POS_ID')
+		return self.state._val['POS_ID']
 
 	@property
 	def canid(self):
 		"""Returns the positioner hardware id on the CAN bus."""
-		return self.state.read('CAN_ID')
+		return self.state._val['CAN_ID']
 
 	@property
 	def busid(self):
 		"""Returns the name of the can bus that the positioner belongs to."""
-		return self.state.read('BUS_ID')
+		return self.state._val['BUS_ID']
 
 	@property
 	def expected_current_position(self):
@@ -191,7 +191,7 @@ class PosModel(object):
 		"""
 		move_data = {}
 		dist_spinup = 2 * np.sign(distance) * self._spinupdown_distance  # distance over which accel / decel to and from cruise speed
-		if not(allow_cruise) or abs(distance) <= (abs(dist_spinup) + self.state.read('MIN_DIST_AT_CRUISE_SPEED')):
+		if not(allow_cruise) or abs(distance) <= (abs(dist_spinup) + self.state._val['MIN_DIST_AT_CRUISE_SPEED']):
 			move_data['motor_step']   = int(round(distance / self._stepsize_creep))
 			move_data['distance']     = move_data['motor_step'] * self._stepsize_creep
 			move_data['speed_mode']   = 'creep'
@@ -210,11 +210,11 @@ class PosModel(object):
 		"""Always perform this after positioner physical moves have been completed,
 		to update the internal tracking of shaft positions and variables.
 		"""
-		if self.state.read('CTRL_ENABLED') == False:
+		if self.state._val['CTRL_ENABLED'] == False:
 			return
 
-		self.state.store('POS_T', self.state.read('POS_T') + cleanup_table['stats']['net_dT'][-1])
-		self.state.store('POS_P', self.state.read('POS_P') + cleanup_table['stats']['net_dP'][-1])
+		self.state.store('POS_T', self.state._val['POS_T'] + cleanup_table['stats']['net_dT'][-1])
+		self.state.store('POS_P', self.state._val['POS_P'] + cleanup_table['stats']['net_dP'][-1])
 		for axis in self.axis:
 			exec(axis.postmove_cleanup_cmds)
 			axis.postmove_cleanup_cmds = ''
@@ -237,11 +237,11 @@ class PosModel(object):
 			self.state.store('MOVE_VAL2', separator.join(x for x in value))
 		except Exception as e:
 			print('postmove_cleanup: %s' % str(e))
-		self.state.store('TOTAL_CRUISE_MOVES_T', self.state.read('TOTAL_CRUISE_MOVES_T') + cleanup_table['stats']['TOTAL_CRUISE_MOVES_T'])
-		self.state.store('TOTAL_CRUISE_MOVES_P', self.state.read('TOTAL_CRUISE_MOVES_P') + cleanup_table['stats']['TOTAL_CRUISE_MOVES_P'])
-		self.state.store('TOTAL_CREEP_MOVES_T', self.state.read('TOTAL_CREEP_MOVES_T') + cleanup_table['stats']['TOTAL_CREEP_MOVES_T'])
-		self.state.store('TOTAL_CREEP_MOVES_P', self.state.read('TOTAL_CREEP_MOVES_P') + cleanup_table['stats']['TOTAL_CREEP_MOVES_P'])
-		self.state.store('TOTAL_MOVE_SEQUENCES', self.state.read('TOTAL_MOVE_SEQUENCES') + 1)
+		self.state.store('TOTAL_CRUISE_MOVES_T', self.state._val['TOTAL_CRUISE_MOVES_T']+ cleanup_table['stats']['TOTAL_CRUISE_MOVES_T'])
+		self.state.store('TOTAL_CRUISE_MOVES_P', self.state._val['TOTAL_CRUISE_MOVES_P'] + cleanup_table['stats']['TOTAL_CRUISE_MOVES_P'])
+		self.state.store('TOTAL_CREEP_MOVES_T', self.state._val['TOTAL_CREEP_MOVES_T'] + cleanup_table['stats']['TOTAL_CREEP_MOVES_T'])
+		self.state.store('TOTAL_CREEP_MOVES_P', self.state._val['TOTAL_CREEP_MOVES_P'] + cleanup_table['stats']['TOTAL_CREEP_MOVES_P'])
+		self.state.store('TOTAL_MOVE_SEQUENCES', self.state._val['TOTAL_MOVE_SEQUENCES'] + 1)
 		self.state.next_log_notes.append(cleanup_table['log_note'])
 
 	def clear_postmove_cleanup_cmds_without_executing(self):
@@ -271,9 +271,9 @@ class Axis(object):
 		"""Internally-tracked angular position of the axis, at the output of the gear.
 		"""
 		if self.axisid == pc.T:
-			return self.posmodel.state.read('POS_T')
+			return self.posmodel.state._val['POS_T']
 		else:
-			return self.posmodel.state.read('POS_P')
+			return self.posmodel.state._val['POS_P']
 
 	@pos.setter
 	def pos(self,value):
@@ -289,10 +289,10 @@ class Axis(object):
 		Returns [1x2] array of [min,max]
 		"""
 		if self.axisid == pc.T:
-			r = abs(self.posmodel.state.read('PHYSICAL_RANGE_T'))
+			r = abs(self.posmodel.state._val['PHYSICAL_RANGE_T'])
 			return [-0.50*r, 0.50*r]  # split theta range such that 0 is essentially in the middle
 		else:
-			r = abs(self.posmodel.state.read('PHYSICAL_RANGE_P'))
+			r = abs(self.posmodel.state._val['PHYSICAL_RANGE_P'])
 			return [-0.01*r, 0.99*r]  # split phi range such that 0 is essentially at the minimum
 
 	@property
@@ -335,18 +335,18 @@ class Axis(object):
 		"""
 		if self.axisid == pc.T:
 			if self.principle_hardstop_direction < 0:
-				return [+self.posmodel.state.read('PRINCIPLE_HARDSTOP_CLEARANCE_T'),
-						-self.posmodel.state.read('SECONDARY_HARDSTOP_CLEARANCE_T')]
+				return [+self.posmodel.state._val['PRINCIPLE_HARDSTOP_CLEARANCE_T'],
+						-self.posmodel.state._val['SECONDARY_HARDSTOP_CLEARANCE_T']]
 			else:
-				return [+self.posmodel.state.read('SECONDARY_HARDSTOP_CLEARANCE_T'),
-						-self.posmodel.state.read('PRINCIPLE_HARDSTOP_CLEARANCE_T')]
+				return [+self.posmodel.state._val['SECONDARY_HARDSTOP_CLEARANCE_T'],
+						-self.posmodel.state._val['PRINCIPLE_HARDSTOP_CLEARANCE_T']]
 		else:
 			if self.principle_hardstop_direction < 0:
-				return [+self.posmodel.state.read('PRINCIPLE_HARDSTOP_CLEARANCE_P'),
-						-self.posmodel.state.read('SECONDARY_HARDSTOP_CLEARANCE_P')]
+				return [+self.posmodel.state._val['PRINCIPLE_HARDSTOP_CLEARANCE_P'],
+						-self.posmodel.state._val['SECONDARY_HARDSTOP_CLEARANCE_P']]
 			else:
-				return [+self.posmodel.state.read('SECONDARY_HARDSTOP_CLEARANCE_P'),
-						-self.posmodel.state.read('PRINCIPLE_HARDSTOP_CLEARANCE_P')]
+				return [+self.posmodel.state._val['SECONDARY_HARDSTOP_CLEARANCE_P'],
+						-self.posmodel.state._val['PRINCIPLE_HARDSTOP_CLEARANCE_P']]
 
 	@property
 	def backlash_clearance(self):
@@ -356,9 +356,9 @@ class Axis(object):
 		similarly as the hardstop clearance directions).
 		"""
 		if self.antibacklash_final_move_dir > 0:
-			return [+self.posmodel.state.read('BACKLASH'),0]
+			return [+self.posmodel.state._val['BACKLASH'],0]
 		else:
-			return [0,-self.posmodel.state.read('BACKLASH')]
+			return [0,-self.posmodel.state._val['BACKLASH']]
 
 	@property
 	def motor_calib_properties(self):
@@ -366,28 +366,28 @@ class Axis(object):
 		"""
 		prop = {}
 		if self.axisid == pc.T:
-			prop['gear_ratio'] = pc.gear_ratio[self.posmodel.state.read('GEAR_TYPE_T')]
-			prop['gear_calib'] = self.posmodel.state.read('GEAR_CALIB_T')
-			prop['ccw_sign'] = self.posmodel.state.read('MOTOR_CCW_DIR_T')
+			prop['gear_ratio'] = pc.gear_ratio[self.posmodel.state._val['GEAR_TYPE_T']]
+			prop['gear_calib'] = self.posmodel.state._val['GEAR_CALIB_T']
+			prop['ccw_sign'] = self.posmodel.state._val['MOTOR_CCW_DIR_T']
 		else:
-			prop['gear_ratio'] = pc.gear_ratio[self.posmodel.state.read('GEAR_TYPE_P')]
-			prop['gear_calib'] = self.posmodel.state.read('GEAR_CALIB_P')
-			prop['ccw_sign'] = self.posmodel.state.read('MOTOR_CCW_DIR_P')
+			prop['gear_ratio'] = pc.gear_ratio[self.posmodel.state._val['GEAR_TYPE_P']]
+			prop['gear_calib'] = self.posmodel.state._val['GEAR_CALIB_P']
+			prop['ccw_sign'] = self.posmodel.state._val['MOTOR_CCW_DIR_P']
 		return prop
 
 	@property
 	def antibacklash_final_move_dir(self):
 		if self.axisid == pc.T:
-			return self.posmodel.state.read('ANTIBACKLASH_FINAL_MOVE_DIR_T')
+			return self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_T']
 		else:
-			return self.posmodel.state.read('ANTIBACKLASH_FINAL_MOVE_DIR_P')
+			return self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_P']
 
 	@property
 	def last_primary_hardstop_dir(self):
 		if self.axisid == pc.T:
-			return self.posmodel.state.read('LAST_PRIMARY_HARDSTOP_DIR_T')
+			return self.posmodel.state._val['LAST_PRIMARY_HARDSTOP_DIR_T']
 		else:
-			return self.posmodel.state.read('LAST_PRIMARY_HARDSTOP_DIR_P')
+			return self.posmodel.state._val['LAST_PRIMARY_HARDSTOP_DIR_P']
 
 	@last_primary_hardstop_dir.setter
 	def last_primary_hardstop_dir(self,value):
@@ -399,9 +399,9 @@ class Axis(object):
 	@property
 	def total_limit_seeks(self):
 		if self.axisid == pc.T:
-			return self.posmodel.state.read('TOTAL_LIMIT_SEEKS_T')
+			return self.posmodel.state._val['TOTAL_LIMIT_SEEKS_T']
 		else:
-			return self.posmodel.state.read('TOTAL_LIMIT_SEEKS_P')
+			return self.posmodel.state._val['TOTAL_LIMIT_SEEKS_P']
 
 	@total_limit_seeks.setter
 	def total_limit_seeks(self,value):
@@ -416,15 +416,15 @@ class Axis(object):
 		(The "secondary" hardstop is only struck when finding the total available travel range.)
 		"""
 		if self.axisid == pc.T:
-			return self.posmodel.state.read('PRINCIPLE_HARDSTOP_DIR_T')
+			return self.posmodel.state._val['PRINCIPLE_HARDSTOP_DIR_T']
 		else:
-			return self.posmodel.state.read('PRINCIPLE_HARDSTOP_DIR_P')
+			return self.posmodel.state._val['PRINCIPLE_HARDSTOP_DIR_P']
 
 	@property
 	def limit_seeking_search_distance(self):
 		"""A distance magnitude that guarantees hitting a hard limit in either direction.
 		"""
-		return np.abs(np.diff(self.full_range)*self.posmodel.state.read('LIMIT_SEEK_EXCEED_RANGE_FACTOR'))[0]
+		return np.abs(np.diff(self.full_range)*self.posmodel.state._val['LIMIT_SEEK_EXCEED_RANGE_FACTOR'])[0]
 
 	def motor_to_shaft(self,distance):
 		"""Convert a distance in motor angle to shaft angle at the gearbox output.

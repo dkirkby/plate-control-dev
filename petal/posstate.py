@@ -57,7 +57,7 @@ class PosState(object):
                 self.conf['POS_ID'] = str(unit_id)
             else:
                 self.conf['FID_ID'] = str(unit_id)
-                self.conf.write()
+            self.conf.write()
         else:
             self.conf = configobj.ConfigObj(unit_filename,unrepr=True,encoding='utf-8')
 

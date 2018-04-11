@@ -76,7 +76,7 @@ class Summarizer(object):
 				init_data[key] = os.path.basename(init_data[key])
 			self.row_template[key] = init_data[key]
 		self.row_template[manual_ignore_key] = ''
-		self.basename = self.state.read('POS_ID') + '_summary.csv'
+		self.basename = self.state._val['POS_ID'] + '_summary.csv'
 		if not(directory):
 			directory = pc.dirs['xytest_summaries']
 		if not directory[-1] == os.path.sep:
@@ -124,8 +124,8 @@ class Summarizer(object):
 		self.row_template['num pts calib P']     = n_pts_calib_P
 		self.row_template['calib mode']          = calib_mode
 		self.row_template['start time']          = pc.timestamp_str_now()
-		self.row_template['curr cruise']         = self.state.read('CURR_CRUISE')
-		self.row_template['curr creep']          = self.state.read('CURR_CREEP')
+		self.row_template['curr cruise']         = self.state._val['CURR_CRUISE']
+		self.row_template['curr creep']          = self.state._val['CURR_CREEP']
 		self.row_template['ranges remeasured']   = ranges_were_remeasured
 		self.next_row_is_new = True
 	
@@ -139,7 +139,7 @@ class Summarizer(object):
 		params argument is used to to restrict which parameters are getting upated.
 		'''
 		for calib_key in params:
-			self.row_template[calib_key + suffix] = self.state.read(calib_key)
+			self.row_template[calib_key + suffix] = self.state._val[calib_key]
 
 	def write_row(self, err_data_mm, autogather=True):
 		'''Makes a row of values and writes them to the csv file.
@@ -160,9 +160,9 @@ class Summarizer(object):
 			if self.state.log_basename not in self.row_template['pos log files']:
 				self.row_template['pos log files'].append(self.state.log_basename)
 			row['finish time'] = pc.timestamp_str_now()
-			row['total move sequences at finish'] = self.state.read('TOTAL_MOVE_SEQUENCES')
-			row['total limit seeks T at finish'] = self.state.read('TOTAL_LIMIT_SEEKS_T')
-			row['total limit seeks P at finish'] = self.state.read('TOTAL_LIMIT_SEEKS_P')
+			row['total move sequences at finish'] = self.state._val['TOTAL_MOVE_SEQUENCES']
+			row['total limit seeks T at finish'] = self.state._val['TOTAL_LIMIT_SEEKS_T']
+			row['total limit seeks P at finish'] = self.state._val['TOTAL_LIMIT_SEEKS_P']
 		with open(self.filename,'r', newline='') as csvfile:
 			rows = list(csv.reader(csvfile))
 		row_vals = list(row.values())

@@ -255,10 +255,10 @@ class PosCollider(object):
         self.tp0 = np.zeros((2,n))
         self.tp_ranges = [[] for i in range(n)]
         for i in range(len(self.posmodels)):
-            self.R1[i] = self.posmodels[i].state.read('LENGTH_R1')
-            self.R2[i] = self.posmodels[i].state.read('LENGTH_R2')
-            self.xy0[:,i] = np.array([self.posmodels[i].state.read('OFFSET_X'), self.posmodels[i].state.read('OFFSET_Y')])
-            self.tp0[:,i] = np.array([self.posmodels[i].state.read('OFFSET_T'), self.posmodels[i].state.read('OFFSET_P')])
+            self.R1[i] = self.posmodels[i].state._val['LENGTH_R1']
+            self.R2[i] = self.posmodels[i].state._val['LENGTH_R2']
+            self.xy0[:,i] = np.array([self.posmodels[i].state._val['OFFSET_X'], self.posmodels[i].state._val['OFFSET_Y']])
+            self.tp0[:,i] = np.array([self.posmodels[i].state._val['OFFSET_T'], self.posmodels[i].state._val['OFFSET_P']])
             self.tp_ranges[i] = np.array(self.posmodels[i].trans.shaft_ranges('targetable'))
 
     def _load_circle_envelopes(self):

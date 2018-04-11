@@ -52,7 +52,7 @@ def plot_arc(path, posid, data):
         if ax == 'T':
             calib_vals_txt = ''
             for key in ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']:
-                calib_vals_txt += format(key,'12s') + ' = ' + format(state.read(key),'.3f') + '\n'
+                calib_vals_txt += format(key,'12s') + ' = ' + format(state._val[key],'.3f') + '\n'
             plt.text(min(plt.xlim())+0.2,max(plt.ylim())-0.2,calib_vals_txt,fontsize=6,color='gray',family='monospace',horizontalalignment='left',verticalalignment='top')
         plt.xlabel('x (mm)')
         plt.ylabel('y (mm)')

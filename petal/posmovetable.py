@@ -21,10 +21,10 @@ class PosMoveTable(object):
         self.log_note = ''               # optional note string which user can associate with this table, to be stored in any logging
         self.rows = []                   # internal representation of the move data
         self.rows_extra = []             # auto-generated backlash and final creep rows get stored here
-        self.should_antibacklash = self.posmodel.state.read('ANTIBACKLASH_ON')
-        self.should_final_creep  = self.posmodel.state.read('FINAL_CREEP_ON')
-        self.allow_exceed_limits = self.posmodel.state.read('ALLOW_EXCEED_LIMITS')
-        self.allow_cruise = not(self.posmodel.state.read('ONLY_CREEP'))
+        self.should_antibacklash = self.posmodel.state._val['ANTIBACKLASH_ON']
+        self.should_final_creep  = self.posmodel.state._val['FINAL_CREEP_ON']
+        self.allow_exceed_limits = self.posmodel.state._val['ALLOW_EXCEED_LIMITS']
+        self.allow_cruise = not(self.posmodel.state._val['ONLY_CREEP'])
 
     # getters
     @property
@@ -127,8 +127,8 @@ class PosMoveTable(object):
                 if true_moves[i][-1]['distance']:
                     has_moved[i] = True
         if self.should_antibacklash and any(has_moved):
-            backlash_dir = [self.posmodel.state.read('ANTIBACKLASH_FINAL_MOVE_DIR_T'), self.posmodel.state.read('ANTIBACKLASH_FINAL_MOVE_DIR_P')]
-            backlash_mag = self.posmodel.state.read('BACKLASH')
+            backlash_dir = [self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_T'], self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_P']]
+            backlash_mag = self.posmodel.state._val['BACKLASH']
             for i in [pc.T,pc.P]:
                 backlash[i] = -backlash_dir[i] * backlash_mag * has_moved[i]
                  # note backlash allow_exceed_limits=True, with assumption that these limits the debounced_range, which already accounts for backlash (see Axis class implementation)

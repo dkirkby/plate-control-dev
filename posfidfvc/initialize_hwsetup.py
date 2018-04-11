@@ -155,10 +155,10 @@ m.make_plots_during_calib = True
 print('Automatic generation of calibration plots is turned ' + ('ON' if m.make_plots_during_calib else 'OFF') + '.')
 for ptl in m.petals:
 	for posmodel in ptl.posmodels:
-		new_and_changed_files.add(posmodel.state.unit.filename)
+		new_and_changed_files.add(posmodel.state.conf.filename)
 		new_and_changed_files.add(posmodel.state.log_path)
 	for fidstate in ptl.fidstates.values():
-		new_and_changed_files.add(fidstate.unit.filename)
+		new_and_changed_files.add(fidstate.conf.filename)
 		new_and_changed_files.add(fidstate.log_path)
 m.n_extradots_expected = hwsetup['num_extra_dots']
 

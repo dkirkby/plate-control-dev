@@ -94,8 +94,8 @@ class PosAnticol:
                 if req['posmodel'].posid == posunitid:
                     posmodel = req['posmodel']
                     posmodels.append(posmodel)
-                    xoffs.append(posmodel.state.read('OFFSET_X'))
-                    yoffs.append(posmodel.state.read('OFFSET_Y'))
+                    xoffs.append(posmodel.state._val['OFFSET_X'])
+                    yoffs.append(posmodel.state._val['OFFSET_Y'])
                     tpstart.append(posmodel.trans.posTP_to_obsTP(req['start_posTP']))
                     tptarg.append(posmodel.trans.posTP_to_obsTP(req['targt_posTP']))
                     log_notes.append(req['log_note'])

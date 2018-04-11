@@ -846,7 +846,7 @@ class PosMoveMeasure(object):
 							params_optimized.x[j] = self._centralized_angular_offset_value(params_optimized.x[j])
 						data[posid][param_keys[j]].append(params_optimized.x[j])
 						debug_str += '  ' + param_keys[j] +': ' + format(data[posid][param_keys[j]][-1],'.3f')
-					print(debug_str)
+					# print(debug_str)
 			trans.alt_override = False
 			petal = data[posid]['petal']
 			for key in param_keys:

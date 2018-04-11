@@ -257,7 +257,7 @@ class Petal(object):
             table.should_antibacklash = False
             table.should_final_creep  = False
             table.allow_exceed_limits = True
-            table.allow_cruise = not(p.state.read('CREEP_TO_LIMITS'))
+            table.allow_cruise = not(p.state._val['CREEP_TO_LIMITS'])
             dist = [0,0]
             dist[axisid] = search_dist
             table.set_move(0,pc.T,dist[0])
@@ -356,7 +356,7 @@ class Petal(object):
             busid = p.busid
             parameter_vals = []
             for parameter_key in parameter_keys:
-                parameter_vals.append(state.read(parameter_key))
+                parameter_vals.append(state._val[parameter_key])
             #syntax for setting currents: comm.set_currents(busid, canid, [curr_spin_p, curr_cruise_p, curr_creep_p, curr_hold_p], [curr_spin_t, curr_cruise_t, curr_creep_t, curr_hold_t])
             self.comm.set_currents(busid, canid, [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]], [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]])
             #syntax for setting periods: comm.set_periods(busid, canid, creep_period_p, creep_period_t, spin_period)
@@ -508,11 +508,8 @@ class Petal(object):
         """
         data = collections.OrderedDict()
         for fidid in self.fidids:
-            print(fidid)
             dotids = self.fid_dotids(fidid)
-            print(dotids)
             for i in range(len(dotids)):
-                print(i)
                 data[dotids[i]] = collections.OrderedDict()
                 x = self.get_fids_val(fidid,'DOTS_FVC_X')[0][i]
                 y = self.get_fids_val(fidid,'DOTS_FVC_Y')[0][i]
@@ -567,7 +564,7 @@ class Petal(object):
         vals = []
         fidids = pc.listify(fidids,keep_flat=True)[0]
         for fidid in fidids:
-            vals.append(self.fidstates[fidid].read(key))
+            vals.append(self.fidstates[fidid]._val[key])
         return vals
     
     def store_fid_val(self,fidid,key,value):
@@ -613,7 +610,7 @@ class Petal(object):
             elif keys[i] == 'expected_current_position':
                 vals.append(self.posmodels[pidx].expected_current_position_str)
             else:
-                vals.append(self.posmodels[pidx].state.read(keys[i]))
+                vals.append(self.posmodels[pidx].state._val[keys[i]])
         if was_not_list:
             vals = pc.delistify(vals)
         return vals
@@ -660,9 +657,9 @@ class Petal(object):
             for state in self.altered_states:
                 # determine whether it's a positioner state or a fiducial state (these have different data)
                 # gather up the data from this state
-                if 'POS_ID' in state.unit:
+                if state.type == 'pos':
                     pos_commit_list.append(state)
-                elif 'FID_ID' in state.unit:
+                elif state.type == 'fid':
                     fid_commit_list.append(state)
                 state.log_unit()
                 # do the commit

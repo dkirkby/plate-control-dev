@@ -252,7 +252,7 @@ class XYTest(object):
             for posid in self.posids:
                 state = self.m.state(posid)
                 self.track_file(state.log_path, commit='once')
-                self.track_file(state.unit.filename, commit='always')
+                self.track_file(state.conf.filename, commit='always')
                 for key in params:
                     self.logwrite(str(posid) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
             for posid in self.posids:
@@ -394,7 +394,7 @@ class XYTest(object):
                 for posid in these_targets.keys():
                     state = self.m.state(posid)
                     self.track_file(state.log_path, commit='once')
-                    self.track_file(state.unit.filename, commit='always')
+                    self.track_file(state.conf.filename, commit='always')
                     row = this_timestamp
                     row += ',' + str(state.read('TOTAL_MOVE_SEQUENCES'))
                     row += ',' + str(state.log_basename)
