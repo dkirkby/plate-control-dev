@@ -19,7 +19,7 @@ fidids = fidids_12
 petal_id = 666
 
 # timing helper wrapper function
-n_stats_lines = 20
+n_stats_lines = 15
 statsfile = 'stats_petalcode'
 def cProfile_wrapper(evaluatable_string):
     print(evaluatable_string)
