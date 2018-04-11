@@ -425,7 +425,7 @@ class PosPoly(object):
     of the fiber positioner.
     """
     def __init__(self, points, point0_index=0, close_polygon=True):
-        points = np.array(points)
+        points = np.array(points,dtype='float64')
         head = points[:,np.arange(point0_index,len(points[0]))]
         tail = points[:,np.arange(0,point0_index+1*close_polygon)]
         self.points = np.append(head, tail, axis=1)
@@ -465,7 +465,7 @@ class PosPoly(object):
             return False
         else:
             return True
-
+    
     @staticmethod
     def _polygons_collide(pts1,pts2):
         """Check whether two closed polygons collide.
@@ -476,31 +476,36 @@ class PosPoly(object):
         for this condition admittedly breaks some conceptual logic, but this case is not
         anticipated to occur given the DESI petal geometry, and speed is at a premium.
         """
-        for i in range(len(pts1[0][:-1])):
-            A1 = np.array([pts1[0,i],   pts1[1,i]])
-            A2 = np.array([pts1[0,i+1], pts1[1,i+1]])
-            for j in range(len(pts2[0][:-1])):
-                B1 = np.array([pts2[0,j],   pts2[1,j]])
-                B2 = np.array([pts2[0,j+1], pts2[1,j+1]])
-                if PosPoly._segments_intersect(A1,A2,B1,B2):
-                    return True
+        A1 = pts1[:,0:-1]
+        A2 = pts1[:,1:]
+        B1 = pts2[:,0:-1]
+        B2 = pts2[:,1:]
+        for i in range(np.shape(A1)[1]):
+            out = PosPoly._segments_intersect(A1[:,i],A2[:,i],B1,B2) # note this is vectorized, to avoid having an internal for loop
+            if np.any(out):
+                return True
         return False
 
     @staticmethod
     def _segments_intersect(A1,A2,B1,B2):
         """Checks whether two 2d line segments intersect. The endpoints for segments
-        A and B are each a pair of (x,y) coordinates.
+        A and B are each a pair of (x,y) coordinates. This function is vectorized,
+        so either A or B can actually be an arbitrary number of segments. But the
+        other one needs to be just one segment. They all need to be numpy arrays.
+        For example, you could have A1,A2 both be 2x1 and B1,B2 both be 2xN or vice versa.
         """
         dx_A = A2[0] - A1[0]
         dy_A = A2[1] - A1[1]
         dx_B = B2[0] - B1[0]
         dy_B = B2[1] - B1[1]
         delta = dx_B * dy_A - dy_B * dx_A
-        if delta == 0:
-            return False  # parallel segments
+        zero_delta = np.where(delta == 0) # parallel segments
+        delta += 1e-16 # avoid divide-by-zero error in next line
         s = (dx_A * (B1[1] - A1[1]) + dy_A * (A1[0] - B1[0])) / delta
         t = (dx_B * (A1[1] - B1[1]) + dy_B * (B1[0] - A1[0])) / (-delta)
-        return (0 <= s <= 1) and (0 <= t <= 1)
+        test_intersect = (0 <= s) * (s <= 1) * (0 <= t) * (t <= 1)
+        test_intersect[zero_delta] = False
+        return test_intersect
 
     @staticmethod
     def _rotmat2D_rad(angle):
@@ -511,3 +516,13 @@ class PosPoly(object):
     def _rotmat2D_deg(angle):
         """Return the 2d rotation matrix for an angle given in degrees."""
         return PosPoly._rotmat2D_rad(np.deg2rad(angle))
+
+if __name__=="__main__":
+    P1 = PosPoly([[0,1,1],[0,0,1]])
+    P2 = P1.translated(0.5,0)
+    P3 = P1.translated(10,0)
+    P4 = P2.rotated(30)
+    print(PosPoly._polygons_collide(P1.points,P1.points))
+    print(PosPoly._polygons_collide(P1.points,P2.points))
+    print(PosPoly._polygons_collide(P1.points,P3.points))
+    print(PosPoly._polygons_collide(P1.points,P4.points))
