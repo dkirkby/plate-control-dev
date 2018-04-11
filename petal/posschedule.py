@@ -27,6 +27,7 @@ class PosSchedule(object):
     def __init__(self, petal,avoidance='EM',verbose=False):
         self.petal = petal
         self.move_tables = []
+        self.posids = [] # internally we keep this list in the same order as self.move_tables
         self.requests = []
 
         class anticol:
@@ -75,7 +76,7 @@ class PosSchedule(object):
     @property
     def collider(self):
         return self.petal.collider
-		
+        
     def request_target(self, posid, uv_type, u, v, log_note=''):
         """Adds a request to the schedule for a given positioner to move to the
         target position (u,v) or by the target distance (du,dv) in the coordinate
@@ -139,8 +140,13 @@ class PosSchedule(object):
         """
         if self._deny_request_because_disabled(move_table.posmodel):
             return
-        self.move_tables.append(move_table)
-        self._merge_tables_for_each_pos()
+        this_posid = move_table.posmodel.posid
+        if this_posid in self.posids:
+            index = self.posids.index(this_posid)
+            self.move_tables[index].extend(move_table)
+        else:
+            self.posids.append(this_posid)
+            self.move_tables.append(move_table)
 
     def schedule_moves(self, anticollision=True):
         """Executes the scheduling algorithm upon the stored list of move requests.
@@ -193,23 +199,6 @@ class PosSchedule(object):
         return was_already_requested
 
     # internal methods
-    def _merge_tables_for_each_pos(self):
-        """In each case where one positioner has multiple tables, they are merged in sequence
-        into a single table.
-        """
-        i = 0
-        while i < len(self.move_tables):
-            j = i + 1
-            extend_list = []
-            while j < len(self.move_tables):
-                if self.move_tables[i].posmodel.posid == self.move_tables[j].posmodel.posid:
-                    extend_list.append(self.move_tables.pop(j))
-                else:
-                    j += 1
-            for e in extend_list:
-                self.move_tables[i].extend(e)
-            i += 1
-
     def _schedule_without_anticollision(self):
         while(self.requests):
             req = self.requests.pop(0)
