@@ -677,9 +677,6 @@ class Petal(object):
             for state in self.altered_states:
                 if log_note:
                     state.next_log_notes.append(log_note)
-                if 'TIME_RECORDED' in state.unit:
-                    del state.unit['TIME_RECORDED']
-                    print(state.unit)
                 state.write()
                 state.log_unit()
         self.altered_states = set()
