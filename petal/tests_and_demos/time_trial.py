@@ -16,7 +16,7 @@ posids_500 = ['M00001','M00002','M00003','M00004','M00005','M00006','M00008','M0
 fidids_12 = ['P077','F001','F010','F011','F017','F021','F022','F025','F029','F074','P022','P057']
 
 # selection of ids
-posids = posids_50
+posids = posids_100
 fidids = fidids_12
 petal_id = 666
 
