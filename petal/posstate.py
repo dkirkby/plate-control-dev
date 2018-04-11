@@ -32,8 +32,9 @@ class PosState(object):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.logging = logging
         self.petal_id = petal_id
-        self.write_to_DB = os.getenv('DOS_POSMOVE_WRITE_TO_DB') if DB_COMMIT_AVAILABLE else False
         self.type = device_type
+
+        # data initialization from .conf file
         if self.type in ['pos','fid']:
             self.settings_directory = pc.dirs[self.type + '_settings']
             self.logs_directory = pc.dirs[self.type + '_logs']
@@ -46,45 +47,47 @@ class PosState(object):
             self.logs_directory = pc.dirs['temp_files']
             self.settings_directory = pc.dirs['temp_files']
             comment = 'Temporary settings file for software test purposes, not associated with a particular unit.'
-
-       
-        
         unit_filename = self.settings_directory + self.unit_basename + '.conf'
         if not(os.path.isfile(unit_filename)):
             temp_filename = template_directory + '_unit_settings_DEFAULT.conf' # read in the template file
-            self.unit = configobj.ConfigObj(temp_filename,unrepr=True,encoding='utf-8')
-            self.unit.initial_comment = [comment,'']
-            self.unit.filename = unit_filename
+            self.conf = configobj.ConfigObj(temp_filename,unrepr=True,encoding='utf-8')
+            self.conf.initial_comment = [comment,'']
+            self.conf.filename = unit_filename
             if self.type == 'pos':
-                self.unit['POS_ID'] = str(unit_id)
+                self.conf['POS_ID'] = str(unit_id)
             else:
-                self.unit['FID_ID'] = str(unit_id)
-                self.unit.write()
+                self.conf['FID_ID'] = str(unit_id)
+                self.conf.write()
         else:
-            self.unit = configobj.ConfigObj(unit_filename,unrepr=True,encoding='utf-8')
+            self.conf = configobj.ConfigObj(unit_filename,unrepr=True,encoding='utf-8')
 
+        # establishment of much faster access python dict, for in-memory operations
+        self._val = self.conf.dict()
+
+        # data initialization from database
+        self.write_to_DB = os.getenv('DOS_POSMOVE_WRITE_TO_DB') if DB_COMMIT_AVAILABLE else False
         if self.write_to_DB:
             if unit_id != None:
                 self.posmoveDB = DBSingleton(self.petal_id)
                 if self.type == 'pos':
-                    self.unit.update(self.posmoveDB.get_pos_id_info(unit_id))
-                    self.unit.update(self.posmoveDB.get_pos_constants(unit_id))
-                    self.unit.update(self.posmoveDB.get_pos_move(unit_id))
-                    self.unit.update(self.posmoveDB.get_pos_calib(unit_id))
+                    self._val.update(self.posmoveDB.get_pos_id_info(unit_id))
+                    self._val.update(self.posmoveDB.get_pos_constants(unit_id))
+                    self._val.update(self.posmoveDB.get_pos_move(unit_id))
+                    self._val.update(self.posmoveDB.get_pos_calib(unit_id))
                 else:
-                    self.unit.update(self.posmoveDB.get_fid_id_info(unit_id))
-                    self.unit.update(self.posmoveDB.get_fid_constants(unit_id))
-                    self.unit.update(self.posmoveDB.get_fid_data(unit_id))
-                    print(self.unit)
-                    self.unit.update(self.posmoveDB.get_fid_calib(unit_id))
+                    self._val.update(self.posmoveDB.get_fid_id_info(unit_id))
+                    self._val.update(self.posmoveDB.get_fid_constants(unit_id))
+                    self._val.update(self.posmoveDB.get_fid_data(unit_id))
+                    print(self._val)
+                    self._val.update(self.posmoveDB.get_fid_calib(unit_id))
             else:
                 self.posmoveDB = DBSingleton()
                 if self.type == 'pos':
-                    self.unit.update(self.posmoveDB.get_pos_def_constants())
+                    self._val.update(self.posmoveDB.get_pos_def_constants())
                 else:
-                    self.unit.update(self.posmoveDB.get_fid_def_constants())
+                    self._val.update(self.posmoveDB.get_fid_def_constants())
 
-
+        # text log file setup
         self.log_separator = '_log_'
         self.log_numformat = '08g'
         self.log_extension = '.csv'
@@ -100,14 +103,13 @@ class PosState(object):
         self.max_log_length = 10000 # number of rows in log before starting a new file
         self.curr_log_length = self._count_log_length() # keep track of this in a separate variable so don't have to recount every time -- only when necessary
         if self.type == 'pos':
-            self.unit['MOVE_CMD'] = ''
-            self.unit['MOVE_VAL1'] = ''
-            self.unit['MOVE_VAL2'] = ''
-
+            self._val['MOVE_CMD'] = ''
+            self._val['MOVE_VAL1'] = ''
+            self._val['MOVE_VAL2'] = ''
         if os.path.isfile(self.log_path):
             with open(self.log_path,'r',newline='') as csvfile:
                 headers = csv.DictReader(csvfile).fieldnames
-            for key in self.unit.keys():
+            for key in self._val.keys():
                 if key not in headers:
                     self.log_basename = self._increment_suffix(self.log_basename) # start a new file if headers don't match up anymore with all the data we're trying to store
                     break
@@ -117,23 +119,18 @@ class PosState(object):
         self.log_unit()
 
     def __str__(self):
-        files = {'settings':self.unit.filename, 'log':self.log_path}
-        if self.type == 'pos':
-            return pprint.pformat({'files':files, 'unit':self.unit})
-        else:
-            return pprint.pformat({'files':files, 'unit':self.unit})
-
+        files = {'settings':self.conf.filename, 'log':self.log_path}
+        return pprint.pformat({'files':files, 'values':self._val})
+        
     def read(self,key):
-        """Returns current value for a given key.
+        """Returns current value for a given key. Left in place for legacy usage,
+        but it is much faster to directly access _val dictionary (for reading values).
         """
-        if key in self.unit.keys():
-            return self.unit[key]
-        self.printfunc('no key ' + repr(key) + ' found')
-        self.printfunc('keys: ' + str(self.unit.keys()))
-        return None
+        return self._val[key]
 
     def store(self,key,val):
-        """Store a value to memory.
+        """Store a value to memory. This is the correct way to store values, as
+        it contains some checks on tolerance values. (Don't write directly to _val.)
         """
         if key in pc.nominals.keys():
             nom = pc.nominals[key]['value']
@@ -141,15 +138,16 @@ class PosState(object):
             if val < nom - tol or val > nom + tol: # check for absurd values
                 self.printfunc('Attempted to set ' + str(key) + ' of ' + str(self.unit_basename) + ' to value = ' + str(val) + ', which is outside the nominal = ' + str(nom) + ' +/- ' + str(tol) + '. Defaulting to nominal value instead.')
                 val = nom
-        if key in self.unit.keys():
-            self.unit[key] = val
+        if key in self._val.keys():
+            self._val[key] = val
         else:
             self.printfunc('value not set, because the key "' + repr(key) + '" was not found')
  
     def write(self):
         """Write all values to disk.
         """
-        self.unit.write()
+        self.conf.update(self._val)
+        self.conf.write()
     
     def log_unit(self):
         """All current unit parameters are written to the hardware unit's log file.
@@ -174,7 +172,7 @@ class PosState(object):
                             start_new_file()
                             break
             with open(self.log_path, 'a', newline='') as csvfile: # now append a row of data
-                row = self.unit.copy()
+                row = self._val.copy()
                 row.update({'TIMESTAMP':timestamp,'NOTE':str(self.next_log_notes)})
                 writer = csv.DictWriter(csvfile,fieldnames=self.log_fieldnames)
                 writer.writerow(row)
@@ -186,7 +184,7 @@ class PosState(object):
     def log_fieldnames(self):
         '''Returns list of fieldnames we save to the log file.
         '''
-        return ['TIMESTAMP'] + list(self.unit.keys()) + ['NOTE']
+        return ['TIMESTAMP'] + list(self._val.keys()) + ['NOTE']
     
     @property
     def log_path(self):
@@ -199,13 +197,13 @@ class PosState(object):
         '''Property setter used here since the log basename is accessed in a few places,
         and want to make sure it is consistently tracked in the .conf file.
         '''
-        if 'CURRENT_LOG_BASENAME' in self.unit.keys():
-            return self.unit['CURRENT_LOG_BASENAME']
+        if 'CURRENT_LOG_BASENAME' in self._val.keys():
+            return self._val['CURRENT_LOG_BASENAME']
         return ''
     
     @log_basename.setter
     def log_basename(self, name):
-        self.unit['CURRENT_LOG_BASENAME'] = name
+        self._val['CURRENT_LOG_BASENAME'] = name
 
     def _increment_suffix(self,s):
         """Increments the numeric suffix at the end of s. This function was specifically written
@@ -244,11 +242,11 @@ class PosState(object):
                                    'LAST_MEAS_BRIGHTNESS'   : 'LAST_MEAS_PEAK',
                                    'LAST_MEAS_BRIGHTNESSES' : 'LAST_MEAS_PEAKS'}
         for old_key in legacy_key_replacements.keys():
-            if old_key in self.unit.keys():
-                temp_val = self.unit[old_key]
-                del self.unit[old_key]
+            if old_key in self._val.keys():
+                temp_val = self._val[old_key]
+                del self._val[old_key]
                 new_key = legacy_key_replacements[old_key]
-                self.unit[new_key] = temp_val
+                self._val[new_key] = temp_val
         # also insert any missing entirely new keys
         if self.type == 'pos':
             possible_new_keys_and_defaults = {'LAST_MEAS_FWHM':None}
@@ -257,8 +255,8 @@ class PosState(object):
                                               'LAST_MEAS_OBS_Y':[],
                                               'LAST_MEAS_FWHMS':[]}
         for key in possible_new_keys_and_defaults:
-            if key not in self.unit.keys():
-                self.unit[key] = possible_new_keys_and_defaults[key]
+            if key not in self._val.keys():
+                self._val[key] = possible_new_keys_and_defaults[key]
 
 if __name__=="__main__":
     state = PosState()
