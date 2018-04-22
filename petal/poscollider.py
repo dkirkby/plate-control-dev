@@ -1,6 +1,5 @@
 import numpy as np
 import posconstants as pc
-import postransforms
 import posplot
 import configobj
 
@@ -429,6 +428,7 @@ class PosPoly(object):
         head = points[:,np.arange(point0_index,len(points[0]))]
         tail = points[:,np.arange(0,point0_index+1*close_polygon)]
         self.points = np.append(head, tail, axis=1)
+        self.points_list = self.points.tolist() # python list is much faster than numpy array for certain kinds of operations, like max/min
 
     def rotated(self, angle, getobject=False):
         """Returns a copy of the polygon object, with points rotated by angle (unit degrees)."""
@@ -443,7 +443,7 @@ class PosPoly(object):
         another PosPoly object. Returns a bool, where true indicates a
         collision.
         """
-        if PosPoly._bounding_boxes_collide(self.points,other.points):
+        if PosPoly._bounding_boxes_collide(self.points_list,other.points_list):
             return PosPoly._polygons_collide(self.points,other.points)
         else:
             return False
@@ -455,13 +455,13 @@ class PosPoly(object):
         Returns True if the bounding boxes collide, False if they do not. Intended as
         a fast check, to enhance speed of other collision detection functions.
         """
-        if   np.max(pts1[0]) < np.min(pts2[0]):
+        if   max(pts1[0]) < min(pts2[0]):
             return False
-        elif np.max(pts1[1]) < np.min(pts2[1]):
+        elif max(pts1[1]) < min(pts2[1]):
             return False
-        elif np.max(pts2[0]) < np.min(pts1[0]):
+        elif max(pts2[0]) < min(pts1[0]):
             return False
-        elif np.max(pts2[1]) < np.min(pts1[1]):
+        elif max(pts2[1]) < min(pts1[1]):
             return False
         else:
             return True
