@@ -3,7 +3,7 @@
 ################
 # iidea - use argv imports
 ## How many positioners would you like to use?
-curnposs = 10
+curnposs = 50
 ## How many times should this run iteratively with new positions?
 nloops = 1
 ## Whether to delete the old temporary files with the same names that will be generated upon execution of this script
@@ -14,18 +14,20 @@ sim_seed = 1036#103950  # None for 'true' random
 make_animations = False
 
 
-
 ##############################
 ####  Imports and setup   ####
 ##############################
 
 ## Need os so that we can define all the environment variables appropriately prior to loading focalplane-specific code
 import os
+import sys
 import numpy as np
 import time
 from astropy.table import Table
 import pdb
 
+os.environ["collision_settings"] = '/software/products/fp_settings-trunk/collision_settings'
+print(os.environ["collision_settings"])
 ## Define the locations in the environment so other modules can find them
 ## Define pythonically all the locations for the desi files
 if 'HOME' in os.environ:
@@ -61,7 +63,7 @@ if not os.path.exists(logdir):
 for dirname in [allsetdir,tempdir,outputsdir,figdir]:
     if not os.path.exists(dirname):
         os.makedirs(dirname)
-
+sys.path.append(os.path.abspath('../'))
 ## Make the last imports, desi specific code
 import petal
 import posconstants as pc
@@ -93,10 +95,9 @@ def run_random_example(nposs,deltemps=False,seed=None,do_anims=False):
     else:
         rand = np.random.RandomState()
     ## Load positioner locations (see docdb 0530
-    pos_locs = os.path.join(allsetdir,'positioner_locations_0530v12.csv')
-    positioners = Table.read(pos_locs,format='ascii.csv',header_start=2,data_start=3)
+    pos_locs = 'positioner_locations_0530v14.csv'#os.path.join(allsetdir,'positioner_locations_0530v12.csv')
+    positioners = Table.read(pos_locs,format='ascii.csv',header_start=0,data_start=1)
     #positioners = locs[((locs['device_type']=='POS')|(locs['device_type']=='FIF')|(locs['type']=='GIF'))]
-
     ## Cut data to appropriate number of positioners
     postype = np.asarray(positioners['device_type'])#[:nposs])
     last_posid = positioners['device_location_id'][postype == 'POS'][:nposs][-1]
@@ -269,6 +270,7 @@ def create_random_state_opt(poscols,posmodels,typ= 'obsTP',randomizer=np.random.
     ## Loop over posmodels. Iterative since we need to add positioners one at a time
     ## to ensure they won't collider
     for i,posmod in enumerate(posmodels):
+        print(i,posmod)
         ## Get targetable ranges and convert to obsTP coordinate system
         pos_mins = [posmod.targetable_range_T[0],posmod.targetable_range_P[0]]
         pos_maxs = [posmod.targetable_range_T[1],posmod.targetable_range_P[1]]
@@ -285,7 +287,7 @@ def create_random_state_opt(poscols,posmodels,typ= 'obsTP',randomizer=np.random.
         for randobstheta,randobsphi in zip(randobsthetas,randobsphis):
             solution_found = True
             ## Check if current position is safe with respect to fixed targets
-            result_fixed = poscols.spatial_collision_with_fixed(i, [randobstheta,randobsphi])
+            result_fixed = poscols.spatial_collision_with_fixed(posmod.posid, [randobstheta,randobsphi])
             ## If collision occurs, try next location in new iteration of loop
             if result_fixed != pc.case.I:
                 solution_found = False
