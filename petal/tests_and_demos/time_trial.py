@@ -4,7 +4,10 @@ sys.path.append(os.path.abspath('../../petal/'))
 import petal
 import cProfile
 import pstats
-
+from astropy.table import Table
+import numpy as np
+import pdb
+import postransforms
 """Timing test script, all done in simulation mode, with no database commits.
 """
 
@@ -16,10 +19,10 @@ posids_500 = ['M00001','M00002','M00003','M00004','M00005','M00006','M00008','M0
 fidids_12 = ['P077','F001','F010','F011','F017','F021','F022','F025','F029','F074','P022','P057']
 
 # selection of ids
-posids = posids_100
+posids = posids_250
 fidids = fidids_12
 petal_id = 666
-
+n_pos=len(posids)
 # timing helper wrapper function
 n_stats_lines = 15
 statsfile = 'stats_petalcode'
@@ -30,10 +33,120 @@ def cProfile_wrapper(evaluatable_string):
     p.strip_dirs()
     p.sort_stats('tottime')
     p.print_stats(n_stats_lines)
-    
+def get_arm_lengths(nvals,rand):
+    ## Empirical data based on first ~2000 positioners
+    r1mean = 3.018
+    r2mean = 3.053626
+    r1std = 0.083
+    r2std = 0.055065
+    r1s = rand.normal(r1mean, r1std, nvals)
+    r2s = rand.normal(r2mean, r2std, nvals)
+    return r1s,r2s
+
+# todo-anthony make this more realistic
+def get_tpoffsets(nvals,rand):
+    ## Completely madeup params
+    tlow,thigh = -180,180 # degrees
+    pmean,pstd = 0, 3 # degrees
+    toffs = rand.uniform(tlow, thigh, nvals)
+    poffs = rand.normal(0, 3, nvals)
+    return toffs,poffs
+
+
+
+# Generate a simulated petal
 # timed test sequence
 cProfile_wrapper('ptl = petal.Petal(petal_id, posids, fidids, simulator_on=True, db_commit_on=False, local_commit_on=True)')
-ptl.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
+ptl.anticollision_default = True # turn off anticollision algorithm for all scheduled moves
+ptl.set(posid='M00093',key='CTRL_ENABLED',value=True)
+
+
+pos_locs = 'positioner_locations_0530v14.csv'#os.path.join(allsetdir,'positioner_locations_0530v12.csv')
+positioners = Table.read(pos_locs,format='ascii.csv',header_start=0,data_start=1)
+seed = 1036
+## if seed is defined, create the random state
+if seed is not None:
+    rand = np.random.RandomState(seed)
+else:
+    rand = np.random.RandomState()
+
+## Randomize arm lengths based on empirical data
+r1s,r2s = get_arm_lengths(n_pos,rand)
+## Randomized tp offsets
+toffs,poffs = get_tpoffsets(n_pos,rand)
+i=0
+j=0
+for row in positioners:
+    if i == n_pos:
+        break
+    idnam, typ, xloc, yloc, zloc, qloc, rloc, sloc = row
+    if typ == 'POS':
+        model = ptl.posmodels[i]
+        #transform = model.trans
+        #x_off,y_off = transform.QS_to_obsXY([float(qloc),float(sloc)])
+        #print(x_off,x_off-float(xloc),y_off,y_off-float(yloc))
+        state = model.state
+        state.store('OFFSET_X',xloc)
+        state.store('OFFSET_Y',yloc)
+        ## store randomized tp offsets
+        state.store('OFFSET_T',toffs[i])
+        state.store('OFFSET_P',poffs[i])
+        ## Stored randomized arm lengths
+        state.store('LENGTH_R1',r1s[i])
+        state.store('LENGTH_R2',r2s[i])
+        state.store('CTRL_ENABLED',True)
+        #state.write()
+        i += 1
+    elif typ == 'FIF' or typ == 'GIF':
+        fidid = fidids[j]
+        state = ptl.fidstates[fidid]
+        state.store('Q',float(qloc))
+        state.store('S',float(sloc))
+        #state.write()
+        j +=1
+    else:
+        print("Type {} didn't match fiducial or positioner!".format(typ))
+
+ 
+# timed test sequence
 cProfile_wrapper('ptl.request_homing(posids)')
 cProfile_wrapper('ptl.schedule_send_and_execute_moves()')
 cProfile_wrapper('ptl.quick_move(posids,"posXY",[4,4])')
+for i in range(len(posids)):
+    pos_t=ptl.posmodels[i].state.read('POS_T')
+    pos_p=ptl.posmodels[i].state.read('POS_P')
+    postrans=postransforms.PosTransforms(this_posmodel=ptl.posmodels[i])
+    xy=postrans.posTP_to_posXY([pos_t,pos_p])
+    print(posids[i],' ',xy)
+    
+
+nx=20
+ny=20
+step_x=12./nx
+step_y=12./ny
+radius_max=5.9
+radius_min=4.
+offset_x_2d=[]
+offset_y_2d=[]
+for i in range(nx):
+    for j in range(ny):
+        offset_x_arr=[]
+        offset_y_arr=[]
+        x_this=i*step_x-6.
+        y_this=j*step_y-6.
+        if np.sqrt(x_this**2+y_this**2) < radius_max and np.sqrt(x_this**2+y_this**2) > radius_min:
+            cProfile_wrapper('ptl.quick_move(posids,"posXY",['+str(x_this)+','+str(y_this)+'])')
+            for k in range(len(posids)):
+                pos_t=ptl.posmodels[k].state.read('POS_T')
+                pos_p=ptl.posmodels[k].state.read('POS_P')
+                postrans=postransforms.PosTransforms(this_posmodel=ptl.posmodels[k])
+                xy=postrans.posTP_to_posXY([pos_t,pos_p])
+                print(posids[k],' ',xy)
+                offset_x_arr.append(xy[0]-x_this)
+                offset_y_arr.append(xy[1]-y_this)
+        offset_x_2d.append(offset_x_arr)
+        offset_y_2d.append(offset_y_arr)
+        if offset_x_arr:
+            print('max offset_x',np.max(np.abs(offset_x_arr)))
+            print('max offset_y',np.max(np.abs(offset_y_arr)))
+pdb.set_trace()
