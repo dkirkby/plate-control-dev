@@ -112,12 +112,12 @@ for row in positioners:
 cProfile_wrapper('ptl.request_homing(posids)')
 cProfile_wrapper('ptl.schedule_send_and_execute_moves()')
 cProfile_wrapper('ptl.quick_move(posids,"posXY",[4,4])')
-for i in range(len(posids)):
-    pos_t=ptl.posmodels[i].state.read('POS_T')
-    pos_p=ptl.posmodels[i].state.read('POS_P')
-    postrans=postransforms.PosTransforms(this_posmodel=ptl.posmodels[i])
-    xy=postrans.posTP_to_posXY([pos_t,pos_p])
-    print(posids[i],' ',xy)
+#for i in range(len(posids)):
+#    pos_t=ptl.posmodels[i].state.read('POS_T')
+#    pos_p=ptl.posmodels[i].state.read('POS_P')
+#    postrans=postransforms.PosTransforms(this_posmodel=ptl.posmodels[i])
+#    xy=postrans.posTP_to_posXY([pos_t,pos_p])
+#    print(posids[i],' ',xy)
     
 
 nx=20
@@ -132,6 +132,7 @@ for i in range(nx):
     for j in range(ny):
         offset_x_arr=[]
         offset_y_arr=[]
+        offset_all_arr=[]
         x_this=i*step_x-6.
         y_this=j*step_y-6.
         if np.sqrt(x_this**2+y_this**2) < radius_max and np.sqrt(x_this**2+y_this**2) > radius_min:
@@ -141,12 +142,16 @@ for i in range(nx):
                 pos_p=ptl.posmodels[k].state.read('POS_P')
                 postrans=postransforms.PosTransforms(this_posmodel=ptl.posmodels[k])
                 xy=postrans.posTP_to_posXY([pos_t,pos_p])
-                print(posids[k],' ',xy)
+                #print(posids[k],' ',xy)
                 offset_x_arr.append(xy[0]-x_this)
                 offset_y_arr.append(xy[1]-y_this)
+                offset_all_arr.append(np.sqrt((xy[0]-x_this)**2+(xy[1]-y_this)**2))
         offset_x_2d.append(offset_x_arr)
         offset_y_2d.append(offset_y_arr)
         if offset_x_arr:
+            index=np.where(np.array(offset_all_arr)>0.02)
+            if index[0].tolist():
+                 print(str(len(index))+' positioners not reach targets')
             print('max offset_x',np.max(np.abs(offset_x_arr)))
             print('max offset_y',np.max(np.abs(offset_y_arr)))
 pdb.set_trace()
