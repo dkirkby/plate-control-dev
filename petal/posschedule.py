@@ -99,15 +99,15 @@ class PosSchedule(object):
 		will NOT be used. Generally, this method should only be used for internal
 		calls by an expert user.
 		"""
-        	if self._deny_request_because_disabled(move_table.posmodel):
-            		return
-        	this_posid = move_table.posmodel.posid
-        	if this_posid in self.posids:
-            		index = self.posids.index(this_posid)
-            		self.move_tables[index].extend(move_table)
-        	else:
-            		self.posids.append(this_posid)
-            		self.move_tables.append(move_table)
+		if self._deny_request_because_disabled(move_table.posmodel):
+			return
+		this_posid = move_table.posmodel.posid
+		if this_posid in self.posids:
+			index = self.posids.index(this_posid)
+			self.move_tables[index].extend(move_table)
+		else:
+			self.posids.append(this_posid)
+			self.move_tables.append(move_table)
 	def schedule_moves(self, anticollision=True):
 		"""Executes the scheduling algorithm upon the stored list of move requests.
 
