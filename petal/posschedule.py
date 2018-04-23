@@ -30,7 +30,7 @@ class PosSchedule(object):
 		self.petal = petal
 		self.move_tables = []
 		self.requests = {}
-		self.posids=[]
+		self.posids = []
 		# todo-anthony make compatible with various tp offsets and tp ranges
 		self.anticol = Anticol(self.collider,self.petal,verbose)
 
@@ -108,6 +108,8 @@ class PosSchedule(object):
 		else:
 			self.posids.append(this_posid)
 			self.move_tables.append(move_table)
+
+
 	def schedule_moves(self, anticollision=True):
 		"""Executes the scheduling algorithm upon the stored list of move requests.
 
