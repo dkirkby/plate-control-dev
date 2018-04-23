@@ -28,12 +28,26 @@ class PosMoveTable(object):
 
     # getters
     @property
-    def for_schedule(self):
+    def for_schedule(self, suppress_any_finalcreep_and_antibacklash=True):
         """Version of the table suitable for move scheduling.
         Distances are given at the output shafts, in degrees.
         Times are given in seconds.
+        
+        An option is provided to select whether final creep and antibacklash
+        moves should be suppressed from the schedule-formatted output table.
+        Typically this option is left as True, since margin space for these moves
+        is included in the geometric envelope of the positioner.
         """
-        return self._for_output_type('schedule')
+        if suppress_any_finalcreep_and_antibacklash:
+            old_finalcreep = self.should_final_creep
+            old_antibacklash = self.should_antibacklash
+            self.should_final_creep = False
+            self.should_antibacklash = False
+        output = self._for_output_type('schedule')
+        if suppress_any_finalcreep_and_antibacklash:
+            self.should_final_creep = old_finalcreep
+            self.should_antibacklash = old_antibacklash
+        return output
 
     @property
     def for_hardware(self):
@@ -192,10 +206,10 @@ class PosMoveTable(object):
             # for hardware type, insert an extra pause-only action if necessary, since hardware commands only really have postpauses
             if output_type == 'hardware' and rows[i].data['prepause']:
                 for key in ['motor_steps_T','motor_steps_P','move_time']:
-                    table[key].insert(0,0)
+                    table[key].insert(i,0)
                 for key in ['speed_mode_T','speed_mode_P']:
-                    table[key].insert(0,'creep') # speed mode doesn't matter here
-                table['postpause'].insert(0,rows[i].data['prepause'])
+                    table[key].insert(i,'creep') # speed mode doesn't matter here
+                table['postpause'].insert(i,rows[i].data['prepause'])
             table['dT'].append(true_moves[pc.T][i]['distance'])
             table['dP'].append(true_moves[pc.P][i]['distance'])
             table['Tdot'].append(true_moves[pc.T][i]['speed'])
@@ -220,8 +234,12 @@ class PosMoveTable(object):
             table['busid'] = self.posmodel.busid
         else:
             table['posid'] = self.posmodel.posid
-        table['nrows'] = len(table['dT'])
-        table['stats'] = self._gather_stats(table)
+        if output_type == 'hardware':
+            table['nrows'] = len(table['move_time'])
+            table['stats'] = {} # thrown away below anyway
+        else:
+            table['nrows'] = len(table['dT'])
+            table['stats'] = self._gather_stats(table)
         table['log_note'] = self.log_note
         restricted_table = table.copy()
         for key in remove_keys:

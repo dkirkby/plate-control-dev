@@ -54,12 +54,17 @@ class PosTransforms(object):
     Note in practice that the coordinate S is similar, but not identical, to the radial distance
     R from the optical axis. This similarity is because the DESI focal plate curvature is gentle.
     See DESI-0530 for detail on the (Q,S) coordinate system.
+    
+    The option "curved" sets whether we are looking at a flat focal plane (such as a laboratory
+    test stand), or a true petal, with it's asphere. When curved == False, PosTransforms will
+    treat S as exactly equal to the radius R.
     """
 
-    def __init__(self, this_posmodel=None):
+    def __init__(self, this_posmodel=None, curved=False):
         if this_posmodel == None:
             this_posmodel = posmodel.PosModel()
         self.posmodel = this_posmodel
+        self.curved = curved
         self.alt_override = False  # alternate calibration values one can set, so one can temporarily override whatever the positioner's stored vals are
         self.alt = {'LENGTH_R1' : 3.0,
                     'LENGTH_R2' : 3.0,
@@ -95,8 +100,8 @@ class PosTransforms(object):
         RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
         """
         (tp, was_not_list) = pc.listify(tp)
-        T = np.array(tp[0]) - (self.posmodel.state._val['OFFSET_T'] if not self.alt_override else self.alt['OFFSET_T'])
-        P = np.array(tp[1]) - (self.posmodel.state._val['OFFSET_P'] if not self.alt_override else self.alt['OFFSET_P'])
+        T = np.array(tp[0]) - (self.posmodel.state.read('OFFSET_T') if not self.alt_override else self.alt['OFFSET_T'])
+        P = np.array(tp[1]) - (self.posmodel.state.read('OFFSET_P') if not self.alt_override else self.alt['OFFSET_P'])
         TP = np.array([T,P]).tolist()
         if was_not_list:
             TP = pc.delistify(TP)
@@ -110,8 +115,8 @@ class PosTransforms(object):
         RETURN: [2][N] array of [[t_values],[p_values]] or [2] array of [t_value,p_value]
         """
         (tp, was_not_list) = pc.listify(tp)
-        T = np.array(tp[0]) + (self.posmodel.state._val['OFFSET_T'] if not self.alt_override else self.alt['OFFSET_T'])
-        P = np.array(tp[1]) + (self.posmodel.state._val['OFFSET_P'] if not self.alt_override else self.alt['OFFSET_P'])
+        T = np.array(tp[0]) + (self.posmodel.state.read('OFFSET_T') if not self.alt_override else self.alt['OFFSET_T'])
+        P = np.array(tp[1]) + (self.posmodel.state.read('OFFSET_P') if not self.alt_override else self.alt['OFFSET_P'])
         TP = np.array([T,P]).tolist()
         if was_not_list:
             TP = pc.delistify(TP)
@@ -125,8 +130,8 @@ class PosTransforms(object):
         RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         """
         (tp, was_not_list) = pc.listify(tp)
-        r = [self.posmodel.state._val['LENGTH_R1'] if not self.alt_override else self.alt['LENGTH_R1'],
-             self.posmodel.state._val['LENGTH_R2'] if not self.alt_override else self.alt['LENGTH_R2']]
+        r = [self.posmodel.state.read('LENGTH_R1') if not self.alt_override else self.alt['LENGTH_R1'],
+             self.posmodel.state.read('LENGTH_R2') if not self.alt_override else self.alt['LENGTH_R2']]
         TP = self.posTP_to_obsTP(tp)  # adjust shaft angles into observer space (since observer sees the physical phi = 0)
         xy = self.tp2xy(TP, r)        # calculate xy in posXY space
         xy = xy.tolist()
@@ -145,8 +150,8 @@ class PosTransforms(object):
         The output "unreachable" is a list of all the indexes of the points that could not be physically reached.
         """
         (xy, was_not_list) = pc.listify(xy)
-        r = [self.posmodel.state._val['LENGTH_R1'] if not self.alt_override else self.alt['LENGTH_R1'],
-             self.posmodel.state._val['LENGTH_R2'] if not self.alt_override else self.alt['LENGTH_R2']]
+        r = [self.posmodel.state.read('LENGTH_R1') if not self.alt_override else self.alt['LENGTH_R1'],
+             self.posmodel.state.read('LENGTH_R2') if not self.alt_override else self.alt['LENGTH_R2']]
         shaft_ranges = self.shaft_ranges(range_limits)
         obs_range = self.posTP_to_obsTP(shaft_ranges)  # want range used in next line to be according to observer (since observer sees the physical phi = 0)
         (tp, unreachable) = self.xy2tp(xy, r, obs_range)
@@ -164,8 +169,8 @@ class PosTransforms(object):
         """
         (xy, was_not_list) = pc.listify(xy)
         
-        X = np.array(xy[0]) + (self.posmodel.state._val['OFFSET_X'] if not self.alt_override else self.alt['OFFSET_X'])
-        Y = np.array(xy[1]) + (self.posmodel.state._val['OFFSET_Y'] if not self.alt_override else self.alt['OFFSET_Y'])
+        X = np.array(xy[0]) + (self.posmodel.state.read('OFFSET_X') if not self.alt_override else self.alt['OFFSET_X'])
+        Y = np.array(xy[1]) + (self.posmodel.state.read('OFFSET_Y') if not self.alt_override else self.alt['OFFSET_Y'])
         XY = np.array([X,Y]).tolist()
         if was_not_list:
             XY = pc.delistify(XY)
@@ -179,8 +184,8 @@ class PosTransforms(object):
         RETURN: [2][N] array of [[x_values],[y_values]] or [2] array of [x_value,y_value]
         """
         (xy, was_not_list) = pc.listify(xy)
-        X = np.array(xy[0]) - (self.posmodel.state._val['OFFSET_X'] if not self.alt_override else self.alt['OFFSET_X'])
-        Y = np.array(xy[1]) - (self.posmodel.state._val['OFFSET_Y'] if not self.alt_override else self.alt['OFFSET_Y'])
+        X = np.array(xy[0]) - (self.posmodel.state.read('OFFSET_X') if not self.alt_override else self.alt['OFFSET_X'])
+        Y = np.array(xy[1]) - (self.posmodel.state.read('OFFSET_Y') if not self.alt_override else self.alt['OFFSET_Y'])
         XY = np.array([X,Y]).tolist()
         if was_not_list:
             XY = pc.delistify(XY)
@@ -198,7 +203,10 @@ class PosTransforms(object):
         Y = np.array(xy[1])
         Q = np.degrees(np.arctan2(Y,X))
         R = np.sqrt(X**2 + Y**2)
-        S = self.R2S(R.tolist())
+        if self.curved:
+            S = self.R2S(R.tolist())
+        else:
+            S = R.tolist()
         QS = [Q.tolist(),S]
         if was_not_list:
             QS = pc.delistify(QS)
@@ -213,7 +221,10 @@ class PosTransforms(object):
         """
         (qs, was_not_list) = pc.listify(qs)
         Q = qs[0]
-        R = self.S2R(qs[1])
+        if self.curved:
+            R = self.S2R(qs[1])
+        else:
+            R = qs[1]
         X = R * np.cos(np.deg2rad(Q))
         Y = R * np.sin(np.deg2rad(Q))
         XY = [X.tolist(),Y.tolist()]
