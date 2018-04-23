@@ -455,6 +455,9 @@ class PosPoly(object):
         Returns True if the bounding boxes collide, False if they do not. Intended as
         a fast check, to enhance speed of other collision detection functions.
         """
+		# Joe note: Use here of python's built-in max() function is intentional, rather than numpy.max(). As of 2018-04-22, I did some
+		# pretty careful timings, and found that for lists up to about 100 elements, the built-in python max function is much faster.
+		# At about 200 elements, they reach parity. Above that, numpy is faster.
         if   max(pts1[0]) < min(pts2[0]):
             return False
         elif max(pts1[1]) < min(pts2[1]):
