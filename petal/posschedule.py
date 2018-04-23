@@ -30,7 +30,7 @@ class PosSchedule(object):
 		self.petal = petal
 		self.move_tables = []
 		self.requests = {}
-                self.posids=[]
+		self.posids=[]
 		# todo-anthony make compatible with various tp offsets and tp ranges
 		self.anticol = Anticol(self.collider,self.petal,verbose)
 
