@@ -2,6 +2,7 @@
 bin/petal -text
 bin/petalcontroller -text
 petal/_deprecated_posschedule.py -text
+petal/bidirect_astar.py -text
 petal/deprecated_posanticollision.py -text
 petal/extra_debug_acnopauses.txt -text
 petal/extra_debug_noacmultistep.txt -text
