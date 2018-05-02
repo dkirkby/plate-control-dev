@@ -20,7 +20,7 @@ MoveGUI
 # History: V1.0   Kai Zhang @LBNL  2017-10-17   Contact: zkdtckk@gmail.com
 # Implemented on Beyonce on 2017-10-17, just change the data_processing_scripts relative location to work. 
 #          V1.1  Kai Zhang, 2018-04-02. Add canbus input to talk to different cans for EM Petal. 
-
+#          V1.2  Kai Zhang  2018-05-01. Add Reload Canbus botton so that no restart is needed. Facilitate the petal check. 
 """
 import os
 import sys
@@ -90,8 +90,8 @@ class MoveGUI(object):
         
         self.simulate = False
         self.logfile='MoveGUI.log'
-        fvc_type='simulator'
-        fidids=['F021']   
+        self.fvc_type='simulator'
+        self.fidids=['F021']   
         gui_root.title='Move Controll for Petal '+str(self.ptl_id)
         self.pcomm=petalcomm.PetalComm(self.ptl_id)
         self.mode = 0
@@ -111,8 +111,8 @@ class MoveGUI(object):
                 self.posids.append('M0'+str(key))
             elif len(str(key))==5:
                 self.posids.append('M'+str(key))
-        self.ptl = petal.Petal(self.ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite)
-        self.fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
+        self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+        self.fvc = fvchandler.FVCHandler(self.fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
         
 # GUI input       
@@ -135,6 +135,11 @@ class MoveGUI(object):
         self.e2=Entry(gui_root)
         self.e2.grid(row=0,column=3)
 
+        self.e_can=Entry(gui_root,width=10)
+        self.e_can.grid(row=5,column=0,sticky=E)
+        self.e_can.insert(0,self.canbus.strip('can'))
+        Label(gui_root,text="CAN Bus:").grid(row=5,column=0,sticky=W,padx=10)
+
         Button(gui_root,text='Theta CW',width=10,command=self.theta_cw_degree).grid(row=3,column=1,sticky=W,pady=4)
         Button(gui_root,text='Theta CCW',width=10,command=self.theta_ccw_degree).grid(row=4,column=1,sticky=W,pady=4)
         self.mode=IntVar(gui_root)
@@ -142,9 +147,11 @@ class MoveGUI(object):
         Checkbutton(gui_root, text='CAN', variable=self.mode).grid(row=3,column=2,sticky=W,pady=4)
         Button(gui_root,text='Phi CW',width=10,command=self.phi_cw_degree).grid(row=3,column=0,sticky=W,pady=4)
         Button(gui_root,text='Phi CCW',width=10,command=self.phi_ccw_degree).grid(row=4,column=0,sticky=W,pady=4)
-        Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=5,column=1,sticky=W,pady=4)
+        Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=5,column=2,sticky=W,pady=4)
+        Button(gui_root,text='Reload CANBus',width=12,command=self.reload_canbus).grid(row=5,column=1,sticky=W,pady=4)
         Button(gui_root,text='Write SiID',width=10,command=self.write_siid).grid(row=5,column=3,sticky=W,pady=4)
         Button(gui_root,text='Center',width=10,command=self.center).grid(row=4,column=2,sticky=W,pady=4)                
+
         self.listbox1 = Listbox(gui_root, width=20, height=20)
         self.listbox1.grid(row=6, column=0,rowspan=10,pady=4,padx=15)
         # create a vertical scrollbar to the right of the listbox
@@ -466,6 +473,37 @@ class MoveGUI(object):
     def restart(self):
         gui_root.destroy()
         MoveGUI()
+    def reload_canbus(self):
+        self.canbus='can'+self.e_can.get().strip()        
+        self.bus_id=self.canbus
+        self.info = self.pcomm.get_posfid_info(self.canbus)
+        self.posids = []
+        print(self.info)
+        for key in sorted(self.info.keys()):
+            if len(str(key))==2:
+                self.posids.append('M000'+str(key))
+            elif len(str(key))==3:
+                self.posids.append('M00'+str(key))
+            elif len(str(key))==4:
+                self.posids.append('M0'+str(key))
+            elif len(str(key))==5:
+                self.posids.append('M'+str(key))
+        self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+        self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
+        cs=self.listbox1.curselection()
+        #self.listbox1.delete(0,cs[0] -1)
+        self.listbox1.delete(0,END)
+        self.listbox1.insert(tkinter.END,'ALL')
+        for key in sorted(self.info.keys()):
+            if len(str(key))==2:
+                self.listbox1.insert(tkinter.END,'M000'+str(key))
+            elif len(str(key))==3:
+                self.listbox1.insert(tkinter.END,'M00'+str(key))
+            elif len(str(key))==4:
+                self.listbox1.insert(tkinter.END,'M0'+str(key))
+            elif len(str(key))==5:
+                self.listbox1.insert(tkinter.END,'M'+str(key))
+
     def clear1(self):
         self.text1.delete('0.0', END)
     def clear2(self):
