@@ -467,8 +467,41 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not set petalbox setting with pbset.  Exception: %s' % str(e)
 
+    def read_gfa_ovrtmp(self):
+        """
+        Read GFA OVER_TEMP signal
+        """
+        try:
+            return self._call_device('read_gfa_ovrtmp')
+        except Exception as e:
+            return 'FAILED: Can not read GFA OVER_TEMP signal.  Exceptions: %s' % str(e)
 
+    def read_adc(self, adc_num):
+        """
+        Read specified anolog input
+        """
+        try:
+            return self._call_device('read_adc', adc_num)
+        except Exception as e:
+            return 'FAILED: Can not read ADC.  Exception: %s' % str(e)
+ 
+    def send_gfa_serial(self, message):
+        """
+        Send out message to GFA serial port
+        """
+        try:
+            return self._call_device('send_gfa_serial', message)
+        except Exception as e:
+            return 'FAILED: Can not send message to GFA port.  Exception: %s' % str(e)
 
+    def recv_gfa_serial(self):
+        """
+        Receive message from GFA serial port
+        """
+        try:
+            return self._call_device('recv_gfa_serial')
+        except Exception as e:
+            return 'FAILED: Can not read GFA port.  Exception: %s' % str(e)
 
 
 
