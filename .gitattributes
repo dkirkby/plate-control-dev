@@ -28,6 +28,7 @@ petal/tests_and_demos/fiberlife.py -text
 petal/tests_and_demos/focal_surface_lookup.csv -text
 petal/tests_and_demos/gtorque_test.py -text
 petal/tests_and_demos/movetablescr.py -text
+petal/tests_and_demos/pbutil.py -text
 petal/tests_and_demos/pift.py -text
 petal/tests_and_demos/positioner_locations_0530v14.csv -text
 petal/tests_and_demos/power_test.py -text
