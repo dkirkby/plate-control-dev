@@ -461,7 +461,7 @@ class MoveGUI_Petal(object):
     
     def restart(self):
         gui_root.destroy()
-        MoveGUI()
+        MoveGUI_Petal()
     def clear1(self):
         self.text1.delete('0.0', END)
     def clear2(self):

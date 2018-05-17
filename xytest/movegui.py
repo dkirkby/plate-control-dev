@@ -267,7 +267,7 @@ class MoveGUI(object):
         elif self.selected_can<7000:
             self.text1.insert(END,'No, you cannot set a positioners as a fiducial, this will burn the motor! \n')
         else:
-            self.pcomm.set_fiducials(['can0'], [self.selected_can], [self.e2.get()])
+            self.pcomm.set_fiducials([self.canbus], [self.selected_can], [self.e2.get()])
             self.text1.insert(END,'Set Fiducial '+str(self.selected_can)+' to '+str(self.e2.get())+' successfully! \n')
         
     def get_list(self,event):
