@@ -26,7 +26,7 @@ class PosSchedule(object):
 	Initialize with the petal object this schedule applies to.
 	"""
 
-	def __init__(self, petal,avoidance='EM',verbose=False):
+	def __init__(self, petal,avoidance='tweak',verbose=False):
 		self.petal = petal
 		self.move_tables = []
 		self.requests = {}
@@ -133,6 +133,7 @@ class PosSchedule(object):
 			self._schedule_with_anticollision()
 		else:
 			self._schedule_without_anticollision()
+		pdb.set_trace()
 		if self.anticol.debug:
 			print("\n\n\nResulting Schedules:")
 			print("\tIn scheduler:")
@@ -216,23 +217,6 @@ class PosSchedule(object):
 		was_already_requested = posid in self.requests
 		return was_already_requested
 
-	## internal methods
-	def _merge_tables_for_each_pos(self):
-		"""In each case where one positioner has multiple tables, they are merged in sequence
-		into a single table.
-		"""
-		i = 0
-		while i < len(self.move_tables):
-			j = i + 1
-			extend_list = []
-			while j < len(self.move_tables):
-				if self.move_tables[i].posmodel.posid == self.move_tables[j].posmodel.posid:
-					extend_list.append(self.move_tables.pop(j))
-				else:
-					j += 1
-			for e in extend_list:
-				self.move_tables[i].extend(e)
-			i += 1
 
 	def _deny_request_because_disabled(self, posmodel):
 		"""This is a special function specifically because there is a bit of care we need to
@@ -261,7 +245,6 @@ class PosSchedule(object):
 
 	def _create_direct_movetable(self,request):
 		posmodel = request['posmodel']
-		# print(posmodel.posstate.get('LENGTH_R1'))
 		table = posmovetable.PosMoveTable(posmodel)
 		dtdp = posmodel.trans.delta_posTP(request['targt_posTP'], \
 										  request['start_posTP'], range_wrap_limits='targetable')
@@ -380,7 +363,7 @@ class PosSchedule(object):
 			for key in stages:
 				movetime = current_tables_dict[key].for_schedule['stats']['net_time']
 				info_for_all_stages[key]['movetables'][posid] = current_tables_dict[key]
-				info_for_all_stages[key]['movetimes'][posid] = movetime[0]
+				info_for_all_stages[key]['movetimes'][posid] = movetime[0] # should be -1? Kai & Joe
 
 
 		## For each of r, r, and e, find the maximum time that
@@ -393,7 +376,7 @@ class PosSchedule(object):
 			for posid in requested_posids:
 				table, movetime = stage_info['movetables'][posid],stage_info['movetimes'][posid]
 				if movetime<stage_info['maxtime']:
-					table.set_postpause(0,stage_info['maxtime']-movetime)
+					table.set_postpause(int(table.for_schedule['nrows'])-1,stage_info['maxtime']-movetime)
 
 		if self.anticol.verbose:
 			print_str = "Max times to start are: "
@@ -415,7 +398,9 @@ class PosSchedule(object):
 			## Check for collisions   oper_info['
 			collision_indices, collision_types = \
 					self._check_for_collisions(tpstarts,movetables)
-
+			print('Stage:',stage)
+			print('Collision_indices',collision_indices)
+			print('Collision_types',collision_types)
 			## If no collisions, move directly to the next step
 			if len(collision_indices) == 0:
 				continue
@@ -431,9 +416,27 @@ class PosSchedule(object):
 									collision_indices, collision_types, tpstarts, \
 									tpfinals, stage, maxtime, \
 									algorithm=self.anticol.avoidance)
+			info_for_all_stages[stage]['movetables']=movetables   #Kai: Update the info_for_all_stages
+			for posid, req in self.requests.items():
+				movetime = info_for_all_stages[stage]['movetables'][posid].for_schedule['stats']['net_time']
+				info_for_all_stages[stage]['movetimes'][posid] = movetime[-1]
+			# Synchronization
+			stage_info = info_for_all_stages[stage]
+			stage_info['maxtime'] = max(stage_info['movetimes'].values())
+			for posid in requested_posids:
+				table, movetime = stage_info['movetables'][posid],stage_info['movetimes'][posid]
+				if movetime<stage_info['maxtime']:
+					table.set_postpause(int(table.for_schedule['nrows'])-1,stage_info['maxtime']-movetime+table.for_schedule['postpause'][0])
 
 			if self.anticol.verbose:
 				## Check for collisions
+				tps_check,tables_check={},{}
+				tps_check['M00131']=tpstarts['M00131']
+				tps_check['M00152']=tpstarts['M00152']
+				tables_check['M00131']=movetables['M00131']
+				tables_check['M00152']=movetables['M00152']
+				a,b=self._check_for_collisions(tps_check,tables_check)
+				print('131,152 check',a,b,tps_check)
 				collision_indices, collision_types = \
 						self._check_for_collisions(tpstarts,movetables)
 				self._printindices('Collisions after Round 1, in Step ',stage,collision_indices)
@@ -456,7 +459,6 @@ class PosSchedule(object):
 			merged_tables = self._combine_tables(output_tables)
 		else:
 			raise(TypeError)
-
 		# Get the obsTP dictionary of starting positions for each positioner in the first move stage
 		first_stage = stages[0]
 		tp_starts = info_for_all_stages[first_stage]['tpstarts']
@@ -464,9 +466,16 @@ class PosSchedule(object):
 		## animate
 		if self.anticol.make_animations == True:
 			self._animate_movetables(merged_tables, tp_starts)
-
+		tps_check,tables_check={},{}
+		tps_check['M00131']=tp_starts['M00131']
+		tps_check['M00152']=tp_starts['M00152']
+		tables_check['M00131']=merged_tables['M00131']
+		tables_check['M00152']=merged_tables['M00152']
+		a,b=self._check_for_collisions(tps_check,tables_check)
+		print('131,152 check after merge',a,b,tps_check)
+		pdb.set_trace()
 		collision_indices, collision_types = self._check_for_collisions(tp_starts, merged_tables)
-
+		print('Collisions that need Zeroth order avoidance',collision_indices)
 		## If no collisions, move directly to the next step
 		if len(collision_indices) > 0:
 			merged_tables, zeroed = self._avoid_collisions(merged_tables,collision_indices,tpss=tp_starts,algorithm='zeroth_order')
@@ -534,20 +543,17 @@ class PosSchedule(object):
 		## return this positioners rre movetable
 		return table, tpsi, tpfi
 
+
+
 	def _avoid_collisions(self, tables, collision_indices, \
 						  collision_types={}, tpss={}, tpfs={}, \
-						  step='retract', maxtimes=np.inf, algorithm='astar'):
+						  step='retract', maxtimes=np.inf, algorithm='tweak'):
 		'''
 			Function that is called with a list of collisions that need to be avoided. This uses 
 			a 'force law' type approach to generate moves that avoid neighboring positioners 
 			that it would otherwise collide with.
 		'''
-		# if algorithm.lower() in ['zeroth_order','zeroth order','zeroeth_order','zeroeth order']:
-		#     return self._avoid_collisions_zerothorder(tables,collision_indices,tpss)
-		# else:
-		#     return self._avoid_collisions_astar(tables, collision_indices, \
-		#                                     collision_types, tpss, tpfs, \
-		#                                     step, maxtimes, algorithm)
+		print('Algorithm',algorithm)
 		if algorithm.lower() in ['zeroth_order','zeroth order','zeroeth_order','zeroeth order']:
 			return self._avoid_collisions_zerothorder(tables,collision_indices,tpss)
 		# Larger phis are more tucked in, check if they are all tucked in enough
@@ -570,9 +576,136 @@ class PosSchedule(object):
 			return self._avoid_collisions_astar(tables, collision_indices, \
 						  collision_types, tpss, tpfs, \
 						  step, maxtimes, algorithm)
+		elif algorithm.lower() == 'tweak':
+			return self._avoid_collisions_tweak(tables,collision_indices, collision_types,tpss,tpfs,step,maxtimes,algorithm)
 		else:
 			return self._avoid_collisions_zerothorder(tables, collision_indices,tpss)
 
+
+	def _avoid_collisions_tweak(self,tables,collision_indices, collision_types,tpss,tpfs,step,maxtimes,algorithm):
+		ptl=self.petal
+		posids=[ptl.posmodels[i].posid for i in range(len(ptl.posmodels))]
+		offsetX_arr=[ptl.posmodels[i].state._val['OFFSET_X'] for i in range(len(ptl.posmodels))]
+		offsetY_arr=[ptl.posmodels[i].state._val['OFFSET_Y'] for i in range(len(ptl.posmodels))]
+		altered_pos=[]
+		for collision_indices_this,collision_type_this in zip(collision_indices,collision_types):
+			posA,posB=collision_indices_this[0],collision_indices_this[1]
+			print('Solving',posA,posB,collision_type_this)
+			# Find neighbours first
+			neighbours_this_pair=set()
+			pos_neighbour_A,pos_neighbour_B=[],[]
+			index_neighbour_A,index_neighbour_B=[],[]
+			if posA != None:
+				pos_neighbour_A,index_neighbour_A=self.find_neighbours(posA,posids,offsetX_arr,offsetY_arr)
+			if posB != None:
+				pos_neighbour_B,index_neighbour_B=self.find_neighbours(posB,posids,offsetX_arr,offsetY_arr)
+			index_neighbour_this_pair=set(index_neighbour_A)|set(index_neighbour_B)
+			neighbours_this_pair=set(pos_neighbour_A) | set(pos_neighbour_B)
+
+			tps_check,tables_check={},{}
+			if posA != None and posB != None:
+				tables_backup=copymodule.deepcopy(tables)
+				for j in neighbours_this_pair:
+					tps_check[j]=tpss[j]
+					tables_check[j]=tables[j]
+				########################
+				# Tweaks begin
+				########################
+				tables=self.tweak_add_prepause(tables,posA,1.)
+				for j in neighbours_this_pair:
+                                        tps_check[j]=tpss[j]
+                                        tables_check[j]=tables[j]
+				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
+				if len(collision_types_try)==0 :
+					print('Solved by pause posA!')
+					altered_pos.append(posA)
+					continue
+				else:
+					tables=copymodule.deepcopy(tables_backup)
+
+
+				tables=self.tweak_add_prepause(tables,posB,1.)
+				for j in neighbours_this_pair:
+                                        tps_check[j]=tpss[j]
+                                        tables_check[j]=tables[j]
+				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
+				if len(collision_types_try)==0 :
+					print('Solved by pause posB!')
+					altered_pos.append(posA)
+					continue
+				else:
+					tables=copymodule.deepcopy(tables_backup)
+
+				tables=self.tweak_move_theta(tables,posA,5.)
+				for j in neighbours_this_pair:
+                                        tps_check[j]=tpss[j]
+                                        tables_check[j]=tables[j]
+				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
+				if len(collision_types_try)==0 :
+					print('Solved by moving posA theta 5 degree!')
+					altered_pos.append(posA)
+					continue
+				else:
+					tables=copymodule.deepcopy(tables_backup)
+
+				tables=self.tweak_move_theta(tables,posB,5)
+				for j in neighbours_this_pair:
+                                        tps_check[j]=tpss[j]
+                                        tables_check[j]=tables[j]
+				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
+				if len(collision_types_try)==0 :
+					print('Solved by moving posB theta -5 degree!')
+					altered_pos.append(posB)
+					continue
+				else:
+					tables=copymodule.deepcopy(tables_backup)
+				
+
+		return tables, altered_pos
+
+	def find_neighbours(self,posid,posids,offsetX_arr,offsetY_arr):
+		ptl=self.petal
+		index=posids.index(posid)
+		offsetX=ptl.posmodels[int(index)].state._val['OFFSET_X']
+		offsetY=ptl.posmodels[int(index)].state._val['OFFSET_Y']
+		pos_dist=np.sqrt((np.array(offsetX_arr)-offsetX)**2+(np.array(offsetY_arr)-offsetY)**2)
+		index1=np.where(pos_dist <= 11)
+		index2=np.where(pos_dist > 0.2)
+		index=set(index1[0].tolist()) & set(index2[0].tolist())
+		index_neighbour=list(index)
+		pos_neighbour=[posids[i] for i in index_neighbour]
+		return pos_neighbour,index_neighbour
+
+	def tweak_add_prepause(self,tables,posid,time):
+		table = tables[posid]
+		table.set_prepause(0, time)
+		tables[posid] = table
+		return tables
+
+	def tweak_move_theta(self,tables,posid,dT):
+		table = tables[posid]
+		nrows=len(table.rows)
+		table.insert_new_row(0)
+		table.insert_new_row(nrows+1)
+		nrows=len(table.rows)
+		table.set_move(0, pc.T, dT)
+		table.set_move(nrows-1,pc.T,-dT)
+		tables[posid] = table
+		return tables
+
+	def tweak_move_phi(self,tables,posid,dP):
+		table = tables[posid]
+		nrows=len(table.rows)
+		table.insert_new_row(0)
+		table.insert_new_row(nrows+1)
+		nrows=len(table.rows)
+		table.set_move(0, pc.P, dP)
+		table.set_move(nrows-1,pc.P,-dP)
+		tables[posid] = table
+		return tables
+
+	def tweak_move_theta_phi(self,tables,posid,dT,dP):
+		pass
 	# todo-anthony split this into algorithm generic and specific, move generic to above function
 	def _avoid_collisions_astar(self, tables, collision_indices, \
 						  collision_types, tpss, tpfs, \
@@ -654,6 +787,7 @@ class PosSchedule(object):
 					unchangings = [A] ## Theta fiber
 				# No need to loop over changing unchanging because its the same spatial collision between the two
 				init_type = self.collider.spatial_collision_between_positioners(A, B, tpss[A], tpss[B])
+				print('init_type:',A,tpss[A],B,tpss[B],init_type)
 				if init_type != pc.case.I:
 					if self.anticol.verbose:
 						print("The current situation can't be resolved in this configuration, as the initial " + \
@@ -902,7 +1036,9 @@ class PosSchedule(object):
 					table.set_prepause(0, prepause)
 
 				indices, coltype = self._check_single_positioner_for_collisions(tpss,tables,changing)
-				if coltype == pc.case.I:
+				print(coltype)
+				print(indices)
+				if len(set(coltype)) ==1 and coltype[0] == pc.case.I:
 					stallmovetimes.append(newmovetime)
 					altered_pos.append(changing)
 					neighbor_ofaltered.union(set(neighbor_ids))
@@ -1238,7 +1374,7 @@ class PosSchedule(object):
 									or [*,None] if colliding with a wall of fiducial.
 				collision_types:   Type of collision as specified in the pc class
 		'''
-		all_posids = self.collider.posids
+		all_posids = [key for key in tables]  # Changed by Kai to work for only a group of positioners
 		sweeps = {posid: PosSweep(posid) for posid in all_posids}
 		collision_ids = {posid: [] for posid in all_posids}
 		collision_type = {posid: pc.case.I for posid in all_posids}
@@ -1452,7 +1588,41 @@ class PosSchedule(object):
 		  that holds information about the number of times each index appears
 		'''         
 		return Counter(np.ravel(indices))
+	def _get_tabletype(self):
+                ## Now look at requests. if moves are small enough, move directly without RRE unless
+                ## explicitly told never to move direct
+		dts_list,dps_list = [],[]
+		for posid,req in self.requests.items():
+			posmodel = req['posmodel']
+			if posmodel.posid != posid and self.anticol.verbose:
+				print("The posid of the request posmodel didn't match the posid key!")
 
+                        ## Find the total extent of the move and save that to a list
+			dtdp = posmodel.trans.delta_posTP(req['targt_posTP'],req['start_posTP'], range_wrap_limits='targetable')
+			dts_list.append(dtdp[pc.T])
+			dps_list.append(dtdp[pc.P])
+
+		dts,dps = np.asarray(dts_list),np.asarray(dps_list)
+		if np.all(dts < self.anticol.theta_direct_threshold) and np.all(dps < self.anticol.phi_direct_threshold) and not self.anticol.never_direct:
+			if self.anticol.verbose:
+				print("Scheduling a direct move, with AC")
+			table_type='direct'
+		else:
+                        ## Make sure that the table type option is one of the allowed keywords
+			for opt in self.anticol.table_type_options:
+				if self.anticol.default_table_type.lower() == opt.lower() and self.anticol.default_table_type != opt:
+					self.anticol.default_table_type = opt
+			if self.anticol.default_table_type not in self.anticol.table_type_options:
+				print_str = 'Table type was not one of: '
+				for opt in self.anticol.table_type_options:
+					print_str += '{}, '.format(opt)
+				print(print_str+'. Exiting')
+				raise(TypeError)
+			if self.anticol.verbose:
+				print("Scheduling move with {} and AC".format(self.anticol.default_table_type))
+			table_type=self.anticol.default_table_type
+
+		return table_type
 
 class Anticol:
 	def __init__(self,collider,petal,verbose, thetas=None,phis=None):
@@ -1460,16 +1630,16 @@ class Anticol:
 		# User defineable parameters #
 		##############################
 		##** General PARAMS **##
-		self.avoidance = 'astar' ## avoidance
+		self.avoidance = 'tweak'#'astar' ## avoidance
 		self.verbose = verbose
-		self.plotting = False#True
+		self.plotting = True
 		self.make_animations = False#True
 		self.use_pdb = False#True
 		self.debug = True
 		self.collider = collider
 
 		self.table_type_options = ['direct', 'RRE', 'RRrE']
-		self.default_table_type = 'RRrE'  # options in line above
+		self.default_table_type = 'RRE'  # options in line above
 		self.never_direct = False
 		self.theta_direct_threshold = 3.
 		self.phi_direct_threshold = 3.
