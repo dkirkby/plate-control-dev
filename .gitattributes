@@ -13,6 +13,7 @@ petal/petaltransforms.py -text
 petal/petsockcomm.py -text
 petal/poscollider.py -text
 petal/posconstants.py -text
+petal/positioner_locations_0530v14.csv -text
 petal/posmodel.py -text
 petal/posmovetable.py -text
 petal/posplot.py -text
@@ -30,7 +31,6 @@ petal/tests_and_demos/gtorque_test.py -text
 petal/tests_and_demos/movetablescr.py -text
 petal/tests_and_demos/pbutil.py -text
 petal/tests_and_demos/pift.py -text
-petal/tests_and_demos/positioner_locations_0530v14.csv -text
 petal/tests_and_demos/power_test.py -text
 petal/tests_and_demos/py_vs_numpy.py -text
 petal/tests_and_demos/stats_petalcode -text
