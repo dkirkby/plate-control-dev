@@ -68,6 +68,8 @@ posfidfvc/SBIG/usbreset.py -text
 posfidfvc/fitcircle.py -text
 posfidfvc/fvchandler.py -text
 posfidfvc/initialize_hwsetup.py -text
+posfidfvc/initialize_hwsetup_desi.py -text
+posfidfvc/instrmaker.py -text
 posfidfvc/mightex/19-mightex_udev.rules -text
 posfidfvc/mightex/Makefile -text
 posfidfvc/mightex/README.txt -text
