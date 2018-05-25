@@ -290,6 +290,7 @@ class MoveGUI(object):
         return sid_dict
             
     def show_info(self):
+        self.text1.insert(END,len(self.info.keys())+' Pos+Fid are found \n')
         for key in sorted(self.info.keys()):
             self.text1.insert(END,str(key)+' '+str(self.info[key])+'\n')
             
