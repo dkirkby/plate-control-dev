@@ -27,6 +27,7 @@ petal/tests_and_demos/em_test.py -text
 petal/tests_and_demos/em_test_sim.py -text
 petal/tests_and_demos/fiberlife.py -text
 petal/tests_and_demos/focal_surface_lookup.csv -text
+petal/tests_and_demos/generate_fake_pos_targets.py -text
 petal/tests_and_demos/gtorque_test.py -text
 petal/tests_and_demos/movetablescr.py -text
 petal/tests_and_demos/pbutil.py -text
