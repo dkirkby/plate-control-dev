@@ -1,5 +1,6 @@
 import posmovetable
 import posconstants as pc
+import postransforms
 from poscollider import PosSweep
 from bidirect_astar import inertial_bidirectional_astar_pathfinding
 
@@ -383,14 +384,18 @@ class PosSchedule(object):
 			for stage in stages:
 				print_str += "{}={:.4f}, ".format(stage, info_for_all_stages[stage]['maxtime'])
 			print(print_str)
-
+		info_original=copymodule.copy(info_for_all_stages)
 		for stage in stages:
 			stage_info = info_for_all_stages[stage]
 			tpstarts = stage_info['tpstarts']
 			tpfinals = stage_info['tpfinals']
 			movetables = stage_info['movetables']
 			maxtime = stage_info['maxtime']
-
+			for posid in requested_posids:   # Update Movetable state
+				postrans=postransforms.PosTransforms(this_posmodel=movetables[posid].posmodel)
+				posTP=postrans.obsTP_to_posTP(tpstarts[posid])
+				movetables[posid].posmodel.state.store('POS_T',posTP[0])
+				movetables[posid].posmodel.state.store('POS_P',posTP[1])				
 			## animate
 			if self.anticol.make_animations == True:
 				self._animate_movetables(movetables, tpstarts)
@@ -430,13 +435,6 @@ class PosSchedule(object):
 
 			if self.anticol.verbose:
 				## Check for collisions
-				tps_check,tables_check={},{}
-				tps_check['M00131']=tpstarts['M00131']
-				tps_check['M00152']=tpstarts['M00152']
-				tables_check['M00131']=movetables['M00131']
-				tables_check['M00152']=movetables['M00152']
-				a,b=self._check_for_collisions(tps_check,tables_check)
-				print('131,152 check',a,b,tps_check)
 				collision_indices, collision_types = \
 						self._check_for_collisions(tpstarts,movetables)
 				self._printindices('Collisions after Round 1, in Step ',stage,collision_indices)
@@ -447,6 +445,12 @@ class PosSchedule(object):
 					print('Movetables are not the same between movetables and the stage movetable')
 				if stage_info['movetables'] is not info_for_all_stages[stage]['movetables']:
 					print('Movetables are not the same between stage_info and info_for_all_stages')
+		movetables_t=info_for_all_stages['retract']['movetables']
+		for posid in requested_posids:   # Update Movetable state
+			postrans=postransforms.PosTransforms(this_posmodel=movetables_t[posid].posmodel)
+			posTP=postrans.obsTP_to_posTP(info_original['retract']['tpstarts'][posid])
+			movetables_t[posid].posmodel.state.store('POS_T',posTP[0])
+			movetables_t[posid].posmodel.state.store('POS_P',posTP[1])  
 
 		if table_type == 'direct':
 			merged_tables = info_for_all_stages['direct']['movetables']
@@ -466,14 +470,6 @@ class PosSchedule(object):
 		## animate
 		if self.anticol.make_animations == True:
 			self._animate_movetables(merged_tables, tp_starts)
-		tps_check,tables_check={},{}
-		tps_check['M00131']=tp_starts['M00131']
-		tps_check['M00152']=tp_starts['M00152']
-		tables_check['M00131']=merged_tables['M00131']
-		tables_check['M00152']=merged_tables['M00152']
-		a,b=self._check_for_collisions(tps_check,tables_check)
-		print('131,152 check after merge',a,b,tps_check)
-		pdb.set_trace()
 		collision_indices, collision_types = self._check_for_collisions(tp_starts, merged_tables)
 		print('Collisions that need Zeroth order avoidance',collision_indices)
 		## If no collisions, move directly to the next step
@@ -505,9 +501,12 @@ class PosSchedule(object):
 		'''
 		## Get a table class instantiation
 		table = {}
-		table['retract'] = posmovetable.PosMoveTable(current_positioner_model)
-		table['rotate'] = posmovetable.PosMoveTable(current_positioner_model)
-		table['extend'] = posmovetable.PosMoveTable(current_positioner_model)
+		a=copymodule.copy(current_positioner_model)
+		b=copymodule.copy(a)
+		c=copymodule.copy(b)
+		table['retract'] = posmovetable.PosMoveTable(a)
+		table['rotate'] = posmovetable.PosMoveTable(b)
+		table['extend'] = posmovetable.PosMoveTable(c)
 		##redefine phi inner:
 		phi_inner = max(self.anticol.phisafe,tp_start[pc.P])
 		## Find the theta and phi movements for the retract move
@@ -536,6 +535,7 @@ class PosSchedule(object):
 			dtdp = current_positioner_model.trans.delta_obsTP(tpfi, tpff,range_wrap_limits='targetable')
 		else:
 			dtdp = current_positioner_model.trans.delta_obsTP(tpff, tpfi, range_wrap_limits='targetable')
+
 		table['extend'].set_move(0, pc.T, dtdp[pc.T])
 		table['extend'].set_move(0, pc.P, dtdp[pc.P])
 		table['extend'].set_prepause(0, 0.0)
@@ -636,30 +636,120 @@ class PosSchedule(object):
 				else:
 					tables=copymodule.deepcopy(tables_backup)
 
-				tables=self.tweak_move_theta(tables,posA,5.)
+				tables=self.tweak_move_theta(tables,posA,45.)
 				for j in neighbours_this_pair:
                                         tps_check[j]=tpss[j]
                                         tables_check[j]=tables[j]
 				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
 				if len(collision_types_try)==0 :
-					print('Solved by moving posA theta 5 degree!')
+					print('Solved by moving posA theta 45 degree!')
 					altered_pos.append(posA)
 					continue
 				else:
 					tables=copymodule.deepcopy(tables_backup)
 
-				tables=self.tweak_move_theta(tables,posB,5)
+				tables=self.tweak_move_theta(tables,posB,45)
 				for j in neighbours_this_pair:
                                         tps_check[j]=tpss[j]
                                         tables_check[j]=tables[j]
 				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
 				if len(collision_types_try)==0 :
-					print('Solved by moving posB theta -5 degree!')
+					print('Solved by moving posB theta 45 degree!')
+					altered_pos.append(posB)
+					continue
+				else:
+					tables=copymodule.deepcopy(tables_backup)
+
+				tables=self.tweak_move_theta_wait_back(tables,posA,45,0.5)
+				for j in neighbours_this_pair:
+					tps_check[j]=tpss[j]
+					tables_check[j]=tables[j]
+				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
+				if len(collision_types_try)==0 :
+					print('Solved by moving posA theta 45 degree and wait 0.5s!')
+					altered_pos.append(posA)
+					continue
+				else:
+					tables=copymodule.deepcopy(tables_backup)
+
+				tables=self.tweak_move_theta_wait_back(tables,posB,45,0.5)
+				for j in neighbours_this_pair:
+					tps_check[j]=tpss[j]
+					tables_check[j]=tables[j]
+				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
+				if len(collision_types_try)==0 :
+					print('Solved by moving posB theta 45 degree and wait 0.5s!')
 					altered_pos.append(posB)
 					continue
 				else:
 					tables=copymodule.deepcopy(tables_backup)
 				
+				tables=self.tweak_freeze(tables,posA)
+				for j in neighbours_this_pair:
+					tps_check[j]=tpss[j]
+					tables_check[j]=tables[j]
+				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
+				if len(collision_types_try)==0 :
+					print('Solved by freezing posA!')
+					altered_pos.append(posA)
+					continue
+				else:
+					tables=copymodule.deepcopy(tables_backup)
+
+				tables=self.tweak_freeze(tables,posB)
+				for j in neighbours_this_pair:
+					tps_check[j]=tpss[j]
+					tables_check[j]=tables[j]
+				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
+				if len(collision_types_try)==0 :
+					print('Solved by freezing posB!')
+					altered_pos.append(posA)
+					continue
+				else:
+					tables=copymodule.deepcopy(tables_backup)
+
+			else: # Collision with wall
+				if posA != None:
+					pos_pos=posA
+				else:
+					pos_pos=posB
+				tables_backup=copymodule.deepcopy(tables)
+				tables=self.tweak_move_theta(tables,pos_pos,45)
+				for j in neighbours_this_pair:
+					tps_check[j]=tpss[j]
+					tables_check[j]=tables[j]
+				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
+				if len(collision_types_try)==0 :
+					print('Solved by moving theta 45 degree!')
+					altered_pos.append(pos_pos)
+					continue
+				else:
+					tables=copymodule.deepcopy(tables_backup)
+
+				tables_backup=copymodule.deepcopy(tables)
+				tables=self.tweak_move_theta(tables,pos_pos,-45)
+				for j in neighbours_this_pair:
+					tps_check[j]=tpss[j]
+					tables_check[j]=tables[j]
+				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
+				if len(collision_types_try)==0 :
+					print('Solved by moving theta -45 degree!')
+					altered_pos.append(pos_pos)
+					continue
+				else:   
+					tables=copymodule.deepcopy(tables_backup)
+				
+				tables=self.tweak_freeze(tables,pos_pos)
+				for j in neighbours_this_pair:
+					tps_check[j]=tpss[j]
+					tables_check[j]=tables[j]
+				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
+				if len(collision_types_try)==0 :
+					print('Solved by freezing posA!')
+					altered_pos.append(pos_pos)
+					continue
+				else:
+					tables=copymodule.deepcopy(tables_backup)
 
 		return tables, altered_pos
 
@@ -702,6 +792,22 @@ class PosSchedule(object):
 		table.set_move(0, pc.P, dP)
 		table.set_move(nrows-1,pc.P,-dP)
 		tables[posid] = table
+		return tables
+	def tweak_move_theta_wait_back(self,tables,posid,dT,time):
+		table = tables[posid]
+		nrows=len(table.rows)
+		table.insert_new_row(0)
+		table.insert_new_row(0)
+		table.set_move(0, pc.T, dT)
+		table.set_postpause(0, time)
+		table.set_move(1, pc.T, -dT)
+		return tables
+	def tweak_freeze(self,tables,posid):
+		table=tables[posid]
+		nrows=len(table.rows)
+		for i in range(nrows):
+			table.set_move(i, pc.T, 0.)
+			table.set_move(i, pc.P, 0.)
 		return tables
 
 	def tweak_move_theta_phi(self,tables,posid,dT,dP):
@@ -1254,6 +1360,7 @@ class PosSchedule(object):
 			tables[best_pos] = table
 		return tables, best_pos
 
+		
 	def _get_tabletype(self):
 		## Now look at requests. if moves are small enough, move directly without RRE unless
 		## explicitly told never to move direct
