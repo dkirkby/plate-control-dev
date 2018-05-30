@@ -1302,7 +1302,6 @@ class PosSchedule(object):
 			for j in pos_neighbours:
 				tps_check[j]=tpss[j]
 				tables_check[j]=tables[j]
-			print('check collision again')
 			collision_indices, collision_types = self._check_for_collisions(tps_check, tables_check)
 			ncols = len(collision_indices)
 			itter += 1
@@ -1348,7 +1347,6 @@ class PosSchedule(object):
 			## For the colliding indices, simply don't move them
 			dn_colls = []
 			for id in possits_to_zero:
-				print('Check ',id,'to see if it is the best pos')
 				if id in zerod:
 					dn_colls.append(-99)
 					continue
