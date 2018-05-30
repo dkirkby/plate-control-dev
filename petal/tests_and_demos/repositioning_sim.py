@@ -15,7 +15,7 @@ from matplotlib import *
 
 """Run generate__fake_pos_targets.py to take the random pos pars and collisionless targets list. 
 """
-
+n_pos_limit=250
 fidids_12 = ['P077','F001','F010','F011','F017','F021','F022','F025','F029','F074','P022','P057']
 fidids = fidids_12
 petal_id = 666
@@ -35,9 +35,10 @@ def cProfile_wrapper(evaluatable_string):
 ###############################
 ### Read the pars #######
 ##########################
-positioners = Table.read(input_pars,format='ascii.csv',header_start=0,data_start=1)
+positioners = Table.read(input_pars,format='ascii.csv',header_start=0,data_start=1,data_end=n_pos_limit+1)
 posids=[positioners[i]['posid'] for i in range(len(positioners))]
 n_pos=len(posids)
+print(n_pos,' pos read')
 # Generate a simulated petal
 # timed test sequence
 cProfile_wrapper('ptl = petal.Petal(petal_id, posids, fidids, simulator_on=True, db_commit_on=False, local_commit_on=True,verbose=False)')
@@ -134,11 +135,34 @@ if ps:
     pp.savefig()
 
 
-offsetX_arr=[]
-offsetY_arr=[]
+#############################
+offset_x_arr=[]
+offset_y_arr=[]
+offset_all_arr=[]
+for k in range(len(posids)):
+    pos_t=ptl.posmodels[k].state.read('POS_T')
+    pos_p=ptl.posmodels[k].state.read('POS_P')
+    postrans=ptl.posmodels[k].trans
+    xy=postrans.posTP_to_obsXY([pos_t,pos_p])
+    offset_x_arr.append(xy[0]-target_x[k])
+    offset_y_arr.append(xy[1]-target_y[k])
+    offset_all_arr.append(np.sqrt((xy[0]-target_x[k])**2+(xy[1]-target_y[k])**2))
+if offset_x_arr:
+    index=np.where(np.array(offset_all_arr)>0.02)
+    ind=index[0].tolist()
+    if ind:
+        print(str(len(ind))+' positioners not reach targets')
+        for i in range(len(ind)):
+            print(posids[ind[i]],offset_all_arr[ind[i]])
+
+
+
+
+del offsetX_arr[:]
+del offsetY_arr[:]
 requests={}
-target_x=[]
-target_y=[]
+del target_x[:]
+del target_y[:]
 for i in range(len(posids)):
     posid=posids[i]
     model = ptl.posmodels[i]
@@ -149,10 +173,12 @@ for i in range(len(posids)):
     posTP_this=postrans.obsTP_to_posTP([float(positioners[i]['target_t2']),float(positioners[i]['target_p2'])])
     posXY_this=postrans.posTP_to_posXY(posTP_this)
     requests[posid] = {'command':'posXY', 'target':posXY_this, 'log_note':'Reach target posXY:'+str(posXY_this[0])+','+str(posXY_this[1])}
-    target_x.append(float(positioners[i]['target_x']))
-    target_y.append(float(positioners[i]['target_y']))
+    target_x.append(float(positioners[i]['target_x2']))
+    target_y.append(float(positioners[i]['target_y2']))
 
-
+plt.figure(1,figsize=(9.5,9.5))
+plt.rc('font', **font)
+plt.subplot(111)
 plt.plot(target_x,target_y,'b+',label=label1)
 for i in range(len(offsetX_arr)):
     plt.text(offsetX_arr[i],offsetY_arr[i],posids[i],fontsize=2)
@@ -163,8 +189,8 @@ plt.plot(offsetX_arr,offsetY_arr,'r+')
 cProfile_wrapper('ptl.request_targets(requests)')
 cProfile_wrapper('ptl.schedule_send_and_execute_moves()')
 
-x_final_arr=[]
-y_final_arr=[]
+del x_final_arr[:]
+del y_final_arr[:]
 for i in range(len(posids)):
     pos_t=ptl.posmodels[i].state._val['POS_T']
     pos_p=ptl.posmodels[i].state._val['POS_P']
@@ -192,17 +218,16 @@ offset_all_arr=[]
 for k in range(len(posids)):
     pos_t=ptl.posmodels[k].state.read('POS_T')
     pos_p=ptl.posmodels[k].state.read('POS_P')
-    postrans=ptl.posmodels[i].trans
-    obsxy=postrans.posTP_to_obsXY([pos_t,pos_p])
-    offset_x_arr.append(obsxy[0]-target_x[k])
-    offset_y_arr.append(obsxy[1]-target_y[k])
-    offset_all_arr.append(np.sqrt((obsxy[0]-target_x[k])**2+(obsxy[1]-target_y[k])**2))
+    postrans=ptl.posmodels[k].trans
+    xy=postrans.posTP_to_obsXY([pos_t,pos_p])
+    offset_x_arr.append(xy[0]-target_x[k])
+    offset_y_arr.append(xy[1]-target_y[k])
+    offset_all_arr.append(np.sqrt((xy[0]-target_x[k])**2+(xy[1]-target_y[k])**2))
 if offset_x_arr:
     index=np.where(np.array(offset_all_arr)>0.02)
     ind=index[0].tolist()
     if ind:
         print(str(len(ind))+' positioners not reach targets')
         for i in range(len(ind)):
-            print(posids[ind[i]],offset_all_arr[ind[i]]) 
+            print(posids[ind[i]],offset_all_arr[ind[i]])
 
-#pdb.set_trace()
