@@ -134,7 +134,7 @@ class PosSchedule(object):
 			self._schedule_with_anticollision()
 		else:
 			self._schedule_without_anticollision()
-		pdb.set_trace()
+
 		if self.anticol.debug:
 			print("\n\n\nResulting Schedules:")
 			print("\tIn scheduler:")
@@ -590,7 +590,7 @@ class PosSchedule(object):
 		altered_pos=[]
 		for collision_indices_this,collision_type_this in zip(collision_indices,collision_types):
 			posA,posB=collision_indices_this[0],collision_indices_this[1]
-			print('Solving',posA,posB,collision_type_this)
+			print('Collision ',posA,posB,collision_type_this)
 			# Find neighbours first
 			neighbours_this_pair=set()
 			pos_neighbour_A,pos_neighbour_B=[],[]
@@ -1273,8 +1273,7 @@ class PosSchedule(object):
 		collision_indices, collision_types = self._check_for_collisions(tpss, tables)
 		itter = 0
 		ncols = len(collision_indices)
-		## Confine collision checks to neighbours only ##
-		pdb.set_trace()
+		## Confine collision checks to neighbours only --Kai 05/30/2018##
 		pos_neighbours=[]
 		for i in range(len(collision_types)):
 			pos_neighbour_A,pos_neighbour_B=[],[]
