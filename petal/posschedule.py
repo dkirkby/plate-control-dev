@@ -618,7 +618,7 @@ class PosSchedule(object):
                                         tables_check[j]=tables[j]
 				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
 				if len(collision_types_try)==0 :
-					print('Solved by pause posA!')
+					print('* Solved by pausing posA 1s!')
 					altered_pos.append(posA)
 					continue
 				else:
@@ -631,7 +631,7 @@ class PosSchedule(object):
                                         tables_check[j]=tables[j]
 				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
 				if len(collision_types_try)==0 :
-					print('Solved by pause posB!')
+					print('* Solved by pausing posB 1s!')
 					altered_pos.append(posA)
 					continue
 				else:
@@ -643,7 +643,7 @@ class PosSchedule(object):
                                         tables_check[j]=tables[j]
 				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
 				if len(collision_types_try)==0 :
-					print('Solved by moving posA theta 45 degree!')
+					print('* Solved by moving posA theta 45 degree!')
 					altered_pos.append(posA)
 					continue
 				else:
@@ -655,7 +655,7 @@ class PosSchedule(object):
                                         tables_check[j]=tables[j]
 				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
 				if len(collision_types_try)==0 :
-					print('Solved by moving posB theta 45 degree!')
+					print('* Solved by moving posB theta 45 degree!')
 					altered_pos.append(posB)
 					continue
 				else:
@@ -667,7 +667,7 @@ class PosSchedule(object):
 					tables_check[j]=tables[j]
 				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
 				if len(collision_types_try)==0 :
-					print('Solved by moving posA theta 45 degree and wait 0.5s!')
+					print('* Solved by moving posA theta 45 degree and wait 0.5s!')
 					altered_pos.append(posA)
 					continue
 				else:
@@ -679,7 +679,7 @@ class PosSchedule(object):
 					tables_check[j]=tables[j]
 				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
 				if len(collision_types_try)==0 :
-					print('Solved by moving posB theta 45 degree and wait 0.5s!')
+					print('* Solved by moving posB theta 45 degree and wait 0.5s!')
 					altered_pos.append(posB)
 					continue
 				else:
@@ -691,7 +691,7 @@ class PosSchedule(object):
 					tables_check[j]=tables[j]
 				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
 				if len(collision_types_try)==0 :
-					print('Solved by freezing posA!')
+					print('* Solved by freezing posA!')
 					altered_pos.append(posA)
 					continue
 				else:
@@ -703,7 +703,7 @@ class PosSchedule(object):
 					tables_check[j]=tables[j]
 				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
 				if len(collision_types_try)==0 :
-					print('Solved by freezing posB!')
+					print('* Solved by freezing posB!')
 					altered_pos.append(posA)
 					continue
 				else:
@@ -721,7 +721,7 @@ class PosSchedule(object):
 					tables_check[j]=tables[j]
 				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
 				if len(collision_types_try)==0 :
-					print('Solved by moving theta 45 degree!')
+					print('* Solved by moving theta 45 degree!')
 					altered_pos.append(pos_pos)
 					continue
 				else:
@@ -734,7 +734,7 @@ class PosSchedule(object):
 					tables_check[j]=tables[j]
 				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
 				if len(collision_types_try)==0 :
-					print('Solved by moving theta -45 degree!')
+					print('* Solved by moving theta -45 degree!')
 					altered_pos.append(pos_pos)
 					continue
 				else:   
@@ -746,7 +746,7 @@ class PosSchedule(object):
 					tables_check[j]=tables[j]
 				collision_indices_try, collision_types_try = self._check_for_collisions(tps_check,tables_check)
 				if len(collision_types_try)==0 :
-					print('Solved by freezing posA!')
+					print('* Solved by freezing posA!')
 					altered_pos.append(pos_pos)
 					continue
 				else:
@@ -1287,19 +1287,22 @@ class PosSchedule(object):
 		while ncols > 0 and itter < 2 * len(tables):
 			if self.anticol.verbose:
 				self._printindices('Collisions before zeroth order run ', itter, collision_indices)
+			print('find the best pos to zero')
 			tables, zeroed_poss = self._zerothorder_avoidance_iteration(tables, collision_indices, tpss, zerod)
 			if np.isscalar(zeroed_poss):
 				zerod.append(zeroed_poss)
 				if self.anticol.verbose:
 					print("\nNumber zeroed: {}\n\n\n\n".format(1))
 			else:
-				zerod.extend(list(zeroed_poss))
+				if zeroed_poss != None: # Revised by Kai 05/30/2018, tested, works
+					zerod.extend(list(zeroed_poss))
 				if self.anticol.verbose:
 					print("\nNumber zeroed: {}\n\n\n\n".format(len(zeroed_poss)))
 			tps_check,tables_check={},{}
 			for j in pos_neighbours:
 				tps_check[j]=tpss[j]
 				tables_check[j]=tables[j]
+			print('check collision again')
 			collision_indices, collision_types = self._check_for_collisions(tps_check, tables_check)
 			ncols = len(collision_indices)
 			itter += 1
@@ -1321,17 +1324,18 @@ class PosSchedule(object):
 				possits_to_zero.append(posid)
 
 		possits_to_zero = np.unique(possits_to_zero)
-		print(max_collisions, possits_to_zero)
+		print('max_collisions,possits_to_zero',max_collisions, possits_to_zero)
 
 		nonzero = set(possits_to_zero).difference(set(zerod))
 		if len(nonzero)==1:
 			best_pos = nonzero.pop()
-			table = posmovetable.PosMoveTable(tables[best_pos].posmodel)
-			table.set_move(0, pc.T, 0.)
-			table.set_move(0, pc.P, 0.)
-			table.set_prepause(0, max_time)
-			table.set_postpause(0, 0.0)
-			tables[best_pos] = table
+			if best_pos != None: # Added condition to exclude None. Kai 05/30/2018 tested, works.
+				table = posmovetable.PosMoveTable(tables[best_pos].posmodel)
+				table.set_move(0, pc.T, 0.)
+				table.set_move(0, pc.P, 0.)
+				table.set_prepause(0, max_time)
+				table.set_postpause(0, 0.0)
+				tables[best_pos] = table
 		elif len(possits_to_zero)==1:
 			best_pos = possits_to_zero[0]
 			table = posmovetable.PosMoveTable(tables[best_pos].posmodel)
@@ -1344,6 +1348,7 @@ class PosSchedule(object):
 			## For the colliding indices, simply don't move them
 			dn_colls = []
 			for id in possits_to_zero:
+				print('Check ',id,'to see if it is the best pos')
 				if id in zerod:
 					dn_colls.append(-99)
 					continue
@@ -1475,7 +1480,7 @@ class PosSchedule(object):
 				collision_types:   Type of collision as specified in the pc class
 		'''
 		#colrelations = self.collider.collidable_relations
-		pos_neighbors = self.collider.pos_neighbors
+		pos_neighbors = self.collider.pos_neighbors[posid]  # added [posid] by Kai 05/30/2018
 		local_radius_tables = {key:tablesdict[key] for key in pos_neighbors}
 		local_radius_tables[posid] = tablesdict[posid]
 		local_radius_tps = {key:tps[key] for key in pos_neighbors}
