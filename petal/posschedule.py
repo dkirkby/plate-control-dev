@@ -596,6 +596,7 @@ class PosSchedule(object):
 			pos_neighbour_A,pos_neighbour_B=[],[]
 			index_neighbour_A,index_neighbour_B=[],[]
 			if posA != None:
+				#neighbours1=self.petal.collider.pos_neighbors[collision_indices[i][0]]
 				pos_neighbour_A,index_neighbour_A=self.find_neighbours(posA,posids,offsetX_arr,offsetY_arr)
 			if posB != None:
 				pos_neighbour_B,index_neighbour_B=self.find_neighbours(posB,posids,offsetX_arr,offsetY_arr)
@@ -754,6 +755,7 @@ class PosSchedule(object):
 		return tables, altered_pos
 
 	def find_neighbours(self,posid,posids,offsetX_arr,offsetY_arr):
+		#neighbours1=self.petal.collider.pos_neighbors[collision_indices[i][0]]
 		ptl=self.petal
 		index=posids.index(posid)
 		offsetX=ptl.posmodels[int(index)].state._val['OFFSET_X']
@@ -1271,6 +1273,18 @@ class PosSchedule(object):
 		collision_indices, collision_types = self._check_for_collisions(tpss, tables)
 		itter = 0
 		ncols = len(collision_indices)
+		## Confine collision checks to neighbours only ##
+		pdb.set_trace()
+		pos_neighbours=[]
+		for i in range(len(collision_types)):
+			pos_neighbour_A,pos_neighbour_B=[],[]
+			if collision_indices[i][0] != None:
+				pos_neighbour_A=self.petal.collider.pos_neighbors[collision_indices[i][0]]
+			if collision_indices[i][1] != None:
+				pos_neighbour_B=self.petal.collider.pos_neighbors[collision_indices[i][1]]
+			neighbours_this_pair=set(pos_neighbour_A) | set(pos_neighbour_B)
+			pos_neighbours=set(pos_neighbours) | set(neighbours_this_pair)
+
 		while ncols > 0 and itter < 2 * len(tables):
 			if self.anticol.verbose:
 				self._printindices('Collisions before zeroth order run ', itter, collision_indices)
@@ -1283,7 +1297,11 @@ class PosSchedule(object):
 				zerod.extend(list(zeroed_poss))
 				if self.anticol.verbose:
 					print("\nNumber zeroed: {}\n\n\n\n".format(len(zeroed_poss)))
-			collision_indices, collision_types = self._check_for_collisions(tpss, tables)
+			tps_check,tables_check={},{}
+			for j in pos_neighbours:
+				tps_check[j]=tpss[j]
+				tables_check[j]=tables[j]
+			collision_indices, collision_types = self._check_for_collisions(tps_check, tables_check)
 			ncols = len(collision_indices)
 			itter += 1
 		## animate
