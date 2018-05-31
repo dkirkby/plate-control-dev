@@ -29,7 +29,7 @@ sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
 sys.path.append(os.path.abspath('/home/msdos/focalplane/positioner_logs/data_processing_scripts/'))
-
+sys.path.append(os.path.abspath('/home/msdos/focalplane/pos_utility/'))
 import fvchandler
 import petal
 import petalcomm
@@ -51,7 +51,8 @@ import collections
 from tkinter import *
 import googlesheets
 import time
-
+import show_detected
+import populate_petal_travelers
 
 class MoveGUI(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
@@ -87,7 +88,8 @@ class MoveGUI(object):
         mainloop()
 
         gui_root = tkinter.Tk()
-        
+        self.populate_petal=populate_petal_travelers
+        self.show_detected=show_detected        
         self.simulate = False
         self.logfile='MoveGUI.log'
         self.fvc_type='simulator'
@@ -150,6 +152,8 @@ class MoveGUI(object):
         Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=5,column=2,sticky=W,pady=4)
         Button(gui_root,text='Reload CANBus',width=12,command=self.reload_canbus).grid(row=5,column=1,sticky=W,pady=4)
         Button(gui_root,text='Write SiID',width=10,command=self.write_siid).grid(row=5,column=3,sticky=W,pady=4)
+        Button(gui_root,text='Write Petal Travelers',width=15,command=self.populate_petal_travelers).grid(row=4,column=3,sticky=W,pady=4)# Call populate_travellers.py under pos_utility/ to read from installation traveler and write to positioner 'database' and ID map
+        Button(gui_root,text='Aliveness Test',width=10,command=self.aliveness_test).grid(row=4,column=4,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
         Button(gui_root,text='Center',width=10,command=self.center).grid(row=4,column=2,sticky=W,pady=4)                
 
         self.listbox1 = Listbox(gui_root, width=20, height=20)
@@ -365,6 +369,21 @@ class MoveGUI(object):
             else:
                 self.text1.insert(END,'Posid and RowID are not consistent. Check the integrity of the file. \nGo to '+url+' \n' )
         self.text1.insert(END,'Writing Sheets Done \n')
+
+    def aliveness_test(self):
+        Show=self.show_detected.Show
+        pc_num = input('Please enter the number of the petal controller being used (eg. 3): ')
+        petal = input('Please enter the petal number (eg. 9): ')
+        can_buses = ['can10', 'can12', 'can11', 'can13', 'can14', 'can15', 'can16','can17', 'can22', 'can23']
+        show = Show(int(pc_num), petal, can_buses)
+        show.read_canbuses()
+        show.plot_hole_info()
+
+
+    def populate_petal_travelers(self):
+        a=input('Do you really want to populate ID maps and Positioners database based on the installation traveler?\n It will take a very long time. \n If yes, make sure the petal you want to load is located at the first tag of the installation traveler.\n')
+        if a == 'y' or a=='Y':
+            self.populate_petal.Populate_Petal_Travelers()
 
     def load_acceptance_traveller(self):
         self.text2.delete('0.0', END)
