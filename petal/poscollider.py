@@ -22,7 +22,7 @@ class PosCollider(object):
         self.config = configobj.ConfigObj(filename,unrepr=True)
         self.posids = [] # list of posid strings for all the positioners
         self.posmodels = {} # key: posid string, value: posmodel instance
-        self.pos_neighbors = {} # all the positioners that surround a given positioner. key is a posmodel, value is a list of neighbor posmodels
+        self.pos_neighbors = {} # all the positioners that surround a given positioner. key is a posid, value is a list of neighbor posids
         self.fixed_neighbor_cases = {} # all the fixed neighbors that apply to a given positioner. key is a posid, value is a list of the fixed neighbor cases
         self.collidable_relations = {'A':[],'B':[],'B_is_fixed':[]} # every unique pair of geometry that can collide
         self.R1, self.R2, self.x0, self.y0, self.t0, self.p0 = {}, {}, {}, {}, {}, {}
