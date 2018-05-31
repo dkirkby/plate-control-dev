@@ -205,7 +205,6 @@ class PosSchedule(object):
         table.set_postpause(0, 0.0)
         return table
 
-
     def _schedule_with_anticollision(self):
         self.anticol._update_positioner_properties()
         table_type = self._get_tabletype()
@@ -224,9 +223,10 @@ class PosSchedule(object):
         '''Generates move tables, finds the collisions,
         and updates move tables such that no collisions will occur.
             
-     It returns the list of all movetables where none collide with
+        It returns the list of all movetables where none collide with
         one another or a fixed object.
-     2018-05-31 --> should discuss with Klaus what kind of error returns we want upon failures.
+        
+        2018-05-31 --> should discuss with Klaus what kind of error returns we want upon failures.
         '''
         requested_posids = []
 
