@@ -84,6 +84,7 @@ xytest/frd_test_gui.py -text
 xytest/grader.py -text
 xytest/loadpetal.py -text
 xytest/movegui.py -text
+xytest/movegui_expert.py -text
 xytest/movegui_petal.py -text
 xytest/pos_xytest_plot.py -text
 xytest/posblast.py -text
