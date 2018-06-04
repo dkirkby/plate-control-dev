@@ -10,7 +10,7 @@ class InstrMaker(object):
     metrology data -- they are the nominal center positions of each device at
     the aspheric focal surface.
     """
-    def __init__(self,plate_type):
+    def __init__(self,plate_type,ptl,m):
         if plate_type == 'petal':
             # import the positioner locations file
         elif plate_type == 'small_array':
@@ -20,40 +20,41 @@ class InstrMaker(object):
     def make_instrfile():
         '''Define function for making platemaker instrument file.
         '''
+        m.request_home()
+
+        # Read dots identification result from ptl and store a dictionary
+        posids=ptl.posids
+        fidids=ptl.fidids
+        n_pos=len(posids)
+        n_fid=len(fidids)
+        pos_fid_dots={}
+        obsX_arr,obsY_arr=[],[]
+        metro_X_arr,metro_Y_arr=[],[]
+
+        # read the Metrology data firest, then match positioners to DEVICE_LOC 
+        pos_locs = '../positioner_locations_0530v14.csv'#os.path.join(allsetdir,'positioner_locations_0530v12.csv')
+        positioners = Table.read(pos_locs,format='ascii.csv',header_start=0,data_start=1)
+        for row in positioners:
+            idnam, typ, xloc, yloc, zloc, qloc, rloc, sloc = row
+            device_loc_file.append(idnam)
+            metro_X_file.append(xloc)
+            metro_Y_file.append(yloc)
+
+        for i in range(n_pos):
+            posid=posids[i]
+            obsX_arr.append(float(ptl.get(posid=posid,key=['LAST_MEAS_OBS_X']))
+            obsY_arr.append(float(ptl.get(posid=posid,key=['LAST_MEAS_OBS_Y']))        
+            device_loc_this=match(posid)
+            index=divice_loc_arr.index(device_loc_this)
+            metro_X_arr.append(metro_X_file[index])
+            metro_Y_arr.append(metro_Y_file[index])
+
+
         import matplotlib.pyplot as plt
-        status = ptl.get(posid=posids) # Read the calibration data
-        obsX_arr=[] # Measured position of each FP
-        obsY_arr=[]
-        length_r1_arr=ptl.get(posid=posids,key='LENGTH_R1')
-        length_r2_arr=ptl.get(posid=posids,key='LENGTH_R2')
-        for i in range(len(posids)):
-            obsX_arr.append(status[i].expected_current_position.get('obsX'))
-            obsY_arr.append(status[i].expected_current_position.get('obsY'))       
         obsX_arr=np.array(obsX_arr)
         obsY_arr=np.array(obsY_arr)
-        # This is fake test data for now. Just input scale, x and y offset, and rotation angle, generate new positions.
-        # Should read the metrology data eventually    
-        pars0=np.array([20,1,1,30.])
-        test=(rot(obsX_arr-pars0[1],obsY_arr-pars0[2],-pars0[3]))/pars0[0]
-        metroX_arr=test[0,:]# Fake data 
-        metroY_arr=test[1,:]#+np.random.normal(scale=5,size=len(test[0,:]))
     
-        metro_X_arr=[] # Real data
-        metro_Y_arr=[]
-        # read the Metrology Data
-        metro_list=[]
-        csvfile=open(pc.dirs['hwsetups']+os.path.sep+'EMPetal_XY.csv')
-        metro=csv.DictReader(csvfile)
-        for row in metro:
-            metro_list.append(row)
-        m_select=('M00096','M00044','M00043','M00069','M00224','M00086','M00074','M00302','M00091','M00088',)
-        device_select=('155','171','184',    '201',    '214',   '232',   '247',   '266',   '282',   '302')
-        for row in metro_list:
-            if row['device_loc'] in device_select:
-                metro_X_arr.append(row['X'])
-                metro_Y_arr.append(row['Y'])
-        print(metro_X_arr)
-        print(metro_Y_arr)        
+
         # metroX_arr= , metroY_arr= 
         pars = Parameters() # Input parameters model and initial guess
         pars.add('scale', value=10.)
@@ -61,7 +62,7 @@ class InstrMaker(object):
         pars.add('offy', value=0.)
         pars.add('angle', value=0.)
         out = minimize(residual, pars, args=(metroX_arr,metroY_arr, obsX_arr,obsY_arr)) # Find the minimum chi2
-     #  Plots
+     #  Plot
         par_out=[out.params['scale'].value,out.params['offx'].value,out.params['offy'].value,out.params['angle'].value]
         pars_out=out.params
         model=pars_out['scale']*(rot(metroX_arr+pars_out['offx'],metroY_arr+pars_out['offy'],pars_out['angle']))
