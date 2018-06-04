@@ -40,14 +40,21 @@ class InstrMaker(object):
             metro_X_file.append(xloc)
             metro_Y_file.append(yloc)
 
+        PFS_file='PFS_ID_Map.csv'
+        PFS=Table.read(PFS_file,format='ascii.csv',header_start=0,data_start=1)
+        for row in PFS:
+            posids_PFS.append(row['DEVICE_ID'])
+            device_loc_PFS.append(row['DEVICE_LOC'])
+        
         for i in range(n_pos):
             posid=posids[i]
             obsX_arr.append(float(ptl.get(posid=posid,key=['LAST_MEAS_OBS_X']))
             obsY_arr.append(float(ptl.get(posid=posid,key=['LAST_MEAS_OBS_Y']))        
-            device_loc_this=match(posid)
-            index=divice_loc_arr.index(device_loc_this)
-            metro_X_arr.append(metro_X_file[index])
-            metro_Y_arr.append(metro_Y_file[index])
+            index=posids_PFS.index(posid.strip('M'))
+            device_loc_this=device_loc_PFS[index]
+            index2=divice_loc_arr.index(device_loc_this)
+            metro_X_arr.append(metro_X_file[index2])
+            metro_Y_arr.append(metro_Y_file[index2])
 
 
         import matplotlib.pyplot as plt
