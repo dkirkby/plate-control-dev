@@ -65,7 +65,6 @@ if USE_LOCAL_PRESETS:
 		test_base_path=os.environ['TEST_BASE_PATH']
 		presets = configobj.ConfigObj(presets_file,unrepr=True)
 		hwsetup_conf=presets['hwsetup_conf']
-		should_make_instrfile=presets['should_make_instrfile']
 		should_update_from_svn=presets['should_update_from_svn']
 		should_commit_to_svn=presets['should_commit_to_svn']
 		should_identify_fiducials = presets['should_identify_fiducials']
@@ -80,7 +79,6 @@ if USE_LOCAL_PRESETS:
 	print("The following presets will be used:")
 	print("")
 	print("  Hardware setup file: "+str(hwsetup_conf))
-	print("  Should make instrument file: "+str(should_make_instrfile))
 	print("  Should update from SVN: "+str(should_update_from_svn))
 	print("  Should commit to SVN: "+str(should_commit_to_svn))
 	print("  Should identify positioners: "+str(should_identify_positioners))
@@ -109,9 +107,6 @@ hwsetup = configobj.ConfigObj(hwsetup_conf,unrepr=True)
 new_and_changed_files.add(hwsetup.filename)
 
 # ask user whether to auto-generate a platemaker instrument file
-if not USE_LOCAL_PRESETS:
-	message = 'Should we auto-generate a platemaker instrument file?'
-	should_make_instrfile = tkinter.messagebox.askyesno(title='Make PM file?',message=message)
 
 # are we in simulation mode?
 sim = hwsetup['fvc_type'] == 'simulator'
@@ -143,7 +138,11 @@ if not(sim):
 
 
 # software initialization and startup
-fvc = fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'])    
+if hwsetup['fvc_type'] == 'FLI' and 'pm_instrument' in hwsetup:
+    fvc=fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'],platemaker_instrument=hwsetup['pm_instrument'])
+else:
+    fvc=fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits']) 
+#fvc = fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'])    
 fvc.rotation = hwsetup['rotation']
 fvc.scale = hwsetup['scale']
 posids = hwsetup['pos_ids']
@@ -234,118 +233,8 @@ if hwsetup['plate_type'] == 'petal' and not ptl.anticollision_default:
 else:
 	should_limit_range = False
 
-# define function for making platemaker instrument file
-def make_instrfile():
-	import matplotlib.pyplot as plt
-	status = ptl.get(posid=posids) # Read the calibration data
-	obsX_arr=[] # Measured position of each FP
-	obsY_arr=[]
-	length_r1_arr=ptl.get(posid=posids,key='LENGTH_R1')
-	length_r2_arr=ptl.get(posid=posids,key='LENGTH_R2')
-	for i in range(len(posids)):
-		obsX_arr.append(status[i].expected_current_position.get('obsX'))
-		obsY_arr.append(status[i].expected_current_position.get('obsY'))       
-	obsX_arr=np.array(obsX_arr)
-	obsY_arr=np.array(obsY_arr)
-	# This is fake test data for now. Just input scale, x and y offset, and rotation angle, generate new positions.
-	# Should read the metrology data eventually    
-	pars0=np.array([20,1,1,30.])
-	test=(rot(obsX_arr-pars0[1],obsY_arr-pars0[2],-pars0[3]))/pars0[0]
-	metroX_arr=test[0,:]# Fake data 
-	metroY_arr=test[1,:]#+np.random.normal(scale=5,size=len(test[0,:]))
-
-	metro_X_arr=[] # Real data
-	metro_Y_arr=[]
-	# read the Metrology Data
-	metro_list=[]
-	csvfile=open(pc.dirs['hwsetups']+os.path.sep+'EMPetal_XY.csv')
-	metro=csv.DictReader(csvfile)
-	for row in metro:
-		metro_list.append(row)
-	m_select=('M00096','M00044','M00043','M00069','M00224','M00086','M00074','M00302','M00091','M00088',)
-	device_select=('155','171','184',    '201',    '214',   '232',   '247',   '266',   '282',   '302')
-	for row in metro_list:
-		if row['device_loc'] in device_select:
-			metro_X_arr.append(row['X'])
-			metro_Y_arr.append(row['Y'])
-	print(metro_X_arr)
-	print(metro_Y_arr)        
-	# metroX_arr= , metroY_arr= 
-	pars = Parameters() # Input parameters model and initial guess
-	pars.add('scale', value=10.)
-	pars.add('offx', value=0.)
-	pars.add('offy', value=0.)
-	pars.add('angle', value=0.)
-	out = minimize(residual, pars, args=(metroX_arr,metroY_arr, obsX_arr,obsY_arr)) # Find the minimum chi2
- #  Plots
-	par_out=[out.params['scale'].value,out.params['offx'].value,out.params['offy'].value,out.params['angle'].value]
-	pars_out=out.params
-	model=pars_out['scale']*(rot(metroX_arr+pars_out['offx'],metroY_arr+pars_out['offy'],pars_out['angle']))
-	model_x=np.array(model[0,:]).ravel()
-	model_y=np.array(model[1,:]).ravel()
-	print(model_x)
-	plt.figure(1,figsize=(15,15))
-	plt.subplot(221)
-	plt.plot(obsX_arr,obsY_arr,'ko',label='fvcmag '+str(out.params['scale'].value)+'\n' +'fvcmag  '+str(out.params['scale'].value)+'\n'+'fvcrot  '+str(out.params['angle'].value % 360)+'\n' \
-									 +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(out.params['offy'].value)+'\n')
-	plt.plot(model_x,model_y,'b')
-	plt.xlabel('obsX')
-	plt.ylabel('obsY')
-	plt.legend(loc=2)
-	plt.plot()    
-	
-	plt.subplot(222)
-	plt.plot(metro_X_arr,metro_Y_arr,'ko',label='')
-	plt.xlabel('metroX')
-	plt.ylabel('metroY')
-	plt.legend(loc=2)
-	plt.plot()    
-	
-	# Write the output
-
-	filename = os.path.splitext(hwsetup.filename)[0] + '_instr.par'
-	f = open(filename,'w')
-	output_lines='fvcmag  '+str(out.params['scale'].value)+'\n'+'fvcrot  '+str(out.params['angle'].value % 360)+'\n' \
-				+'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(out.params['offy'].value)+'\n' \
-				+'fvcflip  0\n'+'fvcnrow  6000 \n'+'fvcncol  6000 \n'+'fvcpixmm  0.006' 
-	f.write(output_lines)
-	return out,metro_list
 
 
-def rot(x,y,angle): # A rotation matrix to rotate the coordiantes by a certain angle
-	theta=np.radians(angle)
-	c,s=np.cos(theta),np.sin(theta)
-	R=np.matrix([[c,-s],[s,c]])
-	rr=np.dot(np.array([x,y]).T,R)
-	return rr.T
-
-
-def residual(pars,x,y,x_data,y_data):
-	# Code to calculate the Chi2 that quantify the difference between data and model
-	# x, y are the metrology data that specify where each fiber positioner is located on the petal (in mm)
-	# x_data and y_data is the X and Y measured by the FVC (in pixel)
-	# The pars contains the scale, offx, offy, and angle that transform fiber positioner focal plane coordinate (mm) 
-	# to FVC coordinate (in pixel)
-	
-	xy_model=pars['scale']*(rot(x+pars['offx'],y+pars['offy'],pars['angle']))
-	x_model=np.array(xy_model[0,:])
-	y_model=np.array(xy_model[1,:])
-	res=np.array((x_model-x_data))**2+np.array((y_model-y_data))**2
-	return res
-
-	# 1. extract positioner locations that we just measured with FVC
-	# 2. read file with nominal locations from metrology data (see DESI-2850 for format)
-	# 3. compare FVC measurements with metrology, to calculate:
-	#       fvcmag  ... scale in pixels at FVC per mm at positioners
-	#       fvcrot  ... rotation in degrees of the field
-	#       fvcxoff ... x offset (in pixels) of the field
-	#       fvcyoff ... y offset (in pixels) of the field
-	#       fvcflip ... either 1 or 0, says whether it image is a mirror (probably 0 in EM petal)
-	#    (see DESI-1416 for defining the geometry)
-	# 4. write the instrument file to disk (simple text file, named "something.par" including the above params as well as:
-	#       fvcnrow  6000
-	#       fvcncol  6000 
-	#       fvcpixmm 0.006
 
 
 # calibration routines
@@ -361,8 +250,6 @@ else:
 	m.extradots_fvcXY = extradots_existing_data
 if should_identify_positioners:
 	m.identify_positioner_locations()
-if should_make_instrfile:
-	instr_par,metro  = make_instrfile()
 if not should_limit_range:
 	m.measure_range(axis='theta')
 	m.measure_range(axis='phi')
