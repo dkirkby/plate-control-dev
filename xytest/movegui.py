@@ -28,8 +28,8 @@ import datetime
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/msdos/focalplane/positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/msdos/focalplane/pos_utility/'))
+sys.path.append(os.path.abspath('/home/desi/focalplane/positioner_logs/data_processing_scripts/'))
+sys.path.append(os.path.abspath('/home/desi/focalplane/pos_utility/'))
 import fvchandler
 import petal
 import petalcomm
@@ -53,12 +53,14 @@ import googlesheets
 import time
 import show_detected
 import populate_petal_travelers
+import populate_busids
 
 class MoveGUI(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
         global gui_root
         gui_root = tkinter.Tk()
-        google_dir='/home/msdos/focalplane/positioner_logs/data_processing_scripts/'        
+        google_dir='/home/desi/focalplane/pos_utility/'        
+        credential_name='google_access_account_lbl.json'
         w=200
         h=100
         ws=gui_root.winfo_screenwidth()
@@ -79,17 +81,19 @@ class MoveGUI(object):
 
         # Load Travellers
         url1='https://docs.google.com/spreadsheets/d/1lJ9GjhUUsK2SIvXeerpGW7664OFKQWAlPqpgxgevvl8/edit#gid=0' # PosID, SiID database
-        self.sheet1=googlesheets.connect_by_url(url1,credentials = google_dir+'/google_access_account.json')
+        self.sheet1=googlesheets.connect_by_url(url1,credentials = google_dir+credential_name)
      
         url2='https://docs.google.com/spreadsheets/d/19Aq-28qgODaaX9wH-NMsX_GiuNyXG_6rjIjPVLb8aYw/edit#gid=795996596' # Acceptance Traveller
-        self.sheet2=googlesheets.connect_by_url(url2,credentials = google_dir+'google_access_account.json')
+        self.sheet2=googlesheets.connect_by_url(url2,credentials = google_dir+credential_name)
         
         
         mainloop()
 
         gui_root = tkinter.Tk()
+        self.can_buses_to_update=['can14','can15','can16','can17']#['can10','can11','can13','can12','can22','can23','can14','can15','can16','can17']
         self.populate_petal=populate_petal_travelers
         self.show_detected=show_detected        
+        self.populate_busids=populate_busids
         self.simulate = False
         self.logfile='MoveGUI.log'
         self.fvc_type='simulator'
@@ -114,6 +118,8 @@ class MoveGUI(object):
             elif len(str(key))==5:
                 self.posids.append('M'+str(key))
         self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+        self.ptl.set(key='CTRL_ENABLED',value=True)
+        self.ptl.anticollision_default= False
         self.fvc = fvchandler.FVCHandler(self.fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
         
@@ -131,7 +137,7 @@ class MoveGUI(object):
         Label(gui_root,text="Rotation Angel").grid(row=0,column=0)
         self.e1=Entry(gui_root)
         self.e1.grid(row=0,column=1)
-        self.e1.insert(0,'190')
+        self.e1.insert(0,'50')
         
         Label(gui_root,text="Set Fiducial").grid(row=0,column=2)
         self.e2=Entry(gui_root)
@@ -151,9 +157,11 @@ class MoveGUI(object):
         Button(gui_root,text='Phi CCW',width=10,command=self.phi_ccw_degree).grid(row=4,column=0,sticky=W,pady=4)
         Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=5,column=2,sticky=W,pady=4)
         Button(gui_root,text='Reload CANBus',width=12,command=self.reload_canbus).grid(row=5,column=1,sticky=W,pady=4)
-        Button(gui_root,text='Write SiID',width=10,command=self.write_siid).grid(row=5,column=3,sticky=W,pady=4)
-        Button(gui_root,text='Write Petal Travelers',width=15,command=self.populate_petal_travelers).grid(row=4,column=3,sticky=W,pady=4)# Call populate_travellers.py under pos_utility/ to read from installation traveler and write to positioner 'database' and ID map
+        Button(gui_root,text='1 Write SiID',width=15,command=self.write_siid).grid(row=3,column=3,sticky=W,pady=4)
+        Button(gui_root,text='3 Populate Busids',width=15,command=self.populate_can).grid(row=5,column=3,sticky=W,pady=4)# Call populate_busids.py under pos_utility/ 
+        Button(gui_root,text='2 Write DEVICE_LOC',width=15,command=self.populate_petal_travelers).grid(row=4,column=3,sticky=W,pady=4)# Call populate_travellers.py under pos_utility/ to read from installation traveler and write to positioner 'database' and ID map
         Button(gui_root,text='Aliveness Test',width=10,command=self.aliveness_test).grid(row=4,column=4,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
+
         Button(gui_root,text='Center',width=10,command=self.center).grid(row=4,column=2,sticky=W,pady=4)                
 
         self.listbox1 = Listbox(gui_root, width=20, height=20)
@@ -353,18 +361,19 @@ class MoveGUI(object):
         self.text1.insert(END,'Writing SiID \n')
         for key in sorted(self.info.keys()):
             info_this=self.info[key]
-            pos_this=googlesheets.read(self.sheet1,20+int(key),1,False,False)
-            if (float(key)<7000 and float(pos_this)== float(key)):
-                googlesheets.write(self.sheet1,int(key)+20,5,str(key),False,False) # POSID
-                googlesheets.write(self.sheet1,int(key)+20,6,info_this[3],False,False) # SI_ID
-                googlesheets.write(self.sheet1,int(key)+20,7,info_this[2],False,False) # Full SI_ID
-                googlesheets.write(self.sheet1,int(key)+20,15,info_this[0],False,False) # Firmware_ver
-                test=googlesheets.read(self.sheet1,int(key)+20,6,False,False)
-                if test == info_this[3]:
-                    self.text1.insert(END,'Writing '+str(key)+' successfully \n')
-                else:
-                    self.text1.insert(END,'Writing '+str(key)+' failed. \n Check doc \n')
-            elif float(key)>7000:
+            if float(key)<8000:
+                pos_this=googlesheets.read(self.sheet1,20+int(key),1,False,False)
+                if float(pos_this)== float(key):
+                    googlesheets.write(self.sheet1,int(key)+20,5,str(key),False,False) # POSID
+                    googlesheets.write(self.sheet1,int(key)+20,6,info_this[3],False,False) # SI_ID
+                    googlesheets.write(self.sheet1,int(key)+20,7,info_this[2],False,False) # Full SI_ID
+                    googlesheets.write(self.sheet1,int(key)+20,15,info_this[0],False,False) # Firmware_ver
+                    test=googlesheets.read(self.sheet1,int(key)+20,6,False,False)
+                    if test == info_this[3]:
+                        print('Writing '+str(key)+' successfully \n')
+                    else:
+                        print('Writing '+str(key)+' failed. \n Check doc \n')
+            elif float(key)>8000:
                 self.text1.insert(END,'Is '+str(key)+' a fiducial? Not writing. \n')
             else:
                 self.text1.insert(END,'Posid and RowID are not consistent. Check the integrity of the file. \nGo to '+url+' \n' )
@@ -372,13 +381,24 @@ class MoveGUI(object):
 
     def aliveness_test(self):
         Show=self.show_detected.Show
-        pc_num = input('Please enter the number of the petal controller being used (eg. 3): ')
+        pc_num = self.ptl_id
         petal = input('Please enter the petal number (eg. 9): ')
         can_buses = ['can10', 'can12', 'can11', 'can13', 'can14', 'can15', 'can16','can17', 'can22', 'can23']
         show = Show(int(pc_num), petal, can_buses)
         show.read_canbuses()
         show.plot_hole_info()
 
+    def populate_can(self):
+        Populate_BusIDs=self.populate_busids.Populate_BusIDs
+        pc_num = self.ptl_id
+        petal = input('Please enter the petal number (eg. 9): ')
+        can_buses = [self.canbus]#['can10','can11','can13','can12','can22','can23','can14','can15','can16','can17']
+        for canbus in can_buses:
+                print('canbus',canbus,'\n')
+                canbus=[canbus]
+                populate = Populate_BusIDs(int(pc_num), petal, canbus)
+                not_in_map = populate.read_canbuses()
+                print('Not in map list: ', not_in_map)
 
     def populate_petal_travelers(self):
         a=input('Do you really want to populate ID maps and Positioners database based on the installation traveler?\n It will take a very long time. \n If yes, make sure the petal you want to load is located at the first tag of the installation traveler.\n')
