@@ -126,8 +126,28 @@ class PosSchedule(object):
         if self.move_tables:
             return
         elif anticollision:
+            # stages = []
+            # gather the start and finish tp for retract, rotate, and extend stages
+            # retract = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='retract')
+            # rotate = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='rotate')
+            # extend = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='extend')
+            # stages = [retract,rotate,extend]
+            # for stage in stages:
+            #     stage.initialize_move_tables()
+            #     stage.anneal_power_density()
+            #     stage.find_collisions()
+            #     stage.adjust_paths()
+            #     stage.find_collisions() # check
+            #     if collisions found:
+            #         stage.freeze(those positioners)
+            # merge the move tables from the separate stages
             self._schedule_with_anticollision()
         else:
+            # gather the start and finish tp from requests
+            # stage = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='direct')
+            # stage.initialize_move_tables()
+            # stage.anneal_power_density()
+            # self.move_tables = stage.move_tables
             self._schedule_without_anticollision()
 
     def total_dtdp(self, posid):
@@ -161,7 +181,6 @@ class PosSchedule(object):
         was_already_requested = posid in self.requests
         return was_already_requested
 
-
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
         consistently take with regard to post-move cleanup, if a request is going to be denied.
@@ -191,7 +210,6 @@ class PosSchedule(object):
             table.store_orig_command(0, req['command'], req['cmd_val1'], req['cmd_val2'])
             table.log_note += (' ' if table.log_note else '') + req['log_note']
             self.move_tables.append(table)
-
 
     def _create_direct_movetable(self,request):
         posmodel = request['posmodel']
