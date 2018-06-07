@@ -155,7 +155,10 @@ class MoveGUI(object):
         self.mode.set(1)
         Checkbutton(gui_root, text='CAN', variable=self.mode).grid(row=3,column=1,sticky=E,pady=4)
         self.syncmode=IntVar(gui_root)
-        self.syncmode.set(1)
+        if self.ptl.sync_mode == 'hard':
+            self.syncmode.set(1)
+        else:
+            self.syncmode.set(0)
         Checkbutton(gui_root, text='SYNC hard', variable=self.syncmode,command=self.sync_mode).grid(row=3,column=2,sticky=W,pady=4)
 
         Button(gui_root,text='Phi CW',width=10,command=self.phi_cw_degree).grid(row=3,column=0,sticky=W,pady=4)
@@ -539,6 +542,7 @@ class MoveGUI(object):
             elif len(str(key))==5:
                 self.posids.append('M'+str(key))
         self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+        self.ptl.set(key='BUS_ID',value=self.canbus)
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
         cs=self.listbox1.curselection()
         #self.listbox1.delete(0,cs[0] -1)
