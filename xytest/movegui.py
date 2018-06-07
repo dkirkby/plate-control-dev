@@ -28,8 +28,8 @@ import datetime
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/desi/focalplane/positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/desi/focalplane/pos_utility/'))
+sys.path.append(os.path.abspath('/home/msdos/focalplane/positioner_logs/data_processing_scripts/'))
+sys.path.append(os.path.abspath('/home/msdos/focalplane/pos_utility/'))
 import fvchandler
 import petal
 import petalcomm
@@ -59,7 +59,7 @@ class MoveGUI(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
         global gui_root
         gui_root = tkinter.Tk()
-        google_dir='/home/desi/focalplane/pos_utility/'        
+        google_dir='/home/msdos/focalplane/pos_utility/'        
         credential_name='google_access_account_lbl.json'
         w=200
         h=100
@@ -119,6 +119,7 @@ class MoveGUI(object):
                 self.posids.append('M'+str(key))
         self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
         self.ptl.set(key='CTRL_ENABLED',value=True)
+        self.ptl.set(key='BUS_ID',value=self.canbus)
         self.ptl.anticollision_default= False
         self.fvc = fvchandler.FVCHandler(self.fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
@@ -152,7 +153,11 @@ class MoveGUI(object):
         Button(gui_root,text='Theta CCW',width=10,command=self.theta_ccw_degree).grid(row=4,column=1,sticky=W,pady=4)
         self.mode=IntVar(gui_root)
         self.mode.set(1)
-        Checkbutton(gui_root, text='CAN', variable=self.mode).grid(row=3,column=2,sticky=W,pady=4)
+        Checkbutton(gui_root, text='CAN', variable=self.mode).grid(row=3,column=1,sticky=E,pady=4)
+        self.syncmode=IntVar(gui_root)
+        self.syncmode.set(1)
+        Checkbutton(gui_root, text='SYNC hard', variable=self.syncmode,command=self.sync_mode).grid(row=3,column=2,sticky=W,pady=4)
+
         Button(gui_root,text='Phi CW',width=10,command=self.phi_cw_degree).grid(row=3,column=0,sticky=W,pady=4)
         Button(gui_root,text='Phi CCW',width=10,command=self.phi_ccw_degree).grid(row=4,column=0,sticky=W,pady=4)
         Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=5,column=2,sticky=W,pady=4)
@@ -281,7 +286,12 @@ class MoveGUI(object):
         else:
             self.pcomm.set_fiducials([self.canbus], [self.selected_can], [self.e2.get()])
             self.text1.insert(END,'Set Fiducial '+str(self.selected_can)+' to '+str(self.e2.get())+' successfully! \n')
-        
+    def sync_mode(self):
+        if self.syncmode.get() == 1:
+            self.ptl.sync_mode = 'hard'
+        else:
+            self.ptl.sync_mode = 'soft'
+ 
     def get_list(self,event):
         # get selected line index
         index = self.listbox1.curselection()[0]
