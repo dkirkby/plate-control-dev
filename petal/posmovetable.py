@@ -18,9 +18,10 @@ class PosMoveTable(object):
         if not(this_posmodel):
             this_posmodel = posmodel.PosModel()
         self.posmodel = this_posmodel    # the particular positioner this table applies to
+        self.posid = self.posmodel.posid # the string ID number of the positioner this table applies to
         self.log_note = ''               # optional note string which user can associate with this table, to be stored in any logging
         self.rows = []                   # internal representation of the move data
-        self.rows_extra = []             # auto-generated backlash and final creep rows get stored here
+        self._rows_extra = []            # auto-generated backlash and final creep rows get internally stored here
         self.should_antibacklash = self.posmodel.state._val['ANTIBACKLASH_ON']
         self.should_final_creep  = self.posmodel.state._val['FINAL_CREEP_ON']
         self.allow_exceed_limits = self.posmodel.state._val['ALLOW_EXCEED_LIMITS']
@@ -69,6 +70,12 @@ class PosMoveTable(object):
         """Version of the table with all data.
         """
         return self._for_output_type('full')
+    
+    @property
+    def n_rows(self):
+        """Number of rows in table.
+        """
+        return len(self.rows)
 
     # setters
     def set_move(self, rowidx, axisid, distance):
@@ -162,17 +169,17 @@ class PosMoveTable(object):
                 new_moves[i][-1]['command'] = '(auto final creep)'
                 new_moves[i][-1]['cmd_val'] = err_dist[i]
                 expected_prior_dTdP[i] += new_moves[i][-1]['distance']
-        self.rows_extra = []
+        self._rows_extra = []
         for i in range(len(new_moves[0])):
-            self.rows_extra.append(PosMoveRow())
-            self.rows_extra[i].data = {'dT_ideal'  : new_moves[pc.T][i]['distance'],
-                                       'dP_ideal'  : new_moves[pc.P][i]['distance'],
-                                       'prepause'  : 0,
-                                       'move_time' : max(new_moves[pc.T][i]['move_time'],new_moves[pc.P][i]['move_time']),
-                                       'postpause' : 0,
-                                       'command'   : new_moves[pc.T][i]['command'],
-                                       'cmd_val1'  : new_moves[pc.T][i]['cmd_val'],
-                                       'cmd_val2'  : new_moves[pc.P][i]['cmd_val']}
+            self._rows_extra.append(PosMoveRow())
+            self._rows_extra[i].data = {'dT_ideal'  : new_moves[pc.T][i]['distance'],
+                                        'dP_ideal'  : new_moves[pc.P][i]['distance'],
+                                        'prepause'  : 0,
+                                        'move_time' : max(new_moves[pc.T][i]['move_time'],new_moves[pc.P][i]['move_time']),
+                                        'postpause' : 0,
+                                        'command'   : new_moves[pc.T][i]['command'],
+                                        'cmd_val1'  : new_moves[pc.T][i]['cmd_val'],
+                                        'cmd_val2'  : new_moves[pc.P][i]['cmd_val']}
         for i in [pc.T,pc.P]:
             true_and_new[i].extend(true_moves[i])
             true_and_new[i].extend(new_moves[i])
@@ -196,10 +203,10 @@ class PosMoveTable(object):
         else:
             print( 'bad table output type ' + output_type)
 
-        # calculate the true moves gather any new extra move rows
+        # calculate the true moves and gather any new extra move rows
         true_moves = self._calculate_true_moves()
         rows = self.rows.copy()
-        rows.extend(self.rows_extra)
+        rows.extend(self._rows_extra)
 
         # format and populate the return tables
         for i in range(len(rows)):
