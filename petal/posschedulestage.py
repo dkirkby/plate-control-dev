@@ -11,15 +11,17 @@ class PosScheduleStage(object):
                         to reduce overall power density consumed by the array. You
                         can also argue None if no annealing should be done.
     """
-    def __init__(self, start_tp, finish_tp, collider, anneal_time=3, stage_type='direct', verbose=False):
+    def __init__(self, start_tp, final_tp, collider, anneal_time=3, stage_type='direct', verbose=False):
+        self.start_tp = start_tp
+        self.final_tp = final_tp
         self.collider = collider # poscollider instance
-        self.move_tables = {} # keys: posids, values: posmovetable instances
+        self.anneal_time = anneal_time
         self.stage_type = stage_type
         if stage_type == 'direct':
             self.anticol_method = 'none'
         else:
             self.anticol_method = 'zeroth' # valid types: 'astar', 'zeroth', 'tweak'
-        self.anneal_time = anneal_time
+        self.move_tables = {} # keys: posids, values: posmovetable instances        
         
     @property
     def posids(self):
@@ -57,4 +59,5 @@ class PosScheduleStage(object):
         """Freezes positioners in their start_tp position, so that they won't
         move at all.
         """
+ 
         
