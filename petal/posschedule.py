@@ -27,15 +27,21 @@ class PosSchedule(object):
 
     def __init__(self, petal,avoidance='tweak',verbose=True):
         self.petal = petal
-        self.move_tables = []
-        self.requests = {}
-        self.posids = []
-        # todo-anthony make compatible with various tp offsets and tp ranges
-        self.anticol = Anticol(self.collider,self.petal,verbose)
+        self.avoidance = avoidance
+        self.verbose = verbose
+        self.move_tables = {} # keys: posids, values: instances of PosMoveTable
+        self.requests = {} # keys: posids, values: target request dictionaries
+        self.anticol = Anticol(self.collider,self.petal,verbose) # to be deprecated
 
     @property
     def collider(self):
         return self.petal.collider
+    
+    @property
+    def posids(self): # consider deprecation, since there is some ambiguity between move_table posids vs request posids
+        """List of posids that have move_tables in the current schedule.
+        """
+        return list(self.move_tables.keys())
         
     def request_target(self, posid, uv_type, u, v, log_note=''):
         """Adds a request to the schedule for a given positioner to move to the
@@ -103,14 +109,11 @@ class PosSchedule(object):
             return
         if self._deny_request_because_unreachable(move_table):
             return
-        this_posid = move_table.posmodel.posid
-        if this_posid in self.posids:
-            index = self.posids.index(this_posid)
-            self.move_tables[index].extend(move_table)
+        this_posid = move_table.posid
+        if move_table.posid in self.posids:
+            self.move_tables[this_posid].extend(move_table)
         else:
-            self.posids.append(this_posid)
-            self.move_tables.append(move_table)
-
+            self.move_tables[this_posid] = move_table
 
     def schedule_moves(self, anticollision=True):
         """Executes the scheduling algorithm upon the stored list of move requests.
@@ -123,73 +126,28 @@ class PosSchedule(object):
         If there were ANY pre-existing move tables in the list, then ALL the target
         requests are ignored, and the anticollision algorithm is NOT performed.
         """
+        stages = []
         if self.move_tables:
             return
         elif anticollision:
-            # stages = []
-            # gather the start and finish tp for retract, rotate, and extend stages
-            # retract = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='retract')
-            # rotate = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='rotate')
-            # extend = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='extend')
-            # stages = [retract,rotate,extend]
-            # for stage in stages:
-            #     stage.initialize_move_tables()
-            #     stage.anneal_power_density()
-            #     stage.find_collisions()
-            #     stage.adjust_paths()
-            #     stage.find_collisions() # check
-            #     if collisions found:
-            #         stage.freeze(those positioners)
-            # merge the move tables from the separate stages
-            self._schedule_with_anticollision()
+            stages = self._schedule_with_anticollision()
         else:
-            # gather the start and finish tp from requests
-            # stage = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='direct')
-            # stage.initialize_move_tables()
-            # stage.anneal_power_density()
-            # self.move_tables = stage.move_tables
-            self._schedule_without_anticollision()
-
-    def total_dtdp(self, posid):
-        """Return as-scheduled total move distance for positioner identified by posid.
-        Returns [dt,dp].
-        """
-        posmodel = self.petal.posmodel(posid)
-        dtdp = [0,0]
-        for tbl in self.move_tables:
-            if tbl.posmodel == posmodel:
-                postprocessed = tbl.full_table
-                dtdp = [postprocessed['stats']['net_dT'][-1], postprocessed['stats']['net_dP'][-1]]
-                break
-        return dtdp
-
-    def total_scheduled_time(self):
-        """Return as-scheduled total time for all moves and pauses to complete for
-        all positioners.
-        """
-        time = 0
-        for tbl in self.move_tables:
-            postprocessed = tbl.full_table
-            tbl_time = postprocessed['stats']['net_time'][-1]
-            if tbl_time > time:
-                time = tbl_time
-
+            stages = self._schedule_without_anticollision()
+        self._generate_move_tables_from_stages(stages)
+                
     def already_requested(self, posid):
         """Returns boolean whether a request has already been registered in the
         schedule for the argued positioner.
         """
         was_already_requested = posid in self.requests
-        return was_already_requested
+        return was_already_requested                
 
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
         consistently take with regard to post-move cleanup, if a request is going to be denied.
         """
         enabled = posmodel.state.read('CTRL_ENABLED')
-        if enabled == False:  ## this is specifically NOT worded as "if not enabled:",
-            ## because here we actually do not want a value of None
-            ## to pass the test, in case the parameter field 'CTRL_ENABLED'
-            ## has not yet been implemented in the positioner's .conf file
+        if enabled == False:  # this is specifically NOT worded as "if not enabled:", because here we actually do not want a value of None to pass the test, in case the parameter field 'CTRL_ENABLED' has not yet been implemented in the positioner's .conf file
             posmodel.clear_postmove_cleanup_cmds_without_executing()
             print(str(posmodel.state.read('POS_ID')) + \
                   ': move request denied because CTRL_ENABLED = ' + str(enabled))
@@ -203,6 +161,21 @@ class PosSchedule(object):
         return False # needs implementation
 
     def _schedule_without_anticollision(self):
+        # stages = []
+        # gather the start and finish tp for retract, rotate, and extend stages
+        # retract = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='retract')
+        # rotate = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='rotate')
+        # extend = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='extend')
+        # stages = [retract,rotate,extend]
+        # for stage in stages:
+        #     stage.initialize_move_tables()
+        #     stage.anneal_power_density()
+        #     stage.find_collisions()
+        #     stage.adjust_paths()
+        #     stage.find_collisions() # check
+        #     if collisions found:
+        #         stage.freeze(those positioners)
+        # return stages
         posids = list(self.requests.keys())
         for posid in posids:
             req = self.requests.pop(posid)
@@ -210,19 +183,15 @@ class PosSchedule(object):
             table.store_orig_command(0, req['command'], req['cmd_val1'], req['cmd_val2'])
             table.log_note += (' ' if table.log_note else '') + req['log_note']
             self.move_tables.append(table)
-
-    def _create_direct_movetable(self,request):
-        posmodel = request['posmodel']
-        table = posmovetable.PosMoveTable(posmodel)
-        dtdp = posmodel.trans.delta_posTP(request['targt_posTP'], \
-                                          request['start_posTP'], range_wrap_limits='targetable')
-        table.set_move(0, pc.T, dtdp[0])
-        table.set_move(0, pc.P, dtdp[1])
-        table.set_prepause(0, 0.0)
-        table.set_postpause(0, 0.0)
-        return table
+        return [] # temporary, for compatibility with in-progress new syntax
 
     def _schedule_with_anticollision(self):
+        # gather the start and finish tp from requests
+        # stage = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='direct')
+        # stage.initialize_move_tables()
+        # stage.anneal_power_density()
+        # self.move_tables = stage.move_tables
+        # return [stage]
         self.anticol._update_positioner_properties()
         table_type = self._get_tabletype()
         move_tables = self._get_collisionless_movetables(table_type=table_type)
@@ -234,7 +203,39 @@ class PosSchedule(object):
             # Add the original commands and log notes to the move tables
             movetable.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2'])
             movetable.log_note += (' ' if movetable.log_note else '') + req['log_note']
-            self.move_tables.append(movetable)
+        return [] # temporary, for compatibility with in-progress new syntax            self.move_tables.append(movetable)
+
+    def _generate_move_tables_from_stages(self,stages):
+        """Collects move tables from a list of PosScheduleStage instances.
+        For each positioner, merges move tables from the stages. This is done
+        in the order of the list stages. Fills in any intermediate time gaps
+        between stages with discrete pause events, so that all positioners have
+        matching scheduled move times for all stages and overall.
+        """
+        for stage in stages:
+            move_times = {}
+            for posid,table in stage.move_tables.items():
+                postprocessed = table.for_schedule
+                move_times[posid] = postprocessed['stats']['net_time'][-1]
+            max_move_time = max(move_times.values())
+            for posid,table in stage.move_tables.items():
+                equalizing_pause = max_move_time - move_times[posid]
+                if equalizing_pause:
+                    idx = table.n_rows
+                    table.insert_new_row(idx)
+                    table.set_postpause(idx,equalizing_pause)
+                self.add_table(table)
+
+    def _create_direct_movetable(self,request):
+        posmodel = request['posmodel']
+        table = posmovetable.PosMoveTable(posmodel)
+        dtdp = posmodel.trans.delta_posTP(request['targt_posTP'], \
+                                          request['start_posTP'], range_wrap_limits='targetable')
+        table.set_move(0, pc.T, dtdp[0])
+        table.set_move(0, pc.P, dtdp[1])
+        table.set_prepause(0, 0.0)
+        table.set_postpause(0, 0.0)
+        return table
 
     def _get_collisionless_movetables(self,table_type='RRrE'):
         '''Generates move tables, finds the collisions,
