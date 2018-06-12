@@ -227,7 +227,7 @@ class Petal(object):
             table.store_orig_command(0,cmd_str,requests[posid]['target'][0],requests[posid]['target'][1])
             table.log_note += (' ' if table.log_note else '') + requests[posid]['log_note']
             table.allow_exceed_limits = True
-            self.schedule.add_table(table)
+            self.schedule.expert_add_table(table)
         return requests            
 
     def request_limit_seek(self, posids, axisid, direction, anticollision=True, cmd_prefix='', log_note=''):
@@ -272,7 +272,7 @@ class Petal(object):
             else:
                 direction_cmd_suffix = '.maxpos\n'
             p.axis[axisid].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + direction_cmd_suffix
-            self.schedule.add_table(table)
+            self.schedule.expert_add_table(table)
 
     def request_homing(self, posids):
         """Request homing sequence for positioners in list posids to find the primary hardstop
