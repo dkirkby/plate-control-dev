@@ -274,6 +274,11 @@ class PosSchedule(object):
             return True
         return False
             
+    
+    
+    
+############### OLD CODE BELOW ################
+
 
     def _get_collisionless_movetables(self,table_type='RRrE'):
         '''Generates move tables, finds the collisions,
