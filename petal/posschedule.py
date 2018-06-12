@@ -18,17 +18,14 @@ class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners
     from starts to finishes. The move tables are instances of the PosMoveTable
     class.
-
-    Note that the schedule may contain multiple move tables for the same positioner,
-    under the assumption that another module (i.e. Petal) will generally be
-    the one which merges any such tables in sequence, before sending off to the hardware.
     
-    Initialize with the petal object this schedule applies to.
+        petal             ... Instance of Petal that this schedule applies to
+        avoidance_method  ... Collision avoidance method. Valid methods are described in the PosScheduleStage class.
     """
 
-    def __init__(self, petal,avoidance='tweak',verbose=True):
+    def __init__(self, petal,avoidance_method='tweak',verbose=True):
         self.petal = petal
-        self.avoidance = avoidance
+        self.avoidance_method = avoidance_method
         self.verbose = verbose
         self.move_tables = {} # keys: posids, values: instances of PosMoveTable
         self.requests = {} # keys: posids, values: target request dictionaries
@@ -159,8 +156,8 @@ class PosSchedule(object):
         for posid,request in self.requests.items():
             start_tp = request['start_posTP']
             final_tp = request['targt_posTP']
-        stage = posschedulestage.PosScheduleStage(start_tp, final_tp, self.collider, stage_type='direct') # add in anneal time parameter?
-        stage.initialize_move_tables()
+        stage = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
+        stage.initialize_move_tables(start_tp, final_tp)
         stage.anneal_power_density()
         return [stage]
 
@@ -172,15 +169,15 @@ class PosSchedule(object):
         # for all disabled or not-in-use positioners, set their start and and finish tp as fixed
         # for all moving positioners, deny any targets that inherently collide with other positioners or boundaries
         # gather the start and finish tp for retract, rotate, and extend stages
-        # retract = posschedulestage.PosScheduleStage(start_tp, final_tp, self.collider, stage_type='retract') # is stage type really relevant?
-        # rotate = posschedulestage.PosScheduleStage(start_tp, final_tp, self.collider, stage_type='rotate') # is stage type really relevant?
-        # extend = posschedulestage.PosScheduleStage(start_tp, final_tp, self.collider, stage_type='extend') # is stage type really relevant?
+        # retract = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
+        # rotate = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
+        # extend = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
         # stages = [retract,rotate,extend]
         # for stage in stages:
         #     stage.initialize_move_tables()
         #     stage.anneal_power_density()
         #     stage.find_collisions()
-        #     stage.adjust_paths()
+        #     stage.adjust_paths(self.avoidance_method)
         #     stage.find_collisions() # check
         #     if collisions found:
         #         stage.freeze(those positioners)
