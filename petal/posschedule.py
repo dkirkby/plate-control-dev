@@ -1,6 +1,7 @@
 import posmovetable
 import posconstants as pc
 import postransforms
+import posschedulestage
 from poscollider import PosSweep
 from bidirect_astar import inertial_bidirectional_astar_pathfinding
 
@@ -58,9 +59,12 @@ class PosSchedule(object):
         """
         posmodel = self.petal.posmodel(posid)
         if self.already_requested(posid):
-            print(str(posmodel.state.read('POS_ID')) + ': cannot request more than one target per positioner in a given schedule')
+            if self.verbose:
+                print(str(posid) + ': target request denied. Cannot request more than one target per positioner in a given schedule.')
             return
         if self._deny_request_because_disabled(posmodel):
+            if self.verbose:
+                print(str(posid) + ': target request denied. Positioner is disabled.')
             return
         current_position = posmodel.expected_current_position
         start_posTP = [current_position['posT'],current_position['posP']]
@@ -86,7 +90,12 @@ class PosSchedule(object):
         elif uv_type == 'dTdP':
             targt_posTP = posmodel.trans.addto_posTP(start_posTP,[u,v],lims)
         else:
-            print('bad uv_type "' + str(uv_type) + '" for target request')
+            if self.verbose:
+                print(str(posid) + ': target request denied. Bad uv_type "' + str(uv_type) + '".')
+            return
+        if unreachable:
+            if self.verbose:
+                print(str(posid) + ': target request denied. Target not reachable: ' + str(uv_type) + ' = (' + format(u,'.3f') + ',' + format(v,'.3f') + ')')
             return
         new_request = {'start_posTP' : start_posTP,
                        'targt_posTP' : targt_posTP,
@@ -99,22 +108,6 @@ class PosSchedule(object):
         # need some usage of deny_request_because_unreachable -- resolve syntax issue of whether that function should receive a request dictionary or a posmovetable
         self.requests[posid] = new_request
 
-    def add_table(self, move_table):
-        """Adds an externally-constructed move table to the schedule. If there
-        is ANY such table in a given schedule, then the anti-collision algorithm
-        will NOT be used. Generally, this method should only be used for internal
-        calls by an expert user.
-        """
-        if self._deny_request_because_disabled(move_table.posmodel):
-            return
-        if self._deny_request_because_unreachable(move_table):
-            return
-        this_posid = move_table.posid
-        if move_table.posid in self.posids:
-            self.move_tables[this_posid].extend(move_table)
-        else:
-            self.move_tables[this_posid] = move_table
-
     def schedule_moves(self, anticollision=True):
         """Executes the scheduling algorithm upon the stored list of move requests.
 
@@ -124,7 +117,7 @@ class PosSchedule(object):
         generating the move tables.
 
         If there were ANY pre-existing move tables in the list, then ALL the target
-        requests are ignored, and the anticollision algorithm is NOT performed.
+        requests are ignored (and the anticollision algorithm is NOT performed).
         """
         stages = []
         if self.move_tables:
@@ -133,55 +126,55 @@ class PosSchedule(object):
             stages = self._schedule_with_anticollision()
         else:
             stages = self._schedule_without_anticollision()
-        self._generate_move_tables_from_stages(stages)
+        self._merge_move_tables_from_stages(stages)
+        for posid,table in self.move_tables.items():
+            req = self.requests.pop(posid)
+            table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
+            table.log_note += (' ' if table.log_note else '') + req['log_note'] # keep the original log notes with move tables
                 
     def already_requested(self, posid):
         """Returns boolean whether a request has already been registered in the
         schedule for the argued positioner.
         """
-        was_already_requested = posid in self.requests
-        return was_already_requested                
+        return posid in self.requests.keys()            
 
-    def _deny_request_because_disabled(self, posmodel):
-        """This is a special function specifically because there is a bit of care we need to
-        consistently take with regard to post-move cleanup, if a request is going to be denied.
+    def expert_add_table(self, move_table):
+        """Adds an externally-constructed move table to the schedule. If there
+        is ANY such table in a given schedule, then the anti-collision algorithm
+        will NOT be used. Generally, this method should only be used for internal
+        calls by an expert user.
         """
-        enabled = posmodel.state.read('CTRL_ENABLED')
-        if enabled == False:  # this is specifically NOT worded as "if not enabled:", because here we actually do not want a value of None to pass the test, in case the parameter field 'CTRL_ENABLED' has not yet been implemented in the positioner's .conf file
-            posmodel.clear_postmove_cleanup_cmds_without_executing()
-            print(str(posmodel.state.read('POS_ID')) + \
-                  ': move request denied because CTRL_ENABLED = ' + str(enabled))
-            return True
-        return False
-    
-    def _deny_request_because_unreachable(self, move_table): # need some syntax resolution of whether to receive a move_table or a request dict as input
-        """Checks for case where a target request is definitively unreachable (such as beyond a fixed
-        petal or GFA boundary).
-        """
-        return False # needs implementation
+        if self._deny_request_because_disabled(move_table.posmodel):
+            return
+        this_posid = move_table.posid
+        if move_table.posid in self.posids:
+            self.move_tables[this_posid].extend(move_table)
+        else:
+            self.move_tables[this_posid] = move_table
 
     def _schedule_without_anticollision(self):
-        # gather the start and finish tp from requests
-        # stage = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='direct')
-        # stage.initialize_move_tables()
-        # stage.anneal_power_density()
-        # self.move_tables = stage.move_tables
-        # return [stage]
-        posids = list(self.requests.keys())
-        for posid in posids:
-            req = self.requests.pop(posid)
-            table = self._create_direct_movetable(req)
-            table.store_orig_command(0, req['command'], req['cmd_val1'], req['cmd_val2'])
-            table.log_note += (' ' if table.log_note else '') + req['log_note']
-            self.move_tables[posid] = table
-        return [] # temporary, for compatibility with in-progress new syntax
+        """Gathers start and finish positions from requests dictionary and generates
+        a schedule with direct motions from start to finish (no anticollision).
+        """
+        for posid,request in self.requests.items():
+            start_tp = request['start_posTP']
+            final_tp = request['targt_posTP']
+        stage = posschedulestage.PosScheduleStage(start_tp, final_tp, self.collider, stage_type='direct') # add in anneal time parameter?
+        stage.initialize_move_tables()
+        stage.anneal_power_density()
+        return [stage]
 
     def _schedule_with_anticollision(self):
+        """Gathers start and finish positions from requests dictionary and generates
+        a schedule which includes calculation of collision avoidance.
+        """
         # stages = []
+        # for all disabled or not-in-use positioners, set their start and and finish tp as fixed
+        # for all moving positioners, deny any targets that inherently collide with other positioners or boundaries
         # gather the start and finish tp for retract, rotate, and extend stages
-        # retract = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='retract')
-        # rotate = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='rotate')
-        # extend = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='extend')
+        # retract = posschedulestage.PosScheduleStage(start_tp, final_tp, self.collider, stage_type='retract') # is stage type really relevant?
+        # rotate = posschedulestage.PosScheduleStage(start_tp, final_tp, self.collider, stage_type='rotate') # is stage type really relevant?
+        # extend = posschedulestage.PosScheduleStage(start_tp, final_tp, self.collider, stage_type='extend') # is stage type really relevant?
         # stages = [retract,rotate,extend]
         # for stage in stages:
         #     stage.initialize_move_tables()
@@ -194,18 +187,10 @@ class PosSchedule(object):
         # return stages
         self.anticol._update_positioner_properties()
         table_type = self._get_tabletype()
-        move_tables = self._get_collisionless_movetables(table_type=table_type)
+        self.move_tables = self._get_collisionless_movetables(table_type=table_type)
+        return [] # temporary, for compatibility with in-progress new syntax
 
-        # Write a comment in each movetable, pop the request out, and save to self.movetables
-        for posid, movetable in move_tables.items():
-            req = self.requests.pop(posid)
-
-            # Add the original commands and log notes to the move tables
-            movetable.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2'])
-            movetable.log_note += (' ' if movetable.log_note else '') + req['log_note']
-        return [] # temporary, for compatibility with in-progress new syntax            self.move_tables.append(movetable)
-
-    def _generate_move_tables_from_stages(self,stages):
+    def _merge_move_tables_from_stages(self,stages):
         """Collects move tables from a list of PosScheduleStage instances.
         For each positioner, merges move tables from the stages. This is done
         in the order of the list stages. Fills in any intermediate time gaps
@@ -224,18 +209,29 @@ class PosSchedule(object):
                     idx = table.n_rows
                     table.insert_new_row(idx)
                     table.set_postpause(idx,equalizing_pause)
-                self.add_table(table)
+                if posid in self.move_tables.keys():
+                    self.move_tables[posid].extend(table)
+                else:
+                    self.move_tables[posid] = table
 
-    def _create_direct_movetable(self,request):
-        posmodel = request['posmodel']
-        table = posmovetable.PosMoveTable(posmodel)
-        dtdp = posmodel.trans.delta_posTP(request['targt_posTP'], \
-                                          request['start_posTP'], range_wrap_limits='targetable')        
-        table.set_move(0, pc.T, dtdp[0])
-        table.set_move(0, pc.P, dtdp[1])
-        table.set_prepause(0, 0.0)
-        table.set_postpause(0, 0.0)
-        return table
+    def _deny_request_because_disabled(self, posmodel):
+        """This is a special function specifically because there is a bit of care we need to
+        consistently take with regard to post-move cleanup, if a request is going to be denied.
+        """
+        enabled = posmodel.state.read('CTRL_ENABLED')
+        if enabled == False:  # this is specifically NOT worded as "if not enabled:", because here we actually do not want a value of None to pass the test, in case the parameter field 'CTRL_ENABLED' has not yet been implemented in the positioner's .conf file
+            posmodel.clear_postmove_cleanup_cmds_without_executing()
+            print(str(posmodel.state.read('POS_ID')) + \
+                  ': move request denied because CTRL_ENABLED = ' + str(enabled))
+            return True
+        return False
+    
+    def _deny_request_because_inherently_collides(self, posid, target_posTP):
+        """Checks for case where a target request is definitively unreachable due to
+        being beyond a fixed petal or GFA boundary, or incompatible with already-existing
+        neighbor targets.
+        """
+        return False # needs implementation
 
     def _get_collisionless_movetables(self,table_type='RRrE'):
         '''Generates move tables, finds the collisions,
