@@ -316,10 +316,6 @@ class Petal(object):
         """
         if anticollision == None or self.anticollision_override:
             anticollision = self.anticollision_default
-        # Should add here gathering list of all the disabled positioners and generating false zero-distance
-        # move requests? to get them into the anticollision? Will this need any special flag known to anti-
-        # collision, to make sure it knows these are fixed, and can't for example move out of a neighbor's
-        # way, then back to where it started.
         self.schedule.schedule_moves(anticollision)
 
     def send_move_tables(self):
