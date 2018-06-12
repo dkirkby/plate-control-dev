@@ -1,19 +1,18 @@
+import posconstants as pc
+import posmovetable
+
 class PosScheduleStage(object):
     """This class encapsulates the concept of a 'stage' of the RRE plan of fiber
     positioner motion. The stage can be of several types, describing retraction,
     rotation, or extension steps.
-    
-        start_tp    ... dict of starting [theta,phi] positions, keys are posids
-        final_tp    ... dict of final [theta,phi] positions, keys are posids
-        collider    ... instanct of poscollider for this petal
+
+        collider    ... instance of poscollider for this petal
         stage_type  ... 'direct', 'retract', 'rotate', 'extend'
         anneal_time ... Time in seconds over which to spread out moves in this stage
                         to reduce overall power density consumed by the array. You
                         can also argue None if no annealing should be done.
     """
-    def __init__(self, start_tp, final_tp, collider, anneal_time=3, stage_type='direct', verbose=False):
-        self.start_tp = start_tp
-        self.final_tp = final_tp
+    def __init__(self, collider, anneal_time=3, stage_type='direct', verbose=False):
         self.collider = collider # poscollider instance
         self.anneal_time = anneal_time
         self.stage_type = stage_type
@@ -33,10 +32,25 @@ class PosScheduleStage(object):
         """Returns dict with key: posid string, value: posmodel instances."""
         return self.collider.posmodels
     
-    def initialize_move_tables(self):
+    def initialize_move_tables(self, start_tp, final_tp):
         """Generates basic move tables for each positioner, going straight from
         the start_tp to the final_tp.
+        
+            start_tp    ... dict of starting [theta,phi] positions, keys are posids
+            final_tp    ... dict of final [theta,phi] positions, keys are posids
+            posmodels   ... dict of posmodel instances, keys are posids
         """
+        self._start_tp = start_tp
+        self._final_tp = final_tp
+        for posid in self._start_tp.keys():
+            posmodel = self.posmodels[posid]
+            dtdp = posmodel.trans.delta_posTP(final_tp[posid], start_tp[posid], range_wrap_limits='targetable')
+            table = posmovetable.PosMoveTable(posmodel)
+            table.set_move(0, pc.T, dtdp[0])
+            table.set_move(0, pc.P, dtdp[1])
+            table.set_prepause(0, 0.0)
+            table.set_postpause(0, 0.0)
+            self.move_tables[posid] = table
 
     def anneal_power_density(self):
         """Adjusts move tables internal timing, to reduce peak power consumption
