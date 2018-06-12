@@ -182,7 +182,7 @@ class PosSchedule(object):
             table = self._create_direct_movetable(req)
             table.store_orig_command(0, req['command'], req['cmd_val1'], req['cmd_val2'])
             table.log_note += (' ' if table.log_note else '') + req['log_note']
-            self.move_tables.append(table)
+            self.move_tables[posid] = table
         return [] # temporary, for compatibility with in-progress new syntax
 
     def _schedule_with_anticollision(self):
