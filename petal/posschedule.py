@@ -95,6 +95,15 @@ class PosSchedule(object):
             if self.verbose:
                 print(str(posid) + ': target request denied. Target not reachable: ' + str(uv_type) + ' = (' + format(u,'.3f') + ',' + format(v,'.3f') + ')')
             return
+        targt_obsTP = posmodel.trans.posTP_to_obsTP(targt_posTP)
+        if self._deny_request_because_target_interference(posmodel,targt_obsTP):
+            if self.verbose:
+                print(str(posid) + ': target request denied. Target interferes with a neighbor\'s existing target.')
+            return
+        if self._deny_request_because_out_of_bounds(posmodel,targt_obsTP):
+            if self.verbose:
+                print(str(posid) + ': target request denied. Target exceeds a fixed boundary.')
+            return
         new_request = {'start_posTP' : start_posTP,
                        'targt_posTP' : targt_posTP,
                           'posmodel' : posmodel,
@@ -131,8 +140,8 @@ class PosSchedule(object):
             table.log_note += (' ' if table.log_note else '') + req['log_note'] # keep the original log notes with move tables
         if self.animate:
             sweeps = self._merge_sweeps_from_stages(stages)
-            savedir = 'to_be_implemented'
-            vidname = 'to_be_implemented'
+            savedir = pc.dirs['fp_temp_files']
+            vidname = pc.filename_timestamp_str_now() + '_schedule_anim.mp4'
             self.collider.animate(sweeps,savedir,vidname)
                 
     def already_requested(self, posid):
@@ -171,7 +180,9 @@ class PosSchedule(object):
         """Gathers start and finish positions from requests dictionary and generates
         a schedule which includes calculation of collision avoidance.
         """
-        # stages = []
+        stages = []
+        disabled = []
+        
         # for all disabled or not-in-use positioners, set their start and and finish tp as fixed
         # for all moving positioners, deny any targets that inherently collide with other positioners or boundaries
         # gather the start and finish tp for retract, rotate, and extend stages
@@ -228,20 +239,41 @@ class PosSchedule(object):
         """This is a special function specifically because there is a bit of care we need to
         consistently take with regard to post-move cleanup, if a request is going to be denied.
         """
-        enabled = posmodel.state.read('CTRL_ENABLED')
+        enabled = posmodel.is_enabled
         if enabled == False:  # this is specifically NOT worded as "if not enabled:", because here we actually do not want a value of None to pass the test, in case the parameter field 'CTRL_ENABLED' has not yet been implemented in the positioner's .conf file
             posmodel.clear_postmove_cleanup_cmds_without_executing()
-            print(str(posmodel.state.read('POS_ID')) + \
-                  ': move request denied because CTRL_ENABLED = ' + str(enabled))
             return True
         return False
     
-    def _deny_request_because_inherently_collides(self, posid, target_posTP):
+    def _deny_request_because_target_interference(self, posmodel, target_obsTP):
         """Checks for case where a target request is definitively unreachable due to
-        being beyond a fixed petal or GFA boundary, or incompatible with already-existing
-        neighbor targets.
+        incompatibility with already-existing neighbor targets.
         """
-        return False # needs implementation
+        posid = posmodel.posid
+        target_interference = False
+        neighbors_with_requests = [neighbor for neighbor in self.collider.pos_neighbors[posid] if neighbor in self.requests.keys()]
+        for neighbor in neighbors_with_requests:
+            neighbor_posmodel = self.collider.posmodels[neighbor]
+            neighbor_target_posTP = self.requests[neighbor]['targt_posTP']
+            neighbor_target_obsTP = neighbor_posmodel.trans.posTP_to_obsTP(neighbor_target_posTP)
+            if self.collider.spatial_collision_between_positioners(self, posid, neighbor, target_obsTP, neighbor_target_obsTP):
+                target_interference = True
+                break
+        if target_interference:
+            posmodel.clear_postmove_cleanup_cmds_without_executing()
+            return True
+        return False
+    
+    def _deny_request_because_out_of_bounds(self, posmodel, target_obsTP):
+        """Checks for case where a target request is definitively unreachable due to
+        being beyond a fixed petal or GFA boundary.
+        """
+        out_of_bounds = self.collider.spatial_collision_with_fixed(self, posmodel.posid, target_obsTP)
+        if out_of_bounds:
+            posmodel.clear_postmove_cleanup_cmds_without_executing()
+            return True
+        return False
+            
 
     def _get_collisionless_movetables(self,table_type='RRrE'):
         '''Generates move tables, finds the collisions,
