@@ -2,24 +2,19 @@ import posconstants as pc
 import posmovetable
 
 class PosScheduleStage(object):
-    """This class encapsulates the concept of a 'stage' of the RRE plan of fiber
-    positioner motion. The stage can be of several types, describing retraction,
-    rotation, or extension steps.
+    """This class encapsulates the concept of a 'stage' of the fiber
+    positioner motion. The typical usage would be either a direct stage from
+    start to finish, or an intermediate stage, used for retraction, rotation,
+    or extension.
 
-        collider    ... instance of poscollider for this petal
-        stage_type  ... 'direct', 'retract', 'rotate', 'extend'
-        anneal_time ... Time in seconds over which to spread out moves in this stage
-                        to reduce overall power density consumed by the array. You
-                        can also argue None if no annealing should be done.
+        collider     ... instance of poscollider for this petal
+        anneal_time  ... Time in seconds over which to spread out moves in this stage
+                         to reduce overall power density consumed by the array. You
+                         can also argue None if no annealing should be done.
     """
-    def __init__(self, collider, anneal_time=3, stage_type='direct', verbose=False):
+    def __init__(self, collider, anneal_time=3, verbose=False):
         self.collider = collider # poscollider instance
         self.anneal_time = anneal_time
-        self.stage_type = stage_type
-        if stage_type == 'direct':
-            self.anticol_method = 'none'
-        else:
-            self.anticol_method = 'zeroth' # valid types: 'astar', 'zeroth', 'tweak'
         self.move_tables = {} # keys: posids, values: posmovetable instances        
         
     @property
@@ -65,8 +60,10 @@ class PosScheduleStage(object):
         """Identifies collisions in the current move tables.
         """
         
-    def adjust_paths(self):
+    def adjust_paths(self, avoidance_method='zeroth'):
         """Alters move tables to avoid collisions.
+        
+            avoidance_method ... Valid collision avoidance methods: 'zeroth', 'tweak', 'astar'
         """
         
     def freeze(self, posids_that_should_not_be_moved):
