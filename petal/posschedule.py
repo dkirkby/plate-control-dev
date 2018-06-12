@@ -19,11 +19,12 @@ class PosSchedule(object):
     from starts to finishes. The move tables are instances of the PosMoveTable
     class.
     
-        petal             ... Instance of Petal that this schedule applies to
+        petal             ... Instance of Petal that this schedule applies to.
         avoidance_method  ... Collision avoidance method. Valid methods are described in the PosScheduleStage class.
+        animate           ... Whether to automatically generate animations of the scheduled moves.
     """
 
-    def __init__(self, petal,avoidance_method='tweak',verbose=True):
+    def __init__(self, petal,avoidance_method='tweak',animate=False,verbose=True):
         self.petal = petal
         self.avoidance_method = avoidance_method
         self.verbose = verbose
@@ -128,6 +129,11 @@ class PosSchedule(object):
             req = self.requests.pop(posid)
             table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
             table.log_note += (' ' if table.log_note else '') + req['log_note'] # keep the original log notes with move tables
+        if self.animate:
+            sweeps = self._merge_sweeps_from_stages(stages)
+            savedir = 'to_be_implemented'
+            vidname = 'to_be_implemented'
+            self.collider.animate(sweeps,savedir,vidname)
                 
     def already_requested(self, posid):
         """Returns boolean whether a request has already been registered in the
@@ -210,6 +216,13 @@ class PosSchedule(object):
                     self.move_tables[posid].extend(table)
                 else:
                     self.move_tables[posid] = table
+    
+    def _merge_sweeps_from_stages(self,stages):
+        """Collects PosSweep instances from PosScheduleStages and merges them
+        into a single list, suitable for animation.
+        """
+        # to be implemented
+        return []
 
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to

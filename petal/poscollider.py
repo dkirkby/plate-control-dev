@@ -56,12 +56,12 @@ class PosCollider(object):
             self._identify_neighbors(p)
         self._update_collidable_relations()
 
-    def animate(self, sweeps,savedir=None,vidname=None):
+    def animate(self, sweeps, savedir=None, vidname=None):
         """Makes an animation of positioners moving about the petal.
             sweeps ... list of PosSweep instances describing positioners' real-time moves
         """
         self.plotter = posplot.PosPlot(fignum=0, timestep=self.timestep)
-        #self.plotter.clear()
+        self.plotter.clear()
         all_times = [s.time for s in sweeps]
         global_start = np.min([np.min(t) for t in all_times if len(t)>0])
         self.plotter.add_or_change_item('GFA', '', global_start, self.keepout_GFA.points)
@@ -408,7 +408,6 @@ class PosSweep(object):
         self.time = np.array(time)
         self.tp = np.array(tp)
         self.tp_dot = np.array(tp_dot)
-
 
     def quantize(self, timestep):
         """Converts itself from exact, continuous time to quantized, discrete time.

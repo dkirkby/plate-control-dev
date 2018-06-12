@@ -1,8 +1,6 @@
 import numpy as np
-import posconstants as pc
 import matplotlib.pyplot as plt
 import os
-import subprocess
 import time
 import datetime
 
@@ -14,11 +12,10 @@ class PosPlot(object):
     the executable file 'ffmpeg.exe' into the working directory. As of 2016-01-31,
     binaries of ffmpeg are available at: http://ffmpeg.zeranoe.com/builds
     """
-    # iidea - use desi environ variables for file locs
-    # iidea - pass savename prefix
     def __init__(self, fignum=0, timestep=0.1):
         self.live_animate = False # whether to plot the animation live
         self.save_movie = True # whether to write out a movie file of animation
+        self.delete_imgs = False # whether to delete individual image files after generating animation
         self.save_dir_prefix = 'anim'
         self.framefile_prefix = 'frame'
         self.framefile_extension = '.png'
@@ -173,6 +170,7 @@ class PosPlot(object):
         plt.ion()
         start_end_still_time = 0.5
         frame_number = 1
+        image_paths = {}
         if self.live_animate:
             plt.show()
         if self.save_movie:
@@ -185,19 +183,22 @@ class PosPlot(object):
             if not(os.path.exists(self.save_dir)):
                 os.mkdir(self.save_dir)
             for i in range(round(start_end_still_time/self.timestep)):
-                frame_number = self.grab_frame(frame_number)
+                frame_number,path = self.grab_frame(frame_number)
+                image_paths[frame_number] = path
         frame_times = np.arange(min(self.all_times), max(self.all_times)+self.timestep/2, self.timestep) # extra half-timestep on max ensures inclusion of max val in range
         for frame in range(len(frame_times)):
             frame_start_time = time.clock()
             self.anim_frame_update(frame)
             if self.save_movie:
-                frame_number = self.grab_frame(frame_number)
+                frame_number,path = self.grab_frame(frame_number)
+                image_paths[frame_number] = path
             if self.live_animate:
                 plt.pause(0.001) # just to force a refresh of the plot window (hacky, yep. that's matplotlib for ya.)
                 time.sleep(max(0,self.timestep-(time.clock()-frame_start_time))) # likely ineffectual (since matplotlib so slow anyway) attempt to roughly take out frame update / write time
         if self.save_movie:
             for i in range(round(start_end_still_time/self.timestep)):
-                frame_number = self.grab_frame(frame_number)
+                frame_number,path = self.grab_frame(frame_number)
+                image_paths[frame_number] = path
         plt.close()
         if self.save_movie:
             quality = 1
@@ -212,12 +213,15 @@ class PosPlot(object):
             #ffmpeg_cmd = 'ffmpeg' + ' -y ' + ' -r ' + str(fps) + ' -i ' + input_file + ' -q:v ' + str(quality) + ' -vcodec ' + codec + ' ' + output_file
             ffmpeg_cmd = 'ffmpeg' + ' -y ' + ' -r ' + str(fps) + ' -i ' + input_file + ' -vcodec ' + codec + ' ' + output_file
             os.system(ffmpeg_cmd)
+        if self.delete_imgs:
+            for path in image_paths.values():
+                os.remove(path)
 
     def grab_frame(self, frame_number):
         """Saves current figure to an image file. Returns next frame number."""
         path = os.path.join(self.save_dir, self.framefile_prefix + str(frame_number).zfill(self.n_framefile_digits) + self.framefile_extension)
         plt.savefig(path)
-        return frame_number + 1
+        return frame_number + 1, path
 
     @staticmethod
     def get_patch(item,index):

@@ -15,7 +15,8 @@ class PosScheduleStage(object):
     def __init__(self, collider, anneal_time=3, verbose=False):
         self.collider = collider # poscollider instance
         self.anneal_time = anneal_time
-        self.move_tables = {} # keys: posids, values: posmovetable instances        
+        self.move_tables = {} # keys: posids, values: posmovetable instances
+        self.sweeps = {} # keys: posids, values: possweep instances
         
     @property
     def posids(self):
