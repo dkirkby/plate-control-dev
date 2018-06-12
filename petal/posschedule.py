@@ -161,6 +161,22 @@ class PosSchedule(object):
         return False # needs implementation
 
     def _schedule_without_anticollision(self):
+        # gather the start and finish tp from requests
+        # stage = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='direct')
+        # stage.initialize_move_tables()
+        # stage.anneal_power_density()
+        # self.move_tables = stage.move_tables
+        # return [stage]
+        posids = list(self.requests.keys())
+        for posid in posids:
+            req = self.requests.pop(posid)
+            table = self._create_direct_movetable(req)
+            table.store_orig_command(0, req['command'], req['cmd_val1'], req['cmd_val2'])
+            table.log_note += (' ' if table.log_note else '') + req['log_note']
+            self.move_tables[posid] = table
+        return [] # temporary, for compatibility with in-progress new syntax
+
+    def _schedule_with_anticollision(self):
         # stages = []
         # gather the start and finish tp for retract, rotate, and extend stages
         # retract = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='retract')
@@ -176,22 +192,6 @@ class PosSchedule(object):
         #     if collisions found:
         #         stage.freeze(those positioners)
         # return stages
-        posids = list(self.requests.keys())
-        for posid in posids:
-            req = self.requests.pop(posid)
-            table = self._create_direct_movetable(req)
-            table.store_orig_command(0, req['command'], req['cmd_val1'], req['cmd_val2'])
-            table.log_note += (' ' if table.log_note else '') + req['log_note']
-            self.move_tables[posid] = table
-        return [] # temporary, for compatibility with in-progress new syntax
-
-    def _schedule_with_anticollision(self):
-        # gather the start and finish tp from requests
-        # stage = posschedulestage.PosScheduleStage(start_tp, finish_tp, self.collider, stage_type='direct')
-        # stage.initialize_move_tables()
-        # stage.anneal_power_density()
-        # self.move_tables = stage.move_tables
-        # return [stage]
         self.anticol._update_positioner_properties()
         table_type = self._get_tabletype()
         move_tables = self._get_collisionless_movetables(table_type=table_type)
@@ -230,7 +230,7 @@ class PosSchedule(object):
         posmodel = request['posmodel']
         table = posmovetable.PosMoveTable(posmodel)
         dtdp = posmodel.trans.delta_posTP(request['targt_posTP'], \
-                                          request['start_posTP'], range_wrap_limits='targetable')
+                                          request['start_posTP'], range_wrap_limits='targetable')        
         table.set_move(0, pc.T, dtdp[0])
         table.set_move(0, pc.P, dtdp[1])
         table.set_prepause(0, 0.0)
