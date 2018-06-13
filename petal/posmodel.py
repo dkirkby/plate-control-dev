@@ -88,6 +88,12 @@ class PosModel(object):
         return self.state._val['CTRL_ENABLED']
 
     @property
+    def expected_current_posTP(self):
+        """Returns the internally-tracked expected position of the theta and phi shafts
+        at the output of the gearbox."""
+        return [self.axis[pc.T].pos, self.axis[pc.P].pos]
+
+    @property
     def expected_current_position(self):
         """Returns a dictionary of the current expected position in the various coordinate systems.
         The keys are:
@@ -106,7 +112,7 @@ class PosModel(object):
             'motT'  ... float, deg, dependent variable, expected position of theta motor
             'motP'  ... float, deg, dependent variable, expected position of phi motor
         """
-        posTP = [self.axis[pc.T].pos, self.axis[pc.P].pos]
+        posTP = self.expected_current_posTP
         d = {}
         d['posT'] = posTP[0]
         d['posP'] = posTP[1]
