@@ -127,9 +127,9 @@ class PetalTransforms(object):
     def rot_matrix(self):
         """Rotations matrix as 3x3 numpy array, for going from metXYZ --> QS."""
         angle_deg = {field:self.transforms['petal_rot_' + str(field)] for field in [1,2,3]}
-        a = {field:np.deg2rad(angle_deg[field]) for field in angle_deg.keys()}
-        c = {field:np.cos(a[field]) for field in a.keys()}
-        s = {field:np.sin(a[field]) for field in a.keys()}
+        a = {field:np.deg2rad(angle_deg[field]) for field in angle_deg}
+        c = {field:np.cos(a[field]) for field in a}
+        s = {field:np.sin(a[field]) for field in a}
         prec = [[c[1],-s[1],0],[s[1],c[1],0],[0,0,1]]
         nuta = [[c[2],0,s[2]],[0,1,0],[-s[2],0,c[2]]]
         spin = [[c[3],-s[3],0],[s[3],c[3],0],[0,0,1]]
@@ -162,7 +162,7 @@ if __name__ == '__main__':
     filetypes = (("CSV file","*.csv"),("All Files","*")),
     files = {key:'' for key in ['petal_metrology','focal_plane_metrology']}
     data = {}
-    for key in files.keys():
+    for key in files:
         message = 'Select ' + key + ' file.'
         files[key] = tkinter.filedialog.askopenfilename(initialdir=initialdir, filetypes=filetypes, title=message)
         if files[key]:
@@ -173,7 +173,7 @@ if __name__ == '__main__':
                     for field in reader.fieldnames:
                         data[key][field].append(float(row[field]))
         initialdir = os.path.split(files[key])[0]
-    if all([key in data.keys() for key in files.keys()]):
+    if all([key in data for key in files]):
         petal_id = data['petal_metrology']['petal_id'][0]
         n = len(data['petal_metrology']['x_meas_proj'])
         metXYZ = []
@@ -214,7 +214,7 @@ if __name__ == '__main__':
                         row['ballY'] = ballXYZ[1]
                         row['ballZ'] = ballXYZ[2]
                         for letter in ['X','Y','Z']:
-                            field = [field for field in data['focal_plane_metrology'].keys() if str(row['device_loc']) in field and letter.lower() in field][0]
+                            field = [field for field in data['focal_plane_metrology'] if str(row['device_loc']) in field and letter.lower() in field][0]
                             row['check'+letter] = data['focal_plane_metrology'][field][trans_row]
                             row['err'+letter] = row['ball'+letter] - row['check'+letter]
                     writer.writerow(row)
