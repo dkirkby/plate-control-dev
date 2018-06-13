@@ -2,6 +2,7 @@ import posmovetable
 import posconstants as pc
 import postransforms
 import posschedulestage
+from collections import OrderedDict
 from poscollider import PosSweep
 from bidirect_astar import inertial_bidirectional_astar_pathfinding
 
@@ -126,7 +127,6 @@ class PosSchedule(object):
         If there were ANY pre-existing move tables in the list, then ALL the target
         requests are ignored (and the anticollision algorithm is NOT performed).
         """
-        stages = []
         if self.move_tables:
             return
         elif anticollision:
@@ -168,36 +168,54 @@ class PosSchedule(object):
         """Gathers start and finish positions from requests dictionary and generates
         a schedule with direct motions from start to finish (no anticollision).
         """
+        start_tp = {}
+        final_tp = {}
         for posid,request in self.requests.items():
-            start_tp = request['start_posTP']
-            final_tp = request['targt_posTP']
+            start_tp[posid] = request['start_posTP']
+            final_tp[posid] = request['targt_posTP']
         stage = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
         stage.initialize_move_tables(start_tp, final_tp)
         stage.anneal_power_density()
-        return [stage]
+        return OrderedDict([('direct',stage)])
 
     def _schedule_with_anticollision(self):
         """Gathers start and finish positions from requests dictionary and generates
         a schedule which includes calculation of collision avoidance.
-        """
-        stages = []
-        disabled = []
         
-        # for all disabled or not-in-use positioners, set their start and and finish tp as fixed
-        # for all moving positioners, deny any targets that inherently collide with other positioners or boundaries
-        # gather the start and finish tp for retract, rotate, and extend stages
-        # retract = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
-        # rotate = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
-        # extend = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
-        # stages = [retract,rotate,extend]
-        # for stage in stages:
-        #     stage.initialize_move_tables()
-        #     stage.anneal_power_density()
-        #     stage.find_collisions()
-        #     stage.adjust_paths(self.avoidance_method)
-        #     stage.find_collisions() # check
-        #     if collisions found:
-        #         stage.freeze(those positioners)
+        For positioners that have not been given specific move requests, but
+        which are not disabled, these get start/finish positions assigned to them that
+        match their current position. This causes them to be included in the anticollision
+        calculation, so that they can be temporarily moved out of the path of other
+        positioners if necessary, and then returned to their original location.
+        """        
+        stage_names = ['retract','rotate','extend']
+        start_tp = {name:{} for name in stage_names}
+        final_tp = {name:{} for name in stage_names}
+        for posid,request in self.requests.items():
+            start_tp['retract'][posid] = request['start_posTP']
+            final_tp['retract'][posid] = [request['start_posTP'][pc.T], self.collider.Ei_phi]
+            start_tp['rotate'][posid]  = final_tp['retract'][posid]
+            final_tp['rotate'][posid]  = [request['targt_posTP'][pc.T], self.collider.Ei_phi]
+            start_tp['extend'][posid]  = final_tp['rotate'][posid]
+            final_tp['extend'][posid]  = request['targt_posTP']
+        enabled_but_not_requested = [posmodel.posid for posmodel in self.collider.posmodels.values() if posmodel.is_enabled and not posmodel.posid in self.requests.keys()]
+        for posid in enabled_but_not_requested:
+            current_posTP = self.collider.posmodels[posid].expected_current_posTP
+            for name in stage_names:
+                start_tp[name][posid] = current_posTP
+                final_tp[name][posid] = current_posTP
+        stages = OrderedDict.fromkeys(stage_names)
+        stages['retract'] = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
+        stages['rotate']  = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
+        stages['extend']  = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
+        for name,stage in stages:
+            stage.initialize_move_tables(start_tp[name], final_tp[name])
+            stage.anneal_power_density()
+            stage.find_collisions()
+            stage.adjust_paths(self.avoidance_method)
+        #    stage.find_collisions()
+        #    if collisions found:
+        #        stage.freeze(those positioners)
         # return stages
         self.anticol._update_positioner_properties()
         table_type = self._get_tabletype()
@@ -205,13 +223,13 @@ class PosSchedule(object):
         return [] # temporary, for compatibility with in-progress new syntax
 
     def _merge_move_tables_from_stages(self,stages):
-        """Collects move tables from a list of PosScheduleStage instances.
+        """Collects move tables from an ordered dict of PosScheduleStage instances.
         For each positioner, merges move tables from the stages. This is done
         in the order of the list stages. Fills in any intermediate time gaps
         between stages with discrete pause events, so that all positioners have
         matching scheduled move times for all stages and overall.
         """
-        for stage in stages:
+        for stage in stages.values():
             move_times = {}
             for posid,table in stage.move_tables.items():
                 postprocessed = table.for_schedule
@@ -232,8 +250,10 @@ class PosSchedule(object):
         """Collects PosSweep instances from PosScheduleStages and merges them
         into a single list, suitable for animation.
         """
-        # to be implemented
-        return []
+        sweeps = []
+        for stage in stages.values():
+            sweeps.extend(stage.sweeps.values())
+        return sweeps
 
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
