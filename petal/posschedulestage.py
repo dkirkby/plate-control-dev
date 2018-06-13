@@ -37,7 +37,7 @@ class PosScheduleStage(object):
         """
         self._start_tp = start_tp
         self._final_tp = final_tp
-        for posid in self._start_tp.keys():
+        for posid in self._start_tp:
             posmodel = self.posmodels[posid]
             dtdp = posmodel.trans.delta_posTP(final_tp[posid], start_tp[posid], range_wrap_limits='targetable')
             table = posmovetable.PosMoveTable(posmodel)
@@ -56,9 +56,37 @@ class PosScheduleStage(object):
         else:
             pass
         
-    def find_collisions(self):
+    def find_collisions(self, posids=[]):
         """Identifies collisions in the current move tables.
+        
+            posids  ... List of positioners to be checked. They will each be checked
+                        for collisions against all their neighbors, and against any
+                        applicable fixed boundaries, such as the GFA or Petal envelopes
+                        Arguing an empty list causes the complete list of positioners to
+                        be checked.
+        
+        It is necessary that even nominally unmoving neighbors must have some move table.
+        In this case, those tables should just start and end at the same location.
+        Collisions will not be searched for if either item in a pair does not have a
+        move table.
+        
+        Returns a dict with keys = posids, values = enumerated collision types
+        (see the 'case' class in PosConstants). The dict only contains positioners
+        that collide, and will be empty if there are no collisions
         """
+        if not posids:
+            posids = self.posids
+        pairs = {}
+        for posid in posids:
+            for neighbor in self.collider.pos_neighbors[posid]:
+                if neighbor not in pairs and posid in self.move_tables and neighbor in self.move_tables:
+                    pair[posid] = neighbor
+                    # make init_obsTPs
+                    # make tables
+                    pospos_sweeps = self.collider.spacetime_collision_between_positioners(posid, init_obsTP_A, tableA, neighbor, init_obsTP_B, tableB)
+        # also do fixed boundary checks
+        # for any positioner that has 2 collisions, return the first collision only
+
         
     def adjust_paths(self, avoidance_method='zeroth'):
         """Alters move tables to avoid collisions.
