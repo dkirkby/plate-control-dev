@@ -96,7 +96,7 @@ class PosPlot(object):
         """Add a polygonal item at a particular time to the animation data.
         """
         key = str(item_str) + ' ' + str(item_idx)
-        if key not in self.items.keys():
+        if key not in self.items:
             item = {'time':[], 'poly':[], 'style':[], 'collision_time':collision_time}
         else:
             item = self.items[key]
