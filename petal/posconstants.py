@@ -89,9 +89,11 @@ nominals['GEAR_CALIB_T']     = {'value':   1.0, 'tol':    0.05}
 nominals['GEAR_CALIB_P']     = {'value':   1.0, 'tol':    0.05}
     
 # Types
-class case(enum.Enum):
+class case(enum.IntEnum):
     """Enumeration of collision cases. The I, II, and III cases are described in
-    detail in DESI-0899.
+    detail in DESI-0899. Type IntEnum is used so that no collision evaluates
+    directly to 0, and can be used as a boolean false value, where as all other
+    collisions evaluate to finite numbers (true).
     """
     I    = 0  # no collision
     II   = 1  # phi arm against neighboring phi arm
