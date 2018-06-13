@@ -34,7 +34,6 @@ class PosScheduleStage(object):
         
             start_tp    ... dict of starting [theta,phi] positions, keys are posids
             final_tp    ... dict of final [theta,phi] positions, keys are posids
-            posmodels   ... dict of posmodel instances, keys are posids
         """
         self._start_tp = start_tp
         self._final_tp = final_tp
@@ -66,6 +65,9 @@ class PosScheduleStage(object):
         
             avoidance_method ... Valid collision avoidance methods: 'zeroth', 'tweak', 'astar'
         """
+        # be sure to not adjust paths on any positioners that aren't specifcially included in the start_tp, final_tp dicts
+
+        
         
     def freeze(self, posids_that_should_not_be_moved):
         """Freezes positioners in their start_tp position, so that they won't
