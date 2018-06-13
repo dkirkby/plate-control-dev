@@ -142,7 +142,7 @@ class Petal(object):
             deleted from the return.
         """
         mark_for_delete = set()
-        for posid in requests.keys():
+        for posid in requests:
             requests[posid]['posmodel'] = self.posmodel(posid) if allow_objects else posid
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
@@ -209,14 +209,14 @@ class Petal(object):
         request_targets command, where only the first request to a given positioner would be valid.)
         """
         mark_for_delete = set()
-        for posid in requests.keys():
+        for posid in requests:
             if not(self.get(posid,'CTRL_ENABLED')):
                 requests[posid]['command'] = 'direct_dTdP'
                 self.printfunc(self._request_denied_disabled_str(posid,requests[posid]))
                 mark_for_delete.add(posid)
         for posid in mark_for_delete:
             del requests[posid]
-        for posid in requests.keys():
+        for posid in requests:
             requests[posid]['posmodel'] = self.posmodel(posid)
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
@@ -829,7 +829,7 @@ class Petal(object):
         resets = {'MOVE_CMD'  : '',
                   'MOVE_VAL1' : '',
                   'MOVE_VAL2' : ''}
-        for k in resets.keys():
+        for k in resets:
             self.set(key=k,value=resets[k])
 
     def _clear_schedule(self):
