@@ -315,7 +315,7 @@ class PosCollider(object):
             Ee_neighbor = self.Ee_poly.translated(self.x0[possible_neighbor], self.y0[possible_neighbor])
             if not(posid == possible_neighbor) and Ee.collides_with(Ee_neighbor):
                 self.pos_neighbors[posid].append(possible_neighbor)
-        for possible_neighbor in self.fixed_neighbor_keepouts.keys():
+        for possible_neighbor in self.fixed_neighbor_keepouts:
             EE_neighbor = self.fixed_neighbor_keepouts[possible_neighbor]
             if Ee.collides_with(EE_neighbor):
                 self.fixed_neighbor_cases[posid].append(possible_neighbor)
