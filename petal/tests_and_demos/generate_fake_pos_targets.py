@@ -26,8 +26,6 @@ fidids_12 = ['P077','F001','F010','F011','F017','F021','F022','F025','F029','F07
 posids = posids_500
 fidids = fidids_12
 petal_id = 666
-target_file='tile560.txt'
-target_file2='tile541.txt'
 output_file='repositioning_sim_pars.csv'
 output_file_fid='repositioning_sim_fid_pars.csv'
 match_target=True
@@ -302,18 +300,24 @@ def assign_targets(ptl,pos_assigned,qs_assigned,x_assigned,y_assigned):
                     requests[posid] = {'command':'posXY', 'target':xy, 'log_note':'Reach target posXY:'+str(xy[0])+','+str(xy[1])}
                     break
     return requests,target_x,target_y,target_tp 
+target_dir=os.getenv('FP_SETTINGS_DIR')+'/predefined_positioner_locations/petal_targets/BCahns_realistic_targets/'
+count=1
+count_limit=10
+header='posid,OFFSET_X,OFFSET_Y,OFFSET_T,OFFSET_P,LENGTH_R1,LENGTH_R2,'
+for target_file in os.listdir(target_dir):
+    if target_file.endswith(".txt") and target_file.startswith("tile") and count<=count_limit:
+        pos_assigned,xy_assigned,x_assigned,y_assigned,qs_assigned=read_targets(ptl,target_dir+'/'+target_file)
+        cmd='requests,target_x'+str(count)+',target_y'+str(count)+',target_tp'+str(count)+'=assign_targets(ptl,pos_assigned,qs_assigned,x_assigned,y_assigned)'
+        exec(cmd)
+        header=header+',target_x'+str(count)+',target_y'+str(count)+',target_t'+str(count)+',target_p'+str(count)
+        count+=1
 
-pos_assigned,xy_assigned,x_assigned,y_assigned,qs_assigned=read_targets(ptl,target_file)
-requests,target_x,target_y,target_tp=assign_targets(ptl,pos_assigned,qs_assigned,x_assigned,y_assigned)
-
-pos_assigned2,xy_assigned2,x_assigned2,y_assigned2,qs_assigned2=read_targets(ptl,target_file2)
-requests2,target_x2,target_y2,target_tp2=assign_targets(ptl,pos_assigned2,qs_assigned2,x_assigned2,y_assigned2)
 
 ################################################
 ########## Output ###########
 #############################
 f = open(output_file, 'w')
-f.write('posid,OFFSET_X,OFFSET_Y,OFFSET_T,OFFSET_P,LENGTH_R1,LENGTH_R2,target_x,target_y,target_t,target_p,target_x2,target_y2,target_t2,target_p2 \n')
+f.write(header+' \n')
 for i in range(len(posids)):
     posid=posids[i]
     output=posid
@@ -323,8 +327,10 @@ for i in range(len(posids)):
     output=output+', '+str(ptl.posmodels[i].state.read('OFFSET_P'))
     output=output+', '+str(ptl.posmodels[i].state.read('LENGTH_R1'))
     output=output+', '+str(ptl.posmodels[i].state.read('LENGTH_R2'))
-    output=output+', '+str(target_x[i])+','+str(target_y[i])+','+str(target_tp[i][0])+','+str(target_tp[i][1]) # obsTP
-    output=output+', '+str(target_x2[i])+','+str(target_y2[i])+','+str(target_tp2[i][0])+','+str(target_tp2[i][1])+'\n'
+    for j in range(count_limit-1):
+        cmd='output=output+", "+str(target_x'+str(j+1)+'[i])+","+str(target_y'+str(j+1)+'[i])+","+str(target_tp'+str(j+1)+'[i][0])+","+str(target_tp'+str(j+1)+'[i][1])'
+        exec(cmd)
+    output=output+'\n'
     f.write(output)
 
 f.close()
