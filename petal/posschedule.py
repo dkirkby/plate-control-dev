@@ -208,7 +208,7 @@ class PosSchedule(object):
         stages['retract'] = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
         stages['rotate']  = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
         stages['extend']  = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
-        for name,stage in stages:
+        for name,stage in stages.items():
             stage.initialize_move_tables(start_tp[name], final_tp[name])
             stage.anneal_power_density()
             stage.find_collisions()
@@ -288,7 +288,7 @@ class PosSchedule(object):
         """Checks for case where a target request is definitively unreachable due to
         being beyond a fixed petal or GFA boundary.
         """
-        out_of_bounds = self.collider.spatial_collision_with_fixed(self, posmodel.posid, target_obsTP)
+        out_of_bounds = self.collider.spatial_collision_with_fixed(posmodel.posid, target_obsTP)
         if out_of_bounds:
             posmodel.clear_postmove_cleanup_cmds_without_executing()
             return True
