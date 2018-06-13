@@ -109,11 +109,12 @@ class PosState(object):
         if os.path.isfile(self.log_path):
             with open(self.log_path,'r',newline='') as csvfile:
                 headers = csv.DictReader(csvfile).fieldnames
-            for key in self._val.keys():
+            for key in self._val:
                 if key not in headers:
                     self.log_basename = self._increment_suffix(self.log_basename) # start a new file if headers don't match up anymore with all the data we're trying to store
                     break
         self._update_legacy_keys()                
+        self.log_fieldnames = ['TIMESTAMP'] + list(self._val.keys()) + ['NOTE'] # list of fieldnames we save to the log file.
         self.next_log_notes = ['software initialization'] # used for storing specific notes in the next row written to the log
         self.log_unit_called_yet = False # used for one time check whether need to make a new log file, or whether log file headers have changed since last run
         self.log_unit()
@@ -132,13 +133,13 @@ class PosState(object):
         """Store a value to memory. This is the correct way to store values, as
         it contains some checks on tolerance values. (Don't write directly to _val.)
         """
-        if key in pc.nominals.keys():
+        if key in pc.nominals:
             nom = pc.nominals[key]['value']
             tol = pc.nominals[key]['tol']
             if val < nom - tol or val > nom + tol: # check for absurd values
                 self.printfunc('Attempted to set ' + str(key) + ' of ' + str(self.unit_basename) + ' to value = ' + str(val) + ', which is outside the nominal = ' + str(nom) + ' +/- ' + str(tol) + '. Defaulting to nominal value instead.')
                 val = nom
-        if key in self._val.keys():
+        if key in self._val:
             self._val[key] = val
         else:
             self.printfunc('value not set, because the key "' + repr(key) + '" was not found')
@@ -179,12 +180,6 @@ class PosState(object):
             self.curr_log_length += 1
             self.next_log_notes = []
             self.log_unit_called_yet = True # only need to check this the first time through
-    
-    @property
-    def log_fieldnames(self):
-        '''Returns list of fieldnames we save to the log file.
-        '''
-        return ['TIMESTAMP'] + list(self._val.keys()) + ['NOTE']
     
     @property
     def log_path(self):
@@ -241,8 +236,8 @@ class PosState(object):
                                    'LAST_MOVE_VAL2'         : 'MOVE_VAL2',
                                    'LAST_MEAS_BRIGHTNESS'   : 'LAST_MEAS_PEAK',
                                    'LAST_MEAS_BRIGHTNESSES' : 'LAST_MEAS_PEAKS'}
-        for old_key in legacy_key_replacements.keys():
-            if old_key in self._val.keys():
+        for old_key in legacy_key_replacements:
+            if old_key in self._val:
                 temp_val = self._val[old_key]
                 del self._val[old_key]
                 new_key = legacy_key_replacements[old_key]
@@ -255,7 +250,7 @@ class PosState(object):
                                               'LAST_MEAS_OBS_Y':[],
                                               'LAST_MEAS_FWHMS':[]}
         for key in possible_new_keys_and_defaults:
-            if key not in self._val.keys():
+            if key not in self._val:
                 self._val[key] = possible_new_keys_and_defaults[key]
 
 if __name__=="__main__":
