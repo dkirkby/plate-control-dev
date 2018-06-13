@@ -72,11 +72,8 @@ for i in range(len(posids)):
     ptl.posmodels[i].state.store('CTRL_ENABLED',True)
     ptl.posmodels[i].state.store('POS_P',170)
     ptl.posmodels[i].state.store('POS_T',0)
-    posTP_this=postrans.obsTP_to_posTP([float(positioners[i]['target_t']),float(positioners[i]['target_p'])])
-    posXY_this=postrans.posTP_to_posXY(posTP_this)
-    requests[posid] = {'command':'posXY', 'target':posXY_this, 'log_note':'Reach target posXY:'+str(posXY_this[0])+','+str(posXY_this[1])}
-    target_x.append(float(positioners[i]['target_x']))
-    target_y.append(float(positioners[i]['target_y']))
+
+
 # timed test sequence
 cProfile_wrapper('ptl.request_homing(posids)')
 cProfile_wrapper('ptl.schedule_send_and_execute_moves()')
@@ -102,132 +99,84 @@ plt.rc('font', **font)
 head_width=0.1
 head_length=0.15
     
-label1='targets'
-plt.subplot(111)
-axes = plt.gca()
-axes.set_xlim([0,350])
-axes.set_ylim([0,350])
-plt.plot(target_x,target_y,'b+',label=label1)
-for i in range(len(offsetX_arr)):
-    plt.text(offsetX_arr[i],offsetY_arr[i],posids[i],fontsize=2)
-plt.xlabel('X')
-plt.ylabel('y')
-plt.legend(loc=1)
-plt.plot(offsetX_arr,offsetY_arr,'r+')
-cProfile_wrapper('ptl.request_targets(requests)')
-cProfile_wrapper('ptl.schedule_send_and_execute_moves()')
+n_targets=10
+label='target'
+for l in range(n_targets):
 
-x_final_arr=[]
-y_final_arr=[]
-for i in range(len(posids)):
-    pos_t=ptl.posmodels[i].state._val['POS_T']
-    pos_p=ptl.posmodels[i].state._val['POS_P']
-    postrans=ptl.posmodels[i].trans
-    obs_tp=postrans.posTP_to_obsTP([pos_t,pos_p])
-    xy=postrans.obsTP_to_flatXY(obs_tp)
-    x_final_arr.append(xy[0])
-    y_final_arr.append(xy[1])
-    plt.plot([offsetX_arr[i],xy[0]],[offsetY_arr[i],xy[1]],'y')
-plt.scatter(x_final_arr,y_final_arr,s=20,c='g')
+    offsetX_arr=[]
+    offsetY_arr=[]
+    requests={}
+    target_x=[]
+    target_y=[]
+    for i in range(len(posids)):
+        posid=posids[i]
+        model = ptl.posmodels[i]
+        state = model.state
+        postrans=model.trans
+        offsetX_arr.append(float(positioners[i]['OFFSET_X']))
+        offsetY_arr.append(float(positioners[i]['OFFSET_Y']))
+        cmd='posTP_this=postrans.obsTP_to_posTP([float(positioners[i]["target_t'+str(l+1)+'"]),float(positioners[i]["target_p'+str(l+1)+'"])])'
+        exec(cmd)
+        posXY_this=postrans.posTP_to_posXY(posTP_this)
+        requests[posid] = {'command':'posXY', 'target':posXY_this, 'log_note':'Reach target posXY:'+str(posXY_this[0])+','+str(posXY_this[1])}
+        cmd='target_x.append(float(positioners[i]["target_x'+str(l+1)+'"]))'
+        exec(cmd)
+        cmd='target_y.append(float(positioners[i]["target_y'+str(l+1)+'"]))'
+        exec(cmd)
+
+    plt.figure(1,figsize=(9.5,9.5))
+    plt.rc('font', **font)
+    plt.subplot(111)
+    plt.plot(target_x,target_y,'b+',label=label)
+    for i in range(len(offsetX_arr)):
+        plt.text(offsetX_arr[i],offsetY_arr[i],posids[i],fontsize=2)
+    plt.xlabel('X')
+    plt.ylabel('y')
+    plt.legend(loc=1)
+    plt.plot(offsetX_arr,offsetY_arr,'r+')
+    cProfile_wrapper('ptl.request_targets(requests)')
+    cProfile_wrapper('ptl.schedule_send_and_execute_moves()')
+
+    x_final_arr=[]
+    y_final_arr=[]
+    for i in range(len(posids)):
+        pos_t=ptl.posmodels[i].state._val['POS_T']
+        pos_p=ptl.posmodels[i].state._val['POS_P']
+        postrans=ptl.posmodels[i].trans
+        obs_tp=postrans.posTP_to_obsTP([pos_t,pos_p])
+        xy=postrans.obsTP_to_flatXY(obs_tp)
+        x_final_arr.append(xy[0])
+        y_final_arr.append(xy[1])
+        plt.plot([offsetX_arr[i],xy[0]],[offsetY_arr[i],xy[1]],'y')
+    plt.scatter(x_final_arr,y_final_arr,s=20,c='g')
+    if ps:
+        pp.savefig()
 
 
-if ps:
-    pp.savefig()
-
+    plt.close()
 
 #############################
-offset_x_arr=[]
-offset_y_arr=[]
-offset_all_arr=[]
-for k in range(len(posids)):
-    pos_t=ptl.posmodels[k].state.read('POS_T')
-    pos_p=ptl.posmodels[k].state.read('POS_P')
-    postrans=ptl.posmodels[k].trans
-    xy=postrans.posTP_to_obsXY([pos_t,pos_p])
-    offset_x_arr.append(xy[0]-target_x[k])
-    offset_y_arr.append(xy[1]-target_y[k])
-    offset_all_arr.append(np.sqrt((xy[0]-target_x[k])**2+(xy[1]-target_y[k])**2))
-if offset_x_arr:
-    index=np.where(np.array(offset_all_arr)>0.02)
-    ind=index[0].tolist()
-    if ind:
-        print(str(len(ind))+' positioners not reach targets')
-        for i in range(len(ind)):
-            print(posids[ind[i]],offset_all_arr[ind[i]])
+    offset_x_arr=[]
+    offset_y_arr=[]
+    offset_all_arr=[]
+    for k in range(len(posids)):
+        pos_t=ptl.posmodels[k].state.read('POS_T')
+        pos_p=ptl.posmodels[k].state.read('POS_P')
+        postrans=ptl.posmodels[k].trans
+        xy=postrans.posTP_to_obsXY([pos_t,pos_p])
+        offset_x_arr.append(xy[0]-target_x[k])
+        offset_y_arr.append(xy[1]-target_y[k])
+        offset_all_arr.append(np.sqrt((xy[0]-target_x[k])**2+(xy[1]-target_y[k])**2))
+    if offset_x_arr:
+        index=np.where(np.array(offset_all_arr)>0.02)
+        ind=index[0].tolist()
+        if ind:
+            print(str(len(ind))+' positioners not reach targets')
+            for i in range(len(ind)):
+                print(posids[ind[i]],offset_all_arr[ind[i]])
 
-
-
-
-del offsetX_arr[:]
-del offsetY_arr[:]
-requests={}
-del target_x[:]
-del target_y[:]
-for i in range(len(posids)):
-    posid=posids[i]
-    model = ptl.posmodels[i]
-    state = model.state
-    postrans=model.trans
-    offsetX_arr.append(float(positioners[i]['OFFSET_X']))
-    offsetY_arr.append(float(positioners[i]['OFFSET_Y']))
-    posTP_this=postrans.obsTP_to_posTP([float(positioners[i]['target_t2']),float(positioners[i]['target_p2'])])
-    posXY_this=postrans.posTP_to_posXY(posTP_this)
-    requests[posid] = {'command':'posXY', 'target':posXY_this, 'log_note':'Reach target posXY:'+str(posXY_this[0])+','+str(posXY_this[1])}
-    target_x.append(float(positioners[i]['target_x2']))
-    target_y.append(float(positioners[i]['target_y2']))
-
-plt.figure(1,figsize=(9.5,9.5))
-plt.rc('font', **font)
-plt.subplot(111)
-plt.plot(target_x,target_y,'b+',label=label1)
-for i in range(len(offsetX_arr)):
-    plt.text(offsetX_arr[i],offsetY_arr[i],posids[i],fontsize=2)
-plt.xlabel('X')
-plt.ylabel('y')
-plt.legend(loc=1)
-plt.plot(offsetX_arr,offsetY_arr,'r+')
-cProfile_wrapper('ptl.request_targets(requests)')
-cProfile_wrapper('ptl.schedule_send_and_execute_moves()')
-
-del x_final_arr[:]
-del y_final_arr[:]
-for i in range(len(posids)):
-    pos_t=ptl.posmodels[i].state._val['POS_T']
-    pos_p=ptl.posmodels[i].state._val['POS_P']
-    postrans=ptl.posmodels[i].trans
-    obs_tp=postrans.posTP_to_obsTP([pos_t,pos_p])
-    xy=postrans.obsTP_to_flatXY(obs_tp)
-    x_final_arr.append(xy[0])
-    y_final_arr.append(xy[1])
-    plt.plot([offsetX_arr[i],xy[0]],[offsetY_arr[i],xy[1]],'y')
-plt.scatter(x_final_arr,y_final_arr,s=20,c='g')
-if ps:
-    pp.savefig()
-
-
-plt.close()
 if ps:
     pp.close()
 
 
-
-#############################
-offset_x_arr=[]
-offset_y_arr=[]
-offset_all_arr=[]
-for k in range(len(posids)):
-    pos_t=ptl.posmodels[k].state.read('POS_T')
-    pos_p=ptl.posmodels[k].state.read('POS_P')
-    postrans=ptl.posmodels[k].trans
-    xy=postrans.posTP_to_obsXY([pos_t,pos_p])
-    offset_x_arr.append(xy[0]-target_x[k])
-    offset_y_arr.append(xy[1]-target_y[k])
-    offset_all_arr.append(np.sqrt((xy[0]-target_x[k])**2+(xy[1]-target_y[k])**2))
-if offset_x_arr:
-    index=np.where(np.array(offset_all_arr)>0.02)
-    ind=index[0].tolist()
-    if ind:
-        print(str(len(ind))+' positioners not reach targets')
-        for i in range(len(ind)):
-            print(posids[ind[i]],offset_all_arr[ind[i]])
 
