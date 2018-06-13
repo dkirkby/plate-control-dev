@@ -36,12 +36,6 @@ class PosSchedule(object):
     @property
     def collider(self):
         return self.petal.collider
-    
-    @property
-    def posids(self): # consider deprecation, since there is some ambiguity between move_table posids vs request posids
-        """List of posids that have move_tables in the current schedule.
-        """
-        return list(self.move_tables.keys())
         
     def request_target(self, posid, uv_type, u, v, log_note=''):
         """Adds a request to the schedule for a given positioner to move to the
@@ -130,9 +124,9 @@ class PosSchedule(object):
         if self.move_tables:
             return
         elif anticollision:
-            stages = self._schedule_with_anticollision()
+            stages = self._schedule_stages_with_anticollision()
         else:
-            stages = self._schedule_without_anticollision()
+            stages = self._schedule_stages_without_anticollision()
         self._merge_move_tables_from_stages(stages)
         for posid,table in self.move_tables.items():
             req = self.requests.pop(posid)
@@ -148,7 +142,7 @@ class PosSchedule(object):
         """Returns boolean whether a request has already been registered in the
         schedule for the argued positioner.
         """
-        return posid in self.requests.keys()            
+        return posid in self.requests           
 
     def expert_add_table(self, move_table):
         """Adds an externally-constructed move table to the schedule. If there
@@ -159,14 +153,16 @@ class PosSchedule(object):
         if self._deny_request_because_disabled(move_table.posmodel):
             return
         this_posid = move_table.posid
-        if move_table.posid in self.posids:
+        if move_table.posid in self.move_tables:
             self.move_tables[this_posid].extend(move_table)
         else:
             self.move_tables[this_posid] = move_table
 
-    def _schedule_without_anticollision(self):
+    def _schedule_stages_with_anticollision(self):
         """Gathers start and finish positions from requests dictionary and generates
         a schedule with direct motions from start to finish (no anticollision).
+
+        Return value is an OrderedDict of PosScheduleStages.
         """
         start_tp = {}
         final_tp = {}
@@ -178,9 +174,11 @@ class PosSchedule(object):
         stage.anneal_power_density()
         return OrderedDict([('direct',stage)])
 
-    def _schedule_with_anticollision(self):
+    def _schedule_stages_without_anticollision(self):
         """Gathers start and finish positions from requests dictionary and generates
         a schedule which includes calculation of collision avoidance.
+        
+        Return value is an OrderedDict of PosScheduleStages.
         
         For positioners that have not been given specific move requests, but
         which are not disabled, these get start/finish positions assigned to them that
@@ -198,7 +196,7 @@ class PosSchedule(object):
             final_tp['rotate'][posid]  = [request['targt_posTP'][pc.T], self.collider.Ei_phi]
             start_tp['extend'][posid]  = final_tp['rotate'][posid]
             final_tp['extend'][posid]  = request['targt_posTP']
-        enabled_but_not_requested = [posmodel.posid for posmodel in self.collider.posmodels.values() if posmodel.is_enabled and not posmodel.posid in self.requests.keys()]
+        enabled_but_not_requested = [posmodel.posid for posmodel in self.collider.posmodels.values() if posmodel.is_enabled and not posmodel.posid in self.requests]
         for posid in enabled_but_not_requested:
             current_posTP = self.collider.posmodels[posid].expected_current_posTP
             for name in stage_names:
@@ -211,16 +209,13 @@ class PosSchedule(object):
         for name,stage in stages.items():
             stage.initialize_move_tables(start_tp[name], final_tp[name])
             stage.anneal_power_density()
-            stage.find_collisions()
+            collisions = stage.find_collisions()
             stage.adjust_paths(self.avoidance_method)
         #    stage.find_collisions()
         #    if collisions found:
         #        stage.freeze(those positioners)
         # return stages
-        self.anticol._update_positioner_properties()
-        table_type = self._get_tabletype()
-        self.move_tables = self._get_collisionless_movetables(table_type=table_type)
-        return [] # temporary, for compatibility with in-progress new syntax
+        return stages
 
     def _merge_move_tables_from_stages(self,stages):
         """Collects move tables from an ordered dict of PosScheduleStage instances.
@@ -241,7 +236,7 @@ class PosSchedule(object):
                     idx = table.n_rows
                     table.insert_new_row(idx)
                     table.set_postpause(idx,equalizing_pause)
-                if posid in self.move_tables.keys():
+                if posid in self.move_tables:
                     self.move_tables[posid].extend(table)
                 else:
                     self.move_tables[posid] = table
@@ -271,7 +266,7 @@ class PosSchedule(object):
         """
         posid = posmodel.posid
         target_interference = False
-        neighbors_with_requests = [neighbor for neighbor in self.collider.pos_neighbors[posid] if neighbor in self.requests.keys()]
+        neighbors_with_requests = [neighbor for neighbor in self.collider.pos_neighbors[posid] if neighbor in self.requests]
         for neighbor in neighbors_with_requests:
             neighbor_posmodel = self.collider.posmodels[neighbor]
             neighbor_target_posTP = self.requests[neighbor]['targt_posTP']
