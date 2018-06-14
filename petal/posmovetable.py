@@ -12,9 +12,14 @@ class PosMoveTable(object):
     or modified, since there is some extra logic associated with correctly
     appending, inserting, validating, etc. Use the provided setters / getters
     instead.
+    
+    The initial starting position (in positioner local [theta,phi] coordinates)
+    of the move table may be specified upon initialization (1x2 list). If it is
+    not provided, then the move table will automatically look up the current
+    expected position from the posmodel's state object.
     """
 
-    def __init__(self, this_posmodel=None):
+    def __init__(self, this_posmodel=None, init_posTP=None):
         if not(this_posmodel):
             this_posmodel = posmodel.PosModel()
         self.posmodel = this_posmodel    # the particular positioner this table applies to
@@ -22,6 +27,11 @@ class PosMoveTable(object):
         self.log_note = ''               # optional note string which user can associate with this table, to be stored in any logging
         self.rows = []                   # internal representation of the move data
         self._rows_extra = []            # auto-generated backlash and final creep rows get internally stored here
+        if init_posTP:
+            self.init_posTP = init_posTP  # initial [theta,phi] position (positioner local coordinates)
+        else:
+            self.init_posTP = self.posmodel.expected_current_posTP            
+        self.init_obsTP = self.posmodel.trans.posTP_to_obsTP(self.init_posTP) # initial theta,phi position (observer coordinates)
         self.should_antibacklash = self.posmodel.state._val['ANTIBACKLASH_ON']
         self.should_final_creep  = self.posmodel.state._val['FINAL_CREEP_ON']
         self.allow_exceed_limits = self.posmodel.state._val['ALLOW_EXCEED_LIMITS']
@@ -256,7 +266,6 @@ class PosMoveTable(object):
     def _gather_stats(self,table):
         stats = {'net_time':[],'net_dT':[],'net_dP':[],'Q':[],'S':[],'obsX':[],'obsY':[],'posX':[],'posY':[],'obsT':[],'obsP':[],'posT':[],'posP':[],
                  'TOTAL_CRUISE_MOVES_T':0,'TOTAL_CRUISE_MOVES_P':0,'TOTAL_CREEP_MOVES_T':0,'TOTAL_CREEP_MOVES_P':0}
-        pos = self.posmodel.expected_current_position
         for i in range(table['nrows']):
             stats['net_time'].append(table['move_time'][i] + table['prepause'][i] + table['postpause'][i])
             stats['net_dT'].append(table['dT'][i])
@@ -265,8 +274,8 @@ class PosMoveTable(object):
                 stats['net_time'][i] += stats['net_time'][i-1]
                 stats['net_dT'][i] += stats['net_dT'][i-1]
                 stats['net_dP'][i] += stats['net_dP'][i-1]
-            stats['posT'].append(pos['posT'] + stats['net_dT'][i])
-            stats['posP'].append(pos['posP'] + stats['net_dP'][i])
+            stats['posT'].append(self.init_posTP[pc.T] + stats['net_dT'][i])
+            stats['posP'].append(self.init_posTP[pc.P] + stats['net_dP'][i])
             stats['TOTAL_CRUISE_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'cruise' and table['dT'] != 0)
             stats['TOTAL_CRUISE_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'cruise' and table['dP'] != 0)
             stats['TOTAL_CREEP_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'creep' and table['dT'] != 0)
