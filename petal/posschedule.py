@@ -202,6 +202,7 @@ class PosSchedule(object):
             for name in stage_names:
                 start_tp[name][posid] = current_posTP
                 final_tp[name][posid] = current_posTP
+        # note, the following sequence (retract, rotate, extend) may be a good candidate for spawning multiple processes (*not* threads, due to GIL)
         stages = OrderedDict.fromkeys(stage_names)
         stages['retract'] = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
         stages['rotate']  = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
