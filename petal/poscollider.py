@@ -6,8 +6,10 @@ import os
 
 class PosCollider(object):
     """PosCollider contains geometry definitions for mechanical components of the
-    fiber positioner. It provides the methods to check for collisions between
-    neighboring positioners.
+    fiber positioner, GFA camera, and petal. It provides the methods to check for
+    collisions between neighboring positioners, and to check for crossing the
+    boundaries of the GFA or petal envelope. It maintains a list of all the particular
+    positioners in its petal.
 
     See DESI-0899 for geometry specifications, illustrations, and kinematics.
     """
@@ -20,7 +22,8 @@ class PosCollider(object):
             filename = os.path.join(pc.dirs['collision_settings'],configfile)
         print("Filename", filename)    
         self.config = configobj.ConfigObj(filename,unrepr=True)
-        self.posids = [] # list of posid strings for all the positioners
+        self.posids = set() # posid strings for all the positioners
+        self.posindexes = {} # key: posid string, value: index number for positioners in animations
         self.posmodels = {} # key: posid string, value: posmodel instance
         self.pos_neighbors = {} # all the positioners that surround a given positioner. key is a posid, value is a list of neighbor posids
         self.fixed_neighbor_cases = {} # all the fixed neighbors that apply to a given positioner. key is a posid, value is a list of the fixed neighbor cases
@@ -37,11 +40,11 @@ class PosCollider(object):
         (pm, was_not_list) = pc.listify(posmodels, keep_flat=True)
         for posmodel in pm:
             posid = posmodel.posid
-            self.posids.append(posid)
+            self.posids.add(posid)
+            self.posindexes[posid] = len(self.posindexes) + 1
             self.posmodels[posid] = posmodel
             self.pos_neighbors[posid] = []
             self.fixed_neighbor_cases[posid] = []
-            
         self.load_config_data()
 
     def load_config_data(self):
@@ -68,7 +71,7 @@ class PosCollider(object):
         self.plotter.add_or_change_item('PTL', '', global_start, self.keepout_PTL.points)            
         for s in sweeps:
             posid = s.posid
-            posidx = self.posids.index(posid)
+            posidx = self.posindexes[posid]
             self.plotter.add_or_change_item('Eo', posidx, global_start, self.Eo_polys[posid].points)
             self.plotter.add_or_change_item('Ei', posidx, global_start, self.Ei_polys[posid].points)
             self.plotter.add_or_change_item('Ee', posidx, global_start, self.Ee_polys[posid].points)
