@@ -25,8 +25,8 @@ class PosCollider(object):
         self.posids = set() # posid strings for all the positioners
         self.posindexes = {} # key: posid string, value: index number for positioners in animations
         self.posmodels = {} # key: posid string, value: posmodel instance
-        self.pos_neighbors = {} # all the positioners that surround a given positioner. key is a posid, value is a list of neighbor posids
-        self.fixed_neighbor_cases = {} # all the fixed neighbors that apply to a given positioner. key is a posid, value is a list of the fixed neighbor cases
+        self.pos_neighbors = {} # all the positioners that surround a given positioner. key is a posid, value is a set of neighbor posids
+        self.fixed_neighbor_cases = {} # all the fixed neighbors that apply to a given positioner. key is a posid, value is a set of the fixed neighbor cases
         self.collidable_relations = {'A':[],'B':[],'B_is_fixed':[]} # every unique pair of geometry that can collide
         self.R1, self.R2, self.x0, self.y0, self.t0, self.p0 = {}, {}, {}, {}, {}, {}
 
@@ -43,8 +43,8 @@ class PosCollider(object):
             self.posids.add(posid)
             self.posindexes[posid] = len(self.posindexes) + 1
             self.posmodels[posid] = posmodel
-            self.pos_neighbors[posid] = []
-            self.fixed_neighbor_cases[posid] = []
+            self.pos_neighbors[posid] = set()
+            self.fixed_neighbor_cases[posid] = set()
         self.load_config_data()
 
     def load_config_data(self):
@@ -317,11 +317,11 @@ class PosCollider(object):
         for possible_neighbor in self.posids:
             Ee_neighbor = self.Ee_poly.translated(self.x0[possible_neighbor], self.y0[possible_neighbor])
             if not(posid == possible_neighbor) and Ee.collides_with(Ee_neighbor):
-                self.pos_neighbors[posid].append(possible_neighbor)
+                self.pos_neighbors[posid].add(possible_neighbor)
         for possible_neighbor in self.fixed_neighbor_keepouts:
             EE_neighbor = self.fixed_neighbor_keepouts[possible_neighbor]
             if Ee.collides_with(EE_neighbor):
-                self.fixed_neighbor_cases[posid].append(possible_neighbor)
+                self.fixed_neighbor_cases[posid].add(possible_neighbor)
 
     def _update_collidable_relations(self):
         """Update the list of all possible collisions."""
