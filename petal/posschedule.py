@@ -187,34 +187,37 @@ class PosSchedule(object):
         positioners if necessary, and then returned to their original location.
         """        
         stage_names = ['retract','rotate','extend']
-        start_tp = {name:{} for name in stage_names}
-        final_tp = {name:{} for name in stage_names}
+        start_posTP = {name:{} for name in stage_names}
+        desired_final_posTP = {name:{} for name in stage_names}
         for posid,request in self.requests.items():
-            start_tp['retract'][posid] = request['start_posTP']
-            final_tp['retract'][posid] = [request['start_posTP'][pc.T], self.collider.Ei_phi]
-            start_tp['rotate'][posid]  = final_tp['retract'][posid]
-            final_tp['rotate'][posid]  = [request['targt_posTP'][pc.T], self.collider.Ei_phi]
-            start_tp['extend'][posid]  = final_tp['rotate'][posid]
-            final_tp['extend'][posid]  = request['targt_posTP']
+            start_posTP['retract'][posid] = request['start_posTP']
+            desired_final_posTP['retract'][posid] = [request['start_posTP'][pc.T], self.collider.Ei_phi]
+            desired_final_posTP['rotate'][posid]  = [request['targt_posTP'][pc.T], self.collider.Ei_phi]
+            desired_final_posTP['extend'][posid]  = request['targt_posTP']
         enabled_but_not_requested = [posmodel.posid for posmodel in self.collider.posmodels.values() if posmodel.is_enabled and not posmodel.posid in self.requests]
         for posid in enabled_but_not_requested:
             current_posTP = self.collider.posmodels[posid].expected_current_posTP
             for name in stage_names:
-                start_tp[name][posid] = current_posTP
-                final_tp[name][posid] = current_posTP
-        # note, the following sequence (retract, rotate, extend) may be a good candidate for spawning multiple processes (*not* threads, due to GIL)
+                start_posTP[name][posid] = current_posTP
+                desired_final_posTP[name][posid] = current_posTP
         stages = OrderedDict.fromkeys(stage_names)
         stages['retract'] = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
         stages['rotate']  = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
         stages['extend']  = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
         for name,stage in stages.items():
-            stage.initialize_move_tables(start_tp[name], final_tp[name])
+            if name == 'rotate':
+                start_posTP[name] = stage['retract'].final_posTP # get these from the previous stage, in case it had to truncate moves due to physical range limits or had to freeze a positioner
+            elif name == 'extend':
+                start_posTP[name] = stage['rotate'].final_posTP # get these from the previous stage, in case it had to truncate moves due to physical range limits or had to freeze a positioner
+            stage.initialize_move_tables(start_posTP[name], desired_final_posTP[name])
             stage.anneal_power_density()
             collisions = stage.find_collisions()
             stage.adjust_paths(self.avoidance_method)
         #    stage.find_collisions()
         #    if collisions found:
         #        stage.freeze(those positioners)
+        #        in this implementation, would need follow-on logic to freeze future stages for these positioners as well
+        #           --> not only setting start / finish tps to a fixed point. also need to 
         # return stages
         return stages
 
