@@ -126,7 +126,7 @@ class PosSchedule(object):
         elif anticollision:
             stages = self._schedule_stages_with_anticollision()
         else:
-            stages = self._schedule_stages_without_anticollision()
+            stages = self._schedule_stages_no_anticollision()
         self._merge_move_tables_from_stages(stages)
         for posid,table in self.move_tables.items():
             req = self.requests.pop(posid)
@@ -158,7 +158,7 @@ class PosSchedule(object):
         else:
             self.move_tables[this_posid] = move_table
 
-    def _schedule_stages_with_anticollision(self):
+    def _schedule_stages_no_anticollision(self):
         """Gathers start and finish positions from requests dictionary and generates
         a schedule with direct motions from start to finish (no anticollision).
 
@@ -174,7 +174,7 @@ class PosSchedule(object):
         stage.anneal_power_density()
         return OrderedDict([('direct',stage)])
 
-    def _schedule_stages_without_anticollision(self):
+    def _schedule_stages_with_anticollision(self):
         """Gathers start and finish positions from requests dictionary and generates
         a schedule which includes calculation of collision avoidance.
         
