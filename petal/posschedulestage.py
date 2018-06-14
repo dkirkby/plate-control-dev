@@ -17,16 +17,6 @@ class PosScheduleStage(object):
         self.anneal_time = anneal_time
         self.move_tables = {} # keys: posids, values: posmovetable instances
         self.sweeps = {} # keys: posids, values: possweep instances
-        
-    @property
-    def posids(self):
-        """List of posid strings for all the positioners."""
-        return self.collider.posids
-    
-    @property
-    def posmodels(self):
-        """Returns dict with key: posid string, value: posmodel instances."""
-        return self.collider.posmodels
     
     def initialize_move_tables(self, start_tp, final_tp):
         """Generates basic move tables for each positioner, going straight from
@@ -38,7 +28,7 @@ class PosScheduleStage(object):
         self._start_tp = start_tp
         self._final_tp = final_tp
         for posid in self._start_tp:
-            posmodel = self.posmodels[posid]
+            posmodel = self.collider.posmodels[posid]
             dtdp = posmodel.trans.delta_posTP(final_tp[posid], start_tp[posid], range_wrap_limits='targetable')
             table = posmovetable.PosMoveTable(posmodel)
             table.set_move(0, pc.T, dtdp[0])
@@ -75,7 +65,7 @@ class PosScheduleStage(object):
         that collide, and will be empty if there are no collisions
         """
         if not posids:
-            posids = self.posids
+            posids = self.collider.posids
         pairs = {}
         for posid in posids:
             for neighbor in self.collider.pos_neighbors[posid]:
