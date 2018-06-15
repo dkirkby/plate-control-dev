@@ -303,7 +303,7 @@ def assign_targets(ptl,pos_assigned,qs_assigned,x_assigned,y_assigned):
 target_dir=os.getenv('FP_SETTINGS_DIR')+'/predefined_positioner_locations/petal_targets/BCahns_realistic_targets/'
 count=1
 count_limit=10
-header='posid,OFFSET_X,OFFSET_Y,OFFSET_T,OFFSET_P,LENGTH_R1,LENGTH_R2,'
+header='posid,OFFSET_X,OFFSET_Y,OFFSET_T,OFFSET_P,LENGTH_R1,LENGTH_R2'
 for target_file in os.listdir(target_dir):
     if target_file.endswith(".txt") and target_file.startswith("tile") and count<=count_limit:
         pos_assigned,xy_assigned,x_assigned,y_assigned,qs_assigned=read_targets(ptl,target_dir+'/'+target_file)
