@@ -42,9 +42,6 @@ class PosScheduleStage(object):
             table.set_postpause(0, 0.0)
             self.move_tables[posid] = table
 
-    def initialize_motionless_move_tables(self):
-        """Generates 
-
     def anneal_power_density(self):
         """Adjusts move tables internal timing, to reduce peak power consumption
         of the overall array.

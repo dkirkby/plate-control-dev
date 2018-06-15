@@ -25,13 +25,12 @@ class PosSchedule(object):
         animate           ... Whether to automatically generate animations of the scheduled moves.
     """
 
-    def __init__(self, petal,avoidance_method='tweak',animate=False,verbose=True):
+    def __init__(self, petal, avoidance_method='tweak', animate=False, verbose=True):
         self.petal = petal
         self.avoidance_method = avoidance_method
         self.verbose = verbose
-        self.move_tables = {} # keys: posids, values: instances of PosMoveTable
         self.requests = {} # keys: posids, values: target request dictionaries
-        self.anticol = Anticol(self.collider,self.petal,verbose) # to be deprecated
+        self.move_tables = {} # keys: posids, values: instances of PosMoveTable
 
     @property
     def collider(self):
@@ -124,9 +123,14 @@ class PosSchedule(object):
         if self.move_tables:
             return
         elif anticollision:
-            stages = self._schedule_with_anticollision()
+            self._schedule_with_path_adjustments()
         else:
-            stages = self._schedule_no_anticollision()
+            self._schedule_with_no_path_adjustments()
+            
+        # 1. always check for collisions and do freezing
+        # 2. have path adjustment off for small correction moves
+        # 3. if path adjustment on, then EVERYTHING gets RRE'd
+            
         for posid,table in self.move_tables.items():
             req = self.requests.pop(posid)
             table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
@@ -157,10 +161,15 @@ class PosSchedule(object):
         else:
             self.move_tables[this_posid] = move_table
 
-    def _schedule_no_anticollision(self):
-        """Gathers start and finish positions from requests dictionary and generates
-        a schedule (populating self.move_tables) with direct motions from start to
-        finish (no anticollision).
+    def _check_tables_for_collisions_and_freeze(self, posids):
+        """Checks for collision of all the argued posids agains their neighbors
+        (other positioners or fixed boundaries). In case of collision
+        """
+
+    def _schedule_with_no_path_adjustments(self, posids):
+        """Gathers data from requests dictionary for the argued posids, and populates
+        self.move_tables with direct motions from start to finish. These positioners
+        are given no path adjustments to avoid each other.
         """
         start_tp = {}
         final_tp = {}
@@ -172,10 +181,10 @@ class PosSchedule(object):
         stage.anneal_power_density()
         self.move_tables = stage.move_tables
         
-    def _schedule_with_anticollision(self):
-        """Gathers start and finish positions from requests dictionary and generates
-        a schedule (populating self.move_tables) which includes calculation of collision
-        avoidance.
+    def _schedule_with_path_adjustments(self, posids):
+        """Gathers data from requests dictionary for the argued posids, and populates
+        self.move_tables with motion paths from start to finish. These include
+        adjustments of paths to avoid collisions.
         
         For positioners that have not been given specific move requests, but
         which are not disabled, these get start/finish positions assigned to them that
