@@ -86,6 +86,16 @@ class PosMoveTable(object):
         """Number of rows in table.
         """
         return len(self.rows)
+    
+    @property
+    def is_motionless(self):
+        """Boolean saying whether the move table contains no motion at all, on
+        neither the theta nor phi axis, in any row.
+        """
+        for row in self.rows:
+            if row.data['dP_ideal'] or row.data['dT_ideal']:
+                return False
+        return True
 
     # setters
     def set_move(self, rowidx, axisid, distance):
