@@ -27,7 +27,6 @@ class PosCollider(object):
         self.posmodels = {} # key: posid string, value: posmodel instance
         self.pos_neighbors = {} # all the positioners that surround a given positioner. key is a posid, value is a set of neighbor posids
         self.fixed_neighbor_cases = {} # all the fixed neighbors that apply to a given positioner. key is a posid, value is a set of the fixed neighbor cases
-        self.collidable_relations = {'A':[],'B':[],'B_is_fixed':[]} # every unique pair of geometry that can collide
         self.R1, self.R2, self.x0, self.y0, self.t0, self.p0 = {}, {}, {}, {}, {}, {}
 
         self.plotting_on = True
@@ -45,19 +44,9 @@ class PosCollider(object):
             self.posmodels[posid] = posmodel
             self.pos_neighbors[posid] = set()
             self.fixed_neighbor_cases[posid] = set()
-        self.load_config_data()
-
-    def load_config_data(self):
-        """Reads latest versions of all configuration file offset, range, and
-        polygon definitions, and updates stored values accordingly.
-        """
-        self.timestep = self.config['TIMESTEP']
-        self._load_keepouts()
-        self._load_positioner_params()
-        self._load_circle_envelopes()
+        self._load_config_data()
         for p in self.posids:
             self._identify_neighbors(p)
-        self._update_collidable_relations()
 
     def animate(self, sweeps, savedir=None, vidname=None):
         """Makes an animation of positioners moving about the petal.
@@ -261,6 +250,15 @@ class PosCollider(object):
         poly2 = self.place_central_body(posid2, t2)
         return poly1.collides_with(poly2)
 
+    def _load_config_data(self):
+        """Reads latest versions of all configuration file offset, range, and
+        polygon definitions, and updates stored values accordingly.
+        """
+        self.timestep = self.config['TIMESTEP']
+        self._load_keepouts()
+        self._load_positioner_params()
+        self._load_circle_envelopes()
+
     def _load_keepouts(self):
         """Read latest versions of all keepout geometries."""
         self.keepout_P = PosPoly(self.config['KEEPOUT_PHI'], self.config['KEEPOUT_PHI_PT0'])
@@ -322,30 +320,6 @@ class PosCollider(object):
             EE_neighbor = self.fixed_neighbor_keepouts[possible_neighbor]
             if Ee.collides_with(EE_neighbor):
                 self.fixed_neighbor_cases[posid].add(possible_neighbor)
-
-    def _update_collidable_relations(self):
-        """Update the list of all possible collisions."""
-        A = []
-        B = []
-        B_is_fixed = []
-        for posid in self.posids:
-            for neighbor in self.pos_neighbors[posid]:
-                if posid in A and neighbor in B and A.index(posid) == B.index(neighbor):
-                    pass
-                elif neighbor in A and posid in B and A.index(neighbor) == B.index(posid):
-                    pass
-                else:
-                    A.append(posid)
-                    B.append(neighbor)
-                    B_is_fixed.append(False)
-        for posid in self.posids:
-            for case in self.fixed_neighbor_cases[posid]:
-                A.append(posid)
-                B.append(case)
-                B_is_fixed.append(True)
-        self.collidable_relations['A'] = A
-        self.collidable_relations['B'] = B
-        self.collidable_relations['B_is_fixed'] = B_is_fixed
 
     def _max_extent(self):
         """Calculation of max radius of keepout for a positioner with fully-extended phi arm."""
