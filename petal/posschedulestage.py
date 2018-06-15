@@ -42,6 +42,9 @@ class PosScheduleStage(object):
             table.set_postpause(0, 0.0)
             self.move_tables[posid] = table
 
+    def initialize_motionless_move_tables(self):
+        """Generates 
+
     def anneal_power_density(self):
         """Adjusts move tables internal timing, to reduce peak power consumption
         of the overall array.
@@ -80,7 +83,6 @@ class PosScheduleStage(object):
                     pospos_sweeps = self.collider.spacetime_collision_between_positioners(posid, init_obsTP_A, tableA, neighbor, init_obsTP_B, tableB)
         # also do fixed boundary checks
         # for any positioner that has 2 collisions, return the first collision only
-
         
     def adjust_paths(self, avoidance_method='zeroth'):
         """Alters move tables to avoid collisions.
@@ -88,12 +90,9 @@ class PosScheduleStage(object):
             avoidance_method ... Valid collision avoidance methods: 'zeroth', 'tweak', 'astar'
         """
         # be sure to not adjust paths on any positioners that aren't specifcially included in the start_tp, final_tp dicts
-
-        
         
     def freeze(self, posids_that_should_not_be_moved):
         """Freezes positioners in their start_tp position, so that they won't
         move at all.
         """
- 
-        
+            

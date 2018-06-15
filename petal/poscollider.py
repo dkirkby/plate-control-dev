@@ -28,7 +28,6 @@ class PosCollider(object):
         self.pos_neighbors = {} # all the positioners that surround a given positioner. key is a posid, value is a set of neighbor posids
         self.fixed_neighbor_cases = {} # all the fixed neighbors that apply to a given positioner. key is a posid, value is a set of the fixed neighbor cases
         self.R1, self.R2, self.x0, self.y0, self.t0, self.p0 = {}, {}, {}, {}, {}, {}
-
         self.plotting_on = True
         self.timestep = self.config['TIMESTEP']
         self.plotter = posplot.PosPlot(fignum=0, timestep=self.timestep)

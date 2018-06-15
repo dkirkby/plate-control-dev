@@ -124,10 +124,9 @@ class PosSchedule(object):
         if self.move_tables:
             return
         elif anticollision:
-            stages = self._schedule_stages_with_anticollision()
+            stages = self._schedule_with_anticollision()
         else:
-            stages = self._schedule_stages_no_anticollision()
-        self._merge_move_tables_from_stages(stages)
+            stages = self._schedule_no_anticollision()
         for posid,table in self.move_tables.items():
             req = self.requests.pop(posid)
             table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
@@ -158,11 +157,10 @@ class PosSchedule(object):
         else:
             self.move_tables[this_posid] = move_table
 
-    def _schedule_stages_no_anticollision(self):
+    def _schedule_no_anticollision(self):
         """Gathers start and finish positions from requests dictionary and generates
-        a schedule with direct motions from start to finish (no anticollision).
-
-        Return value is an OrderedDict of PosScheduleStages.
+        a schedule (populating self.move_tables) with direct motions from start to
+        finish (no anticollision).
         """
         start_tp = {}
         final_tp = {}
@@ -172,13 +170,12 @@ class PosSchedule(object):
         stage = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
         stage.initialize_move_tables(start_tp, final_tp)
         stage.anneal_power_density()
-        return OrderedDict([('direct',stage)])
-
-    def _schedule_stages_with_anticollision(self):
-        """Gathers start and finish positions from requests dictionary and generates
-        a schedule which includes calculation of collision avoidance.
+        self.move_tables = stage.move_tables
         
-        Return value is an OrderedDict of PosScheduleStages.
+    def _schedule_with_anticollision(self):
+        """Gathers start and finish positions from requests dictionary and generates
+        a schedule (populating self.move_tables) which includes calculation of collision
+        avoidance.
         
         For positioners that have not been given specific move requests, but
         which are not disabled, these get start/finish positions assigned to them that
@@ -188,7 +185,15 @@ class PosSchedule(object):
         
         Disabled positioners are still checked for collisions, but of course are not
         allowed to move out of the way in the algorithm.
-        """        
+        """
+        # need a threshold check first, as to whether or not to do RRE (i.e., if we're already within threshold of target)
+        # important philosophical question --> do I allow a MIX of RRE and non-RRE?? (and if NOT, should this check be done higher level, determining whether to go through schedule_without_anticollision?)
+        # categories to deal with:
+        #   1. finite request > threshold ... requires RRE
+        #   2. finite request < threshold ... requires direct, refuses RRE. or does direct
+        #   3. enabled but not requested  ... requires RRE, most cases should end up with no move table at all
+        #   4. disabled                   ... requires no move table at all
+        # consider also doing direct moves during the rotate stage
         stage_names = ['retract','rotate','extend']
         start_posTP = {name:{} for name in stage_names}
         desired_final_posTP = {name:{} for name in stage_names}
@@ -207,6 +212,7 @@ class PosSchedule(object):
             dtdp['extend'][posid]        = posmodel.trans.delta_posTP(desired_final_posTP['extend'][posid],  start_posTP['extend'][posid],  range_wrap_limits='targetable')                
         enabled_but_not_requested = [posmodel.posid for posmodel in self.collider.posmodels.values() if posmodel.is_enabled and not posmodel.posid in self.requests]
         for posid in enabled_but_not_requested:
+            # these get move tables that start and finish 
             current_posTP = self.collider.posmodels[posid].expected_current_posTP
             for name in stage_names:
                 start_posTP[name][posid] = current_posTP
@@ -227,15 +233,20 @@ class PosSchedule(object):
         #        in this implementation, would need follow-on logic to freeze future stages for these positioners as well
         #           --> not only setting start / finish tps to a fixed point. also need to 
         # return stages
-        return stages
+        self.move_tables = self._merge_move_tables_from_stages(stages)
+        motionless = {table.posid for table in self.move_tables if table.is_motionless}
+        for posid in motionless:
+            del self.move_tables[posid]
 
     def _merge_move_tables_from_stages(self,stages):
         """Collects move tables from an ordered dict of PosScheduleStage instances.
         For each positioner, merges move tables from the stages. This is done
-        in the order of the list stages. Fills in any intermediate time gaps
+        in the order of the dict. Fills in any intermediate time gaps
         between stages with discrete pause events, so that all positioners have
-        matching scheduled move times for all stages and overall.
+        matching scheduled move times for all stages and overall. Returns a dict
+        of move_tables, with keys = posids.
         """
+        move_tables = {}
         for stage in stages.values():
             move_times = {}
             for posid,table in stage.move_tables.items():
@@ -248,10 +259,11 @@ class PosSchedule(object):
                     idx = table.n_rows
                     table.insert_new_row(idx)
                     table.set_postpause(idx,equalizing_pause)
-                if posid in self.move_tables:
-                    self.move_tables[posid].extend(table)
+                if posid in move_tables:
+                    move_tables[posid].extend(table)
                 else:
-                    self.move_tables[posid] = table
+                    move_tables[posid] = table
+        return move_tables
     
     def _merge_sweeps_from_stages(self,stages):
         """Collects PosSweep instances from PosScheduleStages and merges them
