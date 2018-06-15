@@ -182,18 +182,29 @@ class PosSchedule(object):
         
         For positioners that have not been given specific move requests, but
         which are not disabled, these get start/finish positions assigned to them that
-        match their current position. This causes them to be included in the anticollision
-        calculation, so that they can be temporarily moved out of the path of other
+        match their current position. This causes them to be included in the collision
+        avoidance algorithm, so that they can be temporarily moved out of the path of other
         positioners if necessary, and then returned to their original location.
+        
+        Disabled positioners are still checked for collisions, but of course are not
+        allowed to move out of the way in the algorithm.
         """        
         stage_names = ['retract','rotate','extend']
         start_posTP = {name:{} for name in stage_names}
         desired_final_posTP = {name:{} for name in stage_names}
+        dtdp = {name:{} for name in stage_names}
         for posid,request in self.requests.items():
+            posmodel = self.collider.posmodels[posid]
+            # some care is taken to use only delta and add functions provided by PosTransforms, to ensure that range wrap limits are always properly handled from stage to stage
             start_posTP['retract'][posid] = request['start_posTP']
             desired_final_posTP['retract'][posid] = [request['start_posTP'][pc.T], self.collider.Ei_phi]
             desired_final_posTP['rotate'][posid]  = [request['targt_posTP'][pc.T], self.collider.Ei_phi]
             desired_final_posTP['extend'][posid]  = request['targt_posTP']
+            dtdp['retract'][posid]       = posmodel.trans.delta_posTP(desired_final_posTP['retract'][posid], start_posTP['retract'][posid], range_wrap_limits='targetable')
+            start_posTP['rotate'][posid] = posmodel.trans.addto_posTP(        start_posTP['retract'][posid],        dtdp['retract'][posid], range_wrap_limits='targetable')
+            dtdp['rotate'][posid]        = posmodel.trans.delta_posTP(desired_final_posTP['rotate'][posid],  start_posTP['rotate'][posid],  range_wrap_limits='targetable')
+            start_posTP['extend'][posid] = posmodel.trans.addto_posTP(        start_posTP['rotate'][posid],         dtdp['rotate'][posid],  range_wrap_limits='targetable')
+            dtdp['extend'][posid]        = posmodel.trans.delta_posTP(desired_final_posTP['extend'][posid],  start_posTP['extend'][posid],  range_wrap_limits='targetable')                
         enabled_but_not_requested = [posmodel.posid for posmodel in self.collider.posmodels.values() if posmodel.is_enabled and not posmodel.posid in self.requests]
         for posid in enabled_but_not_requested:
             current_posTP = self.collider.posmodels[posid].expected_current_posTP
@@ -201,15 +212,12 @@ class PosSchedule(object):
                 start_posTP[name][posid] = current_posTP
                 desired_final_posTP[name][posid] = current_posTP
         stages = OrderedDict.fromkeys(stage_names)
+        # the three stage are a good candidate for multiple processes, to get performance improvement (not multiple threads, due to the GIL)
         stages['retract'] = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
         stages['rotate']  = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
         stages['extend']  = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
         for name,stage in stages.items():
-            if name == 'rotate':
-                start_posTP[name] = stage['retract'].final_posTP # get these from the previous stage, in case it had to truncate moves due to physical range limits or had to freeze a positioner
-            elif name == 'extend':
-                start_posTP[name] = stage['rotate'].final_posTP # get these from the previous stage, in case it had to truncate moves due to physical range limits or had to freeze a positioner
-            stage.initialize_move_tables(start_posTP[name], desired_final_posTP[name])
+            stage.initialize_move_tables(start_posTP[name], dtdp[name])
             stage.anneal_power_density()
             collisions = stage.find_collisions()
             stage.adjust_paths(self.avoidance_method)

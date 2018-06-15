@@ -17,38 +17,30 @@ class PosScheduleStage(object):
         self.anneal_time = anneal_time
         self.move_tables = {} # keys: posids, values: posmovetable instances
         self.sweeps = {} # keys: posids, values: possweep instances
-        self.start_posTP = {} # keys: posids, values: [theta,phi]
-        self.final_posTP = {} # keys: posids, values: [theta,phi]
+        self.frozen = set() # positioners that are required to stay exactly in place (no motion)
+        self._start_posTP = {} # keys: posids, values: [theta,phi]
+        self._final_posTP = {} # keys: posids, values: [theta,phi]
+        self._true_dtdp = {} # keys: posids, values: [delta theta, delta phi]
     
-    def initialize_move_tables(self, start_posTP, final_posTP):
+    def initialize_move_tables(self, start_posTP, dtdp):
         """Generates basic move tables for each positioner, going straight from
         the start_tp to the final_tp.
         
             start_posTP  ... dict of starting [theta,phi] positions, keys are posids
-            final_posTP  ... dict of final [theta,phi] positions, keys are posids
-            
-        This function will store the argued start_tp in the posschedulestage instance.
-        
-        It also stores the final_tp, but a subtle but important thing that this function
-        does is first, before storing final_tp, it recalculates it based on the
-        physical range limits of the positioner. So in most cases, the final_tp is
-        unchanged from what was argued. But in case the user argued a physically
-        unreachable final_tp, this function is offering some protection by storing
-        only what is actually going to be physically accomplished by the positioner.
+            dtdp         ... dict of [delta theta, delta phi] from the starting position. keys are posids
+                             The user should take care that these dtdp have been generated properly using PosTransforms, with range_wrap_limits='targetable'
         """
-        self.start_posTP = start_posTP
-        for posid in self.start_posTP:
+        self._start_posTP = start_posTP
+        for posid in self._start_posTP:
             posmodel = self.collider.posmodels[posid]
-            dtdp = posmodel.trans.delta_posTP(final_posTP[posid], self.start_posTP[posid], range_wrap_limits='targetable')
-            table = posmovetable.PosMoveTable(posmodel, self.start_posTP[posid])
-            table.set_move(0, pc.T, dtdp[0])
-            table.set_move(0, pc.P, dtdp[1])
+            self._final_posTP[posid] = posmodel.trans.addto_posTP(self._start_posTP[posid], dtdp[posid], range_wrap_limits='targetable')
+            self._true_dtdp[posid] = posmodel.trans.delta_posTP(self._final_posTP[posid], self.start_posTP[posid], range_wrap_limits='targetable')
+            table = posmovetable.PosMoveTable(posmodel, self._start_posTP[posid])
+            table.set_move(0, pc.T, dtdp[posid][0])
+            table.set_move(0, pc.P, dtdp[posid][1])
             table.set_prepause(0, 0.0)
             table.set_postpause(0, 0.0)
             self.move_tables[posid] = table
-            true_final_posT = self.start_posTP[posid][pc.T] + dtdp[0]
-            true_final_posP = self.start_posTP[posid][pc.P] + dtdp[1]
-            self.final_posTP[posid] = [true_final_posT, true_final_posP]
 
     def anneal_power_density(self):
         """Adjusts move tables internal timing, to reduce peak power consumption
@@ -67,11 +59,6 @@ class PosScheduleStage(object):
                         applicable fixed boundaries, such as the GFA or Petal envelopes
                         Arguing an empty list causes the complete list of positioners to
                         be checked.
-        
-        It is necessary that even nominally unmoving neighbors must have some move table.
-        In this case, those tables should just start and end at the same location.
-        Collisions will not be searched for if either item in a pair does not have a
-        move table.
         
         Returns a dict with keys = posids, values = enumerated collision types
         (see the 'case' class in PosConstants). The dict only contains positioners
