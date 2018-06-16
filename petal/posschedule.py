@@ -127,6 +127,7 @@ class PosSchedule(object):
         else:
             self._schedule_with_no_path_adjustments()
             
+        # Simplest, therefore best logic:
         # 1. always check for collisions and do freezing
         # 2. have path adjustment off for small correction moves
         # 3. if path adjustment on, then EVERYTHING gets RRE'd
