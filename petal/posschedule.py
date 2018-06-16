@@ -131,6 +131,21 @@ class PosSchedule(object):
         # 1. always check for collisions and do freezing
         # 2. have path adjustment off for small correction moves
         # 3. if path adjustment on, then EVERYTHING gets RRE'd
+        #
+        # so really, we have two basic flags (collision_check on/off, path_adjustment on/off)
+        # not just one anticollision on/off flag
+        #
+        # collision_check and path_adjustment --> adjust paths (RRE) and then collision check
+        # collision_check and not path_adjustment --> direct paths, and then collision check
+        # not collision_check --> direct paths, no collision check (expert only)
+        #
+        # so, throughout the code convert "anticollision" flag to "collision_check"
+        # and add a path_adjustment flag alongside
+        #
+        # or, more clear, change anticollision from a boolean into an enumeration with 3 options:
+        #   no_collision_checks # no collisions are searched for. expert use only.
+        #   collision_checks_only # collisions are searched for. if found, the colliding positioner is frozen at its original position. suitable for small correction moves
+        #   collision_checks_with_path_adjustment # collisions are searched for. if found, the motion paths of colliding positioners are adjusted to attempt to avoid each other. if this fails, the colliding positioner is frozen at its original position. suitable for gross retargeting moves
             
         for posid,table in self.move_tables.items():
             req = self.requests.pop(posid)
