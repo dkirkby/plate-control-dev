@@ -271,22 +271,20 @@ class PosSchedule(object):
             posids  ... Set of positioners to be checked. They will each be checked
                         for collisions against all their neighbors, and against any
                         applicable fixed boundaries, such as the GFA or Petal envelopes
-                        Arguing an empty list causes the complete list of positioners to
-                        be checked.
+                        Arguing an empty list causes the complete list of positioners
+                        on the petal to be checked.
         
-        Returns a dict with keys = posids, values = {'case':case, 'neighbor':neighbor}
-        
-        The subdictionary in the return has keys/values:
-        
-            'case'     ... Enumerated collision types (see the 'case' class in PosConstants)
-            'neighbor' ... posid of the neighbor it collides with, or 'fixed' if it was a fixed boundary collision
+        Returns a dict with keys = posids, values = PosSweep instances (see poscollider.py)
             
-        The return dict only contains positioners that collide, and will be empty if
-        there are no collisions.
+        The return dict only contains sweeps for positioners that collide, and will be
+        empty if there are no collisions.
         
-        The return dict only contains unique positioner pairs. In other words, if there
-        is an entry for posid 'M00001' colliding with neighbor 'M00002', then there will
-        not also be an entry for posid 'M00002' colliding with neighbor 'M0001'.
+        Note that for any pair of positioners that collide, the return dict will
+        contain sweeps for each of them. The two sweeps are both giving you information
+        about the same collision event, but from the perspectives of the two different
+        positioners. In other words, if there is an entry for posid 'M00001', colliding with
+        neighbor 'M00002', then the dict will also contain an entry for posid 'M00002',
+        colliding with neighbor 'M0001'.
         """
         if not posids:
             posids = self.collider.posids
