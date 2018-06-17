@@ -109,8 +109,8 @@ class PosCollider(object):
             'move_time' : list of durations of rotations in seconds, approximately equals max(dT/Tdot,dP/Pdot), but calculated more exactly for the physical hardware
             'prepause'  : list of postpause (after the rotations end) values in seconds
 
-        The return is a list of instances of PosSweep, containing the theta and phi rotations
-        in real time, and when if any collision, and the collision type.
+        The return is a list of instances of PosSweep. (These contain the theta and phi rotations
+        in real time, when if any collision, and the collision type and neighbor.)
         """
         pospos = posid_B is not None # whether this is checking collisions between two positioners (or if false, between one positioner and fixed keepouts)
         if pospos:
@@ -140,17 +140,14 @@ class PosCollider(object):
                 else:
                     collision_case = self.spatial_collision_with_fixed(posid_A, sweeps[0].tp[:,step[0]])
                 if collision_case != pc.case.I:
-                    for i in range(len(sweeps)):
+                    for i,j in zip(range(len(sweeps)), reversed(range(len(sweeps)))):
                         sweeps[i].collision_case = collision_case
-                        sweeps[i].collision_time = sweeps[i].time[step[i]]
                         if pospos:
-                            sweeps[i].collision_neighbor = posid_B if i == 0 else posid_A
-                        elif collision_case == pc.case.PTL:
-                            sweeps[i].collision_neighbor = 'PTL'
-                        elif collision_case == pc.case.GFA:
-                            sweeps[i].collision_neighbor = 'GFA'
+                            sweeps[i].collision_neighbor = sweeps[j].posid
+                            sweeps[i].collision_time = max(sweeps[i].time[step[i]], sweeps[j].time[step[j]])
                         else:
-                            print('Warning: unrecognized collision case ' + str(collision_case) + ' for positioner ' + sweeps[i].posid)
+                            sweeps[i].collision_neighbor = 'PTL' if collision_case == pc.case.PTL else 'GFA'
+                            sweeps[i].collision_time = sweeps[i].time[step[i]]
                         steps_remaining[i] = 0 # halt the sweep here
             steps_remaining = np.clip(np.asarray(steps_remaining)-1,0,np.inf)
             for i in range(len(sweeps)):
@@ -174,7 +171,6 @@ class PosCollider(object):
         """
         if obsTP_A[1] >= self.Eo_phi and obsTP_B[1] >= self.Eo_phi:
             return pc.case.I
-        ### Note to check to make sure A and B are asigned to correct case, had to swap inds to correct bug
         elif obsTP_A[1] < self.Eo_phi and obsTP_B[1] >= self.Ei_phi: # check case IIIA
             if self._case_III_collision(posid_A, posid_B, obsTP_A, obsTP_B[0]):
                 return pc.case.IIIA
