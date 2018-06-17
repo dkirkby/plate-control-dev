@@ -253,12 +253,12 @@ class PosSchedule(object):
         for name,stage in stages.items():
             stage.initialize_move_tables(start_posTP[name], dtdp[name])
             stage.anneal_power_density()
-            colliding_positioners = self.find_collisions(stage.move_tables)
+            colliding_positioners = self._find_collisions(stage.move_tables)
             n_iter = 0
             while colliding_positioners and n_iter < self.max_path_adjustment_iterations:
                 stage.adjust_paths(colliding_positioners, n_iter)
                 colliding_move_tables = {posid:stage.move_tables[posid] for posid in colliding_positioners}
-                colliding_positioners = self.find_collisions(colliding_move_tables)
+                colliding_positioners = self._find_collisions(colliding_move_tables)
                 n_iter += 1
         self.move_tables = self._merge_move_tables_from_stages(stages)
         motionless = {table.posid for table in self.move_tables if table.is_motionless}
@@ -266,13 +266,7 @@ class PosSchedule(object):
             del self.move_tables[posid]
 
     def _find_collisions(self, move_tables):
-        """Identifies collisions in the argued dict of move_tables.
-        
-            posids  ... Set of positioners to be checked. They will each be checked
-                        for collisions against all their neighbors, and against any
-                        applicable fixed boundaries, such as the GFA or Petal envelopes
-                        Arguing an empty list causes the complete list of positioners
-                        on the petal to be checked.
+        """Identifies collisions in the argued dict, keys = posids, values = PosMoveTable instances.
         
         Returns a dict with keys = posids, values = PosSweep instances (see poscollider.py)
             
@@ -285,23 +279,31 @@ class PosSchedule(object):
         positioners. In other words, if there is an entry for posid 'M00001', colliding with
         neighbor 'M00002', then the dict will also contain an entry for posid 'M00002',
         colliding with neighbor 'M0001'.
+        
+        If a positioner has collisions with multiple other postioners or fixed boundaries,
+        then only the collision that occurs first is included in the return dict.
         """
-        if not posids:
-            posids = self.collider.posids
-        pairs = {}
-        for posid in posids:
+        already_checked = {posid:set() for posid in self.collider.posids}
+        colliding_sweeps = {posid:set() for posid in move_tables}
+        for posid in move_tables:
+            table_A = move_tables[posid]
+            init_obsTP_A = table_A.posmodel.trans.posTP_to_obsTP(table_A.init_posTP)
             for neighbor in self.collider.pos_neighbors[posid]:
-                # this if statement below is wrong -- still need to check disabled positioners. it's just that we don't adjust their paths later
-                if neighbor not in pairs and posid in self.move_tables and neighbor in self.move_tables:
-                    pairs[posid] = neighbor
-                    this_table = self.move_tables[posid]
-                    neighbor_table self.move_tables[neighbor]
-                    this_init_obsTP = 
-                    # make init_obsTPs
-                    # make tables
+                if neighbor not in already_checked[posid]:
+                    table_B = move_tables[neighbor] if neighbor in move_tables else table_B = posmovetable.PosMoveTable(self.collider.posmodels[neighbor])
+                    init_obsTP_B = table_B.posmodel.trans.posTP_to_obsTP(table_B.init_posTP)
                     pospos_sweeps = self.collider.spacetime_collision_between_positioners(posid, init_obsTP_A, tableA, neighbor, init_obsTP_B, tableB)
-        # also do fixed boundary checks
-        # for any positioner that has 2 collisions, return the first collision only
+                    for sweep in pospos_sweeps:
+                        if sweep.collision_case != pc.case.I:
+                            colliding_sweeps[sweep.posid].add(sweep)
+                    already_checked[posid].add(neighbor)
+                    already_checked[neighbor].add(posid)
+            for fixed_neighbor in self.collider.fixed_neighbor_cases[posid]:
+                posfix_sweeps = self.collider.spacetime_collision_with_fixed(posid, init_obsTP_A, table_A)
+                if posfix_sweep.collision_case != pc.case.I:
+                    colliding_sweeps[posid].add(posfix_sweeps[0]) # index 0 to retrieve from the one-element list
+        # for any positioner that has > 1 collision, return the first collision only
+        # and convert return data from dict of sets to dict of sweeps
 
     def _merge_move_tables_from_stages(self,stages):
         """Collects move tables from an ordered dict of PosScheduleStage instances.
