@@ -109,48 +109,48 @@ class PosSchedule(object):
         # need some usage of deny_request_because_unreachable -- resolve syntax issue of whether that function should receive a request dictionary or a posmovetable
         self.requests[posid] = new_request
 
-    def schedule_moves(self, anticollision=True):
+    def schedule_moves(self, anticollision='detect_and_freeze'):
         """Executes the scheduling algorithm upon the stored list of move requests.
 
         A single move table is generated for each positioner that has a request
-        registered. The resulting tables are stored in the move_tables list. If the
-        anticollision argument is true, then the anticollision algorithm is run when
-        generating the move tables.
+        registered. The resulting tables are stored in the move_tables list.
+        
+        There are three options for anticollision behavior during scheduling:
+           
+          'none'               ... No collisions are searched for. Expert use only.
+           
+          'detect_and_freeze'  ... Collisions are searched for. If found, the colliding
+                                   positioner is frozen at its original position. This
+                                   setting is suitable for small correction moves.
+           
+          'detect_and_adjust'  ... Collisions are searched for. If found, the motion paths
+                                   of colliding positioners are adjusted to attempt to
+                                   avoid each other. If this fails, the colliding positioner
+                                   is frozen at its original position. This setting is
+                                   suitable for gross retargeting moves.
 
-        If there were ANY pre-existing move tables in the list, then ALL the target
-        requests are ignored (and the anticollision algorithm is NOT performed).
+        If there were ANY pre-existing move tables in the list, then no new
+        scheduling is done. Any new requests are ignored. Furthermore, if
+        anticollision='detect_and_adjust', then it reverts to 'detect_and_freeze'
+        instead. (An argument of anticollision='none' remains as-is.)
         """
-        if self.move_tables:
+        if anticollision not in {'none','detect_and_freeze','detect_and_adjust'}:
+            if self.verbose:
+                print('Bad anticollision option \'' + str(anticollision) + '\' was argued. No move scheduling performed.')
             return
-        elif anticollision:
-            self._schedule_with_path_adjustments()
+        if self.move_tables:
+            anticollision = 'detect_and_freeze' if anticollision == 'detect_and_adjust' else anticollision
         else:
-            self._schedule_with_no_path_adjustments()
-            
-        # Simplest, therefore best logic:
-        # 1. always check for collisions and do freezing
-        # 2. have path adjustment off for small correction moves
-        # 3. if path adjustment on, then EVERYTHING gets RRE'd
-        #
-        # so really, we have two basic flags (collision_check on/off, path_adjustment on/off)
-        # not just one anticollision on/off flag
-        #
-        # collision_check and path_adjustment --> adjust paths (RRE) and then collision check
-        # collision_check and not path_adjustment --> direct paths, and then collision check
-        # not collision_check --> direct paths, no collision check (expert only)
-        #
-        # so, throughout the code convert "anticollision" flag to "collision_check"
-        # and add a path_adjustment flag alongside
-        #
-        # or, more clear, change anticollision from a boolean into an enumeration with 3 options:
-        #   no_collision_checks # no collisions are searched for. expert use only.
-        #   collision_checks_only # collisions are searched for. if found, the colliding positioner is frozen at its original position. suitable for small correction moves
-        #   collision_checks_with_path_adjustment # collisions are searched for. if found, the motion paths of colliding positioners are adjusted to attempt to avoid each other. if this fails, the colliding positioner is frozen at its original position. suitable for gross retargeting moves
-            
-        for posid,table in self.move_tables.items():
-            req = self.requests.pop(posid)
-            table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
-            table.log_note += (' ' if table.log_note else '') + req['log_note'] # keep the original log notes with move tables
+            if anticollision == 'none' or anticollision == 'detect_and_freeze':
+                self.schedule_with_no_path_adjustments()
+            elif anticollision == 'detect_and_adjust':
+                self.schedule_with_path_adjustments()
+            for posid,table in self.move_tables.items():
+                req = self.requests.pop(posid)
+                table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
+                table.log_note += (' ' if table.log_note else '') + req['log_note'] # keep the original log notes with move tables
+        if anticollision != 'none':
+            self._check_tables_for_collisions_and_freeze()
         if self.animate:
             sweeps = self._merge_sweeps_from_stages(stages)
             savedir = pc.dirs['fp_temp_files']
