@@ -143,6 +143,14 @@ class PosCollider(object):
                     for i in range(len(sweeps)):
                         sweeps[i].collision_case = collision_case
                         sweeps[i].collision_time = sweeps[i].time[step[i]]
+                        if pospos:
+                            sweeps[i].collision_neighbor = posid_B if i == 0 else posid_A
+                        elif collision_case == pc.case.PTL:
+                            sweeps[i].collision_neighbor = 'PTL'
+                        elif collision_case == pc.case.GFA:
+                            sweeps[i].collision_neighbor = 'GFA'
+                        else:
+                            print('Warning: unrecognized collision case ' + str(collision_case) + ' for positioner ' + sweeps[i].posid)
                         steps_remaining[i] = 0 # halt the sweep here
             steps_remaining = np.clip(np.asarray(steps_remaining)-1,0,np.inf)
             for i in range(len(sweeps)):
@@ -354,6 +362,7 @@ class PosSweep(object):
         self.tp_dot    = np.array([[],[]])  # theta,phi rotation speeds as function of time (sign indicates direction)
         self.collision_case = pc.case.I     # enumeration of type "case", indicating what kind of collision first detected, if any
         self.collision_time = np.inf        # time at which collision occurs. if no collision, the time is inf
+        self.collision_neighbor = ''        # id string (posid, 'PTL', or 'GFA') of neighbor it collides with, if any
 
     def fill_exact(self, init_obsTP, table, start_time=0):
         """Fills in a sweep object based on the input table. Time and position
