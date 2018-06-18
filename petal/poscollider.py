@@ -144,10 +144,13 @@ class PosCollider(object):
                         sweeps[i].collision_case = collision_case
                         if pospos:
                             sweeps[i].collision_neighbor = sweeps[j].posid
-                            sweeps[i].collision_time = max(sweeps[i].time[step[i]], sweeps[j].time[step[j]])
+                            possible_collision_times = {sweeps[i].time[step[i]]:step[i], sweeps[j].time[step[j]]:step[j]} # key: time value, value: step index
+                            sweeps[i].collision_time = max(possible_collision_times)
+                            sweeps[i].collision_idx = possible_collision_times[sweeps[i].collision_time]
                         else:
                             sweeps[i].collision_neighbor = 'PTL' if collision_case == pc.case.PTL else 'GFA'
                             sweeps[i].collision_time = sweeps[i].time[step[i]]
+                            sweeps[i].collision_idx = step[i]
                         steps_remaining[i] = 0 # halt the sweep here
             steps_remaining = np.clip(np.asarray(steps_remaining)-1,0,np.inf)
             for i in range(len(sweeps)):
@@ -353,11 +356,12 @@ class PosSweep(object):
     """
     def __init__(self, posid=None):
         self.posid     = posid              # unique posid string of the positioner
-        self.time      = np.array([])       # real time at which each TP position value occurs
+        self.time      = np.array([])       # time at which each TP position value occurs
         self.tp        = np.array([[],[]])  # theta,phi angles as function of time (sign indicates direction)
         self.tp_dot    = np.array([[],[]])  # theta,phi rotation speeds as function of time (sign indicates direction)
         self.collision_case = pc.case.I     # enumeration of type "case", indicating what kind of collision first detected, if any
         self.collision_time = np.inf        # time at which collision occurs. if no collision, the time is inf
+        self.collision_idx = None           # index in time and theta,phi lists at which collision occurs
         self.collision_neighbor = ''        # id string (posid, 'PTL', or 'GFA') of neighbor it collides with, if any
 
     def fill_exact(self, init_obsTP, table, start_time=0):
@@ -416,6 +420,14 @@ class PosSweep(object):
         self.tp = discrete_position
         self.tp_dot = speed
 
+    def abs_max_net_distance(self, index1, index2):
+        """Returns the absolute value maximum net distance, in degrees, traveled by
+        either theta or phi axis, going from the timestep referenced by index1 to
+        the timestep referenced by index2.
+        """
+        dtdp = self.tp[:,index2] - self.tp[:,index1]
+        return np.max(np.abs(dtdp))
+        
 
 class PosPoly(object):
     """Represents a collidable polygonal envelope definition for a mechanical component
