@@ -200,6 +200,15 @@ class PosSchedule(object):
             while index_to_freeze > 0 and sweep_to_freeze.abs_max_net_distance(index_to_freeze,index_to_freeze-1) < self.min_freeze_clearance:
                 index_to_freeze -= 1
             
+            # better method
+            #   1. check if one positioner already gets to its target before collision
+            #   2. if so, freeze the other
+            #   3. if not, freeze the one with further out phi
+            #   4. freezing consists of:
+            #       a. get the for_schedule move table
+            #       b. look up row where collision occurs, using collision time
+            #       c. delete that row and all subsequent rows from the move_table
+            
             # make a dict of move_tables of all neighbors of frozen positioners
             colliding_sweeps = self._find_collisions(neighbor_tables_of_frozen) # double-check to ensure the truncation hasn't caused a follow-on collision
             n_iter += 1
