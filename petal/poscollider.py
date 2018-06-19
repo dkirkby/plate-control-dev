@@ -1,6 +1,6 @@
 import numpy as np
 import posconstants as pc
-import posplot
+import posanimator
 import configobj
 import os
 
@@ -30,7 +30,8 @@ class PosCollider(object):
         self.R1, self.R2, self.x0, self.y0, self.t0, self.p0 = {}, {}, {}, {}, {}, {}
         self.plotting_on = True
         self.timestep = self.config['TIMESTEP']
-        self.plotter = posplot.PosPlot(fignum=0, timestep=self.timestep)
+        self.animator = posanimator.PosAnimator(fignum=0, timestep=self.timestep)
+        self.add_fixed_to_animator()
 
     def add_positioners(self, posmodels):
         """Add a positioner or multiple positioners to the collider object.
@@ -47,34 +48,36 @@ class PosCollider(object):
         for p in self.posids:
             self._identify_neighbors(p)
 
-    def add_to_animator(self, sweeps, savedir=None, vidname=None):
-        """Makes an animation of positioners moving about the petal.
-            sweeps ... list of PosSweep instances describing positioners' real-time moves
+    def add_fixed_to_animator(self):
+        """Add unmoving polygon shapes to the animator. Only need to do this one time,
+        upon initialization.
         """
-        self.plotter = posplot.PosPlot(fignum=0, timestep=self.timestep)
-        self.plotter.clear()
-        all_times = [s.time for s in sweeps]
-        global_start = np.min([np.min(t) for t in all_times if len(t)>0])
-        self.plotter.add_or_change_item('GFA', '', global_start, self.keepout_GFA.points)
-        self.plotter.add_or_change_item('PTL', '', global_start, self.keepout_PTL.points)            
-        for s in sweeps:
-            posid = s.posid
+        self.animator.add_or_change_item('GFA', '', 0, self.keepout_GFA.points)
+        self.animator.add_or_change_item('PTL', '', 0, self.keepout_PTL.points)
+        for posid in self.posindexes:
+            self.animator.add_or_change_item('Eo', self.posindexes[posid], 0, self.Eo_polys[posid].points)
+            self.animator.add_or_change_item('Ei', self.posindexes[posid], 0, self.Ei_polys[posid].points)
+            self.animator.add_or_change_item('Ee', self.posindexes[posid], 0, self.Ee_polys[posid].points)
+            self.animator.add_or_change_item('line at 180', self.posindexes[posid], 0, self.line180_polys[posid].points)
+        
+    def add_mobile_to_animator(self, sweeps):
+        """Add a collection of PosSweeps to the animator, describing positioners'
+        real-time motions.
+        
+            sweeps ... dict with keys = posids, values = PosSweep instances
+        """            
+        for posid,s in sweeps:
             posidx = self.posindexes[posid]
-            self.plotter.add_or_change_item('Eo', posidx, global_start, self.Eo_polys[posid].points)
-            self.plotter.add_or_change_item('Ei', posidx, global_start, self.Ei_polys[posid].points)
-            self.plotter.add_or_change_item('Ee', posidx, global_start, self.Ee_polys[posid].points)
-            self.plotter.add_or_change_item('line at 180', posidx, global_start, self.line180_polys[posid].points)
             for i in range(len(s.time)):
                 if s.collision_case != pc.case.I:
                     pass
-                self.plotter.add_or_change_item('central body', posidx, s.time[i], self.place_central_body(posid, s.tp[0,i]).points, s.collision_time)
-                self.plotter.add_or_change_item('phi arm',      posidx, s.time[i], self.place_phi_arm(posid, s.tp[:,i]).points,      s.collision_time)
-                self.plotter.add_or_change_item('ferrule',      posidx, s.time[i], self.place_ferrule(posid, s.tp[:,i]).points,      s.collision_time)
+                self.animator.add_or_change_item('central body', posidx, s.time[i], self.place_central_body(posid, s.tp[0,i]).points, s.collision_time)
+                self.animator.add_or_change_item('phi arm',      posidx, s.time[i], self.place_phi_arm(     posid, s.tp[:,i]).points, s.collision_time)
+                self.animator.add_or_change_item('ferrule',      posidx, s.time[i], self.place_ferrule(     posid, s.tp[:,i]).points, s.collision_time)
                 if s.collision_case == pc.case.GFA:
-                    self.plotter.add_or_change_item('GFA', '', s.time[i], self.keepout_GFA.points, s.collision_time)
+                    self.animator.add_or_change_item('GFA', '', s.time[i], self.keepout_GFA.points, s.collision_time)
                 elif s.collision_case == pc.case.PTL:
-                    self.plotter.add_or_change_item('PTL', '', s.time[i], self.keepout_PTL.points, s.collision_time)
-        self.plotter.animate(savedir,vidname)
+                    self.animator.add_or_change_item('PTL', '', s.time[i], self.keepout_PTL.points, s.collision_time)
 
     def spacetime_collision_between_positioners(self, posid_A, init_obsTP_A, tableA, posid_B, init_obsTP_B, tableB):
         """Wrapper for spacetime_collision method, specifically for checking two positioners

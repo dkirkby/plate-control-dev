@@ -3,8 +3,9 @@ import matplotlib.pyplot as plt
 import os
 import time
 import datetime
+import posconstants as pc
 
-class PosPlot(object):
+class PosAnimator(object):
     """Handles plotting animated visualizations for array of positioners.
 
     Saving movie files of animations is implemented. Must have ffmpeg to write the
@@ -16,9 +17,11 @@ class PosPlot(object):
         self.live_animate = False # whether to plot the animation live
         self.save_movie = True # whether to write out a movie file of animation
         self.delete_imgs = False # whether to delete individual image files after generating animation
-        self.save_dir_prefix = 'anim'
+        self.save_dir = os.path.join(pc.dirs['fp_temp_files'], 'schedule_animations')
         self.framefile_prefix = 'frame'
         self.framefile_extension = '.png'
+        self.movie_codec = 'mpeg4'
+        self.movie_quality = 1
         self.n_framefile_digits = 5
         self.fignum = fignum
         self.timestep = timestep # frame interval for animations
@@ -90,7 +93,13 @@ class PosPlot(object):
                        }
 
     def clear(self):
-        self = PosPlot(self.fignum, self.timestep)
+        self = PosPlot(self.fignum, self.timestep) # change this, obviously
+    
+    def reset_fixed_items(self):
+        """Return all fixed items to their non-collsion style ("gray").
+        """
+        # maybe... need to look thru again at how I actually implemented this before
+        pass
 
     def add_or_change_item(self, item_str, item_idx, time, polygon_points, collision_time=np.inf):
         """Add a polygonal item at a particular time to the animation data.
@@ -175,11 +184,6 @@ class PosPlot(object):
             plt.show()
         if self.save_movie:
             fps = 1/self.timestep
-            if savedir is None:
-                datestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
-                self.save_dir = os.path.join(os.getcwd(), self.save_dir_prefix + '_' + datestamp)
-            else:
-                self.save_dir = savedir
             if not(os.path.exists(self.save_dir)):
                 os.mkdir(self.save_dir)
             for i in range(round(start_end_still_time/self.timestep)):
@@ -201,17 +205,10 @@ class PosPlot(object):
                 image_paths[frame_number] = path
         plt.close()
         if self.save_movie:
-            quality = 1
-            codec = 'mpeg4'
             input_file = os.path.join(self.save_dir, self.framefile_prefix + '%' + str(self.n_framefile_digits) + 'd' + self.framefile_extension)
-            if vidname is None:
-                output_file = os.path.join(self.save_dir,'animation.mp4')
-            elif vidname[-3:] == 'mp4':
-                output_file = os.path.join(self.save_dir, vidname)
-            else:
-                output_file = os.path.join(self.save_dir, vidname+'.mp4')
-            #ffmpeg_cmd = 'ffmpeg' + ' -y ' + ' -r ' + str(fps) + ' -i ' + input_file + ' -q:v ' + str(quality) + ' -vcodec ' + codec + ' ' + output_file
-            ffmpeg_cmd = 'ffmpeg' + ' -y ' + ' -r ' + str(fps) + ' -i ' + input_file + ' -vcodec ' + codec + ' ' + output_file
+            output_file = os.path.join(self.save_dir,pc.filename_timestamp_str_now() + '_schedule_anim.mp4')
+            #ffmpeg_cmd = 'ffmpeg' + ' -y ' + ' -r ' + str(fps) + ' -i ' + input_file + ' -q:v ' + str(self.movie_quality) + ' -vcodec ' + self.movie_codec + ' ' + output_file
+            ffmpeg_cmd = 'ffmpeg' + ' -y ' + ' -r ' + str(fps) + ' -i ' + input_file + ' -vcodec ' + self.movie_codec + ' ' + output_file
             os.system(ffmpeg_cmd)
         if self.delete_imgs:
             for path in image_paths.values():

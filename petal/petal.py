@@ -69,9 +69,10 @@ class Petal(object):
         self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
         self.set_motor_parameters()
         
-        # collider and scheduler setup
+        # collider, scheduler, and animator setup
         self.collider = poscollider.PosCollider(configfile=collider_file)
         self.collider.add_positioners(self.posmodels)
+        self.animator = self.collider.animator
         self.schedule = posschedule.PosSchedule(self,verbose=self.verbose)
         self.anticollision_default = 'detect_and_freeze'  # Default parameter on how to schedule moves. See posschedule.py for valid settings.
         
@@ -741,6 +742,20 @@ class Petal(object):
         """
         pidx = self.posids.index(posid)
         return self.posmodels[pidx]
+    
+# MOVE SCHEDULING ANIMATOR CONTROLS
+        
+    def start_gathering_frames(self):
+        self.plotter.clear()
+        pass
+    
+    def end_gathering_frames(self):
+        pass
+    
+    def generate_animation(self):
+        self.animator.animate(savedir,vidname)
+        pass
+
 
 # INTERNAL METHODS
 

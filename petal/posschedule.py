@@ -140,15 +140,8 @@ class PosSchedule(object):
         if anticollision != 'none':
             self._check_tables_for_collisions_and_freeze(self.move_tables)
         if self.animate:
-            # I think I should break this up a bit:
-            #   make generation of pngs happen inside posschedulestage instances
-            #   high-level user "start animation capture", "finish animation capture" functions
-            #   during this period, stages are spitting back png filenames into a list
-            #   at the end of this period, the single mp4 file is made from however many pngs
-            sweeps = self._merge_sweeps_from_stages(stages)
-            savedir = pc.dirs['fp_temp_files']
-            vidname = pc.filename_timestamp_str_now() + '_schedule_anim.mp4'
-            self.collider.animate(sweeps,savedir,vidname)
+            # more work on how to gather these sweeps is needed...
+            self.collider.add_mobile_to_animator(sweeps)
                 
     def already_requested(self, posid):
         """Returns boolean whether a request has already been registered in the
