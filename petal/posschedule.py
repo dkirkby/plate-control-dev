@@ -176,41 +176,63 @@ class PosSchedule(object):
         frozen in place at a point before the collision would have occurred.
         
         In the case where it is two neighboring positioners who would collide, then
-        we always select to freeze the one that has its phi arm further extended.
-        This provides a greater likelihood that at least one of the two (the less
-        extended positioner) can still get its phi arm tucked in.
+        we select which of the two to freeze according to:
+            
+            1. If one positioner achieves its intended target prior to the collision,
+               then we freeze the other one.
+            2. Otherwise, we freeze the positioner that has its phi arm further extended.
+               (This provides a greater likelihood that at least one of the two (the less
+               extended positioner) can still get its phi arm tucked in.)
+            3. In the rare event of equal phi extension at the moment of collision,
+               then the choice of which to freeze is arbitrary.
         
-        The return is a set containing posids for any positioners that were frozen.
+        The argued dict move_tables will have its contents modified directly by
+        this function, to achieve freezing. The total time to execute the move table
+        is kept the same as the original, by addition of a compensating postpause. In cases
+        where freezing requires that the positioner not move at all, those tables will be
+        deleted from the dict.
         """
         fixed_cases = {pc.case.PTL, pc.case.GFA}
         n_iter = 0
         max_iter = 6 # Since max number of neighbors is six, could never need more than this # of iterations.
         colliding_sweeps = self._find_collisions(self.move_tables)
         while colliding_sweeps and n_iter < max_iter:
-            for posid,sweep in colliding_sweeps:
-                if sweep.collision_case in fixed_cases:
+            frozen = set()
+            neighbors_of_frozen = set()
+            for posid,sweep_A in colliding_sweeps:
+                if sweep_A.collision_case in fixed_cases or sweep_A.collision_neighbor not in move_tables:
                     pos_to_freeze = posid
                 else:
-                    sweep_B = colliding_sweeps[sweep.collision_neighbor]
-                    phi_A = sweep.tp[1,sweep.collision_idx]
-                    phi_B = sweep_B.tp[1,sweep.collision_idx]
-                    pos_to_freeze = posid if phi_A > phi_B else sweep_B.posid
-            sweep_to_freeze = colliding_sweep[pos_to_freeze]
-            index_to_freeze = sweep.collision_index
-            while index_to_freeze > 0 and sweep_to_freeze.abs_max_net_distance(index_to_freeze,index_to_freeze-1) < self.min_freeze_clearance:
-                index_to_freeze -= 1
-            
-            # better method
-            #   1. check if one positioner already gets to its target before collision
-            #   2. if so, freeze the other
-            #   3. if not, freeze the one with further out phi
-            #   4. freezing consists of:
-            #       a. get the for_schedule move table
-            #       b. look up row where collision occurs, using collision time
-            #       c. delete that row and all subsequent rows from the move_table
-            
-            # make a dict of move_tables of all neighbors of frozen positioners
-            colliding_sweeps = self._find_collisions(neighbor_tables_of_frozen) # double-check to ensure the truncation hasn't caused a follow-on collision
+                    sweep_B = colliding_sweeps[sweep_A.collision_neighbor]
+                    if sweep_A.is_final_position(sweep_A.collision_idx):
+                        pos_to_freeze = sweep_A.posid
+                    elif sweep_B.is_final_position(sweep_B.collisiono_idx):
+                        pos_to_freeze = sweep_B.posid
+                    else:
+                        phi_A = sweep_A.phi(sweep_A.collision_idx)
+                        phi_B = sweep_B.phi(sweep_B.collision_idx)
+                        pos_to_freeze = posid if phi_A > phi_B else sweep_B.posid
+                sweep_to_freeze = colliding_sweeps[pos_to_freeze]
+                table_data = move_tables[pos_to_freeze].for_schedule()
+                net_times_before_freeze = [time for time in table_data['stats']['net_time'] if time < sweep_to_freeze.collision_time]
+                net_time_total = table_data['stats']['net_time'][-1]
+                first_row_to_delete = len(net_times_before_freeze)
+                for row_idx in reversed(range(move_tables[pos_to_freeze].n_rows)):
+                    if table_data['stats']['net_time'] >= sweep_to_freeze.collision_time:
+                        move_tables[pos_to_freeze].delete_row(row_idx)
+                    else:
+                        break
+                n_rows = move_tables[pos_to_freeze].n_rows
+                if n_rows == 0:
+                    del move_tables[pos_to_freeze]
+                else:
+                    compensating_pause = net_time_total - table_data['stats']['net_time'][n_rows-1]
+                    new_postpause = table_data['postpause'][n_rows-1] + compensating_pause
+                    move_tables[pos_to_freeze].set_postpause(n_rows-1,new_postpause)
+                frozen.add(pos_to_freeze)
+                neighbors_of_frozen.add(self.collider.pos_neighbors[pos_to_freeze])
+            tables_to_recheck = {posid:move_tables[posid] for posid in frozen.union(neighbors_of_frozen) if posid in move_tables}
+            colliding_sweeps = self._find_collisions(tables_to_recheck) # double-check to ensure the freezing truncation hasn't caused a follow-on collision
             n_iter += 1
         if n_iter >= max_iter:
             print('Error: could not sufficiently arrest colliding positioners, after ' + str(n_iter) + ' iterations of freezing!')
