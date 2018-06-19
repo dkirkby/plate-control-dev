@@ -68,7 +68,7 @@ class Petal(object):
         self.nonresponsive_canids = []
         self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
         self.set_motor_parameters()
-		
+        
         # collider and scheduler setup
         self.collider = poscollider.PosCollider(configfile=collider_file)
         self.collider.add_positioners(self.posmodels)
@@ -310,12 +310,12 @@ class Petal(object):
         """Generate the schedule of moves and submoves that get positioners
         from start to target. Call this after having input all desired moves
         using the move request methods.
-		
-		See posschedule.py for valid arguments to the anticollision flag. If
-		no argument is given, then it the default flag is used.
+        
+        See posschedule.py for valid arguments to the anticollision flag. If
+        no argument is given, then it the default flag is used.
         """
-		if not anticollision:
-			anticollision = self.anticollision_default
+        if not anticollision:
+            anticollision = self.anticollision_default
         self.schedule.schedule_moves(anticollision)
 
     def send_move_tables(self):
@@ -431,7 +431,7 @@ class Petal(object):
         """Set a list of specific fiducials on or off.
         
         fidids ... one fiducial id string, or a list of fiducial id strings, or 'all'
-		           (this is the string given by DEVICE_ID in DESI-2724)
+                   (this is the string given by DEVICE_ID in DESI-2724)
         
         setting ... what to set the fiducials to, as described below:
             'on'         ... turns each fiducial to its default on value
