@@ -47,7 +47,7 @@ class PosCollider(object):
         for p in self.posids:
             self._identify_neighbors(p)
 
-    def animate(self, sweeps, savedir=None, vidname=None):
+    def add_to_animator(self, sweeps, savedir=None, vidname=None):
         """Makes an animation of positioners moving about the petal.
             sweeps ... list of PosSweep instances describing positioners' real-time moves
         """
