@@ -1132,7 +1132,7 @@ class PosMoveMeasure(object):
 		"""Returns the phi angle in degrees for which two positioners cannot collide
 		if they both have phi at this angle or greater.
 		"""
-		phi_Eo_angle = poscollider.PosCollider().config['PHI_EO']
+		phi_Eo_angle = self.petals[0].collider.Eo_phi
 		phi_clear = phi_Eo_angle + self.phi_Eo_margin
 		return phi_clear
 		
