@@ -7,12 +7,12 @@ petal/petal.py -text
 petal/petalcomm.py -text
 petal/petaltransforms.py -text
 petal/petsockcomm.py -text
+petal/posanimator.py -text
 petal/poscollider.py -text
 petal/posconstants.py -text
 petal/positioner_locations_0530v14.csv -text
 petal/posmodel.py -text
 petal/posmovetable.py -text
-petal/posplot.py -text
 petal/posschedule.py -text
 petal/posschedulestage.py -text
 petal/posstate.py -text
