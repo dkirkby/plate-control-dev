@@ -420,15 +420,22 @@ class PosSweep(object):
         self.tp = discrete_position
         self.tp_dot = speed
 
-    def abs_max_net_distance(self, index1, index2):
-        """Returns the absolute value maximum net distance, in degrees, traveled by
-        either theta or phi axis, going from the timestep referenced by index1 to
-        the timestep referenced by index2.
+    def is_final_position(self, index):
+        """Returns boolean value whether the theta phi position at step 'index'
+        of the sweep is the final theta phi position.
         """
-        dtdp = self.tp[:,index2] - self.tp[:,index1]
-        return np.max(np.abs(dtdp))
-        
-
+        return all(self.tp[:,index] == self.tp[:,-1])
+    
+    def theta(self, index):
+        """Returns theta position in sweep at step 'index'.
+        """
+        return self.tp[0,index]
+    
+    def phi(self, index):
+        """Returns phi position in sweep at step 'index'.
+        """
+        return self.tp[1,index]
+    
 class PosPoly(object):
     """Represents a collidable polygonal envelope definition for a mechanical component
     of the fiber positioner.
