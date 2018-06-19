@@ -73,8 +73,7 @@ class Petal(object):
         self.collider = poscollider.PosCollider(configfile=collider_file)
         self.collider.add_positioners(self.posmodels)
         self.schedule = posschedule.PosSchedule(self,verbose=self.verbose)
-        self.anticollision_default = True  # default parameter on whether to schedule moves with anticollision, if not explicitly argued otherwise
-        self.anticollision_override = True # causes the anticollision_default value to be used in all cases
+        self.anticollision_default = 'detect_and_freeze'  # Default parameter on how to schedule moves. See posschedule.py for valid settings.
         
         # fiducials setup
         self.fidstates = {}
@@ -307,15 +306,16 @@ class Petal(object):
                 hardstop_debounce_request = {posid:{'target':hardstop_debounce}}
                 self.request_direct_dtdp(hardstop_debounce_request, cmd_prefix='debounce')
 
-    def schedule_moves(self,anticollision=None):
+    def schedule_moves(self,anticollision=''):
         """Generate the schedule of moves and submoves that get positioners
         from start to target. Call this after having input all desired moves
-        using the move request methods. Note the available boolean to turn the
-        anticollision algorithm on or off for the scheduling. If that flag is
-        None, then the default anticollision parameter is used.
+        using the move request methods.
+		
+		See posschedule.py for valid arguments to the anticollision flag. If
+		no argument is given, then it the default flag is used.
         """
-        if anticollision == None or self.anticollision_override:
-            anticollision = self.anticollision_default
+		if not anticollision:
+			anticollision = self.anticollision_default
         self.schedule.schedule_moves(anticollision)
 
     def send_move_tables(self):
