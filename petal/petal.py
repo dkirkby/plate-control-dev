@@ -73,6 +73,7 @@ class Petal(object):
         self.collider = poscollider.PosCollider(configfile=collider_file)
         self.collider.add_positioners(self.posmodels)
         self.animator = self.collider.animator
+        self.animator_on = False # this should be turned on/off using the animation start/stop control methods below
         self.schedule = posschedule.PosSchedule(self,verbose=self.verbose)
         self.anticollision_default = 'detect_and_freeze'  # Default parameter on how to schedule moves. See posschedule.py for valid settings.
         
@@ -742,19 +743,30 @@ class Petal(object):
         """
         pidx = self.posids.index(posid)
         return self.posmodels[pidx]
-    
+
+
 # MOVE SCHEDULING ANIMATOR CONTROLS
         
     def start_gathering_frames(self):
-        self.plotter.clear()
-        pass
+        """Frame data representing scheduled moves will begin to be collected as
+        it is generated (during move scheduling) and will be retained for making
+        an animation of it in the future. Old frame data from any previous animation
+        is cleared out first.
+        """
+        self.animator.clear()
+        self.animator_on = True
+        self.collider.add_fixed_to_animator()
     
     def end_gathering_frames(self):
-        pass
+        """Stop collecting frame data of scheduled moves for the animator.
+        """
+        self.animator_on = False
     
     def generate_animation(self):
-        self.animator.animate(savedir,vidname)
-        pass
+        """Use the current collection of move frames in the animator to plot
+        the animation.
+        """
+        self.animator.animate()
 
 
 # INTERNAL METHODS

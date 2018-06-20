@@ -13,7 +13,7 @@ class PosSchedule(object):
         animate           ... Whether to automatically generate animations of the scheduled moves.
     """
 
-    def __init__(self, petal, animate=False, verbose=True):
+    def __init__(self, petal, verbose=True):
         self.petal = petal
         self.verbose = verbose
         self.requests = {} # keys: posids, values: target request dictionaries
@@ -139,9 +139,13 @@ class PosSchedule(object):
                 table.log_note += (' ' if table.log_note else '') + req['log_note'] # keep the original log notes with move tables
         if anticollision != 'none':
             self._check_tables_for_collisions_and_freeze(self.move_tables)
-        if self.animate:
-            # more work on how to gather these sweeps is needed...
+        if self.petal.animator_on:
             self.collider.add_mobile_to_animator(sweeps)
+            # Some thinking to do about when to gather / not gather sweeps.
+            # May be that I want a global flag, maybe held in petal or collider,
+            # that I keep flipping on/off depending on context, that would say
+            # whether to add some particular sweeps set to the animator or not,
+            # and what start time to use.
                 
     def already_requested(self, posid):
         """Returns boolean whether a request has already been registered in the

@@ -31,6 +31,7 @@ class PosAnimator(object):
                         #  'poly'  : [], # list of arrays of polygon points (each is 2xN), defining the item polygon to draw at that time
                         #  'style' : [], # list of dictionaries, defining the plotting style to draw the polygon at that time
                         #  'collision_time' : np.inf} # time at which collision occurs. if no collision, the time is inf
+        self.fixed_keys = {'PTL','GFA'}
         self.styles = {'ferrule':
                            {'linestyle' : '-',
                             'linewidth' : 2,
@@ -92,16 +93,13 @@ class PosAnimator(object):
                             'facecolor' : 'none'}
                        }
 
-    def clear(self):
-        self = PosPlot(self.fignum, self.timestep) # change this, obviously
-    
-    def reset_fixed_items(self):
-        """Return all fixed items to their non-collsion style ("gray").
-        """
-        # maybe... need to look thru again at how I actually implemented this before
-        pass
 
-    def add_or_change_item(self, item_str, item_idx, time, polygon_points, collision_time=np.inf):
+    def clear(self):
+        """Clear the animator completely of old data.
+        """
+        self = PosAnimator(self.fignum, self.timestep)
+
+    def add_or_change_item(self, item_str, item_idx, time, polygon_points, collision_style_on=False):
         """Add a polygonal item at a particular time to the animation data.
         """
         key = str(item_str) + ' ' + str(item_idx)
@@ -123,11 +121,10 @@ class PosAnimator(object):
                     if item['time'][i] > time:
                         idx = i - 1  # this is where the new timestep data will get inserted
                         break
-        if time < collision_time:
-            style = self.styles[item_str]
-        else:
+        if collision_style_on:
             style = self.styles['collision']
-            item['collision_time'] = min(time, item['collision_time'])
+        else:
+            style = self.styles[item_str]
         if replace_existing_timestep:
             item['poly'][idx] = polygon_points
             item['style'][idx] = style
@@ -171,10 +168,10 @@ class PosAnimator(object):
         """
         for item in self.items.values():
             i = item['patch_idx']
-            if frame <= item['last_frame'] and len(item['poly'])>frame:
+            if frame <= item['last_frame'] and len(item['poly']) > frame:
                 self.set_patch(self.patches[i], item, frame)
 
-    def animate(self,savedir=None,vidname=None):
+    def animate(self):
         self.anim_init()
         plt.ion()
         start_end_still_time = 0.5
@@ -223,16 +220,15 @@ class PosAnimator(object):
     @staticmethod
     def get_patch(item,index):
         return plt.Polygon(item['poly'][index].transpose().tolist(),
-                           #linestyle=item['style'][index]['linestyle'],
+                           linestyle=item['style'][index]['linestyle'],
                            linewidth=item['style'][index]['linewidth'],
                            edgecolor=item['style'][index]['edgecolor'],
                            facecolor=item['style'][index]['facecolor'])
 
     @staticmethod
     def set_patch(patch,item,index):
-        #if len(item['poly'])>index:
         patch.set_xy(item['poly'][index].transpose().tolist())
-        #patch.set_linestyle(item['style'][index]['linestyle'])
+        patch.set_linestyle(item['style'][index]['linestyle'])
         patch.set_linewidth(item['style'][index]['linewidth'])
         patch.set_edgecolor(item['style'][index]['edgecolor'])
         patch.set_facecolor(item['style'][index]['facecolor'])
