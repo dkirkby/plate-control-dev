@@ -1,7 +1,6 @@
 import posmovetable
 import posconstants as pc
 import posschedulestage
-import math
 from collections import OrderedDict
 
 class PosSchedule(object):
@@ -18,6 +17,7 @@ class PosSchedule(object):
         self.verbose = verbose
         self.requests = {} # keys: posids, values: target request dictionaries
         self.move_tables = {} # keys: posids, values: instances of PosMoveTable
+        self._sweeps = {} # keys: posids, values: instances of PosSweep, corresponding to entries in self.move_tables
         self.max_path_adjustment_iterations = 3 # number of times to attempt move path adjustments to avoid collisions
         self.min_freeze_clearance = 5 # degrees, how early to truncate a move table to avoid collision via "freezing"
 
@@ -137,15 +137,13 @@ class PosSchedule(object):
                 req = self.requests.pop(posid)
                 table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
                 table.log_note += (' ' if table.log_note else '') + req['log_note'] # keep the original log notes with move tables
-        if anticollision != 'none':
-            self._check_tables_for_collisions_and_freeze(self.move_tables)
+        if anticollision == 'none':
+            frozen_posids = set()
+        else:
+            frozen_posids, still_colliding_sweeps = self._check_tables_for_collisions_and_freeze(self.move_tables)            
         if self.petal.animator_on:
-            self.collider.add_mobile_to_animator(sweeps)
-            # Some thinking to do about when to gather / not gather sweeps.
-            # May be that I want a global flag, maybe held in petal or collider,
-            # that I keep flipping on/off depending on context, that would say
-            # whether to add some particular sweeps set to the animator or not,
-            # and what start time to use.
+            self.collider.add_mobile_to_animator(self.petal.animator_move_start_time, self._sweeps, frozen_posids)
+            self.petal.animator_move_start_time += max({sweep.time[-1] for sweep in self._sweeps})
                 
     def already_requested(self, posid):
         """Returns boolean whether a request has already been registered in the
@@ -278,9 +276,10 @@ class PosSchedule(object):
             init_obsTP_A = table_A.posmodel.trans.posTP_to_obsTP(table_A.init_posTP)
             for neighbor in self.collider.pos_neighbors[posid]:
                 if neighbor not in already_checked[posid]:
-                    table_B = move_tables[neighbor] if neighbor in move_tables else table_B = posmovetable.PosMoveTable(self.collider.posmodels[neighbor]) # generation of fixed table if necessary, for a non-moving neighbor
+                    table_B = move_tables[neighbor] if neighbor in move_tables else posmovetable.PosMoveTable(self.collider.posmodels[neighbor]) # generation of fixed table if necessary, for a non-moving neighbor
                     init_obsTP_B = table_B.posmodel.trans.posTP_to_obsTP(table_B.init_posTP)
-                    pospos_sweeps = self.collider.spacetime_collision_between_positioners(posid, init_obsTP_A, tableA, neighbor, init_obsTP_B, tableB)
+                    pospos_sweeps = self.collider.spacetime_collision_between_positioners(posid, init_obsTP_A, table_A, neighbor, init_obsTP_B, table_B)
+                    self._sweeps.update({posid:pospos_sweeps[0], neighbor:pospos_sweeps[1]})
                     for sweep in pospos_sweeps:
                         if sweep.collision_case != pc.case.I:
                             colliding_sweeps[sweep.posid].add(sweep)
@@ -299,6 +298,7 @@ class PosSchedule(object):
                     first_collision_time = sweep.collision_time
             colliding_sweeps[posid] = {first_sweep}
         setless_sweeps_dict = {posid:colliding_sweeps[posid].pop() for posid in colliding_sweeps}
+        self._sweeps.update(setless_sweeps_dict)
         return setless_sweeps_dict
 
     def _check_tables_for_collisions_and_freeze(self, move_tables):
@@ -322,13 +322,22 @@ class PosSchedule(object):
         is kept the same as the original, by addition of a compensating postpause. In cases
         where freezing requires that the positioner not move at all, those tables will be
         deleted from the dict.
+        
+        Return values are:
+            
+            all_frozen       ... set of all the posids that had their move tables frozen by this function
+            colliding_sweeps ... dict of any remaining unresolved sweeps that have collisions, keys = posids
+            
+        In general, it is an error for colliding_sweeps to be anything other than
+        empty. (It means the freezing algorithm did not work.)
         """
         fixed_cases = {pc.case.PTL, pc.case.GFA}
         n_iter = 0
         max_iter = 6 # Since max number of neighbors is six, could never need more than this # of iterations.
-        colliding_sweeps = self._find_collisions(self.move_tables)
+        all_frozen = set()
+        colliding_sweeps = self._find_collisions(move_tables)
         while colliding_sweeps and n_iter < max_iter:
-            frozen = set()
+            these_frozen = set()
             neighbors_of_frozen = set()
             for posid,sweep_A in colliding_sweeps:
                 if sweep_A.collision_case in fixed_cases or sweep_A.collision_neighbor not in move_tables:
@@ -345,9 +354,7 @@ class PosSchedule(object):
                         pos_to_freeze = posid if phi_A > phi_B else sweep_B.posid
                 sweep_to_freeze = colliding_sweeps[pos_to_freeze]
                 table_data = move_tables[pos_to_freeze].for_schedule()
-                net_times_before_freeze = [time for time in table_data['stats']['net_time'] if time < sweep_to_freeze.collision_time]
-                net_time_total = table_data['stats']['net_time'][-1]
-                first_row_to_delete = len(net_times_before_freeze)
+                original_total_move_time = table_data['stats']['net_time'][-1]
                 for row_idx in reversed(range(move_tables[pos_to_freeze].n_rows)):
                     if table_data['stats']['net_time'] >= sweep_to_freeze.collision_time:
                         move_tables[pos_to_freeze].delete_row(row_idx)
@@ -357,16 +364,18 @@ class PosSchedule(object):
                 if n_rows == 0:
                     del move_tables[pos_to_freeze]
                 else:
-                    compensating_pause = net_time_total - table_data['stats']['net_time'][n_rows-1]
+                    compensating_pause = original_total_move_time - table_data['stats']['net_time'][n_rows-1]
                     new_postpause = table_data['postpause'][n_rows-1] + compensating_pause
                     move_tables[pos_to_freeze].set_postpause(n_rows-1,new_postpause)
-                frozen.add(pos_to_freeze)
+                these_frozen.add(pos_to_freeze)
                 neighbors_of_frozen.add(self.collider.pos_neighbors[pos_to_freeze])
-            tables_to_recheck = {posid:move_tables[posid] for posid in frozen.union(neighbors_of_frozen) if posid in move_tables}
+            tables_to_recheck = {posid:move_tables[posid] for posid in these_frozen.union(neighbors_of_frozen) if posid in move_tables}
             colliding_sweeps = self._find_collisions(tables_to_recheck) # double-check to ensure the freezing truncation hasn't caused a follow-on collision
+            all_frozen.add(these_frozen)
             n_iter += 1
         if n_iter >= max_iter:
-            print('Error: could not sufficiently arrest colliding positioners, after ' + str(n_iter) + ' iterations of freezing!')
+            print('Warning: could not sufficiently arrest colliding positioners, after ' + str(n_iter) + ' iterations of freezing!')
+        return all_frozen, colliding_sweeps
 
     def _merge_move_tables_from_stages(self,stages):
         """Collects move tables from an ordered dict of PosScheduleStage instances.
