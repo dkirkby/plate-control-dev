@@ -142,8 +142,8 @@ class PosSchedule(object):
         else:
             frozen_posids, still_colliding_sweeps = self._check_tables_for_collisions_and_freeze(self.move_tables)            
         if self.petal.animator_on:
-            self.collider.add_mobile_to_animator(self.petal.animator_move_start_time, self._sweeps, frozen_posids)
-            self.petal.animator_move_start_time += max({sweep.time[-1] for sweep in self._sweeps})
+            self.collider.add_mobile_to_animator(self.petal.animator_total_time, self._sweeps, frozen_posids)
+            self.petal.animator_total_time += max({sweep.time[-1] for sweep in self._sweeps})
                 
     def already_requested(self, posid):
         """Returns boolean whether a request has already been registered in the
