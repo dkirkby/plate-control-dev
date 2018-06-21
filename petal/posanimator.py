@@ -31,23 +31,24 @@ class PosAnimator(object):
                         #  'poly'  : [], # list of arrays of polygon points (each is 2xN), defining the item polygon to draw at that time
                         #  'style' : [], # list of dictionaries, defining the plotting style to draw the polygon at that time
                         #  'collision_time' : np.inf} # time at which collision occurs. if no collision, the time is inf
-        self.fixed_keys = {'PTL','GFA'}
+        self.pospoly_keys = {'ferrule', 'phi arm', 'central body', 'line at 180', 'Eo', 'Ei', 'Ee'}
+        self.fixpoly_keys = {'PTL','GFA'}
         self.styles = {'ferrule':
                            {'linestyle' : '-',
                             'linewidth' : 2,
-                            'edgecolor' : 'blue',
+                            'edgecolor' : 'green',
                             'facecolor' : 'none'},
 
                        'phi arm':
                            {'linestyle' : '-',
                             'linewidth' : 2,
-                            'edgecolor' : 'blue',
+                            'edgecolor' : 'green',
                             'facecolor' : 'none'},
 
                        'central body':
                            {'linestyle' : '-',
                             'linewidth' : 2,
-                            'edgecolor' : 'blue',
+                            'edgecolor' : 'green',
                             'facecolor' : 'none'},
 
                        'collision':
@@ -55,6 +56,12 @@ class PosAnimator(object):
                             'linewidth' : 2,
                             'edgecolor' : 'red',
                             'facecolor' : 'none'},
+
+                       'frozen':
+                           {'linestyle' : '-',
+                            'linewidth' : 2,
+                            'edgecolor' : 'blue',
+                            'facecolor' : 'none'},                            
 
                        'line at 180':
                            {'linestyle' : '-.',
@@ -99,8 +106,14 @@ class PosAnimator(object):
         """
         self = PosAnimator(self.fignum, self.timestep)
 
-    def add_or_change_item(self, item_str, item_idx, time, polygon_points, collision_style_on=False):
+    def add_or_change_item(self, item_str, item_idx, time, polygon_points, style_override=''):
         """Add a polygonal item at a particular time to the animation data.
+            
+            item_str       ... valid options are string keys defined in self.pospoly_keys and self.fixpoly_keys
+            item_idx       ... numeric index which gets appended to item_str, in particular to distinguish multiple positioners from each other
+            time           ... seconds, time at which this item should be shown
+            polygon_points ... as retrieved from PosPoly object
+            style_override ... valid options are: '' (no override), 'collision', 'frozen'
         """
         key = str(item_str) + ' ' + str(item_idx)
         if key not in self.items:
@@ -121,8 +134,8 @@ class PosAnimator(object):
                     if item['time'][i] > time:
                         idx = i - 1  # this is where the new timestep data will get inserted
                         break
-        if collision_style_on:
-            style = self.styles['collision']
+        if style_override:
+            style = self.styles[style_override]
         else:
             style = self.styles[item_str]
         if replace_existing_timestep:

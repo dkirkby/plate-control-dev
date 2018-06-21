@@ -50,6 +50,8 @@ class PosCollider(object):
 
     def add_fixed_to_animator(self, start_time):
         """Add unmoving polygon shapes to the animator.
+        
+            start_time ... seconds, global time when the move begins
         """
         self.animator.add_or_change_item('GFA', '', start_time, self.keepout_GFA.points)
         self.animator.add_or_change_item('PTL', '', start_time, self.keepout_PTL.points)
@@ -59,24 +61,31 @@ class PosCollider(object):
             self.animator.add_or_change_item('Ee', self.posindexes[posid], start_time, self.Ee_polys[posid].points)
             self.animator.add_or_change_item('line at 180', self.posindexes[posid], start_time, self.line180_polys[posid].points)
         
-    def add_mobile_to_animator(self, sweeps, start_time):
+    def add_mobile_to_animator(self, start_time, sweeps, frozen):
         """Add a collection of PosSweeps to the animator, describing positioners'
         real-time motions.
-        
-            sweeps ... dict with keys = posids, values = PosSweep instances
+
+            start_time ... seconds, global time when the move begins        
+            sweeps     ... dict with keys = posids, values = PosSweep instances
+            frozen     ... set of posids indicating any positioners that have been frozen
         """            
         for posid,s in sweeps:
             posidx = self.posindexes[posid]
             for i in range(len(s.time)):
-                collision_style_on = s.collision_case != pc.case.I  
+                style_override = ''
+                collision_has_occurred = s.time[i] >= s.collision_time
+                if i + 1 == len(s.time) and posid in frozen:
+                    style_override = 'frozen'
+                if collision_has_occurred:
+                    style_override = 'collision'
                 time = start_time + s.time[i]
-                self.animator.add_or_change_item('central body', posidx, time, self.place_central_body(posid, s.tp[0,i]).points, collision_style_on)
-                self.animator.add_or_change_item('phi arm',      posidx, time, self.place_phi_arm(     posid, s.tp[:,i]).points, collision_style_on)
-                self.animator.add_or_change_item('ferrule',      posidx, time, self.place_ferrule(     posid, s.tp[:,i]).points, collision_style_on)
-                if s.collision_case == pc.case.GFA:
-                    self.animator.add_or_change_item('GFA', '', time, self.keepout_GFA.points, collision_style_on)
-                elif s.collision_case == pc.case.PTL:
-                    self.animator.add_or_change_item('PTL', '', time, self.keepout_PTL.points, collision_style_on)
+                self.animator.add_or_change_item('central body', posidx, time, self.place_central_body(posid, s.tp[0,i]).points, style_override)
+                self.animator.add_or_change_item('phi arm',      posidx, time, self.place_phi_arm(     posid, s.tp[:,i]).points, style_override)
+                self.animator.add_or_change_item('ferrule',      posidx, time, self.place_ferrule(     posid, s.tp[:,i]).points, style_override)
+                if collision_has_occurred and s.collision_case == pc.case.GFA:
+                    self.animator.add_or_change_item('GFA', '', time, self.keepout_GFA.points, style_override)
+                elif collision_has_occurred and s.collision_case == pc.case.PTL:
+                    self.animator.add_or_change_item('PTL', '', time, self.keepout_PTL.points, style_override)
 
     def spacetime_collision_between_positioners(self, posid_A, init_obsTP_A, tableA, posid_B, init_obsTP_B, tableB):
         """Wrapper for spacetime_collision method, specifically for checking two positioners
