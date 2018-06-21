@@ -74,6 +74,7 @@ class Petal(object):
         self.collider.add_positioners(self.posmodels)
         self.animator = self.collider.animator
         self.animator_on = False # this should be turned on/off using the animation start/stop control methods below
+        self.animator_total_time = 0 # keeps track of total time of the current animation
         self.schedule = posschedule.PosSchedule(self,verbose=self.verbose)
         self.anticollision_default = 'detect_and_freeze'  # Default parameter on how to schedule moves. See posschedule.py for valid settings.
         
@@ -755,7 +756,8 @@ class Petal(object):
         """
         self.animator.clear()
         self.animator_on = True
-        self.collider.add_fixed_to_animator()
+        self.animator_total_time = 0
+        self.collider.add_fixed_to_animator()        
     
     def end_gathering_frames(self):
         """Stop collecting frame data of scheduled moves for the animator.
