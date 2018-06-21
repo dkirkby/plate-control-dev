@@ -9,7 +9,6 @@ class PosSchedule(object):
     class.
     
         petal             ... Instance of Petal that this schedule applies to.
-        animate           ... Whether to automatically generate animations of the scheduled moves.
     """
 
     def __init__(self, petal, verbose=True):
