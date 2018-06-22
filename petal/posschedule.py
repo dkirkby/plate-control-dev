@@ -116,9 +116,10 @@ class PosSchedule(object):
                                    is frozen at its original position. This setting is
                                    suitable for gross retargeting moves.
 
-        If there were ANY pre-existing move tables in the list, then no new
-        scheduling is done. Any new requests are ignored. Furthermore, if
-        anticollision='detect_and_adjust', then it reverts to 'detect_and_freeze'
+        If there were ANY pre-existing move tables in the list (for example, hard-
+        stop seeking tables directly added by an expert user or expert function),
+        then no new scheduling is done, and the requests list is ignored. Furthermore,
+        if anticollision='detect_and_adjust', then it reverts to 'detect_and_freeze'
         instead. (An argument of anticollision='none' remains as-is.)
         """
         if anticollision not in {'none','detect_and_freeze','detect_and_adjust'}:
@@ -129,9 +130,9 @@ class PosSchedule(object):
             anticollision = 'detect_and_freeze' if anticollision == 'detect_and_adjust' else anticollision
         else:
             if anticollision == 'none' or anticollision == 'detect_and_freeze':
-                self.schedule_with_no_path_adjustments()
+                self._schedule_with_no_path_adjustments()
             elif anticollision == 'detect_and_adjust':
-                self.schedule_with_path_adjustments()
+                self._schedule_with_path_adjustments()
             for posid,table in self.move_tables.items():
                 req = self.requests.pop(posid)
                 table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
@@ -164,24 +165,27 @@ class PosSchedule(object):
         else:
             self.move_tables[this_posid] = move_table
 
-    def _schedule_with_no_path_adjustments(self, posids):
-        """Gathers data from requests dictionary for the argued posids, and populates
-        self.move_tables with direct motions from start to finish. These positioners
-        are given no path adjustments to avoid each other.
+    def _schedule_with_no_path_adjustments(self):
+        """Gathers data from requests dictionary and populates self.move_tables
+        with direct motions from start to finish. The positioners are given no
+        path adjustments to avoid each other.
         """
-        start_tp = {}
-        final_tp = {}
+        start_posTP = {}
+        desired_final_posTP = {}
+        dtdp = {}
         for posid,request in self.requests.items():
-            start_tp[posid] = request['start_posTP']
-            final_tp[posid] = request['targt_posTP']
+            start_posTP[posid] = request['start_posTP']
+            desired_final_posTP[posid] = request['targt_posTP']
+            trans = self.collider.posmodels[posid].trans
+            dtdp[posid] = trans.delta_posTP(desired_final_posTP[posid], start_posTP[posid], range_wrap_limits='targetable')
         stage = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
-        stage.initialize_move_tables(start_tp, final_tp)
+        stage.initialize_move_tables(start_posTP, dtdp)
         stage.anneal_power_density()
         self.move_tables = stage.move_tables
         
-    def _schedule_with_path_adjustments(self, posids):
-        """Gathers data from requests dictionary for the argued posids, and populates
-        self.move_tables with motion paths from start to finish. These include
+    def _schedule_with_path_adjustments(self):
+        """Gathers data from requests dictionary and populates self.move_tables
+        with motion paths from start to finish. The move tables may include
         adjustments of paths to avoid collisions.
         
         For positioners that have not been given specific move requests, but
