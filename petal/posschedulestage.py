@@ -21,14 +21,36 @@ class PosScheduleStage(object):
         self._start_posTP = {} # keys: posids, values: [theta,phi]
         self._final_posTP = {} # keys: posids, values: [theta,phi]
         self._true_dtdp = {} # keys: posids, values: [delta theta, delta phi]
+        self._power_supply_ids = ['V1','V2']
+        self._power_supply_posids = self._map_power_supply_posids()
+
+    def _map_power_supply_posids(self):
+        """Reads in data for device_location_id, power supply id, particular
+        positioners on the petal, and returns a dict with:
+        
+            keys   ... power supply id 'V1' or 'V2'
+            values ... set of posids for positioners attached to that power supply
+        """
+        # read in power supply / device_location_id map
+        # read in device_location_ids / posids from positioner config files
+        power_supply_map = {}
+        for ID in self._power_supply_ids:
+            # map power_supply_ids to posids, something like the line below...
+            power_supply_map[ID] = {posid for posids in something if something[posid] == ID}
+        return power_map
     
     def initialize_move_tables(self, start_posTP, dtdp):
-        """Generates basic move tables for each positioner, going straight from
-        the start_tp to the final_tp.
+        """Generates basic move tables for each positioner, starting at position
+        start_tp and going to a position a distance dtdp away.
         
             start_posTP  ... dict of starting [theta,phi] positions, keys are posids
             dtdp         ... dict of [delta theta, delta phi] from the starting position. keys are posids
-                             The user should take care that these dtdp have been generated properly using PosTransforms, with range_wrap_limits='targetable'
+        
+        The user should take care that dtdp vectors have been generated using the
+        canonical delta_posTP function provided by PosTransforms module, with
+        range_wrap_limits='targetable'. (The user should *not* generate dtdp by a
+        simple vector subtraction or the like, since this would not correctly handle
+        physical range limits of the fiber positioner.)
         """
         self._start_posTP = start_posTP
         for posid in self._start_posTP:
