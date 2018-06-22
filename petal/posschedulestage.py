@@ -43,14 +43,20 @@ class PosScheduleStage(object):
             self.move_tables[posid] = table
 
     def anneal_power_density(self):
-        """Adjusts move tables internal timing, to reduce peak power consumption
+        """Adjusts move tables' internal timing, to reduce peak power consumption
         of the overall array.
         """
         if self.anneal_time == None:
-            pass
-        else:
-            pass
-                
+            return
+        table_data = {posid:self.move_table[posid].for_schedule() for posid in self.move_tables}
+        orig_max_time = max({table['net_time'][-1] for table in table_data.values()})
+        new_max_time = self.anneal_time if self.anneal_time > orig_max_time else orig_max_time
+        for posid,table in self.move_tables:
+            # think about best way to scatter these
+            # probably takes two passes
+            #   1. calculate total power density vs time, and record contributions vs time for each positioner
+            #   2. redistribute, positioner by positioner    
+            
     def adjust_paths(self, colliding_positioners, iteration):
         """Alters move tables to avoid collisions.
         """
