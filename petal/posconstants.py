@@ -102,6 +102,10 @@ class case(enum.IntEnum):
     GFA  = 4  # phi arm against the GFA fixed keepout envelope
     PTL  = 5  # phi arm against the Petal edge keepout envelope
 
+# Positioner power supplies map to can channels
+power_supply_can_map = {'V1':{'can10','can11','can13','can23'},
+                        'V2':{'can12','can15','can17'}}
+
 # Convenience methods
 rotmat2D = lambda angle: [np.cos(np.deg2rad(angle)), - np.sin(np.deg2rad(angle)), np.sin(np.deg2rad(angle)), np.cos(np.deg2rad(angle))]
 

@@ -68,6 +68,7 @@ class Petal(object):
         self.nonresponsive_canids = []
         self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
         self.set_motor_parameters()
+        self.power_supply_map = self._map_power_supplies_to_posids()
         
         # collider, scheduler, and animator setup
         self.collider = poscollider.PosCollider(configfile=collider_file)
@@ -928,4 +929,21 @@ class Petal(object):
         
     def _request_denied_disabled_str(self, posid, target_request_dict):
         return 'Positioner ' + str(posid) + ' is disabled. Target request ' + self._target_str(target_request_dict) + ' ignored.'
+    
+    def _map_power_supplies_to_posids(self):
+        """Reads in data for positioner canids and petal power supply ids, and
+        returns a dict mapping power supply ids (keys) to sets of posids (values).
         
+        Any unknown mappings (e.g. a canid that does not match the nominal petal
+        mapping) gets assigned a power_supply_id of 'other'. (This could happen
+        for example on a non-petal test stand.)
+        """
+        canids = {posmodel.posid:posmodel.canid for posmodel in self.posmodels}
+        power_supply_map = {}
+        already_mapped = set()
+        for supply,mapped_cans in pc.power_supply_can_map.items():
+            mapped_posids = {posid for posid in canids.keys() if canids[posid] in mapped_cans}
+            power_supply_map[supply] = mapped_posids
+            already_mapped.union(mapped_posids)
+        power_supply_map['other'] = set(canids.keys()).difference(already_mapped)
+        return power_supply_map

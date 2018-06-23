@@ -11,33 +11,18 @@ class PosScheduleStage(object):
         anneal_time  ... Time in seconds over which to spread out moves in this stage
                          to reduce overall power density consumed by the array. You
                          can also argue None if no annealing should be done.
+        power_supply_map ... dict where key = power supply id, value = set of posids attached to that supply
     """
-    def __init__(self, collider, anneal_time=3, verbose=False):
+    def __init__(self, collider, anneal_time=3, power_supply_map={}, verbose=False):
         self.collider = collider # poscollider instance
         self.anneal_time = anneal_time
         self.move_tables = {} # keys: posids, values: posmovetable instances
         self.sweeps = {} # keys: posids, values: possweep instances
+        self._power_supply_map = power_supply_map
         self._disabled = {posid for posid in self.collider.posids if not self.collider.posmodels[posid].is_enabled}
         self._start_posTP = {} # keys: posids, values: [theta,phi]
         self._final_posTP = {} # keys: posids, values: [theta,phi]
         self._true_dtdp = {} # keys: posids, values: [delta theta, delta phi]
-        self._power_supply_ids = ['V1','V2']
-        self._power_supply_posids = self._map_power_supply_posids()
-
-    def _map_power_supply_posids(self):
-        """Reads in data for device_location_id, power supply id, particular
-        positioners on the petal, and returns a dict with:
-        
-            keys   ... power supply id 'V1' or 'V2'
-            values ... set of posids for positioners attached to that power supply
-        """
-        # read in power supply / device_location_id map
-        # read in device_location_ids / posids from positioner config files
-        power_supply_map = {}
-        for ID in self._power_supply_ids:
-            # map power_supply_ids to posids, something like the line below...
-            power_supply_map[ID] = {posid for posids in something if something[posid] == ID}
-        return power_map
     
     def initialize_move_tables(self, start_posTP, dtdp):
         """Generates basic move tables for each positioner, starting at position
@@ -73,16 +58,18 @@ class PosScheduleStage(object):
         table_data = {posid:self.move_table[posid].for_schedule() for posid in self.move_tables}
         orig_max_time = max({table['net_time'][-1] for table in table_data.values()})
         new_max_time = self.anneal_time if self.anneal_time > orig_max_time else orig_max_time
-        for posid,table in self.move_tables:
-            # think about best way to scatter these
-            # probably takes two passes
-            #   1. calculate total power density vs time, and record contributions vs time for each positioner
-            #   2. redistribute, positioner by positioner    
+        for posids in self.power_supply_map.values():
+            for posid,table in self.move_tables:
+                # think about best way to scatter these
+                # probably takes two passes
+                #   1. calculate total power density vs time, and record contributions vs time for each positioner
+                #   2. redistribute, positioner by positioner    
             
     def adjust_paths(self, colliding_positioners, iteration):
         """Alters move tables to avoid collisions.
         """
         # be sure not to alter any disabled positioners
+
 
 
 

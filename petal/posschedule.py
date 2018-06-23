@@ -178,7 +178,7 @@ class PosSchedule(object):
             desired_final_posTP[posid] = request['targt_posTP']
             trans = self.collider.posmodels[posid].trans
             dtdp[posid] = trans.delta_posTP(desired_final_posTP[posid], start_posTP[posid], range_wrap_limits='targetable')
-        stage = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
+        stage = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, power_supply_map=self.petal.power_supply_map, verbose=self.verbose)
         stage.initialize_move_tables(start_posTP, dtdp)
         stage.anneal_power_density()
         self.move_tables = stage.move_tables
@@ -222,9 +222,9 @@ class PosSchedule(object):
                 desired_final_posTP[name][posid] = current_posTP
         stages = OrderedDict.fromkeys(stage_names)
         # processing of these three stages is a good candidate for multiple processes, to get performance improvement (not multiple threads, due to the GIL)
-        stages['retract'] = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
-        stages['rotate']  = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
-        stages['extend']  = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, verbose=self.verbose)
+        stages['retract'] = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, power_supply_map=self.petal.power_supply_map, verbose=self.verbose)
+        stages['rotate']  = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, power_supply_map=self.petal.power_supply_map, verbose=self.verbose)
+        stages['extend']  = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, power_supply_map=self.petal.power_supply_map, verbose=self.verbose)
         for name,stage in stages.items():
             stage.initialize_move_tables(start_posTP[name], dtdp[name])
             stage.anneal_power_density()
