@@ -7,15 +7,11 @@ class PosScheduleStage(object):
     start to finish, or an intermediate stage, used for retraction, rotation,
     or extension.
 
-        collider     ... instance of poscollider for this petal
-        anneal_time  ... Time in seconds over which to spread out moves in this stage
-                         to reduce overall power density consumed by the array. You
-                         can also argue None if no annealing should be done.
+        collider         ... instance of poscollider for this petal
         power_supply_map ... dict where key = power supply id, value = set of posids attached to that supply
     """
-    def __init__(self, collider, anneal_time=3, power_supply_map={}, verbose=False):
+    def __init__(self, collider, power_supply_map={}, verbose=False):
         self.collider = collider # poscollider instance
-        self.anneal_time = anneal_time
         self.move_tables = {} # keys: posids, values: posmovetable instances
         self.sweeps = {} # keys: posids, values: possweep instances
         self._power_supply_map = power_supply_map
@@ -49,18 +45,23 @@ class PosScheduleStage(object):
             table.set_postpause(0, 0.0)
             self.move_tables[posid] = table
 
-    def anneal_power_density(self):
+    def anneal_power_density(self, anneal_time=None):
         """Adjusts move tables' internal timing, to reduce peak power consumption
         of the overall array.
+        
+            anneal_time  ... Time in seconds over which to spread out moves in this stage
+                             to reduce overall power density consumed by the array. You
+                             can also argue None if no annealing should be done.
         """
-        if self.anneal_time == None:
+        if anneal_time == None:
             return
         table_data = {posid:self.move_table[posid].for_schedule() for posid in self.move_tables}
         orig_max_time = max({table['net_time'][-1] for table in table_data.values()})
-        new_max_time = self.anneal_time if self.anneal_time > orig_max_time else orig_max_time
-        for posids in self.power_supply_map.values():
+        new_max_time = anneal_time if anneal_time > orig_max_time else orig_max_time
+        for posids_set in self._power_supply_map.values():
             for posid,table in self.move_tables:
                 # think about best way to scatter these
+                # write down some math on paper, to get a clean algorithm
                 # probably takes two passes
                 #   1. calculate total power density vs time, and record contributions vs time for each positioner
                 #   2. redistribute, positioner by positioner    

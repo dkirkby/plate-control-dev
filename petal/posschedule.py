@@ -19,6 +19,7 @@ class PosSchedule(object):
         self._sweeps = {} # keys: posids, values: instances of PosSweep, corresponding to entries in self.move_tables
         self.max_path_adjustment_iterations = 3 # number of times to attempt move path adjustments to avoid collisions
         self.min_freeze_clearance = 5 # degrees, how early to truncate a move table to avoid collision via "freezing"
+        self.anneal_time = {'direct':3, 'retract':3, 'rotate':3, 'extend':3} # times in seconds, see comments in PosScheduleStage
 
     @property
     def collider(self):
@@ -118,9 +119,10 @@ class PosSchedule(object):
 
         If there were ANY pre-existing move tables in the list (for example, hard-
         stop seeking tables directly added by an expert user or expert function),
-        then no new scheduling is done, and the requests list is ignored. Furthermore,
-        if anticollision='detect_and_adjust', then it reverts to 'detect_and_freeze'
-        instead. (An argument of anticollision='none' remains as-is.)
+        then the requests list is ignored. The only changes to move tables are
+        for power density annealing. Furthermore, if anticollision='detect_and_adjust',
+        then it reverts to 'detect_and_freeze' instead. An argument of anticollision='none'
+        remains as-is.
         """
         if anticollision not in {'none','detect_and_freeze','detect_and_adjust'}:
             if self.verbose:
@@ -128,6 +130,7 @@ class PosSchedule(object):
             return
         if self.move_tables:
             anticollision = 'detect_and_freeze' if anticollision == 'detect_and_adjust' else anticollision
+            self._schedule_existing_tables()
         else:
             if anticollision == 'none' or anticollision == 'detect_and_freeze':
                 self._schedule_with_no_path_adjustments()
@@ -165,6 +168,15 @@ class PosSchedule(object):
         else:
             self.move_tables[this_posid] = move_table
 
+    def _schedule_existing_tables(self):
+        """Gathers data from exisitn move tables and applies power annealing.
+        Any requests are ignored.
+        """
+        stage = posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose)
+        stage.move_tables = self.move_tables
+        stage.anneal_power_density(self.anneal_time['direct'])
+        self.move_tables = stage.move_tables
+
     def _schedule_with_no_path_adjustments(self):
         """Gathers data from requests dictionary and populates self.move_tables
         with direct motions from start to finish. The positioners are given no
@@ -178,9 +190,9 @@ class PosSchedule(object):
             desired_final_posTP[posid] = request['targt_posTP']
             trans = self.collider.posmodels[posid].trans
             dtdp[posid] = trans.delta_posTP(desired_final_posTP[posid], start_posTP[posid], range_wrap_limits='targetable')
-        stage = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, power_supply_map=self.petal.power_supply_map, verbose=self.verbose)
+        stage = posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose)
         stage.initialize_move_tables(start_posTP, dtdp)
-        stage.anneal_power_density()
+        stage.anneal_power_density(self.anneal_time['direct'])
         self.move_tables = stage.move_tables
         
     def _schedule_with_path_adjustments(self):
@@ -222,12 +234,12 @@ class PosSchedule(object):
                 desired_final_posTP[name][posid] = current_posTP
         stages = OrderedDict.fromkeys(stage_names)
         # processing of these three stages is a good candidate for multiple processes, to get performance improvement (not multiple threads, due to the GIL)
-        stages['retract'] = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, power_supply_map=self.petal.power_supply_map, verbose=self.verbose)
-        stages['rotate']  = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, power_supply_map=self.petal.power_supply_map, verbose=self.verbose)
-        stages['extend']  = posschedulestage.PosScheduleStage(self.collider, anneal_time=3, power_supply_map=self.petal.power_supply_map, verbose=self.verbose)
+        stages['retract'] = posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose)
+        stages['rotate']  = posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose)
+        stages['extend']  = posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose)
         for name,stage in stages.items():
             stage.initialize_move_tables(start_posTP[name], dtdp[name])
-            stage.anneal_power_density()
+            stage.anneal_power_density(self.anneal_time[name])
             colliding_positioners = self._find_collisions(stage.move_tables)
             n_iter = 0
             while colliding_positioners and n_iter < self.max_path_adjustment_iterations:
