@@ -241,7 +241,7 @@ class PosSchedule(object):
             stage.initialize_move_tables(start_posTP[name], dtdp[name])
             stage.anneal_power_density(self.anneal_time[name])
             colliding_positioners = self._find_collisions(stage.move_tables)
-            n_iter = 0
+            n_iter = 0 # consider switching to direct iteration of a path adjustments definition dictionary, with next() etc
             while colliding_positioners and n_iter < self.max_path_adjustment_iterations:
                 stage.adjust_paths(colliding_positioners, n_iter)
                 colliding_move_tables = {posid:stage.move_tables[posid] for posid in colliding_positioners}

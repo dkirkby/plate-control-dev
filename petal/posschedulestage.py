@@ -15,10 +15,12 @@ class PosScheduleStage(object):
         self.move_tables = {} # keys: posids, values: posmovetable instances
         self.sweeps = {} # keys: posids, values: possweep instances
         self._power_supply_map = power_supply_map
-        self._disabled = {posid for posid in self.collider.posids if not self.collider.posmodels[posid].is_enabled}
+        self._enabled = {posid for posid in self.collider.posids if self.collider.posmodels[posid].is_enabled}
+        self._disabled = self.collider.posids.difference(self._enabled)
         self._start_posTP = {} # keys: posids, values: [theta,phi]
         self._final_posTP = {} # keys: posids, values: [theta,phi]
         self._true_dtdp = {} # keys: posids, values: [delta theta, delta phi]
+        self.path_adjustment_settings = {:{}}
     
     def initialize_move_tables(self, start_posTP, dtdp):
         """Generates basic move tables for each positioner, starting at position
@@ -67,10 +69,17 @@ class PosScheduleStage(object):
                 #   2. redistribute, positioner by positioner    
             
     def adjust_paths(self, colliding_positioners, iteration):
-        """Alters move tables to avoid collisions.
+        """Alters move tables to avoid collisions on the way to final target
+        positions.
         """
         # be sure not to alter any disabled positioners
-
+        # for each collision
+            # if posA-to-posB, adjust posA and/or posB
+            # if posA-to-fixed, adjust posA
+            # recheck collisions with adjacent neighbors
+                # if fixed, remove from collisions list
+                # if not fixe move to bottom of collisions list and try tweaking next collision
+                # if N tries have failed for this collision, and still no fix, revert to zeroth
 
 
 
@@ -82,14 +91,7 @@ class PosScheduleStage(object):
         '''Need function description.
         '''
         
-        # PSEUDO-CODE, discuss with Joe
-        # for each collision
-            # if posA-to-posB, adjust posA and/or posB
-            # if posA-to-fixed, adjust posA
-            # recheck collisions with adjacent neighbors
-                # if fixed, remove from collisions list
-                # if not fixe move to bottom of collisions list and try tweaking next collision
-                # if N tries have failed for this collision, and still no fix, revert to zeroth
+        
         altered_pos=[]
         for collision_indices_this,collision_type_this in zip(collision_indices,collision_types):
             posA,posB=collision_indices_this[0],collision_indices_this[1]
