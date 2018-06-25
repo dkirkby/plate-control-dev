@@ -240,12 +240,12 @@ class PosSchedule(object):
         for name,stage in stages.items():
             stage.initialize_move_tables(start_posTP[name], dtdp[name])
             stage.anneal_power_density(self.anneal_time[name])
-            colliding_positioners = self._find_collisions(stage.move_tables)
-            n_iter = 0 # consider switching to direct iteration of a path adjustments definition dictionary, with next() etc
-            while colliding_positioners and n_iter < self.max_path_adjustment_iterations:
-                stage.adjust_paths(colliding_positioners, n_iter)
-                colliding_move_tables = {posid:stage.move_tables[posid] for posid in colliding_positioners}
-                colliding_positioners = self._find_collisions(colliding_move_tables)
+            colliding_sweeps = self._find_collisions(stage.move_tables)
+            n_iter = 0 # consider switching to direct iteration of an ordered dict of path adjustment definitions
+            while colliding_sweeps and n_iter < self.max_path_adjustment_iterations:
+                stage.adjust_paths(colliding_sweeps, n_iter)
+                colliding_tables = {posid:stage.move_tables[posid] for posid in colliding_sweeps}
+                colliding_sweeps = self._find_collisions(colliding_tables)
                 n_iter += 1
         self.move_tables = self._merge_move_tables_from_stages(stages)
         motionless = {table.posid for table in self.move_tables if table.is_motionless}

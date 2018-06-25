@@ -13,14 +13,13 @@ class PosScheduleStage(object):
     def __init__(self, collider, power_supply_map={}, verbose=False):
         self.collider = collider # poscollider instance
         self.move_tables = {} # keys: posids, values: posmovetable instances
-        self.sweeps = {} # keys: posids, values: possweep instances
+        self.proposed_move_tables = {}
         self._power_supply_map = power_supply_map
         self._enabled = {posid for posid in self.collider.posids if self.collider.posmodels[posid].is_enabled}
         self._disabled = self.collider.posids.difference(self._enabled)
         self._start_posTP = {} # keys: posids, values: [theta,phi]
         self._final_posTP = {} # keys: posids, values: [theta,phi]
         self._true_dtdp = {} # keys: posids, values: [delta theta, delta phi]
-        self.path_adjustment_settings = {:{}}
     
     def initialize_move_tables(self, start_posTP, dtdp):
         """Generates basic move tables for each positioner, starting at position
@@ -68,7 +67,7 @@ class PosScheduleStage(object):
                 #   1. calculate total power density vs time, and record contributions vs time for each positioner
                 #   2. redistribute, positioner by positioner    
             
-    def adjust_paths(self, colliding_positioners, iteration):
+    def adjust_paths(self, colliding_sweeps, iteration):
         """Alters move tables to avoid collisions on the way to final target
         positions.
         """
@@ -81,7 +80,11 @@ class PosScheduleStage(object):
                 # if not fixe move to bottom of collisions list and try tweaking next collision
                 # if N tries have failed for this collision, and still no fix, revert to zeroth
 
-
+    def keep_adjustments(self):
+        """Keep the proposed move tables as the permanent new ones.
+        """
+    
+    def 
 
 
 
