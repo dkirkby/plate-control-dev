@@ -46,6 +46,21 @@ class PosScheduleStage(object):
             table.set_postpause(0, 0.0)
             self.move_tables[posid] = table
 
+    def is_not_empty(self):
+        """Returns boolean whether the stage is empty of move_tables.
+        """
+        return len(self.move_tables) == 0
+        
+    def add_table(self, move_table):
+        """Directly adds a move table to the stage. If a move table representing
+        same positioner already exists, then that table is extended.
+        """
+        this_posid = move_table.posid
+        if move_table.posid in self.move_tables:
+            self.move_tables[this_posid].extend(move_table)
+        else:
+            self.move_tables[this_posid] = move_table
+
     def anneal_power_density(self, anneal_time=None):
         """Adjusts move tables' internal timing, to reduce peak power consumption
         of the overall array.
@@ -85,6 +100,21 @@ class PosScheduleStage(object):
         """
     
     def 
+
+
+# CODE COPY-PASTED FROM POSSCHEDULE (PREVIOUS) FOR EQUALIZING TIMES IN A STAGE
+            move_times = {}
+            for posid,table in stage.move_tables.items():
+                postprocessed = table.for_schedule
+                move_times[posid] = postprocessed['stats']['net_time'][-1]
+            max_move_time = max(move_times.values())
+            for posid,table in stage.move_tables.items():
+                equalizing_pause = max_move_time - move_times[posid]
+                if equalizing_pause:
+                    idx = table.n_rows
+                    table.insert_new_row(idx)
+                    table.set_postpause(idx,equalizing_pause)
+
 
 
 

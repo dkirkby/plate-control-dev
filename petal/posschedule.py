@@ -15,11 +15,13 @@ class PosSchedule(object):
         self.petal = petal
         self.verbose = verbose
         self.requests = {} # keys: posids, values: target request dictionaries
-        self.move_tables = {} # keys: posids, values: instances of PosMoveTable
+        self.stage_order = ['direct','retract','rotate','extend','expert']
+        self.anneal_time = {'direct':3, 'retract':3, 'rotate':3, 'extend':3, 'expert':3} # times in seconds, see comments in PosScheduleStage
+        self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose) for name in self.stage_order}
+        self.move_tables = {}
         self._sweeps = {} # keys: posids, values: instances of PosSweep, corresponding to entries in self.move_tables
         self.max_path_adjustment_iterations = 3 # number of times to attempt move path adjustments to avoid collisions
         self.min_freeze_clearance = 5 # degrees, how early to truncate a move table to avoid collision via "freezing"
-        self.anneal_time = {'direct':3, 'retract':3, 'rotate':3, 'extend':3} # times in seconds, see comments in PosScheduleStage
 
     @property
     def collider(self):
@@ -128,22 +130,33 @@ class PosSchedule(object):
             if self.verbose:
                 print('Bad anticollision option \'' + str(anticollision) + '\' was argued. No move scheduling performed.')
             return
-        if self.move_tables:
-            anticollision = 'detect_and_freeze' if anticollision == 'detect_and_adjust' else anticollision
-            self._schedule_existing_tables()
+        if not self.requests and not self.stages['expert'].is_not_empty():
+            if self.verbose:
+                print('No requests nor existing move tables found. No move scheduling performed.')
+            return
+        if self.stages['expert'].is_not_empty():
+            self.move_tables = self._schedule_expert_tables(anticollision)
+            unchecked_tables = self.move_tables
         else:
-            if anticollision == 'none' or anticollision == 'detect_and_freeze':
-                self._schedule_with_no_path_adjustments()
-            elif anticollision == 'detect_and_adjust':
-                self._schedule_with_path_adjustments()
+            if anticollision == 'detect_and_adjust':
+                self.move_tables, frozen_posids = self._schedule_requests_with_path_adjustments() # there is only one possible anticollision method for this scheduling method
+                unchecked_tables = {}
+            else:
+                self.move_tables = self._schedule_requests_with_no_path_adjustments(anticollision)
+                unchecked_tables = self.move_tables
+        if self.requests:
             for posid,table in self.move_tables.items():
                 req = self.requests.pop(posid)
                 table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
                 table.log_note += (' ' if table.log_note else '') + req['log_note'] # keep the original log notes with move tables
+                
+        # probably move this little block deeper down into the stages            
         if anticollision == 'none':
             frozen_posids = set()
         else:
-            frozen_posids, still_colliding_sweeps = self._check_tables_for_collisions_and_freeze(self.move_tables)            
+            frozen_posids, still_colliding_sweeps = self._check_tables_for_collisions_and_freeze(unchecked_tables)
+
+            
         if self.petal.animator_on:
             self.collider.add_mobile_to_animator(self.petal.animator_total_time, self._sweeps, frozen_posids)
             self.petal.animator_total_time += max({sweep.time[-1] for sweep in self._sweeps})
@@ -155,32 +168,31 @@ class PosSchedule(object):
         return posid in self.requests           
 
     def expert_add_table(self, move_table):
-        """Adds an externally-constructed move table to the schedule. If there
-        is ANY such table in a given schedule, then the anti-collision algorithm
-        will NOT be used. Generally, this method should only be used for internal
-        calls by an expert user.
+        """Adds an externally-constructed move table to the schedule.Only simple
+        freezing is available as an anticollision method for such externally-made
+        tables. If any tables have been added by this method, then any target requests
+        will be ignored upon scheduling. Generally, this method should only be used
+        by an expert user.
         """
         if self._deny_request_because_disabled(move_table.posmodel):
+            if self.verbose:
+                print(str(move_table.posmodel.posid) + ': move table addition to schedule denied. Positioner is disabled.')
             return
-        this_posid = move_table.posid
-        if move_table.posid in self.move_tables:
-            self.move_tables[this_posid].extend(move_table)
-        else:
-            self.move_tables[this_posid] = move_table
+        self.stages['expert'].add_table(move_table)
 
-    def _schedule_existing_tables(self):
-        """Gathers data from exisitn move tables and applies power annealing.
-        Any requests are ignored.
+    def _schedule_expert_tables(self, anticollision):
+        """Gathers data from expert-added move tables and applies power annealing.
+        Any move requests are ignored.
         """
-        stage = posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose)
-        stage.move_tables = self.move_tables
-        stage.anneal_power_density(self.anneal_time['direct'])
-        self.move_tables = stage.move_tables
+        self.stages['expert'].anneal_power_density(self.anneal_time['expert'])
+        return self.stages['expert'].move_tables
 
-    def _schedule_with_no_path_adjustments(self):
+    def _schedule_requests_with_no_path_adjustments(self, anticollision):
         """Gathers data from requests dictionary and populates self.move_tables
         with direct motions from start to finish. The positioners are given no
         path adjustments to avoid each other.
+        
+        Returns a dict with keys: posids, values: instances of PosMoveTable.
         """
         start_posTP = {}
         desired_final_posTP = {}
@@ -190,15 +202,17 @@ class PosSchedule(object):
             desired_final_posTP[posid] = request['targt_posTP']
             trans = self.collider.posmodels[posid].trans
             dtdp[posid] = trans.delta_posTP(desired_final_posTP[posid], start_posTP[posid], range_wrap_limits='targetable')
-        stage = posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose)
-        stage.initialize_move_tables(start_posTP, dtdp)
-        stage.anneal_power_density(self.anneal_time['direct'])
-        self.move_tables = stage.move_tables
+        self.stages['direct'].initialize_move_tables(start_posTP, dtdp)
+        self.stages['direct'].anneal_power_density(self.anneal_time['direct'])
+        return self.stages['direct'].move_tables
         
-    def _schedule_with_path_adjustments(self):
+        
+    def _schedule_requests_with_path_adjustments(self):
         """Gathers data from requests dictionary and populates self.move_tables
         with motion paths from start to finish. The move tables may include
         adjustments of paths to avoid collisions.
+
+        Returns a dict with keys: posids, values: instances of PosMoveTable.
         
         For positioners that have not been given specific move requests, but
         which are not disabled, these get start/finish positions assigned to them that
@@ -247,10 +261,17 @@ class PosSchedule(object):
                 colliding_tables = {posid:stage.move_tables[posid] for posid in colliding_sweeps}
                 colliding_sweeps = self._find_collisions(colliding_tables)
                 n_iter += 1
-        self.move_tables = self._merge_move_tables_from_stages(stages)
-        motionless = {table.posid for table in self.move_tables if table.is_motionless}
+        all_move_tables = {}
+        for stage in stages:
+            for posid,table in stage.move_tables:
+                if posid in self.move_tables:
+                    all_move_tables[posid].extend(table)
+                else:
+                    all_move_tables[posid] = table          
+        motionless = {table.posid for table in all_move_tables if table.is_motionless}
         for posid in motionless:
-            del self.move_tables[posid]
+            del all_move_tables[posid]
+        return all_move_tables
 
     def _find_collisions(self, move_tables):
         """Identifies any collisions that would be induced by executing a collection
@@ -391,33 +412,6 @@ class PosSchedule(object):
         if n_iter >= max_iter:
             print('Warning: could not sufficiently arrest colliding positioners, after ' + str(n_iter) + ' iterations of freezing!')
         return all_frozen, colliding_sweeps
-
-    def _merge_move_tables_from_stages(self,stages):
-        """Collects move tables from an ordered dict of PosScheduleStage instances.
-        For each positioner, merges move tables from the stages. This is done
-        in the order of the dict. Fills in any intermediate time gaps
-        between stages with discrete pause events, so that all positioners have
-        matching scheduled move times for all stages and overall. Returns a dict
-        of move_tables, with keys = posids.
-        """
-        move_tables = {}
-        for stage in stages.values():
-            move_times = {}
-            for posid,table in stage.move_tables.items():
-                postprocessed = table.for_schedule
-                move_times[posid] = postprocessed['stats']['net_time'][-1]
-            max_move_time = max(move_times.values())
-            for posid,table in stage.move_tables.items():
-                equalizing_pause = max_move_time - move_times[posid]
-                if equalizing_pause:
-                    idx = table.n_rows
-                    table.insert_new_row(idx)
-                    table.set_postpause(idx,equalizing_pause)
-                if posid in move_tables:
-                    move_tables[posid].extend(table)
-                else:
-                    move_tables[posid] = table
-        return move_tables
     
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
