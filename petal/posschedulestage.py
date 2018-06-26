@@ -14,6 +14,7 @@ class PosScheduleStage(object):
         self.collider = collider # poscollider instance
         self.move_tables = {} # keys: posids, values: posmovetable instances
         self.proposed_move_tables = {}
+        self._sweeps = {} # keys: posids, values: instances of PosSweep, corresponding to entries in self.move_tables
         self._power_supply_map = power_supply_map
         self._enabled = {posid for posid in self.collider.posids if self.collider.posmodels[posid].is_enabled}
         self._disabled = self.collider.posids.difference(self._enabled)
@@ -76,6 +77,7 @@ class PosScheduleStage(object):
         new_max_time = anneal_time if anneal_time > orig_max_time else orig_max_time
         for posids_set in self._power_supply_map.values():
             for posid,table in self.move_tables:
+                pass
                 # think about best way to scatter these
                 # write down some math on paper, to get a clean algorithm
                 # probably takes two passes
@@ -86,6 +88,7 @@ class PosScheduleStage(object):
         """Alters move tables to avoid collisions on the way to final target
         positions.
         """
+        pass
         # be sure not to alter any disabled positioners
         # for each collision
             # if posA-to-posB, adjust posA and/or posB
@@ -98,23 +101,162 @@ class PosScheduleStage(object):
     def keep_adjustments(self):
         """Keep the proposed move tables as the permanent new ones.
         """
-    
-    def 
+        pass
+
+    def find_collisions(self, move_tables):
+        """Identifies any collisions that would be induced by executing a collection
+        of move tables.
+        
+            move_tables ... dict with keys = posids, values = PosMoveTable instances.
+        
+        Return:
+            
+            dict with keys = posids, values = PosSweep instances (see poscollider.py)
+            
+        The return dict only contains sweeps for positioners that collide. It will be
+        empty if there are no collisions. These sweeps may indicate collision with
+        another positioner or with a fixed boundary. This information is given internally
+        within each sweep instance.
+        
+        For any pair of positioners that collide, the return dict will contain separate
+        sweeps for each of them. These two sweeps are giving you information about the
+        same collision event, but from the perspectives of the two different
+        positioners. In other words, if there is an entry for posid 'M00001', colliding with
+        neighbor 'M00002', then the dict will also contain an entry for posid 'M00002',
+        colliding with neighbor 'M0001'.
+        
+        If positioner A collides with a fixed boundary, or with a disabled neighbor
+        positioner B, then the return dict only contains the sweep of A.
+        
+        If a positioner has collisions with multiple other postioners / fixed boundaries,
+        then only the first collision event in time is included in the return dict.
+        
+        In the rare event of a three-way exactly simultaneous collision between three
+        moving positioners, then all three of those positioners' sweeps would still
+        appear in the return dictionary.
+        """
+        already_checked = {posid:set() for posid in self.collider.posids}
+        colliding_sweeps = {posid:set() for posid in move_tables}
+        for posid in move_tables:
+            table_A = move_tables[posid]
+            init_obsTP_A = table_A.posmodel.trans.posTP_to_obsTP(table_A.init_posTP)
+            for neighbor in self.collider.pos_neighbors[posid]:
+                if neighbor not in already_checked[posid]:
+                    table_B = move_tables[neighbor] if neighbor in move_tables else posmovetable.PosMoveTable(self.collider.posmodels[neighbor]) # generation of fixed table if necessary, for a non-moving neighbor
+                    init_obsTP_B = table_B.posmodel.trans.posTP_to_obsTP(table_B.init_posTP)
+                    pospos_sweeps = self.collider.spacetime_collision_between_positioners(posid, init_obsTP_A, table_A, neighbor, init_obsTP_B, table_B)
+                    self._sweeps.update({posid:pospos_sweeps[0], neighbor:pospos_sweeps[1]})
+                    for sweep in pospos_sweeps:
+                        if sweep.collision_case != pc.case.I:
+                            colliding_sweeps[sweep.posid].add(sweep)
+                    already_checked[posid].add(neighbor)
+                    already_checked[neighbor].add(posid)
+            for fixed_neighbor in self.collider.fixed_neighbor_cases[posid]:
+                posfix_sweep = self.collider.spacetime_collision_with_fixed(posid, init_obsTP_A, table_A)[0] # index 0 to immediately retrieve from the one-element list this function returns
+                if posfix_sweep.collision_case != pc.case.I:
+                    colliding_sweeps[posid].add(posfix_sweep)
+        multiple_collisions = {posid for posid in colliding_sweeps if len(colliding_sweeps[posid]) > 1}
+        for posid in multiple_collisions:
+            first_collision_time = float('inf')
+            for sweep in colliding_sweeps[posid]:
+                if sweep.collision_time < first_collision_time:
+                    first_sweep = sweep
+                    first_collision_time = sweep.collision_time
+            colliding_sweeps[posid] = {first_sweep}
+        setless_sweeps_dict = {posid:colliding_sweeps[posid].pop() for posid in colliding_sweeps}
+        self._sweeps.update(setless_sweeps_dict) # this should not be here -- it should be at a higher level, depending on context, since sometimes you only have proposed sweeps
+        return setless_sweeps_dict
+
+    def check_tables_for_collisions_and_freeze(self, move_tables):
+        """Checks for possible collisions caused by all the argued move tables.        
+        In case of a predicted collision, the colliding positioner is instead
+        frozen in place at a point before the collision would have occurred.
+        
+        In the case where it is two neighboring positioners who would collide, then
+        we select which of the two to freeze according to:
+            
+            1. If one positioner achieves its intended target prior to the collision,
+               then we freeze the other one.
+            2. Otherwise, we freeze the positioner that has its phi arm further extended.
+               (This provides a greater likelihood that at least one of the two (the less
+               extended positioner) can still get its phi arm tucked in.)
+            3. In the rare event of equal phi extension at the moment of collision,
+               then the choice of which to freeze is arbitrary.
+        
+        The argued dict move_tables will have its contents modified directly by
+        this function, to achieve freezing. The total time to execute the move table
+        is kept the same as the original, by addition of a compensating postpause. In cases
+        where freezing requires that the positioner not move at all, those tables will be
+        deleted from the dict.
+        
+        Return values are:
+            
+            all_frozen       ... set of all the posids that had their move tables frozen by this function
+            colliding_sweeps ... dict of any remaining unresolved sweeps that have collisions, keys = posids
+            
+        In general, it is an error for colliding_sweeps to be anything other than
+        empty. (It means the freezing algorithm did not work.)
+        """
+        fixed_cases = {pc.case.PTL, pc.case.GFA}
+        n_iter = 0
+        max_iter = 6 # Since max number of neighbors is six, could never need more than this # of iterations.
+        all_frozen = set()
+        colliding_sweeps = self.find_collisions(move_tables)
+        while colliding_sweeps and n_iter < max_iter:
+            these_frozen = set()
+            neighbors_of_frozen = set()
+            for posid,sweep_A in colliding_sweeps:
+                if sweep_A.collision_case in fixed_cases or sweep_A.collision_neighbor not in move_tables:
+                    pos_to_freeze = posid
+                else:
+                    sweep_B = colliding_sweeps[sweep_A.collision_neighbor]
+                    if sweep_A.is_final_position(sweep_A.collision_idx):
+                        pos_to_freeze = sweep_A.posid
+                    elif sweep_B.is_final_position(sweep_B.collisiono_idx):
+                        pos_to_freeze = sweep_B.posid
+                    else:
+                        phi_A = sweep_A.phi(sweep_A.collision_idx)
+                        phi_B = sweep_B.phi(sweep_B.collision_idx)
+                        pos_to_freeze = posid if phi_A > phi_B else sweep_B.posid
+                sweep_to_freeze = colliding_sweeps[pos_to_freeze]
+                table_data = move_tables[pos_to_freeze].for_schedule()
+                original_total_move_time = table_data['stats']['net_time'][-1]
+                for row_idx in reversed(range(move_tables[pos_to_freeze].n_rows)):
+                    if table_data['stats']['net_time'] >= sweep_to_freeze.collision_time:
+                        move_tables[pos_to_freeze].delete_row(row_idx)
+                    else:
+                        break
+                n_rows = move_tables[pos_to_freeze].n_rows
+                if n_rows == 0:
+                    del move_tables[pos_to_freeze]
+                else:
+                    compensating_pause = original_total_move_time - table_data['stats']['net_time'][n_rows-1]
+                    new_postpause = table_data['postpause'][n_rows-1] + compensating_pause
+                    move_tables[pos_to_freeze].set_postpause(n_rows-1,new_postpause)
+                these_frozen.add(pos_to_freeze)
+                neighbors_of_frozen.add(self.collider.pos_neighbors[pos_to_freeze])
+            tables_to_recheck = {posid:move_tables[posid] for posid in these_frozen.union(neighbors_of_frozen) if posid in move_tables}
+            colliding_sweeps = self.find_collisions(tables_to_recheck) # double-check to ensure the freezing truncation hasn't caused a follow-on collision
+            all_frozen.add(these_frozen)
+            n_iter += 1
+        if n_iter >= max_iter:
+            print('Warning: could not sufficiently arrest colliding positioners, after ' + str(n_iter) + ' iterations of freezing!')
+        return all_frozen, colliding_sweeps
 
 
 # CODE COPY-PASTED FROM POSSCHEDULE (PREVIOUS) FOR EQUALIZING TIMES IN A STAGE
-            move_times = {}
-            for posid,table in stage.move_tables.items():
-                postprocessed = table.for_schedule
-                move_times[posid] = postprocessed['stats']['net_time'][-1]
-            max_move_time = max(move_times.values())
-            for posid,table in stage.move_tables.items():
-                equalizing_pause = max_move_time - move_times[posid]
-                if equalizing_pause:
-                    idx = table.n_rows
-                    table.insert_new_row(idx)
-                    table.set_postpause(idx,equalizing_pause)
-
+#            move_times = {}
+#            for posid,table in stage.move_tables.items():
+#                postprocessed = table.for_schedule
+#                move_times[posid] = postprocessed['stats']['net_time'][-1]
+#            max_move_time = max(move_times.values())
+#            for posid,table in stage.move_tables.items():
+#                equalizing_pause = max_move_time - move_times[posid]
+#                if equalizing_pause:
+#                    idx = table.n_rows
+#                    table.insert_new_row(idx)
+#                    table.set_postpause(idx,equalizing_pause)
+#
 
 
 
