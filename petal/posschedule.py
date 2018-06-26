@@ -15,9 +15,9 @@ class PosSchedule(object):
         self.petal = petal
         self.verbose = verbose
         self.requests = {} # keys: posids, values: target request dictionaries
-        self.stage_order = ['direct','retract','rotate','extend','expert']
+        stage_names = ['direct','retract','rotate','extend','expert']
         self.anneal_time = {'direct':3, 'retract':3, 'rotate':3, 'extend':3, 'expert':3} # times in seconds, see comments in PosScheduleStage
-        self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose) for name in self.stage_order}
+        self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose) for name in stage_names}
         self.move_tables = {}
         self._sweeps = {} # keys: posids, values: instances of PosSweep, corresponding to entries in self.move_tables
         self.max_path_adjustment_iterations = 3 # number of times to attempt move path adjustments to avoid collisions
@@ -246,12 +246,9 @@ class PosSchedule(object):
             for name in stage_names:
                 start_posTP[name][posid] = current_posTP
                 desired_final_posTP[name][posid] = current_posTP
-        stages = OrderedDict.fromkeys(stage_names)
-        # processing of these three stages is a good candidate for multiple processes, to get performance improvement (not multiple threads, due to the GIL)
-        stages['retract'] = posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose)
-        stages['rotate']  = posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose)
-        stages['extend']  = posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose)
-        for name,stage in stages.items():
+        all_move_tables = {}
+        for name in stage_names:
+            stage = self.stage[name]
             stage.initialize_move_tables(start_posTP[name], dtdp[name])
             stage.anneal_power_density(self.anneal_time[name])
             colliding_sweeps = self._find_collisions(stage.move_tables)
@@ -261,8 +258,6 @@ class PosSchedule(object):
                 colliding_tables = {posid:stage.move_tables[posid] for posid in colliding_sweeps}
                 colliding_sweeps = self._find_collisions(colliding_tables)
                 n_iter += 1
-        all_move_tables = {}
-        for stage in stages:
             for posid,table in stage.move_tables:
                 if posid in self.move_tables:
                     all_move_tables[posid].extend(table)
