@@ -109,10 +109,14 @@ class PosScheduleStage(object):
             method  ... string saying what method of adjustment to propose
             value   ... if applicable, some input value associated with method
             
-        METHOD        VALUE           DESCRIPTION
-        'freeze'      ignored         Arrest either posid or its neighbor and don't go to its final target.
-        'prepause'    float           Add a pre-delay (value unit seconds) before executing the move table.
-        'move'        {str:float}     
+        METHOD        VALUE                DESCRIPTION
+        'freeze'      ignored              Arrest either posid or its neighbor and don't go to its final target.
+        
+        'prepause'    delay time           Add a pre-delay (units seconds) before executing the move table.
+        
+        'jog'         {'dtdp':[dt,dp],     Add a move of a specified distance.
+                       'wait':wait time}   The move occurs at the beginning of the move table.
+                          Then the positioner waits 
         """
         pass
         # be sure not to alter any disabled positioners
