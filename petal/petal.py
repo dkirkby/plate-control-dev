@@ -4,6 +4,7 @@ import posmovetable
 import posstate
 import poscollider
 import posconstants as pc
+import posschedstats
 import numpy as np
 import time
 import collections
@@ -33,11 +34,16 @@ class Petal(object):
     Optional initialization inputs:
         simulator_on    ... boolean, controls whether in software-only simulation mode
         db_commit_on    ... boolean, controls whether to commit state data to the online system database (can be done with or without local_commit_on (available only if DB_COMMIT_AVAILABLE == True))
-        local_commit_on ... boolean, controlw whether to commit state data to local log files (can be done with or without db_commit_on)
+        local_commit_on ... boolean, controls whether to commit state data to local log files (can be done with or without db_commit_on)
         printfunc       ... method, used for stdout style printing. we use this for logging during tests
         collider_file   ... string, file name of collider configuration file, no directory loction. If left blank will use default.
+        sched_stats_on  ... boolen, controls whether to log statistics about scheduling runs
     """
-    def __init__(self, petal_id, posids, fidids, simulator_on=False, db_commit_on=False, local_commit_on=True, printfunc=print, verbose=False, user_interactions_enabled=False, collider_file=None):
+    def __init__(self, petal_id, posids, fidids, simulator_on=False,
+                 db_commit_on=False, local_commit_on=True, printfunc=print,
+                 verbose=False, user_interactions_enabled=False,
+                 collider_file=None, sched_stats_on=False):
+        
         # petal setup
         self.petal_id = petal_id
         self.verbose = verbose # whether to print verbose information at the terminal
@@ -76,7 +82,8 @@ class Petal(object):
         self.animator = self.collider.animator
         self.animator_on = False # this should be turned on/off using the animation start/stop control methods below
         self.animator_total_time = 0 # keeps track of total time of the current animation
-        self.schedule = posschedule.PosSchedule(self,verbose=self.verbose)
+        self.schedule_stats_log = posschedstats.PosSchedStats() if sched_stats_on else None    
+        self.schedule = self._new_schedule()
         self.anticollision_default = 'detect_and_freeze'  # Default parameter on how to schedule moves. See posschedule.py for valid settings.
         
         # fiducials setup
@@ -820,7 +827,7 @@ class Petal(object):
             print(self.expected_current_position_str())
         self.commit()
         self._clear_temporary_state_values()
-        self._clear_schedule()
+        self.schedule = self._new_schedule()
 
     def _check_and_disable_nonresponsive_pos_and_fid(self):
         """Asks petalcomm for a list of what canids are nonresponsive, and then
@@ -862,10 +869,10 @@ class Petal(object):
         for k in resets:
             self.set(key=k,value=resets[k])
 
-    def _clear_schedule(self):
-        """Clear out any existing information in the move schedule.
+    def _new_schedule(self):
+        """Generate up a new, clear schedule instance.
         """
-        self.schedule = posschedule.PosSchedule(self,verbose=self.verbose)
+        return posschedule.PosSchedule(petal=self, stats=self.schedule_stats_log, verbose=self.verbose)
 
     def _wait_while_moving(self):
         """Blocking implementation, to not send move tables while any positioners are still moving.

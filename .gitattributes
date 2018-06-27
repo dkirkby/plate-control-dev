@@ -13,6 +13,7 @@ petal/posconstants.py -text
 petal/positioner_locations_0530v14.csv -text
 petal/posmodel.py -text
 petal/posmovetable.py -text
+petal/posschedstats.py -text
 petal/posschedule.py -text
 petal/posschedulestage.py -text
 petal/posstate.py -text

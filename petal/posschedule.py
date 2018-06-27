@@ -6,11 +6,15 @@ class PosSchedule(object):
     from starts to finishes. The move tables are instances of the PosMoveTable
     class.
     
-        petal             ... Instance of Petal that this schedule applies to.
+        petal  ... Instance of Petal that this schedule applies to.
+        
+        log    ... Instance of PosSchedStats in which to register scheduling statistics.
+                   If log=None, then no statistics are logged.
     """
 
-    def __init__(self, petal, verbose=True):
+    def __init__(self, petal, stats=None, verbose=True):
         self.petal = petal
+        self.stats = stats
         self.verbose = verbose
         self.requests = {} # keys: posids, values: target request dictionaries
         stage_names = ['direct','retract','rotate','extend','expert']
