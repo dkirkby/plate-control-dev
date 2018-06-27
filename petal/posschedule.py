@@ -203,7 +203,6 @@ class PosSchedule(object):
         self.stages['direct'].anneal_power_density(self.anneal_time['direct'])
         return self.stages['direct'].move_tables
         
-        
     def _schedule_requests_with_path_adjustments(self):
         """Gathers data from requests dictionary and populates self.move_tables
         with motion paths from start to finish. The move tables may include
@@ -259,13 +258,13 @@ class PosSchedule(object):
                 if posid in self.move_tables:
                     all_move_tables[posid].extend(table)
                 else:
-                    all_move_tables[posid] = table          
+                    all_move_tables[posid] = table
+            stage.equalize_table_times()
         motionless = {table.posid for table in all_move_tables if table.is_motionless}
         for posid in motionless:
             del all_move_tables[posid]
         return all_move_tables
 
-    
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
         consistently take with regard to post-move cleanup, if a request is going to be denied.

@@ -13,8 +13,9 @@ class PosScheduleStage(object):
     def __init__(self, collider, power_supply_map={}, verbose=False):
         self.collider = collider # poscollider instance
         self.move_tables = {} # keys: posids, values: posmovetable instances
-        self.proposed_move_tables = {}
         self._sweeps = {} # keys: posids, values: instances of PosSweep, corresponding to entries in self.move_tables
+        self._proposed_move_tables = {}
+        self._proposed_sweeps = {}
         self._power_supply_map = power_supply_map
         self._enabled = {posid for posid in self.collider.posids if self.collider.posmodels[posid].is_enabled}
         self._disabled = self.collider.posids.difference(self._enabled)
@@ -83,10 +84,35 @@ class PosScheduleStage(object):
                 # probably takes two passes
                 #   1. calculate total power density vs time, and record contributions vs time for each positioner
                 #   2. redistribute, positioner by positioner    
+
+    def equalize_table_times(self):
+        """Makes all move tables in the stage have an equal total time length,
+        by adding in post-pauses wherever necessary.
+        """
+        move_times = {}
+        for posid,table in self.move_tables.items():
+            postprocessed = table.for_schedule
+            move_times[posid] = postprocessed['stats']['net_time'][-1]
+        max_move_time = max(move_times.values())
+        for posid,table in self.move_tables.items():
+            equalizing_pause = max_move_time - move_times[posid]
+            if equalizing_pause:
+                idx = table.n_rows
+                table.insert_new_row(idx)
+                table.set_postpause(idx,equalizing_pause)
             
-    def adjust_paths(self, colliding_sweeps, iteration):
-        """Alters move tables to avoid collisions on the way to final target
-        positions.
+    def propose_path_adjustment(self, posid, method='freeze', value=None):
+        """Generates a proposed alternate move table for the positioner posid
+        or its colliding neighbor. The table is meant attempt to avoid collision.
+        
+            posid   ... the positioner to propose a path for
+            method  ... string saying what method of adjustment to propose
+            value   ... if applicable, some input value associated with method
+            
+        METHOD        VALUE           DESCRIPTION
+        'freeze'      ignored         Arrest either posid or its neighbor and don't go to its final target.
+        'prepause'    float           Add a pre-delay (value unit seconds) before executing the move table.
+        'move'        {str:float}     
         """
         pass
         # be sure not to alter any disabled positioners
@@ -228,7 +254,7 @@ class PosScheduleStage(object):
                         break
                 n_rows = move_tables[pos_to_freeze].n_rows
                 if n_rows == 0:
-                    del move_tables[pos_to_freeze]
+                    del move_tables[pos_to_freeze] # is this sufficient cleanup? self.move_tables? what about sweeps?
                 else:
                     compensating_pause = original_total_move_time - table_data['stats']['net_time'][n_rows-1]
                     new_postpause = table_data['postpause'][n_rows-1] + compensating_pause
@@ -244,19 +270,6 @@ class PosScheduleStage(object):
         return all_frozen, colliding_sweeps
 
 
-# CODE COPY-PASTED FROM POSSCHEDULE (PREVIOUS) FOR EQUALIZING TIMES IN A STAGE
-#            move_times = {}
-#            for posid,table in stage.move_tables.items():
-#                postprocessed = table.for_schedule
-#                move_times[posid] = postprocessed['stats']['net_time'][-1]
-#            max_move_time = max(move_times.values())
-#            for posid,table in stage.move_tables.items():
-#                equalizing_pause = max_move_time - move_times[posid]
-#                if equalizing_pause:
-#                    idx = table.n_rows
-#                    table.insert_new_row(idx)
-#                    table.set_postpause(idx,equalizing_pause)
-#
 
 
 
