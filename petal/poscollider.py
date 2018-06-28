@@ -3,6 +3,7 @@ import posconstants as pc
 import posanimator
 import configobj
 import os
+import copy as copymodule
 
 class PosCollider(object):
     """PosCollider contains geometry definitions for mechanical components of the
@@ -374,6 +375,9 @@ class PosSweep(object):
         self.collision_time = np.inf        # time at which collision occurs. if no collision, the time is inf
         self.collision_idx = None           # index in time and theta,phi lists at which collision occurs
         self.collision_neighbor = ''        # id string (posid, 'PTL', or 'GFA') of neighbor it collides with, if any
+
+    def copy(self):
+        return copymodule.deepcopy(self)
 
     def fill_exact(self, init_obsTP, table, start_time=0):
         """Fills in a sweep object based on the input table. Time and position
