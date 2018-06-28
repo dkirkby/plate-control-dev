@@ -13,6 +13,7 @@ class PosScheduleStage(object):
     def __init__(self, collider, power_supply_map={}, verbose=False):
         self.collider = collider # poscollider instance
         self.move_tables = {} # keys: posids, values: posmovetable instances
+        self.verbose = verbose
         self._sweeps = {} # keys: posids, values: instances of PosSweep, corresponding to entries in self.move_tables
         self._proposed_move_tables = {}
         self._proposed_sweeps = {}
@@ -103,34 +104,51 @@ class PosScheduleStage(object):
                 table.insert_new_row(idx)
                 table.set_postpause(idx,equalizing_pause)
             
-    def propose_path_adjustment(self, posid, freeze=False, dtdp=[0,0], wait=0):
+    def propose_path_adjustment(self, posid, method='freeze'):
         """Generates a proposed alternate move table for the positioner posid
         The alternate table is meant to attempt to avoid collision.
         
-            posid   ... The positioner to propose a path adjustment for.
+          posid  ... The positioner to propose a path adjustment for.
             
-            freeze  ... Boolean, whether to turn on 'freezing'. In this mode,
-                        either posid or its neighbor are halted prior to the 
-                        collision and no attempt is made for its final target.
-                        If freeze=True, the other input values below are ignored.
-                        
-            dtdp    ... Add a pre-move of a specified distance [delta theta, delta phi]
-                        (units deg) to the move table for this stage. The new move
-                        occurs at the beginning of the stage. Then the positioner
-                        waits the argued wait time (see below). After this the move
-                        table proceeds as before. Physical range limits will be applied
-                        to automatically truncate dt and dp if necessary.
+          method ... The type of adjustment to make. Valid selections are:
+              
+             'pause'   ... Pre-delay is added to the positioner's move table in this
+                           stage, to wait for the neighbor to possibly move out of the way.
             
-            wait    ... Add a pre-delay (units seconds) before executing the 
-                        rest of the stage. If there is a non-zero dt or dp (see
-                        above), then that happens prior to the wait.
+             'extend'  ... Positioner phi arm is first extended out, in an attempt to open
+                           a clear path for neighbor.
+             
+             'retract' ... Positioner phi arm is first retracted in, in an attempt to open
+                           a clear path for neighbor.
+             
+             'rot_ccw' ... Positioner theta axis is first rotated ccw, in an attempt to
+                           open a clear path for neighbor.
+             
+             'rot_cw'  ... Positioner theta axis is first rotated cw, in an attempt to
+                           open a clear path for neighbor.
+
+             'freeze'  ... Positioner is halted prior to the collision, and no attempt
+                           is made for its final target.
+            
+        No new collision checking is performed by this method. So it is important 
+        after receiving a new proposal, to re-check the positioner against all its neighbors
+        and see both whether the original collision was solved, and also whether the
+        proposal induces any new collisions.
         """
         if self._sweeps[posid].collision_case == pc.case.I:
+            if self.verbose:
+                print('Warning: no need to propose path adjustment for positioner ' + str(posid) +', it has no collision.') 
             return
         table = self.move_tables[posid].copy()
         sweep = self._sweeps[posid].copy()
-        if freeze:
-            table_data = table.for_schedule()
+        table_data = table.for_schedule()
+        if method == 'pause':
+            pass
+        elif method in {'extend','retract'}:
+            pass
+        elif method in {'rot_ccw','rot_cw'}:
+            pass
+        elif method == 'freeze':
             for row_idx in reversed(range(table.n_rows)):
                 if table_data['stats']['net_time'] >= sweep.collision_time:
                     table.delete_row(row_idx)
@@ -139,10 +157,11 @@ class PosScheduleStage(object):
             if table.n_rows == 0:
                 table.set_move(0,0,0)
         else:
+            if self.verbose:
+                print('Warning: invalid path adjustment method \'' + str(method) + '\' requested for positioner ' + str(posid) + '.')
+            return
             
-            # Is this really what I want to be doing here? sufficiently interesting?
-            # Or do I want to take away the dtdp option from the user, and instead
-            # intelligently calculate them right here? I.e., get the job done now.
+            # old stuff here below
             if any(dtdp) or wait:
                 table.insert_new_row(0)
             if any(dtdp):
