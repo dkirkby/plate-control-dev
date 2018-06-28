@@ -19,9 +19,11 @@ class PosScheduleStage(object):
         self._power_supply_map = power_supply_map
         self._enabled = {posid for posid in self.collider.posids if self.collider.posmodels[posid].is_enabled}
         self._disabled = self.collider.posids.difference(self._enabled)
+        self._frozen = {}
         self._start_posTP = {} # keys: posids, values: [theta,phi]
         self._final_posTP = {} # keys: posids, values: [theta,phi]
         self._true_dtdp = {} # keys: posids, values: [delta theta, delta phi]
+        self._fixed_cases = {pc.case.PTL, pc.case.GFA} # collision case enumerations against fixed polygons
     
     def initialize_move_tables(self, start_posTP, dtdp):
         """Generates basic move tables for each positioner, starting at position
@@ -101,23 +103,65 @@ class PosScheduleStage(object):
                 table.insert_new_row(idx)
                 table.set_postpause(idx,equalizing_pause)
             
-    def propose_path_adjustment(self, posid, method='freeze', value=None):
+    def propose_path_adjustment(self, posid, freeze=False, dtdp=[0,0], wait=0):
         """Generates a proposed alternate move table for the positioner posid
-        or its colliding neighbor. The table is meant attempt to avoid collision.
+        The alternate table is meant to attempt to avoid collision.
         
-            posid   ... the positioner to propose a path for
-            method  ... string saying what method of adjustment to propose
-            value   ... if applicable, some input value associated with method
+            posid   ... The positioner to propose a path adjustment for.
             
-        METHOD        VALUE                DESCRIPTION
-        'freeze'      ignored              Arrest either posid or its neighbor and don't go to its final target.
-        
-        'prepause'    delay time           Add a pre-delay (units seconds) before executing the move table.
-        
-        'jog'         {'dtdp':[dt,dp],     Add a move of a specified distance.
-                       'wait':wait time}   The move occurs at the beginning of the move table.
-                          Then the positioner waits 
+            freeze  ... Boolean, whether to turn on 'freezing'. In this mode,
+                        either posid or its neighbor are halted prior to the 
+                        collision and no attempt is made for its final target.
+                        If freeze=True, the other input values below are ignored.
+                        
+            dtdp    ... Add a pre-move of a specified distance [delta theta, delta phi]
+                        (units deg) to the move table for this stage. The new move
+                        occurs at the beginning of the stage. Then the positioner
+                        waits the argued wait time (see below). After this the move
+                        table proceeds as before. Physical range limits will be applied
+                        to automatically truncate dt and dp if necessary.
+            
+            wait    ... Add a pre-delay (units seconds) before executing the 
+                        rest of the stage. If there is a non-zero dt or dp (see
+                        above), then that happens prior to the wait.
         """
+        if self._sweeps[posid].collision_case == pc.case.I:
+            return
+        table = self.move_tables[posid].copy()
+        sweep = self._sweeps[posid].copy()
+        if freeze:
+            table_data = table.for_schedule()
+            for row_idx in reversed(range(table.n_rows)):
+                if table_data['stats']['net_time'] >= sweep.collision_time:
+                    table.delete_row(row_idx)
+                else:
+                    break
+            if table.n_rows == 0:
+                table.set_move(0,0,0)
+        else:
+            
+            # Is this really what I want to be doing here? sufficiently interesting?
+            # Or do I want to take away the dtdp option from the user, and instead
+            # intelligently calculate them right here? I.e., get the job done now.
+            if any(dtdp) or wait:
+                table.insert_new_row(0)
+            if any(dtdp):
+                targetable_TP = self.collider.posmodels[posid].trans.shaft_ranges('targetable')
+                new_pos = [self._start_posTP[i] + dtdp[i] for i in [0,1]] # intentionally not using a postransforms method, because here I do NOT want to allow wrap around
+                for i in [0,1]:
+                    range_max = max(targetable_TP[i])
+                    range_min = min(targetable_TP[i])
+                    if new_pos[i] < range_min:
+                        dtdp[i] = range_min - self.start_posTP[i]
+                    elif new_pos[i] > range_max:
+                        dtdp[i] = range_max - self.start_posTP[i]
+                table.set_move(0,0,dtdp[0])
+                table.set_move(0,1,dtdp[1])
+            if wait:
+                wait = max(0,wait) # just make sure no negative wait being asked for
+                table.set_postpause(0,wait)
+        
+        
         pass
         # be sure not to alter any disabled positioners
         # for each collision
