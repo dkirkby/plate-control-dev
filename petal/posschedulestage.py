@@ -15,7 +15,6 @@ class PosScheduleStage(object):
         self.move_tables = {} # keys: posids, values: posmovetable instances
         self.sweeps = {} # keys: posids, values: instances of PosSweep, corresponding to entries in self.move_tables
         self.colliding = set() # positioners currently known to have collisions
-        self.frozen = set()
         self.verbose = verbose
         self._power_supply_map = power_supply_map
         self._enabled = {posid for posid in self.collider.posids if self.collider.posmodels[posid].is_enabled}
@@ -152,7 +151,7 @@ class PosScheduleStage(object):
                 for posid in all_sweeps:
                     self.colliding.remove(posid)
                     if method == 'freeze':
-                        self.frozen.add(posid)
+                        self.sweeps[posid].frozen_time = self.sweeps[posid].time[-1]
                 return
         if self.verbose():
             print('Error: adjust_path() failed to prevent all collisions.')
@@ -281,7 +280,7 @@ class PosScheduleStage(object):
         if method == 'freeze':    
             table_data = table.for_schedule
             for row_idx in reversed(range(table.n_rows)):
-                if table_data['stats']['net_time'] >= self.sweep[posid].collision_time:
+                if table_data['stats']['net_time'][row_idx] >= self.sweep[posid].collision_time:
                     table.delete_row(row_idx)
                 else:
                     break
