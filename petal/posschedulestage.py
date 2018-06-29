@@ -151,14 +151,17 @@ class PosScheduleStage(object):
         table_data = table.for_schedule()
         if method == 'pause':
             # estimate time it will take for neighbor to get past
-            # add that wait to posid
+            # add that prepause to posid
             pass
         elif method in {'extend','retract'}:
             # estimate time it will take to extend or retract
-            # add that wait to neighbor
-            
+            # add that prepause to neighbor
+            # add pre-extension or retraction to posid
             pass
         elif method in {'rot_ccw','rot_cw'}:
+            # estimate time it will take to rotate ccw or cw
+            # add that prepause to neighbor
+            # add rotation to posid
             pass
         elif method == 'freeze':
             for row_idx in reversed(range(table.n_rows)):
