@@ -27,10 +27,9 @@ class PosAnimator(object):
         self.timestep = timestep # frame interval for animations
         self.items = {} # keys shall identify the individual items that get drawn, i.e. 'ferrule 321', 'phi arm 42', 'GFA', etc
                         # values are sub-dictionaries, with the entries:
-                        # {'time'  : [], # list of time values at which an update or change is to be applied
-                        #  'poly'  : [], # list of arrays of polygon points (each is 2xN), defining the item polygon to draw at that time
-                        #  'style' : [], # list of dictionaries, defining the plotting style to draw the polygon at that time
-                        #  'collision_time' : np.inf} # time at which collision occurs. if no collision, the time is inf
+                        #  'time'  : [] # list of time values at which an update or change is to be applied
+                        #  'poly'  : [] # list of arrays of polygon points (each is 2xN), defining the item polygon to draw at that time
+                        #  'style' : [] # list of dictionaries, defining the plotting style to draw the polygon at that time
         self.pospoly_keys = {'ferrule', 'phi arm', 'central body', 'line at 180', 'Eo', 'Ei', 'Ee'}
         self.fixpoly_keys = {'PTL','GFA'}
         self.styles = {'ferrule':
@@ -117,7 +116,7 @@ class PosAnimator(object):
         """
         key = str(item_str) + ' ' + str(item_idx)
         if key not in self.items:
-            item = {'time':[], 'poly':[], 'style':[], 'collision_time':collision_time}
+            item = {'time':[], 'poly':[], 'style':[]}
         else:
             item = self.items[key]
         if time in item['time']:
