@@ -151,8 +151,11 @@ class PosSchedule(object):
                 table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
                 table.log_note += (' ' if table.log_note else '') + req['log_note'] # keep the original log notes with move tables
         if self.petal.animator_on:
-            self.collider.add_mobile_to_animator(self.petal.animator_total_time, self._sweeps, frozen_posids)
-            self.petal.animator_total_time += max({sweep.time[-1] for sweep in self._sweeps})
+            for name in self.stage_names:
+                stage = self.stages[name]
+                if stage.is_not_empty():
+                    self.collider.add_mobile_to_animator(self.petal.animator_total_time, stage.sweeps)
+                    self.petal.animator_total_time += max({sweep.time[-1] for sweep in stage.sweeps})
                 
     def already_requested(self, posid):
         """Returns boolean whether a request has already been registered in the
