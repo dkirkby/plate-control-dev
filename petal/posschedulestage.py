@@ -1,5 +1,6 @@
 import posconstants as pc
 import posmovetable
+import numpy as np
 
 class PosScheduleStage(object):
     """This class encapsulates the concept of a 'stage' of the fiber
@@ -67,39 +68,46 @@ class PosScheduleStage(object):
         else:
             self.move_tables[this_posid] = move_table
 
-    def anneal_power_density(self, anneal_time=None):
-        """Adjusts move tables' internal timing, to reduce peak power consumption
+    def anneal_tables(self, anneal_time=None):
+        """Adjusts move table timing, to attempt to reduce peak power consumption
         of the overall array.
         
             anneal_time  ... Time in seconds over which to spread out moves in this stage
                              to reduce overall power density consumed by the array. You
-                             can also argue None if no annealing should be done.
+                             can also argue None if no spreading should be done.
+        
+        If spread_time is less than the time it takes to execute the longest move
+        table, then that longer execution time will be used instead of spread_time.
         """
         if anneal_time == None:
             return
-        table_data = {posid:self.move_table[posid].for_schedule() for posid in self.move_tables}
-        orig_max_time = max({table['net_time'][-1] for table in table_data.values()})
+        postprocessed = {posid:self.move_table[posid].for_schedule for posid in self.move_tables}
+        times = {posid:postprocessed[posid]['stats']['net_time'][-1] for posid in postprocessed}
+        orig_max_time = max(times.values())
         new_max_time = anneal_time if anneal_time > orig_max_time else orig_max_time
         for posids_set in self._power_supply_map.values():
-            for posid,table in self.move_tables:
-                pass
-                # think about best way to scatter these
-                # write down some math on paper, to get a clean algorithm
-                # probably takes two passes
-                #   1. calculate total power density vs time, and record contributions vs time for each positioner
-                #   2. redistribute, positioner by positioner    
+            group = []
+            group_time = 0
+            for posid in posids_set:
+                group.append(posid)
+                group_time += times[posid]
+                if group_time > new_max_time:
+                    # spread out the group's tables by adding prepauses
+                    
+                    group = []
+                    group_time = 0
 
     def equalize_table_times(self):
         """Makes all move tables in the stage have an equal total time length,
         by adding in post-pauses wherever necessary.
         """
-        move_times = {}
+        times = {}
         for posid,table in self.move_tables.items():
             postprocessed = table.for_schedule
-            move_times[posid] = postprocessed['stats']['net_time'][-1]
-        max_move_time = max(move_times.values())
+            times[posid] = postprocessed['stats']['net_time'][-1]
+        max_time = max(times.values())
         for posid,table in self.move_tables.items():
-            equalizing_pause = max_move_time - move_times[posid]
+            equalizing_pause = max_time - times[posid]
             if equalizing_pause:
                 idx = table.n_rows
                 table.insert_new_row(idx)
