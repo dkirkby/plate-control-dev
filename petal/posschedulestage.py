@@ -129,22 +129,34 @@ class PosScheduleStage(object):
 
              'freeze'  ... Positioner is halted prior to the collision, and no attempt
                            is made for its final target.
-            
+        
+        The return value is a dict of proposed new move tables. Key = posid, value =
+        new move table. If no change is proposed, the dict is empty. If the proposal
+        includes changing both the argued positioner and its neighbor, than they will
+        both have tables in the dict.
+        
         No new collision checking is performed by this method. So it is important 
-        after receiving a new proposal, to re-check the positioner against all its neighbors
-        and see both whether the original collision was solved, and also whether the
-        proposal induces any new collisions.
+        after receiving a new proposal, to re-check for collisions against all the
+        neighbors of all the proposed new move tables.
+        
+        *** IS THIS HOW IT SHOULD BE? OR SHOULD I MAKE THIS FUNCTION REALLY AN INTERNAL
+        ONE, AND HANDLE THIS WHOLE SEQUENCE RIGHT HERE, INCLUDING COLLISION CHECKING? ***
         """
         if self._sweeps[posid].collision_case == pc.case.I:
             if self.verbose:
                 print('Warning: no need to propose path adjustment for positioner ' + str(posid) +', it has no collision.') 
-            return
+            return {}
         table = self.move_tables[posid].copy()
         sweep = self._sweeps[posid].copy()
         table_data = table.for_schedule()
         if method == 'pause':
+            # estimate time it will take for neighbor to get past
+            # add that wait to posid
             pass
         elif method in {'extend','retract'}:
+            # estimate time it will take to extend or retract
+            # add that wait to neighbor
+            
             pass
         elif method in {'rot_ccw','rot_cw'}:
             pass
@@ -159,7 +171,7 @@ class PosScheduleStage(object):
         else:
             if self.verbose:
                 print('Warning: invalid path adjustment method \'' + str(method) + '\' requested for positioner ' + str(posid) + '.')
-            return
+            return {}
             
             # old stuff here below
             if any(dtdp) or wait:
