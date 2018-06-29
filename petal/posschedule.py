@@ -186,6 +186,11 @@ class PosSchedule(object):
         Any move requests are ignored.
         """
         self.stages['expert'].anneal_power_density(self.anneal_time['expert'])
+        if anticollision != 'none':
+            colliding_sweeps, all_sweeps = self.stages['expert'].find_collisions(self.stages['expert'].move_tables, store_results=True)
+            while colliding_sweeps:
+                posid = next(iter(colliding_sweeps))
+                self.stages['expert'].adjust_path(posid, force_freezing=True)
         return self.stages['expert'].move_tables
 
     def _schedule_requests_with_no_path_adjustments(self, anticollision):
