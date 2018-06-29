@@ -17,12 +17,15 @@ class PosSchedule(object):
         self.stats = stats
         self.verbose = verbose
         self.requests = {} # keys: posids, values: target request dictionaries
-        stage_names = ['direct','retract','rotate','extend','expert']
-        self.anneal_time = {'direct':3, 'retract':3, 'rotate':3, 'extend':3, 'expert':3} # times in seconds, see comments in PosScheduleStage
-        self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose) for name in stage_names}
-        self.move_tables = {}
-        self.max_path_adjustment_iterations = 3 # number of times to attempt move path adjustments to avoid collisions
+        self.max_path_adjustment_passes = 3 # max number of times to go through the set of colliding positioners and try to adjust each of their paths to avoid collisions
         self.min_freeze_clearance = 5 # degrees, how early to truncate a move table to avoid collision via "freezing"
+        stage_names = ['direct','retract','rotate','extend','expert']
+        self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose) for name in stage_names}
+        self.anneal_time = {'direct':3, 'retract':3, 'rotate':3, 'extend':3, 'expert':3} # times in seconds, see comments in PosScheduleStage
+        self.move_tables = {}
+        self.sweeps = {}
+        self.frozen = set()
+        self.colliding = set()
 
     @property
     def collider(self):
@@ -136,28 +139,17 @@ class PosSchedule(object):
                 print('No requests nor existing move tables found. No move scheduling performed.')
             return
         if self.stages['expert'].is_not_empty():
-            self.move_tables = self._schedule_expert_tables(anticollision)
-            unchecked_tables = self.move_tables
+            self._schedule_expert_tables(anticollision)
         else:
             if anticollision == 'detect_and_adjust':
-                self.move_tables, frozen_posids = self._schedule_requests_with_path_adjustments() # there is only one possible anticollision method for this scheduling method
-                unchecked_tables = {}
+                self._schedule_requests_with_path_adjustments() # there is only one possible anticollision method for this scheduling method
             else:
-                self.move_tables = self._schedule_requests_with_no_path_adjustments(anticollision)
-                unchecked_tables = self.move_tables
+                self._schedule_requests_with_no_path_adjustments(anticollision)
         if self.requests:
             for posid,table in self.move_tables.items():
                 req = self.requests.pop(posid)
                 table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
                 table.log_note += (' ' if table.log_note else '') + req['log_note'] # keep the original log notes with move tables
-                
-        # probably move this little block deeper down into the stages            
-        if anticollision == 'none':
-            frozen_posids = set()
-        else:
-            frozen_posids, still_colliding_sweeps = self._check_tables_for_collisions_and_freeze(unchecked_tables)
-
-            
         if self.petal.animator_on:
             self.collider.add_mobile_to_animator(self.petal.animator_total_time, self._sweeps, frozen_posids)
             self.petal.animator_total_time += max({sweep.time[-1] for sweep in self._sweeps})
@@ -185,13 +177,20 @@ class PosSchedule(object):
         """Gathers data from expert-added move tables and applies power annealing.
         Any move requests are ignored.
         """
-        self.stages['expert'].anneal_power_density(self.anneal_time['expert'])
+        stage = self.stages['expert']
+        stage.anneal_power_density(self.anneal_time['expert'])
         if anticollision != 'none':
-            colliding_sweeps, all_sweeps = self.stages['expert'].find_collisions(self.stages['expert'].move_tables, store_results=True)
-            while colliding_sweeps:
-                posid = next(iter(colliding_sweeps))
-                self.stages['expert'].adjust_path(posid, force_freezing=True)
-        return self.stages['expert'].move_tables
+            stage.find_collisions(stage.move_tables, store_results=True)
+            attempts_remaining = self.max_path_adjustment_passes
+            while stage.colliding and attempts_remaining:
+                for posid in stage.colliding:
+                    if posid in stage.colliding: # because stage.colliding will be changed by adjust_path function
+                        stage.adjust_path(posid, force_freezing=True)
+                attempts_remaining -= 1
+        self.move_tables = stage.move_tables
+        self.sweeps = stage.sweeps
+        self.frozen = stage.frozen
+        self.colliding = stage.colliding
 
     def _schedule_requests_with_no_path_adjustments(self, anticollision):
         """Gathers data from requests dictionary and populates self.move_tables
@@ -208,9 +207,12 @@ class PosSchedule(object):
             desired_final_posTP[posid] = request['targt_posTP']
             trans = self.collider.posmodels[posid].trans
             dtdp[posid] = trans.delta_posTP(desired_final_posTP[posid], start_posTP[posid], range_wrap_limits='targetable')
-        self.stages['direct'].initialize_move_tables(start_posTP, dtdp)
-        self.stages['direct'].anneal_power_density(self.anneal_time['direct'])
-        return self.stages['direct'].move_tables
+        stage = stages['direct']
+        stage.initialize_move_tables(start_posTP, dtdp)
+        stage.anneal_power_density(self.anneal_time['direct'])
+        # need to check anticollision arg and possibly do similar freezing as _schedule_expert_tables.
+        # see if I can pull out the common code from both functions
+        self.move_tables = stage.move_tables
         
     def _schedule_requests_with_path_adjustments(self):
         """Gathers data from requests dictionary and populates self.move_tables
