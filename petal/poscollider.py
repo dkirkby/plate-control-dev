@@ -62,20 +62,20 @@ class PosCollider(object):
             self.animator.add_or_change_item('Ee', self.posindexes[posid], start_time, self.Ee_polys[posid].points)
             self.animator.add_or_change_item('line at 180', self.posindexes[posid], start_time, self.line180_polys[posid].points)
         
-    def add_mobile_to_animator(self, start_time, sweeps, frozen):
+    def add_mobile_to_animator(self, start_time, sweeps):
         """Add a collection of PosSweeps to the animator, describing positioners'
         real-time motions.
 
             start_time ... seconds, global time when the move begins        
             sweeps     ... dict with keys = posids, values = PosSweep instances
-            frozen     ... set of posids indicating any positioners that have been frozen
         """            
         for posid,s in sweeps:
             posidx = self.posindexes[posid]
             for i in range(len(s.time)):
                 style_override = ''
                 collision_has_occurred = s.time[i] >= s.collision_time
-                if i + 1 == len(s.time) and posid in frozen:
+                freezing_has_occurred = s.time[i] >= s.frozen_time
+                if freezing_has_occurred:
                     style_override = 'frozen'
                 if collision_has_occurred:
                     style_override = 'collision'
@@ -375,6 +375,7 @@ class PosSweep(object):
         self.collision_time = np.inf        # time at which collision occurs. if no collision, the time is inf
         self.collision_idx = None           # index in time and theta,phi lists at which collision occurs
         self.collision_neighbor = ''        # id string (posid, 'PTL', or 'GFA') of neighbor it collides with, if any
+        self.frozen_time = np.inf           # time at which positioner is frozen in place. if no freezing, the time is inf
 
     def copy(self):
         return copymodule.deepcopy(self)
