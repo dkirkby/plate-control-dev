@@ -178,7 +178,7 @@ class PosSchedule(object):
         Any move requests are ignored.
         """
         stage = self.stages['expert']
-        stage.anneal_power_density(self.anneal_time['expert'])
+        stage.anneal_tables(self.anneal_time['expert'])
         if anticollision != 'none':
             stage.find_collisions(stage.move_tables, store_results=True)
             attempts_remaining = self.max_path_adjustment_passes
@@ -207,9 +207,9 @@ class PosSchedule(object):
             desired_final_posTP[posid] = request['targt_posTP']
             trans = self.collider.posmodels[posid].trans
             dtdp[posid] = trans.delta_posTP(desired_final_posTP[posid], start_posTP[posid], range_wrap_limits='targetable')
-        stage = stages['direct']
+        stage = self.stages['direct']
         stage.initialize_move_tables(start_posTP, dtdp)
-        stage.anneal_power_density(self.anneal_time['direct'])
+        stage.anneal_tables(self.anneal_time['direct'])
         # need to check anticollision arg and possibly do similar freezing as _schedule_expert_tables.
         # see if I can pull out the common code from both functions
         self.move_tables = stage.move_tables
@@ -257,7 +257,7 @@ class PosSchedule(object):
         for name in stage_names:
             stage = self.stage[name]
             stage.initialize_move_tables(start_posTP[name], dtdp[name])
-            stage.anneal_power_density(self.anneal_time[name])
+            stage.anneal_tables(self.anneal_time[name])
             colliding_sweeps = self._find_collisions(stage.move_tables)
             n_iter = 0 # consider switching to direct iteration of an ordered dict of path adjustment definitions
             while colliding_sweeps and n_iter < self.max_path_adjustment_iterations:

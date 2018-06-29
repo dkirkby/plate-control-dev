@@ -1,6 +1,5 @@
 import posconstants as pc
 import posmovetable
-import numpy as np
 
 class PosScheduleStage(object):
     """This class encapsulates the concept of a 'stage' of the fiber
@@ -85,15 +84,26 @@ class PosScheduleStage(object):
         times = {posid:postprocessed[posid]['stats']['net_time'][-1] for posid in postprocessed}
         orig_max_time = max(times.values())
         new_max_time = anneal_time if anneal_time > orig_max_time else orig_max_time
-        for posids_set in self._power_supply_map.values():
+        for posids in list(self._power_supply_map.values()):
             group = []
             group_time = 0
-            for posid in posids_set:
+            for posid in posids:
                 group.append(posid)
                 group_time += times[posid]
-                if group_time > new_max_time:
-                    # spread out the group's tables by adding prepauses
-                    
+                if group_time > new_max_time or posid == posids[-1]:
+                    n = len(group)
+                    nominal_spacing = new_max_time / (n + 1)
+                    center = 0
+                    for i in range(n):
+                        p = group[i]
+                        center += nominal_spacing
+                        start = center - times[p]/2
+                        if start < 0:
+                            start = 0
+                        finish = start + times[p]
+                        if finish > new_max_time:
+                            start = new_max_time - times[p]
+                        self.move_tables[p].set_prepause(0,start)
                     group = []
                     group_time = 0
 
