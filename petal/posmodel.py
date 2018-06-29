@@ -170,6 +170,20 @@ class PosModel(object):
         """Returns a [1x2] array of [phi_min, phi_max], from hardstop-to-hardstop."""
         return self.axis[pc.P].full_range
 
+    @property
+    def abs_shaft_speed_cruise_T(self):
+        """Returns the absolute output shaft speed (deg/sec), in cruise mode, of the theta axis.
+        """
+        prop = self.axis[pc.T].motor_calib_properties
+        return prop['gear_ratio'] * prop['gear_calib'] * self._motor_speed_cruise
+
+    @property
+    def abs_shaft_speed_cruise_P(self):
+        """Returns the absolute output shaft speed (deg/sec), in cruise mode, of the phi axis.
+        """
+        prop = self.axis[pc.P].motor_calib_properties
+        return prop['gear_ratio'] * prop['gear_calib'] * self._motor_speed_cruise
+
     def true_move(self, axisid, distance, allow_cruise, allow_exceed_limits, expected_prior_dTdP=[0,0]):
         """Input move distance on either the theta or phi axis, as seen by the
         observer, in degrees.
