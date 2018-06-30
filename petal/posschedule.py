@@ -216,7 +216,7 @@ class PosSchedule(object):
             ### FINDING. IS IT SO NECESSARY TO STORE THINGS LIKE STAGE.COLLISION IN THE
             ### STAGE? OR CAN I JUST RELY ON RETURN VALUES FROM FIND_COLLISIONS?
             
-            stage.find_collisions(stage.move_tables, store_results=True)
+            colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             attempts_remaining = self.max_path_adjustment_passes
             while stage.colliding and attempts_remaining:
                 for posid in stage.colliding:
@@ -249,7 +249,7 @@ class PosSchedule(object):
             stage = self.stage[name]
             stage.initialize_move_tables(start_posTP[name], dtdp[name])
             stage.anneal_tables(self.anneal_time[name])
-            colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables, store_results=False)
+            colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             attempts_remaining = self.max_path_adjustment_passes
             while colliding_sweeps and attempts_remaining:
                 for posid in colliding_sweeps:

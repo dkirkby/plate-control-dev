@@ -122,9 +122,16 @@ class PosScheduleStage(object):
                 table.insert_new_row(idx)
                 table.set_postpause(idx,equalizing_pause)
 
-    def adjust_path(self, posid, force_freezing=False):
+    def adjust_path(self, posid, freezing='on'):
         """Adjusts move paths for posid to avoid collision.
         
+            freezing ... string with the following settings for when the "freeze"
+                         method of collision resolution shall be applied:
+            
+                'on'     ... freeze positioner if the path adjustment options all fail to resolve collisions
+                'off'    ... don't freeze, even if the path adjustment options all fail to resolve collisions
+                'forced' ... skip calculating the various path adjustment options, and instead go straight to a forced freeze
+                
         The timing of a neighbor's motion path may be adjusted as well by this
         function, but not the geometric path it follows.
         
@@ -137,14 +144,13 @@ class PosScheduleStage(object):
         all fail, then the fallback is to "freeze" posid. This means the positioner's
         path is simply halted prior to the collision, and no attempt is made for
         it to reach its supposed final target.
-        
-        The force_freezing boolean argument allows you to skip calculating the
-        various adjustment options, and instead go straight to a forced freeze.
         """
-        methods = ['freeze'] if force_freezing else ['pause','extend','retract','rot_ccw','rot_cw','freeze']
+        methods = ['freeze'] if freezing == 'forced' else ['pause','extend','retract','rot_ccw','rot_cw']
+        if freezing == 'on':
+            methods.append('freeze')
         for method in methods:
             proposed_tables = self._propose_path_adjustment(posid,method)
-            colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables, store_results=False)
+            colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables)
             accept_proposed = not(colliding_sweeps)
             if accept_proposed:
                 self.move_tables.update(proposed_tables)
@@ -152,22 +158,14 @@ class PosScheduleStage(object):
                 for posid in all_sweeps:
                     self.colliding.remove(posid)
                     if method == 'freeze':
-                        self.sweeps[posid].frozen_time = self.sweeps[posid].time[-1]
+                        self.sweeps[posid].register_as_frozen()
                 return
-        if self.verbose():
-            print('Error: adjust_path() failed to prevent all collisions.')
 
-    def find_collisions(self, move_tables, store_results=False):
+    def find_collisions(self, move_tables):
         """Identifies any collisions that would be induced by executing a collection
         of move tables.
         
             move_tables   ... dict with keys = posids, values = PosMoveTable instances.
-            
-            store_results ... boolean, saying whether the results of this collision finding
-                              should automatically be stored into the stage's persistent
-                              data. (False is especially useful when making proposed changes
-                              during anticollision algorithm, in case we're not sure yet
-                              whether to keep the proposed change.)
         
         Two items are returned. They are both dicts with keys = posids, values = PosSweep
         instances (see poscollider.py).
@@ -227,10 +225,8 @@ class PosScheduleStage(object):
                     first_sweep = sweep
                     first_collision_time = sweep.collision_time
             colliding_sweeps[posid] = {first_sweep}
-        colliding_sweeps = {posid:colliding_sweeps[posid].pop() for posid in colliding_sweeps if colliding_sweeps[posid]} # remove set structure from elements
+        colliding_sweeps = {posid:colliding_sweeps[posid].pop() for posid in colliding_sweeps if colliding_sweeps[posid]} # remove set structure from elements, and remove empty elements
         all_sweeps.update(colliding_sweeps)
-        if store_results:
-            self.store_collision_finding_results(colliding_sweeps, all_sweeps)
         return colliding_sweeps, all_sweeps
     
     def store_collision_finding_results(self, colliding_sweeps, all_sweeps):
