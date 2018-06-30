@@ -10,19 +10,12 @@ class PosScheduleStage(object):
         collider         ... instance of poscollider for this petal
         power_supply_map ... dict where key = power supply id, value = set of posids attached to that supply
     """
-    def __init__(self, collider, power_supply_map={}, verbose=False):
+    def __init__(self, collider, power_supply_map={}):
         self.collider = collider # poscollider instance
         self.move_tables = {} # keys: posids, values: posmovetable instances
         self.sweeps = {} # keys: posids, values: instances of PosSweep, corresponding to entries in self.move_tables
         self.colliding = set() # positioners currently known to have collisions
-        self.verbose = verbose
         self._power_supply_map = power_supply_map
-        self._enabled = {posid for posid in self.collider.posids if self.collider.posmodels[posid].is_enabled}
-        self._disabled = self.collider.posids.difference(self._enabled)
-        self._start_posTP = {} # keys: posids, values: [theta,phi]
-        self._final_posTP = {} # keys: posids, values: [theta,phi]
-        self._true_dtdp = {} # keys: posids, values: [delta theta, delta phi]
-        self._fixed_cases = {pc.case.PTL, pc.case.GFA} # collision case enumerations against fixed polygons
         self._theta_max_jog = 90 # deg, maximum distance to temporarily shift theta when doing path adjustments
         self._phi_max_jog = 60 # deg, maximum distance to temporarily shift phi when doing path adjustments
     
@@ -39,14 +32,13 @@ class PosScheduleStage(object):
         simple vector subtraction or the like, since this would not correctly handle
         physical range limits of the fiber positioner.)
         """
-        self._start_posTP = start_posTP
-        for posid in self._start_posTP:
+        for posid in start_posTP:
             posmodel = self.collider.posmodels[posid]
-            self._final_posTP[posid] = posmodel.trans.addto_posTP(self._start_posTP[posid], dtdp[posid], range_wrap_limits='targetable')
-            self._true_dtdp[posid] = posmodel.trans.delta_posTP(self._final_posTP[posid], self.start_posTP[posid], range_wrap_limits='targetable')
-            table = posmovetable.PosMoveTable(posmodel, self._start_posTP[posid])
-            table.set_move(0, pc.T, self._true_dtdp[posid][0])
-            table.set_move(0, pc.P, self._true_dtdp[posid][1])
+            final_posTP = posmodel.trans.addto_posTP(start_posTP[posid], dtdp[posid], range_wrap_limits='targetable')
+            true_dtdp = posmodel.trans.delta_posTP(final_posTP, start_posTP[posid], range_wrap_limits='targetable')
+            table = posmovetable.PosMoveTable(posmodel, start_posTP[posid])
+            table.set_move(0, pc.T, true_dtdp[0])
+            table.set_move(0, pc.P, true_dtdp[1])
             table.set_prepause(0, 0.0)
             table.set_postpause(0, 0.0)
             self.move_tables[posid] = table
@@ -318,16 +310,16 @@ class PosScheduleStage(object):
             tables = {posid:table}
             posmodel = self.collider.posmodels[posid]
             if method in {'extend','retract'}:
-                start = self._start_posTP[posid][1]
+                start = self.sweeps[posid].phi(0)
                 speed = posmodel.abs_shaft_speed_cruise_P
                 targetable_range = posmodel.targetable_range_P
                 if method == 'retract':
-                    limit = min(start + self._phi_max_jog, max(targetable_range), self.collider.Ei_phi)
+                    limit = min(start + self._phi_max_jog, max(targetable_range), self.collider.Ei_phi) # deeper retraction than Eo, to give better chance of avoidance
                 else:
                     limit = max(start - self._phi_max_jog, min(targetable_range))
                 axis = pc.P
             else:
-                start = self._start_posTP[posid][0]
+                start = self.sweeps[posid].theta(0)
                 speed = posmodel.abs_shaft_speed_cruise_T
                 targetable_range = posmodel.targetable_range_T
                 if method == 'rot_ccw':
