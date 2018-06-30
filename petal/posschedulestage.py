@@ -123,42 +123,50 @@ class PosScheduleStage(object):
                 table.set_postpause(idx,equalizing_pause)
 
     def adjust_path(self, posid, freezing='on'):
-        """Adjusts move paths for posid to avoid collision.
+        """Adjusts move paths for posid to avoid collision. If the positioner
+        has no collision, then no adjustment is made.
+        
+            posid    ... positioner to adjust. This method assumes that this posid
+                         already has a move_table associated with it in the stage,
+                         that find_collsions() has already been run, and the results
+                         saved via store_collision_finding_results(). 
         
             freezing ... string with the following settings for when the "freeze"
                          method of collision resolution shall be applied:
             
                 'on'     ... freeze positioner if the path adjustment options all fail to resolve collisions
                 'off'    ... don't freeze, even if the path adjustment options all fail to resolve collisions
-                'forced' ... skip calculating the various path adjustment options, and instead go straight to a forced freeze
+                'forced' ... 
                 
+        With freezing == 'off' or 'on', the path adjustment algorithm goes through a
+        series of options, trying adding various pauses and pre-moves to avoid collision.
+        
+        With freezing == 'on', then if all the adjustment options fail, the fallback
+        is to "freeze" the positioner posid. This means its path is simply halted prior
+        to the collision, and no attempt is made for it to reach its supposed final target.
+        
+        With freezing == 'forced', we skip calculating the various path adjustment options,
+        and instead go straight to freezing the positioner before it collides.
+
         The timing of a neighbor's motion path may be adjusted as well by this
-        function, but not the geometric path it follows.
+        function, but not the geometric path that the neighbor follows.
         
         Adjustments to neighbor's timing only go one level deep of neighborliness.
-        In other words, a neighbor's far neighbor (one that is not also neighbor
-        of posid) will not be affected by this function.
-        
-        Normally, the path adjustment algorithm goes through a series of options,
-        trying adding various pauses and pre-moves to avoid collision. If these
-        all fail, then the fallback is to "freeze" posid. This means the positioner's
-        path is simply halted prior to the collision, and no attempt is made for
-        it to reach its supposed final target.
+        In other words, a neighbor's neighbor will not be affected by this function.
         """
+        if self.sweeps[posid].collision_case == pc.case.I:
+            return
         methods = ['freeze'] if freezing == 'forced' else ['pause','extend','retract','rot_ccw','rot_cw']
         if freezing == 'on':
             methods.append('freeze')
         for method in methods:
             proposed_tables = self._propose_path_adjustment(posid,method)
             colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables)
-            accept_proposed = not(colliding_sweeps)
-            if accept_proposed:
+            if not(colliding_sweeps): # i.e., the proposed tables should be accepted
                 self.move_tables.update(proposed_tables)
-                self.sweeps.update(all_sweeps)
-                for posid in all_sweeps:
-                    self.colliding.remove(posid)
-                    if method == 'freeze':
-                        self.sweeps[posid].register_as_frozen()
+                self.store_collision_finding_results(colliding_sweeps, all_sweeps)
+                if method == 'freeze':
+                    self.sweeps[posid].register_as_frozen()
                 return
 
     def find_collisions(self, move_tables):

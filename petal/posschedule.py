@@ -17,8 +17,7 @@ class PosSchedule(object):
         self.stats = stats
         self.verbose = verbose
         self.requests = {} # keys: posids, values: target request dictionaries
-        self.max_path_adjustment_passes = 3 # max number of times to go through the set of colliding positioners and try to adjust each of their paths to avoid collisions
-        self.min_freeze_clearance = 5 # degrees, how early to truncate a move table to avoid collision via "freezing"
+        self.max_path_adjustment_passes = 3 # max number of times to go through the set of colliding positioners and try to adjust each of their paths to avoid collisions. After this many passes, it defaults to freezing any that still collide
         self.stage_order = ['direct','retract','rotate','extend','expert']
         self.RRE_stage_order = ['retract','rotate','extend']
         self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose) for name in self.stage_order}
@@ -199,7 +198,7 @@ class PosSchedule(object):
             dtdp[posid] = trans.delta_posTP(desired_final_posTP[posid], start_posTP[posid], range_wrap_limits='targetable')
         stage = self.stages['direct']
         stage.initialize_move_tables(start_posTP, dtdp)
-        should_freeze = not(not(anticollision))
+        should_freeze = not(not(anticollision)) # double-negative syntax is to be compatible with various False/None/'' negative values
         self._direct_stage_conditioning(stage, self.anneal_time['direct'], should_freeze)
         
     def _direct_stage_conditioning(self, stage, anneal_time, should_freeze):
@@ -207,22 +206,15 @@ class PosSchedule(object):
         
             stage         ... instance of PosScheduleStage, needs to already have its move tables initialized
             anneal_time   ... time in seconds, for annealing
-            should_freese ... boolean, says whether to check for collisions and freeze
+            should_freeze ... boolean, says whether to check for collisions and freeze
         """
         stage.anneal_tables(anneal_time)
         if should_freeze:
-            
-            ### SOME INCONSISTENCIES IN HOW I'M HANDLING STORE RESULTS FROM COLLISION
-            ### FINDING. IS IT SO NECESSARY TO STORE THINGS LIKE STAGE.COLLISION IN THE
-            ### STAGE? OR CAN I JUST RELY ON RETURN VALUES FROM FIND_COLLISIONS?
-            
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
-            attempts_remaining = self.max_path_adjustment_passes
-            while stage.colliding and attempts_remaining:
-                for posid in stage.colliding:
-                    if posid in stage.colliding: # new if statement because stage.colliding contents may be changed by earlier iterations of adjust_path function below
-                        stage.adjust_path(posid, force_freezing=True)
-                attempts_remaining -= 1
+            stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
+            for posid in colliding_sweeps:
+                if posid in stage.colliding: # re-check, since earlier path adjustments in loop may have already resolved this posid's collision
+                    stage.adjust_path(posid, freezing='forced')
         
     def _schedule_requests_with_path_adjustments(self):
         """Gathers data from requests dictionary and populates the 'retract',
@@ -233,7 +225,8 @@ class PosSchedule(object):
         desired_final_posTP = {name:{} for name in self.RRE_stage_order}
         dtdp = {name:{} for name in self.RRE_stage_order}
         for posid,request in self.requests.items():
-            # some care is taken to use only delta and add functions provided by PosTransforms, to ensure that range wrap limits are always properly handled from stage to stage
+            # Some care is taken here to use only delta and add functions provided by PosTransforms,
+            # to ensure that range wrap limits are always safely handled from stage to stage.
             posmodel = self.collider.posmodels[posid]
             trans = posmodel.trans
             start_posTP['retract'][posid] = request['start_posTP']
@@ -250,20 +243,12 @@ class PosSchedule(object):
             stage.initialize_move_tables(start_posTP[name], dtdp[name])
             stage.anneal_tables(self.anneal_time[name])
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
+            stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             attempts_remaining = self.max_path_adjustment_passes
-            while colliding_sweeps and attempts_remaining:
-                for posid in colliding_sweeps:
+            while stage.colliding and attempts_remaining:
+                for posid in stage.colliding:
                     stage.adjust_path(posid)
                 attempts_remaining -= 1
-                
-            # when done, remember to store the final colliding_sweeps and all_sweeps    
-            
-            n_iter = 0 # consider switching to direct iteration of an ordered dict of path adjustment definitions
-            while  and n_iter < self.max_path_adjustment_iterations:
-                stage.adjust_paths(colliding_sweeps, n_iter)
-                colliding_tables = {posid:stage.move_tables[posid] for posid in colliding_sweeps}
-                colliding_sweeps = self._find_collisions(colliding_tables)
-                n_iter += 1
             
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
