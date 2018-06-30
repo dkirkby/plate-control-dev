@@ -145,7 +145,8 @@ class PosScheduleStage(object):
         for method in methods:
             proposed_tables = self._propose_path_adjustment(posid,method)
             colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables, store_results=False)
-            if not colliding_sweeps:
+            accept_proposed = not(colliding_sweeps)
+            if accept_proposed:
                 self.move_tables.update(proposed_tables)
                 self.sweeps.update(all_sweeps)
                 for posid in all_sweeps:

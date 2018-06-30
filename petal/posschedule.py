@@ -20,6 +20,7 @@ class PosSchedule(object):
         self.max_path_adjustment_passes = 3 # max number of times to go through the set of colliding positioners and try to adjust each of their paths to avoid collisions
         self.min_freeze_clearance = 5 # degrees, how early to truncate a move table to avoid collision via "freezing"
         self.stage_order = ['direct','retract','rotate','extend','expert']
+        self.RRE_stage_order = ['retract','rotate','extend']
         self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose) for name in self.stage_order}
         self.anneal_time = {'direct':3, 'retract':3, 'rotate':3, 'extend':3, 'expert':3} # times in seconds, see comments in PosScheduleStage
         self.move_tables = {}
@@ -139,6 +140,7 @@ class PosSchedule(object):
             else:
                 self._schedule_requests_with_no_path_adjustments(anticollision)
         for name in self.stage_order:
+            self.stages[name].equalize_table_times()
             for posid,table in self.stages[name].move_tables:
                 if posid in self.move_tables:
                     self.move_tables[posid].extend(table)
@@ -209,6 +211,11 @@ class PosSchedule(object):
         """
         stage.anneal_tables(anneal_time)
         if should_freeze:
+            
+            ### SOME INCONSISTENCIES IN HOW I'M HANDLING STORE RESULTS FROM COLLISION
+            ### FINDING. IS IT SO NECESSARY TO STORE THINGS LIKE STAGE.COLLISION IN THE
+            ### STAGE? OR CAN I JUST RELY ON RETURN VALUES FROM FIND_COLLISIONS?
+            
             stage.find_collisions(stage.move_tables, store_results=True)
             attempts_remaining = self.max_path_adjustment_passes
             while stage.colliding and attempts_remaining:
@@ -222,10 +229,9 @@ class PosSchedule(object):
         'rotate', and 'extend' stages with motion paths from start to finish.
         The move tables may include adjustments of paths to avoid collisions.
         """
-        stage_names = ['retract','rotate','extend']
-        start_posTP = {name:{} for name in stage_names}
-        desired_final_posTP = {name:{} for name in stage_names}
-        dtdp = {name:{} for name in stage_names}
+        start_posTP = {name:{} for name in self.RRE_stage_order}
+        desired_final_posTP = {name:{} for name in self.RRE_stage_order}
+        dtdp = {name:{} for name in self.RRE_stage_order}
         for posid,request in self.requests.items():
             # some care is taken to use only delta and add functions provided by PosTransforms, to ensure that range wrap limits are always properly handled from stage to stage
             posmodel = self.collider.posmodels[posid]
@@ -238,36 +244,27 @@ class PosSchedule(object):
             start_posTP['rotate'][posid] = trans.addto_posTP(        start_posTP['retract'][posid],        dtdp['retract'][posid], range_wrap_limits='targetable')
             dtdp['rotate'][posid]        = trans.delta_posTP(desired_final_posTP['rotate'][posid],  start_posTP['rotate'][posid],  range_wrap_limits='targetable')
             start_posTP['extend'][posid] = trans.addto_posTP(        start_posTP['rotate'][posid],         dtdp['rotate'][posid],  range_wrap_limits='targetable')
-            dtdp['extend'][posid]        = trans.delta_posTP(desired_final_posTP['extend'][posid],  start_posTP['extend'][posid],  range_wrap_limits='targetable')                
-        enabled_but_not_requested = [posmodel.posid for posmodel in self.collider.posmodels.values() if posmodel.is_enabled and not posmodel.posid in self.requests]
-        for posid in enabled_but_not_requested:
-            current_posTP = self.collider.posmodels[posid].expected_current_posTP
-            for name in stage_names:
-                start_posTP[name][posid] = current_posTP
-                desired_final_posTP[name][posid] = current_posTP
-        all_move_tables = {}
-        for name in stage_names:
+            dtdp['extend'][posid]        = trans.delta_posTP(desired_final_posTP['extend'][posid],  start_posTP['extend'][posid],  range_wrap_limits='targetable')
+        for name in self.RRE_stage_order:
             stage = self.stage[name]
             stage.initialize_move_tables(start_posTP[name], dtdp[name])
             stage.anneal_tables(self.anneal_time[name])
-            colliding_sweeps = self._find_collisions(stage.move_tables)
+            colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables, store_results=False)
+            attempts_remaining = self.max_path_adjustment_passes
+            while colliding_sweeps and attempts_remaining:
+                for posid in colliding_sweeps:
+                    stage.adjust_path(posid)
+                attempts_remaining -= 1
+                
+            # when done, remember to store the final colliding_sweeps and all_sweeps    
+            
             n_iter = 0 # consider switching to direct iteration of an ordered dict of path adjustment definitions
-            while colliding_sweeps and n_iter < self.max_path_adjustment_iterations:
+            while  and n_iter < self.max_path_adjustment_iterations:
                 stage.adjust_paths(colliding_sweeps, n_iter)
                 colliding_tables = {posid:stage.move_tables[posid] for posid in colliding_sweeps}
                 colliding_sweeps = self._find_collisions(colliding_tables)
                 n_iter += 1
-            for posid,table in stage.move_tables:
-                if posid in self.move_tables:
-                    all_move_tables[posid].extend(table)
-                else:
-                    all_move_tables[posid] = table
-            stage.equalize_table_times()
-        motionless = {table.posid for table in all_move_tables if table.is_motionless}
-        for posid in motionless:
-            del all_move_tables[posid]
-        return all_move_tables
-
+            
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
         consistently take with regard to post-move cleanup, if a request is going to be denied.
