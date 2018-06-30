@@ -247,19 +247,15 @@ class Petal(object):
         Requests to disabled positioners will be ignored.
         """
         posids = pc.listify(posids,True)[0]
-        posmodels = []
-        for posid in posids:
-            if self.get(posid,'CTRL_ENABLED'):
-                posmodels.append(self.posmodel(posid))
-            else:
-                self.printfunc('Positioner ' + str(posid) + ' is disabled. Limit seek request ignored.')
+        posmodels = self.enabled_posmodels(posids)
         if anticollision:
             if axisid == pc.P and direction == -1:
                 # calculate thetas where extended phis do not interfere
                 # request anticollision-safe moves to these thetas and phi = 0
                 pass
             else:
-                # request anticollision-safe moves to current thetas and all phis within Eo
+                # request anticollision-safe moves to current thetas and all phis within Ei
+                # Eo has a bit more possible collisions, for example against a stuck-extended neighbor. Costs a bit more time/power to go to Ei, but limit-seeking is not a frequent operation.
                 pass
         for p in posmodels:
             search_dist = np.sign(direction)*p.axis[axisid].limit_seeking_search_distance
@@ -290,12 +286,7 @@ class Petal(object):
         will be ignored.
         """
         posids = pc.listify(posids,True)[0]
-        posmodels = []
-        for posid in posids:
-            if self.get(posid,'CTRL_ENABLED'):
-                posmodels.append(self.posmodel(posid))
-            else:
-                self.printfunc('Positioner ' + str(posid) + ' is disabled. Homing request ignored.')
+        posmodels = self.enabled_posmodels(posids)
         hardstop_debounce = [0,0]
         direction = [0,0]
         direction[pc.P] = +1 # force this, because anticollision logic depends on it
@@ -752,6 +743,17 @@ class Petal(object):
         """
         pidx = self.posids.index(posid)
         return self.posmodels[pidx]
+    
+    def enabled_posmodels(self, posids):
+        """Returns dict with keys = posids, values = posmodels, but only for
+        those positioners in the collection posids which are enabled.
+        """
+        # re-implement this (reduced syntax / overhead) once posmodels are better dictionary-ified in petal.py
+        enabled_posmodels = {}
+        for posid in posids:
+            if self.get(posid,'CTRL_ENABLED'):
+                enabled_posmodels[posid] = self.posmodel(posid)
+        return enabled_posmodels
 
 
 # MOVE SCHEDULING ANIMATOR CONTROLS
