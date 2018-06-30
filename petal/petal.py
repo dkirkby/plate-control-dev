@@ -151,21 +151,14 @@ class Petal(object):
             In cases where the request was made to a disabled positioner, the subdictionary will be
             deleted from the return.
         """
-        mark_for_delete = set()
         for posid in requests:
             requests[posid]['posmodel'] = self.posmodel(posid) if allow_objects else posid
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
-            if not(self.get(posid,'CTRL_ENABLED')):
-                self.printfunc(self._request_denied_disabled_str(posid,requests[posid]))
-                mark_for_delete.add(posid)
-            elif self.schedule.already_requested(posid):
-                self.printfunc('Positioner ' + str(posid) + ' already has a target scheduled. Extra target request ' + self._target_str(requests[posid]) + ' ignored.')
-                mark_for_delete.add(posid)
+            if not(self.get(posid,'CTRL_ENABLED')) or self.schedule.already_requested(posid):
+                del requests[posid]
             else:
-                self.schedule.request_target(posid, requests[posid]['command'], requests[posid]['target'][0], requests[posid]['target'][1], requests[posid]['log_note'])
-        for posid in mark_for_delete:
-            del requests[posid]
+                self.schedule.request_target(posid, requests[posid]['command'], requests[posid]['target'][0], requests[posid]['target'][1], requests[posid]['log_note'])            
         return requests
 
     def request_direct_dtdp(self, requests, cmd_prefix=''):
@@ -218,14 +211,9 @@ class Petal(object):
         wishes a sequence of theta and phi rotations to all be done in one shot. (This is unlike the
         request_targets command, where only the first request to a given positioner would be valid.)
         """
-        mark_for_delete = set()
         for posid in requests:
             if not(self.get(posid,'CTRL_ENABLED')):
-                requests[posid]['command'] = 'direct_dTdP'
-                self.printfunc(self._request_denied_disabled_str(posid,requests[posid]))
-                mark_for_delete.add(posid)
-        for posid in mark_for_delete:
-            del requests[posid]
+                del requests[posid]
         for posid in requests:
             requests[posid]['posmodel'] = self.posmodel(posid)
             if 'log_note' not in requests[posid]:
@@ -825,8 +813,6 @@ class Petal(object):
         for m in self.schedule.move_tables:
             m.posmodel.postmove_cleanup(m.for_cleanup)
             self.altered_states.add(m.posmodel.state)
-        if self.verbose:
-            print(self.expected_current_position_str())
         self.commit()
         self._clear_temporary_state_values()
         self.schedule = self._new_schedule()
@@ -877,16 +863,17 @@ class Petal(object):
         return posschedule.PosSchedule(petal=self, stats=self.schedule_stats_log, verbose=self.verbose)
 
     def _wait_while_moving(self):
-        """Blocking implementation, to not send move tables while any positioners are still moving.
+        """Blocking implementation, to not send move tables while any positioners
+        are still moving.
 
-        Inputs:     canids ... integer CAN id numbers of all the positioners to check whether they are moving
+        Inputs:     canids ... integer CAN id numbers of all the positioners to check
 
-        The implementation has the benefit of simplicity, but it is acknowledged there may be 'better',
-        i.e. multi-threaded, ways to achieve this, to be implemented later.
+        The implementation has the benefit of simplicity, but it is acknowledged
+        there may be 'better', i.e. multi-threaded, ways to achieve this.
         """
         if self.simulator_on:
             return        
-        timeout = 15.0 # seconds
+        timeout = 20.0 # seconds
         poll_period = 0.5 # seconds
         keep_waiting = True
         start_time = time.time()
@@ -927,17 +914,6 @@ class Petal(object):
                 print('either the var1 or the var2 must be of length 1')
                 return None, None
         return var1, var2
-    
-    def _target_str(self, target_request_dict): 
-        """Makes a human readable string describing a target request dictionary.
-        """
-        cmd = str(target_request_dict['command'])
-        val1 = format(target_request_dict['target'][0],'.3f')
-        val2 = format(target_request_dict['target'][1],'.3f')
-        return cmd + '(' + val1 + ',' + val2 + ')'
-        
-    def _request_denied_disabled_str(self, posid, target_request_dict):
-        return 'Positioner ' + str(posid) + ' is disabled. Target request ' + self._target_str(target_request_dict) + ' ignored.'
     
     def _map_power_supplies_to_posids(self):
         """Reads in data for positioner canids and petal power supply ids, and
