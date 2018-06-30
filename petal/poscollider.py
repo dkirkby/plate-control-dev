@@ -21,7 +21,6 @@ class PosCollider(object):
             filename = os.path.join(pc.dirs['collision_settings'],defaultconfigfile)
         else:
             filename = os.path.join(pc.dirs['collision_settings'],configfile)
-        print("Filename", filename)    
         self.config = configobj.ConfigObj(filename,unrepr=True)
         self.posids = set() # posid strings for all the positioners
         self.posindexes = {} # key: posid string, value: index number for positioners in animations
@@ -290,8 +289,6 @@ class PosCollider(object):
     def _load_positioner_params(self):
         """Read latest versions of all positioner parameters."""
         for posid, posmodel in self.posmodels.items():
-            if posid != posmodel.posid:
-                print("PosID's didn't match in poscollider load_positioner_params")
             self.R1[posid] = posmodel.state.read('LENGTH_R1')
             self.R2[posid] = posmodel.state.read('LENGTH_R2')
             self.x0[posid] = posmodel.state.read('OFFSET_X')
