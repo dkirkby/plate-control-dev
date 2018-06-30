@@ -268,13 +268,18 @@ class PosScheduleStage(object):
         includes changing both the argued positioner and its neighbor, than they will
         both have tables in the dict.
         
+        No positioner or neighbor will be changed if it is disabled, or if it has
+        already been "frozen".
+        
         No new collision checking is performed by this method. So it is important 
         after receiving a new proposal, to re-check for collisions against all the
         neighbors of all the proposed new move tables.
         """
         no_collision = self.sweeps[posid].collision_case == pc.case.I
         fixed_collision = self.sweeps[posid].collision_case in {pc.case.PTL, pc.case.GFA}
-        if no_collision or (method == 'pause' and fixed_collision):
+        already_frozen = self.sweeps[posid].is_frozen()
+        not_enabled = not(self.collider.posmodels[posid].is_enabled())
+        if no_collision or (method == 'pause' and fixed_collision) or already_frozen or not_enabled:
             return {posid:self.move_tables[posid]} # unchanged move table
         table = self.move_tables[posid].copy()
         if method == 'freeze':    
@@ -287,16 +292,20 @@ class PosScheduleStage(object):
             if table.n_rows == 0:
                 table.set_move(0,0,0)
             return {posid:table}
-        neighbor = self.sweeps[posid].collision_neighbor
-        neighbor_table_data = self.move_tables[neighbor].for_schedule
-        for neighbor_clearance_time in neighbor_table_data['stats']['net_time']:
-            if neighbor_clearance_time > self.sweeps[posid].collision_time:
-                break
+        if not fixed_collision:
+            neighbor = self.sweeps[posid].collision_neighbor
+            neighbor_table_data = self.move_tables[neighbor].for_schedule
+            for neighbor_clearance_time in neighbor_table_data['stats']['net_time']:
+                if neighbor_clearance_time > self.sweeps[posid].collision_time:
+                    break
+        else:
+            neighbor_clearance_time = 0
         if method == 'pause':
             table.insert_new_row(0)
             table.set_prepause(0,neighbor_clearance_time)
             return {posid:table}
         else:
+            tables = {posid:table}
             posmodel = self.collider.posmodels[posid]
             if method in {'extend','retract'}:
                 start = self._start_posTP[posid][1]
@@ -318,12 +327,15 @@ class PosScheduleStage(object):
                 axis = pc.T
             distance = limit - start
             move_time = abs(distance / speed)
-            neighbor_table = self.move_tables[neighbor].copy()
-            neighbor_table.insert_new_row(0)
-            neighbor_table.set_prepause(0,move_time)
+            if not fixed_collision:
+                if self.collider.posmodels[neighbor].is_enabled() and not self.sweeps[neighbor].is_frozen():
+                    neighbor_table = self.move_tables[neighbor].copy()
+                    neighbor_table.insert_new_row(0)
+                    neighbor_table.set_prepause(0,move_time)
+                    tables[neighbor] = neighbor_table
             table.insert_new_row(0)
             table.insert_new_row(0)
             table.set_move(0,axis,distance)
             table.set_postpause(0,neighbor_clearance_time)
             table.set_move(1,axis,-distance)
-            return {posid:table, neighbor:neighbor_table}
+            return tables
