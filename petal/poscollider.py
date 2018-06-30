@@ -436,6 +436,11 @@ class PosSweep(object):
         self.tp = discrete_position
         self.tp_dot = speed
 
+    def register_as_frozen(self):
+        """Sets an indicator that the sweep has been frozen at the end.
+        """
+        self.frozen_time = self.time[-1]
+
     def is_frozen(self):
         """Returns boolean value whether the sweep has a "freezing" event.
         """
