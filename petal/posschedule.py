@@ -16,11 +16,12 @@ class PosSchedule(object):
         self.petal = petal
         self.stats = stats
         self.verbose = verbose
+        self.printfunc = self.petal.printfunc
         self.requests = {} # keys: posids, values: target request dictionaries
         self.max_path_adjustment_passes = 3 # max number of times to go through the set of colliding positioners and try to adjust each of their paths to avoid collisions. After this many passes, it defaults to freezing any that still collide
         self.stage_order = ['direct','retract','rotate','extend','expert']
         self.RRE_stage_order = ['retract','rotate','extend']
-        self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose) for name in self.stage_order}
+        self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map) for name in self.stage_order}
         self.anneal_time = {'direct':3, 'retract':3, 'rotate':3, 'extend':3, 'expert':3} # times in seconds, see comments in PosScheduleStage
         self.move_tables = {}
 
@@ -44,11 +45,11 @@ class PosSchedule(object):
         posmodel = self.petal.posmodel(posid)
         if self.already_requested(posid):
             if self.verbose:
-                print(str(posid) + ': target request denied. Cannot request more than one target per positioner in a given schedule.')
+                self.printfunc(str(posid) + ': target request denied. Cannot request more than one target per positioner in a given schedule.')
             return
         if self._deny_request_because_disabled(posmodel):
             if self.verbose:
-                print(str(posid) + ': target request denied. Positioner is disabled.')
+                self.printfunc(str(posid) + ': target request denied. Positioner is disabled.')
             return
         current_position = posmodel.expected_current_position
         start_posTP = [current_position['posT'],current_position['posP']]
@@ -75,20 +76,20 @@ class PosSchedule(object):
             targt_posTP = posmodel.trans.addto_posTP(start_posTP,[u,v],lims)
         else:
             if self.verbose:
-                print(str(posid) + ': target request denied. Bad uv_type "' + str(uv_type) + '".')
+                self.printfunc(str(posid) + ': target request denied. Bad uv_type "' + str(uv_type) + '".')
             return
         if unreachable:
             if self.verbose:
-                print(str(posid) + ': target request denied. Target not reachable: ' + str(uv_type) + ' = (' + format(u,'.3f') + ',' + format(v,'.3f') + ')')
+                self.printfunc(str(posid) + ': target request denied. Target not reachable: ' + str(uv_type) + ' = (' + format(u,'.3f') + ',' + format(v,'.3f') + ')')
             return
         targt_obsTP = posmodel.trans.posTP_to_obsTP(targt_posTP)
         if self._deny_request_because_target_interference(posmodel,targt_obsTP):
             if self.verbose:
-                print(str(posid) + ': target request denied. Target interferes with a neighbor\'s existing target.')
+                self.printfunc(str(posid) + ': target request denied. Target interferes with a neighbor\'s existing target.')
             return
         if self._deny_request_because_out_of_bounds(posmodel,targt_obsTP):
             if self.verbose:
-                print(str(posid) + ': target request denied. Target exceeds a fixed boundary.')
+                self.printfunc(str(posid) + ': target request denied. Target exceeds a fixed boundary.')
             return
         new_request = {'start_posTP' : start_posTP,
                        'targt_posTP' : targt_posTP,
@@ -129,7 +130,7 @@ class PosSchedule(object):
         """
         if not self.requests and not self.stages['expert'].is_not_empty():
             if self.verbose:
-                print('No requests nor existing move tables found. No move scheduling performed.')
+                self.printfunc('No requests nor existing move tables found. No move scheduling performed.')
             return
         if self.stages['expert'].is_not_empty():
             self._schedule_expert_tables(anticollision)
@@ -172,7 +173,7 @@ class PosSchedule(object):
         """
         if self._deny_request_because_disabled(move_table.posmodel):
             if self.verbose:
-                print(str(move_table.posmodel.posid) + ': move table addition to schedule denied. Positioner is disabled.')
+                self.printfunc(str(move_table.posmodel.posid) + ': move table addition to schedule denied. Positioner is disabled.')
             return
         self.stages['expert'].add_table(move_table)
 
@@ -230,8 +231,8 @@ class PosSchedule(object):
             posmodel = self.collider.posmodels[posid]
             trans = posmodel.trans
             start_posTP['retract'][posid] = request['start_posTP']
-            desired_final_posTP['retract'][posid] = [request['start_posTP'][pc.T], self.collider.Ei_phi]
-            desired_final_posTP['rotate'][posid]  = [request['targt_posTP'][pc.T], self.collider.Ei_phi]
+            desired_final_posTP['retract'][posid] = [request['start_posTP'][pc.T], self.collider.Eo_phi] # Ei would also be safe, but unnecessary in most cases. Costs more time and power to get to.
+            desired_final_posTP['rotate'][posid]  = [request['targt_posTP'][pc.T], self.collider.Eo_phi] # Ei would also be safe, but unnecessary in most cases. Costs more time and power to get to.
             desired_final_posTP['extend'][posid]  = request['targt_posTP']
             dtdp['retract'][posid]       = trans.delta_posTP(desired_final_posTP['retract'][posid], start_posTP['retract'][posid], range_wrap_limits='targetable')
             start_posTP['rotate'][posid] = trans.addto_posTP(        start_posTP['retract'][posid],        dtdp['retract'][posid], range_wrap_limits='targetable')
