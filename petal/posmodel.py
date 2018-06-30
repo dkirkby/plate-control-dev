@@ -12,47 +12,20 @@ class PosModel(object):
     One instance of PosModel corresponds to one PosState to physical positioner.
     """
 
-    def __init__(self, state=None,is_simulation=False,user_interactions_enabled=False):
+    def __init__(self, state=None):
         if not(state):
             self.state = posstate.PosState()
         else:
             self.state = state
-        if user_interactions_enabled and not is_simulation:
-            if self.canid == -1 and self.posid not in [None,'None','xxxxx']:
-                print('Positioner ' + str(self.posid) + ' currently shows a canid of ' + str(self.canid) + ', which often indicates that we haven''t yet put the real canid into its configuration file. If you know the right canid, you can enter it now. Otherwise you may need to stop whatever is running right now and fix this issue first.')
-                keep_asking = True
-                while keep_asking:
-                    user_canid = input('Enter canid number for ' + str(self.posid) + ' here or hit ENTER key if PosID==CANID: ')
-                    if user_canid=="":user_canid=str(self.posid)[1:]
-                    if not(user_canid.isnumeric()) or '.' in user_canid:
-                        print('Input must be an integer.')
-                    else:
-                        user_canid = int(user_canid)
-                        if user_canid < 0:
-                            print('Input must be > 0.')
-                        else:
-                            keep_asking = False
-                    self.state.store('CAN_ID',int(user_canid))
         self.trans = postransforms.PosTransforms(self)
-
-        # axes
         self.axis = [None,None]
         self.axis[pc.T] = Axis(self,pc.T)
         self.axis[pc.P] = Axis(self,pc.P)
-
-        # internal motor/driver constants
-        self._timer_update_rate    = 18e3   # Hz
-        self._stepsize_creep       = 0.1    # deg
-        self._stepsize_cruise      = 3.3    # deg
-        self._motor_speed_cruise   = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
-        self._legacy_spinupdown    = False   # flag to enable using old firmware's fixed spinupdown_distance
-
-        # temporary parameter, to be removed at a later date
-        # As of 2016-04-18, the positioner firmware uses 'move_time' data to actually decide when to execute the next row in a move table
-        # The potential problem here is that any (even tiny) underestimate of move_time could truncate step(s). That would be bad.
-        # Future firmware will not rely on move_time -- it will just do the number of steps requested until they are all done.
-        # At that point, this margin parameter should be removed.
-        self.temporary_move_time_margin = 0.1 # seconds
+        self._timer_update_rate          = 18e3   # Hz
+        self._stepsize_creep             = 0.1    # deg
+        self._stepsize_cruise            = 3.3    # deg
+        self._motor_speed_cruise         = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
+        self._spinupdown_dist_per_period = sum(range(round(self._stepsize_cruise/self._stepsize_creep) + 1))*self._stepsize_creep
 
     @property
     def _motor_speed_creep(self):
@@ -62,10 +35,7 @@ class PosModel(object):
     @property
     def _spinupdown_distance(self):
         """Returns distance at the motor shaft in deg over which to spin up to cruise speed or down from cruise speed."""
-        if self._legacy_spinupdown:
-            return 628.2  # deg
-        else:
-            return sum(range(round(self._stepsize_cruise/self._stepsize_creep) + 1))*self._stepsize_creep * self.state._val['SPINUPDOWN_PERIOD']
+        return self._spinupdown_dist_per_period * self.state._val['SPINUPDOWN_PERIOD']
 
     @property
     def posid(self):
@@ -207,7 +177,6 @@ class PosModel(object):
         move_data = self.motor_true_move(axisid, motor_dist, allow_cruise)
         move_data['distance'] = self.axis[axisid].motor_to_shaft(move_data['distance'])
         move_data['speed']    = self.axis[axisid].motor_to_shaft(move_data['speed'])
-        move_data['move_time'] += self.temporary_move_time_margin # remove at a future date, when usage of move_time has been eliminated from positioner firmware
         return move_data
 
     def motor_true_move(self, axisid, distance, allow_cruise):
@@ -286,8 +255,6 @@ class Axis(object):
 
     def __init__(self, posmodel, axisid):
         self.posmodel = posmodel
-        if not(axisid == pc.T or axisid == pc.P):
-            print( 'warning: bad axis id ' + repr(axisid))
         self.axisid = axisid
         self.postmove_cleanup_cmds = ''
 
