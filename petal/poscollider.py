@@ -436,21 +436,11 @@ class PosSweep(object):
         self.tp = discrete_position
         self.tp_dot = speed
 
-    def is_final_position(self, index):
-        """Returns boolean value whether the theta phi position at step 'index'
-        of the sweep is the final theta phi position.
+    def is_frozen(self):
+        """Returns boolean value whether the sweep has a "freezing" event.
         """
-        return all(self.tp[:,index] == self.tp[:,-1])
-    
-    def theta(self, index):
-        """Returns theta position in sweep at step 'index'.
-        """
-        return self.tp[0,index]
-    
-    def phi(self, index):
-        """Returns phi position in sweep at step 'index'.
-        """
-        return self.tp[1,index]
+        return self.frozen_time < np.inf
+
     
 class PosPoly(object):
     """Represents a collidable polygonal envelope definition for a mechanical component
