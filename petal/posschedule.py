@@ -19,13 +19,10 @@ class PosSchedule(object):
         self.requests = {} # keys: posids, values: target request dictionaries
         self.max_path_adjustment_passes = 3 # max number of times to go through the set of colliding positioners and try to adjust each of their paths to avoid collisions
         self.min_freeze_clearance = 5 # degrees, how early to truncate a move table to avoid collision via "freezing"
-        stage_names = ['direct','retract','rotate','extend','expert']
-        self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose) for name in stage_names}
+        self.stage_order = ['direct','retract','rotate','extend','expert']
+        self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, verbose=self.verbose) for name in self.stage_order}
         self.anneal_time = {'direct':3, 'retract':3, 'rotate':3, 'extend':3, 'expert':3} # times in seconds, see comments in PosScheduleStage
         self.move_tables = {}
-        self.sweeps = {}
-        self.frozen = set()
-        self.colliding = set()
 
     @property
     def collider(self):
@@ -103,7 +100,7 @@ class PosSchedule(object):
                           'log_note' : log_note}
         self.requests[posid] = new_request
 
-    def schedule_moves(self, anticollision='detect_and_freeze'):
+    def schedule_moves(self, anticollision='freeze'):
         """Executes the scheduling algorithm upon the stored list of move requests.
 
         A single move table is generated for each positioner that has a request
@@ -111,13 +108,13 @@ class PosSchedule(object):
         
         There are three options for anticollision behavior during scheduling:
            
-          'none'               ... No collisions are searched for. Expert use only.
+          None      ... No collisions are searched for. Expert use only.
            
-          'detect_and_freeze'  ... Collisions are searched for. If found, the colliding
+          'freeze'  ... Collisions are searched for. If found, the colliding
                                    positioner is frozen at its original position. This
                                    setting is suitable for small correction moves.
            
-          'detect_and_adjust'  ... Collisions are searched for. If found, the motion paths
+          'adjust'  ... Collisions are searched for. If found, the motion paths
                                    of colliding positioners are adjusted to attempt to
                                    avoid each other. If this fails, the colliding positioner
                                    is frozen at its original position. This setting is
@@ -126,14 +123,10 @@ class PosSchedule(object):
         If there were ANY pre-existing move tables in the list (for example, hard-
         stop seeking tables directly added by an expert user or expert function),
         then the requests list is ignored. The only changes to move tables are
-        for power density annealing. Furthermore, if anticollision='detect_and_adjust',
-        then it reverts to 'detect_and_freeze' instead. An argument of anticollision='none'
+        for power density annealing. Furthermore, if anticollision='adjust',
+        then it reverts to 'freeze' instead. An argument of anticollision=None
         remains as-is.
         """
-        if anticollision not in {'none','detect_and_freeze','detect_and_adjust'}:
-            if self.verbose:
-                print('Bad anticollision option \'' + str(anticollision) + '\' was argued. No move scheduling performed.')
-            return
         if not self.requests and not self.stages['expert'].is_not_empty():
             if self.verbose:
                 print('No requests nor existing move tables found. No move scheduling performed.')
@@ -141,17 +134,23 @@ class PosSchedule(object):
         if self.stages['expert'].is_not_empty():
             self._schedule_expert_tables(anticollision)
         else:
-            if anticollision == 'detect_and_adjust':
+            if anticollision == 'adjust':
                 self._schedule_requests_with_path_adjustments() # there is only one possible anticollision method for this scheduling method
             else:
                 self._schedule_requests_with_no_path_adjustments(anticollision)
+        for name in self.stage_order:
+            for posid,table in self.stages[name].move_tables:
+                if posid in self.move_tables:
+                    self.move_tables[posid].extend(table)
+                else:
+                    self.move_tables[posid] = table
         if self.requests:
             for posid,table in self.move_tables.items():
                 req = self.requests.pop(posid)
                 table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
                 table.log_note += (' ' if table.log_note else '') + req['log_note'] # keep the original log notes with move tables
         if self.petal.animator_on:
-            for name in self.stage_names:
+            for name in self.stage_order:
                 stage = self.stages[name]
                 if stage.is_not_empty():
                     self.collider.add_mobile_to_animator(self.petal.animator_total_time, stage.sweeps)
@@ -164,7 +163,7 @@ class PosSchedule(object):
         return posid in self.requests           
 
     def expert_add_table(self, move_table):
-        """Adds an externally-constructed move table to the schedule.Only simple
+        """Adds an externally-constructed move table to the schedule. Only simple
         freezing is available as an anticollision method for such externally-made
         tables. If any tables have been added by this method, then any target requests
         will be ignored upon scheduling. Generally, this method should only be used
@@ -177,30 +176,16 @@ class PosSchedule(object):
         self.stages['expert'].add_table(move_table)
 
     def _schedule_expert_tables(self, anticollision):
-        """Gathers data from expert-added move tables and applies power annealing.
-        Any move requests are ignored.
+        """Gathers data from expert-added move tables and populates the 'expert'
+        stage. Any move requests are ignored.
         """
-        stage = self.stages['expert']
-        stage.anneal_tables(self.anneal_time['expert'])
-        if anticollision != 'none':
-            stage.find_collisions(stage.move_tables, store_results=True)
-            attempts_remaining = self.max_path_adjustment_passes
-            while stage.colliding and attempts_remaining:
-                for posid in stage.colliding:
-                    if posid in stage.colliding: # because stage.colliding will be changed by adjust_path function
-                        stage.adjust_path(posid, force_freezing=True)
-                attempts_remaining -= 1
-        self.move_tables = stage.move_tables
-        self.sweeps = stage.sweeps
-        self.frozen = stage.frozen
-        self.colliding = stage.colliding
+        should_freeze = not(not(anticollision))
+        self._direct_stage_conditioning(self.stages['expert'], self.anneal_time['expert'], should_freeze)
 
     def _schedule_requests_with_no_path_adjustments(self, anticollision):
-        """Gathers data from requests dictionary and populates self.move_tables
-        with direct motions from start to finish. The positioners are given no
+        """Gathers data from requests dictionary and populates the 'direct'
+        stage with direct motions from start to finish. The positioners are given no
         path adjustments to avoid each other.
-        
-        Returns a dict with keys: posids, values: instances of PosMoveTable.
         """
         start_posTP = {}
         desired_final_posTP = {}
@@ -212,26 +197,30 @@ class PosSchedule(object):
             dtdp[posid] = trans.delta_posTP(desired_final_posTP[posid], start_posTP[posid], range_wrap_limits='targetable')
         stage = self.stages['direct']
         stage.initialize_move_tables(start_posTP, dtdp)
-        stage.anneal_tables(self.anneal_time['direct'])
-        # need to check anticollision arg and possibly do similar freezing as _schedule_expert_tables.
-        # see if I can pull out the common code from both functions
-        self.move_tables = stage.move_tables
+        should_freeze = not(not(anticollision))
+        self._direct_stage_conditioning(stage, self.anneal_time['direct'], should_freeze)
+        
+    def _direct_stage_conditioning(self, stage, anneal_time, should_freeze):
+        """Applies annealing and possibly freezing to a 'direct' or 'expert' stage.
+        
+            stage         ... instance of PosScheduleStage, needs to already have its move tables initialized
+            anneal_time   ... time in seconds, for annealing
+            should_freese ... boolean, says whether to check for collisions and freeze
+        """
+        stage.anneal_tables(anneal_time)
+        if should_freeze:
+            stage.find_collisions(stage.move_tables, store_results=True)
+            attempts_remaining = self.max_path_adjustment_passes
+            while stage.colliding and attempts_remaining:
+                for posid in stage.colliding:
+                    if posid in stage.colliding: # new if statement because stage.colliding contents may be changed by earlier iterations of adjust_path function below
+                        stage.adjust_path(posid, force_freezing=True)
+                attempts_remaining -= 1
         
     def _schedule_requests_with_path_adjustments(self):
-        """Gathers data from requests dictionary and populates self.move_tables
-        with motion paths from start to finish. The move tables may include
-        adjustments of paths to avoid collisions.
-
-        Returns a dict with keys: posids, values: instances of PosMoveTable.
-        
-        For positioners that have not been given specific move requests, but
-        which are not disabled, these get start/finish positions assigned to them that
-        match their current position. This causes them to be included as candidates
-        for path adjustment (so that they can be temporarily moved out of the path of
-        other positioners if necessary, and then returned to their original location).
-        
-        Disabled positioners are still checked for collisions, but of course are not
-        allowed to move out of the way.
+        """Gathers data from requests dictionary and populates the 'retract',
+        'rotate', and 'extend' stages with motion paths from start to finish.
+        The move tables may include adjustments of paths to avoid collisions.
         """
         stage_names = ['retract','rotate','extend']
         start_posTP = {name:{} for name in stage_names}

@@ -84,7 +84,7 @@ class Petal(object):
         self.animator_total_time = 0 # keeps track of total time of the current animation
         self.schedule_stats_log = posschedstats.PosSchedStats() if sched_stats_on else None    
         self.schedule = self._new_schedule()
-        self.anticollision_default = 'detect_and_freeze'  # Default parameter on how to schedule moves. See posschedule.py for valid settings.
+        self.anticollision_default = 'freeze'  # Default parameter on how to schedule moves. See posschedule.py for valid settings.
         
         # fiducials setup
         self.fidstates = {}
