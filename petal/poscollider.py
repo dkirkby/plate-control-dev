@@ -434,15 +434,23 @@ class PosSweep(object):
         self.tp_dot = speed
 
     def register_as_frozen(self):
-        """Sets an indicator that the sweep has been frozen at the end.
-        """
+        """Sets an indicator that the sweep has been frozen at the end."""
         self.frozen_time = self.time[-1]
 
+    @property
     def is_frozen(self):
-        """Returns boolean value whether the sweep has a "freezing" event.
-        """
+        """Returns boolean value whether the sweep has a "freezing" event."""
         return self.frozen_time < np.inf
-
+    
+    @property
+    def theta(self, rowidx):
+        """Returns theta position of the sweep at the specified row index."""
+        return self.tp[0,rowidx]
+    
+    @property
+    def phi(self, rowidx):
+        """Returns phi position of the sweep at the specified row index."""
+        return self.tp[1,rowidx]
     
 class PosPoly(object):
     """Represents a collidable polygonal envelope definition for a mechanical component
