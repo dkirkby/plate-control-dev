@@ -42,11 +42,12 @@ if should_flash:
 # run the various move types
 if should_home:
     print('MOVE: homing')
-    # ptl.set(key='CREEP_TO_LIMITS',value=True) # to force only creeping to hard stops
     ptl.request_homing(posids)
     ptl.schedule_send_and_execute_moves()
 else:
-    ptl.set(key=['POS_T','POS_P'],value=[-180,180]) # faking having just homed
+    for posid in ptl.posids:
+        ptl.set_posfid_val(posid, 'POS_T', -180) # faking having just homed
+        ptl.set_posfid_val(posid, 'POS_P', +180) # faking having just homed
 
 # Here I define a common wrapper function that illustrates the syntax for generating move
 # requests and then executing them on the positioners. There are several distinct syntaxes, all

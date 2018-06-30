@@ -225,7 +225,7 @@ print('Fiducials turned on: ' + str(fid_settings_done))
 # make sure control is enabled for all positioners
 for ptl in m.petals:
 	for posid in ptl.posids:
-		ptl.set(posid, 'CTRL_ENABLED', True)
+		ptl.set_posfid_val(posid, 'CTRL_ENABLED', True)
 
 # disable certain features if anticollision is turned off yet it is also a true petal (with close-packed positioenrs)
 if hwsetup['plate_type'] == 'petal' and not ptl.anticollision_default:

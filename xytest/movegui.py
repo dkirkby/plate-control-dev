@@ -118,8 +118,9 @@ class MoveGUI(object):
             elif len(str(key))==5:
                 self.posids.append('M'+str(key))
         self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
-        self.ptl.set(key='CTRL_ENABLED',value=True)
-        self.ptl.set(key='BUS_ID',value=self.canbus)
+        for posid in self.ptl.posids:
+            self.ptl.set_posfid_val(posid, 'CTRL_ENABLED', True)
+            self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
         self.ptl.anticollision_default= False
         self.fvc = fvchandler.FVCHandler(self.fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
@@ -542,7 +543,8 @@ class MoveGUI(object):
             elif len(str(key))==5:
                 self.posids.append('M'+str(key))
         self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
-        self.ptl.set(key='BUS_ID',value=self.canbus)
+        for posid in self.posids:
+            self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
         cs=self.listbox1.curselection()
         #self.listbox1.delete(0,cs[0] -1)

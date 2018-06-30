@@ -591,7 +591,7 @@ class XYTest(object):
                 self.track_file(state.log_path, commit='once')
                 self.old_currents[posid][key] = state.read(key)
                 if curr_val != None:
-                    ptl.set(posid, key, curr_val)
+                    ptl.set_posfid_val(posid, key, curr_val)
                     self.logwrite(str(posid) + ': Setting ' + key + ' to ' + str(curr_val))
                 else:
                     self.logwrite(str(posid) + ': ' + key + ' is ' + str(self.old_currents[posid][key]))
@@ -607,7 +607,7 @@ class XYTest(object):
                     state = self.m.state(posid)
                     ptl = self.m.petal(posid)
                     self.track_file(state.log_path, commit='once')
-                    ptl.set(posid, key, self.old_currents[posid][key])
+                    ptl.set_posfid_val(posid, key, self.old_currents[posid][key])
                     self.logwrite(str(posid) + ': Restoring ' + key + ' to ' + str(self.old_currents[posid][key]))
         self.m.set_motor_parameters()
 
@@ -687,7 +687,7 @@ class XYTest(object):
         for posid in self.posids:
             for calib_key in keys:
                 ptl = self.m.petal(posid)
-                ptl.set(posid, calib_key, self.calib_store[posid][calib_key])
+                ptl.set_posfid_val(posid, calib_key, self.calib_store[posid][calib_key])
         for ptl in self.m.petals:
             ptl.commit(log_note='xytest restoring old calibration values (if necessary)')
 

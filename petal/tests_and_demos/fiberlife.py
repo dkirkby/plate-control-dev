@@ -124,7 +124,7 @@ for posid in posids:
     pos_params_before_test[posid] = {}
     for param in pos_params_during_test.keys():
         pos_params_before_test[posid][param] = ptl.get(posid, param)
-        ptl.set(posid, param, pos_params_during_test[param])
+        ptl.set_posfid_val(posid, param, pos_params_during_test[param])
         logwrite(posid + ': Set ' + param + ' = ' + str(ptl.get(posid, param)))
 
 # home and center the positioners
@@ -293,7 +293,7 @@ if n_rand_moves > 0:
 # restore old positioner parameters (good housekeeping)
 for posid in pos_params_before_test.keys():
     for param in pos_params_before_test[posid]:
-        ptl.set(posid, param, pos_params_before_test[posid][param])
+        ptl.set_posfid_val(posid, param, pos_params_before_test[posid][param])
         logwrite(posid + ': Restored ' + param + ' to ' + str(states[posid]._val[param]))
 
 # post log files and settings to svn

@@ -28,8 +28,8 @@ class Petal(object):
 
     Required initialization inputs:
         petal_id     ... integer id number of the petal
-        posids       ... list of positioner unique id strings
-        fidids       ... list of fiducials unique id strings
+        posids       ... iterable collection of positioner unique id strings
+        fidids       ... iterable collection of fiducials unique id strings
         
     Optional initialization inputs:
         simulator_on    ... boolean, controls whether in software-only simulation mode
@@ -63,12 +63,12 @@ class Petal(object):
         self.altered_states = set()
 
         # positioners setup
-        self.posmodels = []
+        self.posmodels = {}
+        self.states = {}
         for posid in posids:
-            state = posstate.PosState(posid, logging=True, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
-            model = posmodel.PosModel(state,is_simulation=simulator_on,user_interactions_enabled=user_interactions_enabled)
-            self.posmodels.append(model)
-        self.posids = posids.copy()
+            self.states[posid] = posstate.PosState(posid, logging=True, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
+            self.posmodels[posid] = posmodel.PosModel(self.states[posid])
+        self.posids = set(self.posmodels.keys())
         self.canids_where_tables_were_just_sent = []
         self.busids_where_tables_were_just_sent = []
         self.nonresponsive_canids = []
@@ -87,10 +87,9 @@ class Petal(object):
         self.anticollision_default = 'freeze'  # Default parameter on how to schedule moves. See posschedule.py for valid settings.
         
         # fiducials setup
-        self.fidstates = {}
-        for fidid in fidids:
-            state = posstate.PosState(fidid, logging=True, device_type='fid', printfunc=self.printfunc,petal_id=self.petal_id)
-            self.fidstates[fidid] = state
+        self.fidids = set(fidids)
+        for fidid in self.fidids:
+            self.states[fidid] = posstate.PosState(fidid, logging=True, device_type='fid', printfunc=self.printfunc, petal_id=self.petal_id)        
         
         # power supplies setup?
         # to-do
@@ -100,11 +99,10 @@ class Petal(object):
         
         # sensors setup?
         # to-do
-
  
 # METHODS FOR POSITIONER CONTROL
 
-    def request_targets(self, requests, allow_objects = True):
+    def request_targets(self, requests):
         """Put in requests to the scheduler for specific positioners to move to specific targets.
         
         This method is for requesting that each robot does a complete repositioning sequence to get
@@ -152,10 +150,10 @@ class Petal(object):
             deleted from the return.
         """
         for posid in requests:
-            requests[posid]['posmodel'] = self.posmodel(posid) if allow_objects else posid
+            requests[posid]['posmodel'] = self.posmodels[posid]
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
-            if not(self.get(posid,'CTRL_ENABLED')) or self.schedule.already_requested(posid):
+            if not(self.get_posfid_val(posid,'CTRL_ENABLED')) or self.schedule.already_requested(posid):
                 del requests[posid]
             else:
                 self.schedule.request_target(posid, requests[posid]['command'], requests[posid]['target'][0], requests[posid]['target'][1], requests[posid]['log_note'])            
@@ -212,10 +210,10 @@ class Petal(object):
         request_targets command, where only the first request to a given positioner would be valid.)
         """
         for posid in requests:
-            if not(self.get(posid,'CTRL_ENABLED')):
+            if not(self.get_posfid_val(posid,'CTRL_ENABLED')):
                 del requests[posid]
         for posid in requests:
-            requests[posid]['posmodel'] = self.posmodel(posid)
+            requests[posid]['posmodel'] = self.posmodels[posid]
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
             table = posmovetable.PosMoveTable(requests[posid]['posmodel'])
@@ -245,13 +243,13 @@ class Petal(object):
                 # request anticollision-safe moves to current thetas and all phis within Ei
                 # Eo has a bit more possible collisions, for example against a stuck-extended neighbor. Costs a bit more time/power to go to Ei, but limit-seeking is not a frequent operation.
                 pass
-        for p in posmodels:
-            search_dist = np.sign(direction)*p.axis[axisid].limit_seeking_search_distance
-            table = posmovetable.PosMoveTable(p)
+        for posmodel in posmodels.values():
+            search_dist = np.sign(direction)*posmodel.axis[axisid].limit_seeking_search_distance
+            table = posmovetable.PosMoveTable(posmodel)
             table.should_antibacklash = False
             table.should_final_creep  = False
             table.allow_exceed_limits = True
-            table.allow_cruise = not(p.state._val['CREEP_TO_LIMITS'])
+            table.allow_cruise = not(posmodel.state._val['CREEP_TO_LIMITS'])
             dist = [0,0]
             dist[axisid] = search_dist
             table.set_move(0,pc.T,dist[0])
@@ -259,13 +257,13 @@ class Petal(object):
             cmd_str = (cmd_prefix + ' ' if cmd_prefix else '') + 'limit seek'
             table.store_orig_command(0,cmd_str,direction*(axisid == pc.T),direction*(axisid == pc.P))
             table.log_note += (' ' if table.log_note else '') + log_note
-            p.axis[axisid].postmove_cleanup_cmds += 'self.axis[' + repr(axisid) + '].total_limit_seeks += 1\n'
+            posmodel.axis[axisid].postmove_cleanup_cmds += 'self.axis[' + repr(axisid) + '].total_limit_seeks += 1\n'
             axis_cmd_prefix = 'self.axis[' + repr(axisid) + ']'
             if direction < 0:
                 direction_cmd_suffix = '.minpos\n'
             else:
                 direction_cmd_suffix = '.maxpos\n'
-            p.axis[axisid].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + direction_cmd_suffix
+            posmodel.axis[axisid].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + direction_cmd_suffix
             self.schedule.expert_add_table(table)
 
     def request_homing(self, posids):
@@ -274,25 +272,24 @@ class Petal(object):
         will be ignored.
         """
         posids = pc.listify(posids,True)[0]
-        posmodels = self.enabled_posmodels(posids)
+        enabled = self.enabled_posmodels(posids)
         hardstop_debounce = [0,0]
         direction = [0,0]
         direction[pc.P] = +1 # force this, because anticollision logic depends on it
-        for p in posmodels:
-            self.request_limit_seek(p.posid, pc.P, direction[pc.P], anticollision=True, cmd_prefix='P', log_note='homing')
+        for posid in enabled:
+            self.request_limit_seek(posid, pc.P, direction[pc.P], anticollision=True, cmd_prefix='P', log_note='homing')
         self.schedule_moves(anticollision=True)
-        for p in posmodels:
-            direction[pc.T] = p.axis[pc.T].principle_hardstop_direction
-            self.request_limit_seek(p.posid, pc.T, direction[pc.T], anticollision=False, cmd_prefix='T') # no repetition of log note here
-            posid = self.posids[self.posmodels.index(p)]                      
+        for posid,posmodel in enabled.items():
+            direction[pc.T] = posmodel.axis[pc.T].principle_hardstop_direction
+            self.request_limit_seek(posid, pc.T, direction[pc.T], anticollision=False, cmd_prefix='T') # no repetition of log note here
             for i in [pc.T,pc.P]:
                 axis_cmd_prefix = 'self.axis[' + repr(i) + ']'
                 if direction[i] < 0:
-                    hardstop_debounce[i] = p.axis[i].hardstop_debounce[0]
-                    p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = -1.0\n'
+                    hardstop_debounce[i] = posmodel.axis[i].hardstop_debounce[0]
+                    posmodel.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = -1.0\n'
                 else:
-                    hardstop_debounce[i] = p.axis[i].hardstop_debounce[1]
-                    p.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = +1.0\n'
+                    hardstop_debounce[i] = posmodel.axis[i].hardstop_debounce[1]
+                    posmodel.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = +1.0\n'
                 hardstop_debounce_request = {posid:{'target':hardstop_debounce}}
                 self.request_direct_dtdp(hardstop_debounce_request, cmd_prefix='debounce')
 
@@ -336,21 +333,18 @@ class Petal(object):
                 print('Simulator skips sending motor parameters to positioners.')
             return
         parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD', 'BUMP_CW_FLG', 'BUMP_CCW_FLG']
-        for p in self.posmodels:
-            state = p.state
-            canid = p.canid
-            busid = p.busid
-            parameter_vals = []
-            for parameter_key in parameter_keys:
-                parameter_vals.append(state._val[parameter_key])
-            #syntax for setting currents: comm.set_currents(busid, canid, [curr_spin_p, curr_cruise_p, curr_creep_p, curr_hold_p], [curr_spin_t, curr_cruise_t, curr_creep_t, curr_hold_t])
-            self.comm.set_currents(busid, canid, [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]], [parameter_vals[0], parameter_vals[1], parameter_vals[2], parameter_vals[3]])
-            #syntax for setting periods: comm.set_periods(busid, canid, creep_period_p, creep_period_t, spin_period)
-            self.comm.set_periods(busid, canid, parameter_vals[4], parameter_vals[4], parameter_vals[5])
-            #syntax for setting bump flags: comm.set_bump_flags(busid, canid, curr_hold, bump_cw_flg, bump_ccw_flg)
-            self.comm.set_bump_flags(busid, canid, parameter_vals[3], parameter_vals[6], parameter_vals[7])
-            vals_str =  ''.join([' ' + parameter_keys[i] + '=' + str(parameter_vals[i]) for i in range(len(parameter_keys))])
-            self.printfunc(p.posid + ' (bus=' + str(busid) + ', canid=' + str(canid) + '): motor currents and periods set:' + vals_str)
+        enabled = self.enabled_posmodels(self.posids)
+        for posid,posmodel in enabled.items():
+            canid = posmodel.canid
+            busid = posmodel.busid
+            p = {key:posmodel.state._val[key] for key in parameter_keys}
+            currents = [p[key] for key in ['CURR_SPIN_UP_DOWN','CURR_CRUISE','CURR_CREEP','CURR_HOLD']]
+            self.comm.set_currents(busid, posmodel.canid, currents, currents)
+            self.comm.set_periods(busid, canid, p['CREEP_PERIOD'], p['CREEP_PERIOD'], p['SPINUPDOWN_PERIOD'])
+            self.comm.set_bump_flags(busid, canid, p['CURR_HOLD'], p['BUMP_CW_FLG'], p['BUMP_CCW_FLAG'])
+            if self.verbose:
+                vals_str =  ''.join([' ' + str(key) + '=' + str(p[key]) for key in p])
+                self.printfunc(posid + ' (bus=' + str(busid) + ', canid=' + str(canid) + '): motor currents and periods set:' + vals_str)
 
     def execute_moves(self):
         """Command the positioners to do the move tables that were sent out to them.
@@ -462,10 +456,10 @@ class Petal(object):
         self.comm.set_fiducials(busids, canids, duties)
         settings_done = {}
         for i in range(len(fidids)):
-            self.store_fid_val(fidids[i], 'DUTY_STATE', duties[i])
+            self.set_posfid_val(fidids[i], 'DUTY_STATE', duties[i])
             settings_done[fidids[i]] = duties[i]
             if save_as_default:
-                self.store_fid_val(fidids[i], 'DUTY_DEFAULT_ON', duties[i])
+                self.set_posfid_val(fidids[i], 'DUTY_DEFAULT_ON', duties[i])
         self.commit(log_note='set fiducial parameters')
         return settings_done
     
@@ -552,86 +546,19 @@ class Petal(object):
         for fidid in fidids:
             vals.append(self.fidstates[fidid]._val[key])
         return vals
-    
-    def store_fid_val(self,fidid,key,value):
-        '''Sets a single value to a fiducial. This does NOT turn the fiducial physically
-        on or off. It only saves a value.
-        '''
-        self.fidstates[fidid].store(key,value)
-        self.altered_states.add(self.fidstates[fidid])
 
 
 # GETTERS, SETTERS, STATUS METHODS
 
-    def get(self,posid=None,key=''):
-        """Retrieve the state value identified by string key, for positioner
-        identified by id posid.
-
-        If no key is specified, return the whole posmodel.
-
-        If no posid is specified, a list of values for all positioners is returned.
-
-        If posid is a list of multiple positioner ids, then the return will be a
-        corresponding list of values. The optional argument key can be:
-            ... a list, of same length as posid
-            ... or just a single key, which gets fetched uniformly for all posid
-
-        Examples:
-            m = posarraymaster.PosArrayMaster(posids)
-            m.get('XXXXX','LENGTH_R1') # gets LENGTH_R1 value for positioner XXXXX
-            m.get('XXXXX',['POS_T','POS_P']) # gets these values for positioner XXXXX
-            m.get(['XXXXX','YYYYY'],'PETAL_ID') # gets PETAL_ID value for positioners XXXXX and YYYYY
-            m.get(['XXXXX','YYYYY'],['FINAL_CREEP_ON','DEVICE_ID']) # gets multiple different values on multiple different positioners
-            m.get(key=['POS_T']) # gets this value for all positioners identified in posids
-            m.get() # gets all posmodel objects for all positioners identified in posids
-        """
-        (posids, was_not_list) = self._posid_listify_and_fill(posid)
-        (keys, temp) = pc.listify(key,keep_flat=True)
-        (posids, keys) = self._equalize_input_list_lengths(posids,keys)
-        vals = []
-        for i in range(len(posids)):
-            pidx = self.posids.index(posids[i])
-            if keys[i] == '':
-                vals.append(self.posmodels[pidx])
-            elif keys[i] == 'expected_current_position':
-                vals.append(self.posmodels[pidx].expected_current_position_str)
-            else:
-                vals.append(self.posmodels[pidx].state._val[keys[i]])
-        if was_not_list:
-            vals = pc.delistify(vals)
-        return vals
-
-    def set(self,posid=None,key=None,value=None):
-        """Set the state value identified by string key, for positioner unit
-        identified by id posid.
-
-        If no posid is specified, value is set for all positioners.
-
-        If posid is a list of multiple positioner ids, then this method can handle
-        setting multiple values. The other arguments can either:
-            ... also be lists, of same length as posid
-            ... or just a single value, which gets applied uniformly to all posid.
-
-        Examples:
-            m = posarraymaster.PosArrayMaster(posids)
-            m.set('XXXXX','LENGTH_R1',3.024) # sets LENGTH_R1 value for positioner XXXXX
-            m.set(['XXXXX','YYYYY'],'PETAL_ID',2) # sets PETAL_ID value for positioners XXXXX and YYYYY
-            m.set(['XXXXX','YYYYY'],['FINAL_CREEP_ON','DEVICE_ID'],[False,227]) # sets multiple different values on multiple different positioners
-            m.set(key=['POS_T','POS_P'],value=[0,180]) # sets these values for all positioners identified in posids
-        """
-        if key == None or value == None:
-            self.printfunc('either no key or no value was specified to setval')
-            return
-        (posids, temp)  = self._posid_listify_and_fill(posid)
-        (keys,   temp)  = pc.listify(key,keep_flat=True)
-        (values, temp)  = pc.listify(value,keep_flat=True)
-        (posids, keys)   = self._equalize_input_list_lengths(posids,keys)
-        (posids, values) = self._equalize_input_list_lengths(posids,values)
-        (posids, keys)   = self._equalize_input_list_lengths(posids,keys) # repetition here handles the case where there was 1 posid element, 1 key, but mulitplie elements in value
-        for i in range(len(posids)):
-            p = self.posmodel(posids[i])
-            p.state.store(keys[i],values[i])
-            self.altered_states.add(p.state)
+    def get_posfid_val(self, uniqueid, key):
+        """Retrieve the state value identified by string key, for positioner or fiducial uniqueid."""
+        return self.states[uniqueid]._val[key]
+    
+    def set_posfid_val(self, uniqueid, key, value):
+        """Sets a single value to a positioner or fiducial. In the case of a fiducial, note that
+        this call does NOT turn the fiducial physically on or off. It only saves a value."""
+        self.states[uniqueid].store(key,value)
+        self.altered_states.add(self.states[uniqueid])
 
     def commit(self, log_note='', *args, **kwargs):
         '''Commit data to the local config and log files, and/or the online database.
@@ -739,7 +666,7 @@ class Petal(object):
         # re-implement this (reduced syntax / overhead) once posmodels are better dictionary-ified in petal.py
         enabled_posmodels = {}
         for posid in posids:
-            if self.get(posid,'CTRL_ENABLED'):
+            if self.get_posfid_val(posid,'CTRL_ENABLED'):
                 enabled_posmodels[posid] = self.posmodel(posid)
         return enabled_posmodels
 
@@ -831,11 +758,11 @@ class Petal(object):
                     self.nonresponsive_canids.append(canid)
                     for p in self.posmodels:
                         if p.canid == canid:
-                            self.set(p.posid,'CTRL_ENABLED',False)
+                            self.set_posfid_val(p.posid,'CTRL_ENABLED',False)
                             p.state.next_log_notes.append('disabled sending control commands because positioner was detected to be nonresponsive')
                     for fidid in self.fidids:
                         if self.get_fids_val(fidid,'CAN_ID')[0] == canid:
-                            self.store_fid_val(fidid,'CTRL_ENABLED',False)
+                            self.set_posfid_val(fidid,'CTRL_ENABLED',False)
                             self.fidstates[fidid].next_log_notes.append('disabled sending control commands because fiducial was detected to be nonresponsive')
                     status_updated = True
             for canid in self.nonresponsive_canids:
@@ -854,8 +781,9 @@ class Petal(object):
         resets = {'MOVE_CMD'  : '',
                   'MOVE_VAL1' : '',
                   'MOVE_VAL2' : ''}
-        for k in resets:
-            self.set(key=k,value=resets[k])
+        for key in resets:
+            for posid in self.posids:
+                self.set_posfid_val(posid, key, resets[key])
 
     def _new_schedule(self):
         """Generate up a new, clear schedule instance.

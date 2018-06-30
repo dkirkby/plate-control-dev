@@ -34,10 +34,9 @@ class PosCollider(object):
         self.add_fixed_to_animator()
 
     def add_positioners(self, posmodels):
-        """Add a positioner or multiple positioners to the collider object.
+        """Add a collection of positioners to the collider object.
         """
-        (pm, was_not_list) = pc.listify(posmodels, keep_flat=True)
-        for posmodel in pm:
+        for posmodel in posmodels:
             posid = posmodel.posid
             self.posids.add(posid)
             self.posindexes[posid] = len(self.posindexes) + 1
