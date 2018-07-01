@@ -36,4 +36,5 @@ cProfile_wrapper('ptl = petal.Petal(petal_id, posids, fidids, simulator_on=True,
 ptl.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
 cProfile_wrapper('ptl.request_homing(posids)')
 cProfile_wrapper('ptl.schedule_send_and_execute_moves()')
-cProfile_wrapper('ptl.quick_move(posids,"posXY",[4,4])')
+cProfile_wrapper('ptl.quick_move(posids,"posXY",[4,4],"some note")')
+cProfile_wrapper('ptl.quick_direct_dtdp(posids,[10,-10],"some note")')
