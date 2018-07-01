@@ -54,6 +54,7 @@ class PosSchedule(object):
         current_position = posmodel.expected_current_position
         start_posTP = [current_position['posT'],current_position['posP']]
         lims = 'targetable'
+        unreachable = []
         if uv_type == 'QS':
             (targt_posTP,unreachable) = posmodel.trans.QS_to_posTP([u,v],lims)
         elif uv_type == 'obsXY':

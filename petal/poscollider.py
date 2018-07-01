@@ -14,9 +14,8 @@ class PosCollider(object):
 
     See DESI-0899 for geometry specifications, illustrations, and kinematics.
     """
-    def __init__(self, configfile=None):
-        # load up a configobj from _collision_settings_DEFAULT.conf, in pc.settings_directory
-        if configfile is None:
+    def __init__(self, configfile=''):
+        if not configfile:
             defaultconfigfile = '_collision_settings_DEFAULT.conf'
             filename = os.path.join(pc.dirs['collision_settings'],defaultconfigfile)
         else:

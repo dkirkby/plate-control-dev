@@ -450,7 +450,8 @@ class XYTest(object):
         n_moves = self.xytest_conf['n_unmeasured_moves_after_loop'][loop_number]
         if n_moves > 0:
             self.track_all_poslogs_once()
-            max_log_length = test.m.state(test.posids[0]).max_log_length
+            arbitrary_posid = next(iter(self.posids))
+            max_log_length = self.m.state(arbitrary_posid).max_log_length
             start_time = time.time()
             self.logwrite('Starting unmeasured move sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             status_str = lambda j : 'move ' + str(j + 1) + ' of ' + str(n_moves) + ' within loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops)
@@ -517,7 +518,7 @@ class XYTest(object):
         Optional keep_creds parameter instructs to *not* delete SVN user/pass after
         this commit is complete. Otherwise they get automatically deleted.
         '''
-        self.logwrite('Files changed or generated: ' + str(list(test.new_and_changed_files.keys())))
+        self.logwrite('Files changed or generated: ' + str(list(self.new_and_changed_files.keys())))
         if not self.simulate:
             if not(self.svn_user and self.svn_pass):
                 self.logwrite('No files were auto-committed to SVN due to lack of user / pass credentials.')

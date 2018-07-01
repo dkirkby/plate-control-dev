@@ -340,7 +340,7 @@ class PosMoveMeasure(object):
             parameter_name = 'PHYSICAL_RANGE_T'
             batches = posids
         data = {}
-        batches = set(batches)
+        batches = {batches} if isinstance(batches,str) else set(batches)
         for batch in batches:
             batch_data = self._measure_range_arc(batch,axis)
             data.update(batch_data)
@@ -641,31 +641,30 @@ class PosMoveMeasure(object):
         phi_clear_angle = self.phi_clear_angle
         data = {}
         for petal,these_posids in posids_by_petal.items():
-            posmodels = [self.posmodel(posid) for posid in these_posids]
-            initial_tp = []
-            final_tp = []
+            these_posmodels = {posid:self.posmodel(posid) for posid in these_posids}
+            start_tp = {}
+            final_tp = {}
             if axis == 'theta':
                 n_pts = self.n_points_calib_T
-                for posmodel in posmodels:
+                for posid,posmodel in these_posmodels.items():
                     targetable_range_T = posmodel.targetable_range_T
-                    initial_tp = pc.concat_lists_of_lists(initial_tp, [min(targetable_range_T) + self.calib_arc_margin, phi_clear_angle])
-                    final_tp   = pc.concat_lists_of_lists(final_tp,   [max(targetable_range_T) - self.calib_arc_margin, initial_tp[-1][1]])
+                    start_tp[posid] = [min(targetable_range_T) + self.calib_arc_margin, phi_clear_angle]
+                    final_tp[posid] = [max(targetable_range_T) - self.calib_arc_margin, start_tp[posid][1]]
             else:
                 n_pts = self.n_points_calib_P
-                for posmodel in posmodels:
+                for posid,posmodel in these_posmodels.items():
                     if keep_phi_within_Eo:
                         phi_min = phi_clear_angle
                         theta = 0
                     else:
                         phi_min = min(posmodel.targetable_range_P)
                         theta = posmodel.trans.obsTP_to_posTP([0,0])[pc.T] # when doing phi axis, want obsT to all be uniform (simplifies anti-collision), which means have to figure out appropriate posT for each positioner -- depends on already knowing theta offset reasonably well
-                    initial_tp = pc.concat_lists_of_lists(initial_tp, [theta, phi_min + self.calib_arc_margin])
-                    final_tp   = pc.concat_lists_of_lists(final_tp,   [initial_tp[-1][0], max(posmodel.targetable_range_P) - self.calib_arc_margin])
-            
-            for i in range(len(these_posids)):
-                t = np.linspace(initial_tp[i][0], final_tp[i][0], n_pts)
-                p = np.linspace(initial_tp[i][1], final_tp[i][1], n_pts)
-                data[these_posids[i]] = {'target_posTP':[[t[j],p[j]] for j in range(n_pts)], 'measured_obsXY':[], 'petal':petal, 'trans':posmodels[i].trans}
+                    start_tp[posid] = [theta, phi_min + self.calib_arc_margin]
+                    final_tp[posid] = [start_tp[posid][0], max(posmodel.targetable_range_P) - self.calib_arc_margin]
+            for posid,posmodel in these_posmodels.items():
+                t = np.linspace(start_tp[posid][0], final_tp[posid][0], n_pts)
+                p = np.linspace(start_tp[posid][1], final_tp[posid][1], n_pts)
+                data[posid] = {'target_posTP':[[t[j],p[j]] for j in range(n_pts)], 'measured_obsXY':[], 'petal':petal, 'trans':posmodel.trans}
 
         # make the measurements
         for i in range(n_pts):
@@ -707,8 +706,8 @@ class PosMoveMeasure(object):
         posids_by_petal = self.posids_by_petal(posids)
         phi_clear_angle = self.phi_clear_angle
         n_intermediate_pts = 2
-        data = {}
         initial_tp_requests = {}
+        prefix = 'range measurement on ' + axis + ' axis'
         for petal,these_posids in posids_by_petal.items():
             if axis == 'theta':
                 delta = 360/(n_intermediate_pts + 1)
@@ -729,10 +728,8 @@ class PosMoveMeasure(object):
                     trans = self.trans(posid)
                     initial_tp = trans.obsTP_to_posTP([theta_initial,phi_clear_angle]) # when doing phi axis, want obsT to all be uniform (simplifies anti-collision), which means have to figure out appropriate posT for each positioner -- depends on already knowing theta offset reasonably well
                     initial_tp_requests[posid] = {'command':'posTP', 'target':initial_tp,  'log_note':'range arc ' + axis + ' initial point'}
-            for i in range(len(these_posids)):
-                data[these_posids[i]] = {'target_dtdp':dtdp, 'measured_obsXY':[], 'petal':petal}
+            data = {posid:{'target_dtdp':dtdp, 'measured_obsXY':[], 'petal':petal} for posid in these_posids}
 
-        prefix = 'range measurement on ' + axis + ' axis'
         # go to initial point
         self.printfunc(prefix + ': initial point')
         self.move(initial_tp_requests)
