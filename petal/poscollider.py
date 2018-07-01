@@ -38,11 +38,12 @@ class PosCollider(object):
         """
         for posmodel in posmodels:
             posid = posmodel.posid
-            self.posids.add(posid)
-            self.posindexes[posid] = len(self.posindexes) + 1
-            self.posmodels[posid] = posmodel
-            self.pos_neighbors[posid] = set()
-            self.fixed_neighbor_cases[posid] = set()
+            if posid not in self.posids:
+                self.posids.add(posid)
+                self.posindexes[posid] = len(self.posindexes) + 1
+                self.posmodels[posid] = posmodel
+                self.pos_neighbors[posid] = set()
+                self.fixed_neighbor_cases[posid] = set()
         self._load_config_data()
         for p in self.posids:
             self._identify_neighbors(p)
