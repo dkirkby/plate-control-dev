@@ -340,7 +340,7 @@ class PosMoveMeasure(object):
             parameter_name = 'PHYSICAL_RANGE_T'
             batches = posids
         data = {}
-        batches = pc.listify(batches, keep_flat=True)[0]
+        batches = set(batches)
         for batch in batches:
             batch_data = self._measure_range_arc(batch,axis)
             data.update(batch_data)
