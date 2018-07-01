@@ -42,7 +42,7 @@ class PosSchedule(object):
 
         A schedule can only contain one target request per positioner at a time.
         """
-        posmodel = self.petal.posmodel(posid)
+        posmodel = self.petal.posmodels[posid]
         if self.already_requested(posid):
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Cannot request more than one target per positioner in a given schedule.')
