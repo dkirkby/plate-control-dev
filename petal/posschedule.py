@@ -195,7 +195,7 @@ class PosSchedule(object):
         for posid,request in self.requests.items():
             start_posTP[posid] = request['start_posTP']
             desired_final_posTP[posid] = request['targt_posTP']
-            trans = self.collider.posmodels[posid].trans
+            trans = self.petal.posmodels[posid].trans
             dtdp[posid] = trans.delta_posTP(desired_final_posTP[posid], start_posTP[posid], range_wrap_limits='targetable')
         stage = self.stages['direct']
         stage.initialize_move_tables(start_posTP, dtdp)
@@ -228,7 +228,7 @@ class PosSchedule(object):
         for posid,request in self.requests.items():
             # Some care is taken here to use only delta and add functions provided by PosTransforms,
             # to ensure that range wrap limits are always safely handled from stage to stage.
-            posmodel = self.collider.posmodels[posid]
+            posmodel = self.petal.posmodels[posid]
             trans = posmodel.trans
             start_posTP['retract'][posid] = request['start_posTP']
             desired_final_posTP['retract'][posid] = [request['start_posTP'][pc.T], self.collider.Eo_phi] # Ei would also be safe, but unnecessary in most cases. Costs more time and power to get to.
@@ -269,7 +269,7 @@ class PosSchedule(object):
         target_interference = False
         neighbors_with_requests = [neighbor for neighbor in self.collider.pos_neighbors[posid] if neighbor in self.requests]
         for neighbor in neighbors_with_requests:
-            neighbor_posmodel = self.collider.posmodels[neighbor]
+            neighbor_posmodel = self.petal.posmodels[neighbor]
             neighbor_target_posTP = self.requests[neighbor]['targt_posTP']
             neighbor_target_obsTP = neighbor_posmodel.trans.posTP_to_obsTP(neighbor_target_posTP)
             if self.collider.spatial_collision_between_positioners(self, posid, neighbor, target_obsTP, neighbor_target_obsTP):
