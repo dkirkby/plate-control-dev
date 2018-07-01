@@ -32,8 +32,8 @@ should_move_dtdp    = False
 
 # flash the LEDs
 if should_flash:
-    canids = pc.listify(ptl.get(key='CAN_ID'),True)[0]
-    for canid in canids: # this usage of get method returns a list with that value for all the positioners
+    canids = {ptl.get_posfid_val(fidid,'CAN_ID') for fidid in ptl.fidids}
+    for canid in canids:
         ptl.comm.set_led(canid,'on')
     time.sleep(1)
     for canid in canids:

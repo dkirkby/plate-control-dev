@@ -8,7 +8,6 @@ else:
     sys.path.append(os.path.abspath('../petal/'))
 
 import postransforms
-import poscollider
 import numpy as np
 import fitcircle
 import posconstants as pc
@@ -46,7 +45,7 @@ class PosMoveMeasure(object):
             devices = []
             for ptl in self.petals:
                 devices += posindex.find_by_arbitrary_keys(PETAL_ID=ptl.petal_id)
-            all_device_ids = self.all_posids + self.all_fidids
+            all_device_ids = self.all_posids.union(self.all_fidids)
             self.extradot_ids = [device['DEVICE_ID'] for device in devices if device['DEVICE_ID'] not in all_device_ids]
         self.n_points_calib_T = 7 # number of points in a theta calibration arc
         self.n_points_calib_P = 7 # number of points in a phi calibration arc
@@ -113,13 +112,13 @@ class PosMoveMeasure(object):
         return data,imgfiles
 
     def move(self, requests):
-        """Move positioners.
-        See request_targets method in petal.py for description of format of the 'requests' dictionary.
+        """Move positioners. See request_targets method in petal.py for description
+        of format of the 'requests' dictionary.
         """
-        posids_by_ptl = self.pos_data_listed_by_ptl(list(requests.keys()),'POS_ID')
-        for petal in posids_by_ptl.keys():
+        posids_by_petal = self.posids_by_petal(requests)
+        for petal,posids in posids_by_petal.items():
             these_requests = {}
-            for posid in posids_by_ptl[petal]:
+            for posid in posids:
                 these_requests[posid] = requests[posid]
             petal.request_targets(these_requests)            
             petal.schedule_send_and_execute_moves() # in future, may do this in a different thread for each petal
@@ -235,11 +234,11 @@ class PosMoveMeasure(object):
         """Get all phi arms within their clear rotation envelopes for positioners
         identified by posids.
         """
-        posids_by_ptl = self.pos_data_listed_by_ptl(posids, key='POS_ID')
+        posids_by_petal = self.posids_by_petal(posids)
         requests = {}
         posP = self.phi_clear_angle # uniform value in all cases
-        for petal in posids_by_ptl.keys():
-            for posid in posids_by_ptl[petal]:
+        for petal,these_posids in posids_by_petal.items():
+            for posid in these_posids:
                 posT = petal.expected_current_position(posid,'posT')
                 requests[posid] = {'command':'posTP', 'target':[posT,posP], 'log_note':'retracting phi'}
         self.move(requests)
@@ -247,11 +246,11 @@ class PosMoveMeasure(object):
     def park(self,posids='all'):
         """Fully retract phi arms inward, and put thetas at their neutral theta = 0 position.
         """
-        posids_by_ptl = self.pos_data_listed_by_ptl(posids, key='POS_ID')
+        posids_by_petal = self.posids_by_petal(posids)
         requests = {}
         posT = 0
-        for petal in posids_by_ptl.keys():
-            for posid in posids_by_ptl[petal]:
+        for petal,these_posids in posids_by_petal.items():
+            for posid in these_posids:
                 posmodel = petal.posmodel(posid)
                 posP = max(posmodel.targetable_range_P)
                 requests[posid] = {'command':'posTP', 'target':[posT,posP], 'log_note':'parking'}
@@ -291,10 +290,10 @@ class PosMoveMeasure(object):
             posP = self.phi_close_angle
         else:
             posP = 180
-        posids_by_ptl = self.pos_data_listed_by_ptl(posids, key='POS_ID')
+        posids_by_petal = self.posids_by_petal(posids)
         requests = {}
-        for petal in posids_by_ptl.keys():
-            for posid in posids_by_ptl[petal]:
+        for these_posids in posids_by_petal.values():
+            for posid in these_posids:
                 requests[posid] = {'command':'posTP', 'target':[posT,posP], 'log_note':'one point calibration of ' + mode}
         if mode == 'posTP' or mode == 'offsetsTP' or mode == 'offsetsTP_close':
             old_tp_updates_tol = self.tp_updates_tol
@@ -306,8 +305,8 @@ class PosMoveMeasure(object):
             self.tp_updates_fraction = old_tp_updates_fraction
         else:
             data,imgfiles = self.move_measure(requests, tp_updates=None)
-            for petal in posids_by_ptl.keys():
-                for posid in posids_by_ptl[petal]:
+            for petal,these_posids in posids_by_petal.items():
+                for posid in these_posids:
                     xy = data[posid]
                     petal.set_posfid_val(posid,'OFFSET_X',xy[0])
                     petal.set_posfid_val(posid,'OFFSET_Y',xy[1])
@@ -319,10 +318,10 @@ class PosMoveMeasure(object):
         """Find hardstops and reset current known positions.
         INPUTS:     posids ... 'all' or a list of specific posids
         """
-        posids_by_ptl = self.pos_data_listed_by_ptl(posids,'POS_ID')
-        self.printfunc('rehoming', str({'petal ' + str(ptl.petal_id):posids_by_ptl[ptl] for ptl in posids_by_ptl.keys()}))
-        for petal in posids_by_ptl.keys():
-            petal.request_homing(posids_by_ptl[petal])
+        posids_by_petal = self.posids_by_petal(posids)
+        self.printfunc('rehoming', str({'petal ' + str(ptl.petal_id):posids_by_petal[ptl] for ptl in posids_by_petal}))
+        for petal,these_posids in posids_by_petal.items():
+            petal.request_homing(these_posids)
             petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
 
     def measure_range(self,posids='all',axis='theta'):
@@ -392,9 +391,8 @@ class PosMoveMeasure(object):
         # 'rough' calibration is ALWAYS run
         self.rehome(posids)
         self.one_point_calibration(posids, mode='offsetsXY')
-        posids_by_ptl = self.pos_data_listed_by_ptl(posids,'POS_ID')
-        for petal in posids_by_ptl.keys():
-            these_posids = posids_by_ptl[petal]
+        posids_by_petal = self.posids_by_petal(posids)
+        for petal,these_posids in posids_by_petal.items():
             keys_to_reset = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P']
             for key in keys_to_reset:
                 for posid in these_posids:
@@ -456,54 +454,45 @@ class PosMoveMeasure(object):
         """
         self.printfunc('Nudging positioners to identify their starting locations.')
         requests = {}
-        for posid in self.all_posids:
+        all_posids = self.all_posids # no need to retreive dynamic property multiple times below
+        for posid in all_posids:
             requests[posid] = {'command':'posTP', 'target':[0,180], 'log_note':'identify positioners starting point'}
         self.move(requests) # go to starting point
-        total = len(self.all_posids)
+        total = len(all_posids)
         n = 0
-        for posid in self.all_posids:
+        for posid in all_posids:
             n += 1
             self.printfunc('Identifying location of positioner ' + posid + ' (' + str(n) + ' of ' + str(total) + ')')
             self._identify(posid)
 
-    def pos_data_listed_by_ptl(self, posids='all', key=''):
-        """Returns a dictionary with keys = petal objects and values = lists of data
-        (the particular data to retrieve is identified by key) on each petal.  If
-        posids argument == 'all', then each list contains all the data on that petal.
-        If posids argument is a list of posids, then in the returned dictionary, each list
-        contains only the data for those positioners which are in the intersection set of
-        posids with that petal's positioner ids.
+    def posids_by_petal(self, posids='all'):
+        """Returns a dict that organizes the argued posids by the petals they are
+        associated with. Keys = petal objects, values = sets of posids on each petal.
+        Arguing 'all' returns all petals, and all posids on those petals.
         """
-        data_by_ptl = {}
-        if posids != 'all':
-            posids = pc.listify(posids,keep_flat=True)[0]
-        for petal in self.petals:
-            all_pos_on_ptl = pc.listify(petal.get(key='POS_ID'),keep_flat=True)[0]
-            if posids == 'all':
-                these_posids = all_pos_on_ptl
-            else:
-                these_posids = [p for p in posids if p in all_pos_on_ptl]
-            this_data = petal.get(these_posids,key)
-            data_by_ptl[petal] = this_data
-        return data_by_ptl
+        if posids == 'all':
+            return {petal:petal.posids for petal in self.petals}
+        posids = set(posids)
+        ptl_map = {posid:self._petals_map[posid] for posid in posids}
+        posids_by_petal = {petal:{p for p in ptl_map if ptl_map[p] == petal} for petal in set(ptl_map.values())}
+        return posids_by_petal
     
     @property
     def all_posids(self):
-        """Returns a list of all the posids on all the petals.
+        """Returns a set of all the posids on all the petals.
         """
-        all_posids = []
-        posids_by_ptl = self.pos_data_listed_by_ptl('all','POS_ID')
-        for petal in posids_by_ptl.keys():
-            all_posids.extend(posids_by_ptl[petal])
+        all_posids = set()
+        for ptl in self.petals:
+            all_posids = all_posids.union(ptl.posids)
         return all_posids
     
     @property
     def all_fidids(self):
-        """Returns a list of all the fidids on all the petals.
+        """Returns a set of all the fidids on all the petals.
         """
-        all_fidids = []
+        all_fidids = set()
         for ptl in self.petals:
-            all_fidids.extend(ptl.fidids)
+            all_fidids = all_fidids.union(ptl.fidids)
         return all_fidids
 
     def petal(self, posid_or_fidid_or_dotid):
@@ -596,10 +585,9 @@ class PosMoveMeasure(object):
             'petal'           ... the petal this posid is on
             'trans'           ... the postransform object associated with this particular positioner
         """
-        posids_by_ptl = self.pos_data_listed_by_ptl(posids,'POS_ID')
+        posids_by_petal = self.posids_by_petal(posids)
         data = {}
-        for petal in posids_by_ptl.keys():
-            these_posids = posids_by_ptl[petal]
+        for petal,these_posids in posids_by_petal.items():
             for posid in these_posids:
                 data[posid] = {}
                 posmodel = petal.posmodel(posid)
@@ -616,12 +604,11 @@ class PosMoveMeasure(object):
                 data[posid]['petal'] = petal
                 data[posid]['measured_obsXY'] = []
                 n_pts = len(data[posid]['target_posTP'])
-        all_posids = list(data.keys())
         
         # make the measurements
         for i in range(n_pts):
             requests = {}
-            for posid in all_posids:
+            for posid in data:
                 requests[posid] = {'command':'posTP', 'target':data[posid]['target_posTP'][i], 'log_note':'calib grid point ' + str(i+1)}
             self.printfunc('calibration grid point ' + str(i+1) + ' of ' + str(n_pts))
             this_meas_data,imgfiles = self.move_measure(requests, tp_updates=None)
@@ -652,11 +639,10 @@ class PosMoveMeasure(object):
             'petal'           ... the petal this posid is on
             'trans'           ... the postransform object associated with this particular positioner
         """
-        posids_by_ptl = self.pos_data_listed_by_ptl(posids,'POS_ID')
+        posids_by_petal = self.posids_by_petal(posids)
         phi_clear_angle = self.phi_clear_angle
         data = {}
-        for petal in posids_by_ptl.keys():
-            these_posids = posids_by_ptl[petal]
+        for petal,these_posids in posids_by_petal.items():
             posmodels = [petal.posmodel(posid) for posid in these_posids]
             initial_tp = []
             final_tp = []
@@ -682,12 +668,11 @@ class PosMoveMeasure(object):
                 t = np.linspace(initial_tp[i][0], final_tp[i][0], n_pts)
                 p = np.linspace(initial_tp[i][1], final_tp[i][1], n_pts)
                 data[these_posids[i]] = {'target_posTP':[[t[j],p[j]] for j in range(n_pts)], 'measured_obsXY':[], 'petal':petal, 'trans':posmodels[i].trans}
-        all_posids = list(data.keys())
 
         # make the measurements
         for i in range(n_pts):
             requests = {}
-            for posid in all_posids:
+            for posid in data:
                 requests[posid] = {'command':'posTP', 'target':data[posid]['target_posTP'][i], 'log_note':'calib arc on ' + axis + ' point ' + str(i+1)}
             self.printfunc('calibration arc on ' + axis + ' axis: point ' + str(i+1) + ' of ' + str(n_pts))
             this_meas_data,imgfiles = self.move_measure(requests, tp_updates=None)
@@ -695,7 +680,7 @@ class PosMoveMeasure(object):
                 data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
 
         # circle fits
-        for posid in all_posids:
+        for posid in data:
             (xy_ctr,radius) = fitcircle.FitCircle().fit(data[posid]['measured_obsXY'])
             data[posid]['xy_center'] = xy_ctr
             data[posid]['radius'] = radius
@@ -721,13 +706,12 @@ class PosMoveMeasure(object):
             'petal'           ... petal this posid is on
             'trans'           ... postransform object associated with this particular positioner
         """
-        posids_by_ptl = self.pos_data_listed_by_ptl(posids,'POS_ID')
+        posids_by_petal = self.posids_by_petal(posids)
         phi_clear_angle = self.phi_clear_angle
         n_intermediate_pts = 2
         data = {}
         initial_tp_requests = {}
-        for petal in posids_by_ptl.keys():
-            these_posids = posids_by_ptl[petal]
+        for petal,these_posids in posids_by_petal.items():
             if axis == 'theta':
                 delta = 360/(n_intermediate_pts + 1)
                 dtdp = [delta,0]
@@ -749,7 +733,6 @@ class PosMoveMeasure(object):
                     initial_tp_requests[posid] = {'command':'posTP', 'target':initial_tp,  'log_note':'range arc ' + axis + ' initial point'}
             for i in range(len(these_posids)):
                 data[these_posids[i]] = {'target_dtdp':dtdp, 'measured_obsXY':[], 'petal':petal}
-        all_posids = list(data.keys())
 
         prefix = 'range measurement on ' + axis + ' axis'
         # go to initial point
@@ -758,8 +741,7 @@ class PosMoveMeasure(object):
 
         # seek first limit
         self.printfunc(prefix + ': seeking first limit')
-        for petal in posids_by_ptl.keys():
-            these_posids = posids_by_ptl[petal]
+        for petal,these_posids in posids_by_petal.items():
             petal.request_limit_seek(these_posids, axisid, -np.sign(delta), log_note='seeking first ' + axis + ' limit')
             petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
         meas_data,imgfiles = self.measure()
@@ -772,9 +754,9 @@ class PosMoveMeasure(object):
             # Note that anticollision is NOT done here. The reason is that phi location is not perfectly
             # well-known at this point (having just struck a hard limit). So externally need to have made
             # sure there was a clear path for the phi arm ahead of time.
-            for petal in posids_by_ptl.keys():
+            for petal,these_posids in posids_by_petal.items():
                 requests = {}
-                for posid in posids_by_ptl[petal]:
+                for posid in these_posids:
                     requests[posid] = {'target':dtdp, 'log_note':'intermediate ' + axis + ' point ' + str(i)}
                 petal.request_direct_dtdp(requests)
                 petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
@@ -784,8 +766,7 @@ class PosMoveMeasure(object):
 
         # seek second limit
         self.printfunc(prefix + ': seeking second limit')
-        for petal in posids_by_ptl.keys():
-            these_posids = posids_by_ptl[petal]
+        for petal,these_posids in posids_by_petal.items():
             petal.request_limit_seek(these_posids, axisid, np.sign(delta), log_note='seeking second ' + axis + ' limit')
             petal.schedule_send_and_execute_moves()
         meas_data,imgfiles = self.measure()
@@ -793,14 +774,13 @@ class PosMoveMeasure(object):
             data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],meas_data[p])
 
         # circle fits
-        for posid in all_posids:
+        for posid in data:
             (xy_ctr,radius) = fitcircle.FitCircle().fit(data[posid]['measured_obsXY'])
             data[posid]['xy_center'] = xy_ctr
 
         # get phi axis well back in clear envelope, as a best practice housekeeping thing to do
         if axis == 'phi' and np.sign(delta) == -1:
-            for petal in posids_by_ptl.keys():
-                these_posids = posids_by_ptl[petal]
+            for petal,these_posids in posids_by_petal.items():
                 petal.request_limit_seek(these_posids, axisid, -np.sign(delta), log_note='housekeeping extra ' + axis + ' limit seek')
                 petal.schedule_send_and_execute_moves()
 
@@ -935,8 +915,9 @@ class PosMoveMeasure(object):
     def _identify(self, posid=None):
         """Generic function for identifying either all fiducials or a single positioner's location.
         """
-        posids_by_ptl = self.pos_data_listed_by_ptl('all','POS_ID')
-        n_dots = len(self.all_posids) + self.n_ref_dots
+        posids_by_petal = self.posids_by_petal('all')
+        n_posids = len(self.all_posids)
+        n_dots = n_posids + self.n_ref_dots
         nudges = [-self.nudge_dist, self.nudge_dist]
         xy_init = []
         pseudo_xy_ref = []
@@ -945,9 +926,9 @@ class PosMoveMeasure(object):
             if posid == None:
                 identify_fiducials = True
                 log_note = 'nudge to identify fiducials '
-                for petal in posids_by_ptl.keys():
+                for petal,these_posids in posids_by_petal.items():
                     requests = {}
-                    for p in posids_by_ptl[petal]:
+                    for p in these_posids:
                         if identify_fiducials or p == posid:
                             requests[p] = {'target':[0,nudges[i]], 'log_note':log_note}
                     petal.request_direct_dtdp(requests)
@@ -962,7 +943,7 @@ class PosMoveMeasure(object):
             xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_dots)
             if self.fvc.fvc_type == 'simulator':
                 xy_meas = self._simulate_measured_pixel_locations(pseudo_xy_ref)
-                pseudo_xy_ref = xy_meas[len(self.all_posids):]
+                pseudo_xy_ref = xy_meas[n_posids:]
             if i == 0:
                 xy_init = xy_meas
             else:
@@ -980,7 +961,7 @@ class PosMoveMeasure(object):
             all_xyref_detected = []
             for fidid in self.all_fidids:
                 ptl = self.petal(fidid)
-                num_expected = ptl.get_fids_val(fidid,'N_DOTS')[0]
+                num_expected = ptl.get_posfid_val(fidid,'N_DOTS')
                 if num_expected > 0:
                     self.printfunc('Temporarily turning off fiducial ' + fidid + ' to determine which dots belonged to it.')
                     ptl.set_fiducials(fidid,'off')
@@ -988,7 +969,7 @@ class PosMoveMeasure(object):
                     if self.fvc.fvc_type == 'simulator':
                         xy_meas = self._simulate_measured_pixel_locations(xy_ref)
                         for j in range(num_expected):
-                            for k in range(len(self.all_posids),len(xy_meas)):
+                            for k in range(n_posids,len(xy_meas)):
                                 if xy_meas[k] not in all_xyref_detected:
                                     del xy_meas[k] # this is faking turning off that dot
                                     break
@@ -1036,9 +1017,9 @@ class PosMoveMeasure(object):
         reference points to repeat.
         """
         xy_meas = []
-        posids_by_ptl = self.pos_data_listed_by_ptl('all','POS_ID')
-        for petal in self.petals:
-            positioners_current = petal.expected_current_position(posid=posids_by_ptl[petal],key='obsXY')
+        posids_by_petal = self.posids_by_petal('all')
+        for petal,these_posids in posids_by_petal.items():
+            positioners_current = petal.expected_current_position(posid=these_posids,key='obsXY')
             positioners_current = self.fvc.obsXY_to_fvcXY(positioners_current)
             if len(positioners_current) > 1:
                 i = 0
@@ -1110,8 +1091,8 @@ class PosMoveMeasure(object):
                     param = 'OFFSET'
                 else:
                     param = 'POS'
-                old_T = ptl.get(posid,param + '_T')
-                old_P = ptl.get(posid,param + '_P')              
+                old_T = ptl.get_posfid_val(posid,param + '_T')
+                old_P = ptl.get_posfid_val(posid,param + '_P')              
                 new_T = old_T + delta_T
                 new_P = old_P + delta_P
                 if tp_updates == 'offsetsTP' or tp_updates == 'offsetsTP_close' :

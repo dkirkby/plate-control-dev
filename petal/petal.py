@@ -435,8 +435,8 @@ class Petal(object):
         fidids = pc.listify(fidids,keep_flat=True)[0]
         if fidids[0] == 'all':
             fidids = self.fidids
-        busids = self.get_fids_val(fidids,'BUS_ID')
-        canids = self.get_fids_val(fidids,'CAN_ID')
+        busids = [self.get_posfid_val(fidid,'BUS_ID') for fidid in fidids]
+        canids = [self.get_posfid_val(fidid,'CAN_ID') for fidid in fidids]
         if isinstance(setting,int) or isinstance(setting,float):
             if setting < 0:
                 setting = 0
@@ -444,10 +444,10 @@ class Petal(object):
                 setting = 100
             duties = [setting]*len(fidids)
         elif setting == 'on':
-            duties = self.get_fids_val(fidids,'DUTY_DEFAULT_ON')
+            duties = [self.get_posfid_val(fidid,'DUTY_DEFAULT_ON') for fidid in fidids]
         else:
-            duties = self.get_fids_val(fidids,'DUTY_DEFAULT_OFF')
-        enabled = self.get_fids_val(fidids,'CTRL_ENABLED')
+            duties = [self.get_posfid_val(fidid,'DUTY_DEFAULT_OFF') for fidid in fidids]
+        enabled = [self.get_posfid_val(fidid,'CTRL_ENABLED') for fidid in fidids]
         rng = range(len(fidids))
         fidids = [fidids[i] for i in rng if enabled[i]]
         busids = [busids[i] for i in rng if enabled[i]]
@@ -467,7 +467,7 @@ class Petal(object):
     def n_fiducial_dots(self):
         """Returns number of fixed fiducial dots this petal contributes in the field of view.
         """
-        n_dots = self.get_fids_val(self.fidids,'N_DOTS')
+        n_dots = {self.get_posfid_val(fidid,'N_DOTS') for fidid in self.fidids}
         return sum(n_dots)
     
     @property
@@ -491,8 +491,8 @@ class Petal(object):
             dotids = self.fid_dotids(fidid)
             for i in range(len(dotids)):
                 data[dotids[i]] = collections.OrderedDict()
-                x = self.get_fids_val(fidid,'DOTS_FVC_X')[0][i]
-                y = self.get_fids_val(fidid,'DOTS_FVC_Y')[0][i]
+                x = self.get_posfid_val(fidid,'DOTS_FVC_X')[i]
+                y = self.get_posfid_val(fidid,'DOTS_FVC_Y')[i]
                 data[dotids[i]]['fvcXY'] = [x,y]
         return data
 
@@ -505,7 +505,7 @@ class Petal(object):
     def fid_dotids(self,fidid):
         """Returns a list (in a standard order) of the dot id strings for a particular fiducial.
         """
-        return [self.dotid_str(fidid,i) for i in range(self.get_fids_val(fidid,'N_DOTS')[0])]
+        return [self.dotid_str(fidid,i) for i in range(self.get_posfid_val(fidid,'N_DOTS'))]
       
     @staticmethod
     def dotid_str(fidid,dotnumber):
@@ -514,39 +514,6 @@ class Petal(object):
     @staticmethod
     def extract_fidid(dotid):
         return dotid.split('.')[0]
-    
-    @staticmethod
-    def extract_dotnumber(dotid):
-        return dotid.split('.')[1]
-
-    def fid_busids(self,fidids):
-        """Returns a list of bus ids where you find each of the fiducials (identified
-        in the list fidids). These come back in the same order.
-        """
-        return self.get_fids_val(fidids,'BUS_ID')
-    
-    def fid_canids(self,fidids):
-        """Returns a list of can ids where each fiducial (identified in the list
-        fidids) is addressed on its bus. These come back in the same order.
-        """
-        return self.get_fids_val(fidids,'CAN_ID')
-    
-    def fid_default_duties(self,fidids):
-        """Returns a list of default duty percent settings which each fiducial (identified
-        in the list fidids) is supposed to be set to when turning it on.
-        """
-        return self.get_fids_val(fidids,'DUTY_DEFAULT_ON')
-    
-    def get_fids_val(self,fidids,key):
-        """Returns a list of the values for string key, for all fiducials identified
-        in the list fidids.
-        """
-        vals = []
-        fidids = pc.listify(fidids,keep_flat=True)[0]
-        for fidid in fidids:
-            vals.append(self.fidstates[fidid]._val[key])
-        return vals
-
 
 # GETTERS, SETTERS, STATUS METHODS
 
@@ -761,7 +728,7 @@ class Petal(object):
                             self.set_posfid_val(p.posid,'CTRL_ENABLED',False)
                             p.state.next_log_notes.append('disabled sending control commands because positioner was detected to be nonresponsive')
                     for fidid in self.fidids:
-                        if self.get_fids_val(fidid,'CAN_ID')[0] == canid:
+                        if self.get_posfid_val(fidid,'CAN_ID') == canid:
                             self.set_posfid_val(fidid,'CTRL_ENABLED',False)
                             self.fidstates[fidid].next_log_notes.append('disabled sending control commands because fiducial was detected to be nonresponsive')
                     status_updated = True

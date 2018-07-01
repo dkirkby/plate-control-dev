@@ -48,8 +48,8 @@ class InstrMaker(object):
         
         for i in range(n_pos):
             posid=posids[i]
-            obsX_arr.append(float(ptl.get(posid=posid,key=['LAST_MEAS_OBS_X']))
-            obsY_arr.append(float(ptl.get(posid=posid,key=['LAST_MEAS_OBS_Y']))        
+            obsX_arr.append(float(ptl.get_posfid_val(posid,'LAST_MEAS_OBS_X'))
+            obsY_arr.append(float(ptl.get_posfid_val(posid,'LAST_MEAS_OBS_Y'))        
             index=posids_PFS.index(posid.strip('M'))
             device_loc_this=device_loc_PFS[index]
             index2=divice_loc_arr.index(device_loc_this)

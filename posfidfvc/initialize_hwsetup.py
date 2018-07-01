@@ -165,10 +165,10 @@ m.n_extradots_expected = hwsetup['num_extra_dots']
 text = '\n\nHere are the known positioners and fiducials:\n\n'
 text += str(len(posids)) + ' POSITIONERS:'
 for posid in posids:
-	text += '\n  ' + format(posid+':','11s') + 'busid = ' + format(str(ptl.get(posid,'BUS_ID')),'5s') + '  canid = ' + format(str(ptl.get(posid,'CAN_ID')),'5s')
+	text += '\n  ' + format(posid+':','11s') + 'busid = ' + format(str(ptl.get_posfid_val(posid,'BUS_ID')),'5s') + '  canid = ' + format(str(ptl.get_posfid_val(posid,'CAN_ID')),'5s')
 text += '\n\n' + str(len(fidids)) + ' FIDUCIALS:'
 for fidid in fidids:
-	text += '\n  ' + format(fidid+':','11s') + 'busid = ' + format(str(ptl.get_fids_val(fidid,'BUS_ID')[0]),'5s') + '  canid = ' + format(str(ptl.get_fids_val(fidid,'CAN_ID')[0]),'5s') + '  ndots = ' + str(ptl.get_fids_val(fidid,'N_DOTS')[0])
+	text += '\n  ' + format(fidid+':','11s') + 'busid = ' + format(str(ptl.get_posfid_val(fidid,'BUS_ID')),'5s') + '  canid = ' + format(str(ptl.get_posfid_val(fidid,'CAN_ID')),'5s') + '  ndots = ' + str(ptl.get_posfid_val(fidid,'N_DOTS'))
 text += '\n  num extra dots = ' + str(m.n_extradots_expected) + '\n'
 print(text)
 message='A list of all the positioner and fiducials has been printed to the stdout text console.\n\nPlease check each of these carefully.\n\nAre they all correct?'

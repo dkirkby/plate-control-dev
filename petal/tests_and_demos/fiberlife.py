@@ -123,9 +123,9 @@ pos_params_before_test = collections.OrderedDict()
 for posid in posids:
     pos_params_before_test[posid] = {}
     for param in pos_params_during_test.keys():
-        pos_params_before_test[posid][param] = ptl.get(posid, param)
+        pos_params_before_test[posid][param] = ptl.get_posfid_val(posid, param)
         ptl.set_posfid_val(posid, param, pos_params_during_test[param])
-        logwrite(posid + ': Set ' + param + ' = ' + str(ptl.get(posid, param)))
+        logwrite(posid + ': Set ' + param + ' = ' + str(ptl.get_posfid_val(posid, param)))
 
 # home and center the positioners
 logwrite('Re-homing all positioners to hard stops.')

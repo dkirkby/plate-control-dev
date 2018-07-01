@@ -676,7 +676,7 @@ class XYTest(object):
             self.calib_store[posid] = {}
             ptl = self.m.petal(posid)
             for calib_key in pc.nominals.keys():
-                self.calib_store[posid][calib_key] = ptl.get(posid,calib_key)
+                self.calib_store[posid][calib_key] = ptl.get_posfid_val(posid,calib_key)
 
     def restore_calibrations(self, keys = None):
         '''Restore all the calibration values previously stored with the
