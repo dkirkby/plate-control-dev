@@ -147,6 +147,8 @@ class PosMoveTable(object):
         you want other_move_table to override these flags, this must be explicitly
         done separately.
         """
+        if self == other_move_table:
+            return
         for otherrow in other_move_table.rows:
             self.rows.append(otherrow.copy())
 
@@ -258,10 +260,11 @@ class PosMoveTable(object):
                 table['net_time'][i] += table['net_time'][i-1]
         if output_type in {'cleanup','full'}:
             table.update({'TOTAL_CRUISE_MOVES_T':0,'TOTAL_CRUISE_MOVES_P':0,'TOTAL_CREEP_MOVES_T':0,'TOTAL_CREEP_MOVES_P':0})
-            table['TOTAL_CRUISE_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'cruise' and table['dT'] != 0)
-            table['TOTAL_CRUISE_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'cruise' and table['dP'] != 0)
-            table['TOTAL_CREEP_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'creep' and table['dT'] != 0)
-            table['TOTAL_CREEP_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'creep' and table['dP'] != 0)
+            for i in row_range:
+                table['TOTAL_CRUISE_MOVES_T'] += int(table['speed_mode_T'][i] == 'cruise' and table['dT'] != 0)
+                table['TOTAL_CRUISE_MOVES_P'] += int(table['speed_mode_P'][i] == 'cruise' and table['dP'] != 0)
+                table['TOTAL_CREEP_MOVES_T'] += int(table['speed_mode_T'][i] == 'creep' and table['dT'] != 0)
+                table['TOTAL_CREEP_MOVES_P'] += int(table['speed_mode_P'][i] == 'creep' and table['dP'] != 0)
             table['net_dT'] = table['dT'].copy()
             table['net_dP'] = table['dP'].copy()
             for i in range(1,table['nrows']):

@@ -643,7 +643,7 @@ class Petal(object):
         can be informed that the move was physically done on the hardware.
         """
         self._check_and_disable_nonresponsive_pos_and_fid()
-        for m in self.schedule.move_tables:
+        for m in self.schedule.move_tables.values():
             m.posmodel.postmove_cleanup(m.for_cleanup())
             self.altered_states.add(m.posmodel.state)
         self.commit()
