@@ -141,7 +141,7 @@ class PosSchedule(object):
                 self._schedule_requests_with_no_path_adjustments(anticollision)
         for name in self.stage_order:
             self.stages[name].equalize_table_times()
-            for posid,table in self.stages[name].move_tables:
+            for posid,table in self.stages[name].move_tables.items():
                 if posid in self.move_tables:
                     self.move_tables[posid].extend(table)
                 else:
@@ -272,7 +272,7 @@ class PosSchedule(object):
             neighbor_posmodel = self.petal.posmodels[neighbor]
             neighbor_target_posTP = self.requests[neighbor]['targt_posTP']
             neighbor_target_obsTP = neighbor_posmodel.trans.posTP_to_obsTP(neighbor_target_posTP)
-            if self.collider.spatial_collision_between_positioners(self, posid, neighbor, target_obsTP, neighbor_target_obsTP):
+            if self.collider.spatial_collision_between_positioners(posid, neighbor, target_obsTP, neighbor_target_obsTP):
                 target_interference = True
                 break
         if target_interference:

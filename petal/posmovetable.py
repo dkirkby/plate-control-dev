@@ -38,11 +38,9 @@ class PosMoveTable(object):
         self.allow_cruise = not(self.posmodel.state._val['ONLY_CREEP'])
 
     # getters
-    @property
-    def for_schedule(self, suppress_any_finalcreep_and_antibacklash=True):
-        """Version of the table suitable for move scheduling.
-        Distances are given at the output shafts, in degrees.
-        Times are given in seconds.
+    def for_schedule(self, suppress_any_finalcreep_and_antibacklash=True, _output_type='schedule'):
+        """Version of the table suitable for move scheduling. Distances are given at
+        the output shafts, in degrees. Times are given in seconds.
         
         An option is provided to select whether final creep and antibacklash
         moves should be suppressed from the schedule-formatted output table.
@@ -54,13 +52,18 @@ class PosMoveTable(object):
             old_antibacklash = self.should_antibacklash
             self.should_final_creep = False
             self.should_antibacklash = False
-        output = self._for_output_type('schedule')
+        output = self._for_output_type(_output_type)
         if suppress_any_finalcreep_and_antibacklash:
             self.should_final_creep = old_finalcreep
             self.should_antibacklash = old_antibacklash
         return output
 
-    @property
+    def for_collider(self):
+        """Version of the table that is same as for_schedule, except with reduced
+        amount of data returned (only what the poscollider requires and no more.)
+        """
+        return self.for_schedule(_output_type='collider')
+
     def for_hardware(self):
         """Version of the table suitable for the hardware side.
         Distances are given at the motor shafts, in discrete steps.
@@ -68,14 +71,12 @@ class PosMoveTable(object):
         """
         return self._for_output_type('hardware')
 
-    @property
     def for_cleanup(self):
         """Version of the table suitable for updating the software internal
         position tracking after the physical move has been performed.
         """
         return self._for_output_type('cleanup')
 
-    @property
     def full_table(self):
         """Version of the table with all data.
         """
@@ -212,14 +213,14 @@ class PosMoveTable(object):
                  'prepause':[],'move_time':[],'postpause':[],
                  'command':[],'cmd_val1':[],'cmd_val2':[],
                  'log_note':''}
-        if output_type == 'schedule':
-            remove_keys = ['motor_steps_T','motor_steps_P','speed_mode_T','speed_mode_P','command','cmd_val1','cmd_val2']
+        if output_type in {'collider','schedule'}:
+            remove_keys = {} # no keys to remove because in this case unnecessary calcs are simply not done below
         elif output_type == 'hardware':
-            remove_keys = ['posid','dT','dP','Tdot','Pdot','prepause','command','cmd_val1','cmd_val2','stats','log_note']
+            remove_keys = {'posid','dT','dP','Tdot','Pdot','prepause','command','cmd_val1','cmd_val2','stats','log_note'}
         elif output_type == 'cleanup':
-            remove_keys = ['motor_steps_T','motor_steps_P','speed_mode_T','speed_mode_P','Tdot','Pdot','prepause','postpause','move_time']
+            remove_keys = {'motor_steps_T','motor_steps_P','speed_mode_T','speed_mode_P','Tdot','Pdot','prepause','postpause','move_time'}
         elif output_type == 'full':
-            remove_keys = []
+            remove_keys = {}
         else:
             print( 'bad table output type ' + output_type)
 
@@ -242,8 +243,14 @@ class PosMoveTable(object):
             table['Tdot'].append(true_moves[pc.T][i]['speed'])
             table['Pdot'].append(true_moves[pc.P][i]['speed'])
             table['prepause'].append(rows[i].data['prepause'])
-            table['motor_steps_T'].append(true_moves[pc.T][i]['motor_step'])
-            table['motor_steps_P'].append(true_moves[pc.P][i]['motor_step'])
+            if output_type not in {'collider','schedule'}:
+                table['motor_steps_T'].append(true_moves[pc.T][i]['motor_step'])
+                table['motor_steps_P'].append(true_moves[pc.P][i]['motor_step'])
+                table['command'].append(rows[i].data['command'])
+                table['cmd_val1'].append(rows[i].data['cmd_val1'])
+                table['cmd_val2'].append(rows[i].data['cmd_val2'])
+                table['speed_mode_T'].append(true_moves[pc.T][i]['speed_mode'])
+                table['speed_mode_P'].append(true_moves[pc.P][i]['speed_mode'])
             if output_type == 'hardware':
                 table['postpause'].append(int(round(rows[i].data['postpause']*1000))) # hardware postpause in integer milliseconds
             else:
@@ -251,29 +258,22 @@ class PosMoveTable(object):
             time1 = true_moves[pc.T][i]['move_time']
             time2 = true_moves[pc.P][i]['move_time']
             table['move_time'].append(max(time1,time2))
-            table['command'].append(rows[i].data['command'])
-            table['cmd_val1'].append(rows[i].data['cmd_val1'])
-            table['cmd_val2'].append(rows[i].data['cmd_val2'])
-            table['speed_mode_T'].append(true_moves[pc.T][i]['speed_mode'])
-            table['speed_mode_P'].append(true_moves[pc.P][i]['speed_mode'])
         if output_type == 'hardware':
             table['canid'] = self.posmodel.canid
             table['busid'] = self.posmodel.busid
-        else:
-            table['posid'] = self.posmodel.posid
-        if output_type == 'hardware':
             table['nrows'] = len(table['move_time'])
-            table['stats'] = {} # thrown away below anyway
+            table['log_note'] = self.log_note
         else:
             table['nrows'] = len(table['dT'])
-            table['stats'] = self._gather_stats(table)
-        table['log_note'] = self.log_note
-        restricted_table = table.copy()
+            if output_type != 'collider':
+                table['posid'] = self.posmodel.posid
+                table['stats'] = self._gather_stats(table,output_type)
+                table['log_note'] = self.log_note
         for key in remove_keys:
-            restricted_table.pop(key)
-        return restricted_table
+            table.pop(key)
+        return table
 
-    def _gather_stats(self,table):
+    def _gather_stats(self,table,output_type):
         stats = {'net_time':[],'net_dT':[],'net_dP':[],'Q':[],'S':[],'obsX':[],'obsY':[],'posX':[],'posY':[],'obsT':[],'obsP':[],'posT':[],'posP':[],
                  'TOTAL_CRUISE_MOVES_T':0,'TOTAL_CRUISE_MOVES_P':0,'TOTAL_CREEP_MOVES_T':0,'TOTAL_CREEP_MOVES_P':0}
         for i in range(table['nrows']):
@@ -286,10 +286,11 @@ class PosMoveTable(object):
                 stats['net_dP'][i] += stats['net_dP'][i-1]
             stats['posT'].append(self.init_posTP[pc.T] + stats['net_dT'][i])
             stats['posP'].append(self.init_posTP[pc.P] + stats['net_dP'][i])
-            stats['TOTAL_CRUISE_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'cruise' and table['dT'] != 0)
-            stats['TOTAL_CRUISE_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'cruise' and table['dP'] != 0)
-            stats['TOTAL_CREEP_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'creep' and table['dT'] != 0)
-            stats['TOTAL_CREEP_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'creep' and table['dP'] != 0)
+            if output_type != 'schedule':
+                stats['TOTAL_CRUISE_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'cruise' and table['dT'] != 0)
+                stats['TOTAL_CRUISE_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'cruise' and table['dP'] != 0)
+                stats['TOTAL_CREEP_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'creep' and table['dT'] != 0)
+                stats['TOTAL_CREEP_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'creep' and table['dP'] != 0)
         posTP = [stats['posT'],stats['posP']]
         obsTP = self.posmodel.trans.posTP_to_obsTP(posTP)
         stats['obsT'] = obsTP[0]

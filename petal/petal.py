@@ -87,7 +87,7 @@ class Petal(object):
         self.anticollision_default = 'freeze'  # Default parameter on how to schedule moves. See posschedule.py for valid settings.
         
         # fiducials setup
-        self.fidids = set(fidids)
+        self.fidids = {fidids} if isinstance(fidids,str) else set(fidids)
         for fidid in self.fidids:
             self.states[fidid] = posstate.PosState(fidid, logging=True, device_type='fid', printfunc=self.printfunc, petal_id=self.petal_id)        
         
@@ -232,7 +232,7 @@ class Petal(object):
         descriptive string to the log. This method is generally recommended only for
         expert usage. Requests to disabled positioners will be ignored.
         """
-        posids = set(posids)
+        posids = {posids} if isinstance(posids,str) else set(posids)
         enabled = self.enabled_posmodels(posids)
         if anticollision:
             if axisid == pc.P and direction == -1:
@@ -271,7 +271,7 @@ class Petal(object):
         posids. Finds the primary hardstop, and sets values for the max position and min position.
         Requests to disabled positioners will be ignored.
         """
-        posids = set(posids)
+        posids = {posids} if isinstance(posids,str) else set(posids)
         enabled = self.enabled_posmodels(posids)
         hardstop_debounce = [0,0]
         direction = [0,0]
@@ -385,7 +385,7 @@ class Petal(object):
                     log_note  ... optional string to include in the log file
         """
         requests = {}
-        posids = set(posids)
+        posids = {posids} if isinstance(posids,str) else set(posids)
         for posid in posids:
             requests[posid] = {'command':command, 'target':target, 'log_note':log_note}
         self.request_targets(requests)
@@ -402,7 +402,7 @@ class Petal(object):
                     log_note  ... optional string to include in the log file
         """
         requests = {}
-        posids = set(posids)
+        posids = {posids} if isinstance(posids,str) else set(posids)
         for posid in posids:
             requests[posid] = {'target':dtdp, 'log_note':log_note}
         self.request_direct_dtdp(requests)
@@ -430,10 +430,10 @@ class Petal(object):
         if self.simulator_on:
             self.printfunc('Simulator skips sending out set_fiducials commands on petal ' + str(self.petal_id) + '.')
             return {}
-        if isinstance(fidids,str) and fidids == 'all':
+        if fidids == 'all':
             fidids = self.fidids
         else:
-            fidids = set(fidids)
+            fidids = {fidids} if isinstance(fidids,str) else set(fidids)
         enabled = [fidid for fidid in fidids if self.get_posfid_val(fidid,'CTRL_ENABLED')]
         busids = [self.get_posfid_val(fidid,'BUS_ID') for fidid in enabled]
         canids = [self.get_posfid_val(fidid,'CAN_ID') for fidid in enabled]
@@ -489,12 +489,6 @@ class Petal(object):
                 y = self.get_posfid_val(fidid,'DOTS_FVC_Y')[i]
                 data[dotids[i]]['fvcXY'] = [x,y]
         return data
-
-    @property
-    def fidids(self):
-        """Returns a list of all the fiducial ids on the petal.
-        """
-        return list(self.fidstates.keys())
     
     def fid_dotids(self,fidid):
         """Returns a list (in a standard order) of the dot id strings for a particular fiducial.
@@ -594,7 +588,7 @@ class Petal(object):
         self.animator.clear()
         self.animator_on = True
         self.animator_total_time = 0
-        self.collider.add_fixed_to_animator()        
+        self.collider.add_fixed_to_animator(self.animator_total_time)        
     
     def end_gathering_frames(self):
         """Stop collecting frame data of scheduled moves for the animator.
@@ -640,7 +634,7 @@ class Petal(object):
         """
         hw_tables = []
         for m in self.schedule.move_tables:
-            hw_tbl = m.for_hardware
+            hw_tbl = m.for_hardware()
             hw_tables.append(hw_tbl)
         return hw_tables
 
@@ -650,7 +644,7 @@ class Petal(object):
         """
         self._check_and_disable_nonresponsive_pos_and_fid()
         for m in self.schedule.move_tables:
-            m.posmodel.postmove_cleanup(m.for_cleanup)
+            m.posmodel.postmove_cleanup(m.for_cleanup())
             self.altered_states.add(m.posmodel.state)
         self.commit()
         self._clear_temporary_state_values()
@@ -694,13 +688,9 @@ class Petal(object):
         return posschedule.PosSchedule(petal=self, stats=self.schedule_stats_log, verbose=self.verbose)
 
     def _wait_while_moving(self):
-        """Blocking implementation, to not send move tables while any positioners
-        are still moving.
-
-        Inputs:     canids ... integer CAN id numbers of all the positioners to check
-
-        The implementation has the benefit of simplicity, but it is acknowledged
-        there may be 'better', i.e. multi-threaded, ways to achieve this.
+        """Blocking implementation, to not send move tables while any positioners are
+        still moving. The implementation has the benefit of simplicity, but it is
+        acknowledged there may be 'better', i.e. multi-threaded, ways to achieve this.
         """
         if self.simulator_on:
             return        
@@ -721,12 +711,11 @@ class Petal(object):
     def _map_power_supplies_to_posids(self):
         """Reads in data for positioner canids and petal power supply ids, and
         returns a dict mapping power supply ids (keys) to sets of posids (values).
-        
         Any unknown mappings (e.g. a canid that does not match the nominal petal
         mapping) gets assigned a power_supply_id of 'other'. (This could happen
         for example on a non-petal test stand.)
         """
-        canids = {posmodel.posid:posmodel.canid for posmodel in self.posmodels}
+        canids = {posid:posmodel.canid for posid,posmodel in self.posmodels.items()}
         power_supply_map = {}
         already_mapped = set()
         for supply,mapped_cans in pc.power_supply_can_map.items():

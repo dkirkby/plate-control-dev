@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import time
-import datetime
 import posconstants as pc
 
 class PosAnimator(object):
@@ -17,7 +16,7 @@ class PosAnimator(object):
         self.live_animate = False # whether to plot the animation live
         self.save_movie = True # whether to write out a movie file of animation
         self.delete_imgs = False # whether to delete individual image files after generating animation
-        self.save_dir = os.path.join(pc.dirs['fp_temp_files'], 'schedule_animations')
+        self.save_dir = os.path.join(pc.dirs['temp_files'], 'schedule_animations')
         self.framefile_prefix = 'frame'
         self.framefile_extension = '.png'
         self.movie_codec = 'mpeg4'

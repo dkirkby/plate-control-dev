@@ -16,7 +16,7 @@ posids_500 = ['M00001','M00002','M00003','M00004','M00005','M00006','M00008','M0
 fidids_12 = ['P077','F001','F010','F011','F017','F021','F022','F025','F029','F074','P022','P057']
 
 # selection of ids
-posids = posids_100
+posids = posids_50
 fidids = fidids_12
 petal_id = 666
 
@@ -32,7 +32,7 @@ def cProfile_wrapper(evaluatable_string):
     p.print_stats(n_stats_lines)
     
 # timed test sequence
-cProfile_wrapper('ptl = petal.Petal(petal_id, posids, fidids, simulator_on=True, db_commit_on=False, local_commit_on=True)')
+cProfile_wrapper('ptl = petal.Petal(petal_id, posids, fidids, simulator_on=True, db_commit_on=False, local_commit_on=True, sched_stats_on=True)')
 ptl.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
 cProfile_wrapper('ptl.request_homing(posids)')
 cProfile_wrapper('ptl.schedule_send_and_execute_moves()')

@@ -218,8 +218,8 @@ def run_random_example(nposs,deltemps=False,seed=None,do_anims=False):
     #     print(posmodel == curpetal.posmodels[tablenum])
     #     dp = posmodel.trans.delta_posTP(tpfins[tablenum],tpstarts[tablenum],range_wrap_limits='targetable')
     #     print("Requested dt,dp: ",dp[0],dp[1])
-    #     sched = table.for_hardware
-    #     #sched = table.for_schedule
+    #     sched = table.for_hardware()
+    #     #sched = table.for_schedule()
     #     stats = sched['stats']
     #     print("Stats dt,dp: ",stats['net_dT'][-1],stats['net_dP'][-1])
     #     if len(table.rows) > 2:
@@ -234,7 +234,7 @@ def run_random_example(nposs,deltemps=False,seed=None,do_anims=False):
         dp = posmodel.trans.delta_posTP(tpfins[tablenum],tpstarts[tablenum],range_wrap_limits='targetable')
         print(posmodel.posid)
         print("Requested dt,dp: ",dp[0],dp[1])
-        sched = table.for_hardware
+        sched = table.for_hardware()
 
         if len(sched['motor_steps_T']) == 6:
             tstep = sched['motor_steps_T'][2]

@@ -46,7 +46,7 @@ class PosScheduleStage(object):
     def is_not_empty(self):
         """Returns boolean whether the stage is empty of move_tables.
         """
-        return len(self.move_tables) == 0
+        return not(not(self.move_tables))
         
     def add_table(self, move_table):
         """Directly adds a move table to the stage. If a move table representing
@@ -71,17 +71,18 @@ class PosScheduleStage(object):
         """
         if anneal_time == None:
             return
-        postprocessed = {posid:self.move_table[posid].for_schedule for posid in self.move_tables}
-        times = {posid:postprocessed[posid]['stats']['net_time'][-1] for posid in postprocessed}
+        postprocessed = {posid:table.for_schedule() for posid,table in self.move_tables.items()}
+        times = {posid:post['stats']['net_time'][-1] for posid,post in postprocessed.items()}
         orig_max_time = max(times.values())
         new_max_time = anneal_time if anneal_time > orig_max_time else orig_max_time
-        for posids in list(self._power_supply_map.values()):
+        for posids in self._power_supply_map.values():
             group = []
             group_time = 0
-            for posid in posids:
+            posids_list = list(posids)
+            for posid in posids_list:
                 group.append(posid)
                 group_time += times[posid]
-                if group_time > new_max_time or posid == posids[-1]:
+                if group_time > new_max_time or posid == posids_list[-1]:
                     n = len(group)
                     nominal_spacing = new_max_time / (n + 1)
                     center = 0
@@ -102,9 +103,11 @@ class PosScheduleStage(object):
         """Makes all move tables in the stage have an equal total time length,
         by adding in post-pauses wherever necessary.
         """
+        if not self.move_tables:
+            return
         times = {}
         for posid,table in self.move_tables.items():
-            postprocessed = table.for_schedule
+            postprocessed = table.for_schedule()
             times[posid] = postprocessed['stats']['net_time'][-1]
         max_time = max(times.values())
         for posid,table in self.move_tables.items():
@@ -205,7 +208,7 @@ class PosScheduleStage(object):
                 if neighbor not in already_checked[posid]:
                     table_B = move_tables[neighbor] if neighbor in move_tables else posmovetable.PosMoveTable(self.collider.posmodels[neighbor]) # generation of fixed table if necessary, for a non-moving neighbor
                     init_obsTP_B = table_B.posmodel.trans.posTP_to_obsTP(table_B.init_posTP)
-                    pospos_sweeps = self.collider.spacetime_collision_between_positioners(posid, init_obsTP_A, table_A, neighbor, init_obsTP_B, table_B)
+                    pospos_sweeps = self.collider.spacetime_collision_between_positioners(posid, init_obsTP_A, table_A.for_collider(), neighbor, init_obsTP_B, table_B.for_collider())
                     all_sweeps.update({posid:pospos_sweeps[0], neighbor:pospos_sweeps[1]})
                     for sweep in pospos_sweeps:
                         if sweep.collision_case != pc.case.I:
@@ -213,7 +216,7 @@ class PosScheduleStage(object):
                     already_checked[posid].add(neighbor)
                     already_checked[neighbor].add(posid)
             for fixed_neighbor in self.collider.fixed_neighbor_cases[posid]:
-                posfix_sweep = self.collider.spacetime_collision_with_fixed(posid, init_obsTP_A, table_A)[0] # index 0 to immediately retrieve from the one-element list this function returns
+                posfix_sweep = self.collider.spacetime_collision_with_fixed(posid, init_obsTP_A, table_A.for_collider())[0] # index 0 to immediately retrieve from the one-element list this function returns
                 all_sweeps.update({posid:posfix_sweep})
                 if posfix_sweep.collision_case != pc.case.I:
                     colliding_sweeps[posid].add(posfix_sweep)
@@ -236,7 +239,7 @@ class PosScheduleStage(object):
         all_checked = {posid for posid in all_sweeps}
         now_colliding = {posid for posid in colliding_sweeps}
         now_not_colliding = all_checked.difference(now_colliding)
-        self.colliding.add(now_colliding)
+        self.colliding.union(now_colliding)
         self.colliding.difference(now_not_colliding)
 
     def _propose_path_adjustment(self, posid, method='freeze'):
@@ -285,7 +288,7 @@ class PosScheduleStage(object):
             return {posid:self.move_tables[posid]} # unchanged move table
         table = self.move_tables[posid].copy()
         if method == 'freeze':    
-            table_data = table.for_schedule
+            table_data = table.for_schedule()
             for row_idx in reversed(range(table.n_rows)):
                 if table_data['stats']['net_time'][row_idx] >= self.sweep[posid].collision_time:
                     table.delete_row(row_idx)

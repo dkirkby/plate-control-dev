@@ -31,7 +31,6 @@ class PosCollider(object):
         self.plotting_on = True
         self.timestep = self.config['TIMESTEP']
         self.animator = posanimator.PosAnimator(fignum=0, timestep=self.timestep)
-        self.add_fixed_to_animator()
 
     def add_positioners(self, posmodels):
         """Add a collection of positioners to the collider object.
@@ -48,7 +47,7 @@ class PosCollider(object):
         for p in self.posids:
             self._identify_neighbors(p)
 
-    def add_fixed_to_animator(self, start_time):
+    def add_fixed_to_animator(self, start_time=0):
         """Add unmoving polygon shapes to the animator.
         
             start_time ... seconds, global time when the move begins
