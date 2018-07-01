@@ -2,6 +2,7 @@ import os
 import sys
 sys.path.append(os.path.abspath('../../petal/'))
 import petal
+import posconstants as pc
 import cProfile
 import pstats
 
@@ -22,7 +23,7 @@ petal_id = 666
 
 # timing helper wrapper function
 n_stats_lines = 15
-statsfile = 'stats_petalcode'
+statsfile = os.path.join(pc.dirs['temp_files'],'stats_petal_timetrial')
 def cProfile_wrapper(evaluatable_string):
     print(evaluatable_string)
     cProfile.run(evaluatable_string,statsfile)
