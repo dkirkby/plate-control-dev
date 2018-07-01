@@ -220,8 +220,6 @@ def run_random_example(nposs,deltemps=False,seed=None,do_anims=False):
     #     print("Requested dt,dp: ",dp[0],dp[1])
     #     sched = table.for_hardware()
     #     #sched = table.for_schedule()
-    #     stats = sched['stats']
-    #     print("Stats dt,dp: ",stats['net_dT'][-1],stats['net_dP'][-1])
     #     if len(table.rows) > 2:
     #         print("Ideal table dtdp: ", table.rows[1].data['dT_ideal'],
     #               table.rows[0].data['dP_ideal'] + table.rows[2].data['dP_ideal'])

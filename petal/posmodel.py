@@ -206,9 +206,8 @@ class PosModel(object):
         """
         if self.state._val['CTRL_ENABLED'] == False:
             return
-
-        self.state.store('POS_T', self.state._val['POS_T'] + cleanup_table['stats']['net_dT'][-1])
-        self.state.store('POS_P', self.state._val['POS_P'] + cleanup_table['stats']['net_dP'][-1])
+        self.state.store('POS_T', self.state._val['POS_T'] + cleanup_table['net_dT'][-1])
+        self.state.store('POS_P', self.state._val['POS_P'] + cleanup_table['net_dP'][-1])
         for axis in self.axis:
             exec(axis.postmove_cleanup_cmds)
             axis.postmove_cleanup_cmds = ''
@@ -231,10 +230,10 @@ class PosModel(object):
             self.state.store('MOVE_VAL2', separator.join(x for x in value))
         except Exception as e:
             print('postmove_cleanup: %s' % str(e))
-        self.state.store('TOTAL_CRUISE_MOVES_T', self.state._val['TOTAL_CRUISE_MOVES_T']+ cleanup_table['stats']['TOTAL_CRUISE_MOVES_T'])
-        self.state.store('TOTAL_CRUISE_MOVES_P', self.state._val['TOTAL_CRUISE_MOVES_P'] + cleanup_table['stats']['TOTAL_CRUISE_MOVES_P'])
-        self.state.store('TOTAL_CREEP_MOVES_T', self.state._val['TOTAL_CREEP_MOVES_T'] + cleanup_table['stats']['TOTAL_CREEP_MOVES_T'])
-        self.state.store('TOTAL_CREEP_MOVES_P', self.state._val['TOTAL_CREEP_MOVES_P'] + cleanup_table['stats']['TOTAL_CREEP_MOVES_P'])
+        self.state.store('TOTAL_CRUISE_MOVES_T', self.state._val['TOTAL_CRUISE_MOVES_T']+ cleanup_table['TOTAL_CRUISE_MOVES_T'])
+        self.state.store('TOTAL_CRUISE_MOVES_P', self.state._val['TOTAL_CRUISE_MOVES_P'] + cleanup_table['TOTAL_CRUISE_MOVES_P'])
+        self.state.store('TOTAL_CREEP_MOVES_T', self.state._val['TOTAL_CREEP_MOVES_T'] + cleanup_table['TOTAL_CREEP_MOVES_T'])
+        self.state.store('TOTAL_CREEP_MOVES_P', self.state._val['TOTAL_CREEP_MOVES_P'] + cleanup_table['TOTAL_CREEP_MOVES_P'])
         self.state.store('TOTAL_MOVE_SEQUENCES', self.state._val['TOTAL_MOVE_SEQUENCES'] + 1)
         self.state.next_log_notes.append(cleanup_table['log_note'])
 

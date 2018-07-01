@@ -471,7 +471,7 @@ class PosMoveMeasure(object):
         """
         if posids == 'all':
             return {petal:petal.posids for petal in self.petals}
-        posids = set(posids)
+        posids = {posids} if isinstance(posids,str) else set(posids)
         ptl_map = {posid:self._petals_map[posid] for posid in posids}
         posids_by_petal = {petal:{p for p in ptl_map if ptl_map[p] == petal} for petal in set(ptl_map.values())}
         return posids_by_petal

@@ -207,104 +207,77 @@ class PosMoveTable(object):
         return true_and_new
 
     def _for_output_type(self,output_type):
-        # define the columns that will be filled in
-        table = {'posid':'','nrows':0,'dT':[],'dP':[],'motor_steps_T':[],'motor_steps_P':[],
-                 'Tdot':[],'Pdot':[],'speed_mode_T':[],'speed_mode_P':[],
-                 'prepause':[],'move_time':[],'postpause':[],
-                 'command':[],'cmd_val1':[],'cmd_val2':[],
-                 'log_note':''}
-        if output_type in {'collider','schedule'}:
-            remove_keys = {} # no keys to remove because in this case unnecessary calcs are simply not done below
-        elif output_type == 'hardware':
-            remove_keys = {'posid','dT','dP','Tdot','Pdot','prepause','command','cmd_val1','cmd_val2','stats','log_note'}
-        elif output_type == 'cleanup':
-            remove_keys = {'motor_steps_T','motor_steps_P','speed_mode_T','speed_mode_P','Tdot','Pdot','prepause','postpause','move_time'}
-        elif output_type == 'full':
-            remove_keys = {}
-        else:
-            print( 'bad table output type ' + output_type)
-
-        # calculate the true moves and gather any new extra move rows
+        """Internal function that calculates the various output table formats and
+        passes them up to the wrapper functions above.
+        """
         true_moves = self._calculate_true_moves()
         rows = self.rows.copy()
         rows.extend(self._rows_extra)
-
-        # format and populate the return tables
-        for i in range(len(rows)):
-            # for hardware type, insert an extra pause-only action if necessary, since hardware commands only really have postpauses
-            if output_type == 'hardware' and rows[i].data['prepause']:
-                for key in ['motor_steps_T','motor_steps_P','move_time']:
-                    table[key].insert(i,0)
-                for key in ['speed_mode_T','speed_mode_P']:
-                    table[key].insert(i,'creep') # speed mode doesn't matter here
-                table['postpause'].insert(i,rows[i].data['prepause'])
-            table['dT'].append(true_moves[pc.T][i]['distance'])
-            table['dP'].append(true_moves[pc.P][i]['distance'])
-            table['Tdot'].append(true_moves[pc.T][i]['speed'])
-            table['Pdot'].append(true_moves[pc.P][i]['speed'])
-            table['prepause'].append(rows[i].data['prepause'])
-            if output_type not in {'collider','schedule'}:
-                table['motor_steps_T'].append(true_moves[pc.T][i]['motor_step'])
-                table['motor_steps_P'].append(true_moves[pc.P][i]['motor_step'])
-                table['command'].append(rows[i].data['command'])
-                table['cmd_val1'].append(rows[i].data['cmd_val1'])
-                table['cmd_val2'].append(rows[i].data['cmd_val2'])
-                table['speed_mode_T'].append(true_moves[pc.T][i]['speed_mode'])
-                table['speed_mode_P'].append(true_moves[pc.P][i]['speed_mode'])
-            if output_type == 'hardware':
-                table['postpause'].append(int(round(rows[i].data['postpause']*1000))) # hardware postpause in integer milliseconds
-            else:
-                table['postpause'].append(rows[i].data['postpause'])
-            time1 = true_moves[pc.T][i]['move_time']
-            time2 = true_moves[pc.P][i]['move_time']
-            table['move_time'].append(max(time1,time2))
+        row_range = range(len(rows))
+        table = {}
+        if output_type in {'collider','schedule','full','cleanup'}:
+            table['dT'] = [true_moves[pc.T][i]['distance'] for i in row_range]
+            table['dP'] = [true_moves[pc.P][i]['distance'] for i in row_range]
+        if output_type in {'collider','schedule','full'}:
+            table['Tdot'] = [true_moves[pc.T][i]['speed'] for i in row_range]
+            table['Pdot'] = [true_moves[pc.P][i]['speed'] for i in row_range]
+            table['prepause'] = [rows[i].data['prepause'] for i in row_range]
+            table['postpause'] = [rows[i].data['postpause'] for i in row_range]
+        if output_type in {'hardware','full'}:
+            table['motor_steps_T'] = [true_moves[pc.T][i]['motor_step'] for i in row_range]
+            table['motor_steps_P'] = [true_moves[pc.P][i]['motor_step'] for i in row_range]
+        if output_type in {'hardware','full','cleanup'}:
+            table['speed_mode_T'] = [true_moves[pc.T][i]['speed_mode'] for i in row_range]
+            table['speed_mode_P'] = [true_moves[pc.P][i]['speed_mode'] for i in row_range]
+        if output_type in {'full','cleanup'}:
+            table['command'] = [rows[i].data['command'] for i in row_range]
+            table['cmd_val1'] = [rows[i].data['cmd_val1'] for i in row_range]
+            table['cmd_val2'] = [rows[i].data['cmd_val2'] for i in row_range]
+        if output_type in {'collider','schedule','full','hardware'}:
+            table['move_time'] = [max(true_moves[pc.T][i]['move_time'],true_moves[pc.P][i]['move_time']) for i in row_range]
         if output_type == 'hardware':
             table['canid'] = self.posmodel.canid
             table['busid'] = self.posmodel.busid
+            for i in row_range:  # for hardware type, insert an extra pause-only action if necessary, since hardware commands only really have postpauses
+                if rows[i].data['prepause']:
+                    for key in ['motor_steps_T','motor_steps_P','move_time']:
+                        table[key].insert(i,0)
+                    for key in ['speed_mode_T','speed_mode_P']:
+                        table[key].insert(i,'creep') # speed mode doesn't matter here
+                    table['postpause'].insert(i,rows[i].data['prepause'])
             table['nrows'] = len(table['move_time'])
+            table['postpause'] = [int(round(rows[i].data['postpause']*1000)) for i in range(table['nrows'])] # hardware postpause in integer milliseconds            
+            return table
+        table['nrows'] = len(table['dT'])
+        if output_type == 'collider':
+            return table
+        table['posid'] = self.posmodel.posid
+        if output_type in {'schedule','full'}:
+            table['net_time'] = [table['move_time'][i] + table['prepause'][i] + table['postpause'][i] for i in row_range]
+            for i in range(1,table['nrows']):
+                table['net_time'][i] += table['net_time'][i-1]
+        if output_type in {'cleanup','full'}:
+            table.update({'TOTAL_CRUISE_MOVES_T':0,'TOTAL_CRUISE_MOVES_P':0,'TOTAL_CREEP_MOVES_T':0,'TOTAL_CREEP_MOVES_P':0})
+            table['TOTAL_CRUISE_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'cruise' and table['dT'] != 0)
+            table['TOTAL_CRUISE_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'cruise' and table['dP'] != 0)
+            table['TOTAL_CREEP_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'creep' and table['dT'] != 0)
+            table['TOTAL_CREEP_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'creep' and table['dP'] != 0)
+            table['net_dT'] = table['dT'].copy()
+            table['net_dP'] = table['dP'].copy()
+            for i in range(1,table['nrows']):
+                table['net_dT'][i] += table['net_dT'][i-1]
+                table['net_dP'][i] += table['net_dP'][i-1]
             table['log_note'] = self.log_note
-        else:
-            table['nrows'] = len(table['dT'])
-            if output_type != 'collider':
-                table['posid'] = self.posmodel.posid
-                table['stats'] = self._gather_stats(table,output_type)
-                table['log_note'] = self.log_note
-        for key in remove_keys:
-            table.pop(key)
+        if output_type == 'full':
+            trans = self.posmodel.trans
+            posT = [self.init_posTP[pc.T] + table['net_dT'][i] for i in row_range]
+            posP = [self.init_posTP[pc.P] + table['net_dP'][i] for i in row_range]  
+            table['posTP'] = [[posT[i],posP[i]] for i in row_range]
+            table['obsTP'] = [trans.posTP_to_obsTP(tp) for tp in table['posTP']]
+            table['posXY'] = [trans.posTP_to_posXY(tp) for tp in table['posTP']]
+            table['obsXY'] = [trans.posXY_to_obsXY(xy) for xy in table['posXY']]
+            table['QS'] = [trans.obsXY_to_QS(xy) for xy in table['obsXY']]            
         return table
-
-    def _gather_stats(self,table,output_type):
-        stats = {'net_time':[],'net_dT':[],'net_dP':[],'Q':[],'S':[],'obsX':[],'obsY':[],'posX':[],'posY':[],'obsT':[],'obsP':[],'posT':[],'posP':[],
-                 'TOTAL_CRUISE_MOVES_T':0,'TOTAL_CRUISE_MOVES_P':0,'TOTAL_CREEP_MOVES_T':0,'TOTAL_CREEP_MOVES_P':0}
-        for i in range(table['nrows']):
-            stats['net_time'].append(table['move_time'][i] + table['prepause'][i] + table['postpause'][i])
-            stats['net_dT'].append(table['dT'][i])
-            stats['net_dP'].append(table['dP'][i])
-            if i > 0:
-                stats['net_time'][i] += stats['net_time'][i-1]
-                stats['net_dT'][i] += stats['net_dT'][i-1]
-                stats['net_dP'][i] += stats['net_dP'][i-1]
-            stats['posT'].append(self.init_posTP[pc.T] + stats['net_dT'][i])
-            stats['posP'].append(self.init_posTP[pc.P] + stats['net_dP'][i])
-            if output_type != 'schedule':
-                stats['TOTAL_CRUISE_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'cruise' and table['dT'] != 0)
-                stats['TOTAL_CRUISE_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'cruise' and table['dP'] != 0)
-                stats['TOTAL_CREEP_MOVES_T'] += 1 * (table['speed_mode_T'][i] == 'creep' and table['dT'] != 0)
-                stats['TOTAL_CREEP_MOVES_P'] += 1 * (table['speed_mode_P'][i] == 'creep' and table['dP'] != 0)
-        posTP = [stats['posT'],stats['posP']]
-        obsTP = self.posmodel.trans.posTP_to_obsTP(posTP)
-        stats['obsT'] = obsTP[0]
-        stats['obsP'] = obsTP[1]
-        posXY = self.posmodel.trans.posTP_to_posXY(posTP)
-        stats['posX'] = posXY[0]
-        stats['posY'] = posXY[1]
-        obsXY = self.posmodel.trans.posXY_to_obsXY(posXY)
-        stats['obsX'] = obsXY[0]
-        stats['obsY'] = obsXY[1]
-        QS = self.posmodel.trans.obsXY_to_QS(obsXY)
-        stats['Q'] = QS[0]
-        stats['S'] = QS[1]
-        return stats
 
 class PosMoveRow(object):
     """The general user does not directly use the internal values of a

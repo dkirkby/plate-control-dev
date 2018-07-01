@@ -117,7 +117,7 @@ class PosCollider(object):
             'Pdot'      : list of phi rotation speeds in deg/sec
             'prepause'  : list of prepause (before the rotations begin) values in seconds
             'move_time' : list of durations of rotations in seconds, approximately equals max(dT/Tdot,dP/Pdot), but calculated more exactly for the physical hardware
-            'prepause'  : list of postpause (after the rotations end) values in seconds
+            'postpause' : list of postpause (after the rotations end) values in seconds
 
         The return is a list of instances of PosSweep. (These contain the theta and phi rotations
         in real time, when if any collision, and the collision type and neighbor.)

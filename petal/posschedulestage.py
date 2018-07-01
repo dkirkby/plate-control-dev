@@ -72,7 +72,7 @@ class PosScheduleStage(object):
         if anneal_time == None:
             return
         postprocessed = {posid:table.for_schedule() for posid,table in self.move_tables.items()}
-        times = {posid:post['stats']['net_time'][-1] for posid,post in postprocessed.items()}
+        times = {posid:post['net_time'][-1] for posid,post in postprocessed.items()}
         orig_max_time = max(times.values())
         new_max_time = anneal_time if anneal_time > orig_max_time else orig_max_time
         for posids in self._power_supply_map.values():
@@ -108,7 +108,7 @@ class PosScheduleStage(object):
         times = {}
         for posid,table in self.move_tables.items():
             postprocessed = table.for_schedule()
-            times[posid] = postprocessed['stats']['net_time'][-1]
+            times[posid] = postprocessed['net_time'][-1]
         max_time = max(times.values())
         for posid,table in self.move_tables.items():
             equalizing_pause = max_time - times[posid]
@@ -290,7 +290,7 @@ class PosScheduleStage(object):
         if method == 'freeze':    
             table_data = table.for_schedule()
             for row_idx in reversed(range(table.n_rows)):
-                if table_data['stats']['net_time'][row_idx] >= self.sweep[posid].collision_time:
+                if table_data['net_time'][row_idx] >= self.sweep[posid].collision_time:
                     table.delete_row(row_idx)
                 else:
                     break
@@ -300,7 +300,7 @@ class PosScheduleStage(object):
         if not fixed_collision:
             neighbor = self.sweeps[posid].collision_neighbor
             neighbor_table_data = self.move_tables[neighbor].for_schedule
-            for neighbor_clearance_time in neighbor_table_data['stats']['net_time']:
+            for neighbor_clearance_time in neighbor_table_data['net_time']:
                 if neighbor_clearance_time > self.sweeps[posid].collision_time:
                     break
         else:
