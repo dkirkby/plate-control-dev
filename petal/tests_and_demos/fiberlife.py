@@ -112,7 +112,7 @@ ptl = petal.Petal(ptlid, posids, fidids=[], simulator_on=should_simulate, printf
 ptl.anticollision_default = False
 states = collections.OrderedDict()
 for posid in posids:
-    states[posid] = ptl.posmodel(posid).state
+    states[posid] = ptl.posmodels[posid].state
     new_and_changed_files.add(states[posid].log_path)
     new_and_changed_files.add(states[posid].conf.filename)
 logwrite('Petal ' + str(ptlid) + ' initialized.')

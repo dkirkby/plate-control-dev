@@ -18,7 +18,7 @@ ptl.anticollision_default = False # turn off anticollision algorithm for all sch
 
 print('INITIAL POSITION')
 for posid in posids:
-    print(ptl.posmodel(posid).expected_current_position_str)
+    print(ptl.posmodels[posid].expected_current_position_str)
 
 # demo script flags
 use_standard_syntax = True # enter False to try out the "quick" move syntax
