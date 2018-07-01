@@ -31,7 +31,6 @@ petal/tests_and_demos/pift.py -text
 petal/tests_and_demos/power_test.py -text
 petal/tests_and_demos/py_vs_numpy.py -text
 petal/tests_and_demos/repositioning_sim.py -text
-petal/tests_and_demos/stats_petalcode -text
 petal/tests_and_demos/test_fipos_led.py -text
 petal/tests_and_demos/test_interior_unreachable_nan.py -text
 petal/tests_and_demos/test_poscollider.py -text
