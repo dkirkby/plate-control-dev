@@ -71,14 +71,14 @@ class Petal(object):
         self.posids = set(self.posmodels.keys())
         self.canids_where_tables_were_just_sent = []
         self.busids_where_tables_were_just_sent = []
-        self.nonresponsive_canids = []
+        self.nonresponsive_canids = {}
         self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
         self.set_motor_parameters()
         self.power_supply_map = self._map_power_supplies_to_posids()
         
         # collider, scheduler, and animator setup
         self.collider = poscollider.PosCollider(configfile=collider_file)
-        self.collider.add_positioners(self.posmodels)
+        self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
         self.animator_on = False # this should be turned on/off using the animation start/stop control methods below
         self.animator_total_time = 0 # keeps track of total time of the current animation
@@ -667,24 +667,15 @@ class Petal(object):
             nonresponsives = self.comm.get_nonresponsive_canids()
             for canid in nonresponsives:
                 if canid not in self.nonresponsive_canids:
-                    self.nonresponsive_canids.append(canid)
-                    for p in self.posmodels:
-                        if p.canid == canid:
-                            self.set_posfid_val(p.posid,'CTRL_ENABLED',False)
-                            p.state.next_log_notes.append('disabled sending control commands because positioner was detected to be nonresponsive')
-                    for fidid in self.fidids:
-                        if self.get_posfid_val(fidid,'CAN_ID') == canid:
-                            self.set_posfid_val(fidid,'CTRL_ENABLED',False)
-                            self.fidstates[fidid].next_log_notes.append('disabled sending control commands because fiducial was detected to be nonresponsive')
+                    self.nonresponsive_canids.add(canid)
+                    for item_id in self.posids.union(self.fidids):
+                        if self.get_posfid_val(item_id,'CAN_ID') == canid:
+                            self.set_posfid_val(item_id,'CTRL_ENABLED',False)
+                            self.states[item_id].next_log_notes.append('Disabled sending control commands because device was detected to be nonresponsive.')
+                            break
                     status_updated = True
-            for canid in self.nonresponsive_canids:
-                if canid not in nonresponsives:
-                    # placeholder for re-enabling individual positioners, if they somehow become responsive again
-                    # not sure if we actually want this, Joe / Irena / Michael to discuss
-                    # (there is also the comm.reset_nonresponsive_canids method)
-                    pass
             if status_updated:
-                self.commit(log_note='device status updated')
+                self.commit()
                 
     def _clear_temporary_state_values(self):
         '''Clear out any existing values in the state objects that were only temporarily
