@@ -1,4 +1,4 @@
-import posmodel
+from posmodel import PosModel
 import posschedule
 import posmovetable
 import posstate
@@ -67,7 +67,7 @@ class Petal(object):
         self.states = {}
         for posid in posids:
             self.states[posid] = posstate.PosState(posid, logging=True, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
-            self.posmodels[posid] = posmodel.PosModel(self.states[posid])
+            self.posmodels[posid] = PosModel(self.states[posid])
         self.posids = set(self.posmodels.keys())
         self.canids_where_tables_were_just_sent = []
         self.busids_where_tables_were_just_sent = []
@@ -227,13 +227,13 @@ class Petal(object):
         return requests            
 
     def request_limit_seek(self, posids, axisid, direction, anticollision=True, cmd_prefix='', log_note=''):
-        """Request hardstop seeking sequence for positioners in list posids.
-        The optional argument cmd_prefix allows adding a descriptive string to the log.
-        This method is generally recommended only for expert usage.
-        Requests to disabled positioners will be ignored.
+        """Request hardstop seeking sequence for a single positioner or all positioners
+        in iterable collection posids. The optional argument cmd_prefix allows adding a
+        descriptive string to the log. This method is generally recommended only for
+        expert usage. Requests to disabled positioners will be ignored.
         """
-        posids = pc.listify(posids,True)[0]
-        posmodels = self.enabled_posmodels(posids)
+        posids = set(posids)
+        enabled = self.enabled_posmodels(posids)
         if anticollision:
             if axisid == pc.P and direction == -1:
                 # calculate thetas where extended phis do not interfere
@@ -243,7 +243,7 @@ class Petal(object):
                 # request anticollision-safe moves to current thetas and all phis within Ei
                 # Eo has a bit more possible collisions, for example against a stuck-extended neighbor. Costs a bit more time/power to go to Ei, but limit-seeking is not a frequent operation.
                 pass
-        for posmodel in posmodels.values():
+        for posmodel in enabled.values():
             search_dist = np.sign(direction)*posmodel.axis[axisid].limit_seeking_search_distance
             table = posmovetable.PosMoveTable(posmodel)
             table.should_antibacklash = False
@@ -267,11 +267,11 @@ class Petal(object):
             self.schedule.expert_add_table(table)
 
     def request_homing(self, posids):
-        """Request homing sequence for positioners in list posids to find the primary hardstop
-        and set values for the max position and min position. Requests to disabled positioners
-        will be ignored.
+        """Request homing sequence for positioners in single posid or iterable collection of
+        posids. Finds the primary hardstop, and sets values for the max position and min position.
+        Requests to disabled positioners will be ignored.
         """
-        posids = pc.listify(posids,True)[0]
+        posids = set(posids)
         enabled = self.enabled_posmodels(posids)
         hardstop_debounce = [0,0]
         direction = [0,0]
@@ -324,10 +324,8 @@ class Petal(object):
         self.comm.send_tables(hw_tables)
 
     def set_motor_parameters(self):
-        """Send the current and period parameter settings to the positioners"""
-        # Set the duty cycle currents and creep or accel/decel speeds.
-        # Currently this function needs to be called each time parameters change after petal
-        # initialization or if a positioner is plugged in/powered on after petal initialization
+        """Send the motor current and period settings to the positioners.
+        """
         if self.simulator_on:
             if self.verbose:
                 print('Simulator skips sending motor parameters to positioners.')
@@ -377,17 +375,17 @@ class Petal(object):
 
     def quick_move(self, posids, command, target, log_note=''):
         """Convenience wrapper to request, schedule, send, and execute a single move command, all in
-        one shot. You can argue multiple posids if you want (as a list), though note they will all
-        get the same command and target sent to them. So for something like a local (theta,phi) coordinate
+        one shot. You can argue multiple posids if you want, though note they will all get the same
+        command and target sent to them. So for something like a local (theta,phi) coordinate
         this often makes sense, but not for a global coordinate.
 
-        INPUTS:     posids    ... either a single posid or a list of posids
+        INPUTS:     posids    ... either a single posid or an iterable collection of posids
                     command   ... string like those usually put in the requests dictionary (see request_targets method)
                     target    ... [u,v] values, note that all positioners here get sent the same [u,v] here
                     log_note  ... optional string to include in the log file
         """
         requests = {}
-        posids = pc.listify(posids,True)[0]
+        posids = set(posids)
         for posid in posids:
             requests[posid] = {'command':command, 'target':target, 'log_note':log_note}
         self.request_targets(requests)
@@ -396,15 +394,15 @@ class Petal(object):
     def quick_direct_dtdp(self, posids, dtdp, log_note=''):
         """Convenience wrapper to request, schedule, send, and execute a single move command for a
         direct (delta theta, delta phi) relative move. There is NO anti-collision calculation. This
-        method is intended for expert usage only. You can argue multiple posids if you want (as a
-        list), though note they will all get the same (dt,dp) sent to them.
+        method is intended for expert usage only. You can argue an iterable collection of posids if
+        you want, though note they will all get the same (dt,dp) sent to them.
         
         INPUTS:     posids    ... either a single posid or a list of posids
                     dtdp      ... [dt,dp], note that all posids get sent the same [dt,dp] here. i.e. dt and dp are each just one number
                     log_note  ... optional string to include in the log file
         """
         requests = {}
-        posids = pc.listify(posids,True)[0]
+        posids = set(posids)
         for posid in posids:
             requests[posid] = {'target':dtdp, 'log_note':log_note}
         self.request_direct_dtdp(requests)
@@ -412,11 +410,10 @@ class Petal(object):
 
 # METHODS FOR FIDUCIAL CONTROL        
     def set_fiducials(self, fidids='all', setting='on', save_as_default=False):
-        """Set a list of specific fiducials on or off.
+        """Set specific fiducials on or off.
         
-        fidids ... one fiducial id string, or a list of fiducial id strings, or 'all'
-                   (this is the string given by DEVICE_ID in DESI-2724)
-        
+        fidids ... one fiducial id string, or an iterable collection of fiducial id strings, or 'all'
+                   
         setting ... what to set the fiducials to, as described below:
             'on'         ... turns each fiducial to its default on value
             'off'        ... turns each fiducial individually to its default off value
@@ -425,41 +422,38 @@ class Petal(object):
         save_as_default ... only used when seting is a number, in which case True means we will store that setting permanently to the fiducials' config file, False means its just a temporary setting this time
         
         Method returns a dictionary of all the settings that were made, where
-            key   --> fiducial ids
+            key   --> fiducial id
             value --> duty state that was set
-        Fiducials that do not have control enabled would not be in this dictionary.
+        
+        Fiducials that do not have control enabled will not appear in this dictionary.
         """
         if self.simulator_on:
-            print('Simulator skips sending out set_fiducials commands on petal ' + str(self.petal_id) + '.')
+            self.printfunc('Simulator skips sending out set_fiducials commands on petal ' + str(self.petal_id) + '.')
             return {}
-        fidids = pc.listify(fidids,keep_flat=True)[0]
-        if fidids[0] == 'all':
+        if isinstance(fidids,str) and fidids == 'all':
             fidids = self.fidids
-        busids = [self.get_posfid_val(fidid,'BUS_ID') for fidid in fidids]
-        canids = [self.get_posfid_val(fidid,'CAN_ID') for fidid in fidids]
+        else:
+            fidids = set(fidids)
+        enabled = [fidid for fidid in fidids if self.get_posfid_val(fidid,'CTRL_ENABLED')]
+        busids = [self.get_posfid_val(fidid,'BUS_ID') for fidid in enabled]
+        canids = [self.get_posfid_val(fidid,'CAN_ID') for fidid in enabled]
         if isinstance(setting,int) or isinstance(setting,float):
             if setting < 0:
                 setting = 0
             if setting > 100:
                 setting = 100
-            duties = [setting]*len(fidids)
+            duties = [setting]*len(enabled)
         elif setting == 'on':
-            duties = [self.get_posfid_val(fidid,'DUTY_DEFAULT_ON') for fidid in fidids]
+            duties = [self.get_posfid_val(fidid,'DUTY_DEFAULT_ON') for fidid in enabled]
         else:
-            duties = [self.get_posfid_val(fidid,'DUTY_DEFAULT_OFF') for fidid in fidids]
-        enabled = [self.get_posfid_val(fidid,'CTRL_ENABLED') for fidid in fidids]
-        rng = range(len(fidids))
-        fidids = [fidids[i] for i in rng if enabled[i]]
-        busids = [busids[i] for i in rng if enabled[i]]
-        canids = [canids[i] for i in rng if enabled[i]]
-        duties = [duties[i]  for i in rng if enabled[i]]
+            duties = [self.get_posfid_val(fidid,'DUTY_DEFAULT_OFF') for fidid in enabled]
         self.comm.set_fiducials(busids, canids, duties)
         settings_done = {}
-        for i in range(len(fidids)):
-            self.set_posfid_val(fidids[i], 'DUTY_STATE', duties[i])
-            settings_done[fidids[i]] = duties[i]
+        for i in range(len(enabled)):
+            self.set_posfid_val(enabled[i], 'DUTY_STATE', duties[i])
+            settings_done[enabled[i]] = duties[i]
             if save_as_default:
-                self.set_posfid_val(fidids[i], 'DUTY_DEFAULT_ON', duties[i])
+                self.set_posfid_val(enabled[i], 'DUTY_DEFAULT_ON', duties[i])
         self.commit(log_note='set fiducial parameters')
         return settings_done
     
@@ -558,85 +552,36 @@ class Petal(object):
                 state.log_unit()
         self.altered_states = set()
 
-    def expected_current_position(self,posid=None,key=''):
+    def expected_current_position(self, posid, key):
         """Retrieve the current position, for a positioner identied by posid, according
         to the internal tracking of its posmodel object. Valid keys are:
-            'Q', 'S', 'flatX', 'flatY', 'obsX', 'obsY', 'obsT', 'obsP', 'posT', 'posP', 'motT', 'motP'
-            'QS','flatXY','obsXY','obsTP','posTP','motTP'
+            
+            Returns single value:   'Q', 'S', 'flatX', 'flatY', 'obsX', 'obsY', 'obsT', 'obsP', 'posT', 'posP', 'motT', 'motP'
+            Returns 2 element list: 'QS', 'flatXY', 'obsXY', 'obsTP', 'posTP', 'motTP'
+        
         See comments in posmodel.py for explanation of these values.
-
-        If no posid is specified, then a single value, or list of all positioners' values is returned.
-        This can be used either with or without specifying a key.
-
-        If no key is specified, a dictionary containing all of them will be
-        returned.
-
-        If posid is a list of multiple positioner ids, then the return will be a
-        corresponding list of positions. The optional argument key can be:
-            ... a list, of same length as posid
-            ... or just a single key, which gets fetched uniformly for all posid
         """
-        (posids, was_not_list) = self._posid_listify_and_fill(posid)
-        (keys, temp) = pc.listify(key,keep_flat=True)
-        (posids, keys) = self._equalize_input_list_lengths(posids,keys)
-        vals = []
-        for i in range(len(posids)):
-            pidx = self.posids.index(posids[i])
-            this_val = self.posmodels[pidx].expected_current_position
-            if keys[i] == '':
-                vals.append(this_val)
-            elif keys[i] == 'QS':
-                vals.append([this_val['Q'],this_val['S']])
-            elif keys[i] == 'flatXY':
-                vals.append([this_val['flatX'],this_val['flatY']])
-            elif keys[i] == 'obsXY':
-                vals.append([this_val['obsX'],this_val['obsY']])
-            elif keys[i] == 'obsTP':
-                vals.append([this_val['obsT'],this_val['obsP']])
-            elif keys[i] == 'posTP':
-                vals.append([this_val['posT'],this_val['posP']])
-            elif keys[i] == 'motorTP':
-                vals.append([this_val['motT'],this_val['motP']])
-            else:
-                vals.append(this_val[keys[i]])
-        if was_not_list:
-            vals = pc.delistify(vals)
-        return vals
-
-    def expected_current_position_str(self,posid=None):
-        """One-line string summarizing current expected position of a positioner.
-
-        If posid is a list of multiple positioner ids, then the return will be a
-        corresponding list of strings.
-
-        If no posid is specified, a list of strings for all positioners is returned.
-        """
-        (posids, was_not_list) = self._posid_listify_and_fill(posid)
-        strs = []
-        for p in posids:
-            pidx = self.posids.index(p)
-            strs.append(self.posmodels[pidx].expected_current_position_str)
-        if was_not_list:
-            strs = pc.delistify(strs)
-        return strs
-
-    def posmodel(self, posid):
-        """Returns the posmodel object corresponding to a single posid.
-        """
-        pidx = self.posids.index(posid)
-        return self.posmodels[pidx]
+        vals = self.posmodels[posid].expected_current_position
+        if key == 'obsXY':
+            return [vals['obsX'],vals['obsY']]
+        elif key == 'posTP':
+            return [vals['posT'],vals['posP']]
+        elif key == 'obsTP':
+            return [vals['obsT'],vals['obsP']]
+        elif key == 'QS':
+            return [vals['Q'],vals['S']]
+        elif key == 'flatXY':
+            return [vals['flatX'],vals['flatY']]
+        elif key == 'motorTP':
+            return [vals['motT'],vals['motP']]
+        else:
+            return vals[key]
     
     def enabled_posmodels(self, posids):
         """Returns dict with keys = posids, values = posmodels, but only for
         those positioners in the collection posids which are enabled.
         """
-        # re-implement this (reduced syntax / overhead) once posmodels are better dictionary-ified in petal.py
-        enabled_posmodels = {}
-        for posid in posids:
-            if self.get_posfid_val(posid,'CTRL_ENABLED'):
-                enabled_posmodels[posid] = self.posmodel(posid)
-        return enabled_posmodels
-
+        return {p:self.posmodels[p] for p in posids if self.posmodels[p].is_enabled}
 
 # MOVE SCHEDULING ANIMATOR CONTROLS
         
@@ -781,34 +726,6 @@ class Petal(object):
                 keep_waiting = False
             else:
                 time.sleep(poll_period)
-
-    def _posid_listify_and_fill(self,posid):
-        """Internally-used wrapper method for listification of posid. The additional functionality
-        here is the check for whether to auto-fill with all posids known to posarraymaster.
-        """
-        if posid == None:
-            posids = self.posids
-            was_not_list = False
-        else:
-            (posids, was_not_list) = pc.listify(posid,keep_flat=True)
-        return posids, was_not_list
-
-    def _equalize_input_list_lengths(self,var1,var2):
-        """Internally-used in setter and getter methods, to consistently handle varying
-        lengths of key / value requests.
-        """
-        if not(isinstance(var1,list)) or not(isinstance(var2,list)):
-            print('both var1 and var2 must be lists, even if single-element')
-            return None, None
-        if len(var1) != len(var2):
-            if len(var1) == 1:
-                var1 = var1*len(var2) # note here var1 is starting as a list
-            elif len(var2) == 1:
-                var2 = var2*len(var1) # note here var2 is starting as a list
-            else:
-                print('either the var1 or the var2 must be of length 1')
-                return None, None
-        return var1, var2
     
     def _map_power_supplies_to_posids(self):
         """Reads in data for positioner canids and petal power supply ids, and
