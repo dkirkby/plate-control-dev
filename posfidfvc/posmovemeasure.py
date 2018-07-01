@@ -251,8 +251,7 @@ class PosMoveMeasure(object):
         posT = 0
         for petal,these_posids in posids_by_petal.items():
             for posid in these_posids:
-                posmodel = petal.posmodel(posid)
-                posP = max(posmodel.targetable_range_P)
+                posP = max(petal.posmodels[posid].targetable_range_P)
                 requests[posid] = {'command':'posTP', 'target':[posT,posP], 'log_note':'parking'}
         self.move(requests)
         
@@ -499,6 +498,11 @@ class PosMoveMeasure(object):
         """Returns the petal object associated with a single id key.
         """
         return self._petals_map[posid_or_fidid_or_dotid]
+    
+    def posmodel(self, posid):
+        """Returns the posmodel object associated with a single posid.
+        """
+        return self.petal(posid).posmodels[posid]
 
     def state(self, posid):
         """Returns the posstate object associated with a single posid.
@@ -509,12 +513,6 @@ class PosMoveMeasure(object):
         """Returns the postransforms object associated with a single posid.
         """
         return self.posmodel(posid).trans
-    
-    def posmodel(self, posid):
-        """Returns the posmodel object associated with a single posid.
-        """
-        ptl = self.petal(posid)
-        return ptl.posmodel(posid)
     
     def commit(self,log_note=''):
         """Commit state data controlled by all petals to storage.
@@ -590,7 +588,7 @@ class PosMoveMeasure(object):
         for petal,these_posids in posids_by_petal.items():
             for posid in these_posids:
                 data[posid] = {}
-                posmodel = petal.posmodel(posid)
+                posmodel = self.posmodel(posid)
                 range_T = posmodel.targetable_range_T
                 range_P = posmodel.targetable_range_P
                 if keep_phi_within_Eo:
@@ -643,7 +641,7 @@ class PosMoveMeasure(object):
         phi_clear_angle = self.phi_clear_angle
         data = {}
         for petal,these_posids in posids_by_petal.items():
-            posmodels = [petal.posmodel(posid) for posid in these_posids]
+            posmodels = [self.posmodel(posid) for posid in these_posids]
             initial_tp = []
             final_tp = []
             if axis == 'theta':
@@ -895,7 +893,7 @@ class PosMoveMeasure(object):
             data[posid]['meas_posP_during_P_sweep'] = p_meas_posP_wrapped
             data[posid]['targ_posP_during_T_sweep'] = t_targ_posP[0]
             data[posid]['targ_posT_during_P_sweep'] = p_targ_posT[0]
-            data[posid]['posmodel'] = ptl.posmodel(posid)
+            data[posid]['posmodel'] = self.posmodel(posid)
             
             # gear ratios
             ratios_T = np.divide(np.diff(t_meas_posT_wrapped),np.diff(t_targ_posT))
@@ -1019,7 +1017,7 @@ class PosMoveMeasure(object):
         xy_meas = []
         posids_by_petal = self.posids_by_petal('all')
         for petal,these_posids in posids_by_petal.items():
-            positioners_current = petal.expected_current_position(posid=these_posids,key='obsXY')
+            positioners_current = [petal.expected_current_position(posid,'obsXY') for posid in these_posids]
             positioners_current = self.fvc.obsXY_to_fvcXY(positioners_current)
             if len(positioners_current) > 1:
                 i = 0
@@ -1078,7 +1076,7 @@ class PosMoveMeasure(object):
             expected_obsXY = ptl.expected_current_position(posid,'obsXY')
             err_xy = ((measured_obsXY[0]-expected_obsXY[0])**2 + (measured_obsXY[1]-expected_obsXY[1])**2)**0.5
             if err_xy > self.tp_updates_tol:
-                posmodel = ptl.posmodel(posid)
+                posmodel = self.posmodel(posid)
                 expected_posTP = ptl.expected_current_position(posid,'posTP')
                 measured_posTP = posmodel.trans.obsXY_to_posTP(measured_data[posid],range_limits='full')[0]
                 T_options = measured_posTP[0] + np.array([0,360,-360])
