@@ -3,3 +3,5 @@ class PosSchedStats(object):
     """
     def __init__(self):
         pass
+    
+    # function to plot total power density over time of move before / after annealing

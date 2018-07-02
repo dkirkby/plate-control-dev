@@ -33,7 +33,7 @@ def cProfile_wrapper(evaluatable_string):
     p.print_stats(n_stats_lines)
     
 # timed test sequence
-cProfile_wrapper('ptl = petal.Petal(petal_id, posids, fidids, simulator_on=True, db_commit_on=False, local_commit_on=True, sched_stats_on=True)')
+cProfile_wrapper('ptl = petal.Petal(petal_id, posids, fidids, simulator_on=True, db_commit_on=False, local_commit_on=False, sched_stats_on=True)')
 ptl.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
 cProfile_wrapper('ptl.request_homing(posids)')
 cProfile_wrapper('ptl.schedule_send_and_execute_moves()')
