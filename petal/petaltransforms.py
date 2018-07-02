@@ -1,4 +1,5 @@
 import numpy as np
+import math
 import postransforms
 import posconstants as pc
 
@@ -127,9 +128,9 @@ class PetalTransforms(object):
     def rot_matrix(self):
         """Rotations matrix as 3x3 numpy array, for going from metXYZ --> QS."""
         angle_deg = {field:self.transforms['petal_rot_' + str(field)] for field in [1,2,3]}
-        a = {field:np.deg2rad(angle_deg[field]) for field in angle_deg}
-        c = {field:np.cos(a[field]) for field in a}
-        s = {field:np.sin(a[field]) for field in a}
+        a = {field:angle_deg[field]*pc.rad_per_deg for field in angle_deg}
+        c = {field:math.cos(a[field]) for field in a}
+        s = {field:math.sin(a[field]) for field in a}
         prec = [[c[1],-s[1],0],[s[1],c[1],0],[0,0,1]]
         nuta = [[c[2],0,s[2]],[0,1,0],[-s[2],0,c[2]]]
         spin = [[c[3],-s[3],0],[s[3],c[3],0],[0,0,1]]
