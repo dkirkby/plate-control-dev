@@ -1,6 +1,7 @@
 import os
 import inspect
 import numpy as np
+import math
 import datetime
 import collections
 
@@ -68,6 +69,8 @@ power_supply_can_map = {'V1':{'can10','can11','can13','can23'},
 deg = '\u00b0'
 mm = 'mm'
 um_per_mm = 1000
+deg_per_rad = math.pi/180.
+rad_per_deg = 180./math.pi
 timestamp_format = '%Y-%m-%d %H:%M:%S.%f' # see strftime documentation
 filename_timestamp_format = '%Y-%m-%d_T%H%M%S'
 gear_ratio = {}
@@ -106,7 +109,16 @@ class collision_case(object):
 case = collision_case()
 
 # Convenience methods
-rotmat2D = lambda angle: [np.cos(np.deg2rad(angle)), - np.sin(np.deg2rad(angle)), np.sin(np.deg2rad(angle)), np.cos(np.deg2rad(angle))]
+rotmat2D = lambda angle: [math.cos(angle*deg_per_rad), - math.sin(angle*deg_per_rad), math.sin(angle*deg_per_rad), math.cos(angle*deg_per_rad)]
+
+def sign(x):
+    """Return the sign of the value x as +1, -1, or 0."""
+    if x > 0.:
+        return 1
+    elif x < 0.:
+        return -1
+    else:
+        return 0
 
 # Functions for handling mixes of [M][N] vs [M] dimension lists
 def listify(uv, keep_flat=False):
