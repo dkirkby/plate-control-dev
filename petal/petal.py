@@ -5,7 +5,6 @@ import posstate
 import poscollider
 import posconstants as pc
 import posschedstats
-import numpy as np
 import time
 import collections
 import os
@@ -244,7 +243,7 @@ class Petal(object):
                 # Eo has a bit more possible collisions, for example against a stuck-extended neighbor. Costs a bit more time/power to go to Ei, but limit-seeking is not a frequent operation.
                 pass
         for posmodel in enabled.values():
-            search_dist = np.sign(direction)*posmodel.axis[axisid].limit_seeking_search_distance
+            search_dist = pc.sign(direction)*posmodel.axis[axisid].limit_seeking_search_distance
             table = posmovetable.PosMoveTable(posmodel)
             table.should_antibacklash = False
             table.should_final_creep  = False
