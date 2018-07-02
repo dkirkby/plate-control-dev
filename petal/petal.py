@@ -226,7 +226,7 @@ class Petal(object):
             self.schedule.expert_add_table(table)
         return requests            
 
-    def request_limit_seek(self, posids, axisid, direction, anticollision=True, cmd_prefix='', log_note=''):
+    def request_limit_seek(self, posids, axisid, direction, anticollision='freeze', cmd_prefix='', log_note=''):
         """Request hardstop seeking sequence for a single positioner or all positioners
         in iterable collection posids. The optional argument cmd_prefix allows adding a
         descriptive string to the log. This method is generally recommended only for
@@ -277,11 +277,11 @@ class Petal(object):
         direction = [0,0]
         direction[pc.P] = +1 # force this, because anticollision logic depends on it
         for posid in enabled:
-            self.request_limit_seek(posid, pc.P, direction[pc.P], anticollision=True, cmd_prefix='P', log_note='homing')
-        self.schedule_moves(anticollision=True)
+            self.request_limit_seek(posid, pc.P, direction[pc.P], anticollision=self.anticollision_default, cmd_prefix='P', log_note='homing')
+        self.schedule_moves(anticollision=self.anticollision_default)
         for posid,posmodel in enabled.items():
             direction[pc.T] = posmodel.axis[pc.T].principle_hardstop_direction
-            self.request_limit_seek(posid, pc.T, direction[pc.T], anticollision=False, cmd_prefix='T') # no repetition of log note here
+            self.request_limit_seek(posid, pc.T, direction[pc.T], anticollision=None, cmd_prefix='T') # no repetition of log note here
             for i in [pc.T,pc.P]:
                 axis_cmd_prefix = 'self.axis[' + repr(i) + ']'
                 if direction[i] < 0:
@@ -293,7 +293,7 @@ class Petal(object):
                 hardstop_debounce_request = {posid:{'target':hardstop_debounce}}
                 self.request_direct_dtdp(hardstop_debounce_request, cmd_prefix='debounce')
 
-    def schedule_moves(self,anticollision=''):
+    def schedule_moves(self,anticollision=None):
         """Generate the schedule of moves and submoves that get positioners
         from start to target. Call this after having input all desired moves
         using the move request methods.
@@ -548,10 +548,10 @@ class Petal(object):
 
     def expected_current_position(self, posid, key):
         """Retrieve the current position, for a positioner identied by posid, according
-        to the internal tracking of its posmodel object. Valid keys are:
+        to the internal tracking of its posmodel object. Returns a two element
+        list. Valid keys are:
             
-            Returns single value:   'Q', 'S', 'flatX', 'flatY', 'obsX', 'obsY', 'obsT', 'obsP', 'posT', 'posP', 'motT', 'motP'
-            Returns 2 element list: 'QS', 'flatXY', 'obsXY', 'obsTP', 'posTP', 'motTP'
+            'QS', 'flatXY', 'obsXY', 'posXY', 'obsTP', 'posTP', 'motTP'
         
         See comments in posmodel.py for explanation of these values.
         """
@@ -564,6 +564,8 @@ class Petal(object):
             return [vals['obsT'],vals['obsP']]
         elif key == 'QS':
             return [vals['Q'],vals['S']]
+        elif key == 'posXY':
+            return [vals['posX'],vals['posY']]
         elif key == 'flatXY':
             return [vals['flatX'],vals['flatY']]
         elif key == 'motorTP':
