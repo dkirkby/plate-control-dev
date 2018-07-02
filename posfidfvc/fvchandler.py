@@ -8,6 +8,7 @@ else:
 	sys.path.append(os.path.abspath('../petal/'))
 	sys.path.append(os.path.abspath('../posfidfvc/SBIG'))
 import numpy as np
+import math
 import time
 import postransforms
 import posconstants as pc
@@ -361,8 +362,8 @@ class FVCHandler(object):
 	@staticmethod
 	def rotmat2D_deg(angle):
 		"""Return the 2d rotation matrix for an angle given in degrees."""
-		radians = np.deg2rad(angle)
-		return np.array([[np.cos(radians), -np.sin(radians)], [np.sin(radians), np.cos(radians)]])
+		angle *= pc.rad_per_deg
+		return np.array([[math.cos(angle), -math.sin(angle)], [math.sin(angle), math.cos(angle)]])
 
 if __name__ == '__main__':
 	f = FVCHandler(fvc_type='SBIG')
