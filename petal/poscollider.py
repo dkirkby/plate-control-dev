@@ -4,6 +4,7 @@ import posanimator
 import configobj
 import os
 import copy as copymodule
+import math
 
 class PosCollider(object):
     """PosCollider contains geometry definitions for mechanical components of the
@@ -346,10 +347,10 @@ class PosCollider(object):
         the optional argument 'outside' is true. If 'outside' is false, then the
         segment points lie on the circle.
         """
-        alpha = np.linspace(0, 2 * np.pi, npts + 1)[0:-1]
+        alpha = np.linspace(0, 2 * math.pi, npts + 1)[0:-1]
         if outside:
             half_angle = alpha[0]/2
-            points_radius = diameter/2 / np.cos(half_angle)
+            points_radius = diameter/2 / math.cos(half_angle)
         else:
             points_radius = diameter/2
         x = points_radius * np.cos(alpha)
@@ -367,10 +368,10 @@ class PosSweep(object):
         self.tp        = np.array([[],[]])  # theta,phi angles as function of time (sign indicates direction)
         self.tp_dot    = np.array([[],[]])  # theta,phi rotation speeds as function of time (sign indicates direction)
         self.collision_case = pc.case.I     # enumeration of type "case", indicating what kind of collision first detected, if any
-        self.collision_time = np.inf        # time at which collision occurs. if no collision, the time is inf
+        self.collision_time = math.inf      # time at which collision occurs. if no collision, the time is inf
         self.collision_idx = None           # index in time and theta,phi lists at which collision occurs
         self.collision_neighbor = ''        # id string (posid, 'PTL', or 'GFA') of neighbor it collides with, if any
-        self.frozen_time = np.inf           # time at which positioner is frozen in place. if no freezing, the time is inf
+        self.frozen_time = math.inf         # time at which positioner is frozen in place. if no freezing, the time is inf
 
     def copy(self):
         return copymodule.deepcopy(self)
@@ -393,8 +394,8 @@ class PosSweep(object):
                 time.append(table['move_time'][i] + time[-1])
                 tp[0].append(table['dT'][i] + tp[0][-1])
                 tp[1].append(table['dP'][i] + tp[1][-1])
-                tp_dot[0].append(np.sign(table['dT'][i]) * abs(table['Tdot'][i]))
-                tp_dot[1].append(np.sign(table['dP'][i]) * abs(table['Pdot'][i]))
+                tp_dot[0].append(pc.sign(table['dT'][i]) * abs(table['Tdot'][i]))
+                tp_dot[1].append(pc.sign(table['dP'][i]) * abs(table['Pdot'][i]))
             if table['postpause'][i]:
                 time.append(table['postpause'][i] + time[-1])
                 tp[0].append(tp[0][-1])
@@ -438,7 +439,7 @@ class PosSweep(object):
     @property
     def is_frozen(self):
         """Returns boolean value whether the sweep has a "freezing" event."""
-        return self.frozen_time < np.inf
+        return self.frozen_time < math.inf
     
     @property
     def theta(self, rowidx):
@@ -544,12 +545,12 @@ class PosPoly(object):
     @staticmethod
     def _rotmat2D_rad(angle):
         """Return the 2d rotation matrix for an angle given in radians."""
-        return np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
+        return np.array([[math.cos(angle), -math.sin(angle)], [math.sin(angle), math.cos(angle)]])
 
     @staticmethod
     def _rotmat2D_deg(angle):
         """Return the 2d rotation matrix for an angle given in degrees."""
-        return PosPoly._rotmat2D_rad(np.deg2rad(angle))
+        return PosPoly._rotmat2D_rad(angle*math.pi/180.)
 
 if __name__=="__main__":
     P1 = PosPoly([[0,1,1],[0,0,1]])
