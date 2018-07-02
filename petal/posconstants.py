@@ -109,7 +109,7 @@ class collision_case(object):
 case = collision_case()
 
 # Convenience methods
-rotmat2D = lambda angle: [math.cos(angle*deg_per_rad), - math.sin(angle*deg_per_rad), math.sin(angle*deg_per_rad), math.cos(angle*deg_per_rad)]
+rotmat2D = lambda angle: [math.cos(angle*rad_per_deg), - math.sin(angle*rad_per_deg), math.sin(angle*rad_per_deg), math.cos(angle*rad_per_deg)]
 
 def sign(x):
     """Return the sign of the value x as +1, -1, or 0."""
