@@ -415,7 +415,8 @@ class Axis(object):
     def limit_seeking_search_distance(self):
         """A distance magnitude that guarantees hitting a hard limit in either direction.
         """
-        return np.abs(np.diff(self.full_range)*self.posmodel.state._val['LIMIT_SEEK_EXCEED_RANGE_FACTOR'])[0]
+        full_range = self.full_range
+        return abs((full_range[1]-full_range[0])*self.posmodel.state._val['LIMIT_SEEK_EXCEED_RANGE_FACTOR'])
 
     def motor_to_shaft(self,distance):
         """Convert a distance in motor angle to shaft angle at the gearbox output.
