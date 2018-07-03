@@ -232,16 +232,19 @@ class PosSchedule(object):
             posmodel = self.petal.posmodels[posid]
             trans = posmodel.trans
             start_posTP['retract'][posid] = request['start_posTP']
-            desired_final_posTP['retract'][posid] = [request['start_posTP'][pc.T], self.collider.Eo_phi] # Ei would also be safe, but unnecessary in most cases. Costs more time and power to get to.
-            desired_final_posTP['rotate'][posid]  = [request['targt_posTP'][pc.T], self.collider.Eo_phi] # Ei would also be safe, but unnecessary in most cases. Costs more time and power to get to.
+            starting_phi = start_posTP['retract'][posid][pc.P]
+            retracted_phi = starting_phi if starting_phi < self.collider.Eo_phi else self.collider.Eo_phi # Ei would also be safe, but unnecessary in most cases. Costs more time and power to get to.
+            desired_final_posTP['retract'][posid] = [request['start_posTP'][pc.T], retracted_phi] 
+            desired_final_posTP['rotate'][posid]  = [request['targt_posTP'][pc.T], retracted_phi]
             desired_final_posTP['extend'][posid]  = request['targt_posTP']
             dtdp['retract'][posid]       = trans.delta_posTP(desired_final_posTP['retract'][posid], start_posTP['retract'][posid], range_wrap_limits='targetable')
             start_posTP['rotate'][posid] = trans.addto_posTP(        start_posTP['retract'][posid],        dtdp['retract'][posid], range_wrap_limits='targetable')
             dtdp['rotate'][posid]        = trans.delta_posTP(desired_final_posTP['rotate'][posid],  start_posTP['rotate'][posid],  range_wrap_limits='targetable')
             start_posTP['extend'][posid] = trans.addto_posTP(        start_posTP['rotate'][posid],         dtdp['rotate'][posid],  range_wrap_limits='targetable')
             dtdp['extend'][posid]        = trans.delta_posTP(desired_final_posTP['extend'][posid],  start_posTP['extend'][posid],  range_wrap_limits='targetable')
-        for name in self.RRE_stage_order:
-            stage = self.stage[name]
+        for i in range(len(self.RRE_stage_order)):
+            name = self.RRE_stage_order[i]
+            stage = self.stages[name]
             stage.initialize_move_tables(start_posTP[name], dtdp[name])
             stage.anneal_tables(self.anneal_time[name])
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
@@ -250,6 +253,11 @@ class PosSchedule(object):
             while stage.colliding and attempts_remaining:
                 for posid in stage.colliding:
                     stage.adjust_path(posid)
+                    if posid in stage.frozen:
+                        for j in range(i+1,len(self.RRE_stage_order)):
+                            next_name = self.RRE_stage_order[j]
+                            del start_posTP[next_name][posid]
+                            del dtdp[next_name][posid]
                 attempts_remaining -= 1
             
     def _deny_request_because_disabled(self, posmodel):
