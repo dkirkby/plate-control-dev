@@ -5,6 +5,7 @@ import configobj
 import os
 import copy as copymodule
 import math
+from numba import jit
 
 class PosCollider(object):
     """PosCollider contains geometry definitions for mechanical components of the
@@ -530,11 +531,12 @@ class PosPoly(object):
         B2 = pts2[:,1:]
         for i in range(np.shape(A1)[1]):
             out = PosPoly._segments_intersect(A1[:,i],A2[:,i],B1,B2) # note this is vectorized, to avoid having an internal for loop
-            if np.any(out):
+            if any(out):
                 return True
         return False
 
     @staticmethod
+    @jit # This is about the only place I've found the @jit decorator helpful in here. Everywhere else actually costs overhead.
     def _segments_intersect(A1,A2,B1,B2):
         """Checks whether two 2d line segments intersect. The endpoints for segments
         A and B are each a pair of (x,y) coordinates. This function is vectorized,
