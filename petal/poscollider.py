@@ -442,15 +442,13 @@ class PosSweep(object):
         """Returns boolean value whether the sweep has a "freezing" event."""
         return self.frozen_time < math.inf
     
-    @property
-    def theta(self, rowidx):
-        """Returns theta position of the sweep at the specified row index."""
-        return self.tp[0,rowidx]
+    def theta(self, step):
+        """Returns theta position of the sweep at the specified timestep index."""
+        return self.tp[0,step]
     
-    @property
-    def phi(self, rowidx):
-        """Returns phi position of the sweep at the specified row index."""
-        return self.tp[1,rowidx]
+    def phi(self, step):
+        """Returns phi position of the sweep at the specified timestep index."""
+        return self.tp[1,step]
     
 class PosPoly(object):
     """Represents a collidable polygonal envelope definition for a mechanical component
