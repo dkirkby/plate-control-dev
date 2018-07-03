@@ -1,4 +1,3 @@
-import numpy as np
 import posstate
 import postransforms
 import posconstants as pc
@@ -184,7 +183,7 @@ class PosModel(object):
         an argued distance on the axis identified by axisid.
         """
         move_data = {}
-        dist_spinup = 2 * np.sign(distance) * self._spinupdown_distance  # distance over which accel / decel to and from cruise speed
+        dist_spinup = 2 * pc.sign(distance) * self._spinupdown_distance  # distance over which accel / decel to and from cruise speed
         if not(allow_cruise) or abs(distance) <= (abs(dist_spinup) + self.state._val['MIN_DIST_AT_CRUISE_SPEED']):
             move_data['motor_step']   = int(round(distance / self._stepsize_creep))
             move_data['distance']     = move_data['motor_step'] * self._stepsize_creep
@@ -292,21 +291,25 @@ class Axis(object):
         clearance distances and the backlash removal distance.
         Returns [1x2] array of [min,max]
         """
-        return (np.array(self.full_range) + np.array(self.hardstop_debounce)).tolist()
+        f = self.full_range
+        h = self.hardstop_debounce
+        return [f[0] + h[0], f[1] + h[1]]
 
     @property
     def maxpos(self):
         if self.last_primary_hardstop_dir >= 0:
             return max(self.debounced_range)
         else:
-            return self.minpos + np.diff(self.debounced_range)[0]
+            d = self.debounced_range
+            return self.minpos + (d[1] - d[0])
 
     @property
     def minpos(self):
         if self.last_primary_hardstop_dir < 0:
             return min(self.debounced_range)
         else:
-            return self.maxpos - np.diff(self.debounced_range)[0]
+            d = self.debounced_range
+            return self.maxpos - (d[1] - d[0])
 
     @property
     def hardstop_debounce(self):
@@ -314,7 +317,9 @@ class Axis(object):
         It is the hardstop clearance distance plus the backlash removal distance.
         Returns [1x2] array of [min,max]
         """
-        return (np.array(self.hardstop_clearance) + np.array(self.backlash_clearance)).tolist()
+        h = self.hardstop_clearance
+        b = self.backlash_clearance
+        return [h[0] + b[0], h[1] + b[1]]
 
     @property
     def hardstop_clearance(self):

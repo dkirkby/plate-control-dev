@@ -353,10 +353,10 @@ class PosMoveMeasure(object):
             xy_ctrd = np.array(obsXY) - np.array(center)
             angles_measured = np.arctan2(xy_ctrd[:,1], xy_ctrd[:,0]) * 180/np.pi
             total_angle = 0
-            direction = np.sign(delta)
+            direction = pc.sign(delta)
             for i in range(len(angles_measured) - 1):
                 step_measured = angles_measured[i+1] - angles_measured[i]
-                if np.sign(step_measured) != direction:
+                if pc.sign(step_measured) != direction:
                     step_measured += direction * 360
                 total_angle += step_measured
             total_angle = abs(total_angle)
@@ -737,7 +737,7 @@ class PosMoveMeasure(object):
         # seek first limit
         self.printfunc(prefix + ': seeking first limit')
         for petal,these_posids in posids_by_petal.items():
-            petal.request_limit_seek(these_posids, axisid, -np.sign(delta), log_note='seeking first ' + axis + ' limit')
+            petal.request_limit_seek(these_posids, axisid, -pc.sign(delta), log_note='seeking first ' + axis + ' limit')
             petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
         meas_data,imgfiles = self.measure()
         for p in meas_data.keys():
@@ -762,7 +762,7 @@ class PosMoveMeasure(object):
         # seek second limit
         self.printfunc(prefix + ': seeking second limit')
         for petal,these_posids in posids_by_petal.items():
-            petal.request_limit_seek(these_posids, axisid, np.sign(delta), log_note='seeking second ' + axis + ' limit')
+            petal.request_limit_seek(these_posids, axisid, pc.sign(delta), log_note='seeking second ' + axis + ' limit')
             petal.schedule_send_and_execute_moves()
         meas_data,imgfiles = self.measure()
         for p in meas_data.keys():
@@ -774,9 +774,9 @@ class PosMoveMeasure(object):
             data[posid]['xy_center'] = xy_ctr
 
         # get phi axis well back in clear envelope, as a best practice housekeeping thing to do
-        if axis == 'phi' and np.sign(delta) == -1:
+        if axis == 'phi' and pc.sign(delta) == -1:
             for petal,these_posids in posids_by_petal.items():
-                petal.request_limit_seek(these_posids, axisid, -np.sign(delta), log_note='housekeeping extra ' + axis + ' limit seek')
+                petal.request_limit_seek(these_posids, axisid, -pc.sign(delta), log_note='housekeeping extra ' + axis + ' limit seek')
                 petal.schedule_send_and_execute_moves()
 
         return data
@@ -863,7 +863,7 @@ class PosMoveMeasure(object):
             angles = np.arctan2(xy[:,1]-p_ctr[1], xy[:,0]-p_ctr[0]) * 180/np.pi
             p_meas_obsP = angles - p_meas_obsT
             p_meas_obsP[p_meas_obsP < 0] += 360
-            expected_direction = np.sign(p_targ_posP[1] - p_targ_posP[0])
+            expected_direction = pc.sign(p_targ_posP[1] - p_targ_posP[0])
             p_meas_obsP_wrapped = self._wrap_consecutive_angles(p_meas_obsP.tolist(), expected_direction)
             offset_p = np.median(np.array(p_meas_obsP_wrapped) - np.array(p_targ_posP))
             offset_p = self._centralized_angular_offset_value(offset_p)
@@ -873,7 +873,7 @@ class PosMoveMeasure(object):
             # unwrap thetas
             t_meas_posTP = T[posid]['trans'].obsXY_to_posTP(np.transpose(t_meas_obsXY).tolist(),range_limits='full')[0]
             t_meas_posT = t_meas_posTP[pc.T]
-            expected_direction = np.sign(t_targ_posT[1] - t_targ_posT[0])
+            expected_direction = pc.sign(t_targ_posT[1] - t_targ_posT[0])
             t_meas_posT_wrapped = self._wrap_consecutive_angles(t_meas_posT, expected_direction)
             
             # gather data to return in an organized fashion (used especially for plotting)
@@ -1154,7 +1154,7 @@ class PosMoveMeasure(object):
         wrapped = [angles[0]]
         for i in range(1,len(angles)):
             delta = angles[i] - wrapped[i-1]
-            while np.sign(delta) != expected_direction and np.sign(delta) != 0:
+            while pc.sign(delta) != expected_direction and pc.sign(delta) != 0:
                 delta += expected_direction * 360
             wrapped.append(wrapped[-1] + delta)
         return wrapped

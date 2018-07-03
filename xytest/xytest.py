@@ -13,6 +13,7 @@ import posmovemeasure
 import posconstants as pc
 import summarizer
 import numpy as np
+import math
 import time
 import pos_xytest_plot
 #import um_test_report as test_report
@@ -630,7 +631,7 @@ class XYTest(object):
         r_max = self.xytest_conf['targ_max_radius']
         x = xytarg[0]
         y = xytarg[1]
-        r = np.sqrt(x**2 + y**2)
+        r = math.sqrt(x**2 + y**2)
         if r > r_min and r < r_max:
             return True
         return False
