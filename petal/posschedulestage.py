@@ -1,5 +1,6 @@
 import posconstants as pc
 import posmovetable
+import math
 
 class PosScheduleStage(object):
     """This class encapsulates the concept of a 'stage' of the fiber
@@ -15,6 +16,7 @@ class PosScheduleStage(object):
         self.move_tables = {} # keys: posids, values: posmovetable instances
         self.sweeps = {} # keys: posids, values: instances of PosSweep, corresponding to entries in self.move_tables
         self.colliding = set() # positioners currently known to have collisions
+        self.frozen = set() # positioners that have been frozen
         self._power_supply_map = power_supply_map
         self._theta_max_jog = 90 # deg, maximum distance to temporarily shift theta when doing path adjustments
         self._phi_max_jog = 60 # deg, maximum distance to temporarily shift phi when doing path adjustments
@@ -151,9 +153,12 @@ class PosScheduleStage(object):
         """
         if self.sweeps[posid].collision_case == pc.case.I:
             return
-        methods = ['freeze'] if freezing == 'forced' else ['pause','extend','retract','rot_ccw','rot_cw']
-        if freezing == 'on':
-            methods.append('freeze')
+        elif self.sweeps[posid].collision_case in pc.case.fixed_cases:
+            methods = ['freeze'] if freezing != 'off' else []
+        else:
+            methods = ['freeze'] if freezing == 'forced' else ['pause','extend','retract','rot_ccw','rot_cw']
+            if freezing == 'on':
+                methods.append('freeze')
         for method in methods:
             proposed_tables = self._propose_path_adjustment(posid,method)
             colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables)
@@ -162,6 +167,7 @@ class PosScheduleStage(object):
                 self.store_collision_finding_results(colliding_sweeps, all_sweeps)
                 if method == 'freeze':
                     self.sweeps[posid].register_as_frozen()
+                    self.frozen.add(posid)
                 return
 
     def find_collisions(self, move_tables):
@@ -239,8 +245,8 @@ class PosScheduleStage(object):
         all_checked = {posid for posid in all_sweeps}
         now_colliding = {posid for posid in colliding_sweeps}
         now_not_colliding = all_checked.difference(now_colliding)
-        self.colliding.union(now_colliding)
-        self.colliding.difference(now_not_colliding)
+        self.colliding = self.colliding.union(now_colliding)
+        self.colliding = self.colliding.difference(now_not_colliding)
 
     def _propose_path_adjustment(self, posid, method='freeze'):
         """Generates a proposed alternate move table for the positioner posid
@@ -281,30 +287,31 @@ class PosScheduleStage(object):
         neighbors of all the proposed new move tables.
         """
         no_collision = self.sweeps[posid].collision_case == pc.case.I
-        fixed_collision = self.sweeps[posid].collision_case in {pc.case.PTL, pc.case.GFA}
-        already_frozen = self.sweeps[posid].is_frozen()
-        not_enabled = not(self.collider.posmodels[posid].is_enabled())
-        if no_collision or (method == 'pause' and fixed_collision) or already_frozen or not_enabled:
+        fixed_collision = self.sweeps[posid].collision_case in pc.case.fixed_cases
+        already_frozen = self.sweeps[posid].is_frozen
+        not_enabled = not(self.collider.posmodels[posid].is_enabled)
+        if no_collision or (fixed_collision and method != 'freeze') or already_frozen or not_enabled:
             return {posid:self.move_tables[posid]} # unchanged move table
         table = self.move_tables[posid].copy()
         if method == 'freeze':    
             table_data = table.for_schedule()
             for row_idx in reversed(range(table.n_rows)):
-                if table_data['net_time'][row_idx] >= self.sweep[posid].collision_time:
+                net_time = table_data['net_time'][row_idx]
+                collision_time = self.sweeps[posid].collision_time                
+                if math.fmod(net_time, self.collider.timestep): # i.e., if not exactly matching a quantized timestep (almost always the case)
+                    collision_time -= self.collider.timestep # handles coarseness of discrete time by treating the collision time as one timestep earlier in the sweep
+                if net_time >= collision_time:
                     table.delete_row(row_idx)
                 else:
                     break
             if table.n_rows == 0:
                 table.set_move(0,0,0)
             return {posid:table}
-        if not fixed_collision:
-            neighbor = self.sweeps[posid].collision_neighbor
-            neighbor_table_data = self.move_tables[neighbor].for_schedule
-            for neighbor_clearance_time in neighbor_table_data['net_time']:
-                if neighbor_clearance_time > self.sweeps[posid].collision_time:
-                    break
-        else:
-            neighbor_clearance_time = 0
+        neighbor = self.sweeps[posid].collision_neighbor
+        neighbor_table_data = self.move_tables[neighbor].for_schedule()
+        for neighbor_clearance_time in neighbor_table_data['net_time']:
+            if neighbor_clearance_time > self.sweeps[posid].collision_time:
+                break
         if method == 'pause':
             table.insert_new_row(0)
             table.set_prepause(0,neighbor_clearance_time)
@@ -313,7 +320,7 @@ class PosScheduleStage(object):
             tables = {posid:table}
             posmodel = self.collider.posmodels[posid]
             if method in {'extend','retract'}:
-                start = self.sweeps[posid].phi(0)
+                start = tables[posid].init_posTP[1]
                 speed = posmodel.abs_shaft_speed_cruise_P
                 targetable_range = posmodel.targetable_range_P
                 if method == 'retract':
@@ -322,7 +329,7 @@ class PosScheduleStage(object):
                     limit = max(start - self._phi_max_jog, min(targetable_range))
                 axis = pc.P
             else:
-                start = self.sweeps[posid].theta(0)
+                start = tables[posid].init_posTP[0]
                 speed = posmodel.abs_shaft_speed_cruise_T
                 targetable_range = posmodel.targetable_range_T
                 if method == 'rot_ccw':
@@ -332,12 +339,11 @@ class PosScheduleStage(object):
                 axis = pc.T
             distance = limit - start
             move_time = abs(distance / speed)
-            if not fixed_collision:
-                if self.collider.posmodels[neighbor].is_enabled() and not self.sweeps[neighbor].is_frozen():
-                    neighbor_table = self.move_tables[neighbor].copy()
-                    neighbor_table.insert_new_row(0)
-                    neighbor_table.set_prepause(0,move_time)
-                    tables[neighbor] = neighbor_table
+            if self.collider.posmodels[neighbor].is_enabled and not self.sweeps[neighbor].is_frozen:
+                neighbor_table = self.move_tables[neighbor].copy()
+                neighbor_table.insert_new_row(0)
+                neighbor_table.set_prepause(0,move_time)
+                tables[neighbor] = neighbor_table
             table.insert_new_row(0)
             table.insert_new_row(0)
             table.set_move(0,axis,distance)
