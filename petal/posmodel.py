@@ -25,6 +25,8 @@ class PosModel(object):
         self._stepsize_cruise            = 3.3    # deg
         self._motor_speed_cruise         = 9900.0 * 360.0 / 60.0  # deg/sec (= RPM *360/60)
         self._spinupdown_dist_per_period = sum(range(round(self._stepsize_cruise/self._stepsize_creep) + 1))*self._stepsize_creep
+        self._abs_shaft_speed_cruise_T   = abs(self._motor_speed_cruise / self.axis[pc.T].signed_gear_ratio)
+        self._abs_shaft_speed_cruise_P   = abs(self._motor_speed_cruise / self.axis[pc.P].signed_gear_ratio)
 
     @property
     def _motor_speed_creep(self):
@@ -143,15 +145,13 @@ class PosModel(object):
     def abs_shaft_speed_cruise_T(self):
         """Returns the absolute output shaft speed (deg/sec), in cruise mode, of the theta axis.
         """
-        prop = self.axis[pc.T].motor_calib_properties
-        return prop['gear_ratio'] * prop['gear_calib'] * self._motor_speed_cruise
+        return self._abs_shaft_speed_cruise_T
 
     @property
     def abs_shaft_speed_cruise_P(self):
         """Returns the absolute output shaft speed (deg/sec), in cruise mode, of the phi axis.
         """
-        prop = self.axis[pc.P].motor_calib_properties
-        return prop['gear_ratio'] * prop['gear_calib'] * self._motor_speed_cruise
+        return self._abs_shaft_speed_cruise_P
 
     def true_move(self, axisid, distance, allow_cruise, allow_exceed_limits, expected_prior_dTdP=[0,0]):
         """Input move distance on either the theta or phi axis, as seen by the
