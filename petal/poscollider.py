@@ -305,9 +305,9 @@ class PosCollider(object):
         self.Eo = self.config['ENVELOPE_EO']  # outer clear rotation envelope
         self.Ei = self.config['ENVELOPE_EI']  # inner clear rotation envelope
         self.Ee = self._max_extent() * 2        # extended-phi clear rotation envelope
-        self.Eo_poly = PosPoly(self._circle_poly_points(self.Eo, self.config['RESOLUTION_EO']))
-        self.Ei_poly = PosPoly(self._circle_poly_points(self.Ei, self.config['RESOLUTION_EI']))
-        self.Ee_poly = PosPoly(self._circle_poly_points(self.Ee, self.config['RESOLUTION_EE']))
+        self.Eo_poly = PosPoly(self._circle_poly_points(self.Eo, self.config['RESOLUTION_EO']).tolist())
+        self.Ei_poly = PosPoly(self._circle_poly_points(self.Ei, self.config['RESOLUTION_EI']).tolist())
+        self.Ee_poly = PosPoly(self._circle_poly_points(self.Ee, self.config['RESOLUTION_EE']).tolist())
         self.line180_poly = PosPoly([[0,0],[-self.Eo/2,0]],close_polygon=False)
         self.Eo_polys = {}
         self.Ei_polys = {}
@@ -321,7 +321,7 @@ class PosCollider(object):
             self.Ee_polys[posid] = self.Ee_poly.translated(x,y)
             self.line180_polys[posid] = self.line180_poly.rotated(self.t0[posid]).translated(x,y)
         self.ferrule_diam = self.config['FERRULE_DIAM']
-        self.ferrule_poly = PosPoly(self._circle_poly_points(self.ferrule_diam, self.config['FERRULE_RESLN']))
+        self.ferrule_poly = PosPoly(self._circle_poly_points(self.ferrule_diam, self.config['FERRULE_RESLN']).tolist())
 
     def _identify_neighbors(self, posid):
         """Find all neighbors which can possibly collide with a given positioner."""
@@ -338,7 +338,7 @@ class PosCollider(object):
     def _max_extent(self):
         """Calculation of max radius of keepout for a positioner with fully-extended phi arm."""
         extended_phi = self.keepout_P.translated(max(self.R1.values()),0) # assumption here that phi arm polygon defined at 0 deg angle
-        return max(np.sqrt(np.sum(extended_phi.points**2, axis=0)))
+        return max(np.sqrt(np.sum(np.array(extended_phi.points)**2, axis=0)))
 
     @staticmethod
     def _circle_poly_points(diameter, npts, outside=True):
@@ -454,28 +454,42 @@ class PosSweep(object):
 class PosPoly(object):
     """Represents a collidable polygonal envelope definition for a mechanical component
     of the fiber positioner.
+    
+        points        ... [[x1,x2,...], [y1,y2,...]] list of vertices of the polygon
+        point0_index  ... first point in the list
+        close_polygon ... whether to make an identical last point matching the first
     """
     def __init__(self, points, point0_index=0, close_polygon=True):
-        points = np.array(points,dtype='float64')
-        head = points[:,np.arange(point0_index,len(points[0]))]
-        tail = points[:,np.arange(0,point0_index+1*close_polygon)]
-        self.points = np.append(head, tail, axis=1)
-        self.points_list = self.points.tolist() # python list is much faster than numpy array for certain kinds of operations, like max/min
+        self.points = points
+        if point0_index:
+            shift = point0_index + 1
+            self.points[0] = self.points[0][shift:] + self.points[0][:shift]
+            self.points[1] = self.points[1][shift:] + self.points[1][:shift]
+        if close_polygon:
+            self.points[0].append(points[0][0])
+            self.points[1].append(points[1][0])
 
-    def rotated(self, angle, getobject=False):
+    def rotated(self, angle):
         """Returns a copy of the polygon object, with points rotated by angle (unit degrees)."""
-        return PosPoly(np.dot(PosPoly._rotmat2D_deg(angle), self.points), point0_index=0, close_polygon=False)
+        R = self._rotmat2D_deg(angle)
+        p = self.points
+        rng = range(len(p[0]))
+        X = [R[0][0]*p[0][i] + R[0][1]*p[1][i] for i in rng]
+        Y = [R[1][0]*p[0][i] + R[1][1]*p[1][i] for i in rng]
+        return PosPoly([X,Y], point0_index=0, close_polygon=False)
 
     def translated(self, x, y):
         """Returns a copy of the polygon object, with points translated by distance (x,y)."""
-        return PosPoly(self.points + np.array([[x],[y]]), point0_index=0, close_polygon=False)
+        X = [x + val for val in self.points[0]]
+        Y = [y + val for val in self.points[1]]
+        return PosPoly([X,Y], point0_index=0, close_polygon=False)
 
     def collides_with(self, other):
         """Searches for collisions in space between this polygon and
         another PosPoly object. Returns a bool, where true indicates a
         collision.
         """
-        if PosPoly._bounding_boxes_collide(self.points_list,other.points_list):
+        if PosPoly._bounding_boxes_collide(self.points,other.points):
             return PosPoly._polygons_collide(self.points,other.points)
         else:
             return False
@@ -487,9 +501,6 @@ class PosPoly(object):
         Returns True if the bounding boxes collide, False if they do not. Intended as
         a fast check, to enhance speed of other collision detection functions.
         """
-		# Joe note: Use here of python's built-in max() function is intentional, rather than numpy.max(). As of 2018-04-22, I did some
-		# pretty careful timings, and found that for lists up to about 100 elements, the built-in python max function is much faster.
-		# At about 200 elements, they reach parity. Above that, numpy is faster.
         if   max(pts1[0]) < min(pts2[0]):
             return False
         elif max(pts1[1]) < min(pts2[1]):
@@ -511,6 +522,8 @@ class PosPoly(object):
         for this condition admittedly breaks some conceptual logic, but this case is not
         anticipated to occur given the DESI petal geometry, and speed is at a premium.
         """
+        pts1 = np.array(pts1,dtype='float64')
+        pts2 = np.array(pts2,dtype='float64')
         A1 = pts1[:,0:-1]
         A2 = pts1[:,1:]
         B1 = pts2[:,0:-1]
@@ -545,7 +558,7 @@ class PosPoly(object):
     @staticmethod
     def _rotmat2D_rad(angle):
         """Return the 2d rotation matrix for an angle given in radians."""
-        return np.array([[math.cos(angle), -math.sin(angle)], [math.sin(angle), math.cos(angle)]])
+        return [[math.cos(angle), -math.sin(angle)], [math.sin(angle), math.cos(angle)]]
 
     @staticmethod
     def _rotmat2D_deg(angle):
