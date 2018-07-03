@@ -199,7 +199,7 @@ class PosScheduleStage(object):
         appear in the return dictionary.
         """
         already_checked = {posid:set() for posid in self.collider.posids}
-        colliding_sweeps = {posid:set() for posid in move_tables}
+        colliding_sweeps = {posid:set() for posid in self.collider.posids}
         all_sweeps = {}
         for posid in move_tables:
             table_A = move_tables[posid]
