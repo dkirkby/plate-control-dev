@@ -37,6 +37,12 @@ class PosMoveTable(object):
         self.allow_exceed_limits = self.posmodel.state._val['ALLOW_EXCEED_LIMITS']
         self.allow_cruise = not(self.posmodel.state._val['ONLY_CREEP'])
 
+    def copy(self):
+        new = copymodule.copy(self) # intentionally shallow, then will deep-copy just the row instances as needed below
+        new.rows = [row.copy() for row in self.rows]
+        new._rows_extra = [row.copy() for row in self._rows_extra]
+        return new
+
     # getters
     def for_schedule(self, suppress_any_finalcreep_and_antibacklash=True, _output_type='schedule'):
         """Version of the table suitable for move scheduling. Distances are given at
