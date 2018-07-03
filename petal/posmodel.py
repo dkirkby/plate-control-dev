@@ -255,7 +255,13 @@ class Axis(object):
         self.posmodel = posmodel
         self.axisid = axisid
         self.postmove_cleanup_cmds = ''
-
+        self.antibacklash_final_move_dir = self.calc_antibacklash_final_move_dir()
+        self.principle_hardstop_direction = self.calc_principle_hardstop_direction()
+        self.backlash_clearance = self.calc_backlash_clearance()
+        self.hardstop_clearance = self.calc_hardstop_clearance()
+        self.hardstop_debounce = self.calc_hardstop_debounce()
+        self.signed_gear_ratio = self.motor_calib_properties['ccw_sign']*self.motor_calib_properties['gear_ratio']
+        
     @property
     def pos(self):
         """Internally-tracked angular position of the axis, at the output of the gear.
@@ -312,73 +318,6 @@ class Axis(object):
             return self.maxpos - (d[1] - d[0])
 
     @property
-    def hardstop_debounce(self):
-        """This is the amount to debounce off the hardstop after striking it.
-        It is the hardstop clearance distance plus the backlash removal distance.
-        Returns [1x2] array of [min,max]
-        """
-        h = self.hardstop_clearance
-        b = self.backlash_clearance
-        return [h[0] + b[0], h[1] + b[1]]
-
-    @property
-    def hardstop_clearance(self):
-        """Minimum distance to stay clear from hardstop.
-        Returns [1x2] array of [clearance_at_min_limit, clearance_at_max_limit].
-        These are DIRECTIONAL quantities (i.e., the sign indicates the direction
-        in which one would debounce after hitting the given hardstop, to get
-        back into the accessible range).
-        """
-        if self.axisid == pc.T:
-            if self.principle_hardstop_direction < 0:
-                return [+self.posmodel.state._val['PRINCIPLE_HARDSTOP_CLEARANCE_T'],
-                        -self.posmodel.state._val['SECONDARY_HARDSTOP_CLEARANCE_T']]
-            else:
-                return [+self.posmodel.state._val['SECONDARY_HARDSTOP_CLEARANCE_T'],
-                        -self.posmodel.state._val['PRINCIPLE_HARDSTOP_CLEARANCE_T']]
-        else:
-            if self.principle_hardstop_direction < 0:
-                return [+self.posmodel.state._val['PRINCIPLE_HARDSTOP_CLEARANCE_P'],
-                        -self.posmodel.state._val['SECONDARY_HARDSTOP_CLEARANCE_P']]
-            else:
-                return [+self.posmodel.state._val['SECONDARY_HARDSTOP_CLEARANCE_P'],
-                        -self.posmodel.state._val['PRINCIPLE_HARDSTOP_CLEARANCE_P']]
-
-    @property
-    def backlash_clearance(self):
-        """Minimum clearance distance required for backlash removal moves.
-        Returns 1x2 array of [clearance_from_low_side_of_range, clearance_from_high_side].
-        These are DIRECTIONAL quantities (i.e., the sign indicates the direction
-        similarly as the hardstop clearance directions).
-        """
-        if self.antibacklash_final_move_dir > 0:
-            return [+self.posmodel.state._val['BACKLASH'],0]
-        else:
-            return [0,-self.posmodel.state._val['BACKLASH']]
-
-    @property
-    def motor_calib_properties(self):
-        """Return properties for motor calibration.
-        """
-        prop = {}
-        if self.axisid == pc.T:
-            prop['gear_ratio'] = pc.gear_ratio[self.posmodel.state._val['GEAR_TYPE_T']]
-            prop['gear_calib'] = self.posmodel.state._val['GEAR_CALIB_T']
-            prop['ccw_sign'] = self.posmodel.state._val['MOTOR_CCW_DIR_T']
-        else:
-            prop['gear_ratio'] = pc.gear_ratio[self.posmodel.state._val['GEAR_TYPE_P']]
-            prop['gear_calib'] = self.posmodel.state._val['GEAR_CALIB_P']
-            prop['ccw_sign'] = self.posmodel.state._val['MOTOR_CCW_DIR_P']
-        return prop
-
-    @property
-    def antibacklash_final_move_dir(self):
-        if self.axisid == pc.T:
-            return self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_T']
-        else:
-            return self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_P']
-
-    @property
     def last_primary_hardstop_dir(self):
         if self.axisid == pc.T:
             return self.posmodel.state._val['LAST_PRIMARY_HARDSTOP_DIR_T']
@@ -407,33 +346,34 @@ class Axis(object):
             self.posmodel.state.store('TOTAL_LIMIT_SEEKS_P',value)
 
     @property
-    def principle_hardstop_direction(self):
-        """The "principle" hardstop is the one which is struck during homing.
-        (The "secondary" hardstop is only struck when finding the total available travel range.)
-        """
-        if self.axisid == pc.T:
-            return self.posmodel.state._val['PRINCIPLE_HARDSTOP_DIR_T']
-        else:
-            return self.posmodel.state._val['PRINCIPLE_HARDSTOP_DIR_P']
-
-    @property
     def limit_seeking_search_distance(self):
         """A distance magnitude that guarantees hitting a hard limit in either direction.
         """
         full_range = self.full_range
         return abs((full_range[1]-full_range[0])*self.posmodel.state._val['LIMIT_SEEK_EXCEED_RANGE_FACTOR'])
 
+    @property
+    def motor_calib_properties(self):
+        """Return properties for motor calibration.
+        """
+        prop = {}
+        if self.axisid == pc.T:
+            prop['gear_ratio'] = pc.gear_ratio[self.posmodel.state._val['GEAR_TYPE_T']]
+            prop['ccw_sign'] = self.posmodel.state._val['MOTOR_CCW_DIR_T']
+        else:
+            prop['gear_ratio'] = pc.gear_ratio[self.posmodel.state._val['GEAR_TYPE_P']]
+            prop['ccw_sign'] = self.posmodel.state._val['MOTOR_CCW_DIR_P']
+        return prop
+
     def motor_to_shaft(self,distance):
         """Convert a distance in motor angle to shaft angle at the gearbox output.
         """
-        p = self.motor_calib_properties
-        return distance * p['ccw_sign'] / (p['gear_ratio'] * p['gear_calib'])
+        return distance / self.signed_gear_ratio
 
     def shaft_to_motor(self,distance):
         """Convert a distance in shaft angle to motor angle at the gearbox output.
         """
-        p = self.motor_calib_properties
-        return distance * p['ccw_sign'] * (p['gear_ratio'] * p['gear_calib'])
+        return distance * self.signed_gear_ratio
 
     def truncate_to_limits(self, distance, start_pos=None):
         """Return distance after truncating it (if necessary) to the software limits.
@@ -453,3 +393,59 @@ class Axis(object):
             distance = new_distance
         return distance
 
+    def calc_principle_hardstop_direction(self):
+        """The "principle" hardstop is the one which is struck during homing.
+        (The "secondary" hardstop is only struck when finding the total available travel range.)
+        """
+        if self.axisid == pc.T:
+            return self.posmodel.state._val['PRINCIPLE_HARDSTOP_DIR_T']
+        else:
+            return self.posmodel.state._val['PRINCIPLE_HARDSTOP_DIR_P']
+        
+    def calc_antibacklash_final_move_dir(self):
+        if self.axisid == pc.T:
+            return self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_T']
+        else:
+            return self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_P']
+        
+    def calc_hardstop_debounce(self):
+        """This is the amount to debounce off the hardstop after striking it.
+        It is the hardstop clearance distance plus the backlash removal distance.
+        Returns [1x2] array of [min,max]
+        """
+        h = self.hardstop_clearance
+        b = self.backlash_clearance
+        return [h[0] + b[0], h[1] + b[1]]
+
+    def calc_hardstop_clearance(self):
+        """Minimum distance to stay clear from hardstop.
+        Returns [1x2] array of [clearance_at_min_limit, clearance_at_max_limit].
+        These are DIRECTIONAL quantities (i.e., the sign indicates the direction
+        in which one would debounce after hitting the given hardstop, to get
+        back into the accessible range).
+        """
+        if self.axisid == pc.T:
+            if self.principle_hardstop_direction < 0:
+                return [+self.posmodel.state._val['PRINCIPLE_HARDSTOP_CLEARANCE_T'],
+                        -self.posmodel.state._val['SECONDARY_HARDSTOP_CLEARANCE_T']]
+            else:
+                return [+self.posmodel.state._val['SECONDARY_HARDSTOP_CLEARANCE_T'],
+                        -self.posmodel.state._val['PRINCIPLE_HARDSTOP_CLEARANCE_T']]
+        else:
+            if self.principle_hardstop_direction < 0:
+                return [+self.posmodel.state._val['PRINCIPLE_HARDSTOP_CLEARANCE_P'],
+                        -self.posmodel.state._val['SECONDARY_HARDSTOP_CLEARANCE_P']]
+            else:
+                return [+self.posmodel.state._val['SECONDARY_HARDSTOP_CLEARANCE_P'],
+                        -self.posmodel.state._val['PRINCIPLE_HARDSTOP_CLEARANCE_P']]
+
+    def calc_backlash_clearance(self):
+        """Minimum clearance distance required for backlash removal moves.
+        Returns 1x2 array of [clearance_from_low_side_of_range, clearance_from_high_side].
+        These are DIRECTIONAL quantities (i.e., the sign indicates the direction
+        similarly as the hardstop clearance directions).
+        """
+        if self.antibacklash_final_move_dir > 0:
+            return [+self.posmodel.state._val['BACKLASH'],0]
+        else:
+            return [0,-self.posmodel.state._val['BACKLASH']]
