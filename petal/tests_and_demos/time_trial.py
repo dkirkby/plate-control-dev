@@ -34,7 +34,7 @@ def cProfile_wrapper(evaluatable_string):
     
 # timed test sequence
 cProfile_wrapper('ptl = petal.Petal(petal_id, posids, fidids, simulator_on=True, db_commit_on=False, local_commit_on=False, sched_stats_on=True)')
-ptl.anticollision_default = 'freeze' # None, 'freeze', or 'adjust'
+ptl.anticollision_default = 'adjust' # None, 'freeze', or 'adjust'
 cProfile_wrapper('ptl.request_homing(posids)')
 cProfile_wrapper('ptl.schedule_send_and_execute_moves()')
 cProfile_wrapper('ptl.quick_move(posids,"posXY",[4,4],"some note")')
