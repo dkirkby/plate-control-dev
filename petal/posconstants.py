@@ -105,7 +105,8 @@ class collision_case(object):
         self.IIIA = 2  # phi arm of positioner 'A' against neighbor 'B' central body
         self.IIIB = 3  # phi arm of positioner 'B' against neighbor 'A' central body
         self.GFA  = 4  # phi arm against the GFA fixed keepout envelope
-        self.PTL  = 5  # phi arm against the Petal edge keepout envelope    
+        self.PTL  = 5  # phi arm against the Petal edge keepout envelope
+        self.fixed_cases = {self.PTL,self.GFA}
 case = collision_case()
 
 # Convenience methods
