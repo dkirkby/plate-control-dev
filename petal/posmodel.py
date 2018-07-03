@@ -168,8 +168,8 @@ class PosModel(object):
         future shaft position changes. This is necessary for correct checking of
         software travel limits, when a sequence of multiple moves is being planned out.
         """
-        pos = self.expected_current_position
-        start = self.trans.addto_posTP([pos['posT'],pos['posP']], expected_prior_dTdP, range_wrap_limits='none') # since expected_prior_dTdP is just tracking already-existing commands, do not perform range wrapping on it
+        pos = self.expected_current_posTP
+        start = self.trans.addto_posTP([pos[0],pos[1]], expected_prior_dTdP, range_wrap_limits='none') # since expected_prior_dTdP is just tracking already-existing commands, do not perform range wrapping on it
         if not(allow_exceed_limits):
             distance = self.axis[axisid].truncate_to_limits(distance,start[axisid])
         motor_dist = self.axis[axisid].shaft_to_motor(distance)
