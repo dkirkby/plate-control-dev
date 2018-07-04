@@ -1,5 +1,6 @@
 import posconstants as pc
 import posschedulestage
+import time
 
 class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners
@@ -15,13 +16,16 @@ class PosSchedule(object):
     def __init__(self, petal, stats=None, verbose=True):
         self.petal = petal
         self.stats = stats
+        if stats:
+            schedule_id = pc.filename_timestamp_str_now()
+            self.stats.register_new_schedule(schedule_id, len(self.petal.posids))
         self.verbose = verbose
         self.printfunc = self.petal.printfunc
         self.requests = {} # keys: posids, values: target request dictionaries
         self.max_path_adjustment_passes = 3 # max number of times to go through the set of colliding positioners and try to adjust each of their paths to avoid collisions. After this many passes, it defaults to freezing any that still collide
         self.stage_order = ['direct','retract','rotate','extend','expert']
         self.RRE_stage_order = ['retract','rotate','extend']
-        self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map) for name in self.stage_order}
+        self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, stats=self.stats) for name in self.stage_order}
         self.anneal_time = {'direct':3, 'retract':3, 'rotate':3, 'extend':3, 'expert':3} # times in seconds, see comments in PosScheduleStage
         self.move_tables = {}
 
@@ -42,6 +46,8 @@ class PosSchedule(object):
 
         A schedule can only contain one target request per positioner at a time.
         """
+        if self.stats:
+            timer_start = time.clock()
         posmodel = self.petal.posmodels[posid]
         if self.already_requested(posid):
             if self.verbose:
@@ -101,6 +107,8 @@ class PosSchedule(object):
                           'cmd_val2' : v,
                           'log_note' : log_note}
         self.requests[posid] = new_request
+        if self.stats:
+            self.stats.add_requesting_time(time.clock() - timer_start)
 
     def schedule_moves(self, anticollision='freeze'):
         """Executes the scheduling algorithm upon the stored list of move requests.
@@ -113,14 +121,14 @@ class PosSchedule(object):
           None      ... No collisions are searched for. Expert use only.
            
           'freeze'  ... Collisions are searched for. If found, the colliding
-                                   positioner is frozen at its original position. This
-                                   setting is suitable for small correction moves.
+                        positioner is frozen at its original position. This
+                        setting is suitable for small correction moves.
            
           'adjust'  ... Collisions are searched for. If found, the motion paths
-                                   of colliding positioners are adjusted to attempt to
-                                   avoid each other. If this fails, the colliding positioner
-                                   is frozen at its original position. This setting is
-                                   suitable for gross retargeting moves.
+                        of colliding positioners are adjusted to attempt to
+                        avoid each other. If this fails, the colliding positioner
+                        is frozen at its original position. This setting is
+                        suitable for gross retargeting moves.
 
         If there were ANY pre-existing move tables in the list (for example, hard-
         stop seeking tables directly added by an expert user or expert function),
@@ -129,10 +137,14 @@ class PosSchedule(object):
         then it reverts to 'freeze' instead. An argument of anticollision=None
         remains as-is.
         """
+        if self.stats:
+            timer_start = time.clock()
         if not self.requests and not self.stages['expert'].is_not_empty():
             if self.verbose:
                 self.printfunc('No requests nor existing move tables found. No move scheduling performed.')
             return
+        if self.stats:
+            self.stats.set_scheduling_method(str(anticollision))
         if self.stages['expert'].is_not_empty():
             self._schedule_expert_tables(anticollision)
         else:
@@ -158,6 +170,26 @@ class PosSchedule(object):
                 if stage.is_not_empty():
                     self.collider.add_mobile_to_animator(self.petal.animator_total_time, stage.sweeps)
                     self.petal.animator_total_time += max({sweep.time[-1] for sweep in stage.sweeps})
+        if self.stats:
+            self.stats.add_scheduling_time(time.clock() - timer_start)
+            self.stats.set_num_move_tables(len(self.move_tables))
+            net_times = {table.for_schedule()['net_time'][-1] for table in self.move_tables.values()}
+            self.stats.set_max_table_time(max(net_times))
+            stage_start_time = 0
+            num_moving = {} # key is time, value is number of positioners moving at that time
+            for name in self.stage_order:
+                stage = self.stages[name]
+                if stage.is_not_empty():
+                    for sweep in stage.sweeps.values():
+                        for i in range(len(sweep.time)):
+                            this_time = sweep.time[i] + stage_start_time
+                            if this_time not in num_moving:
+                                num_moving[this_time] = 0
+                            if sweep.is_moving(i):
+                                num_moving[this_time] += 1
+                    stage_start_time = max(num_moving.keys())
+            self.stats.add_num_moving_data(num_moving)
+                    
                 
     def already_requested(self, posid):
         """Returns boolean whether a request has already been registered in the
@@ -172,11 +204,15 @@ class PosSchedule(object):
         will be ignored upon scheduling. Generally, this method should only be used
         by an expert user.
         """
+        if self.stats:
+            timer_start = time.clock()
         if self._deny_request_because_disabled(move_table.posmodel):
             if self.verbose:
                 self.printfunc(str(move_table.posmodel.posid) + ': move table addition to schedule denied. Positioner is disabled.')
             return
         self.stages['expert'].add_table(move_table)
+        if self.stats:
+            self.stats.add_expert_table_time(time.clock() - timer_start)
 
     def _schedule_expert_tables(self, anticollision):
         """Gathers data from expert-added move tables and populates the 'expert'
@@ -251,9 +287,9 @@ class PosSchedule(object):
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             attempts_remaining = self.max_path_adjustment_passes
             while stage.colliding and attempts_remaining:
-                for posid in stage.colliding:
+                for posid in stage.colliding: 
                     stage.adjust_path(posid)
-                    if posid in stage.frozen:
+                    if posid in stage.collisions_resolved['freeze']:
                         for j in range(i+1,len(self.RRE_stage_order)):
                             next_name = self.RRE_stage_order[j]
                             del start_posTP[next_name][posid]

@@ -442,6 +442,12 @@ class PosSweep(object):
         """Returns boolean value whether the sweep has a "freezing" event."""
         return self.frozen_time < math.inf
     
+    def is_moving(self,step):
+        """Returns boolean value whether the sweep is moving at the argued timestep."""
+        if self.tp[0,step]*self.tp_dot[0,step] or self.tp[1,step]*self.tp_dot[1,step]:
+            return True
+        return False
+    
     def theta(self, step):
         """Returns theta position of the sweep at the specified timestep index."""
         return self.tp[0,step]

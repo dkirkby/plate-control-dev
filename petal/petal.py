@@ -81,7 +81,7 @@ class Petal(object):
         self.animator = self.collider.animator
         self.animator_on = False # this should be turned on/off using the animation start/stop control methods below
         self.animator_total_time = 0 # keeps track of total time of the current animation
-        self.schedule_stats_log = posschedstats.PosSchedStats() if sched_stats_on else None    
+        self.schedule_stats = posschedstats.PosSchedStats() if sched_stats_on else None    
         self.schedule = self._new_schedule()
         self.anticollision_default = 'freeze'  # Default parameter on how to schedule moves. See posschedule.py for valid settings.
         
@@ -686,7 +686,7 @@ class Petal(object):
     def _new_schedule(self):
         """Generate up a new, clear schedule instance.
         """
-        return posschedule.PosSchedule(petal=self, stats=self.schedule_stats_log, verbose=self.verbose)
+        return posschedule.PosSchedule(petal=self, stats=self.schedule_stats, verbose=self.verbose)
 
     def _wait_while_moving(self):
         """Blocking implementation, to not send move tables while any positioners are

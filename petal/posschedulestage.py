@@ -11,12 +11,13 @@ class PosScheduleStage(object):
         collider         ... instance of poscollider for this petal
         power_supply_map ... dict where key = power supply id, value = set of posids attached to that supply
     """
-    def __init__(self, collider, power_supply_map={}):
+    def __init__(self, collider, power_supply_map={}, stats=None):
         self.collider = collider # poscollider instance
         self.move_tables = {} # keys: posids, values: posmovetable instances
         self.sweeps = {} # keys: posids, values: instances of PosSweep, corresponding to entries in self.move_tables
         self.colliding = set() # positioners currently known to have collisions
-        self.frozen = set() # positioners that have been frozen
+        self.collisions_resolved = {method:set() for method in pc.all_adjustment_methods} # keep track of which methods resolved collisions on which positioners
+        self.stats = stats
         self._power_supply_map = power_supply_map
         self._theta_max_jog = 90 # deg, maximum distance to temporarily shift theta when doing path adjustments
         self._phi_max_jog = 60 # deg, maximum distance to temporarily shift phi when doing path adjustments
@@ -155,19 +156,22 @@ class PosScheduleStage(object):
             return
         elif self.sweeps[posid].collision_case in pc.case.fixed_cases:
             methods = ['freeze'] if freezing != 'off' else []
+        elif freezing == 'forced':
+            methods = ['freeze']
+        elif freezing == 'off':
+            methods = pc.nonfreeze_adjustment_methods
         else:
-            methods = ['freeze'] if freezing == 'forced' else ['pause','extend','retract','rot_ccw','rot_cw']
-            if freezing == 'on':
-                methods.append('freeze')
+            methods = pc.all_adjustment_methods
         for method in methods:
+            collision_neighbor = self.sweeps[posid].collision_neighbor
             proposed_tables = self._propose_path_adjustment(posid,method)
             colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables)
             if not(colliding_sweeps): # i.e., the proposed tables should be accepted
                 self.move_tables.update(proposed_tables)
+                self.collisions_resolved[method].add(self._collision_id(posid,collision_neighbor))
                 self.store_collision_finding_results(colliding_sweeps, all_sweeps)
                 if method == 'freeze':
                     self.sweeps[posid].register_as_frozen()
-                    self.frozen.add(posid)
                 return
 
     def find_collisions(self, move_tables):
@@ -247,6 +251,11 @@ class PosScheduleStage(object):
         now_not_colliding = all_checked.difference(now_colliding)
         self.colliding = self.colliding.union(now_colliding)
         self.colliding = self.colliding.difference(now_not_colliding)
+        if self.stats:
+            found = {self._collision_id(posid,sweep.collision_neighbor) for posid,sweep in colliding_sweeps.items()}
+            self.stats.add_collisions_found(found)
+            for method,resolved in self.collisions_resolved.items():
+                self.stats.add_collisions_resolved(method,resolved)
 
     def _propose_path_adjustment(self, posid, method='freeze'):
         """Generates a proposed alternate move table for the positioner posid
@@ -350,3 +359,11 @@ class PosScheduleStage(object):
             table.set_postpause(0,neighbor_clearance_time)
             table.set_move(1,axis,-distance)
             return tables
+        
+    @staticmethod
+    def _collision_id(A,B):
+        """Returns an id string combining string A and string B. The returned
+        string will be the same regardless of whether A or B is argued first.
+        """
+        s = sorted({str(A),str(B)})
+        return s[0] + '-' + s[1]

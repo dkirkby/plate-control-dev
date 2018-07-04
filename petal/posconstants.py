@@ -109,6 +109,10 @@ class collision_case(object):
         self.fixed_cases = {self.PTL,self.GFA}
 case = collision_case()
 
+# Collision resolution methods
+nonfreeze_adjustment_methods = ['pause','extend','retract','rot_ccw','rot_cw']
+all_adjustment_methods = nonfreeze_adjustment_methods + ['freeze']
+
 # Convenience methods
 rotmat2D = lambda angle: [math.cos(angle*rad_per_deg), - math.sin(angle*rad_per_deg), math.sin(angle*rad_per_deg), math.cos(angle*rad_per_deg)]
 

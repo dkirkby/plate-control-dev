@@ -37,5 +37,8 @@ cProfile_wrapper('ptl = petal.Petal(petal_id, posids, fidids, simulator_on=True,
 ptl.anticollision_default = 'adjust' # None, 'freeze', or 'adjust'
 cProfile_wrapper('ptl.request_homing(posids)')
 cProfile_wrapper('ptl.schedule_send_and_execute_moves()')
+cProfile_wrapper('ptl.quick_direct_dtdp(posids,[15,-30],"some note")')
 cProfile_wrapper('ptl.quick_move(posids,"posXY",[4,4],"some note")')
-cProfile_wrapper('ptl.quick_direct_dtdp(posids,[10,-10],"some note")')
+cProfile_wrapper('ptl.quick_move(posids,"posXY",[-5.4,0.3],"some note")')
+if ptl.schedule_stats:
+    ptl.schedule_stats.save()
