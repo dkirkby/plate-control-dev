@@ -253,6 +253,8 @@ class PosSchedule(object):
             for posid in colliding_sweeps:
                 if posid in stage.colliding: # re-check, since earlier path adjustments in loop may have already resolved this posid's collision
                     stage.adjust_path(posid, freezing='forced')
+            if self.stats and colliding_sweeps:
+                self.stats.add_to_num_adjustment_iters(1)
         
     def _schedule_requests_with_path_adjustments(self):
         """Gathers data from requests dictionary and populates the 'retract',
@@ -269,7 +271,7 @@ class PosSchedule(object):
             trans = posmodel.trans
             start_posTP['retract'][posid] = request['start_posTP']
             starting_phi = start_posTP['retract'][posid][pc.P]
-            retracted_phi = starting_phi if starting_phi < self.collider.Eo_phi else self.collider.Eo_phi # Ei would also be safe, but unnecessary in most cases. Costs more time and power to get to.
+            retracted_phi = starting_phi if starting_phi > self.collider.Eo_phi else self.collider.Eo_phi # Ei would also be safe, but unnecessary in most cases. Costs more time and power to get to.
             desired_final_posTP['retract'][posid] = [request['start_posTP'][pc.T], retracted_phi] 
             desired_final_posTP['rotate'][posid]  = [request['targt_posTP'][pc.T], retracted_phi]
             desired_final_posTP['extend'][posid]  = request['targt_posTP']
@@ -294,6 +296,8 @@ class PosSchedule(object):
                             next_name = self.RRE_stage_order[j]
                             del start_posTP[next_name][posid]
                             del dtdp[next_name][posid]
+                if self.stats:
+                    self.stats.add_to_num_adjustment_iters(1)
                 attempts_remaining -= 1
             
     def _deny_request_because_disabled(self, posmodel):

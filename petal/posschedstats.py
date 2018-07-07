@@ -9,7 +9,7 @@ class PosSchedStats(object):
         self.schedule_ids = []
         self.collisions = {}
         self.strings = {'method':[]}
-        self.numbers = {'n pos':[], 'n move tables':[], 'max table move time':[], 'request_target calc time':[], 'expert_add_table calc time':[], 'schedule_moves calc time':[]}
+        self.numbers = {'n pos':[], 'n move tables':[], 'max table move time':[],'num path adjustment iters':[], 'request_target calc time':[], 'expert_add_table calc time':[], 'schedule_moves calc time':[]}
         self.num_moving = {}
     
     @property
@@ -87,6 +87,10 @@ class PosSchedStats(object):
         """
         self.num_moving[self.latest] = num_moving
         self.real_data_yet_in_latest_row = True
+        
+    def add_to_num_adjustment_iters(self, iterations):
+        """Add data recording number of iterations of path adjustment were made."""
+        self.numbers['num path adjustment iters'][-1] += iterations
     
     def summarize_collision_resolutions(self):
         """Returns a summary dictionary of the collisions and resolutions data."""
@@ -95,6 +99,8 @@ class PosSchedStats(object):
         summary['collisions with PTL'] = [len({c for c in self.collisions[sched]['found'] if 'PTL' in c}) for sched in self.schedule_ids]
         summary['collisions with GFA'] = [len({c for c in self.collisions[sched]['found'] if 'GFA' in c}) for sched in self.schedule_ids]
         summary['resolved total collisions'] = []
+        summary['found set'] = []
+        summary['resolved set'] = []
         for sched in self.schedule_ids:
             coll = self.collisions[sched]
             summary['resolved total collisions'].append(0)
@@ -106,6 +112,8 @@ class PosSchedStats(object):
                 else:
                     summary[method].append(0)
                 summary['resolved total collisions'][-1] += summary[method][-1]
+            summary['found set'].append(coll['found'])
+            summary['resolved set'].append(coll['resolved'])
         return summary
     
     def summarize_num_moving(self):
