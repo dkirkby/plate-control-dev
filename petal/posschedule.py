@@ -45,6 +45,8 @@ class PosSchedule(object):
            log_note ... optional string to store alongside the requested move in the log data
 
         A schedule can only contain one target request per positioner at a time.
+        
+        Return value is True if the request was accepted and False if denied.
         """
         if self.stats:
             timer_start = time.clock()
@@ -52,11 +54,11 @@ class PosSchedule(object):
         if self.already_requested(posid):
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Cannot request more than one target per positioner in a given schedule.')
-            return
+            return False
         if self._deny_request_because_disabled(posmodel):
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Positioner is disabled.')
-            return
+            return False
         current_position = posmodel.expected_current_position
         start_posTP = [current_position['posT'],current_position['posP']]
         lims = 'targetable'
@@ -84,20 +86,20 @@ class PosSchedule(object):
         else:
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Bad uv_type "' + str(uv_type) + '".')
-            return
+            return False
         if unreachable:
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Target not reachable: ' + str(uv_type) + ' = (' + format(u,'.3f') + ',' + format(v,'.3f') + ')')
-            return
+            return False
         targt_obsTP = posmodel.trans.posTP_to_obsTP(targt_posTP)
         if self._deny_request_because_target_interference(posmodel,targt_obsTP):
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Target interferes with a neighbor\'s existing target.')
-            return
+            return False
         if self._deny_request_because_out_of_bounds(posmodel,targt_obsTP):
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Target exceeds a fixed boundary.')
-            return
+            return False
         new_request = {'start_posTP' : start_posTP,
                        'targt_posTP' : targt_posTP,
                           'posmodel' : posmodel,
@@ -109,6 +111,7 @@ class PosSchedule(object):
         self.requests[posid] = new_request
         if self.stats:
             self.stats.add_requesting_time(time.clock() - timer_start)
+        return True
 
     def schedule_moves(self, anticollision='freeze'):
         """Executes the scheduling algorithm upon the stored list of move requests.
@@ -190,7 +193,6 @@ class PosSchedule(object):
                     stage_start_time = max(num_moving.keys())
             self.stats.add_num_moving_data(num_moving)
                     
-                
     def already_requested(self, posid):
         """Returns boolean whether a request has already been registered in the
         schedule for the argued positioner.
@@ -289,7 +291,7 @@ class PosSchedule(object):
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             attempts_remaining = self.max_path_adjustment_passes
             while stage.colliding and attempts_remaining:
-                for posid in stage.colliding: 
+                for posid in stage.colliding:
                     stage.adjust_path(posid)
                     if posid in stage.collisions_resolved['freeze']:
                         for j in range(i+1,len(self.RRE_stage_order)):
