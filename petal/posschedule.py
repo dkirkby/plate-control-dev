@@ -172,7 +172,7 @@ class PosSchedule(object):
                 stage = self.stages[name]
                 if stage.is_not_empty():
                     self.collider.add_mobile_to_animator(self.petal.animator_total_time, stage.sweeps)
-                    self.petal.animator_total_time += max({sweep.time[-1] for sweep in stage.sweeps})
+                    self.petal.animator_total_time += max({sweep.time[-1] for sweep in stage.sweeps.values()})
         if self.stats:
             self.stats.add_scheduling_time(time.clock() - timer_start)
             self.stats.set_num_move_tables(len(self.move_tables))
