@@ -601,7 +601,7 @@ class Petal(object):
         self.animator_total_time = 0
         self.collider.add_fixed_to_animator(self.animator_total_time)        
     
-    def end_gathering_frames(self):
+    def stop_gathering_frames(self):
         """Stop collecting frame data of scheduled moves for the animator.
         """
         self.animator_on = False
