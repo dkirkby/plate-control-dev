@@ -8,9 +8,9 @@ import harness_constants as hc
 
 # input paramters
 percent_disabled = 0.05 # fraction
-armlength_max_err = 0.3 # mm
+armlength_max_err = 0.2 # mm
 offset_phi_max_err = 10.0 # deg
-offset_xy_max_err = 0.2 # mm
+offset_xy_max_err = 0.1 # mm
 range_max_err = 10.0 # deg
 
 # gather nominal positioner locations from file
