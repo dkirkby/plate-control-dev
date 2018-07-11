@@ -37,11 +37,13 @@ class Petal(object):
         printfunc       ... method, used for stdout style printing. we use this for logging during tests
         collider_file   ... string, file name of collider configuration file, no directory loction. If left blank will use default.
         sched_stats_on  ... boolen, controls whether to log statistics about scheduling runs
+        anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
     """
     def __init__(self, petal_id, posids, fidids, simulator_on=False,
                  db_commit_on=False, local_commit_on=True, printfunc=print,
                  verbose=False, user_interactions_enabled=False,
-                 collider_file=None, sched_stats_on=False):
+                 collider_file=None, sched_stats_on=False,
+                 anticollision='freeze'):
         
         # petal setup
         self.petal_id = petal_id
@@ -62,11 +64,13 @@ class Petal(object):
         self.altered_states = set()
 
         # positioners setup
-        self.posmodels = {}
-        self.states = {}
+        self.posmodels = {} # key posid, value posmodel instance
+        self.states = {} # key posid, value posstate instance
+        self.devices = {} # key device_location_id, value posid
         for posid in posids:
             self.states[posid] = posstate.PosState(posid, logging=True, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
             self.posmodels[posid] = PosModel(self.states[posid])
+            self.devices[self.states[posid]._val['DEVICE_ID']] = posid
         self.posids = set(self.posmodels.keys())
         self.canids_where_tables_were_just_sent = []
         self.busids_where_tables_were_just_sent = []
@@ -83,12 +87,13 @@ class Petal(object):
         self.animator_total_time = 0 # keeps track of total time of the current animation
         self.schedule_stats = posschedstats.PosSchedStats() if sched_stats_on else None    
         self.schedule = self._new_schedule()
-        self.anticollision_default = 'freeze'  # Default parameter on how to schedule moves. See posschedule.py for valid settings.
+        self.anticollision_default = anticollision
         
         # fiducials setup
         self.fidids = {fidids} if isinstance(fidids,str) else set(fidids)
         for fidid in self.fidids:
             self.states[fidid] = posstate.PosState(fidid, logging=True, device_type='fid', printfunc=self.printfunc, petal_id=self.petal_id)        
+            self.devices[self.states[fidid]._val['DEVICE_ID']] = fidid
         
         # power supplies setup?
         # to-do
@@ -148,14 +153,19 @@ class Petal(object):
             In cases where the request was made to a disabled positioner, the subdictionary will be
             deleted from the return.
         """
+        marked_for_delete = set()
         for posid in requests:
             requests[posid]['posmodel'] = self.posmodels[posid]
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
             if not(self.get_posfid_val(posid,'CTRL_ENABLED')) or self.schedule.already_requested(posid):
-                del requests[posid]
+                marked_for_delete.add(posid)
             else:
-                self.schedule.request_target(posid, requests[posid]['command'], requests[posid]['target'][0], requests[posid]['target'][1], requests[posid]['log_note'])            
+                accepted = self.schedule.request_target(posid, requests[posid]['command'], requests[posid]['target'][0], requests[posid]['target'][1], requests[posid]['log_note'])            
+                if not accepted:
+                    marked_for_delete.add(posid)
+        for posid in marked_for_delete:
+            del requests[posid]
         return requests
 
     def request_direct_dtdp(self, requests, cmd_prefix=''):
@@ -208,9 +218,9 @@ class Petal(object):
         wishes a sequence of theta and phi rotations to all be done in one shot. (This is unlike the
         request_targets command, where only the first request to a given positioner would be valid.)
         """
-        for posid in requests:
-            if not(self.get_posfid_val(posid,'CTRL_ENABLED')):
-                del requests[posid]
+        marked_for_delete = {posid for posid in requests if not(self.get_posfid_val(posid,'CTRL_ENABLED'))}
+        for posid in marked_for_delete:
+            del requests[posid]
         for posid in requests:
             requests[posid]['posmodel'] = self.posmodels[posid]
             if 'log_note' not in requests[posid]:
