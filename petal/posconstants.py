@@ -115,6 +115,7 @@ all_adjustment_methods = nonfreeze_adjustment_methods + ['freeze']
 
 # Convenience methods
 rotmat2D = lambda angle: [math.cos(angle*rad_per_deg), - math.sin(angle*rad_per_deg), math.sin(angle*rad_per_deg), math.cos(angle*rad_per_deg)]
+transpose = lambda matrix: [list(x) for x in zip(*matrix)]
 
 def sign(x):
     """Return the sign of the value x as +1, -1, or 0."""
