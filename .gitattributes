@@ -19,6 +19,12 @@ petal/posschedulestage.py -text
 petal/posstate.py -text
 petal/postransforms.py -text
 petal/tests_and_demos/anticol_sim.py -text
+petal/tests_and_demos/anticollision_test_harness/generate_posparam_sets.py -text
+petal/tests_and_demos/anticollision_test_harness/generate_request_sets.py -text
+petal/tests_and_demos/anticollision_test_harness/harness.py -text
+petal/tests_and_demos/anticollision_test_harness/harness_constants.py -text
+petal/tests_and_demos/anticollision_test_harness/read_nominal_pos_locations.py -text
+petal/tests_and_demos/anticollision_test_harness/sequences.py -text
 petal/tests_and_demos/demo.py -text
 petal/tests_and_demos/em_test.py -text
 petal/tests_and_demos/em_test_sim.py -text
