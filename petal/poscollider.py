@@ -57,9 +57,10 @@ class PosCollider(object):
         self.animator.add_or_change_item('PTL', '', start_time, self.keepout_PTL.points)
         for posid in self.posindexes:
             self.animator.add_or_change_item('Eo', self.posindexes[posid], start_time, self.Eo_polys[posid].points)
-            self.animator.add_or_change_item('Ei', self.posindexes[posid], start_time, self.Ei_polys[posid].points)
-            self.animator.add_or_change_item('Ee', self.posindexes[posid], start_time, self.Ee_polys[posid].points)
+            # self.animator.add_or_change_item('Ei', self.posindexes[posid], start_time, self.Ei_polys[posid].points)
+            # self.animator.add_or_change_item('Ee', self.posindexes[posid], start_time, self.Ee_polys[posid].points)
             self.animator.add_or_change_item('line at 180', self.posindexes[posid], start_time, self.line180_polys[posid].points)
+            self.animator.add_label(format(self.posmodels[posid].deviceid,'03d'), self.x0[posid], self.y0[posid])
         
     def add_mobile_to_animator(self, start_time, sweeps):
         """Add a collection of PosSweeps to the animator, describing positioners'
@@ -68,7 +69,7 @@ class PosCollider(object):
             start_time ... seconds, global time when the move begins        
             sweeps     ... dict with keys = posids, values = PosSweep instances
         """            
-        for posid,s in sweeps:
+        for posid,s in sweeps.items():
             posidx = self.posindexes[posid]
             for i in range(len(s.time)):
                 style_override = ''
