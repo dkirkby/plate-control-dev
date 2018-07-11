@@ -166,7 +166,7 @@ class PosScheduleStage(object):
             collision_neighbor = self.sweeps[posid].collision_neighbor
             proposed_tables = self._propose_path_adjustment(posid,method)
             colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables)
-            if not(colliding_sweeps): # i.e., the proposed tables should be accepted
+            if proposed_tables and not(colliding_sweeps): # i.e., the proposed tables should be accepted
                 self.move_tables.update(proposed_tables)
                 self.collisions_resolved[method].add(self._collision_id(posid,collision_neighbor))
                 self.store_collision_finding_results(colliding_sweeps, all_sweeps)
@@ -216,7 +216,7 @@ class PosScheduleStage(object):
             init_obsTP_A = table_A.posmodel.trans.posTP_to_obsTP(table_A.init_posTP)
             for neighbor in self.collider.pos_neighbors[posid]:
                 if neighbor not in already_checked[posid]:
-                    table_B = move_tables[neighbor] if neighbor in move_tables else posmovetable.PosMoveTable(self.collider.posmodels[neighbor]) # generation of fixed table if necessary, for a non-moving neighbor
+                    table_B = move_tables[neighbor] if neighbor in move_tables else self._get_or_generate_table(neighbor)
                     init_obsTP_B = table_B.posmodel.trans.posTP_to_obsTP(table_B.init_posTP)
                     pospos_sweeps = self.collider.spacetime_collision_between_positioners(posid, init_obsTP_A, table_A.for_collider(), neighbor, init_obsTP_B, table_B.for_collider())
                     all_sweeps.update({posid:pospos_sweeps[0], neighbor:pospos_sweeps[1]})
@@ -299,9 +299,10 @@ class PosScheduleStage(object):
         fixed_collision = self.sweeps[posid].collision_case in pc.case.fixed_cases
         already_frozen = self.sweeps[posid].is_frozen
         not_enabled = not(self.collider.posmodels[posid].is_enabled)
-        if no_collision or (fixed_collision and method != 'freeze') or already_frozen or not_enabled:
-            return {posid:self.move_tables[posid]} # unchanged move table
-        table = self.move_tables[posid].copy()
+        unmoving_neighbor = self.sweeps[posid].collision_neighbor not in self.move_tables
+        if no_collision or (fixed_collision and method != 'freeze') or already_frozen or not_enabled or (unmoving_neighbor and method != 'freeze'):
+            return {}
+        table = self._get_or_generate_table(posid,should_copy=True)
         if method == 'freeze':    
             table_data = table.for_schedule()
             for row_idx in reversed(range(table.n_rows)):
@@ -317,7 +318,8 @@ class PosScheduleStage(object):
                 table.set_move(0,0,0)
             return {posid:table}
         neighbor = self.sweeps[posid].collision_neighbor
-        neighbor_table_data = self.move_tables[neighbor].for_schedule()
+        neighbor_table = self._get_or_generate_table(neighbor,should_copy=True)
+        neighbor_table_data = neighbor_table.for_schedule()
         for neighbor_clearance_time in neighbor_table_data['net_time']:
             if neighbor_clearance_time > self.sweeps[posid].collision_time:
                 break
@@ -349,7 +351,6 @@ class PosScheduleStage(object):
             distance = limit - start
             move_time = abs(distance / speed)
             if self.collider.posmodels[neighbor].is_enabled and not self.sweeps[neighbor].is_frozen:
-                neighbor_table = self.move_tables[neighbor].copy()
                 neighbor_table.insert_new_row(0)
                 neighbor_table.set_prepause(0,move_time)
                 tables[neighbor] = neighbor_table
@@ -360,6 +361,21 @@ class PosScheduleStage(object):
             table.set_move(1,axis,-distance)
             return tables
         
+    def _get_or_generate_table(self, posid, should_copy=False):
+        """Fetches move table for posid from self.move_tables. If no such table
+        exists, generates a new one. The should_copy flag allows you to request
+        that the returned table be a duplicate of the original table (not a pointer
+        to it.)
+        """
+        if posid in self.move_tables:
+            table = self.move_tables[posid]
+            if should_copy:
+                table = table.copy()
+        else:
+            table = posmovetable.PosMoveTable(self.collider.posmodels[posid])
+            table.insert_new_row(0)
+        return table
+    
     @staticmethod
     def _collision_id(A,B):
         """Returns an id string combining string A and string B. The returned
