@@ -1,4 +1,4 @@
-"""Creates a set of simulated targets for testing the anticollision code.
+"""Creates a set of simulated move requests for testing the anticollision code.
 """
 
 import os
@@ -14,7 +14,10 @@ import harness_constants as hc
 
 # input parameters
 num_sets_to_make = 2
-nominal_patrol_radius = 6.0 # mm
+nom_R1 = 3.0 # mm, nominal LENGTH_R1
+nom_R2 = 3.0 # mm, nominal LENGTH_R2
+min_patrol = abs(nom_R1 - nom_R2)
+max_patrol = nom_R1 + nom_R2
 
 # initialize a nominal poscollider instance (for reasonable target checking)
 collider = poscollider.PosCollider()
@@ -22,8 +25,8 @@ posmodels = {}
 for posid,data in locations.items():
     state = posstate.PosState(posid)
     state.store('DEVICE_ID',data['DEVICE_ID'])
-    state.store('LENGTH_R1',3.0)
-    state.store('LENGTH_R2',3.0)
+    state.store('LENGTH_R1',nom_R1)
+    state.store('LENGTH_R2',nom_R2)
     state.store('OFFSET_T',0.0)
     state.store('OFFSET_P',0.0)
     state.store('OFFSET_X',data['nomX'])
@@ -40,13 +43,19 @@ for i in range(num_sets_to_make):
     targets_obsTP = {}
     targets_posXY = {}
     for posid,model in posmodels.items():
-        attempts_remaining = 50
+        attempts_remaining = 100 # just to prevent infinite loop if there's a bug somewhere
         while posid not in targets_obsTP:
             rangeT = model.targetable_range_T
             rangeP = model.targetable_range_P
-            this_posT = random.uniform(min(rangeT),max(rangeT))
-            this_posP = random.uniform(min(rangeP),max(rangeP))
-            this_posTP = [this_posT,this_posP]
+            while attempts_remaining:
+                x = random.uniform(-max_patrol,max_patrol)
+                y = random.uniform(-max_patrol,max_patrol)
+                this_radius = (x**2 + y**2)**0.5
+                if min_patrol <= this_radius and this_radius <= max_patrol:
+                    break
+                attempts_remaining -= 1
+            this_posXY = [x,y]
+            this_posTP = model.trans.posXY_to_posTP(this_posXY)[0]
             this_obsTP = model.trans.posTP_to_obsTP(this_posTP)
             target_interference = False
             for neighbor in collider.pos_neighbors[posid]:
@@ -57,7 +66,7 @@ for i in range(num_sets_to_make):
             out_of_bounds = collider.spatial_collision_with_fixed(posid, this_obsTP)
             if not target_interference and not out_of_bounds:
                 targets_obsTP[posid] = this_obsTP
-                targets_posXY[posid] = model.trans.posTP_to_posXY(this_posTP)
+                targets_posXY[posid] = this_posXY
             else:
                 attempts_remaining -= 1
         if not attempts_remaining:
