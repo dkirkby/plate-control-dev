@@ -35,7 +35,7 @@ To check for collision between a positioner and fixed:
 """
 
 # PSEUDO-CODE
-# Divest much of polygon-handling code form poscollider.py into this module.
+# Divest much of polygon-handling code from poscollider.py into this module.
 # Initialize, bringing in the usual poscollider stuff like polygon definitions etc.
 #
 # POS-POS calculations:
