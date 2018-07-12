@@ -1,7 +1,11 @@
 ''' This is a test utility for exercising the full functionality of the petal box'''
+#
+# change log
+# 7/12/18 MS changed abspath to relpath in path append so petalcomm can be found more reliably
+
 import os
 import sys
-sys.path.append(os.path.abspath('/home/msdos/focalplane/plate_control/trunk/petal'))
+sys.path.append(os.path.relpath('../../petal'))
 import petalcomm
 import time
 
