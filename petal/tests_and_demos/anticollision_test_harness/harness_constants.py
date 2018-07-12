@@ -1,6 +1,8 @@
 import os
 import cProfile
 import pstats
+import sys
+sys.path.append(os.path.abspath('../../../petal/'))
 import posconstants as pc
 
 device_locations_path = '../../positioner_locations_0530v14.csv'
