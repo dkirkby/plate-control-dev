@@ -75,6 +75,7 @@ posfidfvc/SBIG/spotfit.py -text
 posfidfvc/SBIG/stf.py -text
 posfidfvc/SBIG/usbreset.c -text
 posfidfvc/SBIG/usbreset.py -text
+posfidfvc/check_pos_move.py -text
 posfidfvc/fitcircle.py -text
 posfidfvc/fvchandler.py -text
 posfidfvc/initialize_hwsetup.py -text
