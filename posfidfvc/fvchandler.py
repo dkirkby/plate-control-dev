@@ -13,7 +13,7 @@ import time
 import postransforms
 import posconstants as pc
 import collections
-
+import pdb
 
 class FVCHandler(object):
 	"""Provides a generic interface to the Fiber View Camera. Can support different
@@ -342,11 +342,16 @@ class FVCHandler(object):
 		if xy != []:
 			if self.fvcproxy:
 				spotids = [i for i in range(len(xy))]
-				qs = self.trans.obsXY_to_QS(np.tranpose(xy).tolist())
-				qs_dicts = [{'spotid':spotids[i],'q':qs[0,i],'s':qs[1,i]} for i in range(len(spotids))]
-				fvcXY_dicts = self.fvcproxy.qs_to_fvcxy(qs_dicts)
-				return_order = [spotids.index(d['spotid']) for d in fvcXY_dicts]
-				xy = [[fvcXY_dicts[i]['x_pix'],fvcXY_dicts[i]['y_pix']] for i in return_order]
+				qs = self.trans.obsXY_to_QS(np.transpose(xy).tolist())# Note qs =[[q1,q2,q3...],[s1,s2,s3...]]
+				qs_dicts = [{'spotid':spotids[i],'q':qs[0][i],'s':qs[1][i]} for i in range(len(spotids))]
+				fvcXY_dicts = self.fvcproxy.qs_to_fvcxy(qs_dicts) # fiducials are added in this process 
+				fvcXY_dicts_this=[]  # Kai: This is a temporary fix, a more efficient fix should be done in the future to save time
+				for d in fvcXY_dicts:
+					if d['spotid'] in spotids:
+						fvcXY_dicts_this.append(d)
+				return_order = [spotids.index(d['spotid']) for d in fvcXY_dicts_this]
+				#pdb.set_trace()
+				xy = [[fvcXY_dicts_this[i]['x'],fvcXY_dicts_this[i]['y']] for i in return_order]
 			else:
 				xy = pc.listify2d(xy)
 				xy_np = np.transpose(xy)
