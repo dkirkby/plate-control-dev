@@ -255,3 +255,11 @@ class PosAnimator(object):
         patch.set_linewidth(item['style'][index]['linewidth'])
         patch.set_edgecolor(item['style'][index]['edgecolor'])
         patch.set_facecolor(item['style'][index]['facecolor'])
+		
+if __name__=="__main__":
+	pass
+	# prototype dynamic animator (pyqtgraph) here
+	# 1. place a single polygon and have it move about the screen as you drag slider
+	# 2. place some text and have it update as you drag slider
+	# 3. ability to zoom in / out
+	# 4. (maybe) option to save movie?
