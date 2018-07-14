@@ -255,11 +255,47 @@ class PosAnimator(object):
         patch.set_linewidth(item['style'][index]['linewidth'])
         patch.set_edgecolor(item['style'][index]['edgecolor'])
         patch.set_facecolor(item['style'][index]['facecolor'])
-		
+        
 if __name__=="__main__":
-	pass
-	# prototype dynamic animator (pyqtgraph) here
-	# 1. place a single polygon and have it move about the screen as you drag slider
-	# 2. place some text and have it update as you drag slider
-	# 3. ability to zoom in / out
-	# 4. (maybe) option to save movie?
+    pass
+    # prototype dynamic animator (pyqtgraph) here
+    # 1. place a single polygon and have it animate
+    # 2. place 1000 polygons and have them animate, see how quick it is
+    # 3. place a single polygon and have it move about the screen as you drag slider
+    # 4. place some text and have it update as you drag slider
+    # 5. ability to zoom in / out
+    # 6. (maybe) option to save movie?
+    import pyqtgraph as pg
+    from pyqtgraph.Qt import QtCore, QtGui
+    win = pg.GraphicsWindow()
+    win.setWindowTitle('pyqtgraph test')
+    plt = win.addPlot()
+    poly = [[3.967, 3.918, 3.269, -1.172, -1.172,  3.269,  3.918, 3.967],
+            [0.000, 1.014, 1.583,  1.037, -1.037, -1.583, -1.014, 0.000]]
+    curve = plt.plot(poly[0],poly[1])
+    top = 10
+    bottom = -10
+    current = 0
+    step = 0.1
+    plt.setXRange(bottom + min(poly[0]), top + max(poly[0]))
+    plt.setYRange(bottom, top)
+    def update():
+        global curve, current, step
+        current += step
+        if current > top and step > 0:
+            current = top
+            step *= -1
+        elif current < bottom and step < 0:
+            current = bottom
+            step *= -1
+        poly_temp = [x + current for x in poly[0]]
+        curve.setData(poly_temp,poly[1])
+    timer = pg.QtCore.QTimer()
+    timer.timeout.connect(update)
+    timer.start(10)
+
+    ## Start Qt event loop unless running in interactive mode or using pyside.
+    if __name__ == '__main__':
+        import sys
+        if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
+            QtGui.QApplication.instance().exec_()
