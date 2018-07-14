@@ -265,22 +265,33 @@ if __name__=="__main__":
     # 4. place some text and have it update as you drag slider
     # 5. ability to zoom in / out
     # 6. (maybe) option to save movie?
+    import random
     import pyqtgraph as pg
     from pyqtgraph.Qt import QtCore, QtGui
     win = pg.GraphicsWindow()
     win.setWindowTitle('pyqtgraph test')
     plt = win.addPlot()
+    n_poly = 10
     poly = [[3.967, 3.918, 3.269, -1.172, -1.172,  3.269,  3.918, 3.967],
             [0.000, 1.014, 1.583,  1.037, -1.037, -1.583, -1.014, 0.000]]
-    curve = plt.plot(poly[0],poly[1])
-    top = 10
-    bottom = -10
+    top = 100
+    bottom = -100
     current = 0
     step = 0.1
-    plt.setXRange(bottom + min(poly[0]), top + max(poly[0]))
+    polys = {}
+    colors = {}
+    curves = {}
+    for i in range(n_poly):
+        dx = random.uniform(bottom/2,top)
+        dy = random.uniform(bottom/2,top)
+        polys[i] = [[x+dx for x in poly[0]],[y+dy for y in poly[1]]]
+        colors[i] = random.choice(['b', 'g', 'r', 'c', 'm', 'y', 'w'])
+        curves[i] = plt.plot(polys[i][0],polys[i][1])
+        curves[i].setPen(colors[i])
+    plt.setXRange(2*bottom, 2*top)
     plt.setYRange(bottom, top)
     def update():
-        global curve, current, step
+        global curves, current, step
         current += step
         if current > top and step > 0:
             current = top
@@ -288,11 +299,12 @@ if __name__=="__main__":
         elif current < bottom and step < 0:
             current = bottom
             step *= -1
-        poly_temp = [x + current for x in poly[0]]
-        curve.setData(poly_temp,poly[1])
+        for key in curves:
+            poly_temp = [x + current for x in polys[key][0]]
+            curves[key].setData(poly_temp,polys[key][1])
     timer = pg.QtCore.QTimer()
     timer.timeout.connect(update)
-    timer.start(10)
+    timer.start(5)
 
     ## Start Qt event loop unless running in interactive mode or using pyside.
     if __name__ == '__main__':
