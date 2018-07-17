@@ -162,14 +162,20 @@ class MoveGUI(object):
             self.syncmode.set(0)
         Checkbutton(gui_root, text='SYNC hard', variable=self.syncmode,command=self.sync_mode).grid(row=3,column=2,sticky=W,pady=4)
 
+        self.pcomm.pbset('stop_mode','on')
+        self.stopmode=IntVar(gui_root)
+        self.stopmode.set(1)
+        Checkbutton(gui_root, text='Low Power', variable=self.stopmode,command=self.stop_mode).grid(row=4,column=1,sticky=E,pady=4)
+    
         Button(gui_root,text='Phi CW',width=10,command=self.phi_cw_degree).grid(row=3,column=0,sticky=W,pady=4)
         Button(gui_root,text='Phi CCW',width=10,command=self.phi_ccw_degree).grid(row=4,column=0,sticky=W,pady=4)
-        Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=5,column=2,sticky=W,pady=4)
+        Button(gui_root,text='Movement Check',width=10,command=self.movement_check).grid(row=5,column=2,sticky=W,pady=4)
+        Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=5,column=3,sticky=W,pady=4)
         Button(gui_root,text='Reload CANBus',width=12,command=self.reload_canbus).grid(row=5,column=1,sticky=W,pady=4)
         Button(gui_root,text='1 Write SiID',width=15,command=self.write_siid).grid(row=3,column=3,sticky=W,pady=4)
-        Button(gui_root,text='3 Populate Busids',width=15,command=self.populate_can).grid(row=5,column=3,sticky=W,pady=4)# Call populate_busids.py under pos_utility/ 
+        Button(gui_root,text='3 Populate Busids',width=15,command=self.populate_can).grid(row=3,column=4,sticky=W,pady=4)# Call populate_busids.py under pos_utility/ 
         Button(gui_root,text='2 Write DEVICE_LOC',width=15,command=self.populate_petal_travelers).grid(row=4,column=3,sticky=W,pady=4)# Call populate_travellers.py under pos_utility/ to read from installation traveler and write to positioner 'database' and ID map
-        Button(gui_root,text='Aliveness Test',width=10,command=self.aliveness_test).grid(row=4,column=4,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
+        Button(gui_root,text='4 Aliveness Test',width=13,command=self.aliveness_test).grid(row=4,column=4,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
 
         Button(gui_root,text='Center',width=10,command=self.center).grid(row=4,column=2,sticky=W,pady=4)                
 
@@ -295,6 +301,11 @@ class MoveGUI(object):
             self.ptl.sync_mode = 'hard'
         else:
             self.ptl.sync_mode = 'soft'
+    def stop_mode(self):
+        if self.stopmode.get() == 1:
+            self.pcomm.pbset('stop_mode','on')
+        else:
+            self.pcomm.pbset('stop_mode','off')
  
     def get_list(self,event):
         # get selected line index
@@ -356,21 +367,51 @@ class MoveGUI(object):
     
     def center(self):
         if self.mode.get()==1:
-            self.pcomm.move(self.canbus, 20000, 'cw', 'cruise', 'theta', 400)
+            self.pcomm.move(self.canbus, self.selected_can, 'cw', 'cruise', 'theta', 400)
             time.sleep(4)
-            self.pcomm.move(self.canbus, 20000, 'ccw', 'cruise', 'phi', 200)
+            self.pcomm.move(self.canbus, self.selected_can, 'ccw', 'cruise', 'phi', 200)
             time.sleep(2)
-            self.pcomm.move(self.canbus, 20000, 'ccw', 'cruise', 'theta', 195)
+            self.pcomm.move(self.canbus, self.selected_can, 'ccw', 'cruise', 'theta', 195)
 
             
        #     self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)            
         else:
             dtdp=[-400,200]
-            self.ptl.quick_direct_dtdp(self.posids,dtdp)       
+            self.ptl.quick_direct_dtdp(self.selected_posids,dtdp)       
             dtdp=[195,0]
-            self.ptl.quick_direct_dtdp(self.posids,dtdp)   
+            self.ptl.quick_direct_dtdp(self.selected_posids,dtdp)   
             self.text1.insert(END,'Centering Done \n')
-        
+
+    def movement_check(self):
+        print('Movement Check Starts! \n')
+        time.sleep(5)
+        if self.mode.get()==1:
+            for i in range(5):
+                self.pcomm.move(self.canbus, self.selected_can, 'cw', 'cruise', 'phi', 30)
+                time.sleep(3)
+                self.pcomm.move(self.canbus, self.selected_can, 'ccw', 'cruise', 'phi', 30)
+                time.sleep(3)
+            for i in range(5):
+                self.pcomm.move(self.canbus, self.selected_can, 'cw', 'cruise', 'theta', 30)
+                time.sleep(3)
+                self.pcomm.move(self.canbus, self.selected_can, 'ccw', 'cruise', 'theta', 30)
+                time.sleep(3)
+        else:
+            for i in range(5):
+                self.ptl.quick_direct_dtdp(self.selected_posids,[0.,-30])
+                time.sleep(3)
+                self.ptl.quick_direct_dtdp(self.selected_posids,[0.,30])
+                time.sleep(3)
+
+            for i in range(5):
+                self.ptl.quick_direct_dtdp(self.selected_posids,[-30.,0.]) 
+                time.sleep(3)
+                self.ptl.quick_direct_dtdp(self.selected_posids,[30,0.])
+                time.sleep(3) 
+        self.center()
+        self.text1.insert(END,'Movement Check Done \n')
+
+ 
     def write_siid(self):
         self.text1.insert(END,'Writing SiID \n')
         for key in sorted(self.info.keys()):
