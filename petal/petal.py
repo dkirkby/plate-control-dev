@@ -348,7 +348,7 @@ class Petal(object):
             currents = [p[key] for key in ['CURR_SPIN_UP_DOWN','CURR_CRUISE','CURR_CREEP','CURR_HOLD']]
             self.comm.set_currents(busid, posmodel.canid, currents, currents)
             self.comm.set_periods(busid, canid, p['CREEP_PERIOD'], p['CREEP_PERIOD'], p['SPINUPDOWN_PERIOD'])
-            self.comm.set_bump_flags(busid, canid, p['CURR_HOLD'], p['BUMP_CW_FLG'], p['BUMP_CCW_FLAG'])
+            self.comm.set_bump_flags(busid, canid, p['CURR_HOLD'], p['BUMP_CW_FLG'], p['BUMP_CCW_FLG'])
             if self.verbose:
                 vals_str =  ''.join([' ' + str(key) + '=' + str(p[key]) for key in p])
                 self.printfunc(posid + ' (bus=' + str(busid) + ', canid=' + str(canid) + '): motor currents and periods set:' + vals_str)
