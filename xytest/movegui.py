@@ -290,15 +290,13 @@ class MoveGUI(object):
         print('Loading Petal'+self.ptl_id+', canbus:'+self.canbus)
         gui_root.destroy()
     def set_fiducial(self):
-        if 20000 in self.selected_can[0] :
+        if 20000 in self.selected_can :
             self.text1.insert(END,'No, you cannot set all positioners as fiducials, this will burn the motor! \n')
         elif all([i <2 for i in range(len(self.selected_can))]):
             self.text1.insert(END,'No, you cannot set a positioners as a fiducial, this will burn the motor! \n')
         else:
-            value_arr=[]
             for i in range(len(self.selected_can)):
-                value_arr.append(self.e2.get())
-            self.pcomm.set_fiducials([self.canbus], self.selected_can, value_arr)
+                self.pcomm.set_fiducials([self.canbus], [self.selected_can[i]], [self.e2.get()])
             self.text1.insert(END,'Set Fiducial '+str(self.selected_can)+' to '+str(self.e2.get())+' successfully! \n')
 
     def sync_mode(self):
