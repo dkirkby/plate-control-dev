@@ -368,11 +368,11 @@ class Petal(object):
         self.canids_where_tables_were_just_sent = []
         self.busids_where_tables_were_just_sent = []
 
-    def schedule_send_and_execute_moves(self):
+    def schedule_send_and_execute_moves(self, anticollision=None):
         """Convenience wrapper to schedule, send, and execute the pending requested
         moves, all in one shot.
         """
-        self.schedule_moves()
+        self.schedule_moves(anticollision)
         self.send_and_execute_moves()
 
     def send_and_execute_moves(self):
