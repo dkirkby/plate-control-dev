@@ -302,15 +302,15 @@ class Petal(object):
                 hardstop_debounce_request = {posid:{'target':hardstop_debounce}}
                 self.request_direct_dtdp(hardstop_debounce_request, cmd_prefix='debounce')
 
-    def schedule_moves(self,anticollision=None):
+    def schedule_moves(self,anticollision='default'):
         """Generate the schedule of moves and submoves that get positioners
         from start to target. Call this after having input all desired moves
         using the move request methods.
         
         See posschedule.py for valid arguments to the anticollision flag. If
-        no argument is given, then it the default flag is used.
+        no argument is given, then the petal's default flag is used.
         """
-        if not anticollision:
+        if anticollision not in {None,'freeze','adjust'}:
             anticollision = self.anticollision_default
         self.schedule.schedule_moves(anticollision)
 
@@ -368,7 +368,7 @@ class Petal(object):
         self.canids_where_tables_were_just_sent = []
         self.busids_where_tables_were_just_sent = []
 
-    def schedule_send_and_execute_moves(self, anticollision=None):
+    def schedule_send_and_execute_moves(self, anticollision='default'):
         """Convenience wrapper to schedule, send, and execute the pending requested
         moves, all in one shot.
         """
