@@ -54,6 +54,7 @@ import time
 import show_detected
 import populate_petal_travelers
 import populate_busids
+import pdb
 
 class MoveGUI(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
@@ -162,10 +163,9 @@ class MoveGUI(object):
             self.syncmode.set(0)
         Checkbutton(gui_root, text='SYNC hard', variable=self.syncmode,command=self.sync_mode).grid(row=3,column=2,sticky=W,pady=4)
 
-        self.pcomm.pbset('stop_mode','on')
         self.stopmode=IntVar(gui_root)
-        self.stopmode.set(1)
-        Checkbutton(gui_root, text='Low Power', variable=self.stopmode,command=self.stop_mode).grid(row=4,column=1,sticky=E,pady=4)
+        self.stopmode.set(0)
+        #Checkbutton(gui_root, text='Low P', variable=self.stopmode,command=self.stop_mode).grid(row=4,column=1,sticky=E,pady=4)
     
         Button(gui_root,text='Phi CW',width=10,command=self.phi_cw_degree).grid(row=3,column=0,sticky=W,pady=4)
         Button(gui_root,text='Phi CCW',width=10,command=self.phi_ccw_degree).grid(row=4,column=0,sticky=W,pady=4)
@@ -179,7 +179,7 @@ class MoveGUI(object):
 
         Button(gui_root,text='Center',width=10,command=self.center).grid(row=4,column=2,sticky=W,pady=4)                
 
-        self.listbox1 = Listbox(gui_root, width=20, height=20)
+        self.listbox1 = Listbox(gui_root, width=20, height=20,selectmode='multiple',exportselection=0)
         self.listbox1.grid(row=6, column=0,rowspan=10,pady=4,padx=15)
         # create a vertical scrollbar to the right of the listbox
         yscroll_listbox1 = Scrollbar(command=self.listbox1.yview, orient=tkinter.VERTICAL)
@@ -280,6 +280,7 @@ class MoveGUI(object):
         label.image = photo # keep a reference!
         label.grid(row=16, column=0, columnspan=1, rowspan=20,sticky=W+E+N+S, padx=5, pady=5)
         
+        #self.pcomm.pbset('stop_mode','off')
 
         mainloop()
         
@@ -289,35 +290,46 @@ class MoveGUI(object):
         print('Loading Petal'+self.ptl_id+', canbus:'+self.canbus)
         gui_root.destroy()
     def set_fiducial(self):
-        if self.selected_can == 20000:
+        if 20000 in self.selected_can[0] :
             self.text1.insert(END,'No, you cannot set all positioners as fiducials, this will burn the motor! \n')
-        elif self.selected_can<7000:
+        elif all([i <2 for i in range(len(self.selected_can))]):
             self.text1.insert(END,'No, you cannot set a positioners as a fiducial, this will burn the motor! \n')
         else:
-            self.pcomm.set_fiducials([self.canbus], [self.selected_can], [self.e2.get()])
+            value_arr=[]
+            for i in range(len(self.selected_can)):
+                value_arr.append(self.e2.get())
+            self.pcomm.set_fiducials([self.canbus], self.selected_can, value_arr)
             self.text1.insert(END,'Set Fiducial '+str(self.selected_can)+' to '+str(self.e2.get())+' successfully! \n')
+
     def sync_mode(self):
         if self.syncmode.get() == 1:
             self.ptl.sync_mode = 'hard'
         else:
             self.ptl.sync_mode = 'soft'
+
     def stop_mode(self):
         if self.stopmode.get() == 1:
-            self.pcomm.pbset('stop_mode','on')
+            #self.pcomm.pbset('stop_mode','on')
+            pass
         else:
-            self.pcomm.pbset('stop_mode','off')
+            #self.pcomm.pbset('stop_mode','off')
+            pass
  
     def get_list(self,event):
         # get selected line index
-        index = self.listbox1.curselection()[0]
+        index = self.listbox1.curselection()
         # get the line's text
-        self.selected=self.listbox1.get(index)        
-        if self.selected == 'ALL':
-            self.selected_posid=self.posids
-            self.selected_can=20000
-        else:
-            self.selected_posid=self.selected
-            self.selected_can=int(str(self.selected[1:6]))
+        self.selected=[]
+        self.selected_posid=[]
+        self.selected_can=[]
+        for i in range(len(index)):
+            self.selected.append(self.listbox1.get(index[i]))        
+            if 'ALL' in self.selected:
+                self.selected_posid=self.posids
+                self.selected_can=[20000]
+            else:
+                self.selected_posid.append(self.selected[i])
+                self.selected_can.append(int(str(self.selected[i][1:6])))
         self.e_selected.delete(0,END)
         self.e_selected.insert(0,str(self.selected_can))
 
@@ -337,7 +349,8 @@ class MoveGUI(object):
         dtdp=[-degree,0]
 
         if self.mode.get()==1:
-            self.pcomm.move(self.canbus, self.selected_can, 'cw', 'cruise', 'theta', degree)
+            for i in range(len(self.selected_can)):
+                self.pcomm.move(self.canbus, self.selected_can[i], 'cw', 'cruise', 'theta', degree)
         else:
             self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
         
@@ -345,7 +358,8 @@ class MoveGUI(object):
         degree=float(self.e1.get())
         dtdp=[degree,0]
         if self.mode.get()==1:
-            self.pcomm.move(self.canbus, self.selected_can, 'ccw', 'cruise', 'theta', degree)
+            for i in range(len(self.selected_can)):
+                self.pcomm.move(self.canbus, self.selected_can[i], 'ccw', 'cruise', 'theta', degree)
         else:
             self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
   
@@ -353,7 +367,8 @@ class MoveGUI(object):
         degree=float(self.e1.get())
         dtdp=[0,-degree]
         if self.mode.get()==1:
-            self.pcomm.move(self.canbus, self.selected_can, 'cw', 'cruise', 'phi', degree)
+            for i in range(len(self.selected_can)):
+                self.pcomm.move(self.canbus, self.selected_can[i], 'cw', 'cruise', 'phi', degree)
         else:
             self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
         
@@ -361,17 +376,21 @@ class MoveGUI(object):
         degree=float(self.e1.get())
         dtdp=[0,degree]
         if self.mode.get()==1:
-            self.pcomm.move(self.canbus, self.selected_can, 'ccw', 'cruise', 'phi', degree)
+            for i in range(len(self.selected_can)):
+                self.pcomm.move(self.canbus, self.selected_can[i], 'ccw', 'cruise', 'phi', degree)
         else:
             self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
     
     def center(self):
         if self.mode.get()==1:
-            self.pcomm.move(self.canbus, self.selected_can, 'cw', 'cruise', 'theta', 400)
+            for i in range(len(self.selected_can)):
+                self.pcomm.move(self.canbus, self.selected_can[i], 'cw', 'cruise', 'theta', 400)
             time.sleep(4)
-            self.pcomm.move(self.canbus, self.selected_can, 'ccw', 'cruise', 'phi', 200)
+            for i in range(len(self.selected_can)):
+                self.pcomm.move(self.canbus, self.selected_can[i], 'ccw', 'cruise', 'phi', 200)
             time.sleep(2)
-            self.pcomm.move(self.canbus, self.selected_can, 'ccw', 'cruise', 'theta', 195)
+            for i in range(len(self.selected_can)):
+                self.pcomm.move(self.canbus, self.selected_can[i], 'ccw', 'cruise', 'theta', 195)
 
             
        #     self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)            
@@ -387,14 +406,18 @@ class MoveGUI(object):
         time.sleep(5)
         if self.mode.get()==1:
             for i in range(5):
-                self.pcomm.move(self.canbus, self.selected_can, 'cw', 'cruise', 'phi', 30)
+                for j in range(len(self.selected_can)):
+                    self.pcomm.move(self.canbus, self.selected_can[j], 'cw', 'cruise', 'phi', 30)
                 time.sleep(3)
-                self.pcomm.move(self.canbus, self.selected_can, 'ccw', 'cruise', 'phi', 30)
+                for j in range(len(self.selected_can)):
+                    self.pcomm.move(self.canbus, self.selected_can[j], 'ccw', 'cruise', 'phi', 30)
                 time.sleep(3)
             for i in range(5):
-                self.pcomm.move(self.canbus, self.selected_can, 'cw', 'cruise', 'theta', 30)
+                for j in range(len(self.selected_can)):
+                    self.pcomm.move(self.canbus, self.selected_can[j], 'cw', 'cruise', 'theta', 30)
                 time.sleep(3)
-                self.pcomm.move(self.canbus, self.selected_can, 'ccw', 'cruise', 'theta', 30)
+                for j in range(len(self.selected_can)):
+                    self.pcomm.move(self.canbus, self.selected_can[j], 'ccw', 'cruise', 'theta', 30)
                 time.sleep(3)
         else:
             for i in range(5):
