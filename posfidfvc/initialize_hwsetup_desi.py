@@ -62,15 +62,20 @@ ptl.anticollision_default = False
 m = posmovemeasure.PosMoveMeasure([ptl],fvc)
 m.make_plots_during_calib = True
 print('Automatic generation of calibration plots is turned ' + ('ON' if m.make_plots_during_calib else 'OFF') + '.')
+
 for ptl in m.petals:
-    for posmodel in ptl.posmodels:
+    for posid_this,posmodel in ptl.posmodels.items():
         new_and_changed_files.add(posmodel.state.conf.filename)
         new_and_changed_files.add(posmodel.state.log_path)
-    for fidstate in ptl.fidstates.values():
-        new_and_changed_files.add(fidstate.conf.filename)
-        new_and_changed_files.add(fidstate.log_path)
+    for id_this,state in ptl.states.items():
+        print(id_this)
+        if id_this.startswith('P') or id_this.startswith('F'):
+            new_and_changed_files.add(state.conf.filename)
+            new_and_changed_files.add(state.log_path)
+
+
 m.n_extradots_expected = hwsetup['num_extra_dots']
-instr = instrmaker.InstrMaker(plate_type=hwsetup['plate_type'])
+instr = instrmaker.InstrMaker(hwsetup['plate_type'],ptl,m,fvc,hwsetup)
 
 # check ids with user
 text = '\n\nHere are the known positioners and fiducials:\n\n'
@@ -138,8 +143,7 @@ else:
 if should_identify_positioners:
     m.identify_positioner_locations()
 if should_make_instrfile:
-    instr.fit_locations_to_model()
-    instr.save_file()
+    instr.make_instrfile()
     instr.push_to_db()
 if not should_limit_range:
     m.measure_range(axis='theta')
