@@ -169,7 +169,7 @@ class MoveGUI(object):
     
         Button(gui_root,text='Phi CW',width=10,command=self.phi_cw_degree).grid(row=3,column=0,sticky=W,pady=4)
         Button(gui_root,text='Phi CCW',width=10,command=self.phi_ccw_degree).grid(row=4,column=0,sticky=W,pady=4)
-        Button(gui_root,text='Movement Check',width=10,command=self.movement_check).grid(row=5,column=2,sticky=W,pady=4)
+        Button(gui_root,text='Movement Check',width=12,command=self.movement_check).grid(row=5,column=2,sticky=W,pady=4)
         Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=5,column=3,sticky=W,pady=4)
         Button(gui_root,text='Reload CANBus',width=12,command=self.reload_canbus).grid(row=5,column=1,sticky=W,pady=4)
         Button(gui_root,text='1 Write SiID',width=15,command=self.write_siid).grid(row=3,column=3,sticky=W,pady=4)
@@ -177,7 +177,7 @@ class MoveGUI(object):
         Button(gui_root,text='2 Write DEVICE_LOC',width=15,command=self.populate_petal_travelers).grid(row=4,column=3,sticky=W,pady=4)# Call populate_travellers.py under pos_utility/ to read from installation traveler and write to positioner 'database' and ID map
         Button(gui_root,text='4 Aliveness Test',width=13,command=self.aliveness_test).grid(row=4,column=4,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
 
-        Button(gui_root,text='Center',width=10,command=self.center).grid(row=4,column=2,sticky=W,pady=4)                
+        Button(gui_root,text='Center',width=12,command=self.center).grid(row=4,column=2,sticky=W,pady=4)                
 
         self.listbox1 = Listbox(gui_root, width=20, height=20,selectmode='multiple',exportselection=0)
         self.listbox1.grid(row=6, column=0,rowspan=10,pady=4,padx=15)
