@@ -36,7 +36,7 @@ class Petal(object):
         local_commit_on ... boolean, controls whether to commit state data to local log files (can be done with or without db_commit_on)
         printfunc       ... method, used for stdout style printing. we use this for logging during tests
         collider_file   ... string, file name of collider configuration file, no directory loction. If left blank will use default.
-        sched_stats_on  ... boolen, controls whether to log statistics about scheduling runs
+        sched_stats_on  ... boolean, controls whether to log statistics about scheduling runs
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
     """
     def __init__(self, petal_id, posids, fidids, simulator_on=False,
