@@ -644,7 +644,7 @@ class Petal(object):
                 postpause     ... list of unsigned integers ... pause time after the row's motion, in milliseconds, before executing the next row
         """
         hw_tables = []
-        for m in self.schedule.move_tables:
+        for m in self.schedule.move_tables.values():
             hw_tbl = m.for_hardware()
             hw_tables.append(hw_tbl)
         return hw_tables
