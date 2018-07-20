@@ -122,7 +122,7 @@ class FVCHandler(object):
 		else:
 			self.fvcproxy.send_fvc_command('make_targets',num_spots=num_objects)
 			centroids = self.fvcproxy.locate(send_centroids=True)
-			if centroids == 'FAILED':
+			if 'FAILED' in centroids: # centroids == 'FAILED':
 				self.printfunc('Failed to locate centroids using FVC.')
 			else:
 				for params in centroids.values():
