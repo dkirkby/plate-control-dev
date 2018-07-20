@@ -255,7 +255,7 @@ class PosMoveTable(object):
                         table[key].insert(i,'creep') # speed mode doesn't matter here
                     table['postpause'].insert(i,rows[i].data['prepause'])
             table['nrows'] = len(table['move_time'])
-            table['postpause'] = [int(round(rows[i].data['postpause']*1000)) for i in range(table['nrows'])] # hardware postpause in integer milliseconds            
+            table['postpause'] = [int(round(x*1000)) for x in table['postpause']] # hardware postpause in integer milliseconds            
             return table
         table['nrows'] = len(table['dT'])
         if output_type == 'collider':
