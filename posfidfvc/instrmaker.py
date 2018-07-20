@@ -1,4 +1,4 @@
-iport numpy as np
+import numpy as np
 from lmfit import minimize, Parameters
 import os
 import pdb
