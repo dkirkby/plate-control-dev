@@ -447,6 +447,7 @@ class PosMoveMeasure(object):
             requests[posid] = {'command':'posTP', 'target':[0,180], 'log_note':'identify fiducials starting point'}
         self.move(requests) # go to starting point
         self._identify(None)
+        self.commit(log_note='fiducial identification complete')
 
     def identify_positioner_locations(self):
         """Nudge positioners (one at a time) forward/back to determine which positioners are where on the FVC.
@@ -463,6 +464,7 @@ class PosMoveMeasure(object):
             n += 1
             self.printfunc('Identifying location of positioner ' + posid + ' (' + str(n) + ' of ' + str(total) + ')')
             self._identify(posid)
+        self.commit(log_note='positioner identification complete')
 
     def posids_by_petal(self, posids='all'):
         """Returns a dict that organizes the argued posids by the petals they are
