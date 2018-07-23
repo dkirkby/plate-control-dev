@@ -33,15 +33,16 @@ class Petal(object):
     Optional initialization inputs:
         simulator_on    ... boolean, controls whether in software-only simulation mode
         db_commit_on    ... boolean, controls whether to commit state data to the online system database (can be done with or without local_commit_on (available only if DB_COMMIT_AVAILABLE == True))
-        local_commit_on ... boolean, controls whether to commit state data to local log files (can be done with or without db_commit_on)
+        local_commit_on ... boolean, controls whether to commit state data to local .conf files (can be done with or without db_commit_on)
+        local_log_on    ... boolean, controls whether to commit timestamped log of state data to local .csv files (can can be done with or without db_commit_on) 
         printfunc       ... method, used for stdout style printing. we use this for logging during tests
         collider_file   ... string, file name of collider configuration file, no directory loction. If left blank will use default.
         sched_stats_on  ... boolean, controls whether to log statistics about scheduling runs
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
     """
     def __init__(self, petal_id, posids, fidids, simulator_on=False,
-                 db_commit_on=False, local_commit_on=True, printfunc=print,
-                 verbose=False, user_interactions_enabled=False,
+                 db_commit_on=False, local_commit_on=True, local_log_on=True,
+                 printfunc=print, verbose=False, user_interactions_enabled=False,
                  collider_file=None, sched_stats_on=False,
                  anticollision='freeze'):
         
@@ -61,6 +62,7 @@ class Petal(object):
             os.environ['DOS_POSMOVE_WRITE_TO_DB'] = 'True'
             self.posmoveDB = DBSingleton(petal_id=self.petal_id)
         self.local_commit_on = local_commit_on
+        self.local_log_on = local_log_on
         self.altered_states = set()
 
         # positioners setup
@@ -528,18 +530,17 @@ class Petal(object):
         '''Commit data to the local config and log files, and/or the online database.
         A note string may optionally be included to go along with this entry in the logs.
         '''
+        if log_note:
+            for state in self.altered_states:
+                state.next_log_notes.append(log_note)
         if self.db_commit_on:
             pos_commit_list = []
             fid_commit_list = []
             for state in self.altered_states:
-                # determine whether it's a positioner state or a fiducial state (these have different data)
-                # gather up the data from this state
                 if state.type == 'pos':
                     pos_commit_list.append(state)
                 elif state.type == 'fid':
                     fid_commit_list.append(state)
-                state.log_unit()
-                # do the commit
             if len(pos_commit_list) != 0:
                 self.posmoveDB.WriteToDB(pos_commit_list,self.petal_id,'pos_move')
                 self.posmoveDB.WriteToDB(pos_commit_list,self.petal_id,'pos_calib')
@@ -548,9 +549,9 @@ class Petal(object):
                 self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid_calib')
         if self.local_commit_on:
             for state in self.altered_states:
-                if log_note:
-                    state.next_log_notes.append(log_note)
                 state.write()
+        if self.local_log_on:
+            for state in self.altered_states:
                 state.log_unit()
         self.altered_states = set()
 
