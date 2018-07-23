@@ -28,8 +28,8 @@ import datetime
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/msdos/focalplane/positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/msdos/focalplane/pos_utility/'))
+sys.path.append(os.path.abspath('/home/desi/focalplane/positioner_logs/data_processing_scripts/'))
+sys.path.append(os.path.abspath('/home/desi/focalplane/pos_utility/'))
 import fvchandler
 import petal
 import petalcomm
@@ -60,7 +60,7 @@ class MoveGUI(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
         global gui_root
         gui_root = tkinter.Tk()
-        google_dir='/home/msdos/focalplane/pos_utility/'        
+        google_dir='/home/desi/focalplane/pos_utility/'        
         credential_name='google_access_account_lbl.json'
         w=200
         h=100
@@ -292,7 +292,7 @@ class MoveGUI(object):
     def set_fiducial(self):
         if 20000 in self.selected_can :
             self.text1.insert(END,'No, you cannot set all positioners as fiducials, this will burn the motor! \n')
-        elif all([i <2 for i in range(len(self.selected_can))]):
+        elif all([self.selected_can[i] <10000 for i in range(len(self.selected_can))]):
             self.text1.insert(END,'No, you cannot set a positioners as a fiducial, this will burn the motor! \n')
         else:
             for i in range(len(self.selected_can)):
