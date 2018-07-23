@@ -472,7 +472,7 @@ class Petal(object):
     def n_fiducial_dots(self):
         """Returns number of fixed fiducial dots this petal contributes in the field of view.
         """
-        n_dots = {self.get_posfid_val(fidid,'N_DOTS') for fidid in self.fidids}
+        n_dots = [self.get_posfid_val(fidid,'N_DOTS') for fidid in self.fidids]
         return sum(n_dots)
     
     @property
