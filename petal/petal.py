@@ -546,7 +546,6 @@ class Petal(object):
             if len(fid_commit_list) != 0:
                 self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid_data')
                 self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid_calib')
-                pass
         if self.local_commit_on:
             for state in self.altered_states:
                 if log_note:
