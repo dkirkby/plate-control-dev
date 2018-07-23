@@ -57,8 +57,19 @@ fvc.rotation = hwsetup['rotation'] # this value is used in setups without fvcpro
 fvc.scale = hwsetup['scale'] # this value is used in setups without fvcproxy / platemaker
 posids = hwsetup['pos_ids']
 fidids = hwsetup['fid_ids']
-ptl = petal.Petal(hwsetup['ptl_id'], posids, fidids, simulator_on=sim, user_interactions_enabled=True)
-ptl.anticollision_default = False
+ptl = petal.Petal(petal_id = hwsetup['ptl_id'],
+                  posids = posids,
+                  fidids = fidids,
+                  simulator_on = sim,
+                  user_interactions_enabled = True,
+                  db_commit_on = False,
+                  local_commit_on = True,
+                  local_log_on = True,
+                  printfunc = print,
+                  verbose = False,
+                  collider_file = None,
+                  sched_stats_on = False,
+                  anticollision = None) # valid options for anticollision arg: None, 'freeze', 'adjust'
 m = posmovemeasure.PosMoveMeasure([ptl],fvc)
 m.make_plots_during_calib = True
 print('Automatic generation of calibration plots is turned ' + ('ON' if m.make_plots_during_calib else 'OFF') + '.')
