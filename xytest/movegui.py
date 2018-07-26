@@ -406,29 +406,29 @@ class MoveGUI(object):
             for i in range(5):
                 for j in range(len(self.selected_can)):
                     self.pcomm.move(self.canbus, self.selected_can[j], 'cw', 'cruise', 'phi', 30)
-                time.sleep(3)
+                #time.sleep(3)
                 for j in range(len(self.selected_can)):
                     self.pcomm.move(self.canbus, self.selected_can[j], 'ccw', 'cruise', 'phi', 30)
-                time.sleep(3)
+                #time.sleep(3)
             for i in range(5):
                 for j in range(len(self.selected_can)):
                     self.pcomm.move(self.canbus, self.selected_can[j], 'cw', 'cruise', 'theta', 30)
-                time.sleep(3)
+                #time.sleep(3)
                 for j in range(len(self.selected_can)):
                     self.pcomm.move(self.canbus, self.selected_can[j], 'ccw', 'cruise', 'theta', 30)
-                time.sleep(3)
+                #time.sleep(3)
         else:
             for i in range(5):
                 self.ptl.quick_direct_dtdp(self.selected_posids,[0.,-30])
-                time.sleep(3)
+                #time.sleep(3)
                 self.ptl.quick_direct_dtdp(self.selected_posids,[0.,30])
-                time.sleep(3)
+                #time.sleep(3)
 
             for i in range(5):
                 self.ptl.quick_direct_dtdp(self.selected_posids,[-30.,0.]) 
-                time.sleep(3)
+                #time.sleep(3)
                 self.ptl.quick_direct_dtdp(self.selected_posids,[30,0.])
-                time.sleep(3) 
+                #time.sleep(3) 
         self.center()
         self.text1.insert(END,'Movement Check Done \n')
 
