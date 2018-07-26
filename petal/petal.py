@@ -76,7 +76,7 @@ class Petal(object):
         self.posids = set(self.posmodels.keys())
         self.canids_where_tables_were_just_sent = []
         self.busids_where_tables_were_just_sent = []
-        self.nonresponsive_canids = {}
+        self.nonresponsive_canids = set()
         self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
         self.set_motor_parameters()
         self.power_supply_map = self._map_power_supplies_to_posids()
