@@ -37,16 +37,6 @@ class PosMoveMeasure(object):
         self.extradots_fvcXY = [] # stores [x,y] pixel locations of any "extra" fiducial dots in the field (used for fixed ref fibers in laboratory test stands)
         self.extradots_id = 'EXTRA' # identifier to use in extra dots id string
         self.n_extradots_expected = 0 # number of extra dots to look for in the field of view
-        if self.fvc.fvcproxy:
-            # This is a temporary hack, since we don't yet support arbitrary device ids in the proxy.
-            # The ids assigned here do NOT correspond to physical reality of which dot is generated at which particular device.
-            from DOSlib.positioner_index import PositionerIndex
-            posindex = PositionerIndex()
-            devices = []
-            for ptl in self.petals:
-                devices += posindex.find_by_arbitrary_keys(PETAL_ID=ptl.petal_id)
-            all_device_ids = self.all_posids.union(self.all_fidids)
-            self.extradot_ids = [device['DEVICE_ID'] for device in devices if device['DEVICE_ID'] not in all_device_ids]
         self.n_points_calib_T = 7 # number of points in a theta calibration arc
         self.n_points_calib_P = 7 # number of points in a phi calibration arc
         self.should_set_gear_ratios = False # whether to adjust gear ratios after calibration
@@ -74,16 +64,7 @@ class PosMoveMeasure(object):
         for posid in self.all_posids:
             ptl = self.petal(posid)
             expected_pos[posid] = {'obsXY':ptl.expected_current_position(posid,'obsXY')}
-        expected_ref = self.ref_dots_XY
-        if self.fvc.fvc_type in ['FLI','SBIG_Yale']:
-            # Consider replacing this implementation with one where instead of "extra dots", we
-            # differentiate positioners by their CTRL_ENABLED flag instead. This means doing
-            # some detail rework in xytest.py, to make sure we are choosing the correct actions
-            # at each step for each positioner, depending on whether it is in fact enabled or not.
-            # (Long term, this work is the right thing to do, because we certainly expect that
-            # dead positioners will occur on the instrument.)
-            extra_dots = {refid:{'obsXY':expected_ref[refid]['obsXY']} for refid in expected_ref.keys() if refid in self.extradot_ids}
-            expected_pos.update(extra_dots)
+        expected_ref = {} if self.fvc.fvcproxy else self.ref_dots_XY
         measured_pos,measured_ref,imgfiles = self.fvc.measure_and_identify(expected_pos,expected_ref)            
         for posid in self.all_posids:
             ptl = self.petal(posid)
@@ -539,8 +520,7 @@ class PosMoveMeasure(object):
     @property
     def ref_dots_XY(self):
         """Ordered dict of ordered dicts of nominal locations of all fixed reference dots in the FOV.
-        Primary keys are the dot id strings. See petal.py similarly named function's comments.
-        Sub-keys are:
+        Primary keys are the dot id strings. Sub-keys are:
             'fvcXY' --> [x,y] values in the FVC coordinate system (pixels)
             'obsXY' --> [x,y] values in the observer coordinate system (millimeters)
         """
@@ -550,15 +530,11 @@ class PosMoveMeasure(object):
             for dotid in more_data.keys():
                 more_data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY([more_data[dotid]['fvcXY']])[0]
             data.update(more_data)
-        for i in range(len(self.extradots_fvcXY)):
-            if not self.fvc.fvcproxy:
+        if not self.fvc.fvcproxy:
+            for i in range(len(self.extradots_fvcXY)):            
                 dotid = ptl.dotid_str(self.extradots_id,i) # any petal instance is fine here (static method)
-            else:
-                # This is a temporary hack, since we don't yet support arbitrary device ids in the proxy.
-                # The ids assigned here do NOT correspond to physical reality of which dot is generated at which particular device.
-                dotid = self.extradot_ids[i]
-            data[dotid] = collections.OrderedDict()
-            data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY([self.extradots_fvcXY[i]])[0]
+                data[dotid] = collections.OrderedDict()
+                data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY([self.extradots_fvcXY[i]])[0]
         return data
 
     def set_motor_parameters(self):
@@ -962,7 +938,7 @@ class PosMoveMeasure(object):
                 if num_expected > 0:
                     self.printfunc('Temporarily turning off fiducial ' + fidid + ' to determine which dots belonged to it.')
                     ptl.set_fiducials(fidid,'off')
-                    xy_meas = self.fvc.measure_fvc_pixels(n_dots - num_expected)[0]
+                    xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_dots - num_expected)[0]
                     if self.fvc.fvc_type == 'simulator':
                         xy_meas = self._simulate_measured_pixel_locations(xy_ref)
                         for j in range(num_expected):
