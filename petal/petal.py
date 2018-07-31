@@ -311,15 +311,15 @@ class Petal(object):
         
         See posschedule.py for valid arguments to the anticollision flag. If
         no argument is given, then the petal's default flag is used.
-		
-		The should_anneal flag should generally be left True. It causes moves
-		to be spread out in time to reduce peak current draw by the full array
-		of positioners. (But there are certain 'expert use' test cases in the
-		lab, where we want this feature turned off.)
+        
+        The should_anneal flag should generally be left True. It causes moves
+        to be spread out in time to reduce peak current draw by the full array
+        of positioners. (But there are certain 'expert use' test cases in the
+        lab, where we want this feature turned off.)
         """
         if anticollision not in {None,'freeze','adjust'}:
             anticollision = self.anticollision_default
-		self.schedule.should_anneal = should_anneal
+        self.schedule.should_anneal = should_anneal
         self.schedule.schedule_moves(anticollision)
 
     def send_move_tables(self):

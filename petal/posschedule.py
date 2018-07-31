@@ -27,7 +27,7 @@ class PosSchedule(object):
         self.RRE_stage_order = ['retract','rotate','extend']
         self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, stats=self.stats) for name in self.stage_order}
         self.anneal_time = {'direct':3, 'retract':3, 'rotate':3, 'extend':3, 'expert':3} # times in seconds, see comments in PosScheduleStage
-		self.should_anneal = True # overriding flag, allowing you to turn off all move time annealing
+        self.should_anneal = True # overriding flag, allowing you to turn off all move time annealing
         self.move_tables = {}
 
     @property
@@ -249,8 +249,8 @@ class PosSchedule(object):
             anneal_time   ... time in seconds, for annealing
             should_freeze ... boolean, says whether to check for collisions and freeze
         """
-		if self.should_anneal:
-			stage.anneal_tables(anneal_time)
+        if self.should_anneal:
+            stage.anneal_tables(anneal_time)
         if should_freeze:
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
@@ -288,8 +288,8 @@ class PosSchedule(object):
             name = self.RRE_stage_order[i]
             stage = self.stages[name]
             stage.initialize_move_tables(start_posTP[name], dtdp[name])
-			if self.should_anneal:
-				stage.anneal_tables(self.anneal_time[name])
+            if self.should_anneal:
+                stage.anneal_tables(self.anneal_time[name])
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             attempts_remaining = self.max_path_adjustment_passes
