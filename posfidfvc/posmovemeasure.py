@@ -938,7 +938,7 @@ class PosMoveMeasure(object):
                 if num_expected > 0:
                     self.printfunc('Temporarily turning off fiducial ' + fidid + ' to determine which dots belonged to it.')
                     ptl.set_fiducials(fidid,'off')
-                    xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_dots - num_expected)[0]
+                    xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_dots - num_expected)
                     if self.fvc.fvc_type == 'simulator':
                         xy_meas = self._simulate_measured_pixel_locations(xy_ref)
                         for j in range(num_expected):
