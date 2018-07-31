@@ -304,16 +304,22 @@ class Petal(object):
                 hardstop_debounce_request = {posid:{'target':hardstop_debounce}}
                 self.request_direct_dtdp(hardstop_debounce_request, cmd_prefix='debounce')
 
-    def schedule_moves(self,anticollision='default'):
+    def schedule_moves(self,anticollision='default',should_anneal=True):
         """Generate the schedule of moves and submoves that get positioners
         from start to target. Call this after having input all desired moves
         using the move request methods.
         
         See posschedule.py for valid arguments to the anticollision flag. If
         no argument is given, then the petal's default flag is used.
+		
+		The should_anneal flag should generally be left True. It causes moves
+		to be spread out in time to reduce peak current draw by the full array
+		of positioners. (But there are certain 'expert use' test cases in the
+		lab, where we want this feature turned off.)
         """
         if anticollision not in {None,'freeze','adjust'}:
             anticollision = self.anticollision_default
+		self.schedule.should_anneal = should_anneal
         self.schedule.schedule_moves(anticollision)
 
     def send_move_tables(self):
@@ -370,11 +376,11 @@ class Petal(object):
         self.canids_where_tables_were_just_sent = []
         self.busids_where_tables_were_just_sent = []
 
-    def schedule_send_and_execute_moves(self, anticollision='default'):
+    def schedule_send_and_execute_moves(self, anticollision='default', should_anneal=True):
         """Convenience wrapper to schedule, send, and execute the pending requested
         moves, all in one shot.
         """
-        self.schedule_moves(anticollision)
+        self.schedule_moves(anticollision,should_anneal)
         self.send_and_execute_moves()
 
     def send_and_execute_moves(self):
