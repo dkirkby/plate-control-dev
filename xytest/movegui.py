@@ -108,7 +108,8 @@ class MoveGUI(object):
    #     info=self.petalcomm.get_device_status()
         canbus=self.canbus
         self.bus_id=canbus
-        self.info = self.pcomm.get_posfid_info(canbus)
+        self.info = self.pcomm.pbget('posfid_info')
+        self.info = self.info[canbus]
         self.posids = []
         print(self.info)
         for key in sorted(self.info.keys()):
@@ -352,7 +353,7 @@ class MoveGUI(object):
             for i in range(len(self.selected_can)):
                 self.pcomm.move(self.canbus, self.selected_can[i], 'cw', 'cruise', 'theta', degree)
         else:
-            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
+            self.quick_direct_dtdp(self.selected_posid,dtdp)
         
     def theta_ccw_degree(self):
         degree=float(self.e1.get())
@@ -361,7 +362,7 @@ class MoveGUI(object):
             for i in range(len(self.selected_can)):
                 self.pcomm.move(self.canbus, self.selected_can[i], 'ccw', 'cruise', 'theta', degree)
         else:
-            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
+            self.quick_direct_dtdp(self.selected_posid,dtdp)
   
     def phi_cw_degree(self):
         degree=float(self.e1.get())
@@ -370,7 +371,7 @@ class MoveGUI(object):
             for i in range(len(self.selected_can)):
                 self.pcomm.move(self.canbus, self.selected_can[i], 'cw', 'cruise', 'phi', degree)
         else:
-            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
+            self.quick_direct_dtdp(self.selected_posid,dtdp)
         
     def phi_ccw_degree(self):
         degree=float(self.e1.get())
@@ -379,7 +380,7 @@ class MoveGUI(object):
             for i in range(len(self.selected_can)):
                 self.pcomm.move(self.canbus, self.selected_can[i], 'ccw', 'cruise', 'phi', degree)
         else:
-            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
+            self.quick_direct_dtdp(self.selected_posid,dtdp)
     
     def center(self):
         if self.mode.get()==1:
@@ -396,9 +397,9 @@ class MoveGUI(object):
        #     self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)            
         else:
             dtdp=[-400,200]
-            self.ptl.quick_direct_dtdp(self.selected_posids,dtdp)       
+            self.quick_direct_dtdp(self.selected_posids,dtdp)       
             dtdp=[195,0]
-            self.ptl.quick_direct_dtdp(self.selected_posids,dtdp)   
+            self.quick_direct_dtdp(self.selected_posids,dtdp)   
             self.text1.insert(END,'Centering Done \n')
 
     def movement_check(self):
@@ -421,19 +422,35 @@ class MoveGUI(object):
                 time.sleep(1)
         else:
             for i in range(5):
-                self.ptl.quick_direct_dtdp(self.selected_posids,[0.,-30])
+                self.quick_direct_dtdp(self.selected_posids,[0.,-30])
                 #time.sleep(3)
-                self.ptl.quick_direct_dtdp(self.selected_posids,[0.,30])
+                self.quick_direct_dtdp(self.selected_posids,[0.,30])
                 #time.sleep(3)
 
             for i in range(5):
-                self.ptl.quick_direct_dtdp(self.selected_posids,[-30.,0.]) 
+                self.quick_direct_dtdp(self.selected_posids,[-30.,0.]) 
                 #time.sleep(3)
-                self.ptl.quick_direct_dtdp(self.selected_posids,[30,0.])
+                self.quick_direct_dtdp(self.selected_posids,[30,0.])
                 #time.sleep(3) 
         self.center()
         self.text1.insert(END,'Movement Check Done \n')
 
+    def quick_direct_dtdp(self, posids, dtdp, log_note=''):
+        """Convenience wrapper to request, schedule, send, and execute a single move command for a
+        direct (delta theta, delta phi) relative move. There is NO anti-collision calculation. This
+        method is intended for expert usage only. You can argue an iterable collection of posids if
+        you want, though note they will all get the same (dt,dp) sent to them.
+
+        INPUTS:     posids    ... either a single posid or a list of posids
+                    dtdp      ... [dt,dp], note that all posids get sent the same [dt,dp] here. i.e. dt and dp are each just one number
+                    log_note  ... optional string to include in the log file
+        """
+        requests = {}
+        posids = {posids} if isinstance(posids,str) else set(posids)
+        for posid in posids:
+            requests[posid] = {'target':dtdp, 'log_note':log_note}
+        self.ptl.request_direct_dtdp(requests)
+        self.ptl.schedule_send_and_execute_moves(should_anneal=False)
  
     def write_siid(self):
         self.text1.insert(END,'Writing SiID \n')
@@ -594,7 +611,8 @@ class MoveGUI(object):
     def reload_canbus(self):
         self.canbus='can'+self.e_can.get().strip()        
         self.bus_id=self.canbus
-        self.info = self.pcomm.get_posfid_info(self.canbus)
+        self.info = self.pcomm.pbget('posfid_info')
+        self.info = self.info[self.canbus]
         self.posids = []
         print(self.info)
         for key in sorted(self.info.keys()):
