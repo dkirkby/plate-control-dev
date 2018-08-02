@@ -300,6 +300,11 @@ class FVCHandler(object):
         """
         if xy != []:
             if self.fvcproxy:
+                #Temporary hack, data passed in wrong format
+                if isinstance(xy[0][0], list):
+                    xy_new = [[xy[0][0][i],xy[0][1][i]] for i in range(len(xy[0][0]))]
+                    xy = xy_new
+                #End of hack
                 spotids = [i for i in range(len(xy))]
                 fvcXY_dicts = [{'spotid':spotids[i],'x_pix':xy[i][0],'y_pix':xy[i][1]} for i in range(len(spotids))]
                 qs_dicts = self.fvcproxy.fvcxy_to_qs(fvcXY_dicts)
@@ -328,6 +333,11 @@ class FVCHandler(object):
         """
         if xy != []:
             if self.fvcproxy:
+                #Temporary hack, data passed in wrong format
+                if isinstance(xy[0][0],	list):
+                    xy_new = [[xy[0][0][i],xy[0][1][i]] for i in range(len(xy[0][0]))]
+                    xy = xy_new
+                #End of	hack
                 spotids = [i for i in range(len(xy))]
                 qs = self.trans.obsXY_to_QS(np.transpose(xy).tolist())# Note qs =[[q1,q2,q3...],[s1,s2,s3...]]
                 qs_dicts = [{'spotid':spotids[i],'q':qs[0][i],'s':qs[1][i]} for i in range(len(spotids))]
