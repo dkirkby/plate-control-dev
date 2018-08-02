@@ -104,8 +104,7 @@ class MoveGUI(object):
         gui_root.title='Move Controll for Petal '+str(self.ptl_id)
         self.pcomm=petalcomm.PetalComm(self.ptl_id)
         self.mode = 0
-        #petalcomm.
-   #     info=self.petalcomm.get_device_status()
+        self.pospwr_on()       
         canbus=self.canbus
         self.bus_id=canbus
         self.info = self.pcomm.pbget('posfid_info')
@@ -124,6 +123,8 @@ class MoveGUI(object):
         self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
         for posid in self.ptl.posids:
             self.ptl.set_posfid_val(posid, 'CTRL_ENABLED', True)
+            self.ptl.set_posfid_val(posid, 'FINAL_CREEP_ON', False)
+            self.ptl.set_posfid_val(posid, 'ANTIBACKLASH_ON', False)
             self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
         self.ptl.anticollision_default= False
         self.fvc = fvchandler.FVCHandler(self.fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
@@ -273,7 +274,9 @@ class MoveGUI(object):
 
         
 #        Button(gui_root,text='Plot List',width=10,command=click_plot_list).grid(row=4,column=2,sticky=W,pady=4)
-        Button(gui_root,text='Refresh/Restart',width=15,command=self.restart).grid(row=0,column=8,sticky=W,pady=4)
+        Button(gui_root,text='Refresh/Restart',width=15,command=self.restart).grid(row=0,column=7,sticky=W,pady=4)
+        self.pwr_button = Button(gui_root,text='POSPWR is ON', width=15, command=self.toggle, bg='green')
+        self.pwr_button.grid(row=1, column=7, sticky=W,pady=4)
         Button(gui_root,text='Clear',width=15,command=self.clear1).grid(row=5,column=4,sticky=W,pady=4)
         Button(gui_root,text='Clear',width=15,command=self.clear2).grid(row=5,column=6,sticky=W,pady=4)
         
@@ -286,6 +289,25 @@ class MoveGUI(object):
         #self.pcomm.pbset('stop_mode','off')
 
         mainloop()
+   
+    def toggle(self, flag = [0]):
+        flag[0] = not flag[0]
+        if flag[0]:
+            self.pospwr_off()
+            self.pwr_button.config(bg='grey')
+            self.pwr_button.config(text='POSPWR is OFF')
+        else:
+            self.pospwr_on()
+            self.pwr_button.config(text='POSPWR is ON')
+            self.pwr_button.config(bg='green')
+ 
+    def pospwr_on(self):
+        self.pcomm.pbset('ps1_en','on')
+        self.pcomm.pbset('ps2_en', 'on')
+
+    def pospwr_off(self):
+        self.pcomm.pbset('ps1_en','off')
+        self.pcomm.pbset('ps2_en','off')
         
     def set_ptl_id(self):
         self.ptl_id=self.e1.get()
@@ -397,9 +419,9 @@ class MoveGUI(object):
        #     self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)            
         else:
             dtdp=[-400,200]
-            self.quick_direct_dtdp(self.selected_posids,dtdp)       
+            self.quick_direct_dtdp(self.selected_posid,dtdp)       
             dtdp=[195,0]
-            self.quick_direct_dtdp(self.selected_posids,dtdp)   
+            self.quick_direct_dtdp(self.selected_posid,dtdp)   
             self.text1.insert(END,'Centering Done \n')
 
     def movement_check(self):
@@ -421,17 +443,21 @@ class MoveGUI(object):
                     self.pcomm.move(self.canbus, self.selected_can[j], 'ccw', 'cruise', 'theta', 30)
                 time.sleep(1)
         else:
-            for i in range(5):
-                self.quick_direct_dtdp(self.selected_posids,[0.,-30])
-                #time.sleep(3)
-                self.quick_direct_dtdp(self.selected_posids,[0.,30])
-                #time.sleep(3)
+            try:
+                print(self.selected_posid)
+                for i in range(5):
+                    self.quick_direct_dtdp(self.selected_posid,[0.,-30])
+                    #time.sleep(3)
+                    self.quick_direct_dtdp(self.selected_posid,[0.,30])
+                    #time.sleep(3)
 
-            for i in range(5):
-                self.quick_direct_dtdp(self.selected_posids,[-30.,0.]) 
-                #time.sleep(3)
-                self.quick_direct_dtdp(self.selected_posids,[30,0.])
-                #time.sleep(3) 
+                for i in range(5):
+                    self.quick_direct_dtdp(self.selected_posid,[-30.,0.]) 
+                    #time.sleep(3)
+                    self.quick_direct_dtdp(self.selected_posid,[30,0.])
+                    #time.sleep(3)
+            except Exception as e:
+                print('FAILED: ' + str(e)) 
         self.center()
         self.text1.insert(END,'Movement Check Done \n')
 
@@ -626,6 +652,9 @@ class MoveGUI(object):
                 self.posids.append('M'+str(key))
         self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
         for posid in self.posids:
+            self.ptl.set_posfid_val(posid, 'CTRL_ENABLED', True)
+            self.ptl.set_posfid_val(posid, 'FINAL_CREEP_ON', False)
+            self.ptl.set_posfid_val(posid, 'ANTIBACKLASH_ON', False)
             self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
         cs=self.listbox1.curselection()
