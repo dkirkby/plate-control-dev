@@ -18,6 +18,7 @@ petal/posschedule.py -text
 petal/posschedulestage.py -text
 petal/posstate.py -text
 petal/postransforms.py -text
+petal/tests_and_demos/anticol_examples.py -text
 petal/tests_and_demos/anticol_sim.py -text
 petal/tests_and_demos/anticollision_test_harness/generate_posparam_sets.py -text
 petal/tests_and_demos/anticollision_test_harness/generate_request_sets.py -text
