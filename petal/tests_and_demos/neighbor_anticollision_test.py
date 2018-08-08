@@ -13,9 +13,13 @@ fifids = []
 
 ptl = petal.Petal(petalid, posid_list, fifids)
 ptl.anticollision_default = 'adjust'
+should_anneal = False
 
-case_1 = {'command':'obsTP','type': 'Type II', 'left': [20,0], 'right': [180,0]}
-case_2 = {'command':'obsTP','type': 'No', 'left': [-90,145], 'right': [90,45]}
+
+case_1 = {'command':'obsTP','type': 'Type II', 'left': [180,20], 'right': [-10,10]}
+case_2 = {'command':'obsTP','type': 'No', 'left': [0,45], 'right': [90,45]}
+case_3 = {'command':'obsTP','type': 'Type II', 'left': [180,20], 'right': [-20,10]}
+
 
 def assemble_requests(case):
     log_note = case['type'] + ' collision test'
@@ -26,14 +30,15 @@ def assemble_requests(case):
     
 def move(requests):
     ptl.request_targets(requests)
-    ptl.schedule_send_and_execute_moves()
+    ptl.schedule_send_and_execute_moves(should_anneal = should_anneal)
     
 if __name__ == '__main__':
-    sleep_time = 5
-    for i in range(2):
-        print('rehoming')
-        ptl.request_homing(posid_list)
-        time.sleep(sleep_time)
+    sleep_time = 1
+    print('rehoming')
+    ptl.request_homing(posid_list)
+    ptl.schedule_send_and_execute_moves(should_anneal = False)
+    time.sleep(sleep_time)
+    for i in range(3):
         request = assemble_requests(case_1)
         print(request[posid_list[0]]['log_note'])
         move(request)
