@@ -14,8 +14,8 @@ fifids = []
 ptl = petal.Petal(petalid, posid_list, fifids)
 ptl.anticollision_default = 'adjust'
 
-case_1 = {'command':'obsTP','type': 'Type II', 'left': [0,0], 'right': [190,0]}
-case_2 = {'command':'obsTP','type': 'No', 'left': [0,145], 'right': [180,45]}
+case_1 = {'command':'obsTP','type': 'Type II', 'left': [20,0], 'right': [180,0]}
+case_2 = {'command':'obsTP','type': 'No', 'left': [-90,145], 'right': [90,45]}
 
 def assemble_requests(case):
     log_note = case['type'] + ' collision test'
@@ -37,9 +37,6 @@ if __name__ == '__main__':
         request = assemble_requests(case_1)
         print(request[posid_list[0]]['log_note'])
         move(request)
-        time.sleep(sleep_time)
-        print('rehoming')
-        ptl.request_homing(posid_list)
         time.sleep(sleep_time)
         request = assemble_requests(case_2)
         print(request[posid_list[0]]['log_note'])
