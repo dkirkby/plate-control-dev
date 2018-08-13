@@ -25,13 +25,11 @@ MoveGUI
 import os
 import sys
 import datetime
-account_name='msdos'
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/'+account_name+'/focalplane/positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/'+account_name+'/focalplane/pos_utility/'))
-
+sys.path.append(os.path.abspath('/home/msdos/focalplane/positioner_logs/data_processing_scripts/'))
+sys.path.append(os.path.abspath('/home/msdos/focalplane/pos_utility/'))
 import fvchandler
 import petal
 import petalcomm
@@ -56,13 +54,12 @@ import time
 import show_detected
 import populate_petal_travelers
 import populate_busids
-import pdb
 
 class MoveGUI(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
         global gui_root
         gui_root = tkinter.Tk()
-        google_dir='/home/'+account_name+'/focalplane/pos_utility/'        
+        google_dir='/home/msdos/focalplane/pos_utility/'        
         credential_name='google_access_account_lbl.json'
         w=200
         h=100
@@ -104,11 +101,11 @@ class MoveGUI(object):
         gui_root.title='Move Controll for Petal '+str(self.ptl_id)
         self.pcomm=petalcomm.PetalComm(self.ptl_id)
         self.mode = 0
-        self.pospwr_on()       
+        #petalcomm.
+   #     info=self.petalcomm.get_device_status()
         canbus=self.canbus
         self.bus_id=canbus
-        self.info = self.pcomm.pbget('posfid_info')
-        self.info = self.info[canbus]
+        self.info = self.pcomm.get_posfid_info(canbus)
         self.posids = []
         print(self.info)
         for key in sorted(self.info.keys()):
@@ -120,11 +117,10 @@ class MoveGUI(object):
                 self.posids.append('M0'+str(key))
             elif len(str(key))==5:
                 self.posids.append('M'+str(key))
+            
         self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
         for posid in self.ptl.posids:
             self.ptl.set_posfid_val(posid, 'CTRL_ENABLED', True)
-            self.ptl.set_posfid_val(posid, 'FINAL_CREEP_ON', False)
-            self.ptl.set_posfid_val(posid, 'ANTIBACKLASH_ON', False)
             self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
         self.ptl.anticollision_default= False
         self.fvc = fvchandler.FVCHandler(self.fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
@@ -167,23 +163,30 @@ class MoveGUI(object):
             self.syncmode.set(0)
         Checkbutton(gui_root, text='SYNC hard', variable=self.syncmode,command=self.sync_mode).grid(row=3,column=2,sticky=W,pady=4)
 
-        self.stopmode=IntVar(gui_root)
-        self.stopmode.set(0)
-        #Checkbutton(gui_root, text='Low P', variable=self.stopmode,command=self.stop_mode).grid(row=4,column=1,sticky=E,pady=4)
-    
         Button(gui_root,text='Phi CW',width=10,command=self.phi_cw_degree).grid(row=3,column=0,sticky=W,pady=4)
         Button(gui_root,text='Phi CCW',width=10,command=self.phi_ccw_degree).grid(row=4,column=0,sticky=W,pady=4)
-        Button(gui_root,text='Movement Check',width=12,command=self.movement_check).grid(row=5,column=2,sticky=W,pady=4)
-        Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=5,column=3,sticky=W,pady=4)
+        Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=5,column=2,sticky=W,pady=4)
         Button(gui_root,text='Reload CANBus',width=12,command=self.reload_canbus).grid(row=5,column=1,sticky=W,pady=4)
         Button(gui_root,text='1 Write SiID',width=15,command=self.write_siid).grid(row=3,column=3,sticky=W,pady=4)
-        Button(gui_root,text='3 Populate Busids',width=15,command=self.populate_can).grid(row=3,column=4,sticky=W,pady=4)# Call populate_busids.py under pos_utility/ 
+        Button(gui_root,text='3 Populate Busids',width=15,command=self.populate_can).grid(row=5,column=3,sticky=W,pady=4)# Call populate_busids.py under pos_utility/ 
         Button(gui_root,text='2 Write DEVICE_LOC',width=15,command=self.populate_petal_travelers).grid(row=4,column=3,sticky=W,pady=4)# Call populate_travellers.py under pos_utility/ to read from installation traveler and write to positioner 'database' and ID map
-        Button(gui_root,text='4 Aliveness Test',width=13,command=self.aliveness_test).grid(row=4,column=4,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
+        Button(gui_root,text='Aliveness Test',width=10,command=self.aliveness_test).grid(row=4,column=4,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
 
-        Button(gui_root,text='Center',width=12,command=self.center).grid(row=4,column=2,sticky=W,pady=4)                
+        Button(gui_root,text='Center',width=10,command=self.center).grid(row=4,column=2,sticky=W,pady=4)                
 
-        self.listbox1 = Listbox(gui_root, width=20, height=20,selectmode='multiple',exportselection=0)
+        yscroll_text1 = Scrollbar(gui_root, orient=tkinter.VERTICAL)
+        yscroll_text1.grid(row=6, column=4, rowspan=20,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)
+        self.text1=Text(gui_root,height=30,width=90,wrap=WORD)
+        self.text1.grid(row=6,column=1,columnspan=4,rowspan=20,sticky=W,pady=4,padx=15)
+        self.text1.configure(yscrollcommand=yscroll_text1.set)
+        self.text1.tag_configure('bold_italics', font=('Arial', 12, 'bold', 'italic'))
+        self.text1.tag_configure('big', font=('Verdana', 12, 'bold','bold'))
+        self.text1.tag_configure('green', foreground='#476042', font=('Tempus Sans ITC', 12, 'bold'))
+        self.text1.tag_configure('red', foreground='#ff0000', font=('Tempus Sans ITC', 12, 'bold'))
+        self.text1.tag_configure('yellow', background='#ffff00', font=('Tempus Sans ITC', 12, 'bold'))
+        yscroll_text1.config(command=self.text1.yview)
+
+        self.listbox1 = Listbox(gui_root, width=20, height=20)
         self.listbox1.grid(row=6, column=0,rowspan=10,pady=4,padx=15)
         # create a vertical scrollbar to the right of the listbox
         yscroll_listbox1 = Scrollbar(command=self.listbox1.yview, orient=tkinter.VERTICAL)
@@ -199,16 +202,12 @@ class MoveGUI(object):
                 self.listbox1.insert(tkinter.END,'M0'+str(key))
             elif len(str(key))==5:
                 self.listbox1.insert(tkinter.END,'M'+str(key))
-                
+            # FW version check
+            if float(self.info[key][0]) < 4.3:
+                self.text1.insert(END,str(key)+' has too low a FW ver = '+self.info[key][0]+', BL ver = '+self.info[key][1]+'!  \n','red')
         self.listbox1.bind('<ButtonRelease-1>', self.get_list)
 
 
-        yscroll_text1 = Scrollbar(gui_root, orient=tkinter.VERTICAL)
-        yscroll_text1.grid(row=6, column=4, rowspan=20,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)     
-        self.text1=Text(gui_root,height=30,width=90,wrap=WORD)
-        self.text1.grid(row=6,column=1,columnspan=4,rowspan=20,sticky=W,pady=4,padx=15)
-        self.text1.configure(yscrollcommand=yscroll_text1.set)        
-        yscroll_text1.config(command=self.text1.yview)
 # Right part of the GUI to write to Acceptance Traveller
 
 #       Load the information 
@@ -274,9 +273,7 @@ class MoveGUI(object):
 
         
 #        Button(gui_root,text='Plot List',width=10,command=click_plot_list).grid(row=4,column=2,sticky=W,pady=4)
-        Button(gui_root,text='Refresh/Restart',width=15,command=self.restart).grid(row=0,column=7,sticky=W,pady=4)
-        self.pwr_button = Button(gui_root,text='POSPWR is ON', width=15, command=self.toggle, bg='green')
-        self.pwr_button.grid(row=1, column=7, sticky=W,pady=4)
+        Button(gui_root,text='Refresh/Restart',width=15,command=self.restart).grid(row=0,column=8,sticky=W,pady=4)
         Button(gui_root,text='Clear',width=15,command=self.clear1).grid(row=5,column=4,sticky=W,pady=4)
         Button(gui_root,text='Clear',width=15,command=self.clear2).grid(row=5,column=6,sticky=W,pady=4)
         
@@ -286,28 +283,8 @@ class MoveGUI(object):
         label.image = photo # keep a reference!
         label.grid(row=16, column=0, columnspan=1, rowspan=20,sticky=W+E+N+S, padx=5, pady=5)
         
-        #self.pcomm.pbset('stop_mode','off')
 
         mainloop()
-   
-    def toggle(self, flag = [0]):
-        flag[0] = not flag[0]
-        if flag[0]:
-            self.pospwr_off()
-            self.pwr_button.config(bg='grey')
-            self.pwr_button.config(text='POSPWR is OFF')
-        else:
-            self.pospwr_on()
-            self.pwr_button.config(text='POSPWR is ON')
-            self.pwr_button.config(bg='green')
- 
-    def pospwr_on(self):
-        self.pcomm.pbset('ps1_en','on')
-        self.pcomm.pbset('ps2_en', 'on')
-
-    def pospwr_off(self):
-        self.pcomm.pbset('ps1_en','off')
-        self.pcomm.pbset('ps2_en','off')
         
     def set_ptl_id(self):
         self.ptl_id=self.e1.get()
@@ -315,44 +292,30 @@ class MoveGUI(object):
         print('Loading Petal'+self.ptl_id+', canbus:'+self.canbus)
         gui_root.destroy()
     def set_fiducial(self):
-        if 20000 in self.selected_can :
+        if self.selected_can == 20000:
             self.text1.insert(END,'No, you cannot set all positioners as fiducials, this will burn the motor! \n')
-        elif all([self.selected_can[i] <10000 for i in range(len(self.selected_can))]):
+        elif self.selected_can<7000:
             self.text1.insert(END,'No, you cannot set a positioners as a fiducial, this will burn the motor! \n')
         else:
-            for i in range(len(self.selected_can)):
-                self.pcomm.set_fiducials([self.canbus], [self.selected_can[i]], [self.e2.get()])
+            self.pcomm.set_fiducials([self.canbus], [self.selected_can], [self.e2.get()])
             self.text1.insert(END,'Set Fiducial '+str(self.selected_can)+' to '+str(self.e2.get())+' successfully! \n')
-
     def sync_mode(self):
         if self.syncmode.get() == 1:
             self.ptl.sync_mode = 'hard'
         else:
             self.ptl.sync_mode = 'soft'
-
-    def stop_mode(self):
-        if self.stopmode.get() == 1:
-            #self.pcomm.pbset('stop_mode','on')
-            pass
-        else:
-            #self.pcomm.pbset('stop_mode','off')
-            pass
  
     def get_list(self,event):
         # get selected line index
-        index = self.listbox1.curselection()
+        index = self.listbox1.curselection()[0]
         # get the line's text
-        self.selected=[]
-        self.selected_posid=[]
-        self.selected_can=[]
-        for i in range(len(index)):
-            self.selected.append(self.listbox1.get(index[i]))        
-            if 'ALL' in self.selected:
-                self.selected_posid=self.posids
-                self.selected_can=[20000]
-            else:
-                self.selected_posid.append(self.selected[i])
-                self.selected_can.append(int(str(self.selected[i][1:6])))
+        self.selected=self.listbox1.get(index)        
+        if self.selected == 'ALL':
+            self.selected_posid=self.posids
+            self.selected_can=20000
+        else:
+            self.selected_posid=self.selected
+            self.selected_can=int(str(self.selected[1:6]))
         self.e_selected.delete(0,END)
         self.e_selected.insert(0,str(self.selected_can))
 
@@ -372,112 +335,51 @@ class MoveGUI(object):
         dtdp=[-degree,0]
 
         if self.mode.get()==1:
-            for i in range(len(self.selected_can)):
-                self.pcomm.move(self.canbus, self.selected_can[i], 'cw', 'cruise', 'theta', degree)
+            self.pcomm.move(self.canbus, self.selected_can, 'cw', 'cruise', 'theta', degree)
         else:
-            self.quick_direct_dtdp(self.selected_posid,dtdp)
+            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
         
     def theta_ccw_degree(self):
         degree=float(self.e1.get())
         dtdp=[degree,0]
         if self.mode.get()==1:
-            for i in range(len(self.selected_can)):
-                self.pcomm.move(self.canbus, self.selected_can[i], 'ccw', 'cruise', 'theta', degree)
+            self.pcomm.move(self.canbus, self.selected_can, 'ccw', 'cruise', 'theta', degree)
         else:
-            self.quick_direct_dtdp(self.selected_posid,dtdp)
+            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
   
     def phi_cw_degree(self):
         degree=float(self.e1.get())
         dtdp=[0,-degree]
         if self.mode.get()==1:
-            for i in range(len(self.selected_can)):
-                self.pcomm.move(self.canbus, self.selected_can[i], 'cw', 'cruise', 'phi', degree)
+            self.pcomm.move(self.canbus, self.selected_can, 'cw', 'cruise', 'phi', degree)
         else:
-            self.quick_direct_dtdp(self.selected_posid,dtdp)
+            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
         
     def phi_ccw_degree(self):
         degree=float(self.e1.get())
         dtdp=[0,degree]
         if self.mode.get()==1:
-            for i in range(len(self.selected_can)):
-                self.pcomm.move(self.canbus, self.selected_can[i], 'ccw', 'cruise', 'phi', degree)
+            self.pcomm.move(self.canbus, self.selected_can, 'ccw', 'cruise', 'phi', degree)
         else:
-            self.quick_direct_dtdp(self.selected_posid,dtdp)
+            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
     
     def center(self):
         if self.mode.get()==1:
-            for i in range(len(self.selected_can)):
-                self.pcomm.move(self.canbus, self.selected_can[i], 'cw', 'cruise', 'theta', 400)
+            self.pcomm.move(self.canbus, 20000, 'cw', 'cruise', 'theta', 400)
             time.sleep(4)
-            for i in range(len(self.selected_can)):
-                self.pcomm.move(self.canbus, self.selected_can[i], 'ccw', 'cruise', 'phi', 200)
+            self.pcomm.move(self.canbus, 20000, 'ccw', 'cruise', 'phi', 200)
             time.sleep(2)
-            for i in range(len(self.selected_can)):
-                self.pcomm.move(self.canbus, self.selected_can[i], 'ccw', 'cruise', 'theta', 195)
+            self.pcomm.move(self.canbus, 20000, 'ccw', 'cruise', 'theta', 195)
 
             
        #     self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)            
         else:
             dtdp=[-400,200]
-            self.quick_direct_dtdp(self.selected_posid,dtdp)       
+            self.ptl.quick_direct_dtdp(self.posids,dtdp)       
             dtdp=[195,0]
-            self.quick_direct_dtdp(self.selected_posid,dtdp)   
+            self.ptl.quick_direct_dtdp(self.posids,dtdp)   
             self.text1.insert(END,'Centering Done \n')
-
-    def movement_check(self):
-        print('Movement Check Starts! \n')
-        time.sleep(5)
-        if self.mode.get()==1:
-            for i in range(5):
-                for j in range(len(self.selected_can)):
-                    self.pcomm.move(self.canbus, self.selected_can[j], 'cw', 'cruise', 'phi', 30)
-                time.sleep(1)
-                for j in range(len(self.selected_can)):
-                    self.pcomm.move(self.canbus, self.selected_can[j], 'ccw', 'cruise', 'phi', 30)
-                time.sleep(1)
-            for i in range(5):
-                for j in range(len(self.selected_can)):
-                    self.pcomm.move(self.canbus, self.selected_can[j], 'cw', 'cruise', 'theta', 30)
-                time.sleep(1)
-                for j in range(len(self.selected_can)):
-                    self.pcomm.move(self.canbus, self.selected_can[j], 'ccw', 'cruise', 'theta', 30)
-                time.sleep(1)
-        else:
-            try:
-                print(self.selected_posid)
-                for i in range(5):
-                    self.quick_direct_dtdp(self.selected_posid,[0.,-30])
-                    #time.sleep(3)
-                    self.quick_direct_dtdp(self.selected_posid,[0.,30])
-                    #time.sleep(3)
-
-                for i in range(5):
-                    self.quick_direct_dtdp(self.selected_posid,[-30.,0.]) 
-                    #time.sleep(3)
-                    self.quick_direct_dtdp(self.selected_posid,[30,0.])
-                    #time.sleep(3)
-            except Exception as e:
-                print('FAILED: ' + str(e)) 
-        self.center()
-        self.text1.insert(END,'Movement Check Done \n')
-
-    def quick_direct_dtdp(self, posids, dtdp, log_note=''):
-        """Convenience wrapper to request, schedule, send, and execute a single move command for a
-        direct (delta theta, delta phi) relative move. There is NO anti-collision calculation. This
-        method is intended for expert usage only. You can argue an iterable collection of posids if
-        you want, though note they will all get the same (dt,dp) sent to them.
-
-        INPUTS:     posids    ... either a single posid or a list of posids
-                    dtdp      ... [dt,dp], note that all posids get sent the same [dt,dp] here. i.e. dt and dp are each just one number
-                    log_note  ... optional string to include in the log file
-        """
-        requests = {}
-        posids = {posids} if isinstance(posids,str) else set(posids)
-        for posid in posids:
-            requests[posid] = {'target':dtdp, 'log_note':log_note}
-        self.ptl.request_direct_dtdp(requests)
-        self.ptl.schedule_send_and_execute_moves(should_anneal=False)
- 
+        
     def write_siid(self):
         self.text1.insert(END,'Writing SiID \n')
         for key in sorted(self.info.keys()):
@@ -637,8 +539,7 @@ class MoveGUI(object):
     def reload_canbus(self):
         self.canbus='can'+self.e_can.get().strip()        
         self.bus_id=self.canbus
-        self.info = self.pcomm.pbget('posfid_info')
-        self.info = self.info[self.canbus]
+        self.info = self.pcomm.get_posfid_info(self.canbus)
         self.posids = []
         print(self.info)
         for key in sorted(self.info.keys()):
@@ -652,9 +553,6 @@ class MoveGUI(object):
                 self.posids.append('M'+str(key))
         self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
         for posid in self.posids:
-            self.ptl.set_posfid_val(posid, 'CTRL_ENABLED', True)
-            self.ptl.set_posfid_val(posid, 'FINAL_CREEP_ON', False)
-            self.ptl.set_posfid_val(posid, 'ANTIBACKLASH_ON', False)
             self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
         cs=self.listbox1.curselection()
