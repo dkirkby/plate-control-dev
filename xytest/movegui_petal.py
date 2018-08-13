@@ -20,15 +20,17 @@ MoveGUI
 # History: V1.0   Kai Zhang @LBNL  2017-10-17   Contact: zkdtckk@gmail.com
 # Implemented on Beyonce on 2017-10-17, just change the data_processing_scripts relative location to work. 
 #          V1.1  Kai Zhang, 2018-04-02. Add canbus input to talk to different cans for EM Petal. 
-
+#          V1.2  Kai Zhang  2018-05-01. Add Reload Canbus botton so that no restart is needed. Facilitate the petal check. 
 """
 import os
 import sys
 import datetime
+account_name='msdos'
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/msdos/focalplane/positioner_logs/data_processing_scripts/'))
+sys.path.append(os.path.abspath('/home/'+account_name+'/focalplane/positioner_logs/data_processing_scripts/'))
+sys.path.append(os.path.abspath('/home/'+account_name+'/focalplane/pos_utility/'))
 
 import fvchandler
 import petal
@@ -51,13 +53,17 @@ import collections
 from tkinter import *
 import googlesheets
 import time
+import show_detected
+import populate_petal_travelers
+import populate_busids
+import pdb
 
-
-class MoveGUI_Petal(object):
+class MoveGUI(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
         global gui_root
         gui_root = tkinter.Tk()
-        google_dir='/home/msdos/focalplane/positioner_logs/data_processing_scripts/'        
+        google_dir='/home/'+account_name+'/focalplane/pos_utility/'        
+        credential_name='google_access_account_lbl.json'
         w=200
         h=100
         ws=gui_root.winfo_screenwidth()
@@ -69,50 +75,60 @@ class MoveGUI_Petal(object):
         self.e1=Entry(gui_root,width=5)
         self.e1.grid(row=0,column=1)
         Label(gui_root,text="Petal ID:").grid(row=0)
+        self.e_can=Entry(gui_root,width=5)
+        self.e_can.grid(row=1,column=1)
+        self.e_can.insert(0,'0')
+        Label(gui_root,text="Petal ID:").grid(row=0)
+        Label(gui_root,text="CAN Bus:").grid(row=1)
         Button(gui_root,text='OK',width=10,command=self.set_ptl_id).grid(row=1,column=2,sticky=W,pady=4)
-        self.canlist=['can10','can11','can13','can12','can22','can23','can15','can16','can17','can14']
 
         # Load Travellers
         url1='https://docs.google.com/spreadsheets/d/1lJ9GjhUUsK2SIvXeerpGW7664OFKQWAlPqpgxgevvl8/edit#gid=0' # PosID, SiID database
-        self.sheet1=googlesheets.connect_by_url(url1,credentials = google_dir+'/google_access_account.json')
+        self.sheet1=googlesheets.connect_by_url(url1,credentials = google_dir+credential_name)
      
         url2='https://docs.google.com/spreadsheets/d/19Aq-28qgODaaX9wH-NMsX_GiuNyXG_6rjIjPVLb8aYw/edit#gid=795996596' # Acceptance Traveller
-        self.sheet2=googlesheets.connect_by_url(url2,credentials = google_dir+'google_access_account.json')
+        self.sheet2=googlesheets.connect_by_url(url2,credentials = google_dir+credential_name)
         
         
         mainloop()
 
         gui_root = tkinter.Tk()
-        
+        self.can_buses_to_update=['can14','can15','can16','can17']#['can10','can11','can13','can12','can22','can23','can14','can15','can16','can17']
+        self.populate_petal=populate_petal_travelers
+        self.show_detected=show_detected        
+        self.populate_busids=populate_busids
         self.simulate = False
         self.logfile='MoveGUI.log'
-        fvc_type='simulator'
-        fidids=['F021']   
+        self.fvc_type='simulator'
+        self.fidids=['F021']   
         gui_root.title='Move Controll for Petal '+str(self.ptl_id)
         self.pcomm=petalcomm.PetalComm(self.ptl_id)
         self.mode = 0
-        #petalcomm.
-   #     info=self.petalcomm.get_device_status()
+        self.pospwr_on()       
+        canbus=self.canbus
+        self.bus_id=canbus
+        self.info = self.pcomm.pbget('posfid_info')
+        pdb.set_trace()
+        self.info = self.info[canbus]
         self.posids = []
-        self.cans= []
-        for can in self.canlist:
-            print('Loading '+can)
-            info = self.pcomm.get_posfid_info(can)
-            print('info:',info)
-            if not isinstance(info, str):
-                for key in sorted(info.keys()):
-                    self.cans.append(can)
-                    if len(str(key))==2:
-                        self.posids.append('M000'+str(key)) 
-                    elif len(str(key))==3:
-                        self.posids.append('M00'+str(key))
-                    elif len(str(key))==4:
-                        self.posids.append('M0'+str(key))
-                    elif len(str(key))==5:
-                        self.posids.append('M'+str(key))
-            #time.sleep(2) 
-        self.ptl = petal.Petal(self.ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite)
-        self.fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
+        print(self.info)
+        for key in sorted(self.info.keys()):
+            if len(str(key))==2:
+                self.posids.append('M000'+str(key)) 
+            elif len(str(key))==3:
+                self.posids.append('M00'+str(key))
+            elif len(str(key))==4:
+                self.posids.append('M0'+str(key))
+            elif len(str(key))==5:
+                self.posids.append('M'+str(key))
+        self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+        for posid in self.ptl.posids:
+            self.ptl.set_posfid_val(posid, 'CTRL_ENABLED', True)
+            self.ptl.set_posfid_val(posid, 'FINAL_CREEP_ON', False)
+            self.ptl.set_posfid_val(posid, 'ANTIBACKLASH_ON', False)
+            self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
+        self.ptl.anticollision_default= False
+        self.fvc = fvchandler.FVCHandler(self.fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
         
 # GUI input       
@@ -129,31 +145,61 @@ class MoveGUI_Petal(object):
         Label(gui_root,text="Rotation Angel").grid(row=0,column=0)
         self.e1=Entry(gui_root)
         self.e1.grid(row=0,column=1)
-        self.e1.insert(0,'190')
+        self.e1.insert(0,'50')
         
         Label(gui_root,text="Set Fiducial").grid(row=0,column=2)
         self.e2=Entry(gui_root)
         self.e2.grid(row=0,column=3)
 
+        self.e_can=Entry(gui_root,width=10)
+        self.e_can.grid(row=5,column=0,sticky=E)
+        self.e_can.insert(0,self.canbus.strip('can'))
+        Label(gui_root,text="CAN Bus:").grid(row=5,column=0,sticky=W,padx=10)
+
         Button(gui_root,text='Theta CW',width=10,command=self.theta_cw_degree).grid(row=3,column=1,sticky=W,pady=4)
         Button(gui_root,text='Theta CCW',width=10,command=self.theta_ccw_degree).grid(row=4,column=1,sticky=W,pady=4)
         self.mode=IntVar(gui_root)
         self.mode.set(1)
-        Checkbutton(gui_root, text='CAN', variable=self.mode).grid(row=3,column=2,sticky=W,pady=4)
+        Checkbutton(gui_root, text='CAN', variable=self.mode).grid(row=3,column=1,sticky=E,pady=4)
+        self.syncmode=IntVar(gui_root)
+        if self.ptl.sync_mode == 'hard':
+            self.syncmode.set(1)
+        else:
+            self.syncmode.set(0)
+        Checkbutton(gui_root, text='SYNC hard', variable=self.syncmode,command=self.sync_mode).grid(row=3,column=2,sticky=W,pady=4)
+
+        self.stopmode=IntVar(gui_root)
+        self.stopmode.set(0)
+        #Checkbutton(gui_root, text='Low P', variable=self.stopmode,command=self.stop_mode).grid(row=4,column=1,sticky=E,pady=4)
+    
         Button(gui_root,text='Phi CW',width=10,command=self.phi_cw_degree).grid(row=3,column=0,sticky=W,pady=4)
         Button(gui_root,text='Phi CCW',width=10,command=self.phi_ccw_degree).grid(row=4,column=0,sticky=W,pady=4)
-        Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=5,column=1,sticky=W,pady=4)
-        Button(gui_root,text='Write SiID',width=10,command=self.write_siid).grid(row=5,column=3,sticky=W,pady=4)
-        Button(gui_root,text='Center',width=10,command=self.center).grid(row=4,column=2,sticky=W,pady=4)                
-        self.listbox1 = Listbox(gui_root, width=20, height=20)
+        Button(gui_root,text='Movement Check',width=12,command=self.movement_check).grid(row=5,column=2,sticky=W,pady=4)
+        Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=5,column=3,sticky=W,pady=4)
+        Button(gui_root,text='Reload CANBus',width=12,command=self.reload_canbus).grid(row=5,column=1,sticky=W,pady=4)
+        Button(gui_root,text='1 Write SiID',width=15,command=self.write_siid).grid(row=3,column=3,sticky=W,pady=4)
+        Button(gui_root,text='3 Populate Busids',width=15,command=self.populate_can).grid(row=3,column=4,sticky=W,pady=4)# Call populate_busids.py under pos_utility/ 
+        Button(gui_root,text='2 Write DEVICE_LOC',width=15,command=self.populate_petal_travelers).grid(row=4,column=3,sticky=W,pady=4)# Call populate_travellers.py under pos_utility/ to read from installation traveler and write to positioner 'database' and ID map
+        Button(gui_root,text='4 Aliveness Test',width=13,command=self.aliveness_test).grid(row=4,column=4,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
+
+        Button(gui_root,text='Center',width=12,command=self.center).grid(row=4,column=2,sticky=W,pady=4)                
+
+        self.listbox1 = Listbox(gui_root, width=20, height=20,selectmode='multiple',exportselection=0)
         self.listbox1.grid(row=6, column=0,rowspan=10,pady=4,padx=15)
         # create a vertical scrollbar to the right of the listbox
         yscroll_listbox1 = Scrollbar(command=self.listbox1.yview, orient=tkinter.VERTICAL)
         yscroll_listbox1.grid(row=6, column=0, rowspan=10,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)
         self.listbox1.configure(yscrollcommand=yscroll_listbox1.set)
         self.listbox1.insert(tkinter.END,'ALL')
-        for posid in sorted(self.posids):
-            self.listbox1.insert(tkinter.END,posid) 
+        for key in sorted(self.info.keys()):
+            if len(str(key))==2:
+                self.listbox1.insert(tkinter.END,'M000'+str(key)) 
+            elif len(str(key))==3:
+                self.listbox1.insert(tkinter.END,'M00'+str(key))
+            elif len(str(key))==4:
+                self.listbox1.insert(tkinter.END,'M0'+str(key))
+            elif len(str(key))==5:
+                self.listbox1.insert(tkinter.END,'M'+str(key))
                 
         self.listbox1.bind('<ButtonRelease-1>', self.get_list)
 
@@ -229,7 +275,9 @@ class MoveGUI_Petal(object):
 
         
 #        Button(gui_root,text='Plot List',width=10,command=click_plot_list).grid(row=4,column=2,sticky=W,pady=4)
-        Button(gui_root,text='Refresh/Restart',width=15,command=self.restart).grid(row=0,column=8,sticky=W,pady=4)
+        Button(gui_root,text='Refresh/Restart',width=15,command=self.restart).grid(row=0,column=7,sticky=W,pady=4)
+        self.pwr_button = Button(gui_root,text='POSPWR is ON', width=15, command=self.toggle, bg='green')
+        self.pwr_button.grid(row=1, column=7, sticky=W,pady=4)
         Button(gui_root,text='Clear',width=15,command=self.clear1).grid(row=5,column=4,sticky=W,pady=4)
         Button(gui_root,text='Clear',width=15,command=self.clear2).grid(row=5,column=6,sticky=W,pady=4)
         
@@ -239,33 +287,73 @@ class MoveGUI_Petal(object):
         label.image = photo # keep a reference!
         label.grid(row=16, column=0, columnspan=1, rowspan=20,sticky=W+E+N+S, padx=5, pady=5)
         
+        #self.pcomm.pbset('stop_mode','off')
 
         mainloop()
+   
+    def toggle(self, flag = [0]):
+        flag[0] = not flag[0]
+        if flag[0]:
+            self.pospwr_off()
+            self.pwr_button.config(bg='grey')
+            self.pwr_button.config(text='POSPWR is OFF')
+        else:
+            self.pospwr_on()
+            self.pwr_button.config(text='POSPWR is ON')
+            self.pwr_button.config(bg='green')
+ 
+    def pospwr_on(self):
+        self.pcomm.pbset('ps1_en','on')
+        self.pcomm.pbset('ps2_en', 'on')
+
+    def pospwr_off(self):
+        self.pcomm.pbset('ps1_en','off')
+        self.pcomm.pbset('ps2_en','off')
         
     def set_ptl_id(self):
         self.ptl_id=self.e1.get()
-        print('Loading Petal'+self.ptl_id)
+        self.canbus='can'+self.e_can.get().strip()        
+        print('Loading Petal'+self.ptl_id+', canbus:'+self.canbus)
         gui_root.destroy()
     def set_fiducial(self):
-        if self.selected_can == 20000:
+        if 20000 in self.selected_can :
             self.text1.insert(END,'No, you cannot set all positioners as fiducials, this will burn the motor! \n')
-        elif self.selected_can<7000:
+        elif all([self.selected_can[i] <10000 for i in range(len(self.selected_can))]):
             self.text1.insert(END,'No, you cannot set a positioners as a fiducial, this will burn the motor! \n')
         else:
-            self.pcomm.set_fiducials(['can0'], [self.selected_can], [self.e2.get()])
+            for i in range(len(self.selected_can)):
+                self.pcomm.set_fiducials([self.canbus], [self.selected_can[i]], [self.e2.get()])
             self.text1.insert(END,'Set Fiducial '+str(self.selected_can)+' to '+str(self.e2.get())+' successfully! \n')
-        
+
+    def sync_mode(self):
+        if self.syncmode.get() == 1:
+            self.ptl.sync_mode = 'hard'
+        else:
+            self.ptl.sync_mode = 'soft'
+
+    def stop_mode(self):
+        if self.stopmode.get() == 1:
+            #self.pcomm.pbset('stop_mode','on')
+            pass
+        else:
+            #self.pcomm.pbset('stop_mode','off')
+            pass
+ 
     def get_list(self,event):
         # get selected line index
-        index = self.listbox1.curselection()[0]
+        index = self.listbox1.curselection()
         # get the line's text
-        self.selected=self.listbox1.get(index)        
-        if self.selected == 'ALL':
-            self.selected_posid=self.posids
-            self.selected_can=20000
-        else:
-            self.selected_posid=self.selected
-            self.selected_can=int(str(self.selected[1:6]))
+        self.selected=[]
+        self.selected_posid=[]
+        self.selected_can=[]
+        for i in range(len(index)):
+            self.selected.append(self.listbox1.get(index[i]))        
+            if 'ALL' in self.selected:
+                self.selected_posid=self.posids
+                self.selected_can=[20000]
+            else:
+                self.selected_posid.append(self.selected[i])
+                self.selected_can.append(int(str(self.selected[i][1:6])))
         self.e_selected.delete(0,END)
         self.e_selected.insert(0,str(self.selected_can))
 
@@ -275,6 +363,7 @@ class MoveGUI_Petal(object):
         return sid_dict
             
     def show_info(self):
+        self.text1.insert(END,str(len(self.info.keys())).strip()+' Pos+Fid are found \n')
         for key in sorted(self.info.keys()):
             self.text1.insert(END,str(key)+' '+str(self.info[key])+'\n')
             
@@ -284,75 +373,159 @@ class MoveGUI_Petal(object):
         dtdp=[-degree,0]
 
         if self.mode.get()==1:
-            for can in self.canlist:
-                self.pcomm.move(can, self.selected_can, 'cw', 'cruise', 'theta', degree)
+            for i in range(len(self.selected_can)):
+                self.pcomm.move(self.canbus, self.selected_can[i], 'cw', 'cruise', 'theta', degree)
         else:
-            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
+            self.quick_direct_dtdp(self.selected_posid,dtdp)
         
     def theta_ccw_degree(self):
         degree=float(self.e1.get())
         dtdp=[degree,0]
         if self.mode.get()==1:
-            for can in self.canlist:
-                self.pcomm.move(can, self.selected_can, 'ccw', 'cruise', 'theta', degree)
+            for i in range(len(self.selected_can)):
+                self.pcomm.move(self.canbus, self.selected_can[i], 'ccw', 'cruise', 'theta', degree)
         else:
-            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
+            self.quick_direct_dtdp(self.selected_posid,dtdp)
   
     def phi_cw_degree(self):
         degree=float(self.e1.get())
         dtdp=[0,-degree]
         if self.mode.get()==1:
-            for can in self.canlist:
-                self.pcomm.move(can, self.selected_can, 'cw', 'cruise', 'phi', degree)
+            for i in range(len(self.selected_can)):
+                self.pcomm.move(self.canbus, self.selected_can[i], 'cw', 'cruise', 'phi', degree)
         else:
-            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
+            self.quick_direct_dtdp(self.selected_posid,dtdp)
         
     def phi_ccw_degree(self):
         degree=float(self.e1.get())
         dtdp=[0,degree]
         if self.mode.get()==1:
-            for can in self.canlist:
-                self.pcomm.move(can, self.selected_can, 'ccw', 'cruise', 'phi', degree)
+            for i in range(len(self.selected_can)):
+                self.pcomm.move(self.canbus, self.selected_can[i], 'ccw', 'cruise', 'phi', degree)
         else:
-            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
+            self.quick_direct_dtdp(self.selected_posid,dtdp)
     
     def center(self):
         if self.mode.get()==1:
-            self.pcomm.move(self.canbus, 20000, 'cw', 'cruise', 'theta', 400)
+            for i in range(len(self.selected_can)):
+                self.pcomm.move(self.canbus, self.selected_can[i], 'cw', 'cruise', 'theta', 400)
             time.sleep(4)
-            self.pcomm.move(self.canbus, 20000, 'ccw', 'cruise', 'phi', 200)
+            for i in range(len(self.selected_can)):
+                self.pcomm.move(self.canbus, self.selected_can[i], 'ccw', 'cruise', 'phi', 200)
             time.sleep(2)
-            self.pcomm.move(self.canbus, 20000, 'ccw', 'cruise', 'theta', 195)
+            for i in range(len(self.selected_can)):
+                self.pcomm.move(self.canbus, self.selected_can[i], 'ccw', 'cruise', 'theta', 195)
 
             
        #     self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)            
         else:
             dtdp=[-400,200]
-            self.ptl.quick_direct_dtdp(self.posids,dtdp)       
+            self.quick_direct_dtdp(self.selected_posid,dtdp)       
             dtdp=[195,0]
-            self.ptl.quick_direct_dtdp(self.posids,dtdp)   
+            self.quick_direct_dtdp(self.selected_posid,dtdp)   
             self.text1.insert(END,'Centering Done \n')
-        
+
+    def movement_check(self):
+        print('Movement Check Starts! \n')
+        time.sleep(5)
+        if self.mode.get()==1:
+            for i in range(5):
+                for j in range(len(self.selected_can)):
+                    self.pcomm.move(self.canbus, self.selected_can[j], 'cw', 'cruise', 'phi', 30)
+                time.sleep(1)
+                for j in range(len(self.selected_can)):
+                    self.pcomm.move(self.canbus, self.selected_can[j], 'ccw', 'cruise', 'phi', 30)
+                time.sleep(1)
+            for i in range(5):
+                for j in range(len(self.selected_can)):
+                    self.pcomm.move(self.canbus, self.selected_can[j], 'cw', 'cruise', 'theta', 30)
+                time.sleep(1)
+                for j in range(len(self.selected_can)):
+                    self.pcomm.move(self.canbus, self.selected_can[j], 'ccw', 'cruise', 'theta', 30)
+                time.sleep(1)
+        else:
+            try:
+                print(self.selected_posid)
+                for i in range(5):
+                    self.quick_direct_dtdp(self.selected_posid,[0.,-30])
+                    #time.sleep(3)
+                    self.quick_direct_dtdp(self.selected_posid,[0.,30])
+                    #time.sleep(3)
+
+                for i in range(5):
+                    self.quick_direct_dtdp(self.selected_posid,[-30.,0.]) 
+                    #time.sleep(3)
+                    self.quick_direct_dtdp(self.selected_posid,[30,0.])
+                    #time.sleep(3)
+            except Exception as e:
+                print('FAILED: ' + str(e)) 
+        self.center()
+        self.text1.insert(END,'Movement Check Done \n')
+
+    def quick_direct_dtdp(self, posids, dtdp, log_note=''):
+        """Convenience wrapper to request, schedule, send, and execute a single move command for a
+        direct (delta theta, delta phi) relative move. There is NO anti-collision calculation. This
+        method is intended for expert usage only. You can argue an iterable collection of posids if
+        you want, though note they will all get the same (dt,dp) sent to them.
+
+        INPUTS:     posids    ... either a single posid or a list of posids
+                    dtdp      ... [dt,dp], note that all posids get sent the same [dt,dp] here. i.e. dt and dp are each just one number
+                    log_note  ... optional string to include in the log file
+        """
+        requests = {}
+        posids = {posids} if isinstance(posids,str) else set(posids)
+        for posid in posids:
+            requests[posid] = {'target':dtdp, 'log_note':log_note}
+        self.ptl.request_direct_dtdp(requests)
+        self.ptl.schedule_send_and_execute_moves(should_anneal=False)
+ 
     def write_siid(self):
         self.text1.insert(END,'Writing SiID \n')
         for key in sorted(self.info.keys()):
             info_this=self.info[key]
-            pos_this=googlesheets.read(self.sheet1,20+int(key),1,False,False)
-            if (float(key)<7000 and float(pos_this)== float(key)):
-                googlesheets.write(self.sheet1,int(key)+20,5,str(key),False,False) # POSID
-                googlesheets.write(self.sheet1,int(key)+20,6,info_this[3],False,False) # SI_ID
-                googlesheets.write(self.sheet1,int(key)+20,7,info_this[2],False,False) # Full SI_ID
-                googlesheets.write(self.sheet1,int(key)+20,15,info_this[0],False,False) # Firmware_ver
-                test=googlesheets.read(self.sheet1,int(key)+20,6,False,False)
-                if test == info_this[3]:
-                    self.text1.insert(END,'Writing '+str(key)+' successfully \n')
-                else:
-                    self.text1.insert(END,'Writing '+str(key)+' failed. \n Check doc \n')
-            elif float(key)>7000:
+            if float(key)<8000:
+                pos_this=googlesheets.read(self.sheet1,20+int(key),1,False,False)
+                if float(pos_this)== float(key):
+                    googlesheets.write(self.sheet1,int(key)+20,5,str(key),False,False) # POSID
+                    googlesheets.write(self.sheet1,int(key)+20,6,info_this[3],False,False) # SI_ID
+                    googlesheets.write(self.sheet1,int(key)+20,7,info_this[2],False,False) # Full SI_ID
+                    googlesheets.write(self.sheet1,int(key)+20,15,info_this[0],False,False) # Firmware_ver
+                    test=googlesheets.read(self.sheet1,int(key)+20,6,False,False)
+                    if test == info_this[3]:
+                        print('Writing '+str(key)+' successfully \n')
+                    else:
+                        print('Writing '+str(key)+' failed. \n Check doc \n')
+            elif float(key)>8000:
                 self.text1.insert(END,'Is '+str(key)+' a fiducial? Not writing. \n')
             else:
                 self.text1.insert(END,'Posid and RowID are not consistent. Check the integrity of the file. \nGo to '+url+' \n' )
         self.text1.insert(END,'Writing Sheets Done \n')
+
+    def aliveness_test(self):
+        Show=self.show_detected.Show
+        pc_num = self.ptl_id
+        petal = input('Please enter the petal number (eg. 9): ')
+        can_buses = ['can10', 'can12', 'can11', 'can13', 'can14', 'can15', 'can16','can17', 'can22', 'can23']
+        show = Show(int(pc_num), petal, can_buses)
+        show.read_canbuses()
+        show.plot_hole_info()
+
+    def populate_can(self):
+        Populate_BusIDs=self.populate_busids.Populate_BusIDs
+        pc_num = self.ptl_id
+        petal = input('Please enter the petal number (eg. 9): ')
+        can_buses = [self.canbus]#['can10','can11','can13','can12','can22','can23','can14','can15','can16','can17']
+        for canbus in can_buses:
+                print('canbus',canbus,'\n')
+                canbus=[canbus]
+                populate = Populate_BusIDs(int(pc_num), petal, canbus)
+                not_in_map = populate.read_canbuses()
+                print('Not in map list: ', not_in_map)
+
+    def populate_petal_travelers(self):
+        a=input('Do you really want to populate ID maps and Positioners database based on the installation traveler?\n It will take a very long time. \n If yes, make sure the petal you want to load is located at the first tag of the installation traveler.\n')
+        if a == 'y' or a=='Y':
+            self.populate_petal.Populate_Petal_Travelers()
 
     def load_acceptance_traveller(self):
         self.text2.delete('0.0', END)
@@ -461,7 +634,44 @@ class MoveGUI_Petal(object):
     
     def restart(self):
         gui_root.destroy()
-        MoveGUI_Petal()
+        MoveGUI()
+    def reload_canbus(self):
+        self.canbus='can'+self.e_can.get().strip()        
+        self.bus_id=self.canbus
+        self.info = self.pcomm.pbget('posfid_info')
+        self.info = self.info[self.canbus]
+        self.posids = []
+        print(self.info)
+        for key in sorted(self.info.keys()):
+            if len(str(key))==2:
+                self.posids.append('M000'+str(key))
+            elif len(str(key))==3:
+                self.posids.append('M00'+str(key))
+            elif len(str(key))==4:
+                self.posids.append('M0'+str(key))
+            elif len(str(key))==5:
+                self.posids.append('M'+str(key))
+        self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+        for posid in self.posids:
+            self.ptl.set_posfid_val(posid, 'CTRL_ENABLED', True)
+            self.ptl.set_posfid_val(posid, 'FINAL_CREEP_ON', False)
+            self.ptl.set_posfid_val(posid, 'ANTIBACKLASH_ON', False)
+            self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
+        self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
+        cs=self.listbox1.curselection()
+        #self.listbox1.delete(0,cs[0] -1)
+        self.listbox1.delete(0,END)
+        self.listbox1.insert(tkinter.END,'ALL')
+        for key in sorted(self.info.keys()):
+            if len(str(key))==2:
+                self.listbox1.insert(tkinter.END,'M000'+str(key))
+            elif len(str(key))==3:
+                self.listbox1.insert(tkinter.END,'M00'+str(key))
+            elif len(str(key))==4:
+                self.listbox1.insert(tkinter.END,'M0'+str(key))
+            elif len(str(key))==5:
+                self.listbox1.insert(tkinter.END,'M'+str(key))
+
     def clear1(self):
         self.text1.delete('0.0', END)
     def clear2(self):
@@ -477,4 +687,4 @@ class MoveGUI_Petal(object):
             print(line)
             
 if __name__=="__main__":
-    gui = MoveGUI_Petal()
+    gui = MoveGUI()
