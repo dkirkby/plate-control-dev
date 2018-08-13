@@ -28,8 +28,8 @@ import datetime
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/msdos/focalplane/positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/msdos/focalplane/pos_utility/'))
+sys.path.append(os.path.abspath('/home/desi/focalplane/positioner_logs/data_processing_scripts/'))
+sys.path.append(os.path.abspath('/home/desi/focalplane/pos_utility/'))
 import fvchandler
 import petal
 import petalcomm
@@ -59,7 +59,7 @@ class MoveGUI(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
         global gui_root
         gui_root = tkinter.Tk()
-        google_dir='/home/msdos/focalplane/pos_utility/'        
+        google_dir='/home/desi/focalplane/pos_utility/'        
         credential_name='google_access_account_lbl.json'
         w=200
         h=100
@@ -204,7 +204,7 @@ class MoveGUI(object):
                 self.listbox1.insert(tkinter.END,'M'+str(key))
             # FW version check
             if float(self.info[key][0]) < 4.3:
-                self.text1.insert(END,str(key)+' has too low a FW ver = '+self.info[key][0]+', BL ver = '+self.info[key][1]+'!  \n','red')
+                self.text1.insert(END,str(key)+' has too low a FW ver = '+self.info[key][0]+', BL ver = '+self.info[key][1]+'! Hand it to Jessica. \n','red')
         self.listbox1.bind('<ButtonRelease-1>', self.get_list)
 
 
