@@ -22,14 +22,15 @@ MoveGUI
 #          V1.1  Kai Zhang, 2018-04-02. Add canbus input to talk to different cans for EM Petal. 
 #          V1.2  Kai Zhang  2018-05-01. Add Reload Canbus botton so that no restart is needed. Facilitate the petal check. 
 """
+account='msdos'
 import os
 import sys
 import datetime
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/desi/focalplane/positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/desi/focalplane/pos_utility/'))
+sys.path.append(os.path.abspath('/home/'+account+'/focalplane/positioner_logs/data_processing_scripts/'))
+sys.path.append(os.path.abspath('/home/'+account+'/focalplane/pos_utility/'))
 import fvchandler
 import petal
 import petalcomm
@@ -54,12 +55,13 @@ import time
 import show_detected
 import populate_petal_travelers
 import populate_busids
+import pdb
 
 class MoveGUI(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
         global gui_root
         gui_root = tkinter.Tk()
-        google_dir='/home/desi/focalplane/pos_utility/'        
+        google_dir='/home/'+account+'/focalplane/pos_utility/'        
         credential_name='google_access_account_lbl.json'
         w=200
         h=100
@@ -168,6 +170,7 @@ class MoveGUI(object):
         Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=5,column=2,sticky=W,pady=4)
         Button(gui_root,text='Reload CANBus',width=12,command=self.reload_canbus).grid(row=5,column=1,sticky=W,pady=4)
         Button(gui_root,text='1 Write SiID',width=15,command=self.write_siid).grid(row=3,column=3,sticky=W,pady=4)
+        Button(gui_root,text='Sync Test',width=15,command=self.sync_test).grid(row=3,column=4,sticky=W,pady=4)
         Button(gui_root,text='3 Populate Busids',width=15,command=self.populate_can).grid(row=5,column=3,sticky=W,pady=4)# Call populate_busids.py under pos_utility/ 
         Button(gui_root,text='2 Write DEVICE_LOC',width=15,command=self.populate_petal_travelers).grid(row=4,column=3,sticky=W,pady=4)# Call populate_travellers.py under pos_utility/ to read from installation traveler and write to positioner 'database' and ID map
         Button(gui_root,text='Aliveness Test',width=10,command=self.aliveness_test).grid(row=4,column=4,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
@@ -193,6 +196,7 @@ class MoveGUI(object):
         yscroll_listbox1.grid(row=6, column=0, rowspan=10,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)
         self.listbox1.configure(yscrollcommand=yscroll_listbox1.set)
         self.listbox1.insert(tkinter.END,'ALL')
+        
         for key in sorted(self.info.keys()):
             if len(str(key))==2:
                 self.listbox1.insert(tkinter.END,'M000'+str(key)) 
@@ -205,6 +209,7 @@ class MoveGUI(object):
             # FW version check
             if float(self.info[key][0]) < 4.3:
                 self.text1.insert(END,str(key)+' has too low a FW ver = '+self.info[key][0]+', BL ver = '+self.info[key][1]+'! Hand it to Jessica. \n','red')
+
         self.listbox1.bind('<ButtonRelease-1>', self.get_list)
 
 
@@ -410,6 +415,26 @@ class MoveGUI(object):
         show = Show(int(pc_num), petal, can_buses)
         show.read_canbuses()
         show.plot_hole_info()
+
+    def sync_test(self):
+        requests = {}
+        command='dTdP'
+        target=[180.,0.]
+        log_note='test'
+        for posid in self.posids:
+            requests[posid] = {'command':command, 'target':target, 'log_note':log_note}
+        self.ptl.request_targets(requests)
+        self.ptl.schedule_moves()
+        self.ptl.send_move_tables()  # the tables of scheduled shaft rotations are sent out to all the positioners over the CAN bus
+        time.sleep(10)
+        for key in sorted(self.info.keys()):
+            if not self.pcomm.ready_for_tables([self.canbus],[int(key)]):
+                self.text1.insert(END,str(key)+' sync always high! Hand it to Jessica. \n','red')
+            else:
+                print(str(key)+' sync is fine.')
+        self.ptl.execute_moves()
+        self.center()
+
 
     def populate_can(self):
         Populate_BusIDs=self.populate_busids.Populate_BusIDs
