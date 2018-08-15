@@ -22,7 +22,7 @@ MoveGUI
 #          V1.1  Kai Zhang, 2018-04-02. Add canbus input to talk to different cans for EM Petal. 
 #          V1.2  Kai Zhang  2018-05-01. Add Reload Canbus botton so that no restart is needed. Facilitate the petal check. 
 """
-account='msdos'
+account='desi'
 import os
 import sys
 import datetime
@@ -171,9 +171,10 @@ class MoveGUI(object):
         Button(gui_root,text='Reload CANBus',width=12,command=self.reload_canbus).grid(row=5,column=1,sticky=W,pady=4)
         Button(gui_root,text='1 Write SiID',width=15,command=self.write_siid).grid(row=3,column=3,sticky=W,pady=4)
         Button(gui_root,text='Sync Test',width=15,command=self.sync_test).grid(row=3,column=4,sticky=W,pady=4)
+        Button(gui_root,text='Movement Check',width=15,command=self.movement_check).grid(row=4,column=4,sticky=W,pady=4)
         Button(gui_root,text='3 Populate Busids',width=15,command=self.populate_can).grid(row=5,column=3,sticky=W,pady=4)# Call populate_busids.py under pos_utility/ 
         Button(gui_root,text='2 Write DEVICE_LOC',width=15,command=self.populate_petal_travelers).grid(row=4,column=3,sticky=W,pady=4)# Call populate_travellers.py under pos_utility/ to read from installation traveler and write to positioner 'database' and ID map
-        Button(gui_root,text='Aliveness Test',width=10,command=self.aliveness_test).grid(row=4,column=4,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
+        Button(gui_root,text='Aliveness Test',width=10,command=self.aliveness_test).grid(row=4,column=5,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
 
         Button(gui_root,text='Center',width=10,command=self.center).grid(row=4,column=2,sticky=W,pady=4)                
 
@@ -220,9 +221,9 @@ class MoveGUI(object):
         self.e_selected=Entry(gui_root)
         self.e_selected.grid(row=3,column=6)
         
-        Button(gui_root,text='Load Acceptance Traveller',width=20,command=self.load_acceptance_traveller).grid(row=4,column=5,sticky=W,pady=4)
-        Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=4,column=6,sticky=W,pady=4)
-        Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=13,column=8,sticky=W,pady=4)
+        #Button(gui_root,text='Load Acceptance Traveller',width=20,command=self.load_acceptance_traveller).grid(row=4,column=5,sticky=W,pady=4)
+        #Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=4,column=6,sticky=W,pady=4)
+        #Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=13,column=8,sticky=W,pady=4)
         
         yscroll_text2 = Scrollbar(gui_root, orient=tkinter.VERTICAL)
         yscroll_text2.grid(row=6, column=6, rowspan=20,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)     
@@ -334,6 +335,23 @@ class MoveGUI(object):
         for key in sorted(self.info.keys()):
             self.text1.insert(END,str(key)+' '+str(self.info[key])+'\n')
             
+    def quick_direct_dtdp(self, posids, dtdp, log_note=''):
+        """Convenience wrapper to request, schedule, send, and execute a single move command for a
+        direct (delta theta, delta phi) relative move. There is NO anti-collision calculation. This
+        method is intended for expert usage only. You can argue an iterable collection of posids if
+        you want, though note they will all get the same (dt,dp) sent to them.
+
+        INPUTS:     posids    ... either a single posid or a list of posids
+                    dtdp      ... [dt,dp], note that all posids get sent the same [dt,dp] here. i.e. dt and dp are each just one number
+                    log_note  ... optional string to include in the log file
+        """
+        requests = {}
+        posids = {posids} if isinstance(posids,str) else set(posids)
+        for posid in posids:
+            requests[posid] = {'target':dtdp, 'log_note':log_note}
+        self.ptl.request_direct_dtdp(requests)
+        self.ptl.schedule_send_and_execute_moves(should_anneal=False)
+
         
     def theta_cw_degree(self):
         degree=float(self.e1.get())
@@ -424,7 +442,7 @@ class MoveGUI(object):
         for posid in self.posids:
             requests[posid] = {'command':command, 'target':target, 'log_note':log_note}
         self.ptl.request_targets(requests)
-        self.ptl.schedule_moves()
+        self.ptl.schedule_moves(should_anneal=False)
         self.ptl.send_move_tables()  # the tables of scheduled shaft rotations are sent out to all the positioners over the CAN bus
         time.sleep(10)
         for key in sorted(self.info.keys()):
@@ -434,6 +452,40 @@ class MoveGUI(object):
                 print(str(key)+' sync is fine.')
         self.ptl.execute_moves()
         self.center()
+
+    def movement_check(self):
+        print('Movement Check Starts! \n')
+        time.sleep(5)
+        if self.mode.get()==1:
+            for i in range(5):
+                self.pcomm.move(self.canbus, self.selected_can, 'cw', 'cruise', 'phi', 30)
+                time.sleep(1)
+                self.pcomm.move(self.canbus, self.selected_can, 'ccw', 'cruise', 'phi', 30)
+                time.sleep(1)
+            for i in range(5):
+                self.pcomm.move(self.canbus, self.selected_can, 'cw', 'cruise', 'theta', 30)
+                time.sleep(1)
+                self.pcomm.move(self.canbus, self.selected_can, 'ccw', 'cruise', 'theta', 30)
+                time.sleep(1)
+        else:
+            try:
+                print(self.selected_posid)
+                for i in range(5):
+                    self.quick_direct_dtdp(self.selected_posid,[0.,-30])
+                    #time.sleep(3)
+                    self.quick_direct_dtdp(self.selected_posid,[0.,30])
+                    #time.sleep(3)
+
+                for i in range(5):
+                    self.quick_direct_dtdp(self.selected_posid,[-30.,0.])
+                    #time.sleep(3)
+                    self.quick_direct_dtdp(self.selected_posid,[30,0.])
+                    #time.sleep(3)
+            except Exception as e:
+                print('FAILED: ' + str(e))
+        self.center()
+        self.text1.insert(END,'Movement Check Done \n')
+
 
 
     def populate_can(self):
@@ -576,6 +628,11 @@ class MoveGUI(object):
                 self.posids.append('M0'+str(key))
             elif len(str(key))==5:
                 self.posids.append('M'+str(key))
+            # FW version check
+            if float(self.info[key][0]) < 4.3:
+                self.text1.insert(END,str(key)+' has too low a FW ver = '+self.info[key][0]+', BL ver = '+self.info[key][1]+'! Hand it to Jessica. \n','red')
+
+
         self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
         for posid in self.posids:
             self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
