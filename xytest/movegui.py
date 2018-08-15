@@ -437,7 +437,7 @@ class MoveGUI(object):
     def sync_test(self):
         requests = {}
         command='dTdP'
-        target=[180.,0.]
+        target=[360.,0.]
         log_note='test'
         for posid in self.posids:
             requests[posid] = {'command':command, 'target':target, 'log_note':log_note}
@@ -445,11 +445,13 @@ class MoveGUI(object):
         self.ptl.schedule_moves(should_anneal=False)
         self.ptl.send_move_tables()  # the tables of scheduled shaft rotations are sent out to all the positioners over the CAN bus
         time.sleep(10)
-        for key in sorted(self.info.keys()):
-            if not self.pcomm.ready_for_tables([self.canbus],[int(key)]):
-                self.text1.insert(END,str(key)+' sync always high! Hand it to Jessica. \n','red')
+        for posid in sorted(self.info.keys()):
+            if not self.pcomm.ready_for_tables([self.canbus],[int(posid)]):
+        #for posid in sorted(self.posids):
+        #    if not self.ptl.schedule.already_requested(posid):
+                self.text1.insert(END,str(posid)+' sync always high! Hand it to Jessica. \n','red')
             else:
-                print(str(key)+' sync is fine.')
+                print(str(posid)+' sync is fine.')
         self.ptl.execute_moves()
         self.center()
 
