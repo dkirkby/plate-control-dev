@@ -57,7 +57,10 @@ To check for collision between a positioner and fixed:
 #   for x in the range [0, 50, 100 ... 950] um
 #       for y in the range [0, 50, 100 ... 950] um
 #           etc...
-
+#
+# CHECKING FOR COLLISIONS
+# Use poscollider.py.
+# Use functions spatial_collision_between_positioners() and spatial_collision_with_fixed().
 
 # Fastest method I found so far for finding nearest quantized value:
 # (Typically <= 1 us on my laptop.)
