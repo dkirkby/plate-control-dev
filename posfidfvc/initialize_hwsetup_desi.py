@@ -2,6 +2,7 @@ import os
 import sys
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
+sys.path.append(os.path.abspath('../xytest/'))
 
 import petal
 import posmovemeasure
@@ -13,7 +14,7 @@ import tkinter.filedialog
 import tkinter.messagebox
 import configobj
 import csv
-import getpass
+
 
 # start set of new and changed files
 new_and_changed_files = set()
@@ -28,28 +29,32 @@ hwsetup_conf = tkinter.filedialog.askopenfilename(initialdir=pc.dirs['hwsetups']
 hwsetup = configobj.ConfigObj(hwsetup_conf,unrepr=True)
 new_and_changed_files.add(hwsetup.filename)
 
-# ask user whether to auto-generate a platemaker instrument file
-message = 'Should we auto-generate a platemaker instrument file?'
-should_make_instrfile = tkinter.messagebox.askyesno(title='Make PM file?',message=message)
-
 # are we in simulation mode?
 sim = hwsetup['fvc_type'] == 'simulator'
 
-# update log and settings files from the SVN
-if not(sim):
-    print("")
-    svn_user=input("Please enter your SVN username: ")
-    svn_pass=getpass.getpass("Please enter your SVN password: ")      
-    svn_auth_err=False
-    svn_update_dirs = [pc.dirs[key] for key in ['pos_logs','pos_settings','xytest_logs','xytest_summaries']]
+# ask user whether to auto-generate a platemaker instrument file
+if not sim:
+    message = 'Should we auto-generate a platemaker instrument file?'
+    should_make_instrfile = tkinter.messagebox.askyesno(title='Make PM file?',message=message)
+else:
+    should_make_instrfile = False
+
+# automated SVN setup
+if not sim:
     should_update_from_svn = tkinter.messagebox.askyesno(title='Update from SVN?',message='Overwrite any existing local positioner log and settings files to match what is currently in the SVN?')
-    if should_update_from_svn:
-        if svn_auth_err:
-            print('Could not validate svn user/password.')
-        else:
-            for d in svn_update_dirs:
-                os.system('svn update --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + d)
-                os.system('svn revert --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + d + '*')
+    should_commit_to_svn = tkinter.messagebox.askyesno(title='Commit to SVN?',message='Auto-commit files to SVN after script is complete?\n\n(Typically answer "Yes")')
+    if should_update_from_svn or should_commit_to_svn:
+        import xytest
+        svn_user, svn_pass, err = xytest.XYTest.ask_user_for_creds()
+        svn_userpass_valid = err == 0
+    if should_update_from_svn and svn_userpass_valid:
+        svn_update_dirs = [pc.dirs[key] for key in ['pos_logs','pos_settings','xytest_logs','xytest_summaries']]
+        for d in svn_update_dirs:
+            os.system('svn update --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + d)
+            os.system('svn revert --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + d + '*')
+else:
+    should_update_from_svn = False
+    should_commit_to_svn = False
 
 # software initialization and startup
 fvc = fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'])    
@@ -84,9 +89,7 @@ for ptl in m.petals:
             new_and_changed_files.add(state.conf.filename)
             new_and_changed_files.add(state.log_path)
 
-
 m.n_extradots_expected = hwsetup['num_extra_dots']
-instr = instrmaker.InstrMaker(hwsetup['plate_type'],ptl,m,fvc,hwsetup)
 
 # check ids with user
 text = '\n\nHere are the known positioners and fiducials:\n\n'
@@ -104,10 +107,6 @@ if not tkinter.messagebox.askyesno(title='IDs correct?',message=message):
     tkinter.messagebox.showinfo(title='Quitting',message='Ok, will quit now so the IDs can be fixed.')
     gui_root.withdraw()    
     sys.exit(0)
-
-# check if auto-svn commit is desired
-if not sim and not svn_auth_err:
-    should_commit_to_svn = tkinter.messagebox.askyesno(title='Commit to SVN?',message='Auto-commit files to SVN after script is complete?\n\n(Typically answer "Yes")')
 
 # determine if we need to identify fiducials and positioners this run
 should_identify_fiducials = True
@@ -154,17 +153,19 @@ else:
 if should_identify_positioners:
     m.identify_positioner_locations()
 if should_make_instrfile:
+    instr = instrmaker.InstrMaker(hwsetup['plate_type'],ptl,m,fvc,hwsetup)
     instr.make_instrfile()
     instr.push_to_db()
+m.calibrate(mode='rough')
 if not should_limit_range:
     m.measure_range(axis='theta')
     m.measure_range(axis='phi')
-plotfiles = m.calibrate(mode='arc', save_file_dir=pc.dirs['xytest_plots'], save_file_timestamp=start_filename_timestamp)
+plotfiles = m.calibrate(mode='arc', save_file_dir=pc.dirs['xytest_plots'], save_file_timestamp=start_filename_timestamp, keep_phi_within_Eo=True)
 new_and_changed_files.update(plotfiles)
 m.park() # retract all positioners to their parked positions
 
 # commit logs and settings files to the SVN
-if should_commit_to_svn:
+if should_commit_to_svn and svn_userpass_valid:
     n_total = len(new_and_changed_files)
     n = 0
     for file in new_and_changed_files:
@@ -172,3 +173,9 @@ if should_commit_to_svn:
         err1 = os.system('svn add --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + file)
         err2 = os.system('svn commit --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive -m "autocommit from initialize_hwsetup script" ' + file)
         print('SVN upload of file ' + str(n) + ' of ' + str(n_total) + ' (' + os.path.basename(file) + ') returned: ' + str(err1) + ' (add) and ' + str(err2) + ' (commit)')
+
+# clean up any svn credentials
+if svn_user:
+    del svn_user
+if svn_pass:
+    del svn_pass
