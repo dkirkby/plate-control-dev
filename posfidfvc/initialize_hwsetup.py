@@ -250,6 +250,7 @@ else:
 	m.extradots_fvcXY = extradots_existing_data
 if should_identify_positioners:
 	m.identify_positioner_locations()
+m.calibrate(mode='rough')
 if not should_limit_range:
 	m.measure_range(axis='theta')
 	m.measure_range(axis='phi')
