@@ -27,7 +27,7 @@ class FVCHandler(object):
     def __init__(self, fvc_type='FLI', platemaker_instrument='lbnl3', printfunc=print, save_sbig_fits=True):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.fvc_type = fvc_type # 'SBIG' or 'SBIG_Yale' or 'FLI' or 'simulator'
-        self.fvcproxy = None
+        self.fvcproxy = None # may be auto-initialized later by the platemaker instrument setter
         self.min_energy = 0.25 * 1.0 # this is the minimum allowed value for the product peak*fwhm for any given dot
         self.max_attempts = 5 # max number of times to retry an image measurement (if poor dot quality) before quitting hard
         if self.fvc_type == 'SBIG':
