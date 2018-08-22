@@ -730,21 +730,23 @@ class XYTest(object):
         '''General function to gather SVN username and password from operator.
         '''
         gui_root = tkinter.Tk()
-        print('Enter your svn username and password for committing the logs to the server. These will not be saved to the logfile, but will briefly be clear-text in this script\'s memory while it is running.')
+        intro = 'Enter your svn username and password for committing the logs'
+        intro += '\nto the server. These will not be saved to the logfile, but will briefly'
+        intro += '\nbe clear-text in this script\'s memory while it is running.'
         n_credential_tries = 4
         while n_credential_tries:
-            svn_user = tkinter.simpledialog.askstring(title='SVN authentication',prompt='svn username:')
+            svn_user = tkinter.simpledialog.askstring(title='SVN authentication',prompt=intro + '\n\n' + 'svn username:' + ' (' + str(n_credential_tries) + ' tries remaining)')
             svn_pass = tkinter.simpledialog.askstring(title='SVN authentication',prompt='svn password:',show="*")
             if should_simulate:
                 err = 0
-            else:
+            elif svn_user and svn_pass:
                 err = os.system('svn --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive list')
+            else:
+                err = 'no name/pass entered'
             if err == 0:
                 n_credential_tries = 0
             else:
                 n_credential_tries -= 1
-                print('SVN user / pass was not verified. This is the same as your DESI user/pass for DocDB and the Wiki.')
-                print(str(n_credential_tries) + ' tries remaining.')
         gui_root.withdraw()
         return svn_user, svn_pass, err
 
