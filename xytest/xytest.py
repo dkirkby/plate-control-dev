@@ -286,6 +286,7 @@ class XYTest(object):
             self.logwrite('Starting arc calibration sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
             self.m.n_points_calib_T = n_pts_calib_T
             self.m.n_points_calib_P = n_pts_calib_P
+            self.m.calibrate(posids='all', mode='rough')
             files = self.m.calibrate(posids='all', mode=calib_mode, save_file_dir=pc.dirs['xytest_plots'], save_file_timestamp=pc.filename_timestamp_str_now())
             for file in files:
                 self.track_file(file, commit='once')
