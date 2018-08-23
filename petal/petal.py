@@ -348,22 +348,41 @@ class Petal(object):
             if self.verbose:
                 print('Simulator skips sending motor parameters to positioners.')
             return
-        parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
-        currents_by_busid = dict((p.busid,{}) for posid,p in self.posmodels.items())
-        periods_by_busid =  dict((p.busid,{}) for posid,p in self.posmodels.items())
+
+        # FUTURE SYNTAX, TO BE USED WHEN PETALCONTROLLER UPDATES ARE COMPLETE ~SEPT 2018
+        # parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
+        # currents_by_busid = dict((p.busid,{}) for posid,p in self.posmodels.items())
+        # periods_by_busid =  dict((p.busid,{}) for posid,p in self.posmodels.items())
+        # enabled = self.enabled_posmodels(self.posids)
+        # for posid,posmodel in enabled.items():
+        #    canid = posmodel.canid
+        #    busid = posmodel.busid
+        #    p = {key:posmodel.state._val[key] for key in parameter_keys}
+        #    currents = tuple([p[key] for key in ['CURR_SPIN_UP_DOWN','CURR_CRUISE','CURR_CREEP','CURR_HOLD']])
+        #    currents_by_busid[busid][canid] = [currents, currents]
+        #    periods_by_busid[busid][canid] = (p['CREEP_PERIOD'], p['CREEP_PERIOD'], p['SPINUPDOWN_PERIOD'])
+        #    if self.verbose:
+        #        vals_str =  ''.join([' ' + str(key) + '=' + str(p[key]) for key in p])
+        #        self.printfunc(posid + ' (bus=' + str(busid) + ', canid=' + str(canid) + '): motor currents and periods set:' + vals_str)
+        # self.comm.pbset('currents', currents_by_busid)
+        # self.comm.pbset('periods', periods_by_busid)
+        # END FUTURE SYNTAX
+
+        # OLD SYNTAX, TO BE REPLACED WHEN PETALCONTROLLER UPDATES ARE COMPLETE ~SEPT 2018
+        parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD', 'BUMP_CW_FLG', 'BUMP_CCW_FLG']
         enabled = self.enabled_posmodels(self.posids)
         for posid,posmodel in enabled.items():
             canid = posmodel.canid
             busid = posmodel.busid
             p = {key:posmodel.state._val[key] for key in parameter_keys}
-            currents = tuple([p[key] for key in ['CURR_SPIN_UP_DOWN','CURR_CRUISE','CURR_CREEP','CURR_HOLD']])
-            currents_by_busid[busid][canid] = [currents, currents]
-            periods_by_busid[busid][canid] = (p['CREEP_PERIOD'], p['CREEP_PERIOD'], p['SPINUPDOWN_PERIOD'])
+            currents = [p[key] for key in ['CURR_SPIN_UP_DOWN','CURR_CRUISE','CURR_CREEP','CURR_HOLD']]
+            self.comm.set_currents(busid, posmodel.canid, currents, currents)
+            self.comm.set_periods(busid, canid, p['CREEP_PERIOD'], p['CREEP_PERIOD'], p['SPINUPDOWN_PERIOD'])
+            self.comm.set_bump_flags(busid, canid, p['CURR_HOLD'], p['BUMP_CW_FLG'], p['BUMP_CCW_FLG'])
             if self.verbose:
                 vals_str =  ''.join([' ' + str(key) + '=' + str(p[key]) for key in p])
                 self.printfunc(posid + ' (bus=' + str(busid) + ', canid=' + str(canid) + '): motor currents and periods set:' + vals_str)
-        self.comm.pbset('currents', currents_by_busid)
-        self.comm.pbset('periods', periods_by_busid)
+        # END OLD SYNTAX
 
     def execute_moves(self):
         """Command the positioners to do the move tables that were sent out to them.
@@ -468,8 +487,16 @@ class Petal(object):
             duties = [self.get_posfid_val(fidid,'DUTY_DEFAULT_ON') for fidid in enabled]
         else:
             duties = [self.get_posfid_val(fidid,'DUTY_DEFAULT_OFF') for fidid in enabled]
-        fiducial_settings_by_busid = dict((busid, {canids[idx]:duties[idx]}) for (idx,busid) in enumerate(busids))
-        self.comm.pbset('fiducials', fiducial_settings_by_busid)
+        
+        # FUTURE SYNTAX, TO BE USED WHEN PETALCONTROLLER UPDATES ARE COMPLETE ~SEPT 2018
+        # fiducial_settings_by_busid = dict((busid, {canids[idx]:duties[idx]}) for (idx,busid) in enumerate(busids))
+        # self.comm.pbset('fiducials', fiducial_settings_by_busid)
+        # END FUTURE SYNTAX
+
+        # OLD SYNTAX, TO BE REPLACED WHEN PETALCONTROLLER UPDATES ARE COMPLETE ~SEPT 2018
+        self.comm.set_fiducials(busids, canids, duties)
+        # END OLD SYNTAX
+        
         settings_done = {}
         for i in range(len(enabled)):
             self.set_posfid_val(enabled[i], 'DUTY_STATE', duties[i])
@@ -507,8 +534,8 @@ class Petal(object):
             dotids = self.fid_dotids(fidid)
             for i in range(len(dotids)):
                 data[dotids[i]] = collections.OrderedDict()
-                x = self.get_posfid_val(fidid,'DOTS_FVC_X')
-                y = self.get_posfid_val(fidid,'DOTS_FVC_Y')
+                x = self.get_posfid_val(fidid,'DOTS_FVC_X')[i]
+                y = self.get_posfid_val(fidid,'DOTS_FVC_Y')[i]
                 data[dotids[i]]['fvcXY'] = [x,y]
         return data
     
