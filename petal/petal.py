@@ -507,8 +507,8 @@ class Petal(object):
             dotids = self.fid_dotids(fidid)
             for i in range(len(dotids)):
                 data[dotids[i]] = collections.OrderedDict()
-                x = self.get_posfid_val(fidid,'DOTS_FVC_X')[i]
-                y = self.get_posfid_val(fidid,'DOTS_FVC_Y')[i]
+                x = self.get_posfid_val(fidid,'DOTS_FVC_X')
+                y = self.get_posfid_val(fidid,'DOTS_FVC_Y')
                 data[dotids[i]]['fvcXY'] = [x,y]
         return data
     
