@@ -31,12 +31,12 @@ class InstrMaker(object):
     def make_instrfile(self):
         '''Define function for making platemaker instrument file.
         '''
-        data,imgfile=self.m.measure()
+        #data,imgfile=self.m.measure()
         # Read dots identification result from ptl and store a dictionary
         pix_size=0.006
         flip=1  # x flip right now this is hard coded since we don't change the camera often. 
-        posids=self.ptl.posids
-        fidids=self.ptl.fidids
+        posids=list(self.ptl.posids)
+        fidids=list(self.ptl.fidids)
         n_pos=len(posids)
         n_fid=len(fidids)
         pos_fid_dots={}
@@ -59,8 +59,8 @@ class InstrMaker(object):
         
         for i in range(n_pos):
             posid=posids[i]
-            obsX_arr.append(float(self.ptl.get(posid=posid,key=['LAST_MEAS_OBS_X'])))
-            obsY_arr.append(float(self.ptl.get(posid=posid,key=['LAST_MEAS_OBS_Y'])))
+            obsX_arr.append(float(self.ptl.get_posfid_val(posid,'LAST_MEAS_OBS_X')))
+            obsY_arr.append(float(self.ptl.get_posfid_val(posid,'LAST_MEAS_OBS_Y')))
             obsXY_arr.append([obsX_arr[i],obsY_arr[i]])
             fvcXY_this=self.fvc.obsXY_to_fvcXY([obsXY_arr[i]])
             fvcX_arr.append(-fvcXY_this[0][0])
@@ -110,7 +110,7 @@ class InstrMaker(object):
         f = open(filename,'w')
         output_lines='fvcmag  '+str(out.params['scale'].value/pix_size)+'\n'+'fvcrot  '+str(out.params['angle'].value % 360-180.)+'\n' \
                     +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(-out.params['offy'].value)+'\n' \
-                    +'fvcflip  '+flip+'\n'+'fvcnrow  6000 \n'+'fvcncol  6000 \n'+'fvcpixmm  '+str(pix_size) 
+                    +'fvcflip  '+str(flip)+'\n'+'fvcnrow  6000 \n'+'fvcncol  6000 \n'+'fvcpixmm  '+str(pix_size) 
         f.write(output_lines)
         f.close()
         pdb.set_trace()
