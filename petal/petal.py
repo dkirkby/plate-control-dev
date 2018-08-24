@@ -413,7 +413,7 @@ class Petal(object):
         self.send_move_tables()
         self.execute_moves()
 
-    def quick_move(self, posids, command, target, log_note=''):
+    def quick_move(self, posids, command, target, log_note='', anticollision='default', should_anneal=True):
         """Convenience wrapper to request, schedule, send, and execute a single move command, all in
         one shot. You can argue multiple posids if you want, though note they will all get the same
         command and target sent to them. So for something like a local (theta,phi) coordinate
@@ -423,15 +423,17 @@ class Petal(object):
                     command   ... string like those usually put in the requests dictionary (see request_targets method)
                     target    ... [u,v] values, note that all positioners here get sent the same [u,v] here
                     log_note  ... optional string to include in the log file
+                    anticollsion  ... see comments in schedule_moves() function
+                    should_anneal ... see comments in schedule_moves() function
         """
         requests = {}
         posids = {posids} if isinstance(posids,str) else set(posids)
         for posid in posids:
             requests[posid] = {'command':command, 'target':target, 'log_note':log_note}
         self.request_targets(requests)
-        self.schedule_send_and_execute_moves()
+        self.schedule_send_and_execute_moves(anticollision,should_anneal)
 
-    def quick_direct_dtdp(self, posids, dtdp, log_note=''):
+    def quick_direct_dtdp(self, posids, dtdp, log_note='', should_anneal=True):
         """Convenience wrapper to request, schedule, send, and execute a single move command for a
         direct (delta theta, delta phi) relative move. There is NO anti-collision calculation. This
         method is intended for expert usage only. You can argue an iterable collection of posids if
@@ -440,13 +442,14 @@ class Petal(object):
         INPUTS:     posids    ... either a single posid or a list of posids
                     dtdp      ... [dt,dp], note that all posids get sent the same [dt,dp] here. i.e. dt and dp are each just one number
                     log_note  ... optional string to include in the log file
+                    should_anneal ... see comments in schedule_moves() function
         """
         requests = {}
         posids = {posids} if isinstance(posids,str) else set(posids)
         for posid in posids:
             requests[posid] = {'target':dtdp, 'log_note':log_note}
         self.request_direct_dtdp(requests)
-        self.schedule_send_and_execute_moves()
+        self.schedule_send_and_execute_moves(anticollision=None,should_anneal)
 
 # METHODS FOR FIDUCIAL CONTROL        
     def set_fiducials(self, fidids='all', setting='on', save_as_default=False):
