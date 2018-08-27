@@ -222,6 +222,42 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not read GFA port.  Exception: %s' % str(e)
 
+    def setup_can(self):
+        """
+        Set up CAN channels
+        """
+        try:
+            return self._call_device('setup_can')
+        except Exception as e:
+            return 'FAILED: Can not setup CAN channels: %s' % str(e)
+
+    def configure(self):
+        """
+        Configure petalcontroller settings
+        """
+        try:
+            return self._call_device('configure')
+        except Exception as e:
+            return 'FAILED: Can not configure petalcontroller: %s' % str(e)
+
+    def pbhelp(self):
+        """
+        Display petalcontroller commands and pbget/pbset keys
+        """
+        try:
+            return self._call_device('pbhelp')
+        except Exception as e:
+            return 'FAILED: Can not display pbhelp info: %s' % str(e)
+
+    def check_and_exit_stop_mode(self):
+        """
+        Check if stop mode is on and exit if it is
+        """
+        try:
+            return self._call_device('check_and_exit_stop_mode')
+        except Exception as e:
+            return 'FAILED: Can not check if stop mode is on or exit stop mode'
+
 
 
 
