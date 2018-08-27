@@ -185,15 +185,6 @@ class PetalComm(object):
             return self._call_device('move', bus_id, can_id, direction, mode, str(motor), angle)
         except Exception as e:
             return 'FAILED: Can not execute send_move_excute command. Exception: %s' % str(e)
-        
-    def set_currents(self, bus_id, can_id, P_currents, T_currents):
-        """
-
-        """
-        try:
-            return self._call_device('set_currents', bus_id, can_id, P_currents, T_currents)
-        except Exception as e:
-            return 'FAILED: Can not set currents. Exception: %s' % str(e)
 
     def pbget(self, key):
         """
