@@ -54,7 +54,7 @@ class Petal(object):
         if not(self.simulator_on):
             import petalcomm
             self.comm = petalcomm.PetalComm(self.petal_id, user_interactions_enabled=user_interactions_enabled)
-            self.comm.reset_nonresponsive_canids() #reset petalcontroller's list of non-responsive canids
+            self.comm.pbset('non_responsives', 'clear') #reset petalcontroller's list of non-responsive canids
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
 
         # database setup
@@ -349,40 +349,22 @@ class Petal(object):
                 print('Simulator skips sending motor parameters to positioners.')
             return
 
-        # FUTURE SYNTAX, TO BE USED WHEN PETALCONTROLLER UPDATES ARE COMPLETE ~SEPT 2018
-        # parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
-        # currents_by_busid = dict((p.busid,{}) for posid,p in self.posmodels.items())
-        # periods_by_busid =  dict((p.busid,{}) for posid,p in self.posmodels.items())
-        # enabled = self.enabled_posmodels(self.posids)
-        # for posid,posmodel in enabled.items():
-        #    canid = posmodel.canid
-        #    busid = posmodel.busid
-        #    p = {key:posmodel.state._val[key] for key in parameter_keys}
-        #    currents = tuple([p[key] for key in ['CURR_SPIN_UP_DOWN','CURR_CRUISE','CURR_CREEP','CURR_HOLD']])
-        #    currents_by_busid[busid][canid] = [currents, currents]
-        #    periods_by_busid[busid][canid] = (p['CREEP_PERIOD'], p['CREEP_PERIOD'], p['SPINUPDOWN_PERIOD'])
-        #    if self.verbose:
-        #        vals_str =  ''.join([' ' + str(key) + '=' + str(p[key]) for key in p])
-        #        self.printfunc(posid + ' (bus=' + str(busid) + ', canid=' + str(canid) + '): motor currents and periods set:' + vals_str)
-        # self.comm.pbset('currents', currents_by_busid)
-        # self.comm.pbset('periods', periods_by_busid)
-        # END FUTURE SYNTAX
-
-        # OLD SYNTAX, TO BE REPLACED WHEN PETALCONTROLLER UPDATES ARE COMPLETE ~SEPT 2018
-        parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD', 'BUMP_CW_FLG', 'BUMP_CCW_FLG']
+        parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
+        currents_by_busid = dict((p.busid,{}) for posid,p in self.posmodels.items())
+        periods_by_busid =  dict((p.busid,{}) for posid,p in self.posmodels.items())
         enabled = self.enabled_posmodels(self.posids)
         for posid,posmodel in enabled.items():
-            canid = posmodel.canid
-            busid = posmodel.busid
-            p = {key:posmodel.state._val[key] for key in parameter_keys}
-            currents = [p[key] for key in ['CURR_SPIN_UP_DOWN','CURR_CRUISE','CURR_CREEP','CURR_HOLD']]
-            self.comm.set_currents(busid, posmodel.canid, currents, currents)
-            self.comm.set_periods(busid, canid, p['CREEP_PERIOD'], p['CREEP_PERIOD'], p['SPINUPDOWN_PERIOD'])
-            self.comm.set_bump_flags(busid, canid, p['CURR_HOLD'], p['BUMP_CW_FLG'], p['BUMP_CCW_FLG'])
-            if self.verbose:
-                vals_str =  ''.join([' ' + str(key) + '=' + str(p[key]) for key in p])
-                self.printfunc(posid + ' (bus=' + str(busid) + ', canid=' + str(canid) + '): motor currents and periods set:' + vals_str)
-        # END OLD SYNTAX
+           canid = posmodel.canid
+           busid = posmodel.busid
+           p = {key:posmodel.state._val[key] for key in parameter_keys}
+           currents = tuple([p[key] for key in ['CURR_SPIN_UP_DOWN','CURR_CRUISE','CURR_CREEP','CURR_HOLD']])
+           currents_by_busid[busid][canid] = [currents, currents]
+           periods_by_busid[busid][canid] = (p['CREEP_PERIOD'], p['CREEP_PERIOD'], p['SPINUPDOWN_PERIOD'])
+           if self.verbose:
+               vals_str =  ''.join([' ' + str(key) + '=' + str(p[key]) for key in p])
+               self.printfunc(posid + ' (bus=' + str(busid) + ', canid=' + str(canid) + '): motor currents and periods set:' + vals_str)
+        self.comm.pbset('currents', currents_by_busid)
+        self.comm.pbset('periods', periods_by_busid)
 
     def execute_moves(self):
         """Command the positioners to do the move tables that were sent out to them.
@@ -449,7 +431,7 @@ class Petal(object):
         for posid in posids:
             requests[posid] = {'target':dtdp, 'log_note':log_note}
         self.request_direct_dtdp(requests)
-        self.schedule_send_and_execute_moves(anticollision=None,should_anneal)
+        self.schedule_send_and_execute_moves(None,should_anneal)
 
 # METHODS FOR FIDUCIAL CONTROL        
     def set_fiducials(self, fidids='all', setting='on', save_as_default=False):
@@ -491,14 +473,8 @@ class Petal(object):
         else:
             duties = [self.get_posfid_val(fidid,'DUTY_DEFAULT_OFF') for fidid in enabled]
         
-        # FUTURE SYNTAX, TO BE USED WHEN PETALCONTROLLER UPDATES ARE COMPLETE ~SEPT 2018
-        # fiducial_settings_by_busid = dict((busid, {canids[idx]:duties[idx]}) for (idx,busid) in enumerate(busids))
-        # self.comm.pbset('fiducials', fiducial_settings_by_busid)
-        # END FUTURE SYNTAX
-
-        # OLD SYNTAX, TO BE REPLACED WHEN PETALCONTROLLER UPDATES ARE COMPLETE ~SEPT 2018
-        self.comm.set_fiducials(busids, canids, duties)
-        # END OLD SYNTAX
+        fiducial_settings_by_busid = dict((busid, {canids[idx]:duties[idx]}) for (idx,busid) in enumerate(busids))
+        self.comm.pbset('fiducials', fiducial_settings_by_busid)
         
         settings_done = {}
         for i in range(len(enabled)):
@@ -710,7 +686,7 @@ class Petal(object):
             pass
         else:
             status_updated = False
-            nonresponsives = self.comm.get_nonresponsive_canids()
+            nonresponsives = self.comm.pbget('non_responsives')
             for canid in nonresponsives:
                 if canid not in self.nonresponsive_canids:
                     self.nonresponsive_canids.add(canid)
