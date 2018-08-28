@@ -22,7 +22,7 @@ MoveGUI
 #          V1.1  Kai Zhang, 2018-04-02. Add canbus input to talk to different cans for EM Petal. 
 #          V1.2  Kai Zhang  2018-05-01. Add Reload Canbus botton so that no restart is needed. Facilitate the petal check. 
 """
-account='desi'
+account='msdos'
 import os
 import sys
 import datetime
@@ -84,6 +84,9 @@ class MoveGUI(object):
         # Load Travellers
         url1='https://docs.google.com/spreadsheets/d/1lJ9GjhUUsK2SIvXeerpGW7664OFKQWAlPqpgxgevvl8/edit#gid=0' # PosID, SiID database
         self.sheet1=googlesheets.connect_by_url(url1,credentials = google_dir+credential_name)
+        self.posid_idmap=googlesheets.read_col(self.sheet1, 1, ID_col_with_data = False)
+        self.posid_idmap_num=[self.posid_idmap[i].upper().lstrip('M').lstrip('0')for i in range(len(self.posid_idmap))]
+        self.posid_idmap=self.posidnum_to_posid(self.posid_idmap_num)
      
         url2='https://docs.google.com/spreadsheets/d/19Aq-28qgODaaX9wH-NMsX_GiuNyXG_6rjIjPVLb8aYw/edit#gid=795996596' # Acceptance Traveller
         self.sheet2=googlesheets.connect_by_url(url2,credentials = google_dir+credential_name)
@@ -408,13 +411,15 @@ class MoveGUI(object):
         for key in sorted(self.info.keys()):
             info_this=self.info[key]
             if float(key)<8000:
-                pos_this=googlesheets.read(self.sheet1,20+int(key),1,False,False)
+                ind_idmap=[j for j, x in enumerate([y.strip() for y in self.posid_idmap]) if x == str(pos_this).strip()] 
+                ind_this=ind_idmap[0]+1 # 20+int(key)
+                pos_this=googlesheets.read(self.sheet1,ind_this,1,False,False)
                 if float(pos_this)== float(key):
-                    googlesheets.write(self.sheet1,int(key)+20,5,str(key),False,False) # POSID
-                    googlesheets.write(self.sheet1,int(key)+20,6,info_this[3],False,False) # SI_ID
-                    googlesheets.write(self.sheet1,int(key)+20,7,info_this[2],False,False) # Full SI_ID
-                    googlesheets.write(self.sheet1,int(key)+20,15,info_this[0],False,False) # Firmware_ver
-                    test=googlesheets.read(self.sheet1,int(key)+20,6,False,False)
+                    googlesheets.write(self.sheet1,ind_this,5,str(key),False,False) # POSID
+                    googlesheets.write(self.sheet1,ind_this,6,info_this[3],False,False) # SI_ID
+                    googlesheets.write(self.sheet1,ind_this,7,info_this[2],False,False) # Full SI_ID
+                    googlesheets.write(self.sheet1,ind_this,15,info_this[0],False,False) # Firmware_ver
+                    test=googlesheets.read(self.sheet1,ind_this,6,False,False)
                     if test == info_this[3]:
                         print('Writing '+str(key)+' successfully \n')
                     else:
