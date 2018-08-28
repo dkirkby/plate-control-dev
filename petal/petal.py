@@ -376,6 +376,13 @@ class Petal(object):
             self._postmove_cleanup()
         else:
             self.comm.execute_sync(self.sync_mode)
+            #TEMPORARY FIX FOR FIRMWARE NOT RESPONDING WHILE EXECUTING POST PAUSES, REMOVE AFTER
+            #FW v4.5 DEPLOYMENT
+            hw_tables = self._hardware_ready_move_tables()
+            if hw_tables:
+                delay_for_post_pauses = 1.2*(max([sum(hw_table['postpause']) for hw_table in hw_tables])/1000)
+                time.sleep(delay_for_post_pauses)
+            #END OF TEMPORARY FIX
             self._postmove_cleanup()
             self._wait_while_moving()
         self.canids_where_tables_were_just_sent = []
