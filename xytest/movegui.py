@@ -22,7 +22,7 @@ MoveGUI
 #          V1.1  Kai Zhang, 2018-04-02. Add canbus input to talk to different cans for EM Petal. 
 #          V1.2  Kai Zhang  2018-05-01. Add Reload Canbus botton so that no restart is needed. Facilitate the petal check. 
 """
-account='badu'
+account='msdos'
 import os
 import sys
 import datetime
@@ -305,7 +305,9 @@ class MoveGUI(object):
         elif self.selected_can<7000:
             self.text1.insert(END,'No, you cannot set a positioners as a fiducial, this will burn the motor! \n')
         else:
-            self.pcomm.set_fiducials([self.canbus], [self.selected_can], [self.e2.get()])
+            #self.pcomm.set_fiducials([self.canbus], [self.selected_can], [self.e2.get()])  # Old pcomm version
+            fiducial_settings_by_busid = dict((self.canbus, {self.selected_can:self.e2.get()}))
+            self.pcomm.pbset('fiducials', fiducial_settings_by_busid)
             self.text1.insert(END,'Set Fiducial '+str(self.selected_can)+' to '+str(self.e2.get())+' successfully! \n')
     def sync_mode(self):
         if self.syncmode.get() == 1:
@@ -410,7 +412,7 @@ class MoveGUI(object):
         for key in sorted(self.info.keys()):
             info_this=self.info[key]
             if float(key)<8000:
-                ind_idmap=[j for j, x in enumerate([y.strip() for y in self.posid_idmap]) if x == str(pos_this).strip()] 
+                ind_idmap=[j for j, x in enumerate([y.strip() for y in self.posid_idmap_num]) if x == str(key).strip()]
                 ind_this=ind_idmap[0]+1 # 20+int(key)
                 pos_this=googlesheets.read(self.sheet1,ind_this,1,False,False)
                 if float(pos_this)== float(key):
@@ -670,6 +672,26 @@ class MoveGUI(object):
             fh.write(line + '\n')
         if stdout:
             print(line)
+
+    def posidnum_to_posid(self,posidnum):
+        output=[]
+        for i in range(len(posidnum)):
+            pos_this=posidnum[i]
+            if len(str(pos_this))==1:
+                str_out='M0000'+str(pos_this)
+            elif len(str(pos_this))==2:
+                str_out='M000'+str(pos_this)
+            elif len(str(pos_this))==3:
+                str_out='M00'+str(pos_this)
+            elif len(str(pos_this))==4:
+                str_out='M0'+str(pos_this)
+            elif len(str(pos_this))==5:
+                str_out='M'+str(pos_this)
+            else:
+                str_out=str(pos_this)
+            output.append(str_out)
+        return output
+
             
 if __name__=="__main__":
     gui = MoveGUI()

@@ -58,7 +58,7 @@ import populate_petal_travelers
 import populate_busids
 import pdb
 
-class MoveGUI(object):
+class MoveGUI_Petal(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
         global gui_root
         gui_root = tkinter.Tk()
@@ -85,7 +85,10 @@ class MoveGUI(object):
         # Load Travellers
         url1='https://docs.google.com/spreadsheets/d/1lJ9GjhUUsK2SIvXeerpGW7664OFKQWAlPqpgxgevvl8/edit#gid=0' # PosID, SiID database
         self.sheet1=googlesheets.connect_by_url(url1,credentials = google_dir+credential_name)
-     
+        self.posid_idmap=googlesheets.read_col(self.sheet1, 1, ID_col_with_data = False)
+        self.posid_idmap_num=[self.posid_idmap[i].upper().lstrip('M').lstrip('0')for i in range(len(self.posid_idmap))]
+        self.posid_idmap=self.posidnum_to_posid(self.posid_idmap_num)
+ 
         url2='https://docs.google.com/spreadsheets/d/19Aq-28qgODaaX9wH-NMsX_GiuNyXG_6rjIjPVLb8aYw/edit#gid=795996596' # Acceptance Traveller
         self.sheet2=googlesheets.connect_by_url(url2,credentials = google_dir+credential_name)
         
@@ -98,7 +101,7 @@ class MoveGUI(object):
         self.show_detected=show_detected        
         self.populate_busids=populate_busids
         self.simulate = False
-        self.logfile='MoveGUI.log'
+        self.logfile='MoveGUI_Petal.log'
         self.fvc_type='simulator'
         self.fidids=['F021']   
         gui_root.title='Move Controll for Petal '+str(self.ptl_id)
@@ -108,7 +111,8 @@ class MoveGUI(object):
         canbus=self.canbus
         self.bus_id=canbus
         self.info = self.pcomm.pbget('posfid_info')
-        pdb.set_trace()
+        #pdb.set_trace()
+
         self.info = self.info[canbus]
         self.posids = []
         print(self.info)
@@ -216,9 +220,9 @@ class MoveGUI(object):
         self.e_selected=Entry(gui_root)
         self.e_selected.grid(row=3,column=6)
         
-        Button(gui_root,text='Load Acceptance Traveller',width=20,command=self.load_acceptance_traveller).grid(row=4,column=5,sticky=W,pady=4)
-        Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=4,column=6,sticky=W,pady=4)
-        Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=13,column=8,sticky=W,pady=4)
+        #Button(gui_root,text='Load Acceptance Traveller',width=20,command=self.load_acceptance_traveller).grid(row=4,column=5,sticky=W,pady=4)
+        #Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=4,column=6,sticky=W,pady=4)
+        #Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=13,column=8,sticky=W,pady=4)
         
         yscroll_text2 = Scrollbar(gui_root, orient=tkinter.VERTICAL)
         yscroll_text2.grid(row=6, column=6, rowspan=20,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)     
@@ -320,8 +324,15 @@ class MoveGUI(object):
         elif all([self.selected_can[i] <10000 for i in range(len(self.selected_can))]):
             self.text1.insert(END,'No, you cannot set a positioners as a fiducial, this will burn the motor! \n')
         else:
+            #fiducial_settings_by_busid = dict((self.canbus, {can_this:self.e2.get()}) for (idx,can_this) in enumerate(self.selected_can))
+            #self.pcomm.pbset('fiducials', fiducial_settings_by_busid)
             for i in range(len(self.selected_can)):
-                self.pcomm.set_fiducials([self.canbus], [self.selected_can[i]], [self.e2.get()])
+                #self.pcomm.set_fiducials([self.canbus], [self.selected_can[i]], [self.e2.get()]) # Old version syntax
+                #fiducial_settings_by_busid = dict((self.canbus, {can_this:self.e2.get()}) for (idx,can_this) in enumerate(self.selected_can))
+                fiducial_settings_by_busid = {self.canbus: {self.selected_can[i]:int(self.e2.get())}}
+                print(fiducial_settings_by_busid)
+                self.pcomm.pbset('fiducials', fiducial_settings_by_busid)
+                #self.ptl.set_fiducials(fidids
             self.text1.insert(END,'Set Fiducial '+str(self.selected_can)+' to '+str(self.e2.get())+' successfully! \n')
 
     def sync_mode(self):
@@ -483,13 +494,15 @@ class MoveGUI(object):
         for key in sorted(self.info.keys()):
             info_this=self.info[key]
             if float(key)<8000:
-                pos_this=googlesheets.read(self.sheet1,20+int(key),1,False,False)
+                ind_idmap=[j for j, x in enumerate([y.strip() for y in self.posid_idmap_num]) if x == str(key).strip()]
+                ind_this=ind_idmap[0]+1 # 20+int(key)
+                pos_this=googlesheets.read(self.sheet1,ind_this,1,False,False)
                 if float(pos_this)== float(key):
-                    googlesheets.write(self.sheet1,int(key)+20,5,str(key),False,False) # POSID
-                    googlesheets.write(self.sheet1,int(key)+20,6,info_this[3],False,False) # SI_ID
-                    googlesheets.write(self.sheet1,int(key)+20,7,info_this[2],False,False) # Full SI_ID
-                    googlesheets.write(self.sheet1,int(key)+20,15,info_this[0],False,False) # Firmware_ver
-                    test=googlesheets.read(self.sheet1,int(key)+20,6,False,False)
+                    googlesheets.write(self.sheet1,ind_this,5,str(key),False,False) # POSID
+                    googlesheets.write(self.sheet1,ind_this,6,info_this[3],False,False) # SI_ID
+                    googlesheets.write(self.sheet1,ind_this,7,info_this[2],False,False) # Full SI_ID
+                    googlesheets.write(self.sheet1,ind_this,15,info_this[0],False,False) # Firmware_ver
+                    test=googlesheets.read(self.sheet1,ind_this,6,False,False)
                     if test == info_this[3]:
                         print('Writing '+str(key)+' successfully \n')
                     else:
@@ -633,7 +646,7 @@ class MoveGUI(object):
     
     def restart(self):
         gui_root.destroy()
-        MoveGUI()
+        MoveGUI_Petal()
     def reload_canbus(self):
         self.canbus='can'+self.e_can.get().strip()        
         self.bus_id=self.canbus
@@ -684,6 +697,26 @@ class MoveGUI(object):
             fh.write(line + '\n')
         if stdout:
             print(line)
+
+    def posidnum_to_posid(self,posidnum):
+        output=[]
+        for i in range(len(posidnum)):
+            pos_this=posidnum[i]
+            if len(str(pos_this))==1:
+                str_out='M0000'+str(pos_this)
+            elif len(str(pos_this))==2:
+                str_out='M000'+str(pos_this)
+            elif len(str(pos_this))==3:
+                str_out='M00'+str(pos_this)
+            elif len(str(pos_this))==4:
+                str_out='M0'+str(pos_this)
+            elif len(str(pos_this))==5:
+                str_out='M'+str(pos_this)
+            else:
+                str_out=str(pos_this)
+            output.append(str_out)
+        return output
+
             
 if __name__=="__main__":
-    gui = MoveGUI()
+    gui = MoveGUI_Petal()
