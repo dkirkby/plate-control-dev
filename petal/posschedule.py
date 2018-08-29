@@ -163,6 +163,9 @@ class PosSchedule(object):
                     self.move_tables[posid].extend(table)
                 else:
                     self.move_tables[posid] = table
+        empties = {posid for posid,table in self.move_tables.items() if not table}
+        for posid in empties:
+            del self.move_tables[posid]
         if self.requests:
             for posid,table in self.move_tables.items():
                 req = self.requests.pop(posid)
