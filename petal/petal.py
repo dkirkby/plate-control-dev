@@ -379,9 +379,10 @@ class Petal(object):
             #TEMPORARY FIX FOR FIRMWARE NOT RESPONDING WHILE EXECUTING POST PAUSES, REMOVE AFTER
             #FW v4.5 DEPLOYMENT
             hw_tables = self._hardware_ready_move_tables()
-            if hw_tables:
-                delay_for_post_pauses = 1.2*(max([sum(hw_table['postpause']) for hw_table in hw_tables])/1000)
-                time.sleep(delay_for_post_pauses)
+            buffer = 1.0 # sec
+            table_times = [sum([pp/1000 for pp in hw_table['postpause']]) + sum(hw_table['move_time']) for hw_table in hw_tables] # note postpauses are in ms
+            delay = buffer + max(table_times)
+            time.sleep(delay)
             #END OF TEMPORARY FIX
             self._postmove_cleanup()
             self._wait_while_moving()
