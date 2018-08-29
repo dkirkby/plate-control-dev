@@ -141,8 +141,7 @@ class XYTest(object):
         db_commit_on = False
         if 'store_mode' in self.hwsetup_conf and self.hwsetup_conf['store_mode'] == 'db':
             db_commit_on = True
-        ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite, collider_file=self.xytest_conf['collider_file'],db_commit_on=db_commit_on)
-        ptl.anticollision_default = self.xytest_conf['anticollision']
+        ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite, collider_file=self.xytest_conf['collider_file'],db_commit_on=db_commit_on, anticollision=self.xytest_conf['anticollision'])
         self.m = posmovemeasure.PosMoveMeasure([ptl],fvc,printfunc=self.logwrite)
         self.posids = self.m.all_posids
         self.logwrite('Positoners: ' + str(self.posids))

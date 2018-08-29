@@ -76,8 +76,8 @@ n_pos=len(posids)
 print(n_pos,' pos read')
 # Generate a simulated petal
 # timed test sequence
-cProfile_wrapper("ptl = petal.Petal(petal_id, posids, fidids, simulator_on=True, db_commit_on=False, local_commit_on=True,verbose=True,anticollision='adjust')")
-ptl.anticollision_default = 'adjust'  # turn off anticollision algorithm for all scheduled moves
+anticollision = 'adjust'
+cProfile_wrapper("ptl = petal.Petal(petal_id, posids, fidids, simulator_on=True, db_commit_on=False, local_commit_on=True,verbose=True,anticollision="+anticollision+")")
 
 
 

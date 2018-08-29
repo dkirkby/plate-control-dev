@@ -11,8 +11,7 @@ power consumption values.
 posids = ['UM00013','UM00014','UM00017','UM00022']
 fidids = []
 petal_id = 0
-ptl = petal.Petal(petal_id, posids, fidids)
-ptl.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
+ptl = petal.Petal(petal_id, posids, fidids, anticollision=None)
 
 # test settings
 should_home = True

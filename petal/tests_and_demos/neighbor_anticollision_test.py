@@ -11,8 +11,7 @@ posid_list = [posids['left'],posids['right']]
 petalid = 48 #change this
 fifids = []
 
-ptl = petal.Petal(petalid, posid_list, fifids)
-ptl.anticollision_default = 'adjust'
+ptl = petal.Petal(petalid, posid_list, fifids, anticollision='adjust')
 should_anneal = False
 
 

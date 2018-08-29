@@ -121,13 +121,12 @@ class MoveGUI(object):
                 self.posids.append('M0'+str(key))
             elif len(str(key))==5:
                 self.posids.append('M'+str(key))
-        self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+        self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite, anticollision=None)
         for posid in self.ptl.posids:
             self.ptl.set_posfid_val(posid, 'CTRL_ENABLED', True)
             self.ptl.set_posfid_val(posid, 'FINAL_CREEP_ON', False)
             self.ptl.set_posfid_val(posid, 'ANTIBACKLASH_ON', False)
             self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
-        self.ptl.anticollision_default= False
         self.fvc = fvchandler.FVCHandler(self.fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
         

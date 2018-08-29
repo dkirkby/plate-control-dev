@@ -13,8 +13,7 @@ import posconstants as pc
 posids = ['M00160', 'M00165', 'M00529', 'M00131', 'M00137', 'M00138', 'M00100', 'M00104', 'M00108']
 fidids = ['P022', 'P057', 'P077']
 petal_id = 48
-ptl = petal.Petal(petal_id, posids, fidids,db_commit_on = True)
-ptl.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
+ptl = petal.Petal(petal_id, posids, fidids,db_commit_on = True, anticollision=None)
 
 print('INITIAL POSITION')
 for posid in posids:

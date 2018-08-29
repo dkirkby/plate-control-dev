@@ -89,8 +89,7 @@ def check_collision(ptl,tp_arr):
                     if case != pc.case.I:
                         print('~~~~~~~~~~~ Oh, no, a collision with wall! ~~~~~~~~~~~')
 
-ptl = petal.Petal(petal_id, posids, fidids, simulator_on=True, db_commit_on=False, local_commit_on=True,verbose=False)
-ptl.anticollision_default = True # turn off anticollision algorithm for all scheduled moves
+ptl = petal.Petal(petal_id, posids, fidids, simulator_on=True, db_commit_on=False, local_commit_on=True,verbose=False, anticollision='adjust')
 
 pos_locs = '../positioner_locations_0530v14.csv'#os.path.join(allsetdir,'positioner_locations_0530v12.csv')
 positioners = Table.read(pos_locs,format='ascii.csv',header_start=0,data_start=1)

@@ -52,8 +52,7 @@ posids=['M'+str(p).zfill(5) for p in posids]
 fidids = []
 petal_id = 30
 ttt=str(time.time()-time0); print('main 0 '+ttt)
-ptl = petal.Petal(petal_id, posids, fidids)
-ptl.anticollision_default = False # turn off anticollision algorithm for all scheduled moves
+ptl = petal.Petal(petal_id, posids, fidids, anticollision=None)
 ttt=str(time.time()-time0)
 print('main 1 '+ttt)
 # test settings

@@ -108,8 +108,7 @@ if not(should_simulate):
 new_and_changed_files = set()
 
 # initialize the "petal" of positioners
-ptl = petal.Petal(ptlid, posids, fidids=[], simulator_on=should_simulate, printfunc=logwrite)
-ptl.anticollision_default = False
+ptl = petal.Petal(ptlid, posids, fidids=[], simulator_on=should_simulate, printfunc=logwrite, anticollision=None)
 states = collections.OrderedDict()
 for posid in posids:
     states[posid] = ptl.posmodels[posid].state

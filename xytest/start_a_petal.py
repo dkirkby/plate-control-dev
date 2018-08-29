@@ -111,7 +111,7 @@ class Start_A_Petal(object):
         self.posids=sorted(self.posids)
         self.fidids=sorted(self.fidids)
         pdb.set_trace()
-        self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, local_commit_on= True,  printfunc=self.logwrite)
+        self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, local_commit_on= True,  printfunc=self.logwrite, anticollision=None)
 
         # Set the BUS_ID for each positioner
         for canbus in self.canbuses:
@@ -122,7 +122,6 @@ class Start_A_Petal(object):
             self.ptl.set_posfid_val(posid, 'CTRL_ENABLED', True)
             self.ptl.set_posfid_val(posid, 'FINAL_CREEP_ON', False)
             self.ptl.set_posfid_val(posid, 'ANTIBACKLASH_ON', False)
-        self.ptl.anticollision_default= False
         self.fvc = fvchandler.FVCHandler(self.fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
        
