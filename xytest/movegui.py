@@ -22,7 +22,7 @@ MoveGUI
 #          V1.1  Kai Zhang, 2018-04-02. Add canbus input to talk to different cans for EM Petal. 
 #          V1.2  Kai Zhang  2018-05-01. Add Reload Canbus botton so that no restart is needed. Facilitate the petal check. 
 """
-account='msdos'
+account='desi'
 import os
 import sys
 import datetime
@@ -110,9 +110,10 @@ class MoveGUI(object):
    #     info=self.petalcomm.get_device_status()
         canbus=self.canbus
         self.bus_id=canbus
-        self.info = self.pcomm.get_posfid_info(canbus)
-        self.posids = []
+        #self.info = self.pcomm.get_posfid_info(canbus)
+        self.info = self.pcomm.pbget('posfid_info')[0]
         print(self.info)
+        self.posids = []
         for key in sorted(self.info.keys()):
             if len(str(key))==2:
                 self.posids.append('M000'+str(key)) 
@@ -126,7 +127,7 @@ class MoveGUI(object):
         self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
         for posid in self.ptl.posids:
             self.ptl.set_posfid_val(posid, 'CTRL_ENABLED', True)
-            self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus, anticollision=None)
+            self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
         self.fvc = fvchandler.FVCHandler(self.fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
         
