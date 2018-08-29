@@ -103,6 +103,7 @@ xytest/movegui.py -text
 xytest/movegui_expert.py -text
 xytest/movegui_petal.py -text
 xytest/movegui_petal_all.py -text
+xytest/movegui_petal_show.py -text
 xytest/pos_xytest_plot.py -text
 xytest/posblast.py -text
 xytest/posdance.py -text
