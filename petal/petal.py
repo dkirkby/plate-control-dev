@@ -480,8 +480,9 @@ class Petal(object):
             duties = [self.get_posfid_val(fidid,'DUTY_DEFAULT_ON') for fidid in enabled]
         else:
             duties = [self.get_posfid_val(fidid,'DUTY_DEFAULT_OFF') for fidid in enabled]
-        
-        fiducial_settings_by_busid = dict((busid, {canids[idx]:duties[idx]}) for (idx,busid) in enumerate(busids))
+        fiducial_settings_by_busid = {busid:{} for busid in set(busids)}
+        for idx, busid in enumerate(busids):
+            fiducial_settings_by_busid[busid][canids[idx]] = duties[idx]
         self.comm.pbset('fiducials', fiducial_settings_by_busid)
         
         settings_done = {}
