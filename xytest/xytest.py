@@ -165,7 +165,9 @@ class XYTest(object):
         self.logwrite('PosMoveMeasure initialized.')
         fid_settings_done = self.m.set_fiducials('on')
         self.logwrite('Fiducials turned on: ' + str(fid_settings_done))
-        
+        if self.m.fvc.fvcproxy: #Remind FVC that it needs to look for all dots, not all dots without a fiducial
+            self.m.fvc.fvcproxy.send_fvc_command('make_targets',len(self.posids) + self.m.n_ref_dots)
+
         # set up the test summarizers
         self.summarizers = {}
         summarizer_init_data = {}
