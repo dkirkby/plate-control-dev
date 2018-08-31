@@ -22,7 +22,7 @@ MoveGUI
 #          V1.1  Kai Zhang, 2018-04-02. Add canbus input to talk to different cans for EM Petal. 
 #          V1.2  Kai Zhang  2018-05-01. Add Reload Canbus botton so that no restart is needed. Facilitate the petal check. 
 """
-account='desi'
+account='msdos'
 import os
 import sys
 import datetime
@@ -111,7 +111,11 @@ class MoveGUI(object):
         canbus=self.canbus
         self.bus_id=canbus
         #self.info = self.pcomm.get_posfid_info(canbus)
-        self.info = self.pcomm.pbget('posfid_info')[0]
+        info_temp=self.pcomm.pbget('posfid_info')
+        if isinstance(info_temp, (list,)):
+            self.info = self.pcomm.pbget('posfid_info')[0]
+        else:
+            self.info=self.pcomm.pbget('posfid_info')[canbus]
         print(self.info)
         self.posids = []
         for key in sorted(self.info.keys()):
@@ -162,6 +166,7 @@ class MoveGUI(object):
         self.mode.set(1)
         Checkbutton(gui_root, text='CAN', variable=self.mode).grid(row=3,column=1,sticky=E,pady=4)
         self.syncmode=IntVar(gui_root)
+        self.sync_mode_value=self.ptl.sync_mode
         if self.ptl.sync_mode == 'hard':
             self.syncmode.set(1)
         else:
@@ -313,8 +318,10 @@ class MoveGUI(object):
     def sync_mode(self):
         if self.syncmode.get() == 1:
             self.ptl.sync_mode = 'hard'
+            self.sync_mode_value='hard'
         else:
             self.ptl.sync_mode = 'soft'
+            self.sync_mode_value='soft'
  
     def get_list(self,event):
         # get selected line index
@@ -349,13 +356,70 @@ class MoveGUI(object):
         INPUTS:     posids    ... either a single posid or a list of posids
                     dtdp      ... [dt,dp], note that all posids get sent the same [dt,dp] here. i.e. dt and dp are each just one number
                     log_note  ... optional string to include in the log file
-        """
+        Old versions
         requests = {}
         posids = {posids} if isinstance(posids,str) else set(posids)
         for posid in posids:
             requests[posid] = {'target':dtdp, 'log_note':log_note}
         self.ptl.request_direct_dtdp(requests)
         self.ptl.schedule_send_and_execute_moves(should_anneal=False)
+        """
+        import posconstants as pc
+        gear_ratio = pc.gear_ratio['namiki']
+        if not isinstance(posids, (list,)):
+            posids=[posids]
+        busid_arr=[]
+        posid_arr=[]
+        canid_arr=[]
+        for i in range(len(posids)):
+            posid=posids[i]
+            canid=self.posid_to_posidnum(posid)
+            busid_arr.append(self.canbus)
+            posid_arr.append(posid)
+            canid_arr.append(canid)
+            dtdp_this=dtdp
+            motor_deg_T = gear_ratio * dtdp_this[0]
+            motor_deg_P =-gear_ratio * dtdp_this[1]
+            motor_degperstep = 3.3
+            motor_steps_T = -int(motor_deg_T / motor_degperstep)
+            motor_steps_P = int(motor_deg_P / motor_degperstep)
+            motor_speed_degpersec = 9900.0 * 360.0 / 60.0
+            move_time_T = abs(motor_deg_T / motor_speed_degpersec)
+            move_time_P = abs(motor_deg_P / motor_speed_degpersec)
+            move_time = max(move_time_T, move_time_P)
+            table = {
+                     'canid':canid,
+                     'busid':self.canbus, 
+                     'nrows':1,
+                     'motor_steps_T':[motor_steps_T], # > 0 means counter-clockwise, < 0 means clockwise
+                     'motor_steps_P':[motor_steps_P], # > 0 means counter-clockwise, < 0 means clockwise
+                     'speed_mode_T':['cruise'],
+                     'speed_mode_P':['cruise'],
+                     'move_time':[move_time],
+                      'postpause':[0]}
+            if canid <10000:
+                if i == 0:
+                    tables = [table] 
+                else:
+                    tables.append(table) # list of dictionaries, one dict per positioner
+
+        # now send all the tables and execute
+        timeout = 20.0 # seconds
+        poll_period = 0.5 # seconds
+        keep_waiting = True
+        start_time = time.time()
+        while keep_waiting:
+            elapsed_time = time.time() - start_time
+            if elapsed_time >= timeout:
+                self.printfunc('Timed out at ' + str(timeout) + ' seconds waiting for positioners to be ready to receive next commands.')
+                keep_waiting = False
+            if self.pcomm.ready_for_tables(busid_arr,canid_arr): # matching lists of busids and canids you're checking
+                keep_waiting = False
+            else:
+                time.sleep(poll_period)
+        self.pcomm.send_tables(tables)
+        self.pcomm.execute_sync(self.sync_mode_value)
+
 
         
     def theta_cw_degree(self):
@@ -365,7 +429,7 @@ class MoveGUI(object):
         if self.mode.get()==1:
             self.pcomm.move(self.canbus, self.selected_can, 'cw', 'cruise', 'theta', degree)
         else:
-            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
+            self.quick_direct_dtdp(self.selected_posid,dtdp)
         
     def theta_ccw_degree(self):
         degree=float(self.e1.get())
@@ -373,7 +437,7 @@ class MoveGUI(object):
         if self.mode.get()==1:
             self.pcomm.move(self.canbus, self.selected_can, 'ccw', 'cruise', 'theta', degree)
         else:
-            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
+            self.quick_direct_dtdp(self.selected_posid,dtdp)
   
     def phi_cw_degree(self):
         degree=float(self.e1.get())
@@ -381,7 +445,7 @@ class MoveGUI(object):
         if self.mode.get()==1:
             self.pcomm.move(self.canbus, self.selected_can, 'cw', 'cruise', 'phi', degree)
         else:
-            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
+            self.quick_direct_dtdp(self.selected_posid,dtdp)
         
     def phi_ccw_degree(self):
         degree=float(self.e1.get())
@@ -389,7 +453,7 @@ class MoveGUI(object):
         if self.mode.get()==1:
             self.pcomm.move(self.canbus, self.selected_can, 'ccw', 'cruise', 'phi', degree)
         else:
-            self.ptl.quick_direct_dtdp(self.selected_posid,dtdp)
+            self.quick_direct_dtdp(self.selected_posid,dtdp)
     
     def center(self):
         if self.mode.get()==1:
@@ -403,9 +467,9 @@ class MoveGUI(object):
        #     self.pcomm.move('can0', 20000, 'ccw', 'cruise', 'phi', 200)            
         else:
             dtdp=[-400,200]
-            self.ptl.quick_direct_dtdp(self.posids,dtdp)       
+            self.quick_direct_dtdp(self.posids,dtdp)       
             dtdp=[195,0]
-            self.ptl.quick_direct_dtdp(self.posids,dtdp)   
+            self.quick_direct_dtdp(self.posids,dtdp)   
             self.text1.insert(END,'Centering Done \n')
         
     def write_siid(self):
@@ -464,7 +528,7 @@ class MoveGUI(object):
 
     def movement_check(self):
         print('Movement Check Starts! \n')
-        time.sleep(5)
+        time.sleep(3)
         if self.mode.get()==1:
             for i in range(5):
                 self.pcomm.move(self.canbus, self.selected_can, 'cw', 'cruise', 'phi', 30)
@@ -481,15 +545,11 @@ class MoveGUI(object):
                 print(self.selected_posid)
                 for i in range(5):
                     self.quick_direct_dtdp(self.selected_posid,[0.,-30])
-                    #time.sleep(3)
                     self.quick_direct_dtdp(self.selected_posid,[0.,30])
-                    #time.sleep(3)
 
                 for i in range(5):
                     self.quick_direct_dtdp(self.selected_posid,[-30.,0.])
-                    #time.sleep(3)
                     self.quick_direct_dtdp(self.selected_posid,[30,0.])
-                    #time.sleep(3)
             except Exception as e:
                 print('FAILED: ' + str(e))
         self.center()
@@ -692,7 +752,17 @@ class MoveGUI(object):
                 str_out=str(pos_this)
             output.append(str_out)
         return output
+    def posid_to_posidnum(self,posids):
+        if isinstance(posids, (list,)):
+            output=[]
+            for i in range(len(posids)):
+                posid=posids[i]
+                output.append(int(posid[-4:]))
+        else:
+            output=int(posids[-4:])
+        return output
 
-            
+
+
 if __name__=="__main__":
     gui = MoveGUI()
