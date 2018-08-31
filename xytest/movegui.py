@@ -180,9 +180,9 @@ class MoveGUI(object):
         Button(gui_root,text='1 Write SiID',width=15,command=self.write_siid).grid(row=3,column=3,sticky=W,pady=4)
         #Button(gui_root,text='Sync Test',width=15,command=self.sync_test).grid(row=3,column=4,sticky=W,pady=4)
         Button(gui_root,text='Movement Check',width=15,command=self.movement_check).grid(row=4,column=4,sticky=W,pady=4)
-        #Button(gui_root,text='3 Populate Busids',width=15,command=self.populate_can).grid(row=5,column=3,sticky=W,pady=4)# Call populate_busids.py under pos_utility/ 
-        #Button(gui_root,text='2 Write DEVICE_LOC',width=15,command=self.populate_petal_travelers).grid(row=4,column=3,sticky=W,pady=4)# Call populate_travellers.py under pos_utility/ to read from installation traveler and write to positioner 'database' and ID map
-        #Button(gui_root,text='Aliveness Test',width=10,command=self.aliveness_test).grid(row=4,column=5,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
+        Button(gui_root,text='3 Populate Busids',width=15,command=self.populate_can).grid(row=5,column=3,sticky=W,pady=4)# Call populate_busids.py under pos_utility/ 
+        Button(gui_root,text='2 Write DEVICE_LOC',width=15,command=self.populate_petal_travelers).grid(row=4,column=3,sticky=W,pady=4)# Call populate_travellers.py under pos_utility/ to read from installation traveler and write to positioner 'database' and ID map
+        Button(gui_root,text='Aliveness Test',width=10,command=self.aliveness_test).grid(row=4,column=5,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
 
         Button(gui_root,text='Center',width=10,command=self.center).grid(row=4,column=2,sticky=W,pady=4)                
 
