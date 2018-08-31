@@ -57,7 +57,11 @@ else:
     should_commit_to_svn = False
 
 # software initialization and startup
-fvc = fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'])    
+# software initialization and startup
+if hwsetup['fvc_type'] == 'FLI' and 'pm_instrument' in hwsetup:
+    fvc=fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'],platemaker_instrument=hwsetup['pm_instrument'])
+else:
+    fvc = fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'])    
 fvc.rotation = hwsetup['rotation'] # this value is used in setups without fvcproxy / platemaker
 fvc.scale = hwsetup['scale'] # this value is used in setups without fvcproxy / platemaker
 posids = hwsetup['pos_ids']
@@ -148,6 +152,8 @@ if should_identify_fiducials:
         writer.writeheader()
         for xy in m.extradots_fvcXY:
             writer.writerow({'x_pix':xy[0],'y_pix':xy[1]})
+        if m.fvc.fvcproxy: #Remind FVC that it needs to look for all dots, not all dots without a fiducial
+            m.fvc.fvcproxy.send_fvc_command('make_targets',len(posids) + m.n_ref_dots)
 else:
     m.extradots_fvcXY = extradots_existing_data
 if should_identify_positioners:
