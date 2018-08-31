@@ -32,7 +32,7 @@ class PosMoveMeasure(object):
                 for dotid in petal.fid_dotids(fidid):
                     self._petals_map[dotid] = petal
         self.fvc = fvc # fvchandler object
-        self.wide_spotmatch_radius = 300.0 # [pixels on FLI FVC CCD] wide search radius used during rough calibration when theta and phi offsets are unknown
+        self.wide_spotmatch_radius = 1000.0 # [pixels on FLI FVC CCD] wide search radius used during rough calibration when theta and phi offsets are unknown
         self.ref_dist_tol = 2.0   # [pixels on FVC CCD] used for identifying fiducial dots
         self.nudge_dist   = 10.0  # [deg] used for identifying fiducial dots
         self.extradots_fvcXY = [] # stores [x,y] pixel locations of any "extra" fiducial dots in the field (used for fixed ref fibers in laboratory test stands)
@@ -374,7 +374,9 @@ class PosMoveMeasure(object):
                     return save_file_dir + posid + '_' + save_file_timestamp + '_calib_' + mode + '.png'
         if mode == 'rough':
             self.rehome(posids)
-            self.one_point_calibration(posids, mode='offsetsXY')
+            # KH added if statement - one point calibration causes measure to fail if the match_radius is not adjusted
+            if not self.fvc.fvcproxy:
+                self.one_point_calibration(posids, mode='offsetsXY')
             posids_by_petal = self.posids_by_petal(posids)
             for petal,these_posids in posids_by_petal.items():
                 keys_to_reset = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P']
@@ -385,8 +387,10 @@ class PosMoveMeasure(object):
                 old_spotmatch_radius = self.fvc.fvcproxy.get('match_radius')
                 self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)
                 self.one_point_calibration(posids, mode='offsetsTP_close')
+                self.one_point_calibration(posids, mode='offsetsTP')
                 self.fvc.fvcproxy.set(match_radius = old_spotmatch_radius)
-            self.one_point_calibration(posids, mode='offsetsTP')
+            else:
+                self.one_point_calibration(posids, mode='offsetsTP')
         elif mode == 'grid':
             if self.grid_calib_num_DOF >= self.grid_calib_num_constraints: # the '=' in >= comparison is due to some places in the code where I am requiring at least one extra point more than exact constraint 
                 new_mode = 'arc'    
@@ -409,7 +413,13 @@ class PosMoveMeasure(object):
                     file = save_file(posid)
                     poscalibplot.plot_arc(file, posid, unwrapped_data)
                     files.add(file)
-        self.one_point_calibration(posids, mode='posTP') # important to lastly update the internally-tracked theta and phi shaft angles
+        if self.fvc.fvcproxy and mode == 'rough':
+            old_spotmatch_radius = self.fvc.fvcproxy.get('match_radius')
+            self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)
+            self.one_point_calibration(posids, mode='posTP') # important to lastly update the internally-tracked theta and phi shaft angles
+            self.fvc.fvcproxy.set(match_radius = old_spotmatch_radius)
+        else:
+            self.one_point_calibration(posids, mode='posTP') # important to lastly update the internally-tracked theta and phi shaft angles
         self.commit(log_note = str(mode) + ' calibration complete')
         return files
 
