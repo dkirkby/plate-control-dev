@@ -40,12 +40,13 @@ class Petal(object):
         collider_file   ... string, file name of collider configuration file, no directory loction. If left blank will use default.
         sched_stats_on  ... boolean, controls whether to log statistics about scheduling runs
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
+        petal_shape     ... string, mechanical shape of petal. options are 'asphere' or 'flat'. (note the flat option is used for example in some test stands)
     """
     def __init__(self, petal_id, posids, fidids, simulator_on=False,
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
                  printfunc=print, verbose=False, user_interactions_enabled=False,
-                 collider_file=None, sched_stats_on=False,
-                 anticollision='freeze'):
+                 collider_file=None, sched_stats_on=False, anticollision='freeze',
+                 petal_shape='asphere'):
         
         # petal setup
         self.petal_id = petal_id
@@ -70,9 +71,10 @@ class Petal(object):
         self.posmodels = {} # key posid, value posmodel instance
         self.states = {} # key posid, value posstate instance
         self.devices = {} # key device_location_id, value posid
+        installed_on_asphere = petal_shape == 'asphere'
         for posid in posids:
             self.states[posid] = posstate.PosState(posid, logging=True, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
-            self.posmodels[posid] = PosModel(self.states[posid])
+            self.posmodels[posid] = PosModel(self.states[posid], installed_on_asphere)
             self.devices[self.states[posid]._val['DEVICE_ID']] = posid
         self.posids = set(self.posmodels.keys())
         self.canids_where_tables_were_just_sent = []
