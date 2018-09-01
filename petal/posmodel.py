@@ -11,12 +11,12 @@ class PosModel(object):
     One instance of PosModel corresponds to one PosState to physical positioner.
     """
 
-    def __init__(self, state=None):
+    def __init__(self, state=None, is_installed_on_asphere=False):
         if not(state):
             self.state = posstate.PosState()
         else:
             self.state = state
-        self.trans = postransforms.PosTransforms(self)
+        self.trans = postransforms.PosTransforms(self, is_installed_on_asphere)
         self.axis = [None,None]
         self.axis[pc.T] = Axis(self,pc.T)
         self.axis[pc.P] = Axis(self,pc.P)
