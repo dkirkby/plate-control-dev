@@ -141,7 +141,8 @@ class XYTest(object):
         db_commit_on = False
         if 'store_mode' in self.hwsetup_conf and self.hwsetup_conf['store_mode'] == 'db':
             db_commit_on = True
-        ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite, collider_file=self.xytest_conf['collider_file'],db_commit_on=db_commit_on, anticollision=self.xytest_conf['anticollision'])
+        shape = 'asphere' if self.hwsetup_conf['plate_type'] == 'petal' else 'flat'
+        ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite, collider_file=self.xytest_conf['collider_file'],db_commit_on=db_commit_on, anticollision=self.xytest_conf['anticollision'], petal_shape=shape)
         self.m = posmovemeasure.PosMoveMeasure([ptl],fvc,printfunc=self.logwrite)
         self.posids = self.m.all_posids
         self.logwrite('Positoners: ' + str(self.posids))
@@ -154,7 +155,7 @@ class XYTest(object):
             with open(extradots_filename,'r',newline='') as file:
                 reader = csv.DictReader(file)
                 for row in reader:
-                    self.m.extradots_fvcXY.append([row['x_pix'],row['y_pix']])
+                    self.m.extradots_fvcXY.append([float(row['x_pix']),float(row['y_pix'])])
                 self.logwrite('Read ' + str(len(self.m.extradots_fvcXY)) + ' from csv file.')
         else:
             self.logwrite('Re-identifying fiducial locations.')
