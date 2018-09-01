@@ -60,7 +60,7 @@ class PosTransforms(object):
     treat S as exactly equal to the radius R.
     """
 
-    def __init__(self, this_posmodel=None, curved=False):
+    def __init__(self, this_posmodel=None, curved=True):
         if this_posmodel == None:
             this_posmodel = posmodel.PosModel()
         self.posmodel = this_posmodel
