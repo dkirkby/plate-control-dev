@@ -56,7 +56,7 @@ class PosTransforms(object):
     See DESI-0530 for detail on the (Q,S) coordinate system.
     
     The option "curved" sets whether we are looking at a flat focal plane (such as a laboratory
-    test stand), or a true petal, with it's asphere. When curved == False, PosTransforms will
+    test stand), or a true petal, with its asphere. When curved == False, PosTransforms will
     treat S as exactly equal to the radius R.
     """
 
