@@ -40,6 +40,8 @@ else:
     should_make_instrfile = False
 
 # automated SVN setup
+svn_user = ''
+svn_pass = ''
 if not sim:
     should_update_from_svn = tkinter.messagebox.askyesno(title='Update from SVN?',message='Overwrite any existing local positioner log and settings files to match what is currently in the SVN?')
     should_commit_to_svn = tkinter.messagebox.askyesno(title='Commit to SVN?',message='Auto-commit files to SVN after script is complete?\n\n(Typically answer "Yes")')
@@ -66,6 +68,7 @@ fvc.rotation = hwsetup['rotation'] # this value is used in setups without fvcpro
 fvc.scale = hwsetup['scale'] # this value is used in setups without fvcproxy / platemaker
 posids = hwsetup['pos_ids']
 fidids = hwsetup['fid_ids']
+shape = 'asphere' if hwsetup['plate_type'] == 'petal' else 'flat'
 ptl = petal.Petal(petal_id = hwsetup['ptl_id'],
                   posids = posids,
                   fidids = fidids,
@@ -78,7 +81,8 @@ ptl = petal.Petal(petal_id = hwsetup['ptl_id'],
                   verbose = False,
                   collider_file = None,
                   sched_stats_on = False,
-                  anticollision = None) # valid options for anticollision arg: None, 'freeze', 'adjust'
+                  anticollision = None, # valid options for anticollision arg: None, 'freeze', 'adjust'
+				  petal_shape = shape)
 m = posmovemeasure.PosMoveMeasure([ptl],fvc)
 m.make_plots_during_calib = True
 print('Automatic generation of calibration plots is turned ' + ('ON' if m.make_plots_during_calib else 'OFF') + '.')

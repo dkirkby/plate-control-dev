@@ -147,7 +147,8 @@ fvc.rotation = hwsetup['rotation']
 fvc.scale = hwsetup['scale']
 posids = hwsetup['pos_ids']
 fidids = hwsetup['fid_ids']
-ptl = petal.Petal(hwsetup['ptl_id'], posids, fidids, simulator_on=sim, user_interactions_enabled=True, anticollision=None)
+shape = 'asphere' if hwsetup['plate_type'] == 'petal' else 'flat'
+ptl = petal.Petal(hwsetup['ptl_id'], posids, fidids, simulator_on=sim, user_interactions_enabled=True, anticollision=None, petal_shape=shape)
 m = posmovemeasure.PosMoveMeasure([ptl],fvc)
 m.make_plots_during_calib = True
 print('Automatic generation of calibration plots is turned ' + ('ON' if m.make_plots_during_calib else 'OFF') + '.')
