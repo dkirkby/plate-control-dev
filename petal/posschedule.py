@@ -187,14 +187,15 @@ class PosSchedule(object):
             for name in self.stage_order:
                 stage = self.stages[name]
                 if stage.is_not_empty():
-                    for sweep in stage.sweeps.values():
-                        for i in range(len(sweep.time)):
-                            this_time = sweep.time[i] + stage_start_time
-                            if this_time not in num_moving:
-                                num_moving[this_time] = 0
-                            if sweep.is_moving(i):
-                                num_moving[this_time] += 1
-                    stage_start_time = max(num_moving.keys())
+                    if stage.sweeps:
+                        for sweep in stage.sweeps.values():
+                            for i in range(len(sweep.time)):
+                                this_time = sweep.time[i] + stage_start_time
+                                if this_time not in num_moving:
+                                    num_moving[this_time] = 0
+                                if sweep.is_moving(i):
+                                    num_moving[this_time] += 1
+                        stage_start_time = max(num_moving.keys())
             self.stats.add_num_moving_data(num_moving)
                     
     def already_requested(self, posid):
