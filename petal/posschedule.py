@@ -255,9 +255,10 @@ class PosSchedule(object):
         """
         if self.should_anneal:
             stage.anneal_tables(anneal_time)
-        if should_freeze:
+        if should_freeze or self.stats:
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
+        if should_freeze:
             for posid in colliding_sweeps:
                 if posid in stage.colliding: # re-check, since earlier path adjustments in loop may have already resolved this posid's collision
                     stage.adjust_path(posid, freezing='forced')
