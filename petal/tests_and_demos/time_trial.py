@@ -22,7 +22,7 @@ fidids = fidids_12
 petal_id = 666
 
 # timing helper wrapper function
-n_stats_lines = 15
+n_stats_lines = 20
 statsfile = os.path.join(pc.dirs['temp_files'],'stats_petal_timetrial')
 def cProfile_wrapper(evaluatable_string):
     print(evaluatable_string)

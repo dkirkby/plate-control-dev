@@ -36,7 +36,7 @@ def filepath(directory,prefix,integer):
     return os.path.join(directory,filename(prefix,integer))
 
 # Timing profiler wrapper function
-n_stats_lines = 15
+n_stats_lines = 20
 statsfile = os.path.join(pc.dirs['temp_files'],'stats_harness')
 def profile(evaluatable_string):
     print(evaluatable_string)

@@ -40,9 +40,10 @@ for pos_params in pos_param_sequence:
                       simulator_on    = True,
                       db_commit_on    = False,
                       local_commit_on = False,
+                      local_log_on    = False,
                       collider_file   = None,
                       sched_stats_on  = True,
-                      anticollision   = 'adjust'
+                      anticollision   = 'adjust',
                       petal_shape     = 'asphere')
     if should_animate:
         ptl.start_gathering_frames()
