@@ -118,9 +118,14 @@ class PosSchedStats(object):
     
     def summarize_num_moving(self):
         """Returns a summary dictionary of the data on number of positioners moving at a time."""
-        summary = {}
-        summary['max moving simultaneously'] = [max(self.num_moving[sched].values()) for sched in self.schedule_ids]
-        summary['avg moving simultaneously'] = [sum(self.num_moving[sched].values())/len(self.num_moving[sched].values()) for sched in self.schedule_ids]
+        summary = {'max moving simultaneously':[], 'avg moving simultaneously':[]}
+        for sched in self.schedule_ids:
+            if self.num_moving[sched]:
+                summary['max moving simultaneously'].append(max(self.num_moving[sched].values()))
+                summary['avg moving simultaneously'].append(sum(self.num_moving[sched].values())/len(self.num_moving[sched].values()))
+            else:
+                summary['max moving simultaneously'].append('-')
+                summary['avg moving simultaneously'].append('-')
         return summary
     
     def summarize_all(self):
