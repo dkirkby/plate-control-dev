@@ -110,12 +110,14 @@ class MoveGUI(object):
    #     info=self.petalcomm.get_device_status()
         canbus=self.canbus
         self.bus_id=canbus
-        #self.info = self.pcomm.get_posfid_info(canbus)
+        self.info = self.pcomm.get_posfid_info(canbus) # Old version petalcontroller syntax
+        """
         info_temp=self.pcomm.pbget('posfid_info')
         if isinstance(info_temp, (list,)):
             self.info = self.pcomm.pbget('posfid_info')[0]
         else:
             self.info=self.pcomm.pbget('posfid_info')[canbus]
+        """
         print(self.info)
         self.posids = []
         for key in sorted(self.info.keys()):
@@ -313,9 +315,9 @@ class MoveGUI(object):
             self.text1.insert(END,'No, you cannot set a positioners as a fiducial, this will burn the motor! \n')
         else:
             for i in range(len(self.selected_can)):
-                #self.pcomm.set_fiducials([self.canbus], [self.selected_can[i]], [self.e2.get()]) # Old version syntax
-                fiducial_settings_by_busid = {self.canbus: {self.selected_can[i]:int(self.e2.get())}}
-                self.pcomm.pbset('fiducials', fiducial_settings_by_busid)
+                self.pcomm.set_fiducials([self.canbus], [self.selected_can[i]], [self.e2.get()]) # Old version syntax
+                #fiducial_settings_by_busid = {self.canbus: {self.selected_can[i]:int(self.e2.get())}}
+                #self.pcomm.pbset('fiducials', fiducial_settings_by_busid)
             self.text1.insert(END,'Set Fiducial '+str(self.selected_can)+' to '+str(self.e2.get())+' successfully! \n')
 
     def sync_mode(self):
