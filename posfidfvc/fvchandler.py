@@ -339,8 +339,8 @@ class FVCHandler(object):
                     xy = xy_new
                 #End of	hack
                 spotids = [i for i in range(len(xy))]
-                qs = self.trans.obsXY_to_QS(np.transpose(xy).tolist())# Note qs =[[q1,q2,q3...],[s1,s2,s3...]]
-                qs_dicts = [{'spotid':spotids[i],'q':qs[0][i],'s':qs[1][i]} for i in range(len(spotids))]
+                qs = [self.trans.obsXY_to_QS(this_xy) for this_xy in xy]
+                qs_dicts = [{'spotid':spotids[i],'q':qs[i][0],'s':qs[i][1]} for i in range(len(spotids))]
                 fvcXY_dicts = self.fvcproxy.qs_to_fvcxy(qs_dicts) # fiducials are added in this process 
                 fvcXY_dicts_this=[]  # Kai: This is a temporary fix, a more efficient fix should be done in the future to save time
                 for d in fvcXY_dicts:

@@ -127,6 +127,11 @@ def sign(x):
     else:
         return 0
 
+def linspace(start,stop,num):
+    """Return a list of floats linearly spaced from start to stop (inclusive).
+    List has num elements."""
+    return [i*(stop-start)/(num-1)+start for i in range(num)]
+
 # Functions for handling mixes of [M][N] vs [M] dimension lists
 def listify(uv, keep_flat=False):
     """Turn [u,v] into [[u],[v]], if it isn't already.

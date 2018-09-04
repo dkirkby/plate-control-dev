@@ -781,16 +781,16 @@ class PosMoveMeasure(object):
             point0 = self.grid_calib_num_DOF - 1
             for pt in range(point0,len(data[posid]['measured_obsXY'])):
                 meas_xy = np.array([data[posid]['measured_obsXY'][j] for j in range(pt+1)]).transpose()
-                targ_tp = np.array([data[posid]['target_posTP'][j] for j in range(pt+1)]).transpose()
+                targ_tp = [data[posid]['target_posTP'][j] for j in range(pt+1)]
                 def expected_xy(params):
                     for j in range(len(param_keys)):
                         trans.alt[param_keys[j]] = params[j]
-                    return trans.posTP_to_obsXY(targ_tp.tolist())
+                    obsxy = [trans.posTP_to_obsXY([targ_tp[i][0],targ_tp[i][1]]) for i in range(len(targ_tp))]
+                    return np.transpose(obsxy)
                 def err_norm(params):
                     expected = np.array(expected_xy(params))
                     all_err = expected - meas_xy
                     return np.linalg.norm(all_err,ord='fro')/np.sqrt(np.size(all_err,axis=1))
- 
                 bounds = ((2.5,3.5),(2.5,3.5),(-180,180),(-50,50),(None,None),(None,None)) #Ranges which values should be in
                 params_optimized = scipy.optimize.minimize(fun=err_norm, x0=params0, bounds=bounds)
                 params0 = params_optimized.x
@@ -853,8 +853,8 @@ class PosMoveMeasure(object):
             p_meas_posP_wrapped = (np.array(p_meas_obsP_wrapped) - offset_p).tolist()
             
             # unwrap thetas
-            t_meas_posTP = T[posid]['trans'].obsXY_to_posTP(np.transpose(t_meas_obsXY).tolist(),range_limits='full')[0]
-            t_meas_posT = t_meas_posTP[pc.T]
+            t_meas_posTP = [T[posid]['trans'].obsXY_to_posTP(this_xy,range_limits='full')[0] for this_xy in t_meas_obsXY]
+            t_meas_posT = [this_tp[pc.T] for this_tp in t_meas_posTP]
             expected_direction = pc.sign(t_targ_posT[1] - t_targ_posT[0])
             t_meas_posT_wrapped = self._wrap_consecutive_angles(t_meas_posT, expected_direction)
             
