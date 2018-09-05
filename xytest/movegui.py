@@ -707,7 +707,12 @@ class MoveGUI(object):
     def reload_canbus(self):
         self.canbus='can'+self.e_can.get().strip()        
         self.bus_id=self.canbus
-        self.info = self.pcomm.get_posfid_info(self.canbus)
+        info_temp=self.pcomm.pbget('posfid_info')
+        if isinstance(info_temp, (list,)):
+            self.info = self.pcomm.pbget('posfid_info')[0]
+        else:
+            self.info=self.pcomm.pbget('posfid_info')[self.canbus]
+        print(self.info)
         self.posids = []
         print(self.info)
         for key in sorted(self.info.keys()):
