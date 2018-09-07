@@ -394,14 +394,22 @@ class MoveGUI(object):
             move_time_T = abs(motor_deg_T / motor_speed_degpersec)
             move_time_P = abs(motor_deg_P / motor_speed_degpersec)
             move_time = max(move_time_T, move_time_P)
+            if motor_steps_T == 0:
+                speed_mode_T='creep'
+            else:
+                speed_mode_T='cruise'
+            if motor_steps_P == 0:
+                speed_mode_P='creep'
+            else:
+                speed_mode_P='cruise'
             table = {
                      'canid':canid,
                      'busid':self.canbus, 
                      'nrows':1,
                      'motor_steps_T':[motor_steps_T], # > 0 means counter-clockwise, < 0 means clockwise
                      'motor_steps_P':[motor_steps_P], # > 0 means counter-clockwise, < 0 means clockwise
-                     'speed_mode_T':['cruise'],
-                     'speed_mode_P':['cruise'],
+                     'speed_mode_T':[speed_mode_T],
+                     'speed_mode_P':[speed_mode_P],
                      'move_time':[move_time],
                       'postpause':[0]}
             if canid <10000:
