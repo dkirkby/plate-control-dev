@@ -57,6 +57,7 @@ class Petal(object):
             self.comm = petalcomm.PetalComm(self.petal_id, user_interactions_enabled=user_interactions_enabled)
             self.comm.pbset('non_responsives', 'clear') #reset petalcontroller's list of non-responsive canids
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
+        self.shape = petal_shape
 
         # database setup
         self.db_commit_on = db_commit_on if DB_COMMIT_AVAILABLE else False
@@ -71,7 +72,7 @@ class Petal(object):
         self.posmodels = {} # key posid, value posmodel instance
         self.states = {} # key posid, value posstate instance
         self.devices = {} # key device_location_id, value posid
-        installed_on_asphere = petal_shape == 'asphere'
+        installed_on_asphere = self.shape == 'asphere'
         for posid in posids:
             self.states[posid] = posstate.PosState(posid, logging=True, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
             self.posmodels[posid] = PosModel(self.states[posid], installed_on_asphere)
@@ -724,7 +725,9 @@ class Petal(object):
     def _new_schedule(self):
         """Generate up a new, clear schedule instance.
         """
-        return posschedule.PosSchedule(petal=self, stats=self.schedule_stats, verbose=self.verbose)
+        schedule = posschedule.PosSchedule(petal=self, stats=self.schedule_stats, verbose=self.verbose)
+        schedule.should_check_petal_boundaries = self.shape == 'asphere'
+        return schedule
 
     def _wait_while_moving(self):
         """Blocking implementation, to not send move tables while any positioners are

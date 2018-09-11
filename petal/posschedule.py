@@ -7,10 +7,12 @@ class PosSchedule(object):
     from starts to finishes. The move tables are instances of the PosMoveTable
     class.
     
-        petal  ... Instance of Petal that this schedule applies to.
+        petal   ... Instance of Petal that this schedule applies to.
         
-        log    ... Instance of PosSchedStats in which to register scheduling statistics.
-                   If log=None, then no statistics are logged.
+        stats   ... Instance of PosSchedStats in which to register scheduling statistics.
+                    If stats=None, then no statistics are logged.
+    
+        verbose ... Control verbosity at stdout.
     """
 
     def __init__(self, petal, stats=None, verbose=True):
@@ -28,6 +30,7 @@ class PosSchedule(object):
         self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, stats=self.stats) for name in self.stage_order}
         self.anneal_time = {'direct':3, 'retract':3, 'rotate':3, 'extend':3, 'expert':3} # times in seconds, see comments in PosScheduleStage
         self.should_anneal = True # overriding flag, allowing you to turn off all move time annealing
+        self.should_check_petal_boundaries = True # allows you to turn off petal-specific boundary checks for non-petal systems (such as positioner test stands)
         self.move_tables = {}
 
     @property
@@ -97,7 +100,7 @@ class PosSchedule(object):
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Target interferes with a neighbor\'s existing target.')
             return False
-        if self._deny_request_because_out_of_bounds(posmodel,targt_obsTP):
+        if self.should_check_boundaries and self._deny_request_because_out_of_bounds(posmodel,targt_obsTP):
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Target exceeds a fixed boundary.')
             return False
