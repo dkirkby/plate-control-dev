@@ -100,7 +100,7 @@ class PosSchedule(object):
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Target interferes with a neighbor\'s existing target.')
             return False
-        if self.should_check_boundaries and self._deny_request_because_out_of_bounds(posmodel,targt_obsTP):
+        if self.should_check_petal_boundaries and self._deny_request_because_out_of_bounds(posmodel,targt_obsTP):
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Target exceeds a fixed boundary.')
             return False
