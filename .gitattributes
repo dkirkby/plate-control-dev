@@ -75,6 +75,7 @@ posfidfvc/SBIG/sbigcam.py -text
 posfidfvc/SBIG/showimage -text
 posfidfvc/SBIG/spotfit.py -text
 posfidfvc/SBIG/stf.py -text
+posfidfvc/SBIG/stxl.py -text
 posfidfvc/SBIG/usbreset.c -text
 posfidfvc/SBIG/usbreset.py -text
 posfidfvc/check_pos_move.py -text
