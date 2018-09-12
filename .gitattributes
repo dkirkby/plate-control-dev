@@ -79,6 +79,7 @@ posfidfvc/SBIG/stxl.py -text
 posfidfvc/SBIG/usbreset.c -text
 posfidfvc/SBIG/usbreset.py -text
 posfidfvc/check_pos_move.py -text
+posfidfvc/enable_all.py -text
 posfidfvc/fitcircle.py -text
 posfidfvc/fvchandler.py -text
 posfidfvc/initialize_hwsetup.py -text
@@ -94,6 +95,7 @@ posfidfvc/mightex/mightex_cmd.help.txt -text
 posfidfvc/mightex/mightex_test.py -text
 posfidfvc/poscalibplot.py -text
 posfidfvc/posmovemeasure.py -text
+posfidfvc/start_a_petal.py -text
 ups/plate_control.table -text
 xytest/desi_logo.gif -text
 xytest/fiber_test_gui.py -text
