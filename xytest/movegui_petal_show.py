@@ -115,7 +115,7 @@ class MoveGUI_Petal(object):
                         self.posids.append('M0'+str(key))
                     elif len(str(key))==5:
                         self.posids.append('M'+str(key))
-            #time.sleep(2) 
+            #time.sleep(3) 
         self.ptl = petal.Petal(self.ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite)
         self.fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
@@ -284,13 +284,13 @@ class MoveGUI_Petal(object):
             self.text1.insert(END,str(key)+' '+str(self.info[key])+'\n')
             
     def dance(self):
-        for i in range(10):
+        for i in range(6):
             for can in self.canlist:
                 self.pcomm.move(can, self.selected_can, 'cw', 'cruise', 'theta', 190)
-            time.sleep(2)
+            time.sleep(3)
             for can in self.canlist:
                 self.pcomm.move(can, self.selected_can, 'ccw', 'cruise', 'theta', 190)
-            time.sleep(2)
+            time.sleep(3)
     
  
     def theta_cw_degree(self):

@@ -103,14 +103,12 @@ xytest/loadpetal.py -text
 xytest/movegui.py -text
 xytest/movegui_expert.py -text
 xytest/movegui_petal.py -text
-xytest/movegui_petal_all.py -text
 xytest/movegui_petal_show.py -text
 xytest/movegui_temp.py -text
 xytest/pos_xytest_plot.py -text
 xytest/posblast.py -text
 xytest/posdance.py -text
 xytest/sendalarm.py -text
-xytest/start_a_petal.py -text
 xytest/summarizer.py -text
 xytest/um_test_report.py -text
 xytest/watcher.py -text
