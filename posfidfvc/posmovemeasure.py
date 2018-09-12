@@ -33,7 +33,8 @@ class PosMoveMeasure(object):
                     self._petals_map[dotid] = petal
         self.fvc = fvc # fvchandler object
         self.wide_spotmatch_radius = 1000.0 # [pixels on FLI FVC CCD] wide search radius used during rough calibration when theta and phi offsets are unknown
-        self.ref_dist_tol = 2.0   # [pixels on FVC CCD] used for identifying fiducial dots
+        self.ref_dist_tol = 3.0   # [pixels on FVC CCD] used for identifying fiducial dots
+        self.ref_dist_thres =100.0  # [pixels on FVC CCD] if distance to all dots are greater than this, probably a misidentification 
         self.nudge_dist   = 10.0  # [deg] used for identifying fiducial dots
         self.extradots_fvcXY = [] # stores [x,y] pixel locations of any "extra" fiducial dots in the field (used for fixed ref fibers in laboratory test stands)
         self.extradots_id = 'EXTRA' # identifier to use in extra dots id string
@@ -929,7 +930,7 @@ class PosMoveMeasure(object):
         for this_xy in xy_test:
             test_delta = np.array(this_xy) - np.array(xy_init)
             test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
-            if any(test_dist < self.ref_dist_tol):
+            if any(test_dist < self.ref_dist_tol) or all(test_dist > self.ref_dist_thres):
                 xy_ref.append(this_xy)
         xy_pos = [xy for xy in xy_test if xy not in xy_ref]
         if identify_fiducials:
@@ -973,6 +974,7 @@ class PosMoveMeasure(object):
         else:
             if len(xy_pos) > 1:
                 self.printfunc('warning: more than one moving dots (' + str(len(xy_pos)) + ') detected when trying to identify positioner ' + posid)
+                print(xy_pos)
             elif len(xy_pos) < 1:
                 self.printfunc('warning: no moving dots detected when trying to identify positioner ' + posid)
             else:
