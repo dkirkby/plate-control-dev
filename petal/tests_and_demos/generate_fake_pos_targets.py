@@ -51,21 +51,21 @@ def get_tpoffsets(nvals,rand):
 
 
 def check_collision(ptl,tp_arr):
-    posids=[ptl.posmodels[i].posid for i in range(len(ptl.posmodels))]
-    offsetX_arr=[ptl.posmodels[i].state._val['OFFSET_X'] for i in range(len(ptl.posmodels))]
-    offsetY_arr=[ptl.posmodels[i].state._val['OFFSET_Y'] for i in range(len(ptl.posmodels))]
+    posids=list(ptl.posids)
+    offsetX_arr=[ptl.get_posfid_val(posids[i],'OFFSET_X') for i in range(len(posids))]
+    offsetY_arr=[ptl.get_posfid_val(posids[i],'OFFSET_Y') for i in range(len(posids))]
     print('*******************************************************')
     print('*****  Check if the targets have any collision ********')
     print('*******************************************************')
     pos_checked=[]
     for i in range(len(posids)):
-        posid=ptl.posmodels[i].posid
+        posid=posids[i]
         pos_checked.append(posid)
         print('******** posid **********',posid)
         tp=tp_arr[i]
-        offsetX_this=ptl.posmodels[i].state._val['OFFSET_X']
-        offsetY_this=ptl.posmodels[i].state._val['OFFSET_Y']
-        postrans=postransforms.PosTransforms(this_posmodel=ptl.posmodels[i])
+        offsetX_this=ptl.get_posfid_val(posid,'OFFSET_X')
+        offsetY_this=ptl.get_posfid_val(posid,'OFFSET_Y')
+        postrans=postransforms.PosTransforms(this_posmodel=ptl.posmodels[posid])
         # Check for collision #
         # find neighbours first
         pos_dist=np.sqrt((np.array(offsetX_arr)-offsetX_this)**2+(np.array(offsetY_arr)-offsetY_this)**2)
@@ -77,7 +77,7 @@ def check_collision(ptl,tp_arr):
             for k in range(len(index_neighbour)):
                 index_this_neighbour=index_neighbour[k]
                 tp_neighbour=tp_arr[index_this_neighbour]
-                print('Check if ',posid, ' collides with ',ptl.posmodels[index_this_neighbour].posid)
+                print('Check if ',posid, ' collides with ',posids[index_this_neighbour])
                 #print('tp',tp,'tp_neighbour',tp_neighbour)
                 if posids[index_this_neighbour] in pos_checked:
                     pass
@@ -90,7 +90,6 @@ def check_collision(ptl,tp_arr):
                         print('~~~~~~~~~~~ Oh, no, a collision with wall! ~~~~~~~~~~~')
 
 ptl = petal.Petal(petal_id, posids, fidids, simulator_on=True, db_commit_on=False, local_commit_on=True,verbose=False, anticollision='adjust')
-
 pos_locs = '../positioner_locations_0530v14.csv'#os.path.join(allsetdir,'positioner_locations_0530v12.csv')
 positioners = Table.read(pos_locs,format='ascii.csv',header_start=0,data_start=1)
 
@@ -124,24 +123,24 @@ for row in positioners:
         offsetY_arr.append(yloc)
         offsetT_arr.append(toffs[i])
         offsetP_arr.append(poffs[i])
-        model = ptl.posmodels[i]
+        model = ptl.posmodels[posids[i]]
         state = model.state
-        ptl.posmodels[i].state.store('OFFSET_X',xloc)
-        ptl.posmodels[i].state.store('OFFSET_Y',yloc)
+        ptl.set_posfid_val(posids[i],'OFFSET_X',xloc)
+        ptl.set_posfid_val(posids[i],'OFFSET_Y',yloc)
         ## store randomized tp offsets
-        ptl.posmodels[i].state.store('OFFSET_T',toffs[i])
-        ptl.posmodels[i].state.store('OFFSET_P',poffs[i])
+        ptl.set_posfid_val(posids[i],'OFFSET_T',toffs[i])
+        ptl.set_posfid_val(posids[i],'OFFSET_P',poffs[i])
         ## Stored randomized arm lengths
-        ptl.posmodels[i].state.store('LENGTH_R1',r1s[i])
-        ptl.posmodels[i].state.store('LENGTH_R2',r2s[i])
-        ptl.posmodels[i].state.store('CTRL_ENABLED',True)
-        ptl.posmodels[i].state.store('POS_P',170)
-        ptl.posmodels[i].state.store('POS_T',0)
+        ptl.set_posfid_val(posids[i],'LENGTH_R1',r1s[i])
+        ptl.set_posfid_val(posids[i],'LENGTH_R2',r2s[i])
+        ptl.set_posfid_val(posids[i],'CTRL_ENABLED',True)
+        ptl.set_posfid_val(posids[i],'POS_P',170)
+        ptl.set_posfid_val(posids[i],'POS_T',0)
         #state.write()
         i += 1
     elif typ == 'FIF' or typ == 'GIF':
         fidid = fidids[j]
-        state = ptl.fidstates[fidid]
+        state = ptl.states[fidid]
         state.store('Q',float(qloc))
         state.store('S',float(sloc))
         #state.write()
@@ -159,8 +158,8 @@ ptl.schedule_send_and_execute_moves()
 ###########################################
 pos_tp_arr=[]
 for i in range(len(posids)):
-    posid=ptl.posmodels[i].posid
-    pos_tp_arr.append([ptl.posmodels[i].state._val['POS_T'],ptl.posmodels[i].state._val['POS_P']])
+    posid=ptl.posmodels[posids[i]].posid
+    pos_tp_arr.append([ptl.posmodels[posids[i]].state._val['POS_T'],ptl.posmodels[posids[i]].state._val['POS_P']])
 
 print('Check Initial Positions Collisions ')
 a=check_collision(ptl,pos_tp_arr)
@@ -188,14 +187,14 @@ def read_targets(ptl,target_file):
             distance=np.sqrt(np.subtract(np.array(offsetX_arr),float(temp[4]))**2+(np.array(offsetY_arr)-float(temp[5]))**2)
             distance=distance.tolist()
             index=distance.index(min(distance))#
-            if min(distance) <=ptl.posmodels[index].state._val['LENGTH_R1']+ptl.posmodels[index].state._val['LENGTH_R2'] :
-                if ptl.posmodels[index].posid not in pos_assigned: 
+            if min(distance) <=ptl.posmodels[posids[index]].state._val['LENGTH_R1']+ptl.posmodels[posids[index]].state._val['LENGTH_R2'] :
+                if ptl.posmodels[posids[index]].posid not in pos_assigned: 
                     loc_assigned.append(temp[0])
                     xy_assigned.append([float(temp[4]),float(temp[5])])
                     x_assigned.append(float(temp[4]))
                     y_assigned.append(float(temp[5]))
                     qs_assigned.append([float(temp[6]),float(temp[7])]) 
-                    pos_assigned.append(ptl.posmodels[index].posid)
+                    pos_assigned.append(ptl.posmodels[posids[index]].posid)
     f.close()
     return pos_assigned,xy_assigned,x_assigned,y_assigned,qs_assigned
 
@@ -206,21 +205,21 @@ def read_targets(ptl,target_file):
 #######################################
 
 def assign_targets(ptl,pos_assigned,qs_assigned,x_assigned,y_assigned):
-    posids=[ptl.posmodels[i].posid for i in range(len(ptl.posmodels))]
-    offsetX_arr=[ptl.posmodels[i].state._val['OFFSET_X'] for i in range(len(ptl.posmodels))]
-    offsetY_arr=[ptl.posmodels[i].state._val['OFFSET_Y'] for i in range(len(ptl.posmodels))]
+    posids=list(ptl.posids)
+    offsetX_arr=[ptl.posmodels[i].state._val['OFFSET_X'] for i in ptl.posmodels.keys()]
+    offsetY_arr=[ptl.posmodels[i].state._val['OFFSET_Y'] for i in ptl.posmodels.keys()]
     requests = {}
     target_x=[]   # On focal plane
     target_y=[]
     target_tp=[]
-    pos_collide=[]
+    pos_collide=[]  # Array to store positioners with assigned target but collider with neighbors or boundaries
     for i in range(len(ptl.posmodels)):
-        posid=ptl.posmodels[i].posid
+        posid=posids[i]
         index_posid=posids.index(posid)
         print('$$$$$$$$$$$$ posid $$$$$$$$$$$$$$' ,posid)
-        offsetX_this=ptl.posmodels[i].state._val['OFFSET_X']
-        offsetY_this=ptl.posmodels[i].state._val['OFFSET_Y']
-        postrans=postransforms.PosTransforms(this_posmodel=ptl.posmodels[i])
+        offsetX_this=ptl.posmodels[posid].state._val['OFFSET_X']
+        offsetY_this=ptl.posmodels[posid].state._val['OFFSET_Y']
+        postrans=postransforms.PosTransforms(this_posmodel=ptl.posmodels[posid])
         distance=10.
         # Find neighbours
         pos_dist=np.sqrt((np.array(offsetX_arr)-offsetX_this)**2+(np.array(offsetY_arr)-offsetY_this)**2)
@@ -240,23 +239,22 @@ def assign_targets(ptl,pos_assigned,qs_assigned,x_assigned,y_assigned):
                 if index_neighbour:
                     for k in range(len(index_neighbour)):
                         index_this_neighbour=index_neighbour[k]
-                        if index_this_neighbour+1<=len(target_x): # target already assigned
+                        if index_this_neighbour+1 <= len(target_tp): # only check with neighbours who have all ready assigned targets
                             tp_neighbour=target_tp[index_this_neighbour]
-                            print('Check if ',posid, ' collides with ',ptl.posmodels[index_this_neighbour].posid)
+                            print('Check if ',posid, ' collides with ',ptl.posmodels[posids[index_this_neighbour]].posid)
                             case=ptl.collider.spatial_collision_between_positioners(posid, posids[index_this_neighbour],tp, tp_neighbour)
                             if case != pc.case.I:
                                 pos_collide.append(posid)
                                 distance=10.
-                            else:
-                                case=ptl.collider.spatial_collision_with_fixed(posid,tp)
-                                if case != pc.case.I:
-                                    print('collide')
-                                    pos_collide.append(posid)
-                                    distance=10. 
-                                else:
-                                    pass
+                print('Check if ',posid, ' collides with wall.\n')
+                case=ptl.collider.spatial_collision_with_fixed(posid,tp)
+                if case != pc.case.I:
+                    print('collide with wall')
+                    pos_collide.append(posid)
+                    distance=10. 
+
                 if distance<5:
-                    target_tp.append(tp)
+                    target_tp.append(tp) # obsTP
                     posXY_this=postrans.posTP_to_posXY(tp1)
 
                     target_x.append(x_assigned[index])
@@ -270,27 +268,24 @@ def assign_targets(ptl,pos_assigned,qs_assigned,x_assigned,y_assigned):
                 tp=postrans.posTP_to_obsTP(tp1)
                 distance=np.sqrt(xy[0]**2+xy[1]**2)
                 print('random xy',xy,'distance',distance)
-                if distance<=ptl.posmodels[index_posid].state._val['LENGTH_R1']+ptl.posmodels[index_posid].state._val['LENGTH_R2']:  # Make sure it is reachable
+                if distance<=ptl.posmodels[posids[index_posid]].state._val['LENGTH_R1']+ptl.posmodels[posids[index_posid]].state._val['LENGTH_R2']:  # Make sure it is reachable
                     # Check for collision #
-                    # find neighbours first
                     if index_neighbour:
                         for k in range(len(index_neighbour)):
                             index_this_neighbour=index_neighbour[k]
-                            if index_this_neighbour+1<=len(target_x): # target already assigned
+                            if index_this_neighbour+1 <= len(target_tp): # only check with neighbours who have all ready assigned targets
                                 tp_neighbour=target_tp[index_this_neighbour]
-                                print('Check if ',posid, ' collides with ',ptl.posmodels[index_this_neighbour].posid)
+                                print('Check if ',posid, ' collides with ',posids[index_this_neighbour])
                                 case=ptl.collider.spatial_collision_between_positioners(posid, posids[index_this_neighbour],tp, tp_neighbour)
                                 if case != pc.case.I:
                                     distance=10.
-                                    print('Oops, collides with ',ptl.posmodels[index_this_neighbour].posid)
-                                else:
-                                    case=ptl.collider.spatial_collision_with_fixed(posid,tp)
-                                    if case != pc.case.I:
-                                        distance=10.
-                                        print('Oops, collides with wall')
-                                    else:
-                                        pass
-                if distance<=ptl.posmodels[index_posid].state._val['LENGTH_R1']+ptl.posmodels[index_posid].state._val['LENGTH_R2']:
+                                    print('Oops, collides with ',posids[index_this_neighbour])
+                    print('Check if ',posid, ' collides with wall.\n')
+                    case=ptl.collider.spatial_collision_with_fixed(posid,tp)
+                    if case != pc.case.I:
+                        distance=10.
+                        print('Oops, collides with wall')
+                if distance<=ptl.posmodels[posids[index_posid]].state._val['LENGTH_R1']+ptl.posmodels[posids[index_posid]].state._val['LENGTH_R2']:
                     print('final xy',xy,'distance',distance)
                     obsXY_this=postrans.posXY_to_obsXY(xy)
                     target_x.append(obsXY_this[0])
@@ -320,12 +315,12 @@ f.write(header+' \n')
 for i in range(len(posids)):
     posid=posids[i]
     output=posid
-    output=output+', '+str(ptl.posmodels[i].state.read('OFFSET_X'))
-    output=output+', '+str(ptl.posmodels[i].state.read('OFFSET_Y'))
-    output=output+', '+str(ptl.posmodels[i].state.read('OFFSET_T'))
-    output=output+', '+str(ptl.posmodels[i].state.read('OFFSET_P'))
-    output=output+', '+str(ptl.posmodels[i].state.read('LENGTH_R1'))
-    output=output+', '+str(ptl.posmodels[i].state.read('LENGTH_R2'))
+    output=output+', '+str(ptl.posmodels[posid].state.read('OFFSET_X'))
+    output=output+', '+str(ptl.posmodels[posid].state.read('OFFSET_Y'))
+    output=output+', '+str(ptl.posmodels[posid].state.read('OFFSET_T'))
+    output=output+', '+str(ptl.posmodels[posid].state.read('OFFSET_P'))
+    output=output+', '+str(ptl.posmodels[posid].state.read('LENGTH_R1'))
+    output=output+', '+str(ptl.posmodels[posid].state.read('LENGTH_R2'))
     for j in range(count_limit-1):
         cmd='output=output+", "+str(target_x'+str(j+1)+'[i])+","+str(target_y'+str(j+1)+'[i])+","+str(target_tp'+str(j+1)+'[i][0])+","+str(target_tp'+str(j+1)+'[i][1])'
         exec(cmd)
@@ -339,8 +334,8 @@ f.write('fidid, Q, S \n')
 for j in range(len(fidids)):
     fidid=fidids[j]
     output=fidid
-    output=output+', '+str(ptl.fidstates[fidid].read('Q'))+', '+str(ptl.fidstates[fidid].read('S'))+ '\n'
-    if int(ptl.fidstates[fidid].read('Q')) !=0:
+    output=output+', '+str(ptl.states[fidid].read('Q'))+', '+str(ptl.states[fidid].read('S'))+ '\n'
+    if int(ptl.states[fidid].read('Q')) !=0:
         f.write(output)
 
 f.close()
