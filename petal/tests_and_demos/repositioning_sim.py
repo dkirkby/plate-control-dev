@@ -1,6 +1,6 @@
 import os
 import sys
-sys.path.append(os.path.abspath('../../petal/'))
+sys.path.append(os.path.abspath('../'))
 import petal
 import cProfile
 import pstats
@@ -77,7 +77,7 @@ print(n_pos,' pos read')
 # Generate a simulated petal
 # timed test sequence
 anticollision = 'adjust'
-cProfile_wrapper("ptl = petal.Petal(petal_id, posids, fidids, simulator_on=True, db_commit_on=False, local_commit_on=True,verbose=True,anticollision="+anticollision+")")
+cProfile_wrapper("ptl = petal.Petal(petal_id, posids, fidids, simulator_on=True, db_commit_on=False, local_commit_on=True,verbose=True,petal_shape='asphere',anticollision='"+anticollision+"')")
 
 
 
@@ -93,22 +93,22 @@ for i in range(len(posids)):
     model = ptl.posmodels[posid]
     state = model.state
     postrans=model.trans
-    ptl.posmodels[posid].state.store('OFFSET_X',positioners[i]['OFFSET_X'])
-    ptl.posmodels[posid].state.store('OFFSET_Y',positioners[i]['OFFSET_Y'])
+    ptl.set_posfid_val(posid,'OFFSET_X',positioners[i]['OFFSET_X'])
+    ptl.set_posfid_val(posid,'OFFSET_Y',positioners[i]['OFFSET_Y'])
     offsetX_arr.append(float(positioners[i]['OFFSET_X']))
     offsetY_arr.append(float(positioners[i]['OFFSET_Y']))
-    ptl.posmodels[posid].state.store('OFFSET_T',positioners[i]['OFFSET_T'])
-    ptl.posmodels[posid].state.store('OFFSET_P',positioners[i]['OFFSET_P'])
-    ptl.posmodels[posid].state.store('LENGTH_R1',positioners[i]['LENGTH_R1'])
-    ptl.posmodels[posid].state.store('LENGTH_R2',positioners[i]['LENGTH_R2'])
-    ptl.posmodels[posid].state.store('CTRL_ENABLED',True)
-    ptl.posmodels[posid].state.store('POS_P',170)
-    ptl.posmodels[posid].state.store('POS_T',0)
-
+    ptl.set_posfid_val(posid,'OFFSET_T',positioners[i]['OFFSET_T'])
+    ptl.set_posfid_val(posid,'OFFSET_P',positioners[i]['OFFSET_P'])
+    ptl.set_posfid_val(posid,'LENGTH_R1',positioners[i]['LENGTH_R1'])
+    ptl.set_posfid_val(posid,'LENGTH_R2',positioners[i]['LENGTH_R2'])
+    ptl.set_posfid_val(posid,'CTRL_ENABLED',True)
+    ptl.set_posfid_val(posid,'POS_P',170)
+    ptl.set_posfid_val(posid,'POS_T',0)
+    ptl.set_posfid_val(posids[i],'PHYSICAL_RANGE_T',400.0)
+    ptl.set_posfid_val(posids[i],'PHYSICAL_RANGE_P',190.0)
 # timed test sequence
 cProfile_wrapper('ptl.request_homing(posids)')
 cProfile_wrapper('ptl.schedule_send_and_execute_moves()')
-
 
 #######################################
 ##  Request Targets###
@@ -181,12 +181,12 @@ for l in range(n_targets):
     patches.append(gfa_polygon)
     for i in range(len(posids)):
         posid=posids[i]
-        pos_t=ptl.posmodels[posid].state.read('POS_T')
-        pos_p=ptl.posmodels[posid].state.read('POS_P')
-        offset_X=ptl.posmodels[posid].state.read('OFFSET_X')
-        offset_Y=ptl.posmodels[posid].state.read('OFFSET_Y')
-        r1=ptl.posmodels[posid].state.read('LENGTH_R1')
-        r2=ptl.posmodels[posid].state.read('LENGTH_R2')
+        pos_t=ptl.get_posfid_val(posid,'POS_T')
+        pos_p=ptl.get_posfid_val(posid,'POS_P')
+        offset_X=ptl.get_posfid_val(posid,'OFFSET_X')
+        offset_Y=ptl.get_posfid_val(posid,'OFFSET_Y')
+        r1=ptl.get_posfid_val(posid,'LENGTH_R1')
+        r2=ptl.get_posfid_val(posid,'LENGTH_R2')
         postrans=ptl.posmodels[posid].trans
         obs_tp=postrans.posTP_to_obsTP([pos_t,pos_p])
         #xy=postrans.obsTP_to_flatXY(obs_tp)
@@ -227,7 +227,7 @@ for l in range(n_targets):
         postrans=ptl.posmodels[posid].trans
         #obs_tp=postrans.posTP_to_obsTP([pos_t,pos_p])
         #xy=postrans.obsTP_to_flatXY(obs_tp)
-        xy=postrans.posTP_to_obsXY([pos_t,pos_p])
+        xy=postrans.posTP_to_obsXY([pos_t,pos_p])  # obsXY
         offset_x_arr.append(xy[0]-target_x[k])
         offset_y_arr.append(xy[1]-target_y[k])
         offset_all_arr.append(np.sqrt((xy[0]-target_x[k])**2+(xy[1]-target_y[k])**2))
@@ -239,6 +239,8 @@ for l in range(n_targets):
             print(str(n_not_reach)+' positioners not reach targets')
             for i in range(len(ind)):
                 print(posids[ind[i]],offset_all_arr[ind[i]])
+        else:
+            n_not_reach=0
     t1=time.time()
     out_str=str(t1-t0)+'  ,  '+str(n_not_reach)+ ' \n'
     f.write(out_str)
