@@ -74,7 +74,6 @@ class PosTransforms(object):
                     'OFFSET_Y'  : 0.0,
                     'OFFSET_T'  : 0.0,
                     'OFFSET_P'  : 0.0}
-
     # SHAFT RANGES
     def shaft_ranges(self, range_limits):
         """Returns a set of range limits for the theta and phi axes. The argument
@@ -134,7 +133,8 @@ class PosTransforms(object):
         r = [self.posmodel.state.read('LENGTH_R1') if not self.alt_override else self.alt['LENGTH_R1'],
              self.posmodel.state.read('LENGTH_R2') if not self.alt_override else self.alt['LENGTH_R2']]
         shaft_ranges = self.shaft_ranges(range_limits)
-        obs_range = [self.posTP_to_obsTP(shaft_ranges[0]), self.posTP_to_obsTP(shaft_ranges[1])] # want range used in next line to be according to observer (since observer sees the physical phi = 0)
+        obs_range_tptp = [self.posTP_to_obsTP([shaft_ranges[0][0],shaft_ranges[1][0]]), self.posTP_to_obsTP([shaft_ranges[0][1],shaft_ranges[1][1]])] # want range used in next line to be according to observer (since observer sees the physical phi = 0)
+        obs_range=[[obs_range_tptp[0][0],obs_range_tptp[1][0]],[obs_range_tptp[0][1],obs_range_tptp[1][1]]]
         (tp, unreachable) = self.xy2tp(xy,r,obs_range)
         TP = self.obsTP_to_posTP(tp) # adjust angles back into shaft space
         return TP, unreachable
@@ -398,7 +398,6 @@ class PosTransforms(object):
         x = xy[0]
         y = xy[1]
         unreachable = False
-
         # adjust targets within reachable annulus
         hypot = (x**2.0 + y**2.0)**0.5
         angle = math.atan2(y,x)
@@ -406,6 +405,7 @@ class PosTransforms(object):
         inner = abs(r[0] - r[1])
         if hypot > outer or hypot < inner:
             unreachable = True
+            print('Target is outside of reachable regions')
         inner += numeric_contraction
         outer -= numeric_contraction
         HYPOT = hypot
@@ -432,14 +432,17 @@ class PosTransforms(object):
             if TP[i] < range_min:
                 TP[i] += math.floor((range_max - TP[i])/360.0)*360.0  # try +360 phase wrap
                 if TP[i] < range_min:
+                    print('TP',i,TP[i],' < range_min:',range_min,' thus unreachable')
+                    print('ranges[i]',ranges[i])
                     TP[i] = range_min
                     unreachable = True
             elif TP[i] > range_max:
                 TP[i] -= np.floor((TP[i] - range_min)/360.0)*360.0  # try -360 phase wrap
                 if TP[i] > range_max:
+                    print('TP ',i,TP[i],'> range_max:',range_max,' thus unreachable')
+                    print('ranges[i]',ranges[i])
                     TP[i] = range_max
                     unreachable = True
-
         # centralize theta
         T_ctr = (ranges[0][0] + ranges[0][1])/2.0
         T_options = pc.linspace(TP[0], T_ctr, n_theta_centralizing_iters)
