@@ -140,7 +140,7 @@ class FVCHandler(object):
                     sys.exit(0) # on the test stand, we definitely want to hard quit in this case
         return xy,peaks,fwhms,imgfiles
 
-    def measure_and_identify(self,expected_pos,expected_ref={}):
+    def measure_and_identify(self,expected_pos,expected_ref={}, pos_flags = None):
         """Calls for an FVC measurement, and returns a list of measured centroids.
         The centroids are in order according to their closeness to the list of
         expected xy values.
@@ -149,6 +149,8 @@ class FVCHandler(object):
 
         INPUT:  expected_pos ... dict of dicts giving expected positioner fiber locations
                 expected_ref ... dict of dicts giving expected fiducial dot positions, not needed when using fvcproxy
+                pos_flags    ... (optional) dict keyed by positioner indicating which flag as indicated below that a
+                                 positioner should receive going to the FLI camera with fvcproxy
                 
                 The expected_pos and expected ref dot dicts should have primary keys
                 be the posid or sub-fidid (of each dot), and the sub-keys should include
@@ -156,6 +158,11 @@ class FVCHandler(object):
                 calls like:
                     expected_pos['M00001']['obsXY']
                     expected_ref['F001.0']['obsXY']
+
+                flags    2 : pinhole center 
+                         4 : fiber center 
+                         8 : fiducial center 
+                        32 : bad fiber or fiducial 
 
         OUTPUT: measured_pos ... list of measured positioner fiber locations
                 measured_ref ... list of measured fiducial dot positions
@@ -185,7 +192,10 @@ class FVCHandler(object):
             fiber_ctr_flag = 4 # this enumeration is specific to Yale/FLI FVC interface
             for posid in posids:
                 qs = self.trans.obsXY_to_QS(expected_pos[posid]['obsXY'])
-                expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':fiber_ctr_flag})
+                if posid in pos_flags:
+                    expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':pos_flags[posid]})
+                else: #Assume it is good, old default behavior
+                    expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':fiber_ctr_flag})
             measured_qs = self.fvcproxy.measure(expected_qs)
             for qs_dict in measured_qs:
                 qs = [qs_dict['q'], qs_dict['s']]
@@ -334,10 +344,10 @@ class FVCHandler(object):
         if xy != []:
             if self.fvcproxy:
                 #Temporary hack, data passed in wrong format
-                if isinstance(xy[0][0],	list):
+                if isinstance(xy[0][0], list):
                     xy_new = [[xy[0][0][i],xy[0][1][i]] for i in range(len(xy[0][0]))]
                     xy = xy_new
-                #End of	hack
+                #End of hack
                 spotids = [i for i in range(len(xy))]
                 qs = [self.trans.obsXY_to_QS(this_xy) for this_xy in xy]
                 qs_dicts = [{'spotid':spotids[i],'q':qs[i][0],'s':qs[i][1]} for i in range(len(spotids))]
