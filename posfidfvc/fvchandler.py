@@ -140,7 +140,7 @@ class FVCHandler(object):
                     sys.exit(0) # on the test stand, we definitely want to hard quit in this case
         return xy,peaks,fwhms,imgfiles
 
-    def measure_and_identify(self,expected_pos,expected_ref={}, pos_flags = None):
+    def measure_and_identify(self,expected_pos,expected_ref={}, pos_flags = {}):
         """Calls for an FVC measurement, and returns a list of measured centroids.
         The centroids are in order according to their closeness to the list of
         expected xy values.
@@ -192,7 +192,7 @@ class FVCHandler(object):
             fiber_ctr_flag = 4 # this enumeration is specific to Yale/FLI FVC interface
             for posid in posids:
                 qs = self.trans.obsXY_to_QS(expected_pos[posid]['obsXY'])
-                if posid in pos_flags:
+                if posid in pos_flags.keys():
                     expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':pos_flags[posid]})
                 else: #Assume it is good, old default behavior
                     expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':fiber_ctr_flag})
