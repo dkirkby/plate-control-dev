@@ -50,7 +50,7 @@ class Petal(object):
         
         # petal setup
         self.petal_id = petal_id
-        self.verbose = verbose # whether to print verbose information at the terminal
+        self.verbose =# whether to print verbose information at the terminal
         self.simulator_on = simulator_on
         if not(self.simulator_on):
             import petalcomm
@@ -158,21 +158,34 @@ class Petal(object):
             
             In cases where the request was made to a disabled positioner, the subdictionary will be
             deleted from the return.
+
+            pos_flags ... dict keyed by positioner indicating which flag as indicated below that a
+                          positioner should receive going to the FLI camera with fvcproxy
+                flags    2 : pinhole center 
+                         4 : fiber center 
+                         8 : fiducial center 
+                        32 : bad fiber or fiducial 
         """
         marked_for_delete = set()
+        pos_flags = {}
         for posid in requests:
             requests[posid]['posmodel'] = self.posmodels[posid]
+            pos_flags[posid] = '4'
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
-            if not(self.get_posfid_val(posid,'CTRL_ENABLED')) or self.schedule.already_requested(posid):
+            if not(self.get_posfid_val(posid,'CTRL_ENABLED')):
+                pos_flags[posid] = '32'
+                marked_for_delete.add(posid)
+            elif self.schedule.already_requested(posid):
                 marked_for_delete.add(posid)
             else:
                 accepted = self.schedule.request_target(posid, requests[posid]['command'], requests[posid]['target'][0], requests[posid]['target'][1], requests[posid]['log_note'])            
                 if not accepted:
+                    pos_flags[posid] = '32'
                     marked_for_delete.add(posid)
         for posid in marked_for_delete:
             del requests[posid]
-        return requests
+        return requests, pos_flags
 
     def request_direct_dtdp(self, requests, cmd_prefix=''):
         """Put in requests to the scheduler for specific positioners to move by specific rotation
@@ -219,15 +232,20 @@ class Petal(object):
                     
             In cases where the request was made to a disabled positioner, the subdictionary will be
             deleted from the return.
+
+            pos_flags ... dictionary, contains appropriate positioner flags for FVC see request_targets()
             
         It is allowed to repeatedly request_direct_dtdp on the same positioner, in cases where one
         wishes a sequence of theta and phi rotations to all be done in one shot. (This is unlike the
         request_targets command, where only the first request to a given positioner would be valid.)
         """
+        pos_flags = {}
         marked_for_delete = {posid for posid in requests if not(self.get_posfid_val(posid,'CTRL_ENABLED'))}
         for posid in marked_for_delete:
+            pos_flags[posid] = '32'
             del requests[posid]
         for posid in requests:
+            pos_flags[posid] = '4'
             requests[posid]['posmodel'] = self.posmodels[posid]
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
@@ -239,7 +257,7 @@ class Petal(object):
             table.log_note += (' ' if table.log_note else '') + requests[posid]['log_note']
             table.allow_exceed_limits = True
             self.schedule.expert_add_table(table)
-        return requests            
+        return requests, pos_flags            
 
     def request_limit_seek(self, posids, axisid, direction, anticollision='freeze', cmd_prefix='', log_note=''):
         """Request hardstop seeking sequence for a single positioner or all positioners
@@ -418,13 +436,17 @@ class Petal(object):
                     log_note  ... optional string to include in the log file
                     anticollsion  ... see comments in schedule_moves() function
                     should_anneal ... see comments in schedule_moves() function
+
+        OUTPUTS:    requests  ... dictionary, see request_targets()
+                    pos_flags ... dictionary, contains appropriate positioner flags for FVC see request_targets()
         """
         requests = {}
         posids = {posids} if isinstance(posids,str) else set(posids)
         for posid in posids:
             requests[posid] = {'command':command, 'target':target, 'log_note':log_note}
-        self.request_targets(requests)
+        requests, pos_flags = self.request_targets(requests)
         self.schedule_send_and_execute_moves(anticollision,should_anneal)
+        return requests, pos_flags
 
     def quick_direct_dtdp(self, posids, dtdp, log_note='', should_anneal=True):
         """Convenience wrapper to request, schedule, send, and execute a single move command for a
@@ -436,13 +458,17 @@ class Petal(object):
                     dtdp      ... [dt,dp], note that all posids get sent the same [dt,dp] here. i.e. dt and dp are each just one number
                     log_note  ... optional string to include in the log file
                     should_anneal ... see comments in schedule_moves() function
+
+        OUTPUTS:    requests  ... dictionary, see request_direct_dpdt()
+                    pos_flags ... dictionary, contains appropriate positioner flags for FVC see request_targets()
         """
         requests = {}
         posids = {posids} if isinstance(posids,str) else set(posids)
         for posid in posids:
             requests[posid] = {'target':dtdp, 'log_note':log_note}
-        self.request_direct_dtdp(requests)
+        requests, pos_flags = self.request_direct_dtdp(requests)
         self.schedule_send_and_execute_moves(None,should_anneal)
+        return requests, pos_flags
 
 # METHODS FOR FIDUCIAL CONTROL        
     def set_fiducials(self, fidids='all', setting='on', save_as_default=False):
