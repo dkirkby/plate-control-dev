@@ -304,8 +304,9 @@ class PosMoveMeasure(object):
             for petal,these_posids in posids_by_petal.items():
                 for posid in these_posids:
                     xy = data[posid]
-                    petal.set_posfid_val(posid,'OFFSET_X',xy[0])
-                    petal.set_posfid_val(posid,'OFFSET_Y',xy[1])
+                    if petal.posmodels[posid].is_enabled():
+                        petal.set_posfid_val(posid,'OFFSET_X',xy[0])
+                        petal.set_posfid_val(posid,'OFFSET_Y',xy[1])
                     self.printfunc(posid + ': Set OFFSET_X to ' + self.fmt(xy[0]))
                     self.printfunc(posid + ': Set OFFSET_Y to ' + self.fmt(xy[1]))
         self.commit() # log note is already handled above
@@ -356,7 +357,8 @@ class PosMoveMeasure(object):
                     step_measured += direction * 360
                 total_angle += step_measured
             total_angle = abs(total_angle)
-            data[posid]['petal'].set_posfid_val(posid,parameter_name,total_angle)
+            if data[posid]['petal'].posmodels[posid].is_enabled():
+                data[posid]['petal'].set_posfid_val(posid,parameter_name,total_angle)
         self.commit(log_note='range measurement complete')
         self.rehome(posids)
         self.one_point_calibration(posids, mode='posTP')
@@ -397,7 +399,8 @@ class PosMoveMeasure(object):
                 keys_to_reset = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P']
                 for key in keys_to_reset:
                     for posid in these_posids:
-                        petal.set_posfid_val(posid, key, pc.nominals[key]['value'])
+                        if petal.posmodels[posid].is_enabled():
+                            petal.set_posfid_val(posid, key, pc.nominals[key]['value'])
             if self.fvc.fvcproxy:
                 old_spotmatch_radius = self.fvc.fvcproxy.get('match_radius')
                 self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)
@@ -823,7 +826,8 @@ class PosMoveMeasure(object):
             trans.alt_override = False
             petal = data[posid]['petal']
             for key in param_keys:
-                petal.set_posfid_val(posid, key, data[posid][key][-1])
+                if petal.posmodels[posid].is_enabled():
+                    petal.set_posfid_val(posid, key, data[posid][key][-1])
                 self.printfunc('Grid calib on ' + str(posid) + ': ' + key + ' set to ' + format(data[posid][key][-1],'.3f'))
             data[posid]['final_expected_obsXY'] = np.array(expected_xy(params_optimized.x)).transpose().tolist()
         return data
@@ -848,14 +852,16 @@ class PosMoveMeasure(object):
             p_ctr = np.array(P[posid]['xy_center'])
             length_r1 = np.sqrt(np.sum((t_ctr - p_ctr)**2))
             length_r2 = P[posid]['radius']
-            ptl.set_posfid_val(posid,'LENGTH_R1',length_r1)
-            ptl.set_posfid_val(posid,'LENGTH_R2',length_r2)
-            ptl.set_posfid_val(posid,'OFFSET_X',t_ctr[0])
-            ptl.set_posfid_val(posid,'OFFSET_Y',t_ctr[1])
+            if ptl.posmodels[posid].is_enabled():
+                ptl.set_posfid_val(posid,'LENGTH_R1',length_r1)
+                ptl.set_posfid_val(posid,'LENGTH_R2',length_r2)
+                ptl.set_posfid_val(posid,'OFFSET_X',t_ctr[0])
+                ptl.set_posfid_val(posid,'OFFSET_Y',t_ctr[1])
             p_meas_obsT = np.arctan2(p_ctr[1]-t_ctr[1], p_ctr[0]-t_ctr[0]) * 180/np.pi
             offset_t = p_meas_obsT - p_targ_posT[0] # just using the first target theta angle in the phi sweep
             offset_t = self._centralized_angular_offset_value(offset_t)
-            ptl.set_posfid_val(posid,'OFFSET_T',offset_t)
+            if ptl.posmodels[posid].is_enabled():
+                ptl.set_posfid_val(posid,'OFFSET_T',offset_t)
             xy = np.array(p_meas_obsXY)
             angles = np.arctan2(xy[:,1]-p_ctr[1], xy[:,0]-p_ctr[0]) * 180/np.pi
             p_meas_obsP = angles - p_meas_obsT
@@ -864,7 +870,8 @@ class PosMoveMeasure(object):
             p_meas_obsP_wrapped = self._wrap_consecutive_angles(p_meas_obsP.tolist(), expected_direction)
             offset_p = np.median(np.array(p_meas_obsP_wrapped) - np.array(p_targ_posP))
             offset_p = self._centralized_angular_offset_value(offset_p)
-            ptl.set_posfid_val(posid,'OFFSET_P',offset_p)
+            if ptl.posmodels[posid].is_enabled():
+                ptl.set_posfid_val(posid,'OFFSET_P',offset_p)
             p_meas_posP_wrapped = (np.array(p_meas_obsP_wrapped) - offset_p).tolist()
             
             # unwrap thetas
@@ -896,7 +903,7 @@ class PosMoveMeasure(object):
             ratio_P = np.median(ratios_P)
             data[posid]['gear_ratio_T'] = ratio_T
             data[posid]['gear_ratio_P'] = ratio_P            
-            if set_gear_ratios:
+            if set_gear_ratios and ptl.posmodels[posid].is_enabled()::
                 ptl.set_posfid_val(posid,'GEAR_CALIB_T',ratio_T)
                 ptl.set_posfid_val(posid,'GEAR_CALIB_P',ratio_P)
             else:
@@ -1072,34 +1079,35 @@ class PosMoveMeasure(object):
             err_xy = ((measured_obsXY[0]-expected_obsXY[0])**2 + (measured_obsXY[1]-expected_obsXY[1])**2)**0.5
             if err_xy > self.tp_updates_tol:
                 posmodel = self.posmodel(posid)
-                expected_posTP = ptl.expected_current_position(posid,'posTP')
-                measured_posTP = posmodel.trans.obsXY_to_posTP(measured_data[posid],range_limits='full')[0]
-                T_options = measured_posTP[0] + np.array([0,360,-360])
-                T_diff = np.abs(T_options - expected_posTP[0])
-                T_best = T_options[np.argmin(T_diff)]
-                measured_posTP[0] = T_best
-                delta_T = (measured_posTP[0] - expected_posTP[0]) * self.tp_updates_fraction
-                delta_P = (measured_posTP[1] - expected_posTP[1]) * self.tp_updates_fraction
-                if tp_updates == 'offsetsTP' or tp_updates == 'offsetsTP_close':
-                    param = 'OFFSET'
-                else:
-                    param = 'POS'
-                old_T = ptl.get_posfid_val(posid,param + '_T')
-                old_P = ptl.get_posfid_val(posid,param + '_P')              
-                new_T = old_T + delta_T
-                new_P = old_P + delta_P
-                if tp_updates == 'offsetsTP' or tp_updates == 'offsetsTP_close' :
-                    ptl.set_posfid_val(posid,'OFFSET_T',new_T)
-                    ptl.set_posfid_val(posid,'OFFSET_P',new_P)
-                    self.printfunc(posid + ': Set OFFSET_T to ' + self.fmt(new_T))
-                    self.printfunc(posid + ': Set OFFSET_P to ' + self.fmt(new_P))                    
-                else:
-                    posmodel.axis[pc.T].pos = new_T
-                    posmodel.axis[pc.P].pos = new_P
-                    self.printfunc(posid + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_T from ' + self.fmt(old_T) + ' to ' + self.fmt(new_T))
-                    self.printfunc(posid + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
-                delta_TP[posid] = [delta_T,delta_P]
-                posmodel.state.next_log_notes.append('updated ' + param + '_T and ' + param + '_P after positioning error of ' + self.fmt(err_xy) + ' mm')
+                if posmodel.is_enabled():
+                    expected_posTP = ptl.expected_current_position(posid,'posTP')
+                    measured_posTP = posmodel.trans.obsXY_to_posTP(measured_data[posid],range_limits='full')[0]
+                    T_options = measured_posTP[0] + np.array([0,360,-360])
+                    T_diff = np.abs(T_options - expected_posTP[0])
+                    T_best = T_options[np.argmin(T_diff)]
+                    measured_posTP[0] = T_best
+                    delta_T = (measured_posTP[0] - expected_posTP[0]) * self.tp_updates_fraction
+                    delta_P = (measured_posTP[1] - expected_posTP[1]) * self.tp_updates_fraction
+                    if tp_updates == 'offsetsTP' or tp_updates == 'offsetsTP_close':
+                        param = 'OFFSET'
+                    else:
+                        param = 'POS'
+                    old_T = ptl.get_posfid_val(posid,param + '_T')
+                    old_P = ptl.get_posfid_val(posid,param + '_P')              
+                    new_T = old_T + delta_T
+                    new_P = old_P + delta_P
+                    if tp_updates == 'offsetsTP' or tp_updates == 'offsetsTP_close' :
+                        ptl.set_posfid_val(posid,'OFFSET_T',new_T)
+                        ptl.set_posfid_val(posid,'OFFSET_P',new_P)
+                        self.printfunc(posid + ': Set OFFSET_T to ' + self.fmt(new_T))
+                        self.printfunc(posid + ': Set OFFSET_P to ' + self.fmt(new_P))                    
+                    else:
+                        posmodel.axis[pc.T].pos = new_T
+                        posmodel.axis[pc.P].pos = new_P
+                        self.printfunc(posid + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_T from ' + self.fmt(old_T) + ' to ' + self.fmt(new_T))
+                        self.printfunc(posid + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
+                    delta_TP[posid] = [delta_T,delta_P]
+                    posmodel.state.next_log_notes.append('updated ' + param + '_T and ' + param + '_P after positioning error of ' + self.fmt(err_xy) + ' mm')
         return delta_TP
                 
     @property
