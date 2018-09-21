@@ -645,6 +645,8 @@ class MoveGUI(object):
                 self.text2.insert('0.0','Cannot find this positioner...\n')
             else:
                 row_id=ind[0][0]+row_skip+1
+                googlesheets.write(self.sheet2,row_id,21,self.e6.get(),False,False)
+                googlesheets.write(self.sheet2,row_id,22,self.e4.get(),False,False)
                 if self.theta_work.get()==1:
                     googlesheets.write(self.sheet2,row_id,23,'YES',False,False)
                 else:
