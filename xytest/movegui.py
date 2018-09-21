@@ -250,33 +250,35 @@ class MoveGUI(object):
         
         self.theta_work=IntVar(gui_root)
         self.phi_work=IntVar(gui_root)
+        self.centerd=IntVar(gui_root)
         self.theta_work.set(1)
         self.phi_work.set(1)
-        
+        self.centered.set(0) 
         column_entry=7
-        Checkbutton(gui_root, text='Theta Work?', variable=self.theta_work).grid(row=6,column=column_entry,sticky=W,pady=4)
-        Checkbutton(gui_root, text='Phi Work?', variable=self.phi_work).grid(row=7,column=column_entry,sticky=W,pady=4)
-        
-        Label(gui_root,text="Note").grid(row=8,column=column_entry)
-        self.e3=Entry(gui_root)
-        self.e3.grid(row=8,column=column_entry+1)
+        Checkbutton(gui_root, text='Theta Work?', variable=self.theta_work).grid(row=5,column=column_entry,sticky=W,pady=4)
+        Checkbutton(gui_root, text='Phi Work?', variable=self.phi_work).grid(row=6,column=column_entry,sticky=W,pady=4)
+        Checkbutton(gui_root, text='Centered?', variable=self.centered).grid(row=7,column=column_entry,sticky=W,pady=4)
+ 
+        #Label(gui_root,text="Note").grid(row=8,column=column_entry)
+        #self.e3=Entry(gui_root)
+        #self.e3.grid(row=8,column=column_entry+1)
         Label(gui_root,text="Send PFA Date").grid(row=9,column=column_entry)
         self.e4=Entry(gui_root)
         self.e4.insert(END,'{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
         self.e4.grid(row=9,column=column_entry+1)
-        Label(gui_root,text="Send PFA Name").grid(row=10,column=column_entry)
-        self.e5=Entry(gui_root)
-        self.e5.grid(row=10,column=column_entry+1)
-        Label(gui_root,text="Tote").grid(row=11,column=column_entry)
-        self.box_options = [    "GREY TOTE\n---------\nREADY FOR PFA INSTALL",    "GREY TOTE\n---------\nINCOMING INSPECTION IN PROGRESS",    "LARGE TOTE\n--------\nFAIL REVIEW LATER", "LARGE TOTE\n--------\nFAIL PERMANENT"]
-        self.box_goto = StringVar(gui_root)
-        self.box_goto.set("Where will you put me?") # default value
-        self.drop1 = OptionMenu(gui_root, self.box_goto, *self.box_options)
-        self.drop1.grid(row=11,column=column_entry+1)
+        #Label(gui_root,text="Send PFA Name").grid(row=10,column=column_entry)
+        #self.e5=Entry(gui_root)
+        #self.e5.grid(row=10,column=column_entry+1)
+        #Label(gui_root,text="Tote").grid(row=11,column=column_entry)
+        #self.box_options = [    "GREY TOTE\n---------\nREADY FOR PFA INSTALL",    "GREY TOTE\n---------\nINCOMING INSPECTION IN PROGRESS",    "LARGE TOTE\n--------\nFAIL REVIEW LATER", "LARGE TOTE\n--------\nFAIL PERMANENT"]
+        #self.box_goto = StringVar(gui_root)
+        #self.box_goto.set("Where will you put me?") # default value
+        #self.drop1 = OptionMenu(gui_root, self.box_goto, *self.box_options)
+        #self.drop1.grid(row=11,column=column_entry+1)
 
-        #Label(gui_root,text="Update DB?, your init").grid(row=12,column=column_entry)
-        #self.e6=Entry(gui_root)
-        #self.e6.grid(row=12,column=column_entry+1)
+        Label(gui_root,text="Your init").grid(row=12,column=column_entry)
+        self.e6=Entry(gui_root)
+        self.e6.grid(row=12,column=column_entry+1)
         
 
         
@@ -655,6 +657,12 @@ class MoveGUI(object):
                     googlesheets.write(self.sheet2,row_id,24,'YES',False,False)
                 else:
                     googlesheets.write(self.sheet2,row_id,24,'NO',False,False)
+                if self.centered.get()==1:
+                    googlesheets.write(self.sheet2,row_id,25,'YES',False,False)
+                    self.centered.set(0)
+                else:
+                    googlesheets.write(self.sheet2,row_id,25,'NO',False,False)
+
 
                 self.load_acceptance_traveller()
  
