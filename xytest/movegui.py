@@ -22,7 +22,7 @@ MoveGUI
 #          V1.1  Kai Zhang, 2018-04-02. Add canbus input to talk to different cans for EM Petal. 
 #          V1.2  Kai Zhang  2018-05-01. Add Reload Canbus botton so that no restart is needed. Facilitate the petal check. 
 """
-account='badu'
+account='msdos'
 import os
 import sys
 import datetime
@@ -229,9 +229,9 @@ class MoveGUI(object):
         self.e_selected=Entry(gui_root)
         self.e_selected.grid(row=3,column=6)
         
-        #Button(gui_root,text='Load Acceptance Traveller',width=20,command=self.load_acceptance_traveller).grid(row=4,column=5,sticky=W,pady=4)
-        #Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=4,column=6,sticky=W,pady=4)
-        #Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=13,column=8,sticky=W,pady=4)
+        Button(gui_root,text='Load Acceptance Traveller',width=20,command=self.load_acceptance_traveller).grid(row=4,column=5,sticky=W,pady=4)
+        Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=4,column=6,sticky=W,pady=4)
+        Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=13,column=8,sticky=W,pady=4)
         
         yscroll_text2 = Scrollbar(gui_root, orient=tkinter.VERTICAL)
         yscroll_text2.grid(row=6, column=6, rowspan=20,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)     
@@ -248,18 +248,12 @@ class MoveGUI(object):
 
 ##      checkboxes
         
-        self.plug=IntVar(gui_root)
-        self.entered=IntVar(gui_root)
         self.theta_work=IntVar(gui_root)
         self.phi_work=IntVar(gui_root)
-        self.plug.set(1)
-        self.entered.set(1)
         self.theta_work.set(1)
         self.phi_work.set(1)
         
         column_entry=7
-        Checkbutton(gui_root, text='Plug?', variable=self.plug).grid(row=4,column=column_entry,sticky=W,pady=4)
-        Checkbutton(gui_root, text='POS INFO Entered?', variable=self.entered).grid(row=5,column=column_entry,sticky=W,pady=4)
         Checkbutton(gui_root, text='Theta Work?', variable=self.theta_work).grid(row=6,column=column_entry,sticky=W,pady=4)
         Checkbutton(gui_root, text='Phi Work?', variable=self.phi_work).grid(row=7,column=column_entry,sticky=W,pady=4)
         
@@ -612,52 +606,24 @@ class MoveGUI(object):
             self.text2.insert('0.0','Cannot load all positioners simultaneously. \nSelect one positioner.\n')
         else: 
             # Find the column we want first
-            pos_list=googlesheets.read_row(self.sheet2,2,False)
-            column_skip=6 # Skip the first 6 description columns
-            pos_list=np.array(pos_list[column_skip:])
+            pos_list=googlesheets.read_col(self.sheet2,1,False)
+            row_skip=1 # Skip the first 6 description columns
+            pos_list=np.array(pos_list[row_skip:])
             selected_can_str=str(self.selected_can)
             selected_can_str.strip()
             ind=np.where(pos_list == selected_can_str)          
             if not ind[0]:
                 self.text2.insert('0.0','Cannot find this positioner while loading... \n')
             else:
-                col_id=ind[0][0]+column_skip+1
-                column_info=googlesheets.read_col(self.sheet2,col_id,False)
-                column_info_title=googlesheets.read_col(self.sheet2,2,False)
+                row_id=ind[0][0]+row_skip+1
+                row_info=googlesheets.read_row(self.sheet2,row_id,False)
+                row_info_title=googlesheets.read_row(self.sheet2,1,False)
                 ref_list=['', '', '', '', '', '', '', '',  'A','','', '', '', '', '','','Y', 'Y', 'Y', 'B', 'B', 'N', 'Y', 'N', 'Y', 'N', 'Y', 'N', 'N', 'Y', 'Y', 'A', 'P', '', '', '', '', 'Y', 'Y', 'Y', 'Y', '', '', '', '', '', '', '', '', '', '', '', '', '', '','','','','','']
                 #['', '', '', '2017-10-23', '', '1748', '5899', '', '', 'John Mourelatos', '2017-10-23', '', '1.15', 'A', '4.3', 'A', '', '', '', 'John Mourelatos', '2017-10-23', 'Y', 'Y', 'Y', 'B', 'B', 'N', 'Y', 'N', 'Y', 'N', 'Y', 'N', 'N', 'Y', 'Y', 'A', '', '', 'John Mourelatos', '2017-10-23', 'P', '0.00997', '0.12588', 'SKIP', 'SKIP', '', '', 'Y', 'Y', 'Y', 'Y', '', '', '', '', '0.13585', '', 'YES', '', '', '', '2017-11-03', 'KAI ZHANG', 'GREY TOTE\n---------\nREADY FOR PFA INSTALL', 'KZ']
                  
-                for i in range(len(column_info)):
-                    if ref_list[i] == '' or column_info[i] == ref_list[i]:
-                        if column_info_title[i] == 'DOCUMENT_DEVIATION' and column_info[i] != '':
-                            self.text2.insert(END,str(column_info_title[i])+': ','big')
-                            self.text2.insert(END,str(column_info[i])+'\n','yellow')
-                        elif column_info_title[i] == 'ENVELOPE_GAGE' and column_info[i] in ['C','D']:
-                            self.text2.insert(END,str(column_info_title[i])+': ','big')
-                            self.text2.insert(END,str(column_info[i])+'\n','red')
-                        elif column_info_title[i] == 'ENVELOPE_GAGE' and column_info[i] == '':
-                            self.text2.insert(END,str(column_info_title[i])+': ','yellow')                        
-                        elif column_info_title[i] == 'THETA_PHI_ANGLE' and float(column_info[i])>0.5:
-                            self.text2.insert(END,str(column_info_title[i])+': ','big')
-                            self.text2.insert(END,str(column_info[i])+'\n','red')
-                        elif column_info_title[i] == 'FERRULE_PHI_ANGLE' and float(column_info[i])>0.5:
-                            self.text2.insert(END,str(column_info_title[i])+': ','big')
-                            self.text2.insert(END,str(column_info[i])+'\n','red')
-                        elif column_info_title[i] == 'COMBINED_ANGLE':
-                            if column_info[i] == '':
-                               self.text2.insert(END,str(column_info_title[i])+': \n','yellow') 
-                            elif float(column_info[i])>0.5:
-                                self.text2.insert(END,str(column_info_title[i])+': ','big')
-                                self.text2.insert(END,str(column_info[i])+'\n','red')
-                            else:
-                                self.text2.insert(END,str(column_info_title[i])+': ','big')
-                                self.text2.insert(END,str(column_info[i])+'\n','green')
-                        else:
-                            self.text2.insert(END,str(column_info_title[i])+': ','big')
-                            self.text2.insert(END,str(column_info[i])+'\n','green')
-                    else:
-                        self.text2.insert(END,str(column_info_title[i])+': ','big')
-                        self.text2.insert(END,str(column_info[i])+'\n','red')
+                for i in range(len(row_info)):
+                    self.text2.insert(END,str(row_info_title[i])+': ','big')
+                    self.text2.insert(END,str(row_info[i])+'\n','red')
         
         
         
@@ -667,47 +633,29 @@ class MoveGUI(object):
         self.e4.insert(END,'{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
         if self.selected_can == 20000:
             self.text2.insert('0.0','Cannot write all positioners simultaneously for safety reason. \nSelect one positioner.\n')
-        else: 
+        else:
             # Find the column we want first
-            pos_list=googlesheets.read_row(self.sheet2,2,False)
-            column_skip=6 # Skip the first 6 description columns
-            pos_list=np.array(pos_list[column_skip:])
+            pos_list=googlesheets.read_col(self.sheet2,1,False)
+            row_skip=1 # Skip the first 6 description columns
+            pos_list=np.array(pos_list[row_skip:])
             selected_can_str=str(self.selected_can)
             selected_can_str.strip()
-            ind=np.where(pos_list == selected_can_str)          
+            ind=np.where(pos_list == selected_can_str)
             if not ind[0]:
                 self.text2.insert('0.0','Cannot find this positioner...\n')
             else:
-                col_id=ind[0][0]+column_skip+1
-                if self.plug.get()==1:
-                    googlesheets.write(self.sheet2,38,col_id,'Y',False,False)
-                else:
-                    googlesheets.write(self.sheet2,38,col_id,'N',False,False)
-                if self.entered.get()==1:
-                    googlesheets.write(self.sheet2,39,col_id,'Y',False,False)
-                else:
-                    googlesheets.write(self.sheet2,39,col_id,'N',False,False)
+                row_id=ind[0][0]+row_skip+1
                 if self.theta_work.get()==1:
-                    googlesheets.write(self.sheet2,40,col_id,'Y',False,False)
+                    googlesheets.write(self.sheet2,row_id,23,'YES',False,False)
                 else:
-                    googlesheets.write(self.sheet2,40,col_id,'N',False,False)
+                    googlesheets.write(self.sheet2,row_id,23,'NO',False,False)
                 if self.phi_work.get()==1:
-                    googlesheets.write(self.sheet2,41,col_id,'Y',False,False)
+                    googlesheets.write(self.sheet2,row_id,24,'YES',False,False)
                 else:
-                    googlesheets.write(self.sheet2,41,col_id,'N',False,False)
-                googlesheets.write(self.sheet2,42,col_id,self.e3.get(),False,False)  #53 before
-                if self.box_goto.get() == self.box_options[0]:   # If accept for PFA installation
-                    googlesheets.write(self.sheet2,58,col_id,self.e4.get(),False,False)
-                    googlesheets.write(self.sheet2,59,col_id,self.e5.get(),False,False)
-                    googlesheets.write(self.sheet2,60,col_id,self.box_goto.get(),False,False)
-                    googlesheets.write(self.sheet2,61,'Y',False,False)
-                else:
-                    googlesheets.write(self.sheet2,58,col_id,'No',False,False)
-                    googlesheets.write(self.sheet2,59,col_id,'No',False,False)
-                    googlesheets.write(self.sheet2,60,col_id,self.box_goto.get(),False,False)
-                    googlesheets.write(self.sheet2,61,'Y',False,False)
+                    googlesheets.write(self.sheet2,row_id,24,'NO',False,False)
+
                 self.load_acceptance_traveller()
-    
+ 
     
     def restart(self):
         gui_root.destroy()
