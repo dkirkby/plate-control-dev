@@ -250,7 +250,7 @@ class MoveGUI(object):
         
         self.theta_work=IntVar(gui_root)
         self.phi_work=IntVar(gui_root)
-        self.centerd=IntVar(gui_root)
+        self.centered=IntVar(gui_root)
         self.theta_work.set(1)
         self.phi_work.set(1)
         self.centered.set(0) 
