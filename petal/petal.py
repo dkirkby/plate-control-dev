@@ -50,7 +50,7 @@ class Petal(object):
         
         # petal setup
         self.petal_id = petal_id
-        self.verbose =# whether to print verbose information at the terminal
+        self.verbose = verbose# whether to print verbose information at the terminal
         self.simulator_on = simulator_on
         if not(self.simulator_on):
             import petalcomm
