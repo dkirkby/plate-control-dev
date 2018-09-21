@@ -903,7 +903,7 @@ class PosMoveMeasure(object):
             ratio_P = np.median(ratios_P)
             data[posid]['gear_ratio_T'] = ratio_T
             data[posid]['gear_ratio_P'] = ratio_P            
-            if set_gear_ratios and ptl.posmodels[posid].is_enabled()::
+            if set_gear_ratios and ptl.posmodels[posid].is_enabled():
                 ptl.set_posfid_val(posid,'GEAR_CALIB_T',ratio_T)
                 ptl.set_posfid_val(posid,'GEAR_CALIB_P',ratio_P)
             else:
