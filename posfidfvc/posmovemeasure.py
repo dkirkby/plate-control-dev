@@ -114,8 +114,8 @@ class PosMoveMeasure(object):
             returned_requests, pos_flags_petal = petal.request_targets(these_requests)            
             petal.schedule_send_and_execute_moves() # in future, may do this in a different thread for each petal
             for posid in pos_flags_petal.keys():
-                if pos_flag_petal[posid] == '4' and not(petal.get_posfid_val(posid,'CTRL_ENABLED')):
-                    pos_flag_petal[posid] = '32'
+                if pos_flags_petal[posid] == '4' and not(petal.get_posfid_val(posid,'CTRL_ENABLED')):
+                    pos_flags_petal[posid] = '32'
             pos_flags.update(pos_flags_petal)
         return pos_flags
 
