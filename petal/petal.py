@@ -265,7 +265,10 @@ class Petal(object):
         descriptive string to the log. This method is generally recommended only for
         expert usage. Requests to disabled positioners will be ignored.
         """
+        pos_flags = {}
         posids = {posids} if isinstance(posids,str) else set(posids)
+        for posid in posids:
+            pos_flags[posid] = '32'
         enabled = self.enabled_posmodels(posids)
         if anticollision:
             if axisid == pc.P and direction == -1:
@@ -276,7 +279,8 @@ class Petal(object):
                 # request anticollision-safe moves to current thetas and all phis within Ei
                 # Eo has a bit more possible collisions, for example against a stuck-extended neighbor. Costs a bit more time/power to go to Ei, but limit-seeking is not a frequent operation.
                 pass
-        for posmodel in enabled.values():
+        for posid, posmodel in enabled.items():
+            pos_flags[posid] = '4'
             search_dist = pc.sign(direction)*posmodel.axis[axisid].limit_seeking_search_distance
             table = posmovetable.PosMoveTable(posmodel)
             table.should_antibacklash = False
@@ -298,18 +302,23 @@ class Petal(object):
                 direction_cmd_suffix = '.maxpos\n'
             posmodel.axis[axisid].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + direction_cmd_suffix
             self.schedule.expert_add_table(table)
+        return pos_flags
 
     def request_homing(self, posids):
         """Request homing sequence for positioners in single posid or iterable collection of
         posids. Finds the primary hardstop, and sets values for the max position and min position.
         Requests to disabled positioners will be ignored.
         """
+        pos_flags = {}
         posids = {posids} if isinstance(posids,str) else set(posids)
+        for posid in posids:
+            pos_flags[posid] = '32'
         enabled = self.enabled_posmodels(posids)
         hardstop_debounce = [0,0]
         direction = [0,0]
         direction[pc.P] = +1 # force this, because anticollision logic depends on it
         for posid in enabled:
+            pos_flags[posid] = '4'
             self.request_limit_seek(posid, pc.P, direction[pc.P], anticollision=self.anticollision_default, cmd_prefix='P', log_note='homing')
         self.schedule_moves(anticollision=self.anticollision_default)
         for posid,posmodel in enabled.items():
@@ -325,6 +334,7 @@ class Petal(object):
                     posmodel.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = +1.0\n'
                 hardstop_debounce_request = {posid:{'target':hardstop_debounce}}
                 self.request_direct_dtdp(hardstop_debounce_request, cmd_prefix='debounce')
+        return pos_flags
 
     def schedule_moves(self,anticollision='default',should_anneal=True):
         """Generate the schedule of moves and submoves that get positioners
