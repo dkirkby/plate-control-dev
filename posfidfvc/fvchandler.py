@@ -320,8 +320,8 @@ class FVCHandler(object):
                 qs_dicts = self.fvcproxy.fvcxy_to_qs(fvcXY_dicts)
                 return_order = [spotids.index(d['spotid']) for d in qs_dicts]
                 qs = [[qs_dicts[i]['q'],qs_dicts[i]['s']] for i in return_order]
-                xy = self.trans.QS_to_obsXY(np.transpose(qs).tolist())
-                xy = np.transpose(xy).tolist()
+                xy = [self.trans.QS_to_obsXY(qs[i]) for i in range(len(qs))]
+                #xy = np.transpose(xy).tolist()
             else:
                 xy = pc.listify2d(xy)
                 xy_np = np.transpose(xy)
