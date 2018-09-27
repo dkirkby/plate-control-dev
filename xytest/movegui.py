@@ -22,15 +22,14 @@ MoveGUI
 #          V1.1  Kai Zhang, 2018-04-02. Add canbus input to talk to different cans for EM Petal. 
 #          V1.2  Kai Zhang  2018-05-01. Add Reload Canbus botton so that no restart is needed. Facilitate the petal check. 
 """
-account='msdos'
 import os
 import sys
 import datetime
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/'+account+'/focalplane/positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/'+account+'/focalplane/pos_utility/'))
+sys.path.append(os.path.abspath(os.getenv('HOME')+'/focalplane/positioner_logs/data_processing_scripts/'))
+sys.path.append(os.path.abspath(os.getenv('HOME')+'/focalplane/pos_utility/'))
 import fvchandler
 import petal
 import petalcomm
@@ -61,7 +60,7 @@ class MoveGUI(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
         global gui_root
         gui_root = tkinter.Tk()
-        google_dir='/home/'+account+'/focalplane/pos_utility/'        
+        google_dir=os.getenv('HOME')+'/focalplane/pos_utility/'        
         credential_name='google_access_account_lbl.json'
         w=200
         h=100
@@ -305,7 +304,7 @@ class MoveGUI(object):
     def set_fiducial(self):
         if 20000 in self.selected_can :
             self.text1.insert(END,'No, you cannot set all positioners as fiducials, this will burn the motor! \n')
-        elif all([self.selected_can[i] <10000 for i in range(len(self.selected_can))]):
+        elif all([self.selected_can[i] <8000 for i in range(len(self.selected_can))]):
             self.text1.insert(END,'No, you cannot set a positioners as a fiducial, this will burn the motor! \n')
         else:
             for i in range(len(self.selected_can)):
@@ -408,7 +407,7 @@ class MoveGUI(object):
                      'speed_mode_P':[speed_mode_P],
                      'move_time':[move_time],
                       'postpause':[0]}
-            if canid <10000:
+            if canid <8000:
                 if i == 0:
                     tables = [table] 
                 else:
