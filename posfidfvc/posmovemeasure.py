@@ -71,7 +71,7 @@ class PosMoveMeasure(object):
         if not(pos_flags):
             pos_flags = {}
             for ptl in self.petals:
-                pos_flags.update(petal.get_pos_flags())        
+                pos_flags.update(ptl.get_pos_flags())        
         data = {}
         expected_pos = collections.OrderedDict()
         for posid in self.all_posids:
