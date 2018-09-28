@@ -654,7 +654,7 @@ class Petal(object):
                 self.pos_flags[posid] = '4' #assume good, just no move needed so never added
             if not(pm.enabled):
                 self.pos_flags[posid] = '36' #final check for disabled
-        return pos_flags
+        return self.pos_flags
 
 # MOVE SCHEDULING ANIMATOR CONTROLS
         
