@@ -652,7 +652,7 @@ class Petal(object):
         for posid, pm in self.posmodels.items():
             if (posid not in self.pos_flags.keys()):
                 self.pos_flags[posid] = '4' #assume good, just no move needed so never added
-            if not(pm.enabled):
+            if not(pm.is_enabled):
                 self.pos_flags[posid] = '36' #final check for disabled
         return self.pos_flags
 
