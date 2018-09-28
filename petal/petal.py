@@ -411,8 +411,9 @@ class Petal(object):
             hw_tables = self._hardware_ready_move_tables()
             buffer = 1.0 # sec
             table_times = [sum([pp/1000 for pp in hw_table['postpause']]) + sum(hw_table['move_time']) for hw_table in hw_tables] # note postpauses are in ms
-            delay = buffer + max(table_times)
-            time.sleep(delay)
+            if table_times != []: #Prevent a crash if no move tables were actually sent (IE all positioners in a move are disabled)
+                delay = buffer + max(table_times)
+                time.sleep(delay)
             #END OF TEMPORARY FIX
             self._postmove_cleanup()
             self._wait_while_moving()
