@@ -55,7 +55,7 @@ class PosMoveMeasure(object):
         self.tp_updates_fraction = 0.8 # fraction of error distance by which to adjust POS_T,POS_P or OFFSET_T,OFFSET_P parameters after measuring an excessive error with FVC
         self.make_plots_during_calib = True # whether to automatically generate and save plots of the calibration data
 
-    def measure(self, pos_flags = {}):
+    def measure(self, pos_flags = None):
         """Measure positioner locations with the FVC and return the values.
 
         INPUT:  pos_flags ... (optional) dict keyed by positioner indicating which flag as indicated below that a
@@ -67,7 +67,11 @@ class PosMoveMeasure(object):
 
         Return data is a dictionary with:   keys ... posid
                                           values ... [measured_obs_x, measured_obs_y]
-        """        
+        """
+        if not(pos_flags):
+            pos_flags = {}
+            for ptl in petals:
+                pos_flags.update(petal.get_pos_flags())        
         data = {}
         expected_pos = collections.OrderedDict()
         for posid in self.all_posids:
@@ -106,19 +110,12 @@ class PosMoveMeasure(object):
         of format of the 'requests' dictionary.
         """
         posids_by_petal = self.posids_by_petal(requests)
-        pos_flags = {}
         for petal,posids in posids_by_petal.items():
             these_requests = {}
             for posid in posids:
                 these_requests[posid] = requests[posid]
-            returned_requests, pos_flags_petal = petal.request_targets(these_requests)            
+            petal.request_targets(these_requests)            
             petal.schedule_send_and_execute_moves() # in future, may do this in a different thread for each petal
-            for posid in pos_flags_petal.keys():
-                if pos_flags_petal[posid] == '4' and not(petal.get_posfid_val(posid,'CTRL_ENABLED')):
-                    pos_flags_petal[posid] = '32'
-            pos_flags.update(pos_flags_petal)
-        return pos_flags
-
 
     def move_measure(self, requests, tp_updates=None):
         """Move positioners and measure output with FVC.
@@ -143,8 +140,8 @@ class PosMoveMeasure(object):
                         limited to scenarios of initial calibration, if for some reason we find that the usual calibrations are
                         failing.
         """
-        pos_flags = self.move(requests)
-        data,imgfiles = self.measure(pos_flags = pos_flags)
+        self.move(requests)
+        data,imgfiles = self.measure()
         if tp_updates == 'posTP' or tp_updates =='offsetsTP' or tp_updates == 'offsetsTP_close':
             self._test_and_update_TP(data, tp_updates)
         return data,imgfiles
@@ -737,9 +734,9 @@ class PosMoveMeasure(object):
         # seek first limit
         self.printfunc(prefix + ': seeking first limit')
         for petal,these_posids in posids_by_petal.items():
-            pos_flags = petal.request_limit_seek(these_posids, axisid, -pc.sign(delta), log_note='seeking first ' + axis + ' limit')
+            petal.request_limit_seek(these_posids, axisid, -pc.sign(delta), log_note='seeking first ' + axis + ' limit')
             petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
-        meas_data,imgfiles = self.measure(pos_flags = pos_flags)
+        meas_data,imgfiles = self.measure()
         for p in meas_data.keys():
             data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],meas_data[p])
 
@@ -753,18 +750,18 @@ class PosMoveMeasure(object):
                 requests = {}
                 for posid in these_posids:
                     requests[posid] = {'target':dtdp, 'log_note':'intermediate ' + axis + ' point ' + str(i)}
-                requests_dpdt, pos_flags = petal.request_direct_dtdp(requests)
+                petal.request_direct_dtdp(requests)
                 petal.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
-            meas_data,imgfiles = self.measure(pos_flags = pos_flags)
+            meas_data,imgfiles = self.measure()
             for p in meas_data.keys():
                 data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],meas_data[p])
 
         # seek second limit
         self.printfunc(prefix + ': seeking second limit')
         for petal,these_posids in posids_by_petal.items():
-            pos_flags = petal.request_limit_seek(these_posids, axisid, pc.sign(delta), log_note='seeking second ' + axis + ' limit')
+            petal.request_limit_seek(these_posids, axisid, pc.sign(delta), log_note='seeking second ' + axis + ' limit')
             petal.schedule_send_and_execute_moves()
-        meas_data,imgfiles = self.measure(pos_flags = pos_flags)
+        meas_data,imgfiles = self.measure()
         for p in meas_data.keys():
             data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],meas_data[p])
 

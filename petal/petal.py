@@ -58,6 +58,7 @@ class Petal(object):
             self.comm.pbset('non_responsives', 'clear') #reset petalcontroller's list of non-responsive canids
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.shape = petal_shape
+        self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
 
         # database setup
         self.db_commit_on = db_commit_on if DB_COMMIT_AVAILABLE else False
@@ -167,25 +168,25 @@ class Petal(object):
                         32 : bad fiber or fiducial 
         """
         marked_for_delete = set()
-        pos_flags = {}
+        self.pos_flags = {}
         for posid in requests:
             requests[posid]['posmodel'] = self.posmodels[posid]
-            pos_flags[posid] = '4'
+            self.pos_flags[posid] = '4'
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
             if not(self.get_posfid_val(posid,'CTRL_ENABLED')):
-                pos_flags[posid] = '32'
+                self.pos_flags[posid] = '36'
                 marked_for_delete.add(posid)
             elif self.schedule.already_requested(posid):
                 marked_for_delete.add(posid)
             else:
                 accepted = self.schedule.request_target(posid, requests[posid]['command'], requests[posid]['target'][0], requests[posid]['target'][1], requests[posid]['log_note'])            
                 if not accepted:
-                    pos_flags[posid] = '32'
+                    self.pos_flags[posid] = '36'
                     marked_for_delete.add(posid)
         for posid in marked_for_delete:
             del requests[posid]
-        return requests, pos_flags
+        return requests
 
     def request_direct_dtdp(self, requests, cmd_prefix=''):
         """Put in requests to the scheduler for specific positioners to move by specific rotation
@@ -239,13 +240,13 @@ class Petal(object):
         wishes a sequence of theta and phi rotations to all be done in one shot. (This is unlike the
         request_targets command, where only the first request to a given positioner would be valid.)
         """
-        pos_flags = {}
+        self.pos_flags = {}
         marked_for_delete = {posid for posid in requests if not(self.get_posfid_val(posid,'CTRL_ENABLED'))}
         for posid in marked_for_delete:
-            pos_flags[posid] = '32'
+            self.pos_flags[posid] = '36'
             del requests[posid]
         for posid in requests:
-            pos_flags[posid] = '4'
+            self.pos_flags[posid] = '4'
             requests[posid]['posmodel'] = self.posmodels[posid]
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
@@ -257,7 +258,7 @@ class Petal(object):
             table.log_note += (' ' if table.log_note else '') + requests[posid]['log_note']
             table.allow_exceed_limits = True
             self.schedule.expert_add_table(table)
-        return requests, pos_flags            
+        return requests            
 
     def request_limit_seek(self, posids, axisid, direction, anticollision='freeze', cmd_prefix='', log_note=''):
         """Request hardstop seeking sequence for a single positioner or all positioners
@@ -265,10 +266,10 @@ class Petal(object):
         descriptive string to the log. This method is generally recommended only for
         expert usage. Requests to disabled positioners will be ignored.
         """
-        pos_flags = {}
+        self.pos_flags = {}
         posids = {posids} if isinstance(posids,str) else set(posids)
         for posid in posids:
-            pos_flags[posid] = '32'
+            self.pos_flags[posid] = '36'
         enabled = self.enabled_posmodels(posids)
         if anticollision:
             if axisid == pc.P and direction == -1:
@@ -280,7 +281,7 @@ class Petal(object):
                 # Eo has a bit more possible collisions, for example against a stuck-extended neighbor. Costs a bit more time/power to go to Ei, but limit-seeking is not a frequent operation.
                 pass
         for posid, posmodel in enabled.items():
-            pos_flags[posid] = '4'
+            self.pos_flags[posid] = '4'
             search_dist = pc.sign(direction)*posmodel.axis[axisid].limit_seeking_search_distance
             table = posmovetable.PosMoveTable(posmodel)
             table.should_antibacklash = False
@@ -302,23 +303,22 @@ class Petal(object):
                 direction_cmd_suffix = '.maxpos\n'
             posmodel.axis[axisid].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + direction_cmd_suffix
             self.schedule.expert_add_table(table)
-        return pos_flags
 
     def request_homing(self, posids):
         """Request homing sequence for positioners in single posid or iterable collection of
         posids. Finds the primary hardstop, and sets values for the max position and min position.
         Requests to disabled positioners will be ignored.
         """
-        pos_flags = {}
+        self.pos_flags = {}
         posids = {posids} if isinstance(posids,str) else set(posids)
         for posid in posids:
-            pos_flags[posid] = '32'
+            self.pos_flags[posid] = '36'
         enabled = self.enabled_posmodels(posids)
         hardstop_debounce = [0,0]
         direction = [0,0]
         direction[pc.P] = +1 # force this, because anticollision logic depends on it
         for posid in enabled:
-            pos_flags[posid] = '4'
+            self.pos_flags[posid] = '4'
             self.request_limit_seek(posid, pc.P, direction[pc.P], anticollision=self.anticollision_default, cmd_prefix='P', log_note='homing')
         self.schedule_moves(anticollision=self.anticollision_default)
         for posid,posmodel in enabled.items():
@@ -334,7 +334,6 @@ class Petal(object):
                     posmodel.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = +1.0\n'
                 hardstop_debounce_request = {posid:{'target':hardstop_debounce}}
                 self.request_direct_dtdp(hardstop_debounce_request, cmd_prefix='debounce')
-        return pos_flags
 
     def schedule_moves(self,anticollision='default',should_anneal=True):
         """Generate the schedule of moves and submoves that get positioners
@@ -446,17 +445,13 @@ class Petal(object):
                     log_note  ... optional string to include in the log file
                     anticollsion  ... see comments in schedule_moves() function
                     should_anneal ... see comments in schedule_moves() function
-
-        OUTPUTS:    requests  ... dictionary, see request_targets()
-                    pos_flags ... dictionary, contains appropriate positioner flags for FVC see request_targets()
         """
         requests = {}
         posids = {posids} if isinstance(posids,str) else set(posids)
         for posid in posids:
             requests[posid] = {'command':command, 'target':target, 'log_note':log_note}
-        requests, pos_flags = self.request_targets(requests)
+        self.request_targets(requests)
         self.schedule_send_and_execute_moves(anticollision,should_anneal)
-        return requests, pos_flags
 
     def quick_direct_dtdp(self, posids, dtdp, log_note='', should_anneal=True):
         """Convenience wrapper to request, schedule, send, and execute a single move command for a
@@ -468,17 +463,13 @@ class Petal(object):
                     dtdp      ... [dt,dp], note that all posids get sent the same [dt,dp] here. i.e. dt and dp are each just one number
                     log_note  ... optional string to include in the log file
                     should_anneal ... see comments in schedule_moves() function
-
-        OUTPUTS:    requests  ... dictionary, see request_direct_dpdt()
-                    pos_flags ... dictionary, contains appropriate positioner flags for FVC see request_targets()
         """
         requests = {}
         posids = {posids} if isinstance(posids,str) else set(posids)
         for posid in posids:
             requests[posid] = {'target':dtdp, 'log_note':log_note}
-        requests, pos_flags = self.request_direct_dtdp(requests)
+        self.request_direct_dtdp(requests)
         self.schedule_send_and_execute_moves(None,should_anneal)
-        return requests, pos_flags
 
 # METHODS FOR FIDUCIAL CONTROL        
     def set_fiducials(self, fidids='all', setting='on', save_as_default=False):
@@ -652,6 +643,18 @@ class Petal(object):
         those positioners in the collection posids which are enabled.
         """
         return {p:self.posmodels[p] for p in posids if self.posmodels[p].is_enabled}
+
+    def get_pos_flags(self):
+        '''Getter function for self.pos_flags that carries out a final is_enabed
+        check before passing them off. Important in case the PC sets ctrl_enabled = False
+        when a positioner is not responding.
+        '''
+        for posid, pm in self.posmodels.items():
+            if (posid not in self.pos_flags.keys()):
+                self.pos_flags[posid] = '4' #assume good, just no move needed so never added
+            if not(pm.enabled):
+                self.pos_flags[posid] = '36' #final check for disabled
+        return pos_flags
 
 # MOVE SCHEDULING ANIMATOR CONTROLS
         
