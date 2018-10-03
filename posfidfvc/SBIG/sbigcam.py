@@ -996,14 +996,14 @@ class SBIGCam(object):
         """
         Opens the CFW, only needed for RS232 connection to computer
         """
-        cfwp = cfwParams(cfwModel = self.cfw, cfwCommand = 4)
-        cfwr = cfwResults()
+        cfwp = CFWParams(cfwModel = self.cfw, cfwCommand = 4)
+        cfwr = CFWResults()
         Error = self.SBIG.SBIGUnivDrvCommand(CC_CFW, byref(cfwp), byref(cfwr))
         if Error != CE_NO_ERROR:
             print('Opening CFW returned camera error:', Error)
             return False
-        elif cfwr.cfwerror != 0:
-            print('Opening CFW returned CFW error:', cfwr.cfwerror, self.cfwError[cfwr.cfwerror])
+        elif cfwr.cfwError != 0:
+            print('Opening CFW returned CFW error:', cfwr.cfwError, self.cfw_error[cfwr.cfwError])
             return False
         elif self.verbose:
             print('CFW successfully opened.')
@@ -1013,14 +1013,14 @@ class SBIGCam(object):
         """
         Closes the CFW, only needed for RS232 connection to computer
         """
-        cfwp = cfwParams(cfwModel = self.cfw, cfwCommand = 5)
-        cfwr = cfwResults()
+        cfwp = CFWParams(cfwModel = self.cfw, cfwCommand = 5)
+        cfwr = CFWResults()
         Error = self.SBIG.SBIGUnivDrvCommand(CC_CFW, byref(cfwp), byref(cfwr))
         if Error != CE_NO_ERROR:
             print('Closing CFW returned camera error:', Error)
             return False
-        elif cfwr.cfwerror != 0:
-            print('Closing CFW returned CFW error:', cfwr.cfwerror, self.cfwError[cfwr.cfwerror])
+        elif cfwr.cfwError != 0:
+            print('Closing CFW returned CFW error:', cfwr.cfwError, self.cfw_error[cfwr.cfwError])
             return False
         elif self.verbose:
             print('CFW successfully closed.')
@@ -1032,23 +1032,23 @@ class SBIGCam(object):
         Input: Position - int representing which filter to go to, usually a number less than the model
         Returns: the reported position if successful, else False
         """
-        if not(isintance(position, int)):
+        if not(isinstance(position, int)):
             if self.verbose:
                 print('Invalid position, must be an int usually less than the number of the model (IE FW8 goes from 0-7).')
             return False
-        cfwp = cfwParams(cfwModel = self.cfw, cfwCommand = 1, cfwParam1 = c_ushort(position))
-        cfwr = cfwResults()
+        cfwp = CFWParams(cfwModel = self.cfw, cfwCommand = 1, cwfParam1 = c_ulong(position))
+        cfwr = CFWResults()
         Error = self.SBIG.SBIGUnivDrvCommand(CC_CFW, byref(cfwp), byref(cfwr))
         if Error != CE_NO_ERROR:
             print('Moving CFW returned camera error:', Error)
             return False
-        elif cfwr.cfwerror != 0:
-            print('Moving CFW returned CFW error:', cfwr.cfwerror, self.cfwError[cfwr.cfwerror])
+        elif cfwr.cfwError != 0:
+            print('Moving CFW returned CFW error:', cfwr.cfwError, self.cfw_error[cfwr.cfwError])
             return False
-        cfwp = cfwParams(cfwModel = self.cfw, cfwCommand = 0)
-        cfwr = cfwResults()
+        cfwp = CFWParams(cfwModel = self.cfw, cfwCommand = 0)
+        cfwr = CFWResults()
         Error = self.SBIG.SBIGUnivDrvCommand(CC_CFW, byref(cfwp), byref(cfwr))
-        while cfwr.sfwStatus == 1:
+        while cfwr.cfwStatus == 2:
             Error = self.SBIG.SBIGUnivDrvCommand(CC_CFW, byref(cfwp), byref(cfwr))
         if self.verbose:
             print('CFW successfully moved.')
@@ -1059,14 +1059,14 @@ class SBIGCam(object):
         Gets the CFW's position.
         Returns position as int if successful, else False
         """
-        cfwp = cfwParams(cfwModel = self.cfw, cfwCommand = 0)
-        cfwr = cfwResults()
+        cfwp = CFWParams(cfwModel = self.cfw, cfwCommand = 0)
+        cfwr = CFWResults()
         Error = self.SBIG.SBIGUnivDrvCommand(CC_CFW, byref(cfwp), byref(cfwr))
         if Error != CE_NO_ERROR:
             print('Query of CFW returned camera error:', Error)
             return False
-        elif cfwr.cfwerror != 0:
-            print('Query of CFW returned CFW error:', cfwr.cfwerror, self.cfwError[cfwr.cfwerror])
+        elif cfwr.cfwError != 0:
+            print('Query of CFW returned CFW error:', cfwr.cfwError, self.cfw_error[cfwr.cfwError])
             return False
         if self.verbose:
             print('CFW position successfully returned.')
@@ -1077,18 +1077,18 @@ class SBIGCam(object):
         Initializes CFW, may help resolve any errors.
         Returns: success of command True or False.
         """
-        cfwp = cfwParams(cfwModel = self.cfw, cfwCommand = 2)
-        cfwr = cfwResults()
+        cfwp = CFWParams(cfwModel = self.cfw, cfwCommand = 2)
+        cfwr = CFWResults()
         Error = self.SBIG.SBIGUnivDrvCommand(CC_CFW, byref(cfwp), byref(cfwr))
         if Error != CE_NO_ERROR:
             print('Initialization of CFW returned camera error:', Error)
             return False
-        elif cfwr.cfwerror != 0:
-            print('Initialization of CFW returned CFW error:', cfwr.cfwerror, self.cfwError[cfwr.cfwerror])
+        elif cfwr.cfwError != 0:
+            print('Initialization of CFW returned CFW error:', cfwr.cfwError, self.cfw_error[cfwr.cfwError])
             return False
         if self.verbose:
             print('CFW successfully Initialized.')
-        return False
+        return True
 
     ### TEMPERATURE COMMANDS ###
 
