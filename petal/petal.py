@@ -46,7 +46,8 @@ class Petal(object):
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
                  printfunc=print, verbose=False, user_interactions_enabled=False,
                  collider_file=None, sched_stats_on=False, anticollision='freeze',
-                 petal_shape='asphere'):
+                 petal_shape='asphere', collision_hashpp_exists=False, 
+                 collision_hashpf_exists=False, hole_angle_file=None):
         
         # petal setup
         self.petal_id = petal_id
@@ -87,7 +88,10 @@ class Petal(object):
         self.power_supply_map = self._map_power_supplies_to_posids()
         
         # collider, scheduler, and animator setup
-        self.collider = poscollider.PosCollider(configfile=collider_file)
+        self.collider = poscollider.PosCollider(configfile=collider_file, 
+                                                collision_hashpp_exists=collision_hashpp_exists, 
+                                                collision_hashpf_exists=collision_hashpf_exists, 
+                                                hole_angle_file=hole_angle_file)
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
         self.animator_on = False # this should be turned on/off using the animation start/stop control methods below
