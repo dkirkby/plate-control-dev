@@ -25,6 +25,9 @@ code_version = petal_directory.split(os.path.sep)[-2]
 dirs = {}
 dirs['all_logs']     = os.environ.get('POSITIONER_LOGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/positioner_logs
 dirs['all_settings'] = os.environ.get('FP_SETTINGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/fp_settings
+dirs['positioner_locations_file'] = os.environ.get('FP_SETTINGS_PATH')+'/hwsetups/Petal_Metrology.csv'
+dirs['small_array_locations_file']=os.getenv('FP_SETTINGS_PATH')+'/hwsetups/SWIntegration_XY.csv'
+
 if 'DESI_HOME' in os.environ:
     dirs['temp_files']   = os.environ.get('DESI_HOME') + os.path.sep + 'fp_temp_files' + os.path.sep
 elif 'HOME' in os.environ:
@@ -32,8 +35,8 @@ elif 'HOME' in os.environ:
 else:
     print("No DESI_HOME or Home defined in environment, assigning temp file generation to current directory/fp_temp_files")
     dirs['temp_files'] = os.path.abspath('./') + 'fp_temp_files' + os.path.sep
-dir_keys_logs        = ['pos_logs','fid_logs','xytest_data','xytest_logs','xytest_plots','xytest_summaries']
-dir_keys_settings    = ['pos_settings','fid_settings','test_settings','collision_settings','hwsetups','other_settings']
+dir_keys_logs        = ['pos_logs','fid_logs','ptl_logs','xytest_data','xytest_logs','xytest_plots','xytest_summaries']
+dir_keys_settings    = ['pos_settings','fid_settings','test_settings','collision_settings','hwsetups','ptl_settings','other_settings']
 for key in dir_keys_logs:
     dirs[key] = dirs['all_logs'] + os.path.sep + key + os.path.sep
 for key in dir_keys_settings:
