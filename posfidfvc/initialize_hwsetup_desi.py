@@ -66,12 +66,10 @@ else:
     fvc = fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'])    
 fvc.rotation = hwsetup['rotation'] # this value is used in setups without fvcproxy / platemaker
 fvc.scale = hwsetup['scale'] # this value is used in setups without fvcproxy / platemaker
-posids = hwsetup['pos_ids']
-fidids = hwsetup['fid_ids']
-shape = 'asphere' if hwsetup['plate_type'] == 'petal' else 'flat'
+fvc.translation = hwsetup['translation']
+
+#shape = 'asphere' if hwsetup['plate_type'] == 'petal' else 'flat'
 ptl = petal.Petal(petal_id = hwsetup['ptl_id'],
-                  posids = posids,
-                  fidids = fidids,
                   simulator_on = sim,
                   user_interactions_enabled = True,
                   db_commit_on = False,
@@ -81,8 +79,9 @@ ptl = petal.Petal(petal_id = hwsetup['ptl_id'],
                   verbose = False,
                   collider_file = None,
                   sched_stats_on = False,
-                  anticollision = None, # valid options for anticollision arg: None, 'freeze', 'adjust'
-				  petal_shape = shape)
+                  anticollision = None) # valid options for anticollision arg: None, 'freeze', 'adjust'
+posids=ptl.posids
+fidids=ptl.fidids
 m = posmovemeasure.PosMoveMeasure([ptl],fvc)
 m.make_plots_during_calib = True
 print('Automatic generation of calibration plots is turned ' + ('ON' if m.make_plots_during_calib else 'OFF') + '.')
@@ -142,7 +141,7 @@ fid_settings_done = m.set_fiducials('on')
 print('Fiducials turned on: ' + str(fid_settings_done))
 
 # disable certain features if anticollision is turned off yet it is also a true petal (with close-packed positioenrs)
-if hwsetup['plate_type'] == 'petal' and not ptl.anticollision_default:
+if ptl.shape == 'petal' and not ptl.anticollision_default:
     should_limit_range = True
 else:
     should_limit_range = False
@@ -161,11 +160,14 @@ if should_identify_fiducials:
 else:
     m.extradots_fvcXY = extradots_existing_data
 if should_identify_positioners:
-    m.identify_positioner_locations()
+    m.identify_positioners_2images()
+    #m.identify_many_enabled_positioners(list(m.all_posids))
 if should_make_instrfile:
-    instr = instrmaker.InstrMaker(hwsetup['plate_type'],ptl,m,fvc,hwsetup)
+    instr = instrmaker.InstrMaker(ptl,m,fvc,hwsetup)
     instr.make_instrfile()
     instr.push_to_db()
+if should_identify_positioners:
+    m.identify_disabled_positioners()
 m.calibrate(mode='rough')
 if not should_limit_range:
     m.measure_range(axis='theta')
