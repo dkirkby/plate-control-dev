@@ -11,7 +11,7 @@ class PetalComm(object):
     and petalbox software running on the petal.
     """
 
-    def __init__(self, petal_id, controller = None, user_interactions_enabled = False):
+    def __init__(self, petalbox_id, controller = None, user_interactions_enabled = False):
         """
         Initialize the object and connect to the petal controller
 
@@ -24,7 +24,7 @@ class PetalComm(object):
         The no_dos flag should be managed one level up (just import a different PetalComm module) and
         not in this file
         """
-        self.petal_id = int(petal_id)
+        self.petalbox_id = int(petalbox_id)
         # Setup Seeker
         self.seeker_thread = None
         self.repeat = threading.Event()
@@ -40,10 +40,10 @@ class PetalComm(object):
             if 'ip' not in controller.keys() or 'port' not in controller.keys():
                 raise RuntimeError('init: the IP address of the petal controller must be specified.')
             # Create the Pyro URI manually
-            self.device['name'] = 'PC%d' % self.petal_id
+            self.device['name'] = 'PC%d' % self.petalbox_id
             self.device['node'] = str(controller['ip'])
             self.device['port'] = int(controller['port'])
-            self.device['pyro_uri'] = 'PYRO:PC%d@%s:%s' % (petal_id, str(controller['ip']),str(controller['port']))
+            self.device['pyro_uri'] = 'PYRO:PC%d@%s:%s' % (petalbox_id, str(controller['ip']),str(controller['port']))
         else:
             self.seeker = Seeker(self.stype, self.service, found_callback = self._found_dev)
             # Start Seeker thread
@@ -54,13 +54,13 @@ class PetalComm(object):
             self.seeker_thread.start()
             print('Seeker thread is now running. Delay %s' % str(self.delay))
             # wait briefly for seeker to find all devices
-            self.found_controller.wait(timeout = 1.0)
+            self.found_controller.wait(timeout = 2.0)
             self.delay = 4.0
 
         # Connect to the device (if we found anything)
         while self.device == {}:
             if user_interactions_enabled:
-                err_question = 'Petal Controller ' + str(self.petal_id) + ' was not discovered. Do you want to:\n  1: try again now\n  2: quit now\n  3: continue anyway (not recommended)\nEnter 1, 2, or 3 >> '
+                err_question = 'Petal Controller ' + str(self.petalbox_id) + ' was not discovered. Do you want to:\n  1: try again now\n  2: quit now\n  3: continue anyway (not recommended)\nEnter 1, 2, or 3 >> '
                 answer = input(err_question)
             else:
                 answer = '1'
@@ -76,7 +76,7 @@ class PetalComm(object):
         else:
             if self.device:
                 self.device['proxy'] = Pyro4.Proxy(self.device['pyro_uri'])
-                print('Connected to Petal Controller %d' % self.petal_id)
+                print('Connected to Petal Controller %d' % self.petalbox_id)
 
     def is_connected(self):
         """
@@ -93,10 +93,10 @@ class PetalComm(object):
     def _found_dev(self, dev):
         for key in dev:
             if dev[key]['service'] == self.service:   # Found a petal controller
-                # Extract unit number and compare to self.petal_id
+                # Extract unit number and compare to self.petalbox_id
                 m = re.search(r'\d+$', key)
                 if m:
-                    if self.petal_id == int(m.group()):
+                    if self.petalbox_id == int(m.group()):
                         # Found the matching petal controller
                         if 'name' not in self.device or self.device['name'] != key:
                             print('_found_dev: Found new device %s' % str(key))
