@@ -27,9 +27,7 @@ class Petal(object):
     Convenience wrapper functions are provided to combine these steps when desirable.
 
     Required initialization inputs:
-        petal_id     ... integer id number of the petal
-        posids       ... iterable collection of positioner unique id strings
-        fidids       ... iterable collection of fiducials unique id strings
+        petal_id        ... unique string id of the petal
         
     Optional initialization inputs:
         simulator_on    ... boolean, controls whether in software-only simulation mode
@@ -40,25 +38,25 @@ class Petal(object):
         collider_file   ... string, file name of collider configuration file, no directory loction. If left blank will use default.
         sched_stats_on  ... boolean, controls whether to log statistics about scheduling runs
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
-        petal_shape     ... string, mechanical shape of petal. options are 'asphere' or 'flat'. (note the flat option is used for example in some test stands)
     """
-    def __init__(self, petal_id, posids, fidids, simulator_on=False,
+    def __init__(self, petal_id, simulator_on=False,
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
                  printfunc=print, verbose=False, user_interactions_enabled=False,
-                 collider_file=None, sched_stats_on=False, anticollision='freeze',
-                 petal_shape='asphere', collision_hashpp_exists=False, 
-                 collision_hashpf_exists=False, hole_angle_file=None):
-        
+                 collider_file=None, sched_stats_on=False, anticollision='freeze'):
+        self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output) 
         # petal setup
-        self.petal_id = petal_id
-        self.verbose = verbose# whether to print verbose information at the terminal
+        self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
+        self.petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
+        self.petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
+        posids = self.petal_state.conf['POS_IDS']
+        fidids = self.petal_state.conf['FID_IDS']
+        self.verbose = verbose # whether to print verbose information at the terminal
         self.simulator_on = simulator_on
         if not(self.simulator_on):
             import petalcomm
-            self.comm = petalcomm.PetalComm(self.petal_id, user_interactions_enabled=user_interactions_enabled)
+            self.comm = petalcomm.PetalComm(self.petalbox_id, user_interactions_enabled=user_interactions_enabled)
             self.comm.pbset('non_responsives', 'clear') #reset petalcontroller's list of non-responsive canids
-        self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
-        self.shape = petal_shape
+        self.shape = self.petal_state.conf['SHAPE']
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
 
         # database setup
@@ -74,7 +72,7 @@ class Petal(object):
         self.posmodels = {} # key posid, value posmodel instance
         self.states = {} # key posid, value posstate instance
         self.devices = {} # key device_location_id, value posid
-        installed_on_asphere = self.shape == 'asphere'
+        installed_on_asphere = self.shape == 'petal'
         for posid in posids:
             self.states[posid] = posstate.PosState(posid, logging=True, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
             self.posmodels[posid] = PosModel(self.states[posid], installed_on_asphere)
@@ -92,6 +90,7 @@ class Petal(object):
                                                 collision_hashpp_exists=collision_hashpp_exists, 
                                                 collision_hashpf_exists=collision_hashpf_exists, 
                                                 hole_angle_file=hole_angle_file)
+        #self.collider = poscollider.PosCollider(configfile=collider_file)
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
         self.animator_on = False # this should be turned on/off using the animation start/stop control methods below
@@ -770,7 +769,7 @@ class Petal(object):
         """Generate up a new, clear schedule instance.
         """
         schedule = posschedule.PosSchedule(petal=self, stats=self.schedule_stats, verbose=self.verbose)
-        schedule.should_check_petal_boundaries = self.shape == 'asphere'
+        schedule.should_check_petal_boundaries = self.shape == 'petal'
         return schedule
 
     def _wait_while_moving(self):
