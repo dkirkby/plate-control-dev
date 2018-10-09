@@ -83,6 +83,7 @@ posfidfvc/check_pos_move.py -text
 posfidfvc/enable_all.py -text
 posfidfvc/fitcircle.py -text
 posfidfvc/fvchandler.py -text
+posfidfvc/generate_platemaker_pars.py -text
 posfidfvc/initialize_hwsetup.py -text
 posfidfvc/initialize_hwsetup_desi.py -text
 posfidfvc/instrmaker.py -text
