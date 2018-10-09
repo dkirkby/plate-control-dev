@@ -459,12 +459,12 @@ class PosMoveMeasure(object):
             The identification of the first positioner takes two images, while all consecutive positioner only need one image. 
             If a positioner is enabled, it will be added to the enabled_posids list, and if no dots are moving after nudging a positioner, 
             it is added to disabled_posids list. 
-            Input: posids, a list of positioners. like ['M00322','M01511']
+            Input: posids, a list of positioners. like ['M00322','M01511']. 
             Output: the obsXY of each enabled positioner will be stored in the conf file.  
         """
         
         n_posids = len(posids)
-        n_dots = n_posids + self.n_ref_dots
+        n_dots = len(self.all_posids) + self.n_ref_dots
         nudges = [-self.nudge_dist, self.nudge_dist]
         xy_init = []
         pseudo_xy_ref = []
