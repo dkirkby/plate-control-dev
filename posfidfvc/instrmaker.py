@@ -3,6 +3,9 @@ from lmfit import minimize, Parameters
 import os
 import pdb
 from astropy.table import Table
+import posconstants as pc
+
+
 class InstrMaker(object):
     """Creates a valid platemaker instrument file using data measured by fvc
     (in pixels) for fiducial and positioner locations. These data are compared
@@ -11,42 +14,39 @@ class InstrMaker(object):
     The nominal locations in the petal are taken from DESI-0530. These are *not*
     metrology data -- they are the nominal center positions of each device at
     the aspheric focal surface.
+    
     """
-    def __init__(self,ptl,m,fvc,hwsetup):
+    def __init__(self,ptl,m,fvc,hwsetup,posids):
         if ptl.shape == 'petal':
-            self.file_metro=os.getenv('FP_SETTINGS_PATH')+'/hwsetups/Petal_Metrology.csv'
-            # import the positioner locations file
+            self.file_metro=pc.dirs['positioner_locations_file']
         elif ptl.shape == 'small_array':
-            self.file_metro=os.getenv('FP_SETTINGS_PATH')+'/hwsetups/SWIntegration_XY.csv'
-            # import the small array block locations file
+            self.file_metro=pc.dirs['small_array_locations_file']
         else:
-            self.file_metro=os.getenv('FP_SETTINGS_PATH')+'/hwsetups/SWIntegration_XY.csv'
+            self.printfunc('Must be a petal or a small_array to proceed. Exit')
+            raise SystemExit
 
-        self.PFS_file=os.getenv('FP_SETTINGS_PATH')+'/hwsetups/PFS_ID_Map.csv' 
         self.m=m 
         self.ptl=ptl
         self.hwsetup=hwsetup
         self.fvc=fvc
+        self.posids=posids
 
     def make_instrfile(self):
         '''Define function for making platemaker instrument file.
         '''
-        #data,imgfile=self.m.measure()
         # Read dots identification result from ptl and store a dictionary
         pix_size=0.006
         if self.fvc.fvc_type == 'FLI':
             flip=1  # x flip right now this is hard coded since we don't change the camera often. 
         else:
             flip=0 
-        posids=list(self.ptl.posids)
-        fidids=list(self.ptl.fidids)
+        posids=list(self.posids)
         n_pos=len(posids)
-        n_fid=len(fidids)
         pos_fid_dots={}
         obsX_arr,obsY_arr,obsXY_arr,fvcX_arr,fvcY_arr=[],[],[],[],[]
         metroX_arr,metroY_arr=[],[]
 
-        # read the Metrology data firest, then match positioners to DEVICE_LOC 
+        # read the Metrology data first, then match positioners to DEVICE_LOC 
         positioners = Table.read(self.file_metro,format='ascii.csv',header_start=0,data_start=1)
         device_loc_file_arr,metro_X_file_arr,metro_Y_file_arr=[],[],[]
         for row in positioners:
@@ -54,16 +54,10 @@ class InstrMaker(object):
             metro_X_file_arr.append(row['X'])
             metro_Y_file_arr.append(row['Y'])
 
-        PFS=Table.read(self.PFS_file,format='ascii.csv',header_start=0,data_start=1)
-        posids_PFS,device_loc_PFS=[],[]
-        for row in PFS:
-            posids_PFS.append(row['DEVICE_ID'])
-            device_loc_PFS.append(row['DEVICE_LOC'])
-        
-        enabled_posids=self.m.enabled_posids
 
-        for i in range(len(enabled_posids)):
-            posid=enabled_posids[i]
+        for i in range(len(posids)):
+            posid=posids[i]
+            #thi_petal=self.ptl.petal(posid)
             obsX_arr.append(float(self.ptl.get_posfid_val(posid,'LAST_MEAS_OBS_X')))
             obsY_arr.append(float(self.ptl.get_posfid_val(posid,'LAST_MEAS_OBS_Y')))
             obsXY_arr.append([obsX_arr[i],obsY_arr[i]])
@@ -73,11 +67,10 @@ class InstrMaker(object):
             else:
                 fvcX_arr.append(fvcXY_this[0][0])
             fvcY_arr.append(fvcXY_this[0][1])
-            index=posids_PFS.index(posid.strip('M'))
-            device_loc_this=device_loc_PFS[index]
-            index2=device_loc_file_arr.index(device_loc_this)
-            metroX_arr.append(metro_X_file_arr[index2])
-            metroY_arr.append(metro_Y_file_arr[index2])
+            device_loc_this=self.ptl.get_posfid_val(posid,'DEVICE_ID')
+            index=device_loc_file_arr.index(device_loc_this)
+            metroX_arr.append(metro_X_file_arr[index])
+            metroY_arr.append(metro_Y_file_arr[index])
         
         import matplotlib.pyplot as plt
         from matplotlib.backends.backend_pdf import PdfPages
@@ -141,6 +134,7 @@ class InstrMaker(object):
             output_lines='fvcmag  '+str(out.params['scale'].value/pix_size)+'\n'+'fvcrot  '+str(rot)+'\n' \
                         +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(offy)+'\n' \
                         +'fvcflip  '+str(flip)+'\n'+'fvcnrow  6000 \n'+'fvcncol  6000 \n'+'fvcpixmm  '+str(pix_size) 
+            self.printfunc(output_lines)
             f.write(output_lines)
             f.close()
             print('PM instrument file saved to instrmaker.par')
@@ -152,6 +146,11 @@ class InstrMaker(object):
                 self.fvc.rotation=out.params['angle'].value 
                 self.fvc.translation=[out.params['offx'].value,out.params['offy'].value]
                 self.fvc.scale=out.params['scale'].value
+                self.hwsetup['rotation']=out.params['angle'].value
+                self.hwsetup['translation']=[out.params['offx'].value,out.params['offy'].value]
+                self.hwsetup['scale']=out.params['scale'].value
+                self.hwsetup.write()
+
 
 
         return out
