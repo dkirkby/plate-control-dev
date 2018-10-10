@@ -32,12 +32,7 @@ new_and_changed_files.add(hwsetup.filename)
 
 # software initialization and startup
 # software initialization and startup
-posids = hwsetup['pos_ids']
-fidids = hwsetup['fid_ids']
-shape = 'asphere' if hwsetup['plate_type'] == 'petal' else 'flat'
 ptl = petal.Petal(petal_id = hwsetup['ptl_id'],
-                  posids = posids,
-                  fidids = fidids,
                   simulator_on = sim,
                   user_interactions_enabled = True,
                   db_commit_on = False,
@@ -47,9 +42,8 @@ ptl = petal.Petal(petal_id = hwsetup['ptl_id'],
                   verbose = False,
                   collider_file = None,
                   sched_stats_on = False,
-                  anticollision = None, # valid options for anticollision arg: None, 'freeze', 'adjust'
-				  petal_shape = shape)
-
+                  anticollision = None) # valid options for anticollision arg: None, 'freeze', 'adjust'
+import pdb; pdb.set_trace()
 print('Enable all positioners')
 for posid in ptl.posids:
     print(posid+'\n')

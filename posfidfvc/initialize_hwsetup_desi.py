@@ -32,12 +32,6 @@ new_and_changed_files.add(hwsetup.filename)
 # are we in simulation mode?
 sim = hwsetup['fvc_type'] == 'simulator'
 
-# ask user whether to auto-generate a platemaker instrument file
-if not sim:
-    message = 'Should we auto-generate a platemaker instrument file?'
-    should_make_instrfile = tkinter.messagebox.askyesno(title='Make PM file?',message=message)
-else:
-    should_make_instrfile = False
 
 # automated SVN setup
 svn_user = ''
@@ -162,12 +156,8 @@ else:
 if should_identify_positioners:
     m.identify_positioners_2images()
     #m.identify_many_enabled_positioners(list(m.all_posids))
-if should_make_instrfile:
-    instr = instrmaker.InstrMaker(ptl,m,fvc,hwsetup)
-    instr.make_instrfile()
-    instr.push_to_db()
-if should_identify_positioners:
-    m.identify_disabled_positioners()
+    #m.identify_disabled_positioners()
+
 m.calibrate(mode='rough')
 if not should_limit_range:
     m.measure_range(axis='theta')
