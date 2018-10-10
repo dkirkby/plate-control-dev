@@ -87,9 +87,9 @@ class Petal(object):
         
         # collider, scheduler, and animator setup
         self.collider = poscollider.PosCollider(configfile=collider_file, 
-                                                collision_hashpp_exists=collision_hashpp_exists, 
-                                                collision_hashpf_exists=collision_hashpf_exists, 
-                                                hole_angle_file=hole_angle_file)
+                                                collision_hashpp_exists=False, 
+                                                collision_hashpf_exists=False, 
+                                                hole_angle_file=None)
         #self.collider = poscollider.PosCollider(configfile=collider_file)
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
