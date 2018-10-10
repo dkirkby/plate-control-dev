@@ -2,6 +2,7 @@
 gaussian fitter
 M. Schubnell, University of Michigan
 """
+import numpy as np
 from numpy import sqrt, exp, ravel, arange
 from scipy import optimize
 from pylab import indices
@@ -21,16 +22,19 @@ def moments(data):
 		the gaussian parameters of a 2D distribution by calculating its
 		moments
 	"""
-	total = data.sum()
-	bias=data.mean()
+	#total = data.sum()
+	#bias=data.mean()
+	bias=np.min(data) # revised by Kai to make faint object detection easier
+	data_this=data-bias
+	total=data_this.sum()
 	X, Y = indices(data.shape)
-	x = (X*data).sum()/total
-	y = (Y*data).sum()/total
-	col = data[:, int(y)]
+	x = (X*data_this).sum()/total
+	y = (Y*data_this).sum()/total
+	col = data_this[:, int(y)]
 	width_x = sqrt(abs((arange(col.size)-y)**2*col).sum()/col.sum())
-	row = data[int(x), :]
+	row = data_this[int(x), :]
 	width_y = sqrt(abs((arange(row.size)-x)**2*row).sum()/row.sum())
-	height = data.max()
+	height = data_this.max()
 	return bias, height, x, y, width_x, width_y
 
 def fitgaussian(data):
