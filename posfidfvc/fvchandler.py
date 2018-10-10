@@ -28,7 +28,7 @@ class FVCHandler(object):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.fvc_type = fvc_type # 'SBIG' or 'SBIG_Yale' or 'FLI' or 'simulator'
         self.fvcproxy = None # may be auto-initialized later by the platemaker instrument setter
-        self.min_energy = 0.25 * 1.0 # this is the minimum allowed value for the product peak*fwhm for any given dot
+        self.min_energy = 0.1 * 1.0 # this is the minimum allowed value for the product peak*fwhm for any given dot
         self.max_attempts = 5 # max number of times to retry an image measurement (if poor dot quality) before quitting hard
         if self.fvc_type == 'SBIG':
             import sbig_grab_cen
@@ -41,7 +41,7 @@ class FVCHandler(object):
             self.sim_err_max = 0.01 # 2D err max for simulator
             self.printfunc('FVCHandler is in simulator mode with max 2D errors of size ' + str(self.sim_err_max) + '.')
         if 'SBIG' in self.fvc_type:
-            self.exposure_time = 0.20
+            self.exposure_time = 0.70
             self.max_counts = 2**16 - 1 # SBIC camera ADU max
         else:
             self.exposure_time = 1.0
@@ -64,7 +64,7 @@ class FVCHandler(object):
         '''
         self._scale = scale
         if 'SBIG' in self.fvc_type:
-            self.sbig.size_fitbox = 7 #int(np.ceil(self.fitbox_mm/2.3 / scale))
+            self.sbig.size_fitbox = 5 #int(np.ceil(self.fitbox_mm/2.3 / scale))
 
     @property
     def platemaker_instrument(self):
@@ -378,7 +378,7 @@ class FVCHandler(object):
 
 if __name__ == '__main__':
     f = FVCHandler(fvc_type='SBIG')
-    n_objects = 16
+    n_objects = 60
     n_repeats = 1
     f.min_energy = -np.Inf
     xy = []
