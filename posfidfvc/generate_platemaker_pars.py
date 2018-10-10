@@ -35,9 +35,9 @@ class Generate_Platemaker_Pars(object):
             self.fvc=fvchandler.FVCHandler(fvc_type=self.hwsetup['fvc_type'],save_sbig_fits=self.hwsetup['save_sbig_fits'],platemaker_instrument=self.hwsetup['pm_instrument'])
         else:
             self.fvc = fvchandler.FVCHandler(fvc_type=self.hwsetup['fvc_type'],save_sbig_fits=self.hwsetup['save_sbig_fits'])    
-        self.fvc.rotation = self.hwsetup['rotation'] # this value is used in setups without fvcproxy / platemaker
-        self.fvc.scale = self.hwsetup['scale'] # this value is used in setups without fvcproxy / platemaker
-        self.fvc.translation = self.hwsetup['translation']
+            self.fvc.rotation = self.hwsetup['rotation'] # this value is used in setups without fvcproxy / platemaker
+            self.fvc.scale = self.hwsetup['scale'] # this value is used in setups without fvcproxy / platemaker
+            self.fvc.translation = self.hwsetup['translation']
 
         self.ptl = petal.Petal(petal_id = self.hwsetup['ptl_id'],
                   simulator_on = False,
@@ -103,7 +103,7 @@ class Generate_Platemaker_Pars(object):
         for i in range(len(index)):
             self.selected.append(self.listbox1.get(index[i]))
             if 'ALL' in self.selected:
-                self.selected_posids=self.posids
+                self.selected_posids=list(self.ptl.posids)
                 self.selected_can=[20000]
             else:
                 self.selected_posids.append(self.selected[i])
