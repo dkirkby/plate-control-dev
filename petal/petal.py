@@ -30,6 +30,8 @@ class Petal(object):
         petal_id        ... unique string id of the petal
         
     Optional initialization inputs:
+        posids          ... list, positioner ids. If provided, validate against the ptl_setting file. If empty [], read from the ptl_setting file directly.
+        fidids          ... list, fiducial ids. If provided, validate against the ptl_setting file. If empty [], read from the ptl_setting file directly. 
         simulator_on    ... boolean, controls whether in software-only simulation mode
         db_commit_on    ... boolean, controls whether to commit state data to the online system database (can be done with or without local_commit_on (available only if DB_COMMIT_AVAILABLE == True))
         local_commit_on ... boolean, controls whether to commit state data to local .conf files (can be done with or without db_commit_on)
@@ -39,7 +41,7 @@ class Petal(object):
         sched_stats_on  ... boolean, controls whether to log statistics about scheduling runs
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
     """
-    def __init__(self, petal_id, simulator_on=False,
+    def __init__(self, petal_id, posids, fidids, simulator_on=False,
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
                  printfunc=print, verbose=False, user_interactions_enabled=False,
                  collider_file=None, sched_stats_on=False, anticollision='freeze'):
@@ -48,8 +50,25 @@ class Petal(object):
         self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
         self.petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
         self.petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
-        posids = self.petal_state.conf['POS_IDS']
-        fidids = self.petal_state.conf['FID_IDS']
+        if not posids:
+            self.printfunc('posids not given, read from ptl_settings file')
+            posids = self.petal_state.conf['POS_IDS']
+        else:
+            posids_file = self.petal_state.conf['POS_IDS'] 
+            if set(posids) != set(posids_file):
+                self.printfunc('WARNING: Input posids are not consistent with ptl_setting file')
+                self.printfunc('Input posids:'+str(posids))
+                self.printfunc('Posids from file:'+str(posids_file))
+        if not fidids:
+            self.printfunc('fidids not given, read from ptl_settings file')
+            fidids = self.petal_state.conf['FID_IDS']
+        else:
+            fidids_file = self.petal_state.conf['FID_IDS']
+            if set(fidids) != set(fidids_file):
+                self.printfunc('WARNING: Input fidids are not consistent with ptl_setting file')
+                self.printfunc('Input fidids:'+str(fidids))
+                self.printfunc('Fidids from file:'+str(fidids_file))
+
         self.verbose = verbose # whether to print verbose information at the terminal
         self.simulator_on = simulator_on
         if not(self.simulator_on):
