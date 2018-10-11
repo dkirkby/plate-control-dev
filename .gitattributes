@@ -80,6 +80,7 @@ posfidfvc/SBIG/stxl.py -text
 posfidfvc/SBIG/usbreset.c -text
 posfidfvc/SBIG/usbreset.py -text
 posfidfvc/check_pos_move.py -text
+posfidfvc/derive_platemaker_pars.py -text
 posfidfvc/enable_all.py -text
 posfidfvc/fitcircle.py -text
 posfidfvc/fvchandler.py -text
