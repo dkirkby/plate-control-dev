@@ -258,8 +258,22 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not check if stop mode is on or exit stop mode'
 
+    def send_ext_formatted(self, ext_commands_by_busid):
+        """
+        Send out externally formatted dictionary of commands (expert use only, diagnostics)
+        """
+        try:
+            return self._call_device('send_ext_formatted', ext_commands_by_busid)
+        except Exception as e:
+            return 'FAILED: Can not send externally formatted commands'
 
-
-
+    def recv_ext_formatted(self):
+        """
+        Receive responses to externally formatted commands (expert use only, diagnostics)
+        """
+        try:
+           return self._call_device('recv_ext_formatted')
+        except Exception as e:
+           return 'FAILED: Can not receive externally formatted commands'
 
 
