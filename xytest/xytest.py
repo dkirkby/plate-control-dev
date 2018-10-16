@@ -126,24 +126,27 @@ class XYTest(object):
             fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=self.hwsetup_conf['save_sbig_fits'])
         fvc.rotation = self.hwsetup_conf['rotation']
         fvc.scale = self.hwsetup_conf['scale']
+        fvc.translation = self.hwsetup_conf['translation']
         fvc.exposure_time = self.hwsetup_conf['exposure_time']
         self.logwrite('FVC type: ' + str(fvc_type))
         self.logwrite('FVC rotation: ' + str(fvc.rotation))
         self.logwrite('FVC scale: ' + str(fvc.scale))
         
         # set up positioners, fiducials, and petals
-        self.posids = self.hwsetup_conf['pos_ids']
         self.pos_notes = self.hwsetup_conf['pos_notes'] # notes for report to add about positioner (reported with positioner in same slot as posids list)
-        while len(self.pos_notes) < len(self.posids):
-            self.pos_notes.append('')
-        fidids = self.hwsetup_conf['fid_ids']
-        ptl_id = self.hwsetup_conf['ptl_id']
         db_commit_on = False
         if 'store_mode' in self.hwsetup_conf and self.hwsetup_conf['store_mode'] == 'db':
             db_commit_on = True
-        shape = 'asphere' if self.hwsetup_conf['plate_type'] == 'petal' else 'flat'
-        ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite, collider_file=self.xytest_conf['collider_file'],db_commit_on=db_commit_on, anticollision=self.xytest_conf['anticollision'], petal_shape=shape)
+        ptl_id=self.hwsetup_conf['ptl_id']
+        ptl = petal.Petal(ptl_id, posids=[],fidids=[],simulator_on=self.simulate, printfunc=self.logwrite, collider_file=self.xytest_conf['collider_file'],db_commit_on=db_commit_on, anticollision=self.xytest_conf['anticollision'])
+        posids=self.posids=ptl.posids
+        fidids=self.fidids=ptl.fidids
+        
+        while len(self.pos_notes) < len(self.posids):
+            self.pos_notes.append('')
+
         self.m = posmovemeasure.PosMoveMeasure([ptl],fvc,printfunc=self.logwrite)
+        self.m.rehome(posids='all')
         self.posids = self.m.all_posids
         self.logwrite('Positoners: ' + str(self.posids))
         self.logwrite('Positoner notes: ' + str(self.pos_notes))
