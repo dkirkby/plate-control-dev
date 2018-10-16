@@ -8,7 +8,6 @@ import petal
 import posmovemeasure
 import fvchandler
 import posconstants as pc
-import instrmaker
 import tkinter
 import tkinter.filedialog
 import tkinter.messagebox
@@ -61,9 +60,10 @@ else:
 fvc.rotation = hwsetup['rotation'] # this value is used in setups without fvcproxy / platemaker
 fvc.scale = hwsetup['scale'] # this value is used in setups without fvcproxy / platemaker
 fvc.translation = hwsetup['translation']
+fvc.exposure_time = hwsetup['exposure_time']
 
 #shape = 'asphere' if hwsetup['plate_type'] == 'petal' else 'flat'
-ptl = petal.Petal(petal_id = hwsetup['ptl_id'],
+ptl = petal.Petal(petal_id = hwsetup['ptl_id'],posids=[],fidids=[], 
                   simulator_on = sim,
                   user_interactions_enabled = True,
                   db_commit_on = False,
