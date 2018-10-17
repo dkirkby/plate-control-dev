@@ -589,7 +589,7 @@ class PosMoveMeasure(object):
             obsX_arr.append(obsXY_this[0])
             obsY_arr.append(obsXY_this[1])
             this_xy=self.fvc.obsXY_to_fvcXY(obsXY_this)[0]
-            plt.text(this_xy[0],this_xy[1],posid,fontsize=3)
+            plt.text(this_xy[0],this_xy[1],posid,fontsize=2.5)
             fvcX_enabled_arr.append(this_xy[0])
             fvcY_enabled_arr.append(this_xy[1])
             test_delta = np.array(this_xy) - np.array(xy_meas)
@@ -648,7 +648,7 @@ class PosMoveMeasure(object):
                 obsX_arr.append(obsXY_this[0])
                 obsY_arr.append(obsXY_this[1])
                 this_xy=self.fvc.obsXY_to_fvcXY(obsXY_this)[0]
-                plt.text(this_xy[0],this_xy[1],posid,fontsize=3,color='red')
+                plt.text(this_xy[0],this_xy[1],posid,fontsize=2.5,color='red')
                 #self.printfunc(posid,' is located at:\n obsXY:',obsXY_this,'fvcXY:',this_xy)
                 test_delta = np.array(this_xy) - np.array(xy_meas)
                 test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
@@ -816,14 +816,16 @@ class PosMoveMeasure(object):
                     posTP=this_petal.posmodels[posid].trans.obsXY_to_posTP(measured_obsXY)[0]
                     this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_X',measured_obsXY[0])
                     this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_Y',measured_obsXY[1])
+                    this_petal.set_posfid_val(posid,'OFFSET_X',measured_obsXY[0])
+                    this_petal.set_posfid_val(posid,'OFFSET_Y',measured_obsXY[1])
                     this_petal.set_posfid_val(posid,'POS_T',posTP[0])
                     this_petal.set_posfid_val(posid,'POS_P',posTP[1])
                     if move_arr[index]:
                         this_petal.set_posfid_val(posid,'CTRL_ENABLED',True)
-                        plt.text(this_xy[0],this_xy[1],posid,fontsize=3,color='blue')
+                        plt.text(this_xy[0],this_xy[1],posid,fontsize=2.5,color='blue')
                     else:
                         this_petal.set_posfid_val(posid,'CTRL_ENABLED',False)
-                        plt.text(this_xy[0],this_xy[1],posid,fontsize=3,color='red')
+                        plt.text(this_xy[0],this_xy[1],posid,fontsize=2.5,color='red')
                 else:
                     self.printfunc(posid+' has '+str(len(index))+' dots in its patrol area, select the nearest one')
                     index=np.where(test_dist == min(test_dist))[0][0]
@@ -832,19 +834,24 @@ class PosMoveMeasure(object):
                     posTP=this_petal.posmodels[posid].trans.obsXY_to_posTP(measured_obsXY)[0]
                     this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_X',measured_obsXY[0])
                     this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_Y',measured_obsXY[1])
+                    this_petal.set_posfid_val(posid,'OFFSET_X',measured_obsXY[0])
+                    this_petal.set_posfid_val(posid,'OFFSET_Y',measured_obsXY[1])
                     this_petal.set_posfid_val(posid,'POS_T',posTP[0])
                     this_petal.set_posfid_val(posid,'POS_P',posTP[1])
                     if move_arr[index]:
                         this_petal.set_posfid_val(posid,'CTRL_ENABLED',True)
-                        plt.text(this_xy[0],this_xy[1],posid,fontsize=3,color='blue')
+                        plt.text(this_xy[0],this_xy[1],posid,fontsize=2.5,color='blue')
                     else:
                         this_petal.set_posfid_val(posid,'CTRL_ENABLED',False)
-                        plt.text(this_xy[0],this_xy[1],posid,fontsize=3,color='red')
+                        plt.text(this_xy[0],this_xy[1],posid,fontsize=2.5,color='red')
         self.commit()
         plt.legend(loc=2)
 
         plt.subplot(212)
         plt.plot(obsX_arr,obsY_arr,'ko')
+        for i in range(len(posids)):
+            posid=posids[i] 
+            plt.text(obsX_arr[i],obsY_arr[i],posid,fontsize=2.5,color='blue')
         plt.legend(loc=2)
         plt.xlabel('obsX')
         plt.ylabel('obsY')
