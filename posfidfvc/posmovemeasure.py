@@ -573,20 +573,23 @@ class PosMoveMeasure(object):
         fvcX_enabled_arr,fvcY_enabled_arr=[],[]
         x_meas=[xy_meas[i][0] for i in range(len(xy_meas))]
         y_meas=[xy_meas[i][1] for i in range(len(xy_meas))]
-
+        obsX_arr=[]
+        obsY_arr=[]
         import matplotlib.pyplot as plt
         from matplotlib.backends.backend_pdf import PdfPages
         pp = PdfPages('identification_check.pdf')
-        plt.figure(1,figsize=(15,15))
-        plt.subplot(111)
+        plt.figure(1,figsize=(8,15))
+        plt.subplot(211)
         plt.plot(x_meas,y_meas,'ko')
 
 
         for posid in self.enabled_posids:
             ptl=self.petal(posid)
             obsXY_this=ptl.expected_current_position(posid,'obsXY') 
+            obsX_arr.append(obsXY_this[0])
+            obsY_arr.append(obsXY_this[1])
             this_xy=self.fvc.obsXY_to_fvcXY(obsXY_this)[0]
-            plt.text(this_xy[0],this_xy[1],posid,fontsize=4)
+            plt.text(this_xy[0],this_xy[1],posid,fontsize=2)
             fvcX_enabled_arr.append(this_xy[0])
             fvcY_enabled_arr.append(this_xy[1])
             test_delta = np.array(this_xy) - np.array(xy_meas)
@@ -642,8 +645,10 @@ class PosMoveMeasure(object):
                 metroX_this=metro_X_file_arr[index2]
                 metroY_this=metro_Y_file_arr[index2]
                 obsXY_this=[metroX_this,metroY_this]
+                obsX_arr.append(obsXY_this[0])
+                obsY_arr.append(obsXY_this[1])
                 this_xy=self.fvc.obsXY_to_fvcXY(obsXY_this)[0]
-                plt.text(this_xy[0],this_xy[1],posid,fontsize=4,color='red')
+                plt.text(this_xy[0],this_xy[1],posid,fontsize=2,color='red')
                 #self.printfunc(posid,' is located at:\n obsXY:',obsXY_this,'fvcXY:',this_xy)
                 test_delta = np.array(this_xy) - np.array(xy_meas)
                 test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
@@ -697,12 +702,16 @@ class PosMoveMeasure(object):
                     self.posid_not_identified.remove(posid)
                 else:
                     self.printfunc(posid+'has no more dots to match')
-        self.commit()
         plt.legend(loc=2)
-        plt.plot()
+
+        plt.subplot(212)
+        plt.plot(obsX_arr,obsY_arr,'ko')
+        plt.legend(loc=2)
         pp.savefig()
+
         plt.close()
         pp.close()
+        self.commit()
      
 
     def identify_positioners_2images(self):
@@ -767,13 +776,16 @@ class PosMoveMeasure(object):
 
         x_meas=[xy_meas[i][0] for i in range(len(xy_meas))]
         y_meas=[xy_meas[i][1] for i in range(len(xy_meas))]
-
+        obsX_arr,obsY_arr=[],[]
         import matplotlib.pyplot as plt
         from matplotlib.backends.backend_pdf import PdfPages
-        pp = PdfPages('identification_check.pdf')
-        plt.figure(1,figsize=(15,15))
-        plt.subplot(111)
+        pp = PdfPages('identification_check_2image.pdf')
+        plt.figure(1,figsize=(8,15))
+        plt.subplot(211)
         plt.plot(x_meas,y_meas,'ko')
+        plt.xlabel('fvcX')
+        plt.ylabel('fvcY')
+
 
         for i in range(n_posids):
             posid=posids[i]
@@ -784,6 +796,9 @@ class PosMoveMeasure(object):
             metroX_this=metro_X_file_arr[index2]
             metroY_this=metro_Y_file_arr[index2]
             obsXY_this=[metroX_this,metroY_this]
+            obsX_arr.append(obsXY_this[0])
+            obsY_arr.append(obsXY_this[1])
+
             this_xy=self.fvc.obsXY_to_fvcXY(obsXY_this)[0]
             test_delta = np.array(this_xy) - np.array(xy_meas)
             test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
@@ -805,10 +820,10 @@ class PosMoveMeasure(object):
                     this_petal.set_posfid_val(posid,'POS_P',posTP[1])
                     if move_arr[index]:
                         this_petal.set_posfid_val(posid,'CTRL_ENABLED',True)
-                        plt.text(this_xy[0],this_xy[1],posid,fontsize=4,color='black')
+                        plt.text(this_xy[0],this_xy[1],posid,fontsize=2,color='black')
                     else:
                         this_petal.set_posfid_val(posid,'CTRL_ENABLED',False)
-                        plt.text(this_xy[0],this_xy[1],posid,fontsize=4,color='red')
+                        plt.text(this_xy[0],this_xy[1],posid,fontsize=2,color='red')
                 else:
                     self.printfunc(posid+' has '+str(len(index))+' dots in its patrol area, select the nearest one')
                     index=np.where(test_dist == min(test_dist))[0][0]
@@ -821,16 +836,24 @@ class PosMoveMeasure(object):
                     this_petal.set_posfid_val(posid,'POS_P',posTP[1])
                     if move_arr[index]:
                         this_petal.set_posfid_val(posid,'CTRL_ENABLED',True)
-                        plt.text(this_xy[0],this_xy[1],posid,fontsize=4,color='black')
+                        plt.text(this_xy[0],this_xy[1],posid,fontsize=2,color='black')
                     else:
                         this_petal.set_posfid_val(posid,'CTRL_ENABLED',False)
-                        plt.text(this_xy[0],this_xy[1],posid,fontsize=4,color='red')
+                        plt.text(this_xy[0],this_xy[1],posid,fontsize=2,color='red')
         self.commit()
         plt.legend(loc=2)
-        plt.plot()
+
+        plt.subplot(212)
+        plt.plot(obsX_arr,obsY_arr,'ko')
+        plt.legend(loc=2)
+        plt.xlabel('obsX')
+        plt.ylabel('obsY')
+
         pp.savefig()
+
         plt.close()
         pp.close()
+        self.set_fiducials(setting='on')
 
 
 
