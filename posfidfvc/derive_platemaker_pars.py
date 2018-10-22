@@ -19,12 +19,21 @@ import csv
 import numpy as np
 from lmfit import minimize, Parameters
 from astropy.table import Table
+from astropy.io import fits
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+from derive_platemaker_pars import *
+from astropy.stats import mad_std, sigma_clipped_stats
+from astropy.modeling import models, fitting
+from astropy.table import Table, Column
+import astropy.visualization as visu
+from astropy.visualization.mpl_normalize import ImageNormalize
+import photutils as phot
 
 class Derive_Platemaker_Pars(object):
     def __init__(self):
         global gui_root
         gui_root = tkinter.Tk()
-
         # get the station config info
         message = 'Pick hardware setup file.'
         hwsetup_conf = tkinter.filedialog.askopenfilename(initialdir=pc.dirs['hwsetups'], filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
@@ -34,7 +43,7 @@ class Derive_Platemaker_Pars(object):
         if self.hwsetup['fvc_type'] == 'FLI' and 'pm_instrument' in self.hwsetup:
             self.fvc=fvchandler.FVCHandler(fvc_type=self.hwsetup['fvc_type'],save_sbig_fits=self.hwsetup['save_sbig_fits'],platemaker_instrument=self.hwsetup['pm_instrument'])
         else:
-            self.fvc = fvchandler.FVCHandler(fvc_type=self.hwsetup['fvc_type'],save_sbig_fits=self.hwsetup['save_sbig_fits'])    
+            self.fvc = fvchandler.FVCHandler(fvc_type=self.hwsetup['fvc_type'],save_sbig_fits=True)    
             self.fvc.rotation = self.hwsetup['rotation'] # this value is used in setups without fvcproxy / platemaker
             self.fvc.scale = self.hwsetup['scale'] # this value is used in setups without fvcproxy / platemaker
             self.fvc.translation = self.hwsetup['translation']
@@ -46,20 +55,7 @@ class Derive_Platemaker_Pars(object):
                   local_commit_on = True,
                   local_log_on = True,
                   printfunc = print,
-                  verbosee:
-            num_objects=input('How many dots are there in the image?')
-            num_objects=int(num_objects)
-            xy,peaks,fwhms,imgfiles=self.fvc.measure_fvc_pixels(num_objects)
-            n_sources=len(xy[0])
-            x_arr=[xy[0][i][0] for i in range(n_sources)]
-            y_arr=[xy[0][i][1] for i in range(n_sources)]
-            sources=Table([x_arr,y_arr],names=('xcentroid','ycentroid'))
-            hdul = fits.open(imgfiles[0])
-            data = hdul[1].data
-            plt.ioff()
-            sourceSel = SourceSelector(data, sources)
-            plt.ion()
-= False,
+                  verbose = False,
                   collider_file = None,
                   sched_stats_on = False,
                   anticollision = None) # valid options for anticollision arg: None, 'freeze', 'adjust'
@@ -71,7 +67,8 @@ class Derive_Platemaker_Pars(object):
 
         # calibration routines
         self.m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
-        if mode == 'automatic':
+        automatic_mode = tkinter.messagebox.askyesno(title='Automatic or Manual Mode?',message='Use Automatic Mode?')
+        if automatic_mode:
             w=800
             h=600
             ws=gui_root.winfo_screenwidth()
@@ -106,16 +103,21 @@ class Derive_Platemaker_Pars(object):
         else:
             num_objects=input('How many dots are there in the image?')
             num_objects=int(num_objects)
-            xy,peaks,fwhms,imgfiles=self.fvc.measure_fvc_pixels(num_objects)
-            n_sources=len(xy[0])
-            x_arr=[xy[0][i][0] for i in range(n_sources)]
-            y_arr=[xy[0][i][1] for i in range(n_sources)]
-            sources=Table([x_arr,y_arr],names=('xcentroid','ycentroid'))
+            xy,peaks,fwhms,imgfiles=self.fvc.measure(num_objects)
+            xy_fvc=self.fvc.obsXY_to_fvcXY(xy)
+            n_sources=len(xy)
+            id=[i+1 for i in range(n_sources)]
+            x_arr=[xy_fvc[i][0] for i in range(n_sources)]
+            y_arr=[xy_fvc[i][1] for i in range(n_sources)]
+            sources=Table([id,x_arr,y_arr],names=('id','xcentroid','ycentroid'),dtype=('i8','f8','f8'))
             hdul = fits.open(imgfiles[0])
-            data = hdul[1].data
+            data = hdul[0].data
             plt.ioff()
             sourceSel = SourceSelector(data, sources)
             plt.ion()
+            sources_tofit=sourceSel.sources_selected
+
+            import pdb;pdb.set_trace()
 
     def ok(self):
         gui_root.destroy()
@@ -187,8 +189,6 @@ class Derive_Platemaker_Pars(object):
             metroX_arr.append(metro_X_file_arr[index])
             metroY_arr.append(metro_Y_file_arr[index])
 
-        import matplotlib.pyplot as plt
-        from matplotlib.backends.backend_pdf import PdfPages
 
         obsX_arr=np.array(obsX_arr)
         obsY_arr=np.array(obsY_arr)
@@ -320,7 +320,7 @@ if __name__=="__main__":
     gui = Derive_Platemaker_Pars()
 
 
-lass SourceSelector():
+class SourceSelector():
         """
         Tool created to click a source on a image, and return
         the source found in "sources"
@@ -329,9 +329,10 @@ lass SourceSelector():
 
         def __init__(self, im, sources ):
                 self.sources = sources
+                self.sources_selected=Table([[],[],[]],names=('id','xcentroid','ycentroid'),dtype=('i8','f8','f8'))
                 self.im = im
                 self.fig = plt.figure(figsize=(12,10))
-                self.ax = self.fig.add_subplot(111,aspect='equal')
+                self.ax = self.fig.add_subplot(111) #,aspect='equal')
                 self.fig.tight_layout()
                 self.state = '' # état du selecteur (selecting, adding or deleting)
 
@@ -354,6 +355,8 @@ lass SourceSelector():
 
                 self.ax.imshow(im, aspect='equal', norm=norm)
                 self.crosses, = self.ax.plot(self.sources['xcentroid'],self.sources['ycentroid'],'x',color='green', mew=2,ms=8)
+                self.crosses_selected, = self.ax.plot(self.sources_selected['xcentroid'],self.sources_selected['ycentroid'],'x',color='blue', mew=2,ms=8)
+
                 self.sh=im.shape
                 self.ax.set_xlim(0,self.sh[0])
                 self.ax.set_ylim(0,self.sh[1])
@@ -384,13 +387,23 @@ lass SourceSelector():
                         # s'il y a plusieurs sources, on garde celle au plus près du clique
                         ind = ind[np.where(distances[ind] == distances[ind].min())]
 
+
+                distances_selected = np.asarray(np.sqrt((self.sources_selected['xcentroid']-event.xdata)**2+(self.sources_selected['ycentroid']-event.ydata)**2))
+                ind_selected, = np.where(distances_selected <= 20.0)
+                if len(ind_selected) > 1:
+                        # s'il y a plusieurs sources, on garde celle au plus près du clique
+                        ind_selected = ind_selected[np.where(distances_selected[ind_selected] == distances_selected[ind_selected].min())]
+
                 if all([ind.shape[0] == 0,any([self.state!='add or suppress',event.button!=1])]):
                 # s'il n'y pas de source ?|  moins de 20 pix du clique et qu'on n'est pas
                 # ?|  vouloir ajouter une sources, alors, on ne fait rien
                         return
-
                 if len(ind) >= 1:
                         ind = int(ind[0])       # ind est un numpy array. On prend la valeur scalaire, et on la convertit en entier
+
+
+                if len(ind_selected) >= 1:
+                        ind_selected = int(ind_selected[0])       # ind est un numpy array. On prend la valeur scalaire, et on la convertit en entier
 
                 if self.state=='':
                         print(self.sources[ind], "\n")
@@ -398,7 +411,8 @@ lass SourceSelector():
                 if all([event.button == 3, self.state == 'add or suppress']):   # DELETING SOURCE 
                         print('deleting source {}'.format(self.sources['id'][ind]))
                         self.sources.remove_row(ind)
-
+                        self.crosses.set_data(self.sources['xcentroid'],self.sources['ycentroid'])
+                        plt.pause(0.01)
                 if all([event.button == 1, self.state == 'add or suppress']): # ADDING SOURCE 
                         hw = 7
                         x0 = event.xdata - hw
@@ -407,7 +421,6 @@ lass SourceSelector():
                         y1 = event.ydata + hw
                         daofind = phot.DAOStarFinder(3.*self.bkg_sigma,self.FWHM_estim(0),sharplo=0.02, sharphi=0.95, roundlo=-0.9, roundhi=0.9)
                         newsource = daofind(self.im[int(y0):int(y1),int(x0):int(x1)])
-                        #newsource = phot.daofind(self.im[int(y0):int(y1),int(x0):int(x1)], fwhm=self.FWHM_estim(0), threshold=3.*self.bkg_sigma, sharplo=0.02, sharphi=0.95, roundlo=-0.9, roundhi=0.9)
                         if len(newsource) != 0:
                                 j = newsource['peak'].argmax()
                                 newsource = newsource[j]
@@ -420,7 +433,20 @@ lass SourceSelector():
                                         self.sources = Table(newsource) # if self.sources was empty (no source found automatically), create it.
                                 self.crosses.set_data(self.sources['xcentroid'],self.sources['ycentroid'])
                                 plt.pause(0.01)
-
+                if all([event.button == 1, self.state == 'select']): # select SOURCE
+                        newsource = self.sources[ind] 
+                        print('Selected source \n{}'.format(newsource))
+                        if len(self.sources_selected) != 0:
+                            self.sources_selected.add_row(newsource)
+                        else:
+                            self.sources_selected = Table(newsource) # if self.sources was empty (no source found automatically), create it.
+                        self.crosses_selected.set_data(self.sources_selected['xcentroid'],self.sources_selected['ycentroid'])
+                        plt.pause(0.01)
+                if all([event.button == 3, self.state == 'select']):   # DELETING SOURCE
+                        print('deleting source {}'.format(self.sources_selected['id'][ind_selected]))
+                        self.sources_selected.remove_row(ind_selected)
+                        self.crosses_selected.set_data(self.sources_selected['xcentroid'],self.sources_selected['ycentroid'])
+                        plt.pause(0.01)
                 return
 
         def onkeypress(self, event):
@@ -435,6 +461,8 @@ lass SourceSelector():
 
                 if (event.key.lower() == 'shift'):
                         self.state = 'add or suppress'
+                if (event.key.lower() == 'control'):
+                        self.state = 'select'
 
                 if (event.key.lower() == 'enter'):
                         if any([len(self.columns)==0, len(self.rows)==0]):
