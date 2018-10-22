@@ -117,7 +117,53 @@ class Derive_Platemaker_Pars(object):
             plt.ion()
             sources_tofit=sourceSel.sources_selected
 
+
+            if self.ptl.shape == 'petal':
+                self.file_metro=pc.dirs['positioner_locations_file']
+            elif self.ptl.shape == 'small_array':
+                self.file_metro=pc.dirs['small_array_locations_file']
+            else:
+                self.printfunc('Must be a petal or a small_array to proceed. Exit')
+                raise SystemExit
+
+            # Read dots identification result from ptl and store a dictionary
+            pix_size=0.006
+            if self.fvc.fvc_type == 'FLI':
+                flip=1  # x flip right now this is hard coded since we don't change the camera often.
+            else:
+                flip=0
+            obsX_arr,obsY_arr,obsXY_arr,fvcX_arr,fvcY_arr=[],[],[],[],[]
+            metroX_arr,metroY_arr=[],[]
+
+            # read the Metrology data first, then match positioners to DEVICE_LOC
+            positioners = Table.read(self.file_metro,format='ascii.csv',header_start=0,data_start=1)
+            device_loc_file_arr,metro_X_file_arr,metro_Y_file_arr=[],[],[]
+            for row in positioners:
+                device_loc_file_arr.append(row['device_loc'])
+                metro_X_file_arr.append(row['X'])
+                metro_Y_file_arr.append(row['Y'])
+            n_sources=len(metro_X_file_arr)
+            id=[i+1 for i in range(n_sources)]
+            sources_metro=Table([id,metro_X_file_arr,metro_Y_file_arr],names=('id','xcentroid','ycentroid'),dtype=('i8','f8','f8'))
+            plt.ioff()
+            sourceSel_metro = SourceSelector(data, sources_metro)
+            plt.ion()
+            sources_tofit_metro=sourceSel_metro.sources_selected
+            fvcX_arr=sources_tofit['xcentroid']
+            fvcY_arr=sources_tofit['ycentroid']
+            for i in range(len(fvcX_arr)):
+                obsXY_this=self.fvc.fvcXY_to_obsXY([fvcX_arr[i],fvcY_arr[i]])[0]
+                obsX_arr.append(obsXY_this[0])
+                obsY_arr.append(obsXY_this[1])
+            metroX_arr=sources_tofit_metro['xcentroid']
+            metroY_arr=sources_tofit_metro['ycentroid']
+            fvcX_arr=fvcX_arr.tolist()
+            fvcY_arr=fvcY_arr.tolist()
+            metroX_arr=metroX_arr.tolist()
+            metroY_arr=metroY_arr.tolist()
+
             import pdb;pdb.set_trace()
+            self.fit_and_plot(obsX_arr,obsY_arr,fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=0)
 
     def ok(self):
         gui_root.destroy()
@@ -192,6 +238,10 @@ class Derive_Platemaker_Pars(object):
 
         obsX_arr=np.array(obsX_arr)
         obsY_arr=np.array(obsY_arr)
+
+        self.fit_and_plot(obsX_arr,obsY_arr,fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=0)
+
+    def fit_and_plot(self,obsX_arr,obsY_arr,fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=0):
 
         pars = Parameters() # Input parameters model and initial guess
         pars.add('offx', value=0.)
