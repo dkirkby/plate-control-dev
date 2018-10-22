@@ -46,7 +46,20 @@ class Derive_Platemaker_Pars(object):
                   local_commit_on = True,
                   local_log_on = True,
                   printfunc = print,
-                  verbose = False,
+                  verbosee:
+            num_objects=input('How many dots are there in the image?')
+            num_objects=int(num_objects)
+            xy,peaks,fwhms,imgfiles=self.fvc.measure_fvc_pixels(num_objects)
+            n_sources=len(xy[0])
+            x_arr=[xy[0][i][0] for i in range(n_sources)]
+            y_arr=[xy[0][i][1] for i in range(n_sources)]
+            sources=Table([x_arr,y_arr],names=('xcentroid','ycentroid'))
+            hdul = fits.open(imgfiles[0])
+            data = hdul[1].data
+            plt.ioff()
+            sourceSel = SourceSelector(data, sources)
+            plt.ion()
+= False,
                   collider_file = None,
                   sched_stats_on = False,
                   anticollision = None) # valid options for anticollision arg: None, 'freeze', 'adjust'
@@ -58,37 +71,51 @@ class Derive_Platemaker_Pars(object):
 
         # calibration routines
         self.m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
-        w=800
-        h=600
-        ws=gui_root.winfo_screenwidth()
-        hs=gui_root.winfo_screenheight()
-        x=(ws/2)-(w/2)
-        y=(hs/2)-(h/2)
-        gui_root.geometry('%dx%d+%d+%d' % (w,h,x,y))
+        if mode == 'automatic':
+            w=800
+            h=600
+            ws=gui_root.winfo_screenwidth()
+            hs=gui_root.winfo_screenheight()
+            x=(ws/2)-(w/2)
+            y=(hs/2)-(h/2)
+            gui_root.geometry('%dx%d+%d+%d' % (w,h,x,y))
 
-        self.listbox1 = Listbox(gui_root, width=20, height=20,selectmode='multiple',exportselection=0)
-        self.listbox1.grid(row=6, column=0,rowspan=10,pady=4,padx=15)
-        Button(gui_root,text='OK',width=10,command=self.ok).grid(row=0,column=4,sticky=W,pady=4)
-        yscroll_listbox1 = Scrollbar(command=self.listbox1.yview, orient=tkinter.VERTICAL)
-        yscroll_listbox1.grid(row=6, column=0, rowspan=10,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)
-        self.listbox1.configure(yscrollcommand=yscroll_listbox1.set)
-        self.listbox1.insert(tkinter.END,'ALL')
-        for key in sorted(posids):
-            self.listbox1.insert(tkinter.END,str(key))
-        self.listbox1.bind('<ButtonRelease-1>', self.get_list)
-
+            self.listbox1 = Listbox(gui_root, width=20, height=20,selectmode='multiple',exportselection=0)
+            self.listbox1.grid(row=6, column=0,rowspan=10,pady=4,padx=15)
+            Button(gui_root,text='OK',width=10,command=self.ok).grid(row=0,column=4,sticky=W,pady=4)
+            yscroll_listbox1 = Scrollbar(command=self.listbox1.yview, orient=tkinter.VERTICAL)
+            yscroll_listbox1.grid(row=6, column=0, rowspan=10,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)
+            self.listbox1.configure(yscrollcommand=yscroll_listbox1.set)
+            self.listbox1.insert(tkinter.END,'ALL')
+            for key in sorted(posids):
+                self.listbox1.insert(tkinter.END,str(key))
+            self.listbox1.bind('<ButtonRelease-1>', self.get_list)
+ 
 #       Load the information
-        Label(gui_root,text="You selected").grid(row=3,column=5)
-        self.e_selected=Entry(gui_root)
-        self.e_selected.grid(row=3,column=6)
+            Label(gui_root,text="You selected").grid(row=3,column=5)
+            self.e_selected=Entry(gui_root)
+            self.e_selected.grid(row=3,column=6)
 
-        mainloop()
+            mainloop()
 
-        self.m.identify_many_enabled_positioners(self.selected_posids)
-
-        self.make_instrfile(self.m.enabled_posids)
-        self.push_to_db()
-        self.m.identify_disabled_positioners()
+            self.m.identify_many_enabled_positioners(self.selected_posids)
+  
+            self.make_instrfile(self.m.enabled_posids)
+            self.push_to_db()
+            self.m.identify_disabled_positioners()
+        else:
+            num_objects=input('How many dots are there in the image?')
+            num_objects=int(num_objects)
+            xy,peaks,fwhms,imgfiles=self.fvc.measure_fvc_pixels(num_objects)
+            n_sources=len(xy[0])
+            x_arr=[xy[0][i][0] for i in range(n_sources)]
+            y_arr=[xy[0][i][1] for i in range(n_sources)]
+            sources=Table([x_arr,y_arr],names=('xcentroid','ycentroid'))
+            hdul = fits.open(imgfiles[0])
+            data = hdul[1].data
+            plt.ioff()
+            sourceSel = SourceSelector(data, sources)
+            plt.ion()
 
     def ok(self):
         gui_root.destroy()
@@ -291,4 +318,166 @@ class Derive_Platemaker_Pars(object):
     
 if __name__=="__main__":
     gui = Derive_Platemaker_Pars()
+
+
+lass SourceSelector():
+        """
+        Tool created to click a source on a image, and return
+        the source found in "sources"
+        (astropy Table returned by phot.daofind())      
+        """
+
+        def __init__(self, im, sources ):
+                self.sources = sources
+                self.im = im
+                self.fig = plt.figure(figsize=(12,10))
+                self.ax = self.fig.add_subplot(111,aspect='equal')
+                self.fig.tight_layout()
+                self.state = '' # état du selecteur (selecting, adding or deleting)
+
+                # données utiles pour daofind (si ajout de sources ?|  la main)
+                pix_sz = 0.015  # pixel size in mm
+                self.bkg_sigma = mad_std(im)
+                self.FWHM_estim = lambda z: abs(z) / 2.0 / 1.7 / pix_sz + 3.333
+
+
+                #other way of computing norme for vizualisation
+                H,bin_edges=np.histogram(im,bins=20000)
+                x=(bin_edges[:-1]+bin_edges[1:])/2.0
+                Fitter=fitting.LevMarLSQFitter()
+                model = models.Gaussian1D(amplitude=H.max(),mean=np.mean(im),stddev=self.bkg_sigma)
+                fit = Fitter(model, x, H)
+                mm = fit.mean.value
+                self.bkg_sigma = np.abs(fit.stddev.value)
+                # high vmax better with R and Z that have bad amps (with high values)
+                norm = ImageNormalize(vmin=mm-4*self.bkg_sigma, vmax=mm+40*self.bkg_sigma, stretch=visu.SqrtStretch())
+
+                self.ax.imshow(im, aspect='equal', norm=norm)
+                self.crosses, = self.ax.plot(self.sources['xcentroid'],self.sources['ycentroid'],'x',color='green', mew=2,ms=8)
+                self.sh=im.shape
+                self.ax.set_xlim(0,self.sh[0])
+                self.ax.set_ylim(0,self.sh[1])
+
+                self.ax.format_coord = self.format_coord # reassign format coord function to my function (just added the "status" display)
+                self.cid = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
+                self.cidkey1 = self.fig.canvas.mpl_connect('key_press_event', self.onkeypress)
+                self.cidkey2 = self.fig.canvas.mpl_connect('key_release_event', self.onkeyrelease)
+
+                self.columns = []
+                self.rows = []
+
+                print("Welcome to the Source Selector tool")
+                print("------------------------------------")
+                print("Press and hold 'Shift' and click left or right to add or suppress sources")
+                print("Press and hold 'Ctrl' and click left or right to build a grid")
+                print("Press 'Enter' to validate")
+                print("Press 'q' to quit")
+
+                plt.show()
+        def onclick(self, event):
+                if self.fig.canvas.toolbar._active is not None:
+                        return
+
+                distances = np.asarray(np.sqrt((self.sources['xcentroid']-event.xdata)**2+(self.sources['ycentroid']-event.ydata)**2))
+                ind, = np.where(distances <= 20.0)
+                if len(ind) > 1:
+                        # s'il y a plusieurs sources, on garde celle au plus près du clique
+                        ind = ind[np.where(distances[ind] == distances[ind].min())]
+
+                if all([ind.shape[0] == 0,any([self.state!='add or suppress',event.button!=1])]):
+                # s'il n'y pas de source ?|  moins de 20 pix du clique et qu'on n'est pas
+                # ?|  vouloir ajouter une sources, alors, on ne fait rien
+                        return
+
+                if len(ind) >= 1:
+                        ind = int(ind[0])       # ind est un numpy array. On prend la valeur scalaire, et on la convertit en entier
+
+                if self.state=='':
+                        print(self.sources[ind], "\n")
+
+                if all([event.button == 3, self.state == 'add or suppress']):   # DELETING SOURCE 
+                        print('deleting source {}'.format(self.sources['id'][ind]))
+                        self.sources.remove_row(ind)
+
+                if all([event.button == 1, self.state == 'add or suppress']): # ADDING SOURCE 
+                        hw = 7
+                        x0 = event.xdata - hw
+                        x1 = event.xdata + hw
+                        y0 = event.ydata - hw
+                        y1 = event.ydata + hw
+                        daofind = phot.DAOStarFinder(3.*self.bkg_sigma,self.FWHM_estim(0),sharplo=0.02, sharphi=0.95, roundlo=-0.9, roundhi=0.9)
+                        newsource = daofind(self.im[int(y0):int(y1),int(x0):int(x1)])
+                        #newsource = phot.daofind(self.im[int(y0):int(y1),int(x0):int(x1)], fwhm=self.FWHM_estim(0), threshold=3.*self.bkg_sigma, sharplo=0.02, sharphi=0.95, roundlo=-0.9, roundhi=0.9)
+                        if len(newsource) != 0:
+                                j = newsource['peak'].argmax()
+                                newsource = newsource[j]
+                                newsource['xcentroid'] = newsource['xcentroid'] + x0
+                                newsource['ycentroid'] = newsource['ycentroid'] + y0
+                                print('adding source \n{}'.format(newsource))
+                                if len(self.sources) != 0:
+                                        self.sources.add_row(newsource)
+                                else:
+                                        self.sources = Table(newsource) # if self.sources was empty (no source found automatically), create it.
+                                self.crosses.set_data(self.sources['xcentroid'],self.sources['ycentroid'])
+                                plt.pause(0.01)
+
+                return
+
+        def onkeypress(self, event):
+                if (event.key.lower() == 'q'):
+                        print("Quitting the Source Selector...")
+                        self.fig.canvas.mpl_disconnect(self.cid)
+                        self.fig.canvas.mpl_disconnect(self.cidkey1)
+                        self.fig.canvas.mpl_disconnect(self.cidkey2)
+                        indexes=np.linspace(1,len(self.sources),len(self.sources))
+                        self.sources['id']=indexes
+                        plt.close(self.fig)
+
+                if (event.key.lower() == 'shift'):
+                        self.state = 'add or suppress'
+
+                if (event.key.lower() == 'enter'):
+                        if any([len(self.columns)==0, len(self.rows)==0]):
+                                return
+
+                        (Xs,Ys) = self.intersects(self.rows, self.columns)
+
+                        finalsources = self.sources[0:0] # an astropy Table of the same format, with no row.
+                        for i,x0 in enumerate(Xs):
+                                y0 = Ys[i]
+                                distances = np.asarray(np.sqrt((self.sources['xcentroid']-x0)**2+(self.sources['ycentroid']-y0)**2))
+                                ind, = np.where(distances <= 20.0)
+
+                                if len(ind) > 1:
+                                        # s'il y a plusieurs sources, on garde celle au plus près du clique
+                                        ind = ind[np.where(distances[ind] == distances[ind].min())]
+
+                                if ind.shape[0] != 0:
+                                        ind = int(ind[0])
+                                        finalsources.add_row(self.sources[ind])
+
+                        self.ax.plot(finalsources['xcentroid'],finalsources['ycentroid'],'+',color='yellow', mew=2,ms=8)
+                        plt.pause(0.01)
+
+                        self.sources = finalsources # overwrite the "sources" Table with the few sources kept.
+
+        def onkeyrelease(self, event):
+                        self.state = ''
+
+        def format_coord(self, x, y):
+                """Return a format string formatting the *x*, *y* coord"""
+                if x is None:
+                        xs = '???'
+                else:
+                        xs = self.ax.format_xdata(x)
+                if y is None:
+                        ys = '???'
+                else:
+                        ys = self.ax.format_ydata(y)
+                if all([self.fig.canvas.toolbar._active is None, self.state != '']):
+                        return '%s SOURCES...   x=%s y=%s' % (self.state.upper(), xs, ys)
+                else:
+                        return 'x=%s y=%s' % (xs, ys)
+
+
 
