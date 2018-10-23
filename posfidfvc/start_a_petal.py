@@ -1,20 +1,16 @@
 """
 Start a Petal
 
-# History: V1.0   Kai Zhang @LBNL  2017-10-17   Contact: zkdtckk@gmail.com
-# Implemented on Beyonce on 2017-10-17, just change the data_processing_scripts relative location to work. 
-#          V1.1  Kai Zhang, 2018-04-02. Add canbus input to talk to different cans for EM Petal. 
-#          V1.2  Kai Zhang  2018-05-01. Add Reload Canbus botton so that no restart is needed. Facilitate the petal check. 
+# History: V1.0   Kai Zhang @LBNL  2018-08-17   Contact: zkdtckk@gmail.com
 """
 import os
 import sys
 import datetime
-account_name='badu'
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../xytest/'))
 sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/'+account_name+'/focalplane/positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/'+account_name+'/focalplane/pos_utility/'))
+sys.path.append(os.path.abspath(os.getenv('HOME')+'/focalplane/positioner_logs/data_processing_scripts/'))
+sys.path.append(os.path.abspath(os.getenv('HOME')+'/focalplane/pos_utility/'))
 
 import fvchandler
 import petal
@@ -46,7 +42,7 @@ class Start_A_Petal(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
         global gui_root
         gui_root = tkinter.Tk()
-        google_dir='/home/'+account_name+'/focalplane/pos_utility/'        
+        google_dir=os.getenv('HOME')+'/focalplane/pos_utility/'        
         credential_name='google_access_account_lbl.json'
         w=200
         h=100
