@@ -77,6 +77,7 @@ class Petal(object):
             self.comm.pbset('non_responsives', 'clear') #reset petalcontroller's list of non-responsive canids
         self.shape = self.petal_state.conf['SHAPE']
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
+        self._initialize_pos_flags()
 
         # database setup
         self.db_commit_on = db_commit_on if DB_COMMIT_AVAILABLE else False
@@ -184,27 +185,23 @@ class Petal(object):
 
             pos_flags ... dict keyed by positioner indicating which flag as indicated below that a
                           positioner should receive going to the FLI camera with fvcproxy
-                flags    2 : pinhole center 
-                         4 : fiber center 
-                         8 : fiducial center 
-                        32 : bad fiber or fiducial 
         """
         marked_for_delete = set()
         self.pos_flags = {}
         for posid in requests:
             requests[posid]['posmodel'] = self.posmodels[posid]
-            self.pos_flags[posid] = '4'
+            self._initialize_pos_flags(ids = {posid})
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
             if not(self.get_posfid_val(posid,'CTRL_ENABLED')):
-                self.pos_flags[posid] = '36'
+                self.pos_flags[posid] += 1<<9
                 marked_for_delete.add(posid)
             elif self.schedule.already_requested(posid):
                 marked_for_delete.add(posid)
+                self.pos_flags[posid] += 1<<16
             else:
                 accepted = self.schedule.request_target(posid, requests[posid]['command'], requests[posid]['target'][0], requests[posid]['target'][1], requests[posid]['log_note'])            
                 if not accepted:
-                    self.pos_flags[posid] = '36'
                     marked_for_delete.add(posid)
         for posid in marked_for_delete:
             del requests[posid]
@@ -262,13 +259,12 @@ class Petal(object):
         wishes a sequence of theta and phi rotations to all be done in one shot. (This is unlike the
         request_targets command, where only the first request to a given positioner would be valid.)
         """
-        self.pos_flags = {}
+        self._initialize_pos_flags(ids = {posid for posid in requests})
         marked_for_delete = {posid for posid in requests if not(self.get_posfid_val(posid,'CTRL_ENABLED'))}
         for posid in marked_for_delete:
-            self.pos_flags[posid] = '36'
+            self.pos_flags[posid] += 1<<9
             del requests[posid]
         for posid in requests:
-            self.pos_flags[posid] = '4'
             requests[posid]['posmodel'] = self.posmodels[posid]
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
@@ -288,11 +284,12 @@ class Petal(object):
         descriptive string to the log. This method is generally recommended only for
         expert usage. Requests to disabled positioners will be ignored.
         """
-        self.pos_flags = {}
+        self._initialize_pos_flags(ids = posids)
         posids = {posids} if isinstance(posids,str) else set(posids)
-        for posid in posids:
-            self.pos_flags[posid] = '36'
         enabled = self.enabled_posmodels(posids)
+        for posid in posids:
+            if posid not in enabled.keys():
+                self.pos_flags[posid] += 1<<9
         if anticollision:
             if axisid == pc.P and direction == -1:
                 # calculate thetas where extended phis do not interfere
@@ -303,7 +300,6 @@ class Petal(object):
                 # Eo has a bit more possible collisions, for example against a stuck-extended neighbor. Costs a bit more time/power to go to Ei, but limit-seeking is not a frequent operation.
                 pass
         for posid, posmodel in enabled.items():
-            self.pos_flags[posid] = '4'
             search_dist = pc.sign(direction)*posmodel.axis[axisid].limit_seeking_search_distance
             table = posmovetable.PosMoveTable(posmodel)
             table.should_antibacklash = False
@@ -331,16 +327,16 @@ class Petal(object):
         posids. Finds the primary hardstop, and sets values for the max position and min position.
         Requests to disabled positioners will be ignored.
         """
-        self.pos_flags = {}
         posids = {posids} if isinstance(posids,str) else set(posids)
-        for posid in posids:
-            self.pos_flags[posid] = '36'
+        self._initialize_pos_flags(ids = posids)
         enabled = self.enabled_posmodels(posids)
+        for posid in posids:
+            if posid not in enabled.keys():
+                self.pos_flags[posid] += 1<<9
         hardstop_debounce = [0,0]
         direction = [0,0]
         direction[pc.P] = +1 # force this, because anticollision logic depends on it
         for posid in enabled:
-            self.pos_flags[posid] = '4'
             self.request_limit_seek(posid, pc.P, direction[pc.P], anticollision=self.anticollision_default, cmd_prefix='P', log_note='homing')
         self.schedule_moves(anticollision=self.anticollision_default)
         for posid,posmodel in enabled.items():
@@ -667,17 +663,21 @@ class Petal(object):
         """
         return {p:self.posmodels[p] for p in posids if self.posmodels[p].is_enabled}
 
-    def get_pos_flags(self):
+    def get_pos_flags(self, posids = 'all', should_reset = False):
         '''Getter function for self.pos_flags that carries out a final is_enabed
         check before passing them off. Important in case the PC sets ctrl_enabled = False
         when a positioner is not responding.
         '''
-        for posid, pm in self.posmodels.items():
-            if (posid not in self.pos_flags.keys()):
-                self.pos_flags[posid] = '4' #assume good, just no move needed so never added
-            if not(pm.is_enabled):
-                self.pos_flags[posid] = '36' #final check for disabled
-        return self.pos_flags
+        pos_flags = {}
+        if posids == 'all':
+            posids = self.posids
+        for posid in self.posids:
+            if not(self.posmodels[posid].is_enabled):
+                self.pos_flags[posid] += 1<<9 #final check for disabled
+            pos_flags[posid] = str(self.pos_flags[posid])
+        if should_reset:
+            self._initialize_pos_flags()
+        return pos_flags
 
 # MOVE SCHEDULING ANIMATOR CONTROLS
         
@@ -767,6 +767,7 @@ class Petal(object):
                     for item_id in self.posids.union(self.fidids):
                         if self.get_posfid_val(item_id,'CAN_ID') == canid:
                             self.set_posfid_val(item_id,'CTRL_ENABLED',False)
+                            self.pos_flags[item_id] += 1<<11
                             self.states[item_id].next_log_notes.append('Disabled sending control commands because device was detected to be nonresponsive.')
                             break
                     status_updated = True
@@ -828,3 +829,38 @@ class Petal(object):
             already_mapped.union(mapped_posids)
         power_supply_map['other'] = set(canids.keys()).difference(already_mapped)
         return power_supply_map
+
+    def _initialize_pos_flags(self, ids = 'all'):
+        '''
+        Sets pos_flags to initial values: 4 for positioners and 8 for fiducials.
+
+        FVC/Petal bit string
+
+        FVC BITS
+        1 - Pinhole Center
+        2 - Fiber Center
+        3 - Fiducial Center
+        4 - 
+        5 - Bad Fiber or Fiducial
+        7 - Reserved for expansion 
+        8 - Reserved for expansion
+
+        PETAL BITS
+        9  - CTRL_ENABLED = False
+        10 - FIBER_INTACT = False
+        11 - Communication error
+        12 - Overlapping targets
+        13 - Frozen by anticollision
+        14 - Unreachable by positioner
+        15 - Targeting restricted boundries
+        16 - Requested multiple times
+        '''
+        if ids == 'all'
+            ids = self.posids.union(self.fidids)
+        for posfidid in ids:
+            if ('M' in posfidid) or ('UM' in posfidid):
+                self.pos_flags[posfidid] = 1<<4
+            else:
+                self.pos_flags[posfidid] = 1<<8
+        return
+
