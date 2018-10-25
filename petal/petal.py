@@ -194,11 +194,11 @@ class Petal(object):
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
             if not(self.get_posfid_val(posid,'CTRL_ENABLED')):
-                self.pos_flags[posid] += 1<<9
+                self.pos_flags[posid] |= 1<<9
                 marked_for_delete.add(posid)
             elif self.schedule.already_requested(posid):
                 marked_for_delete.add(posid)
-                self.pos_flags[posid] += 1<<16
+                self.pos_flags[posid] |= 1<<16
             else:
                 accepted = self.schedule.request_target(posid, requests[posid]['command'], requests[posid]['target'][0], requests[posid]['target'][1], requests[posid]['log_note'])            
                 if not accepted:
@@ -262,7 +262,7 @@ class Petal(object):
         self._initialize_pos_flags(ids = {posid for posid in requests})
         marked_for_delete = {posid for posid in requests if not(self.get_posfid_val(posid,'CTRL_ENABLED'))}
         for posid in marked_for_delete:
-            self.pos_flags[posid] += 1<<9
+            self.pos_flags[posid] |= 1<<9
             del requests[posid]
         for posid in requests:
             requests[posid]['posmodel'] = self.posmodels[posid]
@@ -289,7 +289,7 @@ class Petal(object):
         enabled = self.enabled_posmodels(posids)
         for posid in posids:
             if posid not in enabled.keys():
-                self.pos_flags[posid] += 1<<9
+                self.pos_flags[posid] |= 1<<9
         if anticollision:
             if axisid == pc.P and direction == -1:
                 # calculate thetas where extended phis do not interfere
@@ -332,7 +332,7 @@ class Petal(object):
         enabled = self.enabled_posmodels(posids)
         for posid in posids:
             if posid not in enabled.keys():
-                self.pos_flags[posid] += 1<<9
+                self.pos_flags[posid] |= 1<<9
         hardstop_debounce = [0,0]
         direction = [0,0]
         direction[pc.P] = +1 # force this, because anticollision logic depends on it
@@ -671,9 +671,10 @@ class Petal(object):
         pos_flags = {}
         if posids == 'all':
             posids = self.posids
+        #TODO: check FIBER_INTACT flag and set if False
         for posid in self.posids:
             if not(self.posmodels[posid].is_enabled):
-                self.pos_flags[posid] += 1<<9 #final check for disabled
+                self.pos_flags[posid] |= 1<<9 #final check for disabled
             pos_flags[posid] = str(self.pos_flags[posid])
         if should_reset:
             self._initialize_pos_flags()
@@ -767,7 +768,7 @@ class Petal(object):
                     for item_id in self.posids.union(self.fidids):
                         if self.get_posfid_val(item_id,'CAN_ID') == canid:
                             self.set_posfid_val(item_id,'CTRL_ENABLED',False)
-                            self.pos_flags[item_id] += 1<<11
+                            self.pos_flags[item_id] |= 1<<11
                             self.states[item_id].next_log_notes.append('Disabled sending control commands because device was detected to be nonresponsive.')
                             break
                     status_updated = True
