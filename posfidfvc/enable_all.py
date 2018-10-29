@@ -8,7 +8,6 @@ import petal
 import posmovemeasure
 import fvchandler
 import posconstants as pc
-import instrmaker
 import tkinter
 import tkinter.filedialog
 import tkinter.messagebox
@@ -33,6 +32,7 @@ new_and_changed_files.add(hwsetup.filename)
 # software initialization and startup
 # software initialization and startup
 ptl = petal.Petal(petal_id = hwsetup['ptl_id'],
+                  posids=[],fidids=[],  
                   simulator_on = sim,
                   user_interactions_enabled = True,
                   db_commit_on = False,
@@ -43,7 +43,6 @@ ptl = petal.Petal(petal_id = hwsetup['ptl_id'],
                   collider_file = None,
                   sched_stats_on = False,
                   anticollision = None) # valid options for anticollision arg: None, 'freeze', 'adjust'
-import pdb; pdb.set_trace()
 print('Enable all positioners')
 for posid in ptl.posids:
     print(posid+'\n')
