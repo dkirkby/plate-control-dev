@@ -22,6 +22,7 @@ MoveGUI
 #          V1.1  Kai Zhang, 2018-04-02. Add canbus input to talk to different cans for EM Petal. 
 #          V1.2  Kai Zhang  2018-05-01. Add Reload Canbus botton so that no restart is needed. Facilitate the petal check. 
 """
+account='badu'
 import os
 import sys
 import datetime
@@ -283,6 +284,9 @@ class MoveGUI(object):
         
 #        Button(gui_root,text='Plot List',width=10,command=click_plot_list).grid(row=4,column=2,sticky=W,pady=4)
         Button(gui_root,text='Refresh/Restart',width=15,command=self.restart).grid(row=0,column=8,sticky=W,pady=4)
+        self.pwr_button = Button(gui_root,text='POSPWR is ON', width=15, command=self.toggle, bg='green')
+        self.pwr_button.grid(row=1, column=8, sticky=W,pady=4)
+
         Button(gui_root,text='Clear',width=15,command=self.clear1).grid(row=5,column=4,sticky=W,pady=4)
         Button(gui_root,text='Clear',width=15,command=self.clear2).grid(row=5,column=6,sticky=W,pady=4)
         
@@ -664,6 +668,25 @@ class MoveGUI(object):
 
 
                 self.load_acceptance_traveller()
+
+    def toggle(self, flag = [0]):
+        flag[0] = not flag[0]
+        if flag[0]:
+            self.pospwr_off()
+            self.pwr_button.config(bg='grey')
+            self.pwr_button.config(text='POSPWR is OFF')
+        else:
+            self.pospwr_on()
+            self.pwr_button.config(text='POSPWR is ON')
+            self.pwr_button.config(bg='green')
+
+    def pospwr_on(self):
+        self.pcomm.pbset('ps1_en','on')
+        self.pcomm.pbset('ps2_en', 'on')
+
+    def pospwr_off(self):
+        self.pcomm.pbset('ps1_en','off')
+        self.pcomm.pbset('ps2_en','off')
  
     
     def restart(self):
