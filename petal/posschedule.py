@@ -28,7 +28,7 @@ class PosSchedule(object):
         self.stage_order = ['direct','retract','rotate','extend','expert']
         self.RRE_stage_order = ['retract','rotate','extend']
         self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, stats=self.stats) for name in self.stage_order}
-        self.anneal_time = {'direct':3, 'retract':3, 'rotate':3, 'extend':3, 'expert':3} # times in seconds, see comments in PosScheduleStage
+        self.anneal_time = {'direct':1.0, 'retract':2.0, 'rotate':2.0, 'extend':2.0, 'expert':3} # times in seconds, see comments in PosScheduleStage
         self.should_anneal = True # overriding flag, allowing you to turn off all move time annealing
         self.should_check_petal_boundaries = True # allows you to turn off petal-specific boundary checks for non-petal systems (such as positioner test stands)
         self.move_tables = {}
@@ -174,8 +174,8 @@ class PosSchedule(object):
         empties = {posid for posid,table in self.move_tables.items() if not table}
         for posid in empties:
             del self.move_tables[posid]
-        if self.requests:
-            for posid,table in self.move_tables.items():
+        for posid,table in self.move_tables.items():
+            if posid in self.requests:
                 req = self.requests.pop(posid)
                 table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
                 table.log_note += (' ' if table.log_note else '') + req['log_note'] # keep the original log notes with move tables
