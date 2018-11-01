@@ -76,8 +76,6 @@ class Petal(object):
             self.comm = petalcomm.PetalComm(self.petalbox_id, user_interactions_enabled=user_interactions_enabled)
             self.comm.pbset('non_responsives', 'clear') #reset petalcontroller's list of non-responsive canids
         self.shape = self.petal_state.conf['SHAPE']
-        self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
-        self._initialize_pos_flags()
 
         # database setup
         self.db_commit_on = db_commit_on if DB_COMMIT_AVAILABLE else False
@@ -124,6 +122,11 @@ class Petal(object):
         for fidid in self.fidids:
             self.states[fidid] = posstate.PosState(fidid, logging=True, device_type='fid', printfunc=self.printfunc, petal_id=self.petal_id)        
             self.devices[self.states[fidid]._val['DEVICE_ID']] = fidid
+
+        # pos flags setup
+        self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
+        self._initialize_pos_flags()
+
         
         # power supplies setup?
         # to-do
@@ -856,7 +859,7 @@ class Petal(object):
         15 - Targeting restricted boundries
         16 - Requested multiple times
         '''
-        if ids == 'all'
+        if ids == 'all':
             ids = self.posids.union(self.fidids)
         for posfidid in ids:
             if ('M' in posfidid) or ('UM' in posfidid):
