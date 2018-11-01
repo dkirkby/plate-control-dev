@@ -405,7 +405,7 @@ class PosTransforms(object):
         inner = abs(r[0] - r[1])
         if hypot > outer or hypot < inner:
             unreachable = True
-            print('Target is outside of reachable regions')
+            # print('Target is outside of reachable regions')
         inner += numeric_contraction
         outer -= numeric_contraction
         HYPOT = hypot
@@ -432,15 +432,15 @@ class PosTransforms(object):
             if TP[i] < range_min:
                 TP[i] += math.floor((range_max - TP[i])/360.0)*360.0  # try +360 phase wrap
                 if TP[i] < range_min:
-                    print('TP',i,TP[i],' < range_min:',range_min,' thus unreachable')
-                    print('ranges[i]',ranges[i])
+                    # print('TP',i,TP[i],' < range_min:',range_min,' thus unreachable')
+                    # print('ranges[i]',ranges[i])
                     TP[i] = range_min
                     unreachable = True
             elif TP[i] > range_max:
                 TP[i] -= np.floor((TP[i] - range_min)/360.0)*360.0  # try -360 phase wrap
                 if TP[i] > range_max:
-                    print('TP ',i,TP[i],'> range_max:',range_max,' thus unreachable')
-                    print('ranges[i]',ranges[i])
+                    # print('TP ',i,TP[i],'> range_max:',range_max,' thus unreachable')
+                    # print('ranges[i]',ranges[i])
                     TP[i] = range_max
                     unreachable = True
         # centralize theta
