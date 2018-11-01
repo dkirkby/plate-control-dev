@@ -26,6 +26,7 @@ import tkinter.simpledialog
 import csv
 import collections
 import getpass
+from astropy.io import ascii
 
 class _read_key:
     def __init__(self):
@@ -311,7 +312,8 @@ class XYTest(object):
             self.logwrite('Calibration with ' + str(n_pts_calib_T) + ' theta points and ' + str(n_pts_calib_P) + ' phi points completed in ' + self._elapsed_time_str(start_time) + '.')
         for posid in self.posids:
             self.summarizers[posid].update_loop_calibs(summarizer.used_suffix, params)
-        
+
+
     def run_xyaccuracy_test(self, loop_number):
         """Move positioners to a series of xy targets and measure performance.
         """
@@ -356,12 +358,30 @@ class XYTest(object):
         
         # transform test grid to each positioner's global position, and create all the move request dictionaries
         all_targets = []
-        for local_target in local_targets:
-            these_targets = {}
-            for posid in self.posids:
-                trans = self.m.trans(posid)
-                these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(local_target)}
-            all_targets.append(these_targets)
+        
+        if self.xytest_conf['input_targs_file']:
+            targ_list=ascii.read(pc.dirs['test_settings']+self.xytest_conf['input_targs_file'])
+            targ_list=targ_list['filename']
+            n_targets=len(targ_list)
+            for i in range(n_targets):
+                these_targets = {}
+                file_targ_this=pc.dirs['test_settings']+'move_request_sets/'+targ_list[i]
+                data=ascii.read(file_targ_this)
+                data.add_index('DEVICE_ID')
+                for posid in self.posids:
+                    ptl = self.m.petal(posid)
+                    deviceid_this=ptl.get_posfid_val(posid,'DEVICE_ID')
+                    data_this=data.loc[deviceid_this]
+                    trans = self.m.trans(posid)
+                    these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY([data_this['u'],data_this['v']])}
+                all_targets.append(these_targets)
+        else:
+            for local_target in local_targets:
+                these_targets = {}
+                for posid in self.posids:
+                    trans = self.m.trans(posid)
+                    these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(local_target)}
+                all_targets.append(these_targets)
             
         # initialize some data structures for storing test data
         targ_num = 0
