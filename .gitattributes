@@ -61,6 +61,7 @@ petal/tests_and_demos/movetablescr.py -text
 petal/tests_and_demos/neighbor_anticollision_test.py -text
 petal/tests_and_demos/pbutil.py -text
 petal/tests_and_demos/pift.py -text
+petal/tests_and_demos/pos_collision_plot.py -text
 petal/tests_and_demos/power_test.py -text
 petal/tests_and_demos/py_vs_numpy.py -text
 petal/tests_and_demos/pyqtgraph_scratchpad.py -text
