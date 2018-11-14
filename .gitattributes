@@ -50,6 +50,7 @@ petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_00
 petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_00002.csv -text
 petal/tests_and_demos/anticollision_test_harness/read_nominal_pos_locations.py -text
 petal/tests_and_demos/anticollision_test_harness/sequences.py -text
+petal/tests_and_demos/collision_test_cases.py -text
 petal/tests_and_demos/demo.py -text
 petal/tests_and_demos/em_test.py -text
 petal/tests_and_demos/em_test_sim.py -text
@@ -68,6 +69,7 @@ petal/tests_and_demos/pyqtgraph_scratchpad.py -text
 petal/tests_and_demos/repositioning_sim.py -text
 petal/tests_and_demos/test_fipos_led.py -text
 petal/tests_and_demos/test_interior_unreachable_nan.py -text
+petal/tests_and_demos/test_not_overlapping_targets.py -text
 petal/tests_and_demos/test_poscollider.py -text
 petal/tests_and_demos/test_torque.py -text
 petal/tests_and_demos/test_tp_update_transform.py -text
