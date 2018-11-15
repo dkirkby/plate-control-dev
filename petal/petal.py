@@ -674,10 +674,11 @@ class Petal(object):
         pos_flags = {}
         if posids == 'all':
             posids = self.posids
-        #TODO: check FIBER_INTACT flag and set if False
         for posid in self.posids:
             if not(self.posmodels[posid].is_enabled):
                 self.pos_flags[posid] |= 1<<9 #final check for disabled
+            #if not(self.get_posfid_val(posid, 'FIBER_INTACT')): #WILL BE UNCOMMENTED ONCE KEY IS ADDED TO CONFIG FILES
+            #    self.pos_flags[posid] |= 1<<10
             pos_flags[posid] = str(self.pos_flags[posid])
         if should_reset:
             self._initialize_pos_flags()
