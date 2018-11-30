@@ -365,6 +365,38 @@ class Derive_Platemaker_Pars(object):
     def push_to_db(self):
         pass
 
+    def dots_match(self,obs_x,obs_y,obs_ref_x,obs_ref_y,metro_x,metro_y,obs_ref_y):
+        if len(obs_x) != len(metro_x):
+            raise exception('Obs data and Metrology Data should have the same length!')
+        n_dots=len(obs_x)
+        obs_x=np.array(obs_x)
+        obs_y=np.array(obs_y)
+        obs_ind_ref=np.array(obs_ind_ref)
+        metro_x=np.array(metro_x)
+        metro_y=np.array(metro_y)
+        metro_ind_ref=np.array(metro_ind_ref)
+        output_x=metro_x
+        output_y=metro_y
+        mask_selected=np.zeros((n_dots,), dtype=int)
+        for i in range(n_dots):
+            x_this,y_this=obs_x[i],obs_y[i]
+            scale_obs=np.sqrt((obs_ref_x[0]-obs_ref_x[1])**2+(obs_ref_y[0]-obs_ref_y[1])**2)
+            scale_metro=np.sqrt((metro_ref_x[0]-metro_ref_x[1])**2+(metro_ref_y[0]-metro_ref_y[1])**2)
+
+            dist_vector_obs=np.sqrt((x_this-obs_ref_x)**2+(y_this-obs_ref_y)**2)/scale_obs
+            dist_arr=np.zeros(n_dots)
+            for j in range(n_dots):
+                xx,yy=metro_x[j],metro_y[j]
+                dist_vector_metro=np.sqrt((xx-metro_ref_x)**2+(yy-metro_ref_y)**2)/scale_metro
+                dist_arr[j]=np.sum((dist_vector_metro-dist_vector_obs)**2)
+            ind_min=np.where(dist_arr == min(dist_arr))
+            output_x[i]=metro_x[ind_min[0]] 
+            output_y[i]=metro_y[ind_min[0]]
+            mask_selected[ind_min[0]]=1 
+        return output_x,output_y
+        
+
+
     
 if __name__=="__main__":
     gui = Derive_Platemaker_Pars()
