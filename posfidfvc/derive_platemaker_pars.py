@@ -68,6 +68,7 @@ class Derive_Platemaker_Pars(object):
         # calibration routines
         self.m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
         automatic_mode = tkinter.messagebox.askyesno(title='Automatic or Manual Mode?',message='Use Automatic Mode?')
+        use_fiducial = tkinter.messagebox.askyesno(title='Use Fiducials?',message='Use Fiducials and measured Metrology data??')
         if automatic_mode:
             w=800
             h=600
@@ -100,7 +101,7 @@ class Derive_Platemaker_Pars(object):
             self.make_instrfile(self.m.enabled_posids)
             self.push_to_db()
             self.m.identify_disabled_positioners()
-        else:
+        elif not automatic_mode and not use_fiducial:
             num_objects=input('How many dots are there in the image?')
             num_objects=int(num_objects)
             xy,peaks,fwhms,imgfiles=self.fvc.measure(num_objects)
@@ -162,8 +163,65 @@ class Derive_Platemaker_Pars(object):
             metroX_arr=metroX_arr.tolist()
             metroY_arr=metroY_arr.tolist()
 
-            import pdb;pdb.set_trace()
-            self.fit_and_plot(obsX_arr,obsY_arr,fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=0)
+            self.fit_and_plot(obsX_arr,obsY_arr,fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=flip)
+
+        else:
+            num_objects=input('How many dots are there in the image?')
+            num_objects=int(num_objects)
+            xy,peaks,fwhms,imgfiles=self.fvc.measure(num_objects)
+            xy_fvc=self.fvc.obsXY_to_fvcXY(xy)
+            n_sources=len(xy)
+            id=[i+1 for i in range(n_sources)]
+            x_arr=[xy_fvc[i][0] for i in range(n_sources)]
+            y_arr=[xy_fvc[i][1] for i in range(n_sources)]
+            sources=Table([id,x_arr,y_arr],names=('id','xcentroid','ycentroid'),dtype=('i8','f8','f8'))
+            hdul = fits.open(imgfiles[0])
+            data = hdul[0].data
+            plt.ioff()
+            sourceSel = SourceSelector(data, sources)
+            plt.ion()
+            sources_tofit=sourceSel.sources_selected
+
+
+            self.file_metro=pc.dirs['petal2_fiducial_metrology_file']
+
+            # Read dots identification result from ptl and store a dictionary
+            pix_size=0.006
+            if self.fvc.fvc_type == 'FLI':
+                flip=1  # x flip right now this is hard coded since we don't change the camera often.
+            else:
+                flip=0
+            obsX_arr,obsY_arr,obsXY_arr,fvcX_arr,fvcY_arr=[],[],[],[],[]
+            metroX_arr,metroY_arr=[],[]
+
+            # read the Metrology data first
+            fiducials= Table.read(self.file_metro,format='ascii.csv',header_start=0,data_start=1)
+            device_loc_file_arr,metro_X_file_arr,metro_Y_file_arr=[],[],[]
+            for row in fiducials:
+                metro_X_file_arr.append(row['X'])
+                metro_Y_file_arr.append(row['Y'])
+            n_sources=len(metro_X_file_arr)
+            id=[i+1 for i in range(n_sources)]
+            sources_metro=Table([id,metro_X_file_arr,metro_Y_file_arr],names=('id','xcentroid','ycentroid'),dtype=('i8','f8','f8'))
+            plt.ioff()
+            sourceSel_metro = SourceSelector(data, sources_metro)
+            plt.ion()
+            sources_tofit_metro=sourceSel_metro.sources_selected
+            fvcX_arr=sources_tofit['xcentroid']
+            fvcY_arr=sources_tofit['ycentroid']
+            for i in range(len(fvcX_arr)):
+                obsXY_this=self.fvc.fvcXY_to_obsXY([fvcX_arr[i],fvcY_arr[i]])[0]
+                obsX_arr.append(obsXY_this[0])
+                obsY_arr.append(obsXY_this[1])
+            metroX_arr=sources_tofit_metro['xcentroid']
+            metroY_arr=sources_tofit_metro['ycentroid']
+            fvcX_arr=fvcX_arr.tolist()
+            fvcY_arr=fvcY_arr.tolist()
+            metroX_arr=metroX_arr.tolist()
+            metroY_arr=metroY_arr.tolist()
+
+            self.fit_and_plot(obsX_arr,obsY_arr,fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=flip)
+
 
     def ok(self):
         gui_root.destroy()
