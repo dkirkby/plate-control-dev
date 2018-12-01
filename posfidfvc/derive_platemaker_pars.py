@@ -68,7 +68,7 @@ class Derive_Platemaker_Pars(object):
         # calibration routines
         self.m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
         automatic_mode = tkinter.messagebox.askyesno(title='Automatic or Manual Mode?',message='Use Automatic Mode?')
-        use_fiducial = tkinter.messagebox.askyesno(title='Use Fiducials?',message='Use Fiducials and measured Metrology data??')
+        use_fiducial = tkinter.messagebox.askyesno(title='Use Fiducials?',message='Use Fiducials and measured Metrology data?')
         if automatic_mode:
             w=800
             h=600
@@ -193,7 +193,7 @@ class Derive_Platemaker_Pars(object):
                 flip=0
             obsX_arr,obsY_arr,obsXY_arr,fvcX_arr,fvcY_arr=[],[],[],[],[]
             metroX_arr,metroY_arr=[],[]
-
+            obsX_all_arr,obsY_all_arr=[],[]
             # read the Metrology data first
             fiducials= Table.read(self.file_metro,format='ascii.csv',header_start=0,data_start=1)
             device_loc_file_arr,metro_X_file_arr,metro_Y_file_arr=[],[],[]
@@ -219,9 +219,17 @@ class Derive_Platemaker_Pars(object):
             fvcY_arr=fvcY_arr.tolist()
             metroX_arr=metroX_arr.tolist()
             metroY_arr=metroY_arr.tolist()
+            output_x,output_y=dots_match(x_arr,y_arr,fvcX_arr,fvcY_arr,metro_X_file_arr,metro_Y_file_arr,metroX_arr,metroY_arr)
+            for i in range(len(x_arr)):
+                obsXY_this=self.fvc.fvcXY_to_obsXY([x_arr[i],y_arr[i]])[0]
+                obsX_all_arr.append(obsXY_this[0])
+                obsY_all_arr.append(obsXY_this[1])
 
-            self.fit_and_plot(obsX_arr,obsY_arr,fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=flip)
-
+            use_selected = tkinter.messagebox.askyesno(title='Use Selected Only?',message='Use selected dots only for fitting?')
+            if use_selected:
+                self.fit_and_plot(obsX_arr,obsY_arr,fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=flip)
+            else:
+                self.fit_and_plot(obsX_all_arr,obsY_all_arr,x_arr,y_arr,metro_X_file_arr,metro_Y_file_arr,flip=flip)
 
     def ok(self):
         gui_root.destroy()
@@ -297,7 +305,7 @@ class Derive_Platemaker_Pars(object):
         obsX_arr=np.array(obsX_arr)
         obsY_arr=np.array(obsY_arr)
 
-        self.fit_and_plot(obsX_arr,obsY_arr,fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=0)
+        self.fit_and_plot(obsX_arr,obsY_arr,fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=flip)
 
     def fit_and_plot(self,obsX_arr,obsY_arr,fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=0):
 
@@ -423,7 +431,7 @@ class Derive_Platemaker_Pars(object):
     def push_to_db(self):
         pass
 
-    def dots_match(self,obs_x,obs_y,obs_ref_x,obs_ref_y,metro_x,metro_y,obs_ref_y):
+    def dots_match(self,obs_x,obs_y,obs_ref_x,obs_ref_y,metro_x,metro_y,metro_ref_y):
         if len(obs_x) != len(metro_x):
             raise exception('Obs data and Metrology Data should have the same length!')
         n_dots=len(obs_x)
