@@ -183,7 +183,7 @@ class Derive_Platemaker_Pars(object):
             sources_tofit=sourceSel.sources_selected
 
 
-            self.file_metro=pc.dirs['petal2_fiducial_metrology_file']
+            self.file_metro=tkinter.filedialog.askopenfilename(initialdir=pc.dirs['hwsetups'], filetypes=(("CSV file","*.csv"),("All Files","*")), title='Select Metrology Data')
 
             # Read dots identification result from ptl and store a dictionary
             pix_size=0.006
@@ -209,27 +209,19 @@ class Derive_Platemaker_Pars(object):
             sources_tofit_metro=sourceSel_metro.sources_selected
             fvcX_arr=sources_tofit['xcentroid']
             fvcY_arr=sources_tofit['ycentroid']
-            for i in range(len(fvcX_arr)):
-                obsXY_this=self.fvc.fvcXY_to_obsXY([fvcX_arr[i],fvcY_arr[i]])[0]
-                obsX_arr.append(obsXY_this[0])
-                obsY_arr.append(obsXY_this[1])
             metroX_arr=sources_tofit_metro['xcentroid']
             metroY_arr=sources_tofit_metro['ycentroid']
             fvcX_arr=fvcX_arr.tolist()
             fvcY_arr=fvcY_arr.tolist()
             metroX_arr=metroX_arr.tolist()
             metroY_arr=metroY_arr.tolist()
-            output_x,output_y=dots_match(x_arr,y_arr,fvcX_arr,fvcY_arr,metro_X_file_arr,metro_Y_file_arr,metroX_arr,metroY_arr)
-            for i in range(len(x_arr)):
-                obsXY_this=self.fvc.fvcXY_to_obsXY([x_arr[i],y_arr[i]])[0]
-                obsX_all_arr.append(obsXY_this[0])
-                obsY_all_arr.append(obsXY_this[1])
 
             use_selected = tkinter.messagebox.askyesno(title='Use Selected Only?',message='Use selected dots only for fitting?')
             if use_selected:
-                self.fit_and_plot(obsX_arr,obsY_arr,fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=flip)
+                self.fit_and_plot(fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=flip)
             else:
-                self.fit_and_plot(obsX_all_arr,obsY_all_arr,x_arr,y_arr,metro_X_file_arr,metro_Y_file_arr,flip=flip)
+                output_x,output_y=self.dots_match(x_arr,y_arr,fvcX_arr,fvcY_arr,metro_X_file_arr,metro_Y_file_arr,metroX_arr,metroY_arr)
+                self.fit_and_plot(x_arr,y_arr,output_x,output_y,flip=flip)
 
     def ok(self):
         gui_root.destroy()
@@ -305,21 +297,23 @@ class Derive_Platemaker_Pars(object):
         obsX_arr=np.array(obsX_arr)
         obsY_arr=np.array(obsY_arr)
 
-        self.fit_and_plot(obsX_arr,obsY_arr,fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=flip)
+        self.fit_and_plot(fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=flip)
 
-    def fit_and_plot(self,obsX_arr,obsY_arr,fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=0):
+    def fit_and_plot(self,fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=0):
 
         pars = Parameters() # Input parameters model and initial guess
         pars.add('offx', value=0.)
         pars.add('offy', value=0.)
-        pars.add('angle', value=0.)
-        print('fvcX:',fvcX_arr,'\n metroX:',metroX_arr,'\n fvcY:',fvcY_arr,'\n metroY:',metroY_arr,'\n')
+        pars.add('angle', value=2.0)
+        print('Fitting Data: \n fvcX:',fvcX_arr,'\n metroX:',metroX_arr,'\n fvcY:',fvcY_arr,'\n metroY:',metroY_arr,'\n')
         if self.fvc.fvc_type == 'FLI':
             pars.add('scale', value=10.)
             out = minimize(self._residual, pars, args=(fvcX_arr,fvcY_arr,metroX_arr,metroY_arr)) # Find the minimum chi2
         else:
-            pars.add('scale', value=0.1)
-            out = minimize(self._residual_sbig, pars, args=(fvcX_arr,fvcY_arr,metroX_arr,metroY_arr)) # Find the minimum chi2
+            pars['offx'].value=11.
+            pars['offy'].value=-91.
+            pars.add('scale', value=0.12)
+            out = minimize(self._residual_sbig, pars, args=(fvcX_arr,fvcY_arr,metroX_arr,metroY_arr),epsfcn=0.001) # Find the minimum chi2
 
 
         if flip==1:
@@ -431,31 +425,35 @@ class Derive_Platemaker_Pars(object):
     def push_to_db(self):
         pass
 
-    def dots_match(self,obs_x,obs_y,obs_ref_x,obs_ref_y,metro_x,metro_y,metro_ref_y):
-        if len(obs_x) != len(metro_x):
-            raise exception('Obs data and Metrology Data should have the same length!')
+    def dots_match(self,obs_x,obs_y,obs_ref_x,obs_ref_y,metro_x,metro_y,metro_ref_x,metro_ref_y):
+        if len(obs_x) > len(metro_x):
+            raise exception('Obs Data Length > Metrology Data Length! Can not work. ')
         n_dots=len(obs_x)
+        n_metro_dots=len(metro_x)
         obs_x=np.array(obs_x)
         obs_y=np.array(obs_y)
-        obs_ind_ref=np.array(obs_ind_ref)
+        obs_ref_x=np.array(obs_ref_x)
+        obs_ref_y=np.array(obs_ref_y)
         metro_x=np.array(metro_x)
         metro_y=np.array(metro_y)
-        metro_ind_ref=np.array(metro_ind_ref)
-        output_x=metro_x
-        output_y=metro_y
-        mask_selected=np.zeros((n_dots,), dtype=int)
+        metro_ref_x=np.array(metro_ref_x)
+        metro_ref_y=np.array(metro_ref_y)
+        output_x=obs_x
+        output_y=obs_y
+        mask_selected=np.zeros((n_metro_dots,), dtype=int)
         for i in range(n_dots):
             x_this,y_this=obs_x[i],obs_y[i]
             scale_obs=np.sqrt((obs_ref_x[0]-obs_ref_x[1])**2+(obs_ref_y[0]-obs_ref_y[1])**2)
             scale_metro=np.sqrt((metro_ref_x[0]-metro_ref_x[1])**2+(metro_ref_y[0]-metro_ref_y[1])**2)
 
             dist_vector_obs=np.sqrt((x_this-obs_ref_x)**2+(y_this-obs_ref_y)**2)/scale_obs
-            dist_arr=np.zeros(n_dots)
-            for j in range(n_dots):
+            dist_arr=np.zeros(n_metro_dots)
+            for j in range(n_metro_dots):
                 xx,yy=metro_x[j],metro_y[j]
                 dist_vector_metro=np.sqrt((xx-metro_ref_x)**2+(yy-metro_ref_y)**2)/scale_metro
                 dist_arr[j]=np.sum((dist_vector_metro-dist_vector_obs)**2)
-            ind_min=np.where(dist_arr == min(dist_arr))
+            print(dist_arr)
+            ind_min,=np.where(dist_arr == min(dist_arr))
             output_x[i]=metro_x[ind_min[0]] 
             output_y[i]=metro_y[ind_min[0]]
             mask_selected[ind_min[0]]=1 
@@ -479,7 +477,7 @@ class SourceSelector():
                 self.sources = sources
                 self.sources_selected=Table([[],[],[]],names=('id','xcentroid','ycentroid'),dtype=('i8','f8','f8'))
                 self.im = im
-                self.fig = plt.figure(figsize=(12,10))
+                self.fig = plt.figure(figsize=(22,10))
                 self.ax = self.fig.add_subplot(111) #,aspect='equal')
                 self.fig.tight_layout()
                 self.state = '' # état du selecteur (selecting, adding or deleting)
@@ -506,8 +504,8 @@ class SourceSelector():
                 self.crosses_selected, = self.ax.plot(self.sources_selected['xcentroid'],self.sources_selected['ycentroid'],'x',color='blue', mew=2,ms=8)
 
                 self.sh=im.shape
-                self.ax.set_xlim(0,self.sh[0])
-                self.ax.set_ylim(0,self.sh[1])
+                self.ax.set_xlim(0,self.sh[1])
+                self.ax.set_ylim(0,self.sh[0])
 
                 self.ax.format_coord = self.format_coord # reassign format coord function to my function (just added the "status" display)
                 self.cid = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
@@ -523,8 +521,9 @@ class SourceSelector():
                 print("Press and hold 'Ctrl' and click left or right to build a grid")
                 print("Press 'Enter' to validate")
                 print("Press 'q' to quit")
-
                 plt.show()
+                plt.close()
+
         def onclick(self, event):
                 if self.fig.canvas.toolbar._active is not None:
                         return
