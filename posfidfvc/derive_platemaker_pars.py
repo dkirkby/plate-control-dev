@@ -106,9 +106,21 @@ class Derive_Platemaker_Pars(object):
             num_objects=int(num_objects)
             xy,peaks,fwhms,imgfiles=self.fvc.measure(num_objects)
             xy_fvc=self.fvc.obsXY_to_fvcXY(xy)
-            n_sources=len(xy)
+            
+            n_sources=len(xy_fvc)
             id=[i+1 for i in range(n_sources)]
-            x_arr=[xy_fvc[i][0] for i in range(n_sources)]
+            
+            # Read dots identification result from ptl and store a dictionary
+            pix_size=0.006
+            if self.fvc.fvc_type == 'FLI':
+                flip=1  # x flip right now this is hard coded since we don't change the camera often.
+            else:
+                flip=0
+                
+            if flip==1:
+                x_arr=[-xy_fvc[i][0] for i in range(n_sources)]
+            else:
+                x_arr=[-xy_fvc[i][0] for i in range(n_sources)]
             y_arr=[xy_fvc[i][1] for i in range(n_sources)]
             sources=Table([id,x_arr,y_arr],names=('id','xcentroid','ycentroid'),dtype=('i8','f8','f8'))
             hdul = fits.open(imgfiles[0])
@@ -127,12 +139,6 @@ class Derive_Platemaker_Pars(object):
                 self.printfunc('Must be a petal or a small_array to proceed. Exit')
                 raise SystemExit
 
-            # Read dots identification result from ptl and store a dictionary
-            pix_size=0.006
-            if self.fvc.fvc_type == 'FLI':
-                flip=1  # x flip right now this is hard coded since we don't change the camera often.
-            else:
-                flip=0
             obsX_arr,obsY_arr,obsXY_arr,fvcX_arr,fvcY_arr=[],[],[],[],[]
             metroX_arr,metroY_arr=[],[]
 
@@ -150,7 +156,7 @@ class Derive_Platemaker_Pars(object):
             sourceSel_metro = SourceSelector(data, sources_metro)
             plt.ion()
             sources_tofit_metro=sourceSel_metro.sources_selected
-            fvcX_arr=sources_tofit['xcentroid']
+            fvcX_arr=-sources_tofit['xcentroid']
             fvcY_arr=sources_tofit['ycentroid']
             for i in range(len(fvcX_arr)):
                 obsXY_this=self.fvc.fvcXY_to_obsXY([fvcX_arr[i],fvcY_arr[i]])[0]
@@ -170,9 +176,19 @@ class Derive_Platemaker_Pars(object):
             num_objects=int(num_objects)
             xy,peaks,fwhms,imgfiles=self.fvc.measure(num_objects)
             xy_fvc=self.fvc.obsXY_to_fvcXY(xy)
-            n_sources=len(xy)
+
+            use_stored_centroids = True
+            if use_stored_centroids:
+                flip=1
+                fvcdata=Table.read('fvc.20181203141706.pos',format='ascii.csv',header_start=0,data_start=1)
+                xy_fvc=[[fvcdata[i]['X'],fvcdata[i]['Y']] for i in range(len(fvcdata))]
+            
+            n_sources=len(xy_fvc)
             id=[i+1 for i in range(n_sources)]
-            x_arr=[xy_fvc[i][0] for i in range(n_sources)]
+            if flip==1:
+                x_arr=[-xy_fvc[i][0] for i in range(n_sources)]
+            else:
+                x_arr=[-xy_fvc[i][0] for i in range(n_sources)]
             y_arr=[xy_fvc[i][1] for i in range(n_sources)]
             sources=Table([id,x_arr,y_arr],names=('id','xcentroid','ycentroid'),dtype=('i8','f8','f8'))
             hdul = fits.open(imgfiles[0])
@@ -324,7 +340,7 @@ class Derive_Platemaker_Pars(object):
         if self.fvc.fvc_type=='FLI':
             label='fvcmag  '+str(out.params['scale'].value/pix_size)+'\n'+'fvcrot  '+str(rot)+'\n' +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(offy)+'\n'
         else: 
-            label='fvcmag  '+str(out.params['scale'].value)+'\n'+'fvcrot  '+str(rot)+'\n' +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(offy)+'\n'
+            label='scale  '+str(out.params['scale'].value)+'\n'+'fvcrot  '+str(rot)+'\n' +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(offy)+'\n'
 
         pp = PdfPages('instrmaker_fit_check.pdf')
         plt.figure(1,figsize=(15,15))
