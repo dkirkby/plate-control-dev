@@ -304,17 +304,11 @@ class Derive_Platemaker_Pars(object):
         pars = Parameters() # Input parameters model and initial guess
         pars.add('offx', value=0.)
         pars.add('offy', value=0.)
-        pars.add('angle', value=2.0)
+        pars.add('angle', value=0.0)
         print('Fitting Data: \n fvcX:',fvcX_arr,'\n metroX:',metroX_arr,'\n fvcY:',fvcY_arr,'\n metroY:',metroY_arr,'\n')
-        if self.fvc.fvc_type == 'FLI':
-            pars.add('scale', value=10.)
-            out = minimize(self._residual, pars, args=(fvcX_arr,fvcY_arr,metroX_arr,metroY_arr)) # Find the minimum chi2
-        else:
-            pars['offx'].value=11.
-            pars['offy'].value=-91.
-            pars.add('scale', value=0.12)
-            out = minimize(self._residual_sbig, pars, args=(fvcX_arr,fvcY_arr,metroX_arr,metroY_arr),epsfcn=0.001) # Find the minimum chi2
 
+        pars.add('scale', value=1.)
+        out = minimize(self._residual, pars, args=(fvcX_arr,fvcY_arr,metroX_arr,metroY_arr)) # Find the minimum chi2
 
         if flip==1:
             offy=-out.params['offy'].value
@@ -324,18 +318,12 @@ class Derive_Platemaker_Pars(object):
             rot=out.params['angle'].value
      #  Plot
         pars_out=out.params
+        model=pars_out['scale']*(self._rot(fvcX_arr+pars_out['offx'],fvcY_arr+pars_out['offy'],pars_out['angle']))
+        model_x=np.array(model[0,:]).ravel()
+        model_y=np.array(model[1,:]).ravel()
         if self.fvc.fvc_type=='FLI':
-            model=pars_out['scale']*(self._rot(fvcX_arr+pars_out['offx'],fvcY_arr+pars_out['offy'],pars_out['angle']))
-            model_x=np.array(model[0,:]).ravel()
-            model_y=np.array(model[1,:]).ravel()
             label='fvcmag  '+str(out.params['scale'].value/pix_size)+'\n'+'fvcrot  '+str(rot)+'\n' +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(offy)+'\n'
-        else:
-            rot_xy=self._rot(fvcX_arr,fvcY_arr,pars['angle'])
-            model=pars_out['scale']*rot_xy
-            model_x=np.array(model[0,:])+pars_out['offx']
-            model_y=np.array(model[1,:])+pars_out['offy']
-            model_x=model_x.ravel()
-            model_y=model_y.ravel()
+        else: 
             label='fvcmag  '+str(out.params['scale'].value)+'\n'+'fvcrot  '+str(rot)+'\n' +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(offy)+'\n'
 
         pp = PdfPages('instrmaker_fit_check.pdf')
@@ -401,13 +389,6 @@ class Derive_Platemaker_Pars(object):
         res=np.array((x_model-x_data))**2+np.array((y_model-y_data))**2
         return res
 
-    def _residual_sbig(self,pars,x,y,x_data,y_data):
-        rot_xy=self._rot(x,y,pars['angle'])
-        xy_model=pars['scale']*rot_xy
-        x_model=np.array(xy_model[0,:])+pars['offx']
-        y_model=np.array(xy_model[1,:])+pars['offy']
-        res=np.array((x_model-x_data))**2+np.array((y_model-y_data))**2
-        return res
 
         # 1. extract positioner locations that we just measured with FVC
         # 2. read file with nominal locations from metrology data (see DESI-2850 for format)
