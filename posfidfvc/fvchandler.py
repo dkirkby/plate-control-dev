@@ -325,13 +325,14 @@ class FVCHandler(object):
             else:
                 xy = pc.listify2d(xy)
                 xy_np = np.transpose(xy)
-                rot = FVCHandler.rotmat2D_deg(self.rotation)
-                xy_np = np.dot(rot, xy_np)
-                xy_np *= self.scale
                 translation_x = self.translation[0] * np.ones(np.shape(xy_np)[1])
                 translation_y = self.translation[1] * np.ones(np.shape(xy_np)[1])
                 xy_np += [translation_x,translation_y]
-                xy = np.transpose(xy_np).tolist()       
+                xy_np *= self.scale
+                rot = FVCHandler.rotmat2D_deg(self.rotation)
+                xy_np = np.dot(rot, xy_np)
+                xy = np.transpose(xy_np).tolist() 
+                
         return xy
     
     def obsXY_to_fvcXY(self,xy):
@@ -359,15 +360,16 @@ class FVCHandler(object):
                 return_order = [spotids.index(d['spotid']) for d in fvcXY_dicts_this]
                 xy = [[fvcXY_dicts_this[i]['x'],fvcXY_dicts_this[i]['y']] for i in return_order]
             else:
+                
                 xy = pc.listify2d(xy)
                 xy_np = np.transpose(xy)
+                rot = FVCHandler.rotmat2D_deg(-self.rotation)
+                xy_np = np.dot(rot, xy_np)
+                xy_np /= self.scale
                 translation_x = self.translation[0] * np.ones(np.shape(xy_np)[1])
                 translation_y = self.translation[1] * np.ones(np.shape(xy_np)[1])
                 xy_np -= [translation_x,translation_y]
-                xy_np /= self.scale
-                rot = FVCHandler.rotmat2D_deg(-self.rotation)
-                xy_np = np.dot(rot, xy_np)
-                xy = np.transpose(xy_np).tolist() 
+                xy = np.transpose(xy_np).tolist()
         return xy
     
     @staticmethod
@@ -378,7 +380,7 @@ class FVCHandler(object):
 
 if __name__ == '__main__':
     f = FVCHandler(fvc_type='SBIG')
-    n_objects = 60
+    n_objects = 160
     n_repeats = 1
     f.min_energy = -np.Inf
     xy = []
