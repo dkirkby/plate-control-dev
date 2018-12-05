@@ -43,7 +43,7 @@ class PetalTransforms(object):
     def __init__(self, transforms={}):
         self.transforms = {key:0 for key in self.trans_keys}
         self.transforms.update(transforms)
-        self.postrans = postransforms.PosTransforms(posmodel=None, curved=True)
+        self.postrans = postransforms.PosTransforms(this_posmodel=None, curved=True)
     
     def metXYZ_to_QS(self,xyz):
         """Transforms list of metXYZ coordinates into QS system.
