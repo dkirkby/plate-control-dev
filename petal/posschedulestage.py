@@ -19,8 +19,11 @@ class PosScheduleStage(object):
         self.collisions_resolved = {method:set() for method in pc.all_adjustment_methods} # keep track of which methods resolved collisions on which positioners
         self.stats = stats
         self._power_supply_map = power_supply_map
-        self._theta_max_jog = 90 # deg, maximum distance to temporarily shift theta when doing path adjustments
-        self._phi_max_jog = 60 # deg, maximum distance to temporarily shift phi when doing path adjustments
+        self._theta_max_jog_A = 90  # deg, maximum distance to temporarily shift theta when doing path adjustments
+        self._theta_max_jog_B = 180
+        self._phi_max_jog_A = 45 # deg, maximum distance to temporarily shift phi when doing path adjustments
+        self._phi_max_jog_B = 90
+        self._max_jog = self._assign_max_jog_values() # collection of all the max jog options above
     
     def initialize_move_tables(self, start_posTP, dtdp):
         """Generates basic move tables for each positioner, starting at position
@@ -265,23 +268,32 @@ class PosScheduleStage(object):
             
           method ... The type of adjustment to make. Valid selections are:
               
-             'pause'   ... Pre-delay is added to the positioner's move table in this
-                           stage, to wait for the neighbor to possibly move out of the way.
+             'pause'     ... Pre-delay is added to the positioner's move table in this
+                             stage, to wait for the neighbor to possibly move out of the way.
             
-             'extend'  ... Positioner phi arm is first extended out, in an attempt to open
-                           a clear path for neighbor.
+             'extend_X'    ... Positioner phi arm is first extended out, in an attempt to open
+                               a clear path for neighbor.
              
-             'retract' ... Positioner phi arm is first retracted in, in an attempt to open
-                           a clear path for neighbor.
+             'retract_X'   ... Positioner phi arm is first retracted in, in an attempt to open
+                               a clear path for neighbor.
              
-             'rot_ccw' ... Positioner theta axis is first rotated ccw, in an attempt to
-                           open a clear path for neighbor.
+             'rot_ccw_X'   ... Positioner theta axis is first rotated ccw, in an attempt to
+                               open a clear path for neighbor.
              
-             'rot_cw'  ... Positioner theta axis is first rotated cw, in an attempt to
-                           open a clear path for neighbor.
+             'rot_cw_X'    ... Positioner theta axis is first rotated cw, in an attempt to
+                               open a clear path for neighbor.
+                           
+             'repel_ccw_X' ... Positioner theta axis is first rotated ccw, while simultaneously
+                               the neighbor axis is rotated the opposite direction (cw).
 
-             'freeze'  ... Positioner is halted prior to the collision, and no attempt
-                           is made for its final target.
+             'repel_cw_X'  ... Positioner theta axis is first rotated cw, while simultaneously
+                               the neighbor axis is rotated the opposite direction (ccw).
+
+             'freeze'      ... Positioner is halted prior to the collision, and no attempt
+                               is made for its final target.
+                               
+        The subscript 'X' in many of the adjustment methods above refers to the
+        size of the maximum distance jog step to attempt, labeled 'A', 'B', etc.
         
         The return value is a dict of proposed new move tables. Key = posid, value =
         new move table. If no change is proposed, the dict is empty. If the proposal
@@ -330,30 +342,52 @@ class PosScheduleStage(object):
         else:
             tables = {posid:table}
             posmodel = self.collider.posmodels[posid]
-            if method in {'extend','retract'}:
+            if 'extend' in method or 'retract' in method:
                 start = tables[posid].init_posTP[1]
                 speed = posmodel.abs_shaft_speed_cruise_P
                 targetable_range = posmodel.targetable_range_P
-                if method == 'retract':
-                    limit = min(start + self._phi_max_jog, max(targetable_range), self.collider.Ei_phi) # deeper retraction than Eo, to give better chance of avoidance
+                if 'retract' in method:
+                    limit = min(start + self._max_jog[method], max(targetable_range), self.collider.Ei_phi) # deeper retraction than Eo, to give better chance of avoidance
                 else:
-                    limit = max(start - self._phi_max_jog, min(targetable_range))
+                    limit = max(start - self._max_jog[method], min(targetable_range))
                 axis = pc.P
             else:
                 start = tables[posid].init_posTP[0]
                 speed = posmodel.abs_shaft_speed_cruise_T
                 targetable_range = posmodel.targetable_range_T
-                if method == 'rot_ccw':
-                    limit = min(start + self._theta_max_jog, max(targetable_range))
+                if 'ccw' in method:
+                    limit = min(start + self._max_jog[method], max(targetable_range))
                 else:
-                    limit = max(start - self._theta_max_jog, min(targetable_range))
+                    limit = max(start - self._max_jog[method], min(targetable_range))
                 axis = pc.T
             distance = limit - start
             move_time = abs(distance / speed)
             if self.collider.posmodels[neighbor].is_enabled and not self.sweeps[neighbor].is_frozen:
-                neighbor_table.insert_new_row(0)
-                neighbor_table.set_prepause(0,move_time)
                 tables[neighbor] = neighbor_table
+                if 'repel' in method:
+                    neighbor_posmodel = self.collider.posmodels[neighbor]
+                    neighbor_targetable_range = neighbor_posmodel.targetable_range_T
+                    neighbor_start = tables[neighbor].init_posTP[0]
+                    if 'ccw' in method: # primary goes ccw, so neighbor goes cw
+                        neighbor_limit = max(neighbor_start - self._max_jog[method], min(neighbor_targetable_range))
+                    else: # primary goes cw; neighbor goes ccw
+                        neighbor_limit = min(neighbor_start + self._max_jog[method], max(neighbor_targetable_range))
+                    neighbor_distance = neighbor_limit - neighbor_start
+                    neighbor_move_time = abs(neighbor_distance / speed)
+                    primary_jog_time = max(move_time - neighbor_move_time,0)
+                    neighbor_jog_time = max(neighbor_move_time - move_time,0)
+                    table.insert_new_row(0)
+                    table.set_move(0,axis,distance)
+                    table.set_postpause(0,neighbor_jog_time + neighbor_clearance_time)
+                    table.set_move(table.n_rows,axis,-distance)
+                    neighbor_table.insert_new_row(0)
+                    neighbor_table.set_move(0,axis,neighbor_distance)
+                    neighbor_table.set_postpause(0,primary_jog_time)
+                    neighbor_table.set_move(neighbor_table.n_rows,axis,-neighbor_distance)
+                    return tables
+                else:
+                    neighbor_table.insert_new_row(0)
+                    neighbor_table.set_prepause(0,move_time)
             table.insert_new_row(0)
             table.insert_new_row(0)
             table.set_move(0,axis,distance)
@@ -375,6 +409,24 @@ class PosScheduleStage(object):
             table = posmovetable.PosMoveTable(self.collider.posmodels[posid])
             table.insert_new_row(0)
         return table
+    
+    def _assign_max_jog_values(self):
+        """Makes convenience dict containing theta and phi max jog values for
+        all adjustment methods.
+        """
+        max_jogs = {}
+        for method in pc.nonfreeze_adjustment_methods:
+            if '_A' in method:
+                if 'extend' in method or 'retract' in method:
+                    max_jogs[method] = self._phi_max_jog_A
+                else:
+                    max_jogs[method] = self._theta_max_jog_A
+            else:
+                if 'extend' in method or 'retract' in method:
+                    max_jogs[method] = self._phi_max_jog_B
+                else:
+                    max_jogs[method] = self._theta_max_jog_B
+        return max_jogs
     
     @staticmethod
     def _collision_id(A,B):

@@ -114,7 +114,13 @@ class collision_case(object):
 case = collision_case()
 
 # Collision resolution methods
-nonfreeze_adjustment_methods = ['pause','extend','retract','rot_ccw','rot_cw']
+nonfreeze_adjustment_methods = ['pause',
+                                'extend_A','retract_A',
+                                'extend_B','retract_B',
+                                'rot_ccw_A','rot_cw_A',
+                                'rot_ccw_B','rot_cw_B',
+                                'repel_ccw_A','repel_cw_A',
+                                'repel_ccw_B','repel_cw_B']
 all_adjustment_methods = nonfreeze_adjustment_methods + ['freeze']
 
 # Convenience methods
