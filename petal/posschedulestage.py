@@ -137,7 +137,7 @@ class PosScheduleStage(object):
             
                 'on'     ... freeze positioner if the path adjustment options all fail to resolve collisions
                 'off'    ... don't freeze, even if the path adjustment options all fail to resolve collisions
-                'forced' ... 
+                'forced' ... only freeze
                 
         With freezing == 'off' or 'on', the path adjustment algorithm goes through a
         series of options, trying adding various pauses and pre-moves to avoid collision.
