@@ -24,7 +24,7 @@ class PosSchedule(object):
         self.verbose = verbose
         self.printfunc = self.petal.printfunc
         self.requests = {} # keys: posids, values: target request dictionaries
-        self.max_path_adjustment_passes = 3 # max number of times to go through the set of colliding positioners and try to adjust each of their paths to avoid collisions. After this many passes, it defaults to freezing any that still collide
+        self.max_path_adjustment_passes = 2 # max number of times to go through the set of colliding positioners and try to adjust each of their paths to avoid collisions. After this many passes, it defaults to freezing any that still collide
         self.stage_order = ['direct','retract','rotate','extend','expert']
         self.RRE_stage_order = ['retract','rotate','extend']
         self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, stats=self.stats) for name in self.stage_order}
