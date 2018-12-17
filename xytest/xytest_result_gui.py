@@ -182,7 +182,7 @@ class XYTEST_RESULT_GUI(object):
         pos_conf1 = configobj.ConfigObj(filename1,unrepr=True)
         posid1=self.selected[0]
         posmodel1=self.ptl.posmodels[posid1]
-        trans1 = ptl.posmodels[posid1].trans
+        trans1 = posmodel1.trans
         offset_X1=pos_conf1['OFFSET_X']
         offset_Y1=pos_conf1['OFFSET_Y']
         r1=pos_conf1['LENGTH_R1']
