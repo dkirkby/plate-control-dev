@@ -63,12 +63,13 @@ class XYTEST_RESULT_GUI(object):
         hwsetup_conf = tkinter.filedialog.askopenfilename(initialdir=pc.dirs['ptl_settings'], filetypes=(("Config file","*.conf"),("All Files","*")), title='Choose petal setup file')
         self.hwsetup = configobj.ConfigObj(hwsetup_conf,unrepr=True)
         gui_root = tkinter.Tk()
-        self.ptl = petal.Petal('EM', posids=self.posids,fidids=[],simulator_on=True, sched_stats_on=True, db_commit_on=False, anticollision='adjust')
         self.simulate = False
         self.logfile='MoveGUI.log'
         self.fvc_type='simulator'
         self.fidids=['F021']   
         self.posids = sorted(self.hwsetup['POS_IDS'])
+        self.ptl = petal.Petal('EM', posids=self.posids,fidids=[],simulator_on=True, sched_stats_on=True, db_commit_on=False, anticollision='adjust')
+
             
 # GUI input       
         w=1600
