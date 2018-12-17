@@ -54,6 +54,7 @@ import googlesheets
 import time
 import glob
 import pdb
+from astropy.io import Table
 
 class XYTEST_RESULT_GUI(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
@@ -62,6 +63,7 @@ class XYTEST_RESULT_GUI(object):
         hwsetup_conf = tkinter.filedialog.askopenfilename(initialdir=pc.dirs['ptl_settings'], filetypes=(("Config file","*.conf"),("All Files","*")), title='Choose petal setup file')
         self.hwsetup = configobj.ConfigObj(hwsetup_conf,unrepr=True)
         gui_root = tkinter.Tk()
+        self.ptl = petal.Petal('EM', posids=self.posids,fidids=[],simulator_on=True, sched_stats_on=True, db_commit_on=False, anticollision='adjust')
         self.simulate = False
         self.logfile='MoveGUI.log'
         self.fvc_type='simulator'
@@ -77,7 +79,7 @@ class XYTEST_RESULT_GUI(object):
         y=(hs/2)-(h/2)
         gui_root.geometry('%dx%d+%d+%d' % (w,h,x,y))
         
-        Button(gui_root,text='Plot',width=10,command=self.set_fiducial).grid(row=0,column=4,sticky=W,pady=4)
+        Button(gui_root,text='Plot',width=10,command=self.plot).grid(row=0,column=4,sticky=W,pady=4)
         
         self.listbox1 = Listbox(gui_root, width=20, height=20,selectmode='single',exportselection=0)
         self.listbox1.grid(row=6, column=0,rowspan=10,pady=4,padx=15)
@@ -172,18 +174,68 @@ class XYTEST_RESULT_GUI(object):
         self.selected.append(self.listbox1.get(index[0]))
         self.e_selected.delete(0,END)
         self.e_selected.insert(0,str(self.selected))
-        pdb.set_trace()
         all_data=glob.glob(pc.dirs['xytest_data']+'*'+self.selected[0].strip()+'*.csv')
         
         for f in all_data:
-            self.listbox2.insert(tkinter.END,f)
+            temp=f.split('/')
+            self.listbox2.insert(tkinter.END,temp[-1])
 
     def get_list2(self,event):
         index = self.listbox2.curselection()
         self.selected_file=[]
-        self.selected_file.append(self.listbox2.get(index[0]))
+        self.selected_file.append(pc.dirs['xytest_data']+self.listbox2.get(index[0]))
+        print(self.selected_file)
 
+    def plot(self):
+        data=Table.read(self.selected_file,format='csv')
+        filename1=os.getenv('FP_SETTINGS_PATH')+'/pos_settings/unit_'+self.selected[0].strip()+'.conf'
+        pos_conf1 = configobj.ConfigObj(filename1,unrepr=True)
+        posid1=self.selected[0]
+        posmodel1=self.ptl.posmodels[posid1]
+        trans1 = ptl.posmodels[posid1].trans
+        offset_X1=pos_conf1['OFFSET_X']
+        offset_Y1=pos_conf1['OFFSET_Y']
+        r1=pos_conf1['LENGTH_R1']
+        r2=pos_conf1['LENGTH_R2']
+ 
+        font = {'family' : 'sans-serif',
+                 'weight' : 'normal',
+                 'size'   : 9}
+        plt.rc('font', **font)
+        head_width=0.1
+        head_length=0.15
+        fontsize=25
+        plt.figure(1,figsize=(9.5,9.5))
+        plt.rc('font', **font)
+        plt.subplot(111)
+        axes = plt.gca()
+        axes.set_xlim([offset_X1-7,offset_X1+7])
+        axes.set_ylim([offset_Y1-7,offset_Y1+7])
+
+        theta_min = trans1.posTP_to_obsTP([min(posmodel1.targetable_range_T),0])[0]
+        theta_max = trans1.posTP_to_obsTP([max(posmodel1.targetable_range_T),0])[0]
+        theta_range = [theta_min,theta_max]
+        plot_circle([offset_X1,offset_Y1],r1+r2,theta_range)
+        plot_circle([offset_X1,offset_Y1],abs(r1-r2),theta_range)
+        plt.plot(data['target_x'],data['target_y'],'ko')
+        plt.plot(data['meas_x0'],data['meas_y0'],'b+'(
+
+        pdb.set_trace()                
         
+
+    def plot_circle(center,radius,theta_range):
+        annulus_angles = np.arange(0,360,5)*np.pi/180
+        annulus_angles = np.append(annulus_angles,annulus_angles[0])
+        annulus_outer_x = center[0] + np.abs(radius) * np.cos(annulus_angles)
+        annulus_outer_y = center[1] + np.abs(radius) * np.sin(annulus_angles)
+        plt.plot(annulus_outer_x,annulus_outer_y,'b-',linewidth=0.5,label='patrol envelope')
+        min_line_x = [center[0], radius * np.cos(theta_range[0]*np.pi/180) + center[0]]
+        min_line_y = [center[1], radius * np.sin(theta_range[0]*np.pi/180) + center[1]]
+        max_line_x = [center[0], radius * np.cos(theta_range[1]*np.pi/180) + center[0]]
+        max_line_y = [center[1], radius * np.sin(theta_range[1]*np.pi/180) + center[1]]^M
+        plt.plot(min_line_x,min_line_y,'g-',linewidth=0.5,label='theta min')
+        plt.plot(max_line_x,max_line_y,'g--',linewidth=0.8,label='theta max')
+
 
     def format_sids(self, sid_dict):
         for key,value in sid_dict.items():
