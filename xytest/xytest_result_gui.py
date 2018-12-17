@@ -54,7 +54,7 @@ import googlesheets
 import time
 import glob
 import pdb
-from astropy.io import Table
+from astropy.table import Table
 
 class XYTEST_RESULT_GUI(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
@@ -208,7 +208,7 @@ class XYTEST_RESULT_GUI(object):
         plot_circle([offset_X1,offset_Y1],abs(r1-r2),theta_range)
         plt.plot(data['target_x'],data['target_y'],'ko')
         plt.plot(data['meas_x0'],data['meas_y0'],'b+')
-
+        plt.show()
         pdb.set_trace()                
         
     def plot_circle(center,radius,theta_range):
