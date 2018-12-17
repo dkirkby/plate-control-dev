@@ -207,7 +207,7 @@ class XYTEST_RESULT_GUI(object):
         plot_circle([offset_X1,offset_Y1],r1+r2,theta_range)
         plot_circle([offset_X1,offset_Y1],abs(r1-r2),theta_range)
         plt.plot(data['target_x'],data['target_y'],'ko')
-        plt.plot(data['meas_x0'],data['meas_y0'],'b+'(
+        plt.plot(data['meas_x0'],data['meas_y0'],'b+')
 
         pdb.set_trace()                
         
