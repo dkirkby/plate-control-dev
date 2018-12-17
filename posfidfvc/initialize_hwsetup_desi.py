@@ -168,13 +168,25 @@ m.park() # retract all positioners to their parked positions
 
 # commit logs and settings files to the SVN
 if should_commit_to_svn and svn_userpass_valid:
-    n_total = len(new_and_changed_files)
-    n = 0
+    #n_total = len(new_and_changed_files)
+    #n = 0
+    #for file in new_and_changed_files:
+    #    n += 1
+    #    err1 = os.system('svn add --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + file)
+    #    err2 = os.system('svn commit --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive -m "autocommit from initialize_hwsetup script" ' + file)
+    #    print('SVN upload of file ' + str(n) + ' of ' + str(n_total) + ' (' + os.path.basename(file) + ') returned: ' + str(err1) + ' (add) and ' + str(err2) + ' (commit)')
+
+    n_total=0
+    these_files_to_commit = ''
     for file in new_and_changed_files:
-        n += 1
-        err1 = os.system('svn add --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + file)
-        err2 = os.system('svn commit --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive -m "autocommit from initialize_hwsetup script" ' + file)
-        print('SVN upload of file ' + str(n) + ' of ' + str(n_total) + ' (' + os.path.basename(file) + ') returned: ' + str(err1) + ' (add) and ' + str(err2) + ' (commit)')
+        these_files_to_commit += ' ' + file
+        n_total += 1
+    print("these_files_to_commit")
+    print(these_files_to_commit)
+    print("")
+    self.logwrite('Beginning add + commit of ' + str(n_total) + ' data files to SVN.')
+    err_add = os.system('svn add --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive ' + these_files_to_commit)
+    err_commit = os.system('svn commit --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + these_files_to_commit)
 
 # clean up any svn credentials
 if svn_user:
