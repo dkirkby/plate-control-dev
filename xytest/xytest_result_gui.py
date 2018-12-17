@@ -55,6 +55,7 @@ import time
 import glob
 import pdb
 from astropy.table import Table
+import matplotlib.pyplot as plt
 
 class XYTEST_RESULT_GUI(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
