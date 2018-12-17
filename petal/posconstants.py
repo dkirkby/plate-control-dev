@@ -27,7 +27,7 @@ dirs['all_logs']     = os.environ.get('POSITIONER_LOGS_PATH') # corresponds to h
 dirs['all_settings'] = os.environ.get('FP_SETTINGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/fp_settings
 dirs['positioner_locations_file'] = os.environ.get('FP_SETTINGS_PATH')+'/hwsetups/Petal_Metrology.csv'
 dirs['small_array_locations_file']=os.getenv('FP_SETTINGS_PATH')+'/hwsetups/SWIntegration_XY.csv'
-
+dirs['petal2_fiducials_metrology_file']=os.getenv('FP_SETTINGS_PATH')+'/hwsetups/petal2_fiducials_metrology.csv'
 if 'DESI_HOME' in os.environ:
     dirs['temp_files']   = os.environ.get('DESI_HOME') + os.path.sep + 'fp_temp_files' + os.path.sep
 elif 'HOME' in os.environ:
@@ -73,8 +73,8 @@ power_supply_can_map = {'V1':{'can10','can11','can13','can23'},
 deg = '\u00b0'
 mm = 'mm'
 um_per_mm = 1000
-deg_per_rad = math.pi/180.
-rad_per_deg = 180./math.pi
+deg_per_rad = 180./math.pi  
+rad_per_deg = math.pi/180.
 timestamp_format = '%Y-%m-%d %H:%M:%S.%f' # see strftime documentation
 filename_timestamp_format = '%Y-%m-%d_T%H%M%S'
 gear_ratio = {}
