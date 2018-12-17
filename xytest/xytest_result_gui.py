@@ -206,8 +206,8 @@ class XYTEST_RESULT_GUI(object):
         theta_min = trans1.posTP_to_obsTP([min(posmodel1.targetable_range_T),0])[0]
         theta_max = trans1.posTP_to_obsTP([max(posmodel1.targetable_range_T),0])[0]
         theta_range = [theta_min,theta_max]
-        plot_circle([offset_X1,offset_Y1],r1+r2,theta_range)
-        plot_circle([offset_X1,offset_Y1],abs(r1-r2),theta_range)
+        self.plot_circle([offset_X1,offset_Y1],r1+r2,theta_range)
+        self.plot_circle([offset_X1,offset_Y1],abs(r1-r2),theta_range)
         plt.plot(data['target_x'],data['target_y'],'ko')
         plt.plot(data['meas_x0'],data['meas_y0'],'b+')
         plt.show()
