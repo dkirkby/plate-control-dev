@@ -211,7 +211,6 @@ class XYTEST_RESULT_GUI(object):
 
         pdb.set_trace()                
         
-
     def plot_circle(center,radius,theta_range):
         annulus_angles = np.arange(0,360,5)*np.pi/180
         annulus_angles = np.append(annulus_angles,annulus_angles[0])
@@ -221,7 +220,7 @@ class XYTEST_RESULT_GUI(object):
         min_line_x = [center[0], radius * np.cos(theta_range[0]*np.pi/180) + center[0]]
         min_line_y = [center[1], radius * np.sin(theta_range[0]*np.pi/180) + center[1]]
         max_line_x = [center[0], radius * np.cos(theta_range[1]*np.pi/180) + center[0]]
-        max_line_y = [center[1], radius * np.sin(theta_range[1]*np.pi/180) + center[1]]^M
+        max_line_y = [center[1], radius * np.sin(theta_range[1]*np.pi/180) + center[1]]
         plt.plot(min_line_x,min_line_y,'g-',linewidth=0.5,label='theta min')
         plt.plot(max_line_x,max_line_y,'g--',linewidth=0.8,label='theta max')
 
