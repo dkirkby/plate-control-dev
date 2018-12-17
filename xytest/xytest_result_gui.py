@@ -133,11 +133,11 @@ class XYTEST_RESULT_GUI(object):
 
         Button(gui_root,text='Clear',width=15,command=self.clear2).grid(row=5,column=6,sticky=W,pady=4)
         
-        photo = PhotoImage(file='desi_logo.gif')
-        photo=photo.subsample(7)
-        label = Label(image=photo,width=20,height=100)
-        label.image = photo # keep a reference!
-        label.grid(row=16, column=0, columnspan=1, rowspan=20,sticky=W+E+N+S, padx=5, pady=5)
+        #photo = PhotoImage(file='desi_logo.gif')
+        #photo=photo.subsample(7)
+        #label = Label(image=photo,width=20,height=100)
+        #label.image = photo # keep a reference!
+        #label.grid(row=16, column=0, columnspan=1, rowspan=20,sticky=W+E+N+S, padx=5, pady=5)
         
 
         mainloop()
@@ -165,22 +165,37 @@ class XYTEST_RESULT_GUI(object):
         self.selected.append(self.listbox1.get(index[0]))
         self.e_selected.delete(0,END)
         self.e_selected.insert(0,str(self.selected))
+        filename1=os.getenv('FP_SETTINGS_PATH')+'/pos_settings/unit_'+self.selected[0].strip()+'.conf'
+        self.pos_conf = configobj.ConfigObj(filename1,unrepr=True)
+        self.r1=self.pos_conf['LENGTH_R1']
+        self.r2=self.pos_conf['LENGTH_R2']
+        self.offset_x=self.pos_conf['OFFSET_X']
+        self.offset_y=self.pos_conf['OFFSET_Y']
+
+
         all_data=glob.glob(pc.dirs['xytest_data']+'*'+self.selected[0].strip()+'*.csv')
-        
-        for f in all_data:
+        self.listbox2.delete(0,END) 
+        for f in sorted(all_data):
             temp=f.split('/')
             self.listbox2.insert(tkinter.END,temp[-1])
+
 
     def get_list2(self,event):
         index = self.listbox2.curselection()
         self.selected_file=[]
         self.selected_file.append(pc.dirs['xytest_data']+self.listbox2.get(index[0]))
-        print(self.selected_file)
+        self.data=Table.read(self.selected_file[0],format='ascii.csv',header_start=0,data_start=1)
+
+        dist=np.sqrt((self.data['target_x']-self.offset_x)**2+(self.data['target_y']-self.offset_y)**2)
+        ind1=np.where(dist>self.pos_conf['LENGTH_R1']+self.pos_conf['LENGTH_R2'])
+        ind2=np.where(dist<abs(self.pos_conf['LENGTH_R1']-self.pos_conf['LENGTH_R2']))
+        self.text2.insert(tkinter.END,str(len(self.data))+' targets in total \n') 
+        self.text2.insert(tkinter.END,str(len(ind1[0]))+' targets outside outer boundary \n')
+        self.text2.insert(tkinter.END,str(len(ind2[0]))+' targets inside innter boundary \n')
+
 
     def plot(self):
-        data=Table.read(self.selected_file,format='csv')
-        filename1=os.getenv('FP_SETTINGS_PATH')+'/pos_settings/unit_'+self.selected[0].strip()+'.conf'
-        pos_conf1 = configobj.ConfigObj(filename1,unrepr=True)
+        pos_conf1 = self.pos_conf
         posid1=self.selected[0]
         posmodel1=self.ptl.posmodels[posid1]
         trans1 = posmodel1.trans
@@ -208,12 +223,11 @@ class XYTEST_RESULT_GUI(object):
         theta_range = [theta_min,theta_max]
         self.plot_circle([offset_X1,offset_Y1],r1+r2,theta_range)
         self.plot_circle([offset_X1,offset_Y1],abs(r1-r2),theta_range)
-        plt.plot(data['target_x'],data['target_y'],'ko')
-        plt.plot(data['meas_x0'],data['meas_y0'],'b+')
+        plt.plot(self.data['target_x'],self.data['target_y'],'ko')
+        plt.plot(self.data['meas_x0'],self.data['meas_y0'],'b+')
         plt.show()
-        pdb.set_trace()                
         
-    def plot_circle(center,radius,theta_range):
+    def plot_circle(self,center,radius,theta_range):
         annulus_angles = np.arange(0,360,5)*np.pi/180
         annulus_angles = np.append(annulus_angles,annulus_angles[0])
         annulus_outer_x = center[0] + np.abs(radius) * np.cos(annulus_angles)
