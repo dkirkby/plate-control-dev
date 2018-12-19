@@ -189,7 +189,7 @@ class XYTEST_RESULT_GUI(object):
         dist=np.sqrt((self.data['target_x']-self.offset_x)**2+(self.data['target_y']-self.offset_y)**2)
         ind1=np.where(dist>self.pos_conf['LENGTH_R1']+self.pos_conf['LENGTH_R2'])
         ind2=np.where(dist<abs(self.pos_conf['LENGTH_R1']-self.pos_conf['LENGTH_R2']))
-        ind3=np.where(self.data['err_xy1']>0.02)
+        ind3=np.where(self.data['err_xy1']>0.1)
         n=len(self.data)
         n1=len(ind1[0])
         n2=len(ind2[0])
@@ -197,7 +197,7 @@ class XYTEST_RESULT_GUI(object):
         self.text2.insert(tkinter.END,str(len(self.data))+' targets in total \n') 
         self.text2.insert(tkinter.END,str(len(ind1[0]))+' targets outside outer boundary \n')
         self.text2.insert(tkinter.END,str(len(ind2[0]))+' targets inside innter boundary \n')
-        self.text2.insert(tkinter.END,str(len(ind3[0]))+' targets reached with error less than 20micron \n')
+        self.text2.insert(tkinter.END,str(n3)+' targets not reached with error less than 100micron \n')
         self.text2.insert(tkinter.END,str(float(n-n1-n2-n3)/float(n-n1-n2))+' sources reach target \n')
 
 
@@ -234,7 +234,7 @@ class XYTEST_RESULT_GUI(object):
         self.plot_circle([offset_X1,offset_Y1],abs(r1-r2),theta_range)
         plt.scatter(self.data['target_x'],self.data['target_y'],s=80,facecolors='none', edgecolors='r')
         #plt.plot(self.data['target_x'],self.data['target_y'],'ko')
-        plt.plot(self.data['meas_x1'],self.data['meas_y1'],'b+')
+        plt.plot(self.data['meas_x1'],self.data['meas_y1'],'b+', linewidth=5, markersize=10)
         plt.show()
         
     def plot_circle(self,center,radius,theta_range):
