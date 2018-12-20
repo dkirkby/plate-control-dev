@@ -127,8 +127,7 @@ class MoveGUI(object):
                 self.posids.append('M0'+str(key))
             elif len(str(key))==5:
                 self.posids.append('M'+str(key))
-            
-        self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+        self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite,user_interactions_enabled=True)
         for posid in self.ptl.posids:
             self.ptl.set_posfid_val(posid, 'CTRL_ENABLED', True)
             self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
@@ -497,7 +496,7 @@ class MoveGUI(object):
         self.text1.insert(END,'Writing SiID \n')
         for key in sorted(self.info.keys()):
             info_this=self.info[key]
-            if float(key)<8000:
+            if float(key)<10000:
                 ind_idmap=[j for j, x in enumerate([y.strip() for y in self.posid_idmap_num]) if x == str(key).strip()]
                 ind_this=ind_idmap[0]+1 # 20+int(key)
                 pos_this=googlesheets.read(self.sheet1,ind_this,1,False,False)
@@ -511,7 +510,7 @@ class MoveGUI(object):
                         print('Writing '+str(key)+' successfully \n')
                     else:
                         print('Writing '+str(key)+' failed. \n Check doc \n')
-            elif float(key)>8000:
+            elif float(key)>10000:
                 self.text1.insert(END,'Is '+str(key)+' a fiducial? Not writing. \n')
             else:
                 self.text1.insert(END,'Posid and RowID are not consistent. Check the integrity of the file. \nGo to '+url+' \n' )
@@ -717,7 +716,7 @@ class MoveGUI(object):
                 self.text1.insert(END,str(key)+' has too low a FW ver = '+self.info[key][0]+', BL ver = '+self.info[key][1]+'! Hand it to Jessica. \n','red')
 
 
-        self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+        self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite,user_interactions_enabled=True)
         for posid in self.posids:
             self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
