@@ -677,8 +677,10 @@ class Petal(object):
         for posid in self.posids:
             if not(self.posmodels[posid].is_enabled):
                 self.pos_flags[posid] |= 1<<9 #final check for disabled
-            #if not(self.get_posfid_val(posid, 'FIBER_INTACT')): #WILL BE UNCOMMENTED ONCE KEY IS ADDED TO CONFIG FILES
-            #    self.pos_flags[posid] |= 1<<10
+            if not(self.get_posfid_val(posid, 'FIBER_INTACT')):  
+                self.pos_flags[posid] |= 1<<10
+            if self.get_posdid_val(posid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
+                self.pos_flags[posid] |= 1<<17
             pos_flags[posid] = str(self.pos_flags[posid])
         if should_reset:
             self._initialize_pos_flags()
@@ -859,6 +861,7 @@ class Petal(object):
         14 - Unreachable by positioner
         15 - Targeting restricted boundries
         16 - Requested multiple times
+        17 - Classified Nonfunctional
         '''
         if ids == 'all':
             ids = self.posids.union(self.fidids)
