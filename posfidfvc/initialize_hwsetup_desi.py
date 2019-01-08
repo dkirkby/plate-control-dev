@@ -3,6 +3,10 @@ import sys
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../xytest/'))
+sys.path.remove('/software/products/plate_control-trunk/xytest')
+sys.path.remove('/software/products/plate_control-trunk/posfidfvc')
+sys.path.remove('/software/products/plate_control-trunk/petalbox')
+sys.path.remove('/software/products/plate_control-trunk/petal')
 
 import petal
 import posmovemeasure

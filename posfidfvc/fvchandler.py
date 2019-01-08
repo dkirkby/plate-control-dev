@@ -28,7 +28,7 @@ class FVCHandler(object):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.fvc_type = fvc_type # 'SBIG' or 'SBIG_Yale' or 'FLI' or 'simulator'
         self.fvcproxy = None # may be auto-initialized later by the platemaker instrument setter
-        self.min_energy = 0.1 * 1.0 # this is the minimum allowed value for the product peak*fwhm for any given dot
+        self.min_energy = 0.1 * .5 # this is the minimum allowed value for the product peak*fwhm for any given dot
         self.max_attempts = 5 # max number of times to retry an image measurement (if poor dot quality) before quitting hard
         if self.fvc_type == 'SBIG':
             import sbig_grab_cen
@@ -44,7 +44,7 @@ class FVCHandler(object):
             self.exposure_time = 0.70
             self.max_counts = 2**16 - 1 # SBIC camera ADU max
         else:
-            self.exposure_time = 1.0
+            self.exposure_time = 2.0
             self.max_counts = 2**16 - 1 # FLI camera ADU max
         self.trans = postransforms.PosTransforms() # general transformer object -- does not look up specific positioner info, but fine for QS <--> global X,Y conversions
         self.rotation = 0        # [deg] rotation angle from image plane to object plane
@@ -379,7 +379,7 @@ class FVCHandler(object):
         return np.array([[math.cos(angle), -math.sin(angle)], [math.sin(angle), math.cos(angle)]])
 
 if __name__ == '__main__':
-    f = FVCHandler(fvc_type='SBIG')
+    f = FVCHandler(fvc_type='FLI')
     n_objects = 160
     n_repeats = 1
     f.min_energy = -np.Inf

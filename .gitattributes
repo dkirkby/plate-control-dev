@@ -101,6 +101,7 @@ posfidfvc/SBIG/stf.py -text
 posfidfvc/SBIG/stxl.py -text
 posfidfvc/SBIG/usbreset.c -text
 posfidfvc/SBIG/usbreset.py -text
+posfidfvc/calibrate_cleanroom_FVC.py -text
 posfidfvc/check_pos_move.py -text
 posfidfvc/derive_platemaker_pars.py -text
 posfidfvc/enable_all.py -text
