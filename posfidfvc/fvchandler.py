@@ -345,9 +345,13 @@ class FVCHandler(object):
         if xy != []:
             if self.fvcproxy:
                 #Temporary hack, data passed in wrong format
-                if isinstance(xy[0][0], list):
-                    xy_new = [[xy[0][0][i],xy[0][1][i]] for i in range(len(xy[0][0]))]
-                    xy = xy_new
+                #import pdb;pdb.set_trace()
+                if isinstance(xy[0], float):
+                    xy=[xy]
+                else:
+                    if isinstance(xy[0][0], list):
+                        xy_new = [[xy[0][0][i],xy[0][1][i]] for i in range(len(xy[0][0]))]
+                        xy = xy_new
                 #End of hack
                 spotids = [i for i in range(len(xy))]
                 qs = [self.trans.obsXY_to_QS(this_xy) for this_xy in xy]
