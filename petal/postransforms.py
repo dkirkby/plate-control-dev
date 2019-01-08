@@ -162,6 +162,7 @@ class PosTransforms(object):
         input:  xy ... [obsX,obsY] global to focal plate, centered on optical axis, looking at fiber tips
         output: QS ... [Q,S] global to focal plate, q is angle about the optical axis, s is path distance from optical axis, along the curved focal surface, within a plane that intersects the optical axis
         """
+        #if isinstance(xy[0],float):
         if isinstance(xy[0],list):
             xy=[xy[0][0],xy[1][0]]
         Q = math.degrees(math.atan2(xy[1],xy[0]))
