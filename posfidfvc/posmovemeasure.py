@@ -463,8 +463,9 @@ class PosMoveMeasure(object):
             Output: the obsXY of each enabled positioner will be stored in the conf file.  
         """
         
+        self.set_fiducials(setting='off')
         n_posids = len(posids)
-        n_dots = len(self.all_posids) + self.n_ref_dots
+        n_dots = len(self.all_posids)# + self.n_ref_dots
         nudges = [-self.nudge_dist, self.nudge_dist]
         xy_init = []
         pseudo_xy_ref = []
@@ -491,6 +492,9 @@ class PosMoveMeasure(object):
                 this_petal.request_direct_dtdp(request)
                 this_petal.schedule_send_and_execute_moves()
             xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_dots)
+            if len(xy_init) != len(xy_meas) or len(xy_init) != n_dots:
+                print('Expect '+str(n_dots))
+                print('Found '+str(len(xy_init))+' dots initially, but '+str(len(xy_meas))+ ' dots now.')
             if self.fvc.fvc_type == 'simulator':
                 xy_meas = self._simulate_measured_pixel_locations(pseudo_xy_ref)
                 pseudo_xy_ref = xy_meas[n_posids:]
