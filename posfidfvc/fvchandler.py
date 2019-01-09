@@ -24,11 +24,11 @@ class FVCHandler(object):
         2. scale
         3. translation
     """
-    def __init__(self, fvc_type='FLI', platemaker_instrument='lbnl3', printfunc=print, save_sbig_fits=True):
+    def __init__(self, fvc_type='FLI', platemaker_instrument='petal2', printfunc=print, save_sbig_fits=True):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.fvc_type = fvc_type # 'SBIG' or 'SBIG_Yale' or 'FLI' or 'simulator'
         self.fvcproxy = None # may be auto-initialized later by the platemaker instrument setter
-        self.min_energy = 0.1 * .5 # this is the minimum allowed value for the product peak*fwhm for any given dot
+        self.min_energy = 0. #0.1 * .5 # this is the minimum allowed value for the product peak*fwhm for any given dot
         self.max_attempts = 5 # max number of times to retry an image measurement (if poor dot quality) before quitting hard
         if self.fvc_type == 'SBIG':
             import sbig_grab_cen
@@ -121,6 +121,7 @@ class FVCHandler(object):
         else:
             self.fvcproxy.send_fvc_command('make_targets',num_spots=num_objects)
             centroids = self.fvcproxy.locate(send_centroids=True)
+            
             if 'FAILED' in centroids:
                 self.printfunc('Failed to locate centroids using FVC.')
             else:
@@ -311,9 +312,12 @@ class FVCHandler(object):
         if xy != []:
             if self.fvcproxy:
                 #Temporary hack, data passed in wrong format
-                if isinstance(xy[0][0], list):
-                    xy_new = [[xy[0][0][i],xy[0][1][i]] for i in range(len(xy[0][0]))]
-                    xy = xy_new
+                if isinstance(xy[0],float):
+                    xy=[xy]
+                else:
+                    if isinstance(xy[0][0], list):
+                        xy_new = [[xy[0][0][i],xy[0][1][i]] for i in range(len(xy[0][0]))]
+                        xy = xy_new
                 #End of hack
                 spotids = [i for i in range(len(xy))]
                 fvcXY_dicts = [{'spotid':spotids[i],'x_pix':xy[i][0],'y_pix':xy[i][1]} for i in range(len(spotids))]
@@ -384,7 +388,7 @@ class FVCHandler(object):
 
 if __name__ == '__main__':
     f = FVCHandler(fvc_type='FLI')
-    n_objects = 160
+    n_objects = 495
     n_repeats = 1
     f.min_energy = -np.Inf
     xy = []
@@ -399,6 +403,11 @@ if __name__ == '__main__':
         peaks.append(these_peaks)
         fwhms.append(these_fwhms)
         energies.append([these_peaks[i]*these_fwhms[i] for i in range(len(these_peaks))])
+        x=[these_xy[i][0] for i in range(len(these_xy))]
+        y=[these_xy[i][1] for i in range(len(these_xy))]
+        import matplotlib.pyplot as plt
+        #plt.scatter(x,y)
+        #plt.show()
         print('ndots: ' + str(len(xy[i])))
         print('')
         print('measured xy positions:')
