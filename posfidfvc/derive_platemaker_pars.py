@@ -3,6 +3,10 @@ import sys
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../xytest/'))
+#sys.path.remove('/software/products/plate_control-trunk/xytest')
+#sys.path.remove('/software/products/plate_control-trunk/posfidfvc')
+#sys.path.remove('/software/products/plate_control-trunk/petalbox')
+#sys.path.remove('/software/products/plate_control-trunk/petal')
 
 import petal
 import posmovemeasure
@@ -48,7 +52,7 @@ class Derive_Platemaker_Pars(object):
             self.fvc.scale = self.hwsetup['scale'] # this value is used in setups without fvcproxy / platemaker
             self.fvc.translation = self.hwsetup['translation']
 
-        self.ptl = petal.Petal(petal_id = self.hwsetup['ptl_id'],posids=[],fidids=[],
+        self.ptl = petal.Petal(petal_id = self.hwsetup['ptl_id'],petalcontroller_id=7,posids=[],fidids=[],
                   simulator_on = False,
                   user_interactions_enabled = True,
                   db_commit_on = False,
@@ -123,8 +127,8 @@ class Derive_Platemaker_Pars(object):
                 x_arr=[-xy_fvc[i][0] for i in range(n_sources)]
             y_arr=[xy_fvc[i][1] for i in range(n_sources)]
             sources=Table([id,x_arr,y_arr],names=('id','xcentroid','ycentroid'),dtype=('i8','f8','f8'))
-            hdul = fits.open(imgfiles[0])
-            data = hdul[0].data
+            #hdul = fits.open(imgfiles[0])
+            data = [[0,1,2],[1,2,3],[2,3,4]] #hdul[0].data
             plt.ioff()
             sourceSel = SourceSelector(data, sources)
             plt.ion()
@@ -175,9 +179,14 @@ class Derive_Platemaker_Pars(object):
             num_objects=input('How many dots are there in the image?')
             num_objects=int(num_objects)
             xy,peaks,fwhms,imgfiles=self.fvc.measure(num_objects)
+            imgfiles=['fvc.20190108160731.fits']
             xy_fvc=self.fvc.obsXY_to_fvcXY(xy)
+            if self.fvc.fvc_type == 'FLI':
+                flip=1  # x flip right now this is hard coded since we don't change the camera often.
+            else:
+                flip=0
 
-            use_stored_centroids = True
+            use_stored_centroids =False
             if use_stored_centroids:
                 flip=1
                 fvcdata=Table.read('fvc.20181203141706.pos',format='ascii.csv',header_start=0,data_start=1)
@@ -338,6 +347,7 @@ class Derive_Platemaker_Pars(object):
         model_x=np.array(model[0,:]).ravel()
         model_y=np.array(model[1,:]).ravel()
         if self.fvc.fvc_type=='FLI':
+            pix_size=0.006
             label='fvcmag  '+str(out.params['scale'].value/pix_size)+'\n'+'fvcrot  '+str(rot)+'\n' +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(offy)+'\n'
         else: 
             label='scale  '+str(out.params['scale'].value)+'\n'+'fvcrot  '+str(rot)+'\n' +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(offy)+'\n'
@@ -362,7 +372,7 @@ class Derive_Platemaker_Pars(object):
             output_lines='fvcmag  '+str(out.params['scale'].value/pix_size)+'\n'+'fvcrot  '+str(rot)+'\n' \
                         +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(offy)+'\n' \
                         +'fvcflip  '+str(flip)+'\n'+'fvcnrow  6000 \n'+'fvcncol  6000 \n'+'fvcpixmm  '+str(pix_size)
-            self.printfunc(output_lines)
+            print(output_lines)
             f.write(output_lines)
             f.close()
             print('PM instrument file saved to instrmaker.par')
