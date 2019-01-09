@@ -45,7 +45,7 @@ class Derive_Platemaker_Pars(object):
 
         # software initialization and startup
         if self.hwsetup['fvc_type'] == 'FLI' and 'pm_instrument' in self.hwsetup:
-            self.fvc=fvchandler.FVCHandler(fvc_type=self.hwsetup['fvc_type'],save_sbig_fits=self.hwsetup['save_sbig_fits'],platemaker_instrument=self.hwsetup['pm_instrument'])
+            self.fvc=fvchandler.FVCHandler(fvc_type=self.hwsetup['fvc_type'],save_sbig_fits=self.hwsetup['save_sbig_fits'],platemaker_instrument='lbnl3') #=self.hwsetup['pm_instrument'])
         else:
             self.fvc = fvchandler.FVCHandler(fvc_type=self.hwsetup['fvc_type'],save_sbig_fits=True)    
             self.fvc.rotation = self.hwsetup['rotation'] # this value is used in setups without fvcproxy / platemaker
@@ -70,7 +70,9 @@ class Derive_Platemaker_Pars(object):
 
 
         # calibration routines
-        self.m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
+        rehome=tkinter.messagebox.askyesno(title='Rehome?',message='Rehome?')
+        if rehome:
+            self.m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
         automatic_mode = tkinter.messagebox.askyesno(title='Automatic or Manual Mode?',message='Use Automatic Mode?')
         use_fiducial = tkinter.messagebox.askyesno(title='Use Fiducials?',message='Use Fiducials and measured Metrology data?')
         if automatic_mode:
@@ -110,7 +112,17 @@ class Derive_Platemaker_Pars(object):
             num_objects=int(num_objects)
             xy,peaks,fwhms,imgfiles=self.fvc.measure(num_objects)
             xy_fvc=self.fvc.obsXY_to_fvcXY(xy)
-            
+            x=[xy_fvc[i][0] for i in range(len(xy_fvc))]
+            y=[xy_fvc[i][1] for i in range(len(xy_fvc))]
+            plt.scatter(x,y)
+            plt.show()
+
+            x=[xy[i][0] for i in range(len(xy))]
+            y=[xy[i][1] for i in range(len(xy))]
+            plt.scatter(x,y)
+            plt.show()
+
+            imgfiles=['fvc.20190108160731.fits'] 
             n_sources=len(xy_fvc)
             id=[i+1 for i in range(n_sources)]
             
@@ -124,11 +136,11 @@ class Derive_Platemaker_Pars(object):
             if flip==1:
                 x_arr=[-xy_fvc[i][0] for i in range(n_sources)]
             else:
-                x_arr=[-xy_fvc[i][0] for i in range(n_sources)]
+                x_arr=[xy_fvc[i][0] for i in range(n_sources)]
             y_arr=[xy_fvc[i][1] for i in range(n_sources)]
             sources=Table([id,x_arr,y_arr],names=('id','xcentroid','ycentroid'),dtype=('i8','f8','f8'))
-            #hdul = fits.open(imgfiles[0])
-            data = [[0,1,2],[1,2,3],[2,3,4]] #hdul[0].data
+            hdul = fits.open(imgfiles[0])
+            data=hdul[0].data
             plt.ioff()
             sourceSel = SourceSelector(data, sources)
             plt.ion()
@@ -160,7 +172,7 @@ class Derive_Platemaker_Pars(object):
             sourceSel_metro = SourceSelector(data, sources_metro)
             plt.ion()
             sources_tofit_metro=sourceSel_metro.sources_selected
-            fvcX_arr=-sources_tofit['xcentroid']
+            fvcX_arr=sources_tofit['xcentroid']
             fvcY_arr=sources_tofit['ycentroid']
             for i in range(len(fvcX_arr)):
                 obsXY_this=self.fvc.fvcXY_to_obsXY([fvcX_arr[i],fvcY_arr[i]])[0]
@@ -172,10 +184,10 @@ class Derive_Platemaker_Pars(object):
             fvcY_arr=fvcY_arr.tolist()
             metroX_arr=metroX_arr.tolist()
             metroY_arr=metroY_arr.tolist()
-
-            self.fit_and_plot(obsX_arr,obsY_arr,fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=flip)
+            self.fit_and_plot(fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=flip)
 
         else:
+
             num_objects=input('How many dots are there in the image?')
             num_objects=int(num_objects)
             xy,peaks,fwhms,imgfiles=self.fvc.measure(num_objects)
@@ -197,7 +209,7 @@ class Derive_Platemaker_Pars(object):
             if flip==1:
                 x_arr=[-xy_fvc[i][0] for i in range(n_sources)]
             else:
-                x_arr=[-xy_fvc[i][0] for i in range(n_sources)]
+                x_arr=[xy_fvc[i][0] for i in range(n_sources)]
             y_arr=[xy_fvc[i][1] for i in range(n_sources)]
             sources=Table([id,x_arr,y_arr],names=('id','xcentroid','ycentroid'),dtype=('i8','f8','f8'))
             hdul = fits.open(imgfiles[0])
@@ -371,7 +383,7 @@ class Derive_Platemaker_Pars(object):
             f = open(filename,'w')
             output_lines='fvcmag  '+str(out.params['scale'].value/pix_size)+'\n'+'fvcrot  '+str(rot)+'\n' \
                         +'fvcxoff  '+str(out.params['offx'].value)+'\n'+'fvcyoff  '+str(offy)+'\n' \
-                        +'fvcflip  '+str(flip)+'\n'+'fvcnrow  6000 \n'+'fvcncol  6000 \n'+'fvcpixmm  '+str(pix_size)
+                        +'fvcyflip  '+str(flip)+'\n'+'fvcnrow  6000 \n'+'fvcncol  6000 \n'+'fvcpixmm  '+str(pix_size)
             print(output_lines)
             f.write(output_lines)
             f.close()
