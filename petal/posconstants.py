@@ -35,8 +35,8 @@ elif 'HOME' in os.environ:
 else:
     print("No DESI_HOME or Home defined in environment, assigning temp file generation to current directory/fp_temp_files")
     dirs['temp_files'] = os.path.abspath('./') + 'fp_temp_files' + os.path.sep
-dir_keys_logs        = ['pos_logs','fid_logs','ptl_logs','xytest_data','xytest_logs','xytest_plots','xytest_summaries']
-dir_keys_settings    = ['pos_settings','fid_settings','test_settings','collision_settings','hwsetups','ptl_settings','other_settings']
+dir_keys_logs        = ['pos_logs','fid_logs','ptl_logs','pbx_logs','xytest_data','xytest_logs','xytest_plots','xytest_summaries']
+dir_keys_settings    = ['pos_settings','fid_settings','test_settings','collision_settings','hwsetups','pbx_settings','ptl_settings','other_settings']
 for key in dir_keys_logs:
     dirs[key] = dirs['all_logs'] + os.path.sep + key + os.path.sep
 for key in dir_keys_settings:
