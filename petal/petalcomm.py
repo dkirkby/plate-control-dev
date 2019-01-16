@@ -131,13 +131,14 @@ class PetalComm(object):
     def ready_for_tables(self, bus_ids, can_ids):
         """Checks if all the positioners identified by can_id are ready to receive
         move tables.
-        Returns either True or False
+
+        INPUTS:
+        bus_ids: list of CAN bus_ids (list of strings such as 'can10')
+        can_ids: list of can_ids (list of integers)
+
+        Returns either True or False (True if all listed can_ids are done executing
+        their movements.
         """
-        # status = self.get_pos_status()
-        # bus_ids: list of bus_ids (list of strings such as 'can0')
-        # can_ids: list of can_ids (list of integers)
-        # if everybody is stationary, then true
-        
         try:
             retcode = self._call_device('ready_for_tables', bus_ids, can_ids)
             if type(retcode) != bool:
@@ -179,9 +180,7 @@ class PetalComm(object):
         """
         Low level test command to move a single positioner
         """
-        # add parameter checking
         try:
-            # Michael's code expects motor as a string
             return self._call_device('move', bus_id, can_id, direction, mode, str(motor), angle)
         except Exception as e:
             return 'FAILED: Can not execute send_move_excute command. Exception: %s' % str(e)
@@ -256,7 +255,16 @@ class PetalComm(object):
         try:
             return self._call_device('check_and_exit_stop_mode')
         except Exception as e:
-            return 'FAILED: Can not check if stop mode is on or exit stop mode'
+            return 'FAILED: Can not check if stop mode is on or exit stop mode: %s' % str(e)
+
+    def check_and_disable_can_telemetry(self):
+        """
+        Check if CAN telemetry is running/active, wait for it to go idle and then disable.
+        """
+        try:
+            return self._call_device('check_and_disable_can_telemetry')
+        except Exception as e:
+            return 'FAILED: Can not check if CAN telemetry thread is active: %s' % str(e)
 
     def send_ext_formatted(self, ext_commands_by_busid):
         """
@@ -265,7 +273,7 @@ class PetalComm(object):
         try:
             return self._call_device('send_ext_formatted', ext_commands_by_busid)
         except Exception as e:
-            return 'FAILED: Can not send externally formatted commands'
+            return 'FAILED: Can not send externally formatted commands: %s' % str(e)
 
     def recv_ext_formatted(self):
         """
@@ -274,6 +282,33 @@ class PetalComm(object):
         try:
            return self._call_device('recv_ext_formatted')
         except Exception as e:
-           return 'FAILED: Can not receive externally formatted commands'
+           return 'FAILED: Can not receive externally formatted commands: %s' % str(e)
+
+    def power_up(self, en_supplies = 'both', en_can_boards = 'both', en_sync_buffers = 'both'):
+        """
+        Initializes positioner power, CAN and SYNC buffer lines so that everything is ready for CAN communications
+        and movetables.
+        
+        INPUTS:
+        en_supplies: string (1, 2, or 'both')  that specifies which supplies are enabled
+        en_can_boards:  string (1, 2, or 'both') the specifies which CAN boards are enabled
+        en_sync_buffers:  string (1, 2, or 'both') that specifies which SYNC buffers are enabled
+        
+        'both' is the default for all three arguments.
+        """
+        try:
+            return self._call_device('power_up', en_supplies, en_can_boards, en_sync_buffers)
+        except Exception as e:
+            return 'FAILED: Could not execute the power_up method: %s' % str(e)
+
+    def power_down(self):
+        """
+        Turn positioner power supplies, buffer enables, and CAN boards off.
+        """
+        try:
+            return self._call_device('power_down')
+        except Exceptino as e:
+            return 'FAILED: Could not execute the power_down method: %s' % str(e)
+
 
 
