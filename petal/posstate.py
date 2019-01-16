@@ -15,11 +15,12 @@ class PosState(object):
     parameters which may vary from positioner to positioner in this
     single object.
 
-    This class is also used for tracking state of fiducials or petals.
+    This class is also used for tracking state of fiducials, petals and petalboxes.
 
-    INPUTS: unit_id = POS_ID, FID_ID, or PETAL_ID of device
+    INPUTS: unit_id = POS_ID, FID_ID, PETAL_ID, or PETALBOX_ID of device
             logging = boolean whether to enable logging state data to disk
-            type    = 'pos', 'fid', 'ptl' to say whether it is a positioner, fiducial, or petal
+            type    = 'pos', 'fid', 'ptl', or 'pbx' to say whether it is a positioner, 
+            fiducial, petal, or petalbox
 
     Notes:
         Default settings are used if no unit_id is supplied.
@@ -34,7 +35,7 @@ class PosState(object):
         self.type = device_type
 
         # data initialization from .conf file
-        if self.type in ['pos','fid','ptl']:
+        if self.type in ['pos','fid','ptl', 'pbx']:
             self.settings_directory = pc.dirs[self.type + '_settings']
             self.logs_directory = pc.dirs[self.type + '_logs']
         template_directory = self.settings_directory
@@ -56,8 +57,10 @@ class PosState(object):
                 self.conf['POS_ID'] = str(unit_id)
             elif self.type == 'fid':
                 self.conf['FID_ID'] = str(unit_id)
-            else:
+            elif self.type == 'ptl':
                 self.conf['PETAL_ID'] = str(unit_id)
+            else:
+                self.conf['PETALBOX_ID'] = str(unit_id)
             self.conf.write()
         else:
             self.conf = configobj.ConfigObj(unit_filename,unrepr=True,encoding='utf-8')
@@ -256,7 +259,7 @@ class PosState(object):
             possible_new_keys_and_defaults = {'LAST_MEAS_OBS_X':[],
                                               'LAST_MEAS_OBS_Y':[],
                                               'LAST_MEAS_FWHMS':[]}
-        elif self.type == 'ptl':
+        elif self.type == 'ptl' or self.type == 'pbx':
             possible_new_keys_and_defaults ={}
 
         for key in possible_new_keys_and_defaults:
