@@ -311,7 +311,7 @@ class PosSchedule(object):
             while stage.colliding and attempts_remaining:
                 for posid in stage.colliding:
                     freezing = 'off' if attempts_remaining > 1 else 'on'
-                    stage.adjust_path(posid,freezing)
+                    stage.adjust_path(posid,freezing,self.requests)
                     if posid in stage.collisions_resolved['freeze']:
                         self.petal.pos_flags[posid] |= 1<<13 #Mark as frozen by anticollision
                         for j in range(i+1,len(self.RRE_stage_order)):
