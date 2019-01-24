@@ -44,7 +44,7 @@ class FVCHandler(object):
             self.exposure_time = 0.70
             self.max_counts = 2**16 - 1 # SBIC camera ADU max
         else:
-            self.exposure_time = 2.0
+            self.exposure_time = 0.75 #2.0
             self.max_counts = 2**16 - 1 # FLI camera ADU max
         self.trans = postransforms.PosTransforms() # general transformer object -- does not look up specific positioner info, but fine for QS <--> global X,Y conversions
         self.rotation = 0        # [deg] rotation angle from image plane to object plane
@@ -360,6 +360,7 @@ class FVCHandler(object):
                 spotids = [i for i in range(len(xy))]
                 qs = [self.trans.obsXY_to_QS(this_xy) for this_xy in xy]
                 qs_dicts = [{'spotid':spotids[i],'q':qs[i][0],'s':qs[i][1]} for i in range(len(spotids))]
+                print(qs_dicts)
                 fvcXY_dicts = self.fvcproxy.qs_to_fvcxy(qs_dicts) # fiducials are added in this process 
                 fvcXY_dicts_this=[]  # Kai: This is a temporary fix, a more efficient fix should be done in the future to save time
                 for d in fvcXY_dicts:
@@ -388,7 +389,7 @@ class FVCHandler(object):
 
 if __name__ == '__main__':
     f = FVCHandler(fvc_type='FLI')
-    n_objects = 495
+    n_objects = 48
     n_repeats = 1
     f.min_energy = -np.Inf
     xy = []
@@ -405,9 +406,34 @@ if __name__ == '__main__':
         energies.append([these_peaks[i]*these_fwhms[i] for i in range(len(these_peaks))])
         x=[these_xy[i][0] for i in range(len(these_xy))]
         y=[these_xy[i][1] for i in range(len(these_xy))]
-        import matplotlib.pyplot as plt
-        #plt.scatter(x,y)
-        #plt.show()
+        """
+        import tkinter.messagebox
+        plot = tkinter.messagebox.askyesno(title='Plot the measurements?',message='Plot the measurements?')
+        metro = tkinter.messagebox.askyesno(title='Plot the metology data?',message='Plot the metrology data?')
+
+        if plot:
+            import matplotlib.pyplot as plt
+            import tkinter
+            import tkinter.filedialog
+            import tkinter.simpledialog
+            from tkinter import *
+            from astropy.table import Table
+
+            plt.plot(x,y,'bx',label="Measurements")
+            if metro:
+                file_metro=tkinter.filedialog.askopenfilename(initialdir=pc.dirs['hwsetups'], filetypes=(("CSV file","*.csv"),("All Files","*")), title='Select Metrology Data')
+                fiducials= Table.read(file_metro,format='ascii.csv',header_start=0,data_start=1)
+                metro_X_file_arr,metro_Y_file_arr=[],[]
+                for row in fiducials:
+                    metro_X_file_arr.append(row['X'])
+                    metro_Y_file_arr.append(row['Y'])
+                plt.plot(metro_X_file_arr,metro_Y_file_arr,'rd',label="Fiducials")
+        plt.legend(loc='upper left')
+        plt.xlabel('X')
+        plt.ylabel('Y')
+        plt.show()
+        """
+
         print('ndots: ' + str(len(xy[i])))
         print('')
         print('measured xy positions:')
