@@ -1,12 +1,13 @@
 import os
 import sys
+sys.path.remove('/software/products/plate_control-trunk/xytest')
+sys.path.remove('/software/products/plate_control-trunk/posfidfvc')
+sys.path.remove('/software/products/plate_control-trunk/petalbox')
+sys.path.remove('/software/products/plate_control-trunk/petal')
+
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../xytest/'))
-#sys.path.remove('/software/products/plate_control-trunk/xytest')
-#sys.path.remove('/software/products/plate_control-trunk/posfidfvc')
-#sys.path.remove('/software/products/plate_control-trunk/petalbox')
-#sys.path.remove('/software/products/plate_control-trunk/petal')
 
 import petal
 import posmovemeasure
@@ -26,7 +27,7 @@ from astropy.table import Table
 from astropy.io import fits
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-from derive_platemaker_pars import *
+#from derive_platemaker_pars import *
 from astropy.stats import mad_std, sigma_clipped_stats
 from astropy.modeling import models, fitting
 from astropy.table import Table, Column
@@ -52,14 +53,15 @@ class Derive_Platemaker_Pars(object):
             self.fvc.scale = self.hwsetup['scale'] # this value is used in setups without fvcproxy / platemaker
             self.fvc.translation = self.hwsetup['translation']
 
-        self.ptl = petal.Petal(petal_id = self.hwsetup['ptl_id'],petalcontroller_id=7,posids=[],fidids=[],
+        #self.ptl = petal.Petal(petal_id = self.hwsetup['ptl_id'],petalcontroller_id=7,posids=[],fidids=[],
+        self.ptl = petal.Petal(petal_id = self.hwsetup['ptl_id'],posids=[],fidids=[],
                   simulator_on = False,
                   user_interactions_enabled = True,
                   db_commit_on = False,
                   local_commit_on = True,
                   local_log_on = True,
                   printfunc = print,
-                  verbose = False,
+                  verbose = True,
                   collider_file = None,
                   sched_stats_on = False,
                   anticollision = None) # valid options for anticollision arg: None, 'freeze', 'adjust'
@@ -71,6 +73,7 @@ class Derive_Platemaker_Pars(object):
 
         # calibration routines
         rehome=tkinter.messagebox.askyesno(title='Rehome?',message='Rehome?')
+        #import pdb;pdb.set_trace()
         if rehome:
             self.m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
         automatic_mode = tkinter.messagebox.askyesno(title='Automatic or Manual Mode?',message='Use Automatic Mode?')
@@ -349,7 +352,7 @@ class Derive_Platemaker_Pars(object):
 
         if flip==1:
             offy=-out.params['offy'].value
-            rot=out.params['angle'].value % 360 - 180.
+            rot=(180.-out.params['angle'].value) % 360 # fixed 01/24/19
         else:
             offy=out.params['offy'].value
             rot=out.params['angle'].value
