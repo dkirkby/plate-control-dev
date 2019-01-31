@@ -41,33 +41,35 @@ class Petal(object):
         sched_stats_on  ... boolean, controls whether to log statistics about scheduling runs
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
     """
-    def __init__(self, petal_id, posids, fidids, simulator_on=False,
+    def __init__(self, petal_id = None, posids = None, fidids = None, simulator_on=False,
+                 petalbox_id = None, shape = None,
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
                  printfunc=print, verbose=False, user_interactions_enabled=False,
                  collider_file=None, sched_stats_on=False, anticollision='freeze'):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output) 
         # petal setup
-        self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
-        self.petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
-        self.petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
-        if not posids:
+        if petal_id == None:
+            if not hasattr(self, 'petal_state'):
+                self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
+            self.petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
+        else:
+            self.petal_id = petal_id
+        if petalbox_id == None:
+            if not hasattr(self, 'petal_state'):
+                self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
+            self.petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
+        else:
+            self.petalbox_id = petalbox_id
+        if posids == None:
             self.printfunc('posids not given, read from ptl_settings file')
+            if not hasattr(self, 'petal_state'):
+                self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
             posids = self.petal_state.conf['POS_IDS']
-        else:
-            posids_file = self.petal_state.conf['POS_IDS'] 
-            if set(posids) != set(posids_file):
-                self.printfunc('WARNING: Input posids are not consistent with ptl_setting file')
-                self.printfunc('Input posids:'+str(posids))
-                self.printfunc('Posids from file:'+str(posids_file))
-        if not fidids:
+        if fidids == None:
             self.printfunc('fidids not given, read from ptl_settings file')
+            if not hasattr(self, 'petal_state'):
+                self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
             fidids = self.petal_state.conf['FID_IDS']
-        else:
-            fidids_file = self.petal_state.conf['FID_IDS']
-            if set(fidids) != set(fidids_file):
-                self.printfunc('WARNING: Input fidids are not consistent with ptl_setting file')
-                self.printfunc('Input fidids:'+str(fidids))
-                self.printfunc('Fidids from file:'+str(fidids_file))
 
         self.verbose = verbose # whether to print verbose information at the terminal
         self.simulator_on = simulator_on
@@ -75,7 +77,12 @@ class Petal(object):
             import petalcomm
             self.comm = petalcomm.PetalComm(self.petalbox_id, user_interactions_enabled=user_interactions_enabled)
             self.comm.pbset('non_responsives', 'clear') #reset petalcontroller's list of non-responsive canids
-        self.shape = self.petal_state.conf['SHAPE']
+        if shape == None:
+            if not hasattr(self, 'petal_state'):
+                self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
+            self.shape = self.petal_state.conf['SHAPE']
+        else:
+            self.shape = shape
 
         # database setup
         self.db_commit_on = db_commit_on if DB_COMMIT_AVAILABLE else False
@@ -92,6 +99,7 @@ class Petal(object):
         self.devices = {} # key device_location_id, value posid
         installed_on_asphere = self.shape == 'petal'
         for posid in posids:
+            self.printfunc('now: %r' % posid)
             self.states[posid] = posstate.PosState(posid, logging=True, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
             self.posmodels[posid] = PosModel(self.states[posid], installed_on_asphere)
             self.devices[self.states[posid]._val['DEVICE_ID']] = posid
@@ -379,7 +387,7 @@ class Petal(object):
         """
         if self.simulator_on:
             if self.verbose:
-                print('Simulator skips sending move tables to positioners.')
+                printfunc('Simulator skips sending move tables to positioners.')
             return
         hw_tables = self._hardware_ready_move_tables()
         canids = []
@@ -397,7 +405,7 @@ class Petal(object):
         """
         if self.simulator_on:
             if self.verbose:
-                print('Simulator skips sending motor parameters to positioners.')
+                printfunc('Simulator skips sending motor parameters to positioners.')
             return
 
         parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
@@ -423,7 +431,7 @@ class Petal(object):
         """
         if self.simulator_on:
             if self.verbose:
-                print('Simulator skips sending execute moves command to positioners.')
+                printfunc('Simulator skips sending execute moves command to positioners.')
             self._postmove_cleanup()
         else:
             self.comm.execute_sync(self.sync_mode)
@@ -674,14 +682,18 @@ class Petal(object):
         pos_flags = {}
         if posids == 'all':
             posids = self.posids
-        for posid in self.posids:
-            if not(self.posmodels[posid].is_enabled):
-                self.pos_flags[posid] |= 1<<9 #final check for disabled
-            if not(self.get_posfid_val(posid, 'FIBER_INTACT')):  
-                self.pos_flags[posid] |= 1<<10
-            if self.get_posdid_val(posid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
-                self.pos_flags[posid] |= 1<<17
-            pos_flags[posid] = str(self.pos_flags[posid])
+        try:
+            for posid in self.posids:
+                if not(self.posmodels[posid].is_enabled):
+                    self.pos_flags[posid] |= 1<<9 #final check for disabled
+                if not(self.get_posfid_val(posid, 'FIBER_INTACT')):  
+                    self.pos_flags[posid] |= 1<<10
+                if self.get_posdid_val(posid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
+                    self.pos_flags[posid] |= 1<<17
+                pos_flags[posid] = str(self.pos_flags[posid])
+        except Exception as e:
+            print('xxxxxxxxxxxxxx: posid %r, Exception: %s' % (posid, str(e)))
+            raise e
         if should_reset:
             self._initialize_pos_flags()
         return pos_flags
