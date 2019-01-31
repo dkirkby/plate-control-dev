@@ -688,7 +688,7 @@ class Petal(object):
                     self.pos_flags[posid] |= 1<<9 #final check for disabled
                 if not(self.get_posfid_val(posid, 'FIBER_INTACT')):  
                     self.pos_flags[posid] |= 1<<10
-                if self.get_posdid_val(posid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
+                if self.get_posfid_val(posid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
                     self.pos_flags[posid] |= 1<<17
                 pos_flags[posid] = str(self.pos_flags[posid])
         except Exception as e:
@@ -763,6 +763,7 @@ class Petal(object):
         """This always gets called after performing a set of moves, so that PosModel instances
         can be informed that the move was physically done on the hardware.
         """
+        import pdb; pdb.set_trace()
         self._check_and_disable_nonresponsive_pos_and_fid()
         for m in self.schedule.move_tables.values():
             m.posmodel.postmove_cleanup(m.for_cleanup())
@@ -878,9 +879,9 @@ class Petal(object):
         if ids == 'all':
             ids = self.posids.union(self.fidids)
         for posfidid in ids:
-            if ('M' in posfidid) or ('UM' in posfidid):
-                self.pos_flags[posfidid] = 1<<4
+            if ('M' in posfidid) or ('UM' in posfidid) or posfidid.startswith('D'):
+                self.pos_flags[posfidid] = 1<<2
             else:
-                self.pos_flags[posfidid] = 1<<8
+                self.pos_flags[posfidid] = 1<<3
         return
 
