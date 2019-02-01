@@ -104,11 +104,13 @@ class Petal(object):
         self.power_supply_map = self._map_power_supplies_to_posids()
         
         # collider, scheduler, and animator setup
-        self.collider = poscollider.PosCollider(configfile=collider_file, 
+        self.collider = poscollider.PosCollider(configfile=collider_file,
                                                 collision_hashpp_exists=False, 
                                                 collision_hashpf_exists=False, 
                                                 hole_angle_file=None)
-        #self.collider = poscollider.PosCollider(configfile=collider_file)
+        self.collider.set_petal_offsets(x0=self.petal_state.conf['X_OFFSET'],
+                                        y0=self.petal_state.conf['Y_OFFSET'],
+                                        rot=self.petal_state.conf['ROTATION'])
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
         self.animator_on = False # this should be turned on/off using the animation start/stop control methods below
