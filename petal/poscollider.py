@@ -1,5 +1,6 @@
 import numpy as np
 import posconstants as pc
+import posstate
 import posanimator
 import configobj
 import os
@@ -18,27 +19,27 @@ class PosCollider(object):
 
     See DESI-0899 for geometry specifications, illustrations, and kinematics.
     """
-    def __init__(self, configfile='', collision_hashpp_exists=False, 
-                 collision_hashpf_exists=False, hole_angle_file=None):
+    def __init__(self, configfile='', collision_hashpp_exists=False, collision_hashpf_exists=False, hole_angle_file=None):
         if not configfile:
-            defaultconfigfile = '_collision_settings_DEFAULT.conf'
-            filename = os.path.join(pc.dirs['collision_settings'],defaultconfigfile)
+            filename = '_collision_settings_DEFAULT.conf'
         else:
-            filename = os.path.join(pc.dirs['collision_settings'],configfile)
-        self.config = configobj.ConfigObj(filename,unrepr=True)
+            filename = configfile
+        filepath = os.path.join(pc.dirs['collision_settings'],filename)
+        self.config = configobj.ConfigObj(filepath,unrepr=True)
         self.posids = set() # posid strings for all the positioners
         self.posindexes = {} # key: posid string, value: index number for positioners in animations
         self.posmodels = {} # key: posid string, value: posmodel instance
         self.pos_neighbors = {} # all the positioners that surround a given positioner. key is a posid, value is a set of neighbor posids
         self.fixed_neighbor_cases = {} # all the fixed neighbors that apply to a given positioner. key is a posid, value is a set of the fixed neighbor cases
         self.R1, self.R2, self.x0, self.y0, self.t0, self.p0 = {}, {}, {}, {}, {}, {}
+        self.petal_x0, self.petal_y0, self.petal_rot = 0.0, 0.0, 0.0 # mm, mm, deg
         self.plotting_on = True
         self.timestep = self.config['TIMESTEP']
         self.animator = posanimator.PosAnimator(fignum=0, timestep=self.timestep)
         
+        # hash table initializations (if being used)
         self.collision_hashpp_exists = collision_hashpp_exists
         self.collision_hashpf_exists = collision_hashpf_exists
-        
         if self.collision_hashpp_exists:
             f = open(os.path.join(os.environ.get('collision_table'), 'table_pp_50_5_5_5_5.out'), 'rb')
             self.table_pp = pickle.load(f)
@@ -51,6 +52,15 @@ class PosCollider(object):
             f = open(os.path.join(os.environ.get('collision_table'), 'table_pf_50_50_5_5.out'), 'rb')
             self.table_pf = pickle.load(f)
             f.close()
+            
+    def set_petal_offsets(self, x0, y0, rot):
+        """Sets information about a particular petal's overall location. This
+        information is necessary for handling the fixed collision boundaries of
+        petal exterior and GFA.
+        """
+        self.petal_x0 = x0
+        self.petal_y0 = y0
+        self.petal_rot = rot
 
     def add_positioners(self, posmodels):
         """Add a collection of positioners to the collider object.
@@ -347,8 +357,10 @@ class PosCollider(object):
         self.keepout_T = PosPoly(self.config['KEEPOUT_THETA'], self.config['KEEPOUT_THETA_PT0'])
         self.keepout_PTL = PosPoly(self.config['KEEPOUT_PTL'], self.config['KEEPOUT_PTL_PT0'])
         self.keepout_GFA = PosPoly(self.config['KEEPOUT_GFA'], self.config['KEEPOUT_GFA_PT0'])
-        self.keepout_GFA = self.keepout_GFA.rotated(self.config['KEEPOUT_GFA_ROT'])
-        self.keepout_GFA = self.keepout_GFA.translated(self.config['KEEPOUT_GFA_X0'],self.config['KEEPOUT_GFA_Y0'])
+        self.keepout_PTL = self.keepout_PTL.rotated(self.petal_rot)
+        self.keepout_PTL = self.keepout_PTL.translated(self.petal_x0, self.petal_y0)
+        self.keepout_PTL = self.keepout_GFA.rotated(self.petal_rot)
+        self.keepout_PTL = self.keepout_GFA.translated(self.petal_x0, self.petal_y0)
         self.fixed_neighbor_keepouts = {pc.case.PTL : self.keepout_PTL, pc.case.GFA : self.keepout_GFA}
 
     def _load_positioner_params(self):
