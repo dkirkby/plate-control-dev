@@ -33,49 +33,64 @@ class PosState(object):
         self.logging = logging
         self.type = device_type
 
-        # data initialization from .conf file
-        if self.type in ['pos','fid','ptl']:
-            self.settings_directory = pc.dirs[self.type + '_settings']
-            self.logs_directory = pc.dirs[self.type + '_logs']
-        template_directory = self.settings_directory
-        if unit_id != None:
-            self.unit_basename = 'unit_' + str(unit_id)
-            comment = 'Settings file for unit: ' + str(unit_id)
-        else:
-            self.unit_basename = 'unit_TEMP'
-            self.logs_directory = pc.dirs['temp_files']
-            self.settings_directory = pc.dirs['temp_files']
-            comment = 'Temporary settings file for software test purposes, not associated with a particular unit.'
-        unit_filename = self.settings_directory + self.unit_basename + '.conf'
-        if not(os.path.isfile(unit_filename)):
-            temp_filename = template_directory + '_unit_settings_DEFAULT.conf' # read in the template file
-            self.conf = configobj.ConfigObj(temp_filename,unrepr=True,encoding='utf-8')
-            self.conf.initial_comment = [comment,'']
-            self.conf.filename = unit_filename
-            if self.type == 'pos':
-                self.conf['POS_ID'] = str(unit_id)
-            elif self.type == 'fid':
-                self.conf['FID_ID'] = str(unit_id)
-            else:
-                self.conf['PETAL_ID'] = str(unit_id)
-            self.conf.write()
-        else:
-            self.conf = configobj.ConfigObj(unit_filename,unrepr=True,encoding='utf-8')
-
-        # determine petal_id
-        if self.type == 'ptl':
-            self.petal_id = self.conf['PETAL_ID']
-        else:
-            self.petal_id = petal_id
-
-        # establishment of much faster access python dict, for in-memory operations
-        self._val = self.conf.dict()
-
         # data initialization from database
         self.write_to_DB = os.getenv('DOS_POSMOVE_WRITE_TO_DB') if DB_COMMIT_AVAILABLE else False
+
+        if self.type in ['pos','fid','ptl']:
+            self.logs_directory = pc.dirs[self.type + '_logs']
+
+        # Only read files if write_to_DB is False
+        if not(self.write_to_DB):
+
+            # data initialization from .conf file
+            if self.type in ['pos','fid','ptl']:
+                self.settings_directory = pc.dirs[self.type + '_settings']
+            template_directory = self.settings_directory
+            if unit_id != None:
+                self.unit_basename = 'unit_' + str(unit_id)
+                comment = 'Settings file for unit: ' + str(unit_id)
+            else:
+                self.unit_basename = 'unit_TEMP'
+                self.logs_directory = pc.dirs['temp_files']
+                self.settings_directory = pc.dirs['temp_files']
+                comment = 'Temporary settings file for software test purposes, not associated with a particular unit.'
+            unit_filename = self.settings_directory + self.unit_basename + '.conf'
+            if not(os.path.isfile(unit_filename)):
+                temp_filename = template_directory + '_unit_settings_DEFAULT.conf' # read in the template file
+                self.conf = configobj.ConfigObj(temp_filename,unrepr=True,encoding='utf-8')
+                self.conf.initial_comment = [comment,'']
+                self.conf.filename = unit_filename
+                if self.type == 'pos':
+                    self.conf['POS_ID'] = str(unit_id)
+                elif self.type == 'fid':
+                    self.conf['FID_ID'] = str(unit_id)
+                else:
+                    self.conf['PETAL_ID'] = str(unit_id)
+                self.conf.write()
+            else:
+                self.conf = configobj.ConfigObj(unit_filename,unrepr=True,encoding='utf-8')
+
+            # determine petal_id
+            if self.type == 'ptl':
+                self.petal_id = self.conf['PETAL_ID']
+            else:
+                self.petal_id = petal_id
+
+            # establishment of much faster access python dict, for in-memory operations
+            self._val = self.conf.dict()
+
+
         if self.write_to_DB:
+
+            # establishment of much faster access python dict, for in-memory operations
+            self._val = {}
+            self.conf = {}
+
+            self.petal_id = petal_id
+
             if unit_id != None:
                 self.posmoveDB = DBSingleton(self.petal_id)
+                self.unit_basename = 'unit_' + str(unit_id)
                 if self.type == 'pos':
                     self._val.update(self.posmoveDB.get_pos_id_info(unit_id))
                     self._val.update(self.posmoveDB.get_pos_constants(unit_id))
@@ -88,6 +103,11 @@ class PosState(object):
                     print(self._val)
                     self._val.update(self.posmoveDB.get_fid_calib(unit_id))
             else:
+                self.unit_basename = 'unit_TEMP'
+                self.logs_directory = pc.dirs['temp_files']
+                self.settings_directory = pc.dirs['temp_files']
+                comment = 'Temporary settings file for software test purposes, not associated with a particular unit.'
+
                 self.posmoveDB = DBSingleton()
                 if self.type == 'pos':
                     self._val.update(self.posmoveDB.get_pos_def_constants())
@@ -95,6 +115,7 @@ class PosState(object):
                     self._val.update(self.posmoveDB.get_fid_def_constants())
 
         # text log file setup
+        """
         self.log_separator = '_log_'
         self.log_numformat = '08g'
         self.log_extension = '.csv'
@@ -125,7 +146,8 @@ class PosState(object):
         self.next_log_notes = ['software initialization'] # used for storing specific notes in the next row written to the log
         self.log_unit_called_yet = False # used for one time check whether need to make a new log file, or whether log file headers have changed since last run
         self.log_unit()
-
+        """
+        self.next_log_notes = ['it is cold']
     def __str__(self):
         files = {'settings':self.conf.filename, 'log':self.log_path}
         return pprint.pformat({'files':files, 'values':self._val})

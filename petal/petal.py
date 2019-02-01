@@ -100,7 +100,7 @@ class Petal(object):
         installed_on_asphere = self.shape == 'petal'
         for posid in posids:
             self.printfunc('now: %r' % posid)
-            self.states[posid] = posstate.PosState(posid, logging=True, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
+            self.states[posid] = posstate.PosState(posid, logging=False, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
             self.posmodels[posid] = PosModel(self.states[posid], installed_on_asphere)
             self.devices[self.states[posid]._val['DEVICE_ID']] = posid
         self.posids = set(self.posmodels.keys())
@@ -197,8 +197,8 @@ class Petal(object):
             pos_flags ... dict keyed by positioner indicating which flag as indicated below that a
                           positioner should receive going to the FLI camera with fvcproxy
         """
-        marked_for_delete = set()
-        self.pos_flags = {}
+        marked_for_delete = set()        
+        self._initialize_pos_flags()   # self.pos_flags = {}
         for posid in requests:
             requests[posid]['posmodel'] = self.posmodels[posid]
             self._initialize_pos_flags(ids = {posid})
@@ -683,14 +683,20 @@ class Petal(object):
         if posids == 'all':
             posids = self.posids
         try:
-            for posid in self.posids:
+            for posid in posids:
+                if posid not in self.pos_flags:
+                    self.printfunc('get_pos_flags: UNKNOWN POSID, NOT IN POS_FLAGS: %r' % posid)
+                    continue
+                if posid not in self.posmodels:
+                    self.printfunc('get_pos_flags: UNKNOWN POSID, NOT IN POSMODELS: %r' % posid)
+                    continue
                 if not(self.posmodels[posid].is_enabled):
                     self.pos_flags[posid] |= 1<<9 #final check for disabled
                 if not(self.get_posfid_val(posid, 'FIBER_INTACT')):  
                     self.pos_flags[posid] |= 1<<10
                 if self.get_posfid_val(posid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
                     self.pos_flags[posid] |= 1<<17
-                pos_flags[posid] = str(self.pos_flags[posid])
+                pos_flags[posid] = str(self.pos_flags[posid])     # CAN'T PASS FLAGS AS STRING IN PYTHON3
         except Exception as e:
             print('xxxxxxxxxxxxxx: posid %r, Exception: %s' % (posid, str(e)))
             raise e
@@ -763,7 +769,6 @@ class Petal(object):
         """This always gets called after performing a set of moves, so that PosModel instances
         can be informed that the move was physically done on the hardware.
         """
-        import pdb; pdb.set_trace()
         self._check_and_disable_nonresponsive_pos_and_fid()
         for m in self.schedule.move_tables.values():
             m.posmodel.postmove_cleanup(m.for_cleanup())
