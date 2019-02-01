@@ -33,7 +33,7 @@ class PosMoveMeasure(object):
                 for dotid in petal.fid_dotids(fidid):
                     self._petals_map[dotid] = petal
         self.fvc = fvc # fvchandler object
-        self.wide_spotmatch_radius = 1000.0 # [pixels on FLI FVC CCD] wide search radius used during rough calibration when theta and phi offsets are unknown
+        self.wide_spotmatch_radius = 80.0 #20.0 #1000.0 # [pixels on FLI FVC CCD] wide search radius used during rough calibration when theta and phi offsets are unknown
         self.ref_dist_tol = 3.0   # [pixels on FVC CCD] used for identifying fiducial dots
         self.ref_dist_thres =100.0  # [pixels on FVC CCD] if distance to all dots are greater than this, probably a misidentification 
         self.nudge_dist   = 10.0  # [deg] used for identifying fiducial dots
@@ -81,10 +81,12 @@ class PosMoveMeasure(object):
         for posid in self.all_posids:
             ptl = self.petal(posid)
             expected_pos[posid] = {'obsXY':ptl.expected_current_position(posid,'obsXY')}
+        #print("Expected pos: ",expected_pos)
         expected_ref = {} if self.fvc.fvcproxy else self.ref_dots_XY
+        #print("Expected_ref: ",expected_ref)
         measured_pos,measured_ref,imgfiles = self.fvc.measure_and_identify(expected_pos,expected_ref, pos_flags=pos_flags)            
         for posid in self.all_posids:
-            ptl = self.petal(posid)
+            ptl = self.petal(posid)            
             ptl.set_posfid_val(posid,'LAST_MEAS_OBS_X',measured_pos[posid]['obsXY'][0])
             ptl.set_posfid_val(posid,'LAST_MEAS_OBS_Y',measured_pos[posid]['obsXY'][1])
             ptl.set_posfid_val(posid,'LAST_MEAS_PEAK',measured_pos[posid]['peak'])
@@ -145,8 +147,23 @@ class PosMoveMeasure(object):
                         limited to scenarios of initial calibration, if for some reason we find that the usual calibrations are
                         failing.
         """
+        #print("We are in move measure")
+        #expected_pos = {}
+        #for posid in self.all_posids:
+        #    ptl = self.petal(posid)
+        #    expected_pos[posid] = {'obsXY':ptl.expected_current_position(posid,'obsXY')}
+        #print("\n\n\n\n")
+        #print(expected_pos)
+        #print("\n\n\n\n")
         self.move(requests)
+        #expected_pos = {}
+        #for posid in self.all_posids:
+        #    ptl = self.petal(posid)
+        #    expected_pos[posid] = {'obsXY':ptl.expected_current_position(posid,'obsXY')}
+        #print(expected_pos)
+        #print("\n\n\n\n")
         data,imgfiles = self.measure()
+
         if tp_updates == 'posTP' or tp_updates =='offsetsTP' or tp_updates == 'offsetsTP_close':
             self._test_and_update_TP(data, tp_updates)
         return data,imgfiles
@@ -394,8 +411,9 @@ class PosMoveMeasure(object):
         if mode == 'rough':
             self.rehome(posids)
             # KH added if statement - one point calibration causes measure to fail if the match_radius is not adjusted
-            if not self.fvc.fvcproxy:
-                self.one_point_calibration(posids, mode='offsetsXY')
+            #if not self.fvc.fvcproxy:
+            self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)  #figure out where best to do this
+            self.one_point_calibration(posids, mode='offsetsXY')
             posids_by_petal = self.posids_by_petal(posids)
             for petal,these_posids in posids_by_petal.items():
                 keys_to_reset = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P']
@@ -404,11 +422,11 @@ class PosMoveMeasure(object):
                         if petal.posmodels[posid].is_enabled:
                             petal.set_posfid_val(posid, key, pc.nominals[key]['value'])
             if self.fvc.fvcproxy:
-                old_spotmatch_radius = self.fvc.fvcproxy.get('match_radius')
+                old_spotmatch_radius = 30.0 #self.fvc.fvcproxy.get('match_radius')
                 self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)
                 self.one_point_calibration(posids, mode='offsetsTP_close')
-                self.one_point_calibration(posids, mode='offsetsTP')
                 self.fvc.fvcproxy.set(match_radius = old_spotmatch_radius)
+                self.one_point_calibration(posids, mode='offsetsTP')
             else:
                 self.one_point_calibration(posids, mode='offsetsTP')
         elif mode == 'grid':
@@ -434,10 +452,12 @@ class PosMoveMeasure(object):
                     poscalibplot.plot_arc(file, posid, unwrapped_data)
                     files.add(file)
         if self.fvc.fvcproxy and mode == 'rough':
-            old_spotmatch_radius = self.fvc.fvcproxy.get('match_radius')
-            self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)
-            self.one_point_calibration(posids, mode='posTP') # important to lastly update the internally-tracked theta and phi shaft angles
+            #NOTE set spot match radius to narrow(old) prior to doing 'posTP' calibration, 
+            #testing on Petal02, 2019-01-30
+            old_spotmatch_radius = 30.0 #self.fvc.fvcproxy.get('match_radius')
+            #self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)
             self.fvc.fvcproxy.set(match_radius = old_spotmatch_radius)
+            self.one_point_calibration(posids, mode='posTP') # important to lastly update the internally-tracked theta and phi shaft angles
         else:
             self.one_point_calibration(posids, mode='posTP') # important to lastly update the internally-tracked theta and phi shaft angles
         self.commit(log_note = str(mode) + ' calibration complete')
@@ -791,6 +811,7 @@ class PosMoveMeasure(object):
         plt.ylabel('fvcY')
 
 
+        print('Found '+str(len(x_meas))+' spots, match with '+str(n_posids)+' positioners')
         for i in range(n_posids):
             posid=posids[i]
             self.printfunc('Identifying location of positioner '+posid+' ('+str(i+1)+' of '+str(n_posids)+')')
@@ -806,12 +827,16 @@ class PosMoveMeasure(object):
             this_xy=self.fvc.obsXY_to_fvcXY(obsXY_this)[0]
             test_delta = np.array(this_xy) - np.array(xy_meas)
             test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
-            mm2pix=1./self.fvc.scale
+            if self.fvc.fvc_type == 'FLI':
+                mm2pix=1./(13.308*0.006) 
+            else:
+                1./self.fvc.scale
             matches = [dist < 6*mm2pix for dist in test_dist]
             min_dist=min(test_dist)
             index=np.where(test_dist <6*mm2pix)
             if not any(matches):
                 self.printfunc(posid+' has no dot in its patrol area. It probably has a broken fiber.')
+                plt.text(this_xy[0],this_xy[1],posid,fontsize=2.5,color='green')
             else:
                 if len(index) == 1:
                     index=np.where(test_dist == min(test_dist))[0][0]
@@ -820,8 +845,9 @@ class PosMoveMeasure(object):
                     posTP=this_petal.posmodels[posid].trans.obsXY_to_posTP(measured_obsXY)[0]
                     this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_X',measured_obsXY[0])
                     this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_Y',measured_obsXY[1])
-                    this_petal.set_posfid_val(posid,'OFFSET_X',measured_obsXY[0])
-                    this_petal.set_posfid_val(posid,'OFFSET_Y',measured_obsXY[1])
+                    this_petal.set_posfid_val(posid,'OFFSET_X',metroX_this) #measured_obsXY[0])
+                    this_petal.set_posfid_val(posid,'OFFSET_Y',metroY_this) #measured_obsXY[1])
+                    posTP=this_petal.posmodels[posid].trans.obsXY_to_posTP(measured_obsXY)[0]
                     this_petal.set_posfid_val(posid,'POS_T',posTP[0])
                     this_petal.set_posfid_val(posid,'POS_P',posTP[1])
                     if move_arr[index]:
@@ -835,11 +861,11 @@ class PosMoveMeasure(object):
                     index=np.where(test_dist == min(test_dist))[0][0]
                     #self.printfunc(posid+' matched with ',xy_meas[index])
                     measured_obsXY = self.fvc.fvcXY_to_obsXY(xy_meas[index])[0]
-                    posTP=this_petal.posmodels[posid].trans.obsXY_to_posTP(measured_obsXY)[0]
                     this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_X',measured_obsXY[0])
                     this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_Y',measured_obsXY[1])
-                    this_petal.set_posfid_val(posid,'OFFSET_X',measured_obsXY[0])
-                    this_petal.set_posfid_val(posid,'OFFSET_Y',measured_obsXY[1])
+                    this_petal.set_posfid_val(posid,'OFFSET_X',metroX_this) #measured_obsXY[0])
+                    this_petal.set_posfid_val(posid,'OFFSET_Y',metroY_this) #measured_obsXY[1])
+                    posTP=this_petal.posmodels[posid].trans.obsXY_to_posTP(measured_obsXY)[0]
                     this_petal.set_posfid_val(posid,'POS_T',posTP[0])
                     this_petal.set_posfid_val(posid,'POS_P',posTP[1])
                     if move_arr[index]:
@@ -865,8 +891,6 @@ class PosMoveMeasure(object):
         plt.close()
         pp.close()
         self.set_fiducials(setting='on')
-
-
 
     def posids_by_petal(self, posids='all'):
         """Returns a dict that organizes the argued posids by the petals they are
