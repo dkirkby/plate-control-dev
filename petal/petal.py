@@ -192,7 +192,6 @@ class Petal(object):
                           positioner should receive going to the FLI camera with fvcproxy
         """
         marked_for_delete = set()
-        self.pos_flags = {}
         for posid in requests:
             requests[posid]['posmodel'] = self.posmodels[posid]
             self._initialize_pos_flags(ids = {posid})
@@ -676,7 +675,7 @@ class Petal(object):
         pos_flags = {}
         if posids == 'all':
             posids = self.posids
-        for posid in self.posids:
+        for posid in posids:
             if not(self.posmodels[posid].is_enabled):
                 self.pos_flags[posid] |= 1<<9 #final check for disabled
             if not(self.get_posfid_val(posid, 'FIBER_INTACT')):  
@@ -869,8 +868,8 @@ class Petal(object):
             ids = self.posids.union(self.fidids)
         for posfidid in ids:
             if ('M' in posfidid) or ('UM' in posfidid):
-                self.pos_flags[posfidid] = 1<<4
+                self.pos_flags[posfidid] = 1<<2
             else:
-                self.pos_flags[posfidid] = 1<<8
+                self.pos_flags[posfidid] = 1<<3
         return
 
