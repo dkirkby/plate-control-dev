@@ -94,7 +94,7 @@ class Petal(object):
         for posid in posids:
             self.states[posid] = posstate.PosState(posid, logging=True, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
             self.posmodels[posid] = PosModel(self.states[posid], installed_on_asphere)
-            self.devices[self.states[posid]._val['DEVICE_ID']] = posid
+            self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
         self.posids = set(self.posmodels.keys())
         self.canids_where_tables_were_just_sent = []
         self.busids_where_tables_were_just_sent = []
@@ -123,7 +123,7 @@ class Petal(object):
         self.fidids = {fidids} if isinstance(fidids,str) else set(fidids)
         for fidid in self.fidids:
             self.states[fidid] = posstate.PosState(fidid, logging=True, device_type='fid', printfunc=self.printfunc, petal_id=self.petal_id)        
-            self.devices[self.states[fidid]._val['DEVICE_ID']] = fidid
+            self.devices[self.states[fidid]._val['DEVICE_LOC']] = fidid
 
         # pos flags setup
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
@@ -681,7 +681,7 @@ class Petal(object):
                 self.pos_flags[posid] |= 1<<9 #final check for disabled
             if not(self.get_posfid_val(posid, 'FIBER_INTACT')):  
                 self.pos_flags[posid] |= 1<<10
-            if self.get_posdid_val(posid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
+            if self.get_posfid_val(posid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
                 self.pos_flags[posid] |= 1<<17
             pos_flags[posid] = str(self.pos_flags[posid])
         if should_reset:

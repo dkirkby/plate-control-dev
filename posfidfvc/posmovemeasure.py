@@ -411,8 +411,8 @@ class PosMoveMeasure(object):
         if mode == 'rough':
             self.rehome(posids)
             # KH added if statement - one point calibration causes measure to fail if the match_radius is not adjusted
-            #if not self.fvc.fvcproxy:
-            self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)  #figure out where best to do this
+            if self.fvc.fvcproxy:
+            	self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)  #figure out where best to do this
             self.one_point_calibration(posids, mode='offsetsXY')
             posids_by_petal = self.posids_by_petal(posids)
             for petal,these_posids in posids_by_petal.items():
@@ -664,7 +664,7 @@ class PosMoveMeasure(object):
         if ptl.shape == 'petal' or ptl.shape == 'small_array':
             for posid in self.disabled_posids:
                 this_petal=self.petal(posid)
-                device_loc_this=this_petal.get_posfid_val(posid,'DEVICE_ID') # Use populate_pos_conf.py under pos_utility to populate pos setting files before usage. 
+                device_loc_this=this_petal.get_posfid_val(posid,'DEVICE_LOC') # Use populate_pos_conf.py under pos_utility to populate pos setting files before usage. 
                 index2=device_loc_file_arr.index(device_loc_this)
                 metroX_this=metro_X_file_arr[index2]
                 metroY_this=metro_Y_file_arr[index2]
@@ -816,7 +816,7 @@ class PosMoveMeasure(object):
             posid=posids[i]
             self.printfunc('Identifying location of positioner '+posid+' ('+str(i+1)+' of '+str(n_posids)+')')
             this_petal=self.petal(posid)
-            device_loc_this=this_petal.get_posfid_val(posid,'DEVICE_ID') # Use populate_pos_conf.py under pos_utility to populate pos setting files before usage. 
+            device_loc_this=this_petal.get_posfid_val(posid,'DEVICE_LOC') # Use populate_pos_conf.py under pos_utility to populate pos setting files before usage. 
             index2=device_loc_file_arr.index(device_loc_this)
             metroX_this=metro_X_file_arr[index2]
             metroY_this=metro_Y_file_arr[index2]

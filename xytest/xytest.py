@@ -367,11 +367,11 @@ class XYTest(object):
                 these_targets = {}
                 file_targ_this=pc.dirs['test_settings']+'move_request_sets/'+targ_list[i]
                 data=ascii.read(file_targ_this)
-                data.add_index('DEVICE_ID')
+                data.add_index('DEVICE_LOC')
                 for posid in self.posids:
                     ptl = self.m.petal(posid)
-                    deviceid_this=ptl.get_posfid_val(posid,'DEVICE_ID')
-                    data_this=data.loc[deviceid_this]
+                    deviceloc_this=ptl.get_posfid_val(posid,'DEVICE_LOC')
+                    data_this=data.loc[deviceloc_this]
                     trans = self.m.trans(posid)
                     these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY([data_this['u'],data_this['v']])}
                 all_targets.append(these_targets)
@@ -442,7 +442,7 @@ class XYTest(object):
             # make summary plots showing the targets and measured positions
             if self.xytest_conf['should_make_plots']:
                 for posid in all_data_by_posid.keys():
-                    posmodel = self.m.posmodel(posid)
+                    posmodel = self.m.posmodel(posid) 
                     title = log_timestamp + log_suffix
                     center = [posmodel.state.read('OFFSET_X'),posmodel.state.read('OFFSET_Y')]
                     theta_min = posmodel.trans.posTP_to_obsTP([min(posmodel.targetable_range_T),0])[0]

@@ -24,7 +24,7 @@ collider = poscollider.PosCollider()
 posmodels = {}
 for posid,data in locations.items():
     state = posstate.PosState(posid)
-    state.store('DEVICE_ID',data['DEVICE_ID'])
+    state.store('DEVICE_LOC',data['DEVICE_LOC'])
     state.store('LENGTH_R1',nom_R1)
     state.store('LENGTH_R2',nom_R2)
     state.store('OFFSET_T',0.0)
@@ -71,7 +71,7 @@ for i in range(num_sets_to_make):
                 attempts_remaining -= 1
         if not attempts_remaining:
             v = state._val
-            print('Warning: no valid target found for posid: ' + posid + ' at location ' + str(v['DEVICE_ID']) + ' (x,y) = (' + format(v['OFFSET_X'],'.3f') + ',' + format(v['OFFSET_Y'],'.3f') + ')')
+            print('Warning: no valid target found for posid: ' + posid + ' at location ' + str(v['DEVICE_LOC']) + ' (x,y) = (' + format(v['OFFSET_X'],'.3f') + ',' + format(v['OFFSET_Y'],'.3f') + ')')
     all_targets.append(targets_posXY)
     
 # save set files
@@ -82,7 +82,7 @@ for target in all_targets:
     save_path = hc.filepath(hc.req_dir, hc.req_prefix, next_filenumber)
     with open(save_path,'w',newline='') as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(['DEVICE_ID','command','u','v'])
+        writer.writerow(['DEVICE_LOC','command','u','v'])
         for posid,uv in target.items():
-            writer.writerow([posmodels[posid].state._val['DEVICE_ID'],'posXY',uv[0],uv[1]])
+            writer.writerow([posmodels[posid].state._val['DEVICE_LOC'],'posXY',uv[0],uv[1]])
     next_filenumber += 1

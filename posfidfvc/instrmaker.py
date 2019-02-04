@@ -67,7 +67,7 @@ class InstrMaker(object):
             else:
                 fvcX_arr.append(fvcXY_this[0][0])
             fvcY_arr.append(fvcXY_this[0][1])
-            device_loc_this=self.ptl.get_posfid_val(posid,'DEVICE_ID')
+            device_loc_this=self.ptl.get_posfid_val(posid,'DEVICE_LOC')
             index=device_loc_file_arr.index(device_loc_this)
             metroX_arr.append(metro_X_file_arr[index])
             metroY_arr.append(metro_Y_file_arr[index])

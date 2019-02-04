@@ -92,7 +92,7 @@ class PosCollider(object):
             # self.animator.add_or_change_item('Ei', self.posindexes[posid], start_time, self.Ei_polys[posid].points)
             # self.animator.add_or_change_item('Ee', self.posindexes[posid], start_time, self.Ee_polys[posid].points)
             self.animator.add_or_change_item('line at 180', self.posindexes[posid], start_time, self.line180_polys[posid].points)
-            self.animator.add_label(format(self.posmodels[posid].deviceid,'03d'), self.x0[posid], self.y0[posid])
+            self.animator.add_label(format(self.posmodels[posid].deviceloc,'03d'), self.x0[posid], self.y0[posid])
         
     def add_mobile_to_animator(self, start_time, sweeps):
         """Add a collection of PosSweeps to the animator, describing positioners'
@@ -288,7 +288,7 @@ class PosCollider(object):
         """
         if self.fixed_neighbor_cases[posid]:
             if self.collision_hashpf_exists:
-                loc_id = self.posmodels[posid].deviceid
+                loc_id = self.posmodels[posid].deviceloc
                 dx = abs(self.x0[posid] - self.posmodels[posid].expected_current_position['obsX'])
                 dy = abs(self.y0[posid] - self.posmodels[posid].expected_current_position['obsY'])
                 code = lookup.make_code_pf(loc_id, dx, dy, obsTP[0], obsTP[1])

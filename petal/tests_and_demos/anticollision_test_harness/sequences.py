@@ -58,7 +58,7 @@ def _get_sequence(sequence_id, device_loc_ids, caller):
         sequence_defs = move_request_sequences
         directory = hc.req_dir
         prefix = hc.req_prefix
-        key_label = 'DEVICE_ID'
+        key_label = 'DEVICE_LOC'
     else:
         return
     sequence = []
@@ -67,7 +67,7 @@ def _get_sequence(sequence_id, device_loc_ids, caller):
             reader = csv.DictReader(csvfile)
             new = {}
             for row in reader:
-                if device_loc_ids == 'all' or hc.data_types['DEVICE_ID'](row['DEVICE_ID']) in device_loc_ids:
+                if device_loc_ids == 'all' or hc.data_types['DEVICE_LOC'](row['DEVICE_LOC']) in device_loc_ids:
                     main_key = hc.data_types[key_label](row[key_label])
                     new[main_key] = {key:hc.data_types[key](val) for key,val in row.items()}
             sequence.append(new)
