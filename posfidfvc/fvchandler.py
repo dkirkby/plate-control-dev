@@ -24,11 +24,11 @@ class FVCHandler(object):
         2. scale
         3. translation
     """
-    def __init__(self, fvc_type='FLI', platemaker_instrument='lbnl3', printfunc=print, save_sbig_fits=True):
+    def __init__(self, fvc_type='FLI', platemaker_instrument='petal2', printfunc=print, save_sbig_fits=True):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.fvc_type = fvc_type # 'SBIG' or 'SBIG_Yale' or 'FLI' or 'simulator'
         self.fvcproxy = None # may be auto-initialized later by the platemaker instrument setter
-        self.min_energy = 0.25 * 1.0 # this is the minimum allowed value for the product peak*fwhm for any given dot
+        self.min_energy = 0. #0.1 * .5 # this is the minimum allowed value for the product peak*fwhm for any given dot
         self.max_attempts = 5 # max number of times to retry an image measurement (if poor dot quality) before quitting hard
         if self.fvc_type == 'SBIG':
             import sbig_grab_cen
@@ -41,10 +41,10 @@ class FVCHandler(object):
             self.sim_err_max = 0.01 # 2D err max for simulator
             self.printfunc('FVCHandler is in simulator mode with max 2D errors of size ' + str(self.sim_err_max) + '.')
         if 'SBIG' in self.fvc_type:
-            self.exposure_time = 0.20
+            self.exposure_time = 0.70
             self.max_counts = 2**16 - 1 # SBIC camera ADU max
         else:
-            self.exposure_time = 1.0
+            self.exposure_time = 0.75 #2.0
             self.max_counts = 2**16 - 1 # FLI camera ADU max
         self.trans = postransforms.PosTransforms() # general transformer object -- does not look up specific positioner info, but fine for QS <--> global X,Y conversions
         self.rotation = 0        # [deg] rotation angle from image plane to object plane
@@ -64,7 +64,7 @@ class FVCHandler(object):
         '''
         self._scale = scale
         if 'SBIG' in self.fvc_type:
-            self.sbig.size_fitbox = 7 #int(np.ceil(self.fitbox_mm/2.3 / scale))
+            self.sbig.size_fitbox = 5 #int(np.ceil(self.fitbox_mm/2.3 / scale))
 
     @property
     def platemaker_instrument(self):
@@ -121,6 +121,7 @@ class FVCHandler(object):
         else:
             self.fvcproxy.send_fvc_command('make_targets',num_spots=num_objects)
             centroids = self.fvcproxy.locate(send_centroids=True)
+            
             if 'FAILED' in centroids:
                 self.printfunc('Failed to locate centroids using FVC.')
             else:
@@ -140,7 +141,7 @@ class FVCHandler(object):
                     sys.exit(0) # on the test stand, we definitely want to hard quit in this case
         return xy,peaks,fwhms,imgfiles
 
-    def measure_and_identify(self,expected_pos,expected_ref={}):
+    def measure_and_identify(self,expected_pos,expected_ref={}, pos_flags = {}):
         """Calls for an FVC measurement, and returns a list of measured centroids.
         The centroids are in order according to their closeness to the list of
         expected xy values.
@@ -149,6 +150,8 @@ class FVCHandler(object):
 
         INPUT:  expected_pos ... dict of dicts giving expected positioner fiber locations
                 expected_ref ... dict of dicts giving expected fiducial dot positions, not needed when using fvcproxy
+                pos_flags    ... (optional) dict keyed by positioner indicating which flag as indicated below that a
+                                 positioner should receive going to the FLI camera with fvcproxy
                 
                 The expected_pos and expected ref dot dicts should have primary keys
                 be the posid or sub-fidid (of each dot), and the sub-keys should include
@@ -156,6 +159,11 @@ class FVCHandler(object):
                 calls like:
                     expected_pos['M00001']['obsXY']
                     expected_ref['F001.0']['obsXY']
+
+                flags    2 : pinhole center 
+                         4 : fiber center 
+                         8 : fiducial center 
+                        32 : bad fiber or fiducial 
 
         OUTPUT: measured_pos ... list of measured positioner fiber locations
                 measured_ref ... list of measured fiducial dot positions
@@ -185,7 +193,10 @@ class FVCHandler(object):
             fiber_ctr_flag = 4 # this enumeration is specific to Yale/FLI FVC interface
             for posid in posids:
                 qs = self.trans.obsXY_to_QS(expected_pos[posid]['obsXY'])
-                expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':fiber_ctr_flag})
+                if posid in pos_flags.keys():
+                    expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':pos_flags[posid]})
+                else: #Assume it is good, old default behavior
+                    expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':fiber_ctr_flag})
             measured_qs = self.fvcproxy.measure(expected_qs)
             for qs_dict in measured_qs:
                 qs = [qs_dict['q'], qs_dict['s']]
@@ -301,27 +312,31 @@ class FVCHandler(object):
         if xy != []:
             if self.fvcproxy:
                 #Temporary hack, data passed in wrong format
-                if isinstance(xy[0][0], list):
-                    xy_new = [[xy[0][0][i],xy[0][1][i]] for i in range(len(xy[0][0]))]
-                    xy = xy_new
+                if isinstance(xy[0],float):
+                    xy=[xy]
+                else:
+                    if isinstance(xy[0][0], list):
+                        xy_new = [[xy[0][0][i],xy[0][1][i]] for i in range(len(xy[0][0]))]
+                        xy = xy_new
                 #End of hack
                 spotids = [i for i in range(len(xy))]
                 fvcXY_dicts = [{'spotid':spotids[i],'x_pix':xy[i][0],'y_pix':xy[i][1]} for i in range(len(spotids))]
                 qs_dicts = self.fvcproxy.fvcxy_to_qs(fvcXY_dicts)
                 return_order = [spotids.index(d['spotid']) for d in qs_dicts]
                 qs = [[qs_dicts[i]['q'],qs_dicts[i]['s']] for i in return_order]
-                xy = self.trans.QS_to_obsXY(np.transpose(qs).tolist())
-                xy = np.transpose(xy).tolist()
+                xy = [self.trans.QS_to_obsXY(qs[i]) for i in range(len(qs))]
+                #xy = np.transpose(xy).tolist()
             else:
                 xy = pc.listify2d(xy)
                 xy_np = np.transpose(xy)
-                rot = FVCHandler.rotmat2D_deg(self.rotation)
-                xy_np = np.dot(rot, xy_np)
-                xy_np *= self.scale
                 translation_x = self.translation[0] * np.ones(np.shape(xy_np)[1])
                 translation_y = self.translation[1] * np.ones(np.shape(xy_np)[1])
                 xy_np += [translation_x,translation_y]
-                xy = np.transpose(xy_np).tolist()       
+                xy_np *= self.scale
+                rot = FVCHandler.rotmat2D_deg(self.rotation)
+                xy_np = np.dot(rot, xy_np)
+                xy = np.transpose(xy_np).tolist() 
+                
         return xy
     
     def obsXY_to_fvcXY(self,xy):
@@ -334,13 +349,18 @@ class FVCHandler(object):
         if xy != []:
             if self.fvcproxy:
                 #Temporary hack, data passed in wrong format
-                if isinstance(xy[0][0],	list):
-                    xy_new = [[xy[0][0][i],xy[0][1][i]] for i in range(len(xy[0][0]))]
-                    xy = xy_new
-                #End of	hack
+                #import pdb;pdb.set_trace()
+                if isinstance(xy[0], float):
+                    xy=[xy]
+                else:
+                    if isinstance(xy[0][0], list):
+                        xy_new = [[xy[0][0][i],xy[0][1][i]] for i in range(len(xy[0][0]))]
+                        xy = xy_new
+                #End of hack
                 spotids = [i for i in range(len(xy))]
-                qs = self.trans.obsXY_to_QS(np.transpose(xy).tolist())# Note qs =[[q1,q2,q3...],[s1,s2,s3...]]
-                qs_dicts = [{'spotid':spotids[i],'q':qs[0][i],'s':qs[1][i]} for i in range(len(spotids))]
+                qs = [self.trans.obsXY_to_QS(this_xy) for this_xy in xy]
+                qs_dicts = [{'spotid':spotids[i],'q':qs[i][0],'s':qs[i][1]} for i in range(len(spotids))]
+                print(qs_dicts)
                 fvcXY_dicts = self.fvcproxy.qs_to_fvcxy(qs_dicts) # fiducials are added in this process 
                 fvcXY_dicts_this=[]  # Kai: This is a temporary fix, a more efficient fix should be done in the future to save time
                 for d in fvcXY_dicts:
@@ -349,15 +369,16 @@ class FVCHandler(object):
                 return_order = [spotids.index(d['spotid']) for d in fvcXY_dicts_this]
                 xy = [[fvcXY_dicts_this[i]['x'],fvcXY_dicts_this[i]['y']] for i in return_order]
             else:
+                
                 xy = pc.listify2d(xy)
                 xy_np = np.transpose(xy)
+                rot = FVCHandler.rotmat2D_deg(-self.rotation)
+                xy_np = np.dot(rot, xy_np)
+                xy_np /= self.scale
                 translation_x = self.translation[0] * np.ones(np.shape(xy_np)[1])
                 translation_y = self.translation[1] * np.ones(np.shape(xy_np)[1])
                 xy_np -= [translation_x,translation_y]
-                xy_np /= self.scale
-                rot = FVCHandler.rotmat2D_deg(-self.rotation)
-                xy_np = np.dot(rot, xy_np)
-                xy = np.transpose(xy_np).tolist() 
+                xy = np.transpose(xy_np).tolist()
         return xy
     
     @staticmethod
@@ -367,8 +388,8 @@ class FVCHandler(object):
         return np.array([[math.cos(angle), -math.sin(angle)], [math.sin(angle), math.cos(angle)]])
 
 if __name__ == '__main__':
-    f = FVCHandler(fvc_type='SBIG')
-    n_objects = 16
+    f = FVCHandler(fvc_type='FLI')
+    n_objects = 48
     n_repeats = 1
     f.min_energy = -np.Inf
     xy = []
@@ -383,6 +404,36 @@ if __name__ == '__main__':
         peaks.append(these_peaks)
         fwhms.append(these_fwhms)
         energies.append([these_peaks[i]*these_fwhms[i] for i in range(len(these_peaks))])
+        x=[these_xy[i][0] for i in range(len(these_xy))]
+        y=[these_xy[i][1] for i in range(len(these_xy))]
+        """
+        import tkinter.messagebox
+        plot = tkinter.messagebox.askyesno(title='Plot the measurements?',message='Plot the measurements?')
+        metro = tkinter.messagebox.askyesno(title='Plot the metology data?',message='Plot the metrology data?')
+
+        if plot:
+            import matplotlib.pyplot as plt
+            import tkinter
+            import tkinter.filedialog
+            import tkinter.simpledialog
+            from tkinter import *
+            from astropy.table import Table
+
+            plt.plot(x,y,'bx',label="Measurements")
+            if metro:
+                file_metro=tkinter.filedialog.askopenfilename(initialdir=pc.dirs['hwsetups'], filetypes=(("CSV file","*.csv"),("All Files","*")), title='Select Metrology Data')
+                fiducials= Table.read(file_metro,format='ascii.csv',header_start=0,data_start=1)
+                metro_X_file_arr,metro_Y_file_arr=[],[]
+                for row in fiducials:
+                    metro_X_file_arr.append(row['X'])
+                    metro_Y_file_arr.append(row['Y'])
+                plt.plot(metro_X_file_arr,metro_Y_file_arr,'rd',label="Fiducials")
+        plt.legend(loc='upper left')
+        plt.xlabel('X')
+        plt.ylabel('Y')
+        plt.show()
+        """
+
         print('ndots: ' + str(len(xy[i])))
         print('')
         print('measured xy positions:')

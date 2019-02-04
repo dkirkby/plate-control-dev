@@ -14,6 +14,7 @@ import posconstants as pc
 import poscalibplot
 import scipy.optimize
 import collections
+from astropy.table import Table
 
 class PosMoveMeasure(object):
     """Coordinates moving fiber positioners with fiber view camera measurements.
@@ -32,8 +33,9 @@ class PosMoveMeasure(object):
                 for dotid in petal.fid_dotids(fidid):
                     self._petals_map[dotid] = petal
         self.fvc = fvc # fvchandler object
-        self.wide_spotmatch_radius = 1000.0 # [pixels on FLI FVC CCD] wide search radius used during rough calibration when theta and phi offsets are unknown
-        self.ref_dist_tol = 2.0   # [pixels on FVC CCD] used for identifying fiducial dots
+        self.wide_spotmatch_radius = 80.0 #20.0 #1000.0 # [pixels on FLI FVC CCD] wide search radius used during rough calibration when theta and phi offsets are unknown
+        self.ref_dist_tol = 3.0   # [pixels on FVC CCD] used for identifying fiducial dots
+        self.ref_dist_thres =100.0  # [pixels on FVC CCD] if distance to all dots are greater than this, probably a misidentification 
         self.nudge_dist   = 10.0  # [deg] used for identifying fiducial dots
         self.extradots_fvcXY = [] # stores [x,y] pixel locations of any "extra" fiducial dots in the field (used for fixed ref fibers in laboratory test stands)
         self.extradots_id = 'EXTRA' # identifier to use in extra dots id string
@@ -53,22 +55,38 @@ class PosMoveMeasure(object):
         self.tp_updates_tol = 0.065 # [mm] tolerance on error between requested and measured positions, above which to update the POS_T,POS_P or OFFSET_T,OFFSET_P parameters
         self.tp_updates_fraction = 0.8 # fraction of error distance by which to adjust POS_T,POS_P or OFFSET_T,OFFSET_P parameters after measuring an excessive error with FVC
         self.make_plots_during_calib = True # whether to automatically generate and save plots of the calibration data
+        self.enabled_posids = []
+        self.disabled_posids = []
+        self.posid_not_identified=self.all_posids
 
-    def measure(self):
+    def measure(self, pos_flags = None):
         """Measure positioner locations with the FVC and return the values.
+
+        INPUT:  pos_flags ... (optional) dict keyed by positioner indicating which flag as indicated below that a
+                              positioner should receive going to the FLI camera with fvcproxy
+                flags    2 : pinhole center 
+                         4 : fiber center 
+                         8 : fiducial center 
+                        32 : bad fiber or fiducial 
 
         Return data is a dictionary with:   keys ... posid
                                           values ... [measured_obs_x, measured_obs_y]
-        """        
+        """
+        if not(pos_flags):
+            pos_flags = {}
+            for ptl in self.petals:
+                pos_flags.update(ptl.get_pos_flags())        
         data = {}
         expected_pos = collections.OrderedDict()
         for posid in self.all_posids:
             ptl = self.petal(posid)
             expected_pos[posid] = {'obsXY':ptl.expected_current_position(posid,'obsXY')}
+        #print("Expected pos: ",expected_pos)
         expected_ref = {} if self.fvc.fvcproxy else self.ref_dots_XY
-        measured_pos,measured_ref,imgfiles = self.fvc.measure_and_identify(expected_pos,expected_ref)            
+        #print("Expected_ref: ",expected_ref)
+        measured_pos,measured_ref,imgfiles = self.fvc.measure_and_identify(expected_pos,expected_ref, pos_flags=pos_flags)            
         for posid in self.all_posids:
-            ptl = self.petal(posid)
+            ptl = self.petal(posid)            
             ptl.set_posfid_val(posid,'LAST_MEAS_OBS_X',measured_pos[posid]['obsXY'][0])
             ptl.set_posfid_val(posid,'LAST_MEAS_OBS_Y',measured_pos[posid]['obsXY'][1])
             ptl.set_posfid_val(posid,'LAST_MEAS_PEAK',measured_pos[posid]['peak'])
@@ -102,8 +120,9 @@ class PosMoveMeasure(object):
             these_requests = {}
             for posid in posids:
                 these_requests[posid] = requests[posid]
-            petal.request_targets(these_requests)            
+            petal.request_targets(these_requests)
             petal.schedule_send_and_execute_moves() # in future, may do this in a different thread for each petal
+
 
     def move_measure(self, requests, tp_updates=None):
         """Move positioners and measure output with FVC.
@@ -128,8 +147,23 @@ class PosMoveMeasure(object):
                         limited to scenarios of initial calibration, if for some reason we find that the usual calibrations are
                         failing.
         """
+        #print("We are in move measure")
+        #expected_pos = {}
+        #for posid in self.all_posids:
+        #    ptl = self.petal(posid)
+        #    expected_pos[posid] = {'obsXY':ptl.expected_current_position(posid,'obsXY')}
+        #print("\n\n\n\n")
+        #print(expected_pos)
+        #print("\n\n\n\n")
         self.move(requests)
+        #expected_pos = {}
+        #for posid in self.all_posids:
+        #    ptl = self.petal(posid)
+        #    expected_pos[posid] = {'obsXY':ptl.expected_current_position(posid,'obsXY')}
+        #print(expected_pos)
+        #print("\n\n\n\n")
         data,imgfiles = self.measure()
+
         if tp_updates == 'posTP' or tp_updates =='offsetsTP' or tp_updates == 'offsetsTP_close':
             self._test_and_update_TP(data, tp_updates)
         return data,imgfiles
@@ -289,10 +323,11 @@ class PosMoveMeasure(object):
             for petal,these_posids in posids_by_petal.items():
                 for posid in these_posids:
                     xy = data[posid]
-                    petal.set_posfid_val(posid,'OFFSET_X',xy[0])
-                    petal.set_posfid_val(posid,'OFFSET_Y',xy[1])
-                    self.printfunc(posid + ': Set OFFSET_X to ' + self.fmt(xy[0]))
-                    self.printfunc(posid + ': Set OFFSET_Y to ' + self.fmt(xy[1]))
+                    if petal.posmodels[posid].is_enabled:
+                        petal.set_posfid_val(posid,'OFFSET_X',xy[0])
+                        petal.set_posfid_val(posid,'OFFSET_Y',xy[1])
+                        self.printfunc(posid + ': Set OFFSET_X to ' + self.fmt(xy[0]))
+                        self.printfunc(posid + ': Set OFFSET_Y to ' + self.fmt(xy[1]))
         self.commit() # log note is already handled above
 
     def rehome(self,posids='all'):
@@ -341,7 +376,8 @@ class PosMoveMeasure(object):
                     step_measured += direction * 360
                 total_angle += step_measured
             total_angle = abs(total_angle)
-            data[posid]['petal'].set_posfid_val(posid,parameter_name,total_angle)
+            if data[posid]['petal'].posmodels[posid].is_enabled:
+                data[posid]['petal'].set_posfid_val(posid,parameter_name,total_angle)
         self.commit(log_note='range measurement complete')
         self.rehome(posids)
         self.one_point_calibration(posids, mode='posTP')
@@ -375,20 +411,22 @@ class PosMoveMeasure(object):
         if mode == 'rough':
             self.rehome(posids)
             # KH added if statement - one point calibration causes measure to fail if the match_radius is not adjusted
-            if not self.fvc.fvcproxy:
-                self.one_point_calibration(posids, mode='offsetsXY')
+            if self.fvc.fvcproxy:
+            	self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)  #figure out where best to do this
+            self.one_point_calibration(posids, mode='offsetsXY')
             posids_by_petal = self.posids_by_petal(posids)
             for petal,these_posids in posids_by_petal.items():
                 keys_to_reset = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P']
                 for key in keys_to_reset:
                     for posid in these_posids:
-                        petal.set_posfid_val(posid, key, pc.nominals[key]['value'])
+                        if petal.posmodels[posid].is_enabled:
+                            petal.set_posfid_val(posid, key, pc.nominals[key]['value'])
             if self.fvc.fvcproxy:
-                old_spotmatch_radius = self.fvc.fvcproxy.get('match_radius')
+                old_spotmatch_radius = 30.0 #self.fvc.fvcproxy.get('match_radius')
                 self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)
                 self.one_point_calibration(posids, mode='offsetsTP_close')
-                self.one_point_calibration(posids, mode='offsetsTP')
                 self.fvc.fvcproxy.set(match_radius = old_spotmatch_radius)
+                self.one_point_calibration(posids, mode='offsetsTP')
             else:
                 self.one_point_calibration(posids, mode='offsetsTP')
         elif mode == 'grid':
@@ -414,19 +452,21 @@ class PosMoveMeasure(object):
                     poscalibplot.plot_arc(file, posid, unwrapped_data)
                     files.add(file)
         if self.fvc.fvcproxy and mode == 'rough':
-            old_spotmatch_radius = self.fvc.fvcproxy.get('match_radius')
-            self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)
-            self.one_point_calibration(posids, mode='posTP') # important to lastly update the internally-tracked theta and phi shaft angles
+            #NOTE set spot match radius to narrow(old) prior to doing 'posTP' calibration, 
+            #testing on Petal02, 2019-01-30
+            old_spotmatch_radius = 30.0 #self.fvc.fvcproxy.get('match_radius')
+            #self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)
             self.fvc.fvcproxy.set(match_radius = old_spotmatch_radius)
+            self.one_point_calibration(posids, mode='posTP') # important to lastly update the internally-tracked theta and phi shaft angles
         else:
             self.one_point_calibration(posids, mode='posTP') # important to lastly update the internally-tracked theta and phi shaft angles
         self.commit(log_note = str(mode) + ' calibration complete')
         return files
 
     def identify_fiducials(self):
-        """Nudge positioners (all together) forward/back to determine which centroid dots are fiducials.
+        """Turn fidicuals on and off to determine which centroid dots are fiducials.
         """
-        self.printfunc('Nudging positioners to identify reference dots.')
+        self.printfunc('Turning fiducials on and off to identify reference dots.')
         requests = {}
         for posid in self.all_posids:
             requests[posid] = {'command':'posTP', 'target':[0,180], 'log_note':'identify fiducials starting point'}
@@ -434,7 +474,86 @@ class PosMoveMeasure(object):
         self._identify(None)
         self.commit()
 
-    def identify_positioner_locations(self):
+    def identify_many_enabled_positioners(self,posids):
+        """ Identify a list of positioners one-by-one. All positioners are nudged first, then move back to homing positions one-by-one. 
+            The identification of the first positioner takes two images, while all consecutive positioner only need one image. 
+            If a positioner is enabled, it will be added to the enabled_posids list, and if no dots are moving after nudging a positioner, 
+            it is added to disabled_posids list. 
+            Input: posids, a list of positioners. like ['M00322','M01511']. 
+            Output: the obsXY of each enabled positioner will be stored in the conf file.  
+        """
+        
+        self.set_fiducials(setting='off')
+        n_posids = len(posids)
+        n_dots = len(self.all_posids)# + self.n_ref_dots
+        nudges = [-self.nudge_dist, self.nudge_dist]
+        xy_init = []
+        pseudo_xy_ref = []
+        self.rehome(posids='all')
+
+        for i in range(n_posids):
+            posid=posids[i]
+            print('Identifying location of positioner '+posid+' ('+str(i+1)+' of '+str(n_posids)+')')
+            this_petal = self.petal(posid)
+            if i ==0:
+                request={}
+                log_note='Nudge all positioners first' 
+                for j in range(n_posids):
+                    request[posids[j]] = {'target':[0,nudges[0]], 'log_note':log_note} 
+                this_petal.request_direct_dtdp(request)
+                this_petal.schedule_send_and_execute_moves()
+                xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_dots)            
+                xy_init=xy_meas
+            dtdp = [0,nudges[1]]
+            log_note = 'nudge back to identify positioner location '
+            request = {posid:{'target':dtdp, 'log_note':log_note}}
+            enabled=this_petal.get_posfid_val(posid,'CTRL_ENABLED')
+            if enabled:
+                this_petal.request_direct_dtdp(request)
+                this_petal.schedule_send_and_execute_moves()
+            xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_dots)
+            if len(xy_init) != len(xy_meas) or len(xy_init) != n_dots:
+                print('Expect '+str(n_dots))
+                print('Found '+str(len(xy_init))+' dots initially, but '+str(len(xy_meas))+ ' dots now.')
+            if self.fvc.fvc_type == 'simulator':
+                xy_meas = self._simulate_measured_pixel_locations(pseudo_xy_ref)
+                pseudo_xy_ref = xy_meas[n_posids:]
+            xy_test = xy_meas
+            xy_ref = []
+
+            for this_xy in xy_test:
+                test_delta = np.array(this_xy) - np.array(xy_init)
+                test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
+                if any(test_dist < self.ref_dist_tol) or all(test_dist > self.ref_dist_thres):
+                    xy_ref.append(this_xy)
+            xy_pos = [xy for xy in xy_test if xy not in xy_ref]  # Moving dots xy^M
+
+
+
+            if len(xy_pos) > 1:
+                self.printfunc('warning: more than one moving dots (' + str(len(xy_pos)) + ') detected when trying to identify positioner ' + posid)
+                print(xy_pos)
+            elif len(xy_pos) < 1:
+                self.printfunc('warning: no moving dots detected when trying to identify positioner ' + posid)
+                self.disabled_posids.append(posid)
+            else:
+                self.enabled_posids.append(posid)
+                expected_obsXY = this_petal.expected_current_position(posid,'obsXY')
+                measured_obsXY = self.fvc.fvcXY_to_obsXY(xy_pos)[0]
+                err_x = measured_obsXY[0] - expected_obsXY[0]
+                err_y = measured_obsXY[1] - expected_obsXY[1]
+                prev_offset_x = this_petal.get_posfid_val(posid,'OFFSET_X')
+                prev_offset_y = this_petal.get_posfid_val(posid,'OFFSET_Y')
+                this_petal.set_posfid_val(posid,'OFFSET_X', prev_offset_x + err_x) # this works, assuming we have already have reasonable knowledge of theta and phi (having re-homed or rough-calibrated)^M
+                this_petal.set_posfid_val(posid,'OFFSET_Y', prev_offset_y + err_y) # this works, assuming we have already have reasonable knowledge of theta and phi (having re-homed or rough-calibrated)^M
+                this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_X',measured_obsXY[0])
+                this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_Y',measured_obsXY[1])
+            xy_init=xy_meas
+        self.commit()
+        self.rehome(posids='all')
+
+
+    def identify_enabled_positioners(self):
         """Nudge positioners (one at a time) forward/back to determine which positioners are where on the FVC.
         """
         self.printfunc('Nudging positioners to identify their starting locations.')
@@ -450,6 +569,328 @@ class PosMoveMeasure(object):
             self.printfunc('Identifying location of positioner ' + posid + ' (' + str(n) + ' of ' + str(total) + ')')
             self._identify(posid)
         self.commit()
+
+    def identify_disabled_positioners(self):
+        """Using a single image with everything lit up, associate all the remaining unknown dots to appropriate disabled positioners. For each dot:
+             1. Decide which nominal hole xy position is closest.
+             2. Save nominal xy to be that positioner’s X_OFFSET, Y_OFFSET.
+             3. Using that positioner’s postranform instance, do fvcXY_to_obsXY(measured dot pixels), then obsXY_to_posTP(measured dot xy mm).
+             4. Save posTP to that positioner’s POS_T, POS_P.
+             If two disabled positioner dots are both within a single overlap of patrol regions, then cause an error and tell user to manually identify which one is which.
+        """
+        self.printfunc('Assigning dots not moving to disabled positioners.')
+        requests = {}
+        for posid in self.all_posids:
+            requests[posid] = {'command':'posTP', 'target':[0,180], 'log_note':'identify fiducials starting point'}
+        self.move(requests) # go to starting point
+        n_posids = len(self.all_posids)
+        self.set_fiducials(setting='off') 
+        xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_posids)
+        self.set_fiducials(setting='on')
+        if self.fvc.fvc_type == 'simulator':
+            xy_meas = self._simulate_measured_pixel_locations([])
+            pseudo_xy_ref = xy_meas[n_posids:]
+            xy_meas = xy_meas[0:n_posids] 
+        ###########################################
+        # Match dots to enabled positioners list
+        ###########################################
+        fvcX_enabled_arr,fvcY_enabled_arr=[],[]
+        x_meas=[xy_meas[i][0] for i in range(len(xy_meas))]
+        y_meas=[xy_meas[i][1] for i in range(len(xy_meas))]
+        obsX_arr=[]
+        obsY_arr=[]
+        import matplotlib.pyplot as plt
+        from matplotlib.backends.backend_pdf import PdfPages
+        pp = PdfPages('identification_check.pdf')
+        plt.figure(1,figsize=(8,15))
+        plt.subplot(211)
+        plt.plot(x_meas,y_meas,'ko')
+
+
+        for posid in self.enabled_posids:
+            ptl=self.petal(posid)
+            obsXY_this=ptl.expected_current_position(posid,'obsXY') 
+            obsX_arr.append(obsXY_this[0])
+            obsY_arr.append(obsXY_this[1])
+            this_xy=self.fvc.obsXY_to_fvcXY(obsXY_this)[0]
+            plt.text(this_xy[0],this_xy[1],posid,fontsize=2.5)
+            fvcX_enabled_arr.append(this_xy[0])
+            fvcY_enabled_arr.append(this_xy[1])
+            test_delta = np.array(this_xy) - np.array(xy_meas)
+            test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
+            matches = [dist < 20 for dist in test_dist] # 20 pixels matching radius. Hard coded for now. 
+            if not any(matches):
+                self.printfunc(posid+' was identified earlier but now disappear.')
+                self.printfunc('obsXY:',obsXY_this,'\n','fvcXY:',this_xy)
+                self.printfunc('Minimum dist:',np.min(test_dist))
+            else:
+                self.printfunc(posid,' matched with ','obsXY:',obsXY_this,' fvcXY:',this_xy)
+                index=np.where(test_dist == min(test_dist))[0][0]
+                xy_meas.remove(xy_meas[index])
+        
+        plt.plot(fvcX_enabled_arr,fvcY_enabled_arr,'b+')
+        plt.xlabel('fvcX')
+        plt.ylabel('fvcY')
+
+        ############################################
+        ##  Load metrology data and DEVICE_LOC #####
+        ############################################
+
+        if not self.enabled_posids:
+            self.printfunc('No positioners are enabled, I can not move on. Exit. ')
+            raise SystemExit
+        if ptl.shape == 'petal':
+            self.file_metro=pc.dirs['positioner_locations_file']
+        elif ptl.shape == 'small_array':
+            self.file_metro=pc.dirs['small_array_locations_file']
+        else:
+            self.file_metro=None # might be a bug
+
+
+        # read the Metrology data first, then match positioners to DEVICE_LOC 
+        positioners = Table.read(self.file_metro,format='ascii.csv',header_start=0,data_start=1)
+        device_loc_file_arr,metro_X_file_arr,metro_Y_file_arr=[],[],[]
+        for row in positioners:
+            device_loc_file_arr.append(row['device_loc'])
+            metro_X_file_arr.append(row['X'])
+            metro_Y_file_arr.append(row['Y'])
+
+         
+         ############################################################
+         # Enabled positioners should be matched to their dots now
+         # Match disabled positioners
+         ############################################################
+
+        if ptl.shape == 'petal' or ptl.shape == 'small_array':
+            for posid in self.disabled_posids:
+                this_petal=self.petal(posid)
+                device_loc_this=this_petal.get_posfid_val(posid,'DEVICE_LOC') # Use populate_pos_conf.py under pos_utility to populate pos setting files before usage. 
+                index2=device_loc_file_arr.index(device_loc_this)
+                metroX_this=metro_X_file_arr[index2]
+                metroY_this=metro_Y_file_arr[index2]
+                obsXY_this=[metroX_this,metroY_this]
+                obsX_arr.append(obsXY_this[0])
+                obsY_arr.append(obsXY_this[1])
+                this_xy=self.fvc.obsXY_to_fvcXY(obsXY_this)[0]
+                plt.text(this_xy[0],this_xy[1],posid,fontsize=2.5,color='red')
+                #self.printfunc(posid,' is located at:\n obsXY:',obsXY_this,'fvcXY:',this_xy)
+                test_delta = np.array(this_xy) - np.array(xy_meas)
+                test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
+                #print('minimum distance:',np.min(test_dist))
+                mm2pix=1./self.fvc.scale  
+                matches = [dist < 6*mm2pix for dist in test_dist]
+                min_dist=min(test_dist)
+                index=np.where(test_dist <6*mm2pix)
+                if not any(matches):
+                    self.printfunc(posid+' has no dot in its patrol area. It probably has a broken fiber.')
+                else:
+                    if len(index) == 1:
+                        index=np.where(test_dist == min(test_dist))[0][0]
+                        measured_obsXY = self.fvc.fvcXY_to_obsXY(xy_meas[index])[0]
+                        self.printfunc(posid+' matched with obsXY:',measured_obsXY,' fvcXY:',xy_meas[index])
+                        posTP=this_petal.posmodels[posid].trans.obsXY_to_posTP(measured_obsXY)[0]
+                        this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_X',measured_obsXY[0])
+                        this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_Y',measured_obsXY[1])
+                        this_petal.set_posfid_val(posid,'POS_T',posTP[0])
+                        this_petal.set_posfid_val(posid,'POS_P',posTP[1])
+                        this_petal.set_posfid_val(posid,'CTRL_ENABLED',False)
+                        self.posid_not_identified.remove(posid)
+                    else:
+                        self.printfunc(posid+' has '+str(len(index))+' dots in its patrol area, select the nearest one')
+                        index=np.where(test_dist == min(test_dist))[0][0]
+                        self.printfunc(posid+' matched with ',xy_meas[index])
+                        measured_obsXY = self.fvc.fvcXY_to_obsXY(xy_meas[index])[0]
+                        posTP=this_petal.posmodels[posid].trans.obsXY_to_posTP(measured_obsXY)[0]
+                        this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_X',measured_obsXY[0])
+                        this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_Y',measured_obsXY[1])
+                        this_petal.set_posfid_val(posid,'POS_T',posTP[0])
+                        this_petal.set_posfid_val(posid,'POS_P',posTP[1])
+                        this_petal.set_posfid_val(posid,'CTRL_ENABLED',False)
+                        self.posid_not_identified.remove(posid)
+
+        else:  # No metrology data, just match arbitraryly
+            for posid in self.disabled_posids:
+                this_petal=self.petal(posid)
+                if xy_meas:
+                    xy_fvc = xy_meas.pop()  # fvcXY
+                    self.printfunc(posid+' is matched to ',xy_fvc)
+                    xy_this = self.fvc.fvcXY_to_obsXY(xy_fvc)[0]  # obsXY
+                    this_petal.set_posfid_val(posid,'OFFSET_X',xy_this[0]+0.01) # add a little error to make it reachable
+                    this_petal.set_posfid_val(posid,'OFFSET_Y',xy_this[1])
+                    posTP=this_petal.posmodels[posid].trans.obsXY_to_posTP(xy_this)[0]
+                    this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_X',xy_this[0])
+                    this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_Y',xy_this[1])
+                    this_petal.set_posfid_val(posid,'POS_T',posTP[0])
+                    this_petal.set_posfid_val(posid,'POS_P',posTP[1])
+                    this_petal.set_posfid_val(posid,'CTRL_ENABLED',False)
+                    self.posid_not_identified.remove(posid)
+                else:
+                    self.printfunc(posid+'has no more dots to match')
+        plt.legend(loc=2)
+
+        plt.subplot(212)
+        plt.plot(obsX_arr,obsY_arr,'ko')
+        plt.legend(loc=2)
+        pp.savefig()
+
+        plt.close()
+        pp.close()
+        self.commit()
+     
+
+    def identify_positioners_2images(self):
+        """ Turn off fiducials, and use two images to identify moving and non-moving dots. Assign all dots to positioners according to metrology data. 
+            Must be a petal or small_array with correct metrology data to work. 
+            
+        """ 
+        posids=list(self.all_posids)
+        n_posids = len(self.all_posids)
+        self.set_fiducials(setting='off')
+        xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_posids)
+
+        nudges = [-self.nudge_dist, self.nudge_dist]
+        xy_init = []
+        pseudo_xy_ref = []
+        self.rehome(posids='all')
+
+        request={}
+        log_note='Nudge all positioners first'
+        this_petal = self.petal(posids[0]) 
+        for j in range(n_posids):
+            request[posids[j]] = {'target':[0,nudges[0]], 'log_note':log_note}
+        this_petal.request_direct_dtdp(request)
+        this_petal.schedule_send_and_execute_moves()
+        xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_posids)
+        xy_init=xy_meas
+
+        request={}
+        log_note='Nudge all positioners back to home position'
+        for j in range(n_posids):
+            request[posids[j]] = {'target':[0,nudges[1]], 'log_note':log_note}
+        this_petal.request_direct_dtdp(request)
+        this_petal.schedule_send_and_execute_moves()
+        xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_posids)
+
+        move_arr=[]
+        for this_xy in xy_meas:
+            test_delta = np.array(this_xy) - np.array(xy_init)
+            test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
+            min_dist=min(test_dist) 
+            if min_dist<self.ref_dist_tol:
+                move_arr.append(False)
+            else:
+                move_arr.append(True)
+
+        if this_petal.shape == 'petal':
+            self.file_metro=pc.dirs['positioner_locations_file']
+        elif this_petal.shape == 'small_array':
+            self.file_metro=pc.dirs['small_array_locations_file']
+        else:
+            self.printfunc('Must be a petal or a small_array to proceed. Exit')
+            raise SystemExit
+        
+
+        # read the Metrology data first, then match positioners to DEVICE_LOC 
+        positioners = Table.read(self.file_metro,format='ascii.csv',header_start=0,data_start=1)
+        device_loc_file_arr,metro_X_file_arr,metro_Y_file_arr=[],[],[]
+        for row in positioners:
+            device_loc_file_arr.append(row['device_loc'])
+            metro_X_file_arr.append(row['X'])
+            metro_Y_file_arr.append(row['Y'])
+
+        x_meas=[xy_meas[i][0] for i in range(len(xy_meas))]
+        y_meas=[xy_meas[i][1] for i in range(len(xy_meas))]
+        obsX_arr,obsY_arr=[],[]
+        import matplotlib.pyplot as plt
+        from matplotlib.backends.backend_pdf import PdfPages
+        pp = PdfPages('identification_check_2image.pdf')
+        plt.figure(1,figsize=(8,15))
+        plt.subplot(211)
+        plt.plot(x_meas,y_meas,'ko')
+        plt.xlabel('fvcX')
+        plt.ylabel('fvcY')
+
+
+        print('Found '+str(len(x_meas))+' spots, match with '+str(n_posids)+' positioners')
+        for i in range(n_posids):
+            posid=posids[i]
+            self.printfunc('Identifying location of positioner '+posid+' ('+str(i+1)+' of '+str(n_posids)+')')
+            this_petal=self.petal(posid)
+            device_loc_this=this_petal.get_posfid_val(posid,'DEVICE_LOC') # Use populate_pos_conf.py under pos_utility to populate pos setting files before usage. 
+            index2=device_loc_file_arr.index(device_loc_this)
+            metroX_this=metro_X_file_arr[index2]
+            metroY_this=metro_Y_file_arr[index2]
+            obsXY_this=[metroX_this,metroY_this]
+            obsX_arr.append(obsXY_this[0])
+            obsY_arr.append(obsXY_this[1])
+
+            this_xy=self.fvc.obsXY_to_fvcXY(obsXY_this)[0]
+            test_delta = np.array(this_xy) - np.array(xy_meas)
+            test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
+            if self.fvc.fvc_type == 'FLI':
+                mm2pix=1./(13.308*0.006) 
+            else:
+                1./self.fvc.scale
+            matches = [dist < 6*mm2pix for dist in test_dist]
+            min_dist=min(test_dist)
+            index=np.where(test_dist <6*mm2pix)
+            if not any(matches):
+                self.printfunc(posid+' has no dot in its patrol area. It probably has a broken fiber.')
+                plt.text(this_xy[0],this_xy[1],posid,fontsize=2.5,color='green')
+            else:
+                if len(index) == 1:
+                    index=np.where(test_dist == min(test_dist))[0][0]
+                    measured_obsXY = self.fvc.fvcXY_to_obsXY(xy_meas[index])[0]
+                    #self.printfunc(posid+' matched with obsXY:',measured_obsXY,' fvcXY:',xy_meas[index])
+                    posTP=this_petal.posmodels[posid].trans.obsXY_to_posTP(measured_obsXY)[0]
+                    this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_X',measured_obsXY[0])
+                    this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_Y',measured_obsXY[1])
+                    this_petal.set_posfid_val(posid,'OFFSET_X',metroX_this) #measured_obsXY[0])
+                    this_petal.set_posfid_val(posid,'OFFSET_Y',metroY_this) #measured_obsXY[1])
+                    posTP=this_petal.posmodels[posid].trans.obsXY_to_posTP(measured_obsXY)[0]
+                    this_petal.set_posfid_val(posid,'POS_T',posTP[0])
+                    this_petal.set_posfid_val(posid,'POS_P',posTP[1])
+                    if move_arr[index]:
+                        this_petal.set_posfid_val(posid,'CTRL_ENABLED',True)
+                        plt.text(this_xy[0],this_xy[1],posid,fontsize=2.5,color='blue')
+                    else:
+                        this_petal.set_posfid_val(posid,'CTRL_ENABLED',False)
+                        plt.text(this_xy[0],this_xy[1],posid,fontsize=2.5,color='red')
+                else:
+                    self.printfunc(posid+' has '+str(len(index))+' dots in its patrol area, select the nearest one')
+                    index=np.where(test_dist == min(test_dist))[0][0]
+                    #self.printfunc(posid+' matched with ',xy_meas[index])
+                    measured_obsXY = self.fvc.fvcXY_to_obsXY(xy_meas[index])[0]
+                    this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_X',measured_obsXY[0])
+                    this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_Y',measured_obsXY[1])
+                    this_petal.set_posfid_val(posid,'OFFSET_X',metroX_this) #measured_obsXY[0])
+                    this_petal.set_posfid_val(posid,'OFFSET_Y',metroY_this) #measured_obsXY[1])
+                    posTP=this_petal.posmodels[posid].trans.obsXY_to_posTP(measured_obsXY)[0]
+                    this_petal.set_posfid_val(posid,'POS_T',posTP[0])
+                    this_petal.set_posfid_val(posid,'POS_P',posTP[1])
+                    if move_arr[index]:
+                        this_petal.set_posfid_val(posid,'CTRL_ENABLED',True)
+                        plt.text(this_xy[0],this_xy[1],posid,fontsize=2.5,color='blue')
+                    else:
+                        this_petal.set_posfid_val(posid,'CTRL_ENABLED',False)
+                        plt.text(this_xy[0],this_xy[1],posid,fontsize=2.5,color='red')
+        self.commit()
+        plt.legend(loc=2)
+
+        plt.subplot(212)
+        plt.plot(obsX_arr,obsY_arr,'ko')
+        for i in range(len(posids)):
+            posid=posids[i] 
+            plt.text(obsX_arr[i],obsY_arr[i],posid,fontsize=2.5,color='blue')
+        plt.legend(loc=2)
+        plt.xlabel('obsX')
+        plt.ylabel('obsY')
+
+        pp.savefig()
+
+        plt.close()
+        pp.close()
+        self.set_fiducials(setting='on')
 
     def posids_by_petal(self, posids='all'):
         """Returns a dict that organizes the argued posids by the petals they are
@@ -781,16 +1222,16 @@ class PosMoveMeasure(object):
             point0 = self.grid_calib_num_DOF - 1
             for pt in range(point0,len(data[posid]['measured_obsXY'])):
                 meas_xy = np.array([data[posid]['measured_obsXY'][j] for j in range(pt+1)]).transpose()
-                targ_tp = np.array([data[posid]['target_posTP'][j] for j in range(pt+1)]).transpose()
+                targ_tp = [data[posid]['target_posTP'][j] for j in range(pt+1)]
                 def expected_xy(params):
                     for j in range(len(param_keys)):
                         trans.alt[param_keys[j]] = params[j]
-                    return trans.posTP_to_obsXY(targ_tp.tolist())
+                    obsxy = [trans.posTP_to_obsXY([targ_tp[i][0],targ_tp[i][1]]) for i in range(len(targ_tp))]
+                    return np.transpose(obsxy)
                 def err_norm(params):
                     expected = np.array(expected_xy(params))
                     all_err = expected - meas_xy
                     return np.linalg.norm(all_err,ord='fro')/np.sqrt(np.size(all_err,axis=1))
- 
                 bounds = ((2.5,3.5),(2.5,3.5),(-180,180),(-50,50),(None,None),(None,None)) #Ranges which values should be in
                 params_optimized = scipy.optimize.minimize(fun=err_norm, x0=params0, bounds=bounds)
                 params0 = params_optimized.x
@@ -808,7 +1249,8 @@ class PosMoveMeasure(object):
             trans.alt_override = False
             petal = data[posid]['petal']
             for key in param_keys:
-                petal.set_posfid_val(posid, key, data[posid][key][-1])
+                if petal.posmodels[posid].is_enabled:
+                    petal.set_posfid_val(posid, key, data[posid][key][-1])
                 self.printfunc('Grid calib on ' + str(posid) + ': ' + key + ' set to ' + format(data[posid][key][-1],'.3f'))
             data[posid]['final_expected_obsXY'] = np.array(expected_xy(params_optimized.x)).transpose().tolist()
         return data
@@ -833,14 +1275,16 @@ class PosMoveMeasure(object):
             p_ctr = np.array(P[posid]['xy_center'])
             length_r1 = np.sqrt(np.sum((t_ctr - p_ctr)**2))
             length_r2 = P[posid]['radius']
-            ptl.set_posfid_val(posid,'LENGTH_R1',length_r1)
-            ptl.set_posfid_val(posid,'LENGTH_R2',length_r2)
-            ptl.set_posfid_val(posid,'OFFSET_X',t_ctr[0])
-            ptl.set_posfid_val(posid,'OFFSET_Y',t_ctr[1])
+            if ptl.posmodels[posid].is_enabled:
+                ptl.set_posfid_val(posid,'LENGTH_R1',length_r1)
+                ptl.set_posfid_val(posid,'LENGTH_R2',length_r2)
+                ptl.set_posfid_val(posid,'OFFSET_X',t_ctr[0])
+                ptl.set_posfid_val(posid,'OFFSET_Y',t_ctr[1])
             p_meas_obsT = np.arctan2(p_ctr[1]-t_ctr[1], p_ctr[0]-t_ctr[0]) * 180/np.pi
             offset_t = p_meas_obsT - p_targ_posT[0] # just using the first target theta angle in the phi sweep
             offset_t = self._centralized_angular_offset_value(offset_t)
-            ptl.set_posfid_val(posid,'OFFSET_T',offset_t)
+            if ptl.posmodels[posid].is_enabled:
+                ptl.set_posfid_val(posid,'OFFSET_T',offset_t)
             xy = np.array(p_meas_obsXY)
             angles = np.arctan2(xy[:,1]-p_ctr[1], xy[:,0]-p_ctr[0]) * 180/np.pi
             p_meas_obsP = angles - p_meas_obsT
@@ -849,12 +1293,13 @@ class PosMoveMeasure(object):
             p_meas_obsP_wrapped = self._wrap_consecutive_angles(p_meas_obsP.tolist(), expected_direction)
             offset_p = np.median(np.array(p_meas_obsP_wrapped) - np.array(p_targ_posP))
             offset_p = self._centralized_angular_offset_value(offset_p)
-            ptl.set_posfid_val(posid,'OFFSET_P',offset_p)
+            if ptl.posmodels[posid].is_enabled:
+                ptl.set_posfid_val(posid,'OFFSET_P',offset_p)
             p_meas_posP_wrapped = (np.array(p_meas_obsP_wrapped) - offset_p).tolist()
             
             # unwrap thetas
-            t_meas_posTP = T[posid]['trans'].obsXY_to_posTP(np.transpose(t_meas_obsXY).tolist(),range_limits='full')[0]
-            t_meas_posT = t_meas_posTP[pc.T]
+            t_meas_posTP = [T[posid]['trans'].obsXY_to_posTP(this_xy,range_limits='full')[0] for this_xy in t_meas_obsXY]
+            t_meas_posT = [this_tp[pc.T] for this_tp in t_meas_posTP]
             expected_direction = pc.sign(t_targ_posT[1] - t_targ_posT[0])
             t_meas_posT_wrapped = self._wrap_consecutive_angles(t_meas_posT, expected_direction)
             
@@ -881,7 +1326,7 @@ class PosMoveMeasure(object):
             ratio_P = np.median(ratios_P)
             data[posid]['gear_ratio_T'] = ratio_T
             data[posid]['gear_ratio_P'] = ratio_P            
-            if set_gear_ratios:
+            if set_gear_ratios and ptl.posmodels[posid].is_enabled:
                 ptl.set_posfid_val(posid,'GEAR_CALIB_T',ratio_T)
                 ptl.set_posfid_val(posid,'GEAR_CALIB_P',ratio_P)
             else:
@@ -898,43 +1343,44 @@ class PosMoveMeasure(object):
         nudges = [-self.nudge_dist, self.nudge_dist]
         xy_init = []
         pseudo_xy_ref = []
-        for i in range(len(nudges)):
-            dtdp = [0,nudges[i]]
-            if posid == None:
-                identify_fiducials = True
-                log_note = 'nudge to identify fiducials '
-                for petal,these_posids in posids_by_petal.items():
-                    requests = {}
-                    for p in these_posids:
-                        if identify_fiducials or p == posid:
-                            requests[p] = {'target':[0,nudges[i]], 'log_note':log_note}
-                    petal.request_direct_dtdp(requests)
-                    petal.schedule_send_and_execute_moves()
-            else:
-                identify_fiducials = False
-                log_note = 'nudge to identify positioner location '
-                request = {posid:{'target':dtdp, 'log_note':log_note}}
-                this_petal = self.petal(posid)
-                this_petal.request_direct_dtdp(request)
-                this_petal.schedule_send_and_execute_moves()
+        
+        if posid == None:
+            identify_fiducials = True
             xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_dots)
             if self.fvc.fvc_type == 'simulator':
                 xy_meas = self._simulate_measured_pixel_locations(pseudo_xy_ref)
                 pseudo_xy_ref = xy_meas[n_posids:]
-            if i == 0:
-                xy_init = xy_meas
-            else:
-                xy_test = xy_meas
+            xy_init = xy_meas
+            xy_test = xy_meas
+        else:
+            for i in range(len(nudges)):
+                dtdp = [0,nudges[i]]
+                identify_fiducials = False
+                log_note = 'nudge to identify positioner location '
+                request = {posid:{'target':dtdp, 'log_note':log_note}}
+                this_petal = self.petal(posid)
+                enabled=this_petal.get_posfid_val(posid,'CTRL_ENABLED')
+                if enabled:
+                    this_petal.request_direct_dtdp(request)
+                    this_petal.schedule_send_and_execute_moves()
+                xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_dots)
+                if self.fvc.fvc_type == 'simulator':
+                    xy_meas = self._simulate_measured_pixel_locations(pseudo_xy_ref)
+                    pseudo_xy_ref = xy_meas[n_posids:]
+                if i == 0:
+                    xy_init = xy_meas
+                else:
+                    xy_test = xy_meas
         xy_ref = []
         for this_xy in xy_test:
             test_delta = np.array(this_xy) - np.array(xy_init)
             test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
-            if any(test_dist < self.ref_dist_tol):
+            if any(test_dist < self.ref_dist_tol) or all(test_dist > self.ref_dist_thres):
                 xy_ref.append(this_xy)
-        xy_pos = [xy for xy in xy_test if xy not in xy_ref]
+        xy_pos = [xy for xy in xy_test if xy not in xy_ref]  # Moving dots xy
         if identify_fiducials:
-            if len(xy_ref) != self.n_ref_dots:
-                self.printfunc('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_ref_dots) + ')')
+            #if len(xy_ref) != self.n_ref_dots:
+            #    self.printfunc('warning: number of ref dots detected (' + str(len(xy_ref)) + ') is not equal to expected number of fiducial dots (' + str(self.n_ref_dots) + ')')
             all_xyref_detected = []
             for fidid in self.all_fidids:
                 ptl = self.petal(fidid)
@@ -944,7 +1390,7 @@ class PosMoveMeasure(object):
                     ptl.set_fiducials(fidid,'off')
                     xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(n_dots - num_expected)
                     if self.fvc.fvc_type == 'simulator':
-                        xy_meas = self._simulate_measured_pixel_locations(xy_ref)
+                        xy_meas = self._simulate_measured_pixel_locations(pseudo_xy_ref)
                         for j in range(num_expected):
                             for k in range(n_posids,len(xy_meas)):
                                 if xy_meas[k] not in all_xyref_detected:
@@ -967,15 +1413,18 @@ class PosMoveMeasure(object):
                     ptl.set_posfid_val(fidid,'LAST_MEAS_OBS_Y',[these_xyref[i][1] for i in range(num_detected)])
                     all_xyref_detected += these_xyref
                     ptl.set_fiducials(fidid,'on')
-            self.extradots_fvcXY = [xy for xy in xy_ref if xy not in all_xyref_detected]
-            if self.extradots_fvcXY:
-                self.printfunc(str(len(self.extradots_fvcXY)) + ' extra reference dots detected at FVC pixel coordinates: ' + str(self.extradots_fvcXY))
-        else:
+            #self.extradots_fvcXY = [xy for xy in xy_ref if xy not in all_xyref_detected] # The extra dots are not identified here
+            #if self.extradots_fvcXY:
+            #    self.printfunc(str(len(self.extradots_fvcXY)) + ' extra reference dots detected at FVC pixel coordinates: ' + str(self.extradots_fvcXY))
+        else:  # Identify positioner
             if len(xy_pos) > 1:
                 self.printfunc('warning: more than one moving dots (' + str(len(xy_pos)) + ') detected when trying to identify positioner ' + posid)
+                print(xy_pos)
             elif len(xy_pos) < 1:
                 self.printfunc('warning: no moving dots detected when trying to identify positioner ' + posid)
+                self.disabled_posids.append(posid)
             else:
+                self.enabled_posids.append(posid)
                 expected_obsXY = this_petal.expected_current_position(posid,'obsXY')
                 measured_obsXY = self.fvc.fvcXY_to_obsXY(xy_pos)[0]
                 err_x = measured_obsXY[0] - expected_obsXY[0]
@@ -1056,34 +1505,35 @@ class PosMoveMeasure(object):
             err_xy = ((measured_obsXY[0]-expected_obsXY[0])**2 + (measured_obsXY[1]-expected_obsXY[1])**2)**0.5
             if err_xy > self.tp_updates_tol:
                 posmodel = self.posmodel(posid)
-                expected_posTP = ptl.expected_current_position(posid,'posTP')
-                measured_posTP = posmodel.trans.obsXY_to_posTP(measured_data[posid],range_limits='full')[0]
-                T_options = measured_posTP[0] + np.array([0,360,-360])
-                T_diff = np.abs(T_options - expected_posTP[0])
-                T_best = T_options[np.argmin(T_diff)]
-                measured_posTP[0] = T_best
-                delta_T = (measured_posTP[0] - expected_posTP[0]) * self.tp_updates_fraction
-                delta_P = (measured_posTP[1] - expected_posTP[1]) * self.tp_updates_fraction
-                if tp_updates == 'offsetsTP' or tp_updates == 'offsetsTP_close':
-                    param = 'OFFSET'
-                else:
-                    param = 'POS'
-                old_T = ptl.get_posfid_val(posid,param + '_T')
-                old_P = ptl.get_posfid_val(posid,param + '_P')              
-                new_T = old_T + delta_T
-                new_P = old_P + delta_P
-                if tp_updates == 'offsetsTP' or tp_updates == 'offsetsTP_close' :
-                    ptl.set_posfid_val(posid,'OFFSET_T',new_T)
-                    ptl.set_posfid_val(posid,'OFFSET_P',new_P)
-                    self.printfunc(posid + ': Set OFFSET_T to ' + self.fmt(new_T))
-                    self.printfunc(posid + ': Set OFFSET_P to ' + self.fmt(new_P))                    
-                else:
-                    posmodel.axis[pc.T].pos = new_T
-                    posmodel.axis[pc.P].pos = new_P
-                    self.printfunc(posid + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_T from ' + self.fmt(old_T) + ' to ' + self.fmt(new_T))
-                    self.printfunc(posid + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
-                delta_TP[posid] = [delta_T,delta_P]
-                posmodel.state.next_log_notes.append('updated ' + param + '_T and ' + param + '_P after positioning error of ' + self.fmt(err_xy) + ' mm')
+                if posmodel.is_enabled:
+                    expected_posTP = ptl.expected_current_position(posid,'posTP')
+                    measured_posTP = posmodel.trans.obsXY_to_posTP(measured_data[posid],range_limits='full')[0]
+                    T_options = measured_posTP[0] + np.array([0,360,-360])
+                    T_diff = np.abs(T_options - expected_posTP[0])
+                    T_best = T_options[np.argmin(T_diff)]
+                    measured_posTP[0] = T_best
+                    delta_T = (measured_posTP[0] - expected_posTP[0]) * self.tp_updates_fraction
+                    delta_P = (measured_posTP[1] - expected_posTP[1]) * self.tp_updates_fraction
+                    if tp_updates == 'offsetsTP' or tp_updates == 'offsetsTP_close':
+                        param = 'OFFSET'
+                    else:
+                        param = 'POS'
+                    old_T = ptl.get_posfid_val(posid,param + '_T')
+                    old_P = ptl.get_posfid_val(posid,param + '_P')              
+                    new_T = old_T + delta_T
+                    new_P = old_P + delta_P
+                    if tp_updates == 'offsetsTP' or tp_updates == 'offsetsTP_close' :
+                        ptl.set_posfid_val(posid,'OFFSET_T',new_T)
+                        ptl.set_posfid_val(posid,'OFFSET_P',new_P)
+                        self.printfunc(posid + ': Set OFFSET_T to ' + self.fmt(new_T))
+                        self.printfunc(posid + ': Set OFFSET_P to ' + self.fmt(new_P))                    
+                    else:
+                        posmodel.axis[pc.T].pos = new_T
+                        posmodel.axis[pc.P].pos = new_P
+                        self.printfunc(posid + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_T from ' + self.fmt(old_T) + ' to ' + self.fmt(new_T))
+                        self.printfunc(posid + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
+                    delta_TP[posid] = [delta_T,delta_P]
+                    posmodel.state.next_log_notes.append('updated ' + param + '_T and ' + param + '_P after positioning error of ' + self.fmt(err_xy) + ' mm')
         return delta_TP
                 
     @property

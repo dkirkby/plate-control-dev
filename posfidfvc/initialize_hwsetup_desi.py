@@ -3,12 +3,15 @@ import sys
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../xytest/'))
+sys.path.remove('/software/products/plate_control-trunk/xytest')
+sys.path.remove('/software/products/plate_control-trunk/posfidfvc')
+sys.path.remove('/software/products/plate_control-trunk/petalbox')
+sys.path.remove('/software/products/plate_control-trunk/petal')
 
 import petal
 import posmovemeasure
 import fvchandler
 import posconstants as pc
-import instrmaker
 import tkinter
 import tkinter.filedialog
 import tkinter.messagebox
@@ -32,12 +35,6 @@ new_and_changed_files.add(hwsetup.filename)
 # are we in simulation mode?
 sim = hwsetup['fvc_type'] == 'simulator'
 
-# ask user whether to auto-generate a platemaker instrument file
-if not sim:
-    message = 'Should we auto-generate a platemaker instrument file?'
-    should_make_instrfile = tkinter.messagebox.askyesno(title='Make PM file?',message=message)
-else:
-    should_make_instrfile = False
 
 # automated SVN setup
 svn_user = ''
@@ -66,12 +63,11 @@ else:
     fvc = fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'])    
 fvc.rotation = hwsetup['rotation'] # this value is used in setups without fvcproxy / platemaker
 fvc.scale = hwsetup['scale'] # this value is used in setups without fvcproxy / platemaker
-posids = hwsetup['pos_ids']
-fidids = hwsetup['fid_ids']
-shape = 'asphere' if hwsetup['plate_type'] == 'petal' else 'flat'
-ptl = petal.Petal(petal_id = hwsetup['ptl_id'],
-                  posids = posids,
-                  fidids = fidids,
+fvc.translation = hwsetup['translation']
+fvc.exposure_time = hwsetup['exposure_time']
+
+#shape = 'asphere' if hwsetup['plate_type'] == 'petal' else 'flat'
+ptl = petal.Petal(petal_id = hwsetup['ptl_id'],posids=[],fidids=[], 
                   simulator_on = sim,
                   user_interactions_enabled = True,
                   db_commit_on = False,
@@ -81,8 +77,9 @@ ptl = petal.Petal(petal_id = hwsetup['ptl_id'],
                   verbose = False,
                   collider_file = None,
                   sched_stats_on = False,
-                  anticollision = None, # valid options for anticollision arg: None, 'freeze', 'adjust'
-				  petal_shape = shape)
+                  anticollision = None) # valid options for anticollision arg: None, 'freeze', 'adjust'
+posids=ptl.posids
+fidids=ptl.fidids
 m = posmovemeasure.PosMoveMeasure([ptl],fvc)
 m.make_plots_during_calib = True
 print('Automatic generation of calibration plots is turned ' + ('ON' if m.make_plots_during_calib else 'OFF') + '.')
@@ -142,7 +139,7 @@ fid_settings_done = m.set_fiducials('on')
 print('Fiducials turned on: ' + str(fid_settings_done))
 
 # disable certain features if anticollision is turned off yet it is also a true petal (with close-packed positioenrs)
-if hwsetup['plate_type'] == 'petal' and not ptl.anticollision_default:
+if ptl.shape == 'petal' and not ptl.anticollision_default:
     should_limit_range = True
 else:
     should_limit_range = False
@@ -161,11 +158,10 @@ if should_identify_fiducials:
 else:
     m.extradots_fvcXY = extradots_existing_data
 if should_identify_positioners:
-    m.identify_positioner_locations()
-if should_make_instrfile:
-    instr = instrmaker.InstrMaker(hwsetup['plate_type'],ptl,m,fvc,hwsetup)
-    instr.make_instrfile()
-    instr.push_to_db()
+    m.identify_positioners_2images()
+    #m.identify_many_enabled_positioners(list(m.all_posids))
+    #m.identify_disabled_positioners()
+
 m.calibrate(mode='rough')
 if not should_limit_range:
     m.measure_range(axis='theta')
@@ -176,13 +172,25 @@ m.park() # retract all positioners to their parked positions
 
 # commit logs and settings files to the SVN
 if should_commit_to_svn and svn_userpass_valid:
-    n_total = len(new_and_changed_files)
-    n = 0
+    #n_total = len(new_and_changed_files)
+    #n = 0
+    #for file in new_and_changed_files:
+    #    n += 1
+    #    err1 = os.system('svn add --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + file)
+    #    err2 = os.system('svn commit --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive -m "autocommit from initialize_hwsetup script" ' + file)
+    #    print('SVN upload of file ' + str(n) + ' of ' + str(n_total) + ' (' + os.path.basename(file) + ') returned: ' + str(err1) + ' (add) and ' + str(err2) + ' (commit)')
+
+    n_total=0
+    these_files_to_commit = ''
     for file in new_and_changed_files:
-        n += 1
-        err1 = os.system('svn add --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + file)
-        err2 = os.system('svn commit --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive -m "autocommit from initialize_hwsetup script" ' + file)
-        print('SVN upload of file ' + str(n) + ' of ' + str(n_total) + ' (' + os.path.basename(file) + ') returned: ' + str(err1) + ' (add) and ' + str(err2) + ' (commit)')
+        these_files_to_commit += ' ' + file
+        n_total += 1
+    print("these_files_to_commit")
+    print(these_files_to_commit)
+    print("")
+    self.logwrite('Beginning add + commit of ' + str(n_total) + ' data files to SVN.')
+    err_add = os.system('svn add --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive ' + these_files_to_commit)
+    err_commit = os.system('svn commit --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + these_files_to_commit)
 
 # clean up any svn credentials
 if svn_user:

@@ -18,7 +18,7 @@ def bool(s):
         return False
     return True
 
-data_types = {'POS_ID':str, 'DEVICE_ID':int, 'CTRL_ENABLED':bool,
+data_types = {'POS_ID':str, 'DEVICE_LOC':int, 'CTRL_ENABLED':bool,
               'LENGTH_R1':float, 'LENGTH_R2':float, 'OFFSET_T':float,
               'OFFSET_P':float, 'OFFSET_X':float, 'OFFSET_Y':float,
               'PHYSICAL_RANGE_T':float, 'PHYSICAL_RANGE_P':float,
@@ -36,7 +36,7 @@ def filepath(directory,prefix,integer):
     return os.path.join(directory,filename(prefix,integer))
 
 # Timing profiler wrapper function
-n_stats_lines = 15
+n_stats_lines = 20
 statsfile = os.path.join(pc.dirs['temp_files'],'stats_harness')
 def profile(evaluatable_string):
     print(evaluatable_string)

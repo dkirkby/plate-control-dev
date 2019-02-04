@@ -11,7 +11,7 @@ class PetalComm(object):
     and petalbox software running on the petal.
     """
 
-    def __init__(self, petal_id, controller = None, user_interactions_enabled = False):
+    def __init__(self, petalbox_id, controller = None, user_interactions_enabled = False):
         """
         Initialize the object and connect to the petal controller
 
@@ -24,7 +24,7 @@ class PetalComm(object):
         The no_dos flag should be managed one level up (just import a different PetalComm module) and
         not in this file
         """
-        self.petal_id = int(petal_id)
+        self.petalbox_id = int(petalbox_id)
         # Setup Seeker
         self.seeker_thread = None
         self.repeat = threading.Event()
@@ -40,10 +40,10 @@ class PetalComm(object):
             if 'ip' not in controller.keys() or 'port' not in controller.keys():
                 raise RuntimeError('init: the IP address of the petal controller must be specified.')
             # Create the Pyro URI manually
-            self.device['name'] = 'PC%d' % self.petal_id
+            self.device['name'] = 'PC%d' % self.petalbox_id
             self.device['node'] = str(controller['ip'])
             self.device['port'] = int(controller['port'])
-            self.device['pyro_uri'] = 'PYRO:PC%d@%s:%s' % (petal_id, str(controller['ip']),str(controller['port']))
+            self.device['pyro_uri'] = 'PYRO:PC%d@%s:%s' % (petalbox_id, str(controller['ip']),str(controller['port']))
         else:
             self.seeker = Seeker(self.stype, self.service, found_callback = self._found_dev)
             # Start Seeker thread
@@ -54,13 +54,13 @@ class PetalComm(object):
             self.seeker_thread.start()
             print('Seeker thread is now running. Delay %s' % str(self.delay))
             # wait briefly for seeker to find all devices
-            self.found_controller.wait(timeout = 1.0)
+            self.found_controller.wait(timeout = 2.0)
             self.delay = 4.0
 
         # Connect to the device (if we found anything)
         while self.device == {}:
             if user_interactions_enabled:
-                err_question = 'Petal Controller ' + str(self.petal_id) + ' was not discovered. Do you want to:\n  1: try again now\n  2: quit now\n  3: continue anyway (not recommended)\nEnter 1, 2, or 3 >> '
+                err_question = 'Petal Controller ' + str(self.petalbox_id) + ' was not discovered. Do you want to:\n  1: try again now\n  2: quit now\n  3: continue anyway (not recommended)\nEnter 1, 2, or 3 >> '
                 answer = input(err_question)
             else:
                 answer = '1'
@@ -76,7 +76,7 @@ class PetalComm(object):
         else:
             if self.device:
                 self.device['proxy'] = Pyro4.Proxy(self.device['pyro_uri'])
-                print('Connected to Petal Controller %d' % self.petal_id)
+                print('Connected to Petal Controller %d' % self.petalbox_id)
 
     def is_connected(self):
         """
@@ -93,10 +93,10 @@ class PetalComm(object):
     def _found_dev(self, dev):
         for key in dev:
             if dev[key]['service'] == self.service:   # Found a petal controller
-                # Extract unit number and compare to self.petal_id
+                # Extract unit number and compare to self.petalbox_id
                 m = re.search(r'\d+$', key)
                 if m:
-                    if self.petal_id == int(m.group()):
+                    if self.petalbox_id == int(m.group()):
                         # Found the matching petal controller
                         if 'name' not in self.device or self.device['name'] != key:
                             print('_found_dev: Found new device %s' % str(key))
@@ -128,28 +128,17 @@ class PetalComm(object):
             # Failed to get status from device
             raise RuntimeError('_call_device: remote device not reachable %s' % '' if 'name' not in self.device else self.device)
 
-    def get_pos_status(self, bus_ids, can_ids):
-        """Checks if all the positioners identified by can_id are ready to receive
-        move tables.
-        """
-        # status = self.get_pos_status()
-        # can_ids: list of can_ids (list of integers)
-        # if everybody is stationary, then true
-        try:
-            return self._call_device('get_pos_status', bus_ids, can_ids)
-        except Exception as e:
-            return 'FAILED: Can not execute get_pos_status. Exception: %s' % str(e)
-
     def ready_for_tables(self, bus_ids, can_ids):
         """Checks if all the positioners identified by can_id are ready to receive
         move tables.
-        Returns either True or False
+
+        INPUTS:
+        bus_ids: list of CAN bus_ids (list of strings such as 'can10')
+        can_ids: list of can_ids (list of integers)
+
+        Returns either True or False (True if all listed can_ids are done executing
+        their movements.
         """
-        # status = self.get_pos_status()
-        # bus_ids: list of bus_ids (list of strings such as 'can0')
-        # can_ids: list of can_ids (list of integers)
-        # if everybody is stationary, then true
-        
         try:
             retcode = self._call_device('ready_for_tables', bus_ids, can_ids)
             if type(retcode) != bool:
@@ -191,263 +180,10 @@ class PetalComm(object):
         """
         Low level test command to move a single positioner
         """
-        # add parameter checking
         try:
-            # Michael's code expects motor as a string
             return self._call_device('move', bus_id, can_id, direction, mode, str(motor), angle)
         except Exception as e:
             return 'FAILED: Can not execute send_move_excute command. Exception: %s' % str(e)
-        
-    def set_currents(self, bus_id, can_id, P_currents, T_currents):
-        """
-
-        """
-        try:
-            return self._call_device('set_currents', bus_id, can_id, P_currents, T_currents)
-        except Exception as e:
-            return 'FAILED: Can not set currents. Exception: %s' % str(e)
-
-    def set_periods(self, bus_id, can_id, creep_period_m0, creep_period_m1, spin_steps):
-        """
-
-        """
-        try:
-            return self._call_device('set_periods', bus_id, can_id, creep_period_m0, creep_period_m1, spin_steps)
-        except Exception as e:
-            return 'FAILED: Can not set periods. Exception: %s' % str(e)
-    
-    def set_bump_flags(self, bus_id, can_id, curr_hold, bump_cw_flg, bump_ccw_flg):
-        """
-        Set motor CW/CCW bump flags and hold current.
-        bus_id       ... bus id string (eg. 'can0')
-        can_id       ... positioner can id
-        curr_hold    ... hold current, int between 0 and 100
-        bump_cw_flg  ... flag for switching CW bump, bool, on if True
-        bump_ccw_flg ... flag for switching CCW bump, bool, on if True     
-        """
-        try:
-            return self._call_device('set_bump_flags', bus_id, can_id, curr_hold, bump_cw_flg, bump_ccw_flg)
-        except Exception as e:
-            return 'FAILED: Can not set bump flags. Exception: %s' % str(e)
-
-    def set_pos_constants(self, can_ids, settings):
-        """
-        Send settings over ethernet to the petal controller, where they are
-        sent over CAN to the positioners identified the list 'canids', with the setting
-        values in the corresponding (dictionary? list of dicts?) 'settings'.
-
-        canids       ... list of psoitioner can ids
-        settings     ... list settings dictionaries
-
-        Would probably be better as a dictionary of dictionaries like this:
-        constants = { 1 : {'some setting': value, 'another setting' : another_value}, 4 : {'some setting': ....  }
-        """
-        if not isinstance(can_ids, list) or not isinstance(settings,list):
-            return 'FAILED: parameters must be passed as lists'
-        try:
-            return self._call_device('set_pos_constants',can_ids, settings)
-        except Exception as e:
-            return 'FAILED: Can not set positioner constants. Exception: %s' % str(e)
-
-    def set_fiducials(self, bus_ids, can_ids, percent_duty):
-        """
-        Send settings over ethernet to the petal controller, where they are
-        sent over CAN to the fiducials. Sets the fiducials identified by the list ids
-        to the corresponding duty values.
-        bus_ids      ... list of bus ids where you find each fiducial
-        can_ids      ... list of can id addresses for each fiducial on its bus
-        percent_duty ... list of values, 0-100, 0 means off
-        """
-        if not isinstance(bus_ids, list) or not isinstance(can_ids, list) or not isinstance(percent_duty,list):
-            return 'FAILED: parameters must be passed as lists'
-        try:
-            return self._call_device('set_fiducials', bus_ids, can_ids, percent_duty)
-        except Exception as e:
-            return 'FAILED: Can not set fiducials. Exception: %s' % str(e)
-
-    def set_device(self, can_id, attributes):
-        """
-        Set a value on a device other than positioners or fiducials. This includes
-        fans, power supplies, and sensors.
-
-        For now pos_id is a single positioner id (int)
-        this should really be passed as a dictionary so key, value lists were change to the attributes dictionary
-        Could also be a dictionary of dictionaries if multiple ids and attributes are passed at once
-        lot's of possibilities...
-
-        As implemented, this routine does no error checking or reformatting but passes the parameters on the the petal controller
-        """
-        try:
-            id = int(can_id)
-        except:
-            return 'FAILED: Invalid positioner id'
-        if not isinstance(attributes, dict):
-            return 'FAILED: Attributes must be passed as dictionary'
-        try:
-            return self._call_device('set_device',id, attributes)
-        except Exception as e:
-            return 'FAILED: Can not set attributes. Exception: %s' % str(e)
-
-    def set_led(self, bus_id, can_id, state):
-        """
-        Set the led on positioner id on or off
-        Input:
-             can_id  (int)  positioner id on can bus
-             state   (str)  on, offf
-        """
-        try:
-            id = int(can_id)
-        except:
-            return 'FAILED: Invalid positioner id'
-        if str(state).lower() not in ['on', 'off']:
-            return 'FAILED: Invalid LED state'
-
-        try:
-            return self._call_device('set_led',bus_id, id, str(state).lower())
-        except Exception as e:
-            return 'FAILED: Can not set LED state. Exception: %s' % str(e)
-    
-    def get_nonresponsive_canids(self):
-        """
-        Returns a list of integer canids that correspond to unresponsive positioners, as determined by the petalcontroller.
-        """
-        try:
-            return self._call_device('get_nonresponsive_canids')
-        except Exception as e:
-            return 'FAILED: Can not get list of nonresponsive canids. Exceptions: %s' % str(e)
-
-    def reset_nonresponsive_canids(self):
-        """
-        Resets list of non-responsive canids to being empty.
-        """
-        try:
-            return self._call_device('reset_nonresponsive_canids')
-        except Exception as e:
-            return 'FAILED: Can not reset list of nonresponsive canids. Exceptions: %s' % str(e)
-
-    def get_device_status(self):
-        """
-        Returns a (dictionary?) containing status of all positioners on the petal.
-        """
-        try:
-            return self._call_device('get_device_status')
-        except Exception as e:
-            return 'FAILED: Can not get device status. Exception: %s' % str(e)
-
-    def get_fid_status(self):
-        """
-        Returns a (dictionary?) containing status of all fiducials on the petal.
-        """
-        try:
-            return self._call_device('get_fid_status')
-        except Exception as e:
-            return 'FAILED: Can not get fiducial status. Exception: %s' % str(e)
-
-    def get_posfid_info(self,canbus):
-        """
-        Retrieves CAN ids found on the canbus with corresponding sids and software versions.
-        """
-        try:
-            return self._call_device('get_posfid_info',canbus)
-        except Exception as e:
-            return 'FAILED: Can not read devices. Exception: %s' % str(e)
-
-
-    def set_canid(self,canbus, sid, new_posid):
-        """
-        Sets the positioner ID (= CAN address) for positioner identified by sid to new_posid.
-        """
-        try:
-            return self._call_device('set_canid',canbus, sid, new_posid)
-        except Exception as e:
-            return 'FAILED: Can not set CAN id. Exception: %s' % str(e)
-
-    def read_temp_ptl(self):
-        """
-        Returns a dictionary of temperature sensor readings on BeagleBone 1-wire bus.
-        Keys are temperature sensor serial numbers and values are temperatures in degrees C.
-        """
-        try:
-
-            return self._call_device('read_temp_ptl')
-        except Exception as e:
-            return 'FAILED: Can not read temperature sensors.  Exception: %s' % str(e)
-
-    def fan_pwm_ptl(self, pwm_out, percent_duty):
-        """
-        Sets PWM duty cycles for pwm output (pwm_out= 'GFA_FAN1' or 'GFA_FAN2')
-        """
-        try:
-            return self._call_device('fan_pwm_ptl', pwm_out, percent_duty)
-        except Exception as e:
-            return 'FAILED:  Can not set PWM.  Exception: %s' % str(e)
-
-    def read_fan_pwm(self, pwm_out = None):
-        """
-        Read back PWM duty cycles for pwm output (pwm_out= 'GFA_FAN1' or 'GFA_FAN2')
-        """
-        try:
-            return self._call_device('read_fan_pwm', pwm_out)
-        except Exception as e:
-            return 'FAILED:  Can not read PWM.  Exception: %s' % str(e)
-
-    def switch_en_ptl(self, pin_name, state):
-        """
-        Switches power supply enable lines/ device enable lines to either high or low (state = 1 or 0)
-        PIN NAMES:  "SYNC", "PS1_EN", "PS2_EN", "GFAPWR_EN", "GFA_FAN1", "GFA_FAN2"
-        """
-        try:
-            return self._call_device('switch_en_ptl', pin_name, state)
-        except Exception as e:
-            return 'FAILED: Can not switch GPIO.  Exception: %s' % str(e)
-
-    def read_switch_ptl(self, pin_name = None):
-        """
-        Read back switch
-        Switches power supply enable lines/ device enable lines to either high or low (state = 1 or 0)
-        PIN NAMES:  "SYNC", "PS1_EN", "PS2_EN", "GFAPWR_EN", "GFA_FAN1", "GFA_FAN2"
-        """
-        try:
-            return self._call_device('read_switch_ptl', pin_name)
-        except Exception as e:
-            return 'FAILED: Can not read switch GPIO.  Exception: %s' % str(e)
-
-    def read_HRPG600(self):
-        """
-        Read back power supply status signals, returns dict:  {"PS1_OK" : True, "PS2_OK" : True, "GFAPWR_OK" : True}
-        True = ON, False = OFF
-        """
-        try:
-            return self._call_device('read_HRPG600')
-        except Exception as e:
-            return 'FAILED: Can not read HRPG600 power supply status signals.  Exception: %s' % str(e)
-
-    def get_GPIO_names(self):
-        """
-        Returns dictionary of all pin names (inputs, outputs, pwm, 1-wire).  Names are keys, values are descriptions of the pin functionality
-        """
-        try:
-            return self._call_device('get_GPIO_names')
-        except Exception as e:
-            return 'FAILED: Can not read GPIO names.  Exception: %s' % str(e)
-
-    def read_fan_tach(self):
-        """
-        Reads GFA fan tachometer signals, returns dictionary:  {'GFA_FAN1' : 5000, 'GFA_FAN2' : 5000}
-        """
-        try:
-            return self._call_device('read_fan_tach')
-        except Exception as e:
-            return 'FAILED: Can not read GPIO names.  Exception: %s' % str(e)
-
-    def select_mode(self, pid, mode = 'normal'):
-        """
-        Starts up in normal mode rather than bootloader mode
-        """
-        try:
-            return self._call_device('select_mode', pid, mode)
-        except Exception as e:
-            return 'FAILED: Can not select mode.  Exception: %s' % str(e)
 
     def pbget(self, key):
         """
@@ -466,24 +202,6 @@ class PetalComm(object):
             return self._call_device('pbset', key, value)
         except Exception as e:
             return 'FAILED: Can not set petalbox setting with pbset.  Exception: %s' % str(e)
-
-    def read_gfa_ovrtmp(self):
-        """
-        Read GFA OVER_TEMP signal
-        """
-        try:
-            return self._call_device('read_gfa_ovrtmp')
-        except Exception as e:
-            return 'FAILED: Can not read GFA OVER_TEMP signal.  Exceptions: %s' % str(e)
-
-    def read_adc(self, adc_num):
-        """
-        Read specified anolog input
-        """
-        try:
-            return self._call_device('read_adc', adc_num)
-        except Exception as e:
-            return 'FAILED: Can not read ADC.  Exception: %s' % str(e)
  
     def send_gfa_serial(self, message):
         """
@@ -503,8 +221,94 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not read GFA port.  Exception: %s' % str(e)
 
+    def setup_can(self):
+        """
+        Set up CAN channels
+        """
+        try:
+            return self._call_device('setup_can')
+        except Exception as e:
+            return 'FAILED: Can not setup CAN channels: %s' % str(e)
 
+    def configure(self):
+        """
+        Configure petalcontroller settings
+        """
+        try:
+            return self._call_device('configure')
+        except Exception as e:
+            return 'FAILED: Can not configure petalcontroller: %s' % str(e)
 
+    def pbhelp(self):
+        """
+        Display petalcontroller commands and pbget/pbset keys
+        """
+        try:
+            return self._call_device('pbhelp')
+        except Exception as e:
+            return 'FAILED: Can not display pbhelp info: %s' % str(e)
+
+    def check_and_exit_stop_mode(self):
+        """
+        Check if stop mode is on and exit if it is
+        """
+        try:
+            return self._call_device('check_and_exit_stop_mode')
+        except Exception as e:
+            return 'FAILED: Can not check if stop mode is on or exit stop mode: %s' % str(e)
+
+    def check_and_disable_can_telemetry(self):
+        """
+        Check if CAN telemetry is running/active, wait for it to go idle and then disable.
+        """
+        try:
+            return self._call_device('check_and_disable_can_telemetry')
+        except Exception as e:
+            return 'FAILED: Can not check if CAN telemetry thread is active: %s' % str(e)
+
+    def send_ext_formatted(self, ext_commands_by_busid):
+        """
+        Send out externally formatted dictionary of commands (expert use only, diagnostics)
+        """
+        try:
+            return self._call_device('send_ext_formatted', ext_commands_by_busid)
+        except Exception as e:
+            return 'FAILED: Can not send externally formatted commands: %s' % str(e)
+
+    def recv_ext_formatted(self):
+        """
+        Receive responses to externally formatted commands (expert use only, diagnostics)
+        """
+        try:
+           return self._call_device('recv_ext_formatted')
+        except Exception as e:
+           return 'FAILED: Can not receive externally formatted commands: %s' % str(e)
+
+    def power_up(self, en_supplies = 'both', en_can_boards = 'both', en_sync_buffers = 'both'):
+        """
+        Initializes positioner power, CAN and SYNC buffer lines so that everything is ready for CAN communications
+        and movetables.
+        
+        INPUTS:
+        en_supplies: string (1, 2, or 'both')  that specifies which supplies are enabled
+        en_can_boards:  string (1, 2, or 'both') the specifies which CAN boards are enabled
+        en_sync_buffers:  string (1, 2, or 'both') that specifies which SYNC buffers are enabled
+        
+        'both' is the default for all three arguments.
+        """
+        try:
+            return self._call_device('power_up', en_supplies, en_can_boards, en_sync_buffers)
+        except Exception as e:
+            return 'FAILED: Could not execute the power_up method: %s' % str(e)
+
+    def power_down(self):
+        """
+        Turn positioner power supplies, buffer enables, and CAN boards off.
+        """
+        try:
+            return self._call_device('power_down')
+        except Exceptino as e:
+            return 'FAILED: Could not execute the power_down method: %s' % str(e)
 
 
 

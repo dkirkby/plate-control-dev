@@ -15,11 +15,11 @@ class PosState(object):
     parameters which may vary from positioner to positioner in this
     single object.
 
-    This class is also used for tracking state of fiducials.
+    This class is also used for tracking state of fiducials or petals.
 
-    INPUTS: unit_id = POS_ID of positioner
+    INPUTS: unit_id = POS_ID, FID_ID, or PETAL_ID of device
             logging = boolean whether to enable logging state data to disk
-            type    = 'pos' or 'fid' to say whether it is a positioner or a fiducial
+            type    = 'pos', 'fid', 'ptl' to say whether it is a positioner, fiducial, or petal
 
     Notes:
         Default settings are used if no unit_id is supplied.
@@ -31,11 +31,10 @@ class PosState(object):
     def __init__(self, unit_id=None, logging=False, device_type='pos', printfunc=print, petal_id=None):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.logging = logging
-        self.petal_id = petal_id
         self.type = device_type
 
         # data initialization from .conf file
-        if self.type in ['pos','fid']:
+        if self.type in ['pos','fid','ptl']:
             self.settings_directory = pc.dirs[self.type + '_settings']
             self.logs_directory = pc.dirs[self.type + '_logs']
         template_directory = self.settings_directory
@@ -55,11 +54,19 @@ class PosState(object):
             self.conf.filename = unit_filename
             if self.type == 'pos':
                 self.conf['POS_ID'] = str(unit_id)
-            else:
+            elif self.type == 'fid':
                 self.conf['FID_ID'] = str(unit_id)
+            else:
+                self.conf['PETAL_ID'] = str(unit_id)
             self.conf.write()
         else:
             self.conf = configobj.ConfigObj(unit_filename,unrepr=True,encoding='utf-8')
+
+        # determine petal_id
+        if self.type == 'ptl':
+            self.petal_id = self.conf['PETAL_ID']
+        else:
+            self.petal_id = petal_id
 
         # establishment of much faster access python dict, for in-memory operations
         self._val = self.conf.dict()
@@ -249,6 +256,9 @@ class PosState(object):
             possible_new_keys_and_defaults = {'LAST_MEAS_OBS_X':[],
                                               'LAST_MEAS_OBS_Y':[],
                                               'LAST_MEAS_FWHMS':[]}
+        elif self.type == 'ptl':
+            possible_new_keys_and_defaults ={}
+
         for key in possible_new_keys_and_defaults:
             if key not in self._val:
                 self._val[key] = possible_new_keys_and_defaults[key]

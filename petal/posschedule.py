@@ -7,10 +7,12 @@ class PosSchedule(object):
     from starts to finishes. The move tables are instances of the PosMoveTable
     class.
     
-        petal  ... Instance of Petal that this schedule applies to.
+        petal   ... Instance of Petal that this schedule applies to.
         
-        log    ... Instance of PosSchedStats in which to register scheduling statistics.
-                   If log=None, then no statistics are logged.
+        stats   ... Instance of PosSchedStats in which to register scheduling statistics.
+                    If stats=None, then no statistics are logged.
+    
+        verbose ... Control verbosity at stdout.
     """
 
     def __init__(self, petal, stats=None, verbose=True):
@@ -22,12 +24,13 @@ class PosSchedule(object):
         self.verbose = verbose
         self.printfunc = self.petal.printfunc
         self.requests = {} # keys: posids, values: target request dictionaries
-        self.max_path_adjustment_passes = 3 # max number of times to go through the set of colliding positioners and try to adjust each of their paths to avoid collisions. After this many passes, it defaults to freezing any that still collide
+        self.max_path_adjustment_passes = 2 # max number of times to go through the set of colliding positioners and try to adjust each of their paths to avoid collisions. After this many passes, it defaults to freezing any that still collide
         self.stage_order = ['direct','retract','rotate','extend','expert']
         self.RRE_stage_order = ['retract','rotate','extend']
         self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, stats=self.stats) for name in self.stage_order}
-        self.anneal_time = {'direct':3, 'retract':3, 'rotate':3, 'extend':3, 'expert':3} # times in seconds, see comments in PosScheduleStage
+        self.anneal_time = {'direct':1.0, 'retract':2.0, 'rotate':2.0, 'extend':2.0, 'expert':3} # times in seconds, see comments in PosScheduleStage
         self.should_anneal = True # overriding flag, allowing you to turn off all move time annealing
+        self.should_check_petal_boundaries = True # allows you to turn off petal-specific boundary checks for non-petal systems (such as positioner test stands)
         self.move_tables = {}
 
     @property
@@ -53,17 +56,19 @@ class PosSchedule(object):
             timer_start = time.clock()
         posmodel = self.petal.posmodels[posid]
         if self.already_requested(posid):
+            self.petal.pos_flags[posid] |= 1<<16
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Cannot request more than one target per positioner in a given schedule.')
             return False
         if self._deny_request_because_disabled(posmodel):
+            self.petal.pos_flags[posid] |= 1<<9
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Positioner is disabled.')
             return False
         current_position = posmodel.expected_current_position
         start_posTP = [current_position['posT'],current_position['posP']]
         lims = 'targetable'
-        unreachable = []
+        unreachable = False
         if uv_type == 'QS':
             (targt_posTP,unreachable) = posmodel.trans.QS_to_posTP([u,v],lims)
         elif uv_type == 'obsXY':
@@ -89,15 +94,18 @@ class PosSchedule(object):
                 self.printfunc(str(posid) + ': target request denied. Bad uv_type "' + str(uv_type) + '".')
             return False
         if unreachable:
+            self.petal.pos_flags[posid] |= 1<<14
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Target not reachable: ' + str(uv_type) + ' = (' + format(u,'.3f') + ',' + format(v,'.3f') + ')')
             return False
         targt_obsTP = posmodel.trans.posTP_to_obsTP(targt_posTP)
         if self._deny_request_because_target_interference(posmodel,targt_obsTP):
+            self.petal.pos_flags[posid] |= 1<<12
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Target interferes with a neighbor\'s existing target.')
             return False
-        if self._deny_request_because_out_of_bounds(posmodel,targt_obsTP):
+        if self.should_check_petal_boundaries and self._deny_request_because_out_of_bounds(posmodel,targt_obsTP):
+            self.petal.pos_flags[posid] |= 1<<15
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Target exceeds a fixed boundary.')
             return False
@@ -166,8 +174,8 @@ class PosSchedule(object):
         empties = {posid for posid,table in self.move_tables.items() if not table}
         for posid in empties:
             del self.move_tables[posid]
-        if self.requests:
-            for posid,table in self.move_tables.items():
+        for posid,table in self.move_tables.items():
+            if posid in self.requests:
                 req = self.requests.pop(posid)
                 table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
                 table.log_note += (' ' if table.log_note else '') + req['log_note'] # keep the original log notes with move tables
@@ -214,6 +222,7 @@ class PosSchedule(object):
         if self.stats:
             timer_start = time.clock()
         if self._deny_request_because_disabled(move_table.posmodel):
+            self.petal.pos_flags[posid] |= 1<<9
             if self.verbose:
                 self.printfunc(str(move_table.posmodel.posid) + ': move table addition to schedule denied. Positioner is disabled.')
             return
@@ -255,11 +264,13 @@ class PosSchedule(object):
         """
         if self.should_anneal:
             stage.anneal_tables(anneal_time)
-        if should_freeze:
+        if should_freeze or self.stats:
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
+        if should_freeze:
             for posid in colliding_sweeps:
                 if posid in stage.colliding: # re-check, since earlier path adjustments in loop may have already resolved this posid's collision
+                    self.petal.pos_flags[posid] |= 1<<13 #Mark as frozen by anticollision
                     stage.adjust_path(posid, freezing='forced')
             if self.stats and colliding_sweeps:
                 self.stats.add_to_num_adjustment_iters(1)
@@ -299,8 +310,10 @@ class PosSchedule(object):
             attempts_remaining = self.max_path_adjustment_passes
             while stage.colliding and attempts_remaining:
                 for posid in stage.colliding:
-                    stage.adjust_path(posid)
+                    freezing = 'off' if attempts_remaining > 1 else 'on'
+                    stage.adjust_path(posid,freezing,self.requests)
                     if posid in stage.collisions_resolved['freeze']:
+                        self.petal.pos_flags[posid] |= 1<<13 #Mark as frozen by anticollision
                         for j in range(i+1,len(self.RRE_stage_order)):
                             next_name = self.RRE_stage_order[j]
                             del start_posTP[next_name][posid]
@@ -315,6 +328,7 @@ class PosSchedule(object):
         """
         enabled = posmodel.is_enabled
         if enabled == False:  # this is specifically NOT worded as "if not enabled:", because here we actually do not want a value of None to pass the test, in case the parameter field 'CTRL_ENABLED' has not yet been implemented in the positioner's .conf file
+            self.petal.pos_flags[posmodel.posid] |= 1<<9
             posmodel.clear_postmove_cleanup_cmds_without_executing()
             return True
         return False
@@ -335,6 +349,7 @@ class PosSchedule(object):
                 break
         if target_interference:
             posmodel.clear_postmove_cleanup_cmds_without_executing()
+            self.petal.pos_flags[posmodel.posid] |= 1<<12
             return True
         return False
     
@@ -345,5 +360,6 @@ class PosSchedule(object):
         out_of_bounds = self.collider.spatial_collision_with_fixed(posmodel.posid, target_obsTP)
         if out_of_bounds:
             posmodel.clear_postmove_cleanup_cmds_without_executing()
+            self.petal.pos_flags[posmodel.posid] |= 1<<15
             return True
         return False

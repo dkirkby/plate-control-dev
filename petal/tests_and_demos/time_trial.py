@@ -17,12 +17,12 @@ posids_500 = ['M00001','M00002','M00003','M00004','M00005','M00006','M00008','M0
 fidids_12 = ['P077','F001','F010','F011','F017','F021','F022','F025','F029','F074','P022','P057']
 
 # selection of ids
-posids = posids_50
+posids = posids_500
 fidids = fidids_12
 petal_id = 666
 
 # timing helper wrapper function
-n_stats_lines = 15
+n_stats_lines = 20
 statsfile = os.path.join(pc.dirs['temp_files'],'stats_petal_timetrial')
 def cProfile_wrapper(evaluatable_string):
     print(evaluatable_string)
@@ -33,8 +33,11 @@ def cProfile_wrapper(evaluatable_string):
     p.print_stats(n_stats_lines)
     
 # timed test sequence
-anticollision =  '"adjust"' # None, 'freeze', or 'adjust'
-cProfile_wrapper('ptl = petal.Petal(petal_id, posids, fidids, simulator_on=True, db_commit_on=False, local_commit_on=False, sched_stats_on=True, anticollision=' + anticollision + ', petal_shape="asphere")')
+db_commit_on = False # whether to save state data to online database after every move
+local_commit_on = False # whether to save state data to .conf files after every move
+local_log_on = False # whether to save log data to .csv files after every move
+anticollision =  'adjust' # None, 'freeze', or 'adjust'
+cProfile_wrapper('ptl = petal.Petal(petal_id, posids, fidids, simulator_on=True, db_commit_on='+str(db_commit_on)+', local_commit_on='+str(local_commit_on)+', local_log_on='+str(local_log_on)+', sched_stats_on=True, anticollision="'+anticollision+'", petal_shape="asphere")')
 cProfile_wrapper('ptl.request_homing(posids)')
 cProfile_wrapper('ptl.schedule_send_and_execute_moves()')
 cProfile_wrapper('ptl.quick_direct_dtdp(posids,[15,-30],"some note")')

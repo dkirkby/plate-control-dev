@@ -54,9 +54,9 @@ class PosModel(object):
         return self.state._val['BUS_ID']
     
     @property
-    def deviceid(self):
+    def deviceloc(self):
         """Returns the device location id (on the petal) of the positioner."""
-        return self.state._val['DEVICE_ID']
+        return self.state._val['DEVICE_LOC']
     
     @property
     def is_enabled(self):

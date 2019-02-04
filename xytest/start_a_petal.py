@@ -55,13 +55,13 @@ class Start_A_Petal(object):
         x=(ws/2)-(w/2)
         y=(hs/2)-(h/2)
         gui_root.geometry('%dx%d+%d+%d' % (w,h,x,y))
-
+        self.fidids=[]
         self.e1=Entry(gui_root,width=5)
         self.e1.grid(row=0,column=1)
-        self.e_can=Entry(gui_root,width=5)
-        self.e_can.grid(row=1,column=1)
-        self.e_can.insert(0,'0')
-        Label(gui_root,text="Petal ID:").grid(row=0)
+        #self.e_can=Entry(gui_root,width=5)
+        #self.e_can.grid(row=1,column=1)
+        #self.e_can.insert(0,'0')
+        Label(gui_root,text="PC ID:").grid(row=0)
         #Label(gui_root,text="CAN Bus:").grid(row=1)
         Button(gui_root,text='OK',width=10,command=self.set_ptl_id).grid(row=1,column=2,sticky=W,pady=4)
 
@@ -82,27 +82,28 @@ class Start_A_Petal(object):
         self.simulate = False
         self.logfile='MoveGUI.log'
         self.fvc_type='simulator'
-        self.fidids=['F021']   
-        gui_root.title='Move Controll for Petal '+str(self.ptl_id)
+        gui_root.title='Move Controll for PC '+str(self.ptl_id)
         self.pcomm=petalcomm.PetalComm(self.ptl_id)
         self.mode = 0
         self.pospwr_on()       
         self.info = self.pcomm.pbget('posfid_info')
-
+        self.info_all={}
         # Generate posids and fidids list in different forms. 
-
+        
         self.canbuses=sorted(self.info.keys())
         self.posids = []
         self.posidsnum = []
         self.can_posids={}
         self.can_posidsnum={}
         for canbus in self.canbuses:
+            self.info_all={**self.info_all,**self.info[canbus]}
             posidnum=sorted(list(self.info[canbus].keys()))
             posids_thisbus=self.posidnum_to_posid(posidnum)
             self.can_posids[canbus]=posids_thisbus
             self.can_posidsnum[canbus]=posidnum
             for i in range(len(posids_thisbus)): 
                 self.posidsnum.append(posidnum[i])
+                self.info_all[posidnum[i]]= self.info_all[posidnum[i]]+(canbus,)
                 if posids_thisbus[i].startswith('M'):
                     self.posids.append(posids_thisbus[i])
                 else:
@@ -110,26 +111,79 @@ class Start_A_Petal(object):
         self.posidsnum=sorted(self.posidsnum)
         self.posids=sorted(self.posids)
         self.fidids=sorted(self.fidids)
-        pdb.set_trace()
         self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, local_commit_on= True,  printfunc=self.logwrite, anticollision=None)
 
         # Set the BUS_ID for each positioner
         for canbus in self.canbuses:
             for posid in self.can_posids[canbus]:
                 self.ptl.set_posfid_val(posid, 'BUS_ID',canbus)
+        self.ptl.commit()
 
         for posid in self.ptl.posids:
             self.ptl.set_posfid_val(posid, 'CTRL_ENABLED', True)
             self.ptl.set_posfid_val(posid, 'FINAL_CREEP_ON', False)
             self.ptl.set_posfid_val(posid, 'ANTIBACKLASH_ON', False)
-        self.fvc = fvchandler.FVCHandler(self.fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
-        self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
+        #self.fvc = fvchandler.FVCHandler(self.fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
+        #self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
        
-        # Write a new hwsetup file 
-
+        # Write a new hwsetup file
+        file_this='hwsetup_petal'+self.ptl_id+'.conf'
+        f = open(file_this, 'w')
+        f.write('ptl_id = '+self.ptl_id+' \n')
+        f.write('pos_ids = '+str(self.posids)+ '\n')
+        f.write("pos_notes = [''] \n")                   # list of optional notes associated with each of the positioners
+        f.write('fid_ids = '+str(self.fidids)+ '\n')   # list of id strings for the fiducials
+        f.write('num_extra_dots = 0 \n')                  # number of "extra" reference dots in the field (typically fixed ref fibers in a laboratory test stand)
+             # fiber view cam and platemaker setup
+        f.write('scale = 0.01 \n')                      # mm/pixel, plate scale of fiber view camera
+        f.write('rotation = 0.0 \n')                      # deg, orientation of fiber view camera
+        f.write("fvc_type = 'FLI' \n")                   # 'SBIG', 'FLI', 'SBIG_Yale', or 'simulator', selects fvc hardware
+        f.write('save_sbig_fits = False \n')              # whether to save FITS files generated camera when in 'SBIG' mode
+             # illumination
+        f.write("fiber_illum_adjustment = 'manual' \n")   # 'manual', 'auto_mightex', 'auto_fipos'
+        f.write('exposure_time = 1.0 \n')                # seconds (was 0.2)
+             # hole geometry of the plate
+        f.write("plate_type = 'petal' \n")            # 'clamp_rig', 'small_array', 'petal'
+             # storage mode, local or db
+        f.write("store_mode = 'local' \n")
+             # PlateMaker
+        f.write("pm_instrument = 'petal"+self.ptl_id+"' \n")            # em, desi
+        f.close()
+        """
         # Move All Positioners 
-        
-         
+        should_anneal=False 
+        print('MOVE: homing')
+        t0=time.time()
+        self.ptl.request_homing(self.posids)
+        self.ptl.schedule_send_and_execute_moves(should_anneal=should_anneal)
+        print(time.time()-t0,'s to finish homing')
+        print('MOVE: all positioners to dTdP=[180,0]')
+        for i in range(5):
+            requests = {}
+            command='dTdP'
+            target=[180.,0.]
+            log_note='anticol examples'
+            for posid in self.posids:
+                requests[posid] = {'command':command, 'target':target, 'log_note':log_note}
+            t0=time.time()
+            self.ptl.request_targets(requests) # this is the general use function, where 
+            self.ptl.schedule_send_and_execute_moves(should_anneal=should_anneal)
+            print(time.time()-t0,'s to move to dTdP=[180,0]')
+
+            requests = {}
+            command='dTdP'
+            target=[-180.,0.]
+            log_note='anticol examples'
+            for posid in self.posids:
+                requests[posid] = {'command':command, 'target':target, 'log_note':log_note}
+            t0=time.time()
+            self.ptl.request_targets(requests) # this is the general use function, where 
+            self.ptl.schedule_send_and_execute_moves(should_anneal=should_anneal)
+            print(time.time()-t0,'s to move to posXY=[-180,0]')
+        """
+
+
+          
 # GUI input       
         w=1600
         h=700
@@ -150,10 +204,10 @@ class Start_A_Petal(object):
         self.e2=Entry(gui_root)
         self.e2.grid(row=0,column=3)
 
-        self.e_can=Entry(gui_root,width=10)
-        self.e_can.grid(row=5,column=0,sticky=E)
-        self.e_can.insert(0,self.canbus.strip('can'))
-        Label(gui_root,text="CAN Bus:").grid(row=5,column=0,sticky=W,padx=10)
+        #self.e_can=Entry(gui_root,width=10)
+        #self.e_can.grid(row=5,column=0,sticky=E)
+        #self.e_can.insert(0,self.canbus.strip('can'))
+        #Label(gui_root,text="CAN Bus:").grid(row=5,column=0,sticky=W,padx=10)
 
         Button(gui_root,text='Theta CW',width=10,command=self.theta_cw_degree).grid(row=3,column=1,sticky=W,pady=4)
         Button(gui_root,text='Theta CCW',width=10,command=self.theta_ccw_degree).grid(row=4,column=1,sticky=W,pady=4)
@@ -175,11 +229,11 @@ class Start_A_Petal(object):
         Button(gui_root,text='Phi CCW',width=10,command=self.phi_ccw_degree).grid(row=4,column=0,sticky=W,pady=4)
         Button(gui_root,text='Movement Check',width=12,command=self.movement_check).grid(row=5,column=2,sticky=W,pady=4)
         Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=5,column=3,sticky=W,pady=4)
-        Button(gui_root,text='Reload CANBus',width=12,command=self.reload_canbus).grid(row=5,column=1,sticky=W,pady=4)
-        Button(gui_root,text='1 Write SiID',width=15,command=self.write_siid).grid(row=3,column=3,sticky=W,pady=4)
-        Button(gui_root,text='3 Populate Busids',width=15,command=self.populate_can).grid(row=3,column=4,sticky=W,pady=4)# Call populate_busids.py under pos_utility/ 
+        #Button(gui_root,text='Reload CANBus',width=12,command=self.reload_canbus).grid(row=5,column=1,sticky=W,pady=4)
+        Button(gui_root,text='1 Write PetalID, SiID and Busids',width=20,command=self.write_PSB).grid(row=3,column=3,sticky=W,pady=4)
+        #Button(gui_root,text='3 Populate Busids',width=15,command=self.populate_can).grid(row=3,column=4,sticky=W,pady=4)# Call populate_busids.py under pos_utility/ 
         Button(gui_root,text='2 Write DEVICE_LOC',width=15,command=self.populate_petal_travelers).grid(row=4,column=3,sticky=W,pady=4)# Call populate_travellers.py under pos_utility/ to read from installation traveler and write to positioner 'database' and ID map
-        Button(gui_root,text='4 Aliveness Test',width=13,command=self.aliveness_test).grid(row=4,column=4,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
+        Button(gui_root,text='3 Aliveness Test',width=13,command=self.aliveness_test).grid(row=4,column=4,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
 
         Button(gui_root,text='Center',width=12,command=self.center).grid(row=4,column=2,sticky=W,pady=4)                
 
@@ -190,15 +244,9 @@ class Start_A_Petal(object):
         yscroll_listbox1.grid(row=6, column=0, rowspan=10,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)
         self.listbox1.configure(yscrollcommand=yscroll_listbox1.set)
         self.listbox1.insert(tkinter.END,'ALL')
-        for key in sorted(self.info.keys()):
-            if len(str(key))==2:
-                self.listbox1.insert(tkinter.END,'M000'+str(key)) 
-            elif len(str(key))==3:
-                self.listbox1.insert(tkinter.END,'M00'+str(key))
-            elif len(str(key))==4:
-                self.listbox1.insert(tkinter.END,'M0'+str(key))
-            elif len(str(key))==5:
-                self.listbox1.insert(tkinter.END,'M'+str(key))
+        for canbus in sorted(self.canbuses):
+            for posid in sorted(self.can_posids[canbus]):
+                self.listbox1.insert(tkinter.END,posid+' '+canbus) 
                 
         self.listbox1.bind('<ButtonRelease-1>', self.get_list)
 
@@ -330,8 +378,8 @@ class Start_A_Petal(object):
  
     def set_ptl_id(self):
         self.ptl_id=self.e1.get()
-        self.canbus='can'+self.e_can.get().strip()        
-        print('Loading Petal'+self.ptl_id+', canbus:'+self.canbus)
+        #self.canbus='can'+self.e_can.get().strip()        
+        print('Loading Petal'+self.ptl_id)
         gui_root.destroy()
     def set_fiducial(self):
         if 20000 in self.selected_can :
@@ -365,7 +413,7 @@ class Start_A_Petal(object):
         self.selected_posid=[]
         self.selected_can=[]
         for i in range(len(index)):
-            self.selected.append(self.listbox1.get(index[i]))        
+            self.selected.append(self.listbox1.get(index[i])[0:6])        
             if 'ALL' in self.selected:
                 self.selected_posid=self.posids
                 self.selected_can=[20000]
@@ -381,9 +429,9 @@ class Start_A_Petal(object):
         return sid_dict
             
     def show_info(self):
-        self.text1.insert(END,str(len(self.info.keys())).strip()+' Pos+Fid are found \n')
-        for key in sorted(self.info.keys()):
-            self.text1.insert(END,str(key)+' '+str(self.info[key])+'\n')
+        self.text1.insert(END,str(len(self.info_all.keys())).strip()+' Pos+Fid are found \n')
+        for key in sorted(self.info_all.keys()):
+            self.text1.insert(END,str(key)+' '+str(self.info_all[key])+'\n')
             
         
     def theta_cw_degree(self):
@@ -497,13 +545,17 @@ class Start_A_Petal(object):
         self.ptl.request_direct_dtdp(requests)
         self.ptl.schedule_send_and_execute_moves(should_anneal=False)
  
-    def write_siid(self):
-        self.text1.insert(END,'Writing SiID \n')
-        for key in sorted(self.info.keys()):
-            info_this=self.info[key]
+    def write_PSB(self):
+        self.text1.insert(END,'Writing PetalID, SiID, BUS_ID \n')
+        petal_id=input('Enter Petal ID:')
+         
+        for key in sorted(self.info_all.keys()):
+            info_this=self.info_all[key]
             if float(key)<8000:
                 pos_this=googlesheets.read(self.sheet1,20+int(key),1,False,False)
                 if float(pos_this)== float(key):
+                    googlesheets.write(self.sheet1,int(key)+20,3,petal_id,False,False) # Petal_ID
+                    googlesheets.write(self.sheet1,int(key)+20,4,info_this[4][-2:],False,False) # BUS_ID
                     googlesheets.write(self.sheet1,int(key)+20,5,str(key),False,False) # POSID
                     googlesheets.write(self.sheet1,int(key)+20,6,info_this[3],False,False) # SI_ID
                     googlesheets.write(self.sheet1,int(key)+20,7,info_this[2],False,False) # Full SI_ID

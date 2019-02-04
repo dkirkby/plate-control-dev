@@ -22,15 +22,15 @@ MoveGUI
 #          V1.1  Kai Zhang, 2018-04-02. Add canbus input to talk to different cans for EM Petal. 
 #          V1.2  Kai Zhang  2018-05-01. Add Reload Canbus botton so that no restart is needed. Facilitate the petal check. 
 """
-account='msdos'
+account='badu'
 import os
 import sys
 import datetime
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/'+account+'/focalplane/positioner_logs/data_processing_scripts/'))
-sys.path.append(os.path.abspath('/home/'+account+'/focalplane/pos_utility/'))
+sys.path.append(os.path.abspath(os.getenv('HOME')+'/focalplane/positioner_logs/data_processing_scripts/'))
+sys.path.append(os.path.abspath(os.getenv('HOME')+'/focalplane/pos_utility/'))
 import fvchandler
 import petal
 import petalcomm
@@ -61,7 +61,7 @@ class MoveGUI(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
         global gui_root
         gui_root = tkinter.Tk()
-        google_dir='/home/'+account+'/focalplane/pos_utility/'        
+        google_dir=os.getenv('HOME')+'/focalplane/pos_utility/'        
         credential_name='google_access_account_lbl.json'
         w=200
         h=100
@@ -129,8 +129,7 @@ class MoveGUI(object):
                 self.posids.append('M0'+str(key))
             elif len(str(key))==5:
                 self.posids.append('M'+str(key))
-            
-        self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+        self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite,user_interactions_enabled=True)
         for posid in self.ptl.posids:
             self.ptl.set_posfid_val(posid, 'CTRL_ENABLED', True)
             self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
@@ -231,9 +230,9 @@ class MoveGUI(object):
         self.e_selected=Entry(gui_root)
         self.e_selected.grid(row=3,column=6)
         
-        #Button(gui_root,text='Load Acceptance Traveller',width=20,command=self.load_acceptance_traveller).grid(row=4,column=5,sticky=W,pady=4)
-        #Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=4,column=6,sticky=W,pady=4)
-        #Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=13,column=8,sticky=W,pady=4)
+        Button(gui_root,text='Load Acceptance Traveller',width=20,command=self.load_acceptance_traveller).grid(row=4,column=5,sticky=W,pady=4)
+        Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=4,column=6,sticky=W,pady=4)
+        Button(gui_root,text='Write Acceptence Traveller',width=20,command=self.write_acceptance_traveller).grid(row=13,column=8,sticky=W,pady=4)
         
         yscroll_text2 = Scrollbar(gui_root, orient=tkinter.VERTICAL)
         yscroll_text2.grid(row=6, column=6, rowspan=20,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)     
@@ -250,46 +249,45 @@ class MoveGUI(object):
 
 ##      checkboxes
         
-        self.plug=IntVar(gui_root)
-        self.entered=IntVar(gui_root)
         self.theta_work=IntVar(gui_root)
         self.phi_work=IntVar(gui_root)
-        self.plug.set(1)
-        self.entered.set(1)
+        self.centered=IntVar(gui_root)
         self.theta_work.set(1)
         self.phi_work.set(1)
-        
+        self.centered.set(0) 
         column_entry=7
-        Checkbutton(gui_root, text='Plug?', variable=self.plug).grid(row=4,column=column_entry,sticky=W,pady=4)
-        Checkbutton(gui_root, text='POS INFO Entered?', variable=self.entered).grid(row=5,column=column_entry,sticky=W,pady=4)
-        Checkbutton(gui_root, text='Theta Work?', variable=self.theta_work).grid(row=6,column=column_entry,sticky=W,pady=4)
-        Checkbutton(gui_root, text='Phi Work?', variable=self.phi_work).grid(row=7,column=column_entry,sticky=W,pady=4)
-        
-        Label(gui_root,text="Note").grid(row=8,column=column_entry)
-        self.e3=Entry(gui_root)
-        self.e3.grid(row=8,column=column_entry+1)
+        Checkbutton(gui_root, text='Theta Work?', variable=self.theta_work).grid(row=5,column=column_entry,sticky=W,pady=4)
+        Checkbutton(gui_root, text='Phi Work?', variable=self.phi_work).grid(row=6,column=column_entry,sticky=W,pady=4)
+        Checkbutton(gui_root, text='Centered?', variable=self.centered).grid(row=7,column=column_entry,sticky=W,pady=4)
+ 
+        #Label(gui_root,text="Note").grid(row=8,column=column_entry)
+        #self.e3=Entry(gui_root)
+        #self.e3.grid(row=8,column=column_entry+1)
         Label(gui_root,text="Send PFA Date").grid(row=9,column=column_entry)
         self.e4=Entry(gui_root)
         self.e4.insert(END,'{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
         self.e4.grid(row=9,column=column_entry+1)
-        Label(gui_root,text="Send PFA Name").grid(row=10,column=column_entry)
-        self.e5=Entry(gui_root)
-        self.e5.grid(row=10,column=column_entry+1)
-        Label(gui_root,text="Tote").grid(row=11,column=column_entry)
-        self.box_options = [    "GREY TOTE\n---------\nREADY FOR PFA INSTALL",    "GREY TOTE\n---------\nINCOMING INSPECTION IN PROGRESS",    "LARGE TOTE\n--------\nFAIL REVIEW LATER", "LARGE TOTE\n--------\nFAIL PERMANENT"]
-        self.box_goto = StringVar(gui_root)
-        self.box_goto.set("Where will you put me?") # default value
-        self.drop1 = OptionMenu(gui_root, self.box_goto, *self.box_options)
-        self.drop1.grid(row=11,column=column_entry+1)
+        #Label(gui_root,text="Send PFA Name").grid(row=10,column=column_entry)
+        #self.e5=Entry(gui_root)
+        #self.e5.grid(row=10,column=column_entry+1)
+        #Label(gui_root,text="Tote").grid(row=11,column=column_entry)
+        #self.box_options = [    "GREY TOTE\n---------\nREADY FOR PFA INSTALL",    "GREY TOTE\n---------\nINCOMING INSPECTION IN PROGRESS",    "LARGE TOTE\n--------\nFAIL REVIEW LATER", "LARGE TOTE\n--------\nFAIL PERMANENT"]
+        #self.box_goto = StringVar(gui_root)
+        #self.box_goto.set("Where will you put me?") # default value
+        #self.drop1 = OptionMenu(gui_root, self.box_goto, *self.box_options)
+        #self.drop1.grid(row=11,column=column_entry+1)
 
-        #Label(gui_root,text="Update DB?, your init").grid(row=12,column=column_entry)
-        #self.e6=Entry(gui_root)
-        #self.e6.grid(row=12,column=column_entry+1)
+        Label(gui_root,text="Your init").grid(row=12,column=column_entry)
+        self.e6=Entry(gui_root)
+        self.e6.grid(row=12,column=column_entry+1)
         
 
         
 #        Button(gui_root,text='Plot List',width=10,command=click_plot_list).grid(row=4,column=2,sticky=W,pady=4)
         Button(gui_root,text='Refresh/Restart',width=15,command=self.restart).grid(row=0,column=8,sticky=W,pady=4)
+        self.pwr_button = Button(gui_root,text='POSPWR is ON', width=15, command=self.toggle, bg='green')
+        self.pwr_button.grid(row=1, column=8, sticky=W,pady=4)
+
         Button(gui_root,text='Clear',width=15,command=self.clear1).grid(row=5,column=4,sticky=W,pady=4)
         Button(gui_root,text='Clear',width=15,command=self.clear2).grid(row=5,column=6,sticky=W,pady=4)
         
@@ -311,7 +309,7 @@ class MoveGUI(object):
     def set_fiducial(self):
         if 20000 in self.selected_can :
             self.text1.insert(END,'No, you cannot set all positioners as fiducials, this will burn the motor! \n')
-        elif all([self.selected_can[i] <10000 for i in range(len(self.selected_can))]):
+        elif all([self.selected_can[i] <8000 for i in range(len(self.selected_can))]):
             self.text1.insert(END,'No, you cannot set a positioners as a fiducial, this will burn the motor! \n')
         else:
             for i in range(len(self.selected_can)):
@@ -396,17 +394,25 @@ class MoveGUI(object):
             move_time_T = abs(motor_deg_T / motor_speed_degpersec)
             move_time_P = abs(motor_deg_P / motor_speed_degpersec)
             move_time = max(move_time_T, move_time_P)
+            if motor_steps_T == 0:
+                speed_mode_T='creep'
+            else:
+                speed_mode_T='cruise'
+            if motor_steps_P == 0:
+                speed_mode_P='creep'
+            else:
+                speed_mode_P='cruise'
             table = {
                      'canid':canid,
                      'busid':self.canbus, 
                      'nrows':1,
                      'motor_steps_T':[motor_steps_T], # > 0 means counter-clockwise, < 0 means clockwise
                      'motor_steps_P':[motor_steps_P], # > 0 means counter-clockwise, < 0 means clockwise
-                     'speed_mode_T':['cruise'],
-                     'speed_mode_P':['cruise'],
+                     'speed_mode_T':[speed_mode_T],
+                     'speed_mode_P':[speed_mode_P],
                      'move_time':[move_time],
                       'postpause':[0]}
-            if canid <10000:
+            if canid <8000:
                 if i == 0:
                     tables = [table] 
                 else:
@@ -492,7 +498,7 @@ class MoveGUI(object):
         self.text1.insert(END,'Writing SiID \n')
         for key in sorted(self.info.keys()):
             info_this=self.info[key]
-            if float(key)<8000:
+            if float(key)<10000:
                 ind_idmap=[j for j, x in enumerate([y.strip() for y in self.posid_idmap_num]) if x == str(key).strip()]
                 ind_this=ind_idmap[0]+1 # 20+int(key)
                 pos_this=googlesheets.read(self.sheet1,ind_this,1,False,False)
@@ -506,7 +512,7 @@ class MoveGUI(object):
                         print('Writing '+str(key)+' successfully \n')
                     else:
                         print('Writing '+str(key)+' failed. \n Check doc \n')
-            elif float(key)>8000:
+            elif float(key)>10000:
                 self.text1.insert(END,'Is '+str(key)+' a fiducial? Not writing. \n')
             else:
                 self.text1.insert(END,'Posid and RowID are not consistent. Check the integrity of the file. \nGo to '+url+' \n' )
@@ -606,52 +612,24 @@ class MoveGUI(object):
             self.text2.insert('0.0','Cannot load all positioners simultaneously. \nSelect one positioner.\n')
         else: 
             # Find the column we want first
-            pos_list=googlesheets.read_row(self.sheet2,2,False)
-            column_skip=6 # Skip the first 6 description columns
-            pos_list=np.array(pos_list[column_skip:])
+            pos_list=googlesheets.read_col(self.sheet2,1,False)
+            row_skip=1 # Skip the first 6 description columns
+            pos_list=np.array(pos_list[row_skip:])
             selected_can_str=str(self.selected_can)
             selected_can_str.strip()
             ind=np.where(pos_list == selected_can_str)          
             if not ind[0]:
                 self.text2.insert('0.0','Cannot find this positioner while loading... \n')
             else:
-                col_id=ind[0][0]+column_skip+1
-                column_info=googlesheets.read_col(self.sheet2,col_id,False)
-                column_info_title=googlesheets.read_col(self.sheet2,2,False)
+                row_id=ind[0][0]+row_skip+1
+                row_info=googlesheets.read_row(self.sheet2,row_id,False)
+                row_info_title=googlesheets.read_row(self.sheet2,1,False)
                 ref_list=['', '', '', '', '', '', '', '',  'A','','', '', '', '', '','','Y', 'Y', 'Y', 'B', 'B', 'N', 'Y', 'N', 'Y', 'N', 'Y', 'N', 'N', 'Y', 'Y', 'A', 'P', '', '', '', '', 'Y', 'Y', 'Y', 'Y', '', '', '', '', '', '', '', '', '', '', '', '', '', '','','','','','']
                 #['', '', '', '2017-10-23', '', '1748', '5899', '', '', 'John Mourelatos', '2017-10-23', '', '1.15', 'A', '4.3', 'A', '', '', '', 'John Mourelatos', '2017-10-23', 'Y', 'Y', 'Y', 'B', 'B', 'N', 'Y', 'N', 'Y', 'N', 'Y', 'N', 'N', 'Y', 'Y', 'A', '', '', 'John Mourelatos', '2017-10-23', 'P', '0.00997', '0.12588', 'SKIP', 'SKIP', '', '', 'Y', 'Y', 'Y', 'Y', '', '', '', '', '0.13585', '', 'YES', '', '', '', '2017-11-03', 'KAI ZHANG', 'GREY TOTE\n---------\nREADY FOR PFA INSTALL', 'KZ']
                  
-                for i in range(len(column_info)):
-                    if ref_list[i] == '' or column_info[i] == ref_list[i]:
-                        if column_info_title[i] == 'DOCUMENT_DEVIATION' and column_info[i] != '':
-                            self.text2.insert(END,str(column_info_title[i])+': ','big')
-                            self.text2.insert(END,str(column_info[i])+'\n','yellow')
-                        elif column_info_title[i] == 'ENVELOPE_GAGE' and column_info[i] in ['C','D']:
-                            self.text2.insert(END,str(column_info_title[i])+': ','big')
-                            self.text2.insert(END,str(column_info[i])+'\n','red')
-                        elif column_info_title[i] == 'ENVELOPE_GAGE' and column_info[i] == '':
-                            self.text2.insert(END,str(column_info_title[i])+': ','yellow')                        
-                        elif column_info_title[i] == 'THETA_PHI_ANGLE' and float(column_info[i])>0.5:
-                            self.text2.insert(END,str(column_info_title[i])+': ','big')
-                            self.text2.insert(END,str(column_info[i])+'\n','red')
-                        elif column_info_title[i] == 'FERRULE_PHI_ANGLE' and float(column_info[i])>0.5:
-                            self.text2.insert(END,str(column_info_title[i])+': ','big')
-                            self.text2.insert(END,str(column_info[i])+'\n','red')
-                        elif column_info_title[i] == 'COMBINED_ANGLE':
-                            if column_info[i] == '':
-                               self.text2.insert(END,str(column_info_title[i])+': \n','yellow') 
-                            elif float(column_info[i])>0.5:
-                                self.text2.insert(END,str(column_info_title[i])+': ','big')
-                                self.text2.insert(END,str(column_info[i])+'\n','red')
-                            else:
-                                self.text2.insert(END,str(column_info_title[i])+': ','big')
-                                self.text2.insert(END,str(column_info[i])+'\n','green')
-                        else:
-                            self.text2.insert(END,str(column_info_title[i])+': ','big')
-                            self.text2.insert(END,str(column_info[i])+'\n','green')
-                    else:
-                        self.text2.insert(END,str(column_info_title[i])+': ','big')
-                        self.text2.insert(END,str(column_info[i])+'\n','red')
+                for i in range(len(row_info)):
+                    self.text2.insert(END,str(row_info_title[i])+': ','big')
+                    self.text2.insert(END,str(row_info[i])+'\n','red')
         
         
         
@@ -661,47 +639,56 @@ class MoveGUI(object):
         self.e4.insert(END,'{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
         if self.selected_can == 20000:
             self.text2.insert('0.0','Cannot write all positioners simultaneously for safety reason. \nSelect one positioner.\n')
-        else: 
+        else:
             # Find the column we want first
-            pos_list=googlesheets.read_row(self.sheet2,2,False)
-            column_skip=6 # Skip the first 6 description columns
-            pos_list=np.array(pos_list[column_skip:])
+            pos_list=googlesheets.read_col(self.sheet2,1,False)
+            row_skip=1 # Skip the first 6 description columns
+            pos_list=np.array(pos_list[row_skip:])
             selected_can_str=str(self.selected_can)
             selected_can_str.strip()
-            ind=np.where(pos_list == selected_can_str)          
+            ind=np.where(pos_list == selected_can_str)
             if not ind[0]:
                 self.text2.insert('0.0','Cannot find this positioner...\n')
             else:
-                col_id=ind[0][0]+column_skip+1
-                if self.plug.get()==1:
-                    googlesheets.write(self.sheet2,38,col_id,'Y',False,False)
-                else:
-                    googlesheets.write(self.sheet2,38,col_id,'N',False,False)
-                if self.entered.get()==1:
-                    googlesheets.write(self.sheet2,39,col_id,'Y',False,False)
-                else:
-                    googlesheets.write(self.sheet2,39,col_id,'N',False,False)
+                row_id=ind[0][0]+row_skip+1
+                googlesheets.write(self.sheet2,row_id,21,self.e6.get(),False,False)
+                googlesheets.write(self.sheet2,row_id,22,self.e4.get(),False,False)
                 if self.theta_work.get()==1:
-                    googlesheets.write(self.sheet2,40,col_id,'Y',False,False)
+                    googlesheets.write(self.sheet2,row_id,23,'YES',False,False)
                 else:
-                    googlesheets.write(self.sheet2,40,col_id,'N',False,False)
+                    googlesheets.write(self.sheet2,row_id,23,'NO',False,False)
                 if self.phi_work.get()==1:
-                    googlesheets.write(self.sheet2,41,col_id,'Y',False,False)
+                    googlesheets.write(self.sheet2,row_id,24,'YES',False,False)
                 else:
-                    googlesheets.write(self.sheet2,41,col_id,'N',False,False)
-                googlesheets.write(self.sheet2,42,col_id,self.e3.get(),False,False)  #53 before
-                if self.box_goto.get() == self.box_options[0]:   # If accept for PFA installation
-                    googlesheets.write(self.sheet2,58,col_id,self.e4.get(),False,False)
-                    googlesheets.write(self.sheet2,59,col_id,self.e5.get(),False,False)
-                    googlesheets.write(self.sheet2,60,col_id,self.box_goto.get(),False,False)
-                    googlesheets.write(self.sheet2,61,'Y',False,False)
+                    googlesheets.write(self.sheet2,row_id,24,'NO',False,False)
+                if self.centered.get()==1:
+                    googlesheets.write(self.sheet2,row_id,25,'YES',False,False)
+                    self.centered.set(0)
                 else:
-                    googlesheets.write(self.sheet2,58,col_id,'No',False,False)
-                    googlesheets.write(self.sheet2,59,col_id,'No',False,False)
-                    googlesheets.write(self.sheet2,60,col_id,self.box_goto.get(),False,False)
-                    googlesheets.write(self.sheet2,61,'Y',False,False)
+                    googlesheets.write(self.sheet2,row_id,25,'NO',False,False)
+
+
                 self.load_acceptance_traveller()
-    
+
+    def toggle(self, flag = [0]):
+        flag[0] = not flag[0]
+        if flag[0]:
+            self.pospwr_off()
+            self.pwr_button.config(bg='grey')
+            self.pwr_button.config(text='POSPWR is OFF')
+        else:
+            self.pospwr_on()
+            self.pwr_button.config(text='POSPWR is ON')
+            self.pwr_button.config(bg='green')
+
+    def pospwr_on(self):
+        self.pcomm.pbset('ps1_en','on')
+        self.pcomm.pbset('ps2_en', 'on')
+
+    def pospwr_off(self):
+        self.pcomm.pbset('ps1_en','off')
+        self.pcomm.pbset('ps2_en','off')
+ 
     
     def restart(self):
         gui_root.destroy()
@@ -709,7 +696,12 @@ class MoveGUI(object):
     def reload_canbus(self):
         self.canbus='can'+self.e_can.get().strip()        
         self.bus_id=self.canbus
-        self.info = self.pcomm.get_posfid_info(self.canbus)
+        info_temp=self.pcomm.pbget('posfid_info')
+        if isinstance(info_temp, (list,)):
+            self.info = self.pcomm.pbget('posfid_info')[0]
+        else:
+            self.info=self.pcomm.pbget('posfid_info')[self.canbus]
+        print(self.info)
         self.posids = []
         print(self.info)
         for key in sorted(self.info.keys()):
@@ -726,7 +718,7 @@ class MoveGUI(object):
                 self.text1.insert(END,str(key)+' has too low a FW ver = '+self.info[key][0]+', BL ver = '+self.info[key][1]+'! Hand it to Jessica. \n','red')
 
 
-        self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+        self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite,user_interactions_enabled=True)
         for posid in self.posids:
             self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)

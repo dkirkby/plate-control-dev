@@ -21,7 +21,7 @@ conf_data = {posid:{} for posid in locations}
 for posid,loc_data in locations.items():
     data = conf_data[posid]
     data['POS_ID']           = loc_data['POS_ID']
-    data['DEVICE_ID']        = loc_data['DEVICE_ID']
+    data['DEVICE_LOC']        = loc_data['DEVICE_LOC']
     data['CTRL_ENABLED']     = random.choices([True,False],[1-percent_disabled,percent_disabled])[0]
     data['LENGTH_R1']        = 3.0 + random.uniform(-armlength_max_err,armlength_max_err)
     data['LENGTH_R2']        = 3.0 + random.uniform(-armlength_max_err,armlength_max_err)

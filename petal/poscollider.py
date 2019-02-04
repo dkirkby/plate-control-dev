@@ -1,11 +1,14 @@
 import numpy as np
 import posconstants as pc
+import posstate
 import posanimator
 import configobj
 import os
 import copy as copymodule
 import math
 from numba import jit
+import collision_lookup_generator_subset as lookup
+import pickle
 
 class PosCollider(object):
     """PosCollider contains geometry definitions for mechanical components of the
@@ -16,22 +19,51 @@ class PosCollider(object):
 
     See DESI-0899 for geometry specifications, illustrations, and kinematics.
     """
-    def __init__(self, configfile=''):
+    def __init__(self, configfile='', collision_hashpp_exists=False, collision_hashpf_exists=False, hole_angle_file=None):
         if not configfile:
-            defaultconfigfile = '_collision_settings_DEFAULT.conf'
-            filename = os.path.join(pc.dirs['collision_settings'],defaultconfigfile)
+            filename = '_collision_settings_DEFAULT.conf'
         else:
-            filename = os.path.join(pc.dirs['collision_settings'],configfile)
-        self.config = configobj.ConfigObj(filename,unrepr=True)
+            filename = configfile
+        filepath = os.path.join(pc.dirs['collision_settings'],filename)
+        self.config = configobj.ConfigObj(filepath,unrepr=True)
         self.posids = set() # posid strings for all the positioners
         self.posindexes = {} # key: posid string, value: index number for positioners in animations
         self.posmodels = {} # key: posid string, value: posmodel instance
         self.pos_neighbors = {} # all the positioners that surround a given positioner. key is a posid, value is a set of neighbor posids
         self.fixed_neighbor_cases = {} # all the fixed neighbors that apply to a given positioner. key is a posid, value is a set of the fixed neighbor cases
         self.R1, self.R2, self.x0, self.y0, self.t0, self.p0 = {}, {}, {}, {}, {}, {}
+        self.set_petal_offsets() # default values are used here. one should call this function with actual values after initializing collider
         self.plotting_on = True
         self.timestep = self.config['TIMESTEP']
         self.animator = posanimator.PosAnimator(fignum=0, timestep=self.timestep)
+        
+        # hash table initializations (if being used)
+        self.collision_hashpp_exists = collision_hashpp_exists
+        self.collision_hashpf_exists = collision_hashpf_exists
+        if self.collision_hashpp_exists:
+            f = open(os.path.join(os.environ.get('collision_table'), 'table_pp_50_5_5_5_5.out'), 'rb')
+            self.table_pp = pickle.load(f)
+            f.close()
+            f = open(os.path.join(os.environ.get('collision_table'), hole_angle_file), 'rb')
+            self.hole_angle = pickle.load(f)
+            f.close()
+            
+        if self.collision_hashpf_exists:
+            f = open(os.path.join(os.environ.get('collision_table'), 'table_pf_50_50_5_5.out'), 'rb')
+            self.table_pf = pickle.load(f)
+            f.close()
+            
+    def set_petal_offsets(self, x0=0.0, y0=0.0, rot=0.0):
+        """Sets information about a particular petal's overall location. This
+        information is necessary for handling the fixed collision boundaries of
+        petal exterior and GFA.
+            x0 and y0 units are mm
+            rot units are deg
+        """
+        self._petal_x0 = x0
+        self._petal_y0 = y0
+        self._petal_rot = rot
+        self._load_keepouts()
 
     def add_positioners(self, posmodels):
         """Add a collection of positioners to the collider object.
@@ -60,7 +92,7 @@ class PosCollider(object):
             # self.animator.add_or_change_item('Ei', self.posindexes[posid], start_time, self.Ei_polys[posid].points)
             # self.animator.add_or_change_item('Ee', self.posindexes[posid], start_time, self.Ee_polys[posid].points)
             self.animator.add_or_change_item('line at 180', self.posindexes[posid], start_time, self.line180_polys[posid].points)
-            self.animator.add_label(format(self.posmodels[posid].deviceid,'03d'), self.x0[posid], self.y0[posid])
+            self.animator.add_label(format(self.posmodels[posid].deviceloc,'03d'), self.x0[posid], self.y0[posid])
         
     def add_mobile_to_animator(self, start_time, sweeps):
         """Add a collection of PosSweeps to the animator, describing positioners'
@@ -186,25 +218,60 @@ class PosCollider(object):
         """
         if obsTP_A[1] >= self.Eo_phi and obsTP_B[1] >= self.Eo_phi:
             return pc.case.I
-        elif obsTP_A[1] < self.Eo_phi and obsTP_B[1] >= self.Ei_phi: # check case IIIA
-            if self._case_III_collision(posid_A, posid_B, obsTP_A, obsTP_B[0]):
-                return pc.case.IIIA
+        
+        if self.collision_hashpp_exists:
+            
+            dr = self.hole_angle[posid_A][posid_B][0]
+            angle = self.hole_angle[posid_A][posid_B][1]
+            
+            # to make theta angle ranges from 0-360, rather than -180 to 180
+            # to be consistent with angle convention used in table
+            if obsTP_A[0] < 0: 
+                t1 = 360 + obsTP_A[0]
+            else:
+                t1 = obsTP_A[0]
+                
+            if obsTP_B[0] < 0: 
+                t2 = 360 + obsTP_B[0]
+            else:
+                t2 = obsTP_B[0]
+            
+            # binning to the resolution of the lookup table
+            dr = lookup.nearest(dr, 50, 0, 950)
+            t1 = lookup.nearest(t1, 5, 0, 360)
+            t2 = lookup.nearest(t2, 5, 0, 360)
+            phi1 = lookup.nearest(obsTP_A[1], 5, -20, 205)
+            phi2 = lookup.nearest(obsTP_B[1], 5, -20, 205)
+            
+            if t1 == 360: t1 = 0
+            if t2 == 360: t2 = 0
+            code = lookup.make_code_pp(dr, t1-angle, phi1, t2-angle, phi2)
+            
+            if code in self.table_pp:
+                return self.table_pp[code] # <= 0.1 us
             else:
                 return pc.case.I
-        elif obsTP_B[1] < self.Eo_phi and obsTP_A[1] >= self.Ei_phi: # check case IIIB
-            if self._case_III_collision(posid_B, posid_A, obsTP_B, obsTP_A[0]):
-                return pc.case.IIIB
-            else:
-                return pc.case.I
-        else: # check cases II and III
-            if self._case_III_collision(posid_A, posid_B, obsTP_A, obsTP_B[0]):
-                return pc.case.IIIA
-            elif self._case_III_collision(posid_B, posid_A, obsTP_B, obsTP_A[0]):
-                return pc.case.IIIB
-            elif self._case_II_collision(posid_A, posid_B, obsTP_A, obsTP_B):
-                return pc.case.II
-            else:
-                return pc.case.I
+            
+        else:
+            if obsTP_A[1] < self.Eo_phi and obsTP_B[1] >= self.Ei_phi: # check case IIIA
+                if self._case_III_collision(posid_A, posid_B, obsTP_A, obsTP_B[0]):
+                    return pc.case.IIIA
+                else:
+                    return pc.case.I
+            elif obsTP_B[1] < self.Eo_phi and obsTP_A[1] >= self.Ei_phi: # check case IIIB
+                if self._case_III_collision(posid_B, posid_A, obsTP_B, obsTP_A[0]):
+                    return pc.case.IIIB
+                else:
+                    return pc.case.I
+            else: # check cases II and III
+                if self._case_III_collision(posid_A, posid_B, obsTP_A, obsTP_B[0]):
+                    return pc.case.IIIA
+                elif self._case_III_collision(posid_B, posid_A, obsTP_B, obsTP_A[0]):
+                    return pc.case.IIIB
+                elif self._case_II_collision(posid_A, posid_B, obsTP_A, obsTP_B):
+                    return pc.case.II
+                else:
+                    return pc.case.I
 
     def spatial_collision_with_fixed(self, posid, obsTP):
         """Searches for collisions in space between a fiber positioner and all
@@ -220,11 +287,21 @@ class PosCollider(object):
         was first detected, if any.
         """
         if self.fixed_neighbor_cases[posid]:
-            poly1 = self.place_phi_arm(posid,obsTP)
-            for fixed_case in self.fixed_neighbor_cases[posid]:
-                poly2 = self.fixed_neighbor_keepouts[fixed_case]
-                if poly1.collides_with(poly2):
-                    return fixed_case
+            if self.collision_hashpf_exists:
+                loc_id = self.posmodels[posid].deviceloc
+                dx = abs(self.x0[posid] - self.posmodels[posid].expected_current_position['obsX'])
+                dy = abs(self.y0[posid] - self.posmodels[posid].expected_current_position['obsY'])
+                code = lookup.make_code_pf(loc_id, dx, dy, obsTP[0], obsTP[1])
+                if code in self.table_pf:
+                    return self.table_pf[code]
+                
+            else:
+                poly1 = self.place_phi_arm(posid,obsTP)
+                for fixed_case in self.fixed_neighbor_cases[posid]:
+                    poly2 = self.fixed_neighbor_keepouts[fixed_case]
+                    if poly1.collides_with(poly2):
+                        return fixed_case
+                    
         return pc.case.I
 
     def place_phi_arm(self, posid, obsTP):
@@ -283,8 +360,10 @@ class PosCollider(object):
         self.keepout_T = PosPoly(self.config['KEEPOUT_THETA'], self.config['KEEPOUT_THETA_PT0'])
         self.keepout_PTL = PosPoly(self.config['KEEPOUT_PTL'], self.config['KEEPOUT_PTL_PT0'])
         self.keepout_GFA = PosPoly(self.config['KEEPOUT_GFA'], self.config['KEEPOUT_GFA_PT0'])
-        self.keepout_GFA = self.keepout_GFA.rotated(self.config['KEEPOUT_GFA_ROT'])
-        self.keepout_GFA = self.keepout_GFA.translated(self.config['KEEPOUT_GFA_X0'],self.config['KEEPOUT_GFA_Y0'])
+        self.keepout_PTL = self.keepout_PTL.rotated(self._petal_rot)
+        self.keepout_PTL = self.keepout_PTL.translated(self._petal_x0, self._petal_y0)
+        self.keepout_PTL = self.keepout_GFA.rotated(self._petal_rot)
+        self.keepout_PTL = self.keepout_GFA.translated(self._petal_x0, self._petal_y0)
         self.fixed_neighbor_keepouts = {pc.case.PTL : self.keepout_PTL, pc.case.GFA : self.keepout_GFA}
 
     def _load_positioner_params(self):

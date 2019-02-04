@@ -25,6 +25,8 @@ code_version = petal_directory.split(os.path.sep)[-2]
 dirs = {}
 dirs['all_logs']     = os.environ.get('POSITIONER_LOGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/positioner_logs
 dirs['all_settings'] = os.environ.get('FP_SETTINGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/fp_settings
+dirs['positioner_locations_file'] = os.environ.get('FP_SETTINGS_PATH')+'/hwsetups/Petal_Metrology.csv' # this is NOT metrology, it is a *bad* naming. it is nominals!
+dirs['small_array_locations_file']=os.getenv('FP_SETTINGS_PATH')+'/hwsetups/SWIntegration_XY.csv'
 if 'DESI_HOME' in os.environ:
     dirs['temp_files']   = os.environ.get('DESI_HOME') + os.path.sep + 'fp_temp_files' + os.path.sep
 elif 'HOME' in os.environ:
@@ -32,8 +34,8 @@ elif 'HOME' in os.environ:
 else:
     print("No DESI_HOME or Home defined in environment, assigning temp file generation to current directory/fp_temp_files")
     dirs['temp_files'] = os.path.abspath('./') + 'fp_temp_files' + os.path.sep
-dir_keys_logs        = ['pos_logs','fid_logs','xytest_data','xytest_logs','xytest_plots','xytest_summaries']
-dir_keys_settings    = ['pos_settings','fid_settings','test_settings','collision_settings','hwsetups','other_settings']
+dir_keys_logs        = ['pos_logs','fid_logs','ptl_logs','xytest_data','xytest_logs','xytest_plots','xytest_summaries']
+dir_keys_settings    = ['pos_settings','fid_settings','test_settings','collision_settings','hwsetups','ptl_settings','other_settings']
 for key in dir_keys_logs:
     dirs[key] = dirs['all_logs'] + os.path.sep + key + os.path.sep
 for key in dir_keys_settings:
@@ -70,8 +72,8 @@ power_supply_can_map = {'V1':{'can10','can11','can13','can23'},
 deg = '\u00b0'
 mm = 'mm'
 um_per_mm = 1000
-deg_per_rad = math.pi/180.
-rad_per_deg = 180./math.pi
+deg_per_rad = 180./math.pi  
+rad_per_deg = math.pi/180.
 timestamp_format = '%Y-%m-%d %H:%M:%S.%f' # see strftime documentation
 filename_timestamp_format = '%Y-%m-%d_T%H%M%S'
 gear_ratio = {}
@@ -111,7 +113,13 @@ class collision_case(object):
 case = collision_case()
 
 # Collision resolution methods
-nonfreeze_adjustment_methods = ['pause','extend','retract','rot_ccw','rot_cw']
+nonfreeze_adjustment_methods = ['pause',
+                                'extend_A','retract_A',
+                                'extend_B','retract_B',
+                                'rot_ccw_A','rot_cw_A',
+                                'rot_ccw_B','rot_cw_B',
+                                'repel_ccw_A','repel_cw_A',
+                                'repel_ccw_B','repel_cw_B']
 all_adjustment_methods = nonfreeze_adjustment_methods + ['freeze']
 
 # Convenience methods
@@ -126,6 +134,11 @@ def sign(x):
         return -1
     else:
         return 0
+
+def linspace(start,stop,num):
+    """Return a list of floats linearly spaced from start to stop (inclusive).
+    List has num elements."""
+    return [i*(stop-start)/(num-1)+start for i in range(num)]
 
 # Functions for handling mixes of [M][N] vs [M] dimension lists
 def listify(uv, keep_flat=False):

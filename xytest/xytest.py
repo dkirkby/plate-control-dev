@@ -26,6 +26,7 @@ import tkinter.simpledialog
 import csv
 import collections
 import getpass
+from astropy.io import ascii
 
 class _read_key:
     def __init__(self):
@@ -126,24 +127,27 @@ class XYTest(object):
             fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=self.hwsetup_conf['save_sbig_fits'])
         fvc.rotation = self.hwsetup_conf['rotation']
         fvc.scale = self.hwsetup_conf['scale']
+        fvc.translation = self.hwsetup_conf['translation']
         fvc.exposure_time = self.hwsetup_conf['exposure_time']
         self.logwrite('FVC type: ' + str(fvc_type))
         self.logwrite('FVC rotation: ' + str(fvc.rotation))
         self.logwrite('FVC scale: ' + str(fvc.scale))
         
         # set up positioners, fiducials, and petals
-        self.posids = self.hwsetup_conf['pos_ids']
         self.pos_notes = self.hwsetup_conf['pos_notes'] # notes for report to add about positioner (reported with positioner in same slot as posids list)
-        while len(self.pos_notes) < len(self.posids):
-            self.pos_notes.append('')
-        fidids = self.hwsetup_conf['fid_ids']
-        ptl_id = self.hwsetup_conf['ptl_id']
         db_commit_on = False
         if 'store_mode' in self.hwsetup_conf and self.hwsetup_conf['store_mode'] == 'db':
             db_commit_on = True
-        shape = 'asphere' if self.hwsetup_conf['plate_type'] == 'petal' else 'flat'
-        ptl = petal.Petal(ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite, collider_file=self.xytest_conf['collider_file'],db_commit_on=db_commit_on, anticollision=self.xytest_conf['anticollision'], petal_shape=shape)
+        ptl_id=self.hwsetup_conf['ptl_id']
+        ptl = petal.Petal(ptl_id, posids=[],fidids=[],simulator_on=self.simulate, printfunc=self.logwrite, collider_file=self.xytest_conf['collider_file'],db_commit_on=db_commit_on, anticollision=self.xytest_conf['anticollision'])
+        posids=self.posids=ptl.posids
+        fidids=self.fidids=ptl.fidids
+        
+        while len(self.pos_notes) < len(self.posids):
+            self.pos_notes.append('')
+
         self.m = posmovemeasure.PosMoveMeasure([ptl],fvc,printfunc=self.logwrite)
+        self.m.rehome(posids='all')
         self.posids = self.m.all_posids
         self.logwrite('Positoners: ' + str(self.posids))
         self.logwrite('Positoner notes: ' + str(self.pos_notes))
@@ -308,7 +312,8 @@ class XYTest(object):
             self.logwrite('Calibration with ' + str(n_pts_calib_T) + ' theta points and ' + str(n_pts_calib_P) + ' phi points completed in ' + self._elapsed_time_str(start_time) + '.')
         for posid in self.posids:
             self.summarizers[posid].update_loop_calibs(summarizer.used_suffix, params)
-        
+
+
     def run_xyaccuracy_test(self, loop_number):
         """Move positioners to a series of xy targets and measure performance.
         """
@@ -353,12 +358,30 @@ class XYTest(object):
         
         # transform test grid to each positioner's global position, and create all the move request dictionaries
         all_targets = []
-        for local_target in local_targets:
-            these_targets = {}
-            for posid in self.posids:
-                trans = self.m.trans(posid)
-                these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(local_target)}
-            all_targets.append(these_targets)
+        
+        if self.xytest_conf['input_targs_file']:
+            targ_list=ascii.read(pc.dirs['test_settings']+self.xytest_conf['input_targs_file'])
+            targ_list=targ_list['filename']
+            n_targets=len(targ_list)
+            for i in range(n_targets):
+                these_targets = {}
+                file_targ_this=pc.dirs['test_settings']+'move_request_sets/'+targ_list[i]
+                data=ascii.read(file_targ_this)
+                data.add_index('DEVICE_LOC')
+                for posid in self.posids:
+                    ptl = self.m.petal(posid)
+                    deviceloc_this=ptl.get_posfid_val(posid,'DEVICE_LOC')
+                    data_this=data.loc[deviceloc_this]
+                    trans = self.m.trans(posid)
+                    these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY([data_this['u'],data_this['v']])}
+                all_targets.append(these_targets)
+        else:
+            for local_target in local_targets:
+                these_targets = {}
+                for posid in self.posids:
+                    trans = self.m.trans(posid)
+                    these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(local_target)}
+                all_targets.append(these_targets)
             
         # initialize some data structures for storing test data
         targ_num = 0
@@ -419,7 +442,7 @@ class XYTest(object):
             # make summary plots showing the targets and measured positions
             if self.xytest_conf['should_make_plots']:
                 for posid in all_data_by_posid.keys():
-                    posmodel = self.m.posmodel(posid)
+                    posmodel = self.m.posmodel(posid) 
                     title = log_timestamp + log_suffix
                     center = [posmodel.state.read('OFFSET_X'),posmodel.state.read('OFFSET_Y')]
                     theta_min = posmodel.trans.posTP_to_obsTP([min(posmodel.targetable_range_T),0])[0]

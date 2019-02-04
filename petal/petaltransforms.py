@@ -43,7 +43,7 @@ class PetalTransforms(object):
     def __init__(self, transforms={}):
         self.transforms = {key:0 for key in self.trans_keys}
         self.transforms.update(transforms)
-        self.postrans = postransforms.PosTransforms(posmodel=None, curved=True)
+        self.postrans = postransforms.PosTransforms(this_posmodel=None, curved=True)
     
     def metXYZ_to_QS(self,xyz):
         """Transforms list of metXYZ coordinates into QS system.
@@ -106,12 +106,11 @@ class PetalTransforms(object):
         that is looked up from the Echo22 asphere definition.
         """
         qs = self.listify(qs)
-        qs = np.transpose(qs)
-        xy = self.postrans.QS_to_obsXY(qs.tolist())
-        r = np.sqrt(np.sum(np.power(xy,2),axis=0))
+        xy = [self.postrans.QS_to_obsXY(this_qs) for this_qs in qs]
+        r = np.sqrt(np.sum(np.power(xy,2),axis=1))
         z = pc.R2Z_lookup(r)
-        xyz = np.array([xy[0],xy[1],z])
-        return np.transpose(xyz).tolist()
+        xyz = [[xy[i][0], xy[i][1], z[i]] for i in range(len(xy))]
+        return xyz
         
     @property
     def trans_matrix(self):
