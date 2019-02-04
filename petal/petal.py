@@ -68,6 +68,8 @@ class Petal(object):
                 self.printfunc('WARNING: Input fidids are not consistent with ptl_setting file')
                 self.printfunc('Input fidids:'+str(fidids))
                 self.printfunc('Fidids from file:'+str(fidids_file))
+        if fidids in ['',[''],None,{''}]: # check included to handle simulation cases, where no fidids argued
+            fidids = {}
 
         self.verbose = verbose # whether to print verbose information at the terminal
         self.simulator_on = simulator_on
