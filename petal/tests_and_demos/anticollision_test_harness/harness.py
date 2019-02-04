@@ -16,8 +16,8 @@ locations_near_gfa = {309,328,348,368,389,410,432,454,474,492,508,521,329,349,36
 device_loc_ids = 'all' # make the selection here
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
-pos_param_sequence_id = 2
-move_request_sequence_id = 2
+pos_param_sequence_id = 3
+move_request_sequence_id = 3
 
 # Other ids
 fidids = {}
@@ -25,7 +25,7 @@ petal_id = 666
 
 # Other options
 should_animate = False
-n_corrections = 2 # number of correction moves to simulate after each target
+n_corrections = 1 # number of correction moves to simulate after each target
 max_correction_move = 0.050/1.414 # mm
 
 # randomizer for correction moves
@@ -43,7 +43,7 @@ for pos_params in pos_param_sequence:
         for key,val in params.items():
             state.store(key,val)
         state.write()
-    ptl = petal.Petal(petal_id, pos_params, fidids,
+    ptl = petal.Petal(petal_id, pos_params.keys(), fidids,
                       simulator_on    = True,
                       db_commit_on    = False,
                       local_commit_on = False,
@@ -53,8 +53,12 @@ for pos_params in pos_param_sequence:
                       anticollision   = 'adjust')
     if should_animate:
         ptl.start_gathering_frames()
+    m = 0
+    mtot = len(move_request_sequence)
     for move_request_data in move_request_sequence:
+        m += 1
         for n in range(n_corrections + 1):
+            print(' move: ' + str(m) + ' of ' + str(mtot) + ', submove: ' + str(n))
             requests = {ptl.devices[loc_id]:{'command':data['command'], 'target':[data['u'],data['v']]} for loc_id,data in move_request_data.items()}
             anticollision = 'adjust'
             if n > 0:
