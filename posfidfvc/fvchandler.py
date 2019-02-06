@@ -199,8 +199,13 @@ class FVCHandler(object):
                     expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':fiber_ctr_flag})
             measured_qs = self.fvcproxy.measure(expected_qs)
             for qs_dict in measured_qs:
-                qs = [qs_dict['q'], qs_dict['s']]
-                dqds = [qs_dict['dq'],qs_dict['ds']]
+                match_found = qs_dict['flags'] & 1 # when bit 0 is true, that means a match was found
+                if match_found:
+                    qs = [qs_dict['q'], qs_dict['s']]
+                    dqds = [qs_dict['dq'],qs_dict['ds']]
+                else:
+                    qs = [0.0, 0.0] # intentionally an impossible-to-reach unique position, so that it's obvious we had a match failure but code continues
+                    dqds = [0.0, 0.0]
                 xy = self.trans.QS_to_obsXY(qs)
                 posid = qs_dict['id']
                 measured_pos[posid] = {'obsXY':xy, 'peak':self.normalize_mag(qs_dict['mag']), 'fwhm':qs_dict['fwhm'], 'qs':qs, 'dqds':dqds}
