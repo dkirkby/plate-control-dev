@@ -27,6 +27,7 @@ dirs['all_logs']     = os.environ.get('POSITIONER_LOGS_PATH') # corresponds to h
 dirs['all_settings'] = os.environ.get('FP_SETTINGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/fp_settings
 dirs['positioner_locations_file'] = os.environ.get('FP_SETTINGS_PATH')+'/hwsetups/Petal_Metrology.csv' # this is NOT metrology, it is a *bad* naming. it is nominals!
 dirs['small_array_locations_file']=os.getenv('FP_SETTINGS_PATH')+'/hwsetups/SWIntegration_XY.csv'
+dirs['petal2_fiducials_metrology_file']=os.getenv('FP_SETTINGS_PATH')+'/hwsetups/petal2_fiducials_metrology.csv'
 if 'DESI_HOME' in os.environ:
     dirs['temp_files']   = os.environ.get('DESI_HOME') + os.path.sep + 'fp_temp_files' + os.path.sep
 elif 'HOME' in os.environ:

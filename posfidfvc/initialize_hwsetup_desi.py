@@ -127,9 +127,10 @@ if m.n_extradots_expected > 0 and os.path.isfile(extradots_filename):
                 extradots_existing_data.append([row['x_pix'],row['y_pix']])
         should_identify_positioners = tkinter.messagebox.askyesno(title='Identify positioners?',message='Identify positioner locations?\n\n(Say "NO" only if you are confident of their stored locations from a previous run.)')
 else:
-    response = tkinter.messagebox.askyesno(title='Identify fid and pos?',message='Identify fiducial and positioner locations?\n\n(Say "NO" only if you are confident of their stored locations from a previous run.)')
-    should_identify_fiducials = response
-    should_identify_positioners = response
+    response1 = tkinter.messagebox.askyesno(title='Identify fid ?',message='Identify fiducial locations?\n\n(Say "NO" only if you are confident of their stored locations from a previous run.)')
+    response2 = tkinter.messagebox.askyesno(title='Identify pos?',message='Identify positioner locations?\n\n(Say "NO" only if you are confident of their stored locations from a previous run.)')
+    should_identify_fiducials = response1
+    should_identify_positioners = response2
 
 # close the gui
 gui_root.withdraw()
@@ -159,13 +160,19 @@ else:
     m.extradots_fvcXY = extradots_existing_data
 if should_identify_positioners:
     m.identify_positioners_2images()
+    if m.fvc.fvcproxy: #Remind FVC that it needs to look for all dots, not all dots without a fiducial
+        m.fvc.fvcproxy.send_fvc_command('make_targets',len(posids) + m.n_ref_dots)
+
     #m.identify_many_enabled_positioners(list(m.all_posids))
     #m.identify_disabled_positioners()
 
+#print("Positioners are identified")
+#m.rehome()
 m.calibrate(mode='rough')
 if not should_limit_range:
     m.measure_range(axis='theta')
     m.measure_range(axis='phi')
+m.rehome() #REMOVE put in as test
 plotfiles = m.calibrate(mode='arc', save_file_dir=pc.dirs['xytest_plots'], save_file_timestamp=start_filename_timestamp, keep_phi_within_Eo=True)
 new_and_changed_files.update(plotfiles)
 m.park() # retract all positioners to their parked positions

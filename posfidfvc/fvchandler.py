@@ -121,7 +121,10 @@ class FVCHandler(object):
         else:
             self.fvcproxy.send_fvc_command('make_targets',num_spots=num_objects)
             centroids = self.fvcproxy.locate(send_centroids=True)
-            
+            #if len(centroids) < num_objects:
+            #    print('number of spots found does not match number of targets, autotune and try again. ')
+            #    self.fvcproxy.calibrate_image()      
+            #    centroids = self.fvcproxy.locate(send_centroids=True)
             if 'FAILED' in centroids:
                 self.printfunc('Failed to locate centroids using FVC.')
             else:
@@ -197,6 +200,7 @@ class FVCHandler(object):
                     expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':pos_flags[posid]})
                 else: #Assume it is good, old default behavior
                     expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':fiber_ctr_flag})
+            import pdb; pdb.set_trace() #REMOVE
             measured_qs = self.fvcproxy.measure(expected_qs)
             if len(measured_qs) < len(expected_qs):
                 # for all the expected positioners that weren't included, generate a dummy dict
@@ -405,7 +409,7 @@ class FVCHandler(object):
 
 if __name__ == '__main__':
     f = FVCHandler(fvc_type='FLI')
-    n_objects = 48
+    n_objects = 530#48
     n_repeats = 1
     f.min_energy = -np.Inf
     xy = []
@@ -422,7 +426,6 @@ if __name__ == '__main__':
         energies.append([these_peaks[i]*these_fwhms[i] for i in range(len(these_peaks))])
         x=[these_xy[i][0] for i in range(len(these_xy))]
         y=[these_xy[i][1] for i in range(len(these_xy))]
-        """
         import tkinter.messagebox
         plot = tkinter.messagebox.askyesno(title='Plot the measurements?',message='Plot the measurements?')
         metro = tkinter.messagebox.askyesno(title='Plot the metology data?',message='Plot the metrology data?')
@@ -435,7 +438,12 @@ if __name__ == '__main__':
             from tkinter import *
             from astropy.table import Table
 
-            plt.plot(x,y,'bx',label="Measurements")
+            cm = plt.cm.get_cmap('RdYlBu')
+            colors=these_peaks
+            sc=plt.scatter(x, y, c=colors, alpha=0.7,vmin=min(colors), vmax=max(colors), s=35, cmap=cm)
+            plt.colorbar(sc)
+            #plt.plot(x,y,'bx',label="Measurements")
+
             if metro:
                 file_metro=tkinter.filedialog.askopenfilename(initialdir=pc.dirs['hwsetups'], filetypes=(("CSV file","*.csv"),("All Files","*")), title='Select Metrology Data')
                 fiducials= Table.read(file_metro,format='ascii.csv',header_start=0,data_start=1)
@@ -448,7 +456,6 @@ if __name__ == '__main__':
         plt.xlabel('X')
         plt.ylabel('Y')
         plt.show()
-        """
 
         print('ndots: ' + str(len(xy[i])))
         print('')

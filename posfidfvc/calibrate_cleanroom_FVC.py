@@ -66,6 +66,7 @@ nspots = len(posids)
 print(nspots)
 for fidid in fidids:
     nspots += int(ptl.get_posfid_val(fidid,'N_DOTS'))
+print(hwsetup['num_extra_dots'])
 nspots += hwsetup['num_extra_dots']
 print(nspots)
 text = '\n\n' + str(len(fidids)) + ' FIDUCIALS:'
