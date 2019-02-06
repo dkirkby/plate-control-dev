@@ -121,7 +121,10 @@ class FVCHandler(object):
         else:
             self.fvcproxy.send_fvc_command('make_targets',num_spots=num_objects)
             centroids = self.fvcproxy.locate(send_centroids=True)
-            
+            #if len(centroids) < num_objects:
+            #    print('number of spots found does not match number of targets, autotune and try again. ')
+            #    self.fvcproxy.calibrate_image()      
+            #    centroids = self.fvcproxy.locate(send_centroids=True)
             if 'FAILED' in centroids:
                 self.printfunc('Failed to locate centroids using FVC.')
             else:
@@ -197,10 +200,39 @@ class FVCHandler(object):
                     expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':pos_flags[posid]})
                 else: #Assume it is good, old default behavior
                     expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':fiber_ctr_flag})
+            import pdb; pdb.set_trace() #REMOVE
             measured_qs = self.fvcproxy.measure(expected_qs)
+            if len(measured_qs) < len(expected_qs):
+                # for all the expected positioners that weren't included, generate a dummy dict
+                measured_posids = {d['id'] for d in measured_qs}
+                expected_posids = set(expected_qs.keys())
+                # posids set difference etc
+                dummy_qs_dict = {'qs':[0.0,0.0], 'dqds':[0.0,0.0], 'flags':1, 'peak':0.0, 'mag':0.0, 'fwhm':0.0}
+                # make one for each posid and add to the list measured_qs
+                for id in expected_posids:
+                	if id not in measured_posids:
+                		dummy_qs_dict.update({'id':id}
+                		measured_qs.append(dummy_qs_dict)
+            elif len(measured_qs) > len(expected_qs):
+            	# remove dicts from measured_qs until correct number remaining
+            	# start with the unmatched ones (those with flag =0)
+            	for e in measured_qs:
+            		if len(measured_qs) > len(expected_qs) and e['flag']==0:
+            			measured_qs.remove(e) # check that this actually works and that the loop is still okay
+            	# if we still have too many measured_qs's
+            	if len(measured_qs) > len(expected_qs):	
+            	# remove the dimmest ones (this may not be the right approch ..)
+            	# we have to see from experience how to filter best. It may require to sort 
+            	# by variation of fwhm, or fwhm*mag, or something to know which to remove	
+            		pass
             for qs_dict in measured_qs:
-                qs = [qs_dict['q'], qs_dict['s']]
-                dqds = [qs_dict['dq'],qs_dict['ds']]
+                match_found = qs_dict['flags'] & 1 # when bit 0 is true, that means a match was found
+                if match_found:
+                    qs = [qs_dict['q'], qs_dict['s']]
+                    dqds = [qs_dict['dq'],qs_dict['ds']]
+                else:
+                    qs = [0.0, 0.0] # intentionally an impossible-to-reach unique position, so that it's obvious we had a match failure but code continues
+                    dqds = [0.0, 0.0]
                 xy = self.trans.QS_to_obsXY(qs)
                 posid = qs_dict['id']
                 measured_pos[posid] = {'obsXY':xy, 'peak':self.normalize_mag(qs_dict['mag']), 'fwhm':qs_dict['fwhm'], 'qs':qs, 'dqds':dqds}
@@ -389,7 +421,7 @@ class FVCHandler(object):
 
 if __name__ == '__main__':
     f = FVCHandler(fvc_type='FLI')
-    n_objects = 48
+    n_objects = 530#48
     n_repeats = 1
     f.min_energy = -np.Inf
     xy = []
@@ -406,7 +438,6 @@ if __name__ == '__main__':
         energies.append([these_peaks[i]*these_fwhms[i] for i in range(len(these_peaks))])
         x=[these_xy[i][0] for i in range(len(these_xy))]
         y=[these_xy[i][1] for i in range(len(these_xy))]
-        """
         import tkinter.messagebox
         plot = tkinter.messagebox.askyesno(title='Plot the measurements?',message='Plot the measurements?')
         metro = tkinter.messagebox.askyesno(title='Plot the metology data?',message='Plot the metrology data?')
@@ -419,7 +450,12 @@ if __name__ == '__main__':
             from tkinter import *
             from astropy.table import Table
 
-            plt.plot(x,y,'bx',label="Measurements")
+            cm = plt.cm.get_cmap('RdYlBu')
+            colors=these_peaks
+            sc=plt.scatter(x, y, c=colors, alpha=0.7,vmin=min(colors), vmax=max(colors), s=35, cmap=cm)
+            plt.colorbar(sc)
+            #plt.plot(x,y,'bx',label="Measurements")
+
             if metro:
                 file_metro=tkinter.filedialog.askopenfilename(initialdir=pc.dirs['hwsetups'], filetypes=(("CSV file","*.csv"),("All Files","*")), title='Select Metrology Data')
                 fiducials= Table.read(file_metro,format='ascii.csv',header_start=0,data_start=1)
@@ -432,7 +468,6 @@ if __name__ == '__main__':
         plt.xlabel('X')
         plt.ylabel('Y')
         plt.show()
-        """
 
         print('ndots: ' + str(len(xy[i])))
         print('')
