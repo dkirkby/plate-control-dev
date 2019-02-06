@@ -198,6 +198,17 @@ class FVCHandler(object):
                 else: #Assume it is good, old default behavior
                     expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':fiber_ctr_flag})
             measured_qs = self.fvcproxy.measure(expected_qs)
+            if len(measured_qs) < len(expected_qs):
+                # for all the expected positioners that weren't included, generate a dummy dict
+                measured_posids = {d['id'] for d in measured_qs}
+                expected_posids = set(expected_qs.keys())
+                # posids set difference etc
+                dummy_qs_dict = {'qs':[0.0,0.0], 'dqds':[0.0,0.0], 'flags':1, 'peak':0.0, 'mag':0.0, 'fwhm':0.0}
+                # make one for each posid and add to the list measured_qs
+            elif len(measured_qs) > len(expected_qs):
+                # remove dicts from measured_qs until correct number remaining
+                # start with removing unmatched ones
+                # after that, sort by variation of fwhm, or fwhm*mag, or something to know which to remove
             for qs_dict in measured_qs:
                 match_found = qs_dict['flags'] & 1 # when bit 0 is true, that means a match was found
                 if match_found:
