@@ -823,7 +823,6 @@ class PosMoveMeasure(object):
             obsXY_this=[metroX_this,metroY_this]
             obsX_arr.append(obsXY_this[0])
             obsY_arr.append(obsXY_this[1])
-
             this_xy=self.fvc.obsXY_to_fvcXY(obsXY_this)[0]
             test_delta = np.array(this_xy) - np.array(xy_meas)
             test_dist = np.sqrt(np.sum(test_delta**2,axis=1))
@@ -1093,7 +1092,15 @@ class PosMoveMeasure(object):
         for i in range(n_pts):
             requests = {}
             for posid in data:
-                requests[posid] = {'command':'posTP', 'target':data[posid]['target_posTP'][i], 'log_note':'calib arc on ' + axis + ' point ' + str(i+1)}
+                this_petal = self.petal(posid)
+                enabled=this_petal.get_posfid_val(posid,'CTRL_ENABLED')
+                posT_this=this_petal.get_posfid_val(posid,'POS_T')
+                posP_this=this_petal.get_posfid_val(posid,'POS_P')
+                trans = self.trans(posid)
+                if enabled:
+                    requests[posid] = {'command':'posTP', 'target':data[posid]['target_posTP'][i], 'log_note':'calib arc on ' + axis + ' point ' + str(i+1)}
+                else:
+                    requests[posid] = {'command':'posTP', 'target':[posT_this,posP_this], 'log_note':'calib arc on ' + axis + ' point ' + str(i+1)}
             self.printfunc('calibration arc on ' + axis + ' axis: point ' + str(i+1) + ' of ' + str(n_pts))
             this_meas_data,imgfiles = self.move_measure(requests, tp_updates=None)
             for p in this_meas_data.keys():
