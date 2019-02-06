@@ -682,6 +682,7 @@ class Petal(object):
                 self.pos_flags[posid] |= 1<<9 #final check for disabled
             if not(self.get_posfid_val(posid, 'FIBER_INTACT')):  
                 self.pos_flags[posid] |= 1<<10
+                self.pos_flags[posid] |= 1<<5
             if self.get_posfid_val(posid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
                 self.pos_flags[posid] |= 1<<17
             pos_flags[posid] = str(self.pos_flags[posid])
