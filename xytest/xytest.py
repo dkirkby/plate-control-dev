@@ -139,7 +139,16 @@ class XYTest(object):
         if 'store_mode' in self.hwsetup_conf and self.hwsetup_conf['store_mode'] == 'db':
             db_commit_on = True
         ptl_id=self.hwsetup_conf['ptl_id']
-        ptl = petal.Petal(ptl_id, posids=[],fidids=[],simulator_on=self.simulate, printfunc=self.logwrite, collider_file=self.xytest_conf['collider_file'],db_commit_on=db_commit_on, anticollision=self.xytest_conf['anticollision'])
+		shape = 'asphere' if self.hwsetup_conf['plate_type'] == 'petal' else 'flat'
+        ptl = petal.Petal(ptl_id, 
+			posids=[],
+			fidids=[],
+			simulator_on=self.simulate,
+			sched_stats_on=True,
+			printfunc=self.logwrite,
+			collider_file=self.xytest_conf['collider_file'],
+			db_commit_on=db_commit_on, 
+			anticollision=self.xytest_conf['anticollision'], petal_shape=shape)
         posids=self.posids=ptl.posids
         fidids=self.fidids=ptl.fidids
         
@@ -371,16 +380,30 @@ class XYTest(object):
                 for posid in self.posids:
                     ptl = self.m.petal(posid)
                     deviceloc_this=ptl.get_posfid_val(posid,'DEVICE_LOC')
+                    enabled_this=ptl.get_posfid_val(posid,'CTRL_ENABLED')
+                    posT_this=ptl.get_posfid_val(posid,'POS_T')
+                    posP_this=ptl.get_posfid_val(posid,'POS_P')
                     data_this=data.loc[deviceloc_this]
                     trans = self.m.trans(posid)
-                    these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY([data_this['u'],data_this['v']])}
+                    if enabled_this:
+                        these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY([data_this['u'],data_this['v']])}
+                    else:
+                        these_targets[posid] = {'command':'obsXY','target':trans.posTP_to_obsXY([posT_this,posP_this])} 
+
                 all_targets.append(these_targets)
         else:
             for local_target in local_targets:
                 these_targets = {}
                 for posid in self.posids:
+                    ptl = self.m.petal(posid)
+                    enabled_this=ptl.get_posfid_val(posid,'CTRL_ENABLED')
+                    posT_this=ptl.get_posfid_val(posid,'POS_T')
+                    posP_this=ptl.get_posfid_val(posid,'POS_P') 
                     trans = self.m.trans(posid)
-                    these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(local_target)}
+                    if enabled_this:
+                        these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(local_target)}
+                    else:
+                        these_targets[posid] = {'command':'obsXY','target':trans.posTP_to_obsXY([posT_this,posP_this])}
                 all_targets.append(these_targets)
             
         # initialize some data structures for storing test data
@@ -837,6 +860,7 @@ if __name__=="__main__":
     test = XYTest(hwsetup_conf=hwsetup_conf,xytest_conf=xytest_conf,USE_LOCAL_PRESETS=USE_LOCAL_PRESETS)
     test.get_svn_credentials()
     test.logwrite('Start of positioner performance test.')
+    test.m.park(posids='all')
     for loop_num in range(test.starting_loop_number, test.n_loops):
         test.xytest_conf['current_loop_number'] = loop_num
         test.xytest_conf.write()
@@ -852,6 +876,9 @@ if __name__=="__main__":
     test.logwrite('All test loops complete.')
     test.m.park(posids='all')
     test.logwrite('Moved positioners into \'parked\' position.')
+    for petal in test.m.petals:
+        petal.schedule_stats.save()
+        #petal.generate_animation()
     test.logwrite('Test complete.')
     test.track_all_poslogs_once()
     test.svn_add_commit(keep_creds=False)

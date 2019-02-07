@@ -211,7 +211,7 @@ class FVCHandler(object):
                 # make one for each posid and add to the list measured_qs
                 for id in expected_posids:
                 	if id not in measured_posids:
-                		dummy_qs_dict.update({'id':id}
+                		dummy_qs_dict.update({'id':id})
                 		measured_qs.append(dummy_qs_dict)
             elif len(measured_qs) > len(expected_qs):
             	# remove dicts from measured_qs until correct number remaining

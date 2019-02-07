@@ -42,6 +42,8 @@ class Generate_Platemaker_Pars(object):
             self.fvc.translation = self.hwsetup['translation']
 
         self.ptl = petal.Petal(petal_id = self.hwsetup['ptl_id'],
+                  posids = [],
+                  fidids = [],
                   simulator_on = False,
                   user_interactions_enabled = True,
                   db_commit_on = False,
@@ -52,8 +54,10 @@ class Generate_Platemaker_Pars(object):
                   collider_file = None,
                   sched_stats_on = False,
                   anticollision = None) # valid options for anticollision arg: None, 'freeze', 'adjust'
-        posids=self.ptl.posids
-        fidids=self.ptl.fidids
+        posids=self.posids=self.ptl.posids
+        fidids=self.fidids=self.ptl.fidids
+        #posids=self.ptl.posids
+        #fidids=self.ptl.fidids
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc)
         self.m.n_extradots_expected = self.hwsetup['num_extra_dots']
 

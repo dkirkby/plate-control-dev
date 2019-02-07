@@ -31,6 +31,11 @@ sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
 sys.path.append(os.path.abspath(os.getenv('HOME')+'/focalplane/positioner_logs/data_processing_scripts/'))
 sys.path.append(os.path.abspath(os.getenv('HOME')+'/focalplane/pos_utility/'))
+sys.path.remove('/software/products/plate_control-trunk/xytest')
+sys.path.remove('/software/products/plate_control-trunk/posfidfvc')
+sys.path.remove('/software/products/plate_control-trunk/petalbox')
+sys.path.remove('/software/products/plate_control-trunk/petal')
+
 import fvchandler
 import petal
 import petalcomm
@@ -128,6 +133,8 @@ class MoveGUI(object):
             elif len(str(key))==5:
                 self.posids.append('M'+str(key))
         self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite,user_interactions_enabled=True)
+        print('Finish loading petal')
+
         for posid in self.ptl.posids:
             self.ptl.set_posfid_val(posid, 'CTRL_ENABLED', True)
             self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
