@@ -50,6 +50,7 @@ class Petal(object):
         self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
         self.petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
         self.petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
+        print("PETALBOX_ID")
         if not posids:
             self.printfunc('posids not given, read from ptl_settings file')
             posids = self.petal_state.conf['POS_IDS']
@@ -68,6 +69,8 @@ class Petal(object):
                 self.printfunc('WARNING: Input fidids are not consistent with ptl_setting file')
                 self.printfunc('Input fidids:'+str(fidids))
                 self.printfunc('Fidids from file:'+str(fidids_file))
+        if fidids in ['',[''],None,{''}]: # check included to handle simulation cases, where no fidids argued
+            fidids = {}
 
         self.verbose = verbose # whether to print verbose information at the terminal
         self.simulator_on = simulator_on
@@ -124,6 +127,7 @@ class Petal(object):
         for fidid in self.fidids:
             self.states[fidid] = posstate.PosState(fidid, logging=True, device_type='fid', printfunc=self.printfunc, petal_id=self.petal_id)        
             self.devices[self.states[fidid]._val['DEVICE_LOC']] = fidid
+        print(self.fidids)
 
         # pos flags setup
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
@@ -680,6 +684,7 @@ class Petal(object):
                 self.pos_flags[posid] |= 1<<9 #final check for disabled
             if not(self.get_posfid_val(posid, 'FIBER_INTACT')):  
                 self.pos_flags[posid] |= 1<<10
+                self.pos_flags[posid] |= 1<<5
             if self.get_posfid_val(posid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
                 self.pos_flags[posid] |= 1<<17
             pos_flags[posid] = str(self.pos_flags[posid])

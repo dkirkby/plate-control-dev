@@ -168,11 +168,18 @@ class PosScheduleStage(object):
         for method in methods:
             collision_neighbor = self.sweeps[posid].collision_neighbor
             proposed_tables = self._propose_path_adjustment(posid,method)
+            if len(proposed_tables) > 1: # also check move_tables of mutual neighbor, in potential 3-way close approaches / collisions
+                altered = list(proposed_tables.keys())
+                mutual_neighbors = self.collider.pos_neighbors[altered[0]]
+                for posid in altered[1:]:
+                    mutual_neighbors = self.collider.pos_neighbors[posid].intersection(mutual_neighbors)
+                for posid in mutual_neighbors:
+                    if posid in self.move_tables:
+                        proposed_tables[posid] = self.move_tables[posid]
             colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables)
             if proposed_tables and not(colliding_sweeps): # i.e., the proposed tables should be accepted
                 self.move_tables.update(proposed_tables)
                 self.collisions_resolved[method].add(self._collision_id(posid,collision_neighbor))
-                colliding_sweeps, all_sweeps = self.find_collisions(self.move_tables)
                 self.store_collision_finding_results(colliding_sweeps, all_sweeps, requests)
                 if method == 'freeze':
                     self.sweeps[posid].register_as_frozen()
