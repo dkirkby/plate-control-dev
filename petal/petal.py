@@ -132,7 +132,7 @@ class Petal(object):
         for fidid in self.fidids:
             self.states[fidid] = posstate.PosState(fidid, logging=True, device_type='fid', printfunc=self.printfunc, petal_id=self.petal_id)        
             self.devices[self.states[fidid]._val['DEVICE_LOC']] = fidid
-        print(self.fidids)
+        #print(self.fidids)
 
         # pos flags setup
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
@@ -863,7 +863,7 @@ class Petal(object):
         7 - Reserved for expansion 
         8 - Reserved for expansion
 
-        PETAL BITS
+        PETAL BITS                           XXXXXXXXXXXXXXXXXXXXXXX bits 0 - 15 are reserved for the FVC, petal can use 16 - 31  xxxxxxxxxxxxxxx
         9  - CTRL_ENABLED = False
         10 - FIBER_INTACT = False
         11 - Communication error
