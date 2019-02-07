@@ -56,12 +56,12 @@ class PosSchedule(object):
             timer_start = time.clock()
         posmodel = self.petal.posmodels[posid]
         if self.already_requested(posid):
-            self.petal.pos_flags[posid] |= 1<<16
+            self.petal.pos_flags[posid] |= self.petal.multi_request_bit
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Cannot request more than one target per positioner in a given schedule.')
             return False
         if self._deny_request_because_disabled(posmodel):
-            self.petal.pos_flags[posid] |= 1<<9
+            self.petal.pos_flags[posid] |= self.petal.ctrl_disabled_bit
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Positioner is disabled.')
             return False
@@ -94,18 +94,18 @@ class PosSchedule(object):
                 self.printfunc(str(posid) + ': target request denied. Bad uv_type "' + str(uv_type) + '".')
             return False
         if unreachable:
-            self.petal.pos_flags[posid] |= 1<<14
+            self.petal.pos_flags[posid] |= self.petal.unreachable_targ_bit
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Target not reachable: ' + str(uv_type) + ' = (' + format(u,'.3f') + ',' + format(v,'.3f') + ')')
             return False
         targt_obsTP = posmodel.trans.posTP_to_obsTP(targt_posTP)
         if self._deny_request_because_target_interference(posmodel,targt_obsTP):
-            self.petal.pos_flags[posid] |= 1<<12
+            self.petal.pos_flags[posid] |= self.petal.overlap_targ_bit
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Target interferes with a neighbor\'s existing target.')
             return False
         if self.should_check_petal_boundaries and self._deny_request_because_out_of_bounds(posmodel,targt_obsTP):
-            self.petal.pos_flags[posid] |= 1<<15
+            self.petal.pos_flags[posid] |= self.petal.restricted_targ_bit
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Target exceeds a fixed boundary.')
             return False
@@ -222,7 +222,7 @@ class PosSchedule(object):
         if self.stats:
             timer_start = time.clock()
         if self._deny_request_because_disabled(move_table.posmodel):
-            self.petal.pos_flags[posid] |= 1<<9
+            self.petal.pos_flags[posid] |= self.petal.ctrl_disabled_bit
             if self.verbose:
                 self.printfunc(str(move_table.posmodel.posid) + ': move table addition to schedule denied. Positioner is disabled.')
             return
@@ -270,7 +270,7 @@ class PosSchedule(object):
         if should_freeze:
             for posid in colliding_sweeps:
                 if posid in stage.colliding: # re-check, since earlier path adjustments in loop may have already resolved this posid's collision
-                    self.petal.pos_flags[posid] |= 1<<13 #Mark as frozen by anticollision
+                    self.petal.pos_flags[posid] |= self.petal.frozen_anticol_bit #Mark as frozen by anticollision
                     stage.adjust_path(posid, freezing='forced')
             if self.stats and colliding_sweeps:
                 self.stats.add_to_num_adjustment_iters(1)
@@ -313,7 +313,7 @@ class PosSchedule(object):
                     freezing = 'off' if attempts_remaining > 1 else 'on'
                     stage.adjust_path(posid,freezing,self.requests)
                     if posid in stage.collisions_resolved['freeze']:
-                        self.petal.pos_flags[posid] |= 1<<13 #Mark as frozen by anticollision
+                        self.petal.pos_flags[posid] |= self.petal.frozen_anticol_bit #Mark as frozen by anticollision
                         for j in range(i+1,len(self.RRE_stage_order)):
                             next_name = self.RRE_stage_order[j]
                             del start_posTP[next_name][posid]
@@ -328,7 +328,7 @@ class PosSchedule(object):
         """
         enabled = posmodel.is_enabled
         if enabled == False:  # this is specifically NOT worded as "if not enabled:", because here we actually do not want a value of None to pass the test, in case the parameter field 'CTRL_ENABLED' has not yet been implemented in the positioner's .conf file
-            self.petal.pos_flags[posmodel.posid] |= 1<<9
+            self.petal.pos_flags[posmodel.posid] |= self.petal.ctrl_disabled_bit
             posmodel.clear_postmove_cleanup_cmds_without_executing()
             return True
         return False
@@ -349,7 +349,7 @@ class PosSchedule(object):
                 break
         if target_interference:
             posmodel.clear_postmove_cleanup_cmds_without_executing()
-            self.petal.pos_flags[posmodel.posid] |= 1<<12
+            self.petal.pos_flags[posmodel.posid] |= self.petal.overlap_targ_bit
             return True
         return False
     
@@ -360,6 +360,6 @@ class PosSchedule(object):
         out_of_bounds = self.collider.spatial_collision_with_fixed(posmodel.posid, target_obsTP)
         if out_of_bounds:
             posmodel.clear_postmove_cleanup_cmds_without_executing()
-            self.petal.pos_flags[posmodel.posid] |= 1<<15
+            self.petal.pos_flags[posmodel.posid] |= self.petal.restricted_targ_bit
             return True
         return False
