@@ -35,7 +35,6 @@ petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_0000
 petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00007.csv -text
 petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00008.csv -text
 petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00009.csv -text
-petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00010.csv -text
 petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00011.csv -text
 petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00012.csv -text
 petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00013.csv -text
@@ -45,6 +44,11 @@ petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_0001
 petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00017.csv -text
 petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00018.csv -text
 petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00019.csv -text
+petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00020.csv -text
+petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00021.csv -text
+petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00022.csv -text
+petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00023.csv -text
+petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00024.csv -text
 petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_00000.csv -text
 petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_00001.csv -text
 petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_00002.csv -text
