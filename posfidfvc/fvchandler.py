@@ -213,6 +213,7 @@ class FVCHandler(object):
                 # remove dicts from measured_qs until correct number remaining
                 # start with removing unmatched ones
                 # after that, sort by variation of fwhm, or fwhm*mag, or something to know which to remove
+                pass
             for qs_dict in measured_qs:
                 match_found = qs_dict['flags'] & 1 # when bit 0 is true, that means a match was found
                 if match_found:

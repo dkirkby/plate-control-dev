@@ -139,16 +139,16 @@ class XYTest(object):
         if 'store_mode' in self.hwsetup_conf and self.hwsetup_conf['store_mode'] == 'db':
             db_commit_on = True
         ptl_id=self.hwsetup_conf['ptl_id']
-		shape = 'asphere' if self.hwsetup_conf['plate_type'] == 'petal' else 'flat'
+        shape = 'asphere' if self.hwsetup_conf['plate_type'] == 'petal' else 'flat'
         ptl = petal.Petal(ptl_id, 
-			posids=[],
-			fidids=[],
-			simulator_on=self.simulate,
-			sched_stats_on=True,
-			printfunc=self.logwrite,
-			collider_file=self.xytest_conf['collider_file'],
-			db_commit_on=db_commit_on, 
-			anticollision=self.xytest_conf['anticollision'], petal_shape=shape)
+            posids=[],
+            fidids=[],
+            simulator_on=self.simulate,
+            sched_stats_on=True,
+            printfunc=self.logwrite,
+            collider_file=self.xytest_conf['collider_file'],
+            db_commit_on=db_commit_on, 
+            anticollision=self.xytest_conf['anticollision']) # petal_shape=shape)
         posids=self.posids=ptl.posids
         fidids=self.fidids=ptl.fidids
         

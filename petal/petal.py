@@ -135,6 +135,18 @@ class Petal(object):
         #print(self.fidids)
 
         # pos flags setup
+        self.pos_bit = 1<<2
+        self.fid_bit = 1<<3
+        self.bad_fiber_fvc_bit = 1<<5
+        self.ctrl_disabled_bit = 1<<16
+        self.fiber_broken_bit = 1<<17
+        self.comm_error_bit = 1<<18
+        self.overlap_targ_bit = 1<<19
+        self.frozen_anticol_bit = 1<<20
+        self.unreachable_targ_bit = 1<<21
+        self.restricted_targ_bit = 1<<22
+        self.multi_request_bit = 1<<23
+        self.dev_nonfunctional_bit = 1<<24
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
         self._initialize_pos_flags()
 
@@ -207,11 +219,11 @@ class Petal(object):
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
             if not(self.get_posfid_val(posid,'CTRL_ENABLED')):
-                self.pos_flags[posid] |= 1<<9
+                self.pos_flags[posid] |= self.ctrl_disabled_bit
                 marked_for_delete.add(posid)
             elif self.schedule.already_requested(posid):
                 marked_for_delete.add(posid)
-                self.pos_flags[posid] |= 1<<16
+                self.pos_flags[posid] |= self.multi_request_bit
             else:
                 accepted = self.schedule.request_target(posid, requests[posid]['command'], requests[posid]['target'][0], requests[posid]['target'][1], requests[posid]['log_note'])            
                 if not accepted:
@@ -275,7 +287,7 @@ class Petal(object):
         self._initialize_pos_flags(ids = {posid for posid in requests})
         marked_for_delete = {posid for posid in requests if not(self.get_posfid_val(posid,'CTRL_ENABLED'))}
         for posid in marked_for_delete:
-            self.pos_flags[posid] |= 1<<9
+            self.pos_flags[posid] |= self.ctrl_disabled_bit
             del requests[posid]
         for posid in requests:
             requests[posid]['posmodel'] = self.posmodels[posid]
@@ -302,7 +314,7 @@ class Petal(object):
         enabled = self.enabled_posmodels(posids)
         for posid in posids:
             if posid not in enabled.keys():
-                self.pos_flags[posid] |= 1<<9
+                self.pos_flags[posid] |= self.ctrl_disabled_bit
         if anticollision:
             if axisid == pc.P and direction == -1:
                 # calculate thetas where extended phis do not interfere
@@ -345,7 +357,7 @@ class Petal(object):
         enabled = self.enabled_posmodels(posids)
         for posid in posids:
             if posid not in enabled.keys():
-                self.pos_flags[posid] |= 1<<9
+                self.pos_flags[posid] |= self.ctrl_disabled_bit
         hardstop_debounce = [0,0]
         direction = [0,0]
         direction[pc.P] = +1 # force this, because anticollision logic depends on it
@@ -686,12 +698,12 @@ class Petal(object):
             posids = self.posids
         for posid in posids:
             if not(self.posmodels[posid].is_enabled):
-                self.pos_flags[posid] |= 1<<9 #final check for disabled
+                self.pos_flags[posid] |= self.ctrl_disabled_bit #final check for disabled
             if not(self.get_posfid_val(posid, 'FIBER_INTACT')):  
-                self.pos_flags[posid] |= 1<<10
-                self.pos_flags[posid] |= 1<<5
+                self.pos_flags[posid] |= self.fiber_borken_bit
+                self.pos_flags[posid] |= self.bad_fiber_fvc_bit
             if self.get_posfid_val(posid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
-                self.pos_flags[posid] |= 1<<17
+                self.pos_flags[posid] |= self.dev_nonfunctional_bit
             pos_flags[posid] = str(self.pos_flags[posid])
         if should_reset:
             self._initialize_pos_flags()
@@ -785,7 +797,7 @@ class Petal(object):
                     for item_id in self.posids.union(self.fidids):
                         if self.get_posfid_val(item_id,'CAN_ID') == canid:
                             self.set_posfid_val(item_id,'CTRL_ENABLED',False)
-                            self.pos_flags[item_id] |= 1<<11
+                            self.pos_flags[item_id] |= self.comm_error_bit
                             self.states[item_id].next_log_notes.append('Disabled sending control commands because device was detected to be nonresponsive.')
                             break
                     status_updated = True
@@ -860,26 +872,25 @@ class Petal(object):
         3 - Fiducial Center
         4 - 
         5 - Bad Fiber or Fiducial
-        7 - Reserved for expansion 
-        8 - Reserved for expansion
+        6 - 15 reserved
 
-        PETAL BITS                           XXXXXXXXXXXXXXXXXXXXXXX bits 0 - 15 are reserved for the FVC, petal can use 16 - 31  xxxxxxxxxxxxxxx
-        9  - CTRL_ENABLED = False
-        10 - FIBER_INTACT = False
-        11 - Communication error
-        12 - Overlapping targets
-        13 - Frozen by anticollision
-        14 - Unreachable by positioner
-        15 - Targeting restricted boundries
-        16 - Requested multiple times
-        17 - Classified Nonfunctional
+        PETAL BITS    
+        16 - CTRL_ENABLED = False
+        17 - FIBER_INTACT = False
+        18 - Communication error
+        19 - Overlapping targets
+        20 - Frozen by anticollision
+        21 - Unreachable by positioner
+        22 - Targeting restricted boundries
+        23 - Requested multiple times
+        24 - Classified Nonfunctional
         '''
         if ids == 'all':
             ids = self.posids.union(self.fidids)
         for posfidid in ids:
-            if ('M' in posfidid) or ('UM' in posfidid):
-                self.pos_flags[posfidid] = 1<<2
+            if posfidid.startswith('M') or posfidid.startswith('D') or posfidid.startswith('UM'):
+                self.pos_flags[posfidid] = self.pos_bit
             else:
-                self.pos_flags[posfidid] = 1<<3
+                self.pos_flags[posfidid] = self.fid_bit
         return
 
