@@ -40,10 +40,10 @@ class PetalComm(object):
             if 'ip' not in controller.keys() or 'port' not in controller.keys():
                 raise RuntimeError('init: the IP address of the petal controller must be specified.')
             # Create the Pyro URI manually
-            self.device['name'] = 'PC%d' % self.petalbox_id
+            self.device['name'] = 'PC%02d' % self.petalbox_id
             self.device['node'] = str(controller['ip'])
             self.device['port'] = int(controller['port'])
-            self.device['pyro_uri'] = 'PYRO:PC%d@%s:%s' % (petalbox_id, str(controller['ip']),str(controller['port']))
+            self.device['pyro_uri'] = 'PYRO:PC%02d@%s:%s' % (petalbox_id, str(controller['ip']),str(controller['port']))
         else:
             self.seeker = Seeker(self.stype, self.service, found_callback = self._found_dev)
             # Start Seeker thread
