@@ -41,33 +41,39 @@ class Petal(object):
         sched_stats_on  ... boolean, controls whether to log statistics about scheduling runs
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
     """
-    def __init__(self, petal_id, posids, fidids, simulator_on=False,
+    def __init__(self, petal_id, posids, fidids, simulator_on=False, petalbox_id = None,
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
                  printfunc=print, verbose=False, user_interactions_enabled=False,
                  collider_file=None, sched_stats_on=False, anticollision='freeze'):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output) 
         # petal setup
         self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
-        self.petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
-        self.petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
+        if petal_id == None:
+            self.petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
+        else:
+            self.petal_id = petal_id
+        if petalbox_id == None:
+            self.petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
+        else:
+            self.petalbox_id = petalbox_id
         if not posids:
             self.printfunc('posids not given, read from ptl_settings file')
             posids = self.petal_state.conf['POS_IDS']
         else:
             posids_file = self.petal_state.conf['POS_IDS'] 
-            if set(posids) != set(posids_file):
-                self.printfunc('WARNING: Input posids are not consistent with ptl_setting file')
-                self.printfunc('Input posids:'+str(posids))
-                self.printfunc('Posids from file:'+str(posids_file))
+#            if set(posids) != set(posids_file):
+#                self.printfunc('WARNING: Input posids are not consistent with ptl_setting file')
+#                self.printfunc('Input posids:'+str(posids))
+#                self.printfunc('Posids from file:'+str(posids_file))
         if not fidids:
             self.printfunc('fidids not given, read from ptl_settings file')
             fidids = self.petal_state.conf['FID_IDS']
         else:
             fidids_file = self.petal_state.conf['FID_IDS']
-            if set(fidids) != set(fidids_file):
-                self.printfunc('WARNING: Input fidids are not consistent with ptl_setting file')
-                self.printfunc('Input fidids:'+str(fidids))
-                self.printfunc('Fidids from file:'+str(fidids_file))
+#            if set(fidids) != set(fidids_file):
+#                self.printfunc('WARNING: Input fidids are not consistent with ptl_setting file')
+#                self.printfunc('Input fidids:'+str(fidids))
+#                self.printfunc('Fidids from file:'+str(fidids_file))
         if fidids in ['',[''],None,{''}]: # check included to handle simulation cases, where no fidids argued
             fidids = {}
 
