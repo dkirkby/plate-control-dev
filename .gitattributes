@@ -1,6 +1,7 @@
 * text=auto !eol
 bin/petal -text
 bin/petalcontroller -text
+calibrate/seed_xy_offsets.py -text
 petal/collision_lookup_generator.py -text
 petal/collision_lookup_generator_subset.py -text
 petal/focal_surface_lookup.csv -text
