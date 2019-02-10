@@ -547,12 +547,11 @@ class PosPoly(object):
     def __init__(self, points, point0_index=0, close_polygon=True):
         self.points = points
         if point0_index:
-            shift = point0_index + 1
-            self.points[0] = self.points[0][shift:] + self.points[0][:shift]
-            self.points[1] = self.points[1][shift:] + self.points[1][:shift]
+            self.points[0] = self.points[0][point0_index:] + self.points[0][:point0_index]
+            self.points[1] = self.points[1][point0_index:] + self.points[1][:point0_index]
         if close_polygon:
-            self.points[0].append(points[0][0])
-            self.points[1].append(points[1][0])
+            self.points[0].append(self.points[0][0])
+            self.points[1].append(self.points[1][0])
 
     def rotated(self, angle):
         """Returns a copy of the polygon object, with points rotated by angle (unit degrees)."""
@@ -659,3 +658,5 @@ if __name__=="__main__":
     print(PosPoly._polygons_collide(P1.points,P2.points))
     print(PosPoly._polygons_collide(P1.points,P3.points))
     print(PosPoly._polygons_collide(P1.points,P4.points))
+    P5 = PosPoly([[0,1,2,3,4,5,6,7,8,9],[10,11,12,13,14,15,16,17,18,19]],3)
+    P6 = P5.rotated(45)
