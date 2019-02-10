@@ -545,13 +545,13 @@ class PosPoly(object):
         close_polygon ... whether to make an identical last point matching the first
     """
     def __init__(self, points, point0_index=0, close_polygon=True):
-        self.points = points
         if point0_index:
-            self.points[0] = self.points[0][point0_index:] + self.points[0][:point0_index]
-            self.points[1] = self.points[1][point0_index:] + self.points[1][:point0_index]
+            points[0] = points[0][point0_index:] + points[0][:point0_index]
+            points[1] = points[1][point0_index:] + points[1][:point0_index]
         if close_polygon:
-            self.points[0].append(self.points[0][0])
-            self.points[1].append(self.points[1][0])
+            points[0].append(points[0][0])
+            points[1].append(points[1][0])
+        self.points = points
 
     def rotated(self, angle):
         """Returns a copy of the polygon object, with points rotated by angle (unit degrees)."""
