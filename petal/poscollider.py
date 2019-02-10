@@ -555,11 +555,15 @@ class PosPoly(object):
 
     def rotated(self, angle):
         """Returns a copy of the polygon object, with points rotated by angle (unit degrees)."""
-        R = self._rotmat2D_deg(angle)
         p = self.points
+        a = angle*math.pi/180.
+        R00 = math.cos(a)
+        R01 = -math.sin(a)
+        R10 = math.sin(a)
+        R11 = math.cos(a)
         rng = range(len(p[0]))
-        X = [R[0][0]*p[0][i] + R[0][1]*p[1][i] for i in rng]
-        Y = [R[1][0]*p[0][i] + R[1][1]*p[1][i] for i in rng]
+        X = [R00*p[0][i] + R01*p[1][i] for i in rng]
+        Y = [R10*p[0][i] + R11*p[1][i] for i in rng]
         return PosPoly([X,Y], point0_index=0, close_polygon=False)
 
     def translated(self, x, y):
@@ -639,16 +643,6 @@ class PosPoly(object):
         test_intersect = (0 <= s) * (s <= 1) * (0 <= t) * (t <= 1)
         test_intersect[zero_delta] = False
         return test_intersect
-
-    @staticmethod
-    def _rotmat2D_rad(angle):
-        """Return the 2d rotation matrix for an angle given in radians."""
-        return [[math.cos(angle), -math.sin(angle)], [math.sin(angle), math.cos(angle)]]
-
-    @staticmethod
-    def _rotmat2D_deg(angle):
-        """Return the 2d rotation matrix for an angle given in degrees."""
-        return PosPoly._rotmat2D_rad(angle*math.pi/180.)
 
 if __name__=="__main__":
     P1 = PosPoly([[0,1,1],[0,0,1]])
