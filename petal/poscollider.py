@@ -607,12 +607,11 @@ class PosPoly(object):
         for this condition admittedly breaks some conceptual logic, but this case is not
         anticipated to occur given the DESI petal geometry, and speed is at a premium.
         """
-        pts1 = np.array(pts1,dtype=np.float64)
-        pts2 = np.array(pts2,dtype=np.float64)
-        A1 = pts1[:,0:-1]
-        A2 = pts1[:,1:]
-        B1 = pts2[:,0:-1]
-        B2 = pts2[:,1:]
+        pts = np.array([pts1,pts2],dtype=np.float64)
+        A1 = pts[0,:,0:-1]
+        A2 = pts[0,:,1:]
+        B1 = pts[1,:,0:-1]
+        B2 = pts[1,:,1:]
         for i in range(np.shape(A1)[1]):
             out = PosPoly._segments_intersect(A1[:,i],A2[:,i],B1,B2) # note this is vectorized, to avoid having an internal for loop
             if any(out):
