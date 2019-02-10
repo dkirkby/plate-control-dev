@@ -607,8 +607,8 @@ class PosPoly(object):
         for this condition admittedly breaks some conceptual logic, but this case is not
         anticipated to occur given the DESI petal geometry, and speed is at a premium.
         """
-        pts1 = np.array(pts1,dtype='float64')
-        pts2 = np.array(pts2,dtype='float64')
+        pts1 = np.array(pts1,dtype=np.float64)
+        pts2 = np.array(pts2,dtype=np.float64)
         A1 = pts1[:,0:-1]
         A2 = pts1[:,1:]
         B1 = pts2[:,0:-1]
