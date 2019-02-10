@@ -557,13 +557,11 @@ class PosPoly(object):
         """Returns a copy of the polygon object, with points rotated by angle (unit degrees)."""
         p = self.points
         a = angle*math.pi/180.
-        R00 = math.cos(a)
-        R01 = -math.sin(a)
-        R10 = math.sin(a)
-        R11 = math.cos(a)
+        c = math.cos(a)
+        s = math.sin(a)
         rng = range(len(p[0]))
-        X = [R00*p[0][i] + R01*p[1][i] for i in rng]
-        Y = [R10*p[0][i] + R11*p[1][i] for i in rng]
+        X = [c*p[0][i] + -s*p[1][i] for i in rng]
+        Y = [s*p[0][i] +  c*p[1][i] for i in rng]
         return PosPoly([X,Y], point0_index=0, close_polygon=False)
 
     def translated(self, x, y):
