@@ -566,8 +566,9 @@ class PosPoly(object):
 
     def translated(self, x, y):
         """Returns a copy of the polygon object, with points translated by distance (x,y)."""
-        X = [x + val for val in self.points[0]]
-        Y = [y + val for val in self.points[1]]
+        p = self.points
+        X = [x + val for val in p[0]]
+        Y = [y + val for val in p[1]]
         return PosPoly([X,Y], point0_index=0, close_polygon=False)
 
     def collides_with(self, other):
