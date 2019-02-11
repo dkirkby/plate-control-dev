@@ -4,6 +4,7 @@ import numpy as np
 import gc
 import sbigcam
 import os
+from astropy.io import fits
 
 class SBIG_Grab_Cen(object):
 	"""Module for grabbing images and calculating centroids using the SBIG camera.
@@ -17,6 +18,7 @@ class SBIG_Grab_Cen(object):
 		self.verbose = False
 		self.write_fits = False
 		self.take_darks = True # whether to measure a dark image and subtract it out
+                self.subtract_bias = True # wheather to subtract bias image
 		self.flip_horizontal = True # whether to reflect image across y axis
 		self.flip_vertical = False # whether to reflect image across x axis
 		self.save_dir = save_dir
@@ -71,6 +73,22 @@ class SBIG_Grab_Cen(object):
 				imgfiles.append(filename)                
 		else:
 			D = None             
+
+                if self.subtract_bias:
+                        if self.verbose:
+                                print("Subtracting Bias Image...")
+                        filename = self.save_dir + 'SBIG_bias_image.FITS'
+                        tr:
+                                hdul = fits.open(filename)
+                                B = hdul[1].data 
+                        except:
+                                B = None
+                                print('couldn''t remove file: ' + filename)
+                                self.cam.write_fits(D,filename)
+                                imgfiles.append(filename)
+                else:
+                        B = None   
+
 		if self.verbose:
 			print("Taking light image...")
 		self.cam.set_dark(False)
@@ -88,7 +106,7 @@ class SBIG_Grab_Cen(object):
 			imgfiles.append(filename)
 		if not(self.take_darks):
 			D = np.zeros(np.shape(L), dtype=np.int32)
-		LD = np.array(L,dtype = np.int32) - np.array(D,dtype = np.int32)
+		LD = np.array(L,dtype = np.int32) - np.array(D,dtype = np.int32)  - np.array(B,dtype = np.int32)
 		if self.write_fits and self.take_darks:
 			filename = self.save_dir + 'SBIG_diff_image.FITS'
 			self.cam.write_fits(LD,filename)
