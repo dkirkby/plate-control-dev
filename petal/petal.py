@@ -39,12 +39,13 @@ class Petal(object):
         printfunc       ... method, used for stdout style printing. we use this for logging during tests
         collider_file   ... string, file name of collider configuration file, no directory loction. If left blank will use default.
         sched_stats_on  ... boolean, controls whether to log statistics about scheduling runs
+        pb_config       ... boolean or dictionary, boolean controls whether to send configuration settings from backup json file, if dictionary is not passed from DOS
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
     """
     def __init__(self, petal_id, posids, fidids, simulator_on=False, petalbox_id = None,
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
                  printfunc=print, verbose=False, user_interactions_enabled=False,
-                 collider_file=None, sched_stats_on=False, anticollision='freeze'):
+                 collider_file=None, sched_stats_on=False, pb_config=False, anticollision='freeze'):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output) 
         # petal setup
         self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
@@ -93,6 +94,17 @@ class Petal(object):
         self.local_commit_on = local_commit_on
         self.local_log_on = local_log_on
         self.altered_states = set()
+        self.pb_config = pb_config
+        
+        # petalbox setup (temporary until all settings are passed via init by DOS)
+        if pb_config == True:
+            import json
+            with open(pc.dirs['petalbox_configurations']) as json_file:
+                self.pb_config = json.load(json_file)[self.petal_id]
+        
+        # power supplies, fans, sensors setup
+        if not self.simulator_on and self.pb_config != False:
+            self.setup_petalbox(mode = 'configure')
 
         # positioners setup
         self.posmodels = {} # key posid, value posmodel instance
@@ -149,16 +161,6 @@ class Petal(object):
         self.dev_nonfunctional_bit = 1<<24
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
         self._initialize_pos_flags()
-
-        
-        # power supplies setup?
-        # to-do
-        
-        # fans setup?
-        # to-do
-        
-        # sensors setup?
-        # to-do
  
 # METHODS FOR POSITIONER CONTROL
 
@@ -614,6 +616,77 @@ class Petal(object):
     def extract_fidid(dotid):
         return dotid.split('.')[0]
 
+# METHODS FOR CONFIGURING PETALBOXES
+        
+    def setup_petalbox(self, mode):
+        """Set everything up for the argued petalbox mode.
+        The settings controlled by the petalbox are currently 
+        set identically for the configure and start of observations phases.
+        mode ... string specifying the mode that the petalbox should be set up for
+                 ('configure', 'start_obs', or 'end_obs')
+            
+        The following settings are sent to the petalbox (according to pb_config 
+        enable/duty specifications):
+        for 'configure' or 'start_obs' mode input:
+            Positioner Power - ON
+            CAN Power - ON
+            SYNC Buffer Enable - ON
+            TEC Power Enable - ON
+            GFA Power Enable - ON
+            GFA Fan Enable - ON 
+        for 'end_obs' mode input:
+            Positioner Power - OFF
+            CAN Power - OFF
+            SYNC Buffer Enable - OFF
+            TEC Power Eneble - OFF
+            GFA Power Enable - OFF
+            GFA Fan Enable - OFF
+        This method will take some time (~10 seconds) to return when things are being turned ON 
+        due to the time it takes to configure/re-configure CAN channels.
+        """
+        if self.simulator_on or self.pb_config == False:
+            return
+        conf = self.pb_config
+        if mode in ['configure', 'start_obs']:
+            pospwr_en = 'both' if (conf['PS1_ENABLED'] and conf['PS2_ENABLED'])\
+                        else 1 if conf['PS1_ENABLED'] else 2
+            can_en = 'both' if (conf['CAN_BRD1_ENABLED'] and conf['CAN_BRD2_ENABLED'])\
+                        else 1 if conf['CAN_BD1_ENABLED'] else 2
+            buff_en = 'both' if (conf['PS1_ENABLED'] and conf['PS2_ENABLED'])\
+                        else 1 if conf['PS1_ENABLED'] else 2
+            self.comm.power_up(pospwr_en, can_en, buff_en)
+            inlet_settings = ['on', conf['GFA_FAN_INLET_DUTY_DEFAULT_ON']]\
+                             if conf['GFA_FAN_INLET_ENABLED'] else ['off', 0]
+            outlet_settings = ['on', conf['GFA_FAN_OUTLET_DUTY_DEFAULT_ON']]\
+                              if conf['GFA_FAN_OUTLET_ENABLED'] else ['off', 0]
+            self.comm.pbset('GFA_FAN', {'inlet': inlet_settings, 'outlet': outlet_settings})
+            if conf['GFA_PWR_ENABLED']:
+                self.comm.pbset('GFAPWR_EN', 'on')
+            if conf['TEC_PWR_ENABLED']:
+                self.comm.pbset('TEC_CTRL', 'on')
+            #TODO set CTRL_ENABLED and CAN_ID_MAPPING (in petalcontroller) based on supply
+            #status, set CTRL_ENABLED pos_flags
+            
+            #TODO send out sensor configuration info
+            #sensor_config = {'FPP_TEMP_SENSOR_1' : conf['FPP_TEMP_SENSOR_1],
+            #                 'FPP_TEMP_SENSOR_2 : conf['FPP_TEMP_SENSOR_2],
+            #                 'FPP_TEMP_SENSOR_3 : conf['FPP_TEMP_SENSOR_3],
+            #                 'GXB_MONITOR' : conf['GXB_MONITOR'],
+            #                 'PBOX_TEMP_SENSOR' : conf['PBOX_TEMP_SENSOR']}
+            #self.comm.pbset('SENSOR_CONFIGURATION', sensor_config)
+            
+            #TODO determine whether to get feedback via telemetry or pbget calls (or both)
+        elif mode == 'end_obs':
+            self.comm.power_down()
+        
+        def reset_petalbox(self):
+            """Reset all errors and turn all enables off.  This method
+            returns the petalbox to its default safe state (how it comes up prior to 
+            communicating with the petal).
+            """
+            if not self.simulator_on:
+                self.comm.configure()
+        
 # GETTERS, SETTERS, STATUS METHODS
 
     def get_posfid_val(self, uniqueid, key):
@@ -625,6 +698,16 @@ class Petal(object):
         this call does NOT turn the fiducial physically on or off. It only saves a value."""
         self.states[uniqueid].store(key,value)
         self.altered_states.add(self.states[uniqueid])
+
+    def get_pbconf_val(self, key):
+        """Retrieve petalbox configuration value from the self.pb_config dictionary."""
+        self.pb_config.get(key, None)
+    
+    def set_pbconf_val(self, key, value):
+        """Set a configuration value for the petalbox.  This value will be applied when the 
+        setup_petalbox method is called again.  This method does not update the defaults for the petalbox
+        (which are loaded from either a configuration file or DOS)."""
+        self.pb_config[key] = value
 
     def commit(self, log_note='', *args, **kwargs):
         '''Commit data to the local config and log files, and/or the online database.
