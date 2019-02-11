@@ -83,9 +83,7 @@ class SBIG_Grab_Cen(object):
                                 B = hdul[1].data 
                         except:
                                 B = None
-                                print('couldn''t remove file: ' + filename)
-                                self.cam.write_fits(D,filename)
-                                imgfiles.append(filename)
+                                print('No Bias file: ' + filename)
                 else:
                         B = None   
 
