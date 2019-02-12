@@ -17,7 +17,7 @@ class SBIG_Grab_Cen(object):
 		self.min_num_nonzero_pixels = 100
 		self.verbose = False
 		self.write_fits = True
-		self.take_darks = True # whether to measure a dark image and subtract it out
+		self.take_darks = False #True # whether to measure a dark image and subtract it out
 		self.write_bias = False #True
 		self.subtract_bias = True # wheather to subtract bias image
 		self.flip_horizontal = True # whether to reflect image across y axis
@@ -115,6 +115,8 @@ class SBIG_Grab_Cen(object):
 			except:
 				pass
 			self.cam.write_fits(L,filename_bias)
+			print('Save Bias successfully. Please change self.write_bias in sbig_grab_cen.py to False')
+			import sys; sys.exit()
 		
 		if not(self.take_darks):
 			D = np.zeros(np.shape(L), dtype=np.int32)
