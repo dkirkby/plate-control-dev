@@ -46,7 +46,7 @@ class Derive_Platemaker_Pars(object):
 
         # software initialization and startup
         if self.hwsetup['fvc_type'] == 'FLI' and 'pm_instrument' in self.hwsetup:
-            self.fvc=fvchandler.FVCHandler(fvc_type=self.hwsetup['fvc_type'],save_sbig_fits=self.hwsetup['save_sbig_fits'],platemaker_instrument='lbnl3') #=self.hwsetup['pm_instrument'])
+            self.fvc=fvchandler.FVCHandler(fvc_type=self.hwsetup['fvc_type'],save_sbig_fits=self.hwsetup['save_sbig_fits'],platemaker_instrument=self.hwsetup['pm_instrument'])
         else:
             self.fvc = fvchandler.FVCHandler(fvc_type=self.hwsetup['fvc_type'],save_sbig_fits=True)    
             self.fvc.rotation = self.hwsetup['rotation'] # this value is used in setups without fvcproxy / platemaker

@@ -200,18 +200,21 @@ class FVCHandler(object):
                     expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':pos_flags[posid]})
                 else: #Assume it is good, old default behavior
                     expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':fiber_ctr_flag})
-            import pdb; pdb.set_trace() #REMOVE
             measured_qs = self.fvcproxy.measure(expected_qs)
             if len(measured_qs) < len(expected_qs):
                 # for all the expected positioners that weren't included, generate a dummy dict
                 measured_posids = {d['id'] for d in measured_qs}
-                expected_posids = set(expected_qs.keys())
+                expected_posids = {d['id'] for d in expected_qs} #PARKER CHANGED set(expected_qs.keys())
                 # posids set difference etc
-                dummy_qs_dict = {'qs':[0.0,0.0], 'dqds':[0.0,0.0], 'flags':1, 'peak':0.0, 'mag':0.0, 'fwhm':0.0}
+                #dummy_qs_dict = {'q':0.0,'s':0.0, 'dq':0.0,'ds':0.0, 'flags':1, 'peak':0.0, 'mag':0.0, 'fwhm':0.0}
                 # make one for each posid and add to the list measured_qs
                 for id in expected_posids:
                 	if id not in measured_posids:
-                		dummy_qs_dict.update({'id':id})
+                		#print(id)
+                		dummy_qs_dict = {'id':id,'q':0.0,'s':0.0, 'dq':0.0,'ds':0.0, 'flags':1, 'peak':0.0, 'mag':0.0, 'fwhm':0.0}
+
+                		#dummy_qs_dict.update({'id':id})
+                		#print(dummy_qs_dict)
                 		measured_qs.append(dummy_qs_dict)
             elif len(measured_qs) > len(expected_qs):
             	# remove dicts from measured_qs until correct number remaining
@@ -228,14 +231,19 @@ class FVCHandler(object):
             for qs_dict in measured_qs:
                 match_found = qs_dict['flags'] & 1 # when bit 0 is true, that means a match was found
                 if match_found:
-                    qs = [qs_dict['q'], qs_dict['s']]
-                    dqds = [qs_dict['dq'],qs_dict['ds']]
+                    q = qs_dict['q']
+                    s = qs_dict['s'] #CHANGED BY PARKER 2/11/19
+                    dq = qs_dict['dq']
+                    ds = qs_dict['ds'] #ALSO CHANGED BY PARKER 2/1//19
                 else:
-                    qs = [0.0, 0.0] # intentionally an impossible-to-reach unique position, so that it's obvious we had a match failure but code continues
-                    dqds = [0.0, 0.0]
-                xy = self.trans.QS_to_obsXY(qs)
+                    print(qs_dict)
+                    q = [0.0]
+                    s = [0.0] # intentionally an impossible-to-reach unique position, so that it's obvious we had a match failure but code continues
+                    dq =[0.0]
+                    ds = [0.0]
+                xy = self.trans.QS_to_obsXY([q,s])
                 posid = qs_dict['id']
-                measured_pos[posid] = {'obsXY':xy, 'peak':self.normalize_mag(qs_dict['mag']), 'fwhm':qs_dict['fwhm'], 'qs':qs, 'dqds':dqds}
+                measured_pos[posid] = {'obsXY':xy, 'peak':self.normalize_mag(qs_dict['mag']), 'fwhm':qs_dict['fwhm'], 'q':q, 's':s, 'dq':dq, 'ds':ds}
         else:
             expected_pos_xy = [expected_pos[posid]['obsXY'] for posid in posids]
             expected_ref_xy = [expected_ref[refid]['obsXY'] for refid in refids]
@@ -421,7 +429,7 @@ class FVCHandler(object):
 
 if __name__ == '__main__':
     f = FVCHandler(fvc_type='FLI')
-    n_objects = 530#48
+    n_objects = 48
     n_repeats = 1
     f.min_energy = -np.Inf
     xy = []

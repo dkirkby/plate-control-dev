@@ -54,7 +54,6 @@ if not sim:
 else:
     should_update_from_svn = False
     should_commit_to_svn = False
-
 # software initialization and startup
 # software initialization and startup
 if hwsetup['fvc_type'] == 'FLI' and 'pm_instrument' in hwsetup:
@@ -173,8 +172,11 @@ if not should_limit_range:
     m.measure_range(axis='theta')
     m.measure_range(axis='phi')
 m.rehome() #REMOVE put in as test
-plotfiles = m.calibrate(mode='arc', save_file_dir=pc.dirs['xytest_plots'], save_file_timestamp=start_filename_timestamp, keep_phi_within_Eo=True)
-new_and_changed_files.update(plotfiles)
+try:
+    plotfiles = m.calibrate(mode='arc', save_file_dir=pc.dirs['xytest_plots'], save_file_timestamp=start_filename_timestamp, keep_phi_within_Eo=True)
+    new_and_changed_files.update(plotfiles)
+except:
+    pass
 m.park() # retract all positioners to their parked positions
 
 # commit logs and settings files to the SVN

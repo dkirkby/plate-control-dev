@@ -4,14 +4,14 @@
 # This script assumes that  the FVC, PETAL and ILLUMINATOR are running (either devices or roles - if roles, 
 # join_instance <name> must be called before running this script.
 import os,sys,time
-sys.path.append(os.path.abspath('/home/msdos/focalplane/plate_control/trunk/petal/'))
-sys.path.append(os.path.abspath('/home/msdos/focalplane/plate_control/trunk/posfidfvc/'))
-sys.path.append(os.path.abspath('/home/msdos/focalplane/plate_control/trunk/xytest/'))
+#sys.path.append(os.path.abspath('/home/msdos/focalplane/plate_control/trunk/petal/'))
+#sys.path.append(os.path.abspath('/home/msdos/focalplane/plate_control/trunk/posfidfvc/'))
+#sys.path.append(os.path.abspath('/home/msdos/focalplane/plate_control/trunk/xytest/'))
 
-sys.path.remove('/software/products/plate_control-trunk/xytest')
-sys.path.remove('/software/products/plate_control-trunk/posfidfvc')
-sys.path.remove('/software/products/plate_control-trunk/petalbox')
-sys.path.remove('/software/products/plate_control-trunk/petal')
+#sys.path.remove('/software/products/plate_control-trunk/xytest')
+#sys.path.remove('/software/products/plate_control-trunk/posfidfvc')
+#sys.path.remove('/software/products/plate_control-trunk/petalbox')
+#sys.path.remove('/software/products/plate_control-trunk/petal')
 
 
 from DOSlib.proxies import FVC, Illuminator, Petal

@@ -41,7 +41,8 @@ class Generate_Platemaker_Pars(object):
             self.fvc.scale = self.hwsetup['scale'] # this value is used in setups without fvcproxy / platemaker
             self.fvc.translation = self.hwsetup['translation']
 
-        self.ptl = petal.Petal(petal_id = self.hwsetup['ptl_id'],
+        self.ptl = petal.Petal(petal_id = self.hwsetup['ptl_id'], 
+                  petalbox_id = self.hwsetup['petalbox_id'], 
                   posids = [],
                   fidids = [],
                   simulator_on = False,

@@ -133,7 +133,7 @@ class Petal(object):
         for fidid in self.fidids:
             self.states[fidid] = posstate.PosState(fidid, logging=True, device_type='fid', printfunc=self.printfunc, petal_id=self.petal_id)        
             self.devices[self.states[fidid]._val['DEVICE_LOC']] = fidid
-        #print(self.fidids)
+        print(self.fidids)
 
         # pos flags setup
         self.pos_bit = 1<<2
