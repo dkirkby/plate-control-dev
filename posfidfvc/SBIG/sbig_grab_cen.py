@@ -18,6 +18,7 @@ class SBIG_Grab_Cen(object):
 		self.verbose = False
 		self.write_fits = True
 		self.take_darks = True # whether to measure a dark image and subtract it out
+		self.write_bias = False #True
 		self.subtract_bias = True # wheather to subtract bias image
 		self.flip_horizontal = True # whether to reflect image across y axis
 		self.flip_vertical = False # whether to reflect image across x axis
@@ -103,13 +104,28 @@ class SBIG_Grab_Cen(object):
 					print('couldn''t remove file: ' + filename)
 			self.cam.write_fits(L,filename)
 			imgfiles.append(filename)
+		if self.write_bias:
+			a=input('Warning! Do you really want to save a bias frame?')
+			if a == 'N' or a == 'n' or a=='no' or a=='No' or a=='NO':
+				print('Please change self.write_bias in sbig_grab_cen.py to False')
+				import sys; sys.exit()
+			filename_bias=self.save_dir + 'SBIG_bias_image.FITS'
+			try:
+				os.remove(filename_bias)
+			except:
+				pass
+			self.cam.write_fits(L,filename_bias)
+		
 		if not(self.take_darks):
 			D = np.zeros(np.shape(L), dtype=np.int32)
 		LD = np.array(L,dtype = np.int32) - np.array(D,dtype = np.int32)  - np.array(B,dtype = np.int32)
 		if self.write_fits and (self.take_darks or self.subtract_bias):
 			print('Saving diff image')
 			filename = self.save_dir + 'SBIG_diff_image.FITS'
-			os.remove(filename)
+			try:
+				os.remove(filename)
+			except:
+				pass
 			self.cam.write_fits(LD,filename)
 			imgfiles.append(filename)
 		del L
