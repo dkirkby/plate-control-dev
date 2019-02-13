@@ -24,7 +24,7 @@ class FVCHandler(object):
         2. scale
         3. translation
     """
-    def __init__(self, fvc_type='FLI', platemaker_instrument='petal2', printfunc=print, save_sbig_fits=True):
+    def __init__(self, fvc_type='FLI', platemaker_instrument='petal2', printfunc=print, save_sbig_fits=True, write_bias=False):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.fvc_type = fvc_type # 'SBIG' or 'SBIG_Yale' or 'FLI' or 'simulator'
         self.fvcproxy = None # may be auto-initialized later by the platemaker instrument setter
@@ -32,7 +32,7 @@ class FVCHandler(object):
         self.max_attempts = 5 # max number of times to retry an image measurement (if poor dot quality) before quitting hard
         if self.fvc_type == 'SBIG':
             import sbig_grab_cen
-            self.sbig = sbig_grab_cen.SBIG_Grab_Cen(save_dir=pc.dirs['temp_files'])
+            self.sbig = sbig_grab_cen.SBIG_Grab_Cen(save_dir=pc.dirs['temp_files'],write_bias=write_bias)
             self.sbig.take_darks = False # typically we have the test stand in a dark enough enclosure, so False here saves time
             self.sbig.write_fits = save_sbig_fits
         elif self.fvc_type == 'FLI' or self.fvc_type == 'SBIG_Yale':   
@@ -391,6 +391,7 @@ class FVCHandler(object):
                 xy = [[fvcXY_dicts_this[i]['x'],fvcXY_dicts_this[i]['y']] for i in return_order]
             else:
                 
+                #import pdb; pdb.set_trace()
                 xy = pc.listify2d(xy)
                 xy_np = np.transpose(xy)
                 rot = FVCHandler.rotmat2D_deg(-self.rotation)
@@ -409,8 +410,8 @@ class FVCHandler(object):
         return np.array([[math.cos(angle), -math.sin(angle)], [math.sin(angle), math.cos(angle)]])
 
 if __name__ == '__main__':
-    f = FVCHandler(fvc_type='FLI')
-    n_objects = 530#48
+    f = FVCHandler(fvc_type='SBIG',write_bias=False)
+    n_objects = 22
     n_repeats = 1
     f.min_energy = -np.Inf
     xy = []
