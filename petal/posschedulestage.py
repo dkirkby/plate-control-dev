@@ -265,14 +265,13 @@ class PosScheduleStage(object):
         if self.stats:
             found = {self._collision_id(posid,sweep.collision_neighbor) for posid,sweep in colliding_sweeps.items()}
             self.stats.add_collisions_found(found)
-            
             freeze_disabled = set()
             freeze_unmoving = set()
             for method,resolved in self.collisions_resolved.items():
                 if method == 'freeze' and requests != None:
                     for pair in resolved:
                         posid_1, posid_2 = pair.split('-')
-                        if posid_1 != 'PTL' and posid_2 != 'PTL':
+                        if posid_1 not in {'PTL','GFA'} and posid_2 not in {'PTL','GFA'}:
                             # freeze-disabled
                             if not(self.collider.posmodels[posid_1].is_enabled) or not(self.collider.posmodels[posid_2].is_enabled):
                                 freeze_disabled.add(pair)
