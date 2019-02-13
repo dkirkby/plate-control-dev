@@ -410,7 +410,7 @@ class FVCHandler(object):
         return np.array([[math.cos(angle), -math.sin(angle)], [math.sin(angle), math.cos(angle)]])
 
 if __name__ == '__main__':
-    f = FVCHandler(fvc_type='SBIG',write_bias=False)
+    f = FVCHandler(fvc_type='SBIG',write_bias=True)
     n_objects = 22
     n_repeats = 1
     f.min_energy = -np.Inf
@@ -454,10 +454,10 @@ if __name__ == '__main__':
                     metro_X_file_arr.append(row['X'])
                     metro_Y_file_arr.append(row['Y'])
                 plt.plot(metro_X_file_arr,metro_Y_file_arr,'rd',label="Fiducials")
-        plt.legend(loc='upper left')
-        plt.xlabel('X')
-        plt.ylabel('Y')
-        plt.show()
+            plt.legend(loc='upper left')
+            plt.xlabel('X')
+            plt.ylabel('Y')
+            plt.show()
 
         print('ndots: ' + str(len(xy[i])))
         print('')
