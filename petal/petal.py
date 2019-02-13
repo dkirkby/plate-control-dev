@@ -39,7 +39,10 @@ class Petal(object):
         printfunc       ... method, used for stdout style printing. we use this for logging during tests
         collider_file   ... string, file name of collider configuration file, no directory loction. If left blank will use default.
         sched_stats_on  ... boolean, controls whether to log statistics about scheduling runs
+        pb_config       ... boolean or dictionary, boolean controls whether to send configuration settings from backup json file, if dictionary is not passed from DOS
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
+        petal_loc       ... integer, (option) location (0-9) of petal in FPA
+        fpa_metrology   ... dictionary, petal offsets and rotation in FPA, keyed by petal_loc
     """
     def __init__(self, petal_id = None, posids = None, fidids = None, simulator_on=False,
                  petalbox_id = None, shape = None,
@@ -50,28 +53,35 @@ class Petal(object):
                  fpa_metrology = None):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output) 
         # petal setup
+        self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
         if petal_id == None:
-            if not hasattr(self, 'petal_state'):
-                self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
             self.petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
         else:
             self.petal_id = petal_id
         if petalbox_id == None:
-            if not hasattr(self, 'petal_state'):
-                self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
             self.petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
         else:
             self.petalbox_id = petalbox_id
-        if posids == None:
+        if not posids:
             self.printfunc('posids not given, read from ptl_settings file')
-            if not hasattr(self, 'petal_state'):
-                self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
             posids = self.petal_state.conf['POS_IDS']
-        if fidids == None:
+        else:
+            posids_file = self.petal_state.conf['POS_IDS'] 
+#            if set(posids) != set(posids_file):
+#                self.printfunc('WARNING: Input posids are not consistent with ptl_setting file')
+#                self.printfunc('Input posids:'+str(posids))
+#                self.printfunc('Posids from file:'+str(posids_file))
+        if not fidids:
             self.printfunc('fidids not given, read from ptl_settings file')
-            if not hasattr(self, 'petal_state'):
-                self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
             fidids = self.petal_state.conf['FID_IDS']
+        else:
+            fidids_file = self.petal_state.conf['FID_IDS']
+#            if set(fidids) != set(fidids_file):
+#                self.printfunc('WARNING: Input fidids are not consistent with ptl_setting file')
+#                self.printfunc('Input fidids:'+str(fidids))
+#                self.printfunc('Fidids from file:'+str(fidids_file))
+        if fidids in ['',[''],None,{''}]: # check included to handle simulation cases, where no fidids argued
+            fidids = {}
 
         self.verbose = verbose # whether to print verbose information at the terminal
         self.simulator_on = simulator_on
@@ -79,12 +89,7 @@ class Petal(object):
             import petalcomm
             self.comm = petalcomm.PetalComm(self.petalbox_id, user_interactions_enabled=user_interactions_enabled)
             self.comm.pbset('non_responsives', 'clear') #reset petalcontroller's list of non-responsive canids
-        if shape == None:
-            if not hasattr(self, 'petal_state'):
-                self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
-            self.shape = self.petal_state.conf['SHAPE']
-        else:
-            self.shape = shape
+        self.shape = self.petal_state.conf['SHAPE']
 
         # database setup
         self.db_commit_on = db_commit_on if DB_COMMIT_AVAILABLE else False
@@ -94,6 +99,17 @@ class Petal(object):
         self.local_commit_on = local_commit_on
         self.local_log_on = local_log_on
         self.altered_states = set()
+        self.pb_config = pb_config
+        
+        # petalbox setup (temporary until all settings are passed via init by DOS)
+        if pb_config == True:
+            import json
+            with open(pc.dirs['petalbox_configurations']) as json_file:
+                self.pb_config = json.load(json_file)[self.petal_id]
+        
+        # power supplies, fans, sensors setup
+        if not self.simulator_on and self.pb_config != False:
+            self.setup_petalbox(mode = 'configure')
 
         # positioners setup
         self.posmodels = {} # key posid, value posmodel instance
@@ -101,10 +117,9 @@ class Petal(object):
         self.devices = {} # key device_location_id, value posid
         installed_on_asphere = self.shape == 'petal'
         for posid in posids:
-            self.printfunc('now: %r' % posid)
-            self.states[posid] = posstate.PosState(posid, logging=False, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
+            self.states[posid] = posstate.PosState(posid, logging=True, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
             self.posmodels[posid] = PosModel(self.states[posid], installed_on_asphere)
-            self.devices[self.states[posid]._val['DEVICE_ID']] = posid
+            self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
         self.posids = set(self.posmodels.keys())
         self.canids_where_tables_were_just_sent = []
         self.busids_where_tables_were_just_sent = []
@@ -114,11 +129,13 @@ class Petal(object):
         self.power_supply_map = self._map_power_supplies_to_posids()
         
         # collider, scheduler, and animator setup
-        self.collider = poscollider.PosCollider(configfile=collider_file, 
+        self.collider = poscollider.PosCollider(configfile=collider_file,
                                                 collision_hashpp_exists=False, 
                                                 collision_hashpf_exists=False, 
                                                 hole_angle_file=None)
-        #self.collider = poscollider.PosCollider(configfile=collider_file)
+        self.collider.set_petal_offsets(x0=self.petal_state.conf['X_OFFSET'],
+                                        y0=self.petal_state.conf['Y_OFFSET'],
+                                        rot=self.petal_state.conf['ROTATION'])
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
         self.animator_on = False # this should be turned on/off using the animation start/stop control methods below
@@ -131,21 +148,24 @@ class Petal(object):
         self.fidids = {fidids} if isinstance(fidids,str) else set(fidids)
         for fidid in self.fidids:
             self.states[fidid] = posstate.PosState(fidid, logging=True, device_type='fid', printfunc=self.printfunc, petal_id=self.petal_id)        
-            self.devices[self.states[fidid]._val['DEVICE_ID']] = fidid
+            self.devices[self.states[fidid]._val['DEVICE_LOC']] = fidid
+        #self.printfunc(self.fidids)
 
         # pos flags setup
+        self.pos_bit = 1<<2
+        self.fid_bit = 1<<3
+        self.bad_fiber_fvc_bit = 1<<5
+        self.ctrl_disabled_bit = 1<<16
+        self.fiber_broken_bit = 1<<17
+        self.comm_error_bit = 1<<18
+        self.overlap_targ_bit = 1<<19
+        self.frozen_anticol_bit = 1<<20
+        self.unreachable_targ_bit = 1<<21
+        self.restricted_targ_bit = 1<<22
+        self.multi_request_bit = 1<<23
+        self.dev_nonfunctional_bit = 1<<24
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
         self._initialize_pos_flags()
-
-        
-        # power supplies setup?
-        # to-do
-        
-        # fans setup?
-        # to-do
-        
-        # sensors setup?
-        # to-do
  
 # METHODS FOR POSITIONER CONTROL
 
@@ -199,19 +219,18 @@ class Petal(object):
             pos_flags ... dict keyed by positioner indicating which flag as indicated below that a
                           positioner should receive going to the FLI camera with fvcproxy
         """
-        marked_for_delete = set()        
-        self._initialize_pos_flags()   # self.pos_flags = {}
+        marked_for_delete = set()
         for posid in requests:
             requests[posid]['posmodel'] = self.posmodels[posid]
             self._initialize_pos_flags(ids = {posid})
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
             if not(self.get_posfid_val(posid,'CTRL_ENABLED')):
-                self.pos_flags[posid] |= 1<<9
+                self.pos_flags[posid] |= self.ctrl_disabled_bit
                 marked_for_delete.add(posid)
             elif self.schedule.already_requested(posid):
                 marked_for_delete.add(posid)
-                self.pos_flags[posid] |= 1<<16
+                self.pos_flags[posid] |= self.multi_request_bit
             else:
                 accepted = self.schedule.request_target(posid, requests[posid]['command'], requests[posid]['target'][0], requests[posid]['target'][1], requests[posid]['log_note'])            
                 if not accepted:
@@ -275,7 +294,7 @@ class Petal(object):
         self._initialize_pos_flags(ids = {posid for posid in requests})
         marked_for_delete = {posid for posid in requests if not(self.get_posfid_val(posid,'CTRL_ENABLED'))}
         for posid in marked_for_delete:
-            self.pos_flags[posid] |= 1<<9
+            self.pos_flags[posid] |= self.ctrl_disabled_bit
             del requests[posid]
         for posid in requests:
             requests[posid]['posmodel'] = self.posmodels[posid]
@@ -302,7 +321,7 @@ class Petal(object):
         enabled = self.enabled_posmodels(posids)
         for posid in posids:
             if posid not in enabled.keys():
-                self.pos_flags[posid] |= 1<<9
+                self.pos_flags[posid] |= self.ctrl_disabled_bit
         if anticollision:
             if axisid == pc.P and direction == -1:
                 # calculate thetas where extended phis do not interfere
@@ -345,7 +364,7 @@ class Petal(object):
         enabled = self.enabled_posmodels(posids)
         for posid in posids:
             if posid not in enabled.keys():
-                self.pos_flags[posid] |= 1<<9
+                self.pos_flags[posid] |= self.ctrl_disabled_bit
         hardstop_debounce = [0,0]
         direction = [0,0]
         direction[pc.P] = +1 # force this, because anticollision logic depends on it
@@ -389,7 +408,7 @@ class Petal(object):
         """
         if self.simulator_on:
             if self.verbose:
-                printfunc('Simulator skips sending move tables to positioners.')
+                self.printfunc('Simulator skips sending move tables to positioners.')
             return
         hw_tables = self._hardware_ready_move_tables()
         canids = []
@@ -407,7 +426,7 @@ class Petal(object):
         """
         if self.simulator_on:
             if self.verbose:
-                printfunc('Simulator skips sending motor parameters to positioners.')
+                self.printfunc('Simulator skips sending motor parameters to positioners.')
             return
 
         parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
@@ -433,7 +452,7 @@ class Petal(object):
         """
         if self.simulator_on:
             if self.verbose:
-                printfunc('Simulator skips sending execute moves command to positioners.')
+                self.printfunc('Simulator skips sending execute moves command to positioners.')
             self._postmove_cleanup()
         else:
             self.comm.execute_sync(self.sync_mode)
@@ -602,6 +621,77 @@ class Petal(object):
     def extract_fidid(dotid):
         return dotid.split('.')[0]
 
+# METHODS FOR CONFIGURING PETALBOXES
+        
+    def setup_petalbox(self, mode):
+        """Set everything up for the argued petalbox mode.
+        The settings controlled by the petalbox are currently 
+        set identically for the configure and start of observations phases.
+        mode ... string specifying the mode that the petalbox should be set up for
+                 ('configure', 'start_obs', or 'end_obs')
+            
+        The following settings are sent to the petalbox (according to pb_config 
+        enable/duty specifications):
+        for 'configure' or 'start_obs' mode input:
+            Positioner Power - ON
+            CAN Power - ON
+            SYNC Buffer Enable - ON
+            TEC Power Enable - ON
+            GFA Power Enable - ON
+            GFA Fan Enable - ON 
+        for 'end_obs' mode input:
+            Positioner Power - OFF
+            CAN Power - OFF
+            SYNC Buffer Enable - OFF
+            TEC Power Eneble - OFF
+            GFA Power Enable - OFF
+            GFA Fan Enable - OFF
+        This method will take some time (~10 seconds) to return when things are being turned ON 
+        due to the time it takes to configure/re-configure CAN channels.
+        """
+        if self.simulator_on or self.pb_config == False:
+            return
+        conf = self.pb_config
+        if mode in ['configure', 'start_obs']:
+            pospwr_en = 'both' if (conf['PS1_ENABLED'] and conf['PS2_ENABLED'])\
+                        else 1 if conf['PS1_ENABLED'] else 2
+            can_en = 'both' if (conf['CAN_BRD1_ENABLED'] and conf['CAN_BRD2_ENABLED'])\
+                        else 1 if conf['CAN_BD1_ENABLED'] else 2
+            buff_en = 'both' if (conf['PS1_ENABLED'] and conf['PS2_ENABLED'])\
+                        else 1 if conf['PS1_ENABLED'] else 2
+            self.comm.power_up(pospwr_en, can_en, buff_en)
+            inlet_settings = ['on', conf['GFA_FAN_INLET_DUTY_DEFAULT_ON']]\
+                             if conf['GFA_FAN_INLET_ENABLED'] else ['off', 0]
+            outlet_settings = ['on', conf['GFA_FAN_OUTLET_DUTY_DEFAULT_ON']]\
+                              if conf['GFA_FAN_OUTLET_ENABLED'] else ['off', 0]
+            self.comm.pbset('GFA_FAN', {'inlet': inlet_settings, 'outlet': outlet_settings})
+            if conf['GFA_PWR_ENABLED']:
+                self.comm.pbset('GFAPWR_EN', 'on')
+            if conf['TEC_PWR_ENABLED']:
+                self.comm.pbset('TEC_CTRL', 'on')
+            #TODO set CTRL_ENABLED and CAN_ID_MAPPING (in petalcontroller) based on supply
+            #status, set CTRL_ENABLED pos_flags
+            
+            #TODO send out sensor configuration info
+            #sensor_config = {'FPP_TEMP_SENSOR_1' : conf['FPP_TEMP_SENSOR_1],
+            #                 'FPP_TEMP_SENSOR_2 : conf['FPP_TEMP_SENSOR_2],
+            #                 'FPP_TEMP_SENSOR_3 : conf['FPP_TEMP_SENSOR_3],
+            #                 'GXB_MONITOR' : conf['GXB_MONITOR'],
+            #                 'PBOX_TEMP_SENSOR' : conf['PBOX_TEMP_SENSOR']}
+            #self.comm.pbset('SENSOR_CONFIGURATION', sensor_config)
+            
+            #TODO determine whether to get feedback via telemetry or pbget calls (or both)
+        elif mode == 'end_obs':
+            self.comm.power_down()
+        
+        def reset_petalbox(self):
+            """Reset all errors and turn all enables off.  This method
+            returns the petalbox to its default safe state (how it comes up prior to 
+            communicating with the petal).
+            """
+            if not self.simulator_on:
+                self.comm.configure()
+        
 # GETTERS, SETTERS, STATUS METHODS
 
     def get_posfid_val(self, uniqueid, key):
@@ -613,6 +703,16 @@ class Petal(object):
         this call does NOT turn the fiducial physically on or off. It only saves a value."""
         self.states[uniqueid].store(key,value)
         self.altered_states.add(self.states[uniqueid])
+
+    def get_pbconf_val(self, key):
+        """Retrieve petalbox configuration value from the self.pb_config dictionary."""
+        self.pb_config.get(key, None)
+    
+    def set_pbconf_val(self, key, value):
+        """Set a configuration value for the petalbox.  This value will be applied when the 
+        setup_petalbox method is called again.  This method does not update the defaults for the petalbox
+        (which are loaded from either a configuration file or DOS)."""
+        self.pb_config[key] = value
 
     def commit(self, log_note='', *args, **kwargs):
         '''Commit data to the local config and log files, and/or the online database.
@@ -684,24 +784,15 @@ class Petal(object):
         pos_flags = {}
         if posids == 'all':
             posids = self.posids
-        try:
-            for posid in posids:
-                if posid not in self.pos_flags:
-                    self.printfunc('get_pos_flags: UNKNOWN POSID, NOT IN POS_FLAGS: %r' % posid)
-                    continue
-                if posid not in self.posmodels:
-                    self.printfunc('get_pos_flags: UNKNOWN POSID, NOT IN POSMODELS: %r' % posid)
-                    continue
-                if not(self.posmodels[posid].is_enabled):
-                    self.pos_flags[posid] |= 1<<9 #final check for disabled
-                if not(self.get_posfid_val(posid, 'FIBER_INTACT')):  
-                    self.pos_flags[posid] |= 1<<10
-                if self.get_posfid_val(posid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
-                    self.pos_flags[posid] |= 1<<17
-                pos_flags[posid] = str(self.pos_flags[posid])     # CAN'T PASS FLAGS AS STRING IN PYTHON3
-        except Exception as e:
-            print('xxxxxxxxxxxxxx: posid %r, Exception: %s' % (posid, str(e)))
-            raise e
+        for posid in posids:
+            if not(self.posmodels[posid].is_enabled):
+                self.pos_flags[posid] |= self.ctrl_disabled_bit #final check for disabled
+            if not(self.get_posfid_val(posid, 'FIBER_INTACT')):  
+                self.pos_flags[posid] |= self.fiber_borken_bit
+                self.pos_flags[posid] |= self.bad_fiber_fvc_bit
+            if self.get_posfid_val(posid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
+                self.pos_flags[posid] |= self.dev_nonfunctional_bit
+            pos_flags[posid] = str(self.pos_flags[posid])
         if should_reset:
             self._initialize_pos_flags()
         return pos_flags
@@ -794,7 +885,7 @@ class Petal(object):
                     for item_id in self.posids.union(self.fidids):
                         if self.get_posfid_val(item_id,'CAN_ID') == canid:
                             self.set_posfid_val(item_id,'CTRL_ENABLED',False)
-                            self.pos_flags[item_id] |= 1<<11
+                            self.pos_flags[item_id] |= self.comm_error_bit
                             self.states[item_id].next_log_notes.append('Disabled sending control commands because device was detected to be nonresponsive.')
                             break
                     status_updated = True
@@ -869,26 +960,25 @@ class Petal(object):
         3 - Fiducial Center
         4 - 
         5 - Bad Fiber or Fiducial
-        7 - Reserved for expansion 
-        8 - Reserved for expansion
+        6 - 15 reserved
 
-        PETAL BITS
-        9  - CTRL_ENABLED = False
-        10 - FIBER_INTACT = False
-        11 - Communication error
-        12 - Overlapping targets
-        13 - Frozen by anticollision
-        14 - Unreachable by positioner
-        15 - Targeting restricted boundries
-        16 - Requested multiple times
-        17 - Classified Nonfunctional
+        PETAL BITS    
+        16 - CTRL_ENABLED = False
+        17 - FIBER_INTACT = False
+        18 - Communication error
+        19 - Overlapping targets
+        20 - Frozen by anticollision
+        21 - Unreachable by positioner
+        22 - Targeting restricted boundries
+        23 - Requested multiple times
+        24 - Classified Nonfunctional
         '''
         if ids == 'all':
             ids = self.posids.union(self.fidids)
         for posfidid in ids:
-            if ('M' in posfidid) or ('UM' in posfidid) or posfidid.startswith('D'):
-                self.pos_flags[posfidid] = 1<<2
+            if posfidid.startswith('M') or posfidid.startswith('D') or posfidid.startswith('UM'):
+                self.pos_flags[posfidid] = self.pos_bit
             else:
-                self.pos_flags[posfidid] = 1<<3
+                self.pos_flags[posfidid] = self.fid_bit
         return
 
