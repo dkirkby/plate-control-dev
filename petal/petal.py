@@ -45,7 +45,9 @@ class Petal(object):
                  petalbox_id = None, shape = None,
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
                  printfunc=print, verbose=False, user_interactions_enabled=False,
-                 collider_file=None, sched_stats_on=False, anticollision='freeze'):
+                 collider_file=None, sched_stats_on=False, anticollision='freeze',
+                 petal_loc = None,
+                 fpa_metrology = None):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output) 
         # petal setup
         if petal_id == None:
