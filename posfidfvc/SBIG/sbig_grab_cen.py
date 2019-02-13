@@ -9,7 +9,7 @@ from astropy.io import fits
 class SBIG_Grab_Cen(object):
 	"""Module for grabbing images and calculating centroids using the SBIG camera.
 	"""
-	def __init__(self, save_dir='', size_fitbox=4):  
+	def __init__(self, save_dir='', size_fitbox=4, write_bias=False):  
 		self.__exposure_time = 200 # milliseconds, 90 ms is the minimum
 		self._cam_init()
 		self.min_brightness = 200
@@ -18,8 +18,8 @@ class SBIG_Grab_Cen(object):
 		self.verbose = False
 		self.write_fits = True
 		self.take_darks = False #True # whether to measure a dark image and subtract it out
-		self.write_bias = False #True
-		self.subtract_bias = True # wheather to subtract bias image
+		self.write_bias = write_bias
+		self.subtract_bias = True #True # wheather to subtract bias image
 		self.flip_horizontal = True # whether to reflect image across y axis
 		self.flip_vertical = False # whether to reflect image across x axis
 		self.save_dir = save_dir
