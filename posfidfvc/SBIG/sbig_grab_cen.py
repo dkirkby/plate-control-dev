@@ -122,7 +122,6 @@ class SBIG_Grab_Cen(object):
 			D = np.zeros(np.shape(L), dtype=np.int32)
 		LD = np.array(L,dtype = np.int32) - np.array(D,dtype = np.int32)  - np.array(B,dtype = np.int32)
 		if self.write_fits and (self.take_darks or self.subtract_bias):
-			print('Saving diff image')
 			filename = self.save_dir + 'SBIG_diff_image.FITS'
 			try:
 				os.remove(filename)
