@@ -49,7 +49,7 @@ class Petal(object):
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
                  printfunc=print, verbose=False, user_interactions_enabled=False,
                  collider_file=None, sched_stats_on=False, 
-                 pb_config = None,
+                 pb_config = False,
                  anticollision='freeze',
                  petal_loc = None,
                  fpa_metrology = None):
@@ -111,7 +111,7 @@ class Petal(object):
         
         # power supplies, fans, sensors setup
         if not self.simulator_on and self.pb_config != False:
-            self.setup_petalbox(mode = 'configure')
+            self.setup_petalbox(mode = 'start_up')
 
         # positioners setup
         self.posmodels = {} # key posid, value posmodel instance
@@ -127,7 +127,8 @@ class Petal(object):
         self.busids_where_tables_were_just_sent = []
         self.nonresponsive_canids = set()
         self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
-        self.set_motor_parameters()
+        if self.pb_config == False:
+            self.set_motor_parameters()
         self.power_supply_map = self._map_power_supplies_to_posids()
         
         # collider, scheduler, and animator setup
@@ -628,10 +629,29 @@ class Petal(object):
     def setup_petalbox(self, mode):
         """Set everything up for the argued petalbox mode.
         The settings controlled by the petalbox are currently 
-        set identically for the configure and start of observations phases.
+        set identically for the configure and start of observations modes.  They 
+        are also set identically for start up and end observations.  We
+        may be making distinctions between these modes at a later date.
         mode ... string specifying the mode that the petalbox should be set up for
-                 ('configure', 'start_obs', or 'end_obs')
-            
+                 ('start_up', 'configure', 'start_obs', or 'end_obs')
+                 
+        returns a status dictionary (read back from petalbox) with the following keys and values:
+        'PS1_ENABLED' ... boolean, True if on else False
+        'PS2_ENABLED' ... boolean, True if on else False
+        'CAN_BRD1_ENABLED' ... boolean, True if on else False
+        'CAN_BRD2_ENABLED' ... boolean, True if on else False
+        'BUFF1_ENABLED' ... boolean, True if on else False
+        'BUFF2_ENABLED' ... boolean, True if on else False
+        'TEC_PWR_ENABLED' ... boolean, True if on else False
+        'GFA_PWR_ENABLED' ... boolean, True if on else False
+        'GFA_FAN_INLET_ENABLED' ... boolean, True if on else False
+        'GFA_FAN_OUTLET_ENABLED' ... boolean, True if on else False
+        'GFA_FAN_INLET_DUTY_DEFAULT_ON' ... integer, fan duty setting
+        'GFA_FAN_OUTLET_DUTY_DEFAULT_ON' ... integer, fan duty setting
+        'GFA_FAN_INLET_TACH' ... integer, fan speed in RPM
+        'GFA_FAN_OUTLET_TACH' .. integer, fan speed in RPM
+        'OVERALL_STATUS' ... string, 'SUCCESS' or 'FAILED' 
+          
         The following settings are sent to the petalbox (according to pb_config 
         enable/duty specifications):
         for 'configure' or 'start_obs' mode input:
@@ -641,7 +661,7 @@ class Petal(object):
             TEC Power Enable - ON
             GFA Power Enable - ON
             GFA Fan Enable - ON 
-        for 'end_obs' mode input:
+        for 'start_up' or 'end_obs' mode input:
             Positioner Power - OFF
             CAN Power - OFF
             SYNC Buffer Enable - OFF
@@ -655,12 +675,13 @@ class Petal(object):
             return
         conf = self.pb_config
         if mode in ['configure', 'start_obs']:
+            #self.comm.clear_errors() uncomment when updated in petalcontroller, do for configure only
             pospwr_en = 'both' if (conf['PS1_ENABLED'] and conf['PS2_ENABLED'])\
                         else 1 if conf['PS1_ENABLED'] else 2
             can_en = 'both' if (conf['CAN_BRD1_ENABLED'] and conf['CAN_BRD2_ENABLED'])\
                         else 1 if conf['CAN_BD1_ENABLED'] else 2
-            buff_en = 'both' if (conf['PS1_ENABLED'] and conf['PS2_ENABLED'])\
-                        else 1 if conf['PS1_ENABLED'] else 2
+            buff_en = 'both' if (conf['BUFF1_ENABLED'] and conf['BUFF2_ENABLED'])\
+                        else 1 if conf['BUFF1_ENABLED'] else 2
             self.comm.power_up(pospwr_en, can_en, buff_en)
             inlet_settings = ['on', conf['GFA_FAN_INLET_DUTY_DEFAULT_ON']]\
                              if conf['GFA_FAN_INLET_ENABLED'] else ['off', 0]
@@ -673,18 +694,50 @@ class Petal(object):
                 self.comm.pbset('TEC_CTRL', 'on')
             #TODO set CTRL_ENABLED and CAN_ID_MAPPING (in petalcontroller) based on supply
             #status, set CTRL_ENABLED pos_flags
-            
-            #TODO send out sensor configuration info
-            #sensor_config = {'FPP_TEMP_SENSOR_1' : conf['FPP_TEMP_SENSOR_1],
-            #                 'FPP_TEMP_SENSOR_2 : conf['FPP_TEMP_SENSOR_2],
-            #                 'FPP_TEMP_SENSOR_3 : conf['FPP_TEMP_SENSOR_3],
-            #                 'GXB_MONITOR' : conf['GXB_MONITOR'],
-            #                 'PBOX_TEMP_SENSOR' : conf['PBOX_TEMP_SENSOR']}
-            #self.comm.pbset('SENSOR_CONFIGURATION', sensor_config)
-            
-            #TODO determine whether to get feedback via telemetry or pbget calls (or both)
-        elif mode == 'end_obs':
+            self.set_motor_parameters()
+        elif mode in ['start_up', 'end_obs']:
             self.comm.power_down()
+            self.comm.pbset('GFA_FAN', {'inlet' : ['off', 0], 'outlet' : ['off', 0]})
+        return self.assess_pb_status(mode)
+    
+    def assess_pb_status(self, mode):
+        """Retrieve petalbox feedback for settings associated with input mode. Use to verify
+        that a setup_petalbox call was successful.
+        mode ... string specifying the mode that the petalbox should be set up for
+                 ('start_up', 'configure', 'start_obs', or 'end_obs')
+        returns status dictionary with all settings and a final assessment, see setup_petalbox
+        method for format.
+        """
+        if not self.simulator_on:
+            str_to_bool = {'on' : True, 'off' : False}
+            pospwr_fbk = self.comm.pbget('POSPWR_FBK')
+            canbrd_fbk = self.comm.pbget('CAN_EN')
+            buff_fbk = self.comm.pbget('BUFFERS')
+            tec_fbk = self.comm.pbget('TEC_CTRL')
+            gfa_fbk = self.comm.pbget('GFAPWR_EN')
+            fan_fbk = self.comm.pbget('GFA_FAN')
+            setup_status = {'PS1_ENABLED' : str_to_bool[pospwr_fbk['PS1']],
+                           'PS2_ENABLED' : str_to_bool[pospwr_fbk['PS2']],
+                           'CAN_BRD1_ENABLED': str_to_bool[canbrd_fbk[0]],
+                           'CAN_BRD2_ENABLED': str_to_bool[canbrd_fbk[1]],
+                           'BUFF1_ENABLED' : str_to_bool[buff_fbk[0]],
+                           'BUFF2_ENABLED' : str_to_bool[buff_fbk[1]],
+                           'TEC_PWR_ENABLED' : str_to_bool[tec_fbk],
+                           'GFA_PWR_ENABLED' : str_to_bool[gfa_fbk],
+                           'GFA_FAN_INLET_ENABLED' : str_to_bool[fan_fbk['inlet'][0]],
+                           'GFA_FAN_OUTLET_ENABLED': str_to_bool[fan_fbk['outlet'][0]],
+                           'GFA_FAN_INLET_DUTY_DEFAULT_ON' : fan_fbk['inlet'][1],
+                           'GFA_FAN_OUTLET_DUTY_DEFAULT_ON' : fan_fbk['outlet'][1],
+                            }
+            assessment = {k:v for k,v in setup_status.items() if (v == self.pb_config[k] or mode in ['start_up', 'end_obs'])}
+            if mode in ['configure', 'start_obs']:
+                success_condition_met = False not in assessment.keys() and (fan_fbk['inlet'][2] > 0 and fan_fbk['outlet'][2] > 0)           
+            else:
+                success_condition_met = True not in setup_status
+            assessment['OVERALL_STATUS'] = 'SUCCESS' if success_condition_met else 'FAILED' 
+            assessment['GFA_FAN_INLET_TACH'] = fan_fbk['inlet'][2]
+            assessment['GFA_FAN_OUTLET_TACH'] = fan_fbk['outlet'][2]
+            return assessment
         
         def reset_petalbox(self):
             """Reset all errors and turn all enables off.  This method
@@ -706,16 +759,23 @@ class Petal(object):
         self.states[uniqueid].store(key,value)
         self.altered_states.add(self.states[uniqueid])
 
-    def get_pbconf_val(self, key):
+    def get_pbconfig_val(self, key):
         """Retrieve petalbox configuration value from the self.pb_config dictionary."""
-        self.pb_config.get(key, None)
-    
-    def set_pbconf_val(self, key, value):
-        """Set a configuration value for the petalbox.  This value will be applied when the 
-        setup_petalbox method is called again.  This method does not update the defaults for the petalbox
+        return self.pb_config.get(key, None)
+
+    def set_pbconfig_val(self, key, value):
+        """Set a configuration value for the petalbox in the self.pb_config dictionary.  
+        This value will be applied when the setup_petalbox method is called again.  
+        This method does not update the defaults for the petalbox
         (which are loaded from either a configuration file or DOS)."""
         self.pb_config[key] = value
-
+    
+    def get_pbdata_val(self, key):
+        """Requests data from petalbox using the pbget method.
+        key ... string, corresponds to petalbox pbget method keys (eg 'TELEMETRY', 'CONF_FILE')
+        """
+        return self.comm.pbget(key) 
+    
     def commit(self, log_note='', *args, **kwargs):
         '''Commit data to the local config and log files, and/or the online database.
         A note string may optionally be included to go along with this entry in the logs.
