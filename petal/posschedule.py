@@ -61,7 +61,6 @@ class PosSchedule(object):
                 self.printfunc(str(posid) + ': target request denied. Cannot request more than one target per positioner in a given schedule.')
             return False
         if self._deny_request_because_disabled(posmodel):
-            self.petal.pos_flags[posid] |= self.petal.ctrl_disabled_bit
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Positioner is disabled.')
             return False
@@ -100,12 +99,10 @@ class PosSchedule(object):
             return False
         targt_obsTP = posmodel.trans.posTP_to_obsTP(targt_posTP)
         if self._deny_request_because_target_interference(posmodel,targt_obsTP):
-            self.petal.pos_flags[posid] |= self.petal.overlap_targ_bit
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Target interferes with a neighbor\'s existing target.')
             return False
         if self.should_check_petal_boundaries and self._deny_request_because_out_of_bounds(posmodel,targt_obsTP):
-            self.petal.pos_flags[posid] |= self.petal.restricted_targ_bit
             if self.verbose:
                 self.printfunc(str(posid) + ': target request denied. Target exceeds a fixed boundary.')
             return False
@@ -222,7 +219,6 @@ class PosSchedule(object):
         if self.stats:
             timer_start = time.clock()
         if self._deny_request_because_disabled(move_table.posmodel):
-            self.petal.pos_flags[posid] |= self.petal.ctrl_disabled_bit
             if self.verbose:
                 self.printfunc(str(move_table.posmodel.posid) + ': move table addition to schedule denied. Positioner is disabled.')
             return
