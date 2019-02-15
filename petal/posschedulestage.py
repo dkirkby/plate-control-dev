@@ -123,7 +123,7 @@ class PosScheduleStage(object):
                 table.insert_new_row(idx)
                 table.set_postpause(idx,equalizing_pause)
 
-    def adjust_path(self, posid, freezing='on', requests=None):
+    def adjust_path(self, posid, stage_colliding, freezing='on', requests=None):
         """Adjusts move paths for posid to avoid collision. If the positioner
         has no collision, then no adjustment is made.
         
@@ -131,6 +131,8 @@ class PosScheduleStage(object):
                          already has a move_table associated with it in the stage,
                          that find_collsions() has already been run, and the results
                          saved via store_collision_finding_results(). 
+        
+            stage_colliding ... deep copy of stage.colliding set from posschedule.py
         
             freezing ... string with the following settings for when the "freeze"
                          method of collision resolution shall be applied:
@@ -168,18 +170,26 @@ class PosScheduleStage(object):
         for method in methods:
             collision_neighbor = self.sweeps[posid].collision_neighbor
             proposed_tables = self._propose_path_adjustment(posid,method)
-            if len(proposed_tables) > 1: # also check move_tables of mutual neighbor, in potential 3-way close approaches / collisions
-                altered = list(proposed_tables.keys())
-                mutual_neighbors = self.collider.pos_neighbors[altered[0]]
-                for posid in altered[1:]:
-                    mutual_neighbors = self.collider.pos_neighbors[posid].intersection(mutual_neighbors)
-                for posid in mutual_neighbors:
-                    if posid in self.move_tables:
-                        proposed_tables[posid] = self.move_tables[posid]
             colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables)
             if proposed_tables and not(colliding_sweeps): # i.e., the proposed tables should be accepted
                 self.move_tables.update(proposed_tables)
                 self.collisions_resolved[method].add(self._collision_id(posid,collision_neighbor))
+                
+                stage_colliding.remove(posid)  
+                all_sweeps_keys = list(all_sweeps.keys()) # list of all posids in proposed_tables
+                for pos_id in all_sweeps_keys:
+                    # if a positioner in the proposed table 
+                    # (i) does not correspond to the positioner being adjusted,
+                    # (ii) is one of the positioners in stage_colliding, and 
+                    # (iii) whose collision neighbor is also not the positioner whose path is being adjusted, 
+                    # then prevent the sweep information of this positioner and its collision neighbor from 
+                    # being changed, by removing them from all_sweeps. 
+                    if (pos_id != posid) and (pos_id in stage_colliding) and self.sweeps[pos_id].collision_neighbor != posid:
+                        try: all_sweeps.pop(pos_id)
+                        except KeyError: pass
+                        try: all_sweeps.pop(self.sweeps[pos_id].collision_neighbor)
+                        except KeyError: pass
+                # sweep information for all positioners updated here
                 self.store_collision_finding_results(colliding_sweeps, all_sweeps, requests)
                 if method == 'freeze':
                     self.sweeps[posid].register_as_frozen()
