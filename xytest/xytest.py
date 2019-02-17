@@ -151,7 +151,6 @@ class XYTest(object):
                           anticollision=self.xytest_conf['anticollision'])#, petal_shape=shape)
         posids=self.posids=ptl.posids
         fidids=self.fidids=ptl.fidids
-        
         while len(self.pos_notes) < len(self.posids):
             self.pos_notes.append('')
 

@@ -701,7 +701,7 @@ class Petal(object):
             if not(self.posmodels[posid].is_enabled):
                 self.pos_flags[posid] |= self.ctrl_disabled_bit #final check for disabled
             if not(self.get_posfid_val(posid, 'FIBER_INTACT')):  
-                self.pos_flags[posid] |= self.fiber_borken_bit
+                self.pos_flags[posid] |= self.fiber_broken_bit
                 self.pos_flags[posid] |= self.bad_fiber_fvc_bit
             if self.get_posfid_val(posid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
                 self.pos_flags[posid] |= self.dev_nonfunctional_bit

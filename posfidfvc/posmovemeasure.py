@@ -297,7 +297,7 @@ class PosMoveMeasure(object):
         if there is any uncertainty as to its current location. This is generally not necessary
         in the default case, using 'posTP'.
         """
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         self.printfunc('Running one-point calibration of ' + mode)
         posT = 0
         if mode == 'posTP' or mode == 'offsetsTP':

@@ -78,7 +78,7 @@ class FVCHandler(object):
         """
         from DOSlib.proxies import FVC
         self.__platemaker_instrument = name
-        self.fvcproxy = FVC(self.platemaker_instrument)
+        self.fvcproxy = FVC(self.platemaker_instrument, save_centers=True)#, matched_only = False)
         self.printfunc('proxy FVC created for instrument %s' % self.fvcproxy.get('instrument'))
 
     @property
