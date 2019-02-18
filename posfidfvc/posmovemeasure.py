@@ -1105,13 +1105,19 @@ class PosMoveMeasure(object):
             this_meas_data,imgfiles = self.move_measure(requests, tp_updates=None)
             for p in this_meas_data.keys():
                 data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
-
         # circle fits
         for posid in data:
+            #Temporarily added to throw out purposefully set value of [0,0] for posids that
+            #did not get a measured centroid mathced to them during calibration
+            if self.fvc.fvcproxy:
+                for idx, meas in enumerate(data[posid]['measured_obsXY']):
+                    if meas == [0,0]:
+                        del data[posid]['measured_obsXY'][idx]
+                        del data[posid]['target_posTP'][idx]
+            #End of temporarily added section
             (xy_ctr,radius) = fitcircle.FitCircle().fit(data[posid]['measured_obsXY'])
             data[posid]['xy_center'] = xy_ctr
             data[posid]['radius'] = radius
-        
         return data
 
     def _measure_range_arc(self,posids='all',axis='theta'):
