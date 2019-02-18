@@ -624,7 +624,7 @@ class Petal(object):
     def extract_fidid(dotid):
         return dotid.split('.')[0]
 
-# METHODS FOR CONFIGURING PETALBOXES
+# METHODS FOR CONFIGURING THE PETALBOX
         
     def setup_petalbox(self, mode):
         """Set everything up for the argued petalbox mode.
@@ -692,8 +692,7 @@ class Petal(object):
                 self.comm.pbset('GFAPWR_EN', 'on')
             if conf['TEC_PWR_ENABLED']:
                 self.comm.pbset('TEC_CTRL', 'on')
-            #TODO set CTRL_ENABLED and CAN_ID_MAPPING (in petalcontroller) based on supply
-            #status, set CTRL_ENABLED pos_flags
+            self._update_and_send_can_enabled_info(pospwr_en)
             self.set_motor_parameters()
         elif mode in ['start_up', 'end_obs']:
             self.comm.power_down()
@@ -776,6 +775,36 @@ class Petal(object):
         """
         return self.comm.pbget(key) 
     
+    def get_ptl_performance_telemetry(self):
+        """Returns an abbreviated summary of key performance parameters
+        to be plotted with the telemetry viewer.  These stats are provided
+        for the latest shedule only.
+        
+        Returns dictionary of anticollision statistic parameters (if self.schedule_stats is initialized, 
+        else returns an empty dictionary).
+        key ... value
+        'found total collisions' ... integer number of total collisions found
+        'resolved total collisions' ... integer number of total collisions resolved
+        'resolved freeze collisions' ... integer number of collisions resolved via the 'freeze' method
+        'n pos' ... integer number of positioners included in the schedule
+        'method' ... string name of anticollision method specified for the schedule
+        'avg moving simultaneously' ... float describing the average number of positioners moving simulataneously
+        'max moving simultaneously' ... float describing the maximum number of positioners moving simultaneously
+        'total schedule time' ... float total time (calculation and move) for the schedule
+        """
+        if not self.schedule_stats:
+            return {}
+        data = self.schedule_stats.summarize_all()
+        idx = -2 if not self.schedule_stats.real_data_yet_in_latest_row else -1
+        keys_to_include = ['found total collisions', 'resolved total collisions',\
+                          'freeze', 'n pos', 'method', 'avg moving simultaneously', 'max moving simultaneously']
+        total_time = data['max table move time'][idx] + data['request_target calc time'][idx]\
+                     + data['schedule_moves calc time'][idx] + data['expert_add_table calc time'][idx]
+        data_for_telemetry = {k:data[k][idx] for k in keys_to_include if not k == 'freeze'}
+        data_for_telemetry['resolved freeze collisions'] = data['freeze'][idx]
+        data_for_telemetry['total schedule time'] = total_time
+        return data_for_telemetry
+    
     def commit(self, log_note='', *args, **kwargs):
         '''Commit data to the local config and log files, and/or the online database.
         A note string may optionally be included to go along with this entry in the logs.
@@ -850,7 +879,7 @@ class Petal(object):
             if not(self.posmodels[posid].is_enabled):
                 self.pos_flags[posid] |= self.ctrl_disabled_bit #final check for disabled
             if not(self.get_posfid_val(posid, 'FIBER_INTACT')):  
-                self.pos_flags[posid] |= self.fiber_borken_bit
+                self.pos_flags[posid] |= self.fiber_broken_bit
                 self.pos_flags[posid] |= self.bad_fiber_fvc_bit
             if self.get_posfid_val(posid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
                 self.pos_flags[posid] |= self.dev_nonfunctional_bit
@@ -1009,6 +1038,22 @@ class Petal(object):
             already_mapped.union(mapped_posids)
         power_supply_map['other'] = set(canids.keys()).difference(already_mapped)
         return power_supply_map
+    
+    def _update_and_send_can_enabled_info(self, power_supply_mode = 'both'):
+        """Set up CAN and CTRL_ENABLED information based on positioner power supply or supplies being enabled.
+        
+        power_supply_mode ... string ('both' or 'None') or integer (1 or 2) specifying the power supply or supplies being enabled.
+        """
+        #TODO set CTRL_ENABLED and CAN_ID_MAPPING (in petalcontroller) based on supply
+        #status, set CTRL_ENABLED pos_flags
+        pass
+    
+    def _map_can_enabled_devices(self):
+        """Reads in enable statuses for all posmodels and returns a dictionary mapping
+        busids (keys) to sub-dictionaries containing canid (keys) and device type values 
+        (0 if positioner, 1 if fiducial).  This mapping is sent out to the petalbox.
+        """
+        pass
 
     def _initialize_pos_flags(self, ids = 'all'):
         '''
