@@ -239,6 +239,15 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not configure petalcontroller: %s' % str(e)
 
+    def clear_errors(self):
+        """
+        Clear petalbox error states
+        """
+        try:
+            return self._call_device('clear_errors')
+        except Exception as e:
+            return 'FAILED: Can not clear errors: %s' % str(e)
+
     def pbhelp(self):
         """
         Display petalcontroller commands and pbget/pbset keys
