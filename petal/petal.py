@@ -102,16 +102,6 @@ class Petal(object):
         self.local_log_on = local_log_on
         self.altered_states = set()
         self.pb_config = pb_config
-        
-        # petalbox setup (temporary until all settings are passed via init by DOS)
-        if pb_config == True:
-            import json
-            with open(pc.dirs['petalbox_configurations']) as json_file:
-                self.pb_config = json.load(json_file)[self.petal_id]
-        
-        # power supplies, fans, sensors setup
-        if not self.simulator_on and self.pb_config != False:
-            self.setup_petalbox(mode = 'start_up')
 
         # positioners setup
         self.posmodels = {} # key posid, value posmodel instance
@@ -152,7 +142,6 @@ class Petal(object):
         for fidid in self.fidids:
             self.states[fidid] = posstate.PosState(fidid, logging=True, device_type='fid', printfunc=self.printfunc, petal_id=self.petal_id)        
             self.devices[self.states[fidid]._val['DEVICE_LOC']] = fidid
-        #self.printfunc(self.fidids)
 
         # pos flags setup
         self.pos_bit = 1<<2
@@ -169,7 +158,18 @@ class Petal(object):
         self.dev_nonfunctional_bit = 1<<24
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
         self._initialize_pos_flags()
- 
+
+        # petalbox setup (temporary until all settings are passed via init by DOS)
+        if pb_config == True:
+            import json
+            with open(pc.dirs['petalbox_configurations']) as json_file:
+                self.pb_config = json.load(json_file)[self.petal_id]
+        
+        # power supplies, fans, sensors setup
+        if not self.simulator_on and self.pb_config != False:
+            self._map_can_enabled_devices()
+            self.setup_petalbox(mode = 'start_up')
+
 # METHODS FOR POSITIONER CONTROL
 
     def request_targets(self, requests):
@@ -692,11 +692,12 @@ class Petal(object):
                 self.comm.pbset('GFAPWR_EN', 'on')
             if conf['TEC_PWR_ENABLED']:
                 self.comm.pbset('TEC_CTRL', 'on')
-            self._update_and_send_can_enabled_info(pospwr_en)
             self.set_motor_parameters()
         elif mode in ['start_up', 'end_obs']:
+            pospwr_en = 'None'
             self.comm.power_down()
             self.comm.pbset('GFA_FAN', {'inlet' : ['off', 0], 'outlet' : ['off', 0]})
+        self._update_and_send_can_enabled_info(pospwr_en)
         return self.assess_pb_status(mode)
     
     def assess_pb_status(self, mode):
@@ -976,6 +977,9 @@ class Petal(object):
                     for item_id in self.posids.union(self.fidids):
                         if self.get_posfid_val(item_id,'CAN_ID') == canid:
                             self.set_posfid_val(item_id,'CTRL_ENABLED',False)
+                            self.petal_state.conf['DISABLED_BUFFER'].append(item_id)
+                            self.petal_state.write()
+                            self._update_can_enabled_map(item_id, False)
                             self.pos_flags[item_id] |= self.comm_error_bit
                             self.states[item_id].next_log_notes.append('Disabled sending control commands because device was detected to be nonresponsive.')
                             break
@@ -1044,17 +1048,59 @@ class Petal(object):
         
         power_supply_mode ... string ('both' or 'None') or integer (1 or 2) specifying the power supply or supplies being enabled.
         """
-        #TODO set CTRL_ENABLED and CAN_ID_MAPPING (in petalcontroller) based on supply
-        #status, set CTRL_ENABLED pos_flags
-        pass
-    
+        if power_supply_mode == 'None':
+            for devid in self.posids.union(self.fidids):
+                self.set_posfid_val(devid, 'CTRL_ENABLED', False)
+                self.pos_flags[devid] |= self.comm_error_bit
+            self.comm.pbset('CAN_ENABLED', {})
+        elif power_supply_mode == 'both':
+            for devid in self.posids.union(self.fidids):
+                if not devid in self.disabled_devids:
+                    self.set_posfid_val(devid, 'CTRL_ENABLED', True)
+                    self.pos_flags[devid] &= ~(self.comm_error_bit)
+            both_supplies_map = self.can_enabled_map['V1'].copy()
+            both_supplies_map.update(self.can_enabled_map['V2'])   
+            self.comm.pbset('CAN_ENABLED', both_supplies_map)
+        else:
+            for devid in self.posids.union(self.fidids):
+                if not devid in self.power_supply_map['V{}'.format(power_supply_mode)]:
+                    self.set_posfid_val(devid, 'CTRL_ENABLED', False)
+                    self.pos_flags[devid] |= self.comm_error_bit
+                else:
+                    self.set_posfid_val(devid, 'CTRL_ENABLED', True)
+                    self.pos_flags[devid] &= ~(self.comm_error_bit)
+            self.comm.pbset('CAN_ENABLED', self.can_enabled_map['V{}'.format(power_supply_mode)])
+            
     def _map_can_enabled_devices(self):
-        """Reads in enable statuses for all posmodels and returns a dictionary mapping
-        busids (keys) to sub-dictionaries containing canid (keys) and device type values 
-        (0 if positioner, 1 if fiducial).  This mapping is sent out to the petalbox.
+        """Reads in enable statuses for all devices and builds a formatted for petalbox can 
+        id map by power supply key.
         """
-        pass
+        self.disabled_devids = self.petal_state.conf['DISABLED_BUFFER']
+        self.can_enabled_map = {}
+        for supply in pc.power_supply_can_map.keys():
+            self.can_enabled_map[supply] = dict((k, {}) for k in pc.power_supply_can_map[supply])
+        for devid in self.posids.union(self.fidids):
+            if self.get_posfid_val(devid, 'CTRL_ENABLED') and devid not in self.disabled_devids:
+                busid, canid = self.get_posfid_val(devid, 'BUS_ID'), self.get_posfid_val(devid, 'CAN_ID')
+                if busid in pc.power_supply_can_map['V1']:
+                    self.can_enabled_map['V1'][busid][canid] = 1 if devid.startswith('P') else 0
+                elif busid in pc.power_supply_can_map['V2']:
+                    self.can_enabled_map['V2'][busid][canid] = 1 if devid.startswith('P') else 0
 
+    def _update_can_enabled_map(self, devid, enabled = False):
+        """Update self.can_enabled_map by adding or removing a devid (string unique id of positinoer
+        or fiducial).
+        """
+        busid, canid = self.get_posfid_val(devid, 'BUS_ID'), self.get_posfid_val(devid, 'CAN_ID')
+        devtype = 1 if devid.startswith('P') else 0
+        for supply in ['V1', 'V2']:
+            if self.get_posfid_val(devid, 'BUS_ID') in pc.power_supply_can_map[supply]:
+                dev_supply = supply
+        if enabled:
+            self.can_enabled_map[dev_supply][busid][canid] = devtype
+        else:
+            self.can_enabled_map[dev_supply][busid].pop(canid, None) 
+            
     def _initialize_pos_flags(self, ids = 'all'):
         '''
         Sets pos_flags to initial values: 4 for positioners and 8 for fiducials.
