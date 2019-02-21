@@ -19,6 +19,9 @@ import configobj
 import csv
 
 
+logfile = pc.dirs['xytest_logs'] + pc.filename_timestamp_str_now() + '_calib.log'
+
+
 # start set of new and changed files
 new_and_changed_files = set()
 
@@ -58,9 +61,9 @@ else:
 # software initialization and startup
 # software initialization and startup
 if hwsetup['fvc_type'] == 'FLI' and 'pm_instrument' in hwsetup:
-    fvc=fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'],platemaker_instrument=hwsetup['pm_instrument'])
+    fvc=fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'],printfunc=logwrite,platemaker_instrument=hwsetup['pm_instrument'])
 else:
-    fvc = fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'])    
+    fvc = fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],printfunc=logwrite,save_sbig_fits=hwsetup['save_sbig_fits'])    
 fvc.rotation = hwsetup['rotation'] # this value is used in setups without fvcproxy / platemaker
 fvc.scale = hwsetup['scale'] # this value is used in setups without fvcproxy / platemaker
 fvc.translation = hwsetup['translation']
@@ -73,14 +76,14 @@ ptl = petal.Petal(petal_id = hwsetup['ptl_id'],posids=[],fidids=[],
                   db_commit_on = False,
                   local_commit_on = True,
                   local_log_on = True,
-                  printfunc = print,
+                  printfunc = logwrite,,
                   verbose = False,
                   collider_file = None,
                   sched_stats_on = False,
                   anticollision = None) # valid options for anticollision arg: None, 'freeze', 'adjust'
 posids=ptl.posids
 fidids=ptl.fidids
-m = posmovemeasure.PosMoveMeasure([ptl],fvc)
+m = posmovemeasure.PosMoveMeasure([ptl],fvc,printfunc=logwrite)
 m.make_plots_during_calib = True
 print('Automatic generation of calibration plots is turned ' + ('ON' if m.make_plots_during_calib else 'OFF') + '.')
 
@@ -204,3 +207,16 @@ if svn_user:
     del svn_user
 if svn_pass:
     del svn_pass
+
+def logwrite(text,stdout=True):
+    """Standard logging function for writing to the test traveler log file.
+    """
+    global logfile
+    line = '# ' + pc.timestamp_str_now() + ': ' + text
+    with open(logfile,'a',encoding='utf8') as fh:
+        fh.write(line + '\n')
+    if stdout:
+        print(line)
+
+
+
