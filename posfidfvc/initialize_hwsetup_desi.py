@@ -3,10 +3,10 @@ import sys
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../xytest/'))
-sys.path.remove('/software/products/plate_control-trunk/xytest')
-sys.path.remove('/software/products/plate_control-trunk/posfidfvc')
-sys.path.remove('/software/products/plate_control-trunk/petalbox')
-sys.path.remove('/software/products/plate_control-trunk/petal')
+#sys.path.remove('/software/products/plate_control-trunk/xytest')
+#sys.path.remove('/software/products/plate_control-trunk/posfidfvc')
+#sys.path.remove('/software/products/plate_control-trunk/petalbox')
+#sys.path.remove('/software/products/plate_control-trunk/petal')
 
 import petal
 import posmovemeasure
@@ -20,6 +20,16 @@ import csv
 
 
 logfile = pc.dirs['xytest_logs'] + pc.filename_timestamp_str_now() + '_calib.log'
+
+def logwrite(text,stdout=True):
+    """Standard logging function for writing to the test traveler log file.
+    """
+    global logfile
+    line = '# ' + pc.timestamp_str_now() + ': ' + text
+    with open(logfile,'a',encoding='utf8') as fh:
+        fh.write(line + '\n')
+    if stdout:
+        print(line)
 
 
 # start set of new and changed files
@@ -76,7 +86,7 @@ ptl = petal.Petal(petal_id = hwsetup['ptl_id'],posids=[],fidids=[],
                   db_commit_on = False,
                   local_commit_on = True,
                   local_log_on = True,
-                  printfunc = logwrite,,
+                  printfunc = logwrite,
                   verbose = False,
                   collider_file = None,
                   sched_stats_on = False,
@@ -207,16 +217,4 @@ if svn_user:
     del svn_user
 if svn_pass:
     del svn_pass
-
-def logwrite(text,stdout=True):
-    """Standard logging function for writing to the test traveler log file.
-    """
-    global logfile
-    line = '# ' + pc.timestamp_str_now() + ': ' + text
-    with open(logfile,'a',encoding='utf8') as fh:
-        fh.write(line + '\n')
-    if stdout:
-        print(line)
-
-
 
