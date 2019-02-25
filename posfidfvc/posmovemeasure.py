@@ -1119,9 +1119,9 @@ class PosMoveMeasure(object):
         for posid in data:
             #Temporarily added to throw out purposefully set value of [0,0] for posids that
             #did not get a measured centroid mathced to them during calibration
-            if self.fvc.fvcproxy or True:
+            if self.fvc.fvcproxy:
                 for idx, meas in enumerate(data[posid]['measured_obsXY']):
-                    if meas == [0,0] and self.fvc.fvcproxy:
+                    if meas == [0,0]:
                         del data[posid]['measured_obsXY'][idx]
                         del data[posid]['target_posTP'][idx]
             #End of temporarily added section
