@@ -58,7 +58,7 @@ class PosMoveMeasure(object):
         self.enabled_posids = []
         self.disabled_posids = []
         self.posid_not_identified=self.all_posids
-
+        
     def measure(self, pos_flags = None):
         """Measure positioner locations with the FVC and return the values.
 
@@ -208,6 +208,11 @@ class PosMoveMeasure(object):
         for posid in this_meas.keys():
             m = data[posid] # again, for terseness
             m['meas_obsXY'] = [this_meas[posid]]
+            if m['meas_obsXY'][-1] == [0,0]:
+                self.petal(posid).set_posfid_val(posid, 'CTRL_ENABLED', False)
+                self.petal(posid).pos_flags[posid] |= self.petal(posid).ctrl_disabled_bit
+                self.petal(posid).pos_flags[posid] |= self.petal(posid).bad_fiber_fvc_bit
+                self.printfunc(str(posid) + ': disabled due to not being matched to a centroid.')
             m['errXY'] = [[m['meas_obsXY'][-1][0] - m['targ_obsXY'][0],
                            m['meas_obsXY'][-1][1] - m['targ_obsXY'][1]]]
             m['err2D'] = [(m['errXY'][-1][0]**2 + m['errXY'][-1][1]**2)**0.5]
@@ -232,6 +237,11 @@ class PosMoveMeasure(object):
             for posid in this_meas.keys():
                 m = data[posid] # again, for terseness
                 m['meas_obsXY'].append(this_meas[posid])
+                if m['meas_obsXY'][-1] == [0,0] and self.fvc.fvcproxy:
+                    self.petal(posid).set_posfid_val(posid, 'CTRL_ENABLED', False)
+                    self.petal(posid).pos_flags[posid] |= self.petal(posid).ctrl_disabled_bit
+                    self.petal(posid).pos_flags[posid] |= self.petal(posid).bad_fiber_fvc_bit
+                    self.printfunc(str(posid) + ': disabled due to not being matched to a centroid.')
                 m['errXY'].append([m['meas_obsXY'][-1][0] - m['targ_obsXY'][0],
                                    m['meas_obsXY'][-1][1] - m['targ_obsXY'][1]])
                 m['err2D'].append((m['errXY'][-1][0]**2 + m['errXY'][-1][1]**2)**0.5)
@@ -1109,9 +1119,9 @@ class PosMoveMeasure(object):
         for posid in data:
             #Temporarily added to throw out purposefully set value of [0,0] for posids that
             #did not get a measured centroid mathced to them during calibration
-            if self.fvc.fvcproxy:
+            if self.fvc.fvcproxy or True:
                 for idx, meas in enumerate(data[posid]['measured_obsXY']):
-                    if meas == [0,0]:
+                    if meas == [0,0] and self.fvc.fvcproxy:
                         del data[posid]['measured_obsXY'][idx]
                         del data[posid]['target_posTP'][idx]
             #End of temporarily added section
@@ -1288,6 +1298,12 @@ class PosMoveMeasure(object):
             p_ctr = np.array(P[posid]['xy_center'])
             length_r1 = np.sqrt(np.sum((t_ctr - p_ctr)**2))
             length_r2 = P[posid]['radius']
+            if self._outside_of_tolerance_from_nominals(posid, length_r1, length_r2):
+                self.rehome(posid)
+                self.petal(posid).set_posfid_val(posid, 'CTRL_ENABLED', False)
+                self.petal(posid).pos_flags[posid] |= self.petal(posid).ctrl_disabled_bit
+                self.petal(posid).pos_flags[posid] |= self.petal(posid).bad_fiber_fvc_bit
+                self.printfunc(str(posid) + ': disabled due to poor arc calibration.')
             if ptl.posmodels[posid].is_enabled:
                 ptl.set_posfid_val(posid,'LENGTH_R1',length_r1)
                 ptl.set_posfid_val(posid,'LENGTH_R2',length_r2)
@@ -1512,6 +1528,9 @@ class PosMoveMeasure(object):
         delta_TP = {}
         for posid in measured_data.keys():
             delta_TP[posid] = [0,0]
+            if measured_data[posid] == [0,0] and self.fvc.fvcproxy:
+                #Do not update TP for positioner that did not get matched to a centroid
+                break
             ptl = self.petal(posid)
             measured_obsXY = measured_data[posid]
             expected_obsXY = ptl.expected_current_position(posid,'obsXY')
@@ -1548,7 +1567,21 @@ class PosMoveMeasure(object):
                     delta_TP[posid] = [delta_T,delta_P]
                     posmodel.state.next_log_notes.append('updated ' + param + '_T and ' + param + '_P after positioning error of ' + self.fmt(err_xy) + ' mm')
         return delta_TP
-                
+    
+    def _outside_of_tolerance_from_nominals(self, posid, r1, r2):
+        """Check to see if R1 or R2 are outside of a certain tolerance
+        from nominal values.  Return True if either of these values are out of bounds, else False.
+        Add offset x,y check to this.
+        """         
+        tol = pc.nominals['LENGTH_R1']['tol']
+        nom_val = pc.nominals['LENGTH_R1']['value']
+        if not(nom_val - tol <= r1 <= nom_val + tol):
+            return True
+        tol = pc.nominals['LENGTH_R2']['tol']
+        nom_val = pc.nominals['LENGTH_R2']['value']
+        if not(nom_val - tol <= r2 <= nom_val + tol):
+            return True
+
     @property
     def phi_clear_angle(self):
         """Returns the phi angle in degrees for which two positioners cannot collide
