@@ -981,6 +981,7 @@ class Petal(object):
                             self.petal_state.write()
                             self._update_can_enabled_map(item_id, False)
                             self.pos_flags[item_id] |= self.comm_error_bit
+                            self.printfunc(str(item_id) + ': was disabled due to a CAN communication error.')
                             self.states[item_id].next_log_notes.append('Disabled sending control commands because device was detected to be nonresponsive.')
                             break
                     status_updated = True
