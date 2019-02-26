@@ -158,6 +158,7 @@ class Petal(object):
         self.dev_nonfunctional_bit = 1<<24
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
         self._initialize_pos_flags()
+        self._apply_state_enable_settings()
 
         # petalbox setup (temporary until all settings are passed via init by DOS)
         if pb_config == True:
@@ -1135,4 +1136,19 @@ class Petal(object):
             else:
                 self.pos_flags[posfidid] = self.fid_bit
         return
+
+    def _apply_state_enable_settings(self):
+        """Read positioner/fiducial configuration settings and disable/set flags accordingly.
+        """
+        for devid in self.posids.union(self.fidids):
+            if self.get_posfid_val(devid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
+                self.set_posfid_val(devid, 'CTRL_ENABLED', False)
+                self.pos_flags[devid] |= self.ctrl_disabled_bit
+                self.pos_flags[devid] |= self.dev_nonfunctional_bit
+            if devid in self.posids:
+                if not self.get_posfid_val(devid, 'FIBER_INTACT'):
+                    self.set_posfid_val(devid, 'CTRL_ENABLED', False)
+                    self.pos_flags[devid] |= self.ctrl_disabled_bit
+                    self.pos_flags[devid] |= self.broken_fiber_bit
+                    self.pos_flags[devid] |= self.bad_fiber_fvc_bit            
 
