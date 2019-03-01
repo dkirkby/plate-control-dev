@@ -262,11 +262,11 @@ class PosMoveMeasure(object):
         """
         posids_by_petal = self.posids_by_petal(posids)
         requests = {}
-        posP = self.phi_clear_angle # uniform value in all cases
+        obsP = self.phi_clear_angle # uniform value in all cases
         for petal,these_posids in posids_by_petal.items():
             for posid in these_posids:
-                posT = petal.expected_current_position(posid,'posT')
-                requests[posid] = {'command':'posTP', 'target':[posT,posP], 'log_note':'retracting phi'}
+                obsT = petal.expected_current_position(posid,'obsTP')[0]
+                requests[posid] = {'command':'obsTP', 'target':[obsT,obsP], 'log_note':'retracting phi'}
         self.move(requests)
     
     def park(self,posids='all'):
