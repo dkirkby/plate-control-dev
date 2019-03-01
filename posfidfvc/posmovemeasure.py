@@ -263,9 +263,9 @@ class PosMoveMeasure(object):
         posids_by_petal = self.posids_by_petal(posids)
         requests = {}
         obsP = self.phi_clear_angle # uniform value in all cases
-        for petal,these_posids in posids_by_petal.items():
+        for these_posids in posids_by_petal.values():
             for posid in these_posids:
-                obsT = petal.expected_current_position(posid,'obsTP')[0]
+                obsT = self.posmodel(posid).expected_current_obsTP[0]
                 requests[posid] = {'command':'obsTP', 'target':[obsT,obsP], 'log_note':'retracting phi'}
         self.move(requests)
     
@@ -274,10 +274,10 @@ class PosMoveMeasure(object):
         """
         posids_by_petal = self.posids_by_petal(posids)
         requests = {}
-        posT = 0
-        for petal,these_posids in posids_by_petal.items():
+        posT = 0.0 # uniform value in all cases
+        for these_posids in posids_by_petal.values():
             for posid in these_posids:
-                posP = max(petal.posmodels[posid].targetable_range_P)
+                posP = max(self.posmodel(posid).targetable_range_P)
                 requests[posid] = {'command':'posTP', 'target':[posT,posP], 'log_note':'parking'}
         self.move(requests)
         
@@ -308,17 +308,19 @@ class PosMoveMeasure(object):
         in the default case, using 'posTP'.
         """
         self.printfunc('Running one-point calibration of ' + mode)
-        posT = 0
-        if mode == 'posTP' or mode == 'offsetsTP':
-            posP = self.phi_clear_angle
+        posT = 0.0 # uniform value in all cases
+        dummy_obsT = 0.0 # value doesn't matter -- only used for conformance to transforms interface below
+        if mode in {'posTP','offsetsTP'}:
+            obsP = self.phi_clear_angle
         elif mode == 'offsetsTP_close':
-            posP = self.phi_close_angle
+            obsP = self.phi_close_angle
         else:
-            posP = 180
+            obsP = 180.0
         posids_by_petal = self.posids_by_petal(posids)
         requests = {}
         for these_posids in posids_by_petal.values():
             for posid in these_posids:
+                posP = self.trans(posid).obsTP_to_posTP([dummy_obsT,obsP])[1]
                 requests[posid] = {'command':'posTP', 'target':[posT,posP], 'log_note':'one point calibration of ' + mode}
         if mode == 'posTP' or mode == 'offsetsTP' or mode == 'offsetsTP_close':
             old_tp_updates_tol = self.tp_updates_tol
