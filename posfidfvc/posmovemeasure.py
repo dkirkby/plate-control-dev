@@ -1015,13 +1015,16 @@ class PosMoveMeasure(object):
             for posid in these_posids:
                 data[posid] = {}
                 posmodel = self.posmodel(posid)
-                range_T = posmodel.targetable_range_T
-                range_P = posmodel.targetable_range_P
+                range_posT = posmodel.targetable_range_T
+                range_posP = posmodel.targetable_range_P
                 if keep_phi_within_Eo:
-                    range_P[0] = self.phi_clear_angle
-                t_cmd = np.linspace(min(range_T),max(range_T),self.n_points_calib_T + 1) # the +1 is temporary, remove that extra point in next line
+                    min_obsP = self.phi_clear_angle
+                    dummy_obsT = 0.0
+                    min_posP = posmodel.trans.obsTP_to_posTP([dummy_obsT,min_obsP])[1]
+                    range_posP[0] = min_posP
+                t_cmd = np.linspace(min(range_posT),max(range_posT),self.n_points_calib_T + 1) # the +1 is temporary, remove that extra point in next line
                 t_cmd = t_cmd[:-1] # since theta covers +/-180, it is kind of redundant to hit essentially the same points again
-                p_cmd = np.linspace(min(range_P),max(range_P),self.n_points_calib_P + 1) # the +1 is temporary, remove that extra point in next line
+                p_cmd = np.linspace(min(range_posP),max(range_posP),self.n_points_calib_P + 1) # the +1 is temporary, remove that extra point in next line
                 p_cmd = p_cmd[:-1] # since there is very little useful data right near the center
                 data[posid]['target_posTP'] = [[t,p] for t in t_cmd for p in p_cmd]
                 data[posid]['trans'] = posmodel.trans
