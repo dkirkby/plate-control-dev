@@ -68,10 +68,17 @@ class PosModel(object):
         """Returns the internally-tracked expected position of the theta and phi shafts
         at the output of the gearbox."""
         return [self.axis[pc.T].pos, self.axis[pc.P].pos]
+    
+    @property
+    def expected_current_obsTP(self):
+        """Returns the expected position of theta and phi bodies, as seen by an external
+        observer."""
+        posTP = self.expected_current_posTP
+        return self.trans.posTP_to_obsTP(posTP)
 
     @property
     def expected_current_position(self):
-        """Returns a dictionary of the current expected position in the various coordinate systems.
+        """Returns a general dictionary of the current expected position in all the various coordinate systems.
         The keys are:
             'Q'     ... float, deg, dependent variable, expected global Q position
             'S'     ... float, mm,  dependent variable, expected global S position
