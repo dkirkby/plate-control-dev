@@ -691,11 +691,34 @@ class XYTest(object):
         location in their respective patrol disks.
         """
         requests = []
-        for local_target in xytargets_list:
-            these_targets = {}
-            for posid in sorted(self.posids):
-                these_targets[posid] = {'command':'posXY', 'target':local_target}
-            requests.append(these_targets)
+        if self.xytest_conf['shuffle_targets']:
+            if int(self.xytest_conf['shuffle_seed'][loop_number]):
+                np.random.seed(int(self.xytest_conf['shuffle_seed'][loop_number]))
+                shuffled_targets = list(xytargets_list)
+                np.random.shuffle(shuffled_targets)
+                for local_target in shuffled_targets:
+                    these_targets = {}
+                    for posid in sorted(self.posids):
+                        these_targets[posid] = {'command':'posXY', 'target':local_target}
+                    requests.append(these_targets)
+            else:
+                xytargets_dict = {} #Different targets for different positioners
+                for posid in sorted(self.posids): #Loop through posids to generate unique targets to positioners
+                    np.random.seed(int(posid[1:]))
+                    shuffled_targets = list(xytargets_list)
+                    np.random.shuffle(shuffled_targets)
+                    xytargets_dict[posid] = shuffled_targets
+                for i in range(len(xytargets_list)): #Build these_targets to assign targets to positoners
+                    these_targets = {}
+                    for posid in sorted(self.posids):
+                        these_targets[posid] = {'command':'posXY', 'target':xytargets_dict[posid][i]}
+                    requests.append(these_targets)
+        else:
+            for local_target in xytargets_list:
+                these_targets = {}
+                for posid in sorted(self.posids):
+                    these_targets[posid] = {'command':'posXY', 'target':local_target}
+                requests.append(these_targets)
         return requests
 
     def track_file(self, filename, commit='always'):
