@@ -294,7 +294,7 @@ class Axis(object):
             return [-0.50*r, 0.50*r]  # split theta range such that 0 is essentially in the middle
         else:
             r = abs(self.posmodel.state._val['PHYSICAL_RANGE_P'])
-            return [-0.01*r, 0.99*r]  # split phi range such that 0 is essentially at the minimum
+            return [185.0-r, 185.0]  # split phi range such that 0 is essentially at the minimum
 
     @property
     def debounced_range(self):
