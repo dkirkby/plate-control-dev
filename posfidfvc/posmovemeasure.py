@@ -281,7 +281,7 @@ class PosMoveMeasure(object):
                 requests[posid] = {'command':'posTP', 'target':[posT,posP], 'log_note':'parking'}
         self.move(requests)
         
-    def one_point_calibration(self, posids='all', mode='posTP'):
+    def one_point_calibration(self, posids='all', mode='posTP', wide_spotmatch=False):
         """Goes to a single point, makes measurement with FVC, and re-calibrates the internally-
         tracked angles for the current theta and phi shaft positions.
         
@@ -306,8 +306,14 @@ class PosMoveMeasure(object):
         Prior to calling a mode of 'offsetTP' or 'offsetXY', it is recommended to re-home the positioner
         if there is any uncertainty as to its current location. This is generally not necessary
         in the default case, using 'posTP'.
+        
+        The wide_spotmatch argument allows forcing use of self.wide_spotmatch_radius when in fvcproxy mode.
         """
         self.printfunc('Running one-point calibration of ' + mode)
+        if self.fvc.fvcproxy and wide_spotmatch:
+            old_spotmatch_radius = self.fvc.fvcproxy.get('match_radius')
+            self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)
+            self.printfunc('Spotmatch radius temporarily changed from ' + str(old_spotmatch_radius) + ' to ' + str(self.wide_spotmatch_radius) + '.')
         posT = 0.0 # uniform value in all cases
         dummy_obsT = 0.0 # value doesn't matter -- only used for conformance to transforms interface below
         if mode in {'posTP','offsetsTP'}:
@@ -341,6 +347,9 @@ class PosMoveMeasure(object):
                         self.printfunc(posid + ': Set OFFSET_X to ' + self.fmt(xy[0]))
                         self.printfunc(posid + ': Set OFFSET_Y to ' + self.fmt(xy[1]))
         self.commit() # log note is already handled above
+        if self.fvc.fvc_proxy and wide_spotmatch:
+            self.fvc.fvcproxy.set(match_radius = old_spotmatch_radius)
+            self.printfunc('Spotmatch radius restored to ' + str(old_spotmatch_radius) + '.')
 
     def rehome(self,posids='all'):
         """Find hardstops and reset current known positions.
@@ -422,14 +431,7 @@ class PosMoveMeasure(object):
                     return save_file_dir + posid + '_' + save_file_timestamp + '_calib_' + mode + '.png'
         if mode == 'rough':
             self.rehome(posids)
-            # KH added if statement - one point calibration causes measure to fail if the match_radius is not adjusted
-            # JHS: 1. I am commenting out for now, the "wide_spotmatch_radius" stuff as of 2019-03-01.
-            #      2. My expectation is that the phi offset fixes I put in will deal with this better.
-            #      3. See also the 2 commented-out "if/else self.fvc.fvcproxy blocks below in this function.
-            #      4. We will test on hardware without/with this wide_spotmatch_radius and remove the commented code if in fact not needed.
-#            if self.fvc.fvcproxy:
-#            	self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)  #figure out where best to do this
-            self.one_point_calibration(posids, mode='offsetsXY')
+            self.one_point_calibration(posids, mode='offsetsXY', wide_spotmatch=True)
             posids_by_petal = self.posids_by_petal(posids)
             for petal,these_posids in posids_by_petal.items():
                 keys_to_reset = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P']
@@ -437,15 +439,8 @@ class PosMoveMeasure(object):
                     for posid in these_posids:
                         if petal.posmodels[posid].is_enabled:
                             petal.set_posfid_val(posid, key, pc.nominals[key]['value'])
-#            if self.fvc.fvcproxy:
-#                old_spotmatch_radius = 30.0 #self.fvc.fvcproxy.get('match_radius')
-#                self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)
-#                self.one_point_calibration(posids, mode='offsetsTP_close')
-#                self.fvc.fvcproxy.set(match_radius = old_spotmatch_radius)
-#                self.one_point_calibration(posids, mode='offsetsTP')
-#            else:
-#                self.one_point_calibration(posids, mode='offsetsTP')
-            self.one_point_calibration(posids, mode='offsetsTP')
+            self.one_point_calibration(posids, mode='offsetsTP_close', wide_spotmatch=True)
+            self.one_point_calibration(posids, mode='offsetsTP', wide_spotmatch=False)
         elif mode == 'grid':
             if self.grid_calib_num_DOF >= self.grid_calib_num_constraints: # the '=' in >= comparison is due to some places in the code where I am requiring at least one extra point more than exact constraint 
                 new_mode = 'arc'    
@@ -468,16 +463,7 @@ class PosMoveMeasure(object):
                     file = save_file(posid)
                     poscalibplot.plot_arc(file, posid, unwrapped_data)
                     files.add(file)
-#        if self.fvc.fvcproxy and mode == 'rough':
-#            #NOTE set spot match radius to narrow(old) prior to doing 'posTP' calibration, 
-#            #testing on Petal02, 2019-01-30
-#            old_spotmatch_radius = 30.0 #self.fvc.fvcproxy.get('match_radius')
-#            #self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)
-#            self.fvc.fvcproxy.set(match_radius = old_spotmatch_radius)
-#            self.one_point_calibration(posids, mode='posTP') # important to lastly update the internally-tracked theta and phi shaft angles
-#        else:
-#            self.one_point_calibration(posids, mode='posTP') # important to lastly update the internally-tracked theta and phi shaft angles
-        self.one_point_calibration(posids, mode='posTP') # important to lastly update the internally-tracked theta and phi shaft angles
+        self.one_point_calibration(posids, mode='posTP', wide_spotmatch=False) # important to lastly update the internally-tracked theta and phi shaft angles
         self.commit(log_note = str(mode) + ' calibration complete')
         return files
 
