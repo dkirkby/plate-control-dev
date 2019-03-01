@@ -845,24 +845,25 @@ class Petal(object):
         
         See comments in posmodel.py for explanation of these values.
         """
-        vals = self.posmodels[posid].expected_current_position
-        if key == 'obsXY':
-            return [vals['obsX'],vals['obsY']]
-        elif key == 'posTP':
-            return [vals['posT'],vals['posP']]
+        if key == 'posTP':
+            return self.posmodels[posid].expected_current_posTP
         elif key == 'obsTP':
-            return [vals['obsT'],vals['obsP']]
-        elif key == 'QS':
-            return [vals['Q'],vals['S']]
-        elif key == 'posXY':
-            return [vals['posX'],vals['posY']]
-        elif key == 'flatXY':
-            return [vals['flatX'],vals['flatY']]
-        elif key == 'motorTP':
-            return [vals['motT'],vals['motP']]
+            return self.posmodels[posid].expected_current_obsTP
         else:
-            return vals[key]
-    
+            vals = self.posmodels[posid].expected_current_position
+            if key == 'obsXY':
+                return [vals['obsX'],vals['obsY']]
+            elif key == 'QS':
+                return [vals['Q'],vals['S']]
+            elif key == 'posXY':
+                return [vals['posX'],vals['posY']]
+            elif key == 'flatXY':
+                return [vals['flatX'],vals['flatY']]
+            elif key == 'motorTP':
+                return [vals['motT'],vals['motP']]
+            else:
+                self.printfunc('Unrecognized key ' + str(key) + ' in request for expected_current_position of posid ' + str(posid) + '.')
+                
     def enabled_posmodels(self, posids):
         """Returns dict with keys = posids, values = posmodels, but only for
         those positioners in the collection posids which are enabled.
