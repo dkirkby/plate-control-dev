@@ -347,7 +347,7 @@ class PosMoveMeasure(object):
                         self.printfunc(posid + ': Set OFFSET_X to ' + self.fmt(xy[0]))
                         self.printfunc(posid + ': Set OFFSET_Y to ' + self.fmt(xy[1]))
         self.commit() # log note is already handled above
-        if self.fvc.fvc_proxy and wide_spotmatch:
+        if self.fvc.fvcproxy and wide_spotmatch:
             self.fvc.fvcproxy.set(match_radius = old_spotmatch_radius)
             self.printfunc('Spotmatch radius restored to ' + str(old_spotmatch_radius) + '.')
 
@@ -1156,7 +1156,7 @@ class PosMoveMeasure(object):
         prefix = 'range measurement on ' + axis + ' axis'
         for petal,these_posids in posids_by_petal.items():
             for posid in these_posids:
-                initial_posP[posid] = self.trans(posid).obsTP_to_posTP([dummy_obsT,self.phi_clear_angle])
+                initial_posP[posid] = self.trans(posid).obsTP_to_posTP([dummy_obsT,self.phi_clear_angle])[1]
             if axis == 'theta':
                 delta = 360/(n_intermediate_pts + 1)
                 dtdp = [delta,0]
@@ -1172,7 +1172,7 @@ class PosMoveMeasure(object):
                     if self.use_current_theta_during_phi_range_meas:
                         initial_posT = self.posmodel(posid).expected_current_posTP[0]
                     else:
-                        initial_posT = self.trans(posid).obsTP_to_posTP([0.0,dummy_obsP])
+                        initial_posT = self.trans(posid).obsTP_to_posTP([0.0,dummy_obsP])[0]
                     initial_posTP = [initial_posT,initial_posP[posid]]
                     initial_tp_requests[posid] = {'command':'posTP', 'target':initial_posTP,  'log_note':'range arc ' + axis + ' initial point'}
             data = {posid:{'target_dtdp':dtdp, 'measured_obsXY':[], 'petal':petal} for posid in these_posids}
