@@ -1,12 +1,10 @@
 import numpy as np
 import posconstants as pc
-import posstate
 import posanimator
 import configobj
 import os
 import copy as copymodule
 import math
-from numba import jit
 import collision_lookup_generator_subset as lookup
 import pickle
 
@@ -622,7 +620,6 @@ class PosPoly(object):
         return False
 
     @staticmethod
-    @jit # This is about the only place I've found the @jit decorator helpful in here. Everywhere else actually costs overhead.
     def _segments_intersect(A1,A2,B1,B2):
         """Checks whether two 2d line segments intersect. The endpoints for segments
         A and B are each a pair of (x,y) coordinates. This function is vectorized,
