@@ -125,26 +125,12 @@ class XYTest(object):
         self.logwrite('Positoners: ' + str(self.posids))
         self.logwrite('Positoner notes: ' + str(self.pos_notes))
         self.logwrite('Fiducials: ' + str(fidids))
-        self.m.n_extradots_expected = self.hwsetup_conf['num_extra_dots']
-        self.logwrite('Number of extra fiducial dots: ' + str(self.m.n_extradots_expected))
-        extradots_filename = pc.dirs['temp_files'] + os.path.sep + 'extradots.csv'
-        if self.m.n_extradots_expected > 0 and os.path.isfile(extradots_filename):
-            with open(extradots_filename,'r',newline='') as file:
-                reader = csv.DictReader(file)
-                for row in reader:
-                    self.m.extradots_fvcXY.append([float(row['x_pix']),float(row['y_pix'])])
-                self.logwrite('Read ' + str(len(self.m.extradots_fvcXY)) + ' from csv file.')
-        else:
-            self.logwrite('Re-identifying fiducial locations.')
-            self.m.identify_fiducials()
         self.logwrite('Petal: ' + str(ptl_id))
         self.m.make_plots_during_calib = self.xytest_conf['should_make_plots']
         self.logwrite('Automatic generation of calibration and submove plots is turned ' + ('ON' if self.xytest_conf['should_make_plots'] else 'OFF') + '.')
         self.logwrite('PosMoveMeasure initialized.')
         fid_settings_done = self.m.set_fiducials('on')
         self.logwrite('Fiducials turned on: ' + str(fid_settings_done))
-        if self.m.fvc.fvcproxy: #Remind FVC that it needs to look for all dots, not all dots without a fiducial
-            self.m.fvc.fvcproxy.send_fvc_command('make_targets',len(self.posids) + self.m.n_ref_dots)
 
         # set up the test summarizers
         self.summarizers = {}
