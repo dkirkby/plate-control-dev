@@ -1,6 +1,7 @@
 * text=auto !eol
 bin/petal -text
 bin/petalcontroller -text
+calibrate/derive_platemaker_pars.py -text
 calibrate/seed_xy_offsets.py -text
 petal/collision_lookup_generator.py -text
 petal/collision_lookup_generator_subset.py -text
