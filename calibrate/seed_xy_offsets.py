@@ -24,11 +24,10 @@ def seed(petals_to_seed):
         petals_to_seed = [petals_to_seed]
     for petal_to_seed in petals_to_seed:
         ptl_id = str(petal_to_seed).zfill(2)
-        if CONSTANTS_AVAILABLE:  #determine how to best check if constants database is available
-            #check syntax for connecting to constants db and test
-            #ptl_rot = constants['fpa_metrology'][fpa_location]['petal_rot_1']
-            #ptl_xoff = constants['fpa_metrology'][fpa_location]['petal_offset_x']
-            #ptl_yoff = constants['fpa_metrology'][fpa_location]['petal_offset_y']
+        if CONSTANTS_AVAILABLE:  
+            #will need to access constants database directly when running petal 
+            #in stand-alone mode, this metrology is not currently available and
+            #cannot be meaningfully used
             pass
         else:
             petal_state = posstate.PosState(ptl_id, logging=True, device_type='ptl')
