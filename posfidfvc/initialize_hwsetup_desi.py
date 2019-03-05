@@ -1,12 +1,12 @@
 import os
 import sys
-sys.path.append(os.path.abspath('../petal/'))
-sys.path.append(os.path.abspath('../posfidfvc/'))
-sys.path.append(os.path.abspath('../xytest/'))
-sys.path.remove('/software/products/plate_control-trunk/xytest')
-sys.path.remove('/software/products/plate_control-trunk/posfidfvc')
-sys.path.remove('/software/products/plate_control-trunk/petalbox')
-sys.path.remove('/software/products/plate_control-trunk/petal')
+#sys.path.append(os.path.abspath('../petal/'))
+#sys.path.append(os.path.abspath('../posfidfvc/'))
+#sys.path.append(os.path.abspath('../xytest/'))
+#sys.path.remove('/software/products/plate_control-trunk/xytest')
+#sys.path.remove('/software/products/plate_control-trunk/posfidfvc')
+#sys.path.remove('/software/products/plate_control-trunk/petalbox')
+#sys.path.remove('/software/products/plate_control-trunk/petal')
 
 import petal
 import posmovemeasure
@@ -171,7 +171,7 @@ m.calibrate(mode='rough')
 if not should_limit_range:
     m.measure_range(axis='theta')
     m.measure_range(axis='phi')
-m.rehome() #REMOVE put in as test
+#m.rehome() #REMOVE put in as test
 try:
     plotfiles = m.calibrate(mode='arc', save_file_dir=pc.dirs['xytest_plots'], save_file_timestamp=start_filename_timestamp, keep_phi_within_Eo=True)
     new_and_changed_files.update(plotfiles)

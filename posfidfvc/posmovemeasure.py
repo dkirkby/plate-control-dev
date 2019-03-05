@@ -423,7 +423,7 @@ class PosMoveMeasure(object):
                         if petal.posmodels[posid].is_enabled:
                             petal.set_posfid_val(posid, key, pc.nominals[key]['value'])
             if self.fvc.fvcproxy:
-                old_spotmatch_radius = 30.0 #self.fvc.fvcproxy.get('match_radius')
+                old_spotmatch_radius = 80.0 #50.0 #30.0 #self.fvc.fvcproxy.get('match_radius')
                 self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)
                 self.one_point_calibration(posids, mode='offsetsTP_close')
                 self.fvc.fvcproxy.set(match_radius = old_spotmatch_radius)
@@ -443,6 +443,7 @@ class PosMoveMeasure(object):
                     poscalibplot.plot_grid(file,posid, grid_data)
                     files.add(file)
         elif mode == 'arc':
+            self.fvc.fvcproxy.set(match_radius =80.0) #ADDED BY PARKER)
             T = self._measure_calibration_arc(posids,'theta', keep_phi_within_Eo)
             P = self._measure_calibration_arc(posids,'phi', keep_phi_within_Eo)
             self.printfunc("Finished measuring calibration arcs.")
@@ -455,7 +456,7 @@ class PosMoveMeasure(object):
         if self.fvc.fvcproxy and mode == 'rough':
             #NOTE set spot match radius to narrow(old) prior to doing 'posTP' calibration, 
             #testing on Petal02, 2019-01-30
-            old_spotmatch_radius = 30.0 #self.fvc.fvcproxy.get('match_radius')
+            old_spotmatch_radius = 80.0 #50.0 #30.0 #self.fvc.fvcproxy.get('match_radius')
             #self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)
             self.fvc.fvcproxy.set(match_radius = old_spotmatch_radius)
             self.one_point_calibration(posids, mode='posTP') # important to lastly update the internally-tracked theta and phi shaft angles

@@ -195,7 +195,8 @@ class XYTest(object):
         for key in user_vals.keys():
             self.logwrite('user-entry: ' + key + ': ' + user_vals[key])
             summarizer_init_data[key] = user_vals[key]
-        summarizer_init_data['operator notes'] = self.get_and_log_comments_from_user()
+        summarizer_init_data['operator notes'] = None #self.get_and_log_comments_from_user()
+        #import pdb; pdb.set_trace()
         for posid in self.posids:
             state = self.m.state(posid)
             self.summarizers[posid] = summarizer.Summarizer(state,summarizer_init_data)
@@ -864,13 +865,13 @@ if __name__=="__main__":
         test.xytest_conf['current_loop_number'] = loop_num
         test.xytest_conf.write()
         test.logwrite('Starting xy test in loop ' + str(loop_num + 1) + ' of ' + str(test.n_loops))
-        test.set_current_overrides(loop_num)
+        #test.set_current_overrides(loop_num)
         test.run_range_measurement(loop_num)
         test.run_calibration(loop_num)
         test.run_xyaccuracy_test(loop_num)
         test.run_unmeasured_moves(loop_num)
         test.run_hardstop_strikes(loop_num)
-        test.clear_current_overrides()
+        #test.clear_current_overrides()
         test.svn_add_commit(keep_creds=True)
     test.logwrite('All test loops complete.')
     test.m.park(posids='all')

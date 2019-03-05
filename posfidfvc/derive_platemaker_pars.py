@@ -1,13 +1,13 @@
 import os
 import sys
-sys.path.remove('/software/products/plate_control-trunk/xytest')
-sys.path.remove('/software/products/plate_control-trunk/posfidfvc')
-sys.path.remove('/software/products/plate_control-trunk/petalbox')
-sys.path.remove('/software/products/plate_control-trunk/petal')
+#sys.path.remove('/software/products/plate_control-trunk/xytest')
+#sys.path.remove('/software/products/plate_control-trunk/posfidfvc')
+#sys.path.remove('/software/products/plate_control-trunk/petalbox')
+#sys.path.remove('/software/products/plate_control-trunk/petal')
 
-sys.path.append(os.path.abspath('../petal/'))
-sys.path.append(os.path.abspath('../posfidfvc/'))
-sys.path.append(os.path.abspath('../xytest/'))
+#sys.path.append(os.path.abspath('../petal/'))
+#sys.path.append(os.path.abspath('../posfidfvc/'))
+#sys.path.append(os.path.abspath('../xytest/'))
 
 import petal
 import posmovemeasure
@@ -73,7 +73,7 @@ class Derive_Platemaker_Pars(object):
 
         # calibration routines
         rehome=tkinter.messagebox.askyesno(title='Rehome?',message='Rehome?')
-        #import pdb;pdb.set_trace()
+        import pdb;pdb.set_trace()
         if rehome:
             self.m.rehome() # start out rehoming to hardstops because no idea if last recorded axis position is true / up-to-date / exists at all
         automatic_mode = tkinter.messagebox.askyesno(title='Automatic or Manual Mode?',message='Use Automatic Mode?')

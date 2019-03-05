@@ -24,7 +24,7 @@ class FVCHandler(object):
         2. scale
         3. translation
     """
-    def __init__(self, fvc_type='FLI', platemaker_instrument='petal2', printfunc=print, save_sbig_fits=True):
+    def __init__(self, fvc_type='FLI', platemaker_instrument='petal7', printfunc=print, save_sbig_fits=True):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.fvc_type = fvc_type # 'SBIG' or 'SBIG_Yale' or 'FLI' or 'simulator'
         self.fvcproxy = None # may be auto-initialized later by the platemaker instrument setter

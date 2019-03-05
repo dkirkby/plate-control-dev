@@ -56,7 +56,6 @@ class Petal(object):
             self.petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
         else:
             self.petalbox_id = petalbox_id
-        print("PETALBOX_ID")
         if not posids:
             self.printfunc('posids not given, read from ptl_settings file')
             posids = self.petal_state.conf['POS_IDS']
