@@ -150,8 +150,11 @@ class XYTest(object):
             collider_file=self.xytest_conf['collider_file'],
             db_commit_on=db_commit_on, 
             anticollision=self.xytest_conf['anticollision']) # petal_shape=shape)
-        posids=self.posids=ptl.posids
-        fidids=self.fidids=ptl.fidids
+        
+        # note this is only operable on one petal at a time, as currently written
+        self.posids = ptl.posids
+        self.fidids = ptl.fidids
+        fidids = self.fidids
         
         while len(self.pos_notes) < len(self.posids):
             self.pos_notes.append('')
@@ -428,7 +431,7 @@ class XYTest(object):
                 self.logwrite('MEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets)))
                 self.logwrite('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
                 this_timestamp = pc.timestamp_str_now()
-                these_meas_data = self.m.move_and_correct(these_targets, num_corr_max, anticoll_on=True)
+                these_meas_data = self.m.move_and_correct(these_targets, num_corr_max, force_anticoll_on=True)
                 
                 # store this set of measured data
                 all_data_by_target.append(these_meas_data)
