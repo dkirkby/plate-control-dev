@@ -139,7 +139,7 @@ class XYTest(object):
         if 'store_mode' in self.hwsetup_conf and self.hwsetup_conf['store_mode'] == 'db':
             db_commit_on = True
         ptl_id=self.hwsetup_conf['ptl_id']
-        #shape = 'asphere' if self.hwsetup_conf['plate_type'] == 'petal' else 'flat'
+        shape = 'asphere' if self.hwsetup_conf['plate_type'] == 'petal' else 'flat'
         ptl = petal.Petal(ptl_id, 
             posids=[],
             fidids=[],
@@ -196,7 +196,8 @@ class XYTest(object):
         for key in user_vals.keys():
             self.logwrite('user-entry: ' + key + ': ' + user_vals[key])
             summarizer_init_data[key] = user_vals[key]
-        summarizer_init_data['operator notes'] = self.get_and_log_comments_from_user()
+        summarizer_init_data['operator notes'] = None #self.get_and_log_comments_from_user()
+        #import pdb; pdb.set_trace()
         for posid in self.posids:
             state = self.m.state(posid)
             self.summarizers[posid] = summarizer.Summarizer(state,summarizer_init_data)
