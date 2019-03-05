@@ -66,8 +66,8 @@ def Z2R_lookup(S):
     return np.interp(S,R_lookup_data[:,1],R_lookup_data[:,0],left=float('nan'))
 
 # Mapping of positioner power supplies to can channels
-power_supply_can_map = {'V1':{'can10','can11','can13','can23'},
-                        'V2':{'can12','can15','can17'}}
+power_supply_can_map = {'V1':{'can10','can11','can13','can22', 'can23'},
+                        'V2':{'can12', 'can14', 'can15', 'can16', 'can17'}}
 	
 # Constants
 deg = '\u00b0'
