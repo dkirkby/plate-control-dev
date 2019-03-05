@@ -146,6 +146,7 @@ class XYTest(object):
             simulator_on=self.simulate,
             sched_stats_on=True,
             printfunc=self.logwrite,
+            verbose=True,
             collider_file=self.xytest_conf['collider_file'],
             db_commit_on=db_commit_on, 
             anticollision=self.xytest_conf['anticollision']) # petal_shape=shape)
@@ -406,6 +407,7 @@ class XYTest(object):
                         these_targets[posid] = {'command':'obsXY','target':trans.posTP_to_obsXY([posT_this,posP_this])}
                 all_targets.append(these_targets)
             
+        #print("all_targets", all_targets)
         # initialize some data structures for storing test data
         targ_num = 0
         all_data_by_target = []
@@ -426,7 +428,7 @@ class XYTest(object):
                 self.logwrite('MEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets)))
                 self.logwrite('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
                 this_timestamp = pc.timestamp_str_now()
-                these_meas_data = self.m.move_and_correct(these_targets, num_corr_max)
+                these_meas_data = self.m.move_and_correct(these_targets, num_corr_max, anticoll_on=True)
                 
                 # store this set of measured data
                 all_data_by_target.append(these_meas_data)
@@ -860,17 +862,21 @@ if __name__=="__main__":
     test = XYTest(hwsetup_conf=hwsetup_conf,xytest_conf=xytest_conf,USE_LOCAL_PRESETS=USE_LOCAL_PRESETS)
     test.get_svn_credentials()
     test.logwrite('Start of positioner performance test.')
-    test.m.park(posids='all')
+    #test.m.petals[0].start_gathering_frames()
     for loop_num in range(test.starting_loop_number, test.n_loops):
         test.xytest_conf['current_loop_number'] = loop_num
         test.xytest_conf.write()
         test.logwrite('Starting xy test in loop ' + str(loop_num + 1) + ' of ' + str(test.n_loops))
         test.set_current_overrides(loop_num)
+        #test.m.park(posids='all')
         test.m.one_point_calibration(posids='all', mode='posTP')  # do one_point_calibration before xy
+        #test.m.petals[0].start_gathering_frames()
         test.run_xyaccuracy_test(loop_num)                        # xytest with the input targets
-        test.m.park(posids='all')                                 # parking the positioners after each loop
+        #test.m.petals[0].stop_gathering_frames()
         test.clear_current_overrides()
         test.svn_add_commit(keep_creds=True)
+        
+    #test.m.petals[0].stop_gathering_frames()
     test.logwrite('All test loops complete.')
     test.m.park(posids='all')
     test.logwrite('Moved positioners into \'parked\' position.')
