@@ -111,7 +111,7 @@ class PosMoveMeasure(object):
             ptl.set_posfid_val(fidid,'LAST_MEAS_FWHMS',fid_data[fidid]['fwhms'])
         return data,imgfiles
 
-    def move(self, requests):
+    def move(self, requests, anticollision='default'):
         """Move positioners. See request_targets method in petal.py for description
         of format of the 'requests' dictionary.
         """
@@ -121,10 +121,10 @@ class PosMoveMeasure(object):
             for posid in posids:
                 these_requests[posid] = requests[posid]
             petal.request_targets(these_requests)
-            petal.schedule_send_and_execute_moves() # in future, may do this in a different thread for each petal
+            petal.schedule_send_and_execute_moves(anticollision=anticollision)
 
 
-    def move_measure(self, requests, tp_updates=None):
+    def move_measure(self, requests, tp_updates=None, anticollision='default'):
         """Move positioners and measure output with FVC.
         See comments on inputs from move method.
         See comments on outputs from measure method.
@@ -147,28 +147,14 @@ class PosMoveMeasure(object):
                         limited to scenarios of initial calibration, if for some reason we find that the usual calibrations are
                         failing.
         """
-        #print("We are in move measure")
-        #expected_pos = {}
-        #for posid in self.all_posids:
-        #    ptl = self.petal(posid)
-        #    expected_pos[posid] = {'obsXY':ptl.expected_current_position(posid,'obsXY')}
-        #print("\n\n\n\n")
-        #print(expected_pos)
-        #print("\n\n\n\n")
-        self.move(requests)
-        #expected_pos = {}
-        #for posid in self.all_posids:
-        #    ptl = self.petal(posid)
-        #    expected_pos[posid] = {'obsXY':ptl.expected_current_position(posid,'obsXY')}
-        #print(expected_pos)
-        #print("\n\n\n\n")
+        self.move(requests,anticollision)
         data,imgfiles = self.measure()
 
         if tp_updates == 'posTP' or tp_updates =='offsetsTP' or tp_updates == 'offsetsTP_close':
             self._test_and_update_TP(data, tp_updates)
         return data,imgfiles
 
-    def move_and_correct(self, requests, num_corr_max=2):
+    def move_and_correct(self, requests, num_corr_max=2, force_anticoll_on=False):
         """Move positioners to requested target coordinates, then make a series of correction
         moves in coordination with the fiber view camera, to converge.
 
@@ -178,6 +164,7 @@ class PosMoveMeasure(object):
                                 ... see request_targets method in petal.py for description of format
                                 ... however, only 'obsXY' or 'QS' commands are allowed here
             num_corr_max  ... maximum number of correction moves to perform on any positioner
+            force_anticoll_on   ... boolean value to force usage of anticollision (overrides any petal default)
 
         OUTPUT:
             The measured data gets stored into into a new dictionary, which is a shallow copy of
@@ -203,7 +190,8 @@ class PosMoveMeasure(object):
                 return
             m['log_note'] = 'blind move'
             self.printfunc(str(posid) + ': blind move to (obsX,obsY)=(' + self.fmt(m['targ_obsXY'][0]) + ',' + self.fmt(m['targ_obsXY'][1]) + ')')
-        this_meas,imgfiles = self.move_measure(data, tp_updates=self.tp_updates_mode)
+        anticoll = 'adjust' if force_anticoll_on else 'default'
+        this_meas,imgfiles = self.move_measure(data, tp_updates=self.tp_updates_mode, anticollision=anticoll)
         save_img = False
         for posid in this_meas.keys():
             m = data[posid] # again, for terseness
@@ -233,7 +221,8 @@ class PosMoveMeasure(object):
                 correction[posid]['target'] = dxdy
                 correction[posid]['log_note'] = 'correction move ' + str(i)
                 self.printfunc(str(posid) + ': correction move ' + str(i) + ' of ' + str(num_corr_max) + ' by (dx,dy)=(' + self.fmt(dxdy[0]) + ',' + self.fmt(dxdy[1]) + '), \u221A(dx\u00B2+dy\u00B2)=' + self.fmt(data[posid]['err2D'][-1]))
-            this_meas,imgfiles = self.move_measure(correction, tp_updates=self.tp_updates_mode)
+            anticoll = 'freeze' if force_anticoll_on else None
+            this_meas,imgfiles = self.move_measure(correction, tp_updates=self.tp_updates_mode, anticollision=anticoll)
             for posid in this_meas.keys():
                 m = data[posid] # again, for terseness
                 m['meas_obsXY'].append(this_meas[posid])
