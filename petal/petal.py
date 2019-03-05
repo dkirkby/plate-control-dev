@@ -401,7 +401,7 @@ class Petal(object):
         """
         if self.simulator_on:
             if self.verbose:
-                print('Simulator skips sending move tables to positioners.')
+                self.printfunc('Simulator skips sending move tables to positioners.')
             return
         hw_tables = self._hardware_ready_move_tables()
         canids = []
@@ -419,7 +419,7 @@ class Petal(object):
         """
         if self.simulator_on:
             if self.verbose:
-                print('Simulator skips sending motor parameters to positioners.')
+                self.printfunc('Simulator skips sending motor parameters to positioners.')
             return
 
         parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
@@ -445,7 +445,7 @@ class Petal(object):
         """
         if self.simulator_on:
             if self.verbose:
-                print('Simulator skips sending execute moves command to positioners.')
+                self.printfunc('Simulator skips sending execute moves command to positioners.')
             self._postmove_cleanup()
         else:
             self.comm.execute_sync(self.sync_mode)
