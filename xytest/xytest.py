@@ -139,7 +139,7 @@ class XYTest(object):
         if 'store_mode' in self.hwsetup_conf and self.hwsetup_conf['store_mode'] == 'db':
             db_commit_on = True
         ptl_id=self.hwsetup_conf['ptl_id']
-        shape = 'asphere' if self.hwsetup_conf['plate_type'] == 'petal' else 'flat'
+        #shape = 'asphere' if self.hwsetup_conf['plate_type'] == 'petal' else 'flat'
         ptl = petal.Petal(ptl_id, 
             posids=[],
             fidids=[],
@@ -391,44 +391,6 @@ class XYTest(object):
                         these_targets[posid] = {'command':'obsXY','target':trans.posTP_to_obsXY([posT_this,posP_this])} 
 
                 all_targets.append(these_targets)
-        elif self.xytest_conf['shuffle_targets']:
-            if int(self.xytest_conf['shuffle_seed'][loop_number]):
-                np.random.seed(int(self.xytest_conf['shuffle_seed'][loop_number]))
-                shuffled_targets = list(local_targets)
-                np.random.shuffle(shuffled_targets)
-                for local_target in shuffled_targets:
-                    these_targets = {}
-                    for posid in sorted(self.posids):
-                        ptl = self.m.petal(posid)
-                        enabled_this=ptl.get_posfid_val(posid,'CTRL_ENABLED')
-                        posT_this=ptl.get_posfid_val(posid,'POS_T')
-                        posP_this=ptl.get_posfid_val(posid,'POS_P') 
-                        trans = self.m.trans(posid)
-                        if enabled_this:
-                            these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(local_target)}
-                        else:
-                            these_targets[posid] = {'command':'obsXY','target':trans.posTP_to_obsXY([posT_this,posP_this])}
-                    all_targets.append(these_targets)
-            else:
-                xytargets_dict = {} #Different targets for different positioners
-                for posid in sorted(self.posids): #Loop through posids to generate unique targets to positioners
-                    np.random.seed(int(posid[1:]))
-                    shuffled_targets = list(local_targets)
-                    np.random.shuffle(shuffled_targets)
-                    xytargets_dict[posid] = shuffled_targets
-                for i in range(len(local_targets)): #Build these_targets to assign targets to positoners
-                    these_targets = {}
-                    for posid in sorted(self.posids):
-                        ptl = self.m.petal(posid)
-                        enabled_this=ptl.get_posfid_val(posid,'CTRL_ENABLED')
-                        posT_this=ptl.get_posfid_val(posid,'POS_T')
-                        posP_this=ptl.get_posfid_val(posid,'POS_P') 
-                        trans = self.m.trans(posid)
-                        if enabled_this:
-                            these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(xytargets_dict[posid][i])}
-                        else:
-                            these_targets[posid] = {'command':'obsXY','target':trans.posTP_to_obsXY([posT_this,posP_this])}
-                    all_targets.append(these_targets)
         else:
             for local_target in local_targets:
                 these_targets = {}
@@ -462,8 +424,7 @@ class XYTest(object):
                 targ_num += 1
                 print('')
                 self.logwrite('MEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets)))
-                if not(self.xytest_conf['shuffle_targets']):
-                    self.logwrite('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
+                self.logwrite('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
                 this_timestamp = pc.timestamp_str_now()
                 these_meas_data = self.m.move_and_correct(these_targets, num_corr_max)
                 
@@ -730,34 +691,11 @@ class XYTest(object):
         location in their respective patrol disks.
         """
         requests = []
-        if self.xytest_conf['shuffle_targets']:
-            if int(self.xytest_conf['shuffle_seed'][loop_number]):
-                np.random.seed(int(self.xytest_conf['shuffle_seed'][loop_number]))
-                shuffled_targets = list(xytargets_list)
-                np.random.shuffle(shuffled_targets)
-                for local_target in shuffled_targets:
-                    these_targets = {}
-                    for posid in sorted(self.posids):
-                        these_targets[posid] = {'command':'posXY', 'target':local_target}
-                    requests.append(these_targets)
-            else:
-                xytargets_dict = {} #Different targets for different positioners
-                for posid in sorted(self.posids): #Loop through posids to generate unique targets to positioners
-                    np.random.seed(int(posid[1:]))
-                    shuffled_targets = list(xytargets_list)
-                    np.random.shuffle(shuffled_targets)
-                    xytargets_dict[posid] = shuffled_targets
-                for i in range(len(xytargets_list)): #Build these_targets to assign targets to positoners
-                    these_targets = {}
-                    for posid in sorted(self.posids):
-                        these_targets[posid] = {'command':'posXY', 'target':xytargets_dict[posid][i]}
-                    requests.append(these_targets)
-        else:
-            for local_target in xytargets_list:
-                these_targets = {}
-                for posid in sorted(self.posids):
-                    these_targets[posid] = {'command':'posXY', 'target':local_target}
-                requests.append(these_targets)
+        for local_target in xytargets_list:
+            these_targets = {}
+            for posid in sorted(self.posids):
+                these_targets[posid] = {'command':'posXY', 'target':local_target}
+            requests.append(these_targets)
         return requests
 
     def track_file(self, filename, commit='always'):
