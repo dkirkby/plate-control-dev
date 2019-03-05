@@ -114,15 +114,20 @@ class PosMoveMeasure(object):
     def move(self, requests, anticollision='default'):
         """Move positioners. See request_targets method in petal.py for description
         of format of the 'requests' dictionary.
+        
+        Return is another requests dictionary, but now containing only the requests
+        that were accepted as valid.
         """
         posids_by_petal = self.posids_by_petal(requests)
+        accepted_requests= {}
         for petal,posids in posids_by_petal.items():
             these_requests = {}
             for posid in posids:
                 these_requests[posid] = requests[posid]
-            petal.request_targets(these_requests)
+            these_accepted_requests = petal.request_targets(these_requests)
             petal.schedule_send_and_execute_moves(anticollision=anticollision)
-
+            accepted_requests.update(these_accepted_requests)
+        return accepted_requests
 
     def move_measure(self, requests, tp_updates=None, anticollision='default'):
         """Move positioners and measure output with FVC.
@@ -147,12 +152,12 @@ class PosMoveMeasure(object):
                         limited to scenarios of initial calibration, if for some reason we find that the usual calibrations are
                         failing.
         """
-        self.move(requests,anticollision)
+        accepted_requests = self.move(requests,anticollision)
         data,imgfiles = self.measure()
 
         if tp_updates == 'posTP' or tp_updates =='offsetsTP' or tp_updates == 'offsetsTP_close':
             self._test_and_update_TP(data, tp_updates)
-        return data,imgfiles
+        return data,imgfiles,accepted_requests
 
     def move_and_correct(self, requests, num_corr_max=2, force_anticoll_on=False):
         """Move positioners to requested target coordinates, then make a series of correction
@@ -191,7 +196,9 @@ class PosMoveMeasure(object):
             m['log_note'] = 'blind move'
             self.printfunc(str(posid) + ': blind move to (obsX,obsY)=(' + self.fmt(m['targ_obsXY'][0]) + ',' + self.fmt(m['targ_obsXY'][1]) + ')')
         anticoll = 'adjust' if force_anticoll_on else 'default'
-        this_meas,imgfiles = self.move_measure(data, tp_updates=self.tp_updates_mode, anticollision=anticoll)
+        
+        # make the blind move
+        this_meas,imgfiles,accepted_requests = self.move_measure(data, tp_updates=self.tp_updates_mode, anticollision=anticoll)
         save_img = False
         for posid in this_meas.keys():
             m = data[posid] # again, for terseness
@@ -211,18 +218,28 @@ class PosMoveMeasure(object):
             timestamp_str = pc.filename_timestamp_str_now()
             for file in imgfiles:
                 os.rename(file, pc.dirs['xytest_plots'] + timestamp_str + '_move0' + file)
+                
+        # record which positioners that had their blind move accepted vs denied
+        accepted_blindmove_posids = accepted_requests.keys()         
+        
+        # make the correction moves
         for i in range(1,num_corr_max+1):
             correction = {}
             save_img = False
             for posid in data.keys():
                 correction[posid] = {}
-                dxdy = [-data[posid]['errXY'][-1][0],-data[posid]['errXY'][-1][1]]
+                if posid in accepted_blindmove_posids:
+                    dxdy = [-data[posid]['errXY'][-1][0],-data[posid]['errXY'][-1][1]]
+                    correction[posid]['log_note'] = 'correction move ' + str(i)
+                    self.printfunc(str(posid) + ': correction move ' + str(i) + ' of ' + str(num_corr_max) + ' by (dx,dy)=(' + self.fmt(dxdy[0]) + ',' + self.fmt(dxdy[1]) + '), \u221A(dx\u00B2+dy\u00B2)=' + self.fmt(data[posid]['err2D'][-1]))
+                else:
+                    dxdy = [0.0,0.0]
+                    correction[posid]['log_note'] = 'zero distance correction move ' + str(i) + ' after a denied blind move'
+                    self.printfunc(str(posid) + ': zero distance correction move after a denied blind move')
                 correction[posid]['command'] = 'dXdY'
                 correction[posid]['target'] = dxdy
-                correction[posid]['log_note'] = 'correction move ' + str(i)
-                self.printfunc(str(posid) + ': correction move ' + str(i) + ' of ' + str(num_corr_max) + ' by (dx,dy)=(' + self.fmt(dxdy[0]) + ',' + self.fmt(dxdy[1]) + '), \u221A(dx\u00B2+dy\u00B2)=' + self.fmt(data[posid]['err2D'][-1]))
             anticoll = 'freeze' if force_anticoll_on else None
-            this_meas,imgfiles = self.move_measure(correction, tp_updates=self.tp_updates_mode, anticollision=anticoll)
+            this_meas,imgfiles,accepted_requests = self.move_measure(correction, tp_updates=self.tp_updates_mode, anticollision=anticoll)
             for posid in this_meas.keys():
                 m = data[posid] # again, for terseness
                 m['meas_obsXY'].append(this_meas[posid])
@@ -322,11 +339,11 @@ class PosMoveMeasure(object):
             old_tp_updates_fraction = self.tp_updates_fraction
             self.tp_updates_tol = 0.001
             self.tp_updates_fraction = 1.0
-            data,imgfiles = self.move_measure(requests,tp_updates=mode)
+            data,imgfiles,accepted_requests = self.move_measure(requests,tp_updates=mode)
             self.tp_updates_tol = old_tp_updates_tol
             self.tp_updates_fraction = old_tp_updates_fraction
         else:
-            data,imgfiles = self.move_measure(requests, tp_updates=None)
+            data,imgfiles,accepted_requests = self.move_measure(requests, tp_updates=None)
             for petal,these_posids in posids_by_petal.items():
                 for posid in these_posids:
                     xy = data[posid]
@@ -1027,7 +1044,7 @@ class PosMoveMeasure(object):
             for posid in data:
                 requests[posid] = {'command':'posTP', 'target':data[posid]['target_posTP'][i], 'log_note':'calib grid point ' + str(i+1)}
             self.printfunc('calibration grid point ' + str(i+1) + ' of ' + str(n_pts))
-            this_meas_data,imgfiles = self.move_measure(requests, tp_updates=None)
+            this_meas_data,imgfiles,accepted_requests = self.move_measure(requests, tp_updates=None)
             for p in this_meas_data.keys():
                 data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
         return data 
@@ -1098,7 +1115,7 @@ class PosMoveMeasure(object):
                 else:
                     requests[posid] = {'command':'posTP', 'target':[posT_this,posP_this], 'log_note':'calib arc on ' + axis + ' point ' + str(i+1)}
             self.printfunc('calibration arc on ' + axis + ' axis: point ' + str(i+1) + ' of ' + str(n_pts))
-            this_meas_data,imgfiles = self.move_measure(requests, tp_updates=None)
+            this_meas_data,imgfiles,accepted_requests = self.move_measure(requests, tp_updates=None)
             for p in this_meas_data.keys():
                 data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
         
