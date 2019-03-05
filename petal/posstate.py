@@ -255,7 +255,8 @@ class PosState(object):
         elif self.type == 'fid':
             possible_new_keys_and_defaults = {'LAST_MEAS_OBS_X':[],
                                               'LAST_MEAS_OBS_Y':[],
-                                              'LAST_MEAS_FWHMS':[]}
+                                              'LAST_MEAS_FWHMS':[],
+                                              'DEVICE_CLASSIFIED_NONFUNCTIONAL':False}
         elif self.type == 'ptl':
             possible_new_keys_and_defaults ={}
 
