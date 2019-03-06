@@ -431,7 +431,11 @@ class XYTest(object):
                 self.logwrite('MEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets)))
                 self.logwrite('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
                 this_timestamp = pc.timestamp_str_now()
-                these_meas_data = self.m.move_and_correct(these_targets, num_corr_max, force_anticoll_on=True)
+                
+                if self.xytest_conf['anticollision'] == 'adjust': 
+                    these_meas_data = self.m.move_and_correct(these_targets, num_corr_max, force_anticoll_on=True)
+                else:
+                    these_meas_data = self.m.move_and_correct(these_targets, num_corr_max, force_anticoll_on=False)
                 
                 # store this set of measured data
                 all_data_by_target.append(these_meas_data)
@@ -865,7 +869,6 @@ if __name__=="__main__":
     test = XYTest(hwsetup_conf=hwsetup_conf,xytest_conf=xytest_conf,USE_LOCAL_PRESETS=USE_LOCAL_PRESETS)
     test.get_svn_credentials()
     test.logwrite('Start of positioner performance test.')
-    #test.m.petals[0].start_gathering_frames()
     for loop_num in range(test.starting_loop_number, test.n_loops):
         test.xytest_conf['current_loop_number'] = loop_num
         test.xytest_conf.write()
@@ -878,8 +881,7 @@ if __name__=="__main__":
         #test.m.petals[0].stop_gathering_frames()
         test.clear_current_overrides()
         test.svn_add_commit(keep_creds=True)
-        
-    #test.m.petals[0].stop_gathering_frames()
+
     test.logwrite('All test loops complete.')
     test.m.park(posids='all')
     test.logwrite('Moved positioners into \'parked\' position.')
