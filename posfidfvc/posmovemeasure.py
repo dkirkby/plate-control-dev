@@ -208,6 +208,11 @@ class PosMoveMeasure(object):
         for posid in this_meas.keys():
             m = data[posid] # again, for terseness
             m['meas_obsXY'] = [this_meas[posid]]
+            if m['meas_obsXY'][-1] == [0,0]:
+                self.petal(posid).set_posfid_val(posid, 'CTRL_ENABLED', False)
+                self.petal(posid).pos_flags[posid] |= self.petal(posid).ctrl_disabled_bit
+                self.petal(posid).pos_flags[posid] |= self.petal(posid).bad_fiber_fvc_bit
+                self.printfunc(str(posid) + ': disabled due to not being matched to a centroid.')
             m['errXY'] = [[m['meas_obsXY'][-1][0] - m['targ_obsXY'][0],
                            m['meas_obsXY'][-1][1] - m['targ_obsXY'][1]]]
             m['err2D'] = [(m['errXY'][-1][0]**2 + m['errXY'][-1][1]**2)**0.5]
@@ -232,6 +237,11 @@ class PosMoveMeasure(object):
             for posid in this_meas.keys():
                 m = data[posid] # again, for terseness
                 m['meas_obsXY'].append(this_meas[posid])
+                if m['meas_obsXY'][-1] == [0,0] and self.fvc.fvcproxy:
+                    self.petal(posid).set_posfid_val(posid, 'CTRL_ENABLED', False)
+                    self.petal(posid).pos_flags[posid] |= self.petal(posid).ctrl_disabled_bit
+                    self.petal(posid).pos_flags[posid] |= self.petal(posid).bad_fiber_fvc_bit
+                    self.printfunc(str(posid) + ': disabled due to not being matched to a centroid.')
                 m['errXY'].append([m['meas_obsXY'][-1][0] - m['targ_obsXY'][0],
                                    m['meas_obsXY'][-1][1] - m['targ_obsXY'][1]])
                 m['err2D'].append((m['errXY'][-1][0]**2 + m['errXY'][-1][1]**2)**0.5)
@@ -252,11 +262,11 @@ class PosMoveMeasure(object):
         """
         posids_by_petal = self.posids_by_petal(posids)
         requests = {}
-        posP = self.phi_clear_angle # uniform value in all cases
-        for petal,these_posids in posids_by_petal.items():
+        obsP = self.phi_clear_angle # uniform value in all cases
+        for these_posids in posids_by_petal.values():
             for posid in these_posids:
-                posT = petal.expected_current_position(posid,'posT')
-                requests[posid] = {'command':'posTP', 'target':[posT,posP], 'log_note':'retracting phi'}
+                obsT = self.posmodel(posid).expected_current_obsTP[0]
+                requests[posid] = {'command':'obsTP', 'target':[obsT,obsP], 'log_note':'retracting phi'}
         self.move(requests)
     
     def park(self,posids='all'):
@@ -264,14 +274,14 @@ class PosMoveMeasure(object):
         """
         posids_by_petal = self.posids_by_petal(posids)
         requests = {}
-        posT = 0
-        for petal,these_posids in posids_by_petal.items():
+        posT = 0.0 # uniform value in all cases
+        for these_posids in posids_by_petal.values():
             for posid in these_posids:
-                posP = max(petal.posmodels[posid].targetable_range_P)
+                posP = max(self.posmodel(posid).targetable_range_P)
                 requests[posid] = {'command':'posTP', 'target':[posT,posP], 'log_note':'parking'}
         self.move(requests)
         
-    def one_point_calibration(self, posids='all', mode='posTP'):
+    def one_point_calibration(self, posids='all', mode='posTP', wide_spotmatch=False):
         """Goes to a single point, makes measurement with FVC, and re-calibrates the internally-
         tracked angles for the current theta and phi shaft positions.
         
@@ -280,36 +290,44 @@ class PosMoveMeasure(object):
         robust as a regular calibration routine, which does arcs of multiple points and then takes
         the best fit circle.
         
-          mode ... 'posTP'              --> [common usage] moves positioner to (posT=0,posP=self.phi_clear_angle),
+          mode ... 'posTP'              --> [common usage] moves positioner to (posT=0,obsP=self.phi_clear_angle),
                                                   and then updates our internal counter on where we currently
                                                   expect the theta and phi shafts to be
                                                  
-               ... 'offsetsTP'          --> [expert usage] moves to (posT=0,posP=self.phi_clear_angle),
+               ... 'offsetsTP'          --> [expert usage] moves to (posT=0,obsP=self.phi_clear_angle),
                                                   and then updates setting for theta and phi physical offsets
                                                  
-               ... 'offsetsTP_close'    --> [expert usage] moves to (posT=0,posP=self.phi_close_angle),
+               ... 'offsetsTP_close'    --> [expert usage] moves to (posT=0,obsP=self.phi_close_angle),
                                                   and then updates setting for theta and phi physical offsets
                                                   
-               ... 'offsetsXY'          --> [expert usage] moves positioner to (posT=0,posP=180),
+               ... 'offsetsXY'          --> [expert usage] moves positioner to (posT=0,obsP=180),
                                                   and then updates setting for x and y physical offsets
                
         Prior to calling a mode of 'offsetTP' or 'offsetXY', it is recommended to re-home the positioner
         if there is any uncertainty as to its current location. This is generally not necessary
         in the default case, using 'posTP'.
+        
+        The wide_spotmatch argument allows forcing use of self.wide_spotmatch_radius when in fvcproxy mode.
         """
         #import pdb; pdb.set_trace()
         self.printfunc('Running one-point calibration of ' + mode)
-        posT = 0
-        if mode == 'posTP' or mode == 'offsetsTP':
-            posP = self.phi_clear_angle
+        if self.fvc.fvcproxy and wide_spotmatch:
+            old_spotmatch_radius = self.fvc.fvcproxy.get('match_radius')
+            self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)
+            self.printfunc('Spotmatch radius temporarily changed from ' + str(old_spotmatch_radius) + ' to ' + str(self.wide_spotmatch_radius) + '.')
+        posT = 0.0 # uniform value in all cases
+        dummy_obsT = 0.0 # value doesn't matter -- only used for conformance to transforms interface below
+        if mode in {'posTP','offsetsTP'}:
+            obsP = self.phi_clear_angle
         elif mode == 'offsetsTP_close':
-            posP = self.phi_close_angle
+            obsP = self.phi_close_angle
         else:
-            posP = 180
+            obsP = 180.0
         posids_by_petal = self.posids_by_petal(posids)
         requests = {}
         for these_posids in posids_by_petal.values():
             for posid in these_posids:
+                posP = self.trans(posid).obsTP_to_posTP([dummy_obsT,obsP])[1]
                 requests[posid] = {'command':'posTP', 'target':[posT,posP], 'log_note':'one point calibration of ' + mode}
         if mode == 'posTP' or mode == 'offsetsTP' or mode == 'offsetsTP_close':
             old_tp_updates_tol = self.tp_updates_tol
@@ -330,6 +348,9 @@ class PosMoveMeasure(object):
                         self.printfunc(posid + ': Set OFFSET_X to ' + self.fmt(xy[0]))
                         self.printfunc(posid + ': Set OFFSET_Y to ' + self.fmt(xy[1]))
         self.commit() # log note is already handled above
+        if self.fvc.fvcproxy and wide_spotmatch:
+            self.fvc.fvcproxy.set(match_radius = old_spotmatch_radius)
+            self.printfunc('Spotmatch radius restored to ' + str(old_spotmatch_radius) + '.')
 
     def rehome(self,posids='all'):
         """Find hardstops and reset current known positions.
@@ -411,10 +432,7 @@ class PosMoveMeasure(object):
                     return save_file_dir + posid + '_' + save_file_timestamp + '_calib_' + mode + '.png'
         if mode == 'rough':
             self.rehome(posids)
-            # KH added if statement - one point calibration causes measure to fail if the match_radius is not adjusted
-            if self.fvc.fvcproxy:
-            	self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)  #figure out where best to do this
-            self.one_point_calibration(posids, mode='offsetsXY')
+            self.one_point_calibration(posids, mode='offsetsXY', wide_spotmatch=True)
             posids_by_petal = self.posids_by_petal(posids)
             for petal,these_posids in posids_by_petal.items():
                 keys_to_reset = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P']
@@ -422,14 +440,8 @@ class PosMoveMeasure(object):
                     for posid in these_posids:
                         if petal.posmodels[posid].is_enabled:
                             petal.set_posfid_val(posid, key, pc.nominals[key]['value'])
-            if self.fvc.fvcproxy:
-                old_spotmatch_radius = 80.0 #50.0 #30.0 #self.fvc.fvcproxy.get('match_radius')
-                self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)
-                self.one_point_calibration(posids, mode='offsetsTP_close')
-                self.fvc.fvcproxy.set(match_radius = old_spotmatch_radius)
-                self.one_point_calibration(posids, mode='offsetsTP')
-            else:
-                self.one_point_calibration(posids, mode='offsetsTP')
+            self.one_point_calibration(posids, mode='offsetsTP_close', wide_spotmatch=True)
+            self.one_point_calibration(posids, mode='offsetsTP', wide_spotmatch=False)
         elif mode == 'grid':
             if self.grid_calib_num_DOF >= self.grid_calib_num_constraints: # the '=' in >= comparison is due to some places in the code where I am requiring at least one extra point more than exact constraint 
                 new_mode = 'arc'    
@@ -443,7 +455,6 @@ class PosMoveMeasure(object):
                     poscalibplot.plot_grid(file,posid, grid_data)
                     files.add(file)
         elif mode == 'arc':
-            self.fvc.fvcproxy.set(match_radius =80.0) #ADDED BY PARKER)
             T = self._measure_calibration_arc(posids,'theta', keep_phi_within_Eo)
             P = self._measure_calibration_arc(posids,'phi', keep_phi_within_Eo)
             self.printfunc("Finished measuring calibration arcs.")
@@ -453,15 +464,7 @@ class PosMoveMeasure(object):
                     file = save_file(posid)
                     poscalibplot.plot_arc(file, posid, unwrapped_data)
                     files.add(file)
-        if self.fvc.fvcproxy and mode == 'rough':
-            #NOTE set spot match radius to narrow(old) prior to doing 'posTP' calibration, 
-            #testing on Petal02, 2019-01-30
-            old_spotmatch_radius = 80.0 #50.0 #30.0 #self.fvc.fvcproxy.get('match_radius')
-            #self.fvc.fvcproxy.set(match_radius = self.wide_spotmatch_radius)
-            self.fvc.fvcproxy.set(match_radius = old_spotmatch_radius)
-            self.one_point_calibration(posids, mode='posTP') # important to lastly update the internally-tracked theta and phi shaft angles
-        else:
-            self.one_point_calibration(posids, mode='posTP') # important to lastly update the internally-tracked theta and phi shaft angles
+        self.one_point_calibration(posids, mode='posTP', wide_spotmatch=False) # important to lastly update the internally-tracked theta and phi shaft angles
         self.commit(log_note = str(mode) + ' calibration complete')
         return files
 
@@ -1009,17 +1012,20 @@ class PosMoveMeasure(object):
         """
         posids_by_petal = self.posids_by_petal(posids)
         data = {}
+        dummy_obsT = 0.0
         for petal,these_posids in posids_by_petal.items():
             for posid in these_posids:
                 data[posid] = {}
                 posmodel = self.posmodel(posid)
-                range_T = posmodel.targetable_range_T
-                range_P = posmodel.targetable_range_P
+                range_posT = posmodel.targetable_range_T
+                range_posP = posmodel.targetable_range_P
                 if keep_phi_within_Eo:
-                    range_P[0] = self.phi_clear_angle
-                t_cmd = np.linspace(min(range_T),max(range_T),self.n_points_calib_T + 1) # the +1 is temporary, remove that extra point in next line
+                    min_obsP = self.phi_clear_angle
+                    min_posP = posmodel.trans.obsTP_to_posTP([dummy_obsT,min_obsP])[1]
+                    range_posP[0] = min_posP
+                t_cmd = np.linspace(min(range_posT),max(range_posT),self.n_points_calib_T + 1) # the +1 is temporary, remove that extra point in next line
                 t_cmd = t_cmd[:-1] # since theta covers +/-180, it is kind of redundant to hit essentially the same points again
-                p_cmd = np.linspace(min(range_P),max(range_P),self.n_points_calib_P + 1) # the +1 is temporary, remove that extra point in next line
+                p_cmd = np.linspace(min(range_posP),max(range_posP),self.n_points_calib_P + 1) # the +1 is temporary, remove that extra point in next line
                 p_cmd = p_cmd[:-1] # since there is very little useful data right near the center
                 data[posid]['target_posTP'] = [[t,p] for t in t_cmd for p in p_cmd]
                 data[posid]['trans'] = posmodel.trans
@@ -1062,33 +1068,34 @@ class PosMoveMeasure(object):
             'trans'           ... the postransform object associated with this particular positioner
         """
         posids_by_petal = self.posids_by_petal(posids)
-        phi_clear_angle = self.phi_clear_angle
+        dummy_obsT = 0.0
+        dummy_obsP = 0.0
         data = {}
         for petal,these_posids in posids_by_petal.items():
             these_posmodels = {posid:self.posmodel(posid) for posid in these_posids}
-            start_tp = {}
-            final_tp = {}
+            start_posTP = {}
+            final_posTP = {}
             if axis == 'theta':
                 n_pts = self.n_points_calib_T
                 for posid,posmodel in these_posmodels.items():
                     targetable_range_T = posmodel.targetable_range_T
-                    start_tp[posid] = [min(targetable_range_T) + self.calib_arc_margin, phi_clear_angle]
-                    final_tp[posid] = [max(targetable_range_T) - self.calib_arc_margin, start_tp[posid][1]]
+                    posP = posmodel.trans.obsTP_to_posTP([dummy_obsT,self.phi_clear_angle])[1]
+                    start_posTP[posid] = [min(targetable_range_T) + self.calib_arc_margin, posP]
+                    final_posTP[posid] = [max(targetable_range_T) - self.calib_arc_margin, posP]
             else:
                 n_pts = self.n_points_calib_P
                 for posid,posmodel in these_posmodels.items():
+                    posT = posmodel.trans.obsTP_to_posTP([0.0,dummy_obsP])[0] # When doing phi axis, nice to have obsT all uniform (simplifies anti-collision). this line working correctly depends on already knowing theta offset reasonably well
                     if keep_phi_within_Eo:
-                        phi_min = phi_clear_angle
-                        theta = 0
+                        min_posP = posmodel.trans.obsTP_to_posTP([dummy_obsT,self.phi_clear_angle])[1]
                     else:
-                        phi_min = min(posmodel.targetable_range_P)
-                        theta = posmodel.trans.obsTP_to_posTP([0,0])[pc.T] # when doing phi axis, want obsT to all be uniform (simplifies anti-collision), which means have to figure out appropriate posT for each positioner -- depends on already knowing theta offset reasonably well
-                    start_tp[posid] = [theta, phi_min + self.calib_arc_margin]
-                    final_tp[posid] = [start_tp[posid][0], max(posmodel.targetable_range_P) - self.calib_arc_margin]
+                        min_posP = min(posmodel.targetable_range_P)
+                    start_posTP[posid] = [posT, min_posP + self.calib_arc_margin]
+                    final_posTP[posid] = [posT, max(posmodel.targetable_range_P) - self.calib_arc_margin]
             for posid,posmodel in these_posmodels.items():
-                t = np.linspace(start_tp[posid][0], final_tp[posid][0], n_pts)
-                p = np.linspace(start_tp[posid][1], final_tp[posid][1], n_pts)
-                data[posid] = {'target_posTP':[[t[j],p[j]] for j in range(n_pts)], 'measured_obsXY':[], 'petal':petal, 'trans':posmodel.trans}
+                posT = np.linspace(start_posTP[posid][0], final_posTP[posid][0], n_pts)
+                posP = np.linspace(start_posTP[posid][1], final_posTP[posid][1], n_pts)
+                data[posid] = {'target_posTP':[[posT[j],posP[j]] for j in range(n_pts)], 'measured_obsXY':[], 'petal':petal, 'trans':posmodel.trans}
 
         # make the measurements
         for i in range(n_pts):
@@ -1098,7 +1105,6 @@ class PosMoveMeasure(object):
                 enabled=this_petal.get_posfid_val(posid,'CTRL_ENABLED')
                 posT_this=this_petal.get_posfid_val(posid,'POS_T')
                 posP_this=this_petal.get_posfid_val(posid,'POS_P')
-                trans = self.trans(posid)
                 if enabled:
                     requests[posid] = {'command':'posTP', 'target':data[posid]['target_posTP'][i], 'log_note':'calib arc on ' + axis + ' point ' + str(i+1)}
                 else:
@@ -1110,6 +1116,14 @@ class PosMoveMeasure(object):
 
         # circle fits
         for posid in data:
+            #Temporarily added to throw out purposefully set value of [0,0] for posids that
+            #did not get a measured centroid matched to them during calibration
+            if self.fvc.fvcproxy:
+                for idx, meas in enumerate(data[posid]['measured_obsXY']):
+                    if meas == [0,0]:
+                        del data[posid]['measured_obsXY'][idx]
+                        del data[posid]['target_posTP'][idx]
+            #End of temporarily added section
             (xy_ctr,radius) = fitcircle.FitCircle().fit(data[posid]['measured_obsXY'])
             data[posid]['xy_center'] = xy_ctr
             data[posid]['radius'] = radius
@@ -1136,30 +1150,33 @@ class PosMoveMeasure(object):
             'trans'           ... postransform object associated with this particular positioner
         """
         posids_by_petal = self.posids_by_petal(posids)
-        phi_clear_angle = self.phi_clear_angle
+        dummy_obsT = 0.0
+        dummy_obsP = 0.0
         n_intermediate_pts = 2
         initial_tp_requests = {}
+        initial_posP = {}
         prefix = 'range measurement on ' + axis + ' axis'
         for petal,these_posids in posids_by_petal.items():
+            for posid in these_posids:
+                initial_posP[posid] = self.trans(posid).obsTP_to_posTP([dummy_obsT,self.phi_clear_angle])[1]
             if axis == 'theta':
                 delta = 360/(n_intermediate_pts + 1)
                 dtdp = [delta,0]
                 axisid = pc.T
                 for posid in these_posids:
-                    initial_tp = [-150, phi_clear_angle]
-                    initial_tp_requests[posid] = {'command':'posTP', 'target':initial_tp, 'log_note':'range arc ' + axis + ' initial point'}
+                    initial_posTP = [-150, initial_posP[posid]]
+                    initial_tp_requests[posid] = {'command':'posTP', 'target':initial_posTP, 'log_note':'range arc ' + axis + ' initial point'}
             else:
                 delta = -180/(n_intermediate_pts + 1)
                 dtdp = [0,delta]
                 axisid = pc.P
                 for posid in these_posids:
                     if self.use_current_theta_during_phi_range_meas:
-                        theta_initial = petal.expected_current_position(posid,'obsT')
+                        initial_posT = self.posmodel(posid).expected_current_posTP[0]
                     else:
-                        theta_initial = 0
-                    trans = self.trans(posid)
-                    initial_tp = trans.obsTP_to_posTP([theta_initial,phi_clear_angle]) # when doing phi axis, want obsT to all be uniform (simplifies anti-collision), which means have to figure out appropriate posT for each positioner -- depends on already knowing theta offset reasonably well
-                    initial_tp_requests[posid] = {'command':'posTP', 'target':initial_tp,  'log_note':'range arc ' + axis + ' initial point'}
+                        initial_posT = self.trans(posid).obsTP_to_posTP([0.0,dummy_obsP])[0]
+                    initial_posTP = [initial_posT,initial_posP[posid]]
+                    initial_tp_requests[posid] = {'command':'posTP', 'target':initial_posTP,  'log_note':'range arc ' + axis + ' initial point'}
             data = {posid:{'target_dtdp':dtdp, 'measured_obsXY':[], 'petal':petal} for posid in these_posids}
 
         # go to initial point
@@ -1284,6 +1301,12 @@ class PosMoveMeasure(object):
             p_ctr = np.array(P[posid]['xy_center'])
             length_r1 = np.sqrt(np.sum((t_ctr - p_ctr)**2))
             length_r2 = P[posid]['radius']
+            if self._outside_of_tolerance_from_nominals(posid, length_r1, length_r2):
+                self.rehome(posid)
+                self.petal(posid).set_posfid_val(posid, 'CTRL_ENABLED', False)
+                self.petal(posid).pos_flags[posid] |= self.petal(posid).ctrl_disabled_bit
+                self.petal(posid).pos_flags[posid] |= self.petal(posid).bad_fiber_fvc_bit
+                self.printfunc(str(posid) + ': disabled due to poor arc calibration.')
             if ptl.posmodels[posid].is_enabled:
                 ptl.set_posfid_val(posid,'LENGTH_R1',length_r1)
                 ptl.set_posfid_val(posid,'LENGTH_R2',length_r2)
@@ -1508,6 +1531,9 @@ class PosMoveMeasure(object):
         delta_TP = {}
         for posid in measured_data.keys():
             delta_TP[posid] = [0,0]
+            if measured_data[posid] == [0,0] and self.fvc.fvcproxy:
+                #Do not update TP for positioner that did not get matched to a centroid
+                break
             ptl = self.petal(posid)
             measured_obsXY = measured_data[posid]
             expected_obsXY = ptl.expected_current_position(posid,'obsXY')
@@ -1544,7 +1570,21 @@ class PosMoveMeasure(object):
                     delta_TP[posid] = [delta_T,delta_P]
                     posmodel.state.next_log_notes.append('updated ' + param + '_T and ' + param + '_P after positioning error of ' + self.fmt(err_xy) + ' mm')
         return delta_TP
-                
+    
+    def _outside_of_tolerance_from_nominals(self, posid, r1, r2):
+        """Check to see if R1 or R2 are outside of a certain tolerance
+        from nominal values.  Return True if either of these values are out of bounds, else False.
+        Add offset x,y check to this.
+        """         
+        tol = pc.nominals['LENGTH_R1']['tol']
+        nom_val = pc.nominals['LENGTH_R1']['value']
+        if not(nom_val - tol <= r1 <= nom_val + tol):
+            return True
+        tol = pc.nominals['LENGTH_R2']['tol']
+        nom_val = pc.nominals['LENGTH_R2']['value']
+        if not(nom_val - tol <= r2 <= nom_val + tol):
+            return True
+
     @property
     def phi_clear_angle(self):
         """Returns the phi angle in degrees for which two positioners cannot collide
