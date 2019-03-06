@@ -24,7 +24,7 @@ class FVCHandler(object):
         2. scale
         3. translation
     """
-    def __init__(self, fvc_type='FLI', platemaker_instrument='petal2', printfunc=print, save_sbig_fits=True, write_bias=False):
+    def __init__(self, fvc_type='FLI', platemaker_instrument='petal2',fvc_role='FVC', printfunc=print, save_sbig_fits=True, write_bias=False):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.fvc_type = fvc_type # 'SBIG' or 'SBIG_Yale' or 'FLI' or 'simulator'
         self.fvcproxy = None # may be auto-initialized later by the platemaker instrument setter
@@ -44,9 +44,10 @@ class FVCHandler(object):
             self.exposure_time = 0.70
             self.max_counts = 2**16 - 1 # SBIC camera ADU max
         else:
-            self.exposure_time = 0.75 #2.0
+            self.exposure_time = 2.5
             self.max_counts = 2**16 - 1 # FLI camera ADU max
         self.trans = postransforms.PosTransforms() # general transformer object -- does not look up specific positioner info, but fine for QS <--> global X,Y conversions
+        self.fvc_role=fvc_role
         self.rotation = 0        # [deg] rotation angle from image plane to object plane
         self._scale = 1.0        # scale factor from image plane to object plane
         self.translation = [0,0] # translation of origin within the image plane
@@ -78,7 +79,7 @@ class FVCHandler(object):
         """
         from DOSlib.proxies import FVC
         self.__platemaker_instrument = name
-        self.fvcproxy = FVC(self.platemaker_instrument)
+        self.fvcproxy = FVC(self.platemaker_instrument, fvc_role = 'FVC2') #self.fvc_role)
         self.printfunc('proxy FVC created for instrument %s' % self.fvcproxy.get('instrument'))
 
     @property
@@ -200,7 +201,6 @@ class FVCHandler(object):
                     expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':pos_flags[posid]})
                 else: #Assume it is good, old default behavior
                     expected_qs.append({'id':posid, 'q':qs[0], 's':qs[1], 'flags':fiber_ctr_flag})
-            import pdb; pdb.set_trace() #REMOVE
             measured_qs = self.fvcproxy.measure(expected_qs)
             if len(measured_qs) < len(expected_qs):
                 # for all the expected positioners that weren't included, generate a dummy dict
@@ -430,8 +430,8 @@ class FVCHandler(object):
         return np.array([[math.cos(angle), -math.sin(angle)], [math.sin(angle), math.cos(angle)]])
 
 if __name__ == '__main__':
-    f = FVCHandler(fvc_type='SBIG',write_bias=True)
-    n_objects = 22
+    f = FVCHandler(fvc_type='FLI',platemaker_instrument='petal1',fvc_role='FVC2')
+    n_objects =12 
     n_repeats = 1
     f.min_energy = -np.Inf
     xy = []
