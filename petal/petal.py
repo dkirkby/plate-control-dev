@@ -158,7 +158,7 @@ class Petal(object):
         self.dev_nonfunctional_bit = 1<<24
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
         self._initialize_pos_flags()
-        self._apply_state_enable_settings()
+        #self._apply_state_enable_settings()
 
         # petalbox setup (temporary until all settings are passed via init by DOS)
         if pb_config == True:
@@ -981,7 +981,8 @@ class Petal(object):
                             self.set_posfid_val(item_id,'CTRL_ENABLED',False)
                             self.petal_state.conf['DISABLED_BUFFER'].append(item_id)
                             self.petal_state.write()
-                            self._update_can_enabled_map(item_id, False)
+                            if self.pb_config:
+                                self._update_can_enabled_map(item_id, False)
                             self.pos_flags[item_id] |= self.comm_error_bit
                             self.printfunc(str(item_id) + ': was disabled due to a CAN communication error.')
                             self.states[item_id].next_log_notes.append('Disabled sending control commands because device was detected to be nonresponsive.')
