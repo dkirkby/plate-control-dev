@@ -320,6 +320,8 @@ class XYTest(object):
                     for key in params:
                         self.logwrite(str(posid) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
             self.logwrite('Calibration with ' + str(n_pts_calib_T) + ' theta points and ' + str(n_pts_calib_P) + ' phi points completed in ' + self._elapsed_time_str(start_time) + '.')
+        else:
+            self.m.one_point_calibration(posids='all', mode='posTP')
         for posid in self.posids:
             self.summarizers[posid].update_loop_calibs(summarizer.used_suffix, params)
 
