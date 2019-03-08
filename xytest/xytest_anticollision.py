@@ -347,8 +347,8 @@ class XYTest(object):
             self.summarizers[posid].update_loop_inits(movedata_name(posid), n_pts_calib_T, n_pts_calib_P, calib_mode, should_measure_ranges)
 
         local_targets = self.generate_posXY_targets_grid(self.xytest_conf['n_pts_across_grid'][loop_number])
-        self.logwrite('Number of local targets = ' + str(len(local_targets)))
-        self.logwrite('Local target xy positions: ' + str(local_targets))
+        #self.logwrite('Number of local targets = ' + str(len(local_targets)))
+        #self.logwrite('Local target xy positions: ' + str(local_targets))
         
         num_corr_max = self.xytest_conf['num_corr_max'][loop_number]
         submove_idxs = [i for i in range(num_corr_max+1)]
@@ -371,14 +371,16 @@ class XYTest(object):
         
         # transform test grid to each positioner's global position, and create all the move request dictionaries
         all_targets = []
-        
         if self.xytest_conf['input_targs_file']:
             targ_list=ascii.read(pc.dirs['test_settings']+self.xytest_conf['input_targs_file'])
             targ_list=targ_list['filename']
+            move_request_filenames = []
             n_targets=len(targ_list)
+            
             for i in range(n_targets):
                 these_targets = {}
                 file_targ_this=pc.dirs['test_settings']+'move_request_sets/'+targ_list[i]
+                move_request_filenames.append(targ_list[i])
                 data=ascii.read(file_targ_this)
                 data.add_index('DEVICE_LOC')
                 for posid in self.posids:
@@ -428,13 +430,17 @@ class XYTest(object):
             for these_targets in all_targets:
                 targ_num += 1
                 print('')
+                file_indx = all_targets.index(these_targets)
                 self.logwrite('MEASURING TARGET ' + str(targ_num) + ' OF ' + str(len(all_targets)))
-                self.logwrite('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
+                self.logwrite('doing move request %s' % move_request_filenames[file_indx])
+                #self.logwrite('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
                 this_timestamp = pc.timestamp_str_now()
                 
                 if self.xytest_conf['anticollision'] == 'adjust': 
+                    self.logwrite('force_anticoll_on=True as self.xytest_conf["anticollision"] is adjust')
                     these_meas_data = self.m.move_and_correct(these_targets, num_corr_max, force_anticoll_on=True)
                 else:
+                    self.logwrite('force_anticoll_on=False as self.xytest_conf["anticollision"] is NOT adjust')
                     these_meas_data = self.m.move_and_correct(these_targets, num_corr_max, force_anticoll_on=False)
                 
                 # store this set of measured data
@@ -881,6 +887,7 @@ if __name__=="__main__":
         #test.m.petals[0].stop_gathering_frames()
         test.clear_current_overrides()
         test.svn_add_commit(keep_creds=True)
+        #test.m.petals[0].schedule_stats.save()
 
     test.logwrite('All test loops complete.')
     test.m.park(posids='all')
