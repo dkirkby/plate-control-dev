@@ -402,7 +402,7 @@ class Petal(object):
         of positioners. (But there are certain 'expert use' test cases in the
         lab, where we want this feature turned off.)
         """
-        self.collider._load_config_data() # preferable to do this only in limited cases: after recalibrations of offsets and arm lengths (not posTP)
+        self.collider._load_positioner_params() # preferable to do this only in limited cases: after recalibrations of offsets and arm lengths (not posTP)
         if anticollision not in {None,'freeze','adjust'}:
             anticollision = self.anticollision_default
         self.schedule.should_anneal = should_anneal
