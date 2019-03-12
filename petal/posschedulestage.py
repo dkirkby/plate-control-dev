@@ -192,7 +192,6 @@ class PosScheduleStage(object):
                     
                         try: 
                             neighbor_neighbor = self.sweeps[pos_id].collision_neighbor
-                            neighbor_neighbor = self.sweeps[pos_id].collision_neighbor
                             all_sweeps[neighbor_neighbor].collision_case = self.sweeps[neighbor_neighbor].collision_case
                             all_sweeps[neighbor_neighbor].collision_neighbor = self.sweeps[neighbor_neighbor].collision_neighbor
                         except KeyError: pass
