@@ -265,10 +265,11 @@ class PosSchedule(object):
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
         if should_freeze:
+            ori_stage_colliding = copymodule.deepcopy(stage.colliding)
             for posid in colliding_sweeps:
                 if posid in stage.colliding: # re-check, since earlier path adjustments in loop may have already resolved this posid's collision
                     self.petal.pos_flags[posid] |= self.petal.frozen_anticol_bit #Mark as frozen by anticollision
-                    stage.adjust_path(posid, copymodule.deepcopy(stage.colliding), freezing='forced')
+                    stage.adjust_path(posid, ori_stage_colliding, freezing='forced')
             if self.stats and colliding_sweeps:
                 self.stats.add_to_num_adjustment_iters(1)
         
@@ -305,10 +306,11 @@ class PosSchedule(object):
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             attempts_remaining = self.max_path_adjustment_passes
+            ori_stage_colliding = copymodule.deepcopy(stage.colliding)
             while stage.colliding and attempts_remaining:
                 for posid in stage.colliding:
                     freezing = 'off' if attempts_remaining > 1 else 'on'
-                    stage.adjust_path(posid, copymodule.deepcopy(stage.colliding), freezing, self.requests)
+                    stage.adjust_path(posid, ori_stage_colliding, freezing, self.requests)
                     if posid in stage.collisions_resolved['freeze']:
                         self.petal.pos_flags[posid] |= self.petal.frozen_anticol_bit #Mark as frozen by anticollision
                         for j in range(i+1,len(self.RRE_stage_order)):
