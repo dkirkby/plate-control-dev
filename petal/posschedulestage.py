@@ -178,17 +178,25 @@ class PosScheduleStage(object):
                 stage_colliding.remove(posid)  
                 all_sweeps_keys = list(all_sweeps.keys()) # list of all posids in proposed_tables
                 for pos_id in all_sweeps_keys:
-                    # if a positioner in the proposed table 
+                    # if a positioner in all_sweeps 
                     # (i) does not correspond to the positioner being adjusted,
                     # (ii) is one of the positioners in stage_colliding, and 
-                    # (iii) whose collision neighbor is also not the positioner whose path is being adjusted, 
-                    # then prevent the sweep information of this positioner and its collision neighbor from 
-                    # being changed, by removing them from all_sweeps. 
+                    # (iii) whose collision neighbor is not the positioner whose path is being adjusted, 
+                    # then retain the initial collision case and collision neighbor
+                    # of this positioner and its collision neighbor. 
                     if (pos_id != posid) and (pos_id in stage_colliding) and self.sweeps[pos_id].collision_neighbor != posid:
-                        try: all_sweeps.pop(pos_id)
+                        try: 
+                            all_sweeps[pos_id].collision_case = self.sweeps[pos_id].collision_case
+                            all_sweeps[pos_id].collision_neighbor = self.sweeps[pos_id].collision_neighbor
                         except KeyError: pass
-                        try: all_sweeps.pop(self.sweeps[pos_id].collision_neighbor)
+                    
+                        try: 
+                            neighbor_neighbor = self.sweeps[pos_id].collision_neighbor
+                            neighbor_neighbor = self.sweeps[pos_id].collision_neighbor
+                            all_sweeps[neighbor_neighbor].collision_case = self.sweeps[neighbor_neighbor].collision_case
+                            all_sweeps[neighbor_neighbor].collision_neighbor = self.sweeps[neighbor_neighbor].collision_neighbor
                         except KeyError: pass
+                    
                 # sweep information for all positioners updated here
                 self.store_collision_finding_results(colliding_sweeps, all_sweeps, requests)
                 if method == 'freeze':
