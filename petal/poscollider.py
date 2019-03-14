@@ -360,8 +360,8 @@ class PosCollider(object):
         self.keepout_GFA = PosPoly(self.config['KEEPOUT_GFA'], self.config['KEEPOUT_GFA_PT0'])
         self.keepout_PTL = self.keepout_PTL.rotated(self._petal_rot)
         self.keepout_PTL = self.keepout_PTL.translated(self._petal_x0, self._petal_y0)
-        self.keepout_PTL = self.keepout_GFA.rotated(self._petal_rot)
-        self.keepout_PTL = self.keepout_GFA.translated(self._petal_x0, self._petal_y0)
+        self.keepout_GFA = self.keepout_GFA.rotated(self._petal_rot)
+        self.keepout_GFA = self.keepout_GFA.translated(self._petal_x0, self._petal_y0)
         self.fixed_neighbor_keepouts = {pc.case.PTL : self.keepout_PTL, pc.case.GFA : self.keepout_GFA}
 
     def _load_positioner_params(self):
