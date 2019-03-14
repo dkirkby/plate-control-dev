@@ -30,6 +30,7 @@ class FVCHandler(object):
         self.fvcproxy = None # may be auto-initialized later by the platemaker instrument setter
         self.min_energy = 0. #0.1 * .5 # this is the minimum allowed value for the product peak*fwhm for any given dot
         self.max_attempts = 5 # max number of times to retry an image measurement (if poor dot quality) before quitting hard
+        self.fvc_role=fvc_role
         if self.fvc_type == 'SBIG':
             import sbig_grab_cen
             self.sbig = sbig_grab_cen.SBIG_Grab_Cen(save_dir=pc.dirs['temp_files'],write_bias=write_bias)
@@ -47,7 +48,6 @@ class FVCHandler(object):
             self.exposure_time = 2.5
             self.max_counts = 2**16 - 1 # FLI camera ADU max
         self.trans = postransforms.PosTransforms() # general transformer object -- does not look up specific positioner info, but fine for QS <--> global X,Y conversions
-        self.fvc_role=fvc_role
         self.rotation = 0        # [deg] rotation angle from image plane to object plane
         self._scale = 1.0        # scale factor from image plane to object plane
         self.translation = [0,0] # translation of origin within the image plane
@@ -79,7 +79,7 @@ class FVCHandler(object):
         """
         from DOSlib.proxies import FVC
         self.__platemaker_instrument = name
-        self.fvcproxy = FVC(self.platemaker_instrument, fvc_role = 'FVC2') #self.fvc_role)
+        self.fvcproxy = FVC(self.platemaker_instrument, fvc_role =self.fvc_role)
         self.printfunc('proxy FVC created for instrument %s' % self.fvcproxy.get('instrument'))
 
     @property
@@ -431,7 +431,7 @@ class FVCHandler(object):
 
 if __name__ == '__main__':
     f = FVCHandler(fvc_type='FLI',platemaker_instrument='petal1',fvc_role='FVC2')
-    n_objects =12 
+    n_objects =33 
     n_repeats = 1
     f.min_energy = -np.Inf
     xy = []
