@@ -435,6 +435,7 @@ class PosMoveMeasure(object):
             if self.make_plots_during_calib:
                 def save_file(posid):
                     return save_file_dir + posid + '_' + save_file_timestamp + '_calib_' + mode + '.png'
+            remove_outliers = True if self.fvc.fvcproxy else False
         if mode == 'rough':
             self.rehome(posids)
             self.one_point_calibration(posids, mode='offsetsXY', wide_spotmatch=True)
@@ -452,21 +453,16 @@ class PosMoveMeasure(object):
                 new_mode = 'arc'    
                 self.printfunc('Not enough points requested to constrain grid calibration. Defaulting to ' + new_mode + ' calibration method.')
                 return self.calibrate(posids,new_mode,save_file_dir,save_file_timestamp,keep_phi_within_Eo)
-            grid_data = self._measure_calibration_grid(posids, keep_phi_within_Eo)
-            # grid_data = self._remove_outlier_calibration_points(grid_data, type='grid')
-			grid_data = self._calculate_and_set_arms_and_offsets_from_grid_data(grid_data, set_gear_ratios=self.should_set_gear_ratios)
+            grid_data = self._measure_calibration_grid(posids, keep_phi_within_Eo, remove_outliers)
+            grid_data = self._calculate_and_set_arms_and_offsets_from_grid_data(grid_data, set_gear_ratios=self.should_set_gear_ratios)
             if self.make_plots_during_calib:
                 for posid in grid_data.keys():
                     file = save_file(posid)
                     poscalibplot.plot_grid(file,posid, grid_data)
                     files.add(file)
         elif mode == 'arc':
-            T = self._measure_calibration_arc(posids,'theta', keep_phi_within_Eo)
-            P = self._measure_calibration_arc(posids,'phi', keep_phi_within_Eo)
-			# The below is at least higher level than previous hack.
-			# But may still break arc calibration in cases where the wrong point(s) are removed from the sequence.
-			# T = self._remove_outlier_calibration_points(T, type='arc')
-			# P = self._remove_outlier_calibration_points(P, type='arc')
+            T = self._measure_calibration_arc(posids,'theta', keep_phi_within_Eo, remove_outliers)
+            P = self._measure_calibration_arc(posids,'phi', keep_phi_within_Eo, remove_outliers)
             self.printfunc("Finished measuring calibration arcs.")
             unwrapped_data = self._calculate_and_set_arms_and_offsets_from_arc_data(T,P,set_gear_ratios=self.should_set_gear_ratios)
             if self.make_plots_during_calib:
@@ -1002,7 +998,7 @@ class PosMoveMeasure(object):
         for petal in self.petals:
             petal.set_motor_parameters()
 
-    def _measure_calibration_grid(self,posids='all',keep_phi_within_Eo=True):
+    def _measure_calibration_grid(self, posids='all', keep_phi_within_Eo=True, remove_outliers=False):
         """Expert usage. Send positioner(s) to a series of commanded (theta,phi) positions. Measure
         the (x,y) positions of these points with the FVC.
 
@@ -1052,9 +1048,14 @@ class PosMoveMeasure(object):
             this_meas_data,imgfiles,accepted_requests = self.move_measure(requests, tp_updates=None)
             for p in this_meas_data.keys():
                 data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
+
+        # optionally remove outliers
+        if remove_outliers:
+            data = self._remove_outlier_calibration_points(data, 'grid')
+            
         return data 
 
-    def _measure_calibration_arc(self,posids='all',axis='theta',keep_phi_within_Eo=True):
+    def _measure_calibration_arc(self, posids='all', axis='theta', keep_phi_within_Eo=True, remove_outliers=False):
         """Expert usage. Sweep an arc of points about axis ('theta' or 'phi')
         on positioners identified by posids. Measure these points with the FVC
         and do a best fit of them.
@@ -1064,6 +1065,7 @@ class PosMoveMeasure(object):
 
         keep_phi_within_Eo == True  --> phi never exceeds Eo envelope
         keep_phi_within_Eo == False --> phi can cover the full range (including collidable territory) during calibration
+        remove_outliers == True --> any definitely bad points (e.g. unmatched centroids) are removed from the set of calibration points
 
         OUTPUTS:  data ... see comments below
 
@@ -1124,18 +1126,12 @@ class PosMoveMeasure(object):
             for p in this_meas_data.keys():
                 data[p]['measured_obsXY'] = pc.concat_lists_of_lists(data[p]['measured_obsXY'],this_meas_data[p])
         
+        # optionally remove outliers
+        if remove_outliers:
+            data = self._remove_outlier_calibration_points(data, 'arc')
+        
         # circle fits
         for posid in data:
-			# Probably should remove this -- JHS
-			# It breaks the sequential assumptions of the arc calibration!
-            #Temporarily added to throw out purposefully set value of [0,0] for posids that
-            #did not get a measured centroid matched to them during calibration
-            if self.fvc.fvcproxy:
-                for idx, meas in enumerate(data[posid]['measured_obsXY']):
-                    if meas == [0,0]:
-                        del data[posid]['measured_obsXY'][idx]
-                        del data[posid]['target_posTP'][idx]
-            #End of temporarily added section
             (xy_ctr,radius) = fitcircle.FitCircle().fit(data[posid]['measured_obsXY'])
             data[posid]['xy_center'] = xy_ctr
             data[posid]['radius'] = radius
@@ -1315,7 +1311,7 @@ class PosMoveMeasure(object):
             
 			# BEGIN - probably should remove this -- JHS
 			# It is not in a good place to bury these automatic actions
-			if self._outside_of_tolerance_from_nominals(posid, length_r1, length_r2):
+            if self._outside_of_tolerance_from_nominals(posid, length_r1, length_r2):
                 self.rehome(posid)
                 self.petal(posid).set_posfid_val(posid, 'CTRL_ENABLED', False)
                 self.petal(posid).pos_flags[posid] |= self.petal(posid).ctrl_disabled_bit
@@ -1381,6 +1377,21 @@ class PosMoveMeasure(object):
             else:
                 self.printfunc(posid + ': measurement proposed GEAR_CALIB_T = ' + format(ratio_T,'.6f'))
                 self.printfunc(posid + ': measurement proposed GEAR_CALIB_P = ' + format(ratio_P,'.6f'))
+        return data
+
+    def _remove_outlier_calibration_points(self, data, mode):
+        """Removes bad points from calibration data set.
+            data ... dict from _measure_calibration_grid() or _measure_calibration_arc() function
+            mode ... "arc" or "grid"
+        """
+        for posid in data:
+            n_pts = len(data[posid]['measured_obsXY'])
+            for i in range(n_pts):
+                if data[posid]['measured_obsXY'][i] == [0,0]: # unmatched spot case
+                    del data[posid]['measured_obsXY'][i]
+                    del data[posid]['target_posTP'][i]
+                    self.printfunc(str(posid) + ': Removed ' + str(mode) + ' calibration point ' + str(i) + ' of ' + str(n_pts) + ', due to no matched spot.')
+                # elif ... any other cases to check?
         return data
 
     def _identify(self, posid=None):
