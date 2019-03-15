@@ -71,7 +71,7 @@ else:
 # software initialization and startup
 # software initialization and startup
 if hwsetup['fvc_type'] == 'FLI' and 'pm_instrument' in hwsetup:
-    fvc=fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'],printfunc=logwrite,platemaker_instrument=hwsetup['pm_instrument'])
+    fvc=fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],save_sbig_fits=hwsetup['save_sbig_fits'],printfunc=logwrite,platemaker_instrument=hwsetup['pm_instrument'],fvc_role=hwsetup['fvc_role'])
 else:
     fvc = fvchandler.FVCHandler(fvc_type=hwsetup['fvc_type'],printfunc=logwrite,save_sbig_fits=hwsetup['save_sbig_fits'])    
 fvc.rotation = hwsetup['rotation'] # this value is used in setups without fvcproxy / platemaker
@@ -208,7 +208,7 @@ if should_commit_to_svn and svn_userpass_valid:
     print("these_files_to_commit")
     print(these_files_to_commit)
     print("")
-    self.logwrite('Beginning add + commit of ' + str(n_total) + ' data files to SVN.')
+    logwrite('Beginning add + commit of ' + str(n_total) + ' data files to SVN.')
     err_add = os.system('svn add --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive ' + these_files_to_commit)
     err_commit = os.system('svn commit --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + these_files_to_commit)
 
