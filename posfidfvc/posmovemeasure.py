@@ -453,7 +453,8 @@ class PosMoveMeasure(object):
                 self.printfunc('Not enough points requested to constrain grid calibration. Defaulting to ' + new_mode + ' calibration method.')
                 return self.calibrate(posids,new_mode,save_file_dir,save_file_timestamp,keep_phi_within_Eo)
             grid_data = self._measure_calibration_grid(posids, keep_phi_within_Eo)
-            grid_data = self._calculate_and_set_arms_and_offsets_from_grid_data(grid_data, set_gear_ratios=self.should_set_gear_ratios)
+            # grid_data = self._remove_outlier_calibration_points(grid_data, type='grid')
+			grid_data = self._calculate_and_set_arms_and_offsets_from_grid_data(grid_data, set_gear_ratios=self.should_set_gear_ratios)
             if self.make_plots_during_calib:
                 for posid in grid_data.keys():
                     file = save_file(posid)
@@ -462,6 +463,10 @@ class PosMoveMeasure(object):
         elif mode == 'arc':
             T = self._measure_calibration_arc(posids,'theta', keep_phi_within_Eo)
             P = self._measure_calibration_arc(posids,'phi', keep_phi_within_Eo)
+			# The below is at least higher level than previous hack.
+			# But may still break arc calibration in cases where the wrong point(s) are removed from the sequence.
+			# T = self._remove_outlier_calibration_points(T, type='arc')
+			# P = self._remove_outlier_calibration_points(P, type='arc')
             self.printfunc("Finished measuring calibration arcs.")
             unwrapped_data = self._calculate_and_set_arms_and_offsets_from_arc_data(T,P,set_gear_ratios=self.should_set_gear_ratios)
             if self.make_plots_during_calib:
@@ -1121,6 +1126,8 @@ class PosMoveMeasure(object):
         
         # circle fits
         for posid in data:
+			# Probably should remove this -- JHS
+			# It breaks the sequential assumptions of the arc calibration!
             #Temporarily added to throw out purposefully set value of [0,0] for posids that
             #did not get a measured centroid matched to them during calibration
             if self.fvc.fvcproxy:
@@ -1305,12 +1312,18 @@ class PosMoveMeasure(object):
             p_ctr = np.array(P[posid]['xy_center'])
             length_r1 = np.sqrt(np.sum((t_ctr - p_ctr)**2))
             length_r2 = P[posid]['radius']
-            if self._outside_of_tolerance_from_nominals(posid, length_r1, length_r2):
+            
+			# BEGIN - probably should remove this -- JHS
+			# It is not in a good place to bury these automatic actions
+			if self._outside_of_tolerance_from_nominals(posid, length_r1, length_r2):
                 self.rehome(posid)
                 self.petal(posid).set_posfid_val(posid, 'CTRL_ENABLED', False)
                 self.petal(posid).pos_flags[posid] |= self.petal(posid).ctrl_disabled_bit
                 self.petal(posid).pos_flags[posid] |= self.petal(posid).bad_fiber_fvc_bit
                 self.printfunc(str(posid) + ': disabled due to poor arc calibration.')
+			# END - probably should remove this
+			# (and may also want to remove the if statement right below)
+				
             if ptl.posmodels[posid].is_enabled:
                 ptl.set_posfid_val(posid,'LENGTH_R1',length_r1)
                 ptl.set_posfid_val(posid,'LENGTH_R2',length_r2)
