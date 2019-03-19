@@ -40,7 +40,8 @@ class FVCHandler(object):
             self.platemaker_instrument = platemaker_instrument # this setter also initializes self.fvcproxy
         elif self.fvc_type == 'simulator':
             self.sim_err_max = 0.01 # 2D err max for simulator
-            self.printfunc('FVCHandler is in simulator mode with max 2D errors of size ' + str(self.sim_err_max) + '.')
+            self.sim_badmatch_frquency = 0.05 # how often the simulator returns [0,0], indicating a bad match
+            self.printfunc('FVCHandler is in simulator mode with max 2D errors of size ' + str(self.sim_err_max) + ', and bad match frequency of ' + str(self.sim_badmatch_frquency) + '.')
         if 'SBIG' in self.fvc_type:
             self.exposure_time = 0.70
             self.max_counts = 2**16 - 1 # SBIC camera ADU max
@@ -253,8 +254,12 @@ class FVCHandler(object):
                 sim_error_angles = np.random.uniform(-np.pi,np.pi,len(expected_pos_xy))
                 sim_errors = sim_error_magnitudes * np.array([np.cos(sim_error_angles),np.sin(sim_error_angles)])
                 measured_pos_xy = (expected_pos_xy + np.transpose(sim_errors)).tolist()
-                for posid in posids:    
-                    measured_pos[posid] = {'obsXY':measured_pos_xy[posids.index(posid)]}
+                for posid in posids:
+                    if np.random.uniform() < self.sim_badmatch_frquency:
+                        obsXY = [0,0]
+                    else:
+                        obsXY = measured_pos_xy[posids.index(posid)]
+                    measured_pos[posid] = {'obsXY':obsXY}
                 for refid in refids:
                     measured_ref[refid] = {'obsXY':expected_ref[refid]['obsXY']} # just copy the old vals
                 for item in [measured_pos,measured_ref]:
