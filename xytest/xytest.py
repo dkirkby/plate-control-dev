@@ -7,6 +7,11 @@ if "TEST_LOCATION" in os.environ and os.environ['TEST_LOCATION']=='Michigan':
 else:
     sys.path.append(os.path.abspath('../petal/'))
     sys.path.append(os.path.abspath('../posfidfvc/'))
+sys.path.remove('/home/msdos/focalplane/plate_control/branches/production/xytest')
+sys.path.remove('/home/msdos/focalplane/plate_control/branches/production/posfidfvc')
+sys.path.remove('/home/msdos/focalplane/plate_control/branches/production/petalbox')
+sys.path.remove('/home/msdos/focalplane/plate_control/branches/production/petal')
+
 import fvchandler
 import petal
 import posmovemeasure
@@ -122,7 +127,7 @@ class XYTest(object):
         else:
             fvc_type = self.hwsetup_conf['fvc_type']
         if fvc_type == 'FLI' and 'pm_instrument' in self.hwsetup_conf:
-            fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=self.hwsetup_conf['save_sbig_fits'], platemaker_instrument = self.hwsetup_conf['pm_instrument'])       
+            fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=self.hwsetup_conf['save_sbig_fits'], platemaker_instrument = self.hwsetup_conf['pm_instrument'],fvc_role=self.hwsetup_conf['fvc_role'])       
         else:
             fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=self.hwsetup_conf['save_sbig_fits'])
         fvc.rotation = self.hwsetup_conf['rotation']
