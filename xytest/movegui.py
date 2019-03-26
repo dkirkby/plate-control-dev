@@ -31,10 +31,10 @@ sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../../../positioner_logs/data_processing_scripts/'))
 sys.path.append(os.path.abspath(os.getenv('HOME')+'/focalplane/positioner_logs/data_processing_scripts/'))
 sys.path.append(os.path.abspath(os.getenv('HOME')+'/focalplane/pos_utility/'))
-sys.path.remove('/software/products/plate_control-trunk/xytest')
-sys.path.remove('/software/products/plate_control-trunk/posfidfvc')
-sys.path.remove('/software/products/plate_control-trunk/petalbox')
-sys.path.remove('/software/products/plate_control-trunk/petal')
+#sys.path.remove('/software/products/plate_control-trunk/xytest')
+#sys.path.remove('/software/products/plate_control-trunk/posfidfvc')
+#sys.path.remove('/software/products/plate_control-trunk/petalbox')
+#sys.path.remove('/software/products/plate_control-trunk/petal')
 
 import fvchandler
 import petal
@@ -132,6 +132,7 @@ class MoveGUI(object):
                 self.posids.append('M0'+str(key))
             elif len(str(key))==5:
                 self.posids.append('M'+str(key))
+        print(self.posids)
         self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite,user_interactions_enabled=True)
         print('Finish loading petal')
 
@@ -708,7 +709,6 @@ class MoveGUI(object):
             self.info=self.pcomm.pbget('posfid_info')[self.canbus]
         print(self.info)
         self.posids = []
-        print(self.info)
         for key in sorted(self.info.keys()):
             if len(str(key))==2:
                 self.posids.append('M000'+str(key))
@@ -721,7 +721,7 @@ class MoveGUI(object):
             # FW version check
             if float(self.info[key][0]) < 4.3:
                 self.text1.insert(END,str(key)+' has too low a FW ver = '+self.info[key][0]+', BL ver = '+self.info[key][1]+'! Hand it to Jessica. \n','red')
-
+        print(self.posids)
 
         self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite,user_interactions_enabled=True)
         for posid in self.posids:
