@@ -436,7 +436,7 @@ class FVCHandler(object):
 
 if __name__ == '__main__':
     f = FVCHandler(fvc_type='FLI',platemaker_instrument='petal1',fvc_role='FVC2')
-    n_objects =33 
+    n_objects =86 #74 
     n_repeats = 1
     f.min_energy = -np.Inf
     xy = []

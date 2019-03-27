@@ -7,10 +7,10 @@ sys.path.append(os.path.abspath('../xytest/'))
 #sys.path.remove('/software/products/plate_control-trunk/posfidfvc')
 #sys.path.remove('/software/products/plate_control-trunk/petalbox')
 #sys.path.remove('/software/products/plate_control-trunk/petal')
-sys.path.remove('/home/msdos/focalplane/plate_control/branches/production/xytest')
-sys.path.remove('/home/msdos/focalplane/plate_control/branches/production/posfidfvc')
-sys.path.remove('/home/msdos/focalplane/plate_control/branches/production/petalbox')
-sys.path.remove('/home/msdos/focalplane/plate_control/branches/production/petal')
+#sys.path.remove('/home/msdos/focalplane/plate_control/branches/production/xytest')
+#sys.path.remove('/home/msdos/focalplane/plate_control/branches/production/posfidfvc')
+#sys.path.remove('/home/msdos/focalplane/plate_control/branches/production/petalbox')
+#sys.path.remove('/home/msdos/focalplane/plate_control/branches/production/petal')
 
 import petal
 import posmovemeasure
