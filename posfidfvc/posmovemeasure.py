@@ -1385,13 +1385,24 @@ class PosMoveMeasure(object):
             mode ... "arc" or "grid"
         """
         for posid in data:
+            matched_index=[]
             n_pts = len(data[posid]['measured_obsXY'])
             for i in range(n_pts):
-                if data[posid]['measured_obsXY'][i] == [0,0]: # unmatched spot case
-                    del data[posid]['measured_obsXY'][i]
-                    del data[posid]['target_posTP'][i]
+                if data[posid]['measured_obsXY'][i] != [0,0]: # unmatched spot case
+                    matched_index.append(i)
+                else:
                     self.printfunc(str(posid) + ': Removed ' + str(mode) + ' calibration point ' + str(i) + ' of ' + str(n_pts) + ', due to no matched spot.')
-                # elif ... any other cases to check?
+            if len(matched_index)>2: # if the remaining dots >=3 fine for good fit
+                data[posid]['measured_obsXY']=np.array(data[posid]['measured_obsXY'])[matched_index].tolist()
+                data[posid]['target_posTP']=np.array(data[posid]['target_posTP'])[matched_index].tolist()
+            else:
+                self.printfunc(str(posid)+' does not have enough good measurement for '+mode+' fit')
+
+        #for i in unmatched_index:	
+        #    del data[posid]['measured_obsXY'][i]
+        #    del data[posid]['target_posTP'][i]
+        #    self.printfunc(str(posid) + ': Removed ' + str(mode) + ' calibration point ' + str(i) + ' of ' + str(n_pts) + ', due to no matched spot.')
+            # elif ... any other cases to check?
         return data
 
     def _identify(self, posid=None):
