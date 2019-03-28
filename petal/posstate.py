@@ -36,7 +36,7 @@ class PosState(object):
         # data initialization from database
         self.write_to_DB = os.getenv('DOS_POSMOVE_WRITE_TO_DB') if DB_COMMIT_AVAILABLE else False
 
-        if self.type in ['pos','fid','ptl']:
+        if self.logging and self.type in ['pos','fid','ptl']:
             self.logs_directory = pc.dirs[self.type + '_logs']
 
         # Only read files if write_to_DB is False
@@ -51,7 +51,8 @@ class PosState(object):
                 comment = 'Settings file for unit: ' + str(unit_id)
             else:
                 self.unit_basename = 'unit_TEMP'
-                self.logs_directory = pc.dirs['temp_files']
+                if self.logging:
+                    self.logs_directory = pc.dirs['temp_files']
                 self.settings_directory = pc.dirs['temp_files']
                 comment = 'Temporary settings file for software test purposes, not associated with a particular unit.'
             unit_filename = self.settings_directory + self.unit_basename + '.conf'
@@ -104,7 +105,8 @@ class PosState(object):
                     self._val.update(self.posmoveDB.get_fid_calib(unit_id))
             else:
                 self.unit_basename = 'unit_TEMP'
-                self.logs_directory = pc.dirs['temp_files']
+                if self.logging:
+                    self.logs_directory = pc.dirs['temp_files']
                 self.settings_directory = pc.dirs['temp_files']
                 comment = 'Temporary settings file for software test purposes, not associated with a particular unit.'
 
@@ -115,39 +117,39 @@ class PosState(object):
                     self._val.update(self.posmoveDB.get_fid_def_constants())
 
         # text log file setup
-        """
-        self.log_separator = '_log_'
-        self.log_numformat = '08g'
-        self.log_extension = '.csv'
-        if not(self.log_basename):
-            all_logs = os.listdir(self.logs_directory)
-            unit_logs = [x for x in all_logs if self.unit_basename in x and self.log_extension in x]
-            if unit_logs:
-                unit_logs.sort(reverse=True)
-                self.log_basename = unit_logs[0]
-            else:
-                log_basename = self.unit_basename + self.log_separator + format(0,self.log_numformat) + self.log_extension
-                self.log_basename = self._increment_suffix(log_basename)
-        self.max_log_length = 10000 # number of rows in log before starting a new file
-        self.curr_log_length = self._count_log_length() # keep track of this in a separate variable so don't have to recount every time -- only when necessary
-        if self.type == 'pos':
-            self._val['MOVE_CMD'] = ''
-            self._val['MOVE_VAL1'] = ''
-            self._val['MOVE_VAL2'] = ''
-        if os.path.isfile(self.log_path):
-            with open(self.log_path,'r',newline='') as csvfile:
-                headers = csv.DictReader(csvfile).fieldnames
-            for key in self._val:
-                if key not in headers:
-                    self.log_basename = self._increment_suffix(self.log_basename) # start a new file if headers don't match up anymore with all the data we're trying to store
-                    break
-        self._update_legacy_keys()                
-        self.log_fieldnames = ['TIMESTAMP'] + list(self._val.keys()) + ['NOTE'] # list of fieldnames we save to the log file.
-        self.next_log_notes = ['software initialization'] # used for storing specific notes in the next row written to the log
-        self.log_unit_called_yet = False # used for one time check whether need to make a new log file, or whether log file headers have changed since last run
-        self.log_unit()
-        """
-        self.next_log_notes = ['it is cold']
+        if self.logging:
+            self.log_separator = '_log_'
+            self.log_numformat = '08g'
+            self.log_extension = '.csv'
+            if not(self.log_basename):
+                all_logs = os.listdir(self.logs_directory)
+                unit_logs = [x for x in all_logs if self.unit_basename in x and self.log_extension in x]
+                if unit_logs:
+                    unit_logs.sort(reverse=True)
+                    self.log_basename = unit_logs[0]
+                else:
+                    log_basename = self.unit_basename + self.log_separator + format(0,self.log_numformat) + self.log_extension
+                    self.log_basename = self._increment_suffix(log_basename)
+            self.max_log_length = 10000 # number of rows in log before starting a new file
+            self.curr_log_length = self._count_log_length() # keep track of this in a separate variable so don't have to recount every time -- only when necessary
+            if self.type == 'pos':
+                self._val['MOVE_CMD'] = ''
+                self._val['MOVE_VAL1'] = ''
+                self._val['MOVE_VAL2'] = ''
+            if os.path.isfile(self.log_path):
+                with open(self.log_path,'r',newline='') as csvfile:
+                    headers = csv.DictReader(csvfile).fieldnames
+                for key in self._val:
+                    if key not in headers:
+                        self.log_basename = self._increment_suffix(self.log_basename) # start a new file if headers don't match up anymore with all the data we're trying to store
+                        break
+            self._update_legacy_keys()                
+            self.log_fieldnames = ['TIMESTAMP'] + list(self._val.keys()) + ['NOTE'] # list of fieldnames we save to the log file.
+            self.next_log_notes = ['software initialization'] # used for storing specific notes in the next row written to the log
+            self.log_unit_called_yet = False # used for one time check whether need to make a new log file, or whether log file headers have changed since last run
+            self.log_unit()
+
+
     def __str__(self):
         files = {'settings':self.conf.filename, 'log':self.log_path}
         return pprint.pformat({'files':files, 'values':self._val})

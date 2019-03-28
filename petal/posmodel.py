@@ -239,7 +239,8 @@ class PosModel(object):
         self.state.store('TOTAL_CREEP_MOVES_T', self.state._val['TOTAL_CREEP_MOVES_T'] + cleanup_table['TOTAL_CREEP_MOVES_T'])
         self.state.store('TOTAL_CREEP_MOVES_P', self.state._val['TOTAL_CREEP_MOVES_P'] + cleanup_table['TOTAL_CREEP_MOVES_P'])
         self.state.store('TOTAL_MOVE_SEQUENCES', self.state._val['TOTAL_MOVE_SEQUENCES'] + 1)
-        self.state.next_log_notes.append(cleanup_table['log_note'])
+        if hasattr(self.state,'next_log_notes'):
+            self.state.next_log_notes.append(cleanup_table['log_note'])
 
     def clear_postmove_cleanup_cmds_without_executing(self):
         """Useful for example if a positioner is disabled, and we don't want any false post-move

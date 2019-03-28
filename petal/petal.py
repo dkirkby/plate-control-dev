@@ -49,11 +49,13 @@ class Petal(object):
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
                  printfunc=print, verbose=False, user_interactions_enabled=False,
                  collider_file=None, sched_stats_on=False, anticollision='freeze',
-                 petal_loc = None,
+                 petal_loc = None, pb_config = False,
                  fpa_metrology = None):
+
+        self.logging = local_log_on
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output) 
         # petal setup
-        self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
+        self.petal_state = posstate.PosState(petal_id, logging=self.logging, device_type='ptl', printfunc=self.printfunc)
         if petal_id == None:
             self.petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
         else:
@@ -117,7 +119,7 @@ class Petal(object):
         self.devices = {} # key device_location_id, value posid
         installed_on_asphere = self.shape == 'petal'
         for posid in posids:
-            self.states[posid] = posstate.PosState(posid, logging=True, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
+            self.states[posid] = posstate.PosState(posid, logging=self.logging, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
             self.posmodels[posid] = PosModel(self.states[posid], installed_on_asphere)
             self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
         self.posids = set(self.posmodels.keys())
