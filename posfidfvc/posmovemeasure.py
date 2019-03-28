@@ -435,7 +435,7 @@ class PosMoveMeasure(object):
             if self.make_plots_during_calib:
                 def save_file(posid):
                     return save_file_dir + posid + '_' + save_file_timestamp + '_calib_' + mode + '.png'
-            remove_outliers = True if self.fvc.fvcproxy else False
+            remove_outliers = True if (self.fvc.fvcproxy or self.fvc.fvc_type == 'simulator') else False
         if mode == 'rough':
             self.rehome(posids)
             self.one_point_calibration(posids, mode='offsetsXY', wide_spotmatch=True)
