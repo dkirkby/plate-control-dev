@@ -366,7 +366,6 @@ class Petal(object):
         axis ... string, 'both' (default), 'theta_only', 'phi_only', optional argument that allows for homing either
                  theta or phi only
         """
-        pdb.set_trace()
         posids = {posids} if isinstance(posids,str) else set(posids)
         self._initialize_pos_flags(ids = posids)
         enabled = self.enabled_posmodels(posids)
