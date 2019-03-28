@@ -4,12 +4,18 @@ sys.path.append(os.path.abspath('../petal/'))
 import posconstants as pc
 import posstate
 import petal
-CONSTANTS_AVAILABLE = False
+USE_CONSTANTSDB = False
 
 #point 'positioner_locations_file' to positioner_locations_0530v14.csv
 nominals = np.genfromtxt(pc.dirs['positioner_locations_file'], delimiter = ',',
                        names = True, usecols = (0,2,3))
-
+if USE_CONSTANTSDB:
+    try:
+        from DOSlib.constants import ConstantsDB
+        constants = ConstantsDB().get_constants(snapshot='DOS', tag='CURRENT', group='focal_plane_metrology')
+    except:
+        USE_CONSTANTSDB = False
+    
 def seed(petals_to_seed):
     """
     Gets each positioner's DEVICE_LOC, looks up nominal device X,Y coordinates,
@@ -24,13 +30,13 @@ def seed(petals_to_seed):
         petals_to_seed = [petals_to_seed]
     for petal_to_seed in petals_to_seed:
         ptl_id = str(petal_to_seed).zfill(2)
-        if CONSTANTS_AVAILABLE:  
-            #will need to access constants database directly when running petal 
-            #in stand-alone mode, this metrology is not currently available and
-            #cannot be meaningfully used
-            pass
+        petal_state = posstate.PosState(ptl_id, logging=True, device_type='ptl')
+        if USE_CONSTANTSDB:  
+            ptl_loc = str(petal_state.conf['PETAL_LOCATION_ID'])
+            ptl_rot = constants[ptl_loc]['petal_rot_1']
+            ptl_xoff = constants[ptl_loc]['petal_offset_x']
+            ptl_yoff = constants[ptl_loc]['petal_offset_y']
         else:
-            petal_state = posstate.PosState(ptl_id, logging=True, device_type='ptl')
             ptl_rot =  petal_state.conf['ROTATION']
             ptl_xoff = petal_state.conf['X_OFFSET']
             ptl_yoff = petal_state.conf['Y_OFFSET']
