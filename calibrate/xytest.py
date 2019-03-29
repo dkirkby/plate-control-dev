@@ -87,7 +87,7 @@ class XYTest(object):
         else:
             fvc_type = self.hwsetup_conf['fvc_type']
         if fvc_type == 'FLI' and 'pm_instrument' in self.hwsetup_conf:
-            fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=self.hwsetup_conf['save_sbig_fits'], platemaker_instrument = self.hwsetup_conf['pm_instrument'])       
+            fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=self.hwsetup_conf['save_sbig_fits'], platemaker_instrument = self.hwsetup_conf['pm_instrument'],fvc_role=self.hwsetup_conf['fvc_role'])       
         else:
             fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=self.hwsetup_conf['save_sbig_fits'])
         fvc.rotation = self.hwsetup_conf['rotation']
@@ -116,6 +116,7 @@ class XYTest(object):
                           anticollision=self.xytest_conf['anticollision'])#, petal_shape=shape)
         posids=self.posids=ptl.posids
         fidids=self.fidids=ptl.fidids
+        
         while len(self.pos_notes) < len(self.posids):
             self.pos_notes.append('')
 
@@ -265,6 +266,8 @@ class XYTest(object):
                     for key in params:
                         self.logwrite(str(posid) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
             self.logwrite('Calibration with ' + str(n_pts_calib_T) + ' theta points and ' + str(n_pts_calib_P) + ' phi points completed in ' + self._elapsed_time_str(start_time) + '.')
+        else:
+            self.m.one_point_calibration(posids='all', mode='posTP')
         for posid in self.posids:
             self.summarizers[posid].update_loop_calibs(summarizer.used_suffix, params)
 
@@ -442,7 +445,7 @@ class XYTest(object):
         
     def get_svn_credentials(self):
         '''Query the user for credentials to the SVN, and store them.'''
-        if True: #not self.simulate:
+        if not self.simulate:
             self.logwrite('Querying the user for SVN credentials. These will not be written to the log file.')
             print('')
             [svn_user, svn_pass, err] = self.simple_svn_creds() #ask_user_for_creds(should_simulate=self.simulate)
@@ -660,6 +663,7 @@ class XYTest(object):
         """
         return format((time.time()-start_time)/60/60,'.2f') + ' hrs'
 
+
     def simple_svn_creds(self):
         try:
             svn_user=input("Please enter your SVN username: ")
@@ -684,6 +688,8 @@ if __name__=="__main__":
         test.run_range_measurement(loop_num)
         test.run_calibration(loop_num)
         test.run_xyaccuracy_test(loop_num)
+        test.run_unmeasured_moves(loop_num)
+        test.run_hardstop_strikes(loop_num)
         test.clear_current_overrides()
         test.svn_add_commit(keep_creds=True)
     test.logwrite('All test loops complete.')
