@@ -688,8 +688,6 @@ if __name__=="__main__":
         test.run_range_measurement(loop_num)
         test.run_calibration(loop_num)
         test.run_xyaccuracy_test(loop_num)
-        test.run_unmeasured_moves(loop_num)
-        test.run_hardstop_strikes(loop_num)
         test.clear_current_overrides()
         test.svn_add_commit(keep_creds=True)
     test.logwrite('All test loops complete.')
