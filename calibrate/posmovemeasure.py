@@ -347,6 +347,10 @@ class PosMoveMeasure(object):
         if self.fvc.fvcproxy and wide_spotmatch:
             self.fvc.fvcproxy.set(match_radius = old_spotmatch_radius)
             self.printfunc('Spotmatch radius restored to ' + str(old_spotmatch_radius) + '.')
+        if 'offsets' in mode:
+            for petal in self.petals:
+                petal.collider.update_positioner_offsets_and_arm_lengths()
+            
 
     def rehome(self,posids='all'):
         """Find hardstops and reset current known positions.
@@ -463,6 +467,9 @@ class PosMoveMeasure(object):
                     files.add(file)
         self.one_point_calibration(posids, mode='posTP', wide_spotmatch=False) # important to lastly update the internally-tracked theta and phi shaft angles
         self.commit(log_note = str(mode) + ' calibration complete')
+        if mode == 'arc' or mode == 'grid':
+            for petal in self.petals:
+                petal.collider.update_positioner_offsets_and_arm_lengths()
         return files
 
     def posids_by_petal(self, posids='all'):
@@ -1050,7 +1057,8 @@ class PosMoveMeasure(object):
                         ptl.set_posfid_val(posid,'OFFSET_T',new_T)
                         ptl.set_posfid_val(posid,'OFFSET_P',new_P)
                         self.printfunc(posid + ': Set OFFSET_T to ' + self.fmt(new_T))
-                        self.printfunc(posid + ': Set OFFSET_P to ' + self.fmt(new_P))                    
+                        self.printfunc(posid + ': Set OFFSET_P to ' + self.fmt(new_P)) 
+                        ptl.collider.update_positioner_offsets_and_arm_lengths()
                     else:
                         posmodel.axis[pc.T].pos = new_T
                         posmodel.axis[pc.P].pos = new_P
