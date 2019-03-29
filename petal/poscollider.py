@@ -62,6 +62,12 @@ class PosCollider(object):
         self._petal_y0 = y0
         self._petal_rot = rot
         self._load_keepouts()
+    
+    def update_positioner_offsets_and_arm_lengths(self):
+        """Loads positioner parameters.  This method is called when new calibration data is available
+        for positioner arm lengths and offsets.
+        """
+        self._load_positioner_params()
 
     def add_positioners(self, posmodels):
         """Add a collection of positioners to the collider object.
