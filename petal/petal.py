@@ -55,7 +55,7 @@ class Petal(object):
                  fpa_metrology = None):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output) 
         # petal setup
-        self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
+        self.petal_state = posstate.PosState(petal_id=petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
         if petal_id == None:
             self.petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
         else:
