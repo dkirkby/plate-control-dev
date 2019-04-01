@@ -81,9 +81,7 @@ class PosMoveMeasure(object):
         for posid in self.all_posids:
             ptl = self.petal(posid)
             expected_pos[posid] = {'obsXY':ptl.expected_current_position(posid,'obsXY')}
-        #print("Expected pos: ",expected_pos)
         expected_ref = {} if self.fvc.fvcproxy else self.ref_dots_XY
-        #print("Expected_ref: ",expected_ref)
         measured_pos,measured_ref,imgfiles = self.fvc.measure_and_identify(expected_pos,expected_ref, pos_flags=pos_flags)            
         for posid in self.all_posids:
             ptl = self.petal(posid)            
@@ -1578,7 +1576,7 @@ class PosMoveMeasure(object):
             delta_TP[posid] = [0,0]
             if measured_data[posid] == [0,0] and self.fvc.fvcproxy:
                 #Do not update TP for positioner that did not get matched to a centroid
-                break
+                continue
             ptl = self.petal(posid)
             measured_obsXY = measured_data[posid]
             expected_obsXY = ptl.expected_current_position(posid,'obsXY')
