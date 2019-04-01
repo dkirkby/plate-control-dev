@@ -7,6 +7,7 @@ import copy as copymodule
 import math
 import collision_lookup_generator_subset as lookup
 import pickle
+import yaml
 
 class PosCollider(object):
     """PosCollider contains geometry definitions for mechanical components of the
@@ -17,7 +18,11 @@ class PosCollider(object):
 
     See DESI-0899 for geometry specifications, illustrations, and kinematics.
     """
-    def __init__(self, configfile='', collision_hashpp_exists=False, collision_hashpf_exists=False, hole_angle_file=None):
+    def __init__(self, configfile='', 
+                 collision_hashpp_exists=False, 
+                 collision_hashpf_exists=False, 
+                 hole_angle_file=None, 
+                 use_neighbor_loc_dict=False):
         if not configfile:
             filename = '_collision_settings_DEFAULT.conf'
         else:
@@ -27,6 +32,7 @@ class PosCollider(object):
         self.posids = set() # posid strings for all the positioners
         self.posindexes = {} # key: posid string, value: index number for positioners in animations
         self.posmodels = {} # key: posid string, value: posmodel instance
+        self.devicelocs = {} # key: device loc, value: posid string
         self.pos_neighbors = {} # all the positioners that surround a given positioner. key is a posid, value is a set of neighbor posids
         self.fixed_neighbor_cases = {} # all the fixed neighbors that apply to a given positioner. key is a posid, value is a set of the fixed neighbor cases
         self.R1, self.R2, self.x0, self.y0, self.t0, self.p0 = {}, {}, {}, {}, {}, {}
@@ -34,6 +40,7 @@ class PosCollider(object):
         self.plotting_on = True
         self.timestep = self.config['TIMESTEP']
         self.animator = posanimator.PosAnimator(fignum=0, timestep=self.timestep)
+        self.use_neighbor_loc_dict = use_neighbor_loc_dict
         
         # hash table initializations (if being used)
         self.collision_hashpp_exists = collision_hashpp_exists
@@ -50,6 +57,11 @@ class PosCollider(object):
             f = open(os.path.join(os.environ.get('collision_table'), 'table_pf_50_50_5_5.out'), 'rb')
             self.table_pf = pickle.load(f)
             f.close()
+        
+        # load fixed dictionary containing locations of neighbors for each positioner DEVICE_LOC (if this option has been selected)
+        if self.use_neighbor_loc_dict:
+            with open(pc.dirs['positioner_neighbors_file'], 'rb') as f:
+                self.neighbor_locs = pickle.load(f)
             
     def set_petal_offsets(self, x0=0.0, y0=0.0, rot=0.0):
         """Sets information about a particular petal's overall location. This
@@ -78,6 +90,7 @@ class PosCollider(object):
                 self.posids.add(posid)
                 self.posindexes[posid] = len(self.posindexes) + 1
                 self.posmodels[posid] = posmodel
+                self.devicelocs[posmodel.deviceloc] = posid
                 self.pos_neighbors[posid] = set()
                 self.fixed_neighbor_cases[posid] = set()
         self._load_config_data()
@@ -411,15 +424,20 @@ class PosCollider(object):
     def _identify_neighbors(self, posid):
         """Find all neighbors which can possibly collide with a given positioner."""
         Ee = self.Ee_poly.translated(self.x0[posid], self.y0[posid])
-        for possible_neighbor in self.posids:
-            Ee_neighbor = self.Ee_poly.translated(self.x0[possible_neighbor], self.y0[possible_neighbor])
-            if not(posid == possible_neighbor) and Ee.collides_with(Ee_neighbor):
-                self.pos_neighbors[posid].add(possible_neighbor)
+        if self.use_neighbor_loc_dict:
+            deviceloc = self.posmodels[posid].deviceloc
+            neighbors = self.neighbor_locs[deviceloc].intersection(self.devicelocs.keys())
+            self.pos_neighbors[posid] = {self.devicelocs[loc] for loc in neighbors}
+        else:
+            for possible_neighbor in self.posids:
+                Ee_neighbor = self.Ee_poly.translated(self.x0[possible_neighbor], self.y0[possible_neighbor])
+                if not(posid == possible_neighbor) and Ee.collides_with(Ee_neighbor):
+                    self.pos_neighbors[posid].add(possible_neighbor)
         for possible_neighbor in self.fixed_neighbor_keepouts:
             EE_neighbor = self.fixed_neighbor_keepouts[possible_neighbor]
             if Ee.collides_with(EE_neighbor):
                 self.fixed_neighbor_cases[posid].add(possible_neighbor)
-
+                
     def _max_extent(self):
         """Calculation of max radius of keepout for a positioner with fully-extended phi arm."""
         extended_phi = self.keepout_P.translated(max(self.R1.values()),0) # assumption here that phi arm polygon defined at 0 deg angle
