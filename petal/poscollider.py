@@ -7,7 +7,6 @@ import copy as copymodule
 import math
 import collision_lookup_generator_subset as lookup
 import pickle
-import yaml
 
 class PosCollider(object):
     """PosCollider contains geometry definitions for mechanical components of the
