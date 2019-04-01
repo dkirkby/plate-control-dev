@@ -26,6 +26,7 @@ dirs = {}
 dirs['all_logs']     = os.environ.get('POSITIONER_LOGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/positioner_logs
 dirs['all_settings'] = os.environ.get('FP_SETTINGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/fp_settings
 dirs['positioner_locations_file'] = os.environ.get('FP_SETTINGS_PATH')+'/hwsetups/Petal_Metrology.csv' # this is NOT metrology, it is a *bad* naming. it is nominals!
+dirs['positioner_neighbors_file'] = os.environ.get('FP_SETTINGS_PATH')+'/hwsetups/neighbor_locs'  # neighbor locations dictionary by DEVICE_LOC
 dirs['small_array_locations_file']=os.getenv('FP_SETTINGS_PATH')+'/hwsetups/SWIntegration_XY.csv'
 dirs['petal2_fiducials_metrology_file']=os.getenv('FP_SETTINGS_PATH')+'/hwsetups/petal2_fiducials_metrology.csv'
 dirs['petalbox_configurations'] = os.getenv('FP_SETTINGS_PATH') + '/ptl_settings/petalbox_configurations_by_ptl_id.json' # temporary until configuration info is sent through petal init 
@@ -98,7 +99,7 @@ nominals['PHYSICAL_RANGE_T'] = {'value': 370.0, 'tol':   50.0}
 nominals['PHYSICAL_RANGE_P'] = {'value': 190.0, 'tol':   50.0}
 nominals['GEAR_CALIB_T']     = {'value':   1.0, 'tol':    0.05}
 nominals['GEAR_CALIB_P']     = {'value':   1.0, 'tol':    0.05}
-    
+
 # Types
 class collision_case(object):
     """Enumeration of collision cases. The I, II, and III cases are described in
