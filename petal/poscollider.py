@@ -533,6 +533,36 @@ class PosSweep(object):
         self.time = discrete_time
         self.tp = discrete_position
         self.tp_dot = speed
+        
+    def extend(self, timestep, equalizing_pause):
+        """Extends a sweep object to reflect the postpauses inserted into the move table 
+        in equalize_table_times() in posschedulestage.py, ensuring that the sweep object
+        is in sync with the move table.
+        
+        equalizing_pause ... the same equalizing_pause from equalize_table_times()
+        """
+        starttime_extension = self.time[-1] + timestep
+        endtime_extension = self.time[-1] + equalizing_pause
+        time_extension = np.arange(starttime_extension, endtime_extension + timestep, timestep)
+        extended_time = np.append(self.time, time_extension)
+        
+        # tp extension are just the last tp entry repeated throughout the extended time
+        theta_extension = self.tp[0,-1]*np.ones(len(time_extension))
+        phi_extension = self.tp[1,-1]*np.ones(len(time_extension))
+        extended_theta = list(np.append(self.tp[0], theta_extension))
+        extended_phi = list(np.append(self.tp[1], phi_extension))
+        extended_tp = np.array([extended_theta, extended_phi])
+        
+        # tp_dot extension are just zeros repeated throughout the extended time
+        tdot_extension = np.zeros(len(time_extension))
+        pdot_extension = np.zeros(len(time_extension))
+        extended_tdot = list(np.append(self.tp_dot[0], tdot_extension))
+        extended_pdot= list(np.append(self.tp_dot[1], pdot_extension))
+        extended_tp_dot = np.array([extended_tdot, extended_pdot])
+        
+        self.time = extended_time
+        self.tp = extended_tp
+        self.tp_dot = extended_tp_dot
 
     def register_as_frozen(self):
         """Sets an indicator that the sweep has been frozen at the end."""
