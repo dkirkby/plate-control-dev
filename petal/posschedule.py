@@ -2,6 +2,7 @@ import posconstants as pc
 import posschedulestage
 import time
 import copy as copymodule
+import numpy as np
 
 class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners
@@ -28,7 +29,7 @@ class PosSchedule(object):
         self.max_path_adjustment_passes = 2 # max number of times to go through the set of colliding positioners and try to adjust each of their paths to avoid collisions. After this many passes, it defaults to freezing any that still collide
         self.stage_order = ['direct','retract','rotate','extend','expert']
         self.RRE_stage_order = ['retract','rotate','extend']
-        self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, stats=self.stats) for name in self.stage_order}
+        self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, stats=self.stats, verbose=self.verbose, printfunc=self.printfunc) for name in self.stage_order}
         self.anneal_time = {'direct':1.0, 'retract':2.0, 'rotate':2.0, 'extend':2.0, 'expert':3} # times in seconds, see comments in PosScheduleStage
         self.should_anneal = True # overriding flag, allowing you to turn off all move time annealing
         self.should_check_petal_boundaries = True # allows you to turn off petal-specific boundary checks for non-petal systems (such as positioner test stands)
@@ -163,12 +164,17 @@ class PosSchedule(object):
             else:
                 self._schedule_requests_with_no_path_adjustments(anticollision)
         for name in self.stage_order:
+            if self.verbose:
+                self.printfunc('equalizing, comparing table for ' + name)
             self.stages[name].equalize_table_times()
             for posid,table in self.stages[name].move_tables.items():
                 if posid in self.move_tables:
                     self.move_tables[posid].extend(table)
                 else:
                     self.move_tables[posid] = table
+                table_for_schedule = table.for_schedule()
+                stage_sweep = self.stages[name].sweeps[posid] # quantized sweep after path adjustments
+                self.compare_table_with_sweep(table_for_schedule, stage_sweep)
         empties = {posid for posid,table in self.move_tables.items() if not table}
         for posid in empties:
             del self.move_tables[posid]
@@ -204,6 +210,49 @@ class PosSchedule(object):
                         stage_start_time = max(num_moving.keys())
             self.stats.add_num_moving_data(num_moving)
                     
+    def compare_table_with_sweep(self, move_table, sweep):
+        """ Takes as input a "for_schedule()" move table and a quantized sweep, 
+        and then cross-checks them whether they match. 
+        """
+        ind_tdot_pos = np.where(sweep.tp_dot[0] > 0)[0]
+        ind_tdot_neg = np.where(sweep.tp_dot[0] < 0)[0]
+        ind_pdot_pos = np.where(sweep.tp_dot[1] > 0)[0]
+        ind_pdot_neg = np.where(sweep.tp_dot[1] < 0)[0]
+        all_ind = [ind_tdot_pos, ind_tdot_neg, ind_pdot_pos, ind_pdot_neg]
+        all_moving = [ind for ind in all_ind if ind.size]
+
+        # check_table will be populated based on sweep, and used to check against move_table
+        check_table = {'dT':[], 'dP': [], 'move_time': []} 
+        if all_moving:
+            from operator import itemgetter
+            all_moving = sorted(all_moving, key=itemgetter(0))
+            
+            for i in range(len(all_moving)):
+                time_moving = sweep.time[all_moving[i]]
+                start = all_moving[i][0]
+                end = all_moving[i][-1]
+                
+                move_time = time_moving[-1] - time_moving[0]
+                dT = sweep.theta(end) - sweep.theta(start-1)
+                dP = sweep.phi(end)- sweep.phi(start-1)
+                check_table['dT'].append(dT)
+                check_table['dP'].append(dP)
+                check_table['move_time'].append(move_time)
+        else:
+            check_table['dT'].append(0.)
+            check_table['dP'].append(0.)
+            check_table['move_time'].append(0.)
+ 
+        for key,value in check_table.items():
+            rounded_check = np.round(value, 2)
+            rounded_move = np.round(move_table[key], 2)
+            if len(rounded_move) > len(rounded_check):
+                if np.array_equal(rounded_check, rounded_move[:-1]): pass
+                else: self.printfunc(sweep.posid + ' ' + str(key) + ': check=' + str(rounded_check) + ' move=' + str(rounded_move[:-1]))
+            else:
+                if np.array_equal(rounded_check, rounded_move): pass
+                else: self.printfunc(sweep.posid + ' ' + str(key) + ': check=' + str(rounded_check) + ' move=' + str(rounded_move))
+            
     def already_requested(self, posid):
         """Returns boolean whether a request has already been registered in the
         schedule for the argued positioner.
@@ -266,10 +315,14 @@ class PosSchedule(object):
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
         if should_freeze:
             ori_stage_colliding = copymodule.deepcopy(stage.colliding)
+            if self.verbose:
+                self.printfunc("initial stage.colliding " + str(stage.colliding))
             for posid in colliding_sweeps:
                 if posid in stage.colliding: # re-check, since earlier path adjustments in loop may have already resolved this posid's collision
                     self.petal.pos_flags[posid] |= self.petal.frozen_anticol_bit #Mark as frozen by anticollision
                     stage.adjust_path(posid, ori_stage_colliding, freezing='forced')
+                    if self.verbose:
+                        self.printfunc("remaining stage.colliding " + str(stage.colliding))
             if self.stats and colliding_sweeps:
                 self.stats.add_to_num_adjustment_iters(1)
         
@@ -307,8 +360,14 @@ class PosSchedule(object):
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             attempts_remaining = self.max_path_adjustment_passes
             ori_stage_colliding = copymodule.deepcopy(stage.colliding)
+            if self.verbose:
+                self.printfunc("stage name " + str(name))
+                self.printfunc("initial stage.colliding " + str(stage.colliding))
+                
             while stage.colliding and attempts_remaining:
                 for posid in stage.colliding:
+                    if self.verbose:
+                        self.printfunc("now adjusting path of " + str(posid) + ", remaining attempts " + str(attempts_remaining))
                     freezing = 'off' if attempts_remaining > 1 else 'on'
                     stage.adjust_path(posid, ori_stage_colliding, freezing, self.requests)
                     if posid in stage.collisions_resolved['freeze']:
@@ -320,6 +379,8 @@ class PosSchedule(object):
                 if self.stats:
                     self.stats.add_to_num_adjustment_iters(1)
                 attempts_remaining -= 1
+                if self.verbose:
+                    self.printfunc("remaining stage.colliding " + str(stage.colliding))
             
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
