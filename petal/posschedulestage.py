@@ -11,7 +11,7 @@ class PosScheduleStage(object):
         collider         ... instance of poscollider for this petal
         power_supply_map ... dict where key = power supply id, value = set of posids attached to that supply
     """
-    def __init__(self, collider, power_supply_map={}, stats=None):
+    def __init__(self, collider, power_supply_map={}, stats=None, verbose=False, printfunc=None):
         self.collider = collider # poscollider instance
         self.move_tables = {} # keys: posids, values: posmovetable instances
         self.sweeps = {} # keys: posids, values: instances of PosSweep, corresponding to entries in self.move_tables
@@ -24,6 +24,8 @@ class PosScheduleStage(object):
         self._phi_max_jog_A = 45 # deg, maximum distance to temporarily shift phi when doing path adjustments
         self._phi_max_jog_B = 90
         self._max_jog = self._assign_max_jog_values() # collection of all the max jog options above
+        self.verbose = verbose
+        self.printfunc = printfunc
     
     def initialize_move_tables(self, start_posTP, dtdp):
         """Generates basic move tables for each positioner, starting at position
@@ -122,6 +124,8 @@ class PosScheduleStage(object):
                 idx = table.n_rows
                 table.insert_new_row(idx)
                 table.set_postpause(idx,equalizing_pause)
+                if self.sweeps[posid]:
+                    self.sweeps[posid].extend(self.collider.timestep, equalizing_pause)
 
     def adjust_path(self, posid, stage_colliding, freezing='on', requests=None):
         """Adjusts move paths for posid to avoid collision. If the positioner
@@ -158,6 +162,8 @@ class PosScheduleStage(object):
         In other words, a neighbor's neighbor will not be affected by this function.
         """
         if self.sweeps[posid].collision_case == pc.case.I:
+            if self.verbose: 
+                self.printfunc("no collision")
             return
         elif self.sweeps[posid].collision_case in pc.case.fixed_cases:
             methods = ['freeze'] if freezing != 'off' else []
@@ -169,32 +175,32 @@ class PosScheduleStage(object):
             methods = pc.all_adjustment_methods
         for method in methods:
             collision_neighbor = self.sweeps[posid].collision_neighbor
+            if self.verbose:
+                self.printfunc("===== adjust path: " + str(method) + ' ' + str(posid) + '-' + str(collision_neighbor))
+                
             proposed_tables = self._propose_path_adjustment(posid,method)
             colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables)
             if proposed_tables and not(colliding_sweeps): # i.e., the proposed tables should be accepted
                 self.move_tables.update(proposed_tables)
                 self.collisions_resolved[method].add(self._collision_id(posid,collision_neighbor))
-                
+                if self.verbose:
+                    self.printfunc("collision resolved via " + str(method) + ' for ' + str(posid) + '-' + str(collision_neighbor))
+                    
                 stage_colliding.remove(posid)  
-                all_sweeps_keys = list(all_sweeps.keys()) # list of all posids in proposed_tables
-                for pos_id in all_sweeps_keys:
-                    # if a positioner in all_sweeps 
-                    # (i) does not correspond to the positioner being adjusted,
-                    # (ii) is one of the positioners in stage_colliding, and 
-                    # (iii) whose collision neighbor is not the positioner whose path is being adjusted, 
-                    # then retain the initial collision case and collision neighbor
-                    # of this positioner and its collision neighbor. 
-                    if (pos_id != posid) and (pos_id in stage_colliding) and self.sweeps[pos_id].collision_neighbor != posid:
-                        try: 
+                if collision_neighbor in stage_colliding: stage_colliding.remove(collision_neighbor)                
+                for pos_id in all_sweeps:
+                    if (pos_id != posid) and (pos_id != collision_neighbor):
+                        if (pos_id in stage_colliding) and (self.sweeps[pos_id].collision_neighbor != posid):
+                            if self.verbose:
+                                self.printfunc("changing sweep of " + str(pos_id))
+                                self.printfunc("from collision case " + str(all_sweeps[pos_id].collision_case) + ' to ' + str(self.sweeps[pos_id].collision_case))
+                                self.printfunc("from collision neighbor " + str(all_sweeps[pos_id].collision_neighbor) + ' to ' + str(self.sweeps[pos_id].collision_neighbor))
+                                self.printfunc("from collision time " + str(all_sweeps[pos_id].collision_time) + ' to ' + str(self.sweeps[pos_id].collision_time))
+                                self.printfunc("from collision idx " + str(all_sweeps[pos_id].collision_idx) + ' to ' + str(self.sweeps[pos_id].collision_idx))
                             all_sweeps[pos_id].collision_case = self.sweeps[pos_id].collision_case
                             all_sweeps[pos_id].collision_neighbor = self.sweeps[pos_id].collision_neighbor
-                        except KeyError: pass
-                    
-                        try: 
-                            neighbor_neighbor = self.sweeps[pos_id].collision_neighbor
-                            all_sweeps[neighbor_neighbor].collision_case = self.sweeps[neighbor_neighbor].collision_case
-                            all_sweeps[neighbor_neighbor].collision_neighbor = self.sweeps[neighbor_neighbor].collision_neighbor
-                        except KeyError: pass
+                            all_sweeps[pos_id].collision_time = self.sweeps[pos_id].collision_time
+                            all_sweeps[pos_id].collision_idx = self.sweeps[pos_id].collision_idx
                     
                 # sweep information for all positioners updated here
                 self.store_collision_finding_results(colliding_sweeps, all_sweeps, requests)
@@ -364,6 +370,17 @@ class PosScheduleStage(object):
         not_enabled = not(self.collider.posmodels[posid].is_enabled)
         unmoving_neighbor = self.sweeps[posid].collision_neighbor not in self.move_tables
         if no_collision or (fixed_collision and method != 'freeze') or already_frozen or not_enabled or (unmoving_neighbor and method != 'freeze'):
+            if self.verbose:
+                if no_collision:
+                    self.printfunc("no adjustment to make because no collision")
+                if (fixed_collision and method != 'freeze'):
+                    self.printfunc("no adjustment to make because fixed_collision and method != 'freeze'")
+                if already_frozen:
+                    self.printfunc("no adjustment to make because already_frozen")
+                if not_enabled:
+                    self.printfunc("no adjustment to make because not_enabled")
+                if (unmoving_neighbor and method != 'freeze'):
+                    self.printfunc("no adjustment to make because unmoving_neighbor and method != 'freeze'")
             return {}
         table = self._get_or_generate_table(posid,should_copy=True)
         if method == 'freeze':    
