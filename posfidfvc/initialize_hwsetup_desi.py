@@ -213,8 +213,8 @@ if should_commit_to_svn and svn_userpass_valid:
     print(these_files_to_commit)
     print("")
     logwrite('Beginning add + commit of ' + str(n_total) + ' data files to SVN.')
-    err_add = os.system('svn add --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive ' + these_files_to_commit)
-    err_commit = os.system('svn commit --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + these_files_to_commit)
+    err_add = os.system('svn add --username ' + svn_user + ' --password ' + self.svn_pass + ' --non-interactive ' + these_files_to_commit)
+    err_commit = os.system('svn commit --username ' + svn_user + ' --password ' + self.svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + these_files_to_commit)
 
 # clean up any svn credentials
 if svn_user:
