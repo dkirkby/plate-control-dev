@@ -164,7 +164,7 @@ class PosSchedule(object):
             else:
                 self._schedule_requests_with_no_path_adjustments(anticollision)
         for name in self.stage_order:
-            if self.verbose:
+            if self.stages[name].is_not_empty() and self.verbose:
                 self.printfunc('equalizing, comparing table for ' + name)
             self.stages[name].equalize_table_times()
             for posid,table in self.stages[name].move_tables.items():
@@ -172,9 +172,14 @@ class PosSchedule(object):
                     self.move_tables[posid].extend(table)
                 else:
                     self.move_tables[posid] = table
-                table_for_schedule = table.for_schedule()
-                stage_sweep = self.stages[name].sweeps[posid] # quantized sweep after path adjustments
-                self.compare_table_with_sweep(table_for_schedule, stage_sweep)
+                    
+                # currently only comparing table with sweep for RRE stages
+                # because the compare function currently only works for RRE stage
+                if name in {'retract', 'rotate', 'extend'}:
+                    table_for_schedule = table.for_schedule()
+                    stage_sweep = self.stages[name].sweeps[posid] # quantized sweep after path adjustments
+                    self.compare_table_with_sweep(table_for_schedule, stage_sweep)
+                
         empties = {posid for posid,table in self.move_tables.items() if not table}
         for posid in empties:
             del self.move_tables[posid]
@@ -213,6 +218,8 @@ class PosSchedule(object):
     def compare_table_with_sweep(self, move_table, sweep):
         """ Takes as input a "for_schedule()" move table and a quantized sweep, 
         and then cross-checks them whether they match. 
+        
+        Currently only works correctly for RRE move table.
         """
         ind_tdot_pos = np.where(sweep.tp_dot[0] > 0)[0]
         ind_tdot_neg = np.where(sweep.tp_dot[0] < 0)[0]
@@ -220,9 +227,9 @@ class PosSchedule(object):
         ind_pdot_neg = np.where(sweep.tp_dot[1] < 0)[0]
         all_ind = [ind_tdot_pos, ind_tdot_neg, ind_pdot_pos, ind_pdot_neg]
         all_moving = [ind for ind in all_ind if ind.size]
-
+        
         # check_table will be populated based on sweep, and used to check against move_table
-        check_table = {'dT':[], 'dP': [], 'move_time': []} 
+        check_table = {'dT':[], 'dP': [], 'move_time': [], 'Tdot':[], 'Pdot': []}
         if all_moving:
             from operator import itemgetter
             all_moving = sorted(all_moving, key=itemgetter(0))
@@ -235,13 +242,19 @@ class PosSchedule(object):
                 move_time = time_moving[-1] - time_moving[0]
                 dT = sweep.theta(end) - sweep.theta(start-1)
                 dP = sweep.phi(end)- sweep.phi(start-1)
+                
+                # need to be more robust, as this assumes tdot value is unique
+                tdot = sweep.tp_dot[0][all_moving[i]][0]
+                pdot = sweep.tp_dot[1][all_moving[i]][0]
+                    
                 check_table['dT'].append(dT)
                 check_table['dP'].append(dP)
                 check_table['move_time'].append(move_time)
+                check_table['Tdot'].append(tdot)
+                check_table['Pdot'].append(pdot)
         else:
-            check_table['dT'].append(0.)
-            check_table['dP'].append(0.)
-            check_table['move_time'].append(0.)
+            for key in check_table:
+                check_table[key].append(0.)
  
         for key,value in check_table.items():
             rounded_check = np.round(value, 2)
