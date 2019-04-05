@@ -28,6 +28,7 @@ import collections
 import getpass
 from astropy.io import ascii
 
+print(posmovemeasure.__file__)
 class _read_key:
     def __init__(self):
         import tty, sys
@@ -122,7 +123,7 @@ class XYTest(object):
         else:
             fvc_type = self.hwsetup_conf['fvc_type']
         if fvc_type == 'FLI' and 'pm_instrument' in self.hwsetup_conf:
-            fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=self.hwsetup_conf['save_sbig_fits'], platemaker_instrument = self.hwsetup_conf['pm_instrument'])       
+            fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=self.hwsetup_conf['save_sbig_fits'], platemaker_instrument = self.hwsetup_conf['pm_instrument'],fvc_role=self.hwsetup_conf['fvc_role'])       
         else:
             fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=self.hwsetup_conf['save_sbig_fits'])
         fvc.rotation = self.hwsetup_conf['rotation']
