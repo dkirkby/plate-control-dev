@@ -55,7 +55,7 @@ class Petal(object):
                  fpa_metrology = None):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output) 
         # petal setup
-        self.petal_state = posstate.PosState(petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
+        self.petal_state = posstate.PosState(unit_id=petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
         if petal_id == None:
             self.petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
         else:
@@ -358,10 +358,13 @@ class Petal(object):
             posmodel.axis[axisid].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + direction_cmd_suffix
             self.schedule.expert_add_table(table)
 
-    def request_homing(self, posids):
+    def request_homing(self, posids, axis = 'both'):
         """Request homing sequence for positioners in single posid or iterable collection of
         posids. Finds the primary hardstop, and sets values for the max position and min position.
         Requests to disabled positioners will be ignored.
+        
+        axis ... string, 'both' (default), 'theta_only', 'phi_only', optional argument that allows for homing either
+                 theta or phi only
         """
         posids = {posids} if isinstance(posids,str) else set(posids)
         self._initialize_pos_flags(ids = posids)
@@ -372,22 +375,25 @@ class Petal(object):
         hardstop_debounce = [0,0]
         direction = [0,0]
         direction[pc.P] = +1 # force this, because anticollision logic depends on it
-        for posid in enabled:
-            self.request_limit_seek(posid, pc.P, direction[pc.P], anticollision=self.anticollision_default, cmd_prefix='P', log_note='homing')
-        self.schedule_moves(anticollision=self.anticollision_default)
+        if not(axis == 'theta_only'):
+            for posid in enabled:
+                self.request_limit_seek(posid, pc.P, direction[pc.P], anticollision=self.anticollision_default, cmd_prefix='P', log_note='homing')
+            self.schedule_moves(anticollision=self.anticollision_default)
         for posid,posmodel in enabled.items():
-            direction[pc.T] = posmodel.axis[pc.T].principle_hardstop_direction
-            self.request_limit_seek(posid, pc.T, direction[pc.T], anticollision=None, cmd_prefix='T') # no repetition of log note here
+            if not(axis == 'phi_only'):
+                direction[pc.T] = posmodel.axis[pc.T].principle_hardstop_direction
+                self.request_limit_seek(posid, pc.T, direction[pc.T], anticollision=None, cmd_prefix='T') # no repetition of log note here
             for i in [pc.T,pc.P]:
-                axis_cmd_prefix = 'self.axis[' + repr(i) + ']'
-                if direction[i] < 0:
-                    hardstop_debounce[i] = posmodel.axis[i].hardstop_debounce[0]
-                    posmodel.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = -1.0\n'
-                else:
-                    hardstop_debounce[i] = posmodel.axis[i].hardstop_debounce[1]
-                    posmodel.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = +1.0\n'
-                hardstop_debounce_request = {posid:{'target':hardstop_debounce}}
-                self.request_direct_dtdp(hardstop_debounce_request, cmd_prefix='debounce')
+                if (i == pc.T and axis != 'phi_only') or (i == pc.P and axis != 'theta_only'):
+                    axis_cmd_prefix = 'self.axis[' + repr(i) + ']'
+                    if direction[i] < 0:
+                        hardstop_debounce[i] = posmodel.axis[i].hardstop_debounce[0]
+                        posmodel.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = -1.0\n'
+                    else:
+                        hardstop_debounce[i] = posmodel.axis[i].hardstop_debounce[1]
+                        posmodel.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = +1.0\n'
+                    hardstop_debounce_request = {posid:{'target':hardstop_debounce}}
+                    self.request_direct_dtdp(hardstop_debounce_request, cmd_prefix='debounce')
 
     def schedule_moves(self,anticollision='default',should_anneal=True):
         """Generate the schedule of moves and submoves that get positioners
@@ -402,7 +408,7 @@ class Petal(object):
         of positioners. (But there are certain 'expert use' test cases in the
         lab, where we want this feature turned off.)
         """
-        self.collider._load_positioner_params() # preferable to do this only in limited cases: after recalibrations of offsets and arm lengths (not posTP)
+        #self.collider._load_positioner_params() # preferable to do this only in limited cases: after recalibrations of offsets and arm lengths (not posTP)
         if anticollision not in {None,'freeze','adjust'}:
             anticollision = self.anticollision_default
         self.schedule.should_anneal = should_anneal
