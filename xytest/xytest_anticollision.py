@@ -880,21 +880,19 @@ if __name__=="__main__":
         test.xytest_conf.write()
         test.logwrite('Starting xy test in loop ' + str(loop_num + 1) + ' of ' + str(test.n_loops))
         test.set_current_overrides(loop_num)
-        #test.m.park(posids='all')
         test.m.one_point_calibration(posids='all', mode='posTP')  # do one_point_calibration before xy
-        #test.m.petals[0].start_gathering_frames()
+        test.m.petals[0].start_gathering_frames()
         test.run_xyaccuracy_test(loop_num)                        # xytest with the input targets
-        #test.m.petals[0].stop_gathering_frames()
+        test.m.petals[0].stop_gathering_frames()
         test.clear_current_overrides()
         test.svn_add_commit(keep_creds=True)
-        #test.m.petals[0].schedule_stats.save()
-
+    
     test.logwrite('All test loops complete.')
     test.m.park(posids='all')
     test.logwrite('Moved positioners into \'parked\' position.')
     for petal in test.m.petals:
         petal.schedule_stats.save()
-        #petal.generate_animation()
+        petal.generate_animation()
     test.logwrite('Test complete.')
     test.track_all_poslogs_once()
     test.svn_add_commit(keep_creds=False)
