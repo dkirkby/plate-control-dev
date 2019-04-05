@@ -127,6 +127,8 @@ class PosMoveMeasure(object):
             these_accepted_requests = petal.request_targets(these_requests)
             petal.schedule_send_and_execute_moves(anticollision=anticollision)
             accepted_requests.update(these_accepted_requests)
+        print('<posmovemeasure.move> accepted_requests',accepted_requests)
+        print('<posmovemeasure.move> these_requests',these_requests)
         return accepted_requests
 
     def move_measure(self, requests, tp_updates=None, anticollision='default'):
@@ -260,6 +262,7 @@ class PosMoveMeasure(object):
                     os.rename(file, pc.dirs['xytest_plots'] + timestamp_str + '_move' + str(i) + file)                
         for posid in data.keys():
             self.printfunc(str(posid) + ': final error distance=' + self.fmt(data[posid]['err2D'][-1]))
+        print('<posmovemeasure.move_and_correct> anticollision: ',anticoll)
         return data
 
     def retract_phi(self,posids='all'):

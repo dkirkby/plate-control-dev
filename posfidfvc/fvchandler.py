@@ -46,7 +46,7 @@ class FVCHandler(object):
             self.exposure_time = 0.70
             self.max_counts = 2**16 - 1 # SBIC camera ADU max
         else:
-            self.exposure_time = 2.5
+            self.exposure_time = 2.0
             self.max_counts = 2**16 - 1 # FLI camera ADU max
         self.trans = postransforms.PosTransforms() # general transformer object -- does not look up specific positioner info, but fine for QS <--> global X,Y conversions
         self.rotation = 0        # [deg] rotation angle from image plane to object plane
@@ -436,7 +436,7 @@ class FVCHandler(object):
 
 if __name__ == '__main__':
     f = FVCHandler(fvc_type='FLI',platemaker_instrument='petal1',fvc_role='FVC2')
-    n_objects =86 #74 
+    n_objects =87 #74 
     n_repeats = 1
     f.min_energy = -np.Inf
     xy = []

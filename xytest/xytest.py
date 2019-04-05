@@ -204,6 +204,7 @@ class XYTest(object):
         summarizer_init_data['operator notes'] = None #self.get_and_log_comments_from_user()
         #import pdb; pdb.set_trace()
         for posid in self.posids:
+            print(posid)
             state = self.m.state(posid)
             self.summarizers[posid] = summarizer.Summarizer(state,summarizer_init_data)
             self.track_file(self.summarizers[posid].filename, commit='always')
