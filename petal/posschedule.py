@@ -172,14 +172,30 @@ class PosSchedule(object):
                     self.move_tables[posid].extend(table)
                 else:
                     self.move_tables[posid] = table
-                    
-                # currently only comparing table with sweep for RRE stages
-                # because the compare function currently only works for RRE stage
-                if name in {'retract', 'rotate', 'extend'}:
-                    table_for_schedule = table.for_schedule()
-                    stage_sweep = self.stages[name].sweeps[posid] # quantized sweep after path adjustments
-                    self.compare_table_with_sweep(table_for_schedule, stage_sweep)
-                
+                # note: compare function currently only works correctly for RRE stages
+                table_for_schedule = table.for_schedule()
+                stage_sweep = self.stages[name].sweeps[posid] # quantized sweep after path adjustments
+                self.compare_table_with_sweep(table_for_schedule, stage_sweep)
+              
+        # for debugging purpose -- can be taken/commented out later
+        if self.verbose:
+            self.printfunc("MOVE TABLE")
+            for posid,table in self.move_tables.items():
+                table_for_schedule = table.for_schedule()
+                dT = table_for_schedule['dT']
+                dP = table_for_schedule['dP']
+                Tdot = table_for_schedule['Tdot']
+                Pdot = table_for_schedule['Pdot']
+                movetime = table_for_schedule['move_time']
+                prepause = table_for_schedule['prepause']
+                postpause = table_for_schedule['postpause']
+                nettime = table_for_schedule['net_time']
+                self.printfunc(" ")
+                self.printfunc("posid " + posid)
+                self.printfunc("dT, dP, Tdot, Pdot, move_time, prepause, postpause, net_time")
+                for i in range(len(dT)):
+                    self.printfunc(str('%0.02f' % dT[i]) + ' ' +  str('%0.02f' % dP[i]) + ' '  + str('%0.02f' % Tdot[i]) + ' '  + str('%0.02f' % Pdot[i]) + ' '  + str('%0.02f' % movetime[i]) + ' ' + str('%0.02f' % prepause[i]) + ' ' + str('%0.02f' % postpause[i]) + ' ' + str('%0.02f' % nettime[i]))    
+        
         empties = {posid for posid,table in self.move_tables.items() if not table}
         for posid in empties:
             del self.move_tables[posid]
@@ -214,7 +230,7 @@ class PosSchedule(object):
                                     num_moving[this_time] += 1
                         stage_start_time = max(num_moving.keys())
             self.stats.add_num_moving_data(num_moving)
-                    
+                            
     def compare_table_with_sweep(self, move_table, sweep):
         """ Takes as input a "for_schedule()" move table and a quantized sweep, 
         and then cross-checks them whether they match. 
@@ -252,19 +268,30 @@ class PosSchedule(object):
                 check_table['move_time'].append(move_time)
                 check_table['Tdot'].append(tdot)
                 check_table['Pdot'].append(pdot)
-        else:
-            for key in check_table:
-                check_table[key].append(0.)
- 
+          
+        creep_tol = 2.7
         for key,value in check_table.items():
-            rounded_check = np.round(value, 2)
-            rounded_move = np.round(move_table[key], 2)
-            if len(rounded_move) > len(rounded_check):
-                if np.array_equal(rounded_check, rounded_move[:-1]): pass
-                else: self.printfunc(sweep.posid + ' ' + str(key) + ': check=' + str(rounded_check) + ' move=' + str(rounded_move[:-1]))
+            idx_movetable_moving = np.where(np.array(move_table['move_time']) > 0.)
+            movetable_value = np.array(move_table[key])[idx_movetable_moving].tolist()
+            
+            rounded_movetable_value = np.round(movetable_value, 2)
+            rounded_checktable_value = np.round(value, 2)
+            """
+            if key in {'Tdot', 'Pdot'}:
+                if (abs(rounded_movetable_value - rounded_checktable_value) > creep_tol).any():
+                    self.printfunc(sweep.posid + ' ' + str(key) + ': check=' + str(rounded_checktable_value) + ' move=' + str(rounded_movetable_value))
             else:
-                if np.array_equal(rounded_check, rounded_move): pass
-                else: self.printfunc(sweep.posid + ' ' + str(key) + ': check=' + str(rounded_check) + ' move=' + str(rounded_move))
+                if not np.array_equal(rounded_movetable_value, rounded_checktable_value):
+                    self.printfunc(sweep.posid + ' ' + str(key) + ': check=' + str(rounded_checktable_value) + ' move=' + str(rounded_movetable_value))
+            """
+            
+        # cross-checking final tp positions
+        end_tp_sweep = [sweep.theta(-1), sweep.phi(-1)]
+        end_tp_table = [sum(np.array(move_table['dT'])) + sweep.theta(0), sum(np.array(move_table['dP'])) + sweep.phi(0)]
+        endpos_tol = (180.*self.collider.timestep)/2. # tolerance set to half the timestep...? 
+
+        if (abs(np.array(end_tp_sweep) - np.array(end_tp_table)) <= endpos_tol).all(): pass
+        else: self.printfunc(sweep.posid + ' ' + 'end_tp: check=' + str(end_tp_sweep) + ' move=' + str(end_tp_table))
             
     def already_requested(self, posid):
         """Returns boolean whether a request has already been registered in the
@@ -336,6 +363,7 @@ class PosSchedule(object):
                     stage.adjust_path(posid, ori_stage_colliding, freezing='forced')
                     if self.verbose:
                         self.printfunc("remaining stage.colliding " + str(stage.colliding))
+                        
             if self.stats and colliding_sweeps:
                 self.stats.add_to_num_adjustment_iters(1)
         
@@ -369,13 +397,15 @@ class PosSchedule(object):
             stage.initialize_move_tables(start_posTP[name], dtdp[name])
             if self.should_anneal:
                 stage.anneal_tables(self.anneal_time[name])
+
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             attempts_remaining = self.max_path_adjustment_passes
-            ori_stage_colliding = copymodule.deepcopy(stage.colliding)
+            ori_stage_colliding = copymodule.deepcopy(stage.colliding) # take this out once stage.colliding is working
+            ori_colliding_posid = list(stage.colliding) # take this out once stage.colliding is working
             if self.verbose:
                 self.printfunc("stage name " + str(name))
-                self.printfunc("initial stage.colliding " + str(stage.colliding))
+                self.printfunc("initial stage.colliding " + str(ori_colliding_posid))
                 
             while stage.colliding and attempts_remaining:
                 for posid in stage.colliding:
@@ -383,7 +413,10 @@ class PosSchedule(object):
                         self.printfunc("now adjusting path of " + str(posid) + ", remaining attempts " + str(attempts_remaining))
                     freezing = 'off' if attempts_remaining > 1 else 'on'
                     stage.adjust_path(posid, ori_stage_colliding, freezing, self.requests)
-                    if posid in stage.collisions_resolved['freeze']:
+                    
+                    # this is wrong because stage.collisions_resolved return format is 'MXXXXX-MXXXXX'
+                    #if posid in stage.collisions_resolved['freeze']:
+                    if stage.sweeps[posid].is_frozen:
                         self.petal.pos_flags[posid] |= self.petal.frozen_anticol_bit #Mark as frozen by anticollision
                         for j in range(i+1,len(self.RRE_stage_order)):
                             next_name = self.RRE_stage_order[j]
