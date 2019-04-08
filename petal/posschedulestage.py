@@ -118,15 +118,19 @@ class PosScheduleStage(object):
             postprocessed = table.for_schedule()
             times[posid] = postprocessed['net_time'][-1]
         max_time = max(times.values())
+        if self.verbose:
+            self.printfunc("max time " + str(max_time))
         for posid,table in self.move_tables.items():
             equalizing_pause = max_time - times[posid]
+            if self.verbose:
+                self.printfunc(posid + ' ' + str(equalizing_pause) + ' ' + str(times[posid]))
             if equalizing_pause:
                 idx = table.n_rows
                 table.insert_new_row(idx)
                 table.set_postpause(idx,equalizing_pause)
                 if self.sweeps[posid]:
                     self.sweeps[posid].extend(self.collider.timestep, equalizing_pause)
-
+                    
     def adjust_path(self, posid, stage_colliding, freezing='on', requests=None):
         """Adjusts move paths for posid to avoid collision. If the positioner
         has no collision, then no adjustment is made.
@@ -184,13 +188,14 @@ class PosScheduleStage(object):
                 self.move_tables.update(proposed_tables)
                 self.collisions_resolved[method].add(self._collision_id(posid,collision_neighbor))
                 if self.verbose:
-                    self.printfunc("collision resolved via " + str(method) + ' for ' + str(posid) + '-' + str(collision_neighbor))
-                    
+                    self.printfunc("***collision resolved via " + str(method) + ' for ' + str(posid) + '-' + str(collision_neighbor))                
+                
                 stage_colliding.remove(posid)  
-                if collision_neighbor in stage_colliding: stage_colliding.remove(collision_neighbor)                
+                if collision_neighbor in stage_colliding: stage_colliding.remove(collision_neighbor)      
                 for pos_id in all_sweeps:
                     if (pos_id != posid) and (pos_id != collision_neighbor):
-                        if (pos_id in stage_colliding) and (self.sweeps[pos_id].collision_neighbor != posid):
+                        #if (pos_id in stage_colliding) and (self.sweeps[pos_id].collision_neighbor != posid):
+                        if (pos_id in self.colliding) and (self.sweeps[pos_id].collision_neighbor != posid):
                             if self.verbose:
                                 self.printfunc("changing sweep of " + str(pos_id))
                                 self.printfunc("from collision case " + str(all_sweeps[pos_id].collision_case) + ' to ' + str(self.sweeps[pos_id].collision_case))
@@ -201,7 +206,8 @@ class PosScheduleStage(object):
                             all_sweeps[pos_id].collision_neighbor = self.sweeps[pos_id].collision_neighbor
                             all_sweeps[pos_id].collision_time = self.sweeps[pos_id].collision_time
                             all_sweeps[pos_id].collision_idx = self.sweeps[pos_id].collision_idx
-                    
+                            colliding_sweeps[pos_id] = all_sweeps[pos_id] 
+                
                 # sweep information for all positioners updated here
                 self.store_collision_finding_results(colliding_sweeps, all_sweeps, requests)
                 if method == 'freeze':
@@ -259,11 +265,16 @@ class PosScheduleStage(object):
                             colliding_sweeps[sweep.posid].add(sweep)
                     already_checked[posid].add(neighbor)
                     already_checked[neighbor].add(posid)
+                    if self.verbose:
+                        self.printfunc("checking collision: " + str(posid) + '-' + str(neighbor) + ', case ' + str(sweep.collision_case) + ', time ' + str(sweep.collision_time))
+                        
             for fixed_neighbor in self.collider.fixed_neighbor_cases[posid]:
                 posfix_sweep = self.collider.spacetime_collision_with_fixed(posid, init_obsTP_A, table_A.for_collider())[0] # index 0 to immediately retrieve from the one-element list this function returns
                 all_sweeps.update({posid:posfix_sweep})
                 if posfix_sweep.collision_case != pc.case.I:
                     colliding_sweeps[posid].add(posfix_sweep)
+                if self.verbose:
+                    self.printfunc("checking collision: " + str(posid) + '-' + str(fixed_neighbor) + ', case ' + str(posfix_sweep.collision_case) + ', time ' + str(posfix_sweep.collision_time))
         multiple_collisions = {posid for posid in colliding_sweeps if len(colliding_sweeps[posid]) > 1}
         for posid in multiple_collisions:
             first_collision_time = float('inf')
@@ -311,8 +322,8 @@ class PosScheduleStage(object):
                                     
                     self.stats.add_collisions_resolved('freeze-disabled', freeze_disabled)
                     self.stats.add_collisions_resolved('freeze-unmoving', freeze_unmoving)
-                    resolved -= freeze_disabled # remove the freeze_disabled pair from the normal freeze pair
-                    resolved -= freeze_unmoving # remove the freeze_unmoving pair from the normal freeze pair
+                    #resolved -= freeze_disabled # remove the freeze_disabled pair from the normal freeze pair
+                    #resolved -= freeze_unmoving # remove the freeze_unmoving pair from the normal freeze pair
                 
                 self.stats.add_collisions_resolved(method,resolved)
                 
@@ -387,10 +398,12 @@ class PosScheduleStage(object):
             table_data = table.for_schedule()
             for row_idx in reversed(range(table.n_rows)):
                 net_time = table_data['net_time'][row_idx]
-                collision_time = self.sweeps[posid].collision_time                
+                collision_time = self.sweeps[posid].collision_time   
                 if math.fmod(net_time, self.collider.timestep): # i.e., if not exactly matching a quantized timestep (almost always the case)
                     collision_time -= self.collider.timestep # handles coarseness of discrete time by treating the collision time as one timestep earlier in the sweep
                 if net_time >= collision_time:
+                    if self.verbose:
+                        self.printfunc("net time, collision_time " + str(net_time) + ' ' + str(collision_time))
                     table.delete_row(row_idx)
                 else:
                     break
