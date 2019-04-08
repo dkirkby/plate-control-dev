@@ -378,7 +378,8 @@ class Petal(object):
         if not(axis == 'theta_only'):
             for posid in enabled:
                 self.request_limit_seek(posid, pc.P, direction[pc.P], anticollision=self.anticollision_default, cmd_prefix='P', log_note='homing')
-            self.schedule_moves(anticollision=self.anticollision_default)
+            #self.schedule_moves(anticollision=self.anticollision_default)
+
         for posid,posmodel in enabled.items():
             if not(axis == 'phi_only'):
                 direction[pc.T] = posmodel.axis[pc.T].principle_hardstop_direction
