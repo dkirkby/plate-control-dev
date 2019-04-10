@@ -246,14 +246,17 @@ class PosMoveTable(object):
         if output_type == 'hardware':
             table['canid'] = self.posmodel.canid
             table['busid'] = self.posmodel.busid
-            table['postpause'] = [0 for i in row_range]
+            #table['postpause'] = [0 for i in row_range]
+            table['postpause']=[rows[j].data['postpause'] for j in row_range]
+            temp=0
             for i in row_range:  # for hardware type, insert an extra pause-only action if necessary, since hardware commands only really have postpauses
                 if rows[i].data['prepause']:
                     for key in ['motor_steps_T','motor_steps_P','move_time']:
-                        table[key].insert(i,0)
+                        table[key].insert(i+temp,0)
                     for key in ['speed_mode_T','speed_mode_P']:
-                        table[key].insert(i,'creep') # speed mode doesn't matter here
-                    table['postpause'].insert(i,rows[i].data['prepause'])
+                        table[key].insert(i+temp,'creep') # speed mode doesn't matter here
+                    table['postpause'].insert(i+temp,rows[i].data['prepause'])
+                    temp+=1
             table['nrows'] = len(table['move_time'])
             table['postpause'] = [int(round(x*1000)) for x in table['postpause']] # hardware postpause in integer milliseconds            
             return table
