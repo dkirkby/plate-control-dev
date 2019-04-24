@@ -534,17 +534,19 @@ class PosSweep(object):
         self.tp = discrete_position
         self.tp_dot = speed
         
-    def extend(self, timestep, equalizing_pause):
-        """Extends a sweep object to reflect the postpauses inserted into the move table 
+    def extend(self, timestep, max_time):
+        """Extends a sweep object to max_time to reflect the postpauses inserted into the move table 
         in equalize_table_times() in posschedulestage.py, ensuring that the sweep object
-        is in sync with the move table.
+        is in sync with the move table so that the animator is reflecting true moves. """
         
-        equalizing_pause ... the same equalizing_pause from equalize_table_times()
-        """
         starttime_extension = self.time[-1] + timestep
-        endtime_extension = self.time[-1] + equalizing_pause
-        time_extension = np.arange(starttime_extension, endtime_extension + timestep, timestep)
+        time_extension = np.arange(starttime_extension, max_time + timestep, timestep)
         extended_time = np.append(self.time, time_extension)
+        
+        #starttime_extension = self.time[-1] + timestep
+        #endtime_extension = self.time[-1] + equalizing_pause
+        #time_extension = np.arange(starttime_extension, endtime_extension + timestep, timestep)
+        #extended_time = np.append(self.time, time_extension)
         
         # tp extension are just the last tp entry repeated throughout the extended time
         theta_extension = self.tp[0,-1]*np.ones(len(time_extension))
