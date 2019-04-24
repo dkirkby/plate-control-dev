@@ -130,7 +130,7 @@ class PosScheduleStage(object):
                 table.set_postpause(idx,equalizing_pause)
                 if self.sweeps: # because no collision checking is performed if anticollsion=None
                     if self.sweeps[posid]:
-                        self.sweeps[posid].extend(self.collider.timestep, equalizing_pause)
+                        self.sweeps[posid].extend(self.collider.timestep, max_time)
                     
     def adjust_path(self, posid, stage_colliding, freezing='on', requests=None):
         """Adjusts move paths for posid to avoid collision. If the positioner
