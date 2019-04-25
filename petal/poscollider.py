@@ -365,7 +365,7 @@ class PosCollider(object):
         return PosPoly(p, point0_index=0, close_polygon=False)
 
         
-    def place_central_body(self, posid, obsT,keepout_angular_margin_T=0.):
+    def place_central_body(self, posid, obsT,keepout_angular_margin_T=5.):
         """Rotates and translates the central body of positioner
         to its (x0,y0) and the argued obsT theta angle.
         """
@@ -377,21 +377,22 @@ class PosCollider(object):
     def stretched_T_keepout(self, posid, keepout_angular_margin_T):
         poly = copymodule.deepcopy(self.keepout_T)
         p=poly.points
-        index1=[0,1,2,3,4,12,13,14]
-        p1_x=[p[0][i] for i in index1]
-        p1_y=[p[1][i] for i in index1]
-        p1=[p1_x,p1_y]                                    
-        a = keepout_angular_margin_T*math.pi/180.
-        c = math.cos(a)
-        s = math.sin(a)
-        rng = range(len(p1[0]))
-        X = [c*p1[0][i] + -s*p1[1][i] for i in rng]
-        Y = [s*p1[0][i] +  c*p1[1][i] for i in rng]
-        for i in range(len(index1)):
-            p[0][index1[i]]=X[i]
-            p[1][index1[i]]=Y[i]
+        index1=[] #
+        if index1:
+            p1_x=[p[0][i] for i in index1]
+            p1_y=[p[1][i] for i in index1]
+            p1=[p1_x,p1_y]                                    
+            a = keepout_angular_margin_T*math.pi/180.
+            c = math.cos(a)
+            s = math.sin(a)
+            rng = range(len(p1[0]))
+            X = [c*p1[0][i] + -s*p1[1][i] for i in rng]
+            Y = [s*p1[0][i] +  c*p1[1][i] for i in rng]
+            for i in range(len(index1)):
+                p[0][index1[i]]=X[i]
+                p[1][index1[i]]=Y[i]
 
-        index2=[11]
+        index2=[0,1,2,3,4,11,12,13,14]
         p2_x=[p[0][i] for i in index2]
         p2_y=[p[1][i] for i in index2]
         p2=[p2_x,p2_y]
