@@ -324,38 +324,44 @@ class PosCollider(object):
         """Rotates and translates the phi arm to position defined by the positioner's
         (x0,y0) and the argued obsTP (theta,phi) angles.
         """
-        poly = self.stretched_P_keepout(keepout_angular_margin_P)
+        poly = self.stretched_P_keepout(posid,keepout_angular_margin_P)
         poly = self.keepout_P.rotated(obsTP[1])
         poly = poly.translated(self.R1[posid], 0)
         poly = poly.rotated(obsTP[0])
         poly = poly.translated(self.x0[posid], self.y0[posid])
         return poly
     
-    def keepout_angular_margin_P(self, keepout_angular_margin_P):
+    def stretched_P_keepout(self, posid, keepout_angular_margin_P):
         poly = self.keepout_P.translated(self.R1[posid]-3.,0.)
         p=poly.points
         
-        index1=[1,2]
-        p1=[p[0][index1],p[1][index1]]        
+        index1=[5,6]
+        p1_x=[p[0][i] for i in index1]
+        p1_y=[p[1][i] for i in index1]
+        p1=[p1_x,p1_y]        
         a = keepout_angular_margin_P*math.pi/180.
         c = math.cos(a)
         s = math.sin(a)
         rng = range(len(p1[0]))
-        X = [c*p[0][i] + -s*p[1][i] for i in rng]
-        Y = [s*p[0][i] +  c*p[1][i] for i in rng]
-        p[0][index1]=X
-        p[1][index1]=Y
-        
-        index2=[5,6]
-        p2=[p[0][index2],p[1][index2]]        
+        X = [c*p1[0][i] + -s*p1[1][i] for i in rng]
+        Y = [s*p1[0][i] +  c*p1[1][i] for i in rng]
+        for i in range(len(index1)):
+            p[0][index1[i]]=X[i]
+            p[1][index1[i]]=Y[i]
+ 
+        index2=[1,2]
+        p2_x=[p[0][i] for i in index2]
+        p2_y=[p[1][i] for i in index2]
+        p2=[p2_x,p2_y]                                    
         a = -keepout_angular_margin_P*math.pi/180.
         c = math.cos(a)
         s = math.sin(a)
-        rng = range(len(p1[0]))
-        X = [c*p[0][i] + -s*p[1][i] for i in rng]
-        Y = [s*p[0][i] +  c*p[1][i] for i in rng]
-        p[0][index2]=X
-        p[1][index2]=Y
+        rng = range(len(p2[0]))
+        X = [c*p2[0][i] + -s*p2[1][i] for i in rng]
+        Y = [s*p2[0][i] +  c*p2[1][i] for i in rng]
+        for i in range(len(index2)):
+            p[0][index2[i]]=X[i]
+            p[1][index2[i]]=Y[i]
         return PosPoly(p, point0_index=0, close_polygon=False)
 
         
@@ -363,36 +369,41 @@ class PosCollider(object):
         """Rotates and translates the central body of positioner
         to its (x0,y0) and the argued obsT theta angle.
         """
-        poly = self.stretched_T_keepout(keepout_angular_margin_T)
+        poly = self.stretched_T_keepout(posid,keepout_angular_margin_T)
         poly = self.keepout_T.rotated(obsT)
         poly = poly.translated(self.x0[posid], self.y0[posid])
         return poly
 
-    def keepout_angular_margin_T(self, keepout_angular_margin_T):
-        poly = copy.deepcopy(self.keepout_T)
+    def stretched_T_keepout(self, posid, keepout_angular_margin_T):
+        poly = copymodule.deepcopy(self.keepout_T)
         p=poly.points
-        
         index1=[0,1,2,3,4,12,13,14]
-        p1=[p[0][index1],p[1][index1]]        
+        p1_x=[p[0][i] for i in index1]
+        p1_y=[p[1][i] for i in index1]
+        p1=[p1_x,p1_y]                                    
         a = keepout_angular_margin_T*math.pi/180.
         c = math.cos(a)
         s = math.sin(a)
         rng = range(len(p1[0]))
-        X = [c*p[0][i] + -s*p[1][i] for i in rng]
-        Y = [s*p[0][i] +  c*p[1][i] for i in rng]
-        p[0][index1]=X
-        p[1][index1]=Y
-        
+        X = [c*p1[0][i] + -s*p1[1][i] for i in rng]
+        Y = [s*p1[0][i] +  c*p1[1][i] for i in rng]
+        for i in range(len(index1)):
+            p[0][index1[i]]=X[i]
+            p[1][index1[i]]=Y[i]
+
         index2=[11]
-        p2=[p[0][index2],p[1][index2]]        
+        p2_x=[p[0][i] for i in index2]
+        p2_y=[p[1][i] for i in index2]
+        p2=[p2_x,p2_y]
         a = -keepout_angular_margin_T*math.pi/180.
         c = math.cos(a)
         s = math.sin(a)
-        rng = range(len(p1[0]))
-        X = [c*p[0][i] + -s*p[1][i] for i in rng]
-        Y = [s*p[0][i] +  c*p[1][i] for i in rng]
-        p[0][index2]=X
-        p[1][index2]=Y
+        rng = range(len(p2[0]))
+        X = [c*p2[0][i] + -s*p2[1][i] for i in rng]
+        Y = [s*p2[0][i] +  c*p2[1][i] for i in rng]
+        for i in range(len(index2)):
+            p[0][index2[i]]=X[i]
+            p[1][index2[i]]=Y[i]
         return PosPoly(p, point0_index=0, close_polygon=False)
 
     def place_ferrule(self, posid, obsTP):
