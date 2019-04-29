@@ -43,10 +43,18 @@ ptl = petal.Petal(petal_id = hwsetup['ptl_id'],
                   collider_file = None,
                   sched_stats_on = False,
                   anticollision = None) # valid options for anticollision arg: None, 'freeze', 'adjust'
+ptl.request_homing(these_posids)
+ptl.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
+
+
 print('Enable all positioners')
 for posid in ptl.posids:
     print(posid+'\n')
     ptl.set_posfid_val(posid, 'CTRL_ENABLED', True)
 ptl.commit(log_note='Enable all positioners')
-print('Have Enabled all')
+
+ptl.request_homing(list(ptl.posids))
+ptl.schedule_send_and_execute_moves() # in future, do this in a different thread for each petal
+
+print('Have Enabled all and Rehomed.')
 
