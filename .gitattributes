@@ -115,6 +115,7 @@ posfidfvc/calibrate_FVC.py -text
 posfidfvc/calibrate_cleanroom_FVC.py -text
 posfidfvc/check_pos_move.py -text
 posfidfvc/derive_platemaker_pars.py -text
+posfidfvc/disable_some.py -text
 posfidfvc/enable_all.py -text
 posfidfvc/fitcircle.py -text
 posfidfvc/fvchandler.py -text
