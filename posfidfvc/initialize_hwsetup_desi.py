@@ -98,6 +98,7 @@ ptl = petal.Petal(petal_id = hwsetup['ptl_id'],posids=[],fidids=[],
 posids=ptl.posids
 fidids=ptl.fidids
 m = posmovemeasure.PosMoveMeasure([ptl],fvc,printfunc=logwrite)
+m.fvc.fvcproxy.set(match_radius = 80.)
 m.make_plots_during_calib = True
 print('Automatic generation of calibration plots is turned ' + ('ON' if m.make_plots_during_calib else 'OFF') + '.')
 
@@ -213,8 +214,8 @@ if should_commit_to_svn and svn_userpass_valid:
     print(these_files_to_commit)
     print("")
     logwrite('Beginning add + commit of ' + str(n_total) + ' data files to SVN.')
-    err_add = os.system('svn add --username ' + svn_user + ' --password ' + self.svn_pass + ' --non-interactive ' + these_files_to_commit)
-    err_commit = os.system('svn commit --username ' + svn_user + ' --password ' + self.svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + these_files_to_commit)
+    err_add = os.system('svn add --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive ' + these_files_to_commit)
+    err_commit = os.system('svn commit --username ' + svn_user + ' --password ' + svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + these_files_to_commit)
 
 # clean up any svn credentials
 if svn_user:
