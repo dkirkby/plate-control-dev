@@ -163,14 +163,23 @@ class PosSchedule(object):
                 self._schedule_requests_with_path_adjustments() # there is only one possible anticollision method for this scheduling method
             else:
                 self._schedule_requests_with_no_path_adjustments(anticollision)
+        stage_max_time = {}
         for name in self.stage_order:
             if self.stages[name].is_not_empty() and self.verbose:
                 self.printfunc('equalizing, comparing table for ' + name)
-            self.stages[name].equalize_table_times()
+            max_time = self.stages[name].equalize_table_times()
+            stage_max_time[name] = max_time
             for posid,table in self.stages[name].move_tables.items():
                 if posid in self.move_tables:
                     self.move_tables[posid].extend(table)
                 else:
+                    # setting prepauses to the rotate/extend move tables to wait until earlier stages are over
+                    if name == 'rotate':
+                        self.printfunc(name + ": add prepause " + posid)
+                        table.set_prepause(0, stage_max_time['retract'])
+                    elif name == 'extend':
+                        self.printfunc(name + ": add prepause " + posid)
+                        table.set_prepause(0, stage_max_time['retract'] + stage_max_time['rotate'])
                     self.move_tables[posid] = table
                 # note: compare function currently only works correctly for RRE stages
                 table_for_schedule = table.for_schedule()
@@ -268,31 +277,23 @@ class PosSchedule(object):
                 check_table['move_time'].append(move_time)
                 check_table['Tdot'].append(tdot)
                 check_table['Pdot'].append(pdot)
-          
-        creep_tol = 2.7
+
         for key,value in check_table.items():
             idx_movetable_moving = np.where(np.array(move_table['move_time']) > 0.)
             movetable_value = np.array(move_table[key])[idx_movetable_moving].tolist()
             
             rounded_movetable_value = np.round(movetable_value, 2)
             rounded_checktable_value = np.round(value, 2)
-            """
-            if key in {'Tdot', 'Pdot'}:
-                if (abs(rounded_movetable_value - rounded_checktable_value) > creep_tol).any():
+            if not np.array_equal(rounded_movetable_value, rounded_checktable_value):
+                if self.verbose:
                     self.printfunc(sweep.posid + ' ' + str(key) + ': check=' + str(rounded_checktable_value) + ' move=' + str(rounded_movetable_value))
-            else:
-                if not np.array_equal(rounded_movetable_value, rounded_checktable_value):
-                    self.printfunc(sweep.posid + ' ' + str(key) + ': check=' + str(rounded_checktable_value) + ' move=' + str(rounded_movetable_value))
-            """
             
         # cross-checking final tp positions
         end_tp_sweep = [sweep.theta(-1), sweep.phi(-1)]
         end_tp_table = [sum(np.array(move_table['dT'])) + sweep.theta(0), sum(np.array(move_table['dP'])) + sweep.phi(0)]
-        endpos_tol = (180.*self.collider.timestep)/2. # tolerance set to half the timestep...? 
-
-        if (abs(np.array(end_tp_sweep) - np.array(end_tp_table)) <= endpos_tol).all(): pass
-        else: self.printfunc(sweep.posid + ' ' + 'end_tp: check=' + str(end_tp_sweep) + ' move=' + str(end_tp_table))
-            
+        if end_tp_sweep != end_tp_table: 
+            self.printfunc(sweep.posid + ' ' + 'end_tp: check=' + str(end_tp_sweep) + ' move=' + str(end_tp_table))
+        
     def already_requested(self, posid):
         """Returns boolean whether a request has already been registered in the
         schedule for the argued positioner.

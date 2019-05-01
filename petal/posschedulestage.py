@@ -122,16 +122,17 @@ class PosScheduleStage(object):
             self.printfunc("max time " + str(max_time))
         for posid,table in self.move_tables.items():
             equalizing_pause = max_time - times[posid]
-            if self.verbose:
-                self.printfunc(posid + ' ' + str(equalizing_pause) + ' ' + str(times[posid]))
+            #if self.verbose:
+            #    self.printfunc(posid + ' ' + str(equalizing_pause) + ' ' + str(times[posid]))
             if equalizing_pause:
                 idx = table.n_rows
                 table.insert_new_row(idx)
                 table.set_postpause(idx,equalizing_pause)
                 if self.sweeps: # because no collision checking is performed if anticollsion=None
                     if self.sweeps[posid]:
-                        self.sweeps[posid].extend(self.collider.timestep, max_time)
-                    
+                        self.sweeps[posid].extend(self.collider.timestep, max_time)                
+        return max_time
+    
     def adjust_path(self, posid, stage_colliding, freezing='on', requests=None):
         """Adjusts move paths for posid to avoid collision. If the positioner
         has no collision, then no adjustment is made.
@@ -192,7 +193,7 @@ class PosScheduleStage(object):
                     self.printfunc("***collision resolved via " + str(method) + ' for ' + str(posid) + '-' + str(collision_neighbor))                
                 
                 stage_colliding.remove(posid)  
-                if collision_neighbor in stage_colliding: stage_colliding.remove(collision_neighbor)                
+                if collision_neighbor in stage_colliding: stage_colliding.remove(collision_neighbor)   
                 for pos_id in all_sweeps:
                     if (pos_id != posid) and (pos_id != collision_neighbor):
                         #if (pos_id in stage_colliding) and (self.sweeps[pos_id].collision_neighbor != posid):
@@ -208,7 +209,7 @@ class PosScheduleStage(object):
                             all_sweeps[pos_id].collision_time = self.sweeps[pos_id].collision_time
                             all_sweeps[pos_id].collision_idx = self.sweeps[pos_id].collision_idx
                             colliding_sweeps[pos_id] = all_sweeps[pos_id] 
-                
+
                 # sweep information for all positioners updated here
                 self.store_collision_finding_results(colliding_sweeps, all_sweeps, requests)
                 if method == 'freeze':
