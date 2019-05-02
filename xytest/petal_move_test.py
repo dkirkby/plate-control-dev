@@ -30,7 +30,7 @@ import googlesheets
 import time
 
 ptl_id=input('Input PC Number: ')
-canlist=['can10'] #,'can11'] #,'can13','can12','can22','can23','can15','can16','can17','can14']
+canlist=['can10','can11','can13','can12','can22','can23','can15','can16','can17','can14']
 pcomm=petalcomm.PetalComm(ptl_id)
 info = pcomm.pbget('posfid_info')
 print(info.keys())
