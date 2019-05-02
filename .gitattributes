@@ -147,6 +147,7 @@ xytest/movegui_nogoogle.py -text
 xytest/movegui_petal.py -text
 xytest/movegui_petal_show.py -text
 xytest/movegui_temp.py -text
+xytest/petal_move_test.py -text
 xytest/pos_xytest_plot.py -text
 xytest/posblast.py -text
 xytest/posdance.py -text
