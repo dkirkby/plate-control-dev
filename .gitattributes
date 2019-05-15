@@ -6,6 +6,7 @@ calibrate/derive_platemaker_pars.py -text
 calibrate/posmovemeasure.py -text
 calibrate/seed_xy_offsets.py -text
 calibrate/xytest.py -text
+calibrate/xytest_template.conf -text
 petal/collision_lookup_generator.py -text
 petal/collision_lookup_generator_subset.py -text
 petal/focal_surface_lookup.csv -text
