@@ -430,17 +430,17 @@ class XYTest(object):
                         self.track_file(filename, commit='once')
 
             # Test report and email only on certain tests
-            if self.xytest_conf['should_email']:
-                pass
-                #test_report.do_test_report(self.posids, all_data_by_posid, log_timestamp, self.pos_notes, self._elapsed_time_str(start_time), self.xytest_conf['email_list'])
+            # if self.xytest_conf['should_email']:
+            #     pass
+            #     test_report.do_test_report(self.posids, all_data_by_posid, log_timestamp, self.pos_notes, self._elapsed_time_str(start_time), self.xytest_conf['email_list'])
         except (KeyboardInterrupt, SystemExit):
             raise
         except:
             # Email traceback to alert that test failed and why
-            if self.xytest_conf['should_email']:
-                pass
-                #test_report.email_error(traceback.format_exc(),log_timestamp)
-            raise            
+            # if self.xytest_conf['should_email']:
+            #     pass
+            #     test_report.email_error(traceback.format_exc(),log_timestamp)
+            raise Exception('XYTest error')
         self.logwrite(str(len(all_data_by_target)) + ' targets measured in ' + self._elapsed_time_str(start_time) + '.')
         
     def get_svn_credentials(self):
