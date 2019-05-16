@@ -834,12 +834,13 @@ class Petal(object):
             if len(fid_commit_list) != 0:
                 self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid_data')
                 self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid_calib')
-        if self.local_commit_on:
-            for state in self.altered_states:
-                state.write()
-        if self.local_log_on:
-            for state in self.altered_states:
-                state.log_unit()
+        if not self.simulator_on:  # avoid overwriting config data and logs when testing in simulator mode
+            if self.local_commit_on:
+                for state in self.altered_states:
+                    state.write()
+            if self.local_log_on:
+                for state in self.altered_states:
+                    state.log_unit()
         self.altered_states = set()
 
     def expected_current_position(self, posid, key):

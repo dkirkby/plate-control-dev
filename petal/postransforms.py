@@ -4,6 +4,7 @@ import posmodel
 import math
 import sys
 
+
 class PosTransforms(object):
     """This class provides transformations between positioner coordinate systems. All
     coordinate transforms must be done via the methods provided here. This ensures
@@ -63,7 +64,7 @@ class PosTransforms(object):
     """
 
     def __init__(self, this_posmodel=None, curved=True):
-        if this_posmodel == None:
+        if this_posmodel is None:
             this_posmodel = posmodel.PosModel()
         self.posmodel = this_posmodel
         self.curved = curved
@@ -74,6 +75,10 @@ class PosTransforms(object):
                     'OFFSET_Y'  : 0.0,
                     'OFFSET_T'  : 0.0,
                     'OFFSET_P'  : 0.0}
+        self.getval = lambda varname: (  # varname is a string
+            self.alt[varname] if self.alt_override
+            else self.posmodel.state.read(varname))
+
     # SHAFT RANGES
     def shaft_ranges(self, range_limits):
         """Returns a set of range limits for the theta and phi axes. The argument
@@ -98,28 +103,27 @@ class PosTransforms(object):
         input:  tp ... [obsT,obsP] expected position of fiber tip, including offsets and calibrations
         output: TP ... [posT,posP] internally-tracked expected position of gearmotor shafts at output of gear heads
         """
-        T = tp[0] - (self.posmodel.state.read('OFFSET_T') if not self.alt_override else self.alt['OFFSET_T'])
-        P = tp[1] - (self.posmodel.state.read('OFFSET_P') if not self.alt_override else self.alt['OFFSET_P'])
-        return [T,P]
+        T = tp[0] - self.getval('OFFSET_T')
+        P = tp[1] - self.getval('OFFSET_P')
+        return [T, P]
 
     def posTP_to_obsTP(self, tp):
         """
         input:  tp ... [posT,posP] internally-tracked expected position of gearmotor shafts at output of gear heads
         output: TP ... [obsT,obsP] expected position of fiber tip, including offsets and calibrations
         """
-        T = tp[0] + (self.posmodel.state.read('OFFSET_T') if not self.alt_override else self.alt['OFFSET_T'])
-        P = tp[1] + (self.posmodel.state.read('OFFSET_P') if not self.alt_override else self.alt['OFFSET_P'])
-        return [T,P]
+        T = tp[0] + self.getval('OFFSET_T')
+        P = tp[1] + self.getval('OFFSET_P')
+        return [T, P]
 
     def posTP_to_posXY(self, tp):
         """
         input:  tp ... [posT,posP] internally-tracked expected position of gearmotor shafts at output of gear heads
         output: xy ... [posX,posY] global to focal plate, centered on optical axis, looking at fiber tips
         """
-        r = [self.posmodel.state.read('LENGTH_R1') if not self.alt_override else self.alt['LENGTH_R1'],
-             self.posmodel.state.read('LENGTH_R2') if not self.alt_override else self.alt['LENGTH_R2']]
+        r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
         TP = self.posTP_to_obsTP(tp)  # adjust shaft angles into observer space (since observer sees the physical phi = 0)
-        xy = self.tp2xy(TP,r)         # calculate xy in posXY space
+        xy = self.tp2xy(TP, r)         # calculate xy in posXY space
         return xy
 
     def posXY_to_posTP(self, xy, range_limits='full'):
@@ -130,8 +134,7 @@ class PosTransforms(object):
         input:  range_limits ... (optional) string, see shaft_ranges method
         output: unreachable  ... boolean, True if no posTP exists that can achieve the requested posXY
         """
-        r = [self.posmodel.state.read('LENGTH_R1') if not self.alt_override else self.alt['LENGTH_R1'],
-             self.posmodel.state.read('LENGTH_R2') if not self.alt_override else self.alt['LENGTH_R2']]
+        r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
         shaft_ranges = self.shaft_ranges(range_limits)
         obs_range_tptp = [self.posTP_to_obsTP([shaft_ranges[0][0],shaft_ranges[1][0]]), self.posTP_to_obsTP([shaft_ranges[0][1],shaft_ranges[1][1]])] # want range used in next line to be according to observer (since observer sees the physical phi = 0)
         obs_range=[[obs_range_tptp[0][0],obs_range_tptp[1][0]],[obs_range_tptp[0][1],obs_range_tptp[1][1]]]
@@ -144,18 +147,18 @@ class PosTransforms(object):
         input:  xy ... [posX,posY] local to fiber positioner, centered on theta axis, looking at fiber tip
         output: XY ... [obsX,obsY] global to focal plate, centered on optical axis, looking at fiber tips
         """        
-        X = xy[0] + (self.posmodel.state.read('OFFSET_X') if not self.alt_override else self.alt['OFFSET_X'])
-        Y = xy[1] + (self.posmodel.state.read('OFFSET_Y') if not self.alt_override else self.alt['OFFSET_Y'])
-        return [X,Y]
+        X = xy[0] + self.getval('OFFSET_X')
+        Y = xy[1] + self.getval('OFFSET_Y')
+        return [X, Y]
 
     def obsXY_to_posXY(self, xy):
         """
         input:  xy ... [obsX,obsY] global to focal plate, centered on optical axis, looking at fiber tips
         output: XY ... [posX,posY] local to fiber positioner, centered on theta axis, looking at fiber tip
         """
-        X = xy[0] - (self.posmodel.state.read('OFFSET_X') if not self.alt_override else self.alt['OFFSET_X'])
-        Y = xy[1] - (self.posmodel.state.read('OFFSET_Y') if not self.alt_override else self.alt['OFFSET_Y'])
-        return [X,Y]
+        X = xy[0] - self.getval('OFFSET_X')
+        Y = xy[1] - self.getval('OFFSET_Y')
+        return [X, Y]
 
     def obsXY_to_QS(self,xy):
         """
