@@ -31,14 +31,16 @@ class PosState(object):
     def __init__(self, unit_id=None, logging=False, device_type='pos', printfunc=print, petal_id=None):
         self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
         self.logging = logging
-        self.type = device_type
 
         # data initialization from .conf file
-        if self.type in ['pos','fid','ptl']:
+        if self.type in ['pos', 'fid', 'ptl']:
+            self.type = device_type
             self.settings_directory = pc.dirs[self.type + '_settings']
             self.logs_directory = pc.dirs[self.type + '_logs']
+        else:
+            raise DeviceError("Invalid device type.")
         template_directory = self.settings_directory
-        if unit_id != None:
+        if unit_id is not None:
             self.unit_basename = 'unit_' + str(unit_id)
             comment = 'Settings file for unit: ' + str(unit_id)
         else:
@@ -48,25 +50,28 @@ class PosState(object):
             comment = 'Temporary settings file for software test purposes, not associated with a particular unit.'
         unit_filename = self.settings_directory + self.unit_basename + '.conf'
         if not(os.path.isfile(unit_filename)):
-            temp_filename = template_directory + '_unit_settings_DEFAULT.conf' # read in the template file
-            self.conf = configobj.ConfigObj(temp_filename,unrepr=True,encoding='utf-8')
-            self.conf.initial_comment = [comment,'']
+            # unit config doesn't exisit, read in the generic template file
+            temp_filename = template_directory + '_unit_settings_DEFAULT.conf'
+            self.conf = configobj.ConfigObj(temp_filename, unrepr=True, encoding='utf-8')
+            self.conf.initial_comment = [comment, '']
             self.conf.filename = unit_filename
             if self.type == 'pos':
                 self.conf['POS_ID'] = str(unit_id)
             elif self.type == 'fid':
                 self.conf['FID_ID'] = str(unit_id)
-            else:
+            elif self.type == 'ptl':
                 self.conf['PETAL_ID'] = str(unit_id)
             self.conf.write()
         else:
-            self.conf = configobj.ConfigObj(unit_filename,unrepr=True,encoding='utf-8')
+            self.conf = configobj.ConfigObj(unit_filename, unrepr=True, encoding='utf-8')
 
         # determine petal_id
-        if self.type == 'ptl':
-            self.petal_id = self.conf['PETAL_ID']
-        else:
-            self.petal_id = petal_id
+        # regardless of devide type, config has been read and the
+        # correct petal_id is available in config, so let's just use config only
+        # if self.type == 'ptl':
+        self.petal_id = self.conf['PETAL_ID']
+        # else:
+        #     self.petal_id = petal_id
 
         # establishment of much faster access python dict, for in-memory operations
         self._val = self.conf.dict()

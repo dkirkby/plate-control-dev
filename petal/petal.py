@@ -5,15 +5,21 @@ import posstate
 import poscollider
 import posconstants as pc
 import posschedstats
+from petaltransforms import PetalTransforms
 import time
 import collections
-import pdb
 import os
 try:
-    from DBSingleton import * 
+    import DBSingleton
     DB_COMMIT_AVAILABLE = True
-except:
+except ImportError:
     DB_COMMIT_AVAILABLE = False
+try:
+    from DOSlib.constants import ConstantsDB
+    CONSTANTSDB_AVAILABLE = True
+except ImportError:
+    CONSTANTSDB_AVAILABLE = False
+
 
 class Petal(object):
     """Controls a petal. Communicates with the PetalBox hardware via PetalComm.
@@ -28,7 +34,7 @@ class Petal(object):
 
     Required initialization inputs:
         petal_id        ... unique string id of the petal
-        
+
     Optional initialization inputs:
         posids          ... list, positioner ids. If provided, validate against the ptl_setting file. If empty [], read from the ptl_setting file directly.
         fidids          ... list, fiducial ids. If provided, validate against the ptl_setting file. If empty [], read from the ptl_setting file directly. 
@@ -44,23 +50,24 @@ class Petal(object):
         petal_loc       ... integer, (option) location (0-9) of petal in FPA
         fpa_metrology   ... dictionary, petal offsets and rotation in FPA, keyed by petal_loc
     """
-    def __init__(self, petal_id = None, posids = None, fidids = None, simulator_on=False,
-                 petalbox_id = None, shape = None,
+    def __init__(self, petal_id=None, petal_loc=None, posids=None, fidids=None,
+                 simulator_on=False, petalbox_id=None, shape=None,
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
-                 printfunc=print, verbose=False, user_interactions_enabled=False,
-                 collider_file=None, sched_stats_on=False, 
-                 pb_config = False,
-                 anticollision='freeze',
-                 petal_loc = None,
-                 fpa_metrology = None):
-        self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output) 
+                 printfunc=print, verbose=False,
+                 user_interactions_enabled=False, anticollision='freeze',
+                 collider_file=None, sched_stats_on=False, pb_config=False,
+                 fpa_metrology=None):
+        # specify an alternate to print (useful for logging the output)
+        self.printfunc = printfunc
         # petal setup
-        self.petal_state = posstate.PosState(unit_id=petal_id, logging=True, device_type='ptl', printfunc=self.printfunc)
-        if petal_id == None:
+        self.petal_state = posstate.PosState(
+            unit_id=petal_id, device_type='ptl', logging=True,
+            printfunc=self.printfunc)
+        if petal_id is None:
             self.petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
         else:
             self.petal_id = petal_id
-        if petalbox_id == None:
+        if petalbox_id is None:
             self.petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
         else:
             self.petalbox_id = petalbox_id
@@ -170,6 +177,23 @@ class Petal(object):
         if not self.simulator_on and self.pb_config != False:
             self._map_can_enabled_devices()
             self.setup_petalbox(mode = 'start_up')
+
+        # transformation setup for petal and positioners
+        if petal_loc is None:
+            self.petal_loc = 3
+        else:
+            self.petal_loc = petal_loc
+        self.trans = PetalTransforms()
+        if CONSTANTSDB_AVAILABLE:
+            constants = ConstantsDB().get_constants(
+                snapshot='DOS', tag='CURRENT', group='focal_plane_metrology')
+            ptl_rot_z = constants[self.petal_loc]['petal_rot_z']
+            ptl_off_x = constants[self.petal_loc]['petal_offset_x']
+            ptl_off_y = constants[self.petal_loc]['petal_offset_y']
+        else:
+            ptl_rot = ptl_state.conf['ROTATION']
+            ptl_xos = ptl_state.conf['X_OFFSET']
+            ptl_yos = ptl_state.conf['Y_OFFSET']
 
 # METHODS FOR POSITIONER CONTROL
 
@@ -834,13 +858,15 @@ class Petal(object):
             if len(fid_commit_list) != 0:
                 self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid_data')
                 self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid_calib')
-        if not self.simulator_on:  # avoid overwriting config data and logs when testing in simulator mode
+        # avoid overwriting local config data and logs when testing in simulator mode
+        # but stills allows DB commits above
+        if not self.simulator_on:
             if self.local_commit_on:
                 for state in self.altered_states:
-                    state.write()
+                    state.write()  # this writes posstate to local config
             if self.local_log_on:
                 for state in self.altered_states:
-                    state.log_unit()
+                    state.log_unit()  # this write the local log
         self.altered_states = set()
 
     def expected_current_position(self, posid, key):
