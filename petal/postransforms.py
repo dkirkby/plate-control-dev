@@ -20,7 +20,7 @@ class PosTransforms(object):
         obsXY  ... (x,y) global to focal plate, centered on optical axis, looking at fiber tips
         posTP  ... (theta,phi) internally-tracked expected position of gearmotor shafts at output of gear heads
         obsTP  ... (theta,phi) expected position of fiber tip including offsets
-        QS     ... (q,s) global to focal plate, q is angle about the optical axis, s is path distance from optical axis, along the curved focal surface, within a plane that intersects the optical axis
+        QS     ... (q,s) global to focal plate, q is angle about the optical axis, s is path distance from optical axis, along the curved focal surface, within a plane that intersects the optical axis. this is for observer perspective only and there is no positioner local counterpart
         flatXY ... (x,y) global to focal plate, with focal plate slightly stretched out and flattened (used for anti-collision)
 
     The fundamental transformations provided are:
@@ -160,20 +160,17 @@ class PosTransforms(object):
         Y = xy[1] - self.getval('OFFSET_Y')
         return [X, Y]
 
-    def obsXY_to_QS(self,xy):
+    def obsXY_to_QS(self, xy):
         """
         input:  xy ... [obsX,obsY] global to focal plate, centered on optical axis, looking at fiber tips
         output: QS ... [Q,S] global to focal plate, q is angle about the optical axis, s is path distance from optical axis, along the curved focal surface, within a plane that intersects the optical axis
         """
-        #if isinstance(xy[0],float):
-        if isinstance(xy[0],list):
-            xy=[xy[0][0],xy[1][0]]
         Q = math.degrees(math.atan2(xy[1],xy[0]))
         R = (xy[0]**2.0 + xy[1]**2.0)**0.5
         S = self.R2S(R) if self.curved else R
         return [Q,S]
 
-    def QS_to_obsXY(self,qs):
+    def QS_to_obsXY(self, qs):
         """
         input:  qs ... [Q,S] global to focal plate, q is angle about the optical axis, s is path distance from optical axis, along the curved focal surface, within a plane that intersects the optical axis
         output: XY ... [obsX,obsY] global to focal plate, centered on optical axis, looking at fiber tips
@@ -184,7 +181,8 @@ class PosTransforms(object):
         Y = R * math.sin(Q_rad)
         return [X,Y]
 
-    def QS_to_flatXY(self,qs):
+    @staticmethod
+    def QS_to_flatXY(qs):
         """
         input:  qs ... [Q,S] global to focal plate, q is angle about the optical axis, s is path distance from optical axis, along the curved focal surface, within a plane that intersects the optical axis
         output: XY ... [flatX,flatY] global to focal plate, with focal plate slightly stretched out and flattened (used for anti-collision)
@@ -194,7 +192,8 @@ class PosTransforms(object):
         Y = qs[1] * math.sin(Q_rad)
         return [X,Y]
 
-    def flatXY_to_QS(self,xy):
+    @staticmethod
+    def flatXY_to_QS(xy):
         """
         input:  xy ... [flatX,flatY] global to focal plate, with focal plate slightly stretched out and flattened (used for anti-collision)
         output: QS ... [Q,S] global to focal plate, q is angle about the optical axis, s is path distance from optical axis, along the curved focal surface, within a plane that intersects the optical axis
@@ -204,7 +203,7 @@ class PosTransforms(object):
         return [Q,S]
 
     # COMPOSITE TRANSFORMATIONS
-    def posTP_to_obsXY(self,tp):
+    def posTP_to_obsXY(self, tp):
         """Composite transformation, performs posTP --> posXY --> obsXY."""
         posXY = self.posTP_to_posXY(tp)
         obsXY = self.posXY_to_obsXY(posXY)
@@ -265,11 +264,11 @@ class PosTransforms(object):
         return obsTP, unreachable
 
     # DIFFERENCE METHODS
-    def delta_posXY(self, xy1, xy0):
+    def delta_posXY(xy1, xy0):
         """Returns dxdy corresponding to xy1 - xy0."""
         return PosTransforms.vector_delta(xy1,xy0)
 
-    def delta_obsXY(self, xy1, xy0):
+    def delta_obsXY(xy1, xy0):
         """Returns dxdy corresponding to xy1 - xy0."""
         return PosTransforms.vector_delta(xy1,xy0)
 
@@ -294,20 +293,20 @@ class PosTransforms(object):
         TP1 = self.obsTP_to_posTP(tp1)
         return self.delta_posTP(TP1,TP0,range_wrap_limits)
 
-    def delta_QS(self, qs1, qs0):
+    def delta_QS(qs1, qs0):
         """Returns dqds corresponding to qs1 - qs0."""
         return PosTransforms.vector_delta(qs1,qs0)
 
-    def delta_flatXY(self, xy0, xy1):
+    def delta_flatXY(xy0, xy1):
         """Returns dxdy corresponding to xy1 - xy0."""
         return PosTransforms.vector_delta(xy1,xy0)
 
     # ADDITION METHODS
-    def addto_posXY(self, xy0, dxdy):
+    def addto_posXY(xy0, dxdy):
         """Returns xy corresponding to xy0 + dxdy."""
         return PosTransforms.vector_add(xy0,dxdy)
 
-    def addto_obsXY(self, xy0, dxdy):
+    def addto_obsXY(xy0, dxdy):
         """Returns xy corresponding to xy0 + dxdy."""
         return PosTransforms.vector_add(xy0,dxdy)
 
@@ -330,11 +329,11 @@ class PosTransforms(object):
         TP0 = self.obsTP_to_posTP(tp0)
         return self.addto_posTP(TP0,dtdp,range_wrap_limits)
 
-    def addto_QS(self, qs0, dqds):
+    def addto_QS(qs0, dqds):
         """Returns qs corresponding to qs0 + dqds."""
         return PosTransforms.vector_add(qs0,dqds)
 
-    def addto_flatXY(self, xy0, dxdy):
+    def addto_flatXY(xy0, dxdy):
         """Returns xy corresponding to xy0 + dxdy."""
         return PosTransforms.vector_add(xy0,dxdy)
 

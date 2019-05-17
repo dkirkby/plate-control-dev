@@ -1,174 +1,182 @@
 import numpy as np
-import math
-import postransforms
+from postransforms import PosTransforms
 import posconstants as pc
 
+
+def Rx(angle):
+    Rx = np.array([
+                   [1.0,           0.0,            0.0],
+                   [0.0,           np.cos(angle),  -np.sin(angle)],
+                   [0.0,           np.sin(angle),  np.cos(angle)]
+                  ])
+    return Rx
+
+
+def Ry(angle):
+    Ry = np.array([
+                   [np.cos(angle),  0.0,            np.sin(angle)],
+                   [0.0,            1.0,            0.0],
+                   [-np.sin(angle), 0.0,            np.cos(angle)]
+                  ])
+    return Ry
+
+
+def Rz(angle):
+    Rz = np.array([
+                   [np.cos(angle), -np.sin(angle), 0.0],
+                   [np.sin(angle), np.cos(angle),  0.0],
+                   [0.0,           0.0,            1.0]
+                  ])
+    return Rz
+
+
+def Rxyz(alpha, beta, gamma):  # yaw-pitch-roll system
+    return Rz(gamma) @ Ry(beta) @ Rx(alpha)  # @ is matrix multiplication
+
+
 class PetalTransforms(object):
-    """This class provides transformations between petal metrology data and the
-    global focal plane coordinate system. The key document defining the metrology
-    data meaning and formatting is DESI-2850.
-    
-    There is a 6 DOF rigid-body transformation that takes any given petal's metXYZ into
-    the global system. It is defined by six parameters, which are reported per petal
-    also according to DESI-2850. The method provided in this class contains the
-    canonical order of operations to do this transform.
-    
-    In use, you make one instance of PetalTransforms per petal. A given instance of
-    needs to be initialized with these 6 transform values, provided in a dictionary
-    with the following keys:
-        
-        'petal_offset_x','petal_offset_y','petal_offset_z','petal_rot1','petal_rot_2','petal_rot_3'
+    """
+    This class provides transformations between the petal local nominal
+    coordinate system (CAD model) and the focal plane CS5.
+    The transformation parameters are found in focal palte alignment as
+    6 DOF rigid-body transformation parameters, defined in trans_keys below,
+    and reported per petal according to DESI-2850.
+
+    trans_keys = ['petal_offset_x', 'petal_offset_y', 'petal_offset_z',
+                  'petal_rot_x', 'petal_rot_y', 'petal_rot_z']
+    which are the input variables, Tx, Ty, Tz in mm, alpha, beta, gamma in deg
+
+    For forward transformation,
+    the transformation defined by these 6 parameters can act on
+    (1) nominal values in the petal local CS as defined in the CAD model, or
+    (2) metrology data in the petal local CS (best-fit to the CAD, "ZBF")
+    and result in coordinates in CS5, assuming the alignment achieved on
+    mountain is the same as done in the metrology lab.
+
+    In use, you make one instance of PetalTransforms per petal.
+    A given instance can be initialised with either 6 dof or just 3 dof as
+    viewed by the FVC, assuming the other three are zero.
+
+    Note the rotation angles reported from metrology and used for
+    focal plate alingment are NOT the classic Euler 3-2-3 or Z-Y-Z angles.
+    They are the rotation angles w.r.t. x, y, and z-axes.
+    The Euler method provided in this class contains the
+    canonical order of operations to do this transform in 3-2-3.
 
     The coordinate systems are:
-        
-        metXYZ ... (x,y,z) measured device center locations on the aspheric focal surface,
-                   local to an individual petal, with some arbitrary origin for each petal.
-                   These are the reported values from the metrology, called x_meas_proj,
-                   y_meas_proj, and z_meas_proj in the report file, per DESI-2850.
-                   
-        obsXYZ ... (x,y,z) global cartesian coordinates on the focal plate
-                   cenetered on optical axis, looking at fiber tips
-        
-        QS     ... (q,s) global coordinates on the focal plate, per DESI-0742
-                   q is the angle about the optical axis
-                   s is the path distance from optical axis, along the curved focal surface, within a plane that intersects the optical axis
-                   
-    Once you have coordinates in the QS system, one uses methods from PosTransforms
-    to convert into any other positioner-specific coordinate systems.
+
+        metXYZ:     (x,y,z) measured device center locations on the aspheric
+                    focal surface, local to an individual petal,
+                    with some arbitrary origin for each petal, such that
+                    metrology data are overall closest to nomial specs in CAD.
+                    These are the projected fibre tip or FIF pinhole centre
+                    coordinates reported from the metrology
+                    (x_meas_proj, y_meas_proj, z_meas_proj), assuming
+                    perfectly built positioners.
+        obsXYZ:     (x,y,z) global cartesian coordinates on the focal plate
+                    cenetered on optical axis, looking at fiber tips
+        QS:         (q,s) global coordinates on the focal plate, per DESI-0742
+                    q is the angle about the optical axis
+                    s is the path distance from optical axis,
+                    along the curved focal surface,
+                    within a plane that intersects the optical axis
+
+    With QS coordinates, PosTransforms converts into any other
+    positioner-specific CS. The wrappers here convert a list of positioner
+    coordinates, but that is not acturally supported in PosTransforms.
+    We may want to get rid them and unify our transformation methods.
     """
-    
-    trans_keys = ['petal_offset_x','petal_offset_y','petal_offset_z','petal_rot_1','petal_rot_2','petal_rot_3']
-    tooling_ball_locs = [543,544,545]
 
-    def __init__(self, transforms={}):
-        self.transforms = {key:0 for key in self.trans_keys}
-        self.transforms.update(transforms)
-        self.postrans = postransforms.PosTransforms(this_posmodel=None, curved=True)
-    
-    def metXYZ_to_QS(self,xyz):
-        """Transforms list of metXYZ coordinates into QS system.
-        INPUT:  [N][3] array of [[metX0,metY0,metZ0],[metX1,metY1,metZ1],...]
-        OUTPUT: [N][2] array of corresponding [[q0,s0],[q1,s1],...]
+    dtb_device_ids = [543, 544, 545]  # three datum tooling balls on a petal
+
+    def __init__(self, Tx=0, Ty=0, Tz=0, alpha=0, beta=0, gamma=0):
+        self.postrans = PosTransforms(curved=True)
+        # tanslation matrix from petal nominal CS to CS5, column vector
+        self.T = np.array([self.params['petal_offset_x'],
+                           self.params['petal_offset_y'],
+                           self.params['petal_offset_z']]).reshape(3, 1)
+        self.R = Rxyz(alpha, beta, gamma)  # orthogonal rotation matrix
+
+    def metXYZ_to_obsXYZ(self, metXYZ):
         """
-        obsXYZ = self.metXYZ_to_obsXYZ(xyz)
-        qs = self.obsXYZ_to_QS(obsXYZ)
-        return qs
+        INPUT:  3 x N array, each column vector is metXYZ
+        OUTPUT: 3 x N array, each column vector is obsXYZ
+        """
+        return self.R @ metXYZ + self.T  # forward transformation
 
-    def QS_to_metXYZ(self,qs):
+    def obsXYZ_to_metXYZ(self, obsXYZ):
+        """
+        INPUT:  3 x N array, each column vector is obsXYZ
+        OUTPUT: 3 x N array, each column vector is metXYZ
+        """
+        return self.R.T @ (obsXYZ - self.T)  # backward transformation
+
+    def obsXYZ_to_QS(self, obsXYZ):
+        """Transforms list of obsXYZ coordinates into QS system.
+        INPUT:  3 x N array, each column vector is obsXYZ
+        OUTPUT: 2 x N array of corresponding [[q0,s0],[q1,s1],...]
+        """
+        ret = np.zeros((2, obsXYZ.shape[1]))
+        for i in range(obsXYZ.shape[1]):  # loop over all column vectors
+            ret[:, i] = self.postrans.obsXY_to_QS([obsXYZ[0, i], obsXYZ[1, i]])
+        return ret
+
+    def QS_to_obsXYZ(self, QS):
+        """Transforms list of obsXYZ coordinates into QS system.
+        INPUT:  2 x N array of [[q0,s0],[q1,s1],...]
+        OUTPUT: 3 x N array, each column vector is obsXYZ
+
+        Note that because QS is only 2 dimensional,
+        the Z coordinate is a nominal value
+        that is looked up from the Echo22 asphere definition.
+        """
+        ret = np.zeros((3, QS.shape[1]))
+        for i in range(QS.shape[1]):  # loop over all column vectors
+            ret[:2, i] = self.postrans.QS_to_obsXY([QS[0, i], QS[1, i]])
+            r = np.sqrt(np.sum(np.square(ret[:2, i])))
+            ret[2, i] = pc.R2Z_lookup(r)
+        return ret
+
+    def metXYZ_to_QS(self, metXYZ):
+        """
+        INPUT:  3 x N array, each column vector is metXYZ
+        OUTPUT: 2 x N array of corresponding [[q0,s0],[q1,s1],...]
+        """
+        obsXYZ = self.metXYZ_to_obsXYZ(metXYZ)
+        return self.obsXYZ_to_QS(obsXYZ)
+
+    def QS_to_metXYZ(self, QS):
         """Transforms list of QS coordinates into metXYZ system.
         INPUT:  [N][2] array of [[q0,s0],[q1,s1],...]
-        OUTPUT: [N][3] array of corresponding [[metX0,metY0,metZ0],[metX1,metY1,metZ1],...]
-
-        Note that because QS is only 2 dimensional, the Z coordinate is a nominal value
-        that is looked up from the Echo22 asphere definition.
+        OUTPUT: 3 x N array, each column vector is metXYZ
         """
-        obsXYZ = self.QS_to_obsXYZ(qs)
-        metXYZ = self.obsXYZ_to_metXYZ(obsXYZ)
-        return metXYZ
+        obsXYZ = self.QS_to_obsXYZ(QS)
+        return self.obsXYZ_to_metXYZ(obsXYZ)
 
-    def metXYZ_to_obsXYZ(self,xyz):
-        """Transforms list of metXYZ coordinates into obsXYZ system.
-        INPUT:  [N][3] array of [[metX0,metY0,metZ0],[metX1,metY1,metZ1],...]
-        OUTPUT: [N][3] array of corresponding [[obsX0,obsY0,obsZ0],[obsX1,obsY1,obsZ1],...]
-        """
-        xyz = self.listify(xyz)
-        xyz_trans = np.transpose(xyz) + self.trans_matrix
-        xyz_rot = np.dot(self.rot_matrix,xyz_trans)
-        return np.transpose(xyz_rot).tolist()
 
-    def obsXYZ_to_metXYZ(self,xyz):
-        """Transforms list of obsXYZ coordinates into metXYZ system.
-        INPUT:  [N][3] array of [[obsX0,obsY0,obsZ0],[obsX1,obsY1,obsZ1],...]
-        OUTPUT: [N][3] array of corresponding [[metX0,metY0,metZ0],[metX1,metY1,metZ1],...]
-        """
-        xyz = np.transpose(self.listify(xyz))
-        xyz_rot = np.dot(self.inverse_rot_matrix,xyz)
-        xyz_trans = xyz_rot + self.inverse_tran_matrix
-        return np.transpose(xyz_trans).tolist()
-
-    def obsXYZ_to_QS(self,xyz):
-        """Transforms list of obsXYZ coordinates into QS system.
-        INPUT:  [N][3] array of [[obsX0,obsY0,obsZ0],[obsX1,obsY1,obsZ1],...]
-        OUTPUT: [N][2] array of corresponding [[q0,s0],[q1,s1],...]
-        """
-        xyz = self.listify(xyz)
-        x = [xyz[i][0] for i in range(len(xyz))]
-        y = [xyz[i][1] for i in range(len(xyz))]
-        qs = self.postrans.obsXY_to_QS([x,y])
-        return np.transpose(qs).tolist()
-        
-    def QS_to_obsXYZ(self,qs):
-        """Transforms list of obsXYZ coordinates into QS system.
-        INPUT:  [N][2] array of [[q0,s0],[q1,s1],...]
-        OUTPUT: [N][3] array of corresponding [[obsX0,obsY0,obsZ0],[obsX1,obsY1,obsZ1],...]
-
-        Note that because QS is only 2 dimensional, the Z coordinate is a nominal value
-        that is looked up from the Echo22 asphere definition.
-        """
-        qs = self.listify(qs)
-        xy = [self.postrans.QS_to_obsXY(this_qs) for this_qs in qs]
-        r = np.sqrt(np.sum(np.power(xy,2),axis=1))
-        z = pc.R2Z_lookup(r)
-        xyz = [[xy[i][0], xy[i][1], z[i]] for i in range(len(xy))]
-        return xyz
-        
-    @property
-    def trans_matrix(self):
-        """Translations matrix as 3x1 numpy array, for going from metXYZ --> QS."""
-        offsets = [[self.transforms['petal_offset_' + c]] for c in ['x','y','z']]
-        return np.array(offsets)
-    
-    @property
-    def inverse_tran_matrix(self):
-        """Translations matrix as 3x1 numpy array, for going from QS --> metXYZ."""
-        return -self.trans_matrix
-        
-    @property
-    def rot_matrix(self):
-        """Rotations matrix as 3x3 numpy array, for going from metXYZ --> QS."""
-        angle_deg = {field:self.transforms['petal_rot_' + str(field)] for field in [1,2,3]}
-        a = {field:angle_deg[field]*pc.rad_per_deg for field in angle_deg}
-        c = {field:math.cos(a[field]) for field in a}
-        s = {field:math.sin(a[field]) for field in a}
-        prec = [[c[1],-s[1],0],[s[1],c[1],0],[0,0,1]]
-        nuta = [[c[2],0,s[2]],[0,1,0],[-s[2],0,c[2]]]
-        spin = [[c[3],-s[3],0],[s[3],c[3],0],[0,0,1]]
-        rot = np.dot(prec,np.dot(nuta,spin)) # ordered as extrinsic rots
-        return np.array(rot)
-        
-    @property
-    def inverse_rot_matrix(self):
-        """Rotations matrix as 3x3 numpy array, for going from QS --> metXYZ."""
-        return np.transpose(self.rot_matrix)
-    
-    @staticmethod
-    def listify(x):
-        """For convenience if user accidentally only puts in a list of 3 vals."""
-        if np.ndim(x) == 1:
-            x = [x]        
-        return x
-    
 if __name__ == '__main__':
-    """The code below allows you to test out the transforms on a real-world set of
-    report files formatted per DESI-2850.
+    """The code below allows you to test out the transforms on a real-world
+    set of report files formatted per DESI-2850.
+    Probably not working after the changes.
     """
     import os
     import csv
     import tkinter
     import tkinter.filedialog
-    
+
     gui_root = tkinter.Tk()
     initialdir = os.getcwd()
-    filetypes = (("CSV file","*.csv"),("All Files","*")),
-    files = {key:'' for key in ['petal_metrology','focal_plane_metrology']}
+    filetypes = (("CSV file", "*.csv"), ("All Files", "*")),
+    files = {key: '' for key in ['petal_metrology', 'focal_plane_metrology']}
     data = {}
     for key in files:
         message = 'Select ' + key + ' file.'
-        files[key] = tkinter.filedialog.askopenfilename(initialdir=initialdir, filetypes=filetypes, title=message)
+        files[key] = tkinter.filedialog.askopenfilename(
+            initialdir=initialdir, filetypes=filetypes, title=message)
         if files[key]:
-            with open(files[key],'r',newline='') as csvfile:
+            with open(files[key], 'r', newline='') as csvfile:
                 reader = csv.DictReader(csvfile)
-                data[key] = {field:[] for field in reader.fieldnames}
+                data[key] = {field: [] for field in reader.fieldnames}
                 for row in reader:
                     for field in reader.fieldnames:
                         data[key][field].append(float(row[field]))
@@ -178,45 +186,62 @@ if __name__ == '__main__':
         n = len(data['petal_metrology']['x_meas_proj'])
         metXYZ = []
         for i in range(n):
-            this_xyz = [data['petal_metrology'][field][i] for field in ['x_meas_proj','y_meas_proj','z_meas_proj']]
+            this_xyz = [data['petal_metrology'][field][i] for field in
+                        ['x_meas_proj', 'y_meas_proj', 'z_meas_proj']]
             metXYZ.append(this_xyz)
         trans_row = data['focal_plane_metrology']['petal_id'].index(petal_id)
-        transforms = {field:data['focal_plane_metrology'][field][trans_row] for field in PetalTransforms().trans_keys}
+        transforms = {field: data['focal_plane_metrology'][field][trans_row]
+                      for field in PetalTransforms().trans_keys}
         petal_trans = PetalTransforms(transforms)
         QS = petal_trans.metXYZ_to_QS(metXYZ)
         checkXYZ = petal_trans.QS_to_metXYZ(QS)
         initialdir = os.path.split(files['petal_metrology'])[0]
         initialfile = 'results_petal_' + str(int(petal_id)) + '.csv'
         message = 'Save results as'
-        savefile = tkinter.filedialog.asksaveasfilename(initialdir=initialdir, initialfile=initialfile, filetypes=filetypes, title=message)
+        savefile = tkinter.filedialog.asksaveasfilename(
+            initialdir=initialdir, initialfile=initialfile,
+            filetypes=filetypes, title=message)
         if savefile:
-            with open(savefile,'w',newline='') as csvfile:
-                writer = csv.DictWriter(csvfile,fieldnames=['device_loc','metX','metY','metZ','Q','S','ballX','ballY','ballZ','checkX','checkY', 'checkZ','errX','errY','errZ'])
+            with open(savefile, 'w', newline='') as csvfile:
+                writer = csv.DictWriter(
+                    csvfile,
+                    fieldnames=['device_loc', 'metX', 'metY', 'metZ',
+                                'Q', 'S', 'ballX', 'ballY', 'ballZ',
+                                'checkX', 'checkY', 'checkZ',
+                                'errX', 'errY', 'errZ'])
                 writer.writeheader()
                 for i in range(n):
                     row = {}
-                    row['device_loc'] = int(data['petal_metrology']['device_loc'][i])
+                    row['device_loc'] = int(
+                        data['petal_metrology']['device_loc'][i])
                     row['metX'] = metXYZ[i][0]
                     row['metY'] = metXYZ[i][1]
                     row['metZ'] = metXYZ[i][2]
-                    is_ball = row['device_loc'] in PetalTransforms().tooling_ball_locs
+                    is_ball = (
+                        row['device_loc'] in PetalTransforms().dtb_device_ids)
                     if not is_ball:
                         row['Q'] = QS[i][0]
                         row['S'] = QS[i][1]
                         row['checkX'] = checkXYZ[i][0]
                         row['checkY'] = checkXYZ[i][1]
                         row['checkZ'] = checkXYZ[i][2]
-                        for letter in ['X','Y','Z']:
-                            row['err'+letter] = row['check'+letter] - row['met'+letter]
+                        for letter in ['X', 'Y', 'Z']:
+                            row['err'+letter] = \
+                                row['check'+letter] - row['met'+letter]
                     else:
                         ballXYZ = petal_trans.metXYZ_to_obsXYZ(metXYZ[i])[0]
                         row['ballX'] = ballXYZ[0]
                         row['ballY'] = ballXYZ[1]
                         row['ballZ'] = ballXYZ[2]
-                        for letter in ['X','Y','Z']:
-                            field = [field for field in data['focal_plane_metrology'] if str(row['device_loc']) in field and letter.lower() in field][0]
-                            row['check'+letter] = data['focal_plane_metrology'][field][trans_row]
-                            row['err'+letter] = row['ball'+letter] - row['check'+letter]
+                        for letter in ['X', 'Y', 'Z']:
+                            field = [field for field in
+                                     data['focal_plane_metrology']
+                                     if str(row['device_loc']) in field
+                                     and letter.lower() in field][0]
+                            row['check'+letter] = \
+                                data['focal_plane_metrology'][field][trans_row]
+                            row['err'+letter] = \
+                                row['ball'+letter] - row['check'+letter]
                     writer.writerow(row)
     gui_root.withdraw()
-    
+

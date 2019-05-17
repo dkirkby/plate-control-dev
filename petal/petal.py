@@ -178,12 +178,12 @@ class Petal(object):
             self._map_can_enabled_devices()
             self.setup_petalbox(mode = 'start_up')
 
-        # transformation setup for petal and positioners
+        # transformation instance setup for petal
+        # these values can be used for anti-collision calculations
         if petal_loc is None:
-            self.petal_loc = 3
+            self.petal_loc = 3  # petal local CS aligns with focal plate CS5
         else:
             self.petal_loc = petal_loc
-        self.trans = PetalTransforms()
         if CONSTANTSDB_AVAILABLE:
             constants = ConstantsDB().get_constants(
                 snapshot='DOS', tag='CURRENT', group='focal_plane_metrology')
@@ -191,9 +191,10 @@ class Petal(object):
             ptl_off_x = constants[self.petal_loc]['petal_offset_x']
             ptl_off_y = constants[self.petal_loc]['petal_offset_y']
         else:
-            ptl_rot = ptl_state.conf['ROTATION']
-            ptl_xos = ptl_state.conf['X_OFFSET']
-            ptl_yos = ptl_state.conf['Y_OFFSET']
+            ptl_rot_z = self.petal_state.conf['ROTATION']
+            ptl_off_x = self.petal_state.conf['X_OFFSET']
+            ptl_off_y = self.petal_state.conf['Y_OFFSET']
+        self.trans = PetalTransforms()
 
 # METHODS FOR POSITIONER CONTROL
 
