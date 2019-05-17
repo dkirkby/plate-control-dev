@@ -856,10 +856,8 @@ class Petal(object):
                     fid_commit_list.append(state)
             if len(pos_commit_list) != 0:
                 self.posmoveDB.WriteToDB(pos_commit_list,self.petal_id,'pos_move')
-                self.posmoveDB.WriteToDB(pos_commit_list,self.petal_id,'pos_calib')
             if len(fid_commit_list) != 0:
                 self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid_data')
-                self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid_calib')
         # avoid overwriting local config data and logs when testing in simulator mode
         # but stills allows DB commits above
         if not self.simulator_on:
