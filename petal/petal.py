@@ -179,7 +179,7 @@ class Petal(object):
             self.setup_petalbox(mode = 'start_up')
 
         # transformation instance setup for petal
-        # these values can be used for anti-collision calculations
+        # these values can be used for boundary calculation in anti-collision
         if petal_loc is None:
             self.petal_loc = 3  # petal local CS aligns with focal plate CS5
         else:
@@ -187,14 +187,14 @@ class Petal(object):
         if CONSTANTSDB_AVAILABLE:
             constants = ConstantsDB().get_constants(
                 snapshot='DOS', tag='CURRENT', group='focal_plane_metrology')
-            ptl_rot_z = constants[self.petal_loc]['petal_rot_z']
-            ptl_off_x = constants[self.petal_loc]['petal_offset_x']
-            ptl_off_y = constants[self.petal_loc]['petal_offset_y']
-        else:
-            ptl_rot_z = self.petal_state.conf['ROTATION']
-            ptl_off_x = self.petal_state.conf['X_OFFSET']
-            ptl_off_y = self.petal_state.conf['Y_OFFSET']
-        self.trans = PetalTransforms()
+            gamma = constants[str(self.petal_loc)]['petal_rot_z']
+            Tx = constants[str(self.petal_loc)]['petal_offset_x']
+            Ty = constants[str(self.petal_loc)]['petal_offset_y']
+        else:  # DB unavailable, read from petal config
+            gamma = self.petal_state.conf['ROTATION']
+            Tx = self.petal_state.conf['X_OFFSET']
+            Ty = self.petalssscss_state.conf['Y_OFFSET']
+        self.trans = PetalTransforms(Tx=Tx, Ty=Ty, gamma=gamma)
 
 # METHODS FOR POSITIONER CONTROL
 
@@ -867,7 +867,7 @@ class Petal(object):
                     state.write()  # this writes posstate to local config
             if self.local_log_on:
                 for state in self.altered_states:
-                    state.log_unit()  # this write the local log
+                    state.log_unit()  # this writes the local log
         self.altered_states = set()
 
     def expected_current_position(self, posid, key):
