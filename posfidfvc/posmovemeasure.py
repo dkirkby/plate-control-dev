@@ -350,7 +350,9 @@ class PosMoveMeasure(object):
                         petal.set_posfid_val(posid,'OFFSET_Y',xy[1])
                         self.printfunc(posid + ': Set OFFSET_X to ' + self.fmt(xy[0]))
                         self.printfunc(posid + ': Set OFFSET_Y to ' + self.fmt(xy[1]))
+                        petal.altered_calib_states.add(petal.posmdels[posid].state)
         self.commit() # log note is already handled above
+        self.commit_calib()
         if self.fvc.fvcproxy and wide_spotmatch:
             self.fvc.fvcproxy.set(match_radius = old_spotmatch_radius)
             self.printfunc('Spotmatch radius restored to ' + str(old_spotmatch_radius) + '.')
@@ -407,7 +409,9 @@ class PosMoveMeasure(object):
             total_angle = abs(total_angle)
             if data[posid]['petal'].posmodels[posid].is_enabled:
                 data[posid]['petal'].set_posfid_val(posid,parameter_name,total_angle)
+                data[posid]['petal'].altered_calib_states.add(data[posid]['petal'].posmodels[posid].state)
         self.commit(log_note='range measurement complete')
+        self.commit_calib()
         self.rehome(posids)
         self.one_point_calibration(posids, mode='posTP')
 
@@ -474,8 +478,9 @@ class PosMoveMeasure(object):
                     files.add(file)
         self.one_point_calibration(posids, mode='posTP', wide_spotmatch=False) # important to lastly update the internally-tracked theta and phi shaft angles
         self.commit(log_note = str(mode) + ' calibration complete')
-        if mode == 'arc' or mode == 'grid':
-            for petal in self.petals:
+        for petal in self.petals:
+            petal.commit_calib_DB()
+            if mode == 'arc' or mode == 'grid':
                 petal.collider.update_positioner_offsets_and_arm_lengths()
         return files
 
@@ -489,6 +494,7 @@ class PosMoveMeasure(object):
         self.move(requests) # go to starting point
         self._identify(None)
         self.commit()
+        self.commit_calib()
 
     def identify_many_enabled_positioners(self,posids):
         """ Identify a list of positioners one-by-one. All positioners are nudged first, then move back to homing positions one-by-one. 
@@ -564,8 +570,10 @@ class PosMoveMeasure(object):
                 this_petal.set_posfid_val(posid,'OFFSET_Y', prev_offset_y + err_y) # this works, assuming we have already have reasonable knowledge of theta and phi (having re-homed or rough-calibrated)^M
                 this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_X',measured_obsXY[0])
                 this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_Y',measured_obsXY[1])
+                this_petal.altered_calib_states.add(this_petal.posmodels[posid].state)
             xy_init=xy_meas
         self.commit()
+        self.commit_calib()
         self.rehome(posids='all')
 
 
@@ -585,6 +593,7 @@ class PosMoveMeasure(object):
             self.printfunc('Identifying location of positioner ' + posid + ' (' + str(n) + ' of ' + str(total) + ')')
             self._identify(posid)
         self.commit()
+        self.commit_calib()
 
     def identify_disabled_positioners(self):
         """Using a single image with everything lit up, associate all the remaining unknown dots to appropriate disabled positioners. For each dot:
@@ -883,6 +892,7 @@ class PosMoveMeasure(object):
                     posTP=this_petal.posmodels[posid].trans.obsXY_to_posTP(measured_obsXY)[0]
                     this_petal.set_posfid_val(posid,'POS_T',posTP[0])
                     this_petal.set_posfid_val(posid,'POS_P',posTP[1])
+                    this_petal.altered_calib_states.add(this_petal.posmodels[posid].state)
                     if move_arr[index]:
                         this_petal.set_posfid_val(posid,'CTRL_ENABLED',True)
                         plt.text(this_xy[0],this_xy[1],posid,fontsize=2.5,color='blue')
@@ -890,6 +900,7 @@ class PosMoveMeasure(object):
                         this_petal.set_posfid_val(posid,'CTRL_ENABLED',False)
                         plt.text(this_xy[0],this_xy[1],posid,fontsize=2.5,color='red')
         self.commit()
+        self.commit_calib()
         plt.legend(loc=2)
 
         plt.subplot(212)
@@ -963,6 +974,13 @@ class PosMoveMeasure(object):
         """
         for ptl in self.petals:
             ptl.commit(log_note=log_note)
+
+     def commit_calib(self,log_note=''):
+        """Commit state data controlled by all petals to storage.
+        See commit function in petal.py for explanation of optional additional log note.
+        """
+        for ptl in self.petals:
+            ptl.commit_calib_DB()
     
     def set_fiducials(self, setting='on'):
         """Apply uniform settings to all fiducials on all petals simultaneously.
@@ -1289,6 +1307,7 @@ class PosMoveMeasure(object):
             for key in param_keys:
                 if petal.posmodels[posid].is_enabled:
                     petal.set_posfid_val(posid, key, data[posid][key][-1])
+            petal.altered_calib_states.add(petal.posmodels[posid].state)
                 self.printfunc('Grid calib on ' + str(posid) + ': ' + key + ' set to ' + format(data[posid][key][-1],'.3f'))
             data[posid]['final_expected_obsXY'] = np.array(expected_xy(params_optimized.x)).transpose().tolist()
         return data
@@ -1382,6 +1401,7 @@ class PosMoveMeasure(object):
             else:
                 self.printfunc(posid + ': measurement proposed GEAR_CALIB_T = ' + format(ratio_T,'.6f'))
                 self.printfunc(posid + ': measurement proposed GEAR_CALIB_P = ' + format(ratio_P,'.6f'))
+            ptl.altered_calib_states.add(ptl.posmodels[posid].state)
         return data
 
     def _remove_outlier_calibration_points(self, data, mode):
@@ -1510,6 +1530,7 @@ class PosMoveMeasure(object):
                 this_petal.set_posfid_val(posid,'OFFSET_Y', prev_offset_y + err_y) # this works, assuming we have already have reasonable knowledge of theta and phi (having re-homed or rough-calibrated)
                 this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_X',measured_obsXY[0])
                 this_petal.set_posfid_val(posid,'LAST_MEAS_OBS_Y',measured_obsXY[1])
+                this_petal.altered_calib_states.add(this_petal.posmodels[posid].state)
 
     def _simulate_measured_pixel_locations(self,xy_ref=[]):
         """Generates simulated locations in fvcXY space.
@@ -1613,6 +1634,8 @@ class PosMoveMeasure(object):
                         self.printfunc(posid + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
                     delta_TP[posid] = [delta_T,delta_P]
                     posmodel.state.next_log_notes.append('updated ' + param + '_T and ' + param + '_P after positioning error of ' + self.fmt(err_xy) + ' mm')
+                    if param = 'OFFSET':
+                        ptl.altered_calib_states.add(ptl.posmodels[posid].state)
         return delta_TP
     
     def _outside_of_tolerance_from_nominals(self, posid, r1, r2):

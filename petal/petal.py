@@ -10,7 +10,7 @@ import time
 import collections
 import os
 try:
-    import DBSingleton
+    from DBSingleton import * #DBSingleton in the code is a class inside the file DBSingleton of the same name
     DB_COMMIT_AVAILABLE = True
 except ImportError:
     DB_COMMIT_AVAILABLE = False
@@ -108,6 +108,7 @@ class Petal(object):
         self.local_commit_on = local_commit_on
         self.local_log_on = local_log_on
         self.altered_states = set()
+        self.altered_calib_states = set()
         self.pb_config = pb_config
 
         # positioners setup
@@ -869,6 +870,25 @@ class Petal(object):
                 for state in self.altered_states:
                     state.log_unit()  # this writes the local log
         self.altered_states = set()
+
+    def commit_calib_DB(self, *args, **kwargs):
+        '''Commit data to the pos_calib table. This is to be called at the end of a calibration
+        sequence. No local commit option since local calibration recordings are andled in the
+        commit function.
+        ''' 
+        if self.db_commit_on:
+            pos_commit_list = []
+            fid_commit_list = []
+            for state in self.altered_calib_states:
+                if state.type == 'pos':
+                    pos_commit_list.append(state)
+                elif state.type == 'fid':
+                    fid_commit_list.append(state)
+            if len(pos_commit_list) != 0:
+                self.posmoveDB.WriteToDB(pos_commit_list,self.petal_id,'pos_calib')
+            if len(fid_commit_list) != 0:
+                self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid_calib')
+        return
 
     def expected_current_position(self, posid, key):
         """Retrieve the current position, for a positioner identied by posid, according
