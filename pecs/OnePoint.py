@@ -41,6 +41,6 @@ if __name__ == '__main__':
 		mode = 'posTP'
 	else:
 		mode = user_text
-	dtdp, updates = one_point_calib(selection=selection, mode=mode)
+	dtdp, updates = op.one_point_calib(selection=selection, mode=mode)
 	print(updates)
 	

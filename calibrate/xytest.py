@@ -15,63 +15,54 @@ import petal
 import posconstants as pc
 import summarizer
 import pos_xytest_plot
-import tkinter
-import tkinter.filedialog
-import tkinter.messagebox
-import tkinter.simpledialog
+from fptestdata import FPTestData
 
 
 class XYTest(object):
-    """XYTest handles running a fiber positioner xy accuracy test.
+    """XYTest handles running a fiber positioner xy accuracy test for a petal.
     It supports being called repeatedly in a loop, with variable settings for
-    each loop in terms of number of calibration moves, number of test moves,
+    each loop in terms of number of number of test moves,
     number of unmeasured life moves, number of hardstop slams, etc.
     The idea is that we can really tailor a robust test suite into
     a single automated setup.
     """
 
-    def __init__(self, hwsetup_conf='', xytest_conf=''):
-        """For the inputs hwsetup_conf and xytest_conf, you typically would leave these as the default empty
-        string. This causes a gui file picker to come up. For debug purposes, if you want to short-circuit the
-        gui because it is annoying, then you could argue a filename here. Templates for configfiles are found
+    def __init__(self, test_name, hwsetup_conf, xytest_conf):
+        """For the inputs hwsetup_conf and xytest_conf, you typically would
+        leave these as the default empty string. This causes a gui file picker
+        to come up. For debug purposes, if you want to short-circuit the
+        gui because it is annoying, then you could argue a filename here.
+        Templates for configfiles are found
         in the DESI svn at
             https://desi.lbl.gov/svn/code/focalplane/fp_settings/hwsetups/
             https://desi.lbl.gov/svn/code/focalplane/fp_settings/test_settings/
         """
-        # set up configuration and traveler files that goes with this test, and begin logging
-        gui_root = tkinter.Tk()
-        if not(hwsetup_conf):
-            message = "Select hardware setup file."
-            hwsetup_conf = tkinter.filedialog.askopenfilename(initialdir=pc.dirs['hwsetups'], filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
-        if not(xytest_conf):
-            message = "Select test configuration file."
-            xytest_conf = tkinter.filedialog.askopenfilename(initialdir=pc.dirs['test_settings'], filetypes=(("Config file","*.conf"),("All Files","*")), title=message)
-        if not(hwsetup_conf) or not(xytest_conf):
-            tkinter.messagebox.showwarning(title='Files not found.',message='Not all configuration files specified. Exiting program.')
-            gui_root.withdraw()
-            sys.exit(0)
-        gui_root.withdraw()
 
-        self.hwsetup_conf = ConfigObj(hwsetup_conf,unrepr=True,encoding='utf-8')
-        self.xytest_conf = ConfigObj(xytest_conf,unrepr=True,encoding='utf-8')
-        self.starting_loop_number = self.xytest_conf['current_loop_number']
-        self.n_loops = self._calculate_and_check_n_loops()
-        if self.starting_loop_number == 0:
-            # The status file is used to maintain current status of the test in case of test disruption.
-            self.xytest_conf.filename = pc.dirs['temp_files'] + 'xytest_status.conf'
-            self.xytest_logfile = pc.dirs['xytest_logs'] + pc.filename_timestamp_str_now() + '_' + os.path.splitext(os.path.basename(xytest_conf))[0] + '.log'
-            self.xytest_conf['logfile']=self.xytest_logfile
-            self.xytest_conf.write()
-            self.track_file(self.xytest_logfile, commit='always')
-            self.logwrite(' *** BEGIN TEST LOG ***',False) # just for formatting
-            self.logwrite('HARDWARE SETUP FILE: ' + hwsetup_conf)
-            self.logwrite_conf(hwsetup_conf)
-            self.logwrite('TEST TEMPLATE FILE: ' + xytest_conf)
-            self.logwrite_conf(xytest_conf)
-            self.logwrite('Test traveler file:' + self.xytest_conf.filename)
-        else:
-            self.xytest_logfile=self.xytest_conf['logfile']
-            self.logwrite('*** RESTARTING TEST AT ' + pc.ordinal_str(self.starting_loop_number + 1).upper() + ' LOOP *** (index ' + str(self.starting_loop_number) + ')')
+        self.test_name = test_name
+        # load config and traveler files, begin logging
+        self.hwsetup_conf = ConfigObj(hwsetup_conf, unrepr=True,
+                                      encoding='utf-8')
+        self.xytest_conf = ConfigObj(xytest_conf, unrepr=True,
+                                     encoding='utf-8')
+        petal_id = self.hwsetup_conf['ptl_id']
+        # set up debugging data storage and logger
+        self.data = FPTestData(test_name, petal_id)
+        self.logger = self.data.logger  # use this logger to write to logs
+        
+        
+        
+        # The status file is used to maintain current status of the test in case of test disruption.
+        self.xytest_conf.filename = pc.dirs['temp_files'] + 'xytest_status.conf'
+        self.xytest_logfile = pc.dirs['xytest_logs'] + pc.filename_timestamp_str_now() + '_' + os.path.splitext(os.path.basename(xytest_conf))[0] + '.log'
+        self.xytest_conf['logfile']=self.xytest_logfile
+        self.xytest_conf.write()
+        self.track_file(self.xytest_logfile, commit='always')
+        self.logwrite(' *** BEGIN TEST LOG ***',False) # just for formatting
+        self.logwrite('HARDWARE SETUP FILE: ' + hwsetup_conf)
+        self.logwrite_conf(hwsetup_conf)
+        self.logwrite('TEST TEMPLATE FILE: ' + xytest_conf)
+        self.logwrite_conf(xytest_conf)
+        self.logwrite('Test traveler file:' + self.xytest_conf.filename)
         self.logwrite('Total number of test loops: ' + str(self.n_loops))
         self.logwrite('Code version: ' + pc.code_version)
                 
@@ -126,7 +117,6 @@ class XYTest(object):
         self.logwrite('Fiducials: ' + str(fidids))
         self.logwrite('Petal: ' + str(ptl_id))
         self.m.make_plots_during_calib = self.xytest_conf['should_make_plots']
-        self.logwrite('Automatic generation of calibration and submove plots is turned ' + ('ON' if self.xytest_conf['should_make_plots'] else 'OFF') + '.')
         self.logwrite('PosMoveMeasure initialized.')
         fid_settings_done = self.m.set_fiducials('on')
         self.logwrite('Fiducials turned on: ' + str(fid_settings_done))
@@ -146,91 +136,6 @@ class XYTest(object):
             self.summarizers[posid] = summarizer.Summarizer(state,summarizer_init_data)
             self.track_file(self.summarizers[posid].filename, commit='always')
         self.logwrite('Data summarizers for all positioners initialized.')
-
-        # set up lookup table for random targets
-        self.rand_xy_targs_idx = 0 # where we are in the random targets list
-        self.rand_xy_targs_list = []
-        targs_file = pc.dirs['test_settings'] + self.xytest_conf['rand_xy_targs_file']
-        with open(targs_file, newline='') as csvfile:
-            reader = csv.reader(csvfile)
-            header_rows_remaining = 1
-            for row in reader:
-                if header_rows_remaining:
-                    header_rows_remaining -= 1
-                else:
-                    self.rand_xy_targs_list.append([float(row[0]),float(row[1])])
-        self.logwrite('Random targets file: ' + targs_file)
-        self.logwrite('Random targets file length: ' + str(len(self.rand_xy_targs_list)) + ' targets')
-
-    def run_range_measurement(self, loop_number):
-        set_as_defaults = self.xytest_conf['set_meas_calib_as_new_defaults'][loop_number]
-        params = ['PHYSICAL_RANGE_T','PHYSICAL_RANGE_P']
-        if self.xytest_conf['should_measure_ranges'][loop_number]:
-            if not(set_as_defaults):
-                self.collect_calibrations()
-            start_time = time.time()
-            self.logwrite('Starting physical travel range measurement sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
-            self.m.measure_range(posids='all', axis='theta')
-            self.m.measure_range(posids='all', axis='phi')
-            for posid in self.posids:
-                state = self.m.state(posid)
-                self.track_file(state.log_path, commit='once')
-                self.track_file(state.conf.filename, commit='always')
-                for key in params:
-                    self.logwrite(str(posid) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
-            for posid in self.posids:
-                self.summarizers[posid].update_loop_calibs(summarizer.meas_suffix, params)
-            if not(set_as_defaults):
-                self.restore_calibrations()
-            self.logwrite('Calibration of physical travel ranges completed in ' + self._elapsed_time_str(start_time) + '.')
-        for posid in self.posids:
-            self.summarizers[posid].update_loop_calibs(summarizer.used_suffix, params)
-
-    def run_calibration(self, loop_number):
-        """Move positioners through a short sequence to calibrate them.
-        """
-        n_pts_calib_T = self.xytest_conf['n_points_calib_T'][loop_number]
-        n_pts_calib_P = self.xytest_conf['n_points_calib_P'][loop_number]
-        calib_mode = self.xytest_conf['calib_mode'][loop_number]
-        set_as_defaults = self.xytest_conf['set_meas_calib_as_new_defaults'][loop_number]
-        try:
-            keepR1R2 = self.xytest_conf['keep_arm_old_armlengths'][loop_number]
-        except:
-            keepR1R2 = False
-        params = ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']
-        if n_pts_calib_T >= 4 and n_pts_calib_P >= 3:
-            if not(set_as_defaults):
-                self.collect_calibrations()
-            elif keepR1R2:
-                self.collect_calibrations()
-                params = ['OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']
-            start_time = time.time()
-            self.logwrite('Starting arc calibration sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
-            self.m.n_points_calib_T = n_pts_calib_T
-            self.m.n_points_calib_P = n_pts_calib_P
-            self.m.calibrate(posids='all', mode='rough')
-            files = self.m.calibrate(posids='all', mode=calib_mode, save_file_dir=pc.dirs['xytest_plots'], save_file_timestamp=pc.filename_timestamp_str_now())
-            for file in files:
-                self.track_file(file, commit='once')
-                self.logwrite('Calibration plot file: ' + file)
-            for posid in self.posids:
-                self.summarizers[posid].update_loop_calibs(summarizer.meas_suffix, params)
-            if not(set_as_defaults):
-                self.restore_calibrations()
-            else:
-                if keepR1R2:
-                    self.restore_calibrations(keys = ['LENGTH_R1','LENGTH_R2'])
-                for posid in self.posids:
-                    state = self.m.state(posid)
-                    self.track_file(state.log_path, commit='once')
-                    for key in params:
-                        self.logwrite(str(posid) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
-            self.logwrite('Calibration with ' + str(n_pts_calib_T) + ' theta points and ' + str(n_pts_calib_P) + ' phi points completed in ' + self._elapsed_time_str(start_time) + '.')
-        else:
-            self.m.one_point_calibration(posids='all', mode='posTP')
-        for posid in self.posids:
-            self.summarizers[posid].update_loop_calibs(summarizer.used_suffix, params)
-
 
     def run_xyaccuracy_test(self, loop_number):
         """Move positioners to a series of xy targets and measure performance.
@@ -388,22 +293,13 @@ class XYTest(object):
                     for filename in filenames:
                         self.logwrite(posid + ': Summary plot file: ' + filename)
                         self.track_file(filename, commit='once')
-
-            # Test report and email only on certain tests
-            # if self.xytest_conf['should_email']:
-            #     pass
-            #     test_report.do_test_report(self.posids, all_data_by_posid, log_timestamp, self.pos_notes, self._elapsed_time_str(start_time), self.xytest_conf['email_list'])
-        except (KeyboardInterrupt, SystemExit):
-            raise
         except:
-            # Email traceback to alert that test failed and why
-            # if self.xytest_conf['should_email']:
-            #     pass
-            #     test_report.email_error(traceback.format_exc(),log_timestamp)
             raise Exception('XYTest error')
-        self.logwrite(str(len(all_data_by_target)) + ' targets measured in ' + self._elapsed_time_str(start_time) + '.')
+        deltat = format((time.time()-start_time)/60/60, '.2f') + ' hrs'
+        self.logwrite(str(len(all_data_by_target)) + ' targets measured in '
+                      + deltat + '.')
 
-    def logwrite(self,text,stdout=True):
+    def logwrite(self,text,stdout=True,):
         """Standard logging function for writing to the test traveler log file.
         """
         line = '# ' + pc.timestamp_str_now() + ': ' + text
@@ -497,75 +393,25 @@ class XYTest(object):
             requests.append(these_targets)
         return requests
 
-    def collect_calibrations(self):
-        '''Store all the current positioner calibration values for future use.
-        Restore these with the restore_calibrations() method.
-        '''
-        self.calib_store = {}
-        for posid in self.posids:
-            self.calib_store[posid] = {}
-            ptl = self.m.petal(posid)
-            for calib_key in pc.nominals.keys():
-                self.calib_store[posid][calib_key] = ptl.get_posfid_val(posid,calib_key)
 
-    def restore_calibrations(self, keys = None):
-        '''Restore all the calibration values previously stored with the
-        collect_calibrations() method. Can argue which calib keys to reset.
-        '''
-        if not(keys):
-            keys = pc.nominals.keys()
-        for posid in self.posids:
-            for calib_key in keys:
-                ptl = self.m.petal(posid)
-                ptl.set_posfid_val(posid, calib_key, self.calib_store[posid][calib_key])
-        for ptl in self.m.petals:
-            ptl.commit(log_note='xytest restoring old calibration values (if necessary)')
-
-    def _calculate_and_check_n_loops(self):
-        """Returns total number of loops in test configuration.
-        (Also checks that all params in config file are consistent.)
-        """
-        keys = ['n_pts_across_grid','n_points_calib_T','n_points_calib_P','num_corr_max','should_measure_ranges','cruise_current_override','creep_current_override']
-        all_n = [len(self.xytest_conf[key]) for key in keys]
-        n = max(all_n) # if all lengthss are same, then they must all be as long as the longest one
-        all_same = True
-        for i in range(len(keys)):
-            if all_n[i] != n:
-                self.logwrite('Error: ' + keys[i] + ' has only ' + str(all_n[i]) + ' entries (expected ' + str(n) + ')')
-                all_same = False
-        if not(all_same):
-            sys.exit('Not all loop lengths the same in config file ' + self.xytest_conf.filename)
-        else:
-            return n
-    
-    def _elapsed_time_str(self,start_time):
-        """Standard string for elapsed time.
-        """
-        return format((time.time()-start_time)/60/60,'.2f') + ' hrs'
-      
-
-if __name__=="__main__":
-    hwsetup_conf=''
-    xytest_conf=''    
-    test = XYTest(hwsetup_conf=hwsetup_conf,xytest_conf=xytest_conf)
-    test.get_svn_credentials()
+if __name__ == "__main__":
+    hwsetup_conf_path = os.path.join(pc.dirs['hwsetups'],
+                                     'xytest_template.conf')
+    xytest_conf_path = os.path.join(pc.dirs['test_settings'],
+                                    'xytest_template.conf')
+    test = XYTest(hwsetup_conf=hwsetup_conf_path, xytest_conf=xytest_conf_path)
     test.logwrite('Start of positioner performance test.')
     test.m.park(posids='all')
-    for loop_num in range(test.starting_loop_number, test.n_loops):
-        test.xytest_conf['current_loop_number'] = loop_num
-        test.xytest_conf.write()
-        test.logwrite('Starting xy test in loop ' + str(loop_num + 1) + ' of ' + str(test.n_loops))
-        test.set_current_overrides(loop_num)
-        test.run_range_measurement(loop_num)
-        test.run_calibration(loop_num)
-        test.run_xyaccuracy_test(loop_num)
-        test.clear_current_overrides()
-        test.svn_add_commit(keep_creds=True)
+
+    test.xytest_conf['current_loop_number'] = loop_num
+    test.xytest_conf.write()
+    test.logwrite('Starting xy test in loop ' + str(loop_num + 1) + ' of ' + str(test.n_loops))
+    test.set_current_overrides(loop_num)
+    test.run_xyaccuracy_test(loop_num)
+    test.clear_current_overrides()
     test.logwrite('All test loops complete.')
     test.m.park(posids='all')
     test.logwrite('Moved positioners into \'parked\' position.')
     for petal in test.m.petals:
         petal.schedule_stats.save()
     test.logwrite('Test complete.')
-    test.track_all_poslogs_once()
-    test.svn_add_commit(keep_creds=False)
