@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri May 24 17:46:45 2019
+
+@author: Duan Yutong
+"""
+
 import os
 import sys
 import numpy as np
@@ -5,6 +12,7 @@ import math
 import time
 from astropy.io import ascii
 from configobj import ConfigObj
+from datetime import datetime
 import csv
 sys.path.append(os.path.abspath('../petal/'))
 sys.path.append(os.path.abspath('../posfidfvc/'))
@@ -15,19 +23,25 @@ import petal
 import posconstants as pc
 import summarizer
 import pos_xytest_plot
+from pecs import PECS
 from fptestdata import FPTestData
 
 
-class XYTest(object):
+class XYTest(PECS):
     """XYTest handles running a fiber positioner xy accuracy test for a petal.
     It supports being called repeatedly in a loop, with variable settings for
     each loop in terms of number of number of test moves,
     number of unmeasured life moves, number of hardstop slams, etc.
     The idea is that we can really tailor a robust test suite into
     a single automated setup.
+
+    Input:
+        test_name:      string
+        petal_cfgs:     list of petal config objects
+        xytest_cfg:     config object for xy test settings
     """
 
-    def __init__(self, test_name, hwsetup_conf, xytest_conf):
+    def __init__(self, test_name, petal_cfgs, xytest_cfg):
         """For the inputs hwsetup_conf and xytest_conf, you typically would
         leave these as the default empty string. This causes a gui file picker
         to come up. For debug purposes, if you want to short-circuit the
@@ -37,26 +51,24 @@ class XYTest(object):
             https://desi.lbl.gov/svn/code/focalplane/fp_settings/hwsetups/
             https://desi.lbl.gov/svn/code/focalplane/fp_settings/test_settings/
         """
-
         self.test_name = test_name
-        # load config and traveler files, begin logging
-        self.hwsetup_conf = ConfigObj(hwsetup_conf, unrepr=True,
-                                      encoding='utf-8')
-        self.xytest_conf = ConfigObj(xytest_conf, unrepr=True,
-                                     encoding='utf-8')
-        petal_id = self.hwsetup_conf['ptl_id']
-        # set up debugging data storage and logger
-        self.data = FPTestData(test_name, petal_id)
-        self.logger = self.data.logger  # use this logger to write to logs
-        
+        self.data = FPTestData(test_name, petal_cfgs, xytest_cfg)
+        PECS.__init__(self, )
+
+
+
+        ptlid = str(self.hwsetup_conf['ptl_id']       )
+        self.loggers = self.data.loggers  # use this logger to write to logs
+
+        # write config files to log
+        self.logger.DEBUG('=== HW setup config ===')
+        self.logger.DEBUG()
         
         
         # The status file is used to maintain current status of the test in case of test disruption.
-        self.xytest_conf.filename = pc.dirs['temp_files'] + 'xytest_status.conf'
         self.xytest_logfile = pc.dirs['xytest_logs'] + pc.filename_timestamp_str_now() + '_' + os.path.splitext(os.path.basename(xytest_conf))[0] + '.log'
         self.xytest_conf['logfile']=self.xytest_logfile
         self.xytest_conf.write()
-        self.track_file(self.xytest_logfile, commit='always')
         self.logwrite(' *** BEGIN TEST LOG ***',False) # just for formatting
         self.logwrite('HARDWARE SETUP FILE: ' + hwsetup_conf)
         self.logwrite_conf(hwsetup_conf)
@@ -395,23 +407,25 @@ class XYTest(object):
 
 
 if __name__ == "__main__":
-    hwsetup_conf_path = os.path.join(pc.dirs['hwsetups'],
-                                     'xytest_template.conf')
-    xytest_conf_path = os.path.join(pc.dirs['test_settings'],
-                                    'xytest_template.conf')
-    test = XYTest(hwsetup_conf=hwsetup_conf_path, xytest_conf=xytest_conf_path)
-    test.logwrite('Start of positioner performance test.')
-    test.m.park(posids='all')
-
-    test.xytest_conf['current_loop_number'] = loop_num
-    test.xytest_conf.write()
-    test.logwrite('Starting xy test in loop ' + str(loop_num + 1) + ' of ' + str(test.n_loops))
-    test.set_current_overrides(loop_num)
-    test.run_xyaccuracy_test(loop_num)
-    test.clear_current_overrides()
-    test.logwrite('All test loops complete.')
-    test.m.park(posids='all')
-    test.logwrite('Moved positioners into \'parked\' position.')
-    for petal in test.m.petals:
-        petal.schedule_stats.save()
-    test.logwrite('Test complete.')
+    hwsetup_path = os.path.join(pc.dirs['hwsetups'], 'hwsetup_sim1.conf')
+    xytest_path = os.path.join(pc.dirs['test_settings'],
+                               'xytest_template.conf')
+    hwsetup_cfg = ConfigObj(hwsetup_path, unrepr=True, encoding='utf-8')
+    xytest_cfg = ConfigObj(xytest_path, unrepr=True, encoding='utf-8')
+    test = XYTest(test_name='xytest_0',
+                  petal_cfgs=[hwsetup_cfg], xytest_cfg=xytest_cfg)
+#    test.logwrite('Start of positioner performance test.')
+#    test.m.park(posids='all')
+#
+#    test.xytest_conf['current_loop_number'] = loop_num
+#    test.xytest_conf.write()
+#    test.logwrite('Starting xy test in loop ' + str(loop_num + 1) + ' of ' + str(test.n_loops))
+#    test.set_current_overrides(loop_num)
+#    test.run_xyaccuracy_test(loop_num)
+#    test.clear_current_overrides()
+#    test.logwrite('All test loops complete.')
+#    test.m.park(posids='all')
+#    test.logwrite('Moved positioners into \'parked\' position.')
+#    for petal in test.m.petals:
+#        petal.schedule_stats.save()
+#    test.logwrite('Test complete.')
