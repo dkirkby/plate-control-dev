@@ -1,36 +1,36 @@
 import os
 import sys
+import numpy as np
+import math
+import time
+from astropy.io import ascii
+from configobj import ConfigObj
+import csv
 sys.path.append(os.path.abspath('../petal/'))
-import posmovemeasure
 sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../xytest/'))
+import posmovemeasure
 import fvchandler
 import petal
 import posconstants as pc
 import summarizer
-import numpy as np
-import math
-import time
 import pos_xytest_plot
-import traceback
-import configobj
 import tkinter
 import tkinter.filedialog
 import tkinter.messagebox
 import tkinter.simpledialog
-import csv
-import collections
-import getpass
-from astropy.io import ascii
+
 
 class XYTest(object):
-    """XYTest handles running a fiber positioner xy accuracy test. It supports being called
-    repeatedly in a loop, with variable settings for each loop in terms of number of calibration
-    moves, number of test moves, number of unmeasured life moves, number of hardstop slams, etc.
-    The idea is that we can really tailor a robust test suite into a single automated setup.
+    """XYTest handles running a fiber positioner xy accuracy test.
+    It supports being called repeatedly in a loop, with variable settings for
+    each loop in terms of number of calibration moves, number of test moves,
+    number of unmeasured life moves, number of hardstop slams, etc.
+    The idea is that we can really tailor a robust test suite into
+    a single automated setup.
     """
 
-    def __init__(self,hwsetup_conf='',xytest_conf=''):
+    def __init__(self, hwsetup_conf='', xytest_conf=''):
         """For the inputs hwsetup_conf and xytest_conf, you typically would leave these as the default empty
         string. This causes a gui file picker to come up. For debug purposes, if you want to short-circuit the
         gui because it is annoying, then you could argue a filename here. Templates for configfiles are found
@@ -52,8 +52,8 @@ class XYTest(object):
             sys.exit(0)
         gui_root.withdraw()
 
-        self.hwsetup_conf = configobj.ConfigObj(hwsetup_conf,unrepr=True,encoding='utf-8')
-        self.xytest_conf = configobj.ConfigObj(xytest_conf,unrepr=True,encoding='utf-8')
+        self.hwsetup_conf = ConfigObj(hwsetup_conf,unrepr=True,encoding='utf-8')
+        self.xytest_conf = ConfigObj(xytest_conf,unrepr=True,encoding='utf-8')
         self.starting_loop_number = self.xytest_conf['current_loop_number']
         self.n_loops = self._calculate_and_check_n_loops()
         if self.starting_loop_number == 0:
@@ -62,7 +62,6 @@ class XYTest(object):
             self.xytest_logfile = pc.dirs['xytest_logs'] + pc.filename_timestamp_str_now() + '_' + os.path.splitext(os.path.basename(xytest_conf))[0] + '.log'
             self.xytest_conf['logfile']=self.xytest_logfile
             self.xytest_conf.write()
-            self.new_and_changed_files = collections.OrderedDict()  # keeps track of all files that need to be added / committed to SVN
             self.track_file(self.xytest_logfile, commit='always')
             self.logwrite(' *** BEGIN TEST LOG ***',False) # just for formatting
             self.logwrite('HARDWARE SETUP FILE: ' + hwsetup_conf)
@@ -73,7 +72,6 @@ class XYTest(object):
         else:
             self.xytest_logfile=self.xytest_conf['logfile']
             self.logwrite('*** RESTARTING TEST AT ' + pc.ordinal_str(self.starting_loop_number + 1).upper() + ' LOOP *** (index ' + str(self.starting_loop_number) + ')')
-            self.new_and_changed_files = self.xytest_conf['new_and_changed_files']
         self.logwrite('Total number of test loops: ' + str(self.n_loops))
         self.logwrite('Code version: ' + pc.code_version)
                 
@@ -143,11 +141,6 @@ class XYTest(object):
         summarizer_init_data['ranges remeasured']   = None
         summarizer_init_data['xytest log file']     = os.path.basename(self.xytest_logfile)
         summarizer_init_data['code version']        = pc.code_version
-        user_vals = self.intro_questions()
-        for key in user_vals.keys():
-            self.logwrite('user-entry: ' + key + ': ' + user_vals[key])
-            summarizer_init_data[key] = user_vals[key]
-        summarizer_init_data['operator notes'] = self.get_and_log_comments_from_user()
         for posid in self.posids:
             state = self.m.state(posid)
             self.summarizers[posid] = summarizer.Summarizer(state,summarizer_init_data)
@@ -168,39 +161,6 @@ class XYTest(object):
                     self.rand_xy_targs_list.append([float(row[0]),float(row[1])])
         self.logwrite('Random targets file: ' + targs_file)
         self.logwrite('Random targets file length: ' + str(len(self.rand_xy_targs_list)) + ' targets')
-        
-    def intro_questions(self):
-        print('Please enter the following data. Hit blank if unknown or unmeasured.')
-        keys = summarizer.user_data_keys.copy()
-        keys.remove('operator notes') # this one is handled separately in get_and_log_comments_from_user()
-        user_vals = collections.OrderedDict.fromkeys(keys)
-        for key in user_vals.keys():
-            user_vals[key] = input(key + ': ')
-        print('')
-        print('You entered:')
-        nchar = max([len(key) for key in user_vals.keys()])
-        for key in user_vals.keys():
-            print('  ' + format(key + ':',str(nchar + 2) + 's') + user_vals[key])
-        print('')
-        try_again = input('If this is ok, hit enter to continue. Otherwise, type any character and enter to start over: ')
-        if try_again:
-            return self.intro_questions()
-        else:
-            return user_vals
-        
-    def get_and_log_comments_from_user(self):
-        print('\nPlease enter any specific observations or notes about this test. These will be recorded into the test log. You can keep on entering notes until you hit enter on a blank line.',end=' ')
-        thanks_msg = False
-        notes = []
-        note = input('observation/note: ')
-        while note:
-            self.logwrite('user-entry: OBSERVATION/NOTE: ' + note)
-            notes.append(note)
-            note = input('observation/note: ')
-            thanks_msg = True
-        if thanks_msg:
-            print('Thank you, notes entered into log at ' + self.xytest_conf.filename)   
-        return notes
 
     def run_range_measurement(self, loop_number):
         set_as_defaults = self.xytest_conf['set_meas_calib_as_new_defaults'][loop_number]
@@ -442,66 +402,6 @@ class XYTest(object):
             #     test_report.email_error(traceback.format_exc(),log_timestamp)
             raise Exception('XYTest error')
         self.logwrite(str(len(all_data_by_target)) + ' targets measured in ' + self._elapsed_time_str(start_time) + '.')
-        
-    def get_svn_credentials(self):
-        '''Query the user for credentials to the SVN, and store them.'''
-        if not self.simulate:
-            self.logwrite('Querying the user for SVN credentials. These will not be written to the log file.')
-            print('')
-            [svn_user, svn_pass, err] = self.simple_svn_creds() #ask_user_for_creds(should_simulate=self.simulate)
-
-            if err:
-                self.logwrite('SVN credential failure. Logs will have to be manually uploaded to SVN after the test. This is very BAD, and needs to be resolved.')
-                self.svn_user = ''
-                self.svn_pass = ''
-            else:
-                self.logwrite('SVN user and pass verified.')
-                self.svn_user = svn_user
-                self.svn_pass = svn_pass
-        else:
-            self.logwrite('Skipped querying user for SVN credentials in simulation mode.')
-                
-    def svn_add_commit(self, keep_creds=False):
-        '''Commit logs through SVN.
-        
-        Optional keep_creds parameter instructs to *not* delete SVN user/pass after
-        this commit is complete. Otherwise they get automatically deleted.
-        '''
-        self.logwrite('Files changed or generated: ' + str(list(self.new_and_changed_files.keys())))
-        if not self.simulate:
-            if not(self.svn_user and self.svn_pass):
-                self.logwrite('No files were auto-committed to SVN due to lack of user / pass credentials.')
-            elif self.new_and_changed_files:
-                start_time = time.time()
-                print('Will attempt to commit the logs automatically now. This may take a while.')
-                n_total = 0
-                these_files_to_commit = ''
-                for file in self.new_and_changed_files.keys():
-                    should_commit = self.new_and_changed_files[file]
-                    if should_commit == 'always' or should_commit == 'once':
-                        these_files_to_commit += ' ' + file
-                        n_total += 1
-                print("these_files_to_commit")
-                print(these_files_to_commit)
-                print("")        
-                self.logwrite('Beginning add + commit of ' + str(n_total) + ' data files to SVN.')
-                err_add = os.system('svn add --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive ' + these_files_to_commit)
-                err_commit = os.system('svn commit --username ' + self.svn_user + ' --password ' + self.svn_pass + ' --non-interactive -m "autocommit from xytest script" ' + these_files_to_commit)
-                print('SVN upload attempt of ' + str(n_total) + ' data files returned: ' + str(err_add) + ' for ADD and ' + str(err_commit) + ' for COMMIT. (Return value of 0 means it was added/committed to the SVN ok.)')
-                for file in self.new_and_changed_files.keys():
-                    should_commit = self.new_and_changed_files[file]
-                    if should_commit == 'once' and err_add == 0 and err_commit == 0:
-                        self.new_and_changed_files[file] = 'do not commit'
-                if err_add != 0:
-                    print('Warning: not all data files ADDED correctly to SVN. Check through carefully and do this manually.')
-                if err_commit != 0:
-                    print('Warning: not all data files COMMITTED correctly to SVN. Check through carefully and do this manually.')
-                if not(keep_creds):
-                    del self.svn_user
-                    del self.svn_pass
-                print('SVN uploads completed in ' + self._elapsed_time_str(start_time))
-        else:
-            self.logwrite('Skipped committing files to SVN in simulation mode.')
 
     def logwrite(self,text,stdout=True):
         """Standard logging function for writing to the test traveler log file.
@@ -511,7 +411,7 @@ class XYTest(object):
             fh.write(line + '\n')
         if stdout:
             print(line)
-            
+
     def logwrite_conf(self,conf_file):
         """Standard function for copying a config file's contents to the test traveler log file.
         """
@@ -597,26 +497,6 @@ class XYTest(object):
             requests.append(these_targets)
         return requests
 
-    def track_file(self, filename, commit='always'):
-        """Use this to put new filenames into the list of new and changed files we keep track of.
-        This list gets put into the log later, and is also used for auto-updating of the SVN.
-        
-          commit ... 'always'        --> always commit this file to the SVN upon svn_add_commit
-                 ... 'once'          --> only commit this file to the SVN upon the next svn_add_commit
-                 ... 'do not commit' --> do not commit this file (anymore) to the SVN
-        """
-        self.new_and_changed_files[filename] = commit
-        self.xytest_conf['new_and_changed_files'] = self.new_and_changed_files
-        self.xytest_conf.write()
-        
-    def track_all_poslogs_once(self):
-        '''Special function to run track_file on all the latest pos logs, since they are kind of
-        a moving target. So it's nice to have a convenience function for that.
-        '''
-        for posid in self.posids:
-            state = self.m.state(posid)
-            self.track_file(state.log_path, commit='once')
-
     def collect_calibrations(self):
         '''Store all the current positioner calibration values for future use.
         Restore these with the restore_calibrations() method.
@@ -662,16 +542,7 @@ class XYTest(object):
         """Standard string for elapsed time.
         """
         return format((time.time()-start_time)/60/60,'.2f') + ' hrs'
-
-
-    def simple_svn_creds(self):
-        try:
-            svn_user=input("Please enter your SVN username: ")
-            svn_pass=getpass.getpass("Please enter your SVN password: ")      
-            svn_auth_err=False
-        except:
-            svn_auth_err=True
-        return svn_user, svn_pass, svn_auth_err            
+      
 
 if __name__=="__main__":
     hwsetup_conf=''
