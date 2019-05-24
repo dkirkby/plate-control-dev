@@ -148,17 +148,22 @@ fvc.scale = hwsetup['scale']
 posids = hwsetup['pos_ids']
 fidids = hwsetup['fid_ids']
 shape = 'asphere' if hwsetup['plate_type'] == 'petal' else 'flat'
-ptl = petal.Petal(hwsetup['ptl_id'], posids, fidids, simulator_on=sim, user_interactions_enabled=True, anticollision=None, petal_shape=shape)
+ptl = petal.Petal(hwsetup['ptl_id'], posids=posids, fidids=fidids, simulator_on=sim, user_interactions_enabled=True, anticollision=None, shape=shape)
 m = posmovemeasure.PosMoveMeasure([ptl],fvc)
 m.make_plots_during_calib = True
+#import pdb;pdb.set_trace()
 print('Automatic generation of calibration plots is turned ' + ('ON' if m.make_plots_during_calib else 'OFF') + '.')
+
 for ptl in m.petals:
-	for posmodel in ptl.posmodels:
-		new_and_changed_files.add(posmodel.state.conf.filename)
-		new_and_changed_files.add(posmodel.state.log_path)
-	for fidstate in ptl.fidstates.values():
-		new_and_changed_files.add(fidstate.conf.filename)
-		new_and_changed_files.add(fidstate.log_path)
+    for posid_this,posmodel in ptl.posmodels.items():
+        new_and_changed_files.add(posmodel.state.conf.filename)
+        new_and_changed_files.add(posmodel.state.log_path)
+    for id_this,state in ptl.states.items():
+        print(id_this)
+        if id_this.startswith('P') or id_this.startswith('F'):
+            new_and_changed_files.add(state.conf.filename)
+            new_and_changed_files.add(state.log_path)
+
 m.n_extradots_expected = hwsetup['num_extra_dots']
 
 # check ids with user
@@ -246,10 +251,13 @@ if should_identify_fiducials:
 		writer.writeheader()
 		for xy in m.extradots_fvcXY:
 			writer.writerow({'x_pix':xy[0],'y_pix':xy[1]})
+	ptl.set_fiducials(fidids,'on')
+        fid_settings_done = m.set_fiducials('on')
+
 else:
 	m.extradots_fvcXY = extradots_existing_data
 if should_identify_positioners:
-	m.identify_positioner_locations()
+	m.identify_many_enabled_positioners(posids) #m.identify_positioner_locations()
 m.calibrate(mode='rough')
 if not should_limit_range:
 	m.measure_range(axis='theta')
