@@ -12,21 +12,26 @@ Requires a running DOS Instance with one PetalApp
 (multiple petals are not supported at the moment)
 along with FVC, Spotmatch and Platemaker.
 
-Adding multi-petal support (Duan 05/24)
+Adding multi-petal support; it doesn't cost any more work now,
+but will simply our life so much (Duan 2019/05/24)
 
 '''
 
-from DOSlib.proxies import FVC, PETAL
+from DOSlib.proxies import FVC, Petal
 
 
-class PECS():
+class PECS:
 
     '''input:
-        petal_ids:  list of petal_ids, each petal_id is a string
+        ptlids:         list of petal ids, each petal id is a string
+        printfuncs:     dict of print functions, or a single print function
+                        (each petal may have its own print function or
+                         logger instance for log level filtering and
+                         log file separation purposes)
     '''
 
-    def __init__(self, ptlids=None, platemaker_instrument=None,
-                 fvc_role=None, printfunc=print):
+    def __init__(self, ptlids=None, platemaker_instrument=None, fvc_role=None,
+                 printfunc=print, simulate=False):
         if not(ptlids) and not(platemaker_instrument) and not(fvc_role):
             import configobj
             pecs_local = configobj.ConfigObj(
@@ -35,18 +40,30 @@ class PECS():
             ptlids = [pecs_local['ptl_id']]
             fvc_role = pecs_local['fvc_role']
         self.platemaker_instrument = platemaker_instrument
-        self.fvc_role = fvc_role
         self.ptlids = ptlids
+        if type(printfunc) is not dict:  # if a single printfunc is supplied
+            printfuncs = {ptlid: printfunc for ptlid in ptlids}
+        assert len(ptlids) == len(printfuncs.keys()), 'Input lengths mismatch'
+        self.printfuncs = printfuncs
         # create FVC to access functions in FVC proxy
-        self.fvc = FVC(self.platemaker_instrument, fvc_role=self.fvc_role)
-        self.printfunc(
-            'proxy FVC created for instrument %s' % self.fvc.get('instrument'))
-        self.ptls = {ptlid: PETAL(ptlid) for ptlid in ptlids}
-        self.printfunc(f'proxy petals created for {ptlids}')
+        self.fvc = FVC(self.platemaker_instrument, fvc_role=fvc_role)
+        self._print(
+            'FVC proxy created for instrument %s' % self.fvc.get('instrument'))
+        self.ptls = {}
+        for ptlid in ptlids:
+            self.ptls[ptlid] = Petal(petal_id=ptlid)
+            self.printfuncs[ptlid](f'Petal proxy created for {ptlid}')
+
+    def _print(self, msg):
+        '''self.printfuncs is a dict indexed by ptlids as specified for input,
+        this function prints to all of them for messages shared across petals
+        '''
+        for pf in self.printfuncs.values():
+            pf(msg)
 
     def call_petal(self, ptlid, command, *args, **kwargs):
         '''
         Call petal, command is a command listed in PetalApp.commands.
         Required args/kwargs can be passed along.
         '''
-        return self.ptls[ptlid]._send_command(command, *args, **kwargs)
+        return self.ptls[ptlid](command, *args, **kwargs)

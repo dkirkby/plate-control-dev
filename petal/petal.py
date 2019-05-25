@@ -56,7 +56,7 @@ class Petal(object):
                  printfunc=print, verbose=False,
                  user_interactions_enabled=False, anticollision='freeze',
                  collider_file=None, sched_stats_on=False, pb_config=False,
-                 fpa_metrology=None):
+                 fpa_metrology=None, debug_commit_on=False):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
         # petal setup
@@ -196,6 +196,9 @@ class Petal(object):
             Tx = self.petal_state.conf['X_OFFSET']
             Ty = self.petalssscss_state.conf['Y_OFFSET']
         self.trans = PetalTransforms(Tx=Tx, Ty=Ty, gamma=gamma)
+
+        # set debug mode flag
+        self.debug_commit_on = debug_commit_on
 
 # METHODS FOR POSITIONER CONTROL
 
