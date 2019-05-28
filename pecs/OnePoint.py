@@ -2,6 +2,8 @@
 Runs a one_point_calibration through petal and fvc proxies. Needs running DOS instance. See pecs.py
 '''
 from pecs import PECS
+import pandas
+from DOSlib.positioner_index import PositionerIndex
 
 class OnePoint(PECS):
 
@@ -9,18 +11,22 @@ class OnePoint(PECS):
 		PECS.__init__(petal_id=petal_id, platemaker_instrument=platemaker_instrument, fvc_role=fvc_role, printfunc=printfunc)
 		self.Eo_phi = 104.0
 		self.clear_angle_margin = 3.0
+		self.index = PositionerIndex()
 
 	def one_point_calib(self, selection=[],mode='posTP',auto_update=True,tp_target=[0,self.Eo_phi+self.clear_angle_margin]):
 		if not selection:
-			posid_list = self.call_petal('get_positioner_list', enabled_only=enabled_only)
+			posid_list = list(self.call_petal('get_positioner_list', enabled_only=enabled_only).loc[:'DEVICE_ID'])
 		elif posids[0][0] == 'c': #User passed busids
-			posid_list = self.call_petal('get_positioner_list', enabled_only=enabled_only, busids=selection)
+			posid_list = list(self.call_petal('get_positioner_list', enabled_only=enabled_only, busids=selection).loc[:,'DEVICE_ID'])
 		else: #assume is a list of posids
 			posid_list = selection
 		if tp_target:
-		requests = {} #May need different request structure in the future
+		requests = {'DEVICE_ID':[],'TARGET_X1':[],'TARGET_X2':[],'LOG_NOTE':[]}
 			for posid in posid_list:
-				requests[posid] = {'command':'ObsTP', 'target':tp_target, 'log_note':'One point calibration ' + mode}
+				requests['DEVICE_ID'].append(posid)
+				requests['TARGET_X1'].append(tp_target[0])
+				requests['TARGET_X2'].append(tp_target[1])
+				requests['LOG_NOTE'].append('One point calibration ' + mode)
 			self.call_petal('prepare_move', requests)
 			expected_positions = self.call_petal('execute_move')
 		else:
