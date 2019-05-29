@@ -105,6 +105,8 @@ class PosTransforms(object):
         """
         T = tp[0] - self.getval('OFFSET_T')
         P = tp[1] - self.getval('OFFSET_P')
+		#B141 T = tp[0] - (self.posmodel.state.read('OFFSET_T') if not self.alt_override else self.alt['OFFSET_T'])
+        #B141 P = tp[1] - (self.posmodel.state.read('OFFSET_P') if not self.alt_override else self.alt['OFFSET_P'])
         return [T, P]
 
     def posTP_to_obsTP(self, tp):
@@ -114,6 +116,8 @@ class PosTransforms(object):
         """
         T = tp[0] + self.getval('OFFSET_T')
         P = tp[1] + self.getval('OFFSET_P')
+		#B141 T = tp[0] + (self.posmodel.state.read('OFFSET_T') if not self.alt_override else self.alt['OFFSET_T'])
+        #B141 P = tp[1] + (self.posmodel.state.read('OFFSET_P') if not self.alt_override else self.alt['OFFSET_P'])
         return [T, P]
 
     def posTP_to_posXY(self, tp):
@@ -122,6 +126,8 @@ class PosTransforms(object):
         output: xy ... [posX,posY] global to focal plate, centered on optical axis, looking at fiber tips
         """
         r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
+		#B141 r = [self.posmodel.state.read('LENGTH_R1') if not self.alt_override else self.alt['LENGTH_R1'],
+             self.posmodel.state.read('LENGTH_R2') if not self.alt_override else self.alt['LENGTH_R2']]
         TP = self.posTP_to_obsTP(tp)  # adjust shaft angles into observer space (since observer sees the physical phi = 0)
         xy = self.tp2xy(TP, r)         # calculate xy in posXY space
         return xy
@@ -135,6 +141,8 @@ class PosTransforms(object):
         output: unreachable  ... boolean, True if no posTP exists that can achieve the requested posXY
         """
         r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
+		#B141 r = [self.posmodel.state.read('LENGTH_R1') if not self.alt_override else self.alt['LENGTH_R1'],
+             self.posmodel.state.read('LENGTH_R2') if not self.alt_override else self.alt['LENGTH_R2']]
         shaft_ranges = self.shaft_ranges(range_limits)
         obs_range_tptp = [self.posTP_to_obsTP([shaft_ranges[0][0],shaft_ranges[1][0]]), self.posTP_to_obsTP([shaft_ranges[0][1],shaft_ranges[1][1]])] # want range used in next line to be according to observer (since observer sees the physical phi = 0)
         obs_range=[[obs_range_tptp[0][0],obs_range_tptp[1][0]],[obs_range_tptp[0][1],obs_range_tptp[1][1]]]
@@ -149,6 +157,8 @@ class PosTransforms(object):
         """        
         X = xy[0] + self.getval('OFFSET_X')
         Y = xy[1] + self.getval('OFFSET_Y')
+		#B141 X = xy[0] + (self.posmodel.state.read('OFFSET_X') if not self.alt_override else self.alt['OFFSET_X'])
+        #B141 Y = xy[1] + (self.posmodel.state.read('OFFSET_Y') if not self.alt_override else self.alt['OFFSET_Y'])
         return [X, Y]
 
     def obsXY_to_posXY(self, xy):
@@ -158,6 +168,8 @@ class PosTransforms(object):
         """
         X = xy[0] - self.getval('OFFSET_X')
         Y = xy[1] - self.getval('OFFSET_Y')
+		#B141 X = xy[0] - (self.posmodel.state.read('OFFSET_X') if not self.alt_override else self.alt['OFFSET_X'])
+        #B141 Y = xy[1] - (self.posmodel.state.read('OFFSET_Y') if not self.alt_override else self.alt['OFFSET_Y'])
         return [X, Y]
 
     def obsXY_to_QS(self, xy):
