@@ -33,7 +33,7 @@ class PosState(object):
         self.logging = logging
 
         # data initialization from .conf file
-        if self.type in ['pos', 'fid', 'ptl']:
+        if device_type in ['pos', 'fid', 'ptl']:
             self.type = device_type
             self.settings_directory = pc.dirs[self.type + '_settings']
             self.logs_directory = pc.dirs[self.type + '_logs']
