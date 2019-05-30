@@ -15,8 +15,10 @@ FPTestData.loggers[petal_id]:       logger which writes new lines to log file
 import os
 import sys
 from datetime import datetime, timezone
+from itertools import product
 from io import StringIO
 from shutil import make_archive
+import numpy as np
 import pandas as pd
 import logging
 sys.path.append(os.path.abspath('../petal/'))
@@ -25,6 +27,8 @@ import posconstants as pc
 
 
 class FPTestData:
+    ''' data will be saved in xytest_data/{time}-{test_name}/PTL{ptlid}/*.csv
+    '''
 
     timefmt = '%Y-%m-%dT%H:%M:%S%z'
     timefmtpath = '%Y_%m_%d-%H_%M_%S%z'
@@ -32,20 +36,22 @@ class FPTestData:
         fmt='%(asctime)s %(name)s [%(levelname)s]: %(message)s',
         datefmt=timefmt)
 
-    def __init__(self, test_name, petal_cfgs, test_cfg):
+    def __init__(self, test_name, test_cfg, petal_cfgs=None):
 
-        self.test_name = f'{test_name}'
-        self.test_time = datetime.now(timezone.utc).astimezone().isoformat(
-                timespec='seconds')
+        self.test_name = test_name
+        self.test_time = datetime.now(timezone.utc)  # always use UTC
         self.test_cfg = test_cfg  # one test configuration object
         self.simulate = test_cfg['simulate']
+        self.num_corr_max = self.data.test_cfg['num_corr_max']
         self.petal_cfgs = petal_cfgs
-        self.ptlids = petal_cfgs.keys()
+        self.ptlids = [
+            key for key in test_cfg.keys() if len(key) == 2
+            and key.isdigit() and (test_cfg[key]['mode'] is not None)]
         # create save dir for all files: logs, tables, pickels, gzips
         self.dir = os.path.join(
             pc.dirs['xytest_data'],
             f"{self.test_time.strftime(self.timefmtpath)}-{test_name}")
-        self.dirs = {ptlid: os.path.join(self.dir, f'PTL_{ptlid}')
+        self.dirs = {ptlid: os.path.join(self.dir, f'PTL{ptlid}')
                      for ptlid in self.ptlids}
         # set up log files and loggers for each petal
         self.logs = {}
@@ -73,23 +79,27 @@ class FPTestData:
             logger.addHandler(sh)
             logger.addHandler(ch)
             logger.info(f'Log initialised for test {test_name}, PTL_{ptlid}')
-            logger.info(f'Petalconstants code version: {pc.code_version}')
-            self._log_cfg(logger, petal_cfgs[ptlid])  # write configs to logs
+            # write configs to logs
+            if petal_cfgs is not None:
+                self._log_cfg(logger, petal_cfgs[ptlid])
             self._log_cfg(logger, test_cfg)
             self.logs[ptlid] = log  # assign logs and loggers to attributes
             self.loggers[ptlid] = logger
-        self.logger.info('Simulation mode on: {self.simulate}')
+        self.logger.info([f'Petalconstants code version: {pc.code_version}',
+                          'Simulation mode on: {self.simulate}'])
+        self.movedata = {}  # keyed by posid, one table for each positioner
 
     @staticmethod
     def _log_cfg(logger, config):
         '''ConfigObj module has an outstanding bug that hasn't been fixed.
         It can only write to real files and not in-memory virtual viles,
         such as StringIO objects, although its documentation claims support.
-        We have to write by lines here.
+        We have to write to memory by lines here.
         '''
-        logger.debug('=== Config file dump: {config.filename} ===')
+        logger.debug(f'=== Config file dump: {config.filename} ===')
         for line in config.write(outfile=None):
             logger.debug(line)
+        logger.debug(f'=== Config file dump complete: {config.filename} ===')
 
     def logger(self):
         '''must call methods for particular logger levels below
@@ -98,7 +108,7 @@ class FPTestData:
         def _log(self, lvl, msg):
             if type(msg) is list:
                 map(_log, msg)
-            elif type(msg) is list:
+            elif type(msg) is str:
                 for ptlid in self.ptlids:
                     self.loggers[ptlid].log(lvl, msg)
             else:
@@ -118,3 +128,22 @@ class FPTestData:
 
         def debug(self, msg):
             _log(10, msg)
+
+    def initialise_movedata(self, posids, n_targets):
+        # initialise column names for move data table for each positioner
+        cols0 = ['timestamp', 'cycle', 'move_log', 'target_no']
+        dtypes0 = ['datetime64[ns, UTC]', np.uint32, str, np.uint32]
+        cols1 = ['target_x', 'target_y']
+        cols2_base = ['meas_x', 'meas_y', 'err_x', 'err_y', 'err_xy',
+                      'pos_t', 'pos_p']
+        cols2 = []
+        for field, i in product(cols2_base, range(self.num_corr_max+1)):
+            cols2.append(f'{field}_{i}')
+        cols = cols0 + cols1 + cols2
+        dtypes = dtypes0 + [np.float32] * (len(cols1) + len(cols2))
+        df_dict = {col: pd.Series(dtype=dt) for col, dt in zip(cols, dtypes)}
+        df = pd.DataFrame(df_dict)
+        df['target_no'] = np.arange(n_targets) + 1
+        df = df.set_index('target_no')
+        for posid in posids:
+            self.movedata[posid] = df.copy(deep=True)

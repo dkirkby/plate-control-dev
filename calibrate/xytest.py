@@ -7,32 +7,38 @@ Created on Fri May 24 17:46:45 2019
 
 import os
 import sys
-from itertools import product
 import numpy as np
-import math
 import time
 # from astropy.io import ascii
 from configobj import ConfigObj
-sys.path.append(os.path.abspath('../petal/'))
+sys.path.append(os.path.abspath('../pecs/'))
+from pecs import PECS
 # sys.path.append(os.path.abspath('../posfidfvc/'))
 sys.path.append(os.path.abspath('../xytest/'))
-# import fvchandler
-# import petal
 import posconstants as pc
-from summarizer import Summarizer
+# from summarizer import Summarizer
 import pos_xytest_plot
-from pecs import PECS
 from fptestdata import FPTestData
-
-db_commit = False
 
 
 class XYTest(PECS):
     """XYTest handles running a fiber positioner xy accuracy test.
-    Does not support input_targs_file now for clarity's sake
-    Avoid double inheritance from FPTestData because we want to isolate
+
+    Avoiding double inheritance from FPTestData because we want to isolate
     the data class to one attribute for easy pickling, otherwise we would have
-    to pickle the entire XYTest class
+    to pickle the entire XYTest class.
+
+    So self.attribute should be used for only test methods and objects,
+    all data variables go under self.data which will be stored
+
+    if input_targs_file is given in the config,
+    the ordering of targets strictly follows the list and the test script
+    doesn't bother with checking the sweep pattern or shuffling.
+
+    to run tests in simulation mode, one has to first initiliase petal and fvc
+    in simulation mode as DOS apps. then this test script will connect to
+    these apps which are already in simulation mode. the same goes for changing
+    anti-collision/poscollider settings.
 
     Input:
         petal_cfgs:     list of petal config objects, one for each petal
@@ -40,7 +46,7 @@ class XYTest(PECS):
     """
 
     def __init__(self, petal_cfgs, xytest_cfg):
-        """Templates for configfiles are found on svn
+        """Templates for config are found on svn
         https://desi.lbl.gov/svn/code/focalplane/fp_settings/hwsetups/
         https://desi.lbl.gov/svn/code/focalplane/fp_settings/test_settings/
         """
@@ -48,85 +54,98 @@ class XYTest(PECS):
         self.loggers = self.data.loggers  # use these loggers to write to logs
         self.logger = self.data.logger
         printfuncs = {pid: self.loggers[pid].info for pid in self.data.ptlids}
-        PECS.__init__(self, ptlids=self.data.ptlids, printfunc=printfuncs,
-                      simulate=self.data.simulate,
-                      db_commit=db_commit, sched_stats_on=True,
-                      anticollision=self.xytest_conf['anticollision'],
-                      collider_file=self.test_conf['collider_file'])
-        self.logger.info([
-            'PlateMaker instrument: {self.platemaker_instrument}',
-            'PlateMaker role: {self.fvc.pm_role}',
-            'FVC instrument: {self.fvc.instrument}',
-            'FVC role: {self.fvc.fvc_role}'])
-        # TODO: need to calibrate FVC here when setting up fvc and platemaker?
-        # TODO: replace this loop with MP?
-        self.summarizers = {}
-        for ptlid, ptl in self.ptls.items():
-            # TODO: rehome or park pos before starting?
-            logger = self.loggers[ptlid]
-            logger.info(f'Petal: {ptlid}')
-            logger.debug(f'Positoners: {ptl.posids}')
-            logger.debug(f'Fiducials: {ptl.fidids}')
-            fid_settings_done = ptl.set_fiducials(setting='on')
-            logger.info(f'Fiducials turned on: {fid_settings_done}')
-            # set up the test summarizers
-            self.summarizers[ptlid] = {}
-            summarizer_init_data = {
-                'test loop data file': '',
-                'num pts calib T': None,
-                'num pts calib P': None,
-                'calib mode': None,
-                'ranges remeasured': None,
-                'xytest log file': self.data.log_paths[ptlid],
-                'code version': pc.code_version}
-            for posid in ptl.posids:
-                self.summarizers[ptlid][posid] = Summarizer(
-                        ptl.state(posid), summarizer_init_data)
-            logger.info('Data summarizers for all positioners initialized.')
-
-    def run_xyaccuracy_test(self):
-        """Move positioners to a series of xy targets and measure performance.
-        """
-        @staticmethod
-        def movedata_path(posid):
-            return os.path.join(self.data.dir, f'{posid}_movedata.csv')
-
-        @staticmethod
-        def summary_path(posid):
-            return os.path.join(self.data.dir, f'{posid}_xyplot')
-
-        local_targets = self.generate_posXY_targets_grid(
+        PECS.__init__(self, ptlids=self.data.ptlids, printfunc=printfuncs)
+        self.data.ptl_posids = {}  # enabled posids keyed by petal id
+        self.data.posids = []  # all enabled posids for all petals in a list
+        for ptlid in self.data.ptlids:
+            self.data.ptl_posids[ptlid] = self.get_posids(ptlid)
+            self.data.posids += self.data.ptl_posids[ptlid]
+        # create local targets in posXY
+        # TODO: add support for input target and shuffling
+        self.targets = self.generate_posXY_targets_grid(
             self.data.test_cfg['targ_min_radius'],
             self.data.test_cfg['targ_max_radius'],
             self.data.test_cfg['n_pts_across_grid'])
-        self.logger.info(f'Number of local targets: {len(local_targets)}')
-        self.logger.debug(f'Local targets xy positions: {local_targets}')
-        self.logger.info('Max number of corrections: {num_corr_max}')
-        # columns for pandas dataframe
-        cols = ['timestamp', 'cycle', 'move_log', 'target_no',
-                'target_x', 'target_y']
-        fields = ['meas_x', 'meas_y', 'err_x', 'err_y', 'err_xy',
-                  'pos_t', 'pos_p']
-        num_corr_max = self.data.test_cfg['num_corr_max']
-        for field, i in product(fields, range(num_corr_max+1)):
-            cols.append(f'{field}_{i}')
+        self.logger.info([
+            f'PlateMaker instrument: {self.platemaker_instrument}',
+            f'PlateMaker role: {self.fvc.pm_role}',
+            f'FVC instrument: {self.fvc.instrument}',
+            f'FVC role: {self.fvc.fvc_role}',
+            f'Max num of corrections: {self.data.num_corr_max}',
+            f'Num of local targets: {len(self.local_targets)}'])
+        self.logger.debug(f'Local targets xy positions: {self.local_targets}')
+        self.data.initialise_movedata(self.data.posids, len(self.targets))
+        self.logger.info(f'Move data tables initialised '
+                         f'for {len(self.data.posids)} positioners.')
+        # TODO: add summarizer functionality
 
-        # get enabled posids for each petal
+    def get_posids(self, ptlid):
+        mode = self.data.testcfg[ptlid]['mode']
+        ptl = self.ptls[ptlid]  # use as a petal app instance
+        if mode is None:
+            l0 = []  # this case should never happen, as None is filtered out
+            l1 = []
+        elif mode == 'all':
+            l0 = ptl.get_positioners(enabled_only=False)
+            l1 = ptl.get_positioners(enabled_only=True)
+        elif mode == 'pos':
+            l0 = self.data.test_cfg[ptlid]['posids']
+            l1 = ptl.get_positioners(enabled_only=True, posids=l0)
+        elif mode == 'can':
+            busids = self.data.test_cfg[ptlid]['busids']
+            l0 = ptl.get_positioners(enabled_only=False, busids=busids)
+            l1 = ptl.get_positioners(enabled_only=True, busids=busids)
+        Nr = len(l0)  # number of requested positioners
+        Ne = len(l1)  # nubmer of returned, enabled postiioners
+        Nd = Nr - Ne  # disabled
+        self.loggers[ptlid].info(f'Number of requested positioners: {Nr}')
+        self.loggers[ptlid].info(
+            f'Numbers of enabled and disabled positioners: {Ne}, {Nd}')
+        return sorted(l1)  # always sorted so arrays can use the same ordering
+
+    def run_xyaccuracy_test(self):
+        @staticmethod
+        def movedata_path(posid):  # return csv path for each posid
+            return os.path.join(self.data.dir, f'{posid}_movedata.csv')
+
+        @staticmethod
+        def summary_path(posid):  # return positioner directory for each posid
+            return os.path.join(self.data.dir, f'{posid}_xyplot')
+
+        requests = []  # each request is for one target
+        for i, posXY in enumerate(self.targets):
+            request = {}  # include all petals and all positioners
+            for ptlid in self.data.ptlids:
+                petal_request = {}  # tailor for all positioners in one petal
+                for posid in self.data.posids[ptlid]:
+                    obsXY = self.ptls[ptlid] \
+                        .posmodels[posid].trans.posXY_to_obsXY(posXY)
+                    note = (f'xy test: {self.data.test_name}; '
+                            f'target {i+1} of {len(self.targets)}')
+                    petal_request[posid] = {'command': 'obsXY',
+                                            'target': obsXY,
+                                            'log_note': note}
+                request.update(petal_request)
+            requests.append(request)
+
+
+        # TODO: turn on illuminator        
+        # prepare/schedule move
+        # execute move
+        expected_positions = self.call_petal('execute_move')
+        # take FVC measurement
+        measured_positions = self.fvc.measure(expected_positions, return_coord='QS')
         
-        # transform test grid to each positioner's global position, and create all the move request dictionaries
+        # transform test grid to each positioner's global position
+        # and create all the move request dictionaries
         all_targets = []
         for local_target in local_targets:
             these_targets = {}
             for posid in self.posids:
-                ptl = self.m.petal(posid)
-                enabled_this=ptl.get_posfid_val(posid,'CTRL_ENABLED')
-                posT_this=ptl.get_posfid_val(posid,'POS_T')
-                posP_this=ptl.get_posfid_val(posid,'POS_P') 
+
                 trans = self.m.trans(posid)
-                if enabled_this:
-                    these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(local_target)}
-                else:
-                    these_targets[posid] = {'command':'obsXY','target':trans.posTP_to_obsXY([posT_this,posP_this])}
+                these_targets[posid] = {'command':'obsXY', 'target':trans.posXY_to_obsXY(local_target)}
+
             all_targets.append(these_targets)
 
         # initialize some data structures for storing test data
@@ -158,10 +177,7 @@ class XYTest(PECS):
                         for key in submove_fields:
                             all_data_by_posid[posid][key][sub].append(these_meas_data[posid][key][sub])              
                 
-                # update summary data logs
-                for posid in self.posids:
-                    self.summarizers[posid].write_row(all_data_by_posid[posid]['err2D'])
-        
+
                 # update move data log
                 for posid in these_targets.keys():
                     state = self.m.state(posid)
@@ -212,20 +228,7 @@ class XYTest(PECS):
         x, y = np.mgrid[-rmax:rmax:npts*1j, -rmax:rmax:npts*1j]
         r = np.sqrt(np.square(x) + np.square(y))
         mask = (rmin < r) & (r < rmax)
-        return np.array([x[mask], y[mask]]).T.tolist()
-
-    def generate_posXY_move_requests(self, xy_list, posids):
-        """For a list of local xy targets, make a list of move request
-        dictionaries. Each dictionary contains the move requests to move all
-        the positioners to that location in their respective patrol disks.
-        """
-        requests = []
-        for xy in xy_list:
-            item = {}
-            for posid in posids:
-                item[posid] = {'command': 'posXY', 'target': xy}
-            requests.append(item)
-        return requests
+        return np.array([x[mask], y[mask]]).T.tolist()  # return list of x, y
 
 
 if __name__ == "__main__":
@@ -259,3 +262,7 @@ if __name__ == "__main__":
     for petal in test.m.petals:
         petal.schedule_stats.save()
     test.logwrite('Test complete.')
+
+
+
+

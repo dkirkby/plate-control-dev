@@ -123,7 +123,7 @@ class PetalTransforms(object):
 
     def QS_to_obsXYZ(self, QS):
         """Transforms list of obsXYZ coordinates into QS system.
-        INPUT:  2 x N array of [[q0,s0],[q1,s1],...]
+        INPUT:  2 x N array, each column vector is QS
         OUTPUT: 3 x N array, each column vector is obsXYZ
 
         Note that because QS is only 2 dimensional,

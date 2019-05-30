@@ -188,7 +188,7 @@ class Petal(object):
         if CONSTANTSDB_AVAILABLE:
             constants = ConstantsDB().get_constants(
                 snapshot='DOS', tag='CURRENT', group='focal_plane_metrology')
-            gamma = constants[str(self.petal_loc)]['petal_rot_z']
+            gamma = constants[str(self.petal_loc)]['petal_rot_3']
             Tx = constants[str(self.petal_loc)]['petal_offset_x']
             Ty = constants[str(self.petal_loc)]['petal_offset_y']
         else:  # DB unavailable, read from petal config

@@ -31,28 +31,30 @@ class PECS:
     '''
 
     def __init__(self, ptlids=None, platemaker_instrument=None, fvc_role=None,
-                 printfunc=print, simulate=False):
-        if not(ptlids) and not(platemaker_instrument) and not(fvc_role):
+                 printfunc=print):
+        if not(platemaker_instrument) and not(fvc_role):
             import configobj
             pecs_local = configobj.ConfigObj(
                     'pecs_local.conf', unrepr=True, encoding='utf-8')
             platemaker_instrument = pecs_local['pm_instrument']
-            ptlids = [pecs_local['ptl_id']]
             fvc_role = pecs_local['fvc_role']
         self.platemaker_instrument = platemaker_instrument
+        self.fvc_role = fvc_role
+        # create FVC to access functions in FVC proxy
+        self.fvc = FVC(self.platemaker_instrument, fvc_role=self.fvc_role)
+        self._print(
+            'FVC proxy created for instrument %s' % self.fvc.get('instrument'))
+        if ptlids is None:
+            ptlids = [pecs_local['ptl_id']]
         self.ptlids = ptlids
         if type(printfunc) is not dict:  # if a single printfunc is supplied
             printfuncs = {ptlid: printfunc for ptlid in ptlids}
         assert len(ptlids) == len(printfuncs.keys()), 'Input lengths mismatch'
         self.printfuncs = printfuncs
-        # create FVC to access functions in FVC proxy
-        self.fvc = FVC(self.platemaker_instrument, fvc_role=fvc_role)
-        self._print(
-            'FVC proxy created for instrument %s' % self.fvc.get('instrument'))
         self.ptls = {}
         for ptlid in ptlids:
             self.ptls[ptlid] = Petal(petal_id=ptlid)
-            self.printfuncs[ptlid](f'Petal proxy created for {ptlid}')
+            self.printfuncs[ptlid](f'Petal proxy initialised for {ptlid}')
 
     def _print(self, msg):
         '''self.printfuncs is a dict indexed by ptlids as specified for input,
@@ -63,7 +65,7 @@ class PECS:
 
     def call_petal(self, ptlid, command, *args, **kwargs):
         '''
-        Call petal, command is a command listed in PetalApp.commands.
+        Call petal app, command is a command listed in PetalApp.commands.
         Required args/kwargs can be passed along.
         '''
         return self.ptls[ptlid](command, *args, **kwargs)
