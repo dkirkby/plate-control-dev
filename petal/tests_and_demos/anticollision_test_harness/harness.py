@@ -43,7 +43,10 @@ for pos_params in pos_param_sequence:
         for key,val in params.items():
             state.store(key,val)
         state.write()
-    ptl = petal.Petal(petal_id, pos_params.keys(), fidids,
+    ptl = petal.Petal(petal_id        = petal_id,
+                      petal_loc       = 0,
+                      posids          = pos_params.keys(),
+                      fidids          = fidids,
                       simulator_on    = True,
                       db_commit_on    = False,
                       local_commit_on = False,
