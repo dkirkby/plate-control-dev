@@ -264,11 +264,11 @@ class PosTransforms(object):
         return obsTP, unreachable
 
     # DIFFERENCE METHODS
-    def delta_posXY(xy1, xy0):
+    def delta_posXY(self, xy1, xy0):
         """Returns dxdy corresponding to xy1 - xy0."""
         return PosTransforms.vector_delta(xy1,xy0)
 
-    def delta_obsXY(xy1, xy0):
+    def delta_obsXY(self, xy1, xy0):
         """Returns dxdy corresponding to xy1 - xy0."""
         return PosTransforms.vector_delta(xy1,xy0)
 
@@ -293,20 +293,20 @@ class PosTransforms(object):
         TP1 = self.obsTP_to_posTP(tp1)
         return self.delta_posTP(TP1,TP0,range_wrap_limits)
 
-    def delta_QS(qs1, qs0):
+    def delta_QS(self, qs1, qs0):
         """Returns dqds corresponding to qs1 - qs0."""
         return PosTransforms.vector_delta(qs1,qs0)
 
-    def delta_flatXY(xy0, xy1):
+    def delta_flatXY(self, xy0, xy1):
         """Returns dxdy corresponding to xy1 - xy0."""
         return PosTransforms.vector_delta(xy1,xy0)
 
     # ADDITION METHODS
-    def addto_posXY(xy0, dxdy):
+    def addto_posXY(self, xy0, dxdy):
         """Returns xy corresponding to xy0 + dxdy."""
         return PosTransforms.vector_add(xy0,dxdy)
 
-    def addto_obsXY(xy0, dxdy):
+    def addto_obsXY(self, xy0, dxdy):
         """Returns xy corresponding to xy0 + dxdy."""
         return PosTransforms.vector_add(xy0,dxdy)
 
@@ -329,11 +329,11 @@ class PosTransforms(object):
         TP0 = self.obsTP_to_posTP(tp0)
         return self.addto_posTP(TP0,dtdp,range_wrap_limits)
 
-    def addto_QS(qs0, dqds):
+    def addto_QS(self, qs0, dqds):
         """Returns qs corresponding to qs0 + dqds."""
         return PosTransforms.vector_add(qs0,dqds)
 
-    def addto_flatXY(xy0, dxdy):
+    def addto_flatXY(self, xy0, dxdy):
         """Returns xy corresponding to xy0 + dxdy."""
         return PosTransforms.vector_add(xy0,dxdy)
 
