@@ -40,6 +40,8 @@ class PosCollider(object):
         self.timestep = self.config['TIMESTEP']
         self.animator = posanimator.PosAnimator(fignum=0, timestep=self.timestep)
         self.use_neighbor_loc_dict = use_neighbor_loc_dict
+        self.keepouts_T = {}
+        self.keepouts_P = {}
         
         # hash table initializations (if being used)
         self.collision_hashpp_exists = collision_hashpp_exists
@@ -320,92 +322,24 @@ class PosCollider(object):
                     
         return pc.case.I
 
-    def place_phi_arm(self, posid, obsTP,keepout_angular_margin_P=0.):
+    def place_phi_arm(self, posid, obsTP):
         """Rotates and translates the phi arm to position defined by the positioner's
         (x0,y0) and the argued obsTP (theta,phi) angles.
         """
-        poly = self.stretched_P_keepout(posid,keepout_angular_margin_P)
-        poly = self.keepout_P.rotated(obsTP[1])
+        poly = self.stretched_P_keepout[posid].rotated(obsTP[1])
         poly = poly.translated(self.R1[posid], 0)
         poly = poly.rotated(obsTP[0])
         poly = poly.translated(self.x0[posid], self.y0[posid])
         return poly
-    
-    def stretched_P_keepout(self, posid, keepout_angular_margin_P):
-        poly = self.keepout_P.translated(self.R1[posid]-3.,0.)
-        p=poly.points
-        
-        index1=[5,6]
-        p1_x=[p[0][i] for i in index1]
-        p1_y=[p[1][i] for i in index1]
-        p1=[p1_x,p1_y]        
-        a = keepout_angular_margin_P*math.pi/180.
-        c = math.cos(a)
-        s = math.sin(a)
-        rng = range(len(p1[0]))
-        X = [c*p1[0][i] + -s*p1[1][i] for i in rng]
-        Y = [s*p1[0][i] +  c*p1[1][i] for i in rng]
-        for i in range(len(index1)):
-            p[0][index1[i]]=X[i]
-            p[1][index1[i]]=Y[i]
- 
-        index2=[1,2]
-        p2_x=[p[0][i] for i in index2]
-        p2_y=[p[1][i] for i in index2]
-        p2=[p2_x,p2_y]                                    
-        a = -keepout_angular_margin_P*math.pi/180.
-        c = math.cos(a)
-        s = math.sin(a)
-        rng = range(len(p2[0]))
-        X = [c*p2[0][i] + -s*p2[1][i] for i in rng]
-        Y = [s*p2[0][i] +  c*p2[1][i] for i in rng]
-        for i in range(len(index2)):
-            p[0][index2[i]]=X[i]
-            p[1][index2[i]]=Y[i]
-        return PosPoly(p, point0_index=0, close_polygon=False)
 
         
-    def place_central_body(self, posid, obsT,keepout_angular_margin_T=5.):
+    def place_central_body(self, posid, obsT):
         """Rotates and translates the central body of positioner
         to its (x0,y0) and the argued obsT theta angle.
         """
-        poly = self.stretched_T_keepout(posid,keepout_angular_margin_T)
-        poly = self.keepout_T.rotated(obsT)
+        poly = self.stretched_T_keepout[posid].rotated(obsT)
         poly = poly.translated(self.x0[posid], self.y0[posid])
         return poly
-
-    def stretched_T_keepout(self, posid, keepout_angular_margin_T):
-        poly = copymodule.deepcopy(self.keepout_T)
-        p=poly.points
-        index1=[] #
-        if index1:
-            p1_x=[p[0][i] for i in index1]
-            p1_y=[p[1][i] for i in index1]
-            p1=[p1_x,p1_y]                                    
-            a = keepout_angular_margin_T*math.pi/180.
-            c = math.cos(a)
-            s = math.sin(a)
-            rng = range(len(p1[0]))
-            X = [c*p1[0][i] + -s*p1[1][i] for i in rng]
-            Y = [s*p1[0][i] +  c*p1[1][i] for i in rng]
-            for i in range(len(index1)):
-                p[0][index1[i]]=X[i]
-                p[1][index1[i]]=Y[i]
-
-        index2=[0,1,2,3,4,11,12,13,14]
-        p2_x=[p[0][i] for i in index2]
-        p2_y=[p[1][i] for i in index2]
-        p2=[p2_x,p2_y]
-        a = -keepout_angular_margin_T*math.pi/180.
-        c = math.cos(a)
-        s = math.sin(a)
-        rng = range(len(p2[0]))
-        X = [c*p2[0][i] + -s*p2[1][i] for i in rng]
-        Y = [s*p2[0][i] +  c*p2[1][i] for i in rng]
-        for i in range(len(index2)):
-            p[0][index2[i]]=X[i]
-            p[1][index2[i]]=Y[i]
-        return PosPoly(p, point0_index=0, close_polygon=False)
 
     def place_ferrule(self, posid, obsTP):
         """Rotates and translates the ferrule to position defined by the positioner's
@@ -435,14 +369,16 @@ class PosCollider(object):
         polygon definitions, and updates stored values accordingly.
         """
         self.timestep = self.config['TIMESTEP']
-        self._load_keepouts()
         self._load_positioner_params()
         self._load_circle_envelopes()
+        self._load_keepouts()
+        self._stretch_keepouts()
+
 
     def _load_keepouts(self):
         """Read latest versions of all keepout geometries."""
-        self.keepout_P = PosPoly(self.config['KEEPOUT_PHI'], self.config['KEEPOUT_PHI_PT0'])
-        self.keepout_T = PosPoly(self.config['KEEPOUT_THETA'], self.config['KEEPOUT_THETA_PT0'])
+        self.general_keepout_P = PosPoly(self.config['KEEPOUT_PHI'], self.config['KEEPOUT_PHI_PT0'])
+        self.general_keepout_T = PosPoly(self.config['KEEPOUT_THETA'], self.config['KEEPOUT_THETA_PT0'])
         self.keepout_PTL = PosPoly(self.config['KEEPOUT_PTL'], self.config['KEEPOUT_PTL_PT0'])
         self.keepout_GFA = PosPoly(self.config['KEEPOUT_GFA'], self.config['KEEPOUT_GFA_PT0'])
         self.keepout_PTL = self.keepout_PTL.rotated(self._petal_rot)
@@ -450,6 +386,20 @@ class PosCollider(object):
         self.keepout_GFA = self.keepout_GFA.rotated(self._petal_rot)
         self.keepout_GFA = self.keepout_GFA.translated(self._petal_x0, self._petal_y0)
         self.fixed_neighbor_keepouts = {pc.case.PTL : self.keepout_PTL, pc.case.GFA : self.keepout_GFA}
+    
+    def _adjust_keepouts(self):
+        """Expand/contract, and pre-shift the theta and phi keepouts for each positioner."""
+        self.general_keepout_P = self.general_keepout_P.expanded_radially(self.config['KEEPOUT_EXPANSION_PHI_RADIAL'])
+        self.general_keepout_P = self.general_keepout_P.expanded_angularly(self.config['KEEPOUT_EXPANSION_PHI_ANGULAR'])
+        self.general_keepout_T = self.keepout_T.expanded_radially(self.config['KEEPOUT_EXPANSION_THETA_RADIAL'])
+        self.general_keepout_T = self.general_keepout_T.expanded_angularly(self.config['KEEPOUT_EXPANSION_THETA_ANGULAR'])
+        for posid in self.posids:
+            R1_error = self.R1[posid] - pc.nominals['LENGTH_R1']['value']
+            R2_error = self.R2[posid] - pc.nominals['LENGTH_R2']['value']
+            self.keepouts_P[posid] = self.general_keepout_P.translated(R1_error,0)
+            self.keepouts_P[posid] = self.keepouts_P[posid].expanded_x(R2_error,R1_error)
+            self.keepouts_T[posid] = self.general_keepout_T.translated(0,0) # effectively just a copy operation
+            
 
     def _load_positioner_params(self):
         """Read latest versions of all positioner parameters."""
@@ -488,6 +438,72 @@ class PosCollider(object):
             self.line180_polys[posid] = self.line180_poly.rotated(self.t0[posid]).translated(x,y)
         self.ferrule_diam = self.config['FERRULE_DIAM']
         self.ferrule_poly = PosPoly(self._circle_poly_points(self.ferrule_diam, self.config['FERRULE_RESLN']).tolist())
+
+    def _generate_stretched_P_keepout(self, posid, keepout_angular_margin_P):
+        poly = self.keepout_P.translated(self.R1[posid]-3.,0.)
+        p=poly.points
+        
+        index1=[5,6]
+        p1_x=[p[0][i] for i in index1]
+        p1_y=[p[1][i] for i in index1]
+        p1=[p1_x,p1_y]        
+        a = keepout_angular_margin_P*math.pi/180.
+        c = math.cos(a)
+        s = math.sin(a)
+        rng = range(len(p1[0]))
+        X = [c*p1[0][i] + -s*p1[1][i] for i in rng]
+        Y = [s*p1[0][i] +  c*p1[1][i] for i in rng]
+        for i in range(len(index1)):
+            p[0][index1[i]]=X[i]
+            p[1][index1[i]]=Y[i]
+ 
+        index2=[1,2]
+        p2_x=[p[0][i] for i in index2]
+        p2_y=[p[1][i] for i in index2]
+        p2=[p2_x,p2_y]                                    
+        a = -keepout_angular_margin_P*math.pi/180.
+        c = math.cos(a)
+        s = math.sin(a)
+        rng = range(len(p2[0]))
+        X = [c*p2[0][i] + -s*p2[1][i] for i in rng]
+        Y = [s*p2[0][i] +  c*p2[1][i] for i in rng]
+        for i in range(len(index2)):
+            p[0][index2[i]]=X[i]
+            p[1][index2[i]]=Y[i]
+        return PosPoly(p, point0_index=0, close_polygon=False)
+
+    def _generate_stretched_T_keepout(self, posid, keepout_angular_margin_T):
+        poly = copymodule.deepcopy(self.keepout_T)
+        p=poly.points
+        index1=[] #
+        if index1:
+            p1_x=[p[0][i] for i in index1]
+            p1_y=[p[1][i] for i in index1]
+            p1=[p1_x,p1_y]                                    
+            a = keepout_angular_margin_T*math.pi/180.
+            c = math.cos(a)
+            s = math.sin(a)
+            rng = range(len(p1[0]))
+            X = [c*p1[0][i] + -s*p1[1][i] for i in rng]
+            Y = [s*p1[0][i] +  c*p1[1][i] for i in rng]
+            for i in range(len(index1)):
+                p[0][index1[i]]=X[i]
+                p[1][index1[i]]=Y[i]
+
+        index2=[0,1,2,3,4,11,12,13,14]
+        p2_x=[p[0][i] for i in index2]
+        p2_y=[p[1][i] for i in index2]
+        p2=[p2_x,p2_y]
+        a = -keepout_angular_margin_T*math.pi/180.
+        c = math.cos(a)
+        s = math.sin(a)
+        rng = range(len(p2[0]))
+        X = [c*p2[0][i] + -s*p2[1][i] for i in rng]
+        Y = [s*p2[0][i] +  c*p2[1][i] for i in rng]
+        for i in range(len(index2)):
+            p[0][index2[i]]=X[i]
+            p[1][index2[i]]=Y[i]
+        return PosPoly(p, point0_index=0, close_polygon=False)
 
     def _identify_neighbors(self, posid):
         """Find all neighbors which can possibly collide with a given positioner."""
@@ -692,6 +708,23 @@ class PosPoly(object):
         X = [x + val for val in p[0]]
         Y = [y + val for val in p[1]]
         return PosPoly([X,Y], point0_index=0, close_polygon=False)
+    
+    def expanded_radially(self, dR):
+        """Returns a copy of the polygon object, with points expanded radially by distance dR.
+        The linear expansion is made along lines from the polygon's [0,0] center.
+        A value dR < 0 is allowed, causing contraction of the polygon."""
+    
+    def expanded_x(self, right_dx, left_dx):
+        """Returns a copy of the polygon object, with points expanded along the x direction only.
+        Points rightward of the line x=0 are shifted further right by an amount right_dx > 0.
+        Points leftward of the line x=0 are shifted further left by an amount left_dx > 0.
+        Negative values for right_dx and left_dx are allowed. They contract the polygon leftward and rightward, respectively."""
+        
+    def expanded_angularly(self, dA):
+        """Returns a copy of the polygon object, with points expanded rotationally by angle dA (in degrees).
+        The rotational expansion is made about the polygon's [0,0] center.
+        Expansion is made in both the clockwise and counter-clockwise directions from the line y=0. 
+        A value dA < 0 is allowed, causing contraction of the polygon."""
 
     def collides_with(self, other):
         """Searches for collisions in space between this polygon and
