@@ -320,23 +320,92 @@ class PosCollider(object):
                     
         return pc.case.I
 
-    def place_phi_arm(self, posid, obsTP):
+    def place_phi_arm(self, posid, obsTP,keepout_angular_margin_P=0.):
         """Rotates and translates the phi arm to position defined by the positioner's
         (x0,y0) and the argued obsTP (theta,phi) angles.
         """
+        poly = self.stretched_P_keepout(posid,keepout_angular_margin_P)
         poly = self.keepout_P.rotated(obsTP[1])
         poly = poly.translated(self.R1[posid], 0)
         poly = poly.rotated(obsTP[0])
         poly = poly.translated(self.x0[posid], self.y0[posid])
         return poly
+    
+    def stretched_P_keepout(self, posid, keepout_angular_margin_P):
+        poly = self.keepout_P.translated(self.R1[posid]-3.,0.)
+        p=poly.points
+        
+        index1=[5,6]
+        p1_x=[p[0][i] for i in index1]
+        p1_y=[p[1][i] for i in index1]
+        p1=[p1_x,p1_y]        
+        a = keepout_angular_margin_P*math.pi/180.
+        c = math.cos(a)
+        s = math.sin(a)
+        rng = range(len(p1[0]))
+        X = [c*p1[0][i] + -s*p1[1][i] for i in rng]
+        Y = [s*p1[0][i] +  c*p1[1][i] for i in rng]
+        for i in range(len(index1)):
+            p[0][index1[i]]=X[i]
+            p[1][index1[i]]=Y[i]
+ 
+        index2=[1,2]
+        p2_x=[p[0][i] for i in index2]
+        p2_y=[p[1][i] for i in index2]
+        p2=[p2_x,p2_y]                                    
+        a = -keepout_angular_margin_P*math.pi/180.
+        c = math.cos(a)
+        s = math.sin(a)
+        rng = range(len(p2[0]))
+        X = [c*p2[0][i] + -s*p2[1][i] for i in rng]
+        Y = [s*p2[0][i] +  c*p2[1][i] for i in rng]
+        for i in range(len(index2)):
+            p[0][index2[i]]=X[i]
+            p[1][index2[i]]=Y[i]
+        return PosPoly(p, point0_index=0, close_polygon=False)
 
-    def place_central_body(self, posid, obsT):
+        
+    def place_central_body(self, posid, obsT,keepout_angular_margin_T=5.):
         """Rotates and translates the central body of positioner
         to its (x0,y0) and the argued obsT theta angle.
         """
+        poly = self.stretched_T_keepout(posid,keepout_angular_margin_T)
         poly = self.keepout_T.rotated(obsT)
         poly = poly.translated(self.x0[posid], self.y0[posid])
         return poly
+
+    def stretched_T_keepout(self, posid, keepout_angular_margin_T):
+        poly = copymodule.deepcopy(self.keepout_T)
+        p=poly.points
+        index1=[] #
+        if index1:
+            p1_x=[p[0][i] for i in index1]
+            p1_y=[p[1][i] for i in index1]
+            p1=[p1_x,p1_y]                                    
+            a = keepout_angular_margin_T*math.pi/180.
+            c = math.cos(a)
+            s = math.sin(a)
+            rng = range(len(p1[0]))
+            X = [c*p1[0][i] + -s*p1[1][i] for i in rng]
+            Y = [s*p1[0][i] +  c*p1[1][i] for i in rng]
+            for i in range(len(index1)):
+                p[0][index1[i]]=X[i]
+                p[1][index1[i]]=Y[i]
+
+        index2=[0,1,2,3,4,11,12,13,14]
+        p2_x=[p[0][i] for i in index2]
+        p2_y=[p[1][i] for i in index2]
+        p2=[p2_x,p2_y]
+        a = -keepout_angular_margin_T*math.pi/180.
+        c = math.cos(a)
+        s = math.sin(a)
+        rng = range(len(p2[0]))
+        X = [c*p2[0][i] + -s*p2[1][i] for i in rng]
+        Y = [s*p2[0][i] +  c*p2[1][i] for i in rng]
+        for i in range(len(index2)):
+            p[0][index2[i]]=X[i]
+            p[1][index2[i]]=Y[i]
+        return PosPoly(p, point0_index=0, close_polygon=False)
 
     def place_ferrule(self, posid, obsTP):
         """Rotates and translates the ferrule to position defined by the positioner's
@@ -436,7 +505,7 @@ class PosCollider(object):
             EE_neighbor = self.fixed_neighbor_keepouts[possible_neighbor]
             if Ee.collides_with(EE_neighbor):
                 self.fixed_neighbor_cases[posid].add(possible_neighbor)
-                
+
     def _max_extent(self):
         """Calculation of max radius of keepout for a positioner with fully-extended phi arm."""
         extended_phi = self.keepout_P.translated(max(self.R1.values()),0) # assumption here that phi arm polygon defined at 0 deg angle
@@ -534,17 +603,19 @@ class PosSweep(object):
         self.tp = discrete_position
         self.tp_dot = speed
         
-    def extend(self, timestep, equalizing_pause):
-        """Extends a sweep object to reflect the postpauses inserted into the move table 
+    def extend(self, timestep, max_time):
+        """Extends a sweep object to max_time to reflect the postpauses inserted into the move table 
         in equalize_table_times() in posschedulestage.py, ensuring that the sweep object
-        is in sync with the move table.
+        is in sync with the move table so that the animator is reflecting true moves. """
         
-        equalizing_pause ... the same equalizing_pause from equalize_table_times()
-        """
         starttime_extension = self.time[-1] + timestep
-        endtime_extension = self.time[-1] + equalizing_pause
-        time_extension = np.arange(starttime_extension, endtime_extension + timestep, timestep)
+        time_extension = np.arange(starttime_extension, max_time + timestep, timestep)
         extended_time = np.append(self.time, time_extension)
+        
+        #starttime_extension = self.time[-1] + timestep
+        #endtime_extension = self.time[-1] + equalizing_pause
+        #time_extension = np.arange(starttime_extension, endtime_extension + timestep, timestep)
+        #extended_time = np.append(self.time, time_extension)
         
         # tp extension are just the last tp entry repeated throughout the extended time
         theta_extension = self.tp[0,-1]*np.ones(len(time_extension))
