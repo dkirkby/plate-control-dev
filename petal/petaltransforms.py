@@ -92,9 +92,7 @@ class PetalTransforms(object):
     def __init__(self, Tx=0, Ty=0, Tz=0, alpha=0, beta=0, gamma=0):
         self.postrans = PosTransforms(curved=True)
         # tanslation matrix from petal nominal CS to CS5, column vector
-        self.T = np.array([self.params['petal_offset_x'],
-                           self.params['petal_offset_y'],
-                           self.params['petal_offset_z']]).reshape(3, 1)
+        self.T = np.array([Tx,Ty,Tz]).reshape(3, 1)
         self.R = Rxyz(alpha, beta, gamma)  # orthogonal rotation matrix
 
     def metXYZ_to_obsXYZ(self, metXYZ):
