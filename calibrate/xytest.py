@@ -112,6 +112,7 @@ class XYTest(PECS):
         def summary_path(posid):  # return positioner directory for each posid
             return os.path.join(self.data.dir, f'{posid}_xyplot')
 
+        # generate requests (dicts)
         requests = []  # each request is for one target
         for i, posXY in enumerate(self.targets):
             request = {}  # include all petals and all positioners

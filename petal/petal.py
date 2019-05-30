@@ -258,7 +258,9 @@ class Petal(object):
             self._initialize_pos_flags(ids = {posid})
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
-            if not(self.get_posfid_val(posid,'CTRL_ENABLED')):
+            if posid not in self.posids:  # check if posid belongs to this petal
+                marked_for_delete.add(posid)
+            elif not(self.get_posfid_val(posid,'CTRL_ENABLED')):
                 self.pos_flags[posid] |= self.ctrl_disabled_bit
                 marked_for_delete.add(posid)
             elif self.schedule.already_requested(posid):
