@@ -194,7 +194,7 @@ class Petal(object):
         else:  # DB unavailable, read from petal config
             gamma = self.petal_state.conf['ROTATION']
             Tx = self.petal_state.conf['X_OFFSET']
-            Ty = self.petalssscss_state.conf['Y_OFFSET']
+            Ty = self.petal_state.conf['Y_OFFSET']
         self.trans = PetalTransforms(Tx=Tx, Ty=Ty, gamma=gamma)
 
         # set debug mode flag
