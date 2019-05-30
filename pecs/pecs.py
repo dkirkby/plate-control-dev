@@ -15,19 +15,27 @@ along with FVC, Spotmatch and Platemaker.
 Adding multi-petal support; it doesn't cost any more work now,
 but will simply our life so much (Duan 2019/05/24)
 
+Added basic FVC simulator (Kevin 2019/05/30)
+
 '''
 
 from DOSlib.proxies import FVC, Petal
+from fvc_sim import FVC_proxy_sim
+
 
 
 class PECS:
 
     '''input:
-        ptlids:         list of petal ids, each petal id is a string
-        printfuncs:     dict of print functions, or a single print function
-                        (each petal may have its own print function or
-                         logger instance for log level filtering and
-                         log file separation purposes)
+        ptlids:                list of petal ids, each petal id is a string
+        printfuncs:            dict of print functions, or a single print function
+                               (each petal may have its own print function or
+                                logger instance for log level filtering and
+                                log file separation purposes)
+        platemaker_instrument: name of the platemaker instrument file (for single
+                               usually something like petal5)
+        fvc_role:              The DOS role name of the the FVC application
+                               usually FVC or FVC1 or FVC2
     '''
 
     def __init__(self, ptlids=None, platemaker_instrument=None, fvc_role=None,
@@ -41,9 +49,11 @@ class PECS:
         self.platemaker_instrument = platemaker_instrument
         self.fvc_role = fvc_role
         # create FVC to access functions in FVC proxy
-        self.fvc = FVC(self.platemaker_instrument, fvc_role=self.fvc_role)
-        self._print(
-            'FVC proxy created for instrument %s' % self.fvc.get('instrument'))
+        if 'sim' in platemaker_instrument.lower() or 'sim' in fvc_role.lower():
+            self.fvc = FVC_proxy_sim()
+        else:
+            self.fvc = FVC(self.platemaker_instrument, fvc_role=self.fvc_role)
+            self._print('FVC proxy created for instrument %s' % self.fvc.get('instrument'))
         if ptlids is None:
             ptlids = [pecs_local['ptl_id']]
         self.ptlids = ptlids

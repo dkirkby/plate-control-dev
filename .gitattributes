@@ -8,6 +8,7 @@ calibrate/seed_xy_offsets.py -text
 calibrate/xytest.py -text
 pecs/OnePoint.py -text
 pecs/fptestdata.py -text
+pecs/fvc_sim.py -text
 pecs/pecs.py -text
 pecs/pecs_local.conf -text
 petal/collision_lookup_generator.py -text
