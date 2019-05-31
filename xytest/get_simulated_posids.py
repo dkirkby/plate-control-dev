@@ -21,4 +21,5 @@ with open(posidpath, 'w') as h:
     h.write(', '.join(posids))
 with open(fididpath, 'w') as h:
     h.write(', '.join(fidids))
-print(f'{len(posids)} posids and {len(fidids)} fidids written')
+print(f'PTL {PETAL_ID}, localtion {ret[0]["PETAL_LOC"]}',
+      f'{len(posids)} posids and {len(fidids)} fidids written')
