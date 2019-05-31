@@ -416,10 +416,10 @@ class PosCollider(object):
         
     def _load_keepouts(self):
         """Read latest versions of all keepout geometries."""
-        self.general_keepout_P = PosPoly(self.config['KEEPOUT_PHI'], self.config['KEEPOUT_PHI_PT0'])
-        self.general_keepout_T = PosPoly(self.config['KEEPOUT_THETA'], self.config['KEEPOUT_THETA_PT0'])
-        self.keepout_PTL = PosPoly(self.config['KEEPOUT_PTL'], self.config['KEEPOUT_PTL_PT0'])
-        self.keepout_GFA = PosPoly(self.config['KEEPOUT_GFA'], self.config['KEEPOUT_GFA_PT0'])
+        self.general_keepout_P = PosPoly(self.config['KEEPOUT_PHI'])
+        self.general_keepout_T = PosPoly(self.config['KEEPOUT_THETA'])
+        self.keepout_PTL = PosPoly(self.config['KEEPOUT_PTL'])
+        self.keepout_GFA = PosPoly(self.config['KEEPOUT_GFA'])
         self.keepout_PTL = self.keepout_PTL.rotated(self._petal_rot)
         self.keepout_PTL = self.keepout_PTL.translated(self._petal_x0, self._petal_y0)
         self.keepout_GFA = self.keepout_GFA.rotated(self._petal_rot)
