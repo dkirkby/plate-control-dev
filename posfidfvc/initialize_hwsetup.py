@@ -148,7 +148,32 @@ fvc.scale = hwsetup['scale']
 posids = hwsetup['pos_ids']
 fidids = hwsetup['fid_ids']
 shape = 'asphere' if hwsetup['plate_type'] == 'petal' else 'flat'
-ptl = petal.Petal(hwsetup['ptl_id'], posids, fidids, simulator_on=sim, user_interactions_enabled=True, anticollision=None, petal_shape=shape)
+try:
+    db_commit_on = hwsetup['db_commit_on']
+except:
+    db_commit_on = False
+
+try:
+    petal_proxy = hwsetup['use_petal_proxy']
+    from DOSlib.proxies import Petal
+except:
+    petal_proxy = False
+
+if petal_proxy:
+    ptl = Petal(hwsetup['ptl_id'])
+else:
+    #shape = 'asphere' if hwsetup['plate_type'] == 'petal' else 'flat'
+    ptl = petal.Petal(petal_id = hwsetup['ptl_id'],posids=[],fidids=[], 
+                      simulator_on = sim,
+                      user_interactions_enabled = True,
+                      db_commit_on = db_commit_on,
+                      local_commit_on = not(db_commit_on),
+                      local_log_on = True,
+                      printfunc = logwrite,
+                      verbose = False,
+                      collider_file = None,
+                      sched_stats_on = False,
+                      anticollision = None) # valid options for anticollision arg: None, 'freeze', 'adjust'
 m = posmovemeasure.PosMoveMeasure([ptl],fvc)
 m.make_plots_during_calib = True
 print('Automatic generation of calibration plots is turned ' + ('ON' if m.make_plots_during_calib else 'OFF') + '.')

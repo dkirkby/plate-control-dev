@@ -82,19 +82,32 @@ fvc.rotation = hwsetup['rotation'] # this value is used in setups without fvcpro
 fvc.scale = hwsetup['scale'] # this value is used in setups without fvcproxy / platemaker
 fvc.translation = hwsetup['translation']
 fvc.exposure_time = hwsetup['exposure_time']
+try:
+    db_commit_on = hwsetup['db_commit_on']
+except:
+    db_commit_on = False
 
-#shape = 'asphere' if hwsetup['plate_type'] == 'petal' else 'flat'
-ptl = petal.Petal(petal_id = hwsetup['ptl_id'],posids=[],fidids=[], 
-                  simulator_on = sim,
-                  user_interactions_enabled = True,
-                  db_commit_on = False,
-                  local_commit_on = True,
-                  local_log_on = True,
-                  printfunc = logwrite,
-                  verbose = False,
-                  collider_file = None,
-                  sched_stats_on = False,
-                  anticollision = None) # valid options for anticollision arg: None, 'freeze', 'adjust'
+try:
+    petal_proxy = hwsetup['use_petal_proxy']
+    from DOSlib.proxies import Petal
+except:
+    petal_proxy = False
+
+if petal_proxy:
+    ptl = Petal(hwsetup['ptl_id'])
+else:
+    #shape = 'asphere' if hwsetup['plate_type'] == 'petal' else 'flat'
+    ptl = petal.Petal(petal_id = hwsetup['ptl_id'],posids=[],fidids=[], 
+                      simulator_on = sim,
+                      user_interactions_enabled = True,
+                      db_commit_on = db_commit_on,
+                      local_commit_on = not(db_commit_on),
+                      local_log_on = True,
+                      printfunc = logwrite,
+                      verbose = False,
+                      collider_file = None,
+                      sched_stats_on = False,
+                      anticollision = None) # valid options for anticollision arg: None, 'freeze', 'adjust'
 posids=ptl.posids
 fidids=ptl.fidids
 m = posmovemeasure.PosMoveMeasure([ptl],fvc,printfunc=logwrite)
