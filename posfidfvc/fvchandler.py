@@ -43,7 +43,7 @@ class FVCHandler(object):
             self.sim_badmatch_frquency = 0.05 # how often the simulator returns [0,0], indicating a bad match
             self.printfunc('FVCHandler is in simulator mode with max 2D errors of size ' + str(self.sim_err_max) + ', and bad match frequency of ' + str(self.sim_badmatch_frquency) + '.')
         if 'SBIG' in self.fvc_type:
-            self.exposure_time = 0.70
+            self.exposure_time = 0.20
             self.max_counts = 2**16 - 1 # SBIC camera ADU max
         else:
             self.exposure_time = 2.5
@@ -435,8 +435,9 @@ class FVCHandler(object):
         return np.array([[math.cos(angle), -math.sin(angle)], [math.sin(angle), math.cos(angle)]])
 
 if __name__ == '__main__':
-    f = FVCHandler(fvc_type='FLI',platemaker_instrument='petal1',fvc_role='FVC2')
-    n_objects =86 #74 
+    #f = FVCHandler(fvc_type='FLI',platemaker_instrument='petal1',fvc_role='FVC2')
+    f = FVCHandler(fvc_type='SBIG')
+    n_objects =15 #74 
     n_repeats = 1
     f.min_energy = -np.Inf
     xy = []
