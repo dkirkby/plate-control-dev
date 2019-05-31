@@ -87,6 +87,7 @@ class MoveGUI(object):
         Button(gui_root,text='OK',width=10,command=self.set_ptl_id).grid(row=1,column=2,sticky=W,pady=4)
 
         # Load Travellers
+        """
         url1='https://docs.google.com/spreadsheets/d/1lJ9GjhUUsK2SIvXeerpGW7664OFKQWAlPqpgxgevvl8/edit#gid=0' # PosID, SiID database
         self.sheet1=googlesheets.connect_by_url(url1,credentials = google_dir+credential_name)
         self.posid_idmap=googlesheets.read_col(self.sheet1, 1, ID_col_with_data = False)
@@ -95,7 +96,7 @@ class MoveGUI(object):
      
         url2='https://docs.google.com/spreadsheets/d/19Aq-28qgODaaX9wH-NMsX_GiuNyXG_6rjIjPVLb8aYw/edit#gid=795996596' # Acceptance Traveller
         self.sheet2=googlesheets.connect_by_url(url2,credentials = google_dir+credential_name)
-        
+        """
         
         mainloop()
 
@@ -133,6 +134,7 @@ class MoveGUI(object):
             elif len(str(key))==5:
                 self.posids.append('M'+str(key))
         print(self.posids)
+        """
         self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite,user_interactions_enabled=True)
         print('Finish loading petal')
 
@@ -141,7 +143,7 @@ class MoveGUI(object):
             self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
         self.fvc = fvchandler.FVCHandler(self.fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
-        
+        """
 # GUI input       
         w=1600
         h=700
@@ -173,8 +175,8 @@ class MoveGUI(object):
         self.mode.set(1)
         Checkbutton(gui_root, text='CAN', variable=self.mode).grid(row=3,column=1,sticky=E,pady=4)
         self.syncmode=IntVar(gui_root)
-        self.sync_mode_value=self.ptl.sync_mode
-        if self.ptl.sync_mode == 'hard':
+        self.sync_mode_value='hard'
+        if self.sync_mode == 'hard':
             self.syncmode.set(1)
         else:
             self.syncmode.set(0)
@@ -326,10 +328,8 @@ class MoveGUI(object):
 
     def sync_mode(self):
         if self.syncmode.get() == 1:
-            self.ptl.sync_mode = 'hard'
             self.sync_mode_value='hard'
         else:
-            self.ptl.sync_mode = 'soft'
             self.sync_mode_value='soft'
  
     def get_list(self,event):
@@ -726,7 +726,7 @@ class MoveGUI(object):
         self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite,user_interactions_enabled=True)
         for posid in self.posids:
             self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
-        self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
+        #self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
         cs=self.listbox1.curselection()
         #self.listbox1.delete(0,cs[0] -1)
         self.listbox1.delete(0,END)
