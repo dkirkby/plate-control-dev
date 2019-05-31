@@ -19,8 +19,8 @@ petal/petalcomm.py -text
 petal/petaltransforms.py -text
 petal/petsockcomm.py -text
 petal/posanimator.py -text
-petal/poscollider.py -text
 petal/poscollider.pyx -text
+petal/poscollider_old.py -text
 petal/posconstants.py -text
 petal/positioner_locations_0530v14.csv -text
 petal/posmodel.py -text
