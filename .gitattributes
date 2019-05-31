@@ -146,6 +146,7 @@ ups/plate_control.table -text
 xytest/desi_logo.gif -text
 xytest/fiber_test_gui.py -text
 xytest/frd_test_gui.py -text
+xytest/get_simulated_posids.py -text
 xytest/grader.py -text
 xytest/loadpetal.py -text
 xytest/movegui.py -text
