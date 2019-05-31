@@ -329,6 +329,7 @@ class PosCollider(object):
         """Rotates and translates the phi arm to position defined by the positioner's
         (x0,y0) and the argued obsTP (theta,phi) angles.
         """
+        #return self.keepouts_P[posid].place_as_phi_arm(obsTP[0],obsTP[1],self.x0[posid],self.y0[posid],self.R1[posid])
         poly = self.keepouts_P[posid].rotated(obsTP[1])
         poly = poly.translated(self.R1[posid], 0)
         poly = poly.rotated(obsTP[0])
@@ -712,10 +713,12 @@ cdef class PosPoly:
         a *= rad_per_deg
         cdef double c = c_cos(a)
         cdef double s = c_sin(a)
+        cdef double this_x
         cdef unsigned int i
-        for i in range(new.n_pts):    
-            new.x[i] = c*new.x[i] + -s*new.y[i]
-            new.y[i] = s*new.x[i] +  c*new.y[i]
+        for i in range(new.n_pts):
+            this_x = new.x[i]
+            new.x[i] = c*this_x + -s*new.y[i]
+            new.y[i] = s*this_x +  c*new.y[i]
         return new
 
     cpdef PosPoly translated(self, dx, dy):
@@ -743,7 +746,7 @@ cdef class PosPoly:
             new.y[i] += delta_r * c_sin(angle)
         return new
     
-    def expanded_x(self, left_shift, right_shift):
+    cpdef PosPoly expanded_x(self, left_shift, right_shift):
         """Returns a copy of the polygon object, with points expanded along the x direction only.
         Points leftward of the line x=0 are shifted further left by an amount left_shift > 0.
         Points rightward of the line x=0 are shifted further right by an amount right_shift > 0.
@@ -760,7 +763,7 @@ cdef class PosPoly:
                 new.x[i] -= L
         return new
         
-    def expanded_angularly(self, dA):
+    cpdef PosPoly expanded_angularly(self, dA):
         """Returns a copy of the polygon object, with points expanded rotationally by angle dA (in degrees).
         The rotational expansion is made about the polygon's [0,0] center.
         Expansion is made in both the clockwise and counter-clockwise directions from the line y=0. 
@@ -780,6 +783,28 @@ cdef class PosPoly:
             radius = (new.x[i]**2 + new.y[i]**2)**0.5
             new.x[i] = radius * c_cos(this_angle)
             new.y[i] = radius * c_sin(this_angle)
+        return new
+
+    cpdef PosPoly place_as_phi_arm(self, theta, phi, x0, y0, r1):
+        """Rotates and translates the phi arm to position defined by the positioner's
+        (x0,y0) and the argued obsTP (theta,phi) angles.
+        """
+        cdef double T = theta
+        cdef double P = phi
+        cdef double X0 = x0
+        cdef double Y0 = y0
+        cdef double R1 = r1
+        cdef unsigned int i
+        
+        cdef PosPoly new = self.rotated(T + P) # units deg
+        T *= rad_per_deg
+        cdef double delta_x = X0 + R1 * c_cos(T) # now radians
+        cdef double delta_y = Y0 + R1 * c_sin(T)
+    
+        
+        for i in range(new.n_pts):
+            new.x[i] += delta_x
+            new.y[i] += delta_y
         return new
 
     cpdef unsigned int collides_with(self, PosPoly other):
@@ -892,4 +917,14 @@ cpdef test():
     bools += [polys[0].collides_with(polys[3])]
     bools += [polys[0].collides_with(polys[4])]
     bools += [polys[4].collides_with(polys[5])]
-    return polys,bools
+    t = 20
+    p = -100
+    x = 10
+    y = -4
+    r1 = 3
+    a = polys[0].rotated(p)
+    a = a.translated(r1,0)
+    a = a.rotated(t)
+    a = a.translated(x,y)
+    b = polys[0].place_as_phi_arm(t,p,x,y,r1)
+    return polys,bools, a, b
