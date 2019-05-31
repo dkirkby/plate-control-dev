@@ -6,7 +6,7 @@ import posstate
 import posanimator
 import configobj
 import os
-import copy
+import copy as copymodule
 import math
 import collision_lookup_generator_subset as lookup
 import pickle
@@ -20,7 +20,11 @@ class PosCollider(object):
 
     See DESI-0899 for geometry specifications, illustrations, and kinematics.
     """
-    def __init__(self, configfile='', collision_hashpp_exists=False, collision_hashpf_exists=False, hole_angle_file=None):
+    def __init__(self, configfile='', 
+                 collision_hashpp_exists=False, 
+                 collision_hashpf_exists=False, 
+                 hole_angle_file=None, 
+                 use_neighbor_loc_dict=False):
         if not configfile:
             filename = '_collision_settings_DEFAULT.conf'
         else:
@@ -30,6 +34,7 @@ class PosCollider(object):
         self.posids = set() # posid strings for all the positioners
         self.posindexes = {} # key: posid string, value: index number for positioners in animations
         self.posmodels = {} # key: posid string, value: posmodel instance
+        self.devicelocs = {} # key: device loc, value: posid string
         self.pos_neighbors = {} # all the positioners that surround a given positioner. key is a posid, value is a set of neighbor posids
         self.fixed_neighbor_cases = {} # all the fixed neighbors that apply to a given positioner. key is a posid, value is a set of the fixed neighbor cases
         self.R1, self.R2, self.x0, self.y0, self.t0, self.p0 = {}, {}, {}, {}, {}, {}
@@ -37,6 +42,9 @@ class PosCollider(object):
         self.plotting_on = True
         self.timestep = self.config['TIMESTEP']
         self.animator = posanimator.PosAnimator(fignum=0, timestep=self.timestep)
+        self.use_neighbor_loc_dict = use_neighbor_loc_dict
+        self.keepouts_T = {} # key: posid, value: central body keepout of type PosPoly
+        self.keepouts_P = {} # key: posid, value: phi arm keepout of type PosPoly
         
         # hash table initializations (if being used)
         self.collision_hashpp_exists = collision_hashpp_exists
@@ -53,6 +61,11 @@ class PosCollider(object):
             f = open(os.path.join(os.environ.get('collision_table'), 'table_pf_50_50_5_5.out'), 'rb')
             self.table_pf = pickle.load(f)
             f.close()
+        
+        # load fixed dictionary containing locations of neighbors for each positioner DEVICE_LOC (if this option has been selected)
+        if self.use_neighbor_loc_dict:
+            with open(pc.dirs['positioner_neighbors_file'], 'rb') as f:
+                self.neighbor_locs = pickle.load(f)
             
     def set_petal_offsets(self, x0=0.0, y0=0.0, rot=0.0):
         """Sets information about a particular petal's overall location. This
@@ -65,6 +78,12 @@ class PosCollider(object):
         self._petal_y0 = y0
         self._petal_rot = rot
         self._load_keepouts()
+    def update_positioner_offsets_and_arm_lengths(self):
+        """Loads positioner parameters.  This method is called when new calibration data is available
+        for positioner arm lengths and offsets.
+        """
+        self._load_positioner_params()
+        self._adjust_keepouts()
 
     def add_positioners(self, posmodels):
         """Add a collection of positioners to the collider object.
@@ -75,6 +94,7 @@ class PosCollider(object):
                 self.posids.add(posid)
                 self.posindexes[posid] = len(self.posindexes) + 1
                 self.posmodels[posid] = posmodel
+                self.devicelocs[posmodel.deviceloc] = posid
                 self.pos_neighbors[posid] = set()
                 self.fixed_neighbor_cases[posid] = set()
         self._load_config_data()
@@ -309,7 +329,7 @@ class PosCollider(object):
         """Rotates and translates the phi arm to position defined by the positioner's
         (x0,y0) and the argued obsTP (theta,phi) angles.
         """
-        poly = self.keepout_P.rotated(obsTP[1])
+        poly = self.keepouts_P[posid].rotated(obsTP[1])
         poly = poly.translated(self.R1[posid], 0)
         poly = poly.rotated(obsTP[0])
         poly = poly.translated(self.x0[posid], self.y0[posid])
@@ -319,7 +339,7 @@ class PosCollider(object):
         """Rotates and translates the central body of positioner
         to its (x0,y0) and the argued obsT theta angle.
         """
-        poly = self.keepout_T.rotated(obsT)
+        poly = self.keepouts_T[posid].rotated(obsT)
         poly = poly.translated(self.x0[posid], self.y0[posid])
         return poly
 
@@ -351,21 +371,10 @@ class PosCollider(object):
         polygon definitions, and updates stored values accordingly.
         """
         self.timestep = self.config['TIMESTEP']
-        self._load_keepouts()
         self._load_positioner_params()
         self._load_circle_envelopes()
-
-    def _load_keepouts(self):
-        """Read latest versions of all keepout geometries."""
-        self.keepout_P = PosPoly(self.config['KEEPOUT_PHI'], self.config['KEEPOUT_PHI_PT0'])
-        self.keepout_T = PosPoly(self.config['KEEPOUT_THETA'], self.config['KEEPOUT_THETA_PT0'])
-        self.keepout_PTL = PosPoly(self.config['KEEPOUT_PTL'], self.config['KEEPOUT_PTL_PT0'])
-        self.keepout_GFA = PosPoly(self.config['KEEPOUT_GFA'], self.config['KEEPOUT_GFA_PT0'])
-        self.keepout_PTL = self.keepout_PTL.rotated(self._petal_rot)
-        self.keepout_PTL = self.keepout_PTL.translated(self._petal_x0, self._petal_y0)
-        self.keepout_PTL = self.keepout_GFA.rotated(self._petal_rot)
-        self.keepout_PTL = self.keepout_GFA.translated(self._petal_x0, self._petal_y0)
-        self.fixed_neighbor_keepouts = {pc.case.PTL : self.keepout_PTL, pc.case.GFA : self.keepout_GFA}
+        self._load_keepouts()
+        self._adjust_keepouts()
 
     def _load_positioner_params(self):
         """Read latest versions of all positioner parameters."""
@@ -386,7 +395,7 @@ class PosCollider(object):
         self.Ei_phi = self.config['PHI_EI']   # angle above which phi is guaranteed to be within envelope Ei
         self.Eo = self.config['ENVELOPE_EO']  # outer clear rotation envelope
         self.Ei = self.config['ENVELOPE_EI']  # inner clear rotation envelope
-        self.Ee = self._max_extent() * 2        # extended-phi clear rotation envelope
+        self.Ee = self._max_extent() * 2      # extended-phi clear rotation envelope
         self.Eo_poly = PosPoly(self._circle_poly_points(self.Eo, self.config['RESOLUTION_EO']).tolist())
         self.Ei_poly = PosPoly(self._circle_poly_points(self.Ei, self.config['RESOLUTION_EI']).tolist())
         self.Ee_poly = PosPoly(self._circle_poly_points(self.Ee, self.config['RESOLUTION_EE']).tolist())
@@ -404,14 +413,44 @@ class PosCollider(object):
             self.line180_polys[posid] = self.line180_poly.rotated(self.t0[posid]).translated(x,y)
         self.ferrule_diam = self.config['FERRULE_DIAM']
         self.ferrule_poly = PosPoly(self._circle_poly_points(self.ferrule_diam, self.config['FERRULE_RESLN']).tolist())
+        
+    def _load_keepouts(self):
+        """Read latest versions of all keepout geometries."""
+        self.general_keepout_P = PosPoly(self.config['KEEPOUT_PHI'], self.config['KEEPOUT_PHI_PT0'])
+        self.general_keepout_T = PosPoly(self.config['KEEPOUT_THETA'], self.config['KEEPOUT_THETA_PT0'])
+        self.keepout_PTL = PosPoly(self.config['KEEPOUT_PTL'], self.config['KEEPOUT_PTL_PT0'])
+        self.keepout_GFA = PosPoly(self.config['KEEPOUT_GFA'], self.config['KEEPOUT_GFA_PT0'])
+        self.keepout_PTL = self.keepout_PTL.rotated(self._petal_rot)
+        self.keepout_PTL = self.keepout_PTL.translated(self._petal_x0, self._petal_y0)
+        self.keepout_GFA = self.keepout_GFA.rotated(self._petal_rot)
+        self.keepout_GFA = self.keepout_GFA.translated(self._petal_x0, self._petal_y0)
+        self.fixed_neighbor_keepouts = {pc.case.PTL : self.keepout_PTL, pc.case.GFA : self.keepout_GFA}
+    
+    def _adjust_keepouts(self):
+        """Expand/contract, and pre-shift the theta and phi keepouts for each positioner."""
+        self.general_keepout_P = self.general_keepout_P.expanded_radially(self.config['KEEPOUT_EXPANSION_PHI_RADIAL'])
+        self.general_keepout_P = self.general_keepout_P.expanded_angularly(self.config['KEEPOUT_EXPANSION_PHI_ANGULAR'])
+        self.general_keepout_T = self.general_keepout_T.expanded_radially(self.config['KEEPOUT_EXPANSION_THETA_RADIAL'])
+        self.general_keepout_T = self.general_keepout_T.expanded_angularly(self.config['KEEPOUT_EXPANSION_THETA_ANGULAR'])
+        for posid in self.posids:
+            R1_error = self.R1[posid] - pc.nominals['LENGTH_R1']['value']
+            R2_error = self.R2[posid] - pc.nominals['LENGTH_R2']['value']
+            self.keepouts_P[posid] = self.general_keepout_P.translated(R1_error,0)
+            self.keepouts_P[posid] = self.keepouts_P[posid].expanded_x(left_shift=R1_error, right_shift=R2_error)
+            self.keepouts_T[posid] = self.general_keepout_T.translated(0,0) # effectively just a copy operation
 
     def _identify_neighbors(self, posid):
         """Find all neighbors which can possibly collide with a given positioner."""
         Ee = self.Ee_poly.translated(self.x0[posid], self.y0[posid])
-        for possible_neighbor in self.posids:
-            Ee_neighbor = self.Ee_poly.translated(self.x0[possible_neighbor], self.y0[possible_neighbor])
-            if not(posid == possible_neighbor) and Ee.collides_with(Ee_neighbor):
-                self.pos_neighbors[posid].add(possible_neighbor)
+        if self.use_neighbor_loc_dict:
+            deviceloc = self.posmodels[posid].deviceloc
+            neighbors = self.neighbor_locs[deviceloc].intersection(self.devicelocs.keys())
+            self.pos_neighbors[posid] = {self.devicelocs[loc] for loc in neighbors}
+        else:
+            for possible_neighbor in self.posids:
+                Ee_neighbor = self.Ee_poly.translated(self.x0[possible_neighbor], self.y0[possible_neighbor])
+                if not(posid == possible_neighbor) and Ee.collides_with(Ee_neighbor):
+                    self.pos_neighbors[posid].add(possible_neighbor)
         for possible_neighbor in self.fixed_neighbor_keepouts:
             EE_neighbor = self.fixed_neighbor_keepouts[possible_neighbor]
             if Ee.collides_with(EE_neighbor):
@@ -419,7 +458,7 @@ class PosCollider(object):
 
     def _max_extent(self):
         """Calculation of max radius of keepout for a positioner with fully-extended phi arm."""
-        extended_phi = self.keepout_P.translated(max(self.R1.values()),0) # assumption here that phi arm polygon defined at 0 deg angle
+        extended_phi = self.general_keepout_P.translated(max(self.R1.values()),0) # assumption here that phi arm polygon defined at 0 deg angle
         return max(np.sqrt(np.sum(np.array(extended_phi.points)**2, axis=0)))
 
     @staticmethod
@@ -456,7 +495,7 @@ class PosSweep(object):
         self.frozen_time = math.inf         # time at which positioner is frozen in place. if no freezing, the time is inf
 
     def copy(self):
-        return copy.deepcopy(self)
+        return copymodule.deepcopy(self)
 
     def fill_exact(self, init_obsTP, table, start_time=0):
         """Fills in a sweep object based on the input table. Time and position
@@ -513,6 +552,38 @@ class PosSweep(object):
         self.time = discrete_time
         self.tp = discrete_position
         self.tp_dot = speed
+        
+    def extend(self, timestep, max_time):
+        """Extends a sweep object to max_time to reflect the postpauses inserted into the move table 
+        in equalize_table_times() in posschedulestage.py, ensuring that the sweep object
+        is in sync with the move table so that the animator is reflecting true moves. """
+        
+        starttime_extension = self.time[-1] + timestep
+        time_extension = np.arange(starttime_extension, max_time + timestep, timestep)
+        extended_time = np.append(self.time, time_extension)
+        
+        #starttime_extension = self.time[-1] + timestep
+        #endtime_extension = self.time[-1] + equalizing_pause
+        #time_extension = np.arange(starttime_extension, endtime_extension + timestep, timestep)
+        #extended_time = np.append(self.time, time_extension)
+        
+        # tp extension are just the last tp entry repeated throughout the extended time
+        theta_extension = self.tp[0,-1]*np.ones(len(time_extension))
+        phi_extension = self.tp[1,-1]*np.ones(len(time_extension))
+        extended_theta = list(np.append(self.tp[0], theta_extension))
+        extended_phi = list(np.append(self.tp[1], phi_extension))
+        extended_tp = np.array([extended_theta, extended_phi])
+        
+        # tp_dot extension are just zeros repeated throughout the extended time
+        tdot_extension = np.zeros(len(time_extension))
+        pdot_extension = np.zeros(len(time_extension))
+        extended_tdot = list(np.append(self.tp_dot[0], tdot_extension))
+        extended_pdot= list(np.append(self.tp_dot[1], pdot_extension))
+        extended_tp_dot = np.array([extended_tdot, extended_pdot])
+        
+        self.time = extended_time
+        self.tp = extended_tp
+        self.tp_dot = extended_tp_dot
 
     def register_as_frozen(self):
         """Sets an indicator that the sweep has been frozen at the end."""
@@ -543,6 +614,7 @@ from libc.math cimport cos as c_cos
 from libc.math cimport pi as c_pi
 from libc.math cimport fmax as c_fmax
 from libc.math cimport fmin as c_fmin
+from libc.math cimport atan2 as c_atan2
 cdef double rad_per_deg = c_pi / 180.0
 cdef double deg_per_rad = 180.0 / c_pi
 
@@ -655,6 +727,59 @@ cdef class PosPoly:
         for i in range(new.n_pts):
             new.x[i] += delta_x
             new.y[i] += delta_y
+        return new
+
+    cpdef PosPoly expanded_radially(self, dR):
+        """Returns a copy of the polygon object, with points expanded radially by distance dR.
+        The linear expansion is made along lines from the polygon's [0,0] center.
+        A value dR < 0 is allowed, causing contraction of the polygon."""
+        cdef PosPoly new = self.copy()
+        cdef unsigned int i
+        cdef double delta_r = dR
+        cdef double angle
+        for i in range(new.n_pts):
+            angle = c_atan2(new.y[i], new.x[i])
+            new.x[i] += delta_r * c_cos(angle)
+            new.y[i] += delta_r * c_sin(angle)
+        return new
+    
+    def expanded_x(self, left_shift, right_shift):
+        """Returns a copy of the polygon object, with points expanded along the x direction only.
+        Points leftward of the line x=0 are shifted further left by an amount left_shift > 0.
+        Points rightward of the line x=0 are shifted further right by an amount right_shift > 0.
+        Points upon the line x=0 are not shifted.
+        Negative values for left_dx and right_dx are allowed. They contract the polygon rightward and leftward, respectively."""
+        cdef PosPoly new = self.copy()
+        cdef unsigned int i
+        cdef double L = left_shift
+        cdef double R = right_shift
+        for i in range(new.n_pts):
+            if new.x[i] > 0:
+                new.x[i] += R
+            elif new.x[i] < 0:
+                new.x[i] -= L
+        return new
+        
+    def expanded_angularly(self, dA):
+        """Returns a copy of the polygon object, with points expanded rotationally by angle dA (in degrees).
+        The rotational expansion is made about the polygon's [0,0] center.
+        Expansion is made in both the clockwise and counter-clockwise directions from the line y=0. 
+        A value dA < 0 is allowed, causing contraction of the polygon."""
+        cdef PosPoly new = self.copy()
+        cdef unsigned int i
+        cdef double delta_angle = dA
+        cdef double this_angle
+        cdef double radius
+        delta_angle *= rad_per_deg
+        for i in range(new.n_pts):
+            this_angle = c_atan2(new.y[i], new.x[i])
+            if this_angle > 0:
+                this_angle += delta_angle
+            elif this_angle < 0:
+                this_angle -= delta_angle
+            radius = (new.x[i]**2 + new.y[i]**2)**0.5
+            new.x[i] = radius * c_cos(this_angle)
+            new.y[i] = radius * c_sin(this_angle)
         return new
 
     cpdef unsigned int collides_with(self, PosPoly other):
