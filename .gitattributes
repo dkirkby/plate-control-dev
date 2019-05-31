@@ -20,6 +20,7 @@ petal/petaltransforms.py -text
 petal/petsockcomm.py -text
 petal/posanimator.py -text
 petal/poscollider.py -text
+petal/poscollider.pyx -text
 petal/posconstants.py -text
 petal/positioner_locations_0530v14.csv -text
 petal/posmodel.py -text
@@ -29,6 +30,7 @@ petal/posschedule.py -text
 petal/posschedulestage.py -text
 petal/posstate.py -text
 petal/postransforms.py -text
+petal/setup.py -text
 petal/tests_and_demos/anticol_examples.py -text
 petal/tests_and_demos/anticol_sim.py -text
 petal/tests_and_demos/anticollision_test_harness/generate_posparam_sets.py -text
