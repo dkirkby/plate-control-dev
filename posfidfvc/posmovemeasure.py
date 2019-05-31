@@ -125,7 +125,7 @@ class PosMoveMeasure(object):
             these_accepted_requests = petal.request_targets(these_requests)
             petal.schedule_send_and_execute_moves(anticollision=anticollision)
             accepted_requests.update(these_accepted_requests)
-		print('<posmovemeasure.move> accepted_requests',accepted_requests) #from B141 PAF 5/28/19
+        print('<posmovemeasure.move> accepted_requests',accepted_requests) #from B141 PAF 5/28/19
         print('<posmovemeasure.move> these_requests',these_requests) #from B141 PAF 5/28/19
         return accepted_requests
 
@@ -260,7 +260,7 @@ class PosMoveMeasure(object):
                     os.rename(file, pc.dirs['xytest_plots'] + timestamp_str + '_move' + str(i) + file)                
         for posid in data.keys():
             self.printfunc(str(posid) + ': final error distance=' + self.fmt(data[posid]['err2D'][-1]))
-		print('<posmovemeasure.move_and_correct> anticollision: ',anticoll) #from B141 PAF 5/28/19
+            print('<posmovemeasure.move_and_correct> anticollision: ',anticoll) #from B141 PAF 5/28/19
         return data
 
     def retract_phi(self,posids='all'):
@@ -978,7 +978,7 @@ class PosMoveMeasure(object):
         for ptl in self.petals:
             ptl.commit(log_note=log_note)
 
-     def commit_calib(self,log_note=''):
+    def commit_calib(self,log_note=''):
         """Commit state data controlled by all petals to storage.
         See commit function in petal.py for explanation of optional additional log note.
         """
@@ -1311,7 +1311,7 @@ class PosMoveMeasure(object):
                 if petal.posmodels[posid].is_enabled:
                     petal.set_posfid_val(posid, key, data[posid][key][-1])
             petal.altered_calib_states.add(petal.posmodels[posid].state)
-                self.printfunc('Grid calib on ' + str(posid) + ': ' + key + ' set to ' + format(data[posid][key][-1],'.3f'))
+            self.printfunc('Grid calib on ' + str(posid) + ': ' + key + ' set to ' + format(data[posid][key][-1],'.3f'))
             data[posid]['final_expected_obsXY'] = np.array(expected_xy(params_optimized.x)).transpose().tolist()
         return data
 
@@ -1637,7 +1637,7 @@ class PosMoveMeasure(object):
                         self.printfunc(posid + ': xy err = ' + self.fmt(err_xy) + ', changed ' + param + '_P from ' + self.fmt(old_P) + ' to ' + self.fmt(new_P))
                     delta_TP[posid] = [delta_T,delta_P]
                     posmodel.state.next_log_notes.append('updated ' + param + '_T and ' + param + '_P after positioning error of ' + self.fmt(err_xy) + ' mm')
-                    if param = 'OFFSET':
+                    if param == 'OFFSET':
                         ptl.altered_calib_states.add(ptl.posmodels[posid].state)
         return delta_TP
     
