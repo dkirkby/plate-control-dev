@@ -3,8 +3,9 @@ from Cython.Build import cythonize
 import os
 
 for module in ['poscollider']:
-    if os.path.isfile(module + '.cp36-win_amd64.pyd'):
-        os.remove(module + '.cp36-win_amd64.pyd')  # ease-of-use hack for windows machines
+    for file in os.listdir():
+        if os.path.splitext(file)[-1] in ['.so','.pyd'] and module in file:
+            os.remove(file)
     setup(name=module, ext_modules=cythonize(module + '.pyx', annotate=True))
 
 # General tips for the Cython-uninitiated...
