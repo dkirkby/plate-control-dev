@@ -22,7 +22,7 @@ MoveGUI
 #          V1.1  Kai Zhang, 2018-04-02. Add canbus input to talk to different cans for EM Petal. 
 
 """
-account='badu'
+account='msdos'
 import os
 import sys
 import datetime
@@ -97,6 +97,7 @@ class MoveGUI_Petal(object):
         self.posids = []
         self.cans= []
         self.info = self.pcomm.pbget('posfid_info')
+
         for can in self.canlist:
             print('Loading '+can)
             if can in self.info.keys(): 
@@ -116,7 +117,10 @@ class MoveGUI_Petal(object):
                     elif len(str(key))==5:
                         self.posids.append('M'+str(key))
             #time.sleep(3) 
-        self.ptl = petal.Petal(self.ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+        #self.ptl = petal.Petal(self.ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite)
+        self.ptl = petal.Petal(self.ptl_id, self.posids, fidids, simulator_on=self.simulate, printfunc=self.logwrite,user_interactions_enabled=True)
+        print('Finish loading petal')
+
         self.fvc = fvchandler.FVCHandler(fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
         
