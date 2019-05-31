@@ -353,7 +353,7 @@ class PosMoveMeasure(object):
                         petal.set_posfid_val(posid,'OFFSET_Y',xy[1])
                         self.printfunc(posid + ': Set OFFSET_X to ' + self.fmt(xy[0]))
                         self.printfunc(posid + ': Set OFFSET_Y to ' + self.fmt(xy[1]))
-                        petal.altered_calib_states.add(petal.posmdels[posid].state)
+                        petal.altered_calib_states.add(petal.posmodels[posid].state)
         self.commit() # log note is already handled above
         self.commit_calib()
         if self.fvc.fvcproxy and wide_spotmatch:
