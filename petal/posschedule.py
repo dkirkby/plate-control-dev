@@ -172,10 +172,11 @@ class PosSchedule(object):
                     self.move_tables[posid].extend(table)
                 else:
                     self.move_tables[posid] = table
-                # note: compare function currently only works correctly for RRE stages
-                table_for_schedule = table.for_schedule()
-                stage_sweep = self.stages[name].sweeps[posid] # quantized sweep after path adjustments
-                self.compare_table_with_sweep(table_for_schedule, stage_sweep)
+                if anticollision == 'adjust':
+                    # note: compare function currently only works correctly for RRE stages
+                    table_for_schedule = table.for_schedule()
+                    stage_sweep = self.stages[name].sweeps[posid] # quantized sweep after path adjustments
+                    self.compare_table_with_sweep(table_for_schedule, stage_sweep)
               
         # for debugging purpose -- can be taken/commented out later
         if self.verbose:

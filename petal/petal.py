@@ -64,9 +64,9 @@ class Petal(object):
             unit_id=petal_id, device_type='ptl', logging=True,
             printfunc=self.printfunc)
         if petal_id is None:
-            self.petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
+            self.petal_id = int(self.petal_state.conf['PETAL_ID']) # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
         else:
-            self.petal_id = petal_id
+            self.petal_id = int(petal_id)
         if petalbox_id is None:
             self.petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
         else:
@@ -104,7 +104,7 @@ class Petal(object):
         self.db_commit_on = db_commit_on if DB_COMMIT_AVAILABLE else False
         if self.db_commit_on:
             os.environ['DOS_POSMOVE_WRITE_TO_DB'] = 'True'
-            self.posmoveDB = DBSingleton(petal_id=self.petal_id)
+            self.posmoveDB = DBSingleton(petal_id=int(self.petal_id))
         self.local_commit_on = local_commit_on
         self.local_log_on = local_log_on
         self.altered_states = set()
@@ -185,7 +185,7 @@ class Petal(object):
             self.petal_loc = 3  # petal local CS aligns with focal plate CS5
         else:
             self.petal_loc = petal_loc
-        if CONSTANTSDB_AVAILABLE:
+        if False:#CONSTANTSDB_AVAILABLE: #Something seems broken here come back and fix this later KF - 2019/05/31
             constants = ConstantsDB().get_constants(
                 snapshot='DOS', tag='CURRENT', group='focal_plane_metrology')
             gamma = constants[str(self.petal_loc)]['petal_rot_3']
@@ -258,9 +258,7 @@ class Petal(object):
             self._initialize_pos_flags(ids = {posid})
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
-            if posid not in self.posids:  # check if posid belongs to this petal
-                marked_for_delete.add(posid)
-            elif not(self.get_posfid_val(posid,'CTRL_ENABLED')):
+            if not(self.get_posfid_val(posid,'CTRL_ENABLED')):
                 self.pos_flags[posid] |= self.ctrl_disabled_bit
                 marked_for_delete.add(posid)
             elif self.schedule.already_requested(posid):
