@@ -14,7 +14,8 @@ positioner_param_sequences = {0:[0],
 move_request_sequences     = {0:[0],
                               1:[0,1],
 							  2:[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-                              3:[20,21,22,23,24]}
+                              3:[20,21,22,23,24],
+                              4:[20,21]}
 
 def get_positioner_param_sequence(sequence_id, device_loc_ids='all'):
     """Select a sequence of positioner parameter sets.
