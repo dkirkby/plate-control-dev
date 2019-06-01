@@ -329,20 +329,13 @@ class PosCollider(object):
         """Rotates and translates the phi arm to position defined by the positioner's
         (x0,y0) and the argued obsTP (theta,phi) angles.
         """
-        #return self.keepouts_P[posid].place_as_phi_arm(obsTP[0],obsTP[1],self.x0[posid],self.y0[posid],self.R1[posid])
-        poly = self.keepouts_P[posid].rotated(obsTP[1])
-        poly = poly.translated(self.R1[posid], 0)
-        poly = poly.rotated(obsTP[0])
-        poly = poly.translated(self.x0[posid], self.y0[posid])
-        return poly
+        return self.keepouts_P[posid].place_as_phi_arm(obsTP[0],obsTP[1],self.x0[posid],self.y0[posid],self.R1[posid])
 
     def place_central_body(self, posid, obsT):
         """Rotates and translates the central body of positioner
         to its (x0,y0) and the argued obsT theta angle.
         """
-        poly = self.keepouts_T[posid].rotated(obsT)
-        poly = poly.translated(self.x0[posid], self.y0[posid])
-        return poly
+        return self.keepouts_T[posid].place_as_central_body(obsT,self.x0[posid],self.y0[posid])
 
     def place_ferrule(self, posid, obsTP):
         """Rotates and translates the ferrule to position defined by the positioner's
@@ -786,22 +779,31 @@ cdef class PosPoly:
         return new
 
     cpdef PosPoly place_as_phi_arm(self, theta, phi, x0, y0, r1):
-        """Rotates and translates the phi arm to position defined by the positioner's
-        (x0,y0) and the argued obsTP (theta,phi) angles.
+        """Treating polygon as a phi arm, rotates and translates it to position defined
+        by angles theta and phi (deg) and calibration values x0, y0, r1.
         """
-        cdef double T = theta
-        cdef double P = phi
+        cdef PosPoly new = self.rotated(theta + phi) # units deg
         cdef double X0 = x0
         cdef double Y0 = y0
         cdef double R1 = r1
+        cdef double T = theta
         cdef unsigned int i
-        
-        cdef PosPoly new = self.rotated(T + P) # units deg
         T *= rad_per_deg
         cdef double delta_x = X0 + R1 * c_cos(T) # now radians
         cdef double delta_y = Y0 + R1 * c_sin(T)
-    
-        
+        for i in range(new.n_pts):
+            new.x[i] += delta_x
+            new.y[i] += delta_y
+        return new
+
+    cpdef PosPoly place_as_central_body(self, theta, x0, y0):
+        """Treating polygon as a central body, rotates and translates it to postion
+        defined by angle theta (deg) and calibration values x0, y0.
+        """
+        cdef PosPoly new = self.rotated(theta)
+        cdef double delta_x = x0
+        cdef double delta_y = y0
+        cdef unsigned int i
         for i in range(new.n_pts):
             new.x[i] += delta_x
             new.y[i] += delta_y
