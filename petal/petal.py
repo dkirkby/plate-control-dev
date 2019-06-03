@@ -2,13 +2,7 @@ from posmodel import PosModel
 import posschedule
 import posmovetable
 import posstate
-try:
-    import poscollider
-except ModuleNotFoundError as e:
-    print('poscollider.py unavailable, importing pyx...')
-    import pyximport
-    pyximport.install()
-    import poscollider
+import poscollider
 import posconstants as pc
 import posschedstats
 from petaltransforms import PetalTransforms
