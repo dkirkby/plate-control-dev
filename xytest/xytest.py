@@ -7,10 +7,6 @@ if "TEST_LOCATION" in os.environ and os.environ['TEST_LOCATION']=='Michigan':
 else:
     sys.path.append(os.path.abspath('../petal/'))
     sys.path.append(os.path.abspath('../posfidfvc/'))
-sys.path.remove('/home/msdos/focalplane/plate_control/branches/production/xytest')
-sys.path.remove('/home/msdos/focalplane/plate_control/branches/production/posfidfvc')
-sys.path.remove('/home/msdos/focalplane/plate_control/branches/production/petalbox')
-sys.path.remove('/home/msdos/focalplane/plate_control/branches/production/petal')
 
 import fvchandler
 import petal
@@ -144,12 +140,12 @@ class XYTest(object):
         shape = 'asphere' if self.hwsetup_conf['plate_type'] == 'petal' else 'flat'
 
         try:
-            db_commit_on = hwsetup['db_commit_on']
+            db_commit_on = self.hwsetup_conf['db_commit_on']
         except:
             db_commit_on = False
 
         try:
-            petal_proxy = hwsetup['use_petal_proxy']
+            petal_proxy = self.hwsetup_conf['use_petal_proxy']
             from DOSlib.proxies import Petal
         except:
             petal_proxy = False
@@ -447,6 +443,7 @@ class XYTest(object):
                 self.logwrite('Local target (posX,posY)=(' + format(local_targets[targ_num-1][0],'.3f') + ',' + format(local_targets[targ_num-1][1],'.3f') + ') for each positioner.')
                 this_timestamp = pc.timestamp_str_now()
                 these_meas_data = self.m.move_and_correct(these_targets, num_corr_max)
+                import pdb; pdb.set_trace()
                 
                 # store this set of measured data
                 all_data_by_target.append(these_meas_data)
