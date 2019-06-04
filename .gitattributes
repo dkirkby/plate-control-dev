@@ -150,6 +150,8 @@ xytest/movegui_temp.py -text
 xytest/pos_xytest_plot.py -text
 xytest/posblast.py -text
 xytest/posdance.py -text
+xytest/ptl_build_gui.py -text
+xytest/ptl_build_xytest.py -text
 xytest/sendalarm.py -text
 xytest/start_a_petal.py -text
 xytest/summarizer.py -text
