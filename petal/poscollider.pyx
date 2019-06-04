@@ -190,13 +190,15 @@ class PosCollider(object):
             sweeps = [PosSweep(posid_A)]
             steps_remaining = [0]
             step = [0]
-        for i in range(len(tables)):
+        pos_range = range(len(sweeps))
+        rev_pos_range = reversed(pos_range)
+        for i in pos_range:
             sweeps[i].fill_exact(init_obsTPs[i], tables[i])
             sweeps[i].quantize(self.timestep)
             steps_remaining[i] = len(sweeps[i].time)
         while any(steps_remaining):
             check_collision_this_loop = False
-            for i in range(len(sweeps)):
+            for i in pos_range:
                 if any(sweeps[i].tp_dot[:,step[i]]) or step[i] == 0:
                     check_collision_this_loop = True
             if check_collision_this_loop:
@@ -205,7 +207,7 @@ class PosCollider(object):
                 else:
                     collision_case = self.spatial_collision_with_fixed(posid_A, sweeps[0].tp[:,step[0]])
                 if collision_case != pc.case.I:
-                    for i,j in zip(range(len(sweeps)), reversed(range(len(sweeps)))):
+                    for i,j in zip(pos_range, rev_pos_range):
                         sweeps[i].collision_case = collision_case
                         if pospos:
                             sweeps[i].collision_neighbor = sweeps[j].posid
@@ -218,7 +220,7 @@ class PosCollider(object):
                             sweeps[i].collision_idx = step[i]
                         steps_remaining[i] = 0 # halt the sweep here
             steps_remaining = np.clip(np.asarray(steps_remaining)-1,0,np.inf)
-            for i in range(len(sweeps)):
+            for i in pos_range:
                 if steps_remaining[i]:
                     step[i] += 1
                 else:
