@@ -184,14 +184,15 @@ class PosCollider(object):
             sweeps = [PosSweep(posid_A),PosSweep(posid_B)]
             steps_remaining = [0,0]
             step = [0,0]
+            pos_range = [0,1]
         else:
             init_obsTPs = [init_obsTP_A]
             tables = [tableA]
             sweeps = [PosSweep(posid_A)]
             steps_remaining = [0]
             step = [0]
-        pos_range = range(len(sweeps))
-        rev_pos_range = reversed(pos_range)
+            pos_range = [0]
+        rev_pos_range = pos_range[::-1]
         for i in pos_range:
             sweeps[i].fill_exact(init_obsTPs[i], tables[i])
             sweeps[i].quantize(self.timestep)
