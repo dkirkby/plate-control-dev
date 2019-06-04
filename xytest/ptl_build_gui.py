@@ -32,73 +32,19 @@ from tkinter import *
 import time
 import show_detected
 import pdb
+from configobj import ConfigObj
 import write_conf_files as wc
 
 class PtlTestGUI(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
         global gui_root
-        gui_root = tkinter.Tk()
-
-        w=200
-        h=100
-        ws=gui_root.winfo_screenwidth()
-        hs=gui_root.winfo_screenheight()
-        x=(ws/2)-(w/2)
-        y=(hs/2)-(h/2)
-        gui_root.geometry('%dx%d+%d+%d' % (w,h,x,y))
-
-        self.e1=Entry(gui_root,width=5)
-        self.e1.grid(row=0,column=1)
-        Label(gui_root,text="Petal ID:").grid(row=0)
-        self.e_can=Entry(gui_root,width=5)
-        self.e_can.grid(row=1,column=1)
-        self.e_can.insert(0,'0')
-        Label(gui_root,text="Petal ID:").grid(row=0)
-        Button(gui_root,text='OK',width=10,command=self.set_ptl_id).grid(row=1,column=2,sticky=W,pady=4)
-
-        
-        mainloop()
 
         gui_root = tkinter.Tk()
         self.logfile='PtlTestGUI.log'
-        self.fvc_type='simulator'
-        self.fidids=['F021']   
-        gui_root.title='Petal Build GUI'
-        self.pcomm=petalcomm.PetalComm(self.ptl_id)
         self.mode = 0
-        #petalcomm.
-   #     info=self.petalcomm.get_device_status()
-        canbus=self.canbus
-        self.bus_id=canbus
-        #self.info = self.pcomm.get_posfid_info(canbus)
-        info_temp=self.pcomm.pbget('posfid_info')
-        if isinstance(info_temp, (list,)):
-            self.info = self.pcomm.pbget('posfid_info')[0]
-        else:
-            self.info=self.pcomm.pbget('posfid_info')[canbus]
-        print(self.info)
-        self.posids = []
-        for key in sorted(self.info.keys()):
-            if len(str(key))==2:
-                self.posids.append('M000'+str(key)) 
-            elif len(str(key))==3:
-                self.posids.append('M00'+str(key))
-            elif len(str(key))==4:
-                self.posids.append('M0'+str(key))
-            elif len(str(key))==5:
-                self.posids.append('M'+str(key))
-        print(self.posids)
-        self.ptl = petal.Petal(self.ptl_id, self.posids, self.fidids, simulator_on=self.simulate, printfunc=self.logwrite,user_interactions_enabled=True)
-        print('Finish loading petal')
 
-        for posid in self.ptl.posids:
-            self.ptl.set_posfid_val(posid, 'CTRL_ENABLED', True)
-            self.ptl.set_posfid_val(posid, 'BUS_ID', self.canbus)
-        self.fvc = fvchandler.FVCHandler(self.fvc_type,printfunc=self.logwrite,save_sbig_fits=False)               
-        self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc,printfunc=self.logwrite)
-        
-# GUI input       
-        w=1600
+        # GUI geometry       
+        w=800
         h=700
         ws=gui_root.winfo_screenwidth()
         hs=gui_root.winfo_screenheight()
@@ -106,47 +52,39 @@ class PtlTestGUI(object):
         y=(hs/2)-(h/2)
         gui_root.geometry('%dx%d+%d+%d' % (w,h,x,y))
         
-        Button(gui_root,text='Set',width=10,command=self.set_fiducial).grid(row=0,column=4,sticky=W,pady=4)
-        
-        Label(gui_root,text="Rotation Angel").grid(row=0,column=0)
-        self.e1=Entry(gui_root)
-        self.e1.grid(row=0,column=1)
-        self.e1.insert(0,'50')
-        
-        Label(gui_root,text="Set Fiducial").grid(row=0,column=2)
+        #Set Petal and PetalBox
+        self.get_petal = Entry(gui_root, width = 8, justify = 'right')
+        self.get_petal.grid(row=0, column=0)
+        self.get_petal.insert(0, 'PETAL')
+        self.get_pc = Entry(gui_root, width = 8, justify = 'right')
+        self.get_pc.grid(row=1, column=0)
+        self.get_pc.insert(0, 'PC')
+        Button(gui_root, width = 10, text = 'PETAL + PC', command=lambda: self.set_peta_no()).grid(row=0, column=1)
+
+        #Set Scale
+
         self.e2=Entry(gui_root)
         self.e2.grid(row=0,column=3)
 
         self.e_can=Entry(gui_root,width=10)
         self.e_can.grid(row=5,column=0,sticky=E)
-        self.e_can.insert(0,self.canbus.strip('can'))
         Label(gui_root,text="CAN Bus:").grid(row=5,column=0,sticky=W,padx=10)
 
-        Button(gui_root,text='Theta CW',width=10,command=self.theta_cw_degree).grid(row=3,column=1,sticky=W,pady=4)
-        Button(gui_root,text='Theta CCW',width=10,command=self.theta_ccw_degree).grid(row=4,column=1,sticky=W,pady=4)
+        Button(gui_root,text='Theta CW',width=10).grid(row=3,column=1,sticky=W,pady=4)
+        Button(gui_root,text='Theta CCW',width=10).grid(row=4,column=1,sticky=W,pady=4)
         self.mode=IntVar(gui_root)
         self.mode.set(1)
         Checkbutton(gui_root, text='CAN', variable=self.mode).grid(row=3,column=1,sticky=E,pady=4)
         self.syncmode=IntVar(gui_root)
-        self.sync_mode_value=self.ptl.sync_mode
-        if self.ptl.sync_mode == 'hard':
-            self.syncmode.set(1)
-        else:
-            self.syncmode.set(0)
-        Checkbutton(gui_root, text='SYNC hard', variable=self.syncmode,command=self.sync_mode).grid(row=3,column=2,sticky=W,pady=4)
-
-        Button(gui_root,text='Phi CW',width=10,command=self.phi_cw_degree).grid(row=3,column=0,sticky=W,pady=4)
-        Button(gui_root,text='Phi CCW',width=10,command=self.phi_ccw_degree).grid(row=4,column=0,sticky=W,pady=4)
-        Button(gui_root,text='Show INFO',width=10,command=self.show_info).grid(row=5,column=2,sticky=W,pady=4)
-        Button(gui_root,text='Reload CANBus',width=12,command=self.reload_canbus).grid(row=5,column=1,sticky=W,pady=4)
-        Button(gui_root,text='1 Write SiID',width=15,command=self.write_siid).grid(row=3,column=3,sticky=W,pady=4)
+        Button(gui_root,text='Reload CANBus',width=12).grid(row=5,column=1,sticky=W,pady=4)
+        Button(gui_root,text='1 Write SiID',width=15).grid(row=3,column=3,sticky=W,pady=4)
         #Button(gui_root,text='Sync Test',width=15,command=self.sync_test).grid(row=3,column=4,sticky=W,pady=4)
-        Button(gui_root,text='Movement Check',width=15,command=self.movement_check).grid(row=4,column=4,sticky=W,pady=4)
-        Button(gui_root,text='3 Populate Busids',width=15,command=self.populate_can).grid(row=5,column=3,sticky=W,pady=4)# Call populate_busids.py under pos_utility/ 
-        Button(gui_root,text='2 Write DEVICE_LOC',width=15,command=self.populate_petal_travelers).grid(row=4,column=3,sticky=W,pady=4)# Call populate_travellers.py under pos_utility/ to read from installation traveler and write to positioner 'database' and ID map
-        Button(gui_root,text='Aliveness Test',width=10,command=self.aliveness_test).grid(row=4,column=5,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
+        Button(gui_root,text='Movement Check',width=15).grid(row=4,column=4,sticky=W,pady=4)
+        Button(gui_root,text='3 Populate Busids',width=15).grid(row=5,column=3,sticky=W,pady=4)# Call populate_busids.py under pos_utility/ 
+        Button(gui_root,text='2 Write DEVICE_LOC',width=15).grid(row=4,column=3,sticky=W,pady=4)# Call populate_travellers.py under pos_utility/ to read from installation traveler and write to positioner 'database' and ID map
+        Button(gui_root,text='Aliveness Test',width=10).grid(row=4,column=5,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
 
-        Button(gui_root,text='Center',width=10,command=self.center).grid(row=4,column=2,sticky=W,pady=4)                
+        Button(gui_root,text='Center',width=10).grid(row=4,column=2,sticky=W,pady=4)                
 
         yscroll_text1 = Scrollbar(gui_root, orient=tkinter.VERTICAL)
         yscroll_text1.grid(row=6, column=4, rowspan=20,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)
@@ -168,18 +106,6 @@ class PtlTestGUI(object):
         self.listbox1.configure(yscrollcommand=yscroll_listbox1.set)
         self.listbox1.insert(tkinter.END,'ALL')
         
-        for key in sorted(self.info.keys()):
-            if len(str(key))==2:
-                self.listbox1.insert(tkinter.END,'M000'+str(key)) 
-            elif len(str(key))==3:
-                self.listbox1.insert(tkinter.END,'M00'+str(key))
-            elif len(str(key))==4:
-                self.listbox1.insert(tkinter.END,'M0'+str(key))
-            elif len(str(key))==5:
-                self.listbox1.insert(tkinter.END,'M'+str(key))
-            # FW version check
-            if float(self.info[key][0]) < 4.3:
-                self.text1.insert(END,str(key)+' has too low a FW ver = '+self.info[key][0]+', BL ver = '+self.info[key][1]+'! Hand it to Jessica. \n','red')
 
         self.listbox1.bind('<ButtonRelease-1>', self.get_list)
 
@@ -205,19 +131,7 @@ class PtlTestGUI(object):
         
 
 ##      checkboxes
-        
-        self.theta_work=IntVar(gui_root)
-        self.phi_work=IntVar(gui_root)
-        self.centered=IntVar(gui_root)
-        self.theta_work.set(1)
-        self.phi_work.set(1)
-        self.centered.set(0) 
-        column_entry=7
-        Checkbutton(gui_root, text='Theta Work?', variable=self.theta_work).grid(row=5,column=column_entry,sticky=W,pady=4)
-        Checkbutton(gui_root, text='Phi Work?', variable=self.phi_work).grid(row=6,column=column_entry,sticky=W,pady=4)
-        Checkbutton(gui_root, text='Centered?', variable=self.centered).grid(row=7,column=column_entry,sticky=W,pady=4)
- 
-        #Label(gui_root,text="Note").grid(row=8,column=column_entry)
+        column_entry = 7 
         #self.e3=Entry(gui_root)
         #self.e3.grid(row=8,column=column_entry+1)
         Label(gui_root,text="Send PFA Date").grid(row=9,column=column_entry)
@@ -240,13 +154,6 @@ class PtlTestGUI(object):
         
 
         
-#        Button(gui_root,text='Plot List',width=10,command=click_plot_list).grid(row=4,column=2,sticky=W,pady=4)
-        Button(gui_root,text='Refresh/Restart',width=15,command=self.restart).grid(row=0,column=8,sticky=W,pady=4)
-        self.pwr_button = Button(gui_root,text='POSPWR is ON', width=15, command=self.toggle, bg='green')
-        self.pwr_button.grid(row=1, column=8, sticky=W,pady=4)
-
-        Button(gui_root,text='Clear',width=15,command=self.clear1).grid(row=5,column=4,sticky=W,pady=4)
-        Button(gui_root,text='Clear',width=15,command=self.clear2).grid(row=5,column=6,sticky=W,pady=4)
         
         photo = PhotoImage(file='desi_logo.gif')
         photo=photo.subsample(7)
@@ -262,6 +169,17 @@ class PtlTestGUI(object):
         self.canbus='can'+self.e_can.get().strip()        
         print('Loading Petal'+self.ptl_id+', canbus:'+self.canbus)
         gui_root.destroy()
+ 
+    def set_petal_no(self):
+        try:
+            self.petal = int(self.get_petal.get())
+        except:
+            print("Input an integer for the Petal number")
+         
+        try:
+            self.pc = int(self.get_pc.get())
+        except:
+            print("Input an integer for the Petal Controller number")
 
  
     def get_list(self,event):
@@ -304,4 +222,4 @@ class PtlTestGUI(object):
 
 
 if __name__=="__main__":
-    gui = MoveGUI()
+    gui =  PtlTestGUI()
