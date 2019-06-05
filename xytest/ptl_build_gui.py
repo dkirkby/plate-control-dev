@@ -229,7 +229,7 @@ class PtlTestGUI(object):
                 bus = line['BUS']
                 busid = 'can'+str(bus)
                 config['BUS_ID'] = str(busid)
-                config['DEVICE_ID'] = int(line['DEV'])
+                config['DEVICE_LOC'] = int(line['DEV'])
                 config['PETAL_ID'] = int(self.petal)
                 config.write()
                 self.main.insert(END,"Wrote config file for %s \n" % pos)
