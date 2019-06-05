@@ -34,6 +34,7 @@ import show_detected
 import pdb
 from configobj import ConfigObj
 import write_conf_files as wc
+import subprocess as sub
 
 class PtlTestGUI(object):
     def __init__(self,hwsetup_conf='',xytest_conf=''):
@@ -61,30 +62,41 @@ class PtlTestGUI(object):
         self.get_pc.insert(0, 'PC')
         Button(gui_root, width = 10, text = 'PETAL + PC', command=lambda: self.set_peta_no()).grid(row=0, column=1)
 
-        #Set Scale
+        #Set Scaleself.get_petal = Entry(gui_root, width = 8, justify = 'right')
+        self.scale_conf = ConfigObj('b141_scale.conf', unrepr=True,encoding='utf-8')
+        self.scale = float(scale_conf['SCALE'])
+        self.get_scale = Entry(gui_root, width = 8, justify = 'right')
+        self.get_scale.grid(row=0, column=2)
+        self.get_scale.insert(0, str(self.scale))
+        Button(gui_root, width = 10, text = 'SCALE', command=lambda: self.update_scale()).grid(row=1, column=2)
 
-        self.e2=Entry(gui_root)
-        self.e2.grid(row=0,column=3)
+        #Set svn username and call for password
+        self.svnuser = None
+        self.svnpass = None
+        self.get_svnuser = Entry(gui_root, width = 8, justify = 'right')
+        self.get_svnuser.grid(row=0, column=3)
+        Button(gui_root, width = 10, text = 'SVN INFO', command=lambda: self.svn_info()).grid(row=1, column=3)
 
-        self.e_can=Entry(gui_root,width=10)
-        self.e_can.grid(row=5,column=0,sticky=E)
-        Label(gui_root,text="CAN Bus:").grid(row=5,column=0,sticky=W,padx=10)
+        #Entry for CAN, BUS, DEV      
+        self.pos_info = {'CAN':[], 'BUS':[], 'DEV':[]}
 
-        Button(gui_root,text='Theta CW',width=10).grid(row=3,column=1,sticky=W,pady=4)
-        Button(gui_root,text='Theta CCW',width=10).grid(row=4,column=1,sticky=W,pady=4)
-        self.mode=IntVar(gui_root)
-        self.mode.set(1)
-        Checkbutton(gui_root, text='CAN', variable=self.mode).grid(row=3,column=1,sticky=E,pady=4)
-        self.syncmode=IntVar(gui_root)
-        Button(gui_root,text='Reload CANBus',width=12).grid(row=5,column=1,sticky=W,pady=4)
-        Button(gui_root,text='1 Write SiID',width=15).grid(row=3,column=3,sticky=W,pady=4)
-        #Button(gui_root,text='Sync Test',width=15,command=self.sync_test).grid(row=3,column=4,sticky=W,pady=4)
-        Button(gui_root,text='Movement Check',width=15).grid(row=4,column=4,sticky=W,pady=4)
-        Button(gui_root,text='3 Populate Busids',width=15).grid(row=5,column=3,sticky=W,pady=4)# Call populate_busids.py under pos_utility/ 
-        Button(gui_root,text='2 Write DEVICE_LOC',width=15).grid(row=4,column=3,sticky=W,pady=4)# Call populate_travellers.py under pos_utility/ to read from installation traveler and write to positioner 'database' and ID map
-        Button(gui_root,text='Aliveness Test',width=10).grid(row=4,column=5,sticky=W,pady=4)# Call show_detected.py under pos_utility/ to do aliveness test.
+        Label(gui_root, text = 'CAN ID (int)').grid(row=3, column = 0)
+        self.get_canid = Entry(gui_root, width = 8, justify = 'right')
+        self.get_canid.grid(row=4, column = 0)
+        self.get_canid.insert(0, str('CAN ID')) 
 
-        Button(gui_root,text='Center',width=10).grid(row=4,column=2,sticky=W,pady=4)                
+        Label(gui_root, text = 'BUS ID (int)').grid(row=3, column = 1)
+        self.get_busid = Entry(gui_root, width = 8, justify = 'right')
+        self.get_busid.grid(row=4, column = 1)
+        self.get_busid.insert(0, str('BUS ID')) 
+
+        Label(gui_root, text = 'DEV LOC (int)').grid(row=3, column = 2)
+        self.get_devloc = Entry(gui_root, width = 8, justify = 'right')
+        self.get_devloc.grid(row=4, column = 2)
+        self.get_devloc.insert(0, str('DEV LOC'))   
+
+        Button(gui_root, width = 10, text = 'ADD POS', command=lambda: self.get_pos()).grid(row=4, column=4)   
+
 
         yscroll_text1 = Scrollbar(gui_root, orient=tkinter.VERTICAL)
         yscroll_text1.grid(row=6, column=4, rowspan=20,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)
@@ -129,30 +141,6 @@ class PtlTestGUI(object):
         self.text2.configure(yscrollcommand=yscroll_text2.set)   
         yscroll_text2.config(command=self.text2.yview)
         
-
-##      checkboxes
-        column_entry = 7 
-        #self.e3=Entry(gui_root)
-        #self.e3.grid(row=8,column=column_entry+1)
-        Label(gui_root,text="Send PFA Date").grid(row=9,column=column_entry)
-        self.e4=Entry(gui_root)
-        self.e4.insert(END,'{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
-        self.e4.grid(row=9,column=column_entry+1)
-        #Label(gui_root,text="Send PFA Name").grid(row=10,column=column_entry)
-        #self.e5=Entry(gui_root)
-        #self.e5.grid(row=10,column=column_entry+1)
-        #Label(gui_root,text="Tote").grid(row=11,column=column_entry)
-        #self.box_options = [    "GREY TOTE\n---------\nREADY FOR PFA INSTALL",    "GREY TOTE\n---------\nINCOMING INSPECTION IN PROGRESS",    "LARGE TOTE\n--------\nFAIL REVIEW LATER", "LARGE TOTE\n--------\nFAIL PERMANENT"]
-        #self.box_goto = StringVar(gui_root)
-        #self.box_goto.set("Where will you put me?") # default value
-        #self.drop1 = OptionMenu(gui_root, self.box_goto, *self.box_options)
-        #self.drop1.grid(row=11,column=column_entry+1)
-
-        Label(gui_root,text="Your init").grid(row=12,column=column_entry)
-        self.e6=Entry(gui_root)
-        self.e6.grid(row=12,column=column_entry+1)
-        
-
         
         
         photo = PhotoImage(file='desi_logo.gif')
@@ -180,6 +168,66 @@ class PtlTestGUI(object):
             self.pc = int(self.get_pc.get())
         except:
             print("Input an integer for the Petal Controller number")
+
+    def update_scale(self):
+        try:
+            self.scale = float(self.get_scale.get())
+            self.scale_conf['SCALE'] = self.scale
+            self.scale_conf.write()
+            print("Scale resaved as %f" % self.scale)
+        except:
+            print("Input a float for the scale")
+
+    def get_pos(self):
+        self.canid = self.get_canid.get()
+        self.busid = self.get_busid.get()
+        self.devloc = self.get_devloc.get()
+
+        try:
+            self.canid = int(self.canid)
+        except:
+            print('Need to input CAN ID as an integer')
+        try:
+            self.busid = int(self.busid)
+        except:
+            print('Need to input BUS ID as an integer')
+        try:
+            self.devloc = int(self.devloc)
+        except:
+            print('Need to input DEV LOC as an integer')
+
+        if (isinstance(self.canid, int)) and (isinstance(self.busid, int)) and (isinstance(self.devloc, int)):
+            self.pos_info['CAN'].append(self.canid)
+            self.pos_info['BUS'].append(self.busid)
+            self.pos_info['DEV'].append(self.devloc)
+            self.print_pos_info()
+
+        else:
+            return
+
+    def print_pos_info(self):
+        self.listbox1.clear(0,tkinter.END)
+        this_pos_info = pd.DataFrame.from_dict(self.pos_info)
+        self.listbox1.insert(tkinter.END,this_pos_info)
+
+    def check_svn(self):
+        if (self.svnuser is None) | (self.svnpass is None):
+            print("You must enter your SVN credentials before proceeding")
+
+
+    def svn_info(self):
+        try:
+            self.svnuser = str(self.get_svnuser.get())
+            self.svnpass = tkinter.simpledialog.askstring(title='SVN authentication',prompt='svn password:',show="*")
+            err = os.system('svn --username ' + self.svnuser + ' --password ' + self.svnpass + ' --non-interactive list')
+            if err == 0:
+                pass
+            else:
+                print("Something wrong with the SVN credentials")
+        except:
+            print("Please put in your SVN credentials")
+
+
 
  
     def get_list(self,event):
