@@ -117,7 +117,7 @@ class PosState(object):
         self.log_unit()
     
     def set_ptlid_from_pi(self, unit_id):
-        ''' lookup petal id using unit_id (pos, fid) from PositionerIndex '''
+        ''' lookup petal id using unit_id for pos, fid from PositionerIndex '''
         pi = PositionerIndex(os.getenv('DOS_POSITIONERINDEXTABLE'))
         ret = pi.find_by_arbitrary_keys(DEVICE_TYPE=self.type.upper(),
                                         DEVICE_ID=unit_id)
@@ -131,10 +131,10 @@ class PosState(object):
         if unit_id is None:  # unit id not supplied, load templates
             if self.type == 'pos':
                 group = 'fiber_positioner' + '_default'
-                self._val.update(self.posmoveDB.get_pos_def_constants())
+                self._val.update(self.pDB.get_pos_def_constants())
             elif self.type == 'fid':
                 group = 'fiducials' + '_default'
-                self._val.update(self.posmoveDB.get_fid_def_constants())
+                self._val.update(self.pDB.get_fid_def_constants())
             else:
                 raise Exception('PTL settings cannot be loaded from DB yet')
         else:  # unit id is supplied
