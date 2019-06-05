@@ -1,13 +1,16 @@
 import os
-import configobj
+from configobj import ConfigObj
 import csv
 import pprint
 import posconstants as pc
+from DOSlib.positioner_index import PositionerIndex
 try:
-    from DBSingleton import *
+    from DOSlib.constants import ConstantsDB
+    from DBSingleton import DBSingleton
     DB_COMMIT_AVAILABLE = True
-except:
+except ModuleNotFoundError:
     DB_COMMIT_AVAILABLE = False
+
 
 class PosState(object):
     """Variables for the positioner are generally stored, accessed,
@@ -17,94 +20,76 @@ class PosState(object):
 
     This class is also used for tracking state of fiducials or petals.
 
-    INPUTS: unit_id = POS_ID, FID_ID, or PETAL_ID of device
-            logging = boolean whether to enable logging state data to disk
-            type    = 'pos', 'fid', 'ptl' to say whether it is a positioner, fiducial, or petal
+    INPUTS:
+        unit_id:  POS_ID, FID_ID, or PETAL_ID of device, must be str
+        logging:  boolean whether to enable logging state data to disk
+        type:     'pos', 'fid', 'ptl'
+        petal_id: '00' to '11', '900' to '909'
 
     Notes:
         Default settings are used if no unit_id is supplied.
         Values are stored in configobj files.
-        There is a distinction between unit parameters (specific to one hardware
-        unit) and general parameters (settings which apply uniformly to many units).
+        There is a distinction between unit parameters (specific to one
+        hardware unit) and general parameters (settings which apply
+        uniformly to many units).
+
+        to enable config read and write, set DOS_POSMOVE_WRITE_TO_DB to false
     """
 
-    def __init__(self, unit_id=None, logging=False, device_type='pos', printfunc=print, petal_id=None):
-        self.printfunc = printfunc # allows you to specify an alternate to print (useful for logging the output)
+    def __init__(self, unit_id=None, device_type='pos', petal_id=None,
+                 logging=False, printfunc=print):
+        self.printfunc = printfunc
         self.logging = logging
-
-        # data initialization from .conf file
+        self.write_to_DB = os.getenv('DOS_POSMOVE_WRITE_TO_DB') \
+            if DB_COMMIT_AVAILABLE else False
+        print('env', os.getenv('DOS_POSMOVE_WRITE_TO_DB'))
+        print('DB_COMMIT_AVAILABLE', DB_COMMIT_AVAILABLE)
+        print('write_to_DB', self.write_to_DB)
+        # data initialization
         if device_type in ['pos', 'fid', 'ptl']:
             self.type = device_type
-            self.settings_directory = pc.dirs[self.type + '_settings']
-            self.logs_directory = pc.dirs[self.type + '_logs']
         else:
-            raise DeviceError("Invalid device type.")
-        template_directory = self.settings_directory
-        if unit_id is not None:
-            self.unit_basename = 'unit_' + str(unit_id)
-            comment = 'Settings file for unit: ' + str(unit_id)
-        else:
-            self.unit_basename = 'unit_TEMP'
-            self.logs_directory = pc.dirs['temp_files']
-            self.settings_directory = pc.dirs['temp_files']
-            comment = 'Temporary settings file for software test purposes, not associated with a particular unit.'
-        unit_filename = self.settings_directory + self.unit_basename + '.conf'
-        if not(os.path.isfile(unit_filename)):
-            # unit config doesn't exisit, read in the generic template file
-            temp_filename = template_directory + '_unit_settings_DEFAULT.conf'
-            self.conf = configobj.ConfigObj(temp_filename, unrepr=True, encoding='utf-8')
-            self.conf.initial_comment = [comment, '']
-            self.conf.filename = unit_filename
-            if self.type == 'pos':
-                self.conf['POS_ID'] = str(unit_id)
-            elif self.type == 'fid':
-                self.conf['FID_ID'] = str(unit_id)
-            elif self.type == 'ptl':
-                self.conf['PETAL_ID'] = str(unit_id)
-            self.conf.write()
-        else:
-            self.conf = configobj.ConfigObj(unit_filename, unrepr=True, encoding='utf-8')
-
-        # determine petal_id
-        # regardless of devide type, config has been read and the
-        # correct petal_id is available in config, so let's just use config only
-        # if self.type == 'ptl':
-        self.petal_id = self.conf['PETAL_ID']
-        # else:
-        #     self.petal_id = petal_id
-
-        # establishment of much faster access python dict, for in-memory operations
-        self._val = self.conf.dict()
-
-        # data initialization from database
-        self.write_to_DB = os.getenv('DOS_POSMOVE_WRITE_TO_DB') if DB_COMMIT_AVAILABLE else False
-        if self.write_to_DB:
-            if unit_id != None:
-                self.posmoveDB = DBSingleton(self.petal_id)
-                if self.type == 'pos':
-                    self._val.update(self.posmoveDB.get_pos_id_info(unit_id))
-                    self._val.update(self.posmoveDB.get_pos_constants(unit_id))
-                    self._val.update(self.posmoveDB.get_pos_move(unit_id))
-                    self._val.update(self.posmoveDB.get_pos_calib(unit_id))
-                else:
-                    self._val.update(self.posmoveDB.get_fid_id_info(unit_id))
-                    self._val.update(self.posmoveDB.get_fid_constants(unit_id))
-                    self._val.update(self.posmoveDB.get_fid_data(unit_id))
-                    print(self._val)
-                    self._val.update(self.posmoveDB.get_fid_calib(unit_id))
+            raise Exception('Invalid device_type')
+        if self.write_to_DB:  # data initialization from database
+            if petal_id is not None:  # ptlid is given, simple
+                self.ptlid = petal_id
+                if unit_id is not None:  # both ptlid and unit_id given
+                    if self.type == 'ptl':
+                        assert self.ptlid == unit_id, 'inconsistent input'
+                        # TODO fix this; still reading from a template config
+                        self.load_from_cfg(unit_id=self.ptlid)
+                    else:
+                        self.load_from_db(unit_id=unit_id)
+            else:  # ptlid unkonwn
+                if unit_id is not None:  # only unit id given
+                    if self.type == 'ptl':  # no ptlid, but unit_id given
+                        self.ptlid = unit_id
+                        # TODO fix this; still reading from a template config
+                        self.load_from_cfg(unit_id=self.ptlid)
+                    else:
+                        self.set_ptlid_from_pi(unit_id)  # lookup ptlid
+                        self.load_from_db(unit_id=unit_id)
+                else:  # both unit_id and ptlid are unkonwn, read template
+                    self.ptlid = '-1'  # assume ptlid = -1
+                    if self.type == 'ptl':  # unit_id and ptlid both unkonwn
+                        # TODO fix this; still reading from a template config
+                        self.load_from_cfg(unit_id=unit_id)
+                    else:
+                        self.load_from_db(unit_id=unit_id)
+        else:  # no DB commit, use local cfg only, skipped after switchover
+            if petal_id is None:  # ptlid is none, what about unit id?
+                if unit_id is not None and self.type == 'ptl':
+                    self.ptlid = unit_id
             else:
-                self.posmoveDB = DBSingleton()
-                if self.type == 'pos':
-                    self._val.update(self.posmoveDB.get_pos_def_constants())
-                else:
-                    self._val.update(self.posmoveDB.get_fid_def_constants())
+                self.ptlid = petal_id
+            self.load_from_cfg(unit_id=unit_id)
 
         # text log file setup
         self.log_separator = '_log_'
         self.log_numformat = '08g'
         self.log_extension = '.csv'
         if not(self.log_basename):
-            all_logs = os.listdir(self.logs_directory)
+            all_logs = os.listdir(self.logs_dir)
             unit_logs = [x for x in all_logs if self.unit_basename in x and self.log_extension in x]
             if unit_logs:
                 unit_logs.sort(reverse=True)
@@ -130,6 +115,80 @@ class PosState(object):
         self.next_log_notes = ['software initialization'] # used for storing specific notes in the next row written to the log
         self.log_unit_called_yet = False # used for one time check whether need to make a new log file, or whether log file headers have changed since last run
         self.log_unit()
+    
+    def set_ptlid_from_pi(self, unit_id):
+        ''' lookup petal id using unit_id (pos, fid) from PositionerIndex '''
+        pi = PositionerIndex(os.getenv('DOS_POSITIONERINDEXTABLE'))
+        ret = pi.find_by_arbitrary_keys(DEVICE_TYPE=self.type.upper(),
+                                        DEVICE_ID=unit_id)
+        assert len(ret) == 1, f'lookup not unique, {ret}'
+        self.ptlid = ret[0]['PETAL_ID']
+
+    def load_from_db(self, unit_id=None):
+
+        self._val = {}  # no local config used to create _val, make empty one
+        self.pDB = DBSingleton(int(self.ptlid))
+        if unit_id is None:  # unit id not supplied, load templates
+            if self.type == 'pos':
+                group = 'fiber_positioner' + '_default'
+                self._val.update(self.posmoveDB.get_pos_def_constants())
+            elif self.type == 'fid':
+                group = 'fiducials' + '_default'
+                self._val.update(self.posmoveDB.get_fid_def_constants())
+            else:
+                raise Exception('PTL settings cannot be loaded from DB yet')
+        else:  # unit id is supplied
+            if self.type == 'pos':
+                group = 'fiber_positioner'
+                self.printfunc(f'Loading for PTL {self.ptlid}, unit {unit_id}')
+                self._val.update(self.pDB.get_pos_id_info(unit_id))
+                self._val.update(self.pDB.get_pos_constants(unit_id))
+                self._val.update(self.pDB.get_pos_move(unit_id))
+                self._val.update(self.pDB.get_pos_calib(unit_id))
+            elif self.type == 'fid':
+                group = 'fiducials'
+                self._val.update(self.pDB.get_fid_id_info(unit_id))
+                self._val.update(self.pDB.get_fid_constants(unit_id))
+                self._val.update(self.pDB.get_fid_data(unit_id))
+                self._val.update(self.pDB.get_fid_calib(unit_id))
+            else:
+                raise Exception('PTL settings cannot be loaded from DB yet')
+        # TODO: check overlap between self.cDB and self._val ?
+        self.cDB = ConstantsDB().get_constants(snapshot='DESI', tag='CURRENT',
+                                               group=group)[group][unit_id]
+
+    def load_from_cfg(self, unit_id=None):
+
+        if unit_id is not None:
+            self.unit_basename = 'unit_' + str(unit_id)
+            self.settings_dir = pc.dirs[self.type + '_settings']
+            self.logs_dir = pc.dirs[self.type + '_logs']
+            comment = 'Settings file for unit: ' + str(unit_id)
+        else:
+            self.unit_basename = 'unit_TEMP'
+            self.logs_dir = pc.dirs['temp_files']
+            self.settings_dir = pc.dirs['temp_files']
+            comment = 'Temporary settings file for software test purposes'\
+                      ', not associated with aany particular unit.'
+        unit_fn = self.settings_dir + self.unit_basename + '.conf'
+        if not(os.path.isfile(unit_fn)):
+            # unit config doesn't exisit, read in the generic template file
+            tmpfn = self.settings_dir + '_unit_settings_DEFAULT.conf'
+            self.conf = ConfigObj(tmpfn, unrepr=True, encoding='utf-8')
+            self.conf.initial_comment = [comment, '']
+            self.conf.filename = unit_fn
+            if self.type == 'pos':
+                self.conf['POS_ID'] = str(unit_id)
+            elif self.type == 'fid':
+                self.conf['FID_ID'] = str(unit_id)
+            elif self.type == 'ptl':
+                self.conf['PETAL_ID'] = str(unit_id)
+            self.conf.write()
+        else:
+            self.printfunc(f'Loading existing unit config for '
+                           f'device_type = {self.type}, path: {unit_fn}')
+            self.conf = ConfigObj(unit_fn, unrepr=True, encoding='utf-8')
+        self._val = self.conf.dict()
 
     def __str__(self):
         files = {'settings':self.conf.filename, 'log':self.log_path}
@@ -197,7 +256,7 @@ class PosState(object):
     def log_path(self):
         """Convenience method for consistent formatting of file path to log file.
         """
-        return self.logs_directory + self.log_basename
+        return self.logs_dir + self.log_basename
 
     @property
     def log_basename(self):
