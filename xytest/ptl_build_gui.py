@@ -240,7 +240,8 @@ class PtlTestGUI(object):
     def write_hwsetup_conf(self):
         pos_list = pd.read_csv('pos_list.csv', header=0)
         pos_list = pos_list.to_records(index=False)
-        hwconfig = ConfigObj(hwsetup_path+'hwsetup_test_xytest.conf', unrepr=True, encoding='utf-8')
+        self.main.insert(END, "Will update this hwsetup file: %s \n " % hwsetup_path+'hwsetup_petal0_xytest.conf')
+        hwconfig = ConfigObj(hwsetup_path+'hwsetup_petal0_xytest.conf', unrepr=True, encoding='utf-8')
         pos_ids = [str('M'+str(line['CAN']).zfill(5)) for line in pos_list]
         time_now = str(datetime.now())
         hwconfig['scale'] = float(self.scale)
