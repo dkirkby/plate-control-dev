@@ -52,8 +52,8 @@ class InitHwSetup(object):
 
 		self.fvc.rotation = self.hwsetup['rotation']
 		self.fvc.scale = self.hwsetup['scale']
-        self.fvc.translation = self.hwsetup_conf['translation']
-        self.fvc.exposure_time = self.hwsetup_conf['exposure_time']
+                self.fvc.translation = self.hwsetup_conf['translation']
+                self.fvc.exposure_time = self.hwsetup_conf['exposure_time']
 		self.posids = self.hwsetup['pos_ids']
 		self.fidids = self.hwsetup['fid_ids']
 		shape = 'asphere' if self.hwsetup['plate_type'] == 'petal' else 'flat'
@@ -166,33 +166,33 @@ class InitHwSetup(object):
 
 
 	def run_range_measurement(self, loop_number):
-        set_as_defaults = self.xytest_conf['set_meas_calib_as_new_defaults'][loop_number]
-        params = ['PHYSICAL_RANGE_T','PHYSICAL_RANGE_P']
-        if self.xytest_conf['should_measure_ranges'][loop_number]:
-            if not(set_as_defaults):
-                self.collect_calibrations()
-            start_time = time.time()
-            self.logwrite('Starting physical travel range measurement sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
-            self.m.measure_range(posids='all', axis='theta')
-            self.m.measure_range(posids='all', axis='phi')
-            for posid in self.posids:
-                state = self.m.state(posid)
-                self.track_file(state.log_path, commit='once')
-                self.track_file(state.conf.filename, commit='always')
-                for key in params:
-                    self.logwrite(str(posid) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
-            for posid in self.posids:
-                self.summarizers[posid].update_loop_calibs(summarizer.meas_suffix, params)
-            if not(set_as_defaults):
-                self.restore_calibrations()
-            self.logwrite('Calibration of physical travel ranges completed in ' + self._elapsed_time_str(start_time) + '.')
-        for posid in self.posids:
-            self.summarizers[posid].update_loop_calibs(summarizer.used_suffix, params)
+                set_as_defaults = self.xytest_conf['set_meas_calib_as_new_defaults'][loop_number]
+                params = ['PHYSICAL_RANGE_T','PHYSICAL_RANGE_P']
+                if self.xytest_conf['should_measure_ranges'][loop_number]:
+                    if not(set_as_defaults):
+                        self.collect_calibrations()
+                start_time = time.time()
+                self.logwrite('Starting physical travel range measurement sequence in loop ' + str(loop_number + 1) + ' of ' + str(self.n_loops))
+                self.m.measure_range(posids='all', axis='theta')
+                self.m.measure_range(posids='all', axis='phi')
+                for posid in self.posids:
+                    state = self.m.state(posid)
+                    self.track_file(state.log_path, commit='once')
+                    self.track_file(state.conf.filename, commit='always')
+                    for key in params:
+                        self.logwrite(str(posid) + ': Set ' + str(key) + ' = ' + format(state.read(key),'.3f'))
+                for posid in self.posids:
+                    self.summarizers[posid].update_loop_calibs(summarizer.meas_suffix, params)
+                if not(set_as_defaults):
+                    self.restore_calibrations()
+                self.logwrite('Calibration of physical travel ranges completed in ' + self._elapsed_time_str(start_time) + '.')
+                for posid in self.posids:
+                    self.summarizers[posid].update_loop_calibs(summarizer.used_suffix, params)
 
-    def run_calibration(self, loop_number):
-        """Move positioners through a short sequence to calibrate them.
-        """
-        n_pts_calib_T = self.xytest_conf['n_points_calib_T'][loop_number]
+        def run_calibration(self, loop_number):
+            """Move positioners through a short sequence to calibrate them.
+            """
+            n_pts_calib_T = self.xytest_conf['n_points_calib_T'][loop_number]
         n_pts_calib_P = self.xytest_conf['n_points_calib_P'][loop_number]
         calib_mode = self.xytest_conf['calib_mode'][loop_number]
         set_as_defaults = self.xytest_conf['set_meas_calib_as_new_defaults'][loop_number]

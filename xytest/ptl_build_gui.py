@@ -129,12 +129,12 @@ class PtlTestGUI(object):
 
         #Positioner List Box
         self.listbox1 = Listbox(gui_root, width=15, height=15,selectmode='multiple',exportselection=0)
-        self.listbox1.grid(row=6, column=0,rowspan=10,pady=4,padx=15)
+        self.listbox1.grid(row=6, column=0,rowspan=8,pady=4,padx=15)
         yscroll_listbox1 = Scrollbar(command=self.listbox1.yview, orient=tkinter.VERTICAL)
         yscroll_listbox1.grid(row=6, column=0, rowspan=10,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)
         self.listbox1.configure(yscrollcommand=yscroll_listbox1.set)
         #self.listbox1.insert(tkinter.END,'ALL')
-        Button(gui_root, width = 10, text = 'REMOVE', command=lambda: self.remove_pos()).grid(row=0, column=6)
+        Button(gui_root, width = 10, text = 'REMOVE', command=lambda: self.remove_pos()).grid(row=15, column=0)
 
         #Logo Image 
         photo = PhotoImage(file='desi_logo.gif')
@@ -176,6 +176,7 @@ class PtlTestGUI(object):
 
         try:
             self.canid = int(self.canid)
+            self.canid = 'M' + str(self.canid).zfill(5)
         except:
             self.main.insert(END,'Need to input CAN ID as an integer'+'\n')
         try:
@@ -187,7 +188,7 @@ class PtlTestGUI(object):
         except:
             self.main.insert(END,'Need to input DEV LOC as an integer'+'\n')
 
-        if (isinstance(self.canid, int)) and (isinstance(self.busid, int)) and (isinstance(self.devloc, int)):
+        if (isinstance(self.canid, str)) and (isinstance(self.busid, int)) and (isinstance(self.devloc, int)):
             self.pos_info['CAN'].append(self.canid)
             self.pos_info['BUS'].append(self.busid)
             self.pos_info['DEV'].append(self.devloc)
@@ -222,7 +223,7 @@ class PtlTestGUI(object):
         pos_list = pd.read_csv('pos_list.csv', header=0)
         pos_list = pos_list.to_records(index=False)
         for line in pos_list:
-            pos = str('M' + str(line['CAN']).zfill(5))
+            pos = str(line['CAN']) # str('M' + str(line['CAN']).zfill(5))
             try:
                 file_name = pos_settings_path+'unit_%s.conf'%pos
                 config = ConfigObj(file_name,unrepr=True,encoding='utf-8')
@@ -242,7 +243,7 @@ class PtlTestGUI(object):
         pos_list = pos_list.to_records(index=False)
         self.main.insert(END, "Will update this hwsetup file: %s \n " % hwsetup_path+'hwsetup_petal0_xytest.conf')
         hwconfig = ConfigObj(hwsetup_path+'hwsetup_petal0_xytest.conf', unrepr=True, encoding='utf-8')
-        pos_ids = [str('M'+str(line['CAN']).zfill(5)) for line in pos_list]
+        pos_ids = [str(line['CAN']) for line in pos_list]
         time_now = str(datetime.now())
         hwconfig['scale'] = float(self.scale)
         hwconfig['pos_ids'] = pos_ids
@@ -285,10 +286,24 @@ class PtlTestGUI(object):
 
     def remove_pos(self):
         index = self.listbox1.curselection()
+        if len(index) == 0:
+            self.main.insert(END, "You haven't selected any positioners to remove")
+            return
+
         selected = []
         for i in range(len(index)):
             selected.append(self.listbox1.get(index[i]))
-        print(selected)
+
+        remove_these_pos = [str(s[2:8]) for s in selected]
+        self.main.insert(END, "You have selected to remove the following positioners: \n")
+        for pos in remove_these_pos:
+            self.main.insert(END, pos + '\n')
+        for pos in remove_these_pos:
+            idx = np.where(np.array(self.pos_info['CAN']) == str(pos))
+            del self.pos_info['CAN'][idx[0][0]]
+            del self.pos_info['BUS'][idx[0][0]]
+            del self.pos_info['DEV'][idx[0][0]]
+        self.print_pos_info()
 
     def get_list(self,event):
         # get selected line index
