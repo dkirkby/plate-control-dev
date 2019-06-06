@@ -128,13 +128,13 @@ class PtlTestGUI(object):
         yscroll_main.config(command=self.main.yview)
 
         #Positioner List Box
-        self.listbox1 = Listbox(gui_root, width=15, height=20,selectmode='multiple',exportselection=0)
+        self.listbox1 = Listbox(gui_root, width=15, height=15,selectmode='multiple',exportselection=0)
         self.listbox1.grid(row=6, column=0,rowspan=10,pady=4,padx=15)
         yscroll_listbox1 = Scrollbar(command=self.listbox1.yview, orient=tkinter.VERTICAL)
         yscroll_listbox1.grid(row=6, column=0, rowspan=10,sticky=tkinter.E+tkinter.N+tkinter.S,pady=5)
         self.listbox1.configure(yscrollcommand=yscroll_listbox1.set)
         #self.listbox1.insert(tkinter.END,'ALL')
-        self.listbox1.bind('<ButtonRelease-1>', self.get_list)
+        Button(gui_root, width = 10, text = 'REMOVE', command=lambda: self.remove_pos()).grid(row=0, column=6)
 
         #Logo Image 
         photo = PhotoImage(file='desi_logo.gif')
@@ -282,6 +282,13 @@ class PtlTestGUI(object):
  
     def quit(self):
         sys.exit()
+
+    def remove_pos(self):
+        index = self.listbox1.curselection()
+        selected = []
+        for i in range(len(index)):
+            selected.append(self.listbox1.get(index[i]))
+        print(selected)
 
     def get_list(self,event):
         # get selected line index
