@@ -35,6 +35,7 @@ import show_detected
 import pdb
 from configobj import ConfigObj
 from datetime import datetime
+import ptl_build_xytest as build
 
 pos_settings_path = ('/home/msdos/focalplane/fp_settings/pos_settings/')
 hwsetup_path = ('/home/msdos/focalplane/fp_settings/hwsetups/')
@@ -274,6 +275,8 @@ class PtlTestGUI(object):
 
     def run_init_hwsetup(self):
         self.main.insert(END, "You selected to run the Initialize HWSetup. This will identify positioners and run calibration \n")
+        test = build.InitHwSetup(self.svnuser, self.svnpass)
+        test.init_hwsetup()
 
     def run_xytest(self):
         self.main.insert(END, "You selected to run the XYTest \n")

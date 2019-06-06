@@ -34,9 +34,9 @@ class InitHwSetup(object):
         # start set of new and changed files
         self.new_and_changed_files = set()
 
-        self.hwsetup_conf = hwsetup_path + 'hwsetup_test_xytest.conf'
-        print("Using this configuration file: ", hwsetup_conf)
-        self.hwsetup = configobj.ConfigObj(hwsetup_conf,unrepr=Trueencoding='utf-8')
+        self.hwsetup_conf = hwsetup_path + 'hwsetup_petal0_xytest.conf'
+        print("Using this configuration file: ", self.hwsetup_conf)
+        self.hwsetup = configobj.ConfigObj(self.hwsetup_conf,unrepr=True,encoding='utf-8')
         self.add_file(self.hwsetup_conf)
 
         # software initialization and startup
@@ -47,23 +47,26 @@ class InitHwSetup(object):
 
         self.fvc.rotation = self.hwsetup['rotation']
         self.fvc.scale = self.hwsetup['scale']
-                self.fvc.translation = self.hwsetup_conf['translation']
-                self.fvc.exposure_time = self.hwsetup_conf['exposure_time']
+        #self.fvc.translation = self.hwsetup_conf['translation']
+        #self.fvc.exposure_time = self.hwsetup_conf['exposure_time']
         self.posids = self.hwsetup['pos_ids']
         self.fidids = self.hwsetup['fid_ids']
+        sim = self.hwsetup['fvc_type'] == 'simulator'
         shape = 'asphere' if self.hwsetup['plate_type'] == 'petal' else 'flat'
-        self.ptl = petal.Petal(self.hwsetup['ptl_id'], posids, fidids, simulator_on=sim, user_interactions_enabled=True, anticollision=None, petal_shape=shape)
+        self.ptl = petal.Petal(self.hwsetup['ptl_id'], self.posids, self.fidids, simulator_on=sim, user_interactions_enabled=True, anticollision=None)
         self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc)
         self.m.make_plots_during_calib = True
 
-        print('Automatic generation of calibration plots is turned ' + ('ON' if m.make_plots_during_calib else 'OFF') + '.')
+        print('Automatic generation of calibration plots is turned ' + ('ON' if self.m.make_plots_during_calib else 'OFF') + '.')
         for ptl in self.m.petals:
-            for posmodel in self.ptl.posmodels:
+            for posmodel in ptl.posmodels.values():
                 self.add_file(posmodel.state.conf.filename)
                 self.add_file(posmodel.state.log_path)
-            for fidstate in self.ptl.fidstates.values():
-                self.add_file(fidstate.conf.filename)
-                self.add_file(fidstate.log_path)
+            for id_this,state in ptl.states.items():
+                print(id_this)
+                if id_this.startswith('P') or id_this.startswith('F'):
+                    self.new_and_changed_files.add(state.conf.filename)
+                    self.new_and_changed_files.add(state.log_path)
         print("Initialization Complete")
 
     def add_file(self, file):
@@ -77,7 +80,7 @@ class InitHwSetup(object):
             text += '\n  ' + format(posid+':','11s') + 'busid = ' + format(str(self.ptl.get_posfid_val(posid,'BUS_ID')),'5s') + '  canid = ' + format(str(self.ptl.get_posfid_val(posid,'CAN_ID')),'5s')
         
         text += '\n\n' + str(len(self.fidids)) + ' FIDUCIALS:'
-        for fidid in fidids:
+        for fidid in self.fidids:
             text += '\n  ' + format(fidid+':','11s') + 'busid = ' + format(str(self.ptl.get_posfid_val(fidid,'BUS_ID')),'5s') + '  canid = ' + format(str(self.ptl.get_posfid_val(fidid,'CAN_ID')),'5s') + '  ndots = ' + str(self.ptl.get_posfid_val(fidid,'N_DOTS'))
         print(text)
 
