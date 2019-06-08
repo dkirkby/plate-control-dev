@@ -6,15 +6,15 @@ Created on Fri May 24 17:46:45 2019
 """
 
 import os
-import sys
+# import sys
 import numpy as np
 import time
 # from astropy.io import ascii
 from configobj import ConfigObj
-sys.path.append(os.path.abspath('../pecs/'))
+# sys.path.append(os.path.abspath('../pecs/'))
 from pecs import PECS
 # sys.path.append(os.path.abspath('../posfidfvc/'))
-sys.path.append(os.path.abspath('../xytest/'))
+# sys.path.append(os.path.abspath('../xytest/'))
 import posconstants as pc
 # from summarizer import Summarizer
 import pos_xytest_plot
@@ -40,6 +40,9 @@ class XYTest(PECS):
     these apps which are already in simulation mode. the same goes for changing
     anti-collision/poscollider settings.
 
+    Need to check that PECS default cfg has the correct platemaker_instrument
+    and fvc_role that work for all ten petals.
+
     Input:
         petal_cfgs:     list of petal config objects, one for each petal
         xytest_cfg:     one config object for xy test settings
@@ -54,7 +57,8 @@ class XYTest(PECS):
         self.loggers = self.data.loggers  # use these loggers to write to logs
         self.logger = self.data.logger
         printfuncs = {pid: self.loggers[pid].info for pid in self.data.ptlids}
-        PECS.__init__(self, ptlids=self.data.ptlids, printfunc=printfuncs)
+        PECS.__init__(self, ptlids=self.data.ptlids, printfunc=printfuncs,
+                      simulate=self.data.simulate)
         self.data.ptl_posids = {}  # enabled posids keyed by petal id
         self.data.posids = []  # all enabled posids for all petals in a list
         for ptlid in self.data.ptlids:
@@ -77,7 +81,7 @@ class XYTest(PECS):
         self.data.initialise_movedata(self.data.posids, len(self.targets))
         self.logger.info(f'Move data tables initialised '
                          f'for {len(self.data.posids)} positioners.')
-        # TODO: add summarizer functionality
+        # TODO: add summarizer functionality if needed?
 
     def get_posids(self, ptlid):
         mode = self.data.testcfg[ptlid]['mode']
@@ -112,10 +116,10 @@ class XYTest(PECS):
         def summary_path(posid):  # return positioner directory for each posid
             return os.path.join(self.data.dir, f'{posid}_xyplot')
 
-        # generate requests (dicts)
-        requests = []  # each request is for one target
+        # generate requests (list of dicts)
+        requests = []  # each request is for one target, applied to 10 petals
         for i, posXY in enumerate(self.targets):
-            request = {}  # include all petals and all positioners
+            request = {}  # include all petals and all positioners in this
             for ptlid in self.data.ptlids:
                 petal_request = {}  # tailor for all positioners in one petal
                 for posid in self.data.posids[ptlid]:
@@ -129,8 +133,8 @@ class XYTest(PECS):
                 request.update(petal_request)
             requests.append(request)
 
-
-        # TODO: turn on illuminator        
+        # TODO: turn on illuminator      
+        
         # prepare/schedule move
         # execute move
         expected_positions = self.call_petal('execute_move')

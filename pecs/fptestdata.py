@@ -13,7 +13,6 @@ FPTestData.loggers[petal_id]:       logger which writes new lines to log file
 
 """
 import os
-import sys
 from datetime import datetime, timezone
 from itertools import product
 from io import StringIO
@@ -21,13 +20,13 @@ from shutil import make_archive
 import numpy as np
 import pandas as pd
 import logging
-sys.path.append(os.path.abspath('../petal/'))
 from posschedstats import PosSchedStats
 import posconstants as pc
 
 
 class FPTestData:
-    ''' data will be saved in xytest_data/{time}-{test_name}/PTL{ptlid}/*.csv
+    ''' data will be saved in:
+            /xytest_data/{time}-{test_name}/PTL{ptlid}/*.*
     '''
 
     timefmt = '%Y-%m-%dT%H:%M:%S%z'
