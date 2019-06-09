@@ -39,8 +39,9 @@ class FPTestData:
 
         self.test_name = test_name
         self.test_time = datetime.now(timezone.utc)  # always use UTC
-        self.test_cfg = test_cfg  # one test configuration object
+        self.test_cfg = test_cfg
         self.simulate = test_cfg['simulate']
+        self.anticollision = test_cfg['anticollision']
         self.num_corr_max = self.data.test_cfg['num_corr_max']
         self.petal_cfgs = petal_cfgs
         self.ptlids = [
@@ -84,8 +85,9 @@ class FPTestData:
             self._log_cfg(logger, test_cfg)
             self.logs[ptlid] = log  # assign logs and loggers to attributes
             self.loggers[ptlid] = logger
-        self.logger.info([f'Petalconstants code version: {pc.code_version}',
-                          'Simulation mode on: {self.simulate}'])
+        self.logger.info([f'petalconstants.py version: {pc.code_version}',
+                          f'Saving to directory: {self.dir}',
+                          f'Simulation mode enabled: {self.simulate}'])
         self.movedata = {}  # keyed by posid, one table for each positioner
 
     @staticmethod
@@ -129,9 +131,13 @@ class FPTestData:
             _log(10, msg)
 
     def initialise_movedata(self, posids, n_targets):
-        # initialise column names for move data table for each positioner
-        cols0 = ['timestamp', 'cycle', 'move_log', 'target_no']
-        dtypes0 = ['datetime64[ns, UTC]', np.uint32, str, np.uint32]
+        '''initialise column names for move data table for each positioner
+        existing attributes required (see xytest.py):
+            self.ptlids
+        '''
+        # build column names and data types
+        cols0 = ['timestamp_utc', 'cycle', 'move_log']  # posid in 'move_log'
+        dtypes0 = ['datetime64[ns, UTC]', np.uint32, str]
         cols1 = ['target_x', 'target_y']
         cols2_base = ['meas_x', 'meas_y', 'err_x', 'err_y', 'err_xy',
                       'pos_t', 'pos_p']
@@ -140,9 +146,14 @@ class FPTestData:
             cols2.append(f'{field}_{i}')
         cols = cols0 + cols1 + cols2
         dtypes = dtypes0 + [np.float32] * (len(cols1) + len(cols2))
-        df_dict = {col: pd.Series(dtype=dt) for col, dt in zip(cols, dtypes)}
-        df = pd.DataFrame(df_dict)
-        df['target_no'] = np.arange(n_targets) + 1
-        df = df.set_index('target_no')
-        for posid in posids:
-            self.movedata[posid] = df.copy(deep=True)
+        data = {col: pd.Series(dtype=dt) for col, dt in zip(cols, dtypes)}
+        # build multi-level index
+        device_loc = np.arange(535)  # only 514 holes occupied, blank lines ok
+        iterables = [np.arange(self.ntargets), self.ptlids, device_loc]
+        names = ['target no', 'petal id', 'device loc']
+        index = pd.MultiIndex.from_product(iterables, names=names)
+        self.movedata = pd.DataFrame(data=data, index=index)
+        # idx = pd.IndexSlice
+        # df.loc[idx[:, '01', 0], 'timestamp']
+        # a = df.loc[idx[0, '01', [0,1,2,3]], ['timestamp', 'cycle']]
+        # a = df.loc[0, '01', :5][['timestamp', 'cycle']]
