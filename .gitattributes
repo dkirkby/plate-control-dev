@@ -7,6 +7,7 @@ calibrate/posmovemeasure.py -text
 calibrate/seed_xy_offsets.py -text
 calibrate/xytest.py -text
 pecs/ArcCalib.py -text
+pecs/GridCalib.py -text
 pecs/OnePoint.py -text
 pecs/fptestdata.py -text
 pecs/fvc_sim.py -text

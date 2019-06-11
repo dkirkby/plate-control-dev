@@ -11,7 +11,7 @@ class OnePoint(PECS):
 		PECS.__init__(petal_id=petal_id, platemaker_instrument=platemaker_instrument, fvc_role=fvc_role, printfunc=printfunc)
 		self.Eo_phi = 104.0
 		self.clear_angle_margin = 3.0
-		self.ptlid = petal_id
+		self.ptlid = list(self.ptls.keys())[0]
 		self.index = PositionerIndex()
 
 	def one_point_calib(self, selection=[],mode='posTP',auto_update=True,tp_target=[0,self.Eo_phi+self.clear_angle_margin]):
