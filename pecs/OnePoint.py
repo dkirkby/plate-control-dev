@@ -11,13 +11,14 @@ class OnePoint(PECS):
 		PECS.__init__(petal_id=petal_id, platemaker_instrument=platemaker_instrument, fvc_role=fvc_role, printfunc=printfunc)
 		self.Eo_phi = 104.0
 		self.clear_angle_margin = 3.0
+		self.ptlid = petal_id
 		self.index = PositionerIndex()
 
 	def one_point_calib(self, selection=[],mode='posTP',auto_update=True,tp_target=[0,self.Eo_phi+self.clear_angle_margin]):
 		if not selection:
-			posid_list = list(self.call_petal('get_positioner_list', enabled_only=enabled_only).loc[:'DEVICE_ID'])
+			posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only).loc[:'DEVICE_ID'])
 		elif posids[0][0] == 'c': #User passed busids
-			posid_list = list(self.call_petal('get_positioner_list', enabled_only=enabled_only, busids=selection).loc[:,'DEVICE_ID'])
+			posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only, busids=selection).loc[:,'DEVICE_ID'])
 		else: #assume is a list of posids
 			posid_list = selection
 		if tp_target:
@@ -27,12 +28,14 @@ class OnePoint(PECS):
 				requests['TARGET_X1'].append(tp_target[0])
 				requests['TARGET_X2'].append(tp_target[1])
 				requests['LOG_NOTE'].append('One point calibration ' + mode)
-			self.call_petal('prepare_move', requests)
-			expected_positions = self.call_petal('execute_move')
+			self.ptls[ptlid].prepare_move(requests)
+			expected_positions = self.ptls[self.ptlid].execute_move()
 		else:
-			expected_positions = self.call_petal('get_positions')
+			expected_positions = self.ptls[self.ptlid].get_positions()
 		measured_positions = self.fvc.measure(expected_positions) #may need formatting of measured positons
-		dtdp, updates = self.call_petal('test_and_update_TP', measured_positions, tp_updates_tol=0.0, tp_updates_fraction=1.0, tp_updates=mode, auto_update=auto_update)
+		measured_positions = pandas.DataFrame.from_dict(measured_positions)
+		measured_positions.rename(columns={'q':'Q','s':'S','SERIAL':'serial', 'flags':'FLAGS', 'id':'DEVICE_ID'},inplace=True)
+		dtdp, updates = self.ptls[self.ptlid].test_and_update_TP(measured_positions, tp_updates_tol=0.0, tp_updates_fraction=1.0, tp_updates=mode, auto_update=auto_update)
 		return dtdp, updates
 
 if __name__ == '__main__':
