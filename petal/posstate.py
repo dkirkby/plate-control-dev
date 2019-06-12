@@ -218,7 +218,13 @@ class PosState(object):
     def write(self):
         """Write all values to disk.
         """
-        self.conf.update(self._val)
+        if 'TIME_RECORDED' in self._val.keys():
+            date_object = self._val['TIME_RECORDED']
+            self._val['TIME_RECORDED'] = self._val['TIME_RECORDED'].isoformat()
+            self.conf.update(self._val)
+            self._val['TIME_RECORDED'] = date_object
+        else:
+            self.conf.update(self._val)
         self.conf.write()
     
     def log_unit(self):
