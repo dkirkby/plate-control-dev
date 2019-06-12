@@ -39,17 +39,18 @@ class PECS:
                                usually FVC or FVC1 or FVC2
     '''
 
-    def __init__(self, ptlids, printfunc=print, simulate=True,
-                 platemaker_instrument='DESI', fvc_role='FVC',
-                 illuminator_role='ILLUMINATOR'):
-
-        # if defaults can be set here, why set them in and read a local cfg?
-        # if not(platemaker_instrument) and not(fvc_role):
-        #     from configobj import ConfigObj
-        #     pecs_local = ConfigObj('pecs_local.conf',
-        #                            unrepr=True, encoding='utf-8')
-        #     platemaker_instrument = pecs_local['pm_instrument']
-        #     fvc_role = pecs_local['fvc_role']
+    def __init__(self, ptlids=[], printfunc=print, simulate=True,
+                 platemaker_instrument=None, fvc_role=None,
+                 illuminator_role=None):
+        # Allow local config so scripts do not always have to collect roles
+        # and names from the user.
+        if not(platemaker_instrument) or not(fvc_role) or not(ptlids):
+            from configobj import ConfigObj
+            pecs_local = ConfigObj('pecs_local.conf',
+                                    unrepr=True, encoding='utf-8')
+            platemaker_instrument = pecs_local['pm_instrument']
+            fvc_role = pecs_local['fvc_role']
+            ptlids = pecs_local['ptlids']
         self.ptlids = ptlids
         if type(printfunc) is not dict:  # if a single printfunc is supplied
             printfuncs = {ptlid: printfunc for ptlid in ptlids}
@@ -81,6 +82,7 @@ class PECS:
             pf(msg)
 
     # We don't need this since any PetalApp methods can be directly called
+    # Was a more PML like call to petal, but yes, not needed.
     # def call_petal(self, ptlid, command, *args, **kwargs):
     #     '''
     #     Call petal app, command is a command listed in PetalApp.commands.
