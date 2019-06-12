@@ -160,7 +160,7 @@ class PosState(object):
     def load_from_cfg(self, unit_id=None):
 
         if unit_id is not None:
-            self.unit_basename = 'unit_' + str(unit_id)
+            self.unit_basename = 'unit_' + str(unit_id).zfill(2) #Updated by parker 6/12/19
             self.settings_dir = pc.dirs[self.type + '_settings']
             self.logs_dir = pc.dirs[self.type + '_logs']
             comment = 'Settings file for unit: ' + str(unit_id)
