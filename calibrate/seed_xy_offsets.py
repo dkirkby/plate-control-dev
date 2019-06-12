@@ -15,8 +15,7 @@ After calibration, the estimatd parameters will be updated with newly
 measured values.
 
 Petal transformation parameters (6 dof) have been measured by CMM during
-focal plate alignment. Only three dof are needed here. We need to find the
-effective 3 dof transformation from the as-aligned full 6 dof results.
+focal plate alignment. Only three dof are needed here.
 Then these three dof can serve as a starting point for calibration.
  (from constants database or petal configuration file)
 
@@ -30,24 +29,19 @@ We are only doing this for positioners, no fiducials.
 
 """
 
-import os
 import sys
 import numpy as np
-sys.path.append(os.path.abspath('../petal/'))
+import pandas as pd
 import posconstants as pc
 from posstate import PosState
 from petal import Petal
+try:
+    from DOSlib.constants import ConstantsDB
+    USE_CONSTANTSDB = True
+except ModuleNotFoundError:
+    USE_CONSTANTSDB = False
 
 USE_CONSTANTSDB = False
-
-
-if USE_CONSTANTSDB:
-    #  try:  # debug this
-    from DOSlib.constants import ConstantsDB
-    constants = ConstantsDB().get_constants(
-        snapshot='DOS', tag='CURRENT', group='focal_plane_metrology')
-    # except:  # what exception can happen here? do not use bare except
-    #     USE_CONSTANTSDB = False
 
 
 def initialise_pos_xy_offsets(ptl_id_input):
@@ -60,24 +54,44 @@ def initialise_pos_xy_offsets(ptl_id_input):
     and petal location as integer
     '''
     if type(ptl_id_input) is str:
-        ptl_ids = [ptl_id_input]
+        ptlids = [ptl_id_input]
     elif type(ptl_id_input) is list:
-        ptl_ids = ptl_id_input
+        ptlids = ptl_id_input
     else:
         raise Exception('Wrong input type, must be string or list')
-    nominal = np.genfromtxt(pc.dirs['positioner_locations_file'],
-                            delimiter=',', names=True, usecols=(0, 2, 3))
-    for ptl_id in ptl_ids:
-        # first read in petal config to get petal_location in the ring
-        ptl_state = PosState(ptl_id, logging=True, device_type='ptl')
-        petal_loc = ptl_state.conf['PETAL_LOCATION_ID']
-        ptl = Petal(petal_id=ptl_id, petal_loc=int(petal_loc),
+    if USE_CONSTANTSDB:
+        fp_DB = ConstantsDB().get_constants(
+            snapshot='DESI', tag='CURRENT',
+            group='focal_plane_metrology')['focal_plane_metrology']
+        loc_lookup = {fp_DB[key]['petal_id']: key for key in fp_DB.keys()}
+        ptl_DB = ConstantsDB().get_constants(
+            snapshot='DESI', tag='CURRENT',
+            group='petal_metrology')['petal_metrology']
+    for ptlid in ptlids:
+        if USE_CONSTANTSDB:
+            petal_loc = loc_lookup[f'petal{int(ptlid)}']  # lookup loc from DB
+            # load metrology measured device xy from DB, load petal location
+            pos = pd.DataFrame(ptl_DB[f'petal{int(ptlid)}']).T
+            pos['DEVICE_LOC'] = [int(i[11:]) for i in pos.index.values]
+            pos.rename(columns={'x_meas': 'X',
+                                'y_meas': 'Y',
+                                'z_meas': 'Z'}, inplace=True)
+            pos.set_index('DEVICE_LOC', inplace=True)
+        else:
+            # read in petal config to get petal_location in the ring
+            ptl_state = PosState(ptlid, logging=True, device_type='ptl')
+            petal_loc = ptl_state.conf['PETAL_LOCATION_ID']
+            # load nominal device xy from file
+            pos = np.genfromtxt(pc.dirs['positioner_locations_file'],
+                                delimiter=',', names=True,
+                                usecols=(0, 2, 3, 4))
+        ptl = Petal(petal_id=ptlid, petal_loc=int(petal_loc),
                     simulator_on=True)
         for posid in ptl.posids:
-            device_loc = ptl.get_posfid_val(posid, 'DEVICE_LOC')
-            metXYZ = np.array([nominal[device_loc]['X'],
-                               nominal[device_loc]['Y'],
-                               nominal[device_loc]['Z']]).reshape(3, 1)
+            device_loc = ptl.get_posfid_val(posid, 'DEVICE_LOC')  # int
+            metXYZ = np.array([pos['X'][device_loc],
+                               pos['Y'][device_loc],
+                               pos['Z'][device_loc]]).reshape(3, 1)
             x, y, _ = ptl.trans.metXYZ_to_obsXYZ(metXYZ).reshape(3)
             ptl.set_posfid_val(posid, 'OFFSET_X', x)
             ptl.set_posfid_val(posid, 'OFFSET_Y', y)
@@ -89,5 +103,5 @@ if __name__ == "__main__":
         ptls = sys.argv[1]
     else:
         ptls = input('Enter a petal id or list of petal ids,'
-                     'eg. [\'02\',\'03\']: \n')
+                     "eg. ['02','03']: \n")
     initialise_pos_xy_offsets(ptls)

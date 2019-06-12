@@ -185,7 +185,7 @@ class Petal(object):
             self.petal_loc = 3  # petal local CS aligns with focal plate CS5
         else:
             self.petal_loc = petal_loc
-        if False:#CONSTANTSDB_AVAILABLE: #Something seems broken here come back and fix this later KF - 2019/05/31
+        if False:  # CONSTANTSDB_AVAILABLE real petal information isn't in the DB yet
             constants = ConstantsDB().get_constants(
                 snapshot='DOS', tag='CURRENT', group='focal_plane_metrology')
             gamma = constants[str(self.petal_loc)]['petal_rot_3']
