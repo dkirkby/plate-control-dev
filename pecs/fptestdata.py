@@ -16,12 +16,15 @@ import os
 from datetime import datetime, timezone
 from itertools import product
 from io import StringIO
-from shutil import make_archive
+from shutil import copyfileobj
+import pickle
 import numpy as np
 import pandas as pd
 import logging
 from posschedstats import PosSchedStats
 import posconstants as pc
+
+idx = pd.IndexSlice
 
 
 class FPTestData:
@@ -35,10 +38,13 @@ class FPTestData:
         fmt='%(asctime)s %(name)s [%(levelname)s]: %(message)s',
         datefmt=timefmt)
 
+    @property
+    def now(self): return datetime.now(timezone.utc).astimezone()
+
     def __init__(self, test_name, test_cfg, petal_cfgs=None):
 
         self.test_name = test_name
-        self.test_time = datetime.now(timezone.utc)  # always use UTC
+        self.test_time = self.now
         self.test_cfg = test_cfg
         self.simulate = test_cfg['simulate']
         self.anticollision = test_cfg['anticollision']
@@ -59,7 +65,7 @@ class FPTestData:
         self.loggers = {}
         for ptlid in self.ptlids:
             self.log_paths[ptlid] = os.path.join(self.dirs[ptlid],
-                                                 f'PTL_{ptlid}.log')
+                                                 f'ptl_{ptlid}_realtime.log')
             # create virtual file object for storing log entries
             # using stringio because it supports write() and flush()
             log = StringIO(newline='\n')
@@ -105,6 +111,7 @@ class FPTestData:
     def logger(self):
         '''must call methods for particular logger levels below
         input message can be a string of list of strings
+        msg will be broadcasted to all petals
         '''
         def _log(self, lvl, msg):
             if type(msg) is list:
@@ -136,8 +143,8 @@ class FPTestData:
             self.ptlids
         '''
         # build column names and data types
-        cols0 = ['timestamp_utc', 'cycle', 'move_log']  # posid in 'move_log'
-        dtypes0 = ['datetime64[ns, UTC]', np.uint32, str]
+        cols0 = ['timestamp', 'cycle', 'move_log']
+        dtypes0 = ['datetime64[ns]', np.uint32, str]
         cols1 = ['target_x', 'target_y']
         cols2_base = ['meas_x', 'meas_y', 'err_x', 'err_y', 'err_xy',
                       'pos_t', 'pos_p']
@@ -148,12 +155,32 @@ class FPTestData:
         dtypes = dtypes0 + [np.float32] * (len(cols1) + len(cols2))
         data = {col: pd.Series(dtype=dt) for col, dt in zip(cols, dtypes)}
         # build multi-level index
-        device_loc = np.arange(535)  # only 514 holes occupied, blank lines ok
-        iterables = [np.arange(self.ntargets), self.ptlids, device_loc]
-        names = ['target no', 'petal id', 'device loc']
+        iterables = [np.arange(self.ntargets), posids]
+        names = ['target_no', 'posid']
         index = pd.MultiIndex.from_product(iterables, names=names)
-        self.movedata = pd.DataFrame(data=data, index=index)
+        self.movedf = pd.DataFrame(data=data, index=index)
         # idx = pd.IndexSlice
         # df.loc[idx[:, '01', 0], 'timestamp']
-        # a = df.loc[idx[0, '01', [0,1,2,3]], ['timestamp', 'cycle']]
-        # a = df.loc[0, '01', :5][['timestamp', 'cycle']]
+        # df.loc[idx[0, '01', [0,1,2,3]], ['timestamp', 'cycle']]
+        # df.loc[0, '01', :5][['timestamp', 'cycle']]
+
+    def export_move_data(self):
+        '''must have writte self.posids_ptl, a dict keyed by ptlid'''
+        self.movedf.to_pickle(os.path.join(self.dir, 'move_df.pkl'),
+                              compression='gzip')
+        self.movedf.to_csv(os.path.join(self.dir, 'move_df.csv'))
+        for ptlid in self.ptlids:
+            os.makedirs(self.dirs[ptlid], exist_ok=True)
+            def makepath(fn): return os.path.join(self.dirs[ptlid], fn)
+            for posid in self.posids_ptl[ptlid]:  # write move data csv
+                df_pos = self.movedf.loc[idx[:, posid], :].droplevel(1)
+                df_pos.to_pickle(makepath(f'{posid}_df.pkl'),
+                                 compression='gzip')
+                df_pos.to_csv(makepath(f'{posid}_df.csv'))
+            with open(makepath(f'ptl_{ptlid}_export.log'), 'w') as handle:
+                self.logs[ptlid].seek(0)
+                copyfileobj(self.logs[ptlid], handle)  # write final logs
+
+    def dump_as_one_pickle(self):
+        with open(os.path.join(self.dir, 'data_dump.pkl'), 'wb') as handle:
+            pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
