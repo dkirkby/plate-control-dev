@@ -43,7 +43,8 @@ class PECS:
                  platemaker_instrument=None, fvc_role=None,
                  illuminator_role=None):
         # Allow local config so scripts do not always have to collect roles
-        # and names from the user.
+        # and names from the user. No check for illuminator at the moment
+        # since it is not used in tests.
         if not(platemaker_instrument) or not(fvc_role) or not(ptlids):
             from configobj import ConfigObj
             pecs_local = ConfigObj('pecs_local.conf',
