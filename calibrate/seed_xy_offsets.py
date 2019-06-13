@@ -40,8 +40,13 @@ try:
     USE_CONSTANTSDB = True
 except ModuleNotFoundError:
     USE_CONSTANTSDB = False
+try: #added by kfanning
+    from DOSlib.proxies import Petal as Petal_prox
+    USE_PROXY = True
+except ModuleNotFoundError:
+    USE_PROXY = False
 
-USE_CONSTANTSDB = False
+USE_CONSTANTSDB = False #Will keep this for a while, true Metrology does not exist
 
 
 def initialise_pos_xy_offsets(ptl_id_input):
@@ -85,7 +90,10 @@ def initialise_pos_xy_offsets(ptl_id_input):
             pos = np.genfromtxt(pc.dirs['positioner_locations_file'],
                                 delimiter=',', names=True,
                                 usecols=(0, 2, 3, 4))
-        ptl = Petal(petal_id=ptlid, petal_loc=int(petal_loc),
+        if USE_PROXY:
+            ptl = Petal_prox(petal_id=ptlid)
+        else:
+            ptl = Petal(petal_id=ptlid, petal_loc=int(petal_loc),
                     simulator_on=True)
         for posid in ptl.posids:
             device_loc = ptl.get_posfid_val(posid, 'DEVICE_LOC')  # int
@@ -95,10 +103,15 @@ def initialise_pos_xy_offsets(ptl_id_input):
             x, y, _ = ptl.trans.metXYZ_to_obsXYZ(metXYZ).reshape(3)
             ptl.set_posfid_val(posid, 'OFFSET_X', x)
             ptl.set_posfid_val(posid, 'OFFSET_Y', y)
-            ptl.states[posid].write()
+            ptl.altered_states.add(ptl.states[posid]) #needed for local commits
+            ptl.altered_calib_states.add(ptl.states[posid]) #needed for DB commits
+        ptl.commit()
+        ptl.commit_calib_DB()
 
 
 if __name__ == "__main__":
+    if USE_PROXY:
+        print('ALERT: The program expects a running PetalApp')
     if len(sys.argv) > 1:
         ptls = sys.argv[1]
     else:

@@ -889,6 +889,7 @@ class Petal(object):
                 self.posmoveDB.WriteToDB(pos_commit_list,self.petal_id,'pos_calib')
             if len(fid_commit_list) != 0:
                 self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid_calib')
+        self.altered_calib_states = set()
         return
 
     def expected_current_position(self, posid, key):
