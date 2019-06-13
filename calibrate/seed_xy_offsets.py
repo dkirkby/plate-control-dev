@@ -102,8 +102,8 @@ def initialise_pos_xy_offsets(ptl_id_input):
             ptl.set_posfid_val(posid, 'OFFSET_Y', y)
             ptl.altered_states.add(ptl.states[posid])  # for local commits
             ptl.altered_calib_states.add(ptl.states[posid])  # for DB commits
-        ptl.commit()  # for local commits throgh petal.py
-        ptl.commit_calibration(log_note='seed xy')  # DB commit through ptlApp
+        ptl.commit(log_note='seed offsets xy')  # for local commits throgh petal.py
+        ptl.commit_calibration(log_note='seed offsets xy')  # DB commit through ptlApp
 
 
 if __name__ == "__main__":
