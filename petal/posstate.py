@@ -55,6 +55,7 @@ class PosState(object):
             if petal_id is not None:  # ptlid is given, simple
                 self.ptlid = petal_id
                 if unit_id is not None:  # both ptlid and unit_id given
+                    self.unit_basename = 'unit_' + str(unit_id).zfill(2) #Updated by parker 6/12/19
                     if self.type == 'ptl':
                         assert self.ptlid == unit_id, 'inconsistent input'
                         # TODO fix this; still reading from a template config
@@ -63,6 +64,7 @@ class PosState(object):
                         self.load_from_db(unit_id=unit_id)
             else:  # ptlid unkonwn
                 if unit_id is not None:  # only unit id given
+                    self.unit_basename = 'unit_' + str(unit_id).zfill(2) #Updated by parker 6/12/19
                     if self.type == 'ptl':  # no ptlid, but unit_id given
                         self.ptlid = unit_id
                         # TODO fix this; still reading from a template config
@@ -72,6 +74,7 @@ class PosState(object):
                         self.load_from_db(unit_id=unit_id)
                 else:  # both unit_id and ptlid are unkonwn, read template
                     self.ptlid = '-1'  # assume ptlid = -1
+                    self.unit_basename = 'unit_TEMP'
                     if self.type == 'ptl':  # unit_id and ptlid both unkonwn
                         # TODO fix this; still reading from a template config
                         self.load_from_cfg(unit_id=unit_id)
@@ -161,11 +164,9 @@ class PosState(object):
     def load_from_cfg(self, unit_id=None):
 
         if unit_id is not None:
-            self.unit_basename = 'unit_' + str(unit_id).zfill(2) #Updated by parker 6/12/19
             self.settings_dir = pc.dirs[self.type + '_settings']
             comment = 'Settings file for unit: ' + str(unit_id)
         else:
-            self.unit_basename = 'unit_TEMP'
             self.logs_dir = pc.dirs['temp_files']
             self.settings_dir = pc.dirs['temp_files']
             comment = 'Temporary settings file for software test purposes'\
