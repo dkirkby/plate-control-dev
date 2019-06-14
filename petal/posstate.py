@@ -46,6 +46,7 @@ class PosState(object):
         print('DB_COMMIT_AVAILABLE', DB_COMMIT_AVAILABLE)
         print('write_to_DB', self.write_to_DB)
         # data initialization
+        self.logs_dir = pc.dirs[self.type + '_logs']
         if device_type in ['pos', 'fid', 'ptl']:
             self.type = device_type
         else:
@@ -162,7 +163,6 @@ class PosState(object):
         if unit_id is not None:
             self.unit_basename = 'unit_' + str(unit_id).zfill(2) #Updated by parker 6/12/19
             self.settings_dir = pc.dirs[self.type + '_settings']
-            self.logs_dir = pc.dirs[self.type + '_logs']
             comment = 'Settings file for unit: ' + str(unit_id)
         else:
             self.unit_basename = 'unit_TEMP'
