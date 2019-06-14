@@ -46,11 +46,11 @@ class PosState(object):
         print('DB_COMMIT_AVAILABLE', DB_COMMIT_AVAILABLE)
         print('write_to_DB', self.write_to_DB)
         # data initialization
-        self.logs_dir = pc.dirs[self.type + '_logs']
         if device_type in ['pos', 'fid', 'ptl']:
             self.type = device_type
         else:
             raise Exception('Invalid device_type')
+        self.logs_dir = pc.dirs[self.type + '_logs']
         if self.write_to_DB:  # data initialization from database
             if petal_id is not None:  # ptlid is given, simple
                 self.ptlid = petal_id
