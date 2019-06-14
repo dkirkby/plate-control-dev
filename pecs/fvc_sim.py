@@ -65,6 +65,15 @@ class FVC_proxy_sim:
             assert isinstance(expected_positions[0], dict),'expected_positions argument must be a list of dictionaries'
             # Convert list of dictionaries to dataframe
             expected_positions = pandas.DataFrame(expected_positions)
+        elif isinstance(expected_positions, pandas.core.frame.DataFame):
+            #Assume same format as returned from get_positions in petalApp X1 and X2 must be Q and S
+            expected_positions.rename(columns = {'X1':'q'}, inplace=True)
+            expected_positions.rename(columns = {'X2':'s'}, inplace=True)
+            expected_positions.rename(columns = {'FLAGS':'flags'}, inplace=True)
+            expected_positions.rename(columns = {'DEVICE_LOC':'id'}, inplace=True)
+            for i, row in expected_positions.iterrows():
+                expected_positions.loc[i,('id')] = self.positions.find_by_petal_loc_device_loc(row['PETAL_LOC'],row['id'],key='DEVICE_ID')
+            expected_positions.drop(columns='PETAL_LOC', inplace=True)
 
         # Add a check that the required keys (id, q, s and flags are given)
         expected_positions = expected_positions[['id', 'q', 's', 'flags']]
