@@ -907,6 +907,32 @@ class XYTest(object):
         gui_root.withdraw()
         return svn_user, svn_pass, err
 
+    def run(self):
+        self.get_svn_credentials()
+        self.logwrite('Start of positioner performance test.')
+        self.m.park(posids='all')
+        for loop_num in range(self.starting_loop_number, self.n_loops):
+            self.xytest_conf['current_loop_number'] = loop_num
+            self.xytest_conf.write()
+            self.logwrite('Starting xy test in loop ' + str(loop_num + 1) + ' of ' + str(self.n_loops))
+            self.set_current_overrides(loop_num)
+            self.run_range_measurement(loop_num)
+            self.run_calibration(loop_num)
+            self.run_xyaccuracy_test(loop_num)
+            self.run_unmeasured_moves(loop_num)
+            self.run_hardstop_strikes(loop_num)
+            self.clear_current_overrides()
+            self.svn_add_commit(keep_creds=True)
+        self.logwrite('All test loops complete.')
+        self.m.park(posids='all')
+        self.logwrite('Moved positioners into \'parked\' position.')
+        for petal in self.m.petals:
+            petal.schedule_stats.save()
+            #petal.generate_animation()
+        self.logwrite('Test complete.')
+        self.track_all_poslogs_once()
+        self.svn_add_commit(keep_creds=False)
+
 
     
 
