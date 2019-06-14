@@ -14,6 +14,7 @@ pecs/fptestdata.py -text
 pecs/fvc_sim.py -text
 pecs/pecs.py -text
 pecs/pecs_local.conf -text
+pecs/seed_xy_offsets.py -text
 petal/collision_lookup_generator.py -text
 petal/collision_lookup_generator_subset.py -text
 petal/focal_surface_lookup.csv -text
