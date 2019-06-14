@@ -109,8 +109,9 @@ class PtlTestGUI(object):
         #Run Tests
         Label(gui_root, text = 'Tests').grid(row=1, column=5)
         Button(gui_root, width = 10, text = 'Init HW', command=lambda: self.run_init_hwsetup()).grid(row=2, column=5)
-        Button(gui_root, width = 10, text = 'XYTEST', command=lambda: self.run_xytest()).grid(row=3, column=5)
-        Button(gui_root, width = 10, text = 'Get RESULTS', command=lambda: self.test_results()).grid(row=4, column=5)
+        Button(gui_root, width = 10, text = 'GRID', command=lambda: self.run_grid()).grid(row=3, column=5)
+        Button(gui_root, width = 10, text = 'XYTEST', command=lambda: self.run_xytest()).grid(row=4, column=5)
+        Button(gui_root, width = 10, text = 'Get RESULTS', command=lambda: self.test_results()).grid(row=5, column=5)
      
         #Quit Button
         Button(gui_root, width = 10, text = 'QUIT', command=lambda: self.quit()).grid(row=0, column=6)
@@ -280,9 +281,60 @@ class PtlTestGUI(object):
 
     def run_xytest(self):
         self.main.insert(END, "You selected to run the XYTest \n")
+        test = build.XYTest(self.svnuser, self.svnpass)
+        test.run()
+
+    def run_grid(self):
+        self.main.insert(END, "You selected to run a Grid calibration \n")
+        test = build.XYTest(self.svnuser, self.svnpass, opt = 'grid')
+        test.run()
 
     def test_results(self):
-        self.main.insert(END, "Here is where the results will print \n")
+        if len(self.pos_info['CAN']) == 0:
+            hwconfig = ConfigObj(hwsetup_path+'hwsetup_petal0_xytest.conf', unrepr=True, encoding='utf-8')
+            pos_list = hwconfig['pos_ids']
+        else:
+            pos_list = self.pos_info['CAN']
+
+        Data = {}
+        for pos in pos_list:
+            try:
+                self.main.insert(END, "Getting data for positioner %s \n" % pos)
+                filen = "/home/msdos/focalplane/positioner_logs/xytest_summaries/%s_summary.csv" % pos
+                df = pd.read_csv(filen)
+                d = df.iloc[[-1]]
+                Data[pos] = d
+            except:
+                self.main.insert(END,"Didnt have a summary file for %s \n" % pos)
+        Grades = {}
+        for pos, df in Data.items():
+            rms_corr = float(df['corr rms (um) all targets with 5.0 um threshold'])
+            max_corr = float(df['corr max (um) all targets with 5.0 um threshold'])
+            max_blind = float(df['blind max (um) all targets'])
+            max_corr_95 = float(df['corr max (um) best 95% with 5.0 um threshold'])
+            rms_corr_95 = float(df['corr rms (um) best 95% with 5.0 um threshold'])
+
+            grade = self.grade_pos(max_blind,max_corr, rms_corr, max_corr_95, rms_corr_95)
+            Grades[pos] = grade
+
+        self.main.insert(END,"Here are the final grades for each positioner in the last test: \n") 
+        for pos, grade in Grades.items():
+            self.main.insert(END,"%s: %s \n" % (pos, grade))
+       
+
+    def grade_pos(self,max_blind,max_corr, rms_corr, max_corr_95, rms_corr_95):
+        if (max_blind <= 100) & (max_corr <=15) & (rms_corr <=5):
+            grade = 'A'
+        elif (max_blind <= 250) & (max_corr <=25) & (max_corr_95 <=15) & (rms_corr <=10) & (rms_corr <=5):
+            grade = 'B'
+        elif (max_blind <= 250) & (max_corr <=50) & (max_corr_95 <=25) & (rms_corr <=20) & (rms_corr <=10):
+            grade = 'C'
+        elif (max_blind <= 500) & (max_corr <=50) & (max_corr_95 <=25) & (rms_corr <=20) & (rms_corr <=10):
+            grade = 'D'
+        else:
+            grade = 'F'
+        
+        return grade
  
     def quit(self):
         sys.exit()
