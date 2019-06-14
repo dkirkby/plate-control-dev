@@ -64,12 +64,13 @@ class PosState(object):
                         self.load_from_db(unit_id=unit_id)
             else:  # ptlid unkonwn
                 if unit_id is not None:  # only unit id given
-                    self.unit_basename = 'unit_' + str(unit_id).zfill(2) #Updated by parker 6/12/19
                     if self.type == 'ptl':  # no ptlid, but unit_id given
                         self.ptlid = unit_id
+                        self.unit_basename = 'unit_' + str(unit_id).zfill(2) #Updated by parker 6/12/19
                         # TODO fix this; still reading from a template config
                         self.load_from_cfg(unit_id=self.ptlid)
                     else:
+                        self.unit_basename = 'unit_' + str(unit_id)
                         self.set_ptlid_from_pi(unit_id)  # lookup ptlid
                         self.load_from_db(unit_id=unit_id)
                 else:  # both unit_id and ptlid are unkonwn, read template
@@ -83,9 +84,11 @@ class PosState(object):
         else:  # no DB commit, use local cfg only, skipped after switchover
             if petal_id is None:  # ptlid is none, what about unit id?
                 if unit_id is not None and self.type == 'ptl':
+                    self.unit_basename = 'unit_' + str(unit_id).zfill(2) #Updated by parker 6/12/19
                     self.ptlid = unit_id
             else:
                 self.ptlid = petal_id
+                self.unit_basename = 'unit_' + str(unit_id)
             self.load_from_cfg(unit_id=unit_id)
 
         # text log file setup
