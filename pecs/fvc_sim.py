@@ -26,7 +26,7 @@ class FVC_proxy_sim:
     def qs_to_fvcxy(self, qs, seqid=None):
         return
 
-    def measure(self, expected_positions seqid=None, exptime=None, match_radius=None):
+    def measure(self, expected_positions, seqid=None, exptime=None, match_radius=None):
         """
         Request a list of center positions
         (Illuminator functionality and fiducial control are outside of the scope of measure())
@@ -65,7 +65,7 @@ class FVC_proxy_sim:
             assert isinstance(expected_positions[0], dict),'expected_positions argument must be a list of dictionaries'
             # Convert list of dictionaries to dataframe
             expected_positions = pandas.DataFrame(expected_positions)
-        elif isinstance(expected_positions, pandas.core.frame.DataFame):
+        elif isinstance(expected_positions, pandas.core.frame.DataFrame):
             #Assume same format as returned from get_positions in petalApp X1 and X2 must be Q and S
             expected_positions.rename(columns = {'X1':'q'}, inplace=True)
             expected_positions.rename(columns = {'X2':'s'}, inplace=True)

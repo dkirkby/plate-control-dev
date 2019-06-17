@@ -39,7 +39,7 @@ class PECS:
                                usually FVC or FVC1 or FVC2
     '''
 
-    def __init__(self, ptlids=[], printfunc=print, simulate=True,
+    def __init__(self, ptlids=[], printfunc=print, simulate=False,
                  platemaker_instrument=None, fvc_role=None,
                  illuminator_role=None):
         # Allow local config so scripts do not always have to collect roles
@@ -67,13 +67,13 @@ class PECS:
             self.fvc = FVC_proxy_sim()
         else:
             self.fvc = FVC(self.platemaker_instrument, fvc_role=self.fvc_role)
-        self.printfunc('FVC proxy created for instrument',
-                       self.fvc.get('instrument'))
+        printfunc('FVC proxy created for instrument',
+                        self.fvc.get('instrument'))
         self.ptls = {}  # call petal proxy
         for ptlid in ptlids:
             self.ptls[ptlid] = Petal(petal_id=ptlid)  # no sim state control
             self.printfuncs[ptlid](f'Petal proxy initialised for {ptlid}')
-        self.illuminator = Illuminator()
+        #self.illuminator = Illuminator()
 
     def printfunc(self, msg):
         '''self.printfuncs is a dict indexed by ptlids as specified for input,
