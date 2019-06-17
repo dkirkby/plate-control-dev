@@ -30,7 +30,11 @@ import photutils as phot
 class Derive_Platemaker_Pars(object):
     def __init__(self, petal_num):
         self.petal_num = str(int(petal_num))
-        self.petal_dir = '/home/msdos/data/petaltests/platemaker/petal%s/'%self.petal_num
+        self.petal_dir = '/home/msdos/data/petaltests/platemaker/instruments/petal%s/'%self.petal_num
+
+
+        self.ref_dist_tol = 3.0 # [pixels on FVC CCD] used for identifying fiducial dots
+        self.ref_dist_thres = 100.0 
 
         # get the station config info
         hwsetup_conf = pc.dirs['hwsetups']+'/hwsetup_petal%s.conf' % self.petal_num
@@ -58,8 +62,14 @@ class Derive_Platemaker_Pars(object):
                   anticollision = None) # valid options for anticollision arg: None, 'freeze', 'adjust'
         posids=self.ptl.posids
         fidids=self.ptl.fidids
-        self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc)
-        self.m.n_extradots_expected = self.hwsetup['num_extra_dots']
+        
+        self._petals_map = {}
+        for posid in self.ptl.posids:
+            self._petals_map[posid] = self.ptl
+        for fidid in self.ptl.fidids:
+            self._petals_map[fidid] = self.ptl
+        #self.m = posmovemeasure.PosMoveMeasure([self.ptl],self.fvc)
+        #self.m.n_extradots_expected = self.hwsetup['num_extra_dots']
 
 
         #Get number of dots
@@ -67,9 +77,8 @@ class Derive_Platemaker_Pars(object):
         for fidid in self.ptl.fidids:
             self.N_dots[fidid] = self.ptl.get_posfid_val(fidid,'N_DOTS')
         self.total_dots = sum(self.N_dots.values())
-
         # Initial image
-        xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(total_dots)
+        xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(self.total_dots)
         xy_init = xy_meas
         xy_test = xy_meas
 
@@ -84,39 +93,38 @@ class Derive_Platemaker_Pars(object):
         #Then turn one off at a time
         self.fids_identified = {}
         for fid in self.ptl.fidids:
-            self.fids_identified[fid] = self.identify_one_fid(fid)
-            
+            data = self.identify_one_fid(fid)
+            if data is not None:
+                self.fids_identified[fid] = data 
+        import pdb;pdb.set_trace()    
         #Identify pinhole numbers and label data
-        XY = {'ID':[], 'obsX':[], 'obsY':[],'fvcX':[], 'fvcY':[],'metroX':[], 'metroY':[]}
+        XY = {'ID':[], 'fvcX':[], 'fvcY':[]}
         for fidid, data in self.fids_identified.items():
             dev_loc = self.ptl.get_posfid_val(fidid, 'DEVICE_LOC')
             new_data = self.identify_pinholes(data)
             for i, xy in enumerate(new_data):
-                name = str(dev_loc) + '-%d' %i
+                name = str(dev_loc) + '-%d' %(i+1)
                 XY['ID'].append(name)
-                XY['obsX'].append(xy[0])
-                XY['obsY'].append(xy[1])
-
-        #Go from obsXY to fvcXY
-        xy = [[XY['X'][i],XY['Y'][i]] for i in range(len(XY))]
-        xy_fvc=self.fvc.obsXY_to_fvcXY(xy)
-
-        XY['fvcX']=[-xy_fvc[i][0] for i in range(self.total_dots)] # x flip with FLI
-        XY['fvcY']=[xy_fvc[i][1] for i in range(self.total_dots)]
+                XY['fvcX'].append(xy[0])
+                XY['fvcY'].append(xy[1])
 
         self.XY = pd.DataFrame.from_dict(XY)
 
         #Then pull the metrology data (maybe from the database?)
-        self.file_metro = pc.dirs['hwsetups'] + '/petal%d__fiducials_metrology.csv' % int(self.petal_num)
+        self.file_metro = pc.dirs['hwsetups'] + '/petal%d_fiducials_metrology.csv' % int(self.petal_num)
 
         # Read dots identification result from ptl and store a dictionary
         pix_size=0.006
 
-        metrology = pd.from_csv(self.file_metro)    
-        #merge pandas databases
+        metrology = pd.read_csv(self.file_metro)    
+        metrology.columns = ['ID','metroX','metroY','metroZ']
 
-        #THen send them through the fit and plot function
+        #merge pandas databases
+        self.XY = self.XY.merge(metrology, on='ID',how='left')
+         
+        #Then send them through the fit and plot function
         fvcX_arr=self.XY['fvcX'].tolist()
+        fvcX_arr = [-x for x in fvcX_arr]
         fvcY_arr=self.XY['fvcY'].tolist()
         metroX_arr=self.XY['metroX'].tolist()
         metroY_arr=self.XY['metroY'].tolist()
@@ -126,11 +134,9 @@ class Derive_Platemaker_Pars(object):
 
 
     def identify_pinholes(self, data):
-        #data is list of lists
-        # Get radius of each
         this_data = np.array(data).T
-        X = this_data[:,0]
-        Y = this_data[:,1]
+        X = this_data[0]
+        Y = this_data[1]
 
         xavg = np.mean(X)
         yavg = np.mean(Y)
@@ -138,9 +144,9 @@ class Derive_Platemaker_Pars(object):
         rr = []
         for pin in [0,1,2,3]:
             r = np.sqrt((X[pin]-xavg)**2.+(Y[pin]-yavg)**2.)
-        rr.append(r)
+            rr.append(r)
 
-
+        r = [(i/max(rr))*1.0969 for i in rr]
         ##Figure out correct labelling
         index_value=[3,0,2,1] # pinhole indices in order of increasing r_value
         index_name = ['FIF-4','FIF-1','FIF-3','FIF-2']
@@ -150,7 +156,7 @@ class Derive_Platemaker_Pars(object):
         index = []
         r_error =[]
 
-        for i in range(0,len(rr)):
+        for i in range(0,len(r)):
             best_index=-1
             best_diff = 1.0e12  # start with infinity
             for j in range(0,len(r)):
@@ -168,9 +174,9 @@ class Derive_Platemaker_Pars(object):
 
     def identify_one_fid(self, fidid):
         ptl = self.petal(fidid)
-        num_expected = N_dots[fidid]
+        num_expected = self.N_dots[fidid]
         if num_expected > 0:
-            self.printfunc('Temporarily turning off fiducial ' + fidid + ' to determine which dots belonged to it.')
+            print('Temporarily turning off fiducial ' + fidid + ' to determine which dots belonged to it.')
             ptl.set_fiducials(fidid,'off')
             xy_meas,peaks,fwhms,imgfiles = self.fvc.measure_fvc_pixels(self.total_dots - num_expected)
 
@@ -182,25 +188,26 @@ class Derive_Platemaker_Pars(object):
                 matches = [dist < self.ref_dist_tol for dist in test_dist]
                 if not any(matches):
                     these_xyref.append(this_xy)
-                    self.printfunc('Ref dot ' + str(len(these_xyref)-1) + ' identified for fiducial ' + fidid + ' at fvc coordinates ' + str(this_xy))
+                    print('Ref dot ' + str(len(these_xyref)-1) + ' identified for fiducial ' + fidid + ' at fvc coordinates ' + str(this_xy))
 
             num_detected = len(these_xyref)
             if num_detected != num_expected:
-                self.printfunc('warning: expected ' + str(num_expected) + ' dots for fiducial ' + fidid + ', but detected ' + str(num_detected))
+                print('warning: expected ' + str(num_expected) + ' dots for fiducial ' + fidid + ', but detected ' + str(num_detected))
+                return
+            else:
+                ptl.set_posfid_val(fidid,'DOTS_FVC_X',[these_xyref[i][0] for i in range(num_detected)])
+                ptl.set_posfid_val(fidid,'DOTS_FVC_Y',[these_xyref[i][1] for i in range(num_detected)])
+                ptl.set_posfid_val(fidid,'LAST_MEAS_OBS_X',[these_xyref[i][0] for i in range(num_detected)])
+                ptl.set_posfid_val(fidid,'LAST_MEAS_OBS_Y',[these_xyref[i][1] for i in range(num_detected)])
+                ptl.set_fiducials(fidid,'on')
 
-            for i in range(num_detected):
-
-
-            ptl.set_posfid_val(fidid,'DOTS_FVC_X',[these_xyref[i][0] for i in range(num_detected)])
-            ptl.set_posfid_val(fidid,'DOTS_FVC_Y',[these_xyref[i][1] for i in range(num_detected)])
-            ptl.set_posfid_val(fidid,'LAST_MEAS_OBS_X',[these_xyref[i][0] for i in range(num_detected)])
-            ptl.set_posfid_val(fidid,'LAST_MEAS_OBS_Y',[these_xyref[i][1] for i in range(num_detected)])
-            all_xyref_detected += these_xyref
-            ptl.set_fiducials(fidid,'on')
-
-        return these_xyref
+                return these_xyref
 
 
+    def petal(self, posid_or_fidid_or_dotid):
+        """Returns the petal bject associated with a asingle id key.
+        """
+        return self._petals_map[posid_or_fidid_or_dotid]
 
     def fit_and_plot(self,fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=0):
 
