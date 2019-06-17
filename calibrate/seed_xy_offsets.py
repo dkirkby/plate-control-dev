@@ -34,6 +34,7 @@ import numpy as np
 import pandas as pd
 import posconstants as pc
 from posstate import PosState
+from petaltransforms import PetalTransforms
 try:
     from DOSlib.constants import ConstantsDB
     USE_CONSTANTSDB = True
@@ -73,8 +74,9 @@ def initialise_pos_xy_offsets(ptl_id_input):
             snapshot='DESI', tag='CURRENT',
             group='petal_metrology')['petal_metrology']
     for ptlid in ptlids:
+        #import pdb; pdb.set_trace()
         if USE_CONSTANTSDB:
-            petal_loc = loc_lookup[f'petal{int(ptlid)}']  # lookup loc from DB
+            petal_loc = 0 #loc_lookup[f'petal{int(ptlid)}']  # lookup loc from DB
             # load metrology measured device xy from DB, load petal location
             pos = pd.DataFrame(ptl_DB[f'petal{int(ptlid)}']).T
             pos['DEVICE_LOC'] = [int(i[11:]) for i in pos.index.values]
@@ -91,13 +93,14 @@ def initialise_pos_xy_offsets(ptl_id_input):
                                 delimiter=',', names=True,
                                 usecols=(0, 2, 3, 4))
         ptl = Petal(petal_id=ptlid, petal_loc=int(petal_loc),
-                    simulator_on=True)
-        for posid in ptl.posids:
+                    simulator_on=False) #changed by PAF
+        for posid in ptl.posids: 
             device_loc = ptl.get_posfid_val(posid, 'DEVICE_LOC')  # int
             metXYZ = np.array([pos['X'][device_loc],
                                pos['Y'][device_loc],
                                pos['Z'][device_loc]]).reshape(3, 1)
-            x, y, _ = ptl.trans.metXYZ_to_obsXYZ(metXYZ).reshape(3)
+            #trans = ptl.trans
+            x, y, _ = PetalTransforms().metXYZ_to_obsXYZ(metXYZ).reshape(3)
             ptl.set_posfid_val(posid, 'OFFSET_X', x)
             ptl.set_posfid_val(posid, 'OFFSET_Y', y)
             ptl.altered_states.add(ptl.states[posid])  # for local commits
