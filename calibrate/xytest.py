@@ -9,10 +9,10 @@ import numpy as np
 import pandas as pd
 from pecs import PECS
 import posconstants as pc
-import pos_xytest_plot
+# import pos_xytest_plot
 from fptestdata import FPTestData
 
-idx = pd.IndexSlice
+idx = pd.IndexSlice  # pandas slice for selecting slice using multiindex
 
 
 class XYTest(PECS):
@@ -129,13 +129,13 @@ class XYTest(PECS):
 
     @staticmethod
     def _generate_posXY_targets_grid(rmin, rmax, npts):
-        x, y = np.mgrid[-rmax:rmax:npts*1j, -rmax:rmax:npts*1j]
+        x, y = np.mgrid[-rmax:rmax:npts*1j, -rmax:rmax:npts*1j]  # 1j is step
         r = np.sqrt(np.square(x) + np.square(y))
         mask = (rmin < r) & (r < rmax)
         return np.array([x[mask], y[mask]])  # return 2 x N array of targets
 
     def _add_posid_col(self, df, ptlid):
-        '''df only has DEVICE_LOC, add posids column and use as index
+        '''when df only has DEVICE_LOC, add posids column and use as index
         '''
         df0 = self.data.posdf[self.data.posdf['ptlid'] == ptlid]
         return df.merge(df0, on=['PETAL_LOC', 'DEVICE_LOC'],
@@ -152,15 +152,12 @@ class XYTest(PECS):
         self.offXY = {}  # keys are ptlids, each array of shape (2, N_posids)
         for ptlid in self.data.ptlids:  # TODO: parallelise this?
             posids = self.data.posids_ptl[ptlid]
-            offXY = np.zeros((2, len(posids)))  # read xy offsets
-            for j, posid in enumerate(posids):
-                t = self.ptls[ptlid].posmodels[posid].trans
-                offXY[:, j] = (t.getval['OFFSET_X'], t.getval['OFFSET_Y'])
-                self.loggers[ptlid].debug(
-                    f'Positioner: {posid}, xy offsets read: {offXY[:, j]}')
-            self.offXY[ptlid] = offXY
+            ret = self.ptls[ptlid].read_offsets_xy(posids)  # pd.df format
+            self.offXY[ptlid] = ret.values.T  # np array of (2, N_posids)
+            self.loggers[ptlid].debug(f'XY offsets read:\n{ret.to_string()}')
 
     def _update(self, newdf, i):
+        '''newdf is single-index on posid only'''
         newdf = newdf.set_index(pd.MultiIndex.from_product([[i], newdf.index]))
         self.data.movedf.update(newdf)  # write to movedf
 
@@ -169,17 +166,20 @@ class XYTest(PECS):
         movedf = self.data.movedf
         # before moving for each target, write time cycle etc. for all posids
         movedf.loc[idx[i, :], 'timestamp'] = self.data.now
-        for posid in self.data.posids:
-            ptlid = self.posdf.loc[posid, 'ptlid']
-            movedf.loc[idx[i, posid], 'cycle'] = \
-                self.ptls[ptlid].states[posid].read('TOTAL_MOVE_SEQUENCES')
-            movedf.loc[idx[i, posid], 'move_log'] = \
-                self.ptls[ptlid].states[posid].log_basename
+        movedf.loc[idx[i, :], 'move_log'] = \
+            'local posmove csv log deprecated; check posmoveDB instead.'
+        # self.ptls[ptlid].states[posid].log_basename
+        for ptlid in self.data.ptlids:
+            ptl, posids = self.ptls[ptlid], self.data.posids_ptl[ptlid]
+            cycles = ptl.read_pos_state(posids, 'TOTAL_MOVE_SEQUENCES') \
+                .set_index('posid')
             # TODO: store other posstate stuff here
+            newdf = pd.DataFrame({'posid': posids, 'cycle': cycles})
+            self._update(newdf, i)
 
     def calculate_xy_errors(self, i, n):
         movedf = self.data.movedf
-        # convenience functin below returns a column of the movedf for all pos
+        # convenience functin c returns a column of the movedf for all pos
         def c(col_name): return movedf.loc[idx[i], [col_name]].values
         movedf.loc[idx[i], [f'err_x_{n}']] = c(f'meas_x_{n}') - c('target_x')
         movedf.loc[idx[i], [f'err_y_{n}']] = c(f'meas_y_{n}') - c('target_y')
@@ -187,6 +187,7 @@ class XYTest(PECS):
                 np.hstack([c(f'err_x_{n}'), c(f'err_y_{n}')]), axis=1)
 
     def run_xyaccuracy_test(self):
+        led_initial = self.illuminator.get('led')
         self.illuminator.set(led='ON')  # turn on illuminator
         for i in range(self.data.ntargets):  # test loop over all test targets
             posXY = self.data.targets[:, i].reshape(2, 1)
@@ -196,7 +197,7 @@ class XYTest(PECS):
             for n in range(self.data.num_corr_max + 1):
                 self.move_measure(i, n)
             # TODO: make plots after each target completes
-        self.illuminator.set(led='OFF')
+        self.illuminator.set(led=led_initial)  # restore initial LED state
 
     def move_measure(self, i, n, posXY):
         '''one complete iteration: move ten petals once, measure once
@@ -204,7 +205,7 @@ class XYTest(PECS):
         movedf = self.data.movedf
         # move ten petals
         # TODO: parallelise this and have ten petals run simultaneously
-        expected_QS_list = []
+        expected_QS_list = []  # each item is a dataframe for one petal
         for ptlid in self.data.ptlids:
             posids = self.data.posids_ptl[ptlid]  # all data ordered by this
             ptl = self.ptls[ptlid]
@@ -215,8 +216,8 @@ class XYTest(PECS):
                 movedf.loc[idx[i, posids], ['target_x', 'target_y']] = obsXY.T
             else:
                 movetype, cmd = 'corrective', 'dXdY'
-                target = -movedf.loc[idx[i, posids],
-                                     [f'err_x_{n-1}', f'err_y_{n-1}']].T
+                target = - movedf.loc[idx[i, posids],  # note minus sign
+                                      [f'err_x_{n-1}', f'err_y_{n-1}']].T
             # build move request dataframe for a petal
             note = (f'xy test: {self.data.test_name}; '  # same for all
                     f'target {i+1} of {self.ntargets}; '
@@ -242,7 +243,7 @@ class XYTest(PECS):
                                       + ret_QS.to_string())
             # build expected QS positions for fvc measure
             # TODO is flag gauranteed to be 4?
-            expected_QS = pd.DataFrame(
+            expected_QS = pd.DataFrame(  # this is for only one petal
                 {'id': pd.Series(posids, dtype=str),
                  'q': pd.Series(ret_QS['X1'], dtype=np.float64),
                  's': pd.Series(ret_QS['X2'], dtype=np.float64),
@@ -260,7 +261,7 @@ class XYTest(PECS):
                                 f'pos_p_{n}': ret_TP['X2']},
                                dtype=np.float32, index=ret_TP.index)
             self._update(new, i)
-        # combined expected QS from all petals to form a single table
+        # combine expected QS list to form a single dataframe
         expected_QS = pd.concat(expected_QS_list)
         # measure ten petals with FVC after all petals have moved
         measured_QS = self.fvc.measure(expected_QS) \

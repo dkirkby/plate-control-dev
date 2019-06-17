@@ -17,7 +17,7 @@ but will simply our life so much (Duan 2019/05/24)
 
 Added basic FVC simulator (Kevin 2019/05/30)
 
-Added illuminator proxy (Duan 2019/06/07)
+Added illuminator proxy for xy test control over LED (Duan 2019/06/07)
 
 '''
 
@@ -48,7 +48,7 @@ class PECS:
         if not(platemaker_instrument) or not(fvc_role) or not(ptlids):
             from configobj import ConfigObj
             pecs_local = ConfigObj('pecs_local.conf',
-                                    unrepr=True, encoding='utf-8')
+                                   unrepr=True, encoding='utf-8')
             platemaker_instrument = pecs_local['pm_instrument']
             fvc_role = pecs_local['fvc_role']
             ptlids = pecs_local['ptlids']
@@ -67,13 +67,13 @@ class PECS:
             self.fvc = FVC_proxy_sim()
         else:
             self.fvc = FVC(self.platemaker_instrument, fvc_role=self.fvc_role)
-        printfunc('FVC proxy created for instrument',
-                        self.fvc.get('instrument'))
+        printfunc('FVC proxy created for instrument'
+                  + self.fvc.get('instrument'))
         self.ptls = {}  # call petal proxy
         for ptlid in ptlids:
             self.ptls[ptlid] = Petal(petal_id=ptlid)  # no sim state control
             self.printfuncs[ptlid](f'Petal proxy initialised for {ptlid}')
-        #self.illuminator = Illuminator()
+        self.illuminator = Illuminator()
 
     def printfunc(self, msg):
         '''self.printfuncs is a dict indexed by ptlids as specified for input,

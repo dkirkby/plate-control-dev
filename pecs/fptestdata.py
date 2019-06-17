@@ -21,7 +21,7 @@ import pickle
 import numpy as np
 import pandas as pd
 import logging
-from posschedstats import PosSchedStats
+# from posschedstats import PosSchedStats
 import posconstants as pc
 
 idx = pd.IndexSlice
