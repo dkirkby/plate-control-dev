@@ -214,6 +214,8 @@ class XYTest(PECS):
                 self.move_measure(i, n)
             # TODO: make real-time plots as test runs
         self.illuminator.set(led=led_initial)  # restore initial LED state
+        if self.data.test_cfg['make_plots']:
+            self.make_summary_plots()  # plot for all positioners by default
 
     def move_measure(self, i, n):
         '''one complete iteration: move ten petals once, measure once
@@ -260,7 +262,7 @@ class XYTest(PECS):
             self.loggers[ptlid].debug('execute_move() returns expected QS:\n'
                                       + ret_QS.to_string())
             # build expected QS positions for fvc measure
-            # TODO is flag gauranteed to be 4?
+            # TODO: is the flag below gauranteed to be 4?
             expected_QS = pd.DataFrame(  # this is for only one petal
                 {'id': pd.Series(posids, dtype=str),
                  'q': pd.Series(ret_QS['X1'], dtype=np.float64),
@@ -306,7 +308,6 @@ if __name__ == "__main__":
     test = XYTest()
     test.run_xyaccuracy_test()
     test.data.export_move_data()
-    test.make_summary_plots()  # plot for all positioners by default
     test.data.dump_as_one_pickle()
 
 # def unit_test(self):
