@@ -11,9 +11,9 @@ class XY_Offsets(PECS):
         self.clear_angle_margin = 3.0
         self.ptlid = list(self.ptls.keys())[0]
 
-    def seed_vals(self, selection=[],enabled_only=True,auto_update=False):
-        if not selection:
-            posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only).loc[:'DEVICE_ID'])
+    def seed_vals(self, selection=None,enabled_only=False,auto_update=False):
+        if not(selection):
+            posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only).loc[:,'DEVICE_ID'])
         elif selection[0][0] == 'c': #User passed busids
             posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only, busids=selection).loc[:,'DEVICE_ID'])
         else: #assume is a list of posids

@@ -73,7 +73,7 @@ class PECS:
         for ptlid in ptlids:
             self.ptls[ptlid] = Petal(petal_id=ptlid)  # no sim state control
             self.printfuncs[ptlid](f'Petal proxy initialised for {ptlid}')
-        self.illuminator = Illuminator()
+        #self.illuminator = Illuminator() #this crashes don't uncomment this KF 06/18/19
 
     def printfunc(self, msg):
         '''self.printfuncs is a dict indexed by ptlids as specified for input,
