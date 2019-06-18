@@ -166,7 +166,7 @@ class Petal(object):
         self.dev_nonfunctional_bit = 1<<24
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
         self._initialize_pos_flags()
-        #self._apply_state_enable_settings()
+        self._apply_state_enable_settings()
 
         # petalbox setup (temporary until all settings are passed via init by DOS)
         if pb_config == True:
