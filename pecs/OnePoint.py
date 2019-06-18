@@ -15,7 +15,7 @@ class OnePoint(PECS):
         self.ptlid = list(self.ptls.keys())[0]
         self.index = PositionerIndex()
 
-    def one_point_calib(self, selection=None,enabled_only=True,mode='posTP',auto_update=True,tp_target='default'):
+    def one_point_calib(self, selection=None,enabled_only=True,mode='posTP',auto_update=True,tp_target='default', match_radius=80):
         if tp_target == 'default':
             tp_target = [0,self.Eo_phi+self.clear_angle_margin]
         if not selection:
@@ -36,11 +36,12 @@ class OnePoint(PECS):
             expected_positions = self.ptls[self.ptlid].execute_move()
         else:
             expected_positions = self.ptls[self.ptlid].get_positions()
-        rows = expected_positions[expected_positions['DEVICE_ID']=='M03757']
+        old_radius = self.fvc.get('match_radius')
+        self.fvc.set(match_radius=match_radius)
         measured_positions = self.fvc.measure(expected_positions) #may need formatting of measured positons
+        self.fvc.set(match_radius=old_radius)
         measured_positions = pandas.DataFrame(measured_positions)
         measured_positions.rename(columns={'q':'Q','s':'S','flags':'FLAGS', 'id':'DEVICE_ID'},inplace=True)
-        print(measured_positions[measured_positions["DEVICE_ID"]=='M03757'])
         used_positions = measured_positions[measured_positions['DEVICE_ID'].isin(posid_list)]
         dtdp, updates = self.ptls[self.ptlid].test_and_update_TP(used_positions, tp_updates_tol=0.0, tp_updates_fraction=1.0, tp_updates=mode, auto_update=auto_update)
         updates['auto_update'] = auto_update
