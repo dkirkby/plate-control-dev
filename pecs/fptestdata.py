@@ -2,7 +2,7 @@
 """
 Created on Thu May 23 22:18:28 2019
 
-@author: Duan Yutong
+@author: Duan Yutong (dyt@physics.bu.edu)
 
 Store xy test, anti-collision data in a class for debugging.
 Most fields are dictionaries indexed by petal id:
@@ -13,18 +13,23 @@ FPTestData.loggers[petal_id]:       logger which writes new lines to log file
 
 """
 import os
-from datetime import datetime, timezone
+import logging
 from itertools import product
+from datetime import datetime, timezone
 from io import StringIO
 from shutil import copyfileobj
 import pickle
 import numpy as np
 import pandas as pd
-import logging
+import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
 # from posschedstats import PosSchedStats
 import posconstants as pc
 
 idx = pd.IndexSlice
+plt.rcParams.update({'font.family': 'serif',
+                     'mathtext.fontset': 'cm'})
+np.rms = lambda x: np.sqrt(np.mean(np.square(x)))
 
 
 class FPTestData:
@@ -38,7 +43,7 @@ class FPTestData:
         fmt='%(asctime)s %(name)s [%(levelname)s]: %(message)s',
         datefmt=timefmt)
 
-    @property
+    @property  # calling self.now returns properly formatted current timestamp
     def now(self): return datetime.now(timezone.utc).astimezone()
 
     def __init__(self, test_name, test_cfg, petal_cfgs=None):
@@ -59,8 +64,7 @@ class FPTestData:
             f"{self.test_time.strftime(self.timefmtpath)}-{test_name}")
         self.dirs = {ptlid: os.path.join(self.dir, f'PTL{ptlid}')
                      for ptlid in self.ptlids}
-        # set up log files and loggers for each petal
-        self.logs = {}
+        self.logs = {}  # set up log files and loggers for each petal
         self.log_paths = {}
         self.loggers = {}
         for ptlid in self.ptlids:
@@ -159,19 +163,67 @@ class FPTestData:
         names = ['target_no', 'posid']
         index = pd.MultiIndex.from_product(iterables, names=names)
         self.movedf = pd.DataFrame(data=data, index=index)
-        # idx = pd.IndexSlice
-        # df.loc[idx[:, '01', 0], 'timestamp']
-        # df.loc[idx[0, '01', [0,1,2,3]], ['timestamp', 'cycle']]
-        # df.loc[0, '01', :5][['timestamp', 'cycle']]
+
+    def make_summary_plot(self, posid):
+        row = self.posdf.loc[posid]  # row containing calibration values
+        ptlid, offX, offY, r1, r2 = \
+            row[['ptlid', 'OFFSET_X', 'OFFSET_Y', 'LENGTH_R1', 'LENGTH_R2']]
+        rmin, rmax = r1 - r1, r1 + r2  # min and max patrol radii
+        posT = np.sort(row[['targetable_range_T_0', 'targetable_range_T_1']])
+        Tmin, Tmax = posT + row['OFFSET_T']  # min and max targetable obsTheta
+        path = os.path.join(self.dirs[ptlid],
+                            '{}_xyplot_submove_{{}}.pdf'.format(posid))
+        title = (f'XY Accuracy Test {self.now}\n'  # shared by submove plots
+                 f'Positioner {posid} ({self.ntargets} targets)')
+        moves = self.movedf.loc[idx[:, posid]]  # all targets for a posid
+        tgtX, tgtY = moves['target_x'], moves['target_y']  # target obsXY
+        Tmin_line_x = [offX, offX + rmax * np.cos(np.radians(Tmin))]
+        Tmin_line_y = [offY, offY + rmax * np.sin(np.radians(Tmin))]
+        Tmax_line_x = [offX, offX + rmax * np.cos(np.radians(Tmax))]
+        Tmax_line_y = [offY, offY + rmax * np.sin(np.radians(Tmax))]
+        # make one plot for each submove
+        for n in range(self.num_corr_max+1):  # one plot for each submove
+            fig, ax = plt.subplots(figsize=(10, 8))
+            ax.plot(Tmin_line_x, Tmin_line_y, '-', lw=0.5, color='C2',
+                    label=r'$\theta_\mathrm{min}$')  # theta min line
+            ax.plot(Tmax_line_x, Tmax_line_y, '--', lw=0.8, color='C2',
+                    label=r'$\theta_\mathrm{max}$')  # theta max line
+            for r in [rmin, rmax]:  # inner and outer patrol circles
+                c = Circle((offX, offY), r, lw=0.5, color='C0', fill=False)
+                ax.add_patch(c)
+            ax.plot(tgtX, tgtY, 'o', ms=4, color='C3', fillstyle='none',
+                    label=r'target $(x, y)$')  # circles for all target points
+            meaX, meaY = moves[f'meas_x_{n}'], moves[f'meas_y_{n}']
+            ax.plot(meaX, meaY, '+', ms=6, mew=1, color='k',
+                    label=r'measured $(x, y)$')  # measured xy for nth move
+            errXY = moves[f'err_xy_{n}'] * 1000  # convert mm to microns
+            u = r'$\mathrm{\mu m}$'
+            text = (f'SUBMOVE: {n} {u}\n',  # text box for submove errors
+                    f'error max: {np.max(errXY): 6.1f} {u}\n'
+                    f'      rms: {np.max(errXY): 6.1f} {u}\n'
+                    f'      avg: {np.rms(errXY): 6.1f} {u}\n'
+                    f'      min: {np.min(errXY): 6.1f} {u}')
+            ax.text(0.05, 0.95, text, transform=ax.transAxes, fontsize=10,
+                    horizontalalignment='left', verticalalignment='top',
+                    bbox={'boxstyle': 'square', 'alpha': 0.8})
+            ax.grid(True)
+            ax.set_aspect('equal')
+            ax.set_title(title)
+            ax.set_xlabel(r'$x/\mathrm{mm}$')
+            ax.set_ylabel(r'$y/\mathrm{mm}$')
+            ax.legend(loc='upper right', fontsize=8)
+            fig.savefig(path.format(n), bbox_inches='tight')
+            self.loggers[ptlid].info(f'saved xyplot: {path.format(n)}')
 
     def export_move_data(self):
         '''must have writte self.posids_ptl, a dict keyed by ptlid'''
         self.movedf.to_pickle(os.path.join(self.dir, 'move_df.pkl'),
                               compression='gzip')
+        self.logger.info(f'Focal plane move data written to: {self.dir}.')
         self.movedf.to_csv(os.path.join(self.dir, 'move_df.csv'))
         for ptlid in self.ptlids:
             os.makedirs(self.dirs[ptlid], exist_ok=True)
-            def makepath(fn): return os.path.join(self.dirs[ptlid], fn)
+            def makepath(name): return os.path.join(self.dirs[ptlid], name)
             for posid in self.posids_ptl[ptlid]:  # write move data csv
                 df_pos = self.movedf.loc[idx[:, posid], :].droplevel(1)
                 df_pos.to_pickle(makepath(f'{posid}_df.pkl'),
@@ -180,6 +232,8 @@ class FPTestData:
             with open(makepath(f'ptl_{ptlid}_export.log'), 'w') as handle:
                 self.logs[ptlid].seek(0)
                 copyfileobj(self.logs[ptlid], handle)  # write final logs
+            self.loggers[ptlid].info('Petal move data written to: '
+                                     f'{self.dirs[ptlid]}')
 
     def dump_as_one_pickle(self):
         with open(os.path.join(self.dir, 'data_dump.pkl'), 'wb') as handle:

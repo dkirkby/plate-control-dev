@@ -77,7 +77,7 @@ class PosTransforms(object):
                     'OFFSET_P'  : 0.0}
         self.getval = lambda varname: (  # varname is a string
             self.alt[varname] if self.alt_override
-            else self.posmodel.state.read(varname))
+            else self.posmodel.state._val(varname))
 
     # SHAFT RANGES
     def shaft_ranges(self, range_limits):

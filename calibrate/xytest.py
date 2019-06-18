@@ -4,12 +4,11 @@ Created on Fri May 24 17:46:45 2019
 
 @author: Duan Yutong
 """
-
+import os
 import numpy as np
 import pandas as pd
 from pecs import PECS
 import posconstants as pc
-# import pos_xytest_plot
 from fptestdata import FPTestData
 
 idx = pd.IndexSlice  # pandas slice for selecting slice using multiindex
@@ -46,15 +45,15 @@ class XYTest(PECS):
         self.data.posids_ptl    dict with ptlid as key, list of posids as value
                                 posids are sorted
         self.data.posdf         dataframe with posid as index and columns:
-                                ptlid, PETAL_LOC, DEVICE_LOC
-                                for lookup and conversion
+                                ptlid, PETAL_LOC, DEVICE_LOC, calibration
+                                constants and posmodel properties
+                                for lookup and coordinate conversion
                                 every petal block is contiguous and records
                                 within are sorted by posid
-        self.offXY              dict with ptlid as key, 2D offset array of
-                                dimension (2, N_posids) as value
         self.data.movedf        dataframe for positioner move data, with
                                 (target_no, posid) as index and conventional
                                 columns
+        self.data.targets_pos   targets dictionary by posid
     """
 
     def __init__(self, petal_cfgs, xytest_cfg):
@@ -69,13 +68,7 @@ class XYTest(PECS):
         PECS.__init__(self, ptlids=self.data.ptlids, printfunc=printfuncs,
                       simulate=self.data.simulate)
         self._get_pos_info()
-        # create local targets in posXY
-        # TODO: add support for input target and shuffling
-        self.data.targets = self._generate_posXY_targets_grid(  # shape (2, N)
-            self.data.test_cfg['targ_min_radius'],
-            self.data.test_cfg['targ_max_radius'],
-            self.data.test_cfg['n_pts_across_grid'])
-        self.data.ntargets = self.data.targets.shape[1]
+        self.generate_targets()  # generate local targets or load from file
         self.logger.info([
             f'PlateMaker instrument: {self.platemaker_instrument}',
             f'PlateMaker role: {self.fvc.pm_role}',
@@ -87,16 +80,24 @@ class XYTest(PECS):
         self.data.initialise_movedata(self.data.posids, self.data.ntargets)
         self.logger.info(f'Move data tables initialised '
                          f'for {len(self.data.posids)} positioners.')
-        self._read_xy_offsets()
         # TODO: add summarizer functionality if needed?
 
     def _get_pos_info(self):
         '''get enabled positioners, according to given posids or busids
+        also load pos calibration values for each positioner
+        which are not expected to change after each move.
+        read them before test so transform can be more efficient
+        unfortunately all positioner states are stored completely separately,
+        but still we can sort of vectorise the XY and TP transformations
+        which are particularly simple and should been vectorised
         '''
+        keys = ['LENGTH_R1', 'LENGTH_R2', 'OFFSET_X', 'OFFSET_Y',
+                'OFFSET_T', 'OFFSET_P']
+        props = ['targetable_range_T']  # posT to be converted to obsT
         self.data.posids = []
         self.data.posids_ptl = {}
         dfs = []
-        for ptlid in self.data.ptlids:
+        for ptlid in self.data.ptlids:  # TODO: parallelise this?
             mode = self.data.testcfg[ptlid]['mode']
             ptl = self.ptls[ptlid]  # use as a petal app instance
             if mode == 'all':
@@ -111,18 +112,25 @@ class XYTest(PECS):
                 l1 = ptl.get_positioners(enabled_only=True, busids=busids)
             Nr = len(l0)  # number of requested positioners
             Ne = len(l1)  # nubmer of returned enabled postiioners
-            Nd = Nr - Ne  # disabled
+            Nd = Nr - Ne  # number of disabled positioners, inferred
             self.loggers[ptlid].info(f'Number of requested positioners: {Nr}')
             self.loggers[ptlid].info(
                 f'Numbers of enabled and disabled positioners: {Ne}, {Nd}')
-            l1.rename(columns={'DEVICE_ID': 'posid'}, inplace=True)
+            l1 = l1.rename(columns={'DEVICE_ID': 'posid'})
             l1 = l1.set_index('posid').sort_index()  # posids sorted within ptl
+            self.data.posids_ptl[ptlid] = posids = l1.index.to_list()
+            self.data.posids += posids
+            # add to existing positioner index table, first calibration values
             l1['ptlid'] = ptlid  # add petal id as string column
-            dfs.append(l1)
-            self.data.posids_ptl[ptlid] = l1.index.tolist()
-            self.data.posids += l1.index.tolist()
-        self.data.posdf = pd.concat(dfs, ignore_index=True)
-        # write ptlid to movedf
+            ret1 = self.get_pos_vals(keys, posids).set_index('posid')
+            self.loggers[ptlid].debug(f'XY offsets read:\n{ret1.to_string()}')
+            # read posmodel properties, for now just targetable_range_T
+            ret2 = self.get_posmodel_prop(props, posids).set_index('posid')
+            self.loggers[ptlid].debug(f'PosModel properties read:\n'
+                                      f'{ret2.to_string()}')
+            dfs.append(l1.join(ret1).join(ret2))
+        self.data.posdf = pd.concat(dfs)
+        # write ptlid column to movedf
         self.data.movedf = self.data.movedf.merge(
             self.data.posdf['ptlid'].reset_index(), on='posid',
             right_index=True)
@@ -134,27 +142,37 @@ class XYTest(PECS):
         mask = (rmin < r) & (r < rmax)
         return np.array([x[mask], y[mask]])  # return 2 x N array of targets
 
+    def generate_targets(self):
+        path = self.data.test_cfg['input_targs_file']
+        if path is None:  # no targets supplied, create local targets in posXY
+            tgt = self._generate_posXY_targets_grid(
+                self.data.test_cfg['targ_min_radius'],
+                self.data.test_cfg['targ_max_radius'],
+                self.data.test_cfg['n_pts_across_grid']).T  # shape (N, 2)
+        else:  # input target table shoud have two colummns (posX, posY)
+            assert os.path.isfile(path), f'Invald target file path: {path}'
+            tgt = np.genfromtxt(path, delimiter=',')  # load csv file
+            assert tgt.shape[1] == 2, 'Targets should be of dimension (N, 2)'
+        self.data.targets = tgt
+        self.data.ntargets = tgt.shape[0]  # shape (N_targets, 2)
+        if self.data.test_cfg['shuffle_targets']:  # target shuffling
+            if self.data.test_cfg['shuffle_seed'] is None:  # posid as seed
+                self.data.targets_pos = {}  # different targets for each pos
+                for posid in self.data.posids:
+                    np.random.seed(int(posid[1:]))  # only the numeral part
+                    np.random.shuffle(tgt)  # numpy shuffles in place
+                    self.data.targets_pos[posid] = tgt  # shape (N, 2)
+            else:  # use the same given seed for all posids
+                np.random.seed(self.data.test_cfg['shuffle_seed'])
+                np.random.shuffle(tgt)  # same shuffled target list for all
+                self.data.targets_pos = {pid: tgt for pid in self.data.posids}
+
     def _add_posid_col(self, df, ptlid):
         '''when df only has DEVICE_LOC, add posids column and use as index
         '''
         df0 = self.data.posdf[self.data.posdf['ptlid'] == ptlid]
         return df.merge(df0, on=['PETAL_LOC', 'DEVICE_LOC'],
                         left_index=True).sort_index()
-
-    def _read_xy_offsets(self):
-        '''xy offsets for each positioner are not expected to change after
-        each move. read them before test so transform can be more efficient
-
-        unfortunately all positioner states are stored comppletely separately,
-        but still we can sort of vectorise posXY_to_obsXY which is
-        particularly simple and should have been vectorised
-        '''
-        self.offXY = {}  # keys are ptlids, each array of shape (2, N_posids)
-        for ptlid in self.data.ptlids:  # TODO: parallelise this?
-            posids = self.data.posids_ptl[ptlid]
-            ret = self.ptls[ptlid].read_offsets_xy(posids)  # pd.df format
-            self.offXY[ptlid] = ret.values.T  # np array of (2, N_posids)
-            self.loggers[ptlid].debug(f'XY offsets read:\n{ret.to_string()}')
 
     def _update(self, newdf, i):
         '''newdf is single-index on posid only'''
@@ -171,7 +189,7 @@ class XYTest(PECS):
         # self.ptls[ptlid].states[posid].log_basename
         for ptlid in self.data.ptlids:
             ptl, posids = self.ptls[ptlid], self.data.posids_ptl[ptlid]
-            cycles = ptl.read_pos_state(posids, 'TOTAL_MOVE_SEQUENCES') \
+            cycles = ptl.get_pos_state(posids, 'TOTAL_MOVE_SEQUENCES') \
                 .set_index('posid')
             # TODO: store other posstate stuff here
             newdf = pd.DataFrame({'posid': posids, 'cycle': cycles})
@@ -190,16 +208,14 @@ class XYTest(PECS):
         led_initial = self.illuminator.get('led')
         self.illuminator.set(led='ON')  # turn on illuminator
         for i in range(self.data.ntargets):  # test loop over all test targets
-            posXY = self.data.targets[:, i].reshape(2, 1)
-            self.logger.info([f'target {i+1} of {self.ntargets}, ',
-                              f'posXY = {posXY}'])
+            self.logger.info(f'target {i+1} of {self.ntargets}')
             self.record_basic_move_data(i)  # for each target, record basics
             for n in range(self.data.num_corr_max + 1):
                 self.move_measure(i, n)
-            # TODO: make plots after each target completes
+            # TODO: make real-time plots as test runs
         self.illuminator.set(led=led_initial)  # restore initial LED state
 
-    def move_measure(self, i, n, posXY):
+    def move_measure(self, i, n):
         '''one complete iteration: move ten petals once, measure once
         ith target, nth move'''
         movedf = self.data.movedf
@@ -207,37 +223,39 @@ class XYTest(PECS):
         # TODO: parallelise this and have ten petals run simultaneously
         expected_QS_list = []  # each item is a dataframe for one petal
         for ptlid in self.data.ptlids:
-            posids = self.data.posids_ptl[ptlid]  # all data ordered by this
+            posids = self.data.posids_ptl[ptlid]  # all records obey this order
             ptl = self.ptls[ptlid]
             device_loc = self.data.posdf.loc[posids, 'DEVICE_LOC']
             if n == 0:  # blind move
+                posXY = np.vstack(   # shape (N_posids, 2)
+                    [self.data.targets_pos[posid][i, :] for posid in posids])
                 movetype, cmd = 'blind', 'obxXY'
-                target = obsXY = posXY + self.offXY[ptlid]
-                movedf.loc[idx[i, posids], ['target_x', 'target_y']] = obsXY.T
+                offXY = self.data.posdf.loc[posids, ['OFFSET_X', 'OFFSET_Y']]
+                tgt = posXY + offXY.values  # convert to obsXY, shape (N, 2)
+                movedf.loc[idx[i, posids], ['target_x', 'target_y']] = tgt
             else:
                 movetype, cmd = 'corrective', 'dXdY'
-                target = - movedf.loc[idx[i, posids],  # note minus sign
-                                      [f'err_x_{n-1}', f'err_y_{n-1}']].T
+                tgt = - movedf.loc[idx[i, posids],  # note minus sign
+                                   [f'err_x_{n-1}', f'err_y_{n-1}']].values
             # build move request dataframe for a petal
             note = (f'xy test: {self.data.test_name}; '  # same for all
                     f'target {i+1} of {self.ntargets}; '
                     f'move {n} ({movetype})')
-            req_dict = {'DEVICE_LOC': device_loc,
-                        'COMMAND': cmd,
-                        'TARGET_X1': target[0, :],
-                        'TARGET_X2': target[1, :],
-                        'LOG_NOTE': note}
-            requests = pd.DataFrame(data=req_dict)
-            # TODO: anti collision schedule rejection needs to be recorded
+            req = pd.DataFrame({'DEVICE_LOC': device_loc,
+                                'COMMAND': cmd,
+                                'TARGET_X1': tgt[:, 0],  # shape (N_posids, 2)
+                                'TARGET_X2': tgt[:, 1],  # shape (N_posids, 2)
+                                'LOG_NOTE': note})
+            # TODO: anti-collision schedule rejection needs to be recorded
             accepted_requests = ptl.prepare_move(
-                requests, anticollision=self.data.anticollision)
+                req, anticollision=self.data.anticollision)
             self.loggers[ptlid].debug(  # already keyed by posids
                 'prepare_move() returns accepted requests:\n'
                 + pd.DataFrame(accepted_requests).to_string())
             # execute move, make sure return df has proper format for logging
             ret_QS = ptl.execute_move(posids=posids, return_coord='QS')
             # ensure the same set of devices are returned after execution
-            assert set(req_dict['DEVICE_LOC']) == set(ret_QS['DEVICE_LOC'])
+            assert set(req['DEVICE_LOC']) == set(ret_QS['DEVICE_LOC'])
             ret_QS = self._add_posid_col(ret_QS, ptlid)  # add posid column
             self.loggers[ptlid].debug('execute_move() returns expected QS:\n'
                                       + ret_QS.to_string())
@@ -277,41 +295,50 @@ class XYTest(PECS):
         self._update(new, i)
         self.calculate_xy_errors(i, n)
 
-    # def unit_test(self):
-    #     num_corr_max = 3
-    #     i = 0
-    #     n = 0
-    #     # return of execute move and get positions
-    #     posids = ['M01525', 'M01527', 'M01545', 'M01588', 'M01589',
-    #               'M01625', 'M01662', 'M01699', 'M01704', 'M01945']
-    #     PETAL_LOC = 3
-    #     DEVICE_LOC = np.arange(10)
-    #     X1 = np.random.rand(10)
-    #     X2 = np.random.rand(10)
-    #     FLAGS = [4] * 10
-    #     ptlid = '01'
-    #     ret = pd.DataFrame({'PETAL_LOC': PETAL_LOC,
-    #                         'DEVICE_LOC': DEVICE_LOC[::-1],
-    #                         'X1': X1,
-    #                         'X2': X2,
-    #                         'FLAGS': FLAGS})
-    #     posdf1 = pd.DataFrame({'posid': posids,
-    #                            'ptlid': '09',
-    #                            'PETAL_LOC': PETAL_LOC,
-    #                            'DEVICE_LOC': DEVICE_LOC})
-    #     posdf2 = pd.DataFrame({'posid': posids,
-    #                            'ptlid': '01',
-    #                            'PETAL_LOC': PETAL_LOC,
-    #                            'DEVICE_LOC': DEVICE_LOC})
-    #     posdf = pd.concat([posdf1, posdf2],
-    #                       ignore_index=True).set_index('posid')
-    #     df0 = posdf[posdf['ptlid'] == ptlid]
-    #     ret.merge(df0, left_index=True,
-    #               on=['PETAL_LOC', 'DEVICE_LOC']).sort_index()
+    def make_summary_plots(self, posids=None):
+        if posids is None:
+            posids = self.data.posids
+        for posid in posids:
+            self.data.make_summary_plot(posid)
 
 
 if __name__ == "__main__":
     test = XYTest()
     test.run_xyaccuracy_test()
     test.data.export_move_data()
+    test.make_summary_plots()  # plot for all positioners by default
     test.data.dump_as_one_pickle()
+
+# def unit_test(self):
+#     num_corr_max = 3
+#     i = 0
+#     n = 0
+#     # return of execute move and get positions
+#     posids = ['M01525', 'M01527', 'M01545', 'M01588', 'M01589',
+#               'M01625', 'M01662', 'M01699', 'M01704', 'M01945']
+#     PETAL_LOC = 3
+#     DEVICE_LOC = np.arange(10)
+#     X1 = np.random.rand(10)
+#     X2 = np.random.rand(10)
+#     FLAGS = [4] * 10
+#     ptlid = '01'
+#     ret = pd.DataFrame({'PETAL_LOC': PETAL_LOC,
+#                         'DEVICE_LOC': DEVICE_LOC[::-1],
+#                         'X1': X1,
+#                         'X2': X2,
+#                         'FLAGS': FLAGS})
+#     posdf1 = pd.DataFrame({'posid': posids,
+#                            'ptlid': '09',
+#                            'PETAL_LOC': PETAL_LOC,
+#                            'DEVICE_LOC': DEVICE_LOC})
+#     posdf2 = pd.DataFrame({'posid': posids,
+#                            'ptlid': '01',
+#                            'PETAL_LOC': PETAL_LOC,
+#                            'DEVICE_LOC': DEVICE_LOC})
+#     posdf2 = pd.DataFrame({'posid': posids,
+#                            'OFFSET_X': 0.3})
+#     posdf = pd.concat([posdf1, posdf2],
+#                       ignore_index=True).set_index('posid')
+#     df0 = posdf[posdf['ptlid'] == ptlid]
+#     ret.merge(df0, left_index=True,
+#               on=['PETAL_LOC', 'DEVICE_LOC']).sort_index()
