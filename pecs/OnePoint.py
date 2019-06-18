@@ -36,20 +36,22 @@ class OnePoint(PECS):
             expected_positions = self.ptls[self.ptlid].execute_move()
         else:
             expected_positions = self.ptls[self.ptlid].get_positions()
+        rows = expected_positions[expected_positions['DEVICE_ID']=='M03757']
         measured_positions = self.fvc.measure(expected_positions) #may need formatting of measured positons
         measured_positions = pandas.DataFrame(measured_positions)
         measured_positions.rename(columns={'q':'Q','s':'S','flags':'FLAGS', 'id':'DEVICE_ID'},inplace=True)
-        used_positions = measured_positions['DEVICE_ID'].isin(posid_list)
+        print(measured_positions[measured_positions["DEVICE_ID"]=='M03757'])
+        used_positions = measured_positions[measured_positions['DEVICE_ID'].isin(posid_list)]
         dtdp, updates = self.ptls[self.ptlid].test_and_update_TP(used_positions, tp_updates_tol=0.0, tp_updates_fraction=1.0, tp_updates=mode, auto_update=auto_update)
         updates['auto_update'] = auto_update
-        updates['tp_target'] = tp_target
+        updates['tp_target'] = [tp_target for i in range(len(updates))]
         updates['enabled_only'] = enabled_only
         return dtdp, updates
 
 if __name__ == '__main__':
     op = OnePoint()
     user_text = input('Please list BUSIDs or POSIDs (not both) seperated by spaces, leave it blank to use all on petal: ')
-    if user_test != '':
+    if user_text != '':
         user_text = user_text.split()
         selection = []
         for item in user_text:
