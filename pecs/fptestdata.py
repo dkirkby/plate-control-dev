@@ -166,11 +166,11 @@ class FPTestData:
 
     def make_summary_plot(self, posid):
         row = self.posdf.loc[posid]  # row containing calibration values
-        ptlid, offX, offY, r1, r2 = \
-            row[['ptlid', 'OFFSET_X', 'OFFSET_Y', 'LENGTH_R1', 'LENGTH_R2']]
+        ptlid, offX, offY, r1, r2, posT = row[
+            ['ptlid', 'OFFSET_X', 'OFFSET_Y', 'LENGTH_R1', 'LENGTH_R2',
+             'targetable_range_T']]
         rmin, rmax = r1 - r1, r1 + r2  # min and max patrol radii
-        posT = np.sort(row[['targetable_range_T_0', 'targetable_range_T_1']])
-        Tmin, Tmax = posT + row['OFFSET_T']  # min and max targetable obsTheta
+        Tmin, Tmax = np.sort(posT) + row['OFFSET_T']  # targetable obsTheta
         path = os.path.join(self.dirs[ptlid],
                             '{}_xyplot_submove_{{}}.pdf'.format(posid))
         title = (f'XY Accuracy Test {self.now}\n'  # shared by submove plots

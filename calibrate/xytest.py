@@ -155,7 +155,7 @@ class XYTest(PECS):
             assert tgt.shape[1] == 2, 'Targets should be of dimension (N, 2)'
         self.data.targets = tgt
         self.data.ntargets = tgt.shape[0]  # shape (N_targets, 2)
-        if self.data.test_cfg['shuffle_targets']:  # target shuffling
+        if self.data.test_cfg['shuffle_targets']:  # target shuffling logic
             if self.data.test_cfg['shuffle_seed'] is None:  # posid as seed
                 self.data.targets_pos = {}  # different targets for each pos
                 for posid in self.data.posids:
@@ -189,11 +189,10 @@ class XYTest(PECS):
         # self.ptls[ptlid].states[posid].log_basename
         for ptlid in self.data.ptlids:
             ptl, posids = self.ptls[ptlid], self.data.posids_ptl[ptlid]
-            cycles = ptl.get_pos_state(posids, 'TOTAL_MOVE_SEQUENCES') \
+            cycles = ptl.get_pos_vals(['TOTAL_MOVE_SEQUENCES'], posids) \
                 .set_index('posid')
             # TODO: store other posstate stuff here
-            newdf = pd.DataFrame({'posid': posids, 'cycle': cycles})
-            self._update(newdf, i)
+            self._update(cycles, i)
 
     def calculate_xy_errors(self, i, n):
         movedf = self.data.movedf
