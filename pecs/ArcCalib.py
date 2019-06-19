@@ -24,28 +24,38 @@ class Arc(PECS):
         T_data = []
         old_radius = self.fvc.get('match_radius')
         self.fvc.set(match_radius=match_radius)
+        i = 1
         for request in requests_list_T:
+            print('Measuring theta arc point '+str(i)+' of '+str(len(requests_list_T)))
+            i += 1 
             self.ptls[self.ptlid].prepare_move(request)
             expected_positions = self.ptls[self.ptlid].execute_move()
             measured_positions = self.fvc.measure(expected_positions)
             measured_positions = pandas.DataFrame(measured_positions)
             measured_positions.rename(columns={'q':'MEASURED_Q','s':'MEASURED_S','flags':'FLAGS', 'id':'DEVICE_ID'},inplace=True)
             used_positions = measured_positions[measured_positions['DEVICE_ID'].isin(posid_list)]
-            request.rename(columns={'X1':'TARGET_T','X2':'TARGET_P'})
-            used_positions.merge(request, how='outer',on='DEVICE_ID')
-            T_data.append(used_positions)
+            request.rename(columns={'TARGET_X1':'TARGET_T','TARGET_X2':'TARGET_P'},inplace=True)
+            merged = used_positions.merge(request, how='outer',on='DEVICE_ID')
+            T_data.append(merged)
         P_data = []
+        i = 1
         for request in requests_list_P:
+            print('Measuring phi arc point '+str(i)+' of '+str(len(requests_list_P)))
+            i += 1
             self.ptls[self.ptlid].prepare_move(request)
             expected_positions = self.ptls[self.ptlid].execute_move()
             measured_positions = self.fvc.measure(expected_positions)
             measured_positions = pandas.DataFrame(measured_positions)
             measured_positions.rename(columns={'q':'MEASURED_Q','s':'MEASURED_S','flags':'FLAGS', 'id':'DEVICE_ID'},inplace=True)
             used_positions = measured_positions[measured_positions['DEVICE_ID'].isin(posid_list)]
-            request.rename(columns={'X1':'TARGET_T','X2':'TARGET_P'})
-            used_positions.merge(request, how='outer',on='DEVICE_ID')
-            P_data.append(used_positions)
+            request.rename(columns={'TARGET_X1':'TARGET_T','TARGET_X2':'TARGET_P'},inplace=True)
+            merged = used_positions.merge(request, how='outer',on='DEVICE_ID')
+            P_data.append(merged)
         self.fvc.set(match_radius=old_radius)
+        #for i in range(len(P_data)):
+        #    P_data[i].to_csv('real_data_P_' + str(i) + '.csv')
+        #for i in range(len(T_data)):
+        #    T_data[i].to_csv('real_data_T_' + str(i) + '.csv')
         data = self.ptls[self.ptlid].calibrate_from_arc_data(T_data,P_data,auto_update=auto_update)
         data['auto_update'] = auto_update
         data['enabled_only'] = enabled_only
