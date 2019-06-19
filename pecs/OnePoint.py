@@ -43,11 +43,11 @@ class OnePoint(PECS):
         measured_positions = pandas.DataFrame(measured_positions)
         measured_positions.rename(columns={'q':'Q','s':'S','flags':'FLAGS', 'id':'DEVICE_ID'},inplace=True)
         used_positions = measured_positions[measured_positions['DEVICE_ID'].isin(posid_list)]
-        dtdp, updates = self.ptls[self.ptlid].test_and_update_TP(used_positions, tp_updates_tol=0.0, tp_updates_fraction=1.0, tp_updates=mode, auto_update=auto_update)
+        updates = self.ptls[self.ptlid].test_and_update_TP(used_positions, tp_updates_tol=0.0, tp_updates_fraction=1.0, tp_updates=mode, auto_update=auto_update)
         updates['auto_update'] = auto_update
         updates['tp_target'] = [tp_target for i in range(len(updates))]
         updates['enabled_only'] = enabled_only
-        return dtdp, updates
+        return updates
 
 if __name__ == '__main__':
     op = OnePoint()
@@ -64,7 +64,7 @@ if __name__ == '__main__':
         mode = 'posTP'
     else:
         mode = user_text
-    dtdp, updates = op.one_point_calib(selection=selection, mode=mode)
+    updates = op.one_point_calib(selection=selection, mode=mode)
     print(updates)
     updates.to_csv('one_point_'+pc.filename_timestamp_str_now()+'.csv')
     
