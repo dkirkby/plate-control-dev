@@ -36,6 +36,7 @@ class OnePoint(PECS):
             expected_positions = self.ptls[self.ptlid].execute_move()
         else:
             expected_positions = self.ptls[self.ptlid].get_positions()
+        expected_positions.to_csv('test.csv')
         old_radius = self.fvc.get('match_radius')
         self.fvc.set(match_radius=match_radius)
         measured_positions = self.fvc.measure(expected_positions) #may need formatting of measured positons
