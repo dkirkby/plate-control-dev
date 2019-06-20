@@ -116,23 +116,22 @@ class XYTest(PECS):
             self.loggers[ptlid].info(f'Number of requested positioners: {Nr}')
             self.loggers[ptlid].info(
                 f'Numbers of enabled and disabled positioners: {Ne}, {Nd}')
-            l1 = l1.rename(columns={'DEVICE_ID': 'posid'})
-            l1 = l1.set_index('posid').sort_index()  # posids sorted within ptl
+            l1 = l1.set_index('DEVICE_ID').sort_index()  # sorted within ptl
             self.data.posids_ptl[ptlid] = posids = l1.index.to_list()
             self.data.posids += posids
             # add to existing positioner index table, first calibration values
-            l1['ptlid'] = ptlid  # add petal id as string column
-            ret1 = self.get_pos_vals(keys, posids).set_index('posid')
+            l1['PETAL_ID'] = ptlid  # add petal id as string column
+            ret1 = self.get_pos_vals(keys, posids).set_index('DEVICE_ID')
             self.loggers[ptlid].debug(f'XY offsets read:\n{ret1.to_string()}')
             # read posmodel properties, for now just targetable_range_T
-            ret2 = self.get_posmodel_prop(props, posids).set_index('posid')
+            ret2 = self.get_posmodel_prop(props, posids).set_index('DEVICE_ID')
             self.loggers[ptlid].debug(f'PosModel properties read:\n'
                                       f'{ret2.to_string()}')
             dfs.append(l1.join(ret1).join(ret2))
         self.data.posdf = pd.concat(dfs)
         # write ptlid column to movedf
         self.data.movedf = self.data.movedf.merge(
-            self.data.posdf['ptlid'].reset_index(), on='posid',
+            self.data.posdf['PETAL_ID'].reset_index(), on='DEVICE_ID',
             right_index=True)
 
     @staticmethod
@@ -170,7 +169,7 @@ class XYTest(PECS):
     def _add_posid_col(self, df, ptlid):
         '''when df only has DEVICE_LOC, add posids column and use as index
         '''
-        df0 = self.data.posdf[self.data.posdf['ptlid'] == ptlid]
+        df0 = self.data.posdf[self.data.posdf['PETAL_ID'] == ptlid]
         return df.merge(df0, on=['PETAL_LOC', 'DEVICE_LOC'],
                         left_index=True).sort_index()
 
@@ -190,7 +189,7 @@ class XYTest(PECS):
         for ptlid in self.data.ptlids:
             ptl, posids = self.ptls[ptlid], self.data.posids_ptl[ptlid]
             cycles = ptl.get_pos_vals(['TOTAL_MOVE_SEQUENCES'], posids) \
-                .set_index('posid')
+                .set_index('DEVICE_ID')
             # TODO: store other posstate stuff here
             self._update(cycles, i)
 
@@ -284,7 +283,7 @@ class XYTest(PECS):
         expected_QS = pd.concat(expected_QS_list)
         # measure ten petals with FVC after all petals have moved
         measured_QS = self.fvc.measure(expected_QS) \
-            .rename(columns={'id': 'posid'}).set_index('posid')
+            .rename(columns={'id': 'DEVICE_ID'}).set_index('DEVICE_ID')
         # TODO: handle spotmatch errors? no return code from FVC proxy?
         # TODO: if measured position is [0, 0], disable positioner?
         # calculate measured obsXY from measured QS and write to movedf
