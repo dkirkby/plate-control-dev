@@ -23,7 +23,7 @@ class Rehome(PECS):
 
 if __name__ == '__main__':
     rh = rehome_pos()
-    print('WARNING: this script will drive positioners to their hardstops. Be sure you know what you are doing!')
+    warning = input('WARNING: this script will drive positioners to their hardstops. Be sure you know what you are doing! (enter to continue)')
     user_text = input('Please list BUSIDs or POSIDs (not both) seperated by spaces, leave it blank to use all on petal: ')
     if user_text != '':
         user_text = user_text.split()
@@ -33,5 +33,8 @@ if __name__ == '__main__':
     else:
         selection = None
     user_text = input('Please provide axis (both, theta_only, phi_only): ')
-    rh.rehome(selection=selection, axis=user_text)
+    if not(user_text in ['both','theta_only','phi_only']):
+        print('Invalid input!')
+    else:
+        rh.rehome(selection=selection, axis=user_text)
     print('Done!')
