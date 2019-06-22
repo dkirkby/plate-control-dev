@@ -65,7 +65,7 @@ if __name__ == '__main__':
         mode = 'posTP'
     else:
         mode = user_text
-    updates = op.one_point_calib(selection=selection, mode=mode)
+    updates = op.one_point_calib(selection=selection, mode=mode, tp_target=[0,170])
     print(updates)
     updates.to_csv('one_point_'+pc.filename_timestamp_str_now()+'.csv')
     

@@ -52,10 +52,6 @@ class Arc(PECS):
             merged = used_positions.merge(request, how='outer',on='DEVICE_ID')
             P_data.append(merged)
         self.fvc.set(match_radius=old_radius)
-        #for i in range(len(P_data)):
-        #    P_data[i].to_csv('real_data_P_' + str(i) + '.csv')
-        #for i in range(len(T_data)):
-        #    T_data[i].to_csv('real_data_T_' + str(i) + '.csv')
         data = self.ptls[self.ptlid].calibrate_from_arc_data(T_data,P_data,auto_update=auto_update)
         data['auto_update'] = auto_update
         data['enabled_only'] = enabled_only

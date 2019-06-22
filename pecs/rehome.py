@@ -22,7 +22,7 @@ class Rehome(PECS):
         self.ptls[self.ptlid].rehome_pos(posid_list, axis=axis)
 
 if __name__ == '__main__':
-    rh = rehome_pos()
+    rh = Rehome()
     warning = input('WARNING: this script will drive positioners to their hardstops. Be sure you know what you are doing! (enter to continue)')
     user_text = input('Please list BUSIDs or POSIDs (not both) seperated by spaces, leave it blank to use all on petal: ')
     if user_text != '':

@@ -12,7 +12,7 @@ class Grid(PECS):
         self.ptlid = list(self.ptls.keys())[0]
         return
 
-    def grid_calibration(self,selection=None,n_points_P=9, n_points_T=4,enabled_only=True,auto_update=True,match_radius=80.0):
+    def grid_calibration(self,selection=None,n_points_P=4, n_points_T=9,enabled_only=True,auto_update=True,match_radius=80.0):
         if not selection:
             posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only).loc[:,'DEVICE_ID'])
         elif posids[0][0] == 'c': #User passed busids
@@ -29,7 +29,6 @@ class Grid(PECS):
             i += 1 
             self.ptls[self.ptlid].prepare_move(request)
             expected_positions = self.ptls[self.ptlid].execute_move()
-            expected_positions.to_csv('oh_no_'+str(i)+'.csv')
             measured_positions = self.fvc.measure(expected_positions)
             measured_positions = pandas.DataFrame.from_dict(measured_positions)
             measured_positions.rename(columns={'q':'MEASURED_Q','s':'MEASURED_S','flags':'FLAGS', 'id':'DEVICE_ID'},inplace=True)
