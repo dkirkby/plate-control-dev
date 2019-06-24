@@ -69,5 +69,5 @@ if __name__ == '__main__':
         selection = None
     data = arc.arc_calibration(selection=selection)
     print(data)
-    data.to_csv('arc_calibration_'+pc.filename_timestamp_str_now()+'.csv')
+    data.to_csv(pc.dirs['ALL_LOGS']+'/calib_logs/arc_calibration_'+pc.filename_timestamp_str_now()+'.csv')
     
