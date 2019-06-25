@@ -849,7 +849,7 @@ class Petal(object):
         if log_note:
             for state in self.altered_states:
                 state.next_log_notes.append(log_note)
-        if self.db_commit_on:
+        if self.db_commit_on and not(self.simulator_on):
             pos_commit_list = []
             fid_commit_list = []
             for state in self.altered_states:
@@ -862,7 +862,7 @@ class Petal(object):
             if len(fid_commit_list) != 0:
                 self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid_data')
         # avoid overwriting local config data and logs when testing in simulator mode
-        # but stills allows DB commits above
+        # but stills allows DB commits above #changed by kevin 6/25/19
         if not self.simulator_on:
             if self.local_commit_on:
                 for state in self.altered_states:
@@ -877,7 +877,7 @@ class Petal(object):
         sequence. No local commit option since local calibration recordings are andled in the
         commit function.
         ''' 
-        if self.db_commit_on:
+        if self.db_commit_on and not(self.simulator_on):
             pos_commit_list = []
             fid_commit_list = []
             for state in self.altered_calib_states:
