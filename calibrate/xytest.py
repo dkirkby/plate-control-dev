@@ -242,8 +242,8 @@ class XYTest(PECS):
                     f'move {n} ({movetype})')
             req = pd.DataFrame({'DEVICE_LOC': device_loc,
                                 'COMMAND': cmd,
-                                'X1': tgt[:, 0],  # shape (N_posids, 2)
-                                'X2': tgt[:, 1],  # shape (N_posids, 2)
+                                'X1': tgt[:, 0],  # shape (N_posids, 1)
+                                'X2': tgt[:, 1],  # shape (N_posids, 1)
                                 'LOG_NOTE': note})
             # TODO: anti-collision schedule rejection needs to be recorded
             accepted_requests = ptl.prepare_move(

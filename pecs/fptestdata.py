@@ -70,6 +70,9 @@ class FPTestData:
         for ptlid in self.ptlids:
             self.log_paths[ptlid] = os.path.join(self.dirs[ptlid],
                                                  f'ptl_{ptlid}_realtime.log')
+            # ensure save directory and log file exist if they don't already
+            os.makedirs(self.dirs[ptlid], exist_ok=True)
+            open(self.log_paths[ptlid], 'a').close()
             # create virtual file object for storing log entries
             # using stringio because it supports write() and flush()
             log = StringIO(newline='\n')
@@ -221,7 +224,6 @@ class FPTestData:
         self.logger.info(f'Focal plane move data written to: {self.dir}.')
         self.movedf.to_csv(os.path.join(self.dir, 'move_df.csv'))
         for ptlid in self.ptlids:
-            os.makedirs(self.dirs[ptlid], exist_ok=True)
             def makepath(name): return os.path.join(self.dirs[ptlid], name)
             for posid in self.posids_ptl[ptlid]:  # write move data csv
                 df_pos = self.movedf.loc[idx[:, posid], :].droplevel(1)
