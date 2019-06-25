@@ -33,7 +33,7 @@ class Grid(PECS):
             measured_positions = pandas.DataFrame.from_dict(measured_positions)
             measured_positions.rename(columns={'q':'MEASURED_Q','s':'MEASURED_S','flags':'FLAGS', 'id':'DEVICE_ID'},inplace=True)
             used_positions = measured_positions[measured_positions['DEVICE_ID'].isin(posid_list)]
-            request.rename(columns={'TARGET_X1':'TARGET_T','TARGET_X2':'TARGET_P'}, inplace=True)
+            request.rename(columns={'X1':'TARGET_T','X2':'TARGET_P'}, inplace=True)
             merged_data = used_positions.merge(request, how='outer',on='DEVICE_ID')
             meas_data.append(merged_data)
         self.fvc.set(match_radius=old_radius)

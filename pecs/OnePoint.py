@@ -28,8 +28,8 @@ class OnePoint(PECS):
             requests = {'DEVICE_ID':[],'TARGET_X1':[],'TARGET_X2':[],'LOG_NOTE':[],'COMMAND':[]}
             for posid in posid_list:
                 requests['DEVICE_ID'].append(posid)
-                requests['TARGET_X1'].append(tp_target[0])
-                requests['TARGET_X2'].append(tp_target[1])
+                requests['X1'].append(tp_target[0])
+                requests['X2'].append(tp_target[1])
                 requests['LOG_NOTE'].append('One point calibration ' + mode)
                 requests['COMMAND'].append('posTP')
             self.ptls[self.ptlid].prepare_move(pandas.DataFrame.from_dict(requests))
