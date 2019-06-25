@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from pecs import PECS
 import posconstants as pc
+from configobj import ConfigObj
 from fptestdata import FPTestData
 
 idx = pd.IndexSlice  # pandas slice for selecting slice using multiindex
@@ -37,7 +38,6 @@ class XYTest(PECS):
     and fvc_role that work for all ten petals.
 
     Input:
-        petal_cfgs:     list of petal config objects, one for each petal
         xytest_cfg:     one config object for xy test settings
 
     Useful attributes:
@@ -56,17 +56,16 @@ class XYTest(PECS):
         self.data.targets_pos   targets dictionary by posid
     """
 
-    def __init__(self, petal_cfgs, xytest_cfg):
+    def __init__(self, xytest_cfg):
         """Templates for config are found on svn
         https://desi.lbl.gov/svn/code/focalplane/fp_settings/hwsetups/
         https://desi.lbl.gov/svn/code/focalplane/fp_settings/test_settings/
         """
-        self.data = FPTestData(xytest_cfg.filename, petal_cfgs, xytest_cfg)
+        self.data = FPTestData(xytest_cfg.filename, xytest_cfg)
         self.loggers = self.data.loggers  # use these loggers to write to logs
         self.logger = self.data.logger
         printfuncs = {pid: self.loggers[pid].info for pid in self.data.ptlids}
-        PECS.__init__(self, ptlids=self.data.ptlids, printfunc=printfuncs,
-                      simulate=self.data.simulate)
+        PECS.__init__(self, ptlids=self.data.ptlids, printfunc=printfuncs)
         self._get_pos_info()
         self.generate_targets()  # generate local targets or load from file
         self.logger.info([
@@ -303,41 +302,11 @@ class XYTest(PECS):
 
 
 if __name__ == "__main__":
-    test = XYTest()
+    test_filename = "xytest_ptl3.cfg"  # specify filename before starting test
+    path = os.path.join(os.environ['TEST_BASE_PATH'], 'fp_settings',
+                        'test_settings', test_filename)  # built path to cfg
+    test_cfg = ConfigObj(path, unrepr=True)  # load xytest config
+    test = XYTest(test_cfg)
     test.run_xyaccuracy_test()
     test.data.export_move_data()
     test.data.dump_as_one_pickle()
-
-# def unit_test(self):
-#     num_corr_max = 3
-#     i = 0
-#     n = 0
-#     # return of execute move and get positions
-#     posids = ['M01525', 'M01527', 'M01545', 'M01588', 'M01589',
-#               'M01625', 'M01662', 'M01699', 'M01704', 'M01945']
-#     PETAL_LOC = 3
-#     DEVICE_LOC = np.arange(10)
-#     X1 = np.random.rand(10)
-#     X2 = np.random.rand(10)
-#     FLAGS = [4] * 10
-#     ptlid = '01'
-#     ret = pd.DataFrame({'PETAL_LOC': PETAL_LOC,
-#                         'DEVICE_LOC': DEVICE_LOC[::-1],
-#                         'X1': X1,
-#                         'X2': X2,
-#                         'FLAGS': FLAGS})
-#     posdf1 = pd.DataFrame({'posid': posids,
-#                            'ptlid': '09',
-#                            'PETAL_LOC': PETAL_LOC,
-#                            'DEVICE_LOC': DEVICE_LOC})
-#     posdf2 = pd.DataFrame({'posid': posids,
-#                            'ptlid': '01',
-#                            'PETAL_LOC': PETAL_LOC,
-#                            'DEVICE_LOC': DEVICE_LOC})
-#     posdf2 = pd.DataFrame({'posid': posids,
-#                            'OFFSET_X': 0.3})
-#     posdf = pd.concat([posdf1, posdf2],
-#                       ignore_index=True).set_index('posid')
-#     df0 = posdf[posdf['ptlid'] == ptlid]
-#     ret.merge(df0, left_index=True,
-#               on=['PETAL_LOC', 'DEVICE_LOC']).sort_index()

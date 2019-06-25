@@ -51,7 +51,7 @@ class FPTestData:
         self.test_name = test_name
         self.test_time = self.now
         self.test_cfg = test_cfg
-        self.simulate = test_cfg['simulate']
+        # TODO: can xytest change anticollision setting of PetalApp on the fly?
         self.anticollision = test_cfg['anticollision']
         self.num_corr_max = self.data.test_cfg['num_corr_max']
         self.petal_cfgs = petal_cfgs
@@ -90,15 +90,14 @@ class FPTestData:
             logger.addHandler(ch)
             logger.info(f'Log initialised for test {test_name}, PTL_{ptlid}')
             # write configs to logs
-            if petal_cfgs is not None:
+            if petal_cfgs is not None:  # dump petal cfg to petal logger
                 self._log_cfg(logger, petal_cfgs[ptlid])
             self._log_cfg(logger, test_cfg)
             self.logs[ptlid] = log  # assign logs and loggers to attributes
             self.loggers[ptlid] = logger
         self.logger.info([f'petalconstants.py version: {pc.code_version}',
-                          f'Saving to directory: {self.dir}',
-                          f'Simulation mode enabled: {self.simulate}'])
-        self.movedata = {}  # keyed by posid, one table for each positioner
+                          f'Saving to directory: {self.dir}'])
+        # TODO: log sim state for each petalApp instance
 
     @staticmethod
     def _log_cfg(logger, config):
