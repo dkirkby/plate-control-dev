@@ -34,6 +34,9 @@ class PosState(object):
         uniformly to many units).
 
         to enable config read and write, set DOS_POSMOVE_WRITE_TO_DB to false
+
+    For testing:
+        use petal 03, pos M05055, fid P051, which are all available in DB
     """
 
     def __init__(self, unit_id=None, device_type='pos', petal_id=None,
@@ -42,20 +45,18 @@ class PosState(object):
         self.logging = logging
         self.write_to_DB = os.getenv('DOS_POSMOVE_WRITE_TO_DB') \
             if DB_COMMIT_AVAILABLE else False
-        print('env', os.getenv('DOS_POSMOVE_WRITE_TO_DB'))
-        print('DB_COMMIT_AVAILABLE', DB_COMMIT_AVAILABLE)
-        print('write_to_DB', self.write_to_DB)
+        self.printfunc('DB_COMMIT_AVAILABLE:', DB_COMMIT_AVAILABLE)
+        self.printfunc('write_to_DB:', self.write_to_DB)
         # data initialization
         if device_type in ['pos', 'fid', 'ptl']:
             self.type = device_type
         else:
             raise Exception('Invalid device_type')
-        self.logs_dir = pc.dirs[self.type + '_logs']
+
         if self.write_to_DB:  # data initialization from database
             if petal_id is not None:  # ptlid is given, simple
                 self.ptlid = petal_id
                 if unit_id is not None:  # both ptlid and unit_id given
-                    self.unit_basename = 'unit_' + str(unit_id).zfill(2) #Updated by parker 6/12/19
                     if self.type == 'ptl':
                         assert self.ptlid == unit_id, 'inconsistent input'
                         # TODO fix this; still reading from a template config
@@ -66,16 +67,13 @@ class PosState(object):
                 if unit_id is not None:  # only unit id given
                     if self.type == 'ptl':  # no ptlid, but unit_id given
                         self.ptlid = unit_id
-                        self.unit_basename = 'unit_' + str(unit_id).zfill(2) #Updated by parker 6/12/19
                         # TODO fix this; still reading from a template config
                         self.load_from_cfg(unit_id=self.ptlid)
                     else:
-                        self.unit_basename = 'unit_' + str(unit_id)
                         self.set_ptlid_from_pi(unit_id)  # lookup ptlid
                         self.load_from_db(unit_id=unit_id)
                 else:  # both unit_id and ptlid are unkonwn, read template
                     self.ptlid = '-1'  # assume ptlid = -1
-                    self.unit_basename = 'unit_TEMP'
                     if self.type == 'ptl':  # unit_id and ptlid both unkonwn
                         # TODO fix this; still reading from a template config
                         self.load_from_cfg(unit_id=unit_id)
@@ -84,45 +82,59 @@ class PosState(object):
         else:  # no DB commit, use local cfg only, skipped after switchover
             if petal_id is None:  # ptlid is none, what about unit id?
                 if unit_id is not None and self.type == 'ptl':
-                    self.unit_basename = 'unit_' + str(unit_id).zfill(2) #Updated by parker 6/12/19
                     self.ptlid = unit_id
             else:
                 self.ptlid = petal_id
                 self.unit_basename = 'unit_' + str(unit_id)
             self.load_from_cfg(unit_id=unit_id)
+            # local text log file setup
+            self.log_separator = '_log_'
+            self.log_numformat = '08g'
+            self.log_extension = '.csv'
+            if not(self.log_basename):
+                all_logs = os.listdir(self.logs_dir)
+                unit_logs = [x for x in all_logs if self.unit_basename in x
+                             and self.log_extension in x]
+                if unit_logs:
+                    unit_logs.sort(reverse=True)
+                    self.log_basename = unit_logs[0]
+                else:
+                    log_basename = (self.unit_basename + self.log_separator
+                                    + format(0, self.log_numformat)
+                                    + self.log_extension)
+                    self.log_basename = self._increment_suffix(log_basename)
+            # number of rows in log before starting a new file
+            self.max_log_length = 10000
+            # keep track of this in a separate variable so don't have to
+            # recount every time -- only when necessary
+            self.curr_log_length = self._count_log_length()
+            if os.path.isfile(self.log_path):  # create local log file
+                with open(self.log_path, 'r', newline='') as csvfile:
+                    headers = csv.DictReader(csvfile).fieldnames
+                for key in self._val:
+                    if key not in headers:
+                        # start a new file if headers don't match up anymore
+                        # with all the data we're trying to store
+                        self.log_basename = self._increment_suffix(
+                            self.log_basename)
+                        break
+            # list of fieldnames we save to the log file.
+            self.log_fieldnames = (['TIMESTAMP'] + list(self._val.keys())
+                                   + ['NOTE'])
+            # used for storing specific notes in the next row written to log
+            self.next_log_notes = ['software initialization']
+            # used for one time check whether need to make a new log file,
+            # or whether log file headers have changed since last run
+            self.log_unit_called_yet = False
+            self.log_unit()
+            self._update_legacy_keys()  # only config files need this update
 
-        # text log file setup
-        self.log_separator = '_log_'
-        self.log_numformat = '08g'
-        self.log_extension = '.csv'
-        if not(self.log_basename):
-            all_logs = os.listdir(self.logs_dir)
-            unit_logs = [x for x in all_logs if self.unit_basename in x and self.log_extension in x]
-            if unit_logs:
-                unit_logs.sort(reverse=True)
-                self.log_basename = unit_logs[0]
-            else:
-                log_basename = self.unit_basename + self.log_separator + format(0,self.log_numformat) + self.log_extension
-                self.log_basename = self._increment_suffix(log_basename)
-        self.max_log_length = 10000 # number of rows in log before starting a new file
-        self.curr_log_length = self._count_log_length() # keep track of this in a separate variable so don't have to recount every time -- only when necessary
+        # reset values in the beginning
         if self.type == 'pos':
             self._val['MOVE_CMD'] = ''
             self._val['MOVE_VAL1'] = ''
             self._val['MOVE_VAL2'] = ''
-        if os.path.isfile(self.log_path):
-            with open(self.log_path,'r',newline='') as csvfile:
-                headers = csv.DictReader(csvfile).fieldnames
-            for key in self._val:
-                if key not in headers:
-                    self.log_basename = self._increment_suffix(self.log_basename) # start a new file if headers don't match up anymore with all the data we're trying to store
-                    break
-        self._update_legacy_keys()                
-        self.log_fieldnames = ['TIMESTAMP'] + list(self._val.keys()) + ['NOTE'] # list of fieldnames we save to the log file.
-        self.next_log_notes = ['software initialization'] # used for storing specific notes in the next row written to the log
-        self.log_unit_called_yet = False # used for one time check whether need to make a new log file, or whether log file headers have changed since last run
-        self.log_unit()
-    
+
     def set_ptlid_from_pi(self, unit_id):
         ''' lookup petal id using unit_id for pos, fid from PositionerIndex '''
         pi = PositionerIndex(os.getenv('DOS_POSITIONERINDEXTABLE'))
@@ -147,13 +159,14 @@ class PosState(object):
         else:  # unit id is supplied
             if self.type == 'pos':
                 group = 'fiber_positioner'
-                self.printfunc(f'Loading for PTL {self.ptlid}, unit {unit_id}')
+                self.printfunc(f'Loading PTL {self.ptlid}, pos {unit_id}...')
                 self._val.update(self.pDB.get_pos_id_info(unit_id))
                 self._val.update(self.pDB.get_pos_constants(unit_id))
                 self._val.update(self.pDB.get_pos_move(unit_id))
                 self._val.update(self.pDB.get_pos_calib(unit_id))
             elif self.type == 'fid':
                 group = 'fiducials'
+                self.printfunc(f'Loading PTL {self.ptlid}, fid {unit_id}...')
                 self._val.update(self.pDB.get_fid_id_info(unit_id))
                 self._val.update(self.pDB.get_fid_constants(unit_id))
                 self._val.update(self.pDB.get_fid_data(unit_id))
@@ -167,9 +180,12 @@ class PosState(object):
     def load_from_cfg(self, unit_id=None):
 
         if unit_id is not None:
+            self.unit_basename = 'unit_' + str(unit_id).zfill(2)
+            self.logs_dir = pc.dirs[self.type + '_logs']
             self.settings_dir = pc.dirs[self.type + '_settings']
             comment = 'Settings file for unit: ' + str(unit_id)
         else:
+            self.unit_basename = 'unit_TEMP'
             self.logs_dir = pc.dirs['temp_files']
             self.settings_dir = pc.dirs['temp_files']
             comment = 'Temporary settings file for software test purposes'\
@@ -338,5 +354,13 @@ class PosState(object):
             if key not in self._val:
                 self._val[key] = possible_new_keys_and_defaults[key]
 
-if __name__=="__main__":
-    state = PosState()
+
+if __name__ == "__main__":
+    # unit tests below, enable DB write
+    os.environ['DOS_POSMOVE_WRITE_TO_DB'] = 'True'
+    # pos init
+    state = PosState(unit_id='M05055', device_type='pos', petal_id='03')
+    # fid init
+    state = PosState(unit_id='P051', device_type='fid', petal_id='03')
+    # ptl init
+    state = PosState(device_type='ptl', petal_id='03')
