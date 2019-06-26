@@ -73,12 +73,10 @@ class XYTest(PECS):
         self.generate_targets()  # generate local targets or load from file
         self.logger.info([
             f'PlateMaker instrument: {self.platemaker_instrument}',
-            f'PlateMaker role: {self.fvc.pm_role}',
-            f'FVC instrument: {self.fvc.instrument}',
-            f'FVC role: {self.fvc.fvc_role}',
+            f'FVC role: {self.fvc_role}',
             f'Max num of corrections: {self.data.num_corr_max}',
-            f'Num of local targets: {len(self.local_targets)}'])
-        self.logger.debug(f'Local targets xy positions: {self.local_targets}')
+            f'Num of local targets: {len(self.data.targets)}'])
+        self.logger.debug(f'Local targets xy positions: {self.data.targets}')
         self.data.initialise_movedata(self.data.posids, self.data.ntargets)
         self.logger.info(f'Move data tables initialised '
                          f'for {len(self.data.posids)} positioners.')
@@ -119,22 +117,22 @@ class XYTest(PECS):
             self.loggers[ptlid].info(
                 f'Numbers of enabled and disabled positioners: {Ne}, {Nd}')
             l1 = l1.set_index('DEVICE_ID').sort_index()  # sorted within ptl
-            self.data.posids_ptl[ptlid] = posids = l1.index.to_list()
+            self.data.posids_ptl[ptlid] = posids = list(l1.index)
             self.data.posids += posids
             # add to existing positioner index table, first calibration values
             l1['PETAL_ID'] = ptlid  # add petal id as string column
-            ret1 = self.get_pos_vals(keys, posids).set_index('DEVICE_ID')
+            ret1 = self.ptls[int(ptlid)].get_pos_vals(keys, posids).set_index('DEVICE_ID')
             self.loggers[ptlid].debug(f'XY offsets read:\n{ret1.to_string()}')
             # read posmodel properties, for now just targetable_range_T
-            ret2 = self.get_posmodel_prop(props, posids).set_index('DEVICE_ID')
+            ret2 = self.ptls[int(ptlid)].get_posmodel_prop(props, posids).set_index('DEVICE_ID')
             self.loggers[ptlid].debug(f'PosModel properties read:\n'
                                       f'{ret2.to_string()}')
             dfs.append(l1.join(ret1).join(ret2))
         self.data.posdf = pd.concat(dfs)
         # write ptlid column to movedf
-        self.data.movedf = self.data.movedf.merge(
-            self.data.posdf['PETAL_ID'].reset_index(), on='DEVICE_ID',
-            right_index=True)
+        #self.data.movedf = self.data.movedf.merge( #KF-data.movedf can only be created after this function
+        #    self.data.posdf['PETAL_ID'].reset_index(), on='DEVICE_ID',
+        #    right_index=True)
 
     @staticmethod
     def _generate_posXY_targets_grid(rmin, rmax, npts):
@@ -167,6 +165,8 @@ class XYTest(PECS):
                 np.random.seed(self.test_cfg['shuffle_seed'])
                 np.random.shuffle(tgt)  # same shuffled target list for all
                 self.data.targets_pos = {pid: tgt for pid in self.data.posids}
+        else:
+            self.data.targets_pos = {posid:tgt for posid in self.data.posids}
 
     def _add_posid_col(self, df, ptlid):
         '''when df only has DEVICE_LOC, add posids column and use as index
@@ -205,15 +205,15 @@ class XYTest(PECS):
                 np.hstack([c(f'err_x_{n}'), c(f'err_y_{n}')]), axis=1)
 
     def run_xyaccuracy_test(self):
-        led_initial = self.illuminator.get('led')
-        self.illuminator.set(led='ON')  # turn on illuminator
+        #led_initial = self.illuminator.get('led') #no illuminator control yet
+        #self.illuminator.set(led='ON')  # turn on illuminator
         for i in range(self.data.ntargets):  # test loop over all test targets
-            self.logger.info(f'target {i+1} of {self.ntargets}')
+            self.logger.info(f'target {i+1} of {self.data.ntargets}')
             self.record_basic_move_data(i)  # for each target, record basics
             for n in range(self.data.num_corr_max + 1):
                 self.move_measure(i, n)
             # TODO: make real-time plots as test runs
-        self.illuminator.set(led=led_initial)  # restore initial LED state
+        #self.illuminator.set(led=led_initial)  # restore initial LED state
         if self.test_cfg['make_plots']:
             self.make_summary_plots()  # plot for all positioners by default
 
@@ -241,39 +241,34 @@ class XYTest(PECS):
                                    [f'err_x_{n-1}', f'err_y_{n-1}']].values
             # build move request dataframe for a petal
             note = (f'xy test: {self.data.test_name}; '  # same for all
-                    f'target {i+1} of {self.ntargets}; '
+                    f'target {i+1} of {self.data.ntargets}; '
                     f'move {n} ({movetype})')
             req = pd.DataFrame({'DEVICE_LOC': device_loc,
                                 'COMMAND': cmd,
                                 'X1': tgt[:, 0],  # shape (N_posids, 1)
                                 'X2': tgt[:, 1],  # shape (N_posids, 1)
                                 'LOG_NOTE': note})
-            # TODO: anti-collision schedule rejection needs to be recorded
-            accepted_requests = ptl.prepare_move(
-                req, anticollision=self.data.anticollision)
-            self.loggers[ptlid].debug(  # already keyed by posids
-                'prepare_move() returns accepted requests:\n'
-                + pd.DataFrame(accepted_requests).to_string())
+            ptl.prepare_move(req, anticollision=self.data.anticollision)
             # execute move, make sure return df has proper format for logging
-            ret_QS = ptl.execute_move(posids=posids, return_coord='QS')
+            expected_QS = ptl.execute_move(posids=posids, return_coord='QS')
             # ensure the same set of devices are returned after execution
-            assert set(req['DEVICE_LOC']) == set(ret_QS['DEVICE_LOC'])
-            ret_QS = self._add_posid_col(ret_QS, ptlid)  # add posid column
-            self.loggers[ptlid].debug('execute_move() returns expected QS:\n'
-                                      + ret_QS.to_string())
+            #assert set(req['DEVICE_LOC']) == set(ret_QS['DEVICE_LOC'])
+            #ret_QS = self._add_posid_col(ret_QS, ptlid)  # add posid column
+            #self.loggers[ptlid].debug('execute_move() returns expected QS:\n'
+            #                          + ret_QS.to_string())
             # build expected QS positions for fvc measure
             # TODO: is the flag below gauranteed to be 4?
-            expected_QS = pd.DataFrame(  # this is for only one petal
-                {'id': pd.Series(posids, dtype=str),
-                 'q': pd.Series(ret_QS['X1'], dtype=np.float64),
-                 's': pd.Series(ret_QS['X2'], dtype=np.float64),
-                 'flags': pd.Series(4*np.ones(len(posids)),
-                                    dtype=np.uint32)})
+            #expected_QS = pd.DataFrame(  # this is for only one petal
+            #    {'id': pd.Series(posids, dtype=str),
+            #     'q': pd.Series(ret_QS['X1'], dtype=np.float64),
+            #     's': pd.Series(ret_QS['X2'], dtype=np.float64),
+            #     'flags': pd.Series(4*np.ones(len(posids)),
+            #                        dtype=np.uint32)})
             expected_QS_list.append(expected_QS)
 
             # # get expected posTP from petal and write to movedf after move
             ret_TP = ptl.get_positions(posids=posids, return_coord='posTP')
-            ret_TP = self._add_posid_col(ret_TP, ptlid)  # add posid column
+            #ret_TP = self._add_posid_col(ret_TP, ptlid)  # add posid column
             self.loggers[ptlid].debug('expected posTP after move:\n'
                                       + ret_TP.to_string())
             # write posTP for a petal to movedf
@@ -284,8 +279,9 @@ class XYTest(PECS):
         # combine expected QS list to form a single dataframe
         expected_QS = pd.concat(expected_QS_list)
         # measure ten petals with FVC after all petals have moved
-        measured_QS = self.fvc.measure(expected_QS) \
-            .rename(columns={'id': 'DEVICE_ID'}).set_index('DEVICE_ID')
+        measured_QS = pd.DataFrame(self.fvc.measure(expected_QS))
+        measured_QS.rename(columns = {'id':'DEVICE_ID'}, inplace=True)
+        measured_QS.set_index('DEVICE_ID',inplace=True)
         # TODO: handle spotmatch errors? no return code from FVC proxy?
         # TODO: if measured position is [0, 0], disable positioner?
         # calculate measured obsXY from measured QS and write to movedf
