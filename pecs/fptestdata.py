@@ -98,7 +98,7 @@ class FPTestData:
             self._log_cfg(logger, test_cfg)
             self.logs[ptlid] = log  # assign logs and loggers to attributes
             self.loggers[ptlid] = logger
-        self.logger = self.logger_class(self)
+        self.logger = self.logger_class(self.ptlids, self.loggers)
         self.logger.info([f'petalconstants.py version: {pc.code_version}',
                           f'Saving to directory: {self.dir}'])
         # TODO: log sim state for each petalApp instance
@@ -123,8 +123,9 @@ class FPTestData:
         input message can be a string of list of strings
         msg will be broadcasted to all petals
         '''
-        def __init__(self, other_class):
-            self = other_class
+        def __init__(self, ptlids, loggers):
+            self.ptlids = ptlids
+            self.loggers = loggers
 
         def _log(self, lvl, msg):
             if type(msg) is list:
