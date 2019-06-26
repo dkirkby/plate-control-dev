@@ -23,7 +23,7 @@ Added illuminator proxy for xy test control over LED (Duan 2019/06/07)
 
 from DOSlib.proxies import FVC, Petal, Illuminator
 from fvc_sim import FVC_proxy_sim
-
+import os
 
 class PECS:
 
@@ -39,7 +39,7 @@ class PECS:
                                usually FVC or FVC1 or FVC2
     '''
 
-    def __init__(self, ptlids=[], printfunc=print, simulate=False,
+    def __init__(self, ptlids=[], printfunc=print,
                  platemaker_instrument=None, fvc_role=None,
                  illuminator_role=None):
         # Allow local config so scripts do not always have to collect roles
@@ -47,7 +47,7 @@ class PECS:
         # since it is not used in tests.
         if not(platemaker_instrument) or not(fvc_role) or not(ptlids):
             from configobj import ConfigObj
-            pecs_local = ConfigObj('pecs_local.conf',
+            pecs_local = ConfigObj(os.path.dirname(os.path.realpath(__file__))+'/pecs_local.conf',
                                    unrepr=True, encoding='utf-8')
             platemaker_instrument = pecs_local['pm_instrument']
             fvc_role = pecs_local['fvc_role']
@@ -55,19 +55,20 @@ class PECS:
         self.ptlids = ptlids
         if type(printfunc) is not dict:  # if a single printfunc is supplied
             printfuncs = {ptlid: printfunc for ptlid in ptlids}
+        else:
+            printfuncs = printfunc
         # if input printfunc is already a dict, need to check consistency still
         assert set(ptlids) == set(printfuncs.keys()), 'Input ptlids mismatch'
         self.printfuncs = printfuncs
-        self.simulate = simulate
         self.platemaker_instrument = platemaker_instrument
         self.fvc_role = fvc_role
         self.illuminator_role = illuminator_role
         # call fvc proxy
-        if self.simulate:
+        if 'SIM' in self.fvc_role.upper():
             self.fvc = FVC_proxy_sim()
         else:
             self.fvc = FVC(self.platemaker_instrument, fvc_role=self.fvc_role)
-        printfunc('FVC proxy created for instrument'
+        print('FVC proxy created for instrument'
                   + self.fvc.get('instrument'))
         self.ptls = {}  # call petal proxy
         for ptlid in ptlids:

@@ -53,7 +53,7 @@ class FPTestData:
         self.test_cfg = test_cfg
         # TODO: can xytest change anticollision setting of PetalApp on the fly?
         self.anticollision = test_cfg['anticollision']
-        self.num_corr_max = self.data.test_cfg['num_corr_max']
+        self.num_corr_max = self.test_cfg['num_corr_max']
         self.petal_cfgs = petal_cfgs
         self.ptlids = [
             key for key in test_cfg.keys() if len(key) == 2
@@ -98,6 +98,7 @@ class FPTestData:
             self._log_cfg(logger, test_cfg)
             self.logs[ptlid] = log  # assign logs and loggers to attributes
             self.loggers[ptlid] = logger
+        self.logger = self.logger_class(self)
         self.logger.info([f'petalconstants.py version: {pc.code_version}',
                           f'Saving to directory: {self.dir}'])
         # TODO: log sim state for each petalApp instance
@@ -110,18 +111,24 @@ class FPTestData:
         We have to write to memory by lines here.
         '''
         logger.debug(f'=== Config file dump: {config.filename} ===')
-        for line in config.write(outfile=None):
+        old_filename = config.filename
+        config.filename = None
+        for line in config.write():
             logger.debug(line)
+        config.filename = old_filename
         logger.debug(f'=== Config file dump complete: {config.filename} ===')
 
-    def logger(self):
+    class logger_class():
         '''must call methods for particular logger levels below
         input message can be a string of list of strings
         msg will be broadcasted to all petals
         '''
+        def __init__(self, other_class):
+            self = other_class
+
         def _log(self, lvl, msg):
             if type(msg) is list:
-                map(_log, msg)
+                map(self._log, msg)
             elif type(msg) is str:
                 for ptlid in self.ptlids:
                     self.loggers[ptlid].log(lvl, msg)
@@ -129,19 +136,19 @@ class FPTestData:
                 raise Exception('Wrong logger message type')
 
         def critical(self, msg):
-            _log(50, msg)
+            self._log(50, msg)
 
         def error(self, msg):
-            _log(40, msg)
+            self._log(40, msg)
 
         def warning(self, msg):
-            _log(30, msg)
+            self._log(30, msg)
 
         def info(self, msg):
-            _log(20, msg)
+            self._log(20, msg)
 
         def debug(self, msg):
-            _log(10, msg)
+            self._log(10, msg)
 
     def initialise_movedata(self, posids, n_targets):
         '''initialise column names for move data table for each positioner

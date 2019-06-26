@@ -128,7 +128,7 @@ class FVC_proxy_sim:
         some commands go to the PlateMaker or spotmatch, others to the FVC.
         """
         if 'instrument' in args:
-            return self.send_pm_command('get', *args, **kwargs)
+            return 'sim' #self.send_pm_command('get', *args, **kwargs)
         elif 'match_radius' in args:
             return self.send_spotmatch_command('get', 'match_radius')
         else:
