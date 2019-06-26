@@ -5,6 +5,8 @@ Created on Fri May 24 17:46:45 2019
 @author: Duan Yutong
 """
 import os
+import sys
+sys.path.append('../pecs')
 import numpy as np
 import pandas as pd
 from pecs import PECS
@@ -61,10 +63,11 @@ class XYTest(PECS):
         https://desi.lbl.gov/svn/code/focalplane/fp_settings/hwsetups/
         https://desi.lbl.gov/svn/code/focalplane/fp_settings/test_settings/
         """
+        self.test_cfg = xytest_cfg
         self.data = FPTestData(xytest_cfg.filename, xytest_cfg)
         self.loggers = self.data.loggers  # use these loggers to write to logs
         self.logger = self.data.logger
-        printfuncs = {pid: self.loggers[pid].info for pid in self.data.ptlids}
+        printfuncs = {int(pid): self.loggers[pid].info for pid in self.data.ptlids} #petalids are just ints now, DB and DOS have forced the conversion
         PECS.__init__(self, ptlids=self.data.ptlids, printfunc=printfuncs)
         self._get_pos_info()
         self.generate_targets()  # generate local targets or load from file
@@ -97,16 +100,16 @@ class XYTest(PECS):
         self.data.posids_ptl = {}
         dfs = []
         for ptlid in self.data.ptlids:  # TODO: parallelise this?
-            mode = self.data.testcfg[ptlid]['mode']
-            ptl = self.ptls[ptlid]  # use as a petal app instance
+            mode = self.test_cfg[ptlid]['mode']
+            ptl = self.ptls[int(ptlid)]  # use as a petal app instance, here ptlid is int
             if mode == 'all':
                 l0 = ptl.get_positioners(enabled_only=False)
                 l1 = ptl.get_positioners(enabled_only=True)
             elif mode == 'pos':
-                l0 = self.data.test_cfg[ptlid]['posids']
+                l0 = self.test_cfg[ptlid]['posids']
                 l1 = ptl.get_positioners(enabled_only=True, posids=l0)
             elif mode == 'can':
-                busids = self.data.test_cfg[ptlid]['busids']
+                busids = self.test_cfg[ptlid]['busids']
                 l0 = ptl.get_positioners(enabled_only=False, busids=busids)
                 l1 = ptl.get_positioners(enabled_only=True, busids=busids)
             Nr = len(l0)  # number of requested positioners
@@ -141,27 +144,27 @@ class XYTest(PECS):
         return np.array([x[mask], y[mask]])  # return 2 x N array of targets
 
     def generate_targets(self):
-        path = self.data.test_cfg['input_targs_file']
+        path = self.test_cfg['input_targs_file']
         if path is None:  # no targets supplied, create local targets in posXY
             tgt = self._generate_posXY_targets_grid(
-                self.data.test_cfg['targ_min_radius'],
-                self.data.test_cfg['targ_max_radius'],
-                self.data.test_cfg['n_pts_across_grid']).T  # shape (N, 2)
+                self.test_cfg['targ_min_radius'],
+                self.test_cfg['targ_max_radius'],
+                self.test_cfg['n_pts_across_grid']).T  # shape (N, 2)
         else:  # input target table shoud have two colummns (posX, posY)
             assert os.path.isfile(path), f'Invald target file path: {path}'
             tgt = np.genfromtxt(path, delimiter=',')  # load csv file
             assert tgt.shape[1] == 2, 'Targets should be of dimension (N, 2)'
         self.data.targets = tgt
         self.data.ntargets = tgt.shape[0]  # shape (N_targets, 2)
-        if self.data.test_cfg['shuffle_targets']:  # target shuffling logic
-            if self.data.test_cfg['shuffle_seed'] is None:  # posid as seed
+        if self.test_cfg['shuffle_targets']:  # target shuffling logic
+            if self.test_cfg['shuffle_seed'] is None:  # posid as seed
                 self.data.targets_pos = {}  # different targets for each pos
                 for posid in self.data.posids:
                     np.random.seed(int(posid[1:]))  # only the numeral part
                     np.random.shuffle(tgt)  # numpy shuffles in place
                     self.data.targets_pos[posid] = tgt  # shape (N, 2)
             else:  # use the same given seed for all posids
-                np.random.seed(self.data.test_cfg['shuffle_seed'])
+                np.random.seed(self.test_cfg['shuffle_seed'])
                 np.random.shuffle(tgt)  # same shuffled target list for all
                 self.data.targets_pos = {pid: tgt for pid in self.data.posids}
 
@@ -184,9 +187,9 @@ class XYTest(PECS):
         movedf.loc[idx[i, :], 'timestamp'] = self.data.now
         movedf.loc[idx[i, :], 'move_log'] = \
             'local posmove csv log deprecated; check posmoveDB instead.'
-        # self.ptls[ptlid].states[posid].log_basename
+        # self.ptls[int(ptlid)].states[posid].log_basename
         for ptlid in self.data.ptlids:
-            ptl, posids = self.ptls[ptlid], self.data.posids_ptl[ptlid]
+            ptl, posids = self.ptls[int(ptlid)], self.data.posids_ptl[ptlid]
             cycles = ptl.get_pos_vals(['TOTAL_MOVE_SEQUENCES'], posids) \
                 .set_index('DEVICE_ID')
             # TODO: store other posstate stuff here
@@ -211,7 +214,7 @@ class XYTest(PECS):
                 self.move_measure(i, n)
             # TODO: make real-time plots as test runs
         self.illuminator.set(led=led_initial)  # restore initial LED state
-        if self.data.test_cfg['make_plots']:
+        if self.test_cfg['make_plots']:
             self.make_summary_plots()  # plot for all positioners by default
 
     def move_measure(self, i, n):
@@ -223,7 +226,7 @@ class XYTest(PECS):
         expected_QS_list = []  # each item is a dataframe for one petal
         for ptlid in self.data.ptlids:
             posids = self.data.posids_ptl[ptlid]  # all records obey this order
-            ptl = self.ptls[ptlid]
+            ptl = self.ptls[int(ptlid)]
             device_loc = self.data.posdf.loc[posids, 'DEVICE_LOC']
             if n == 0:  # blind move
                 posXY = np.vstack(   # shape (N_posids, 2)
@@ -303,7 +306,7 @@ class XYTest(PECS):
 
 if __name__ == "__main__":
     test_filename = "xytest_ptl3.cfg"  # specify filename before starting test
-    path = os.path.join(os.environ['TEST_BASE_PATH'], 'fp_settings',
+    path = os.path.join(os.environ['FP_SETTINGS_PATH'],
                         'test_settings', test_filename)  # built path to cfg
     test_cfg = ConfigObj(path, unrepr=True)  # load xytest config
     test = XYTest(test_cfg)
