@@ -55,5 +55,5 @@ if __name__ == '__main__':
         selection = None
     updates = grid.grid_calibration(selection=selection)
     print(updates)
-    updates.to_csv(pc.dirs['ALL_LOGS']+'/calib_logs/grid_calibration_'+pc.filename_timestamp_str_now()+'.csv')
+    updates.to_csv(pc.dirs['all_logs']+'/calib_logs/grid_calibration_'+pc.filename_timestamp_str_now()+'.csv')
     
