@@ -210,7 +210,6 @@ class FPTestData:
             ax.plot(Tmax_line_x, Tmax_line_y, '--', lw=0.8, color='C2',
                     label=r'$\theta_\mathrm{max}$')  # theta max line
             for r in [rmin, rmax]:  # inner and outer patrol circles
-                print(f'R1 = {r1}, R2={r2}')
                 c = Circle((offX, offY), r, lw=0.5, color='b', fill=False)
                 ax.add_patch(c)
             ax.plot(tgtX, tgtY, 'o', ms=4, color='C3', fillstyle='none',
