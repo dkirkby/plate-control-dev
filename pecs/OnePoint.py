@@ -25,7 +25,7 @@ class OnePoint(PECS):
         else: #assume is a list of posids
             posid_list = selection
         if tp_target:
-            requests = {'DEVICE_ID':[],'TARGET_X1':[],'TARGET_X2':[],'LOG_NOTE':[],'COMMAND':[]}
+            requests = {'DEVICE_ID':[],'X1':[],'X2':[],'LOG_NOTE':[],'COMMAND':[]}
             for posid in posid_list:
                 requests['DEVICE_ID'].append(posid)
                 requests['X1'].append(tp_target[0])

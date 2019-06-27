@@ -4,7 +4,7 @@ from DOSlib.positioner_index import PositionerIndex
 
 class FVC_proxy_sim:
     
-    def __init__(self, max_err = 0.5, error_rate=0.01):
+    def __init__(self, max_err = 0.01, error_rate=0.01):
         self.max_err = max_err
         self.error_rate = error_rate #Unused, later to have a chance to "not" match a spot
         self.positions = PositionerIndex
