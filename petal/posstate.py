@@ -121,13 +121,15 @@ class PosState(object):
             # list of fieldnames we save to the log file.
             self.log_fieldnames = (['TIMESTAMP'] + list(self._val.keys())
                                    + ['NOTE'])
+             # used for storing specific notes in the next row written to log
+            self.next_log_notes = ['software initialization']
             # used for one time check whether need to make a new log file,
             # or whether log file headers have changed since last run
             self.log_unit_called_yet = False
             self.log_unit()
             self._update_legacy_keys()  # only config files need this update
         # used for storing specific notes in the next row written to log
-        self.next_log_notes = ['software initialization']
+        self.next_log_notes = [''] #Log notes aren't recorded in DB :( but we still need to 'collect' them
         # reset values in the beginning
         if self.type == 'pos':
             self._val['MOVE_CMD'] = ''

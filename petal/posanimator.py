@@ -229,6 +229,7 @@ class PosAnimator(object):
             input_file = os.path.join(self.frame_dir, self.framefile_prefix + '%' + str(self.n_framefile_digits) + 'd' + self.framefile_extension)
             output_file = os.path.join(self.save_dir, timestamp + '_schedule_anim.mp4')
             ffmpeg_cmd = 'ffmpeg -y -r ' + str(fps) + ' -i ' + input_file + ' -c:v libx265 ' + output_file
+            ffmpeg_cmd = 'ffmpeg -y -r ' + str(fps) + ' -i ' + input_file + ' ' + output_file
             os.system(ffmpeg_cmd)
         if self.delete_imgs:
             for path in image_paths.values():

@@ -167,7 +167,7 @@ class Petal(object):
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
         self._initialize_pos_flags()
         self._apply_state_enable_settings()
-
+        
         # petalbox setup (temporary until all settings are passed via init by DOS)
         if pb_config == True:
             import json
@@ -1035,8 +1035,8 @@ class Petal(object):
                     for item_id in self.posids.union(self.fidids):
                         if self.get_posfid_val(item_id,'CAN_ID') == canid:
                             self.set_posfid_val(item_id,'CTRL_ENABLED',False)
-                            self.petal_state.conf['DISABLED_BUFFER'].append(item_id)
-                            self.petal_state.write()
+                            #self.petal_state.conf['DISABLED_BUFFER'].append(item_id)
+                            #self.petal_state.write()
                             if self.pb_config:
                                 self._update_can_enabled_map(item_id, False)
                             self.pos_flags[item_id] |= self.comm_error_bit
@@ -1197,8 +1197,9 @@ class Petal(object):
 
     def _apply_state_enable_settings(self):
         """Read positioner/fiducial configuration settings and disable/set flags accordingly.
+           KF - fids in DB might not have DEVICE_CLASSIFIED_NONFUNCTIONAL 6/27/19
         """
-        for devid in self.posids.union(self.fidids):
+        for devid in self.posids: #.union(self.fidids):
             if self.get_posfid_val(devid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
                 self.set_posfid_val(devid, 'CTRL_ENABLED', False)
                 self.pos_flags[devid] |= self.ctrl_disabled_bit
@@ -1207,6 +1208,6 @@ class Petal(object):
                 if not self.get_posfid_val(devid, 'FIBER_INTACT'):
                     self.set_posfid_val(devid, 'CTRL_ENABLED', False)
                     self.pos_flags[devid] |= self.ctrl_disabled_bit
-                    self.pos_flags[devid] |= self.broken_fiber_bit
+                    self.pos_flags[devid] |= self.fiber_broken_bit
                     self.pos_flags[devid] |= self.bad_fiber_fvc_bit            
 
