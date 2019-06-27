@@ -262,7 +262,7 @@ class XYTest(PECS):
             # execute move, make sure return df has proper format for logging
             expected_QS = ptl.execute_move(posids=posids, return_coord='QS')
             # ensure the same set of devices are returned after execution
-            assert set(req['DEVICE_LOC']) == set(expected_QS['DEVICE_LOC'])
+            assert set(req['DEVICE_ID']) == set(expected_QS['DEVICE_ID'])
             # log = self._add_device_id_col(expected_QS, ptlid)
             self.loggers[ptlid].debug('execute_move() returns expected QS:\n'
                                       + expected_QS.to_string())
