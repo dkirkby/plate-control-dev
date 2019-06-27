@@ -148,6 +148,7 @@ class PosState(object):
         self._val = {}  # no local config used to create _val, make empty one
         self.pDB = DBSingleton(int(self.ptlid))
         if unit_id is None:  # unit id not supplied, load templates
+            unit_id = 'xxxxx'
             if self.type == 'pos':
                 group = 'fiber_positioner' + '_default'
                 self._val.update(self.pDB.get_pos_def_constants())
@@ -364,3 +365,5 @@ if __name__ == "__main__":
     state = PosState(unit_id='P051', device_type='fid', petal_id='03')
     # ptl init
     state = PosState(device_type='ptl', petal_id='03')
+    # None input
+    state = PosState()
