@@ -68,8 +68,8 @@ class PECS:
             self.fvc = FVC_proxy_sim()
         else:
             self.fvc = FVC(self.platemaker_instrument, fvc_role=self.fvc_role)
-        print('FVC proxy created for instrument'
-                  + self.fvc.get('instrument'))
+        self.printfunc('FVC proxy created for instrument: '
+                       f"{self.fvc.get('instrument')}")
         self.ptls = {}  # call petal proxy
         for ptlid in ptlids:
             self.ptls[ptlid] = Petal(petal_id=ptlid)  # no sim state control
