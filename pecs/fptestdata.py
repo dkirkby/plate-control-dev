@@ -122,7 +122,7 @@ class FPTestData:
         configcopy = copy(config)
         configcopy.filename = None
         for line in configcopy.write():
-            logger.debug(line)
+            logger.debug(line.decode('utf_8'))  # convert byte str to str
         logger.debug(f'=== End of config file dump: {config.filename} ===')
 
     class BroadcastLogger:

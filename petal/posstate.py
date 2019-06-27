@@ -45,8 +45,8 @@ class PosState(object):
         self.logging = logging
         self.write_to_DB = os.getenv('DOS_POSMOVE_WRITE_TO_DB') \
             if DB_COMMIT_AVAILABLE else False
-        self.printfunc('DB_COMMIT_AVAILABLE:', DB_COMMIT_AVAILABLE)
-        self.printfunc('write_to_DB:', self.write_to_DB)
+        self.printfunc(f'posstate DB_COMMIT_AVAILABLE: {DB_COMMIT_AVAILABLE}')
+        self.printfunc(f'posstate write_to_DB: {self.write_to_DB}')
         # data initialization
         if device_type in ['pos', 'fid', 'ptl']:
             self.type = device_type

@@ -79,7 +79,7 @@ class XYTest(PECS):
             f'FVC role: {self.fvc_role}',
             f'Max num of corrections: {self.data.num_corr_max}',
             f'Num of local targets: {len(self.data.targets)}'])
-        self.logger.debug(f'Local targets xy positions: {self.data.targets}')
+        self.logger.debug(f'Local targets xy positions:\n{self.data.targets}')
         self.data.initialise_movedata(self.data.posids, self.data.ntargets)
         self.logger.info(f'Move data tables initialised '
                          f'for {len(self.data.posids)} positioners.')
@@ -271,7 +271,7 @@ class XYTest(PECS):
             # # get expected posTP from petal and write to movedf after move
             ret_TP = (ptl.get_positions(posids=posids, return_coord='posTP')
                       .set_index('DEVICE_ID'))
-            self.loggers[ptlid].debug('expected posTP after move:\n'
+            self.loggers[ptlid].debug('expected posTP after move {n}:\n'
                                       + ret_TP.to_string())
             # write posTP for a petal to movedf
             new = pd.DataFrame({f'pos_t_{n}': ret_TP['X1'],
