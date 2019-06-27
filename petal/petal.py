@@ -846,7 +846,7 @@ class Petal(object):
         '''Commit data to the local config and log files, and/or the online database.
         A note string may optionally be included to go along with this entry in the logs.
         '''
-        if log_note:
+        if log_note and (self.local_log_on or self.local_commit_on):
             for state in self.altered_states:
                 state.next_log_notes.append(log_note)
         if self.db_commit_on and not(self.simulator_on):
@@ -1041,11 +1041,10 @@ class Petal(object):
                                 self._update_can_enabled_map(item_id, False)
                             self.pos_flags[item_id] |= self.comm_error_bit
                             self.printfunc(str(item_id) + ': was disabled due to a CAN communication error.')
-                            self.states[item_id].next_log_notes.append('Disabled sending control commands because device was detected to be nonresponsive.')
                             break
                     status_updated = True
             if status_updated:
-                self.commit()
+                self.commit(log_note = 'Disabled sending control commands because device was detected to be nonresponsive.')
                 
     def _clear_temporary_state_values(self):
         '''Clear out any existing values in the state objects that were only temporarily
