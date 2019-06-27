@@ -45,8 +45,8 @@ class PosState(object):
         self.logging = logging
         self.write_to_DB = os.getenv('DOS_POSMOVE_WRITE_TO_DB') \
             if DB_COMMIT_AVAILABLE else False
-        self.printfunc(f'posstate DB_COMMIT_AVAILABLE: {DB_COMMIT_AVAILABLE}')
-        self.printfunc(f'posstate write_to_DB: {self.write_to_DB}')
+        # self.printfunc(f'DB_COMMIT_AVAILABLE: {DB_COMMIT_AVAILABLE}')
+        # self.printfunc(f'write_to_DB: {self.write_to_DB}')
         # data initialization
         if device_type in ['pos', 'fid', 'ptl']:
             self.type = device_type
@@ -159,14 +159,14 @@ class PosState(object):
         else:  # unit id is supplied
             if self.type == 'pos':
                 group = 'fiber_positioner'
-                self.printfunc(f'Loading PTL {self.ptlid}, pos {unit_id}...')
+                # self.printfunc(f'Loading PTL {self.ptlid}, pos {unit_id}...')
                 self._val.update(self.pDB.get_pos_id_info(unit_id))
                 self._val.update(self.pDB.get_pos_constants(unit_id))
                 self._val.update(self.pDB.get_pos_move(unit_id))
                 self._val.update(self.pDB.get_pos_calib(unit_id))
             elif self.type == 'fid':
                 group = 'fiducials'
-                self.printfunc(f'Loading PTL {self.ptlid}, fid {unit_id}...')
+                # self.printfunc(f'Loading PTL {self.ptlid}, fid {unit_id}...')
                 self._val.update(self.pDB.get_fid_id_info(unit_id))
                 self._val.update(self.pDB.get_fid_constants(unit_id))
                 self._val.update(self.pDB.get_fid_data(unit_id))
