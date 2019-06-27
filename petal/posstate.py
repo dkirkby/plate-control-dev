@@ -63,8 +63,10 @@ class PosState(object):
                         self.load_from_cfg(unit_id=self.ptlid)
                     else:
                         self.load_from_db(unit_id=unit_id)
+                    self.unit_id = unit_id
             else:  # ptlid unkonwn
                 if unit_id is not None:  # only unit id given
+                    self.unit_id = unit_id
                     if self.type == 'ptl':  # no ptlid, but unit_id given
                         self.ptlid = unit_id
                         # TODO fix this; still reading from a template config
@@ -121,15 +123,18 @@ class PosState(object):
             # list of fieldnames we save to the log file.
             self.log_fieldnames = (['TIMESTAMP'] + list(self._val.keys())
                                    + ['NOTE'])
-             # used for storing specific notes in the next row written to log
+            # used for storing specific notes in the next row written to log
             self.next_log_notes = ['software initialization']
             # used for one time check whether need to make a new log file,
             # or whether log file headers have changed since last run
             self.log_unit_called_yet = False
             self.log_unit()
             self._update_legacy_keys()  # only config files need this update
-        # used for storing specific notes in the next row written to log
-        self.next_log_notes = [''] #Log notes aren't recorded in DB :( but we still need to 'collect' them
+            # used for storing specific notes in the next row written to log
+            # log notes aren't recorded in DB :(
+            # but we still need to 'collect' them
+            self.next_log_notes = ['']
+
         # reset values in the beginning
         if self.type == 'pos':
             self._val['MOVE_CMD'] = ''
@@ -178,6 +183,7 @@ class PosState(object):
         # TODO: check overlap between self.cDB and self._val ?
         self.cDB = ConstantsDB().get_constants(snapshot='DESI', tag='CURRENT',
                                                group=group)[group][unit_id]
+        self.unit_id = unit_id
 
     def load_from_cfg(self, unit_id=None):
 
@@ -186,7 +192,8 @@ class PosState(object):
             self.logs_dir = pc.dirs[self.type + '_logs']
             self.settings_dir = pc.dirs[self.type + '_settings']
             comment = 'Settings file for unit: ' + str(unit_id)
-        else:
+        else:  # unit ID is None
+            self.unit_id = 'TEMP'
             self.unit_basename = 'unit_TEMP'
             self.logs_dir = pc.dirs['temp_files']
             self.settings_dir = pc.dirs['temp_files']
@@ -222,21 +229,24 @@ class PosState(object):
         """
         return self._val[key]
 
-    def store(self,key,val):
+    def store(self, key, val):
         """Store a value to memory. This is the correct way to store values, as
-        it contains some checks on tolerance values. (Don't write directly to _val.)
+        it contains some checks on tolerance values.
+        (Don't write directly to _val.)
         """
         if key in pc.nominals:
             nom = pc.nominals[key]['value']
             tol = pc.nominals[key]['tol']
-            if val < nom - tol or val > nom + tol: # check for absurd values
-                self.printfunc('Attempted to set ' + str(key) + ' of ' + str(self.unit_basename) + ' to value = ' + str(val) + ', which is outside the nominal = ' + str(nom) + ' +/- ' + str(tol) + '. Defaulting to nominal value instead.')
+            if val < nom - tol or val > nom + tol:  # check for absurd values
+                self.printfunc(f'Attempting to set unit {self.unit_id}, '
+                               f'key {key} to value {val}, outside the nominal'
+                               f'{nom} +/- {tol}. Defaulting to nominal.')
                 val = nom
         if key in self._val:
             self._val[key] = val
         else:
-            self.printfunc('value not set, because the key "' + repr(key) + '" was not found')
- 
+            self.printfunc(f'Key {key} not found, value not set.')
+
     def write(self):
         """Write all values to disk.
         """
