@@ -95,7 +95,8 @@ class FPTestData:
             logger.addHandler(fh)
             logger.addHandler(sh)
             logger.addHandler(ch)
-            logger.info(f'Log initialised for test: {test_name}, PTL_{ptlid}')
+            logger.info(f'Log initialised for test: {test_name}, '
+                        f'PTL{ptlid:02d}')
             # write configs to logs
             if petal_cfgs is not None:  # dump petal cfg to petal logger
                 self._log_cfg(logger, petal_cfgs[ptlid])
@@ -248,7 +249,6 @@ class FPTestData:
         for ptlid in self.ptlids:
             def makepath(name): return os.path.join(self.dirs[ptlid], name)
             for posid in self.posids_ptl[ptlid]:  # write move data csv
-                # self.movedf.loc[idx[:, posid], :].rename_axis(['target_no', 'DEVICE_ID']).drop(index='DEVICE_ID')
                 df_pos = self.movedf.loc[idx[:, posid], :].droplevel(1)
                 df_pos.to_pickle(makepath(f'{posid}_df.pkl'),
                                  compression='gzip')
@@ -260,5 +260,7 @@ class FPTestData:
                                      f'{self.dirs[ptlid]}')
 
     def dump_as_one_pickle(self):
+        del self.logger
+        del self.loggers
         with open(os.path.join(self.dir, 'data_dump.pkl'), 'wb') as handle:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)

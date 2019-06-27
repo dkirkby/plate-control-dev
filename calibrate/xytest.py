@@ -81,7 +81,7 @@ class XYTest(PECS):
             f'Num of local targets: {len(self.data.targets)}'])
         self.logger.debug(f'Local targets xy positions:\n{self.data.targets}')
         self.data.initialise_movedata(self.data.posids, self.data.ntargets)
-        self.logger.info(f'Move data tables initialised '
+        self.logger.info(f'Move data table initialised '
                          f'for {len(self.data.posids)} positioners.')
         # TODO: add summarizer functionality if needed?
 
@@ -193,10 +193,10 @@ class XYTest(PECS):
         # self.ptls[int(ptlid)].states[posid].log_basename
         for ptlid in self.data.ptlids:
             ptl, posids = self.ptls[ptlid], self.data.posids_ptl[ptlid]
-            cycles = ptl.get_pos_vals(['TOTAL_MOVE_SEQUENCES'], posids) \
-                .set_index('DEVICE_ID')
+            cycles = (ptl.get_pos_vals(['TOTAL_MOVE_SEQUENCES'], posids)
+                      .rename(columns={'TOTAL_MOVE_SEQUENCES': 'cycle'}))
             # TODO: store other posstate stuff here
-            self._update(cycles, i)
+            self._update(cycles.set_index('DEVICE_ID'), i)
 
     def calculate_xy_errors(self, i, n):
         movedf = self.data.movedf
