@@ -1,11 +1,13 @@
 import pandas
 import random
+from DOSlib.positioner_index import PositionerIndex
 
 class FVC_proxy_sim:
     
     def __init__(self, max_err = 0.5, error_rate=0.01):
         self.max_err = max_err
         self.error_rate = error_rate #Unused, later to have a chance to "not" match a spot
+        self.positions = PositionerIndex
         return
 
     def send_pm_command(self, command, *args, **kwargs):
@@ -70,10 +72,8 @@ class FVC_proxy_sim:
             expected_positions.rename(columns = {'X1':'q'}, inplace=True)
             expected_positions.rename(columns = {'X2':'s'}, inplace=True)
             expected_positions.rename(columns = {'FLAGS':'flags'}, inplace=True)
-            expected_positions.rename(columns = {'DEVICE_LOC':'id'}, inplace=True)
-            for i, row in expected_positions.iterrows():
-                expected_positions.loc[i,('id')] = self.positions.find_by_petal_loc_device_loc(row['PETAL_LOC'],row['id'],key='DEVICE_ID')
-            expected_positions.drop(columns='PETAL_LOC', inplace=True)
+            expected_positions.rename(columns = {'DEVICE_ID':'id'}, inplace=True)
+            #expected_positions.drop(columns=['PETAL_LOC','DEVICE_LOC'], inplace=True)
 
         # Add a check that the required keys (id, q, s and flags are given)
         expected_positions = expected_positions[['id', 'q', 's', 'flags']]

@@ -177,7 +177,7 @@ class FPTestData:
     def make_summary_plot(self, posid):
         row = self.posdf.loc[posid]  # row containing calibration values
         ptlid, offX, offY, r1, r2, posT = row[
-            ['ptlid', 'OFFSET_X', 'OFFSET_Y', 'LENGTH_R1', 'LENGTH_R2',
+            ['PETAL_ID', 'OFFSET_X', 'OFFSET_Y', 'LENGTH_R1', 'LENGTH_R2',
              'targetable_range_T']]
         rmin, rmax = r1 - r1, r1 + r2  # min and max patrol radii
         Tmin, Tmax = np.sort(posT) + row['OFFSET_T']  # targetable obsTheta
@@ -185,7 +185,7 @@ class FPTestData:
                             '{}_xyplot_submove_{{}}.pdf'.format(posid))
         title = (f'XY Accuracy Test {self.now}\n'  # shared by submove plots
                  f'Positioner {posid} ({self.ntargets} targets)')
-        moves = self.movedf.loc[idx[:, posid]]  # all targets for a posid
+        moves = self.movedf.loc[idx[:,posid],:]  # all targets for a posid
         tgtX, tgtY = moves['target_x'], moves['target_y']  # target obsXY
         Tmin_line_x = [offX, offX + rmax * np.cos(np.radians(Tmin))]
         Tmin_line_y = [offY, offY + rmax * np.sin(np.radians(Tmin))]
