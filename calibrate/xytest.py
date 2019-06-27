@@ -230,7 +230,7 @@ class XYTest(PECS):
         for ptlid in self.data.ptlids:
             posids = self.data.posids_ptl[ptlid]  # all records obey this order
             ptl = self.ptls[ptlid]
-            device_loc = self.data.posdf.loc[posids, 'DEVICE_LOC']
+            # device_loc = self.data.posdf.loc[posids, 'DEVICE_LOC']
             if n == 0:  # blind move
                 posXY = np.vstack(   # shape (N_posids, 2)
                     [self.data.targets_pos[posid][i, :] for posid in posids])
@@ -246,7 +246,7 @@ class XYTest(PECS):
             note = (f'xy test: {self.data.test_name}; '  # same for all
                     f'target {i+1} of {self.data.ntargets}; '
                     f'move {n} ({movetype})')
-            req = pd.DataFrame({'DEVICE_LOC': device_loc,
+            req = pd.DataFrame({'DEVICE_ID': posids,
                                 'COMMAND': cmd,
                                 'X1': tgt[:, 0],  # shape (N_posids, 1)
                                 'X2': tgt[:, 1],  # shape (N_posids, 1)
