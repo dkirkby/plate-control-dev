@@ -5,7 +5,7 @@ import pprint
 import posconstants as pc
 from DOSlib.positioner_index import PositionerIndex
 try:
-    from DOSlib.constants import ConstantsDB
+    # from DOSlib.constants import ConstantsDB
     from DBSingleton import DBSingleton
     DB_COMMIT_AVAILABLE = True
 except ModuleNotFoundError:
@@ -181,8 +181,10 @@ class PosState(object):
             else:
                 raise Exception('PTL settings cannot be loaded from DB yet')
         # TODO: check overlap between self.cDB and self._val ?
-        self.cDB = ConstantsDB().get_constants(snapshot='DESI', tag='CURRENT',
-                                               group=group)[group][unit_id]
+        # self.cDB = ConstantsDB().get_constants(
+        #     snapshot='DESI', tag='CURRENT', group=group)[group][unit_id]
+        self.cdB = self.pDB.constantsDB.get_constants(
+            snapshot='SIM', tag='CURRENT', group=group)[group][unit_id]
         self.unit_id = unit_id
 
     def load_from_cfg(self, unit_id=None):
@@ -239,8 +241,9 @@ class PosState(object):
             tol = pc.nominals[key]['tol']
             if val < nom - tol or val > nom + tol:  # check for absurd values
                 self.printfunc(f'Attempting to set unit {self.unit_id}, '
-                               f'key {key} to value {val}, outside the nominal'
-                               f'{nom} +/- {tol}. Defaulting to nominal.')
+                               f'key {key} to value {val}, outside the '
+                               f'nominal range {nom} +/- {tol}. '
+                               f'Defaulting to nominal.')
                 val = nom
         if key in self._val:
             self._val[key] = val

@@ -260,9 +260,10 @@ class XYTest(PECS):
             ptl.prepare_move(req, anticollision=self.data.anticollision)
 
             # execute move, make sure return df has proper format for logging
-            expected_QS = ptl.execute_move(posids=posids, return_coord='QS')
+            # expected_QS = ptl.execute_move(posids=posids, return_coord='QS')
+            expected_QS = ptl.execute_move(return_coord='QS')
             # ensure the same set of devices are returned after execution
-            assert set(req['DEVICE_ID']) == set(expected_QS['DEVICE_ID'])
+            # assert set(req['DEVICE_ID']) == set(expected_QS['DEVICE_ID'])
             # log = self._add_device_id_col(expected_QS, ptlid)
             self.loggers[ptlid].debug('execute_move() returns expected QS:\n'
                                       + expected_QS.to_string())
@@ -283,7 +284,7 @@ class XYTest(PECS):
         # measure ten petals with FVC after all petals have moved
         measured_QS = (pd.DataFrame(self.fvc.measure(expected_QS))
                        .rename(columns={'id': 'DEVICE_ID'})
-                       .set_index('DEVICE_ID'))
+                       .set_index('DEVICE_ID')).loc[posids]
         # TODO: handle spotmatch errors? no return code from FVC proxy?
         # TODO: if measured position is [0, 0], shall we disable positioner?
         # calculate below measured obsXY from measured QS and write to movedf
