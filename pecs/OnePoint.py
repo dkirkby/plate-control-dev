@@ -15,7 +15,7 @@ class OnePoint(PECS):
         self.ptlid = list(self.ptls.keys())[0]
         self.index = PositionerIndex()
 
-    def one_point_calib(self, selection=None,enabled_only=True,mode='posTP',auto_update=True,tp_target='default', match_radius=80):
+    def one_point_calib(self, selection=None,enabled_only=True,mode='posTP',auto_update=True,tp_target='default', match_radius=80.0):
         if tp_target == 'default':
             tp_target = [0,self.Eo_phi+self.clear_angle_margin]
         if not selection:
@@ -32,7 +32,7 @@ class OnePoint(PECS):
                 requests['X2'].append(tp_target[1])
                 requests['LOG_NOTE'].append('One point calibration ' + mode)
                 requests['COMMAND'].append('posTP')
-            self.ptls[self.ptlid].prepare_move(pandas.DataFrame.from_dict(requests))
+            self.ptls[self.ptlid].prepare_move(pandas.DataFrame.from_dict(requests),anticollision=None)
             expected_positions = self.ptls[self.ptlid].execute_move()
         else:
             expected_positions = self.ptls[self.ptlid].get_positions()

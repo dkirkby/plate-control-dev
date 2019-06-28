@@ -1,13 +1,6 @@
 import os
 import sys
-sys.path.remove('/software/products/plate_control-trunk/xytest')
-sys.path.remove('/software/products/plate_control-trunk/posfidfvc')
-sys.path.remove('/software/products/plate_control-trunk/petalbox')
-sys.path.remove('/software/products/plate_control-trunk/petal')
 
-sys.path.append(os.path.abspath('../petal/'))
-sys.path.append(os.path.abspath('../posfidfvc/'))
-sys.path.append(os.path.abspath('../xytest/'))
 
 import petal
 import posmovemeasure
@@ -187,6 +180,7 @@ class Derive_Platemaker_Pars(object):
             self.fit_and_plot(fvcX_arr,fvcY_arr,metroX_arr,metroY_arr,flip=flip)
 
         else:
+            import pdb; pdb.set_trace()
 
             num_objects=input('How many dots are there in the image?')
             num_objects=int(num_objects)
@@ -473,8 +467,6 @@ class Derive_Platemaker_Pars(object):
             mask_selected[ind_min[0]]=1 
         return output_x,output_y
             
-if __name__=="__main__":
-    gui = Derive_Platemaker_Pars()
 
 class SourceSelector():
         """
@@ -665,3 +657,5 @@ class SourceSelector():
 
 
 
+if __name__=="__main__":
+    gui = Derive_Platemaker_Pars()

@@ -96,7 +96,7 @@ class Derive_Platemaker_Pars(object):
             data = self.identify_one_fid(fid)
             if data is not None:
                 self.fids_identified[fid] = data 
-        import pdb;pdb.set_trace()    
+
         #Identify pinhole numbers and label data
         XY = {'ID':[], 'fvcX':[], 'fvcY':[]}
         for fidid, data in self.fids_identified.items():
@@ -193,6 +193,7 @@ class Derive_Platemaker_Pars(object):
             num_detected = len(these_xyref)
             if num_detected != num_expected:
                 print('warning: expected ' + str(num_expected) + ' dots for fiducial ' + fidid + ', but detected ' + str(num_detected))
+                ptl.set_fiducials(fidid, 'on')
                 return
             else:
                 ptl.set_posfid_val(fidid,'DOTS_FVC_X',[these_xyref[i][0] for i in range(num_detected)])

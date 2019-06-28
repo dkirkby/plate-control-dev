@@ -22,7 +22,7 @@ MoveGUI
 #          V1.1  Kai Zhang, 2018-04-02. Add canbus input to talk to different cans for EM Petal. 
 #          V1.2  Kai Zhang  2018-05-01. Add Reload Canbus botton so that no restart is needed. Facilitate the petal check. 
 """
-account='badu'
+account='msdos'
 import os
 import sys
 import datetime
