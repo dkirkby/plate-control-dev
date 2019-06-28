@@ -242,6 +242,8 @@ class XYTest(PECS):
                 movetype, cmd = 'corrective', 'dXdY'
                 tgt = - movedf.loc[idx[i, posids],  # note minus sign
                                    [f'err_x_{n-1}', f'err_y_{n-1}']].values
+                # check for NaN values and replace with zero
+                tgt = np.nan_to_num(tgt)
             # build move request dataframe for a petal
             note = (f'xy test: {self.data.test_name}; '  # same for all
                     f'target {i+1} of {self.data.ntargets}; '
@@ -298,11 +300,11 @@ class XYTest(PECS):
                     f'{self.data.posdf.loc[posid].to_string()}')
             pass
             # if anticolliions is on, disable positioner and neighbours
-        measured_QS = measured_QS.loc[included]
+        # measured_QS = measured_QS.loc[posids]
         # TODO: call test_and_update_TP here
 
         # TODO: handle spotmatch errors? no return code from FVC proxy?
-        # TODO: if measured position is [0, 0], shall we disable positioner?
+        # shall we disable positioner?
         # calculate below measured obsXY from measured QS and write to movedf
         q_rad = np.radians(measured_QS['q'])
         r = pc.S2R_lookup(measured_QS['s'])
