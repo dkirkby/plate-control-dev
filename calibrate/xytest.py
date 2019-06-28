@@ -285,7 +285,20 @@ class XYTest(PECS):
         # measure ten petals with FVC after all petals have moved
         measured_QS = (pd.DataFrame(self.fvc.measure(expected_QS))
                        .rename(columns={'id': 'DEVICE_ID'})
-                       .set_index('DEVICE_ID')).loc[posids]
+                       .set_index('DEVICE_ID'))
+        if not set(posids).issubset(set(measured_QS.index)):
+            included = set(posids).intersection(set(measured_QS.index))
+            missing = set(posids) - included
+            self.logger.warning(
+                f'Requested posids are not included in FVC measure return: '
+                f'{missing}')
+            for posid in missing:
+                self.logger.warning(
+                    f'Missing posid: {posid}, info\n'
+                    f'{self.data.posdf.loc[posid].to_string()}')
+            pass
+            # if anticolliions is on, disable positioner and neighbours
+        measured_QS = measured_QS.loc[included]
         # TODO: call test_and_update_TP here
 
         # TODO: handle spotmatch errors? no return code from FVC proxy?

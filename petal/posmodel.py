@@ -212,6 +212,7 @@ class PosModel(object):
             move_data['move_time']    = abs(move_data['distance']) / move_data['speed']
         else:
             dist_cruise = distance - dist_spinup
+            self.print(f'dist_cruise, type: {type(dist_cruise)}, value: {dist_cruise}, _stepsize_cruise, type: {type(_stepsize_cruise)}, value: {_stepsize_cruise}') 
             move_data['motor_step']   = int(round(dist_cruise / self._stepsize_cruise))
             move_data['distance']     = move_data['motor_step'] * self._stepsize_cruise + dist_spinup
             move_data['speed_mode']   = 'cruise'
