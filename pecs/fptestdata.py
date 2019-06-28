@@ -220,10 +220,10 @@ class FPTestData:
             errXY = moves[f'err_xy_{n}'] * 1000  # convert mm to microns
             u = r'$\mathrm{\mu m}$'
             text = (f'SUBMOVE: {n}\n'  # text box for submove errors
-                    f'error max: {np.max(errXY): 6.1f} {u}\n'
-                    f'      rms: {np.max(errXY): 6.1f} {u}\n'
-                    f'      avg: {np.rms(errXY): 6.1f} {u}\n'
-                    f'      min: {np.min(errXY): 6.1f} {u}')
+                    f'error max: {np.max(errXY):6.1f} {u}\n'
+                    f'      rms: {np.rms(errXY):6.1f} {u}\n'
+                    f'      avg: {np.mean(errXY):6.1f} {u}\n'
+                    f'      min: {np.min(errXY):6.1f} {u}')
             ax.text(0.02, 0.98, text, transform=ax.transAxes,
                     horizontalalignment='left', verticalalignment='top',
                     family='monospace', fontsize=10,

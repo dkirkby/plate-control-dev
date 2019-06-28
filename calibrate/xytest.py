@@ -251,6 +251,7 @@ class XYTest(PECS):
                                 'X1': tgt[:, 0],  # shape (N_posids, 1)
                                 'X2': tgt[:, 1],  # shape (N_posids, 1)
                                 'LOG_NOTE': note})
+            # TODO: add commands to log display
             # TODO: anti-collision schedule rejection needs to be recorded
             # accepted_requests = ptl.prepare_move(
             #     req, anticollision=self.data.anticollision)
@@ -272,7 +273,7 @@ class XYTest(PECS):
             # # get expected posTP from petal and write to movedf after move
             ret_TP = (ptl.get_positions(posids=posids, return_coord='posTP')
                       .set_index('DEVICE_ID'))
-            self.loggers[ptlid].debug('expected posTP after move {n}:\n'
+            self.loggers[ptlid].debug(f'expected posTP after move {n}:\n'
                                       + ret_TP.to_string())
             # write posTP for a petal to movedf
             new = pd.DataFrame({f'pos_t_{n}': ret_TP['X1'],
@@ -285,6 +286,8 @@ class XYTest(PECS):
         measured_QS = (pd.DataFrame(self.fvc.measure(expected_QS))
                        .rename(columns={'id': 'DEVICE_ID'})
                        .set_index('DEVICE_ID')).loc[posids]
+        # TODO: call test_and_update_TP here
+
         # TODO: handle spotmatch errors? no return code from FVC proxy?
         # TODO: if measured position is [0, 0], shall we disable positioner?
         # calculate below measured obsXY from measured QS and write to movedf
@@ -295,6 +298,9 @@ class XYTest(PECS):
                            dtype=np.float32, index=measured_QS.index)
         self._update(new, i)
         self.calculate_xy_errors(i, n)
+        # TODO: add log of error for each move
+        # for ptlid in self.data.ptlids:
+
 
     def make_summary_plots(self, posids=None):
         if posids is None:
