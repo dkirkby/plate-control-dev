@@ -28,7 +28,7 @@ class Arc(PECS):
         for request in requests_list_T:
             print('Measuring theta arc point '+str(i)+' of '+str(len(requests_list_T)))
             i += 1 
-            self.ptls[self.ptlid].prepare_move(request)
+            self.ptls[self.ptlid].prepare_move(request, anticollision=None)
             expected_positions = self.ptls[self.ptlid].execute_move()
             measured_positions = self.fvc.measure(expected_positions)
             measured_positions = pandas.DataFrame(measured_positions)
@@ -42,7 +42,7 @@ class Arc(PECS):
         for request in requests_list_P:
             print('Measuring phi arc point '+str(i)+' of '+str(len(requests_list_P)))
             i += 1
-            self.ptls[self.ptlid].prepare_move(request)
+            self.ptls[self.ptlid].prepare_move(request, anticollision=None)
             expected_positions = self.ptls[self.ptlid].execute_move()
             measured_positions = self.fvc.measure(expected_positions)
             measured_positions = pandas.DataFrame(measured_positions)
