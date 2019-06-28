@@ -33,7 +33,7 @@ class Petal(object):
     Convenience wrapper functions are provided to combine these steps when desirable.
 
     Required initialization inputs:
-        petal_id        ... unique string id of the petal
+        petal_id        ... unique int id of the petal
 
     Optional initialization inputs:
         posids          ... list, positioner ids. If provided, validate against the ptl_setting file. If empty [], read from the ptl_setting file directly.
@@ -60,36 +60,29 @@ class Petal(object):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
         # petal setup
-        self.petal_state = posstate.PosState(
-            unit_id=petal_id, device_type='ptl', logging=True,
-            printfunc=self.printfunc)
-        if petal_id is None:
-            self.petal_id = int(self.petal_state.conf['PETAL_ID']) # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
-        else:
-            self.petal_id = int(petal_id)
-        if petalbox_id is None:
-            self.petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
-        else:
-            self.petalbox_id = petalbox_id
-        if not posids:
-            self.printfunc('posids not given, read from ptl_settings file')
-            posids = self.petal_state.conf['POS_IDS']
-        else:
-            posids_file = self.petal_state.conf['POS_IDS'] 
-#            if set(posids) != set(posids_file):
-#                self.printfunc('WARNING: Input posids are not consistent with ptl_setting file')
-#                self.printfunc('Input posids:'+str(posids))
-#                self.printfunc('Posids from file:'+str(posids_file))
-        if not fidids:
-            self.printfunc('fidids not given, read from ptl_settings file')
-            fidids = self.petal_state.conf['FID_IDS']
-        else:
-            fidids_file = self.petal_state.conf['FID_IDS']
-#            if set(fidids) != set(fidids_file):
-#                self.printfunc('WARNING: Input fidids are not consistent with ptl_setting file')
-#                self.printfunc('Input fidids:'+str(fidids))
-#                self.printfunc('Fidids from file:'+str(fidids_file))
-        if fidids in ['',[''],None,{''}]: # check included to handle simulation cases, where no fidids argued
+        if None in [petal_id, petalbox_id, fidids, posids, shape]:
+            self.printfunc('Some parameters not provided to __init__, reading petal config.')
+            self.petal_state = posstate.PosState(
+                unit_id=petal_id, device_type='ptl', logging=True,
+                printfunc=self.printfunc)
+            if petal_id is None:
+                petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
+            if petalbox_id is None:
+                petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
+            if posids is None:
+                self.printfunc('posids not given, read from ptl_settings file')
+                posids = self.petal_state.conf['POS_IDS']
+            if fidids is None:
+                self.printfunc('fidids not given, read from ptl_settings file')
+                fidids = self.petal_state.conf['FID_IDS']
+            if shape is None:
+                shape = self.petal_state.conf['SHAPE']
+
+        self.petalbox_id = petalbox_id
+        self.petal_id = int(petal_id)
+        self.shape = shape
+
+        if fidids in ['',[''],{''}]: # check included to handle simulation cases, where no fidids argued
             fidids = {}
 
         self.verbose = verbose # whether to print verbose information at the terminal
@@ -98,7 +91,6 @@ class Petal(object):
             import petalcomm
             self.comm = petalcomm.PetalComm(self.petalbox_id, user_interactions_enabled=user_interactions_enabled)
             self.comm.pbset('non_responsives', 'clear') #reset petalcontroller's list of non-responsive canids
-        self.shape = self.petal_state.conf['SHAPE']
 
         # database setup
         self.db_commit_on = db_commit_on if DB_COMMIT_AVAILABLE else False
@@ -165,6 +157,7 @@ class Petal(object):
         self.multi_request_bit = 1<<23
         self.dev_nonfunctional_bit = 1<<24
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
+        self.disabled_devids = [] #list of devids with DEVICE_CLASSIFIED_NONFUNCTIONAL = True or FIBER_INTACT = False
         self._initialize_pos_flags()
         self._apply_state_enable_settings()
         
@@ -1035,8 +1028,6 @@ class Petal(object):
                     for item_id in self.posids.union(self.fidids):
                         if self.get_posfid_val(item_id,'CAN_ID') == canid:
                             self.set_posfid_val(item_id,'CTRL_ENABLED',False)
-                            #self.petal_state.conf['DISABLED_BUFFER'].append(item_id)
-                            #self.petal_state.write()
                             if self.pb_config:
                                 self._update_can_enabled_map(item_id, False)
                             self.pos_flags[item_id] |= self.comm_error_bit
@@ -1134,7 +1125,6 @@ class Petal(object):
         """Reads in enable statuses for all devices and builds a formatted for petalbox can 
         id map by power supply key.
         """
-        self.disabled_devids = self.petal_state.conf['DISABLED_BUFFER']
         self.can_enabled_map = {}
         for supply in pc.power_supply_can_map.keys():
             self.can_enabled_map[supply] = dict((k, {}) for k in pc.power_supply_can_map[supply])
@@ -1203,10 +1193,12 @@ class Petal(object):
                 self.set_posfid_val(devid, 'CTRL_ENABLED', False)
                 self.pos_flags[devid] |= self.ctrl_disabled_bit
                 self.pos_flags[devid] |= self.dev_nonfunctional_bit
+                self.disabled_devids.append(devid)
             if devid in self.posids:
                 if not self.get_posfid_val(devid, 'FIBER_INTACT'):
                     self.set_posfid_val(devid, 'CTRL_ENABLED', False)
                     self.pos_flags[devid] |= self.ctrl_disabled_bit
                     self.pos_flags[devid] |= self.fiber_broken_bit
-                    self.pos_flags[devid] |= self.bad_fiber_fvc_bit            
+                    self.pos_flags[devid] |= self.bad_fiber_fvc_bit 
+                    self.disabled_devids.append(devid)           
 
