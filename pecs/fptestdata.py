@@ -237,7 +237,7 @@ class FPTestData:
             ax.set_ylabel(r'$y/\mathrm{mm}$')
             ax.legend(loc='upper right', fontsize=10)
             fig.savefig(path.format(n), bbox_inches='tight')
-            self.loggers[ptlid].info(f'saved xyplot: {path.format(n)}')
+            self.loggers[ptlid].debug(f'saved xyplot: {path.format(n)}')
             plt.close(fig)
 
     def export_move_data(self):

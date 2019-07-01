@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import posconstants as pc
 from configobj import ConfigObj
+from tqdm import tqdm
 sys.path.append('../pecs')
 from pecs import PECS
 from fptestdata import FPTestData
@@ -183,6 +184,28 @@ class XYTest(PECS):
         newdf = newdf.set_index(pd.MultiIndex.from_product([[i], newdf.index]))
         self.data.movedf.update(newdf)  # write to movedf
 
+    def run_xyaccuracy_test(self):
+        # led_initial = self.illuminator.get('led')  # no illuminator ctrl yet
+        # self.illuminator.set(led='ON')  # turn on illuminator
+        t_i = self.data.now
+        for i in range(self.data.ntargets):  # test loop over all test targets
+            self.logger.info(f'Setting target {i+1} of {self.data.ntargets}')
+            self.record_basic_move_data(i)  # for each target, record basics
+            for n in range(self.data.num_corr_max + 1):
+                self.logger.info(
+                    f'Target {i+1} of {self.data.ntargets}, '
+                    f'submove {n+1} of {self.data.num_corr_max+1}')
+                measured_QS = self.move_measure(i, n)
+                self.update_calibrations(measured_QS)
+                self.record_measurement(measured_QS, i, n)
+                self.calculate_xy_errors(i, n)
+            # TODO: make real-time plots as test runs
+        t_f = self.data.now
+        self.logger.info(f'Test complete, duration {t_f - t_i}.\n Plotting...')
+        # self.illuminator.set(led=led_initial)  # restore initial LED state
+        if self.data.test_cfg['make_plots']:
+            self.make_summary_plots()  # plot for all positioners by default
+
     def record_basic_move_data(self, i):
         self.logger.info('Recording basic move data for new xy target...')
         movedf = self.data.movedf
@@ -197,34 +220,6 @@ class XYTest(PECS):
                       .rename(columns={'TOTAL_MOVE_SEQUENCES': 'cycle'}))
             # TODO: store other posstate stuff here
             self._update(cycles.set_index('DEVICE_ID'), i)
-
-    def calculate_xy_errors(self, i, n):
-        movedf = self.data.movedf
-        # convenience functin c returns a column of the movedf for all pos
-        def c(col_name): return movedf.loc[idx[i], [col_name]].values
-        movedf.loc[idx[i], [f'err_x_{n}']] = c(f'meas_x_{n}') - c('target_x')
-        movedf.loc[idx[i], [f'err_y_{n}']] = c(f'meas_y_{n}') - c('target_y')
-        movedf.loc[idx[i], [f'err_xy_{n}']] = np.linalg.norm(
-                np.hstack([c(f'err_x_{n}'), c(f'err_y_{n}')]), axis=1)
-
-    def run_xyaccuracy_test(self):
-        # led_initial = self.illuminator.get('led')  # no illuminator ctrl yet
-        # self.illuminator.set(led='ON')  # turn on illuminator
-        t_i = self.data.now
-        for i in range(self.data.ntargets):  # test loop over all test targets
-            self.logger.info(f'Setting target {i+1} of {self.data.ntargets}')
-            self.record_basic_move_data(i)  # for each target, record basics
-            for n in range(self.data.num_corr_max + 1):
-                self.logger.info(
-                    f'Target {i+1} of {self.data.ntargets}, '
-                    f'submove {n} of {self.data.num_corr_max + 1}')
-                self.move_measure(i, n)
-            # TODO: make real-time plots as test runs
-        t_f = self.data.now
-        self.logger.info(f'Test complete, duration {t_f - t_i}.\n Plotting...')
-        # self.illuminator.set(led=led_initial)  # restore initial LED state
-        if self.data.test_cfg['make_plots']:
-            self.make_summary_plots()  # plot for all positioners by default
 
     def move_measure(self, i, n):
         '''one complete iteration: move ten petals once, measure once
@@ -297,19 +292,30 @@ class XYTest(PECS):
             included = set(posids).intersection(set(measured_QS.index))
             missing = set(posids) - included
             self.logger.warning(
-                f'{len(missing)} requested posids are not included in '
-                f' FVC measure return: {missing}')
+                f'{len(missing)} requested devices are not included in '
+                f' FVC.measure() return: {missing}')
             for posid in missing:
                 self.logger.debug(
                     f'Missing posid: {posid}, info\n'
                     f'{self.data.posdf.loc[posid].to_string()}')
-            pass
-            # if anticolliions is on, disable positioner and neighbours
-        # measured_QS = measured_QS.loc[posids]
-        # TODO: call test_and_update_TP here
-        # updates = self.ptls[self.ptlid].test_and_update_TP(used_positions, tp_updates_tol=0.0, tp_updates_fraction=1.0, tp_updates=mode, auto_update=auto_update)
-        # TODO: handle spotmatch errors? no return code from FVC proxy?
+        return measured_QS
+        # TODO: if anticolliions is on, disable positioner and neighbours
         # shall we disable positioner?
+        # for ptlid in self.data.ptlids:
+
+    def update_calibrations(self, measured_QS):
+        # TODO: call test_and_update_TP here
+        for ptlid in tqdm(self.data.ptlids):
+            self.loggers[ptlid].info('Testing and updating posTP...')
+            posids = set(self.data.posids_ptl[ptlid]).intersection(
+                set(measured_QS.index))
+            updates = self.ptls[ptlid].test_and_update_TP(
+                measured_QS.loc[posids].reset_index())
+            self.loggers[ptlid].debug(f'test_and_update_TP returned:\n'
+                                      f'{updates.to_string()}')
+
+    def record_measurement(self, measured_QS, i, n):
+
         # calculate below measured obsXY from measured QS and write to movedf
         q_rad = np.radians(measured_QS['q'])
         r = pc.S2R_lookup(measured_QS['s'])
@@ -317,14 +323,29 @@ class XYTest(PECS):
                             f'meas_y_{n}': r * np.sin(q_rad)},
                            dtype=np.float32, index=measured_QS.index)
         self._update(new, i)
-        self.calculate_xy_errors(i, n)
-        # TODO: add log of error for each move
-        # for ptlid in self.data.ptlids:
+
+    def calculate_xy_errors(self, i, n):  # calculate xy error columns in df
+        movedf = self.data.movedf
+        # convenience functin c returns a column of the movedf for all pos
+        def c(col_name): return movedf.loc[idx[i], [col_name]].values
+        movedf.loc[idx[i], [f'err_x_{n}']] = c(f'meas_x_{n}') - c('target_x')
+        movedf.loc[idx[i], [f'err_y_{n}']] = c(f'meas_y_{n}') - c('target_y')
+        movedf.loc[idx[i], [f'err_xy_{n}']] = np.linalg.norm(
+                np.hstack([c(f'err_x_{n}'), c(f'err_y_{n}')]), axis=1)
+        for ptlid in self.data.ptlids:  # log of error after each move
+            errXY = movedf.loc[idx[i, self.data.posids_ptl[ptlid]],
+                               [f'err_xy_{n}']]
+            self.loggers[ptlid].info(
+                f'SUBMOVE: {n}, errXY for all positioners:\n'
+                f'    max: {np.max(errXY):6.1f} μm\n'
+                f'    rms: {np.sqrt(np.mean(np.square(errXY):6.1f} μm\n'
+                f'    avg: {np.mean(errXY):6.1f} μm\n'
+                f'    min: {np.min(errXY):6.1f} μm')
 
     def make_summary_plots(self, posids=None):
         if posids is None:
             posids = self.data.posids
-        for posid in posids:
+        for posid in tqdm(posids):
             self.data.make_summary_plot(posid)
 
 
