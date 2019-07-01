@@ -184,22 +184,23 @@ class XYTest(PECS):
         newdf = newdf.set_index(pd.MultiIndex.from_product([[i], newdf.index]))
         self.data.movedf.update(newdf)  # write to movedf
 
-    def run_xyaccuracy_test(self):
+    def run_xyaccuracy_test(self, disable_unmatched=True):
         # led_initial = self.illuminator.get('led')  # no illuminator ctrl yet
         # self.illuminator.set(led='ON')  # turn on illuminator
         t_i = self.data.now
         for i in range(self.data.ntargets):  # test loop over all test targets
-            self.logger.info(f'Setting target {i+1} of {self.data.ntargets}')
+            self.logger.info(f'Target {i+1} of {self.data.ntargets}')
             self.record_basic_move_data(i)  # for each target, record basics
             for n in range(self.data.num_corr_max + 1):
                 self.logger.info(
                     f'Target {i+1} of {self.data.ntargets}, '
                     f'submove {n+1} of {self.data.num_corr_max+1}')
-                measured_QS = self.move_measure(i, n)
+                measured_QS = self.move_measure(i, n)  # includes 10 petals
+                self.check_unmatched(measured_QS, disable_unmatched)
                 self.update_calibrations(measured_QS)
                 self.record_measurement(measured_QS, i, n)
                 self.calculate_xy_errors(i, n)
-            # TODO: make real-time plots as test runs
+            # TODO: make real-time plots as test runs?
         t_f = self.data.now
         self.logger.info(f'Test complete, duration {t_f - t_i}.\n Plotting...')
         # self.illuminator.set(led=led_initial)  # restore initial LED state
@@ -213,12 +214,11 @@ class XYTest(PECS):
         movedf.loc[idx[i, :], 'timestamp'] = self.data.now
         movedf.loc[idx[i, :], 'move_log'] = \
             'local posmove csv log deprecated; check posmoveDB instead.'
-        # self.ptls[int(ptlid)].states[posid].log_basename
         for ptlid in self.data.ptlids:
             ptl, posids = self.ptls[ptlid], self.data.posids_ptl[ptlid]
             cycles = (ptl.get_pos_vals(['TOTAL_MOVE_SEQUENCES'], posids)
                       .rename(columns={'TOTAL_MOVE_SEQUENCES': 'cycle'}))
-            # TODO: store other posstate stuff here
+            # TODO: store other posstate values here
             self._update(cycles.set_index('DEVICE_ID'), i)
 
     def move_measure(self, i, n):
@@ -226,7 +226,7 @@ class XYTest(PECS):
         ith target, nth move'''
         movedf = self.data.movedf
         # move ten petals
-        # TODO: parallelise this and have ten petals run simultaneously
+        # TODO: parallelise this loop and have ten petals run simultaneously
         expected_QS_list = []  # each item is a dataframe for one petal
         for ptlid in self.data.ptlids:
             posids = self.data.posids_ptl[ptlid]  # all records obey this order
@@ -254,7 +254,6 @@ class XYTest(PECS):
                                 'X1': tgt[:, 0],  # shape (N_posids, 1)
                                 'X2': tgt[:, 1],  # shape (N_posids, 1)
                                 'LOG_NOTE': note})
-            # TODO: add commands to log display
             # TODO: anti-collision schedule rejection needs to be recorded
             # accepted_requests = ptl.prepare_move(
             #     req, anticollision=self.data.anticollision)
@@ -284,38 +283,46 @@ class XYTest(PECS):
             self._update(new, i)
         # combine expected QS list for all petals to form a single dataframe
         expected_QS = pd.concat(expected_QS_list)
-        # measure ten petals with FVC after all petals have moved
+        # measure ten petals with FVC at once, FVC after all petals have moved
         measured_QS = (pd.DataFrame(self.fvc.measure(expected_QS))
                        .rename(columns={'id': 'DEVICE_ID'})
                        .set_index('DEVICE_ID'))
-        if not set(posids).issubset(set(measured_QS.index)):
-            included = set(posids).intersection(set(measured_QS.index))
-            missing = set(posids) - included
-            self.logger.warning(
-                f'{len(missing)} requested devices are not included in '
-                f' FVC.measure() return: {missing}')
-            for posid in missing:
-                self.logger.debug(
-                    f'Missing posid: {posid}, info\n'
-                    f'{self.data.posdf.loc[posid].to_string()}')
         return measured_QS
-        # TODO: if anticolliions is on, disable positioner and neighbours
-        # shall we disable positioner?
-        # for ptlid in self.data.ptlids:
 
-    def update_calibrations(self, measured_QS):
-        # TODO: call test_and_update_TP here
-        for ptlid in tqdm(self.data.ptlids):
-            self.loggers[ptlid].info('Testing and updating posTP...')
+    def check_unmatched(self, measured_QS, disable_unmatched):
+        for ptlid in self.data.ptlids:  # check unmatched positioners
+            posids = self.data.posids_ptl[ptlid]
+            if not set(posids).issubset(set(measured_QS.index)):
+                matched = set(posids).intersection(set(measured_QS.index))
+                unmatched = set(posids) - matched
+                self.logger.warning(
+                    f'{len(unmatched)} of {len(posids)} requested devices '
+                    f'are not included in FVC.measure() return:\n{unmatched}')
+                for posid in unmatched:
+                    self.loggers[ptlid].debug(
+                        f'Missing posid: {posid}, pos details:\n'
+                        f'{self.data.posdf.loc[posid].to_string()}')
+                if disable_unmatched:
+                    # if anticolliions is on, disable positioner and neighbours
+                    self.disable_pos_and_neighbors(unmatched)
+            else:
+                self.loggers[ptlid].info(f'All {len(posids)} fibres matched.')
+
+    def update_calibrations(self, measured_QS):  # test and update TP here
+        self.logger.info('Testing and updating posTP...')
+        for ptlid in self.data.ptlids:
             posids = set(self.data.posids_ptl[ptlid]).intersection(
-                set(measured_QS.index))
-            updates = self.ptls[ptlid].test_and_update_TP(
-                measured_QS.loc[posids].reset_index())
+                set(measured_QS.index))  # only update measured, valid posid
+            df = measured_QS.loc[posids].reset_index()
+            assert ('Q' in df.columns and 'S' in df.columns), f'df.columns'
+            updates = self.ptls[ptlid].test_and_update_TP(df)
+            assert type(updates) == pd.core.frame.DataFrame, (
+                f'Exception calling test_and_update_TP, returned:\n'
+                f'{updates}')
             self.loggers[ptlid].debug(f'test_and_update_TP returned:\n'
                                       f'{updates.to_string()}')
 
     def record_measurement(self, measured_QS, i, n):
-
         # calculate below measured obsXY from measured QS and write to movedf
         q_rad = np.radians(measured_QS['q'])
         r = pc.S2R_lookup(measured_QS['s'])
@@ -355,6 +362,6 @@ if __name__ == "__main__":
                         'test_settings', test_filename)  # built path to cfg
     test_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')
     test = XYTest(test_cfg)
-    test.run_xyaccuracy_test()
+    test.run_xyaccuracy_test(disable_unmatched=True)
     test.data.export_move_data()
     test.data.dump_as_one_pickle()
