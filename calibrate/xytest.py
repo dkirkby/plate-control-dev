@@ -287,6 +287,7 @@ class XYTest(PECS):
         measured_QS = (pd.DataFrame(self.fvc.measure(expected_QS))
                        .rename(columns={'id': 'DEVICE_ID'})
                        .set_index('DEVICE_ID'))
+        measured_QS.columns = measured_QS.columns.str.upper()  # rename upper
         return measured_QS
 
     def check_unmatched(self, measured_QS, disable_unmatched):
@@ -327,8 +328,8 @@ class XYTest(PECS):
 
     def record_measurement(self, measured_QS, i, n):
         # calculate below measured obsXY from measured QS and write to movedf
-        q_rad = np.radians(measured_QS['q'])
-        r = pc.S2R_lookup(measured_QS['s'])
+        q_rad = np.radians(measured_QS['Q'])
+        r = pc.S2R_lookup(measured_QS['S'])
         new = pd.DataFrame({f'meas_x_{n}': r * np.cos(q_rad),
                             f'meas_y_{n}': r * np.sin(q_rad)},
                            dtype=np.float32, index=measured_QS.index)
