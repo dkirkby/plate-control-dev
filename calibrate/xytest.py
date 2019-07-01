@@ -338,7 +338,7 @@ class XYTest(PECS):
             self.loggers[ptlid].info(
                 f'SUBMOVE: {n}, errXY for all positioners:\n'
                 f'    max: {np.max(errXY):6.1f} μm\n'
-                f'    rms: {np.sqrt(np.mean(np.square(errXY):6.1f} μm\n'
+                f'    rms: {np.sqrt(np.mean(np.square(errXY))):6.1f} μm\n'
                 f'    avg: {np.mean(errXY):6.1f} μm\n'
                 f'    min: {np.min(errXY):6.1f} μm')
 
