@@ -304,6 +304,9 @@ class XYTest(PECS):
                         f'{self.data.posdf.loc[posid].to_string()}')
                 if disable_unmatched:
                     # if anticolliions is on, disable positioner and neighbours
+                    self.loggers[ptlid].info(
+                        f'Disabling unmatched fibres and their neighbours:\n'
+                        f'{unmatched}')
                     self.disable_pos_and_neighbors(unmatched)
             else:
                 self.loggers[ptlid].info(f'All {len(posids)} fibres matched.')
