@@ -65,7 +65,7 @@ class FPTestData:
         # create save dir for all files: logs, tables, pickels, gzips
         self.dir = os.path.join(
             pc.dirs['xytest_data'],
-            f"{self.test_time.strftime(self.timefmtpath)}-{test_name}")
+            f'{self.test_time.strftime(self.timefmtpath)}-{test_name}')
         self.dirs = {ptlid: os.path.join(self.dir, f'PTL{ptlid}')
                      for ptlid in self.ptlids}
         self.logs = {}  # set up log files and loggers for each petal
@@ -127,6 +127,7 @@ class FPTestData:
         logger.debug(f'=== End of config file dump: {config.filename} ===')
 
     class BroadcastLogger:
+        # TODO: convert this to a class method?
         '''must call methods below for particular logger levels below
         input message can be a string of list of strings
         msg will be broadcasted to all petals
@@ -259,6 +260,10 @@ class FPTestData:
                                      f'{self.dirs[ptlid]}')
 
     def dump_as_one_pickle(self):
+        '''lod the dumped pickle file as follows, protocol is auto determined
+        with open(filename.pkl, 'rb') as handle:
+            data = pickle.load(handle)
+        '''
         del self.logger
         del self.loggers
         with open(os.path.join(self.dir, 'data_dump.pkl'), 'wb') as handle:

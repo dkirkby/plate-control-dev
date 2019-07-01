@@ -210,12 +210,18 @@ class XYTest(PECS):
     def run_xyaccuracy_test(self):
         # led_initial = self.illuminator.get('led')  # no illuminator ctrl yet
         # self.illuminator.set(led='ON')  # turn on illuminator
+        t_i = self.data.now
         for i in range(self.data.ntargets):  # test loop over all test targets
-            self.logger.info(f'Testing target {i+1} of {self.data.ntargets}')
+            self.logger.info(f'Setting target {i+1} of {self.data.ntargets}')
             self.record_basic_move_data(i)  # for each target, record basics
             for n in range(self.data.num_corr_max + 1):
+                self.logger.info(
+                    f'Target {i+1} of {self.data.ntargets}, '
+                    f'submove {n} of {self.data.num_corr_max + 1}')
                 self.move_measure(i, n)
             # TODO: make real-time plots as test runs
+        t_f = self.data.now
+        self.logger.info(f'Test complete, duration {t_f - t_i}.\n Plotting...')
         # self.illuminator.set(led=led_initial)  # restore initial LED state
         if self.data.test_cfg['make_plots']:
             self.make_summary_plots()  # plot for all positioners by default
@@ -261,7 +267,6 @@ class XYTest(PECS):
             #     'prepare_move() returns accepted requests:\n'
             #     + pd.DataFrame(accepted_requests).to_string())
             ptl.prepare_move(req, anticollision=self.data.anticollision)
-
             # execute move, make sure return df has proper format for logging
             # expected_QS = ptl.execute_move(posids=posids, return_coord='QS')
             expected_QS = ptl.execute_move(return_coord='QS')
@@ -292,17 +297,17 @@ class XYTest(PECS):
             included = set(posids).intersection(set(measured_QS.index))
             missing = set(posids) - included
             self.logger.warning(
-                f'Requested posids are not included in FVC measure return: '
-                f'{missing}')
+                f'{len(missing)} requested posids are not included in '
+                f' FVC measure return: {missing}')
             for posid in missing:
-                self.logger.warning(
+                self.logger.debug(
                     f'Missing posid: {posid}, info\n'
                     f'{self.data.posdf.loc[posid].to_string()}')
             pass
             # if anticolliions is on, disable positioner and neighbours
         # measured_QS = measured_QS.loc[posids]
         # TODO: call test_and_update_TP here
-
+        # updates = self.ptls[self.ptlid].test_and_update_TP(used_positions, tp_updates_tol=0.0, tp_updates_fraction=1.0, tp_updates=mode, auto_update=auto_update)
         # TODO: handle spotmatch errors? no return code from FVC proxy?
         # shall we disable positioner?
         # calculate below measured obsXY from measured QS and write to movedf
@@ -315,7 +320,6 @@ class XYTest(PECS):
         self.calculate_xy_errors(i, n)
         # TODO: add log of error for each move
         # for ptlid in self.data.ptlids:
-
 
     def make_summary_plots(self, posids=None):
         if posids is None:
