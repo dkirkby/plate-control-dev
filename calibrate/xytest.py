@@ -298,7 +298,7 @@ class XYTest(PECS):
                 unmatched = set(posids) - matched
                 self.logger.warning(
                     'Please check the numbers: # unmatched spots = '
-                    '# broken fibres + 2 ETC fibres + # unmatched fibres'
+                    '# broken fibres + 2 ETC fibres + # unmatched fibres\n'
                     f'{len(unmatched)} of {len(posids)} requested devices '
                     f'are not included in FVC.measure() return, '
                     'possibly including two dark ETC fibres:'
@@ -357,7 +357,7 @@ class XYTest(PECS):
                 np.hstack([c(f'err_x_{n}'), c(f'err_y_{n}')]), axis=1)
         for ptlid in self.data.ptlids:  # log of error after each move
             errXY = movedf.loc[idx[i, self.data.posids_ptl[ptlid]],
-                               [f'err_xy_{n}']].values
+                               [f'err_xy_{n}']].values * 1000  # to microns
             self.loggers[ptlid].info(
                 f'\nSUBMOVE: {n}, errXY for all positioners:\n'
                 f'    max: {np.max(errXY):6.1f} μm\n'
