@@ -297,13 +297,17 @@ class XYTest(PECS):
                 matched = set(posids).intersection(set(measured_QS.index))
                 unmatched = set(posids) - matched
                 self.logger.warning(
+                    'Please check the numbers: # unmatched spots = '
+                    '# broken fibres + 2 ETC fibres + # unmatched fibres'
                     f'{len(unmatched)} of {len(posids)} requested devices '
-                    f'are not included in FVC.measure() return:\n{unmatched}')
-                for posid in unmatched:
+                    f'are not included in FVC.measure() return, '
+                    'possibly including two dark ETC fibres:'
+                    f':\n{unmatched}')
+                for posid in unmatched:  # log unmatched
                     self.loggers[ptlid].debug(
                         f'Missing posid: {posid}, pos details:\n'
                         f'{self.data.posdf.loc[posid].to_string()}')
-                if disable_unmatched:
+                if disable_unmatched:  # log unmatched and disable them
                     # if anticolliions is on, disable positioner and neighbours
                     self.loggers[ptlid].info(
                         f'Disabling unmatched fibres and their neighbours:\n'
