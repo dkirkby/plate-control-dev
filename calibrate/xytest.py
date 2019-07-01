@@ -194,7 +194,7 @@ class XYTest(PECS):
             for n in range(self.data.num_corr_max + 1):
                 self.logger.info(
                     f'Target {i+1} of {self.data.ntargets}, '
-                    f'submove {n+1} of {self.data.num_corr_max+1}')
+                    f'submove {n} of {self.data.num_corr_max}')
                 measured_QS = self.move_measure(i, n)  # includes 10 petals
                 self.check_unmatched(measured_QS, disable_unmatched)
                 self.update_calibrations(measured_QS)
@@ -308,7 +308,13 @@ class XYTest(PECS):
                     self.loggers[ptlid].info(
                         f'Disabling unmatched fibres and their neighbours:\n'
                         f'{unmatched}')
-                    self.ptls[ptlid].disable_pos_and_neighbors(unmatched)
+                    self.ptls[ptlid].disable_pos_and_neighbors(
+                        list(unmatched))
+                    # remove disabled posids from self attributes
+                    self.data.posids = [posid for posid in self.data.posids
+                                        if posid not in unmatched]
+                    self.data.posids_ptl[ptlid] = [posid for posid in posids
+                                                   if posid not in unmatched]
             else:
                 self.loggers[ptlid].info(f'All {len(posids)} fibres matched.')
 
@@ -345,9 +351,9 @@ class XYTest(PECS):
                 np.hstack([c(f'err_x_{n}'), c(f'err_y_{n}')]), axis=1)
         for ptlid in self.data.ptlids:  # log of error after each move
             errXY = movedf.loc[idx[i, self.data.posids_ptl[ptlid]],
-                               [f'err_xy_{n}']]
+                               [f'err_xy_{n}']].values
             self.loggers[ptlid].info(
-                f'SUBMOVE: {n}, errXY for all positioners:\n'
+                f'\nSUBMOVE: {n}, errXY for all positioners:\n'
                 f'    max: {np.max(errXY):6.1f} μm\n'
                 f'    rms: {np.sqrt(np.mean(np.square(errXY))):6.1f} μm\n'
                 f'    avg: {np.mean(errXY):6.1f} μm\n'
