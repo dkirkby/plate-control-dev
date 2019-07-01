@@ -310,13 +310,15 @@ class XYTest(PECS):
                         f'{unmatched}')
                     self.ptls[ptlid].disable_pos_and_neighbors(
                         list(unmatched))
+                    self.loggers[ptlid].info('Finished disabling positioners.')
                     # remove disabled posids from self attributes
                     self.data.posids = [posid for posid in self.data.posids
                                         if posid not in unmatched]
                     self.data.posids_ptl[ptlid] = [posid for posid in posids
                                                    if posid not in unmatched]
             else:
-                self.loggers[ptlid].info(f'All {len(posids)} fibres matched.')
+                self.loggers[ptlid].info(
+                    f'All {len(posids)} fibres measured and returned by FVC.')
 
     def update_calibrations(self, measured_QS):  # test and update TP here
         self.logger.info('Testing and updating posTP...')
