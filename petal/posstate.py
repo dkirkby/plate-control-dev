@@ -184,7 +184,7 @@ class PosState(object):
         # self.cDB = ConstantsDB().get_constants(
         #     snapshot='DESI', tag='CURRENT', group=group)[group][unit_id]
         self.cdB = self.pDB.constantsDB.get_constants(
-            snapshot='SIM', tag='CURRENT', group=group)[group][unit_id]
+            snapshot='DESI', tag='CURRENT', group=group)[group][unit_id]
         self.unit_id = unit_id
 
     def load_from_cfg(self, unit_id=None):

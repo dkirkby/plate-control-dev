@@ -77,7 +77,7 @@ class Petal(object):
                 fidids = self.petal_state.conf['FID_IDS']
             if shape is None:
                 shape = self.petal_state.conf['SHAPE']
-
+        
         self.petalbox_id = petalbox_id
         self.petal_id = int(petal_id)
         self.shape = shape
