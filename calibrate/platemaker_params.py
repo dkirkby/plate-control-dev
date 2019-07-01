@@ -49,7 +49,7 @@ class Derive_Platemaker_Pars(object):
             self.fvc.scale = self.hwsetup['scale'] # this value is used in setups without fvcproxy / platemaker
             self.fvc.translation = self.hwsetup['translation']
 
-        self.ptl = petal.Petal(petal_id = self.hwsetup['ptl_id'],posids=[],fidids=[],
+        self.ptl = petal.Petal(petal_id = self.hwsetup['ptl_id'],posids=None,fidids=None,
                   simulator_on = False,
                   user_interactions_enabled = True,
                   db_commit_on = False,
