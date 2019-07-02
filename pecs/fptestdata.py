@@ -273,17 +273,20 @@ class FPTestData:
             for r in [rmin, rmax]:  # inner and outer patrol circles
                 c = Circle((offX, offY), r, lw=0.5, color='b', fill=False)
                 ax.add_patch(c)
-            ax.plot(tgtX, tgtY, 'o', ms=4, color='C3', fillstyle='none',
-                    label=r'target $(x, y)$')  # circles for all target points
+            # circles for all target points
+            ax.plot(tgtX, tgtY, 'o', ms=4, mew=0.8, color='C3',
+                    fillstyle='none', label=r'target $(x, y)$')
             meaX, meaY = moves[f'meas_x_{n}'], moves[f'meas_y_{n}']
-            ax.plot(meaX, meaY, '+', ms=6, mew=1, color='k',
+            ax.plot(meaX, meaY, '+', ms=6, mew=0.6, color='k',
                     label=r'measured $(x, y)$')  # measured xy for nth move
             errXY = moves[f'err_xy_{n}'] * 1000  # convert mm to microns
             for i in range(len(tgtX)):
                 ax.annotate(f'{i+1}', xy=(tgtX[i]-0.2, tgtY[i]), color='C3',
-                            size=6, horizontalalignment='right')
+                            size=6, horizontalalignment='right',
+                            verticalalignment='center_baseline')
                 ax.annotate(f'{i+1}', xy=(meaX[i]+0.2, meaY[i]), color='k',
-                            size=6, horizontalalignment='left')
+                            size=6, horizontalalignment='left',
+                            verticalalignment='center_baseline')
             u = r'$\mathrm{\mu m}$'
             text = (f'SUBMOVE: {n}\n'  # text box for submove errors
                     f'error max: {np.max(errXY):6.1f} {u}\n'

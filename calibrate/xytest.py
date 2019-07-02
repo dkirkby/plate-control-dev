@@ -386,6 +386,7 @@ if __name__ == "__main__":
     test = XYTest(xytest_name, xytest_cfg)
     test.run_xyaccuracy_test(disable_unmatched=True)
     test.data.export_move_data()
-    test.data.dump_as_one_pickle()
     if xytest_cfg['make_plots']:
         test.make_summary_plots()  # plot for all positioners by default
+    test.data.dump_as_one_pickle()
+
