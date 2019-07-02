@@ -168,7 +168,7 @@ class XYTest(PECS):
                 np.random.seed(self.data.test_cfg['shuffle_seed'])
                 np.random.shuffle(tgt)  # same shuffled target list for all
                 self.data.targets_pos = {pid: tgt for pid in self.data.posids}
-        else:
+        else:  # same targets for all positioners
             self.data.targets_pos = {pid: tgt for pid in self.data.posids}
 
     def _add_device_id_col(self, df, ptlid):
@@ -235,7 +235,7 @@ class XYTest(PECS):
             if n == 0:  # blind move
                 posXY = np.vstack(   # shape (N_posids, 2)
                     [self.data.targets_pos[posid][i, :] for posid in posids])
-                movetype, cmd = 'blind', 'obxXY'
+                movetype, cmd = 'blind', 'obsXY'
                 offXY = self.data.posdf.loc[posids, ['OFFSET_X', 'OFFSET_Y']]
                 tgt = posXY + offXY.values  # convert to obsXY, shape (N, 2)
                 movedf.loc[idx[i, posids], ['target_x', 'target_y']] = tgt
