@@ -254,6 +254,7 @@ class XYTest(PECS):
                                 'X1': tgt[:, 0],  # shape (N_posids, 1)
                                 'X2': tgt[:, 1],  # shape (N_posids, 1)
                                 'LOG_NOTE': note})
+            self.loggers[ptlid].debug(f'Move requests:\n{req.to_string()}')
             # TODO: anti-collision schedule rejection needs to be recorded
             # accepted_requests = ptl.prepare_move(
             #     req, anticollision=self.data.anticollision)
@@ -274,7 +275,7 @@ class XYTest(PECS):
             # # get expected posTP from petal and write to movedf after move
             ret_TP = (ptl.get_positions(posids=posids, return_coord='posTP')
                       .set_index('DEVICE_ID'))
-            self.loggers[ptlid].debug(f'expected posTP after move {n}:\n'
+            self.loggers[ptlid].debug(f'Expected posTP after move {n}:\n'
                                       + ret_TP.to_string())
             # write posTP for a petal to movedf
             new = pd.DataFrame({f'pos_t_{n}': ret_TP['X1'],
@@ -312,14 +313,16 @@ class XYTest(PECS):
                     self.loggers[ptlid].info(
                         f'Disabling unmatched fibres and their neighbours:\n'
                         f'{unmatched}')
-                    self.ptls[ptlid].disable_pos_and_neighbors(
+                    disabled = self.ptls[ptlid].disable_pos_and_neighbors(
                         list(unmatched))
-                    self.loggers[ptlid].info('Finished disabling positioners.')
+                    assert set(unmatched).issubset(set(disabled))
+                    self.loggers[ptlid].info(
+                        f'Disabled {len(disabled)} positioners:\n{disabled}')
                     # remove disabled posids from self attributes
                     self.data.posids = [posid for posid in self.data.posids
-                                        if posid not in unmatched]
+                                        if posid not in disabled]
                     self.data.posids_ptl[ptlid] = [posid for posid in posids
-                                                   if posid not in unmatched]
+                                                   if posid not in disabled]
             else:
                 self.loggers[ptlid].info(
                     f'All {len(posids)} fibres measured and returned by FVC.')
