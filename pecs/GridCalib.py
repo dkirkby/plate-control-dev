@@ -27,7 +27,7 @@ class Grid(PECS):
         for request in requests_list:
             print('Measuring grid point '+str(i)+' of '+str(len(requests_list)))
             i += 1 
-            self.ptls[self.ptlid].prepare_move(request)
+            self.ptls[self.ptlid].prepare_move(request, anticollision=None)
             expected_positions = self.ptls[self.ptlid].execute_move()
             measured_positions = self.fvc.measure(expected_positions)
             measured_positions = pandas.DataFrame.from_dict(measured_positions)
