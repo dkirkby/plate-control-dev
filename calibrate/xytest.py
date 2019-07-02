@@ -203,8 +203,6 @@ class XYTest(PECS):
         t_f = self.data.now
         self.logger.info(f'Test complete, duration {t_f - t_i}.\n Plotting...')
         # self.illuminator.set(led=led_initial)  # restore initial LED state
-        if self.data.test_cfg['make_plots']:
-            self.make_summary_plots()  # plot for all positioners by default
 
     def record_basic_move_data(self, i):
         self.logger.info('Recording basic move data for new xy target...')
@@ -359,7 +357,7 @@ class XYTest(PECS):
         for ptlid in self.data.ptlids:  # log of error after each move
             err = (movedf.loc[idx[i],
                               [f'err_x_{n}', f'err_y_{n}', f'err_xy_{n}']]
-                   .sort_values('err_xy_0', ascending=False))
+                   .sort_values(f'err_xy_{n}', ascending=False))
             errXY = err[f'err_xy_{n}'].values * 1000  # to microns
             self.loggers[ptlid].info(
                 f'\nSUBMOVE: {n}, errXY for all positioners:\n'
@@ -389,3 +387,5 @@ if __name__ == "__main__":
     test.run_xyaccuracy_test(disable_unmatched=True)
     test.data.export_move_data()
     test.data.dump_as_one_pickle()
+    if xytest_cfg['make_plots']:
+        test.make_summary_plots()  # plot for all positioners by default

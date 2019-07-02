@@ -246,6 +246,65 @@ class FPTestData:
             self.loggers[ptlid].debug(f'saved xyplot: {path.format(n)}')
             plt.close(fig)
 
+    def make_error_plot(self, posid):
+        row = self.posdf.loc[posid]  # row containing calibration values
+        ptlid, offX, offY, r1, r2, posT = row[
+            ['PETAL_ID', 'OFFSET_X', 'OFFSET_Y', 'LENGTH_R1', 'LENGTH_R2',
+             'targetable_range_T']]
+        rmin, rmax = r1 - r2, r1 + r2  # min and max patrol radii
+        Tmin, Tmax = np.sort(posT) + row['OFFSET_T']  # targetable obsTheta
+        path = os.path.join(self.dirs[ptlid],  # one plot for all submoves
+                            '{}_xyplot_error.pdf'.format(posid))
+        title = (f'XY Accuracy Test {self.test_time}\n'
+                 f'Positioner {posid} ({self.ntargets} Targets)')
+        moves = self.movedf.loc[idx[:, posid], :]  # all targets for a posid
+        tgtX, tgtY = moves['target_x'], moves['target_y']  # target obsXY
+        Tmin_line_x = [offX, offX + rmax * np.cos(np.radians(Tmin))]
+        Tmin_line_y = [offY, offY + rmax * np.sin(np.radians(Tmin))]
+        Tmax_line_x = [offX, offX + rmax * np.cos(np.radians(Tmax))]
+        Tmax_line_y = [offY, offY + rmax * np.sin(np.radians(Tmax))]
+        # make one plot for each submove
+        for n in range(self.num_corr_max+1):  # one plot for each submove
+            fig, ax = plt.subplots(figsize=(10, 8))
+            ax.plot(Tmin_line_x, Tmin_line_y, '-', lw=0.5, color='C2',
+                    label=r'$\theta_\mathrm{min}$')  # theta min line
+            ax.plot(Tmax_line_x, Tmax_line_y, '--', lw=0.8, color='C2',
+                    label=r'$\theta_\mathrm{max}$')  # theta max line
+            for r in [rmin, rmax]:  # inner and outer patrol circles
+                c = Circle((offX, offY), r, lw=0.5, color='b', fill=False)
+                ax.add_patch(c)
+            ax.plot(tgtX, tgtY, 'o', ms=4, color='C3', fillstyle='none',
+                    label=r'target $(x, y)$')  # circles for all target points
+            meaX, meaY = moves[f'meas_x_{n}'], moves[f'meas_y_{n}']
+            ax.plot(meaX, meaY, '+', ms=6, mew=1, color='k',
+                    label=r'measured $(x, y)$')  # measured xy for nth move
+            errXY = moves[f'err_xy_{n}'] * 1000  # convert mm to microns
+            for i in range(len(tgtX)):
+                ax.annotate(f'{i+1}', xy=(tgtX[i]-0.2, tgtY[i]), color='C3',
+                            size=6, horizontalalignment='right')
+                ax.annotate(f'{i+1}', xy=(meaX[i]+0.2, meaY[i]), color='k',
+                            size=6, horizontalalignment='left')
+            u = r'$\mathrm{\mu m}$'
+            text = (f'SUBMOVE: {n}\n'  # text box for submove errors
+                    f'error max: {np.max(errXY):6.1f} {u}\n'
+                    f'      rms: {np.rms(errXY):6.1f} {u}\n'
+                    f'      avg: {np.mean(errXY):6.1f} {u}\n'
+                    f'      min: {np.min(errXY):6.1f} {u}')
+            ax.text(0.02, 0.98, text, transform=ax.transAxes,
+                    horizontalalignment='left', verticalalignment='top',
+                    family='monospace', fontsize=10,
+                    bbox={'boxstyle': 'round', 'alpha': 0.8,
+                          'facecolor': 'white', 'edgecolor': 'lightgrey'})
+            ax.grid(linestyle='--')
+            ax.set_aspect('equal')
+            ax.set_title(title)
+            ax.set_xlabel(r'$x/\mathrm{mm}$')
+            ax.set_ylabel(r'$y/\mathrm{mm}$')
+            ax.legend(loc='upper right', fontsize=10)
+            fig.savefig(path.format(n), bbox_inches='tight')
+            self.loggers[ptlid].debug(f'saved xyplot: {path.format(n)}')
+            plt.close(fig)
+
     def export_move_data(self):
         '''must have writte self.posids_ptl, a dict keyed by ptlid'''
         self.movedf.to_pickle(os.path.join(self.dir, 'move_df.pkl'),
