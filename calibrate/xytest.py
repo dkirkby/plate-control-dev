@@ -355,7 +355,7 @@ class XYTest(PECS):
         movedf.loc[idx[i], [f'err_xy_{n}']] = np.linalg.norm(
                 np.hstack([c(f'err_x_{n}'), c(f'err_y_{n}')]), axis=1)
         for ptlid in self.data.ptlids:  # log of error after each move
-            err = (movedf.loc[idx[i],
+            err = (movedf.loc[idx[i, self.data.posids_ptl[ptlid]],
                               [f'err_x_{n}', f'err_y_{n}', f'err_xy_{n}']]
                    .sort_values(f'err_xy_{n}', ascending=False))
             errXY = err[f'err_xy_{n}'].values * 1000  # to microns
