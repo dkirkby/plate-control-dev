@@ -105,7 +105,8 @@ class FPTestData:
             self.loggers[ptlid] = logger
         self.logger = self.BroadcastLogger(self.ptlids, self.loggers)
         self.logger.info([f'petalconstants.py version: {pc.code_version}',
-                          f'Saving to directory: {self.dir}'])
+                          f'Saving to directory: {self.dir}',
+                          f'Anti-collision mode: {self.anticollision}'])
         # TODO: log sim state for each petalApp instance
 
     @staticmethod
@@ -220,9 +221,9 @@ class FPTestData:
                     label=r'measured $(x, y)$')  # measured xy for nth move
             errXY = moves[f'err_xy_{n}'] * 1000  # convert mm to microns
             for i in range(len(tgtX)):
-                ax.annotate(f'{i+1}', xy=(tgtX[i]-0.1, tgtY[i]), color='C3',
+                ax.annotate(f'{i+1}', xy=(tgtX[i]-0.2, tgtY[i]), color='C3',
                             size=6, horizontalalignment='right')
-                ax.annotate(f'{i+1}', xy=(meaX[i]+0.1, meaY[i]), color='k',
+                ax.annotate(f'{i+1}', xy=(meaX[i]+0.2, meaY[i]), color='k',
                             size=6, horizontalalignment='left')
             u = r'$\mathrm{\mu m}$'
             text = (f'SUBMOVE: {n}\n'  # text box for submove errors

@@ -157,10 +157,10 @@ class PosState(object):
             unit_id = 'xxxxx'
             if self.type == 'pos':
                 # group = 'fiber_positioner' + '_default'
-                self._val.update(self.pDB.get_pos_def_constants()['xxxxx'])
+                self._val.update(self.pDB.get_pos_def_constants()[unit_id])
             elif self.type == 'fid':
                 # group = 'fiducials' + '_default'
-                self._val.update(self.pDB.get_fid_def_constants()['xxxxx'])
+                self._val.update(self.pDB.get_fid_def_constants()[unit_id])
             else:
                 raise Exception('PTL settings cannot be loaded from DB yet')
         else:  # unit id is supplied

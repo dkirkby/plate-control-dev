@@ -15,6 +15,7 @@ sys.path.append('../pecs')
 from pecs import PECS
 from fptestdata import FPTestData
 
+# TODO: save DF after each target
 
 idx = pd.IndexSlice  # pandas slice for selecting slice using multiindex
 
@@ -60,14 +61,13 @@ class XYTest(PECS):
         self.data.targets_pos   targets dictionary by DEVICE_ID
     """
 
-    def __init__(self, xytest_cfg):
+    def __init__(self, xytest_name, xytest_cfg):
         """Templates for config are found on svn
         https://desi.lbl.gov/svn/code/focalplane/fp_settings/hwsetups/
         https://desi.lbl.gov/svn/code/focalplane/fp_settings/test_settings/
         """
         # self.data.test_cfg = xytest_cfg
-        self.data = FPTestData(os.path.basename(xytest_cfg.filename),
-                               xytest_cfg)
+        self.data = FPTestData(xytest_name, xytest_cfg)
         self.loggers = self.data.loggers  # use these loggers to write to logs
         self.logger = self.data.logger
         # petalids are just ints now, DB and DOS have forced the conversion
@@ -357,14 +357,18 @@ class XYTest(PECS):
         movedf.loc[idx[i], [f'err_xy_{n}']] = np.linalg.norm(
                 np.hstack([c(f'err_x_{n}'), c(f'err_y_{n}')]), axis=1)
         for ptlid in self.data.ptlids:  # log of error after each move
-            errXY = movedf.loc[idx[i, self.data.posids_ptl[ptlid]],
-                               [f'err_xy_{n}']].values * 1000  # to microns
+            err = (movedf.loc[idx[i],
+                              [f'err_x_{n}', f'err_y_{n}', f'err_xy_{n}']]
+                   .sort_values('err_xy_0', ascending=False))
+            errXY = err[f'err_xy_{n}'].values * 1000  # to microns
             self.loggers[ptlid].info(
                 f'\nSUBMOVE: {n}, errXY for all positioners:\n'
                 f'    max: {np.max(errXY):6.1f} μm\n'
                 f'    rms: {np.sqrt(np.mean(np.square(errXY))):6.1f} μm\n'
                 f'    avg: {np.mean(errXY):6.1f} μm\n'
                 f'    min: {np.min(errXY):6.1f} μm')
+            self.loggers[ptlid].info('Worst 10 positioners:\n'
+                                     f'{err.iloc[:10].to_string()}')
 
     def make_summary_plots(self, posids=None):
         if posids is None:
@@ -377,8 +381,11 @@ if __name__ == "__main__":
     test_filename = "xytest_ptl3.cfg"  # specify filename before starting test
     path = os.path.join(os.environ['FP_SETTINGS_PATH'],
                         'test_settings', test_filename)  # built path to cfg
-    test_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')
-    test = XYTest(test_cfg)
+    xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')
+    xytest_name = input('Name of this test (leave blank to use cfg filename:')
+    if xytest_name == '':
+        xytest_name = xytest_cfg.filename
+    test = XYTest(xytest_name, xytest_cfg)
     test.run_xyaccuracy_test(disable_unmatched=True)
     test.data.export_move_data()
     test.data.dump_as_one_pickle()
