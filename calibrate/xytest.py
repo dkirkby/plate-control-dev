@@ -84,7 +84,6 @@ class XYTest(PECS):
         self.data.initialise_movedata(self.data.posids, self.data.ntargets)
         self.logger.info(f'Move data table initialised '
                          f'for {len(self.data.posids)} positioners.')
-        # TODO: add summarizer functionality if needed?
 
     def _get_pos_info(self):
         '''get enabled positioners, according to given posids or busids
@@ -218,7 +217,7 @@ class XYTest(PECS):
             ptl, posids = self.ptls[ptlid], self.data.posids_ptl[ptlid]
             cycles = (ptl.get_pos_vals(['TOTAL_MOVE_SEQUENCES'], posids)
                       .rename(columns={'TOTAL_MOVE_SEQUENCES': 'cycle'}))
-            # TODO: store other posstate values here
+            # store other posstate values here
             self._update(cycles.set_index('DEVICE_ID'), i)
 
     def move_measure(self, i, n):
@@ -226,9 +225,8 @@ class XYTest(PECS):
         ith target, nth move'''
         movedf = self.data.movedf
         # move ten petals
-        # TODO: parallelise this loop and have ten petals run simultaneously
         expected_QS_list = []  # each item is a dataframe for one petal
-        for ptlid in self.data.ptlids:
+        for ptlid in self.data.ptlids:  # TODO: parallelise this
             posids = self.data.posids_ptl[ptlid]  # all records obey this order
             ptl = self.ptls[ptlid]
             # device_loc = self.data.posdf.loc[posids, 'DEVICE_LOC']

@@ -45,8 +45,6 @@ class PosState(object):
         self.logging = logging
         self.write_to_DB = os.getenv('DOS_POSMOVE_WRITE_TO_DB') \
             if DB_COMMIT_AVAILABLE else False
-        # self.printfunc(f'DB_COMMIT_AVAILABLE: {DB_COMMIT_AVAILABLE}')
-        # self.printfunc(f'write_to_DB: {self.write_to_DB}')
         # data initialization
         if device_type in ['pos', 'fid', 'ptl']:
             self.type = device_type
@@ -81,7 +79,9 @@ class PosState(object):
                         self.load_from_cfg(unit_id=unit_id)
                     else:
                         self.load_from_db(unit_id=unit_id)
-        else:  # no DB commit, use local cfg only, skipped after switchover
+        else:
+            # no DB commit, use local cfg only, skipped after switchover
+            # below is directly repositioned from old version
             if petal_id is None:  # ptlid is none, what about unit id?
                 if unit_id is not None and self.type == 'ptl':
                     self.ptlid = unit_id
@@ -135,7 +135,7 @@ class PosState(object):
             # but we still need to 'collect' them
             self.next_log_notes = ['']
 
-        # reset values in the beginning
+        # reset some positioner values in the beginning
         if self.type == 'pos':
             self._val['MOVE_CMD'] = ''
             self._val['MOVE_VAL1'] = ''
@@ -156,23 +156,23 @@ class PosState(object):
         if unit_id is None:  # unit id not supplied, load templates
             unit_id = 'xxxxx'
             if self.type == 'pos':
-                group = 'fiber_positioner' + '_default'
+                # group = 'fiber_positioner' + '_default'
                 self._val.update(self.pDB.get_pos_def_constants()['xxxxx'])
             elif self.type == 'fid':
-                group = 'fiducials' + '_default'
+                # group = 'fiducials' + '_default'
                 self._val.update(self.pDB.get_fid_def_constants()['xxxxx'])
             else:
                 raise Exception('PTL settings cannot be loaded from DB yet')
         else:  # unit id is supplied
             if self.type == 'pos':
-                group = 'fiber_positioner'
+                # group = 'fiber_positioner'
                 # self.printfunc(f'Loading PTL {self.ptlid}, pos {unit_id}...')
                 self._val.update(self.pDB.get_pos_id_info(unit_id))
                 self._val.update(self.pDB.get_pos_constants(unit_id))
                 self._val.update(self.pDB.get_pos_move(unit_id))
                 self._val.update(self.pDB.get_pos_calib(unit_id))
             elif self.type == 'fid':
-                group = 'fiducials'
+                # group = 'fiducials'
                 # self.printfunc(f'Loading PTL {self.ptlid}, fid {unit_id}...')
                 self._val.update(self.pDB.get_fid_id_info(unit_id))
                 self._val.update(self.pDB.get_fid_constants(unit_id))
@@ -181,10 +181,8 @@ class PosState(object):
             else:
                 raise Exception('PTL settings cannot be loaded from DB yet')
         # TODO: check overlap between self.cDB and self._val ?
-        # self.cDB = ConstantsDB().get_constants(
+        # self.cdB = self.pDB.constantsDB.get_constants(
         #     snapshot='DESI', tag='CURRENT', group=group)[group][unit_id]
-        self.cdB = self.pDB.constantsDB.get_constants(
-            snapshot='DESI', tag='CURRENT', group=group)[group][unit_id]
         self.unit_id = unit_id
 
     def load_from_cfg(self, unit_id=None):
