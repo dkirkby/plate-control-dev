@@ -388,4 +388,5 @@ if __name__ == "__main__":
     test.data.export_move_data()
     if xytest_cfg['make_plots']:
         test.make_summary_plots()  # plot for all positioners by default
+    test.data.save_archive()
     test.data.dump_as_one_pickle()

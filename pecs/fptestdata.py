@@ -20,6 +20,7 @@ from itertools import product
 from datetime import datetime, timezone
 from io import StringIO
 from shutil import copyfileobj
+import tarfile
 import pickle
 import numpy as np
 import pandas as pd
@@ -326,6 +327,12 @@ class FPTestData:
                 copyfileobj(self.logs[ptlid], handle)  # write final logs
             self.loggers[ptlid].info('Petal move data written to: '
                                      f'{self.dirs[ptlid]}')
+
+    def save_archive(self):
+        path = os.path.join(self.dir, f'{os.path.basename(self.dir)}.tgz')
+        with tarfile.open(path, 'w:gz') as tar:
+            tar.add(self.dir, arcname=os.path.basename(self.dir))
+        self.logger.info(f'Test data archived: {path}')
 
     def dump_as_one_pickle(self):
         '''lod the dumped pickle file as follows, protocol is auto determined
