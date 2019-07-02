@@ -50,7 +50,7 @@ class PECS:
             from configobj import ConfigObj
             pecs_local = ConfigObj(
                 os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                             '/pecs_local.conf'),
+                             'pecs_local.conf'),
                 unrepr=True, encoding='utf-8')
             platemaker_instrument = pecs_local['pm_instrument']
             fvc_role = pecs_local['fvc_role']
