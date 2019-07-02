@@ -246,7 +246,7 @@ class FPTestData:
             self.loggers[ptlid].debug(f'saved xyplot: {path.format(n)}')
             plt.close(fig)
 
-    def make_error_plot(self, posid):
+    def make_error_plot(self, posid):  # TODO finish this
         row = self.posdf.loc[posid]  # row containing calibration values
         ptlid, offX, offY, r1, r2, posT = row[
             ['PETAL_ID', 'OFFSET_X', 'OFFSET_Y', 'LENGTH_R1', 'LENGTH_R2',
@@ -281,10 +281,10 @@ class FPTestData:
                     label=r'measured $(x, y)$')  # measured xy for nth move
             errXY = moves[f'err_xy_{n}'] * 1000  # convert mm to microns
             for i in range(len(tgtX)):
-                ax.annotate(f'{i+1}', xy=(tgtX[i]-0.2, tgtY[i]), color='C3',
+                ax.annotate(f'{i+1}', xy=(tgtX[i]-0.15, tgtY[i]), color='C3',
                             size=6, horizontalalignment='right',
                             verticalalignment='center_baseline')
-                ax.annotate(f'{i+1}', xy=(meaX[i]+0.2, meaY[i]), color='k',
+                ax.annotate(f'{i+1}', xy=(meaX[i]+0.15, meaY[i]), color='k',
                             size=6, horizontalalignment='left',
                             verticalalignment='center_baseline')
             u = r'$\mathrm{\mu m}$'

@@ -21,9 +21,10 @@ Added illuminator proxy for xy test control over LED (Duan 2019/06/07)
 
 '''
 
-from DOSlib.proxies import FVC, Petal, Illuminator
+from DOSlib.proxies import FVC, Petal  # , Illuminator
 from fvc_sim import FVC_proxy_sim
 import os
+
 
 class PECS:
 
@@ -47,8 +48,10 @@ class PECS:
         # since it is not used in tests.
         if not(platemaker_instrument) or not(fvc_role) or not(ptlids):
             from configobj import ConfigObj
-            pecs_local = ConfigObj(os.path.dirname(os.path.realpath(__file__))+'/pecs_local.conf',
-                                   unrepr=True, encoding='utf-8')
+            pecs_local = ConfigObj(
+                os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                             '/pecs_local.conf'),
+                unrepr=True, encoding='utf-8')
             platemaker_instrument = pecs_local['pm_instrument']
             fvc_role = pecs_local['fvc_role']
             ptlids = pecs_local['ptlids']
@@ -73,8 +76,11 @@ class PECS:
         self.ptls = {}  # call petal proxy
         for ptlid in ptlids:
             self.ptls[ptlid] = Petal(petal_id=ptlid)  # no sim state control
-            self.printfuncs[ptlid](f'Petal proxy initialised for {ptlid}')
-        #self.illuminator = Illuminator() #this crashes don't uncomment this KF 06/18/19
+            self.printfuncs[ptlid](
+                f'Petal proxy initialised for {ptlid}, '
+                f'simulator mode: {self.ptls[ptlid].simulator_on}')
+        # this crashes don't uncomment this KF 06/18/19
+        # self.illuminator = Illuminator()
 
     def printfunc(self, msg):
         '''self.printfuncs is a dict indexed by ptlids as specified for input,

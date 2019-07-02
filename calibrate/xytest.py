@@ -380,7 +380,7 @@ if __name__ == "__main__":
     path = os.path.join(os.environ['FP_SETTINGS_PATH'],
                         'test_settings', test_filename)  # built path to cfg
     xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')
-    xytest_name = input('Name of this test (leave blank to use cfg filename:')
+    xytest_name = input('Name of this test (blank to use cfg filename): ')
     if xytest_name == '':
         xytest_name = xytest_cfg.filename
     test = XYTest(xytest_name, xytest_cfg)
@@ -389,4 +389,3 @@ if __name__ == "__main__":
     if xytest_cfg['make_plots']:
         test.make_summary_plots()  # plot for all positioners by default
     test.data.dump_as_one_pickle()
-
