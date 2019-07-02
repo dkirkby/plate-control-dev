@@ -301,7 +301,7 @@ class XYTest(PECS):
                     'Please check the numbers: # unmatched spots = '
                     '# broken fibres + 2 ETC fibres + # unmatched fibres\n'
                     f'{len(unmatched)} of {len(posids)} requested devices '
-                    f'are not included in FVC.measure() return, '
+                    f'are missing in FVC measurement, '
                     'possibly including two dark ETC fibres:'
                     f':\n{unmatched}')
                 for posid in unmatched:  # log unmatched
@@ -315,9 +315,9 @@ class XYTest(PECS):
                         f'{unmatched}')
                     disabled = self.ptls[ptlid].disable_pos_and_neighbors(
                         list(unmatched))
-                    assert set(unmatched).issubset(set(disabled))
                     self.loggers[ptlid].info(
                         f'Disabled {len(disabled)} positioners:\n{disabled}')
+                    assert set(unmatched).issubset(set(disabled))
                     # remove disabled posids from self attributes
                     self.data.posids = [posid for posid in self.data.posids
                                         if posid not in disabled]
@@ -325,7 +325,7 @@ class XYTest(PECS):
                                                    if posid not in disabled]
             else:
                 self.loggers[ptlid].info(
-                    f'All {len(posids)} fibres measured and returned by FVC.')
+                    f'All {len(posids)} requested fibres measured by FVC.')
 
     def update_calibrations(self, measured_QS):  # test and update TP here
         self.logger.info('Testing and updating posTP...')

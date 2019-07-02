@@ -220,10 +220,10 @@ class FPTestData:
                     label=r'measured $(x, y)$')  # measured xy for nth move
             errXY = moves[f'err_xy_{n}'] * 1000  # convert mm to microns
             for i in range(len(tgtX)):
-                ax.annotate(f'{i+1}', xy=(tgtX[i], tgtY[i]), color='C3',
-                            horizontalalignment='right')
-                ax.annotate(f'{i+1}', xy=(meaX[i], meaY[i]), color='k',
-                            horizontalalignment='left')
+                ax.annotate(f'{i+1}', xy=(tgtX[i]-0.1, tgtY[i]), color='C3',
+                            size=6, horizontalalignment='right')
+                ax.annotate(f'{i+1}', xy=(meaX[i]+0.1, meaY[i]), color='k',
+                            size=6, horizontalalignment='left')
             u = r'$\mathrm{\mu m}$'
             text = (f'SUBMOVE: {n}\n'  # text box for submove errors
                     f'error max: {np.max(errXY):6.1f} {u}\n'
