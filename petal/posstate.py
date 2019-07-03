@@ -199,7 +199,7 @@ class PosState(object):
             self.settings_dir = pc.dirs['temp_files']
             comment = 'Temporary settings file for software test purposes'\
                       ', not associated with aany particular unit.'
-        unit_fn = self.settings_dir + self.unit_basename + '.conf'
+        unit_fn = os.path.join(self.settings_dir, f'{self.unit_basename}.conf')
         if not(os.path.isfile(unit_fn)):
             # unit config doesn't exisit, read in the generic template file
             tmpfn = self.settings_dir + '_unit_settings_DEFAULT.conf'
