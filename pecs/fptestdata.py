@@ -18,6 +18,7 @@ from copy import copy
 import logging
 from glob import glob
 from itertools import product
+from functools import partial
 from datetime import datetime, timezone
 from io import StringIO
 from shutil import copyfileobj
@@ -69,7 +70,6 @@ class FPTestData:
         self.dir = os.path.join(
             pc.dirs['xytest_data'],
             f'{self.test_time.strftime(self.timefmtpath)}-{test_name}')
-        self.logger(f'Saving test data to directory: {self.dir}')
         self.dirs = {ptlid: os.path.join(self.dir, f'PTL{ptlid}')
                      for ptlid in self.ptlids}
         self.logs = {}  # set up log files and loggers for each petal
@@ -110,7 +110,7 @@ class FPTestData:
         self.logger = self.BroadcastLogger(self.ptlids, self.loggers)
         self.logger.info([f'petalconstants.py version: {pc.code_version}',
                           f'Saving to directory: {self.dir}',
-                          f'Anti-collision mode: {self.anticollision}'])
+                          f'Anticollision mode: {self.anticollision}'])
         # TODO: log sim state for each petalApp instance
 
     @staticmethod
@@ -141,9 +141,9 @@ class FPTestData:
             self.ptlids = ptlids
             self.loggers = loggers
 
-        def _log(self, lvl, msg):  # reserved for in-class use, don't call this
+        def _log(self, msg, lvl):  # reserved for in-class use, don't call this
             if type(msg) is list:
-                list(map(self._log, msg))  # map invidual string to _log()
+                list(map(partial(self._log, lvl=lvl), msg))
             elif type(msg) is str:
                 for ptlid in self.ptlids:
                     self.loggers[ptlid].log(lvl, msg)
@@ -151,19 +151,19 @@ class FPTestData:
                 raise Exception('Wrong message data type sent to logger')
 
         def critical(self, msg):
-            self._log(50, msg)
+            self._log(msg, 50)
 
         def error(self, msg):
-            self._log(40, msg)
+            self._log(msg, 40)
 
         def warning(self, msg):
-            self._log(30, msg)
+            self._log(msg, 30)
 
         def info(self, msg):
-            self._log(20, msg)
+            self._log(msg, 20)
 
         def debug(self, msg):
-            self._log(10, msg)
+            self._log(msg, 10)
 
     def initialise_movedata(self, posids, n_targets):
         '''initialise column names for move data table for each positioner

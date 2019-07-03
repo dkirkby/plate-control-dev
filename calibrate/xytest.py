@@ -374,6 +374,7 @@ class XYTest(PECS):
             posids = self.data.posids
         for posid in tqdm(posids):
             self.data.make_summary_plot(posid)
+        self.data.make_summary_plot_binder()
 
 
 if __name__ == "__main__":
