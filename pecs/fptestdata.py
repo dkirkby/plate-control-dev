@@ -263,7 +263,7 @@ class FPTestData:
                 for path in paths:
                     binder.append(path)
                 savepath = os.path.join(self.dirs[ptlid],
-                                        f'all_xyplot_submove_{n}.pdf')
+                                        f'{len(paths)}_xyplot_submove_{n}.pdf')
                 binder.write(savepath)
                 binder.close()
                 self.loggers[ptlid].info(
