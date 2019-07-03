@@ -127,7 +127,7 @@ class XYTest(PECS):
             l1['PETAL_ID'] = ptlid  # add petal id as string column
             ret1 = (self.ptls[ptlid].get_pos_vals(keys, posids)
                     .set_index('DEVICE_ID'))
-            self.loggers[ptlid].debug(f'XY offsets read:\n{ret1.to_string()}')
+            self.loggers[ptlid].debug(f'Calibration read:\n{ret1.to_string()}')
             # read posmodel properties, for now just targetable_range_T
             ret2 = (self.ptls[ptlid].get_posmodel_prop(props, posids)
                     .set_index('DEVICE_ID'))
@@ -201,7 +201,7 @@ class XYTest(PECS):
                 self.calculate_xy_errors(i, n)
             # TODO: make real-time plots as test runs?
         t_f = self.data.now
-        self.logger.info(f'Test complete, duration {t_f - t_i}.\n Plotting...')
+        self.logger.info(f'Test complete, duration {t_f - t_i}. Plotting...')
         # self.illuminator.set(led=led_initial)  # restore initial LED state
 
     def record_basic_move_data(self, i):

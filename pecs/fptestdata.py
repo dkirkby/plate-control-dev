@@ -142,7 +142,7 @@ class FPTestData:
 
         def _log(self, lvl, msg):  # reserved for in-class use, don't call this
             if type(msg) is list:
-                map(self._log, msg)
+                list(map(self._log, msg))  # map invidual string to _log()
             elif type(msg) is str:
                 for ptlid in self.ptlids:
                     self.loggers[ptlid].log(lvl, msg)
