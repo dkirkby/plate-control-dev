@@ -69,6 +69,7 @@ class FPTestData:
         self.dir = os.path.join(
             pc.dirs['xytest_data'],
             f'{self.test_time.strftime(self.timefmtpath)}-{test_name}')
+        self.logger(f'Saving test data to directory: {self.dir}')
         self.dirs = {ptlid: os.path.join(self.dir, f'PTL{ptlid}')
                      for ptlid in self.ptlids}
         self.logs = {}  # set up log files and loggers for each petal
@@ -174,7 +175,7 @@ class FPTestData:
         dtypes0 = ['datetime64[ns]', np.uint32, str]
         cols1 = ['target_x', 'target_y']
         cols2_base = ['meas_x', 'meas_y', 'err_x', 'err_y', 'err_xy',
-                      'pos_t', 'pos_p']
+                      'pos_t', 'pos_p', 'pos_bit', 'pos_flag']
         cols2 = []
         for field, i in product(cols2_base, range(self.num_corr_max+1)):
             cols2.append(f'{field}_{i}')

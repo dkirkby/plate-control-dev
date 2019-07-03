@@ -285,6 +285,7 @@ class XYTest(PECS):
                        .rename(columns={'id': 'DEVICE_ID'})
                        .set_index('DEVICE_ID'))
         measured_QS.columns = measured_QS.columns.str.upper()  # rename upper
+        self.logger.debug(f'FVC measured_QS:\n{measured_QS.to_string()}')
         return measured_QS
 
     def check_unmatched(self, measured_QS, disable_unmatched):
