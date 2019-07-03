@@ -16,6 +16,7 @@ FPTestData.loggers[petal_id]:       logger which writes new lines to log file
 import os
 from copy import copy
 import logging
+from glob import glob
 from itertools import product
 from datetime import datetime, timezone
 from io import StringIO
@@ -26,6 +27,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
+from PyPDF2 import PdfFileMerger
 # from posschedstats import PosSchedStats
 import posconstants as pc
 
@@ -247,6 +249,26 @@ class FPTestData:
             self.loggers[ptlid].debug(f'saved xyplot: {path.format(n)}')
             plt.close(fig)
 
+    def make_summary_plot_binder(self):
+        for ptlid in self.ptlids:
+            self.loggers[ptlid].info(f'Creating xyplot binders...')
+            for n in range(self.num_corr_max+1):
+                template = os.path.join(self.dirs[ptlid],
+                                        f'*_xyplot_submove_{n}.pdf')
+                paths = glob(template)
+                assert len(paths) == len(self.posids_ptl[ptlid]), (
+                        f'Length mismatch: {len(paths)} ≠ '
+                        f'{len(self.posids_ptl[ptlid])}')
+                binder = PdfFileMerger()
+                for path in paths:
+                    binder.append(path)
+                savepath = os.path.join(self.dirs[ptlid],
+                                        f'all_xyplot_submove_{n}.pdf')
+                binder.write(savepath)
+                binder.close()
+                self.loggers[ptlid].info(
+                    f'xyplot binder for submove {n} saved to: {savepath}')
+
     def make_error_plot(self, posid):  # TODO finish this
         row = self.posdf.loc[posid]  # row containing calibration values
         ptlid, offX, offY, r1, r2, posT = row[
@@ -294,7 +316,7 @@ class FPTestData:
                     f'      rms: {np.rms(errXY):6.1f} {u}\n'
                     f'      avg: {np.mean(errXY):6.1f} {u}\n'
                     f'      min: {np.min(errXY):6.1f} {u}')
-            ax.text(0.02, 0.98, text, transform=ax.transAxes,
+            ax.text(0.02, 0.985, text, transform=ax.transAxes,
                     horizontalalignment='left', verticalalignment='top',
                     family='monospace', fontsize=10,
                     bbox={'boxstyle': 'round', 'alpha': 0.8,
@@ -336,7 +358,8 @@ class FPTestData:
 
     def dump_as_one_pickle(self):
         '''lod the dumped pickle file as follows, protocol is auto determined
-        with open(filename.pkl, 'rb') as handle:
+        import pickle
+        with open(path, 'rb') as handle:
             data = pickle.load(handle)
         '''
         del self.logger

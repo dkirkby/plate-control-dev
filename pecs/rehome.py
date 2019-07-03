@@ -19,6 +19,7 @@ class Rehome(PECS):
             posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only, busids=selection).loc[:,'DEVICE_ID'])
         else: #assume is a list of posids
             posid_list = selection
+            print(f'PECS: rehoming {len(posid_list)} positioners: {posid_list}')
         self.ptls[self.ptlid].rehome_pos(posid_list, axis=axis)
 
 if __name__ == '__main__':

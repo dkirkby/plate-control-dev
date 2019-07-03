@@ -245,6 +245,7 @@ class PosState(object):
                 val = nom
         if key in self._val:
             self._val[key] = val
+            # self.printfunc(f'Key {key} set to value: {val}.')  # debug line
         else:
             self.printfunc(f'Key {key} not found, value not set.')
 
