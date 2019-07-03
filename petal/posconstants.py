@@ -40,9 +40,9 @@ else:
 dir_keys_logs        = ['pos_logs','fid_logs','ptl_logs','xytest_data','xytest_logs','xytest_plots','xytest_summaries']
 dir_keys_settings    = ['pos_settings','fid_settings','test_settings','collision_settings','hwsetups','ptl_settings','other_settings']
 for key in dir_keys_logs:
-    dirs[key] = dirs['all_logs'] + os.path.sep + key + os.path.sep
+    dirs[key] = os.path.join(dirs['all_logs'], key)
 for key in dir_keys_settings:
-    dirs[key] = dirs['all_settings'] + os.path.sep + key + os.path.sep
+    dirs[key] = os.path.join(dirs['all_settings'], key)
 try:
     for directory in dirs.values():    
         os.makedirs(directory,exist_ok=True)
