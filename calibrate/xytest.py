@@ -73,6 +73,7 @@ class XYTest(PECS):
         # petalids are just ints now, DB and DOS have forced the conversion
         printfuncs = {pid: self.loggers[pid].info for pid in self.data.ptlids}
         PECS.__init__(self, ptlids=self.data.ptlids, printfunc=printfuncs)
+        self.enable_debugg_log()
         self._get_pos_info()
         self.generate_targets()  # generate local targets or load from file
         self.logger.info([
@@ -82,8 +83,11 @@ class XYTest(PECS):
             f'Num of local targets: {len(self.data.targets)}'])
         self.logger.debug(f'Local targets xy positions:\n{self.data.targets}')
         self.data.initialise_movedata(self.data.posids, self.data.ntargets)
-        self.logger.info(f'Move data table initialised '
-                         f'for {len(self.data.posids)} positioners.')
+
+    def enable_debugg_log(self):
+        # for ptlid in self.data.ptlids:
+        #     self.ptls[ptlid].enable_debug_products
+        pass
 
     def _get_pos_info(self):
         '''get enabled positioners, according to given posids or busids
@@ -202,6 +206,8 @@ class XYTest(PECS):
             # TODO: make real-time plots as test runs?
         t_f = self.data.now
         self.logger.info(f'Test complete, duration {t_f - t_i}. Plotting...')
+        for ptlid in self.data.ptlids:
+            self.ptls[ptlid].schedule_stats.save()
         # self.illuminator.set(led=led_initial)  # restore initial LED state
 
     def record_basic_move_data(self, i):

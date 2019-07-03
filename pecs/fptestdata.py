@@ -111,6 +111,7 @@ class FPTestData:
         self.logger.info([f'petalconstants.py version: {pc.code_version}',
                           f'Saving to directory: {self.dir}',
                           f'Anticollision mode: {self.anticollision}'])
+        # self.debug_log = StringIO(newline='\n')  # TODO: collect verbose
         # TODO: log sim state for each petalApp instance
 
     @staticmethod
@@ -190,6 +191,8 @@ class FPTestData:
         # write ptlid column to movedf
         self.movedf = self.movedf.merge(self.posdf['PETAL_ID'].reset_index(),
                                         on='DEVICE_ID', right_index=True)
+        self.logger.info(f'Move data table initialised '
+                         f'for {len(self.posids)} positioners.')
 
     def make_summary_plot(self, posid):
         row = self.posdf.loc[posid]  # row containing calibration values
