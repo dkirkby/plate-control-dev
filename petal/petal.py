@@ -99,6 +99,7 @@ class Petal(object):
             self.posmoveDB = DBSingleton(petal_id=int(self.petal_id))
         self.local_commit_on = local_commit_on
         self.local_log_on = local_log_on
+        self.sched_stats_on = sched_stats_on
         self.altered_states = set()
         self.altered_calib_states = set()
         self.pb_config = pb_config
@@ -133,7 +134,7 @@ class Petal(object):
         self.animator = self.collider.animator
         self.animator_on = False # this should be turned on/off using the animation start/stop control methods below
         self.animator_total_time = 0 # keeps track of total time of the current animation
-        self.schedule_stats = posschedstats.PosSchedStats() if sched_stats_on else None    
+        self.schedule_stats = posschedstats.PosSchedStats() if self.sched_stats_on else None    
         self.schedule = self._new_schedule()
         self.anticollision_default = anticollision
         
