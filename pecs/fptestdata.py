@@ -357,7 +357,7 @@ class FPTestData:
     def save_archive(self):
         path = os.path.join(self.dir, f'{os.path.basename(self.dir)}.tgz')
         with tarfile.open(path, 'w:gz') as tar:
-            tar.add(self.dir, arcname=os.path.basename(self.dir))
+            tar.add(self.dir, arcname=f'{os.path.basename(self.dir)}.tar')
         self.logger.info(f'Test data archived: {path}')
 
     def dump_as_one_pickle(self):
