@@ -125,8 +125,7 @@ class PetalTransforms(object):
         OUTPUT: 3 x N array, each column vector is obsXYZ
 
         Note that because QS is only 2 dimensional,
-        the Z coordinate is a nominal value
-        that is looked up from the Echo22 asphere definition.
+        the Z coordinate is a nominal value looked up from the Echo22 asphere.
         """
         ret = np.zeros((3, QS.shape[1]))
         for i in range(QS.shape[1]):  # loop over all column vectors
@@ -242,4 +241,3 @@ if __name__ == '__main__':
                                 row['ball'+letter] - row['check'+letter]
                     writer.writerow(row)
     gui_root.withdraw()
-

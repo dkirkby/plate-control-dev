@@ -5,12 +5,10 @@ Created on Fri May 24 17:46:45 2019
 @author: Duan Yutong (dyt@physics.bu.edu)
 """
 import os
-import sys
 import numpy as np
 import pandas as pd
-import posconstants as pc
 from configobj import ConfigObj
-sys.path.append('../pecs')
+import posconstants as pc
 from pecs import PECS
 from fptestdata import FPTestData
 idx = pd.IndexSlice  # pandas slice for selecting slice using multiindex

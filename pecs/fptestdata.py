@@ -32,12 +32,11 @@ from PyPDF2 import PdfFileMerger
 import posconstants as pc
 import matplotlib
 matplotlib.use('pdf')
-import matplotlib.pyplot as plt
-from matplotlib.patches import Circle
-
-idx = pd.IndexSlice
+plt = matplotlib.pyplot
 plt.rcParams.update({'font.family': 'serif',
                      'mathtext.fontset': 'cm'})
+Circle = matplotlib.patches.Circle
+idx = pd.IndexSlice
 np.rms = lambda x: np.sqrt(np.mean(np.square(x)))
 
 
@@ -60,7 +59,6 @@ class FPTestData:
         self.test_name = test_name
         self.test_time = self.now
         self.test_cfg = test_cfg  # petal id sections are string ids
-        # TODO: can xytest change anticollision setting of PetalApp on the fly?
         self.anticollision = test_cfg['anticollision']
         self.num_corr_max = self.test_cfg['num_corr_max']
         self.petal_cfgs = petal_cfgs
