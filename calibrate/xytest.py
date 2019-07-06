@@ -2,7 +2,7 @@
 """
 Created on Fri May 24 17:46:45 2019
 
-@author: Duan Yutong
+@author: Duan Yutong (dyt@physics.bu.edu)
 """
 import os
 import sys
@@ -13,39 +13,30 @@ from configobj import ConfigObj
 sys.path.append('../pecs')
 from pecs import PECS
 from fptestdata import FPTestData
-
-# TODO: save DF after each target
-
 idx = pd.IndexSlice  # pandas slice for selecting slice using multiindex
 
 
 class XYTest(PECS):
-    """XYTest handles running a fiber positioner xy accuracy test.
+    """Class for running fiber positioner xy accuracy test.
+    Avoiding double inheritance from FPTestData as we want to isolate the data
+    class for easy pickling, which would otherwise be rather difficult.
+    All data go under self.data; self.attribute only for test methods.
 
-    Avoiding double inheritance from FPTestData because we want to isolate
-    the data class to one attribute for easy pickling, otherwise we would have
-    to pickle the entire XYTest class.
+    if input_targs_file is given in the test config, the ordering of targets
+    strictly follows the list, no check of the sweep pattern or shuffling.
 
-    So self.attribute should be used for only test methods and objects,
-    all data variables go under self.data which will be stored
-
-    if input_targs_file is given in the config,
-    the ordering of targets strictly follows the list and the test script
-    doesn't bother with checking the sweep pattern or shuffling.
-
-    to run tests in simulation mode, one has to first initiliase petal and fvc
-    in simulation mode as DOS apps. then this test script will connect to
-    these apps which are already in simulation mode. the same goes for changing
-    anti-collision/poscollider settings.
-
-    Need to check that PECS default cfg has the correct platemaker_instrument
+    To run tests in simulation mode, one has to first initiliase petal and fvc
+    in simulation mode as DOS apps using architect. Then this test script will
+    connect to these apps via proxies.
+    Also need to check PECS default cfg has the correct platemaker_instrument
     and fvc_role that work for all ten petals.
 
     Input:
+        xytest_name:    string, name of the test for folder creation
         xytest_cfg:     one config object for xy test settings
 
     Useful attributes:
-        self.data.posids        list of posids
+        self.data.posids        list of posids for all petals
         self.data.posids_ptl    dict with ptlid as key, list of posids as value
                                 posids are sorted
         self.data.posdf         dataframe with DEVICE_ID as index and columns:
@@ -82,6 +73,8 @@ class XYTest(PECS):
             f'Num of local targets: {len(self.data.targets)}'])
         self.logger.debug(f'Local targets xy positions:\n{self.data.targets}')
         self.data.initialise_movedata(self.data.posids, self.data.ntargets)
+        self.run_xyaccuracy_test(disable_unmatched=True)
+        self.data.save_test_products()
 
     def enable_debugg_log(self):
         # for ptlid in self.data.ptlids:
@@ -91,7 +84,7 @@ class XYTest(PECS):
     def _get_pos_info(self):
         '''get enabled positioners, according to given posids or busids
         also load pos calibration values for each positioner
-        which are not expected to change after each move.
+        which are not expected to change during the test.
         read them before test so transform can be more efficient
         unfortunately all positioner states are stored completely separately,
         but still we can sort of vectorise the XY and TP transformations
@@ -202,7 +195,6 @@ class XYTest(PECS):
                 self.update_calibrations(measured_QS)
                 self.record_measurement(measured_QS, i, n)
                 self.calculate_xy_errors(i, n)
-            # TODO: make real-time plots as test runs?
         t_f = self.data.now
         self.logger.info(f'Test complete, duration {t_f - t_i}. Plotting...')
         for ptlid in self.data.ptlids:
@@ -244,10 +236,9 @@ class XYTest(PECS):
                 movetype, cmd = 'corrective', 'dXdY'
                 tgt = - movedf.loc[idx[i, posids],  # note minus sign
                                    [f'err_x_{n-1}', f'err_y_{n-1}']].values
-                # check for NaN values and replace with zero
-                tgt = np.nan_to_num(tgt)
+                tgt = np.nan_to_num(tgt)  # replace NaN with zero for unmatched
             # build move request dataframe for a petal
-            note = (f'xy test: {self.data.test_name}; '  # same for all
+            note = (f'xytest: {self.data.test_name}; '  # same for all
                     f'target {i+1} of {self.data.ntargets}; '
                     f'move {n} ({movetype})')
             req = pd.DataFrame({'DEVICE_ID': posids,
@@ -256,23 +247,11 @@ class XYTest(PECS):
                                 'X2': tgt[:, 1],  # shape (N_posids, 1)
                                 'LOG_NOTE': note})
             self.loggers[ptlid].debug(f'Move requests:\n{req.to_string()}')
-            # TODO: anti-collision schedule rejection needs to be recorded
-            # accepted_requests = ptl.prepare_move(
-            #     req, anticollision=self.data.anticollision)
-            # self.loggers[ptlid].debug(  # already keyed by posids
-            #     'prepare_move() returns accepted requests:\n'
-            #     + pd.DataFrame(accepted_requests).to_string())
             ptl.prepare_move(req, anticollision=self.data.anticollision)
-            # execute move, make sure return df has proper format for logging
-            # expected_QS = ptl.execute_move(posids=posids, return_coord='QS')
             expected_QS = ptl.execute_move(return_coord='QS')
-            # ensure the same set of devices are returned after execution
-            # assert set(req['DEVICE_ID']) == set(expected_QS['DEVICE_ID'])
-            # log = self._add_device_id_col(expected_QS, ptlid)
             self.loggers[ptlid].debug('execute_move() returns expected QS:\n'
                                       + expected_QS.to_string())
             expected_QS_list.append(expected_QS)
-
             # # get expected posTP from petal and write to movedf after move
             ret_TP = (ptl.get_positions(posids=posids, return_coord='posTP')
                       .set_index('DEVICE_ID'))
@@ -376,17 +355,7 @@ class XYTest(PECS):
 
 
 if __name__ == "__main__":
-    test_filename = "xytest_ptl3_debug.cfg"  # specify filename before starting
-    path = os.path.join(os.environ['FP_SETTINGS_PATH'],
-                        'test_settings', test_filename)  # built path to cfg
-    xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')
-    xytest_name = input('Name of this test (blank to use cfg filename): ')
-    if xytest_name == '':
-        xytest_name = xytest_cfg.filename
+    path = os.path.join(pc.dirs['test_settings'], 'xytest_ptl3_debug.cfg')
+    xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')  # read cfg
+    xytest_name = input('Please name this test: ')
     test = XYTest(xytest_name, xytest_cfg)
-    test.run_xyaccuracy_test(disable_unmatched=True)
-    test.data.export_move_data()
-    if xytest_cfg['make_plots']:
-        test.data.make_summary_plots()  # plot for all positioners by default
-    test.data.save_archive()
-    test.data.dump_as_one_pickle()

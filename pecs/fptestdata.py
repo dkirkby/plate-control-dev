@@ -114,8 +114,6 @@ class FPTestData:
         self.logger.info([f'petalconstants.py version: {pc.code_version}',
                           f'Saving to directory: {self.dir}',
                           f'Anticollision mode: {self.anticollision}'])
-        # self.debug_log = StringIO(newline='\n')  # TODO: collect verbose
-        # TODO: log sim state for each petalApp instance
 
     @staticmethod
     def _log_cfg(logger, config):
@@ -283,13 +281,13 @@ class FPTestData:
                 binder.write(savepath)
                 binder.close()
                 self.loggers[ptlid].info(
-                    f'xyplot binder for submove {n} saved to: {savepath}')
+                    f'Binder for submove {n} saved to: {savepath}')
 
     def export_move_data(self):
         '''must have writte self.posids_ptl, a dict keyed by ptlid'''
         self.movedf.to_pickle(os.path.join(self.dir, 'move_df.pkl'),
                               compression='gzip')
-        self.logger.info(f'Focal plane move data written to: {self.dir}.')
+        self.logger.info(f'Focal plane move data written to: {self.dir}')
         self.movedf.to_csv(os.path.join(self.dir, 'move_df.csv'))
         for ptlid in self.ptlids:
             def makepath(name): return os.path.join(self.dirs[ptlid], name)
@@ -304,7 +302,7 @@ class FPTestData:
             self.loggers[ptlid].info('Petal move data written to: '
                                      f'{self.dirs[ptlid]}')
 
-    def save_archive(self):
+    def make_archive(self):
         path = os.path.join(self.dir, f'{os.path.basename(self.dir)}.tgz')
         with tarfile.open(path, 'w:gz') as tar:
             tar.add(self.dir, arcname=f'{os.path.basename(self.dir)}.tar')
@@ -320,3 +318,10 @@ class FPTestData:
         del self.loggers
         with open(os.path.join(self.dir, 'data_dump.pkl'), 'wb') as handle:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def save_test_products(self):
+        self.export_move_data()
+        if self.test_cfg['make_plots']:
+            self.make_summary_plots()  # plot for all positioners by default
+        self.make_archive()
+        self.dump_as_one_pickle()
