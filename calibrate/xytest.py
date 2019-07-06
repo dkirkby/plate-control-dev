@@ -10,7 +10,6 @@ import numpy as np
 import pandas as pd
 import posconstants as pc
 from configobj import ConfigObj
-from tqdm import tqdm
 sys.path.append('../pecs')
 from pecs import PECS
 from fptestdata import FPTestData
@@ -375,16 +374,9 @@ class XYTest(PECS):
             self.loggers[ptlid].info('Worst 10 positioners:\n'
                                      f'{err.iloc[:10].to_string()}')
 
-    def make_summary_plots(self, posids=None):
-        if posids is None:
-            posids = self.data.posids
-        for posid in tqdm(posids):
-            self.data.make_summary_plot(posid)
-        self.data.make_summary_plot_binder()
-
 
 if __name__ == "__main__":
-    test_filename = "xytest_ptl3.cfg"  # specify filename before starting test
+    test_filename = "xytest_ptl3_debug.cfg"  # specify filename before starting
     path = os.path.join(os.environ['FP_SETTINGS_PATH'],
                         'test_settings', test_filename)  # built path to cfg
     xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')
@@ -395,6 +387,6 @@ if __name__ == "__main__":
     test.run_xyaccuracy_test(disable_unmatched=True)
     test.data.export_move_data()
     if xytest_cfg['make_plots']:
-        test.make_summary_plots()  # plot for all positioners by default
+        test.data.make_summary_plots()  # plot for all positioners by default
     test.data.save_archive()
     test.data.dump_as_one_pickle()
