@@ -132,7 +132,6 @@ class FPTestData:
         logger.debug(f'=== End of config file dump: {config.filename} ===')
 
     class BroadcastLogger:
-        # TODO: convert this to a class method?
         '''must call methods below for particular logger levels below
         input message can be a string of list of strings
         msg will be broadcasted to all petals
@@ -200,7 +199,12 @@ class FPTestData:
             p.start()
         self.logger.info('Waiting for the last MP chunk to complete...')
         p.join()
-        self.make_summary_plot_binder()
+        self.logger.info('Creating xyplot binders...')
+        for ptlid, n in tqdm(product(self.ptlids, range(self.num_corr_max+1))):
+            p = Process(target=self.make_summary_plot_binder, args=(ptlid, n))
+            p.start()
+        self.logger.info('Waiting for the last MP chunk to complete...')
+        p.join()
 
     def make_summary_plot(self, posid):  # make one plot for a given posid
         row = self.posdf.loc[posid]  # row containing calibration values
@@ -261,25 +265,23 @@ class FPTestData:
             self.loggers[ptlid].debug(f'saved xyplot: {path.format(n)}')
             plt.close(fig)
 
-    def make_summary_plot_binder(self):
-        for ptlid in self.ptlids:
-            self.loggers[ptlid].info(f'Creating xyplot binders...')
-            for n in range(self.num_corr_max+1):
-                template = os.path.join(self.dirs[ptlid],
-                                        f'*_xyplot_submove_{n}.pdf')
-                paths = glob(template)
-                assert len(paths) == len(self.posids_ptl[ptlid]), (
-                        f'Length mismatch: {len(paths)} ≠ '
-                        f'{len(self.posids_ptl[ptlid])}')
-                binder = PdfFileMerger()
-                for path in paths:
-                    binder.append(path)
-                savepath = os.path.join(self.dirs[ptlid],
-                                        f'{len(paths)}_xyplot_submove_{n}.pdf')
-                binder.write(savepath)
-                binder.close()
-                self.loggers[ptlid].info(
-                    f'Binder for submove {n} saved to: {savepath}')
+    def make_summary_plot_binder(self, ptlid, n):
+        template = os.path.join(self.dirs[ptlid],
+                                f'*_xyplot_submove_{n}.pdf')
+        paths = glob(template)
+        assert len(paths) == len(self.posids_ptl[ptlid]), (
+                f'Length mismatch: {len(paths)} ≠ '
+                f'{len(self.posids_ptl[ptlid])}')
+        binder = PdfFileMerger()
+        for path in paths:
+            binder.append(path)
+        savepath = os.path.join(self.dirs[ptlid],
+                                f'{len(paths)}_xyplot_submove_{n}.pdf')
+        self.loggers[ptlid].info(f'Writing xyplot binder for submove {n}...')
+        binder.write(savepath)
+        binder.close()
+        self.loggers[ptlid].info(
+            f'Binder for submove {n} saved to: {savepath}')
 
     def export_move_data(self):
         '''must have writte self.posids_ptl, a dict keyed by ptlid'''

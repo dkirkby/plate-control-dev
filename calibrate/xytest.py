@@ -7,6 +7,7 @@ Created on Fri May 24 17:46:45 2019
 import os
 import numpy as np
 import pandas as pd
+# from multiprocessing import Queue, Process
 from configobj import ConfigObj
 import posconstants as pc
 from pecs import PECS
@@ -94,7 +95,7 @@ class XYTest(PECS):
         self.data.posids = []
         self.data.posids_ptl = {}
         dfs = []
-        for ptlid in self.data.ptlids:  # TODO: parallelise this?
+        for ptlid in self.data.ptlids:  # fast enough, no need to parallelise
             mode = self.data.test_cfg[ptlid]['mode']
             ptl = self.ptls[ptlid]  # use as a PetalApp instance, ptlid is int
             if mode == 'all':
@@ -188,7 +189,8 @@ class XYTest(PECS):
                 self.logger.info(
                     f'Target {i+1} of {self.data.ntargets}, '
                     f'submove {n} of {self.data.num_corr_max}')
-                measured_QS = self.move_measure(i, n)  # includes 10 petals
+                self.expected_QS_list = []
+                measured_QS = self.move_measure_petals(i, n)  # all petals
                 self.check_unmatched(measured_QS, disable_unmatched)
                 self.update_calibrations(measured_QS)
                 self.record_measurement(measured_QS, i, n)
@@ -213,55 +215,21 @@ class XYTest(PECS):
             # store other posstate values here
             self._update(cycles.set_index('DEVICE_ID'), i)
 
-    def move_measure(self, i, n):
-        '''one complete iteration: move ten petals once, measure once
-        ith target, nth move'''
-        movedf = self.data.movedf
-        # move ten petals
-        expected_QS_list = []  # each item is a dataframe for one petal
+    def move_measure_petals(self, i, n):
+        '''move ten petals once, measure once for the ith target, nth move'''
+
+        # ps = []  # MP implementation
+        # for ptlid in self.data.ptlids:
+        #     p = Process(target=self.move_measure_petal, args=(ptlid, i, n))
+        #     ps.append(p)
+        # [p.start() for p in ps]
+        # for p in ps:
+        #     p.join()
         for ptlid in self.data.ptlids:  # TODO: parallelise this
-            posids = self.data.posids_ptl[ptlid]  # all records obey this order
-            ptl = self.ptls[ptlid]
-            # device_loc = self.data.posdf.loc[posids, 'DEVICE_LOC']
-            if n == 0:  # blind move
-                posXY = np.vstack(   # shape (N_posids, 2)
-                    [self.data.targets_pos[posid][i, :] for posid in posids])
-                movetype, cmd = 'blind', 'obsXY'
-                offXY = self.data.posdf.loc[posids, ['OFFSET_X', 'OFFSET_Y']]
-                tgt = posXY + offXY.values  # convert to obsXY, shape (N, 2)
-                movedf.loc[idx[i, posids], ['target_x', 'target_y']] = tgt
-            else:
-                movetype, cmd = 'corrective', 'dXdY'
-                tgt = - movedf.loc[idx[i, posids],  # note minus sign
-                                   [f'err_x_{n-1}', f'err_y_{n-1}']].values
-                tgt = np.nan_to_num(tgt)  # replace NaN with zero for unmatched
-            # build move request dataframe for a petal
-            note = (f'xytest: {self.data.test_name}; '  # same for all
-                    f'target {i+1} of {self.data.ntargets}; '
-                    f'move {n} ({movetype})')
-            req = pd.DataFrame({'DEVICE_ID': posids,
-                                'COMMAND': cmd,
-                                'X1': tgt[:, 0],  # shape (N_posids, 1)
-                                'X2': tgt[:, 1],  # shape (N_posids, 1)
-                                'LOG_NOTE': note})
-            self.loggers[ptlid].debug(f'Move requests:\n{req.to_string()}')
-            ptl.prepare_move(req, anticollision=self.data.anticollision)
-            expected_QS = ptl.execute_move(return_coord='QS')
-            self.loggers[ptlid].debug('execute_move() returns expected QS:\n'
-                                      + expected_QS.to_string())
-            expected_QS_list.append(expected_QS)
-            # # get expected posTP from petal and write to movedf after move
-            ret_TP = (ptl.get_positions(posids=posids, return_coord='posTP')
-                      .set_index('DEVICE_ID'))
-            self.loggers[ptlid].debug(f'Expected posTP after move {n}:\n'
-                                      + ret_TP.to_string())
-            # write posTP for a petal to movedf
-            new = pd.DataFrame({f'pos_t_{n}': ret_TP['X1'],
-                                f'pos_p_{n}': ret_TP['X2']},
-                               dtype=np.float32, index=ret_TP.index)
-            self._update(new, i)
+            self.move_measure_petal(ptlid, i, n)
+        assert len(self.expected_QS_list) == len(self.data.ptlids)
         # combine expected QS list for all petals to form a single dataframe
-        expected_QS = pd.concat(expected_QS_list)
+        expected_QS = pd.concat(self.expected_QS_list)
         # measure ten petals with FVC at once, FVC after all petals have moved
         measured_QS = (pd.DataFrame(self.fvc.measure(expected_QS))
                        .rename(columns={'id': 'DEVICE_ID'})
@@ -269,6 +237,49 @@ class XYTest(PECS):
         measured_QS.columns = measured_QS.columns.str.upper()  # rename upper
         self.logger.debug(f'FVC measured_QS:\n{measured_QS.to_string()}')
         return measured_QS
+
+    def move_measure_petal(self, ptlid, i, n):
+        movedf = self.data.movedf
+        posids = self.data.posids_ptl[ptlid]  # all records obey this order
+        ptl = self.ptls[ptlid]
+        # device_loc = self.data.posdf.loc[posids, 'DEVICE_LOC']
+        if n == 0:  # blind move
+            posXY = np.vstack(   # shape (N_posids, 2)
+                [self.data.targets_pos[posid][i, :] for posid in posids])
+            movetype, cmd = 'blind', 'obsXY'
+            offXY = self.data.posdf.loc[posids, ['OFFSET_X', 'OFFSET_Y']]
+            tgt = posXY + offXY.values  # convert to obsXY, shape (N, 2)
+            movedf.loc[idx[i, posids], ['target_x', 'target_y']] = tgt
+        else:
+            movetype, cmd = 'corrective', 'dXdY'
+            tgt = - movedf.loc[idx[i, posids],  # note minus sign
+                               [f'err_x_{n-1}', f'err_y_{n-1}']].values
+            tgt = np.nan_to_num(tgt)  # replace NaN with zero for unmatched
+        # build move request dataframe for a petal
+        note = (f'xytest: {self.data.test_name}; '  # same for all
+                f'target {i+1} of {self.data.ntargets}; '
+                f'move {n} ({movetype})')
+        req = pd.DataFrame({'DEVICE_ID': posids,
+                            'COMMAND': cmd,
+                            'X1': tgt[:, 0],  # shape (N_posids, 1)
+                            'X2': tgt[:, 1],  # shape (N_posids, 1)
+                            'LOG_NOTE': note})
+        self.loggers[ptlid].debug(f'Move requests:\n{req.to_string()}')
+        ptl.prepare_move(req, anticollision=self.data.anticollision)
+        expected_QS = ptl.execute_move(return_coord='QS')
+        self.loggers[ptlid].debug('execute_move() returns expected QS:\n'
+                                  + expected_QS.to_string())
+        self.expected_QS_list.append(expected_QS)
+        # # get expected posTP from petal and write to movedf after move
+        ret_TP = (ptl.get_positions(posids=posids, return_coord='posTP')
+                  .set_index('DEVICE_ID'))
+        self.loggers[ptlid].debug(f'Expected posTP after move {n}:\n'
+                                  + ret_TP.to_string())
+        # write posTP for a petal to movedf
+        new = pd.DataFrame({f'pos_t_{n}': ret_TP['X1'],
+                            f'pos_p_{n}': ret_TP['X2']},
+                           dtype=np.float32, index=ret_TP.index)
+        self._update(new, i)
 
     def check_unmatched(self, measured_QS, disable_unmatched):
         for ptlid in self.data.ptlids:  # check unmatched positioners
