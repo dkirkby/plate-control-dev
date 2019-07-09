@@ -22,8 +22,8 @@ from functools import partial
 from datetime import datetime, timezone
 from multiprocessing import Process
 from tqdm import tqdm
-from io import StringIO
-from shutil import copyfileobj
+import io
+import shutil
 import tarfile
 import pickle
 import numpy as np
@@ -32,7 +32,7 @@ from PyPDF2 import PdfFileMerger
 import posconstants as pc
 import matplotlib
 matplotlib.use('pdf')
-plt = matplotlib.pyplot
+import matplotlib.pyplot as plt
 plt.rcParams.update({'font.family': 'serif',
                      'mathtext.fontset': 'cm'})
 Circle = matplotlib.patches.Circle
@@ -68,9 +68,8 @@ class FPTestData:
         for ptlid in self.test_cfg.sections:  # convert petal id to int now
             self.test_cfg.rename(ptlid, int(ptlid))
         # create save dir for all files: logs, tables, pickels, gzips
-        self.dir = os.path.join(
-            pc.dirs['xytest_data'],
-            f'{self.test_time.strftime(self.timefmtpath)}-{test_name}')
+        self.dir_name = f'{self.test_time.strftime(self.timefmtpath)}-{test_name}'
+        self.dir = os.path.join(pc.dirs['xytest_data'], self.dir_name)
         self.dirs = {ptlid: os.path.join(self.dir, f'PTL{ptlid}')
                      for ptlid in self.ptlids}
         self.logs = {}  # set up log files and loggers for each petal
@@ -84,7 +83,7 @@ class FPTestData:
             open(self.log_paths[ptlid], 'a').close()
             # create virtual file object for storing log entries
             # using stringio because it supports write() and flush()
-            log = StringIO(newline='\n')
+            log = io.StringIO(newline='\n')
             # craete a new logger for each petal by unique logger name
             logger = logging.getLogger(f'PTL{ptlid}')
             logger.handlers = []  # clear handlers that might exisit already
@@ -298,22 +297,21 @@ class FPTestData:
                 df_pos.to_csv(makepath(f'{posid}_df.csv'))
             with open(makepath(f'ptl_{ptlid}_export.log'), 'w') as handle:
                 self.logs[ptlid].seek(0)
-                copyfileobj(self.logs[ptlid], handle)  # write final logs
+                shutil.copyfileobj(self.logs[ptlid], handle)  # write final logs
             self.loggers[ptlid].info('Petal move data written to: '
                                      f'{self.dirs[ptlid]}')
 
     def make_archive(self):
-        path = os.path.join(self.dir, f'{os.path.basename(self.dir)}.tgz')
-        with tarfile.open(path, 'w:gz') as tar:
-            tar.add(self.dir, arcname=f'{os.path.basename(self.dir)}.tar')
+        # shutil.make_archive(  # recursion w/itself...file grows indefinitely
+        #     os.path.join(self.dir, self.dir_name), 'zip', # logger=self.logger, 
+        #     root_dir=pc.dirs['xytest_data'], base_dir=self.dir_name)
+        # print(f'saved: {os.path.join(self.dir, self.dir_name)}')
+        path = os.path.join(self.dir, f'{os.path.basename(self.dir)}.tar.gz')
+        with tarfile.open(path, 'w:gz') as arc:  # ^tgz doesn't work properly
+            arc.add(self.dir, arcname=os.path.basename(self.dir))
         self.logger.info(f'Test data archived: {path}')
 
     def dump_as_one_pickle(self):
-        '''lod the dumped pickle file as follows, protocol is auto determined
-        import pickle
-        with open(path, 'rb') as handle:
-            data = pickle.load(handle)
-        '''
         del self.logger
         del self.loggers
         with open(os.path.join(self.dir, 'data_dump.pkl'), 'wb') as handle:
@@ -325,3 +323,15 @@ class FPTestData:
             self.make_summary_plots()  # plot for all positioners by default
         self.make_archive()
         self.dump_as_one_pickle()
+
+if __name__ == '__main__':
+    '''load the dumped pickle file as follows, protocol is auto determined'''
+    dir_name = "2019_07_03-12_10_58-0700-hw_ac_default_24_bad_pos"
+    with open(os.path.join(pc.dirs['xytest_data'], dir_name, 'data_dump.pkl'),
+              'rb') as handle:
+        data = pickle.load(handle)
+    data.dir = os.path.join(pc.dirs['xytest_data'], dir_name)
+    data.dir_name = dir_name
+    print(f'Making archive: {data.dir}')
+    data.make_archive()
+    print(f'Archive saved to: {data.dir}')

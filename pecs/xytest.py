@@ -364,7 +364,7 @@ class XYTest(PECS):
                                      f'{err.iloc[:10].to_string()}')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     path = os.path.join(pc.dirs['test_settings'], 'xytest_ptl3_debug.cfg')
     xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')  # read cfg
     xytest_name = input('Please name this test: ')
