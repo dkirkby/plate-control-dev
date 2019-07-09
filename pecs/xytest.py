@@ -266,7 +266,8 @@ class XYTest(PECS):
                             'LOG_NOTE': note})
         self.loggers[ptlid].debug(f'Move requests:\n{req.to_string()}')
         ptl.prepare_move(req, anticollision=self.data.anticollision)
-        expected_QS = ptl.execute_move(return_coord='QS')
+        expected_QS = ptl.execute_move(
+            posids=posids, reset_flags=False, return_coord='QS')
         self.loggers[ptlid].debug('execute_move() returns expected QS:\n'
                                   + expected_QS.to_string())
         self.expected_QS_list.append(expected_QS)
