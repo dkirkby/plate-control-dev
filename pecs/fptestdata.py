@@ -318,9 +318,9 @@ class FPTestData:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def save_test_products(self):
-        self.export_move_data()
         if self.test_cfg['make_plots']:
             self.make_summary_plots()  # plot for all positioners by default
+        self.export_move_data()
         self.make_archive()
         self.dump_as_one_pickle()
 
