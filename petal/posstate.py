@@ -186,15 +186,15 @@ class PosState(object):
         self.unit_id = unit_id
 
     def load_from_cfg(self, unit_id=None):
-
+        typical_settings_dir = pc.dirs[self.type + '_settings'] # do this here because used in 2 different places below
         if unit_id is not None:
             self.unit_basename = 'unit_' + str(unit_id).zfill(2)
             self.logs_dir = pc.dirs[self.type + '_logs']
-            self.settings_dir = pc.dirs[self.type + '_settings']
+            self.settings_dir = typical_settings_dir
             comment = 'Settings file for unit: ' + str(unit_id)
         else:  # unit ID is None
-            self.unit_id = 'TEMP'
-            self.unit_basename = 'unit_TEMP'
+            self.unit_id = 'TEMP_' + self.type
+            self.unit_basename = 'unit_' + self.unit_id
             self.logs_dir = pc.dirs['temp_files']
             self.settings_dir = pc.dirs['temp_files']
             comment = 'Temporary settings file for software test purposes'\
@@ -202,7 +202,7 @@ class PosState(object):
         unit_fn = os.path.join(self.settings_dir, f'{self.unit_basename}.conf')
         if not(os.path.isfile(unit_fn)):
             # unit config doesn't exisit, read in the generic template file
-            tmpfn = self.settings_dir + '_unit_settings_DEFAULT.conf'
+            tmpfn = os.path.join(typical_settings_dir,'_unit_settings_DEFAULT.conf')
             self.conf = ConfigObj(tmpfn, unrepr=True, encoding='utf-8')
             self.conf.initial_comment = [comment, '']
             self.conf.filename = unit_fn
