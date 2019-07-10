@@ -893,6 +893,7 @@ cdef double _c_max(double x[], unsigned int length):
         max_val = x[0]
         for i in range(1,length):
             max_val = c_fmax(x[i],max_val)
+        return max_val
     else:
         return 0.0
     
@@ -904,6 +905,7 @@ cdef double _c_min(double x[], unsigned int length):
         min_val = x[0]
         for i in range(1,length):
             min_val = c_fmin(x[i],min_val)
+        return min_val
     else:
         return 0.0
 
@@ -915,6 +917,7 @@ cpdef test():
     polys += [polys[1].rotated(30)]
     polys += [PosPoly([[0,1,2,3,4,5,6,7,8,9],[10,11,12,13,14,15,16,17,18,19]])]
     polys += [polys[4].rotated(45)]
+    polys += [PosPoly([[20,10,43.2,-74],[1,2,3,4]])]
     bools = []
     bools += [polys[0].collides_with(polys[0])]
     bools += [polys[0].collides_with(polys[1])]
@@ -922,6 +925,7 @@ cpdef test():
     bools += [polys[0].collides_with(polys[3])]
     bools += [polys[0].collides_with(polys[4])]
     bools += [polys[4].collides_with(polys[5])]
+    bools += [polys[6].collides_with(polys[0])]
     t = 20
     p = -100
     x = 10
