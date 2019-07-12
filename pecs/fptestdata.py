@@ -45,19 +45,14 @@ class FPTestData:
             /xytest_data/{time}-{test_name}/PTL{ptlid}/*.*
     '''
 
-    timefmt = '%Y-%m-%dT%H:%M:%S%z'
-    timefmtpath = '%Y%m%dT%H%M%S%z'
     log_formatter = logging.Formatter(  # log format for each line
         fmt='%(asctime)s %(name)s [%(levelname)s]: %(message)s',
-        datefmt=timefmt)
-
-    @property  # calling self.now returns properly formatted current timestamp
-    def now(self): return datetime.utcnow().astimezone()
+        datefmt=pc.timestamp_format)
 
     def __init__(self, test_name, test_cfg, petal_cfgs=None):
 
         self.test_name = test_name
-        self.test_time = self.now
+        self.test_time = pc.now
         self.test_cfg = test_cfg  # petal id sections are string ids
         self.anticollision = test_cfg['anticollision']
         self.num_corr_max = self.test_cfg['num_corr_max']
@@ -68,7 +63,7 @@ class FPTestData:
         for ptlid in self.test_cfg.sections:  # convert petal id to int now
             self.test_cfg.rename(ptlid, int(ptlid))
         # create save dir for all files: logs, tables, pickels, gzips
-        self.dir_name = f'{self.test_time.strftime(self.timefmtpath)}-{test_name}'
+        self.dir_name = f'{pc.filename_timestamp_str_now}-{test_name}'
         self.dir = os.path.join(pc.dirs['xytest_data'], self.dir_name)
         self.dirs = {ptlid: os.path.join(self.dir, f'PTL{ptlid}')
                      for ptlid in self.ptlids}
@@ -173,7 +168,7 @@ class FPTestData:
         dtypes0 = ['datetime64[ns]', np.uint32, str]
         cols1 = ['target_x', 'target_y']
         cols2_base = ['meas_x', 'meas_y', 'err_x', 'err_y', 'err_xy',
-                      'pos_t', 'pos_p', 'pos_bit', 'pos_flag']
+                      'pos_t', 'pos_p', 'pos_flag', 'pos_status']
         cols2 = []
         for field, i in product(cols2_base, range(self.num_corr_max+1)):
             cols2.append(f'{field}_{i}')

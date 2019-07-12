@@ -77,8 +77,8 @@ mm = 'mm'
 um_per_mm = 1000
 deg_per_rad = 180./math.pi  
 rad_per_deg = math.pi/180.
-timestamp_format = '%Y-%m-%d %H:%M:%S.%f' # see strftime documentation
-filename_timestamp_format = '%Y-%m-%d_T%H%M%S'
+timestamp_format = '%Y-%m-%dT%H:%M:%S%z' # see strftime documentation
+filename_timestamp_format = '%Y%m%dT%H%M%S%z'
 gear_ratio = {}
 gear_ratio['namiki'] = (46.0/14.0+1)**4  # namiki    "337:1", output rotation/motor input
 gear_ratio['maxon'] = 4100625.0/14641.0  # maxon     "280:1", output rotation/motor input
@@ -230,11 +230,15 @@ def is_very_verbose(verbosity_enum):
     return boole
 
 # timestamp functions
+@property
+def now():
+    return datetime.datetime.utcnow().astimezone()
+
 def timestamp_str_now():
-    return datetime.datetime.now().strftime(timestamp_format)
+    return now().strftime(timestamp_format)
 
 def filename_timestamp_str_now():
-    return datetime.datetime.now().strftime(filename_timestamp_format)
+    return now().strftime(filename_timestamp_format)
 
 # other misc functions
 def ordinal_str(number):

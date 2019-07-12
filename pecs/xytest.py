@@ -181,7 +181,7 @@ class XYTest(PECS):
     def run_xyaccuracy_test(self, disable_unmatched=True):
         # led_initial = self.illuminator.get('led')  # no illuminator ctrl yet
         # self.illuminator.set(led='ON')  # turn on illuminator
-        t_i = self.data.now
+        t_i = pc.now
         for i in range(self.data.ntargets):  # test loop over all test targets
             self.logger.info(f'Target {i+1} of {self.data.ntargets}')
             self.record_basic_move_data(i)  # for each target, record basics
@@ -195,7 +195,7 @@ class XYTest(PECS):
                 self.update_calibrations(measured_QS)
                 self.record_measurement(measured_QS, i, n)
                 self.calculate_xy_errors(i, n)
-        t_f = self.data.now
+        t_f = pc.now
         self.logger.info(f'Test complete, duration {t_f - t_i}. Plotting...')
         for ptlid in self.data.ptlids:
             self.ptls[ptlid].schedule_stats.save()
@@ -205,7 +205,7 @@ class XYTest(PECS):
         self.logger.info('Recording basic move data for new xy target...')
         movedf = self.data.movedf
         # before moving for each target, write time cycle etc. for all posids
-        movedf.loc[idx[i, :], 'timestamp'] = self.data.now
+        movedf.loc[idx[i, :], 'timestamp'] = pc.now
         movedf.loc[idx[i, :], 'move_log'] = \
             'local posmove csv log deprecated; check posmoveDB instead.'
         for ptlid in self.data.ptlids:
