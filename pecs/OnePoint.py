@@ -31,7 +31,7 @@ class OnePoint(PECS):
                 requests['X1'].append(tp_target[0])
                 requests['X2'].append(tp_target[1])
                 requests['LOG_NOTE'].append('One point calibration ' + mode)
-                requests['COMMAND'].append('posTP')
+                requests['COMMAND'].append('obsTP')
             self.ptls[self.ptlid].prepare_move(pandas.DataFrame.from_dict(requests),anticollision=None)
             expected_positions = self.ptls[self.ptlid].execute_move()
         else:

@@ -91,7 +91,7 @@ class XYTest(PECS):
         '''
         keys = ['LENGTH_R1', 'LENGTH_R2', 'OFFSET_X', 'OFFSET_Y',
                 'OFFSET_T', 'OFFSET_P']
-        props = ['targetable_range_T']  # posT to be converted to obsT
+        props = ['targetable_range_T', 'targetable_range_P']
         self.data.posids = []
         self.data.posids_ptl = {}
         dfs = []
