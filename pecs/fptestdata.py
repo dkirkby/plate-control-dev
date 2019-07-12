@@ -19,7 +19,7 @@ import logging
 from glob import glob
 from itertools import product
 from functools import partial
-from datetime import datetime, timezone
+from datetime import datetime
 from multiprocessing import Process
 from tqdm import tqdm
 import io
@@ -46,13 +46,13 @@ class FPTestData:
     '''
 
     timefmt = '%Y-%m-%dT%H:%M:%S%z'
-    timefmtpath = '%Y_%m_%d-%H_%M_%S%z'
+    timefmtpath = '%Y%m%dT%H%M%S%z'
     log_formatter = logging.Formatter(  # log format for each line
         fmt='%(asctime)s %(name)s [%(levelname)s]: %(message)s',
         datefmt=timefmt)
 
     @property  # calling self.now returns properly formatted current timestamp
-    def now(self): return datetime.now(timezone.utc).astimezone()
+    def now(self): return datetime.utcnow().astimezone()
 
     def __init__(self, test_name, test_cfg, petal_cfgs=None):
 

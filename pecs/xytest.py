@@ -225,20 +225,18 @@ class XYTest(PECS):
         # [p.start() for p in ps]
         # for p in ps:
         #     p.join()
-        for ptlid in self.data.ptlids:  # TODO: parallelise this
-            self.move_measure_petal(ptlid, i, n)
-        assert len(self.expected_QS_list) == len(self.data.ptlids)
+        # TODO: parallelise this
+        ret = [self.move_petal(ptlid, i, n) for ptlid in self.data.ptlids]
         # combine expected QS list for all petals to form a single dataframe
-        expected_QS = pd.concat(self.expected_QS_list)
+        expected_QS = pd.concat(ret)
         # measure ten petals with FVC at once, FVC after all petals have moved
         measured_QS = (pd.DataFrame(self.fvc.measure(expected_QS))
-                       .rename(columns={'id': 'DEVICE_ID'})
-                       .set_index('DEVICE_ID'))
+                       .rename(columns={'id': 'DEVICE_ID'}))
         measured_QS.columns = measured_QS.columns.str.upper()  # rename upper
         self.logger.debug(f'FVC measured_QS:\n{measured_QS.to_string()}')
-        return measured_QS
+        return measured_QS.set_index('DEVICE_ID')
 
-    def move_measure_petal(self, ptlid, i, n):
+    def move_petal(self, ptlid, i, n):
         movedf = self.data.movedf
         posids = self.data.posids_ptl[ptlid]  # all records obey this order
         ptl = self.ptls[ptlid]
@@ -246,7 +244,7 @@ class XYTest(PECS):
         if n == 0:  # blind move
             posXY = np.vstack(   # shape (N_posids, 2)
                 [self.data.targets_pos[posid][i, :] for posid in posids])
-            movetype, cmd = 'blind', 'obsXY'
+            movetype, cmd = 'blind', 'obsXY'  # could use posXY here actually
             offXY = self.data.posdf.loc[posids, ['OFFSET_X', 'OFFSET_Y']]
             tgt = posXY + offXY.values  # convert to obsXY, shape (N, 2)
             movedf.loc[idx[i, posids], ['target_x', 'target_y']] = tgt
@@ -268,19 +266,22 @@ class XYTest(PECS):
         ptl.prepare_move(req, anticollision=self.data.anticollision)
         expected_QS = ptl.execute_move(
             posids=posids, reset_flags=False, return_coord='QS')
+            # .sort_values(by='DEVICE_ID').reset_index())
         self.loggers[ptlid].debug('execute_move() returns expected QS:\n'
                                   + expected_QS.to_string())
-        self.expected_QS_list.append(expected_QS)
-        # # get expected posTP from petal and write to movedf after move
-        ret_TP = (ptl.get_positions(posids=posids, return_coord='posTP')
-                  .set_index('DEVICE_ID'))
+        # get expected posTP from petal and write to movedf after move
+        ret_TP = ptl.get_positions(posids=posids, return_coord='posTP')
+                 #  .sort_values(by='DEVICE_ID').reset_index())
         self.loggers[ptlid].debug(f'Expected posTP after move {n}:\n'
                                   + ret_TP.to_string())
-        # write posTP for a petal to movedf
+        # record per-move data to movedf for a petal
         new = pd.DataFrame({f'pos_t_{n}': ret_TP['X1'],
-                            f'pos_p_{n}': ret_TP['X2']},
-                           dtype=np.float32, index=ret_TP.index)
+                            f'pos_p_{n}': ret_TP['X2'],
+                            f'pos_flag_{n}': ret_TP['FLAG'],
+                            f'pos_status_{n}': ret_TP['STATUS']},
+                           dtype=np.float32, index=ret_TP['DEVICE_ID'])
         self._update(new, i)
+        return expected_QS
 
     def check_unmatched(self, measured_QS, disable_unmatched):
         for ptlid in self.data.ptlids:  # check unmatched positioners

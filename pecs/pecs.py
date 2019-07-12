@@ -40,7 +40,7 @@ class PECS:
                                usually FVC or FVC1 or FVC2
     '''
 
-    def __init__(self, ptlids=[], printfunc=print,
+    def __init__(self, ptlids=None, printfunc=print,
                  platemaker_instrument=None, fvc_role=None,
                  illuminator_role=None):
         # Allow local config so scripts do not always have to collect roles
@@ -62,6 +62,7 @@ class PECS:
             printfuncs = printfunc
         # if input printfunc is already a dict, need to check consistency still
         assert set(ptlids) == set(printfuncs.keys()), 'Input ptlids mismatch'
+        self.ptlids = ptlids
         self.printfuncs = printfuncs
         self.platemaker_instrument = platemaker_instrument
         self.fvc_role = fvc_role
