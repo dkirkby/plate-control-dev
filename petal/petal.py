@@ -607,14 +607,16 @@ class Petal(object):
                 self.set_posfid_val(enabled[i], 'DUTY_DEFAULT_ON', duties[i])
         self.commit(log_note='set fiducial parameters')
         return settings_done
-    
+
     @property
     def n_fiducial_dots(self):
-        """Returns number of fixed fiducial dots this petal contributes in the field of view.
+        """Returns number of fixed fiducial dots this petal contributes
+        in the field of view.
         """
-        n_dots = [self.get_posfid_val(fidid,'N_DOTS') for fidid in self.fidids]
+        n_dots = [int(self.get_posfid_val(fidid, 'N_DOTS'))
+                  for fidid in self.fidids]
         return sum(n_dots)
-    
+
     @property
     def fiducial_dots_fvcXY(self):
         """Returns an ordered dict of ordered dicts of all [x,y] positions of all
@@ -640,12 +642,14 @@ class Petal(object):
                 y = self.get_posfid_val(fidid,'DOTS_FVC_Y')[i]
                 data[dotids[i]]['fvcXY'] = [x,y]
         return data
-    
-    def fid_dotids(self,fidid):
-        """Returns a list (in a standard order) of the dot id strings for a particular fiducial.
+
+    def fid_dotids(self, fidid):
+        """Returns a list (in a standard order) of the dot id strings
+        for a particular fiducial.
         """
-        return [self.dotid_str(fidid,i) for i in range(self.get_posfid_val(fidid,'N_DOTS'))]
-      
+        return [self.dotid_str(fidid, i) for i in
+                range(int(self.get_posfid_val(fidid, 'N_DOTS')))]
+
     @staticmethod
     def dotid_str(fidid,dotnumber):
         return fidid + '.' + str(dotnumber)
