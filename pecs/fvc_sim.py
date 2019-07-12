@@ -71,7 +71,7 @@ class FVC_proxy_sim:
             #Assume same format as returned from get_positions in petalApp X1 and X2 must be Q and S
             expected_positions.rename(columns = {'X1':'q'}, inplace=True)
             expected_positions.rename(columns = {'X2':'s'}, inplace=True)
-            expected_positions.rename(columns = {'FLAGS':'flags'}, inplace=True)
+            expected_positions.rename(columns = {'FLAG':'flags'}, inplace=True)
             expected_positions.rename(columns = {'DEVICE_ID':'id'}, inplace=True)
             #expected_positions.drop(columns=['PETAL_LOC','DEVICE_LOC'], inplace=True)
 
