@@ -69,8 +69,15 @@ class OnePoint(PECS):
             used_pos, tp_updates_tol=0.0, tp_updates_fraction=1.0,
             tp_updates=mode, auto_update=auto_update)
         updates['auto_update'] = auto_update
-        updates['target_t'] = targets[0]
-        updates['target_p'] = targets[1]
+        target_t, target_p = [], []
+        for i, posid in enumerate(posids):
+            if posid in used_pos:  # was measured by FVC and returned
+                target_t.append(targets[0][i])
+                target_p.append(targets[1][i])
+            else:  # was not measured by FVC and ommited in the return
+                pass  # skip this posid because length is shorted by Nunmatched
+        updates['target_t'] = target_t
+        updates['target_p'] = target_p
         updates['enabled_only'] = enabled_only
         return updates
 
