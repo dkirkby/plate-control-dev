@@ -230,7 +230,6 @@ def is_very_verbose(verbosity_enum):
     return boole
 
 # timestamp functions
-@property
 def now():
     return datetime.datetime.utcnow().astimezone()
 

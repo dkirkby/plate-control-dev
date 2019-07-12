@@ -52,7 +52,7 @@ class FPTestData:
     def __init__(self, test_name, test_cfg, petal_cfgs=None):
 
         self.test_name = test_name
-        self.test_time = pc.now
+        self.test_time = pc.now()
         self.test_cfg = test_cfg  # petal id sections are string ids
         self.anticollision = test_cfg['anticollision']
         self.num_corr_max = self.test_cfg['num_corr_max']
@@ -63,7 +63,7 @@ class FPTestData:
         for ptlid in self.test_cfg.sections:  # convert petal id to int now
             self.test_cfg.rename(ptlid, int(ptlid))
         # create save dir for all files: logs, tables, pickels, gzips
-        self.dir_name = f'{pc.filename_timestamp_str_now}-{test_name}'
+        self.dir_name = f'{pc.filename_timestamp_str_now()}-{test_name}'
         self.dir = os.path.join(pc.dirs['xytest_data'], self.dir_name)
         self.dirs = {ptlid: os.path.join(self.dir, f'PTL{ptlid}')
                      for ptlid in self.ptlids}
