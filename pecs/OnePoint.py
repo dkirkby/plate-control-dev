@@ -71,7 +71,7 @@ class OnePoint(PECS):
         updates['auto_update'] = auto_update
         target_t, target_p = [], []
         for i, posid in enumerate(posids):
-            if posid in used_pos:  # was measured by FVC and returned
+            if posid in used_pos['DEVICE_ID'].values:
                 target_t.append(targets[0][i])
                 target_p.append(targets[1][i])
             else:  # was not measured by FVC and ommited in the return
@@ -94,7 +94,7 @@ if __name__ == '__main__':
     user_text = input(
         'Please provide calibration mode, valid options are\n'
         '\t offsetTP, offsetT, offsetP, posTP\n'
-        '\t (leave blank for posTP)\n: ')
+        '(leave blank for posTP): ')
     if user_text == '':
         mode = 'posTP'
     else:
