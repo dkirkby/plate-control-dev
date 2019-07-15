@@ -76,7 +76,7 @@ if __name__ == '__main__':
         print('Invalid input!')
     else:
         rh = Rehome(selection=selection, axis=user_text)
-        df = rh.rehome()
+        df = rh.rehome(rh.posids)
         df.to_csv(os.path.join(
             pc.dirs['all_logs'], 'calib_logs',
             f'{pc.filename_timestamp_str_now()}-rehome.csv'))
