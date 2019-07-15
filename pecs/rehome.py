@@ -42,7 +42,7 @@ class Rehome(PECS):
             self.printfunc(f'Rehoming sucessful for all positioners.')
         else:  # non-empty list, need another attempt
             self.printfunc(f'{len(retry_list)} unsucessful: {retry_list}\n'
-                           f'{ret.to_string()}\n'
+                           f'{ret.loc[mask].to_string()}\n'
                            f'Retrying...')
             if attempt < 2:
                 if attempt == 0:  # set anticollision mode for 2nd attempt
@@ -55,7 +55,8 @@ class Rehome(PECS):
                 self.printfunc(f'3rd attempt did not complete successfully. '
                                f'Exiting...')
         ret = ptl.get_positions(posids=self.posids, return_coord='obsXY')
-        return ret
+        self.printfunc(f'Final positioner states:\n{ret.to_string()}')
+        return ret.rename(columns={'X1': 'obsX', 'X2': 'obsY'})
 
 
 if __name__ == '__main__':
