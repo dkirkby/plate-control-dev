@@ -55,7 +55,6 @@ class Rehome(PECS):
                 self.printfunc(f'3rd attempt did not complete successfully. '
                                f'Exiting...')
         ret = ptl.get_positions(posids=self.posids, return_coord='obsXY')
-        self.printfunc(f'Final positioner states:\n{ret.to_string()}')
         return ret.rename(columns={'X1': 'obsX', 'X2': 'obsY'})
 
 
@@ -78,6 +77,7 @@ if __name__ == '__main__':
     else:
         rh = Rehome(selection=selection, axis=user_text)
         df = rh.rehome(rh.posids)
+        print(f'Final positioner states:\n{df.to_string()}')
         df.to_csv(os.path.join(
             pc.dirs['all_logs'], 'calib_logs',
             f'{pc.filename_timestamp_str_now()}-rehome.csv'))
