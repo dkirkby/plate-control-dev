@@ -1,6 +1,7 @@
 '''
 Runs an Arc Calibration using fvc and petal proxies. Requires running DOS instance. See pecs.py
 '''
+import os
 from pecs import PECS
 import posconstants as pc
 import pandas
@@ -69,5 +70,6 @@ if __name__ == '__main__':
         selection = None
     data = arc.arc_calibration(selection=selection)
     print(data)
-    data.to_csv(pc.dirs['all_logs']+'/calib_logs/arc_calibration_'+pc.filename_timestamp_str_now()+'.csv')
-    
+    data.to_csv(os.path.join(
+                pc.dirs['all_logs'], 'calib_logs',
+                f'{pc.filename_timestamp_str_now()}-arc_calibration.csv'))

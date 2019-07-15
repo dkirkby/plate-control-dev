@@ -32,7 +32,7 @@ class Rehome(PECS):
             self.posids = selection
 
     def rehome(self, posids, anticollision='freeze', attempt=0):
-        self.printfunc(f'Rehoming {len(posid_list)} positioners...')
+        self.printfunc(f'Rehoming {len(posids)} positioners...')
         ptl = self.ptls[self.ptlid]
         ret = ptl.rehome_pos(posids, axis=self.axis,
                              anticollision=anticollision)

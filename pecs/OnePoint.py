@@ -103,4 +103,4 @@ if __name__ == '__main__':
     print(updates)
     updates.to_csv(os.path.join(
         pc.dirs['all_logs'], 'calib_logs',
-        f'one_point_{pc.filename_timestamp_str_now()}.csv'))
+        f'{pc.filename_timestamp_str_now()}-onepoint_calibration-{mode}.csv'))
