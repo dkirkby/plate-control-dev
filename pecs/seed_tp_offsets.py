@@ -25,7 +25,7 @@ class TP_Offsets(PECS):
         return 'hi'
 
 if __name__ == '__main__':
-    off = XY_Offsets()
+    off = TP_Offsets()
     user_text = input('Please list BUSIDs or POSIDs (not both) seperated by spaces, or type all: ')
     selection = []
     if 'all' not in user_text.lower():
