@@ -40,8 +40,8 @@ class OnePoint(PECS):
                 axis = (['offsetT', 'offsetP'].index(mode) + 1) % 2  # keep it
                 ret = ptl.get_positions(posids=posids, return_coord='obsTP')
                 targets[axis] = list(ret['X'+str(axis+1)])  # copy current pos
-                mode = 'offsetTP'  # for updating purposes, after targets set
-            elif mode in ['offsetTP', 'posTP']:
+                mode = 'offsetsTP'  # for updating purposes, after targets set
+            elif mode in ['offsetsTP', 'posTP']:
                 pass  # use default targets for all, move both axes
             else:
                 raise Exception('Invalid input 1P calibration mode')
@@ -93,7 +93,7 @@ if __name__ == '__main__':
         selection = [item for item in user_text.split()]
     user_text = input(
         'Please provide calibration mode, valid options are\n'
-        '\t offsetTP, offsetT, offsetP, posTP\n'
+        '\t offsetsTP, offsetT, offsetP, posTP\n'
         '(leave blank for posTP): ')
     if user_text == '':
         mode = 'posTP'
