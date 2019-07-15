@@ -229,9 +229,11 @@ def is_very_verbose(verbosity_enum):
         boole = True
     return boole
 
+
 # timestamp functions
 def now():
-    return datetime.datetime.utcnow().astimezone()
+    # current TZ unaware local time (), then TZ aware in local timezone
+    return datetime.datetime.now().astimezone()
 
 def timestamp_str_now():
     return now().strftime(timestamp_format)
