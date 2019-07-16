@@ -335,10 +335,10 @@ class XYTest(PECS):
 
     def record_measurement(self, measured_QS, i, n):
         # calculate below measured obsXY from measured QS and write to movedf
-        q_rad = np.radians(measured_QS['Q'])
-        r = pc.S2R_lookup(measured_QS['S'])
-        new = pd.DataFrame({f'meas_x_{n}': r * np.cos(q_rad),
-                            f'meas_y_{n}': r * np.sin(q_rad)},
+        Q_rad = np.radians(measured_QS['Q'])
+        R = pc.S2R_lookup(measured_QS['S'])
+        new = pd.DataFrame({f'meas_x_{n}': R * np.cos(Q_rad),
+                            f'meas_y_{n}': R * np.sin(Q_rad)},
                            dtype=np.float32, index=measured_QS.index)
         self._update(new, i)
 
