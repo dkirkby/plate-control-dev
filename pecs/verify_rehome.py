@@ -68,6 +68,12 @@ class RehomeVerify(PECS):
         expected_pos = (ptl.get_positions(return_coord='obsXY')
                         .rename(columns={'X1': 'expectedX', 'X2': 'expectedY'})
                         .set_index('DEVICE_ID'))
+        # what's unmatched
+        all_posids = set(expected_pos['DEVICE_ID'])
+        measured_posids = set(measured_QS['DEVICE_ID'])
+        unmatched = all_posids - measured_posids
+        self.printfunc(f'Missing {len(unmatched)} unmatched positioners:\n'
+                       f'{unmatched}')
         # filter expected pos because there are unmatched fibres
         expected_pos = expected_pos.loc[measured_QS.index]  # same order
         expected_pos['expectedX'] = offsetX.loc[measured_QS.index]
