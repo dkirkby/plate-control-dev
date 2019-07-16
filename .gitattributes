@@ -15,6 +15,7 @@ pecs/pecs_local.conf -text
 pecs/rehome.py -text
 pecs/seed_tp_offsets.py -text
 pecs/seed_xy_offsets.py -text
+pecs/verify_rehome.py -text
 pecs/xytest.py -text
 petal/collision_lookup_generator.py -text
 petal/collision_lookup_generator_subset.py -text
