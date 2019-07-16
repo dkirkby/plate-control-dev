@@ -93,9 +93,10 @@ class RehomeVerify(PECS):
             return True
         else:
             self.printfunc(f'Possibly not rehomed sucessfully '
-                           f'(radial deviations > 2 mm):\n'
-                           f'{expected_pos[mask]}\n'
-                           f'Positioners: {expected_pos[mask].DEVICE_ID}')
+                           f'(radial deviations > 2 mm):\n\n'
+                           f'{expected_pos[expected_pos[mask]]}\n\n'
+                           f'Positioner IDs:\n'
+                           f'{list(expected_pos[mask].DEVICE_ID})')
         return expected_pos
 
 
