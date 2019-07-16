@@ -70,7 +70,7 @@ class Rehome(PECS):
         df = (XY_Offsets().seed_vals(selection=self.posids, auto_update=True)
               .sort_values(by='DEVICE_ID').reset_index())
         offsetX, offsetY = df['OFFSET_X'], df['OFFSET_Y']
-        Q = np.degrees(np.atan2(offsetY, offsetX))  # convert offsetXY to QS
+        Q = np.degrees(np.arctan2(offsetY, offsetX))  # convert offsetXY to QS
         R = np.sqrt(np.square(offsetX) + np.square(offsetY))
         S = pc.R2S_lookup(R)  # convert offsetXY to QS
         expected_pos = ptl.get_positions(posids=self.posids, return_coord='QS')
