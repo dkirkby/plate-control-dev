@@ -92,7 +92,7 @@ class RehomeVerify(PECS):
             + np.square(expected_pos['delta_obsY'])))
         expected_pos = expected_pos.sort_values(
             by='delta_r', ascending=False).reset_index()
-        mask = expected_pos['delta_r'] > 2
+        mask = expected_pos['delta_r'] > 1
         bad_posids = list(expected_pos[mask]['DEVICE_ID'])
         if len(bad_posids) == 0:
             self.printfunc('All successful and verified to match measurement.')
@@ -102,7 +102,7 @@ class RehomeVerify(PECS):
                            f'(radial deviations > 1 mm):\n\n'
                            f'{expected_pos[mask]}\n\n'
                            f'Positioner IDs:\n'
-                           f'{list(expected_pos[mask].DEVICE_ID})')
+                           f'{list(expected_pos[mask].DEVICE_ID)}')
         return expected_pos
 
 
