@@ -59,6 +59,7 @@ class OnePoint(PECS):
         # expected_pos.to_csv('test.csv')
         old_radius = self.fvc.get('match_radius')  # hold old radius
         self.fvc.set(match_radius=match_radius)  # set larger radius for calib
+        all_requested_posids = set(expected_pos['DEVICE_ID'])
         measured_pos = (pd.DataFrame(self.fvc.measure(expected_pos))
                         .rename(columns={'id': 'DEVICE_ID'}))
         measured_pos.columns = measured_pos.columns.str.upper()
@@ -78,6 +79,9 @@ class OnePoint(PECS):
         updates['target_t'] = target_t
         updates['target_p'] = target_p
         updates['enabled_only'] = enabled_only
+        measured_posids = set(updates['DEVICE_ID'])
+        unmatched = all_requested_posids - measured_posids
+        print(f'Missing {len(unmatched)} unmatched positioners:\n{unmatched}')
         return updates
 
 
