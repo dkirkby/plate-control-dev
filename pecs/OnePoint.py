@@ -16,7 +16,7 @@ class OnePoint(PECS):
         PECS.__init__(self, ptlids=petal_id, fvc_role=fvc_role,
                       platemaker_instrument=platemaker_instrument,
                       printfunc=printfunc)
-        self.Eo_phi = 104.0
+        self.phi = 130
         self.clear_angle_margin = 3.0
         self.ptlid = list(self.ptls.keys())[0]
         self.index = PositionerIndex()
@@ -35,7 +35,7 @@ class OnePoint(PECS):
             posids = selection
         if tp_target == 'default':  # use (0, 107) as target, move positioners
             targets = {0: [0] * len(posids),  # 0 for theta, 1 for phi
-                       1: [self.Eo_phi+self.clear_angle_margin] * len(posids)}
+                       1: [self.phi+self.clear_angle_margin] * len(posids)}
             if mode in ['offsetT', 'offsetP']:  # move this axis only
                 axis = (['offsetT', 'offsetP'].index(mode) + 1) % 2  # keep it
                 ret = ptl.get_positions(posids=posids, return_coord='obsTP')

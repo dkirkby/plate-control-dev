@@ -70,11 +70,11 @@ class Rehome(PECS):
         df = (XY_Offsets().seed_vals(selection=self.posids, auto_update=True)
               .sort_values(by='DEVICE_ID').reset_index())
         offsetX, offsetY = df['OFFSET_X'], df['OFFSET_Y']
-        q = np.degrees(np.atan2(offsetY, offsetX))  # convert offsetXY to QS
-        r = np.sqrt(np.square(offsetX) + np.square(offsetY))
-        s = pc.R2S_lookup(r)  # convert offsetXY to QS
+        Q = np.degrees(np.atan2(offsetY, offsetX))  # convert offsetXY to QS
+        R = np.sqrt(np.square(offsetX) + np.square(offsetY))
+        S = pc.R2S_lookup(R)  # convert offsetXY to QS
         expected_pos = ptl.get_positions(posids=self.posids, return_coord='QS')
-        expected_pos['X1'], expected_pos['X2'] = q, s
+        expected_pos['X1'], expected_pos['X2'] = Q, S  # offsetXY as expected
         # take FVC measurement
         mr_old = self.fvc.get('match_radius')  # hold old radius
         self.fvc.set(match_radius=80)  # set larger radius for calib
