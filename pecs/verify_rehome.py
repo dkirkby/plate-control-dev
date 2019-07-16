@@ -41,12 +41,12 @@ class RehomeVerify(PECS):
 
     def compare_xy(self):
         ptl = self.ptls[self.ptlid]
-        self.printfunc(f'Seeding XY offsets...')
-        df = (XY_Offsets().seed_vals(auto_update=True)
-              .set_index('DEVICE_ID'))  # all 502 fibres including dark
+        # self.printfunc(f'Seeding XY offsets...')
+        # df = (XY_Offsets().seed_vals(auto_update=True)
+        #       .set_index('DEVICE_ID'))  # all 502 fibres including dark
         expected_pos = (ptl.get_positions(return_coord='QS')
                         .set_index('DEVICE_ID'))  # all good fibres
-        df = df.loc[expected_pos.index]
+        df = ptl.get_pos_vals(['OFFSET_X', 'OFFSET_Y'], posids=self.posids)
         offsetX, offsetY = df['OFFSET_X'], df['OFFSET_Y']  # all backlit fibres
         Q = np.degrees(np.arctan2(offsetY, offsetX))  # convert offsetXY to QS
         R = np.sqrt(np.square(offsetX) + np.square(offsetY))
@@ -69,8 +69,8 @@ class RehomeVerify(PECS):
                         .rename(columns={'X1': 'expectedX', 'X2': 'expectedY'})
                         .set_index('DEVICE_ID'))
         # what's unmatched
-        all_posids = set(expected_pos['DEVICE_ID'])
-        measured_posids = set(measured_QS['DEVICE_ID'])
+        all_posids = set(expected_pos.index)
+        measured_posids = set(measured_QS.index)
         unmatched = all_posids - measured_posids
         self.printfunc(f'Missing {len(unmatched)} unmatched positioners:\n'
                        f'{unmatched}')
@@ -101,8 +101,7 @@ class RehomeVerify(PECS):
             self.printfunc(f'Possibly not rehomed sucessfully '
                            f'(radial deviations > 1 mm):\n\n'
                            f'{expected_pos[mask]}\n\n'
-                           f'Positioner IDs:\n'
-                           f'{list(expected_pos[mask].DEVICE_ID)}')
+                           f'Positioner IDs:\n{bad_posids}')
         return expected_pos
 
 
