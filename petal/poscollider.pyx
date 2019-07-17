@@ -24,13 +24,17 @@ class PosCollider(object):
                  collision_hashpp_exists=False, 
                  collision_hashpf_exists=False, 
                  hole_angle_file=None, 
-                 use_neighbor_loc_dict=False):
-        if not configfile:
-            filename = '_collision_settings_DEFAULT.conf'
+                 use_neighbor_loc_dict=False,
+                 config=None):
+        if not config:
+            if not configfile:
+                filename = '_collision_settings_DEFAULT.conf'
+            else:
+                filename = configfile
+            filepath = os.path.join(pc.dirs['collision_settings'],filename)
+            self.config = configobj.ConfigObj(filepath,unrepr=True)
         else:
-            filename = configfile
-        filepath = os.path.join(pc.dirs['collision_settings'],filename)
-        self.config = configobj.ConfigObj(filepath,unrepr=True)
+            self.config = config
         self.posids = set() # posid strings for all the positioners
         self.posindexes = {} # key: posid string, value: index number for positioners in animations
         self.posmodels = {} # key: posid string, value: posmodel instance
