@@ -68,7 +68,7 @@ class RehomeVerify(PECS):
         # what's unmatched?
         all_posids = set(self.posids)
         measured_posids = set(measured_QS.index)
-        unmatched = sorted(list(all_posids - measured_posids))
+        unmatched = sorted(all_posids - measured_posids)
         self.printfunc(f'Missing {len(unmatched)} unmatched positioners:\n'
                        f'{unmatched}')
         # filter expected pos because there are unmatched fibres
