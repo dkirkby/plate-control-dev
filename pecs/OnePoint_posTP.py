@@ -16,7 +16,7 @@ class OnePoint(PECS):
         PECS.__init__(self, ptlids=petal_id, fvc_role=fvc_role,
                       platemaker_instrument=platemaker_instrument,
                       printfunc=printfunc)
-        self.obsP = 130
+        self.obsP = 135 # phi_close angle in posmovemeasure
         self.ptlid = list(self.ptls.keys())[0]
         self.index = PositionerIndex()
 
@@ -24,7 +24,8 @@ class OnePoint(PECS):
                         auto_update=True, tp_target='default',
                         match_radius=80.0):
         ptl = self.ptls[self.ptlids[0]]
-        if selection is None:
+        # Interpret selection, decide what positioner to use
+        if selection is None: 
             posids = list(ptl.get_positioners(
                 enabled_only=enabled_only)['DEVICE_ID'])
         elif 'can' in selection[0]:  # User passed a list of canids
@@ -32,41 +33,46 @@ class OnePoint(PECS):
                 enabled_only=enabled_only, busids=selection)['DEVICE_ID'])
         else:  # assume is a list of posids
             posids = selection
-        if tp_target == 'default':  # use (0, 107) as target, move positioners
-            targets = {0: [0] * len(posids),  # 0 for theta, 1 for phi
-                       1: [self.obsP] * len(posids)}
-            if mode in ['offsetT', 'offsetP']:  # move this axis only
-                axis = (['offsetT', 'offsetP'].index(mode) + 1) % 2  # keep it
-                ret = ptl.get_positions(posids=posids, return_coord='obsTP')
-                targets[axis] = list(ret['X'+str(axis+1)])  # copy current pos
-                mode = 'offsetsTP'  # for updating purposes, after targets set
-            elif mode in ['offsetsTP', 'posTP']:
-                pass  # use default targets for all, move both axes
-            else:
-                raise Exception('Invalid input 1P calibration mode')
-            rows = []
-            for i, posid in enumerate(posids):
+        # Interpret tp_target and move if target != None
+        if tp_target == 'default':  # use (0, self.obsP to posP) as target
+            row = []
+            for posid in posids:
+                offsetP = ptl.get_posfid_val(posid, 'OFFSET_P')
                 row = {'DEVICE_ID': posid,
-                       'COMMAND': 'obsTP',
-                       'X1': targets[0][i],
-                       'X2': targets[1][i],
+                       'COMMAND': 'posTP',
+                       'X1': 0,
+                       'X2': self.obsP - offsetP, #conversion obsP to posP as in posmovemeasure
+                       'LOG_NOTE': f'One point calibration {mode}'}
+                rows.append(row)
+            ptl.prepare_move(pd.DataFrame(rows), anticollision=None)
+            expected_pos = ptl.execute_move()
+        elif isinstance(tp_target, list):
+            row = []
+            for posid in posids:
+                offsetP = ptl.get_posfid_val(posid, 'OFFSET_P')
+                row = {'DEVICE_ID': posid,
+                       'COMMAND': 'posTP',
+                       'X1': tp_target[0],
+                       'X2': tp_target[1] - offsetP, #conversion obsP to posP as in posmovemeasure
                        'LOG_NOTE': f'One point calibration {mode}'}
                 rows.append(row)
             ptl.prepare_move(pd.DataFrame(rows), anticollision=None)
             expected_pos = ptl.execute_move()
         else:  # don't move, just use current position
             expected_pos = ptl.get_positions()
-        # expected_pos.to_csv('test.csv')
+        # Prepare FVC and measure targets
         old_radius = self.fvc.get('match_radius')  # hold old radius
         self.fvc.set(match_radius=match_radius)  # set larger radius for calib
         measured_pos = (pd.DataFrame(self.fvc.measure(expected_pos))
                         .rename(columns={'id': 'DEVICE_ID'}))
         measured_pos.columns = measured_pos.columns.str.upper()
         self.fvc.set(match_radius=old_radius)  # restore old radius
-        used_pos = measured_pos[measured_pos['DEVICE_ID'].isin(posids)]
+        used_pos = measured_pos[measured_pos['DEVICE_ID'].isin(posids)] #filter only selected positioners
+        # Do analysis with test_and_update_TP
         updates = ptl.test_and_update_TP(
             used_pos, tp_updates_tol=0.0, tp_updates_fraction=1.0,
             tp_updates=mode, auto_update=auto_update)
+        # Clean up and record additional entries in updates
         updates['auto_update'] = auto_update
         target_t, target_p = [], []
         for i, posid in enumerate(posids):
@@ -81,6 +87,10 @@ class OnePoint(PECS):
         measured_posids = set(updates['DEVICE_ID'])
         unmatched = sorted(list(set(posids) - measured_posids))
         print(f'Missing {len(unmatched)} unmatched positioners:\n{unmatched}')
+        addon_to_updates = []
+        for no in unmatched:
+            addon_to_updates.append({'DEVICE_ID':no})
+        updates.appedn(addon_to_updates) #List unmeasured positioners in updates, even with no data
         return updates
 
 
@@ -93,16 +103,20 @@ if __name__ == '__main__':
         selection = None
     else:
         selection = [item for item in user_text.split()]
-    user_text = input(
-        'Please provide calibration mode, valid options are\n'
-        '\t offsetsTP, offsetT, offsetP, posTP\n'
-        '(leave blank for posTP): ')
-    if user_text == '':
-        mode = 'posTP'
+    user_text = input('Do you want to move positioners? (y/n) ')
+    if 'y' in user_text:
+        tp_target = 'default'
     else:
-        mode = user_text
-    updates = op.one_point_calib(selection=selection, mode=mode)
+        tp_target = None
+    user_text = input('Automatically update calibration? (y/n) ')
+    if 'y' in user_text:
+        auto_update = True
+    else:
+        auto_update = False
+    user_text = input()
+    updates = op.one_point_calib(selection=selection, mode='posTP',
+                                 auto_update=auto_update, tp_target=tp_target)
     print(updates)
     updates.to_csv(os.path.join(
         pc.dirs['all_logs'], 'calib_logs',
-        f'{pc.filename_timestamp_str_now()}-onepoint_calibration-{mode}.csv'))
+        f'{pc.filename_timestamp_str_now()}-onepoint_calibration-posTP.csv'))
