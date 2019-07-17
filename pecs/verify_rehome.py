@@ -41,13 +41,11 @@ class RehomeVerify(PECS):
 
     def compare_xy(self):
         ptl = self.ptls[self.ptlid]
-        # self.printfunc(f'Seeding XY offsets...')
-        # df = (XY_Offsets().seed_vals(auto_update=True)
-        #       .set_index('DEVICE_ID'))  # all 502 fibres including dark
-        expected_pos = (ptl.get_positions(return_coord='QS')
-                        .set_index('DEVICE_ID'))  # all good fibres
-        df = ptl.get_pos_vals(['OFFSET_X', 'OFFSET_Y'], posids=self.posids)
-        offsetX, offsetY = df['OFFSET_X'], df['OFFSET_Y']  # all backlit fibres
+        # all backlit fibres, including those disabled, needed for FVC
+        expected_pos = ptl.get_positions(return_coord='QS')
+        df = ptl.get_pos_vals(['OFFSET_X', 'OFFSET_Y'],
+                              posids=list(expected_pos['DEVICE_ID']))
+        offsetX, offsetY = df['OFFSET_X'], df['OFFSET_Y']
         Q = np.degrees(np.arctan2(offsetY, offsetX))  # convert offsetXY to QS
         R = np.sqrt(np.square(offsetX) + np.square(offsetY))
         S = pc.R2S_lookup(R)  # convert offsetXY to QS
@@ -56,7 +54,6 @@ class RehomeVerify(PECS):
         self.printfunc('Taking FVC exposure to confirm home positions...')
         mr_old = self.fvc.get('match_radius')  # hold old radius
         self.fvc.set(match_radius=80)  # set larger radius for calib
-        expected_pos.reset_index(inplace=True)
         # self.printfunc(f'Sending the following expected positions to FVC:\n'
         #                f'{expected_pos}')
         measured_QS = (pd.DataFrame(self.fvc.measure(expected_pos))
@@ -68,10 +65,10 @@ class RehomeVerify(PECS):
         expected_pos = (ptl.get_positions(return_coord='obsXY')
                         .rename(columns={'X1': 'expectedX', 'X2': 'expectedY'})
                         .set_index('DEVICE_ID'))
-        # what's unmatched
-        all_posids = set(expected_pos.index)
+        # what's unmatched?
+        all_posids = set(self.posids)
         measured_posids = set(measured_QS.index)
-        unmatched = all_posids - measured_posids
+        unmatched = sorted(list(all_posids - measured_posids))
         self.printfunc(f'Missing {len(unmatched)} unmatched positioners:\n'
                        f'{unmatched}')
         # filter expected pos because there are unmatched fibres
