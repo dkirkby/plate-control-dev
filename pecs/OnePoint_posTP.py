@@ -34,13 +34,16 @@ class OnePoint(PECS):
         else:  # assume is a list of posids
             posids = selection
         # Interpret tp_target and move if target != None
+        offsetPs = {}
         if tp_target == 'default':  # use (0, self.obsP to posP) as target
             row = []
             for posid in posids:
                 offsetP = ptl.get_posfid_val(posid, 'OFFSET_P')
+                offsetPs[posid] = offsetP
+                tp_target = [0.0,self.obsP]
                 row = {'DEVICE_ID': posid,
                        'COMMAND': 'posTP',
-                       'X1': 0,
+                       'X1': 0.0,
                        'X2': self.obsP - offsetP, #conversion obsP to posP as in posmovemeasure
                        'LOG_NOTE': f'One point calibration {mode}'}
                 rows.append(row)
@@ -50,6 +53,7 @@ class OnePoint(PECS):
             row = []
             for posid in posids:
                 offsetP = ptl.get_posfid_val(posid, 'OFFSET_P')
+                offsetPs[posid] = offsetP
                 row = {'DEVICE_ID': posid,
                        'COMMAND': 'posTP',
                        'X1': tp_target[0],
@@ -68,29 +72,34 @@ class OnePoint(PECS):
         measured_pos.columns = measured_pos.columns.str.upper()
         self.fvc.set(match_radius=old_radius)  # restore old radius
         used_pos = measured_pos[measured_pos['DEVICE_ID'].isin(posids)] #filter only selected positioners
+        unmatched_used_pos = used_pos[used_pos['FLAGS'] & 1 == 0] #split into unmatched and matched
+        matched_used_pos = used_pos[used_pos['FLAGS'] & 1 != 0]
         # Do analysis with test_and_update_TP
         updates = ptl.test_and_update_TP(
-            used_pos, tp_updates_tol=0.0, tp_updates_fraction=1.0,
+            matched_used_pos, tp_updates_tol=0.0, tp_updates_fraction=1.0,
             tp_updates=mode, auto_update=auto_update)
         # Clean up and record additional entries in updates
         updates['auto_update'] = auto_update
         target_t, target_p = [], []
-        for i, posid in enumerate(posids):
-            if posid in used_pos['DEVICE_ID'].values:
-                target_t.append(targets[0][i])
-                target_p.append(targets[1][i])
+        for posid in posids:
+            if posid in matched_used_pos['DEVICE_ID'].values:
+                try: #ask for forgiveness later
+                    target_t.append(tp_target[0])
+                    target_p.append(tp_target[1] - offsetPs[posid])
+                except:
+                    target_t = tp_target #Positioners weren't moved so
+                    target_p = tp_target #tp_target is not 'default' or a list
+                    break
             else:  # was not measured by FVC and ommited in the return
                 pass  # skip this posid because length is shorted by Nunmatched
         updates['target_t'] = target_t
         updates['target_p'] = target_p
         updates['enabled_only'] = enabled_only
         measured_posids = set(updates['DEVICE_ID'])
-        unmatched = sorted(list(set(posids) - measured_posids))
-        print(f'Missing {len(unmatched)} unmatched positioners:\n{unmatched}')
-        addon_to_updates = []
-        for no in unmatched:
-            addon_to_updates.append({'DEVICE_ID':no})
-        updates.appedn(addon_to_updates) #List unmeasured positioners in updates, even with no data
+        unmatched = unmatched_used_pos['DEVICE_ID'].values
+        print(f'Missing {len(unmatched)} of the selected positioners:\n{unmatched}')
+        unmatched_used_pos.drop(['Q','S'],axis=1) #Drop QS so we don't get columns QS in updates with NaNs
+        updates.append(unmatched_used_pos,ignore_index=True) #List unmeasured positioners in updates, even with no data
         return updates
 
 
