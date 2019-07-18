@@ -82,6 +82,7 @@ class PosCollider(object):
         self._petal_y0 = y0
         self._petal_rot = rot
         self._load_keepouts()
+		
     def update_positioner_offsets_and_arm_lengths(self):
         """Loads positioner parameters.  This method is called when new calibration data is available
         for positioner arm lengths and offsets.
@@ -417,8 +418,8 @@ class PosCollider(object):
         
     def _load_keepouts(self):
         """Read latest versions of all keepout geometries."""
-        self.general_keepout_P = PosPoly(self.config['KEEPOUT_PHI'])
-        self.general_keepout_T = PosPoly(self.config['KEEPOUT_THETA'])
+        self.general_keepout_P_unexpanded = PosPoly(self.config['KEEPOUT_PHI'])
+        self.general_keepout_T_unexpanded = PosPoly(self.config['KEEPOUT_THETA'])
         self.keepout_PTL = PosPoly(self.config['KEEPOUT_PTL'])
         self.keepout_GFA = PosPoly(self.config['KEEPOUT_GFA'])
         self.keepout_PTL = self.keepout_PTL.rotated(self._petal_rot)
@@ -429,10 +430,10 @@ class PosCollider(object):
     
     def _adjust_keepouts(self):
         """Expand/contract, and pre-shift the theta and phi keepouts for each positioner."""
-        self.general_keepout_P = self.general_keepout_P.expanded_radially(self.config['KEEPOUT_EXPANSION_PHI_RADIAL'])
-        self.general_keepout_P = self.general_keepout_P.expanded_angularly(self.config['KEEPOUT_EXPANSION_PHI_ANGULAR'])
-        self.general_keepout_T = self.general_keepout_T.expanded_radially(self.config['KEEPOUT_EXPANSION_THETA_RADIAL'])
-        self.general_keepout_T = self.general_keepout_T.expanded_angularly(self.config['KEEPOUT_EXPANSION_THETA_ANGULAR'])
+        self.general_keepout_P = self.general_keepout_P_unexpanded.expanded_radially(self.config['KEEPOUT_EXPANSION_PHI_RADIAL'])
+        self.general_keepout_P = self.general_keepout_P_unexpanded.expanded_angularly(self.config['KEEPOUT_EXPANSION_PHI_ANGULAR'])
+        self.general_keepout_T = self.general_keepout_T_unexpanded.expanded_radially(self.config['KEEPOUT_EXPANSION_THETA_RADIAL'])
+        self.general_keepout_T = self.general_keepout_T_unexpanded.expanded_angularly(self.config['KEEPOUT_EXPANSION_THETA_ANGULAR'])
         for posid in self.posids:
             R1_error = self.R1[posid] - pc.nominals['LENGTH_R1']['value']
             R2_error = self.R2[posid] - pc.nominals['LENGTH_R2']['value']
