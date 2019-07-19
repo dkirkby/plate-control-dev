@@ -24,7 +24,7 @@ class Arc(PECS):
         requests_list_T, requests_list_P = self.ptls[self.ptlid].get_arc_requests(ids=posid_list)
         T_data = []
         old_radius = self.fvc.get('match_radius')
-        self.fvc.set(match_radius=match_radius)
+        self.fvc.set(match_radius=match_radius) #Change radius usually to larger values to accound for poor calibration at this point
         i = 1
         for request in requests_list_T:
             print('Measuring theta arc point '+str(i)+' of '+str(len(requests_list_T)))
@@ -37,7 +37,11 @@ class Arc(PECS):
             used_positions = measured_positions[measured_positions['DEVICE_ID'].isin(posid_list)]
             request.rename(columns={'X1':'TARGET_T','X2':'TARGET_P'},inplace=True)
             merged = used_positions.merge(request, how='outer',on='DEVICE_ID')
-            T_data.append(merged)
+            unmatched_merged = merged[merged['FLAGS'] & 1 == 0] #split into unmatched and matched
+            matched_merged = merged[merged['FLAGS'] & 1 != 0]
+            unmatched = unmatched_merged['DEVICE_ID'].values
+            print(f'Missing {len(unmatched)} of the selected positioners:\n{unmatched}')
+            T_data.append(matched_merged)
         P_data = []
         i = 1
         for request in requests_list_P:
@@ -51,7 +55,11 @@ class Arc(PECS):
             used_positions = measured_positions[measured_positions['DEVICE_ID'].isin(posid_list)]
             request.rename(columns={'X1':'TARGET_T','X2':'TARGET_P'},inplace=True)
             merged = used_positions.merge(request, how='outer',on='DEVICE_ID')
-            P_data.append(merged)
+            unmatched_merged = merged[merged['FLAGS'] & 1 == 0] #split into unmatched and matched
+            matched_merged = merged[merged['FLAGS'] & 1 != 0]
+            unmatched = unmatched_merged['DEVICE_ID'].values
+            print(f'Missing {len(unmatched)} of the selected positioners:\n{unmatched}')
+            P_data.append(matched_merged)
         self.fvc.set(match_radius=old_radius)
         data = self.ptls[self.ptlid].calibrate_from_arc_data(T_data,P_data,auto_update=auto_update)
         data['auto_update'] = auto_update
@@ -68,8 +76,13 @@ if __name__ == '__main__':
             selection.append(item)
     else:
         selection = None
-    data = arc.arc_calibration(selection=selection)
-    print(data)
+    user_text = input('Automatically update calibration? (y/n) ')
+    if 'y' in user_text:
+        auto_update = True
+    else:
+        auto_update = False
+    data = arc.arc_calibration(selection=selection, auto_update=auto_update)
     data.to_csv(os.path.join(
                 pc.dirs['all_logs'], 'calib_logs',
                 f'{pc.filename_timestamp_str_now()}-arc_calibration.csv'))
+    print(data[['DEVICE_ID','LENGTH_R1','LENGTH_R2','OFFSET_X','OFFSET_Y','OFFSET_T','OFFSET_P']])

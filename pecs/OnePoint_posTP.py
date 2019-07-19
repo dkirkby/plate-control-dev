@@ -122,10 +122,9 @@ if __name__ == '__main__':
         auto_update = True
     else:
         auto_update = False
-    user_text = input()
     updates = op.one_point_calib(selection=selection, mode='posTP',
                                  auto_update=auto_update, tp_target=tp_target)
-    print(updates)
     updates.to_csv(os.path.join(
         pc.dirs['all_logs'], 'calib_logs',
         f'{pc.filename_timestamp_str_now()}-onepoint_calibration-posTP.csv'))
+    print(updates[['DEVICE_ID','POS_T','POS_P','POS_T_OLD','POS_P_OLD','dT','dP']])

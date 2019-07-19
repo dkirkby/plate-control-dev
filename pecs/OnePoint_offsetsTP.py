@@ -20,10 +20,9 @@ if __name__ == '__main__':
         auto_update = True
     else:
         auto_update = False
-    user_text = input()
     updates = op.one_point_calib(selection=selection, mode='offsetsTP',
                                  auto_update=auto_update, tp_target=tp_target)
-    print(updates)
     updates.to_csv(os.path.join(
         pc.dirs['all_logs'], 'calib_logs',
         f'{pc.filename_timestamp_str_now()}-onepoint_calibration-offsetsTP.csv'))
+    print(updates[['DEVICE_ID','OFFSET_T','OFFSET_P','OFFSET_T_OLD','OFFSET_P_OLD','dT','dP']])
