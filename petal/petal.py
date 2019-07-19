@@ -59,14 +59,16 @@ class Petal(object):
         self.printfunc = printfunc
         # petal setup
         if (None in [petal_id, petalbox_id, fidids, posids, shape]) or \
-           (not(hasattr(self, Tx)) or not(hasattr(self, Ty)) or not(hasattr(self, gamma))):
+           (not(hasattr(self, 'Tx')) or not(hasattr(self, 'Ty')) or not(hasattr(self, 'gamma'))):
             self.printfunc('Some parameters not provided to __init__, reading petal config.')
             self.petal_state = posstate.PosState(
                 unit_id=petal_id, device_type='ptl', logging=True,
                 printfunc=self.printfunc)
             if petal_id is None:
+                self.printfunc('Reading Petal_ID from petal_state')
                 petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
             if petalbox_id is None:
+                self.printfunc('Reading petalbox_ID from petal_state')
                 petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
             if posids is None:
                 self.printfunc('posids not given, read from ptl_settings file')
@@ -75,6 +77,7 @@ class Petal(object):
                 self.printfunc('fidids not given, read from ptl_settings file')
                 fidids = self.petal_state.conf['FID_IDS']
             if shape is None:
+                self.printfunc('Reading shape from petal_state')
                 shape = self.petal_state.conf['SHAPE']
             self.gamma = self.petal_state.conf['ROTATION']
             self.Tx = self.petal_state.conf['X_OFFSET']
@@ -123,7 +126,8 @@ class Petal(object):
         self.power_supply_map = self._map_power_supplies_to_posids()
         
         # collider, scheduler, and animator setup
-        if hasattr(anticol_settings):
+        if hasattr(self, 'anticol_settings'):
+            self.printfunc('Using provided anticollision settings')
             self.collider = poscollider.PosCollider(config=self.anticol_settings,
                                                     collision_hashpp_exists=False, 
                                                     collision_hashpf_exists=False, 
