@@ -58,8 +58,8 @@ class Petal(object):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
         # petal setup
-        if None in [petal_id, petalbox_id, fidids, posids, shape] or
-            not(hasattr(self, Tx)) or not(hasattr(self, Ty)) not(hasattr(self, gamma)):
+        if (None in [petal_id, petalbox_id, fidids, posids, shape]) or \
+           (not(hasattr(self, Tx)) or not(hasattr(self, Ty)) or not(hasattr(self, gamma))):
             self.printfunc('Some parameters not provided to __init__, reading petal config.')
             self.petal_state = posstate.PosState(
                 unit_id=petal_id, device_type='ptl', logging=True,
@@ -134,9 +134,9 @@ class Petal(object):
                                                     collision_hashpf_exists=False, 
                                                     hole_angle_file=None)
             self.anticol_settings = self.collider.config
-        self.collider.set_petal_offsets(x0=self.petal_state.conf['X_OFFSET'],
-                                        y0=self.petal_state.conf['Y_OFFSET'],
-                                        rot=self.petal_state.conf['ROTATION'])
+        self.collider.set_petal_offsets(x0=self.Tx,
+                                        y0=self.Ty,
+                                        rot=self.gamma)
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
         self.animator_on = False # this should be turned on/off using the animation start/stop control methods below
@@ -171,20 +171,6 @@ class Petal(object):
 
         # transformation instance setup for petal
         # these values can be used for boundary calculation in anti-collision
-        if petal_loc is None:
-            self.petal_loc = 3  # petal local CS aligns with focal plate CS5
-        else:
-            self.petal_loc = petal_loc
-        if False:  # CONSTANTSDB_AVAILABLE real petal information isn't in the DB yet
-            constants = ConstantsDB().get_constants(
-                snapshot='DOS', tag='CURRENT', group='focal_plane_metrology')
-            gamma = constants[str(self.petal_loc)]['petal_rot_3']
-            Tx = constants[str(self.petal_loc)]['petal_offset_x']
-            Ty = constants[str(self.petal_loc)]['petal_offset_y']
-        else:  # DB unavailable, read from petal config
-            gamma = self.petal_state.conf['ROTATION']
-            Tx = self.petal_state.conf['X_OFFSET']
-            Ty = self.petal_state.conf['Y_OFFSET']
         self.trans = PetalTransforms(Tx=self.Tx, Ty=self.Ty, gamma=self.gamma)
 
         # set debug mode flag
