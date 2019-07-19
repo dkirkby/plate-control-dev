@@ -374,9 +374,9 @@ class PosCollider(object):
         """
         self.timestep = self.config['TIMESTEP']
         self._load_positioner_params()
-        self._load_circle_envelopes()
         self._load_keepouts()
         self._adjust_keepouts()
+        self._load_circle_envelopes()
 
     def _load_positioner_params(self):
         """Read latest versions of all positioner parameters."""
