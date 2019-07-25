@@ -603,47 +603,6 @@ class Petal(object):
                   for fidid in self.fidids]
         return sum(n_dots)
 
-    @property
-    def fiducial_dots_fvcXY(self):
-        """Returns an ordered dict of ordered dicts of all [x,y] positions of all
-        fiducial dots this petal contributes in the field of view.
-        
-        Primary keys are the fiducial dot ids, formatted like:
-            'F001.0', 'F001.1', etc...
-        
-        Returned values are accessed with the sub-key 'fvcXY'. So that:
-            data['F001.1']['fvcXY'] --> [x,y] floats giving location of dot #1 in fiducial #F001
-            
-        The coordinates are all given in fiber view camera pixel space.
-        
-        In some laboratory setups, we have a "extra" fixed reference fibers. These
-        are not provided here (instead they are handled in posmovemeasure.py).
-        """
-        data = collections.OrderedDict()
-        for fidid in self.fidids:
-            dotids = self.fid_dotids(fidid)
-            for i in range(len(dotids)):
-                data[dotids[i]] = collections.OrderedDict()
-                x = self.get_posfid_val(fidid,'DOTS_FVC_X')[i]
-                y = self.get_posfid_val(fidid,'DOTS_FVC_Y')[i]
-                data[dotids[i]]['fvcXY'] = [x,y]
-        return data
-
-    def fid_dotids(self, fidid):
-        """Returns a list (in a standard order) of the dot id strings
-        for a particular fiducial.
-        """
-        return [self.dotid_str(fidid, i) for i in
-                range(int(self.get_posfid_val(fidid, 'N_DOTS')))]
-
-    @staticmethod
-    def dotid_str(fidid,dotnumber):
-        return fidid + '.' + str(dotnumber)
-
-    @staticmethod
-    def extract_fidid(dotid):
-        return dotid.split('.')[0]
-
 # METHODS FOR CONFIGURING THE PETALBOX
         
     def setup_petalbox(self, mode):

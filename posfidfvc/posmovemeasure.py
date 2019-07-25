@@ -30,7 +30,7 @@ class PosMoveMeasure(object):
                 self._petals_map[posid] = petal
             for fidid in petal.fidids:
                 self._petals_map[fidid] = petal
-                for dotid in petal.fid_dotids(fidid):
+                for dotid in fid_dotids(fidid, petal):
                     self._petals_map[dotid] = petal
         self.fvc = fvc # fvchandler object
         self.wide_spotmatch_radius = 80.0 #20.0 #1000.0 # [pixels on FLI FVC CCD] wide search radius used during rough calibration when theta and phi offsets are unknown
@@ -94,7 +94,7 @@ class PosMoveMeasure(object):
         for refid in measured_ref.keys():
             if self.extradots_id not in refid:
                 ptl = self.petal(refid)
-                fidid = ptl.extract_fidid(refid)
+                fidid = self.extract_fidid(refid)
                 if fidid not in fid_data.keys():
                     fid_data[fidid] = {key:[] for key in ['obsX','obsY','peaks','fwhms']}
                 fid_data[fidid]['obsX'].append(measured_ref[refid]['obsXY'][0])
@@ -1007,13 +1007,13 @@ class PosMoveMeasure(object):
         """
         data = collections.OrderedDict()
         for ptl in self.petals:
-            more_data = ptl.fiducial_dots_fvcXY
+            more_data = self.fiducial_dots_fvcXY(ptl)
             for dotid in more_data.keys():
                 more_data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY([more_data[dotid]['fvcXY']])[0]
             data.update(more_data)
         if not self.fvc.fvcproxy:
             for i in range(len(self.extradots_fvcXY)):            
-                dotid = ptl.dotid_str(self.extradots_id,i) # any petal instance is fine here (static method)
+                dotid = self.dotid_str(self.extradots_id,i) # any petal instance is fine here (static method)
                 data[dotid] = collections.OrderedDict()
                 data[dotid]['obsXY'] = self.fvc.fvcXY_to_obsXY([self.extradots_fvcXY[i]])[0]
         return data
@@ -1655,6 +1655,38 @@ class PosMoveMeasure(object):
         if not(nom_val - tol <= r2 <= nom_val + tol):
             return True
 
+    def fiducial_dots_fvcXY(self, ptl):
+        """Returns an ordered dict of ordered dicts of all [x,y] positions of all
+        fiducial dots this petal contributes in the field of view.
+        
+        Primary keys are the fiducial dot ids, formatted like:
+            'F001.0', 'F001.1', etc...
+        
+        Returned values are accessed with the sub-key 'fvcXY'. So that:
+            data['F001.1']['fvcXY'] --> [x,y] floats giving location of dot #1 in fiducial #F001
+            
+        The coordinates are all given in fiber view camera pixel space.
+        
+        In some laboratory setups, we have a "extra" fixed reference fibers. These
+        are not provided here (instead they are handled in posmovemeasure.py).
+        """
+        data = collections.OrderedDict()
+        for fidid in self.fidids:
+            dotids = self.fid_dotids(fidid)
+            for i in range(len(dotids)):
+                data[dotids[i]] = collections.OrderedDict()
+                x = ptl.get_posfid_val(fidid,'DOTS_FVC_X')[i]
+                y = ptl.get_posfid_val(fidid,'DOTS_FVC_Y')[i]
+                data[dotids[i]]['fvcXY'] = [x,y]
+        return data
+
+    def fid_dotids(self, fidid, ptl):
+        """Returns a list (in a standard order) of the dot id strings
+        for a particular fiducial.
+        """
+        return [self.dotid_str(fidid, i) for i in
+                range(int(ptl.get_posfid_val(fidid, 'N_DOTS')))]
+
     @property
     def phi_clear_angle(self):
         """Returns the phi angle in degrees for which two positioners cannot collide
@@ -1696,6 +1728,14 @@ class PosMoveMeasure(object):
         """
         self.printfunc('n_fixed_dots() method not yet implemented')
         pass
+
+    @staticmethod
+    def dotid_str(fidid,dotnumber):
+        return fidid + '.' + str(dotnumber)
+
+    @staticmethod
+    def extract_fidid(dotid):
+        return dotid.split('.')[0]
             
     def _wrap_consecutive_angles(self, angles, expected_direction):
         """Wrap angles in one expected direction. It is expected that the physical deltas
