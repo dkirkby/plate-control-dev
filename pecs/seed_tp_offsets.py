@@ -1,7 +1,8 @@
 '''
-Runs a one_point_calibration through petal and fvc proxies. Needs running DOS instance. See pecs.py
+Sets offsetsTP to nominal values. Needs running DOS instance. See pecs.py
 '''
 from pecs import PECS
+import posconstants as pc
 
 class TP_Offsets(PECS):
 
@@ -12,20 +13,21 @@ class TP_Offsets(PECS):
         self.ptlid = list(self.ptls.keys())[0]
 
     def seed_vals(self, selection=None,enabled_only=False,auto_update=False):
+        ptl = self.ptls[self.ptlid]
         if not(selection):
-            posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only).loc[:,'DEVICE_ID'])
+            posid_list = list(ptl.get_positioners(enabled_only=enabled_only).loc[:,'DEVICE_ID'])
         elif selection[0][0] == 'c': #User passed busids
-            posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only, busids=selection).loc[:,'DEVICE_ID'])
+            posid_list = list(ptl.get_positioners(enabled_only=enabled_only, busids=selection).loc[:,'DEVICE_ID'])
         else: #assume is a list of posids
             posid_list = selection
         for posid in posid_list:
-            self.ptls[self.ptlid].set_posfid_val(posid,'OFFSET_T',0.0)
-            self.ptls[self.ptlid].set_posfid_val(posid,'OFFSET_P',0.0)
-        #updates = self.ptls[self.ptlid].initialize_self.ptls[self.ptlid].set_posfid_val(posid,'OFFSET_T',0.0)offsets_xy(ids=posid_list, auto_update=auto_update)
-        return 'hi'
+            ptl.set_posfid_val(posid,'OFFSET_T',pc.nominals['OFFSET_T'])
+            ptl.set_posfid_val(posid,'OFFSET_P',pc.nominals['OFFSET_P'])
+        return 
 
 if __name__ == '__main__':
     off = TP_Offsets()
+    user_text = input('Confirm: are you sure you want to set offsetsTP to their nominal values? (enter to continue)')
     user_text = input('Please list BUSIDs or POSIDs (not both) seperated by spaces, or type all: ')
     selection = []
     if 'all' not in user_text.lower():
@@ -34,4 +36,5 @@ if __name__ == '__main__':
             selection.append(item)
     else:
         selection = None
+    off.seed_vals(selection=selection)
     print('DONE!')

@@ -1,5 +1,5 @@
 '''
-Runs a one_point_calibration through petal and fvc proxies. Needs running DOS instance. See pecs.py
+Seeds offsetsXY using nominal hole locations and the petal location. Needs running DOS instance. See pecs.py
 '''
 from pecs import PECS
 
@@ -12,13 +12,14 @@ class XY_Offsets(PECS):
         self.ptlid = list(self.ptls.keys())[0]
 
     def seed_vals(self, selection=None,enabled_only=False,auto_update=False):
+        ptl = self.ptls[self.ptlid]
         if not(selection):
-            posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only).loc[:,'DEVICE_ID'])
+            posid_list = list(ptl.get_positioners(enabled_only=enabled_only).loc[:,'DEVICE_ID'])
         elif selection[0][0] == 'c': #User passed busids
-            posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only, busids=selection).loc[:,'DEVICE_ID'])
+            posid_list = list(ptl.get_positioners(enabled_only=enabled_only, busids=selection).loc[:,'DEVICE_ID'])
         else: #assume is a list of posids
             posid_list = selection
-        updates = self.ptls[self.ptlid].initialize_offsets_xy(ids=posid_list, auto_update=auto_update)
+        updates = ptl.initialize_offsets_xy(ids=posid_list, auto_update=auto_update)
         return updates
 
 if __name__ == '__main__':
