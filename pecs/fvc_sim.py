@@ -88,6 +88,8 @@ class FVC_proxy_sim:
             if random.random() > 0.5:
                 sign = -1
             ds = random.random()*self.max_err*sign
+            row['flags'] = int(row['flags'])
+            row['flags'] |= 1 #set matched
             measured_position = {'id':row['id'], 'q':row['q']+dq,'s':row['s']+ds,'dq':dq,'ds':ds,'flags':row['flags'],'fwhm':random.random(),'mag':random.random(),'peak':random.random()}
             measured_positions.append(measured_position)
         return measured_positions 
