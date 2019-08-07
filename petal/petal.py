@@ -133,7 +133,7 @@ class Petal(object):
                                                     collision_hashpf_exists=False, 
                                                     hole_angle_file=None)
         else:
-            self.collider = poscollider.PosCollider(configfile=self.collider_file,
+            self.collider = poscollider.PosCollider(configfile=collider_file,
                                                     collision_hashpp_exists=False, 
                                                     collision_hashpf_exists=False, 
                                                     hole_angle_file=None)
