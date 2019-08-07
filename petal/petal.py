@@ -736,7 +736,10 @@ class Petal(object):
         """Sets a single value to a positioner or fiducial. In the case of a fiducial, note that
         this call does NOT turn the fiducial physically on or off. It only saves a value."""
         self.states[uniqueid].store(key,value)
-        self.altered_states.add(self.states[uniqueid])
+        if key.split('_')[0] in ['LENGTH','OFFSET','PHYSICAL']:
+            self.altered_calib_states.add(self.states[uniqueid])
+        else:
+            self.altered_states.add(self.states[uniqueid])
     
     def get_pbdata_val(self, key):
         """Requests data from petalbox using the pbget method.
@@ -874,7 +877,7 @@ class Petal(object):
                 self.pos_flags[posid] |= self.bad_fiber_fvc_bit
             if self.get_posfid_val(posid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
                 self.pos_flags[posid] |= self.dev_nonfunctional_bit
-            pos_flags[posid] = str(self.pos_flags[posid])
+            pos_flags[posid] = self.pos_flags[posid]
         if should_reset:
             self._initialize_pos_flags()
         return pos_flags
