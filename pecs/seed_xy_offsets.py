@@ -32,10 +32,6 @@ if __name__ == '__main__':
             selection.append(item)
     else:
         selection = None
-    user_text = input('Please provide whether to automatically update Offset XY (y/n): ')
-    if 'y' in user_text.lower():
-        mode = True
-    else:
-        mode = False
-    updates = off.seed_vals(selection=selection, auto_update=mode)
+    print(f'Selection is: {selection}')
+    updates = off.seed_vals(selection=selection, auto_update=True)
     print(updates)

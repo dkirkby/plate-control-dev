@@ -73,8 +73,10 @@ class RehomeVerify(PECS):
                        f'{unmatched}')
         # filter expected pos because there are unmatched fibres
         expected_pos = expected_pos.loc[measured_QS.index]  # same order
-        expected_pos['expectedX'] = offsetX.loc[measured_QS.index]
-        expected_pos['expectedY'] = offsetY.loc[measured_QS.index]
+        expected_pos['expectedX'] = \
+            df.loc[df['DEVICE_ID'].isin(measured_QS.index)]['OFFSET_X']
+        expected_pos['expectedY'] = \
+            df.loc[df['DEVICE_ID'].isin(measured_QS.index)]['OFFSET_Y']
         # convert QS to obsXY for measuredXY
         Q_rad = np.radians(measured_QS['Q'])
         R = pc.S2R_lookup(measured_QS['S'])
@@ -93,7 +95,6 @@ class RehomeVerify(PECS):
         bad_posids = list(expected_pos[mask]['DEVICE_ID'])
         if len(bad_posids) == 0:
             self.printfunc('All successful and verified to match measurement.')
-            return True
         else:
             self.printfunc(f'Possibly not rehomed sucessfully '
                            f'(radial deviations > 1 mm):\n\n'
