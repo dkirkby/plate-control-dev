@@ -15,9 +15,9 @@ class Arc(PECS):
         self.ptlid = list(self.ptls.keys())[0]
 
     def arc_calibration(self,selection=None,enabled_only=True,n_points_P=6, n_points_T=6,auto_update=True, match_radius=80):
-        if not selection:
+        if selection is None:
             posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only).loc[:,'DEVICE_ID'])
-        elif posids[0][0] == 'c': #User passed busids
+        elif selection[0][0] == 'c': #User passed busids
             posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only, busids=selection).loc[:,'DEVICE_ID'])
         else: #assume is a list of posids
             posid_list = selection
@@ -37,8 +37,12 @@ class Arc(PECS):
             used_positions = measured_positions[measured_positions['DEVICE_ID'].isin(posid_list)]
             request.rename(columns={'X1':'TARGET_T','X2':'TARGET_P'},inplace=True)
             merged = used_positions.merge(request, how='outer',on='DEVICE_ID')
-            unmatched_merged = merged[merged['FLAGS'] & 1 == 0] #split into unmatched and matched
-            matched_merged = merged[merged['FLAGS'] & 1 != 0]
+            unmatched_merged = merged.loc[merged['FLAGS'].isnull()]
+            #if unmatched_merged.empty:
+            #    unmatched_merged = merged[merged['FLAGS'] & 1 == 0] #split into unmatched and matched
+            #    matched_merged = merged[merged['FLAGS'] & 1 != 0]
+            #else:
+            matched_merged = merged.loc[merged['FLAGS'].notnull()]
             unmatched = unmatched_merged['DEVICE_ID'].values
             print(f'Missing {len(unmatched)} of the selected positioners:\n{unmatched}')
             T_data.append(matched_merged)
@@ -55,8 +59,10 @@ class Arc(PECS):
             used_positions = measured_positions[measured_positions['DEVICE_ID'].isin(posid_list)]
             request.rename(columns={'X1':'TARGET_T','X2':'TARGET_P'},inplace=True)
             merged = used_positions.merge(request, how='outer',on='DEVICE_ID')
-            unmatched_merged = merged[merged['FLAGS'] & 1 == 0] #split into unmatched and matched
-            matched_merged = merged[merged['FLAGS'] & 1 != 0]
+            unmatched_merged = merged.loc[merged['FLAGS'].isnull()]
+            #unmatched_merged = merged[merged['FLAGS'] & 1 == 0] #split into unmatched and matched
+            #matched_merged = merged[merged['FLAGS'] & 1 != 0]
+            matched_merged = merged.loc[merged['FLAGS'].notnull()]
             unmatched = unmatched_merged['DEVICE_ID'].values
             print(f'Missing {len(unmatched)} of the selected positioners:\n{unmatched}')
             P_data.append(matched_merged)
@@ -69,13 +75,14 @@ class Arc(PECS):
 if __name__ == '__main__':
     arc = Arc()
     user_text = input('Please list BUSIDs or POSIDs (not both) seperated by spaces, leave it blank to use all on petal: ')
-    if user_text == '':
+    if user_text != '':
         user_text = user_text.split()
         selection = []
         for item in user_text:
             selection.append(item)
     else:
         selection = None
+    print('You chose: %s' % selection)
     user_text = input('Automatically update calibration? (y/n) ')
     if 'y' in user_text:
         auto_update = True

@@ -953,7 +953,7 @@ class Petal(object):
                 m.posmodel.postmove_cleanup(m.for_cleanup())
                 self.altered_states.add(m.posmodel.state)
             else:
-                m.clear_postmove_cleanup_cmds_without_executing()
+                m.posmodel.clear_postmove_cleanup_cmds_without_executing()
         self.commit()
         self._clear_temporary_state_values()
         self.schedule = self._new_schedule()
