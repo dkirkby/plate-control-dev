@@ -36,7 +36,7 @@ class OnePoint(PECS):
         # Interpret tp_target and move if target != None
         offsetPs = {}
         if tp_target == 'default':  # use (0, self.obsP to posP) as target
-            row = []
+            rows = []
             for posid in posids:
                 offsetP = ptl.get_posfid_val(posid, 'OFFSET_P')
                 offsetPs[posid] = offsetP
@@ -67,7 +67,7 @@ class OnePoint(PECS):
         # Prepare FVC and measure targets
         old_radius = self.fvc.get('match_radius')  # hold old radius
         self.fvc.set(match_radius=match_radius)  # set larger radius for calib
-        measured_pos = (pd.DataFrame(self.fvc.measure(expected_pos))
+        measured_pos = (pd.DataFrame(self.fvc.measure(expected_pos,matched_only=True))
                         .rename(columns={'id': 'DEVICE_ID'}))
         measured_pos.columns = measured_pos.columns.str.upper()
         self.fvc.set(match_radius=old_radius)  # restore old radius
@@ -127,4 +127,4 @@ if __name__ == '__main__':
     updates.to_csv(os.path.join(
         pc.dirs['all_logs'], 'calib_logs',
         f'{pc.filename_timestamp_str_now()}-onepoint_calibration-posTP.csv'))
-    print(updates[['DEVICE_ID','POS_T','POS_P','POS_T_OLD','POS_P_OLD','dT','dP']])
+    print(updates[['DEVICE_ID','POS_T','POS_P','dT','dP']])

@@ -21,8 +21,10 @@ class TP_Offsets(PECS):
         else: #assume is a list of posids
             posid_list = selection
         for posid in posid_list:
-            ptl.set_posfid_val(posid,'OFFSET_T',pc.nominals['OFFSET_T'])
-            ptl.set_posfid_val(posid,'OFFSET_P',pc.nominals['OFFSET_P'])
+            ptl.set_posfid_val(posid,'OFFSET_T',pc.nominals['OFFSET_T']['value'])
+            ptl.set_posfid_val(posid,'OFFSET_P',pc.nominals['OFFSET_P']['value'])
+        ptl.commit()
+        ptl.commit_calib_DB()
         return 
 
 if __name__ == '__main__':

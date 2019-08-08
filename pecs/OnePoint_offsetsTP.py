@@ -1,4 +1,6 @@
 from OnePoint_posTP import OnePoint
+import os
+import posconstants as pc
 
 if __name__ == '__main__':
     op = OnePoint()
@@ -25,4 +27,4 @@ if __name__ == '__main__':
     updates.to_csv(os.path.join(
         pc.dirs['all_logs'], 'calib_logs',
         f'{pc.filename_timestamp_str_now()}-onepoint_calibration-offsetsTP.csv'))
-    print(updates[['DEVICE_ID','OFFSET_T','OFFSET_P','OFFSET_T_OLD','OFFSET_P_OLD','dT','dP']])
+    print(updates[['DEVICE_ID','OFFSET_T','OFFSET_P','OLD_OFFSET_T','OLD_OFFSET_P','dT','dP']])
