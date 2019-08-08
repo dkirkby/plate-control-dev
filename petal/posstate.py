@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 from configobj import ConfigObj
 import csv
@@ -232,22 +233,31 @@ class PosState(object):
     def store(self, key, val):
         """Store a value to memory. This is the correct way to store values, as
         it contains some checks on tolerance values.
-        (Don't write directly to _val.)
+        
+        no longer default to nominal value, just reject, and keep current val.
+        added boolean return to indicate outcome of storing posstate
+        
+        (NEVER EVER write directly to state._val dictionary)
         """
-        if key in pc.nominals:
-            nom = pc.nominals[key]['value']
-            tol = pc.nominals[key]['tol']
-            if val < nom - tol or val > nom + tol:  # check for absurd values
-                self.printfunc(f'Attempting to set unit {self.unit_id}, '
-                               f'key {key} to value {val}, outside the '
-                               f'nominal range {nom} +/- {tol}. '
-                               f'Defaulting to nominal.')
-                val = nom
-        if key in self._val:
-            self._val[key] = val
-            # self.printfunc(f'Key {key} set to value: {val}.')  # debug line
-        else:
-            self.printfunc(f'Key {key} not found, value not set.')
+        try:  # 1st check: input value is numerical
+            val = float(val)
+        except ValueError:
+            self.printfunc(f'Unit {self.unit_id}: invalid value: {val}')
+            return False
+        if key not in self._val.keys():  # 2nd check: validate the key name
+            self.printfunc(f'Unit {self.unit_id}: invalid Key {key}')
+            return False
+        if key in pc.nominals:  # 3rd check: reject values too far from nominal
+            nom, tol = pc.nominals[key]['value'], pc.nominals[key]['tol']
+            if not nom - tol <= val <= nom - tol:  # check for absurd values
+                self.printfunc(
+                    f'Unit {self.unit_id}: new value {val} for posstate key '
+                    f'{key} rejected, outside nominal range {nom} ± {tol}')
+                # val = nom
+                return False
+        self._val[key] = val  # set value if all 3 checks above are passed
+        # self.printfunc(f'Key {key} set to value: {val}.')  # debug line
+        return True
 
     def write(self):
         """Write all values to disk.
