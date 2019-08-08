@@ -14,6 +14,7 @@ pecs/fvc_sim.py -text
 pecs/pecs.py -text
 pecs/pecs_local.conf -text
 pecs/rehome.py -text
+pecs/seed_armlengths.py -text
 pecs/seed_tp_offsets.py -text
 pecs/seed_xy_offsets.py -text
 pecs/verify_rehome.py -text
