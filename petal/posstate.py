@@ -239,15 +239,10 @@ class PosState(object):
         
         (NEVER EVER write directly to state._val dictionary)
         """
-        try:  # 1st check: input value is numerical
-            val = float(val)
-        except ValueError:
-            self.printfunc(f'Unit {self.unit_id}: invalid value: {val}')
-            return False
-        if key not in self._val.keys():  # 2nd check: validate the key name
+        if key not in self._val.keys():  # 1nd check: validate the key name
             self.printfunc(f'Unit {self.unit_id}: invalid Key {key}')
             return False
-        if key in pc.nominals:  # 3rd check: reject values too far from nominal
+        if key in pc.nominals:  # 2nd check: reject values too far from nominal
             nom, tol = pc.nominals[key]['value'], pc.nominals[key]['tol']
             if not nom - tol <= val <= nom - tol:  # check for absurd values
                 self.printfunc(
