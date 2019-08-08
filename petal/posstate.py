@@ -41,17 +41,21 @@ class PosState(object):
     """
 
     def __init__(self, unit_id=None, device_type='pos', petal_id=None,
-                 logging=False, printfunc=print):
+                 logging=False, printfunc=print, defaults = None):    # DOS change
         self.printfunc = printfunc
         self.logging = logging
-        self.write_to_DB = os.getenv('DOS_POSMOVE_WRITE_TO_DB') \
-            if DB_COMMIT_AVAILABLE else False
+        self.write_to_DB = os.getenv('DOS_POSMOVE_WRITE_TO_DB') if DB_COMMIT_AVAILABLE else False
         # data initialization
         if device_type in ['pos', 'fid', 'ptl']:
             self.type = device_type
         else:
             raise Exception('Invalid device_type')
 
+        # DOS change
+        if device_type == 'ptl':
+            self.petal_state_defaults = defaults
+        else:
+            self.petal_state_defaults = None
         if self.write_to_DB:  # data initialization from database
             if petal_id is not None:  # ptlid is given, simple
                 self.ptlid = petal_id
@@ -213,7 +217,12 @@ class PosState(object):
                 self.conf['FID_ID'] = str(unit_id)
             elif self.type == 'ptl':
                 self.conf['PETAL_ID'] = str(unit_id)
-            self.conf.write()
+                # DOS change
+                if isinstance(self.petal_state_defaults, dict):
+                    self.conf.update(self.petal_state_defaults)
+            # DOS change
+            if self.type != 'ptl':
+                self.conf.write()
         else:
             self.printfunc(f'Loading existing unit config for '
                            f'device_type = {self.type}, path: {unit_fn}')
