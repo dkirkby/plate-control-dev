@@ -244,7 +244,7 @@ class PosState(object):
             return False
         if key in pc.nominals:  # 2nd check: reject values too far from nominal
             nom, tol = pc.nominals[key]['value'], pc.nominals[key]['tol']
-            if not nom - tol <= val <= nom - tol:  # check for absurd values
+            if not nom - tol <= val <= nom + tol:  # check for absurd values
                 self.printfunc(
                     f'Unit {self.unit_id}: new value {val} for posstate key '
                     f'{key} rejected, outside nominal range {nom} ± {tol}')
