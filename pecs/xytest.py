@@ -271,15 +271,17 @@ class XYTest(PECS):
         # get expected posTP from petal and write to movedf after move
         ret_TP = ptl.get_positions(posids=posids, return_coord='posTP')
                  #  .sort_values(by='DEVICE_ID').reset_index())
+        ret_TP['STATUS'] = ptl.decipher_posflags(ret_TP['FLAG'])
         self.loggers[ptlid].debug(f'Expected posTP after move {n}:\n'
                                   + ret_TP.to_string())
+
         # record per-move data to movedf for a petal
         new = pd.DataFrame({f'pos_t_{n}': ret_TP['X1'],
                             f'pos_p_{n}': ret_TP['X2'],
                             f'pos_flag_{n}': ret_TP['FLAG'],
-                            f'pos_status_{n}': ret_TP['STATUS']},
-                           dtype=np.float32, index=ret_TP['DEVICE_ID'])
-        self._update(new, i)
+                            f'pos_status_{n}': ret_TP['STATUS'],
+                            f'DEVICE_ID': ret_TP['DEVICE_ID']})
+        self._update(new.set_index('DEVICE_ID'), i)
         return expected_QS
 
     def check_unmatched(self, measured_QS, disable_unmatched):
@@ -306,6 +308,8 @@ class XYTest(PECS):
                         f'{unmatched}')
                     disabled = self.ptls[ptlid].disable_pos_and_neighbors(
                         list(unmatched))
+                    if disabled is None:
+                        disabled = []
                     self.loggers[ptlid].info(
                         f'Disabled {len(disabled)} positioners:\n{disabled}')
                     assert set(unmatched).issubset(set(disabled))
@@ -365,7 +369,7 @@ class XYTest(PECS):
 
 
 if __name__ == '__main__':
-    path = os.path.join(pc.dirs['test_settings'], 'xytest_ptl3_debug.cfg')
+    path = os.path.join(pc.dirs['test_settings'], 'xytest_ptl0.cfg')
     xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')  # read cfg
     xytest_name = input('Please name this test: ')
     test = XYTest(xytest_name, xytest_cfg)

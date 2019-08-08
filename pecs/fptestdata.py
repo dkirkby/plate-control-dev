@@ -19,7 +19,7 @@ import logging
 from glob import glob
 from itertools import product
 from functools import partial
-from datetime import datetime
+# from datetime import datetime
 from multiprocessing import Process
 from tqdm import tqdm
 import io
@@ -292,13 +292,13 @@ class FPTestData:
                 df_pos.to_csv(makepath(f'{posid}_df.csv'))
             with open(makepath(f'ptl_{ptlid}_export.log'), 'w') as handle:
                 self.logs[ptlid].seek(0)
-                shutil.copyfileobj(self.logs[ptlid], handle)  # write final logs
+                shutil.copyfileobj(self.logs[ptlid], handle)  # save logs
             self.loggers[ptlid].info('Petal move data written to: '
                                      f'{self.dirs[ptlid]}')
 
     def make_archive(self):
         # shutil.make_archive(  # recursion w/itself...file grows indefinitely
-        #     os.path.join(self.dir, self.dir_name), 'zip', # logger=self.logger, 
+        #     os.path.join(self.dir, self.dir_name), 'zip',
         #     root_dir=pc.dirs['xytest_data'], base_dir=self.dir_name)
         # print(f'saved: {os.path.join(self.dir, self.dir_name)}')
         path = os.path.join(self.dir, f'{os.path.basename(self.dir)}.tar.gz')
@@ -318,6 +318,7 @@ class FPTestData:
         self.export_move_data()
         self.make_archive()
         self.dump_as_one_pickle()
+
 
 if __name__ == '__main__':
     '''load the dumped pickle file as follows, protocol is auto determined'''
