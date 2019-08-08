@@ -197,8 +197,11 @@ class XYTest(PECS):
                 self.calculate_xy_errors(i, n)
         t_f = pc.now()
         self.logger.info(f'Test complete, duration {t_f - t_i}. Plotting...')
-        for ptlid in self.data.ptlids:
-            self.ptls[ptlid].schedule_stats.save()
+        try:
+            for ptlid in self.data.ptlids:
+                self.ptls[ptlid].schedule_stats.save()
+        except:
+            self.logger.warning('Call to schedule_stats.save() failed')
         # self.illuminator.set(led=led_initial)  # restore initial LED state
 
     def record_basic_move_data(self, i):
