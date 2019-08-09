@@ -69,7 +69,7 @@ class RehomeVerify(PECS):
         self.printfunc(f'{len(unmatched)} unmatched positioners:\n{unmatched}')
         # write columns to measured_QS using auto index matching
         mQS['FLAG'] = \
-            expected_pos.set_index('id').loc(mQS.index)['flags'].values
+            expected_pos.set_index('id').loc[mQS.index]['flags'].values
         mQS['STATUS'] = ptl.decipher_posflags(mQS['FLAG'])
         mQS['expectedX'] = df.loc[mQS.index]['OFFSET_X'].values
         mQS['expectedY'] = df.loc[mQS.index]['OFFSET_Y'].values
@@ -92,8 +92,8 @@ class RehomeVerify(PECS):
         if len(bad_posids) == 0:
             self.printfunc(f'All {len(mQS)} matched fibres verified rehomed.')
         else:
-            self.printfunc(f'Possibly {len(mQS)} positioners not rehomed '
-                           f'(radial deviations > 1 mm):\n\n'
+            self.printfunc(f'Possibly {len(bad_posids)} positioners not rehomed'
+                           f' (radial deviations > 1 mm):\n\n'
                            f'{mQS[mask]}\n\n'
                            f'Positioner IDs:\n{bad_posids}')
         self.printfunc(mQS)
