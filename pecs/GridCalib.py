@@ -14,7 +14,7 @@ class Grid(PECS):
         return
 
     def grid_calibration(self,selection=None,n_points_P=5, n_points_T=7,enabled_only=True,auto_update=True,match_radius=80.0):
-        if not selection:
+        if selection is none:
             posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only).loc[:,'DEVICE_ID'])
         elif posids[0][0] == 'c': #User passed busids
             posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only, busids=selection).loc[:,'DEVICE_ID'])
@@ -47,7 +47,7 @@ class Grid(PECS):
 if __name__ == '__main__':
     grid = Grid()
     user_text = input('Please list BUSIDs or POSIDs (not both) seperated by spaces, leave it blank to use all on petal: ')
-    if user_text == '':
+    if user_text != '':
         user_text = user_text.split()
         selection = []
         for item in user_text:
