@@ -7,6 +7,7 @@ from pecs import PECS
 # import pandas as pd
 # from DOSlib.positioner_index import PositionerIndex
 import posconstants as pc
+from verify_rehome import VerifyRehome
 
 
 class Rehome(PECS):
@@ -87,3 +88,6 @@ if __name__ == '__main__':
                         f'{pc.filename_timestamp_str_now()}-rehome.csv')
     df.to_csv(path)
     print(f'Rehome data saved to: {path}')
+    user_text = input('Verify rehome positions? (y/n)\n: ')
+    if 'y' in user_text:
+        VerifyRehome()

@@ -15,7 +15,7 @@ import posconstants as pc
 # from DOSlib.positioner_index import PositionerIndex
 
 
-class RehomeVerify(PECS):
+class VerifyRehome(PECS):
 
     def __init__(self, petal_id=None, platemaker_instrument=None,
                  fvc_role=None, printfunc=print,
@@ -38,6 +38,11 @@ class RehomeVerify(PECS):
             self.posids = sorted(selection)
         self.printfunc(f'Verifying homing positions for all '
                        f'{len(self.posids)} enabled positioners...')
+        df = self.compare_xy()
+        df.to_csv(os.path.join(
+            pc.dirs['all_logs'], 'calib_logs',
+            f'{pc.filename_timestamp_str_now()}-rehome_verify.csv'))
+        self.printfunc(f'Rehome verification data saved to calib logs.')
 
     def compare_xy(self):
         ptl = self.ptls[self.ptlid]
@@ -101,9 +106,4 @@ class RehomeVerify(PECS):
 
 
 if __name__ == '__main__':
-    rv = RehomeVerify()
-    df = rv.compare_xy()
-    path = os.path.join(pc.dirs['all_logs'], 'calib_logs',
-                        f'{pc.filename_timestamp_str_now()}-rehome_verify.csv')
-    df.to_csv(path)
-    print(f'Rehome verification data saved to: {path}')
+    VerifyRehome()
