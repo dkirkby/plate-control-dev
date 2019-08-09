@@ -35,9 +35,10 @@ class Rehome(PECS):
         # three atetmpts built in, two with ac freeze, one with ac None
         if posids is None:
             posids = self.posids
-        self.printfunc(f'Attempt {attempt}, rehoming {len(posids)} '
-                       f'positioners with anticollision: {anticollision} ')
         ptl = self.ptls[self.ptlid]
+        self.printfunc(f'Attempt {attempt}, rehoming {len(posids)} '
+                       f'positioners with anticollision: {anticollision}\n'
+                       f'{posids}')
         ret = (ptl.rehome_pos(posids, axis=self.axis,
                               anticollision=anticollision)
                .rename(columns={'X1': 'posT', 'X2': 'posP'})
