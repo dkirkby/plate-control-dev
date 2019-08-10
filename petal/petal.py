@@ -175,6 +175,8 @@ class Petal(object):
         self._initialize_pos_flags()
         self._apply_state_enable_settings()
 
+        self.hw_states = {}
+
         # transformation instance setup for petal
         # these values can be used for boundary calculation in anti-collision
         self.trans = PetalTransforms(Tx=self.Tx, Ty=self.Ty, gamma=self.gamma)
@@ -606,119 +608,111 @@ class Petal(object):
         return sum(n_dots)
 
 # METHODS FOR CONFIGURING THE PETALBOX
-        
-    def setup_petalbox(self, mode):
-        """Set everything up for the argued petalbox mode.
-        The settings controlled by the petalbox are currently 
-        set identically for the configure and start of observations modes.  They 
-        are also set identically for start up and end observations.  We
-        may be making distinctions between these modes at a later date.
-        mode ... string specifying the mode that the petalbox should be set up for
-                 ('start_up', 'configure', 'start_obs', or 'end_obs')
-                 
-        returns a status dictionary (read back from petalbox) with the following keys and values:
-        'PS1_ENABLED' ... boolean, True if on else False
-        'PS2_ENABLED' ... boolean, True if on else False
-        'CAN_BRD1_ENABLED' ... boolean, True if on else False
-        'CAN_BRD2_ENABLED' ... boolean, True if on else False
-        'BUFF1_ENABLED' ... boolean, True if on else False
-        'BUFF2_ENABLED' ... boolean, True if on else False
-        'TEC_PWR_ENABLED' ... boolean, True if on else False
-        'GFA_PWR_ENABLED' ... boolean, True if on else False
-        'GFA_FAN_INLET_ENABLED' ... boolean, True if on else False
-        'GFA_FAN_OUTLET_ENABLED' ... boolean, True if on else False
-        'GFA_FAN_INLET_DUTY_DEFAULT_ON' ... integer, fan duty setting
-        'GFA_FAN_OUTLET_DUTY_DEFAULT_ON' ... integer, fan duty setting
-        'GFA_FAN_INLET_TACH' ... integer, fan speed in RPM
-        'GFA_FAN_OUTLET_TACH' .. integer, fan speed in RPM
-        'OVERALL_STATUS' ... string, 'SUCCESS' or 'FAILED' 
-          
-        The following settings are sent to the petalbox (according to pb_config 
-        enable/duty specifications):
-        for 'configure' or 'start_obs' mode input:
-            Positioner Power - ON
-            CAN Power - ON
-            SYNC Buffer Enable - ON
-            TEC Power Enable - ON
-            GFA Power Enable - ON
-            GFA Fan Enable - ON 
-        for 'start_up' or 'end_obs' mode input:
-            Positioner Power - OFF
-            CAN Power - OFF
-            SYNC Buffer Enable - OFF
-            TEC Power Eneble - OFF
-            GFA Power Enable - OFF
-            GFA Fan Enable - OFF
-        This method will take some time (~10 seconds) to return when things are being turned ON 
-        due to the time it takes to configure/re-configure CAN channels.
-        """
-        if self.simulator_on or True: #KF 7/17/19 to be done at PC level maybe TBD future called by petalApp in configure
-            return
-        conf = self.pb_config
-        if mode in ['configure', 'start_obs']:
-            #self.comm.clear_errors() uncomment when updated in petalcontroller, do for configure only
-            pospwr_en = 'both' if (conf['PS1_ENABLED'] and conf['PS2_ENABLED'])\
-                        else 1 if conf['PS1_ENABLED'] else 2
-            can_en = 'both' if (conf['CAN_BRD1_ENABLED'] and conf['CAN_BRD2_ENABLED'])\
-                        else 1 if conf['CAN_BD1_ENABLED'] else 2
-            buff_en = 'both' if (conf['BUFF1_ENABLED'] and conf['BUFF2_ENABLED'])\
-                        else 1 if conf['BUFF1_ENABLED'] else 2
-            self.comm.power_up(pospwr_en, can_en, buff_en)
-            inlet_settings = ['on', conf['GFA_FAN_INLET_DUTY_DEFAULT_ON']]\
-                             if conf['GFA_FAN_INLET_ENABLED'] else ['off', 0]
-            outlet_settings = ['on', conf['GFA_FAN_OUTLET_DUTY_DEFAULT_ON']]\
-                              if conf['GFA_FAN_OUTLET_ENABLED'] else ['off', 0]
-            self.comm.pbset('GFA_FAN', {'inlet': inlet_settings, 'outlet': outlet_settings})
-            if conf['GFA_PWR_ENABLED']:
-                self.comm.pbset('GFAPWR_EN', 'on')
-            if conf['TEC_PWR_ENABLED']:
-                self.comm.pbset('TEC_CTRL', 'on')
-            self.set_motor_parameters()
-        elif mode in ['start_up', 'end_obs']:
-            pospwr_en = 'None'
-            self.comm.power_down()
-            self.comm.pbset('GFA_FAN', {'inlet' : ['off', 0], 'outlet' : ['off', 0]})
-        self._update_and_send_can_enabled_info(pospwr_en)
-        return self.assess_pb_status(mode)
-    
-    def assess_pb_status(self, mode):
-        """Retrieve petalbox feedback for settings associated with input mode. Use to verify
-        that a setup_petalbox call was successful.
-        mode ... string specifying the mode that the petalbox should be set up for
-                 ('start_up', 'configure', 'start_obs', or 'end_obs')
-        returns status dictionary with all settings and a final assessment, see setup_petalbox
-        method for format.
-        """
-        if not self.simulator_on and False: #KF 7/17/19 to be done at PC level maybe TBD
-            str_to_bool = {'on' : True, 'off' : False}
-            pospwr_fbk = self.comm.pbget('POSPWR_FBK')
-            canbrd_fbk = self.comm.pbget('CAN_EN')
-            buff_fbk = self.comm.pbget('BUFFERS')
-            tec_fbk = self.comm.pbget('TEC_CTRL')
-            gfa_fbk = self.comm.pbget('GFAPWR_EN')
-            fan_fbk = self.comm.pbget('GFA_FAN')
-            setup_status = {'PS1_ENABLED' : str_to_bool[pospwr_fbk['PS1']],
-                           'PS2_ENABLED' : str_to_bool[pospwr_fbk['PS2']],
-                           'CAN_BRD1_ENABLED': str_to_bool[canbrd_fbk[0]],
-                           'CAN_BRD2_ENABLED': str_to_bool[canbrd_fbk[1]],
-                           'BUFF1_ENABLED' : str_to_bool[buff_fbk[0]],
-                           'BUFF2_ENABLED' : str_to_bool[buff_fbk[1]],
-                           'TEC_PWR_ENABLED' : str_to_bool[tec_fbk],
-                           'GFA_PWR_ENABLED' : str_to_bool[gfa_fbk],
-                           'GFA_FAN_INLET_ENABLED' : str_to_bool[fan_fbk['inlet'][0]],
-                           'GFA_FAN_OUTLET_ENABLED': str_to_bool[fan_fbk['outlet'][0]],
-                           'GFA_FAN_INLET_DUTY_DEFAULT_ON' : fan_fbk['inlet'][1],
-                           'GFA_FAN_OUTLET_DUTY_DEFAULT_ON' : fan_fbk['outlet'][1],
-                            }
-            assessment = {k:v for k,v in setup_status.items() if (v == self.pb_config[k] or mode in ['start_up', 'end_obs'])}
-            if mode in ['configure', 'start_obs']:
-                success_condition_met = False not in assessment.keys() and (fan_fbk['inlet'][2] > 0 and fan_fbk['outlet'][2] > 0)           
+
+    def set_hardware_state(self, hw_state):
+        '''
+        Sets the hardware state on the petal controller, scheme documented here:
+        https://docs.google.com/document/d/1U9mxdTwgT6Bj5Sw_oTerU5wkiq9cXnN7I8QpMl_LT9E/edit#heading=h.ineqjw6t36ek
+
+        Goes through and sets the parameters that defines the state. Checks
+        the state at the end and returns the state that was actually set
+        (either the one requested or 'ERROR') along with a list of strings
+        explaining the reason for an error state.
+        '''
+        hw_state = hw_state.upper()
+        state_list = ['INITIALIZED','STANDBY','READY','OBSERVING'] #'ERROR' State also exists but cannot be set
+        self._last_state = {}
+        if hw_state not in state_list:
+            self.printfunc('set_hardware_state: invalid state setting, possible states: %s' % state_list)
+            return 'FAILED: invalid state'
+        # Setup what values are expected when checking the state in the future
+        if hw_state == 'INITIALIZED':
+            #AC Positioner Power ON - not controlled by software
+            self._last_state={'CAN_EN':['on','on'], #CAN Power ON
+                              #TEC Power EN ON - No PC control?
+                              'GFAPWR_EN':'off', #GFA Power Enable OFF
+                              'GFA_FAN':{'inlet':['off',0],'outlet':['off',0]}, #GFA Fan Power OFF
+                              'BUFFERS':['off','off'], #SYNC Buffer EN OFF - what about SYNC?
+                              #GFA CCD OFF
+                              #GFA CCD Voltages EN OFF
+                              'TEC_CTRL':'off', #TEC Control EN OFF
+                              #PetalBox Power ON - controlled by physical raritan switch
+                              'PS1_EN':'off', #Positioner Power EN OFF
+                              'PS2_EN':'off'}
+        elif hw_state == 'STANDBY':
+            #AC Positioner Power ON - not controlled by software
+            self._last_state={'CAN_EN':['on','on'], #CAN Power ON
+                              #TEC Power EN OFF - No PC control?
+                              'GFAPWR_EN':'off', #GFA Power Enable OFF
+                              'GFA_FAN':{'inlet':['off',0],'outlet':['off',0]}, #GFA Fan Power OFF
+                              'BUFFERS':['off','off'], #SYNC Buffer EN OFF - what about SYNC?
+                              #GFA CCD OFF
+                              #GFA CCD Voltages EN OFF
+                              'TEC_CTRL':'off', #TEC Control EN OFF
+                              #PetalBox Power ON - controlled by physical raritan switch
+                              'PS1_EN':'off', #Positioner Power EN OFF
+                              'PS2_EN':'off'}
+        elif hw_state == 'READY':
+            #AC Positioner Power ON - not controlled by software
+            self._last_state={'CAN_EN':['on','on'], #CAN Power ON
+                              #TEC Power EN ON - No PC control?
+                              'GFAPWR_EN':'on', #GFA Power Enable ON
+                              'GFA_FAN':{'inlet':['on',20],'outlet':['on',20]}, #GFA Fan Power ON
+                              'BUFFERS':['on','on'], #SYNC Buffer EN ON - what about SYNC?
+                              #GFA CCD OFF
+                              #GFA CCD Voltages EN OFF
+                              'TEC_CTRL':'on', #TEC Control EN ON
+                              #PetalBox Power ON - controlled by physical raritan switch
+                              'PS1_EN':'off', #Positioner Power EN OFF
+                              'PS2_EN':'off'}
+        elif hw_state == 'OBSERVING':
+            #AC Positioner Power ON - not controlled by software
+            self._last_state={'CAN_EN':['on','on'], #CAN Power ON
+                              #TEC Power EN ON - No PC control?
+                              'GFAPWR_EN':'on', #GFA Power Enable ON
+                              'GFA_FAN':{'inlet':['on',20],'outlet':['on',20]}, #GFA Fan Power ON
+                              'BUFFERS':['on','on'], #SYNC Buffer EN ON - what about SYNC?
+                              #GFA CCD ON
+                              #GFA CCD Voltages EN ON
+                              'TEC_CTRL':'on', #TEC Control EN ON
+                              #PetalBox Power ON - controlled by physical raritan switch
+                              'PS1_EN':'on', #Positioner Power EN ON
+                              'PS2_EN':'on'}
+        #Set State
+        for key in self._last_state.keys():
+            self.comm.pbset(key,self._last_state.keys())
+        self.comm.pbset('STATE', hw_state)
+        #Check for errors when setting state - want to know this right away
+        set_state, err_strings = self.get_hardware_state()
+        return set_state, err_stings
+
+
+    def get_hardware_state(self):
+        '''
+        Loops through keys in self._last_state to compare with what the
+        PetalController thinks they are. Any differences are recorded and
+        'ERROR' state is set if there are any discrepencies. Otherwise
+        returns the state of the PetalController.
+        '''
+        err_strings = []
+        if self._last_state == {}:
+            self.pbset('STATE','ERROR')
+            return 'ERROR', ['No state yet set by petal']
+        # Look for different settings from what petal last set.
+        for key in self._last_state.keys():
+            fbk = self.pbget(key)
+            if key == 'GFA_FAN': #sadly GFA_FAN is a little weird.
+                for k in fbk.keys(): #should be 'inlet' and 'outlet'
+                    if fbk[k][0] != self._last_state[key][k][0]: #comparing only off/on, not worring about PWM or TACH
+                        err_strings.append(key+' expected: '+str(self._last_state[key][k])+', got: '+str(fbk[k][0]))
             else:
-                success_condition_met = True not in setup_status
-            assessment['OVERALL_STATUS'] = 'SUCCESS' if success_condition_met else 'FAILED' 
-            assessment['GFA_FAN_INLET_TACH'] = fan_fbk['inlet'][2]
-            assessment['GFA_FAN_OUTLET_TACH'] = fan_fbk['outlet'][2]
-            return assessment
+                if self._last_state[key] != fbk:
+                    err_strings.append(key+' expected: '+str(self._last_state[key])+', got: '+str(fbk))
+        if err_strings == []: #If no errors found, just return the state that was set
+            return self.pbget('STATE'), err_strings
+        else: #If errors were found, set 'ERROR' state and return 'ERROR' as well as strings explaining why.
+            self.pbset('STATE','ERROR')
+            return 'ERROR', err_strings
         
         def reset_petalbox(self):
             """Reset all errors and turn all enables off.  This method
