@@ -7,7 +7,7 @@ import posconstants as pc
 import posschedstats
 from petaltransforms import PetalTransforms
 import time
-import collections
+from collections import OrderedDict
 import os
 try:
     from DBSingleton import * #DBSingleton in the code is a class inside the file DBSingleton of the same name
@@ -19,7 +19,11 @@ try:
     CONSTANTSDB_AVAILABLE = True
 except ImportError:
     CONSTANTSDB_AVAILABLE = False
-
+try:
+    from DOSlib.util import raise_error
+except ImportError:
+    def raise_error(*args, **kwargs):
+        raise RuntimeError(*args, **kwargs)
 
 class Petal(object):
     """Controls a petal. Communicates with the PetalBox hardware via PetalComm.
@@ -89,6 +93,7 @@ class Petal(object):
         self.petalbox_id = petalbox_id
         self.petal_id = int(petal_id)
         self.shape = shape
+        self._last_state = OrderedDict()
         if fidids in ['',[''],{''}]: # check included to handle simulation cases, where no fidids argued
             fidids = {}
 
@@ -98,6 +103,12 @@ class Petal(object):
             import petalcomm
             self.comm = petalcomm.PetalComm(self.petalbox_id, user_interactions_enabled=user_interactions_enabled)
             self.comm.pbset('non_responsives', 'clear') #reset petalcontroller's list of non-responsive canids
+            # get ops_state from petalcontroller
+            try:
+                o = self.comm.ops_state()
+                self.ops_state_sv.write(o)
+            except Exception as e:
+                self.printfunc('__init__: Exception calling petalcontroller ops_state: %s' % str(e))
 
         # database setup
         self.db_commit_on = db_commit_on if DB_COMMIT_AVAILABLE else False
@@ -609,7 +620,7 @@ class Petal(object):
 
 # METHODS FOR CONFIGURING THE PETALBOX
 
-    def set_hardware_state(self, hw_state):
+    def _set_hardware_state(self, hw_state):
         '''
         Sets the hardware state on the petal controller, scheme documented here:
         https://docs.google.com/document/d/1U9mxdTwgT6Bj5Sw_oTerU5wkiq9cXnN7I8QpMl_LT9E/edit#heading=h.ineqjw6t36ek
@@ -620,74 +631,76 @@ class Petal(object):
         explaining the reason for an error state.
         '''
         hw_state = hw_state.upper()
-        state_list = ['INITIALIZED','STANDBY','READY','OBSERVING'] #'ERROR' State also exists but cannot be set
-        self._last_state = {}
-        if hw_state not in state_list:
-            self.printfunc('set_hardware_state: invalid state setting, possible states: %s' % state_list)
-            return 'FAILED: invalid state'
+        state_list = ['STANDBY','READY','OBSERVING'] #INITIALIZED ops_state also exists but can only be reached when BBB reboots
+        if not hasattr(self, '_last_state'):
+            self._last_state = OrderedDict()
+        assert hw_state in state_list, '_set_hardware_state: invalid state requested, possible states: %s' % state_list
         # Setup what values are expected when checking the state in the future
         if hw_state == 'INITIALIZED':
             #AC Positioner Power ON - not controlled by software
-            self._last_state={'CAN_EN':['on','on'], #CAN Power ON
-                              #TEC Power EN ON - No PC control?
-                              'GFAPWR_EN':'off', #GFA Power Enable OFF
-                              'GFA_FAN':{'inlet':['off',0],'outlet':['off',0]}, #GFA Fan Power OFF
-                              'BUFFERS':['off','off'], #SYNC Buffer EN OFF - what about SYNC?
-                              #GFA CCD OFF
-                              #GFA CCD Voltages EN OFF
-                              'TEC_CTRL':'off', #TEC Control EN OFF
-                              #PetalBox Power ON - controlled by physical raritan switch
-                              'PS1_EN':'off', #Positioner Power EN OFF
-                              'PS2_EN':'off'}
+            self._last_state=OrderedDict({'CAN_EN':['on','on'], #CAN Power ON
+                                          #TEC Power EN ON - No PC control?
+                                          'GFA_FAN':{'inlet':['off',0],'outlet':['off',0]}, #GFA Fan Power OFF
+                                          'GFAPWR_EN':'off', #GFA Power Enable OFF
+                                          'BUFFERS':['off','off'], #SYNC Buffer EN OFF - what about SYNC?
+                                          #GFA CCD OFF
+                                          #GFA CCD Voltages EN OFF
+                                          'TEC_CTRL':'off', #TEC Control EN OFF
+                                          #PetalBox Power ON - controlled by physical raritan switch
+                                          'PS1_EN':'off', #Positioner Power EN OFF
+                                          'PS2_EN':'off'})
         elif hw_state == 'STANDBY':
             #AC Positioner Power ON - not controlled by software
-            self._last_state={'CAN_EN':['on','on'], #CAN Power ON
-                              #TEC Power EN OFF - No PC control?
-                              'GFAPWR_EN':'off', #GFA Power Enable OFF
-                              'GFA_FAN':{'inlet':['off',0],'outlet':['off',0]}, #GFA Fan Power OFF
-                              'BUFFERS':['off','off'], #SYNC Buffer EN OFF - what about SYNC?
-                              #GFA CCD OFF
-                              #GFA CCD Voltages EN OFF
-                              'TEC_CTRL':'off', #TEC Control EN OFF
-                              #PetalBox Power ON - controlled by physical raritan switch
-                              'PS1_EN':'off', #Positioner Power EN OFF
-                              'PS2_EN':'off'}
+            self._last_state=OrderedDict({'CAN_EN':['on','on'], #CAN Power ON
+                                          #TEC Power EN OFF - No PC control?
+                                          'GFAPWR_EN':'off', #GFA Power Enable OFF
+                                          'GFA_FAN':{'inlet':['off',0],'outlet':['off',0]}, #GFA Fan Power OFF
+                                          'BUFFERS':['off','off'], #SYNC Buffer EN OFF - what about SYNC?
+                                          #GFA CCD OFF
+                                          #GFA CCD Voltages EN OFF
+                                          'TEC_CTRL':'off', #TEC Control EN OFF
+                                          #PetalBox Power ON - controlled by physical raritan switch
+                                          'PS1_EN':'off', #Positioner Power EN OFF
+                                          'PS2_EN':'off'})
         elif hw_state == 'READY':
             #AC Positioner Power ON - not controlled by software
-            self._last_state={'CAN_EN':['on','on'], #CAN Power ON
-                              #TEC Power EN ON - No PC control?
-                              'GFAPWR_EN':'on', #GFA Power Enable ON
-                              'GFA_FAN':{'inlet':['on',20],'outlet':['on',20]}, #GFA Fan Power ON
-                              'BUFFERS':['on','on'], #SYNC Buffer EN ON - what about SYNC?
-                              #GFA CCD OFF
-                              #GFA CCD Voltages EN OFF
-                              'TEC_CTRL':'on', #TEC Control EN ON
-                              #PetalBox Power ON - controlled by physical raritan switch
-                              'PS1_EN':'off', #Positioner Power EN OFF
-                              'PS2_EN':'off'}
+            self._last_state=OrderedDict({'CAN_EN':['on','on'], #CAN Power ON
+                                          #TEC Power EN ON - No PC control?
+                                          'GFA_FAN':{'inlet':['on',20],'outlet':['on',20]}, #GFA Fan Power ON
+                                          'GFAPWR_EN':'on', #GFA Power Enable ON
+                                          'BUFFERS':['on','on'], #SYNC Buffer EN ON - what about SYNC?
+                                          #GFA CCD OFF
+                                          #GFA CCD Voltages EN OFF
+                                          'TEC_CTRL':'on', #TEC Control EN ON
+                                          #PetalBox Power ON - controlled by physical raritan switch
+                                          'PS1_EN':'off', #Positioner Power EN OFF
+                                          'PS2_EN':'off'})
         elif hw_state == 'OBSERVING':
             #AC Positioner Power ON - not controlled by software
-            self._last_state={'CAN_EN':['on','on'], #CAN Power ON
-                              #TEC Power EN ON - No PC control?
-                              'GFAPWR_EN':'on', #GFA Power Enable ON
-                              'GFA_FAN':{'inlet':['on',20],'outlet':['on',20]}, #GFA Fan Power ON
-                              'BUFFERS':['on','on'], #SYNC Buffer EN ON - what about SYNC?
-                              #GFA CCD ON
-                              #GFA CCD Voltages EN ON
-                              'TEC_CTRL':'on', #TEC Control EN ON
-                              #PetalBox Power ON - controlled by physical raritan switch
-                              'PS1_EN':'on', #Positioner Power EN ON
-                              'PS2_EN':'on'}
+            self._last_state=OrderedDict({'CAN_EN':['on','on'], #CAN Power ON
+                                          #TEC Power EN ON - No PC control?
+                                          'GFA_FAN':{'inlet':['on',20],'outlet':['on',20]}, #GFA Fan Power ON
+                                          'GFAPWR_EN':'on', #GFA Power Enable ON
+                                          'BUFFERS':['on','on'], #SYNC Buffer EN ON - what about SYNC?
+                                          #GFA CCD ON
+                                          #GFA CCD Voltages EN ON
+                                          'TEC_CTRL':'on', #TEC Control EN ON
+                                          #PetalBox Power ON - controlled by physical raritan switch
+                                          'PS1_EN':'on', #Positioner Power EN ON
+                                          'PS2_EN':'on'})
         #Set State
         for key in self._last_state.keys():
-            self.comm.pbset(key,self._last_state.keys())
-        self.comm.pbset('STATE', hw_state)
-        #Check for errors when setting state - want to know this right away
-        set_state, err_strings = self.get_hardware_state()
-        return set_state, err_stings
+            self.comm.pbset(key,self._last_state[key])
 
+        # update petal controller ops_state
+        self.comm.ops_state(hw_state)
+        # Check for errors when setting state - want to know this right away
+        # _get_hardware_state might raise an exception that the caller needs to handle
+        set_state = self._get_hardware_state()
+        self.printfunc('_set_hardware_state: petal controller ops_state is now %r' % set_state)
+        return set_state
 
-    def get_hardware_state(self):
+    def _get_hardware_state(self):
         '''
         Loops through keys in self._last_state to compare with what the
         PetalController thinks they are. Any differences are recorded and
@@ -696,11 +709,10 @@ class Petal(object):
         '''
         err_strings = []
         if self._last_state == {}:
-            self.pbset('STATE','ERROR')
-            return 'ERROR', ['No state yet set by petal']
+            raise_error('_get_hardware_state: current state has not yet been set')
         # Look for different settings from what petal last set.
         for key in self._last_state.keys():
-            fbk = self.pbget(key)
+            fbk = self.comm.pbget(key)
             if key == 'GFA_FAN': #sadly GFA_FAN is a little weird.
                 for k in fbk.keys(): #should be 'inlet' and 'outlet'
                     if fbk[k][0] != self._last_state[key][k][0]: #comparing only off/on, not worring about PWM or TACH
@@ -709,19 +721,26 @@ class Petal(object):
                 if self._last_state[key] != fbk:
                     err_strings.append(key+' expected: '+str(self._last_state[key])+', got: '+str(fbk))
         if err_strings == []: #If no errors found, just return the state that was set
-            return self.pbget('STATE'), err_strings
+            return self.comm.ops_state()
         else: #If errors were found, set 'ERROR' state and return 'ERROR' as well as strings explaining why.
-            self.pbset('STATE','ERROR')
-            return 'ERROR', err_strings
+            raise_error('_get_hardware_state: petalcontroller reports inconsistent device state: %r' % err_strings)
         
-        def reset_petalbox(self):
-            """Reset all errors and turn all enables off.  This method
-            returns the petalbox to its default safe state (how it comes up prior to 
-            communicating with the petal).
-            """
-            if not self.simulator_on:
-                self.comm.configure()
-        
+    def reset_petalbox(self):
+        """Reset all errors and turn all enables off.  This method
+        returns the petalbox to its default safe state (how it comes up prior to 
+        communicating with the petal).
+        KH: note that there is now initial_configure and configure implemented on the petalcontroller
+            Decide what should be done to the petalbox. I switched to initial_configure which is equivalent to the original configure 
+            before the code was adapted for DOS.
+            Calling reset_petalbox will reset the petalcontroller state (ops_state) to INITIALIZED
+        """
+        if not self.simulator_on:
+            try:
+                self.comm.initial_configure()
+            except Exception as e:
+                return 'FAILED: Exception calling petalcontroller initial_configure: %s' % str(e)
+        return 'SUCCESS'
+
 # GETTERS, SETTERS, STATUS METHODS
 
     def get_posfid_val(self, uniqueid, key):
@@ -1141,3 +1160,33 @@ class Petal(object):
                     self.pos_flags[devid] |= self.bad_fiber_fvc_bit 
                     self.disabled_devids.append(devid)           
 
+
+    def _petal_configure(self, constants = 'DEFAULT'):
+        """
+        petal.py internal configure function.
+        calls petalcontroller configure
+        calls get_ready to change ops_state to READY
+        does not perfrom any petal.py configuration nor does it reinitialize any values
+        """
+        self.printfunc('_petal_configure: configuring Petalbox %r' % self.petalbox_id)
+        if hasattr(self, 'comm'):
+            # get petalcontroller ops state
+            try:
+                opsstate = self.comm.ops_state()
+                if opsstate == 'INITIALIZED':   # move petal controller to STANDBY
+                    self._set_hardware_state(self, 'STANDBY')
+            except Exception as e:
+                rstring = '_petal_configure: Exception setting PC ops_state to STANDBY: %s' % str(e)
+                self.printfunc(rstring)
+                return 'FAILED: ' + rstring
+            try:
+                retcode = self.comm.configure(contants = constants)
+                self.printfunc('_petal_configure: petalbox returns %r' % retcode)
+            except Exception as e:
+                rstring = '_petal_configure: Exception configuring petalbox: %s' % str(e)
+                self.printfunc(rstring)
+                return 'FAILED: ' + rstring
+
+        # move petalcontroller to STANDBY state
+        self.printfunc('_petal_configure: ops_state is now STANDBY')
+        self.ops_state_sv.write('STANDBY')

@@ -230,14 +230,32 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not setup CAN channels: %s' % str(e)
 
-    def configure(self):
+    def intial_configure(self, *args, **kwargs):
+        """
+        Initial configure call for petalcontroller settings
+        """
+        try:
+            return self._call_device('initial_configure', *args, **kwargs)
+        except Exception as e:
+            return 'FAILED: Can not configure petalcontroller: %s' % str(e)
+
+    def configure(self, *args, **kwargs):
         """
         Configure petalcontroller settings
         """
         try:
-            return self._call_device('configure')
+            return self._call_device('configure', *args, **kwargs)
         except Exception as e:
             return 'FAILED: Can not configure petalcontroller: %s' % str(e)
+
+    def ops_state(self, state = None):
+        """
+        Read/Set petalcontroller ops_state
+        """
+        try:
+            return self._call_device('ops_state', state = state)
+        except Exception as e:
+            return 'FAILED: Exception calling petalcontroller ops_state: %s' % str(e)        
 
     def clear_errors(self):
         """
