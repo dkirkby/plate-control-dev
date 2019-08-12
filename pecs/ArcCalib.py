@@ -45,7 +45,7 @@ class Arc(PECS):
             matched_merged = merged.loc[merged['FLAGS'].notnull()]
             unmatched = unmatched_merged['DEVICE_ID'].values
             print(f'Missing {len(unmatched)} of the selected positioners:\n{unmatched}')
-            T_data.append(matched_merged)
+            T_data.append(merged)
         P_data = []
         i = 1
         for request in requests_list_P:
