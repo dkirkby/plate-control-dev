@@ -716,7 +716,7 @@ class Petal(object):
             if key == 'GFA_FAN': #sadly GFA_FAN is a little weird.
                 for k in fbk.keys(): #should be 'inlet' and 'outlet'
                     if fbk[k][0] != self._last_state[key][k][0]: #comparing only off/on, not worring about PWM or TACH
-                        err_strings.append(key+' expected: '+str(self._last_state[key][k])+', got: '+str(fbk[k][0]))
+                        err_strings.append(key+' '+k+' expected: '+str(self._last_state[key][k])+', got: '+str(fbk[k][0]))
             else:
                 if self._last_state[key] != fbk:
                     err_strings.append(key+' expected: '+str(self._last_state[key])+', got: '+str(fbk))
