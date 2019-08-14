@@ -1112,7 +1112,7 @@ class Petal(object):
         '''
         Sets pos_flags to initial values: 4 for positioners and 8 for fiducials.
 
-        FVC/Petal bit string
+        FVC/Petal bit string (When bits are passed to FVC, petal bits are wiped out)
 
         FVC BITS
         1 - Pinhole Center
@@ -1166,7 +1166,9 @@ class Petal(object):
         petal.py internal configure function.
         calls petalcontroller configure
         calls get_ready to change ops_state to READY
-        does not perfrom any petal.py configuration nor does it reinitialize any values
+        
+        Resets posflags, schedule, clears temporary posstate values,
+        commits uncommitted state changes to the DB
         """
         self.printfunc('_petal_configure: configuring Petalbox %r' % self.petalbox_id)
         if hasattr(self, 'comm'):
@@ -1190,3 +1192,16 @@ class Petal(object):
         # move petalcontroller to STANDBY state
         self.printfunc('_petal_configure: ops_state is now STANDBY')
         self.ops_state_sv.write('STANDBY')
+
+        #Reset values
+        self.canids_where_tables_were_just_sent = []
+        self.busids_where_tables_were_just_sent = []
+        self.nonresponsive_canids = set()
+        self._initialize_pos_flags() # Reset posflags
+        self._apply_state_enable_settings()
+        for posmodel in self.posmodels: #Clean up posmodel and posstate
+            posmodel.clear_postmove_cleanup_cmds_without_executing() 
+        self._clear_temporary_state_values()
+        self.commit(log_note='configuring') #commit uncommitted changes to DB
+        self.commit_calib_DB()
+        self.schedule = self._new_schedule() # Refresh schedule so it has no tables
