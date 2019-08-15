@@ -639,52 +639,52 @@ class Petal(object):
         if hw_state == 'INITIALIZED':
             #AC Positioner Power ON - not controlled by software
             self._last_state=OrderedDict({'CAN_EN':['on','on'], #CAN Power ON
-                                          #TEC Power EN ON - No PC control?
+                                          'TEC_CTRL':'off', #TEC Power EN OFF
                                           'GFA_FAN':{'inlet':['off',0],'outlet':['off',0]}, #GFA Fan Power OFF
                                           'GFAPWR_EN':'off', #GFA Power Enable OFF
                                           'BUFFERS':['off','off'], #SYNC Buffer EN OFF - what about SYNC?
                                           #GFA CCD OFF
                                           #GFA CCD Voltages EN OFF
-                                          'TEC_CTRL':'off', #TEC Control EN OFF
+                                          #TEC Control EN OFF - handeled by camera.py
                                           #PetalBox Power ON - controlled by physical raritan switch
                                           'PS1_EN':'off', #Positioner Power EN OFF
                                           'PS2_EN':'off'})
         elif hw_state == 'STANDBY':
             #AC Positioner Power ON - not controlled by software
             self._last_state=OrderedDict({'CAN_EN':['on','on'], #CAN Power ON
-                                          #TEC Power EN OFF - No PC control?
+                                          'TEC_CTRL':'off', #TEC Power EN OFF
                                           'GFAPWR_EN':'off', #GFA Power Enable OFF
                                           'GFA_FAN':{'inlet':['off',0],'outlet':['off',0]}, #GFA Fan Power OFF
                                           'BUFFERS':['off','off'], #SYNC Buffer EN OFF - what about SYNC?
                                           #GFA CCD OFF
                                           #GFA CCD Voltages EN OFF
-                                          'TEC_CTRL':'off', #TEC Control EN OFF
+                                          #TEC Control EN OFF - handeled by camera.py
                                           #PetalBox Power ON - controlled by physical raritan switch
                                           'PS1_EN':'off', #Positioner Power EN OFF
                                           'PS2_EN':'off'})
         elif hw_state == 'READY':
             #AC Positioner Power ON - not controlled by software
             self._last_state=OrderedDict({'CAN_EN':['on','on'], #CAN Power ON
-                                          #TEC Power EN ON - No PC control?
+                                          'TEC_CTRL':'on', #TEC Power EN ON 
                                           'GFA_FAN':{'inlet':['on',20],'outlet':['on',20]}, #GFA Fan Power ON
                                           'GFAPWR_EN':'on', #GFA Power Enable ON
                                           'BUFFERS':['on','on'], #SYNC Buffer EN ON - what about SYNC?
                                           #GFA CCD OFF
                                           #GFA CCD Voltages EN OFF
-                                          'TEC_CTRL':'on', #TEC Control EN ON
+                                          #TEC Control EN ON - controlled by camera.py
                                           #PetalBox Power ON - controlled by physical raritan switch
                                           'PS1_EN':'off', #Positioner Power EN OFF
                                           'PS2_EN':'off'})
         elif hw_state == 'OBSERVING':
             #AC Positioner Power ON - not controlled by software
             self._last_state=OrderedDict({'CAN_EN':['on','on'], #CAN Power ON
-                                          #TEC Power EN ON - No PC control?
+                                          'TEC_CTRL':'on', #TEC Power EN ON 
                                           'GFA_FAN':{'inlet':['on',20],'outlet':['on',20]}, #GFA Fan Power ON
                                           'GFAPWR_EN':'on', #GFA Power Enable ON
                                           'BUFFERS':['on','on'], #SYNC Buffer EN ON - what about SYNC?
                                           #GFA CCD ON
                                           #GFA CCD Voltages EN ON
-                                          'TEC_CTRL':'on', #TEC Control EN ON
+                                          #TEC Control EN ON - controlled by camera.py
                                           #PetalBox Power ON - controlled by physical raritan switch
                                           'PS1_EN':'on', #Positioner Power EN ON
                                           'PS2_EN':'on'})
