@@ -1176,13 +1176,13 @@ class Petal(object):
             try:
                 opsstate = self.comm.ops_state()
                 if opsstate == 'INITIALIZED':   # move petal controller to STANDBY
-                    self._set_hardware_state(self, 'STANDBY')
+                    self._set_hardware_state('STANDBY')
             except Exception as e:
                 rstring = '_petal_configure: Exception setting PC ops_state to STANDBY: %s' % str(e)
                 self.printfunc(rstring)
                 return 'FAILED: ' + rstring
             try:
-                retcode = self.comm.configure(contants = constants)
+                retcode = self.comm.configure(constants = constants)
                 self.printfunc('_petal_configure: petalbox returns %r' % retcode)
             except Exception as e:
                 rstring = '_petal_configure: Exception configuring petalbox: %s' % str(e)
