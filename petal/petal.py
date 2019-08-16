@@ -1199,9 +1199,12 @@ class Petal(object):
         self.nonresponsive_canids = set()
         self._initialize_pos_flags() # Reset posflags
         self._apply_state_enable_settings()
-        for posmodel in self.posmodels: #Clean up posmodel and posstate
+        for posmodel in self.posmodels.values(): #Clean up posmodel and posstate
             posmodel.clear_postmove_cleanup_cmds_without_executing() 
+
         self._clear_temporary_state_values()
         self.commit(log_note='configuring') #commit uncommitted changes to DB
         self.commit_calib_DB()
         self.schedule = self._new_schedule() # Refresh schedule so it has no tables
+
+        return 'SUCCESS'
