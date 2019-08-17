@@ -337,5 +337,8 @@ class PetalComm(object):
         except Exceptino as e:
             return 'FAILED: Could not execute the power_down method: %s' % str(e)
 
-
-
+    def get(self, what):
+        """
+        returns petal controller information
+        """
+        return self._call_device('get', what)

@@ -742,6 +742,11 @@ class Petal(object):
         return 'SUCCESS'
 
 # GETTERS, SETTERS, STATUS METHODS
+    def get_information(self, what):
+        """
+        returns petalcontroller information
+        """
+        return self.comm.get(what)
 
     def get_posfid_val(self, uniqueid, key):
         """Retrieve the state value identified by string key, for positioner or fiducial uniqueid."""
