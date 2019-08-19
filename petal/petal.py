@@ -582,7 +582,7 @@ class Petal(object):
             fidids = self.fidids
         else:
             fidids = {fidids} if isinstance(fidids,str) else set(fidids)
-        enabled = [fidid for fidid in fidids if self.get_posfid_val(fidid,'CTRL_ENABLED')]
+        enabled = [fidid for fidid in fidids if True or self.get_posfid_val(fidid,'CTRL_ENABLED')]   # needs to be fixed (True)
         busids = [self.get_posfid_val(fidid,'BUS_ID') for fidid in enabled]
         canids = [self.get_posfid_val(fidid,'CAN_ID') for fidid in enabled]
         if isinstance(setting,int) or isinstance(setting,float):
