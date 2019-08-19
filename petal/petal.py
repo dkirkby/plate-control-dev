@@ -636,69 +636,94 @@ class Petal(object):
             self._last_state = OrderedDict()
         assert hw_state in state_list, '_set_hardware_state: invalid state requested, possible states: %s' % state_list
         # Setup what values are expected when checking the state in the future
+        # Notation: key (device name), tuple with value, max wait time for state change
         if hw_state == 'INITIALIZED':
             #AC Positioner Power ON - not controlled by software
-            self._last_state=OrderedDict({'CAN_EN':['on','on'], #CAN Power ON
-                                          'TEC_CTRL':'off', #TEC Power EN OFF
-                                          'GFA_FAN':{'inlet':['off',0],'outlet':['off',0]}, #GFA Fan Power OFF
-                                          'GFAPWR_EN':'off', #GFA Power Enable OFF
-                                          'BUFFERS':['off','off'], #SYNC Buffer EN OFF - what about SYNC?
+            self._last_state=OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                                          'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
+                                          'GFAPWR_EN':('off', 60.0),  #GFA Power Enable OFF
+                                          'TEC_CTRL':('off', 1.0), #TEC Power EN OFF
+                                          'BUFFERS':(['off','off'], 1.0), #SYNC Buffer EN OFF - what about SYNC?
                                           #GFA CCD OFF
                                           #GFA CCD Voltages EN OFF
                                           #TEC Control EN OFF - handeled by camera.py
                                           #PetalBox Power ON - controlled by physical raritan switch
-                                          'PS1_EN':'off', #Positioner Power EN OFF
-                                          'PS2_EN':'off'})
+                                          'PS1_EN':('off', 1.0), #Positioner Power EN OFF
+                                          'PS2_EN':('off', 1.0)})
         elif hw_state == 'STANDBY':
             #AC Positioner Power ON - not controlled by software
-            self._last_state=OrderedDict({'CAN_EN':['on','on'], #CAN Power ON
-                                          'TEC_CTRL':'off', #TEC Power EN OFF
-                                          'GFAPWR_EN':'off', #GFA Power Enable OFF
-                                          'GFA_FAN':{'inlet':['off',0],'outlet':['off',0]}, #GFA Fan Power OFF
-                                          'BUFFERS':['off','off'], #SYNC Buffer EN OFF - what about SYNC?
+            self._last_state=OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                                          'GFAPWR_EN':('off', 60.0), #GFA Power Enable OFF
+                                          'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
+                                          'TEC_CTRL': ('off', 1.0), #TEC Power EN OFF
+                                          'BUFFERS':(['off','off'], 1.0), #SYNC Buffer EN OFF - what about SYNC?
                                           #GFA CCD OFF
                                           #GFA CCD Voltages EN OFF
                                           #TEC Control EN OFF - handeled by camera.py
                                           #PetalBox Power ON - controlled by physical raritan switch
-                                          'PS1_EN':'off', #Positioner Power EN OFF
-                                          'PS2_EN':'off'})
+                                          'PS1_EN':('off', 1.0), #Positioner Power EN OFF
+                                          'PS2_EN':('off', 1.0)})
         elif hw_state == 'READY':
             #AC Positioner Power ON - not controlled by software
-            self._last_state=OrderedDict({'CAN_EN':['on','on'], #CAN Power ON
-                                          'TEC_CTRL':'on', #TEC Power EN ON 
-                                          'GFA_FAN':{'inlet':['on',20],'outlet':['on',20]}, #GFA Fan Power ON
-                                          'GFAPWR_EN':'on', #GFA Power Enable ON
-                                          'BUFFERS':['on','on'], #SYNC Buffer EN ON - what about SYNC?
+            self._last_state=OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                                          'GFA_FAN':({'inlet':['on',20],'outlet':['on',20]}, 1.0), #GFA Fan Power ON
+                                          'GFAPWR_EN':('on', 1.0), #GFA Power Enable ON
+                                          'TEC_CTRL': ('on', 15.0), #TEC Power EN ON 
+                                          'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON - what about SYNC?
                                           #GFA CCD OFF
                                           #GFA CCD Voltages EN OFF
                                           #TEC Control EN ON - controlled by camera.py
                                           #PetalBox Power ON - controlled by physical raritan switch
-                                          'PS1_EN':'off', #Positioner Power EN OFF
-                                          'PS2_EN':'off'})
+                                          'PS1_EN': ('off', 1.0), #Positioner Power EN OFF
+                                          'PS2_EN': ('off', 1.0)})
         elif hw_state == 'OBSERVING':
             #AC Positioner Power ON - not controlled by software
-            self._last_state=OrderedDict({'CAN_EN':['on','on'], #CAN Power ON
-                                          'TEC_CTRL':'on', #TEC Power EN ON 
-                                          'GFA_FAN':{'inlet':['on',20],'outlet':['on',20]}, #GFA Fan Power ON
-                                          'GFAPWR_EN':'on', #GFA Power Enable ON
-                                          'BUFFERS':['on','on'], #SYNC Buffer EN ON - what about SYNC?
+            self._last_state=OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                                          'GFA_FAN':({'inlet':['on',20],'outlet':['on',20]}, 1.0), #GFA Fan Power ON
+                                          'GFAPWR_EN':('on', 1.0), #GFA Power Enable ON
+                                          'TEC_CTRL':('on', 5.0), #TEC Power EN ON 
+                                          'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON - what about SYNC?
                                           #GFA CCD ON
                                           #GFA CCD Voltages EN ON
                                           #TEC Control EN ON - controlled by camera.py
                                           #PetalBox Power ON - controlled by physical raritan switch
-                                          'PS1_EN':'on', #Positioner Power EN ON
-                                          'PS2_EN':'on'})
+                                          'PS1_EN':('on', 1.0), #Positioner Power EN ON
+                                          'PS2_EN':('on', 1.0)})
         #Set State
         for key in self._last_state.keys():
-            self.comm.pbset(key,self._last_state[key])
+            self.comm.pbset(key,self._last_state[key][0])
 
-        # update petal controller ops_state
-        self.comm.ops_state(hw_state)
-        # Check for errors when setting state - want to know this right away
-        # _get_hardware_state might raise an exception that the caller needs to handle
-        set_state = self._get_hardware_state()
-        self.printfunc('_set_hardware_state: petal controller ops_state is now %r' % set_state)
-        return set_state
+        # now check if all state changes are complete
+        # wait for timeout, if still inconsistent raise exception
+        todo = list(self._last_state.keys())
+        failed = {}
+        start = time.time()
+        while len(todo) != 0:
+            for key in self._last_state.keys():
+                if key not in todo:
+                    continue
+                new_state = self.comm.pbget(key)
+                if new_state == self._last_state[key][0]:
+                    todo.remove(key)
+                elif key == 'GFA_FAN':
+                    req = self._last_state[key][0]['inlet'][0], self._last_state[key][0]['outlet'][0]
+                    new = new_state['inlet'][0], new_state['outlet'][0]
+                    if req == new:
+                        todo.remove(key)
+                else:   # check timeout
+                    self.printfunc('xxxxxxxxxxxxx %r' % key)
+                    if time.time() > start + self._last_state[key][1]:
+                        failed[key] = (new_state, self._last_state[key][0])
+                        todo.remove(key)
+            time.sleep(1)
+
+        if len(failed) == 0:
+            self.printfunc('_set_hardware_state: all devices have changed state.')
+        else:
+            self.printfunc('_set_hardware_state: FAILED: some inconsistent device states: %r' % failed)
+            raise_error('_set_hardware_state: Inconsistent device states: %r' % failed)
+
+        return hw_state
 
     def _get_hardware_state(self):
         '''
@@ -715,10 +740,10 @@ class Petal(object):
             fbk = self.comm.pbget(key)
             if key == 'GFA_FAN': #sadly GFA_FAN is a little weird.
                 for k in fbk.keys(): #should be 'inlet' and 'outlet'
-                    if fbk[k][0] != self._last_state[key][k][0]: #comparing only off/on, not worring about PWM or TACH
+                    if fbk[k][0] != self._last_state[key][0][k][0]: #comparing only off/on, not worring about PWM or TACH
                         err_strings.append(key+' '+k+' expected: '+str(self._last_state[key][k])+', got: '+str(fbk[k][0]))
             else:
-                if self._last_state[key] != fbk:
+                if self._last_state[key][0] != fbk:
                     err_strings.append(key+' expected: '+str(self._last_state[key])+', got: '+str(fbk))
         if err_strings == []: #If no errors found, just return the state that was set
             return self.comm.ops_state()
