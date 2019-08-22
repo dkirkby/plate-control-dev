@@ -3,7 +3,7 @@ from postransforms import PosTransforms
 import posconstants as pc
 
 
-def Rx(angle):
+def Rx(angle):  # all in radians
     Rx = np.array([
                    [1.0,           0.0,            0.0],
                    [0.0,           np.cos(angle),  -np.sin(angle)],
@@ -12,7 +12,7 @@ def Rx(angle):
     return Rx
 
 
-def Ry(angle):
+def Ry(angle):  # all in radians
     Ry = np.array([
                    [np.cos(angle),  0.0,            np.sin(angle)],
                    [0.0,            1.0,            0.0],
@@ -21,7 +21,7 @@ def Ry(angle):
     return Ry
 
 
-def Rz(angle):
+def Rz(angle):  # all in radians
     Rz = np.array([
                    [np.cos(angle), -np.sin(angle), 0.0],
                    [np.sin(angle), np.cos(angle),  0.0],
@@ -30,7 +30,7 @@ def Rz(angle):
     return Rz
 
 
-def Rxyz(alpha, beta, gamma):  # yaw-pitch-roll system
+def Rxyz(alpha, beta, gamma):  # yaw-pitch-roll system, all in radians
     return Rz(gamma) @ Ry(beta) @ Rx(alpha)  # @ is matrix multiplication
 
 
@@ -93,7 +93,8 @@ class PetalTransforms(object):
         self.postrans = PosTransforms(curved=True)
         # tanslation matrix from petal nominal CS to CS5, column vector
         self.T = np.array([Tx, Ty, Tz]).reshape(3, 1)
-        self.R = Rxyz(alpha, beta, gamma)  # orthogonal rotation matrix
+        # orthogonal rotation matrix
+        self.R = Rxyz(np.degrees(alpha), np.degrees(beta), np.degrees(gamma))
 
     def metXYZ_to_obsXYZ(self, metXYZ):
         """

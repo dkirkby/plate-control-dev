@@ -97,8 +97,8 @@ class VerifyRehome(PECS):
         if len(bad_posids) == 0:
             self.printfunc(f'All {len(mQS)} matched fibres verified rehomed.')
         else:
-            self.printfunc(f'Possibly {len(bad_posids)} positioners not rehomed'
-                           f' (radial deviations > 1 mm):\n\n'
+            self.printfunc(f'Possibly {len(bad_posids)} positioners not '
+                           f'rehomed (radial deviations > 1 mm):\n\n'
                            f'{mQS[mask]}\n\n'
                            f'Positioner IDs:\n{bad_posids}')
         self.printfunc(mQS)

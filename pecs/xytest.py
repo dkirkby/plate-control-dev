@@ -200,7 +200,7 @@ class XYTest(PECS):
         try:
             for ptlid in self.data.ptlids:
                 self.ptls[ptlid].schedule_stats.save()
-        except:
+        except NameError:
             self.logger.warning('Call to schedule_stats.save() failed')
         # self.illuminator.set(led=led_initial)  # restore initial LED state
 
@@ -268,12 +268,12 @@ class XYTest(PECS):
         self.loggers[ptlid].debug(f'Move requests:\n{req.to_string()}')
         ptl.prepare_move(req, anticollision=self.data.anticollision)
         expected_QS = ptl.execute_move(reset_flags=False, return_coord='QS')
-            # .sort_values(by='DEVICE_ID').reset_index())
+        # .sort_values(by='DEVICE_ID').reset_index())
         self.loggers[ptlid].debug('execute_move() returns expected QS:\n'
                                   + expected_QS.to_string())
         # get expected posTP from petal and write to movedf after move
         ret_TP = ptl.get_positions(posids=posids, return_coord='posTP')
-                 #  .sort_values(by='DEVICE_ID').reset_index())
+        #  .sort_values(by='DEVICE_ID').reset_index())
         ret_TP['STATUS'] = ptl.decipher_posflags(ret_TP['FLAG'])
         self.loggers[ptlid].debug(f'Expected posTP after move {n}:\n'
                                   + ret_TP.to_string())
@@ -340,6 +340,7 @@ class XYTest(PECS):
                                       f'{updates.to_string()}')
 
     def record_measurement(self, measured_QS, i, n):
+        # QS to obsXY conversion here
         # calculate below measured obsXY from measured QS and write to movedf
         Q_rad = np.radians(measured_QS['Q'])
         R = pc.S2R_lookup(measured_QS['S'])
