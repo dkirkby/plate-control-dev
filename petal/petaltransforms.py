@@ -94,7 +94,7 @@ class PetalTransforms(object):
         # tanslation matrix from petal nominal CS to CS5, column vector
         self.T = np.array([Tx, Ty, Tz]).reshape(3, 1)
         # orthogonal rotation matrix
-        self.R = Rxyz(np.degrees(alpha), np.degrees(beta), np.degrees(gamma))
+        self.R = Rxyz(np.radians(alpha), np.radians(beta), np.radians(gamma))
 
     def metXYZ_to_obsXYZ(self, metXYZ):
         """
