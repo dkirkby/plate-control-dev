@@ -1,8 +1,8 @@
 import numpy as np
-from postransforms import PosTransforms
 import posconstants as pc
 
 
+# %% rotation matrices
 def Rx(angle):  # all in radians
     Rx = np.array([
                    [1.0,           0.0,            0.0],
@@ -34,6 +34,21 @@ def Rxyz(alpha, beta, gamma):  # yaw-pitch-roll system, all in radians
     return Rz(gamma) @ Ry(beta) @ Rx(alpha)  # @ is matrix multiplication
 
 
+def typecast(x):
+    if type(x) is list or tuple:  # 2 or 3 coordinates, reshape into column vec
+        return np.array(x).reshape(len(x), 1)
+    elif type(x) is np.ndarray:
+        if x.ndim == 1:  # a 1D array of 2 or 3 coordinates
+            return x.reshape(x.size, 1)  # reshape into column vector
+        elif x.ndim == 2:  # 2D array, assume each column is a column vector
+            return x
+        else:
+            raise ValueError(f'Wrong numpy array dimension: {x.ndim}')
+    else:
+        raise TypeError(f'Wrong data type: {type(x)}')
+
+
+# %% class definition
 class PetalTransforms(object):
     """
     This class provides transformations between the petal local nominal
@@ -67,83 +82,195 @@ class PetalTransforms(object):
 
         ptlXYZ:     position of a point in the petal's local coordinate system
                     according to the CAD design (overlaps with location 3)
+
         obsXYZ:     (x,y,z) global cartesian coordinates on the focal plate
                     cenetered on optical axis, looking at fiber tips
+
         QS:         (q,s) global coordinates on the focal plate, per DESI-0742
                     q is the angle about the optical axis
                     s is the path distance from optical axis,
                     along the curved focal surface,
                     within a plane that intersects the optical axis
 
+        obsXY:      2D projection of obsXY Zabove in CS5
+
+        flatXY:     (x, y) global to focal plate, with focal plate slightly
+                    stretched out and flattened (used for anti-collision)
+
     With QS coordinates, PosTransforms converts into any other
     positioner-specific CS. The wrappers here convert a list of positioner
     coordinates, but that is not acturally supported in PosTransforms.
     We may want to get rid them and unify our transformation methods.
+
+    All methods take list or np.ndarray input as handled in typecast() above.
+    Set optional arg cast=True when feeding a non-column-vector-based array.
     """
 
     dtb_device_ids = [543, 544, 545]  # three datum tooling balls on a petal
 
-    def __init__(self, Tx=0, Ty=0, Tz=0, alpha=0, beta=0, gamma=0):
-        self.postrans = PosTransforms(curved=True)
+    def __init__(self, Tx=0, Ty=0, Tz=0, alpha=0, beta=0, gamma=0,
+                 curved=True):
+        # self.postrans = PosTransforms(curved=True)
         # tanslation matrix from petal nominal CS to CS5, column vector
         self.T = np.array([Tx, Ty, Tz]).reshape(3, 1)
         # orthogonal rotation matrix
         self.R = Rxyz(np.radians(alpha), np.radians(beta), np.radians(gamma))
+        self.curved = curved
 
-    def ptlXYZ_to_obsXYZ(self, ptlXYZ):
+    # %% fundamental transformations
+    def ptlXYZ_to_obsXYZ(self, ptlXYZ, cast=False):
         """
-        INPUT:  3 x N array, each column vector is metXYZ
+        INPUT:  3 x N array, each column vector is ptlXYZ
         OUTPUT: 3 x N array, each column vector is obsXYZ
         """
+        if cast:
+            ptlXYZ = typecast(ptlXYZ)
         return self.R @ ptlXYZ + self.T  # forward transformation
 
-    def obsXYZ_to_ptlXYZ(self, obsXYZ):
+    def obsXYZ_to_ptlXYZ(self, obsXYZ, cast=False):
         """
         INPUT:  3 x N array, each column vector is obsXYZ
-        OUTPUT: 3 x N array, each column vector is metXYZ
+        OUTPUT: 3 x N array, each column vector is ptlXYZ
         """
-        return self.R.T @ (obsXYZ - self.T)  # backward transformation
+        if cast:
+            obsXYZ = typecast(obsXYZ)
+        return self.R.T @ (typecast(obsXYZ) - self.T)  # backward transform
 
-    def obsXYZ_to_QS(self, obsXYZ):
-        """Transforms list of obsXYZ coordinates into QS system.
-        INPUT:  3 x N array, each column vector is obsXYZ
-        OUTPUT: 2 x N array of corresponding [[q0,s0],[q1,s1],...]
+    def ptlXY_to_obsXY(self, ptlXY, cast=False):
         """
+        INPUT:  2 x N array, each column vector is ptlXY
+        OUTPUT: 2 x N array, each column vector is obsXY
+        On-shell condition is enforced because Z coordinates necessrily mix
+        with XY when doing a (more accurate in principle) 3D transformation
+        """
+        if cast:
+            ptlXY = typecast(ptlXY)
+        R = np.sqrt(np.square(ptlXY[0, :]) + np.square(ptlXY[1, :]))
+        ptlXYZ = np.vstack([ptlXY, pc.R2Z_lookup(R)])
+        return self.ptlXYZ_to_obsXYZ(ptlXYZ)[:2, :]  # only take first 2 rows
+
+    def obsXY_to_ptlXY(self, obsXY, cast=False):
+        """
+        INPUT:  2 x N array, each column vector is obsXY
+        OUTPUT: 2 x N array, each column vector is ptlXY
+        On-shell condition is enforced
+        """
+        if cast:
+            obsXY = typecast(obsXY)
+        R = np.sqrt(np.square(obsXY[0, :]) + np.square(obsXY[1, :]))
+        obsXYZ = np.vstack([obsXY, pc.R2Z_lookup(R)])
+        return self.obsXYZ_to_ptlXYZ(obsXYZ)[:2, :]  # only take first 2 rows
+
+    # %% QS transforms (only need 2D)
+    def obsXY_to_QS(self, obsXY, curved=None, cast=False):
+        """
+        input:  2 x N array
+        output: 2 x N array, each column vector is QS
+        """
+        if cast:
+            obsXY = typecast(obsXY)
+        if curved is None:  # allow forcing flatXY despite curved instance
+            curved = self.curved
         X, Y = obsXYZ[0, :], obsXYZ[1, :]
         Q = np.degrees(np.arctan2(Y, X))  # Y over X
         R = np.sqrt(np.square(X) + np.square(Y))
-        S = pc.R2S_lookup(R)
+        S = pc.R2S_lookup(R) if curved else R
         return np.array([Q, S])
 
-    def QS_to_obsXYZ(self, QS):
+    def QS_to_obsXY(self, QS, curved=None, cast=False):
+        """
+        input:  2 x N array, each column vector is QS
+        output: 2 x N array
+        """
+        if cast:
+            QS = typecast(QS)
+        if curved is None:  # allow forcing flatXY despite curved instance
+            curved = self.curved
+        Q_rad, S = np.radians(QS[0, :]), QS[1, :]
+        R = self.S2R(S) if curved else S
+        X = R * np.cos(Q_rad)
+        Y = R * np.sin(Q_rad)
+        return np.array([X, Y])
+
+    def obsXYZ_to_QS(self, obsXYZ, curved=None, cast=False):
+        """Transform obsXYZ coordinates into QS system.
+        Z data (in 3rd row) aren't used at all, as X and Y are sufficient.
+        INPUT:  3 x N array, each column vector is obsXYZ
+        OUTPUT: 2 x N array of corresponding [[q0,s0],[q1,s1],...]
+        """
+        if cast:
+            obsXYZ = typecast(obsXYZ)
+        if curved is None:  # allow forcing flatXY despite curved instance
+            curved = self.curved
+        return self.obsXY_to_QS(obsXYZ[:2, :], curved=curved)
+
+    def QS_to_obsXYZ(self, QS, curved=None, cast=False):
         """Transforms list of QS coordinates into obsXYZ system.
+        On-shell condition is enforced
         INPUT:  2 x N array, each column vector is QS
         OUTPUT: 3 x N array, each column vector is obsXYZ
         """
-        Q_rad, S = np.radians(QS[0, :]), QS[1, :]
-        R = self.S2R(S)
-        X = R * np.cos(Q_rad)
-        Y = R * np.sin(Q_rad)
+        if cast:
+            QS = typecast(QS)
+        if curved is None:  # allow forcing flatXY despite curved instance
+            curved = self.curved
+        obsXY = self.QS_to_obsXY(QS, curved=curved)
+        R = np.sqrt(np.square(obsXY[0, :]) + np.square(obsXY[1, :]))
         Z = pc.R2Z_lookup(R)
-        return np.array([X, Y, Z])
+        return np.vstack([obsXY, Z])  # add z data to the 3rd row
 
-    def ptlXYZ_to_QS(self, ptlXYZ):
+    # %% flatXY transforms
+    def QS_to_flatXY(self, QS, cast=False):
+        """
+        INPUT:  2 x N array, each column vector is QS
+        OUTPUT: 2 x N array, each column vector is flatXY
+        """
+        if cast:
+            QS = typecast(QS)
+        return self.QS_to_obsXY(QS, curved=False)
+
+    def flatXY_to_QS(self, flatXY, cast=False):
+        """
+        INPUT:  2 x N array, each column vector is flatXY
+        OUTPUT: 2 x N array, each column vector is QS
+        """
+        if cast:
+            flatXY = typecast(flatXY)
+        return self.obsXY_to_QS(flatXY, curved=False)
+
+    # %% composite transformations for convenience
+    def ptlXYZ_to_QS(self, ptlXYZ, cast=False):
         """
         INPUT:  3 x N array, each column vector is ptlXYZ
         OUTPUT: 2 x N array of corresponding [[q0,s0],[q1,s1],...]
         """
+        if cast:
+            ptlXYZ = typecast(ptlXYZ)
         obsXYZ = self.ptlXYZ_to_obsXYZ(ptlXYZ)
         return self.obsXYZ_to_QS(obsXYZ)
 
-    def QS_to_ptlXYZ(self, QS):
+    def QS_to_ptlXYZ(self, QS, cast=False):
         """
         INPUT:  2 x N array of corresponding [[q0,s0],[q1,s1],...]
         OUTPUT: 3 x N array, each column vector is ptlXYZ
         """
+        if cast:
+            QS = typecast(QS)
         obsXYZ = self.QS_to_obsXYZ(QS)
         return self.obsXYZ_to_ptlXYZ(obsXYZ)
 
+    def obsXY_to_flatXY(self, obsXY):
+        """Composite transformation, performs obsXY --> QS --> flatXY"""
+        QS = self.obsXY_to_QS(obsXY)
+        return self.QS_to_flatXY(QS)
 
+    def flatXY_to_obsXY(self, flatXY):
+        """Composite transformation, performs flatXY --> QS --> obsXY"""
+        QS = self.flatXY_to_QS(flatXY)
+        return self.QS_to_obsXY(QS)
+
+
+# %% main
 if __name__ == '__main__':
     """
     Unit test, choose location 4, which is 36 degrees of rotation ccw
@@ -158,9 +285,9 @@ if __name__ == '__main__':
                                alpha=0.001382631,
                                beta=-0.002945219,
                                gamma=35.9887675)
-    obsXYZ_actual = np.array([11.671,	23.542,	-81.893])
-    ptlXYZ_actual = np.array([23.233778, 12.1450584, -81.9095268])
+    obsXYZ_actual = np.array([11.671,	23.542,	-81.893]).reshape(3, 1)
+    ptlXYZ_actual = np.array([23.2337, 12.1450, -81.9095]).reshape(3, 1)
     obsXYZ = ptltrans.ptlXYZ_to_obsXYZ(ptlXYZ_actual)
     ptlXYZ = ptltrans.obsXYZ_to_ptlXYZ(obsXYZ_actual)
-    print(f'obsXYZ, actual: {obsXYZ_actual}, transformed: {obsXYZ}\n'
-          f'ptlXYZ, actual: {ptlXYZ_actual}, transformed: {ptlXYZ}')
+    print(f'obsXYZ, actual: {obsXYZ_actual.T}\ntransformed: {obsXYZ.T}\n'
+          f'ptlXYZ, actual: {ptlXYZ_actual.T}\ntransformed: {ptlXYZ.T}')
