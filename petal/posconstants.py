@@ -29,7 +29,7 @@ dirs['positioner_locations_file'] = os.environ.get('FP_SETTINGS_PATH')+'/hwsetup
 dirs['positioner_neighbors_file'] = os.environ.get('FP_SETTINGS_PATH')+'/hwsetups/neighbor_locs'  # neighbor locations dictionary by DEVICE_LOC
 dirs['small_array_locations_file']=os.getenv('FP_SETTINGS_PATH')+'/hwsetups/SWIntegration_XY.csv'
 dirs['petal2_fiducials_metrology_file']=os.getenv('FP_SETTINGS_PATH')+'/hwsetups/petal2_fiducials_metrology.csv'
-dirs['petalbox_configurations'] = os.getenv('FP_SETTINGS_PATH') + '/ptl_settings/petalbox_configurations_by_ptl_id.json' # temporary until configuration info is sent through petal init 
+dirs['petalbox_configurations'] = os.getenv('FP_SETTINGS_PATH') + '/ptl_settings/petalbox_configurations_by_ptl_id.json' # temporary until configuration info is sent through petal init
 if 'DESI_HOME' in os.environ:
     dirs['temp_files']   = os.environ.get('DESI_HOME') + os.path.sep + 'fp_temp_files' + os.path.sep
 elif 'HOME' in os.environ:
@@ -44,38 +44,54 @@ for key in dir_keys_logs:
 for key in dir_keys_settings:
     dirs[key] = os.path.join(dirs['all_settings'], key)
 try:
-    for directory in dirs.values():    
+    for directory in dirs.values():
         os.makedirs(directory,exist_ok=True)
 except:
     pass
 
 # Lookup tables for focal plane coordinate conversions
 R_lookup_path = petal_directory + os.path.sep + 'focal_surface_lookup.csv'
-R_lookup_data = np.genfromtxt(R_lookup_path,comments="#",delimiter=",")
+R_lookup_data = np.genfromtxt(R_lookup_path, comments="#", delimiter=",")
 
-# Mapping of radial coordinate R to pseudo-radial coordinate S (distance along focal surface from optical axis)
-R2S_poly = [-1.26341e-23,1.90376e-20,-1.11245e-17,3.30271e-15,-5.78982e-13,7.31761e-11,1.72104e-09,1.91532e-07,0.999997,0.50001]
+# Mapping of radial coordinate R to pseudo-radial coordinate S
+# (distance along focal surface from optical axis)
+R2S_poly = [-1.26341e-23, 1.90376e-20, -1.11245e-17, 3.30271e-15, -5.78982e-13,
+            7.31761e-11, 1.72104e-09, 1.91532e-07, 0.999997, 0.50001]
+
+
 def R2S_lookup(R):
-    return np.interp(R,R_lookup_data[:,0],R_lookup_data[:,2],left=float('nan'))
+    return np.interp(R, R_lookup_data[:, 0], R_lookup_data[:, 2],
+                     left=float('nan'))
+
+
 def S2R_lookup(S):
-    return np.interp(S,R_lookup_data[:,2],R_lookup_data[:,0],left=float('nan'))
+    return np.interp(S, R_lookup_data[:, 2], R_lookup_data[:, 0],
+                     left=float('nan'))
+
 
 # Mapping of radial coordinate R to Z5 coordinate on the nominal asphere
-R2Z_poly = [6.74215e-23,-7.75243e-20,2.9168e-17,-5.23944e-15,1.61621e-12,-4.82781e-10,1.24578e-08,-0.000100884,6.63924e-06,-2.33702e-05]
+R2Z_poly = [6.74215e-23, -7.75243e-20, 2.9168e-17, -5.23944e-15, 1.61621e-12,
+            -4.82781e-10, 1.24578e-08, -0.000100884, 6.63924e-06, -2.33702e-05]
+
+
 def R2Z_lookup(R):
-    return np.interp(R,R_lookup_data[:,0],R_lookup_data[:,1],left=float('nan'))
+    return np.interp(R, R_lookup_data[:, 0], R_lookup_data[:, 1],
+                     left=float('nan'))
+
+
 def Z2R_lookup(S):
-    return np.interp(S,R_lookup_data[:,1],R_lookup_data[:,0],left=float('nan'))
+    return np.interp(S, R_lookup_data[:, 1], R_lookup_data[:, 0],
+                     left=float('nan'))
 
 # Mapping of positioner power supplies to can channels
 power_supply_can_map = {'V1':{'can10','can11','can13','can22', 'can23'},
                         'V2':{'can12', 'can14', 'can15', 'can16', 'can17'}}
-	
+
 # Constants
 deg = '\u00b0'
 mm = 'mm'
 um_per_mm = 1000
-deg_per_rad = 180./math.pi  
+deg_per_rad = 180./math.pi
 rad_per_deg = math.pi/180.
 timestamp_format = '%Y-%m-%dT%H:%M:%S%z' # see strftime documentation
 filename_timestamp_format = '%Y%m%dT%H%M%S%z'
@@ -182,7 +198,7 @@ def delistify(uv):
         else:
             new_uv.append(uv[i])
     return new_uv
-    
+
 def listify2d(uv):
     """If uv is [u,v], return [[u,v]]. Otherwise return uv.
     I.e., so [[u1,v1],[u2,v2],...] would stay the same
