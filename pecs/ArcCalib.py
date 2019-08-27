@@ -86,41 +86,17 @@ class Arc(PECS):
             enabled_only = self._parse_yn(user_text)
         # Ask for n_points_P
         if n_points_P is None:
-            user_text = input('Enter the number of points to measure on the phi arc: ')
-            if user_text.isdigit():
-                n_points_P = int(user_text)
-            else:
-                user_text = input('You did not enter an integer, try again. Enter the number of points to measure on the phi arc: ')
-                if user_text.isdigit():
-                    n_points_P = int(user_text)
-                else:
-                    raise ValueError('Input requires an integer.')
+            n_points_P = self._get_integer('Enter the number of points to measure on the phi arc: ')
         # Ask for n_points_T
         if n_points_T is None:
-            user_text = input('Enter the number of points to measure on the theta arc: ')
-            if user_text.isdigit():
-                n_points_T = int(user_text)
-            else:
-                user_text = input('You did not enter an integer, try again. Enter the number of points to measure on the theta arc: ')
-                if user_text.isdigit():
-                    n_points_T = int(user_text)
-                else:
-                    raise ValueError('Input requires an integer.')
+            n_points_T = self._get_integer('Enter the number of points to measure on the theta arc: ')
         # Ask for auto_update
         if auto_update is None:
             user_text = input('Automatically update positioner calibration? (y/n) ')
             enabled_only = self._parse_yn(user_text)
         # Ask for match_radius
         if match_radius is None:
-            user_text = input('Enter the match_radius for spotmatch: ')
-            if user_text.isdigit():
-                match_radius = int(user_text)
-            else:
-                user_text = input('You did not enter an integer, try again. Enter the match_radius for spotmatch: ')
-                if user_text.isdigit():
-                    match_radius = int(user_text)
-                else:
-                    raise ValueError('Input requires an integer.')
+            match_radius = self._get_integer('Enter the match_radius for spotmatch: ')
         # Run calibration
         data = self.arc_calibration(selection=selection,enabled_only=enabled_only,n_points_P=n_points_P,n_points_T=n_points_T,auto_update=auto_update,match_radius=match_radius)
         data.to_csv(os.path.join(
@@ -134,6 +110,18 @@ class Arc(PECS):
             return True
         else:
             return False
+
+    def _get_integer(prompt_string):
+        user_text = input(prompt_string)
+        if user_text.isdigit():
+            return int(user_text)
+        else:
+            user_text = input('You did not enter an integer, try again. ' + prompt_string)
+            if user_text.isdigit():
+                return int(user_text)
+            else:
+                raise ValueError('Input requires an integer.')
+
 
 
 if __name__ == '__main__':
