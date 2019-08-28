@@ -11,12 +11,13 @@ class PosModel(object):
     One instance of PosModel corresponds to one PosState to physical positioner.
     """
 
-    def __init__(self, state=None, is_installed_on_asphere=False):
+    def __init__(self, state=None, petal_transform=None):
         if not(state):
             self.state = posstate.PosState()
         else:
             self.state = state
-        self.trans = postransforms.PosTransforms(self, is_installed_on_asphere)
+        self.trans = postransforms.PosTransforms(
+            this_posmodel=self, petal_transform=petal_transform)
         self.axis = [None,None]
         self.axis[pc.T] = Axis(self,pc.T)
         self.axis[pc.P] = Axis(self,pc.P)
@@ -52,12 +53,12 @@ class PosModel(object):
     def busid(self):
         """Returns the name of the can bus that the positioner belongs to."""
         return self.state._val['BUS_ID']
-    
+
     @property
     def deviceloc(self):
         """Returns the device location id (on the petal) of the positioner."""
         return self.state._val['DEVICE_LOC']
-    
+
     @property
     def is_enabled(self):
         """Returns whether the positioner has its control enabled or not."""
@@ -68,7 +69,7 @@ class PosModel(object):
         """Returns the internally-tracked expected position of the theta and phi shafts
         at the output of the gearbox."""
         return [self.axis[pc.T].pos, self.axis[pc.P].pos]
-    
+
     @property
     def expected_current_obsTP(self):
         """Returns the expected position of theta and phi bodies, as seen by an external
@@ -211,7 +212,7 @@ class PosModel(object):
             move_data['speed']        = self._motor_speed_creep
             move_data['move_time']    = abs(move_data['distance']) / move_data['speed']
         else:
-            dist_cruise = distance - dist_spinup 
+            dist_cruise = distance - dist_spinup
             move_data['motor_step']   = int(round(dist_cruise / self._stepsize_cruise))
             move_data['distance']     = move_data['motor_step'] * self._stepsize_cruise + dist_spinup
             move_data['speed_mode']   = 'cruise'
@@ -282,7 +283,7 @@ class Axis(object):
         self.hardstop_clearance = self.calc_hardstop_clearance()
         self.hardstop_debounce = self.calc_hardstop_debounce()
         self.signed_gear_ratio = self.motor_calib_properties['ccw_sign']*self.motor_calib_properties['gear_ratio']
-        
+
     @property
     def pos(self):
         """Internally-tracked angular position of the axis, at the output of the gear.
@@ -422,13 +423,13 @@ class Axis(object):
             return self.posmodel.state._val['PRINCIPLE_HARDSTOP_DIR_T']
         else:
             return self.posmodel.state._val['PRINCIPLE_HARDSTOP_DIR_P']
-        
+
     def calc_antibacklash_final_move_dir(self):
         if self.axisid == pc.T:
             return self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_T']
         else:
             return self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_P']
-        
+
     def calc_hardstop_debounce(self):
         """This is the amount to debounce off the hardstop after striking it.
         It is the hardstop clearance distance plus the backlash removal distance.

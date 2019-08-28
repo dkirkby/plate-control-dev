@@ -86,7 +86,7 @@ class PosTransforms(object):
 
     """
 
-    def __init__(self, petal_transform=None, this_posmodel=None):
+    def __init__(self, this_posmodel=None, petal_transform=None):
         if this_posmodel is None:
             this_posmodel = posmodel.PosModel()
         self.posmodel = this_posmodel
@@ -95,7 +95,7 @@ class PosTransforms(object):
             self.ptltrans = petaltransforms.PetalTransforms()
         else:
             self.ptltrans = petal_transform
-        # set up 2D petal transform aliases for legacy support and easy access
+        # set up 2D petal transform aliases for easy access and legacy support
         self.ptlXY_to_obsXY = self.ptltrans.ptlXY_to_obsXY
         self.obsXY_to_ptlXY = self.ptltrans.obsXY_to_ptlXY
         self.obsXY_to_QS = self.ptltrans.obsXY_to_QS
