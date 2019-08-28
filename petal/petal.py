@@ -106,6 +106,12 @@ class Petal(object):
         self.altered_states = set()
         self.altered_calib_states = set()
 
+
+        # must call the following 3 methods whenever petal alingment changes
+        self.init_trans()
+        self.init_posmodels(posids)
+        self.init_collider(collider_file, anticollision)
+
         # fiducials setup
         self.fidids = {fidids} if isinstance(fidids,str) else set(fidids)
         for fidid in self.fidids:
@@ -131,11 +137,6 @@ class Petal(object):
         self._apply_state_enable_settings()
 
         self.hw_states = {}
-
-        # must call the following 3 methods whenever petal alingment changes
-        self.init_trans()
-        self.init_posmodels(posids)
-        self.init_collider(collider_file, anticollision)
 
     def init_trans(self, alignment=None):
         '''
@@ -172,7 +173,7 @@ class Petal(object):
                                      beta=self.alignment['beta'],
                                      gamma=self.alignment['gamma'])
 
-    def init_posmodel(self, posids=None):
+    def init_posmodels(self, posids=None):
         # positioners setup
         if posids is None:  # posids are not supplied, only alingment changed
             assert hasattr(self, 'posids')  # re-use self.posids
@@ -1187,3 +1188,7 @@ class Petal(object):
                     self.pos_flags[devid] |= self.bad_fiber_fvc_bit
                     self.disabled_devids.append(devid)
 
+
+if __name__ == '__main__':
+    petal = Petal(petal_id=0, petal_loc=0, db_commit_on=True,
+                  simulator_on=True)
