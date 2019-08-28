@@ -106,6 +106,11 @@ class Petal(object):
         self.altered_states = set()
         self.altered_calib_states = set()
 
+        # must call the following 3 methods whenever petal alingment changes
+        self.init_trans()
+        self.init_posmodels(posids)
+        self.init_collider(collider_file, anticollision)
+
         # fiducials setup
         self.fidids = {fidids} if isinstance(fidids,str) else set(fidids)
         for fidid in self.fidids:
@@ -131,11 +136,6 @@ class Petal(object):
         self._apply_state_enable_settings()
 
         self.hw_states = {}
-
-        # must call the following 3 methods whenever petal alingment changes
-        self.init_trans()
-        self.init_posmodels(posids)
-        self.init_collider(collider_file, anticollision)
 
     def init_trans(self, alignment=None):
         '''
@@ -172,7 +172,7 @@ class Petal(object):
                                      beta=self.alignment['beta'],
                                      gamma=self.alignment['gamma'])
 
-    def init_posmodel(self, posids=None):
+    def init_posmodels(self, posids=None):
         # positioners setup
         if posids is None:  # posids are not supplied, only alingment changed
             assert hasattr(self, 'posids')  # re-use self.posids
@@ -182,15 +182,13 @@ class Petal(object):
         self.posmodels = {}  # key posid, value posmodel instance
         self.states = {}  # key posid, value posstate instance
         self.devices = {}  # key device_location_id, value posid
-        installed_on_asphere = self.shape == 'petal'
+        self.shape == 'petal'
         for posid in posids:
             self.states[posid] = posstate.PosState(
                 posid, logging=self.local_log_on, device_type='pos',
                 printfunc=self.printfunc, petal_id=self.petal_id)
-            self.posmodels[posid] = PosModel(
-                state=self.states[posid],
-                is_installed_on_asphere=installed_on_asphere,
-                petal_transform=self.trans)
+            self.posmodels[posid] = PosModel(state=self.states[posid],
+                                             petal_transform=self.trans)
             self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
         self.posids = set(self.posmodels.keys())
         self.canids_where_tables_were_just_sent = []
@@ -1189,3 +1187,7 @@ class Petal(object):
                     self.pos_flags[devid] |= self.bad_fiber_fvc_bit
                     self.disabled_devids.append(devid)
 
+
+if __name__ == '__main__':
+    petal = Petal(petal_id=0, petal_loc=0, db_commit_on=True,
+                  simulator_on=True)
