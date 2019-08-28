@@ -61,9 +61,6 @@ class Petal(object):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
         # petal setup
-
-        # TODO: load parameters from DB always, instead of from petal config
-        # 6 petal transformation params need to be updated in self.alignment
         if None in [petal_id, petalbox_id, fidids, posids, shape]:
             self.printfunc('Some parameters not provided to __init__, reading petal config.')
             self.petal_state = posstate.PosState(
@@ -109,23 +106,6 @@ class Petal(object):
         self.altered_states = set()
         self.altered_calib_states = set()
 
-        # positioners setup
-        self.posmodels = {} # key posid, value posmodel instance
-        self.states = {} # key posid, value posstate instance
-        self.devices = {} # key device_location_id, value posid
-        installed_on_asphere = self.shape == 'petal'
-        for posid in posids:
-            self.states[posid] = posstate.PosState(posid, logging=self.local_log_on, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
-            self.posmodels[posid] = PosModel(self.states[posid], installed_on_asphere)
-            self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
-        self.posids = set(self.posmodels.keys())
-        self.canids_where_tables_were_just_sent = []
-        self.busids_where_tables_were_just_sent = []
-        self.nonresponsive_canids = set()
-        self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
-        self.set_motor_parameters()
-        self.power_supply_map = self._map_power_supplies_to_posids()
-
         # fiducials setup
         self.fidids = {fidids} if isinstance(fidids,str) else set(fidids)
         for fidid in self.fidids:
@@ -152,7 +132,9 @@ class Petal(object):
 
         self.hw_states = {}
 
+        # must call the following 3 methods whenever petal alingment changes
         self.init_trans()
+        self.init_posmodels(posids)
         self.init_collider(collider_file, anticollision)
 
     def init_trans(self, alignment=None):
@@ -189,6 +171,34 @@ class Petal(object):
                                      alpha=self.alignment['alpha'],
                                      beta=self.alignment['beta'],
                                      gamma=self.alignment['gamma'])
+
+    def init_posmodel(self, posids=None):
+        # positioners setup
+        if posids is None:  # posids are not supplied, only alingment changed
+            assert hasattr(self, 'posids')  # re-use self.posids
+            posids = self.posids
+        else:  # posids are supplied
+            pass  # just use supplied posids, ignore self.posids that may exist
+        self.posmodels = {}  # key posid, value posmodel instance
+        self.states = {}  # key posid, value posstate instance
+        self.devices = {}  # key device_location_id, value posid
+        installed_on_asphere = self.shape == 'petal'
+        for posid in posids:
+            self.states[posid] = posstate.PosState(
+                posid, logging=self.local_log_on, device_type='pos',
+                printfunc=self.printfunc, petal_id=self.petal_id)
+            self.posmodels[posid] = PosModel(self.states[posid],
+                                             installed_on_asphere)
+            self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
+        self.posids = set(self.posmodels.keys())
+        self.canids_where_tables_were_just_sent = []
+        self.busids_where_tables_were_just_sent = []
+        self.nonresponsive_canids = set()
+        # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start
+        # positioners
+        self.sync_mode = 'soft'
+        self.set_motor_parameters()
+        self.power_supply_map = self._map_power_supplies_to_posids()
 
     def init_collider(self, collider_file=None, anticollision='freeze'):
         '''collider, scheduler, and animator setup
