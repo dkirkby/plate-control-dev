@@ -104,6 +104,11 @@ class PetalTransforms(object):
 
     All methods take list or np.ndarray input as handled in typecast() above.
     Set optional arg cast=True when feeding a non-column-vector-based array.
+
+    The option "curved" sets whether we are looking at a flat focal plane
+    (such as a laboratory test stand), or a true petal, with its asphere.
+    When curved == False, PosTransforms will treat S as exactly equal to the
+    radius R.
     """
 
     dtb_device_ids = [543, 544, 545]  # three datum tooling balls on a petal

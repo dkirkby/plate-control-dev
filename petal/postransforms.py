@@ -19,47 +19,46 @@ class PosTransforms(object):
 
     The coordinate systems are:
 
-        intTP:  internally-tracked expected (theta, phi) of gearmotor shafts
-                at output of gear heads
-                theta offset depends on the individual rotation of positioner
-                when installed
-                formerly posTP
+        posintTP:   internally-tracked expected (theta, phi) of gearmotor
+                    shafts at output of gear heads
+                    theta offset depends on the individual rotation of
+                    positioner when installed formerly posTP
 
-        posTP:  (theta, phi) in the petal local CS but centred on theta axis
-                renamed, does not exist before
+        poslocTP:   (theta, phi) in the petal local CS but centred on theta
+                    axis renamed, does not exist before
 
-        posXY:  (x, y) local to fiber positioner, centered on theta axis,
-                directly corresponds to posTP
+        poslocXY:   (x, y) local to fiber positioner, centered on theta axis,
+                    directly corresponds to posTP
 
-        ptlXY:  (x, y) position in petal local CS as defined in petal CAD
+        ptllocXY:   (x, y) position in petal local CS as defined in petal CAD
 
-        obsXY:  2D projection of obsXYZ in CS5 defined in PetalTransforms
+        obsXY:      2D projection of obsXYZ in CS5 defined in PetalTransforms
 
-        obsTP:  (theta, phi) expected position of fiber tip including
-                offsets in CS5 but centred on positioner theta axis,
-                probably not useful anymore
+        obsTP:      (theta, phi) expected position of fiber tip including
+                    offsets in CS5 but centred on positioner theta axis,
+                    probably not useful anymore
 
     The fundamental transformations provided are:
 
-        intTP   <--> posTP
-        posXY   <--> ptlXY
-        ptlXY   <--> obsXY    (from PetalTransforms)
-        obsXY   <--> QS       (from PetalTransforms)
-        flatXY  <--> QS       (from PetalTransforms)
+        posintTP        <--> poslocTP
+        poslocTP        <--> ptllocXY
+        ptllocXY        <--> obsXY    (from PetalTransforms)
+        obsXY           <--> QS       (from PetalTransforms)
+        flatXY          <--> QS       (from PetalTransforms)
 
     Composite transformations are provided for convenience:
 
         degree 1:
-            intTP   <--> posXY
+            posintTP    <--> poslocXY
         degree 2:
-            posXY   <--> obsXY
-            obsXY   <--> flatXY
+            poslocXY    <--> obsXY
+            obsXY       <--> flatXY
         degree 3:
-            intTP   <--> obsXY
+            posintTP    <--> obsXY
         degree 4:
-            intTP   <--> QS
+            intTP       <--> QS
         degree 5:
-            intTP   <--> flatXY
+            intTP       <--> flatXY
 
     These can be chained together in any order to convert among the various
     coordinate systems.
@@ -84,14 +83,10 @@ class PosTransforms(object):
     DESI focal plate curvature is gentle. See DESI-0530 for detail on the (Q,S)
     coordinate system.
 
-    The option "curved" sets whether we are looking at a flat focal plane
-    (such as a laboratory test stand), or a true petal, with its asphere.
-    When curved == False, PosTransforms will treat S as exactly equal to the
-    radius R.
+
     """
 
-    def __init__(self, petal_transform=None, this_posmodel=None, curved=True):
-        self.curved = curved
+    def __init__(self, petal_transform=None, this_posmodel=None):
         if this_posmodel is None:
             this_posmodel = posmodel.PosModel()
         self.posmodel = this_posmodel
