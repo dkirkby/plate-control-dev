@@ -21,23 +21,27 @@ class PosTransforms(object):
     The coordinate systems are:
 
         posintTP:   internally-tracked expected (theta, phi) of gearmotor
-                    shafts at output of gear heads
+                    shafts at output of gear heads, pos origin
                     theta offset depends on the individual rotation of
                     positioner when installed formerly posTP
 
-        poslocTP:   (theta, phi) in the petal local CS but centred on theta
-                    axis renamed, does not exist before
+        poslocTP:   (theta, phi) in the petal local CS with pos origin
+                    (centred on theta axis) renamed, does not exist before
 
-        poslocXY:   (x, y) local to fiber positioner, centered on theta axis,
-                    directly corresponds to posTP
+        poslocXY:   (x, y) in the petal local CS with pos origin
+                    (centered on theta axis), directly corresponds to posTP
 
         ptlXY:      (x, y) position in petal local CS as defined in petal CAD
+                    petal origin
 
         obsXY:      2D projection of obsXYZ in CS5 defined in PetalTransforms
+                    CS5 origin
 
-        obsTP:      (theta, phi) expected position of fiber tip including
-                    offsets in CS5 but centred on positioner theta axis,
-                    probably not useful anymore
+        posobsXY:   (x, y) in global CS5 with pos origin (centred on theta)
+                    formerly posXY
+
+        posobsTP:   (T, P) in global CS5 with pos origin (centred on theta)
+                    formerly obsTP
 
     The fundamental transformations provided are:
 
@@ -46,6 +50,7 @@ class PosTransforms(object):
         ptlXY           <--> obsXY    (from PetalTransforms)
         obsXY           <--> QS       (from PetalTransforms)
         flatXY          <--> QS       (from PetalTransforms)
+        obsXY           <--> posobsXY
 
     Composite transformations are provided for convenience:
 
@@ -173,21 +178,46 @@ class PosTransforms(object):
         poslocY = ptlXY[1] - self.getval('OFFSET_Y')
         return poslocX, poslocY
 
+    def obsXY_to_posobsXY(self, obsXY):
+        ''' input is list or tuple or 1D array '''
+        centre_ptlXY = [self.getval('OFFSET_X'), self.getval('OFFSET_Y')]
+        centre_obsXY = self.ptlXY_to_obsXY(centre_ptlXY)
+        return self.delta_obsXY(obsXY, centre_obsXY)
+
+    def posobsXY_to_obsXY(self, posobsXY):
+        ''' input is list or tuple or 1D array '''
+        centre_ptlXY = [self.getval('OFFSET_X'), self.getval('OFFSET_Y')]
+        centre_obsXY = self.ptlXY_to_obsXY(centre_ptlXY)
+        return self.addto_obsXY(posobsXY, centre_obsXY)
+
     # %% fundamental XY and TP conversion in the same positioner-centred CS
     def poslocTP_to_poslocXY(self, poslocTP):
-        ''' input is list or tuple '''
+        ''' input is list or tuple or 1D array '''
         r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
-        return self.tp2xy(poslocTP, r)  # return (posX, posY)
+        return self.tp2xy(poslocTP, r)  # return (poslocX, poslocY)
 
     def poslocXY_to_poslocTP(self, poslocXY, range_limits='full'):
         ''' input is list or tuple or 1D array '''
-        intT_range, intP_range = self.shaft_ranges(range_limits)
-        posTP_min = self.posintTP_to_poslocTP([intT_range[0], intP_range[0]])
-        posTP_max = self.posintTP_to_poslocTP([intT_range[1], intP_range[1]])
-        pos_ranges = [[posTP_min[0], posTP_max[0]],  # theta min, theta max
-                      [posTP_min[1], posTP_max[1]]]  # phi min, phi max
+        posintT_range, posintP_range = self.shaft_ranges(range_limits)
+        poslocTP_min = self.posintTP_to_poslocTP(
+            [posintT_range[0], posintT_range[0]])
+        poslocTP_max = self.posintTP_to_poslocTP(
+            [posintP_range[1], posintP_range[1]])
+        posloc_ranges = [[poslocTP_min[0], poslocTP_max[0]],  # T min, T max
+                         [poslocTP_min[1], poslocTP_max[1]]]  # P min, P max
         r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
-        return self.xy2tp(poslocXY, r, pos_ranges)  # return (tp, unreachable)
+        return self.xy2tp(poslocXY, r, posloc_ranges)  # (tp, unreachable)
+
+    def posobsTP_to_posobsXY(self, posobsTP):
+        ''' input is list or tuple or 1D array '''
+        r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
+        return self.tp2xy(posobsTP, r)  # return (posobsX, posobsY)
+
+    def posobsXY_to_posobsTP(self, posobsXY, range_limits='full'):
+        ''' input is list or tuple or 1D array '''
+        r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
+        posobs_ranges = [[0, 359.99999999], [0, 220]]
+        return self.xy2tp(posobsXY, r, posobs_ranges)[0]  # (posobsT, posobsP)
 
     # %% composit transformations for convenience (degree 1)
     def posintTP_to_poslocXY(self, posintTP):
@@ -235,6 +265,10 @@ class PosTransforms(object):
         obsXY = self.QS_to_obsXY(QS, cast=True)  # 1D array
         return self.obsXY_to_posintTP(obsXY, range_limits)  # tp, unreachable
 
+    def posintTP_to_posobsXY(self, posintTP):
+        obsXY = self.posintTP_to_obsXY(posintTP)
+        return self.obsXY_to_posobsXY(obsXY)  # tuple
+
     # %% composit transformations for convenience (degree 5)
     def posintTP_to_flatXY(self, posintTP):
         """Composite transformation, performs intTP --> QS --> flatXY"""
@@ -263,55 +297,47 @@ class PosTransforms(object):
 
     # %% # ADDITION and DIFFERENCE METHODS
     # difference
-    def delta_posXY(self, xy0, xy1):
+    def delta_XY(self, xy0, xy1):
         """Returns dxdy corresponding to xy0 - xy1."""
         return PosTransforms.vector_delta(xy0, xy1)
-
-    def delta_obsXY(self, xy0, xy1):
-        """Returns dxdy corresponding to xy0 - xy1."""
-        return PosTransforms.vector_delta(xy0, xy1)
-
-    def delta_posTP(self, tp1, tp0, range_wrap_limits='full'):
-        """Returns dtdp corresponding to tp1 - tp0.
-        The range_wrap_limits option can be any of the values for the
-        shaft_ranges method, or 'none'. If 'none', then the returned delta is
-        a simple vector subtraction with no special checks for angle-wrapping
-        across positioner's theta = +/-180 deg.
-        """
-        dtdp = PosTransforms.vector_delta(tp1, tp0)
-        if range_wrap_limits != 'none':
-            dtdp = self._wrap_theta(tp0, dtdp, range_wrap_limits)
-        return dtdp
-
-    def delta_obsTP(self, tp1, tp0, range_wrap_limits='full'):
-        """Returns dtdp corresponding to tp1 - tp0.
-        The range_wrap_limits option can be any of the values for the
-        shaft_ranges method, or 'none'. If 'none', then the returned delta is
-        a simple vector subtraction with no special checks for angle-wrapping
-        across positioner's theta = +/-180 deg.
-        """
-        TP0 = self.obsTP_to_posTP(tp0)
-        TP1 = self.obsTP_to_posTP(tp1)
-        return self.delta_posTP(TP1, TP0, range_wrap_limits)
 
     def delta_QS(self, qs0, qs1):
         """Returns dqds corresponding to qs0 - qs1."""
         return PosTransforms.vector_delta(qs0, qs1)
 
-    def delta_flatXY(self, xy0, xy1):
-        """Returns dxdy corresponding to xy0 - xy1."""
-        return PosTransforms.vector_delta(xy0, xy1)
+    def delta_posintTP(self, posintTP0, posintTP1, range_wrap_limits='full'):
+        """Returns dtdp corresponding to tp1 - tp0.
+        The range_wrap_limits option can be any of the values for the
+        shaft_ranges method, or 'none'. If 'none', then the returned delta is
+        a simple vector subtraction with no special checks for angle-wrapping
+        across positioner's theta = +/-180 deg.
+        """
+        dtdp = PosTransforms.vector_delta(posintTP0, posintTP1)
+        if range_wrap_limits != 'none':
+            dtdp = self._wrap_theta(posintTP0, posintTP1, range_wrap_limits)
+        return dtdp
+
+    def delta_poslocTP(self, poslocTP0, poslocTP1, range_wrap_limits='full'):
+        """Returns dtdp corresponding to tp1 - tp0.
+        The range_wrap_limits option can be any of the values for the
+        shaft_ranges method, or 'none'. If 'none', then the returned delta is
+        a simple vector subtraction with no special checks for angle-wrapping
+        across positioner's theta = +/-180 deg.
+        """
+        posintTP0 = self.poslocTP_to_posintTP(poslocTP0)
+        posintTP1 = self.poslocTP_to_posintTP(poslocTP1)
+        return self.delta_posintTP(posintTP0, posintTP1, range_wrap_limits)
 
     # ADDITION METHODS
-    def addto_posXY(self, xy0, dxdy):
+    def addto_XY(self, xy0, dxdy):
         """Returns xy corresponding to xy0 + dxdy."""
         return PosTransforms.vector_add(xy0, dxdy)
 
-    def addto_obsXY(self, xy0, dxdy):
-        """Returns xy corresponding to xy0 + dxdy."""
-        return PosTransforms.vector_add(xy0, dxdy)
+    def addto_QS(self, qs0, dqds):
+        """Returns qs corresponding to qs0 + dqds."""
+        return PosTransforms.vector_add(qs0, dqds)
 
-    def addto_posTP(self, tp0, dtdp, range_wrap_limits='full'):
+    def addto_posintTP(self, tp0, dtdp, range_wrap_limits='full'):
         """Returns tp corresponding to tp0 + dtdp.
         The range_wrap_limits option can be any of the values for the
         shaft_ranges method, or 'none'. If 'none', then the returned point is
@@ -321,24 +347,6 @@ class PosTransforms(object):
         if range_wrap_limits != 'none':
             dtdp = self._wrap_theta(tp0, dtdp, range_wrap_limits)
         return PosTransforms.vector_add(tp0, dtdp)
-
-#    def addto_obsTP(self, tp0, dtdp, range_wrap_limits='full'):
-#        """Returns tp corresponding to tp0 + dtdp.
-#        The range_wrap_limits option can be any of the values for the
-#        shaft_ranges method, or 'none'. If 'none', then the returned point is
-#        a simple vector addition with no special checks for angle-wrapping
-#        across positioner's theta = +/-180 deg.
-#        """
-#        TP0 = self.obsTP_to_posTP(tp0)
-#        return self.addto_posTP(TP0, dtdp, range_wrap_limits)
-
-    def addto_QS(self, qs0, dqds):
-        """Returns qs corresponding to qs0 + dqds."""
-        return PosTransforms.vector_add(qs0, dqds)
-
-    def addto_flatXY(self, xy0, dxdy):
-        """Returns xy corresponding to xy0 + dxdy."""
-        return PosTransforms.vector_add(xy0, dxdy)
 
     # %% INTERNAL METHODS
     def _wrap_theta(self, tp0, dtdp, range_wrap_limits='full'):
