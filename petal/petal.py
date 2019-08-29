@@ -60,7 +60,7 @@ class Petal(object):
                  collider_file=None, sched_stats_on=False):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
-        self.printfunc('Running code version: {pc.code_version}')
+        self.printfunc(f'Running code version: {pc.code_version}')
         # read values from cfg files if not given
         if None in [petal_id, petalbox_id, fidids, posids, shape]:
             self.printfunc('Some parameters not provided to __init__, '
@@ -730,11 +730,11 @@ class Petal(object):
             self.comm.pbset(key,self._last_state.keys())
         self.comm.pbset('STATE', hw_state)
         #Check for errors when setting state - want to know this right away
-        set_state, err_strings = self.get_hardware_state()
+        set_state, err_strings = self._get_hardware_state()
         return set_state, err_stings
 
 
-    def get_hardware_state(self):
+    def _get_hardware_state(self):
         '''
         Loops through keys in self._last_state to compare with what the
         PetalController thinks they are. Any differences are recorded and
