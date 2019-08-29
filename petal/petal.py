@@ -111,6 +111,7 @@ class Petal(object):
         self.sched_stats_on = sched_stats_on
         self.altered_states = set()
         self.altered_calib_states = set()
+        self._last_state = {}
 
         # must call the following 3 methods whenever petal alingment changes
         self.init_trans()
@@ -734,7 +735,7 @@ class Petal(object):
             set_state, err_strings = self._get_hardware_state()
             return set_state, err_stings
         else:
-            return hw_state, []
+            return hw_state
 
 
     def _get_hardware_state(self):
@@ -745,11 +746,11 @@ class Petal(object):
         returns the state of the PetalController.
         '''
         err_strings = []
-        if self._last_state == {}:
-            self.pbset('STATE','ERROR')
-            return 'ERROR', ['No state yet set by petal']
-        # Look for different settings from what petal last set.
         if not(self.simulator_on):
+            if self._last_state == {}:
+                self.pbset('STATE','ERROR')
+                return 'ERROR', ['No state yet set by petal']
+            # Look for different settings from what petal last set.
             for key in self._last_state.keys():
                 fbk = self.pbget(key)
                 if key == 'GFA_FAN': #sadly GFA_FAN is a little weird.
@@ -765,7 +766,7 @@ class Petal(object):
                 self.pbset('STATE','ERROR')
                 return 'ERROR', err_strings
         else:
-            return 'READY', err_strings
+            return 'READY'
 
     def reset_petalbox(self):
         """Reset all errors and turn all enables off.  This method
