@@ -656,7 +656,7 @@ class Petal(object):
 
 # METHODS FOR CONFIGURING THE PETALBOX
 
-    def set_hardware_state(self, hw_state):
+    def _set_hardware_state(self, hw_state):
         '''
         Sets the hardware state on the petal controller, scheme documented here:
         https://docs.google.com/document/d/1U9mxdTwgT6Bj5Sw_oTerU5wkiq9cXnN7I8QpMl_LT9E/edit#heading=h.ineqjw6t36ek
