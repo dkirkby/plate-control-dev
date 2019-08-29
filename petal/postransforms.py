@@ -1,8 +1,9 @@
+import sys
+import math
 import numpy as np
 import posconstants as pc
 import posmodel
-import math
-import sys
+import petaltransforms
 
 
 class PosTransforms(object):
@@ -30,7 +31,7 @@ class PosTransforms(object):
         poslocXY:   (x, y) local to fiber positioner, centered on theta axis,
                     directly corresponds to posTP
 
-        ptllocXY:   (x, y) position in petal local CS as defined in petal CAD
+        ptlXY:      (x, y) position in petal local CS as defined in petal CAD
 
         obsXY:      2D projection of obsXYZ in CS5 defined in PetalTransforms
 
@@ -41,8 +42,8 @@ class PosTransforms(object):
     The fundamental transformations provided are:
 
         posintTP        <--> poslocTP
-        poslocTP        <--> ptllocXY
-        ptllocXY        <--> obsXY    (from PetalTransforms)
+        poslocTP        <--> ptlXY
+        ptlXY           <--> obsXY    (from PetalTransforms)
         obsXY           <--> QS       (from PetalTransforms)
         flatXY          <--> QS       (from PetalTransforms)
 
@@ -91,7 +92,6 @@ class PosTransforms(object):
             this_posmodel = posmodel.PosModel()
         self.posmodel = this_posmodel
         if petal_transform is None:
-            import petaltransforms
             self.ptltrans = petaltransforms.PetalTransforms()
         else:
             self.ptltrans = petal_transform
@@ -139,112 +139,113 @@ class PosTransforms(object):
             return None
 
     # %% FUNDAMENTAL TRANSFORMATIONS between different CS
-    def intTP_to_posTP(self, intTP):
+    def posintTP_to_poslocTP(self, posintTP):
         """
         input:  list or tuple of internally-tracked expected position of
                 gearmotor shafts at output of gear heads
         output: (posT, posP) expected position of fiber tip including offsets
                 and calibrations in petal local CS
         """
-        posT = intTP[0] + self.getval('OFFSET_T')
-        posP = intTP[1] + self.getval('OFFSET_P')
-        return posT, posP
+        poslocT = posintTP[0] + self.getval('OFFSET_T')
+        poslocP = posintTP[1] + self.getval('OFFSET_P')
+        return poslocT, poslocP
 
-    def posTP_to_intTP(self, posTP):
+    def poslocTP_to_posintTP(self, poslocTP):
         """
         input:  list or tuple of expected position of fiber tip including
                 offsets and calibrations in petal local CS
         output: (intT, intP) internally-tracked expected position of
                 gearmotor shafts at output of gear heads
         """
-        intT = posTP[0] - self.getval('OFFSET_T')
-        intP = posTP[1] - self.getval('OFFSET_P')
-        return intT, intP
+        posintT = poslocTP[0] - self.getval('OFFSET_T')
+        posintP = poslocTP[1] - self.getval('OFFSET_P')
+        return posintT, posintP
 
-    def posXY_to_ptlXY(self, posXY):
+    def poslocXY_to_ptlXY(self, poslocXY):
         ''' input is list or tuple or 1D array '''
-        ptlX = posXY[0] + self.getval('OFFSET_X')
-        ptlY = posXY[1] + self.getval('OFFSET_Y')
+        ptlX = poslocXY[0] + self.getval('OFFSET_X')
+        ptlY = poslocXY[1] + self.getval('OFFSET_Y')
         return ptlX, ptlY
 
-    def ptlXY_to_posXY(self, ptlXY):
+    def ptlXY_to_poslocXY(self, ptlXY):
         ''' input is list or tuple or 1D array '''
-        posX = ptlXY[0] - self.getval('OFFSET_X')
-        posY = ptlXY[1] - self.getval('OFFSET_Y')
-        return posX, posY
+        poslocX = ptlXY[0] - self.getval('OFFSET_X')
+        poslocY = ptlXY[1] - self.getval('OFFSET_Y')
+        return poslocX, poslocY
 
     # %% fundamental XY and TP conversion in the same positioner-centred CS
-    def posTP_to_posXY(self, posTP):
+    def poslocTP_to_poslocXY(self, poslocTP):
         ''' input is list or tuple '''
         r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
-        return self.tp2xy(posTP, r)  # return (posX, posY)
+        return self.tp2xy(poslocTP, r)  # return (posX, posY)
 
-    def posXY_to_posTP(self, posXY, range_limits='full'):
+    def poslocXY_to_poslocTP(self, poslocXY, range_limits='full'):
         ''' input is list or tuple or 1D array '''
         intT_range, intP_range = self.shaft_ranges(range_limits)
-        posTP_min = self.intTP_to_posTP([intT_range[0], intP_range[0]])
-        posTP_max = self.intTP_to_posTP([intT_range[1], intP_range[1]])
+        posTP_min = self.posintTP_to_poslocTP([intT_range[0], intP_range[0]])
+        posTP_max = self.posintTP_to_poslocTP([intT_range[1], intP_range[1]])
         pos_ranges = [[posTP_min[0], posTP_max[0]],  # theta min, theta max
                       [posTP_min[1], posTP_max[1]]]  # phi min, phi max
         r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
-        return self.xy2tp(posXY, r, pos_ranges)  # return (tp, unreachable)
+        return self.xy2tp(poslocXY, r, pos_ranges)  # return (tp, unreachable)
 
     # %% composit transformations for convenience (degree 1)
-    def intTP_to_posXY(self, intTP):
+    def posintTP_to_poslocXY(self, posintTP):
         ''' input is list or tuple '''
-        posTP = self.intTP_to_posTP(intTP)
-        return self.posTP_to_posXY(posTP)  # tuple
+        poslocTP = self.posintTP_to_poslocTP(posintTP)
+        return self.poslocTP_to_poslocXY(poslocTP)  # tuple
 
-    def posXY_to_intTP(self, posXY, range_limits='full'):
+    def poslocXY_to_posintTP(self, poslocXY, range_limits='full'):
         ''' input is list or tuple '''
-        posTP = self.posXY_to_posTP(posXY, range_limits=range_limits)
-        return self.posTP_to_intTP(posTP)  # tuple
+        poslocTP, unreachable = self.poslocXY_to_poslocTP(
+            poslocXY, range_limits=range_limits)
+        return self.poslocTP_to_posintTP(poslocTP), unreachable  # tuple
 
     # %% composit transformations for convenience (degree 2)
-    def posXY_to_obsXY(self, posXY):
+    def poslocXY_to_obsXY(self, poslocXY):
         ''' input is list or tuple '''
-        ptlXY = self.posXY_to_ptlXY(posXY)  # tuple
-        obsXY = self.ptlXY_to_obsXY(ptlXY, cast=True).flatten()  # 1D array
+        ptlXY = self.poslocXY_to_ptlXY(poslocXY)  # tuple
+        obsXY = self.ptlXY_to_obsXY(ptlXY, cast=True).flatten()  # 1D arr
         return tuple(obsXY)
 
-    def obsXY_to_posXY(self, obsXY):
+    def obsXY_to_poslocXY(self, obsXY):
         ''' input is list or tuple '''
-        ptlXY = self.obsXY_to_ptlXY(obsXY, cast=True).flatten()  # 1D array
-        return self.ptlXY_to_posXY(ptlXY)  # return (posX, posY)
+        ptlXY = self.obsXY_to_ptlXY(obsXY, cast=True).flatten()  # 1D arr
+        return self.ptlXY_to_poslocXY(ptlXY)  # return (posX, posY)
 
     # %% composit transformations for convenience (degree 3)
-    def intTP_to_obsXY(self, intTP):
-        posXY = self.intTP_to_posXY(intTP)  # tuple
-        return self.posXY_to_obsXY(posXY)  # return (obsX, obsY)
+    def posintTP_to_obsXY(self, posintTP):
+        poslocXY = self.posintTP_to_poslocXY(posintTP)  # tuple
+        return self.poslocXY_to_obsXY(poslocXY)  # return (obsX, obsY)
 
-    def obsXY_to_intTP(self, obsXY, range_limits='full'):
+    def obsXY_to_posintTP(self, obsXY, range_limits='full'):
         """Composite transformation, performs obsXY --> posXY --> intTP"""
-        posXY = self.obsXY_to_posXY(obsXY)  # tuple
-        return self.posXY_to_posTP(posXY, range_limits=range_limits)
+        poslocXY = self.obsXY_to_poslocXY(obsXY)  # tuple
+        return self.poslocXY_to_poslocTP(poslocXY, range_limits=range_limits)
 
     # %% composit transformations for convenience (degree 4)
-    def intTP_to_QS(self, intTP):
+    def posintTP_to_QS(self, posintTP):
         """Composite transformation, performs intTP --> obsXY --> QS"""
-        obsXY = self.intTP_to_obsXY(intTP)  # tuple (obsX, obsY)
+        obsXY = self.posintTP_to_obsXY(posintTP)  # tuple (obsX, obsY)
         QS = self.obsXY_to_QS(obsXY, cast=True).flatten()  # 1D array
         return tuple(QS)
 
-    def QS_to_intTP(self, QS, range_limits='full'):
+    def QS_to_posintTP(self, QS, range_limits='full'):
         """Composite transformation, performs QS --> obsXY --> intTP"""
         obsXY = self.QS_to_obsXY(QS, cast=True)  # 1D array
-        return self.obsXY_to_intTP(obsXY, range_limits)  # tp, unreachable
+        return self.obsXY_to_posintTP(obsXY, range_limits)  # tp, unreachable
 
     # %% composit transformations for convenience (degree 5)
-    def intTP_to_flatXY(self, intTP):
+    def posintTP_to_flatXY(self, posintTP):
         """Composite transformation, performs intTP --> QS --> flatXY"""
-        QS = self.intTP_to_QS(intTP)
-        flatXY = self.QS_to_flatXY(QS).flatten()  # 1D array
+        QS = self.posintTP_to_QS(posintTP)
+        flatXY = self.QS_to_flatXY(QS, cast=True).flatten()  # 1D array
         return tuple(flatXY)
 
-    def flatXY_to_intTP(self, flatXY, range_limits='full'):
+    def flatXY_to_posintTP(self, flatXY, range_limits='full'):
         """Composite transformation, performs flatXY --> QS --> intTP"""
         QS = self.flatXY_to_QS(flatXY, cast=True)
-        return self.QS_to_intTP(QS, range_limits)  # return (tp, unreachable)
+        return self.QS_to_posintTP(QS, range_limits)  # (tp, unreachable)
 
 #    def obsTP_to_flatXY(self, tp):
 #        """Composite transformation, performs
@@ -476,3 +477,47 @@ class PosTransforms(object):
     def vector_add(uv0, uv1):
         """Generic vector addition uv0 + uv1."""
         return [uv0[0] + uv1[0], uv0[1] + uv1[1]]
+
+
+if __name__ == '__main__':
+    '''
+    try several gamma rotaion values here, e.g. 0, 36 deg, 180 deg
+    '''
+    ptltrans = petaltransforms.PetalTransforms(Tx=0.1, Ty=0, Tz=0,
+                                               alpha=0, beta=-0, gamma=36)
+    trans = PosTransforms(petal_transform=ptltrans)
+    state = trans.posmodel.state
+    state._val['OFFSET_X'], state._val['OFFSET_Y'] = 28.134375, 5.201437
+    print(f'posstate values:\n{state._val}')
+    poslocTP1 = trans.posintTP_to_poslocTP([0, 120])
+    print(f'poslocTP1 = {poslocTP1}')
+    posintTP1 = trans.poslocTP_to_posintTP(poslocTP1)
+    print(f'posintTP1 = {posintTP1}')
+    ptlXY = trans.poslocXY_to_ptlXY([1.5, 1.5*np.sqrt(3)])
+    print(f'ptlXY = {ptlXY}')
+    poslocXY1 = trans.ptlXY_to_poslocXY(ptlXY)
+    print(f'poslocXY1 = {poslocXY1}')
+    poslocXY2 = trans.poslocTP_to_poslocXY(poslocTP1)
+    print(f'poslocXY2 = {poslocXY2}')
+    poslocTP2, unreachable = trans.poslocXY_to_poslocTP(poslocXY2)
+    print(f'poslocTP2 = {poslocTP2}, unreachable: {unreachable}')
+    poslocXY3 = trans.posintTP_to_poslocXY(posintTP1)
+    print(f'poslocXY3 = {poslocXY3}')
+    posintTP2, unreachable = trans.poslocXY_to_posintTP(poslocXY3)
+    print(f'posintTP2 = {posintTP2}, unreachable: {unreachable}')
+    obsXY1 = trans.poslocXY_to_obsXY(poslocXY3)
+    print(f'obsXY1 = {obsXY1}')
+    poslocXY4 = trans.obsXY_to_poslocXY(obsXY1)
+    print(f'poslocXY4 = {poslocXY4}')
+    obsXY2 = trans.posintTP_to_obsXY(posintTP2)
+    print(f'obsXY2 = {obsXY2}')
+    posintTP3, unreachable = trans.obsXY_to_posintTP(obsXY2)
+    print(f'posintTP3 = {posintTP3}, unreachable: {unreachable}')
+    QS = trans.posintTP_to_QS(posintTP2)
+    print(f'QS = {QS}')
+    posintTP4, unreachable = trans.QS_to_posintTP(QS)
+    print(f'posintTP4 = {posintTP4}, unreachable: {unreachable}')
+    flatXY1 = trans.posintTP_to_flatXY(posintTP3)
+    print(f'flatXY1 = {flatXY1}')
+    posintTP4, unreachable = trans.flatXY_to_posintTP(flatXY1)
+    print(f'posintTP4 = {posintTP4}, unreachable: {unreachable}')

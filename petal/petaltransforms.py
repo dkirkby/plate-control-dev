@@ -176,7 +176,7 @@ class PetalTransforms(object):
             obsXY = typecast(obsXY)
         if curved is None:  # allow forcing flatXY despite curved instance
             curved = self.curved
-        X, Y = obsXYZ[0, :], obsXYZ[1, :]
+        X, Y = obsXY[0, :], obsXY[1, :]
         Q = np.degrees(np.arctan2(Y, X))  # Y over X
         R = np.sqrt(np.square(X) + np.square(Y))
         S = pc.R2S_lookup(R) if curved else R
@@ -192,7 +192,7 @@ class PetalTransforms(object):
         if curved is None:  # allow forcing flatXY despite curved instance
             curved = self.curved
         Q_rad, S = np.radians(QS[0, :]), QS[1, :]
-        R = self.S2R(S) if curved else S
+        R = pc.S2R_lookup(S) if curved else S
         X = R * np.cos(Q_rad)
         Y = R * np.sin(Q_rad)
         return np.array([X, Y])
