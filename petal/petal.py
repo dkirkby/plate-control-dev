@@ -730,11 +730,11 @@ class Petal(object):
             self.comm.pbset(key,self._last_state.keys())
         self.comm.pbset('STATE', hw_state)
         #Check for errors when setting state - want to know this right away
-        set_state, err_strings = self.get_hardware_state()
+        set_state, err_strings = self._get_hardware_state()
         return set_state, err_stings
 
 
-    def get_hardware_state(self):
+    def _get_hardware_state(self):
         '''
         Loops through keys in self._last_state to compare with what the
         PetalController thinks they are. Any differences are recorded and
