@@ -60,18 +60,21 @@ class Petal(object):
                  collider_file=None, sched_stats_on=False):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
-        # petal setup
+        self.printfunc('Running code version: {pc.code_version}')
+        # read values from cfg files if not given
         if None in [petal_id, petalbox_id, fidids, posids, shape]:
-            self.printfunc('Some parameters not provided to __init__, reading petal config.')
-            self.petal_state = posstate.PosState(
-                unit_id=petal_id, device_type='ptl', logging=True,
-                printfunc=self.printfunc)
+            self.printfunc('Some parameters not provided to __init__, '
+                           'reading petal config.')
             if petal_id is None:
                 self.printfunc('Reading Petal_ID from petal_state')
-                petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
+                # this is the string unique hardware id of the particular petal
+                # (not the integer id of the beaglebone in the petalbox)
+                petal_id = self.petal_state.conf['PETAL_ID']
             if petalbox_id is None:
                 self.printfunc('Reading petalbox_ID from petal_state')
-                petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
+                # this is the integer software id of the petalbox (previously
+                # known as 'petal_id', before disambiguation)
+                petalbox_id = self.petal_state.conf['PETALBOX_ID']
             if posids is None:
                 self.printfunc('posids not given, read from ptl_settings file')
                 posids = self.petal_state.conf['POS_IDS']
@@ -81,6 +84,9 @@ class Petal(object):
             if shape is None:
                 self.printfunc('Reading shape from petal_state')
                 shape = self.petal_state.conf['SHAPE']
+        self.petal_state = posstate.PosState(  # initialise petal state
+            unit_id=petal_id, device_type='ptl', logging=True,
+            printfunc=self.printfunc)
 
         self.petalbox_id = petalbox_id
         self.petal_id = int(petal_id)
