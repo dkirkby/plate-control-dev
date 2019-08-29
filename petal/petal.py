@@ -109,7 +109,7 @@ class Petal(object):
         # must call the following 3 methods whenever petal alingment changes
         self.init_trans()
         self.init_posmodels(posids)
-        self.init_collider(collider_file, anticollision)
+        self._init_collider(collider_file, anticollision)
 
         # fiducials setup
         self.fidids = {fidids} if isinstance(fidids,str) else set(fidids)
@@ -200,9 +200,8 @@ class Petal(object):
         self.set_motor_parameters()
         self.power_supply_map = self._map_power_supplies_to_posids()
 
-    def init_collider(self, collider_file=None, anticollision='freeze'):
+    def _init_collider(self, collider_file=None, anticollision='freeze'):
         '''collider, scheduler, and animator setup
-        this needs to be called whenever petal alignment changes upon slew
         '''
         if hasattr(self, 'anticol_settings'):
             self.printfunc('Using provided anticollision settings')
@@ -214,10 +213,6 @@ class Petal(object):
                 configfile=collider_file, collision_hashpp_exists=False,
                 collision_hashpf_exists=False, hole_angle_file=None)
             self.anticol_settings = self.collider.config
-        assert hasattr(self, 'alignment')  # require petal alignment to be set
-        self.collider.set_petal_offsets(x0=self.alignment['Tx'],
-                                        y0=self.alignment['Ty'],
-                                        rot=self.alignment['gamma'])
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
         # this should be turned on/off using the animation start/stop

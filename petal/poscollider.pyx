@@ -42,7 +42,6 @@ class PosCollider(object):
         self.pos_neighbors = {} # all the positioners that surround a given positioner. key is a posid, value is a set of neighbor posids
         self.fixed_neighbor_cases = {} # all the fixed neighbors that apply to a given positioner. key is a posid, value is a set of the fixed neighbor cases
         self.R1, self.R2, self.x0, self.y0, self.t0, self.p0 = {}, {}, {}, {}, {}, {}
-        self.set_petal_offsets() # default values are used here. one should call this function with actual values after initializing collider
         self.plotting_on = True
         self.timestep = self.config['TIMESTEP']
         self.animator = posanimator.PosAnimator(fignum=0, timestep=self.timestep)
@@ -70,18 +69,6 @@ class PosCollider(object):
         if self.use_neighbor_loc_dict:
             with open(pc.dirs['positioner_neighbors_file'], 'rb') as f:
                 self.neighbor_locs = pickle.load(f)
-            
-    def set_petal_offsets(self, x0=0.0, y0=0.0, rot=0.0):
-        """Sets information about a particular petal's overall location. This
-        information is necessary for handling the fixed collision boundaries of
-        petal exterior and GFA.
-            x0 and y0 units are mm
-            rot units are deg
-        """
-        self._petal_x0 = x0
-        self._petal_y0 = y0
-        self._petal_rot = rot
-        self._load_keepouts()
 		
     def update_positioner_offsets_and_arm_lengths(self):
         """Loads positioner parameters.  This method is called when new calibration data is available
@@ -422,10 +409,6 @@ class PosCollider(object):
         self.general_keepout_T_unexpanded = PosPoly(self.config['KEEPOUT_THETA'])
         self.keepout_PTL = PosPoly(self.config['KEEPOUT_PTL'])
         self.keepout_GFA = PosPoly(self.config['KEEPOUT_GFA'])
-        self.keepout_PTL = self.keepout_PTL.rotated(self._petal_rot)
-        self.keepout_PTL = self.keepout_PTL.translated(self._petal_x0, self._petal_y0)
-        self.keepout_GFA = self.keepout_GFA.rotated(self._petal_rot)
-        self.keepout_GFA = self.keepout_GFA.translated(self._petal_x0, self._petal_y0)
         self.fixed_neighbor_keepouts = {pc.case.PTL : self.keepout_PTL, pc.case.GFA : self.keepout_GFA}
     
     def _adjust_keepouts(self):
