@@ -163,16 +163,16 @@ class FPTestData:
         existing attributes required (see xytest.py):
             self.ptlids
         '''
-        # build column names and data types
+        # build column names and data types, all in global CS5
         cols0 = ['timestamp', 'cycle', 'move_log']
         dtypes0 = ['datetime64[ns]', np.uint32, str]
         cols1 = ['target_x', 'target_y']
         cols2_base = ['meas_x', 'meas_y', 'err_x', 'err_y', 'err_xy',
                       'pos_t', 'pos_p', 'pos_flag', 'pos_status']
-        cols2 = []
+        cols2 = []  # add suffix for base column names corrective moves
         for field, i in product(cols2_base, range(self.num_corr_max+1)):
             cols2.append(f'{field}_{i}')
-        cols = cols0 + cols1 + cols2
+        cols = cols0 + cols1 + cols2  # list of all columns
         dtypes = dtypes0 + [np.float32] * (len(cols1) + len(cols2))
         data = {col: pd.Series(dtype=dt) for col, dt in zip(cols, dtypes)}
         # build multi-level index

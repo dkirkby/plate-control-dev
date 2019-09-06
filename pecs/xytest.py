@@ -162,7 +162,7 @@ class XYTest(PECS):
                 np.random.seed(self.data.test_cfg['shuffle_seed'])
                 np.random.shuffle(tgt)  # same shuffled target list for all
                 self.data.targets_pos = {pid: tgt for pid in self.data.posids}
-        else:  # same targets for all positioners
+        else:  # same set of targets for all positioners
             self.data.targets_pos = {pid: tgt for pid in self.data.posids}
 
     def _add_device_id_col(self, df, ptlid):
@@ -245,15 +245,18 @@ class XYTest(PECS):
         ptl = self.ptls[ptlid]
         # device_loc = self.data.posdf.loc[posids, 'DEVICE_LOC']
         if n == 0:  # blind move, issue commands just in poslocXY
-            posXY = np.vstack(   # shape (N_posids, 2)
-                [self.data.targets_pos[posid][i, :] for posid in posids])
-            movetype, cmd = 'blind', 'obsXY'  # could use posXY here actually
-            offXY = self.data.posdf.loc[posids, ['OFFSET_X', 'OFFSET_Y']]
-            tgt = posXY + offXY.values  # convert to obsXY, shape (N, 2)
-            movedf.loc[idx[i, posids], ['target_x', 'target_y']] = tgt
+            for posid in posids:
+                movetype, cmd = 'blind', 'obsXY'
+                poslocXY = self.data.targets_pos[posid][i, :]
+                obsXY = ptl.posmodels[posid].trans.poslocXY_to_obsXY(poslocXY)
+                movedf.loc[idx[i, posid], ['target_x', 'target_y']] = obsXY
+#            poslocXY = np.vstack(   # shape (N_posids, 2)
+#                [self.data.targets_pos[posid][i, :] for posid in posids])
+#            offXY = self.data.posdf.loc[posids, ['OFFSET_X', 'OFFSET_Y']]
+            tgt = movedf.loc[idx[i, posids], ['target_x', 'target_y']].values
         else:
             movetype, cmd = 'corrective', 'dXdY'
-            tgt = - movedf.loc[idx[i, posids],  # note minus sign
+            tgt = - movedf.loc[idx[i, posids],  # note the minus sign
                                [f'err_x_{n-1}', f'err_y_{n-1}']].values
             tgt = np.nan_to_num(tgt)  # replace NaN with zero for unmatched
         # build move request dataframe for a petal
@@ -342,10 +345,12 @@ class XYTest(PECS):
     def record_measurement(self, measured_QS, i, n):
         # QS to obsXY conversion here
         # calculate below measured obsXY from measured QS and write to movedf
-        Q_rad = np.radians(measured_QS['Q'])
-        R = pc.S2R_lookup(measured_QS['S'])
-        new = pd.DataFrame({f'meas_x_{n}': R * np.cos(Q_rad),
-                            f'meas_y_{n}': R * np.sin(Q_rad)},
+        QS = measured_QS[['Q', 'S']].values.T  # 2 x N array
+        obsXY = self.ptls[0].trans.QS_to_obsXY(QS)  # 2 x N array
+        # Q_rad = np.radians(measured_QS['Q'])
+        # R = pc.S2R_lookup(measured_QS['S'])
+        new = pd.DataFrame({f'meas_x_{n}': obsXY[0, :],
+                            f'meas_y_{n}': obsXY[1, :]},
                            dtype=np.float32, index=measured_QS.index)
         self._update(new, i)
 
