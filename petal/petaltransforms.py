@@ -59,7 +59,7 @@ class PetalTransforms(object):
 
     trans_keys = ['petal_offset_x', 'petal_offset_y', 'petal_offset_z',
                   'petal_rot_x', 'petal_rot_y', 'petal_rot_z']
-    which are the input variables, Tx, Ty, Tz in mm, alpha, beta, gamma in deg
+    which are the input variables, Tx, Ty, Tz in mm, alpha, beta, gamma in rad
 
     For forward transformation,
     the transformation defined by these 6 parameters can act on
@@ -114,12 +114,12 @@ class PetalTransforms(object):
     dtb_device_ids = [543, 544, 545]  # three datum tooling balls on a petal
 
     def __init__(self, Tx=0, Ty=0, Tz=0, alpha=0, beta=0, gamma=0,
-                 curved=True):
+                 curved=True):  # input in mm and radians
         # self.postrans = PosTransforms(curved=True)
         # tanslation matrix from petal nominal CS to CS5, column vector
         self.T = np.array([Tx, Ty, Tz]).reshape(3, 1)
         # orthogonal rotation matrix
-        self.R = Rxyz(np.radians(alpha), np.radians(beta), np.radians(gamma))
+        self.R = Rxyz(alpha, beta, gamma)
         self.curved = curved
 
     # %% fundamental transformations
@@ -305,7 +305,7 @@ if __name__ == '__main__':
     ptltrans = PetalTransforms(Tx=0.01261281, Ty=0.068910657, Tz=0.017850711,
                                alpha=0.001382631,
                                beta=-0.002945219,
-                               gamma=35.9887675)
+                               gamma=35.9887675/180*np.pi)
     obsXYZ_actual = np.array([11.671,	23.542,	-81.893]).reshape(3, 1)
     ptlXYZ_actual = np.array([23.2337, 12.1450, -81.9095]).reshape(3, 1)
     obsXYZ = ptltrans.ptlXYZ_to_obsXYZ(ptlXYZ_actual)
