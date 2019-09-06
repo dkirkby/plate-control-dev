@@ -274,16 +274,16 @@ class XYTest(PECS):
         # .sort_values(by='DEVICE_ID').reset_index())
         self.loggers[ptlid].debug('execute_move() returns expected QS:\n'
                                   + expected_QS.to_string())
-        # get expected posTP from petal and write to movedf after move
-        ret_TP = ptl.get_positions(posids=posids, return_coord='posTP')
+        # get expected posintTP from petal and write to movedf after move
+        ret_TP = ptl.get_positions(posids=posids, return_coord='posintTP')
         #  .sort_values(by='DEVICE_ID').reset_index())
         ret_TP['STATUS'] = ptl.decipher_posflags(ret_TP['FLAG'])
-        self.loggers[ptlid].debug(f'Expected posTP after move {n}:\n'
+        self.loggers[ptlid].debug(f'Expected posintTP after move {n}:\n'
                                   + ret_TP.to_string())
 
         # record per-move data to movedf for a petal
-        new = pd.DataFrame({f'pos_t_{n}': ret_TP['X1'],
-                            f'pos_p_{n}': ret_TP['X2'],
+        new = pd.DataFrame({f'pos_int_t_{n}': ret_TP['X1'],
+                            f'pos_int_p_{n}': ret_TP['X2'],
                             f'pos_flag_{n}': ret_TP['FLAG'],
                             f'pos_status_{n}': ret_TP['STATUS'],
                             f'DEVICE_ID': ret_TP['DEVICE_ID']})
@@ -329,7 +329,7 @@ class XYTest(PECS):
                     f'All {len(posids)} requested fibres measured by FVC.')
 
     def update_calibrations(self, measured_QS):  # test and update TP here
-        self.logger.info('Testing and updating posTP...')
+        self.logger.info('Testing and updating posintTP...')
         for ptlid in self.data.ptlids:
             posids = set(self.data.posids_ptl[ptlid]).intersection(
                 set(measured_QS.index))  # only update measured, valid posid
