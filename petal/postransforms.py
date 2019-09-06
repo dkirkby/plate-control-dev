@@ -183,13 +183,13 @@ class PosTransforms(object):
     def obsXY_to_posobsXY(self, obsXY):
         ''' input is list or tuple or 1D array '''
         centre_ptlXY = [self.getval('OFFSET_X'), self.getval('OFFSET_Y')]
-        centre_obsXY = self.ptlXY_to_obsXY(centre_ptlXY)
+        centre_obsXY = self.ptlXY_to_obsXY(centre_ptlXY, cast=True)
         return self.delta_obsXY(obsXY, centre_obsXY)
 
     def posobsXY_to_obsXY(self, posobsXY):
         ''' input is list or tuple or 1D array '''
         centre_ptlXY = [self.getval('OFFSET_X'), self.getval('OFFSET_Y')]
-        centre_obsXY = self.ptlXY_to_obsXY(centre_ptlXY)
+        centre_obsXY = self.ptlXY_to_obsXY(centre_ptlXY, cast=True)
         return self.addto_obsXY(posobsXY, centre_obsXY)
 
     # %% fundamental XY and TP conversion in the same positioner-centred CS
