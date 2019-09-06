@@ -884,26 +884,29 @@ class Petal(object):
         to the internal tracking of its posmodel object. Returns a two element
         list. Valid keys are:
 
-            'QS', 'flatXY', 'obsXY', 'posXY', 'obsTP', 'posTP', 'motTP'
+            'posintTP, 'poslocXY', 'poslocTP',
+            'QS', 'flatXY', 'obsXY', 'ptlXY', 'motTP'
 
         See comments in posmodel.py for explanation of these values.
         """
-        if key == 'posTP':
-            return self.posmodels[posid].expected_current_posTP
-        elif key == 'obsTP':
-            return self.posmodels[posid].expected_current_obsTP
+        if key == 'posintTP':
+            return self.posmodels[posid].expected_current_posintTP
+        elif key == 'poslocTP':
+            return self.posmodels[posid].expected_current_poslocTP
         else:
             vals = self.posmodels[posid].expected_current_position
             if key == 'obsXY':
-                return [vals['obsX'],vals['obsY']]
+                return [vals['obsX'], vals['obsY']]
             elif key == 'QS':
-                return [vals['Q'],vals['S']]
-            elif key == 'posXY':
-                return [vals['posX'],vals['posY']]
+                return [vals['Q'], vals['S']]
+            elif key == 'poslocXY':
+                return [vals['poslocX'], vals['poslocY']]
+            elif key == 'poslocTP':
+                return [vals['poslocT'], vals['poslocT']]
             elif key == 'flatXY':
-                return [vals['flatX'],vals['flatY']]
+                return [vals['flatX'], vals['flatY']]
             elif key == 'motorTP':
-                return [vals['motT'],vals['motP']]
+                return [vals['motT'], vals['motP']]
             else:
                 self.printfunc('Unrecognized key ' + str(key) + ' in request for expected_current_position of posid ' + str(posid) + '.')
 
