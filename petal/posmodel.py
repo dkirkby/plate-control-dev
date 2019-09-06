@@ -227,7 +227,7 @@ class PosModel(object):
         software travel limits, when a sequence of multiple moves is being planned out.
         """
         pos = self.expected_current_posintTP
-        start = self.trans.addto_posTP([pos[0],pos[1]], expected_prior_dTdP, range_wrap_limits='none') # since expected_prior_dTdP is just tracking already-existing commands, do not perform range wrapping on it
+        start = self.trans.addto_posintTP([pos[0],pos[1]], expected_prior_dTdP, range_wrap_limits='none') # since expected_prior_dTdP is just tracking already-existing commands, do not perform range wrapping on it
         if not(allow_exceed_limits):
             distance = self.axis[axisid].truncate_to_limits(distance,start[axisid])
         motor_dist = self.axis[axisid].shaft_to_motor(distance)
