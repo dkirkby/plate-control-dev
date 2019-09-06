@@ -65,6 +65,9 @@ class Petal(object):
         if None in [petal_id, petalbox_id, fidids, posids, shape]:
             self.printfunc('Some parameters not provided to __init__, '
                            'reading petal config.')
+            self.petal_state = posstate.PosState(  # initialise petal state
+                    unit_id=petal_id, device_type='ptl', logging=True,
+                    printfunc=self.printfunc)
             if petal_id is None:
                 self.printfunc('Reading Petal_ID from petal_state')
                 # this is the string unique hardware id of the particular petal
@@ -84,9 +87,6 @@ class Petal(object):
             if shape is None:
                 self.printfunc('Reading shape from petal_state')
                 shape = self.petal_state.conf['SHAPE']
-        self.petal_state = posstate.PosState(  # initialise petal state
-            unit_id=petal_id, device_type='ptl', logging=True,
-            printfunc=self.printfunc)
         self.petalbox_id = petalbox_id
         self.petal_id = int(petal_id)
         self.shape = shape
@@ -159,16 +159,20 @@ class Petal(object):
         '''
         if alignment is None:
             # no alingment supplied, try to find self.alingment attribute
-            if not(hasattr(self, 'alignment')):
-                # attribute not existent, runnin without ICS, load cfg
+            if hasattr(self, 'alignment'):
+                # self.alignment found, just re-use it
+                pass
+            elif hasattr(self, 'petal_state'):
+                # alignment not existent, runnin without ICS, use petal-state
                 self.alignment = {'Tx': self.petal_state.conf['X_OFFSET'],
                                   'Ty': self.petal_state.conf['Y_OFFSET'],
                                   'Tz': 0,  # z translation in mm
                                   'alpha': 0,  # x rotation in deg
                                   'beta': 0,  # y rotation in deg
                                   'gamma': self.petal_state.conf['ROTATION']}
-            else:  # self.alignment found, just re-use it
-                pass
+            else:
+                raise Exception('Initialisation requires either alignment'
+                                'or petal_state be set')
         else:  # new alingment supplied, overwrite self.aglinment attribute
             self.alignment = alignment
         self.trans = PetalTransforms(Tx=self.alignment['Tx'],
