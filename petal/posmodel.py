@@ -264,8 +264,8 @@ class PosModel(object):
         """
         if self.state._val['CTRL_ENABLED'] is False:
             return
-        self.state.store('POS_INT_T', self.state._val['POS_INT_T'] + cleanup_table['net_dT'][-1])
-        self.state.store('POS_INT_P', self.state._val['POS_INT_P'] + cleanup_table['net_dP'][-1])
+        self.state.store('POS_T', self.state._val['POS_T'] + cleanup_table['net_dT'][-1])
+        self.state.store('POS_P', self.state._val['POS_P'] + cleanup_table['net_dP'][-1])
         for axis in self.axis:
             exec(axis.postmove_cleanup_cmds)
             axis.postmove_cleanup_cmds = ''
@@ -327,16 +327,16 @@ class Axis(object):
         """Internally-tracked angular position of the axis, at the output of the gear.
         """
         if self.axisid == pc.T:
-            return self.posmodel.state._val['POS_INT_T']
+            return self.posmodel.state._val['POS_T']
         else:
-            return self.posmodel.state._val['POS_INT_P']
+            return self.posmodel.state._val['POS_P']
 
     @pos.setter
     def pos(self, value):
         if self.axisid == pc.T:
-            self.posmodel.state.store('POS_INT_T', value)
+            self.posmodel.state.store('POS_T', value)
         else:
-            self.posmodel.state.store('POS_INT_P', value)
+            self.posmodel.state.store('POS_P', value)
 
     @property
     def full_range(self):
