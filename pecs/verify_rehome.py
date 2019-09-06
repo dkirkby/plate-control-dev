@@ -39,10 +39,11 @@ class VerifyRehome(PECS):
         self.printfunc(f'Verifying homing positions for all '
                        f'{len(self.posids)} enabled positioners...')
         df = self.compare_xy()
-        df.to_csv(os.path.join(
-            pc.dirs['all_logs'], 'calib_logs',
-            f'{pc.filename_timestamp_str_now()}-rehome_verify.csv'))
-        self.printfunc(f'Rehome verification data saved to calib logs.')
+        path = os.path.join(
+            pc.dirs['calib_logs'],
+            f'{pc.filename_timestamp_str_now()}-rehome_verify.csv')
+        df.to_csv(path)
+        self.printfunc(f'Rehome verification data saved to: {path}')
 
     def compare_xy(self):
         ptl = self.ptls[self.ptlid]
@@ -94,6 +95,7 @@ class VerifyRehome(PECS):
         mQS = mQS.sort_values(by='dr', ascending=False).reset_index()
         mask = mQS['dr'] > 1
         bad_posids = list(mQS[mask].index)
+        self.printfunc(mQS)
         if len(bad_posids) == 0:
             self.printfunc(f'All {len(mQS)} matched fibres verified rehomed.')
         else:
@@ -101,7 +103,6 @@ class VerifyRehome(PECS):
                            f'rehomed (radial deviations > 1 mm):\n\n'
                            f'{mQS[mask]}\n\n'
                            f'Positioner IDs:\n{bad_posids}')
-        self.printfunc(mQS)
         return mQS
 
 

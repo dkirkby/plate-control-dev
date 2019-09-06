@@ -1,6 +1,8 @@
 '''
 Seeds offsetsXY using nominal hole locations and the petal location. Needs running DOS instance. See pecs.py
 '''
+import os
+import posconstants as pc
 from pecs import PECS
 
 class XY_Offsets(PECS):
@@ -34,4 +36,10 @@ if __name__ == '__main__':
         selection = None
     print(f'Selection is: {selection}')
     updates = off.seed_vals(selection=selection, auto_update=True)
-    print(updates)
+    path = os.path.join(
+        pc.dirs['calib_logs'],
+        f'{pc.filename_timestamp_str_now()}-seed_xy_offsets.csv')
+    updates.to_csv(path)
+    print(updates[['DEVICE_ID', 'DEVICE_LOC', 'OFFSET_X', 'OFFSET_Y'
+                   'POS_INT_T', 'POS_INT_P', 'LENGTH_R1', 'LENGTH_R2']])
+    print(f'Seed XY offsets data saved to: {path}')

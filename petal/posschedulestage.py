@@ -185,6 +185,7 @@ class PosScheduleStage(object):
                 self.printfunc("===== adjust path: " + str(method) + ' ' + str(posid) + '-' + str(collision_neighbor))
 
             proposed_tables = self._propose_path_adjustment(posid,method)
+            self.printfunc('Calling find_collisions, stage 188')
             colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables)
             if proposed_tables and not(colliding_sweeps): # i.e., the proposed tables should be accepted
                 self.move_tables.update(proposed_tables)
@@ -258,7 +259,10 @@ class PosScheduleStage(object):
         already_checked = {posid: set() for posid in self.collider.posids}
         colliding_sweeps = {posid: set() for posid in self.collider.posids}
         all_sweeps = {}
+        i = 0
         for posid in move_tables:
+            i += 1
+            self.printfunc(f'{i} of {len(move_tables)}')
             table_A = move_tables[posid]
             init_poslocTP_A = table_A.posmodel.trans.posintTP_to_poslocTP(
                 table_A.init_posintTP)
@@ -283,8 +287,9 @@ class PosScheduleStage(object):
                     already_checked[neighbor].add(posid)
                     if self.verbose:
                         self.printfunc(
-                            f'Checking collision: {posid} - {neighbor}, case '
-                            f'{sweep.collision_case}, '
+                            f'Checking neighbor collision: '
+                            f'{posid} - {neighbor}, '
+                            f'case {sweep.collision_case}, '
                             f'time {sweep.collision_time}')
             for fixed_neighbor in self.collider.fixed_neighbor_cases[posid]:
                 # index 0 to immediately retrieve from the one-element list
@@ -296,7 +301,8 @@ class PosScheduleStage(object):
                     colliding_sweeps[posid].add(posfix_sweep)
                 if self.verbose:
                     self.printfunc(
-                        f'Checking collision: {posid} - {fixed_neighbor}, '
+                        f'Checking fixed_neighbor collision: '
+                        f'{posid} - {fixed_neighbor}, '
                         f'case {posfix_sweep.collision_case}, '
                         f'time {posfix_sweep.collision_time}')
         multiple_collisions = {posid for posid in colliding_sweeps

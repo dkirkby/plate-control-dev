@@ -172,7 +172,7 @@ class Petal(object):
                                   'gamma': self.petal_state.conf['ROTATION']}
             else:
                 raise Exception('Initialisation requires either alignment'
-                                'or petal_state be set')
+                                ' or petal_state to be set')
         else:  # new alingment supplied, overwrite self.aglinment attribute
             self.alignment = alignment
         self.trans = PetalTransforms(Tx=self.alignment['Tx'],
