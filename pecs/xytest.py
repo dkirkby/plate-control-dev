@@ -248,7 +248,7 @@ class XYTest(PECS):
             for posid in posids:
                 movetype, cmd = 'blind', 'obsXY'
                 poslocXY = self.data.targets_pos[posid][i, :]
-                obsXY = ptl.posmodels[posid].trans.poslocXY_to_obsXY(poslocXY)
+                obsXY = ptl.postrans(posid, 'poslocXY_to_obsXY', poslocXY)
                 movedf.loc[idx[i, posid], ['target_x', 'target_y']] = obsXY
 #            poslocXY = np.vstack(   # shape (N_posids, 2)
 #                [self.data.targets_pos[posid][i, :] for posid in posids])
@@ -346,9 +346,7 @@ class XYTest(PECS):
         # QS to obsXY conversion here
         # calculate below measured obsXY from measured QS and write to movedf
         QS = measured_QS[['Q', 'S']].values.T  # 2 x N array
-        obsXY = self.ptls[0].trans.QS_to_obsXY(QS)  # 2 x N array
-        # Q_rad = np.radians(measured_QS['Q'])
-        # R = pc.S2R_lookup(measured_QS['S'])
+        obsXY = self.ptls[self.ptlids[0]].ptltrans('QS_to_obsXY', QS)
         new = pd.DataFrame({f'meas_x_{n}': obsXY[0, :],
                             f'meas_y_{n}': obsXY[1, :]},
                            dtype=np.float32, index=measured_QS.index)
