@@ -132,7 +132,7 @@ class XYTest(PECS):
         self.data.posdf = pd.concat(dfs)
 
     @staticmethod
-    def _generate_posXY_targets_grid(rmin, rmax, npts):
+    def _generate_poslocXY_targets_grid(rmin, rmax, npts):
         x, y = np.mgrid[-rmax:rmax:npts*1j, -rmax:rmax:npts*1j]  # 1j is step
         r = np.sqrt(np.square(x) + np.square(y))
         mask = (rmin < r) & (r < rmax)
@@ -141,7 +141,7 @@ class XYTest(PECS):
     def generate_targets(self):
         path = self.data.test_cfg['input_targs_file']
         if path is None:  # no targets supplied, create local targets in posXY
-            tgt = self._generate_posXY_targets_grid(
+            tgt = self._generate_poslocXY_targets_grid(
                 self.data.test_cfg['targ_min_radius'],
                 self.data.test_cfg['targ_max_radius'],
                 self.data.test_cfg['n_pts_across_grid']).T  # shape (N, 2)
@@ -244,7 +244,7 @@ class XYTest(PECS):
         posids = self.data.posids_ptl[ptlid]  # all records obey this order
         ptl = self.ptls[ptlid]
         # device_loc = self.data.posdf.loc[posids, 'DEVICE_LOC']
-        if n == 0:  # blind move
+        if n == 0:  # blind move, issue commands just in poslocXY
             posXY = np.vstack(   # shape (N_posids, 2)
                 [self.data.targets_pos[posid][i, :] for posid in posids])
             movetype, cmd = 'blind', 'obsXY'  # could use posXY here actually

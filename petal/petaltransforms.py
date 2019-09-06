@@ -264,13 +264,29 @@ class PetalTransforms(object):
         obsXYZ = self.QS_to_obsXYZ(QS)
         return self.obsXYZ_to_ptlXYZ(obsXYZ)
 
-    def obsXY_to_flatXY(self, obsXY):
+    def ptlXY_to_QS(self, ptlXY, cast=False):
+        if cast:
+            ptlXY = typecast(ptlXY)
+        obsXY = self.ptlXY_to_obsXY(ptlXY)
+        return self.obsXY_to_QS(obsXY)
+
+    def QS_to_ptlXY(self, QS, cast=False):
+        if cast:
+            QS = typecast(QS)
+        obsXY = self.QS_to_obsXY(QS)
+        return self.obsXY_to_ptlXY(obsXY)
+
+    def obsXY_to_flatXY(self, obsXY, cast=False):
         """Composite transformation, performs obsXY --> QS --> flatXY"""
+        if cast:
+            obsXY = typecast(obsXY)
         QS = self.obsXY_to_QS(obsXY)
         return self.QS_to_flatXY(QS)
 
-    def flatXY_to_obsXY(self, flatXY):
+    def flatXY_to_obsXY(self, flatXY, cast=False):
         """Composite transformation, performs flatXY --> QS --> obsXY"""
+        if cast:
+            flatXY = typecast(flatXY)
         QS = self.flatXY_to_QS(flatXY)
         return self.QS_to_obsXY(QS)
 

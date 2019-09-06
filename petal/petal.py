@@ -87,7 +87,6 @@ class Petal(object):
         self.petal_state = posstate.PosState(  # initialise petal state
             unit_id=petal_id, device_type='ptl', logging=True,
             printfunc=self.printfunc)
-
         self.petalbox_id = petalbox_id
         self.petal_id = int(petal_id)
         self.shape = shape
@@ -737,7 +736,6 @@ class Petal(object):
         else:
             return hw_state
 
-
     def _get_hardware_state(self):
         '''
         Loops through keys in self._last_state to compare with what the
@@ -1199,3 +1197,4 @@ class Petal(object):
 if __name__ == '__main__':
     petal = Petal(petal_id=0, petal_loc=0, db_commit_on=True,
                   simulator_on=True)
+

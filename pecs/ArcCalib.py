@@ -1,29 +1,34 @@
 '''
 Runs an Arc Calibration using fvc and petal proxies. Requires running DOS instance. See pecs.py
+Currently only runs one Petal at a time, awaiting a petalMan proxy.
 '''
 import os
-from pecs import PECS
 import posconstants as pc
 import pandas
 
-class Arc(PECS):
+class Arc(object):
     
-    def __init__(self,petal_id=None, platemaker_instrument=None, fvc_role=None, printfunc = print):
-        PECS.__init__(self,ptlids=petal_id, platemaker_instrument=platemaker_instrument, fvc_role=fvc_role, printfunc=printfunc)
-        self.Eo_phi = 104.0
-        self.clear_angle_margin = 3.0
-        self.ptlid = list(self.ptls.keys())[0]
+    def __init__(self,pecs=None, petal_id=None, platemaker_instrument=None, fvc_role=None, printfunc = print, verbose=False):
+        if pecs is None:
+            from pecs import PECS
+            self.pecs = PECS(self,ptlids=petal_id, platemaker_instrument=platemaker_instrument, fvc_role=fvc_role, printfunc=printfunc)
+        else:
+            self.pecs = pecs
+        self.verbose = verbose
+        if self.verbose:
+            print('Selecting default petal, override with a call to select_petal.')
+        self.select_petal(petal_id=petal_id)
 
     def arc_calibration(self,selection=None,enabled_only=True,n_points_P=6, n_points_T=6,auto_update=True, match_radius=80):
         if selection is None:
-            posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only).loc[:,'DEVICE_ID'])
+            posid_list = list(self.ptl.get_positioners(enabled_only=enabled_only).loc[:,'DEVICE_ID'])
         elif selection[0][0] == 'c': #User passed busids
-            posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only, busids=selection).loc[:,'DEVICE_ID'])
+            posid_list = list(self.ptl.get_positioners(enabled_only=enabled_only, busids=selection).loc[:,'DEVICE_ID'])
         else: #assume is a list of posids
             posid_list = selection
-        requests_list_T, requests_list_P = self.ptls[self.ptlid].get_arc_requests(ids=posid_list)
+        requests_list_T, requests_list_P = self.ptl.get_arc_requests(ids=posid_list)
         T_data = []
-        old_radius = self.fvc.get('match_radius')
+        old_radius = self.pecs.fvc.get('match_radius')
         self.fvc.set(match_radius=match_radius) #Change radius usually to larger values to accound for poor calibration at this point
         i = 1
         for request in requests_list_T:
@@ -38,8 +43,8 @@ class Arc(PECS):
             i += 1
             merged_data = self.move_measure(request)
             P_data.append(merged_data)
-        self.fvc.set(match_radius=old_radius)
-        data = self.ptls[self.ptlid].calibrate_from_arc_data(T_data,P_data,auto_update=auto_update)
+        self.pecs.fvc.set(match_radius=old_radius)
+        data = self.ptl.calibrate_from_arc_data(T_data,P_data,auto_update=auto_update)
         data['auto_update'] = auto_update
         data['enabled_only'] = enabled_only
         return data
@@ -49,9 +54,9 @@ class Arc(PECS):
         Wrapper for often repeated moving and measuring sequence.
         Prints missing positioners, returns data merged with request
         '''
-        self.ptls[self.ptlid].prepare_move(request, anticollision=None)
-        expected_positions = self.ptls[self.ptlid].execute_move()
-        measured_positions = self.fvc.measure(expected_positions)
+        self.ptl.prepare_move(request, anticollision=None)
+        expected_positions = self.ptl.execute_move()
+        measured_positions = self.pecs.fvc.measure(expected_positions)
         measured_positions = pandas.DataFrame(measured_positions)
         measured_positions.rename(columns={'q':'MEASURED_Q','s':'MEASURED_S','flags':'FLAGS', 'id':'DEVICE_ID'},inplace=True)
         used_positions = measured_positions[measured_positions['DEVICE_ID'].isin(posid_list)]
@@ -69,6 +74,10 @@ class Arc(PECS):
 
     def run_interactively(self,selection=None,enabled_only=None,n_points_P=None, n_points_T=None,auto_update=None, match_radius=None):
         print('Running interactive arc calibration.')
+        # Ask for petal_id
+        if petal = None:
+            ptlid = self._get_integer('Please select a petal_id, availible petal_IDs: %s ' % list(self.pecs.ptls.keys()))
+            self.select_petal(petal_id = ptlid)
         # Ask for selection
         if selection is None:
             user_text = input('Please list BUSIDs or POSIDs (not both) seperated by spaces, leave it blank to use all on petal: ')
@@ -104,6 +113,17 @@ class Arc(PECS):
                 f'{pc.filename_timestamp_str_now()}-arc_calibration.csv'))
         print(data[['DEVICE_ID','LENGTH_R1','LENGTH_R2','OFFSET_X','OFFSET_Y','OFFSET_T','OFFSET_P']])
 
+    def select_petal(self, petal_id=None, index=None)
+        if petal_id is None:
+            if index is None:
+                print('No petal selected, choosing index=0 as default, petal_id %s', % list(self.pecs.ptls.keys())[0])
+                self.ptl = self.pecs.ptls[list(self.pecs.ptls.keys())[0]]
+            else:
+                print('Choosing petal in index %s, petal_id %s' % (index, self.list(self.pecs.ptls.keys())[index]))
+                self.ptl = self.pecs.ptls[list(self.pecs.ptls.keys())[index]]
+        else:
+            print('Choosing petal_id %s' % petal_id)
+            self.ptl = self.ptl = self.pecs.ptls[petal_id]
 
     def _parse_yn(yn_str):
         if 'y' in yn_str.lower():
@@ -122,8 +142,6 @@ class Arc(PECS):
             else:
                 raise ValueError('Input requires an integer.')
 
-
-
 if __name__ == '__main__':
-    arc = Arc()
+    arc = Arc(verbose=True)
     arc.run_interactively(enabled_only=True,n_points_P=6,n_points_T=6,match_radius=80.0)

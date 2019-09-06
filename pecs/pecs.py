@@ -42,11 +42,11 @@ class PECS:
 
     def __init__(self, ptlids=None, printfunc=print,
                  platemaker_instrument=None, fvc_role=None,
-                 illuminator_role=None):
+                 illuminator_role=None, constants_version = None):
         # Allow local config so scripts do not always have to collect roles
         # and names from the user. No check for illuminator at the moment
         # since it is not used in tests.
-        if not(platemaker_instrument) or not(fvc_role) or not(ptlids):
+        if not(platemaker_instrument) or not(fvc_role) or not(ptlids) or not constants_version:
             from configobj import ConfigObj
             pecs_local = ConfigObj(
                 os.path.join(os.path.dirname(os.path.realpath(__file__)),
@@ -55,6 +55,8 @@ class PECS:
             platemaker_instrument = pecs_local['pm_instrument']
             fvc_role = pecs_local['fvc_role']
             ptlids = pecs_local['ptlids']
+            constants_version = pecs_local['constants_version']
+            all_fiducial = True is 'T' in str(pecs_local['all_fiducials']).upper() else False
         self.ptlids = ptlids
         if type(printfunc) is not dict:  # if a single printfunc is supplied
             printfuncs = {ptlid: printfunc for ptlid in ptlids}
@@ -67,11 +69,12 @@ class PECS:
         self.platemaker_instrument = platemaker_instrument
         self.fvc_role = fvc_role
         self.illuminator_role = illuminator_role
+        self.constants_version = constants_version
         # call fvc proxy
         if 'SIM' in self.fvc_role.upper():
             self.fvc = FVC_proxy_sim()
         else:
-            self.fvc = FVC(self.platemaker_instrument, fvc_role=self.fvc_role)
+            self.fvc = FVC(self.platemaker_instrument, fvc_role=self.fvc_role, constants_version = self.constants_version, all_fiducials = all_fiducials)
         self.printfunc('FVC proxy created for instrument: '
                        f"{self.fvc.get('instrument')}")
         self.ptls = {}  # call petal proxy

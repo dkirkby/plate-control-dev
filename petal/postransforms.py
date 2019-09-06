@@ -105,6 +105,8 @@ class PosTransforms(object):
         self.obsXY_to_ptlXY = self.ptltrans.obsXY_to_ptlXY
         self.obsXY_to_QS = self.ptltrans.obsXY_to_QS
         self.QS_to_obsXY = self.ptltrans.QS_to_obsXY
+        self.ptlXY_to_QS = self.ptltrans.ptlXY_to_QS
+        self.QS_to_ptlXY = self.ptltrans.QS_to_ptlXY
         self.flatXY_to_QS = self.ptltrans.flatXY_to_QS
         self.QS_to_flatXY = self.ptltrans.QS_to_flatXY
         self.flatXY_to_obsXY = self.ptltrans.flatXY_to_obsXY
@@ -242,6 +244,16 @@ class PosTransforms(object):
         ''' input is list or tuple '''
         ptlXY = self.obsXY_to_ptlXY(obsXY, cast=True).flatten()  # 1D arr
         return self.ptlXY_to_poslocXY(ptlXY)  # return (posX, posY)
+
+    def ptlXY_to_posintTP(self, ptlXY):
+        ''' input is list or tuple '''
+        poslocXY = self.ptlXY_to_poslocXY(ptlXY)
+        return self.poslocXY_to_posintTP(poslocXY)
+
+    def posintTP_to_ptlXY(self, posintTP):
+        ''' input is list or tuple '''
+        poslocXY = self.posintTP_to_poslocXY(posintTP)
+        return self.poslocXY_to_ptlXY(poslocXY)
 
     # %% composit transformations for convenience (degree 3)
     def posintTP_to_obsXY(self, posintTP):
