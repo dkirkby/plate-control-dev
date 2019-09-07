@@ -1,4 +1,4 @@
-import numpy as np
+# import numpy as np
 import posconstants as pc
 import posmodel
 import math
@@ -442,7 +442,7 @@ class PosTransforms(object):
                     TP[i] = range_min
                     unreachable = True
             elif TP[i] > range_max:
-                TP[i] -= np.floor((TP[i] - range_min)/360.0)*360.0  # try -360 phase wrap
+                TP[i] -= math.floor((TP[i] - range_min)/360.0)*360.0  # try -360 phase wrap
                 if TP[i] > range_max:
                     # print('TP ',i,TP[i],'> range_max:',range_max,' thus unreachable')
                     # print('ranges[i]',ranges[i])

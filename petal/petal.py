@@ -1197,5 +1197,30 @@ class Petal(object):
 
 
 if __name__ == '__main__':
-    petal = Petal(petal_id=0, petal_loc=0, db_commit_on=True,
-                  simulator_on=True)
+    import numpy as np
+    from configobj import ConfigObj
+    # posids and fidids
+    cfg = ConfigObj(
+        "/home/msdos/focalplane/fp_settings/ptl_settings/unit_03.conf",
+        unrepr=True, encoding='utf-8')
+    ptl = Petal(petal_id=3, petal_loc=0,
+                posids=cfg['POS_IDS'], fidids=cfg['FID_IDS'],
+                db_commit_on=True, local_commit_on=False,
+                simulator_on=True, printfunc=print, verbose=True)
+    # tracker = ClassTracker()
+    # tracker.track_object(ptl)
+    # tracker.track_class(PosModel)
+    # tracker.track_class(posschedule.PosSchedule)
+    # targets setup
+    posT = np.linspace(0, 360, 4)
+    posP = np.linspace(0, 180, 4)
+    for i in range(len(posT)):
+        print(f'====== i = {i} target =====')
+        # tracker.create_snapshot()
+        # construct requests
+        request = {'command': 'posTP',
+                   'target': (posT[i], posP[i])}
+        requests = {posid: request for posid in ptl.posids}
+        ptl.request_targets(requests)
+        ptl.schedule_moves(anticollision='adjust')
+        ptl.send_and_execute_moves()
