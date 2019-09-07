@@ -56,7 +56,7 @@ class PECS:
             fvc_role = pecs_local['fvc_role']
             ptlids = pecs_local['ptlids']
             constants_version = pecs_local['constants_version']
-            all_fiducial = True is 'T' in str(pecs_local['all_fiducials']).upper() else False
+            all_fiducials = True if 'T' in str(pecs_local['all_fiducials']).upper() else False
         self.ptlids = ptlids
         if type(printfunc) is not dict:  # if a single printfunc is supplied
             printfuncs = {ptlid: printfunc for ptlid in ptlids}
