@@ -185,7 +185,7 @@ class PosScheduleStage(object):
                 self.printfunc("===== adjust path: " + str(method) + ' ' + str(posid) + '-' + str(collision_neighbor))
 
             proposed_tables = self._propose_path_adjustment(posid,method)
-            self.printfunc('Calling find_collisions, stage 188')
+            self.printfunc(f'schedule stage finding collisions method {method}: len {len(proposed_tables)}')
             colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables)
             if proposed_tables and not(colliding_sweeps): # i.e., the proposed tables should be accepted
                 self.move_tables.update(proposed_tables)
@@ -259,10 +259,7 @@ class PosScheduleStage(object):
         already_checked = {posid: set() for posid in self.collider.posids}
         colliding_sweeps = {posid: set() for posid in self.collider.posids}
         all_sweeps = {}
-        i = 0
         for posid in move_tables:
-            i += 1
-            self.printfunc(f'{i} of {len(move_tables)}')
             table_A = move_tables[posid]
             init_poslocTP_A = table_A.posmodel.trans.posintTP_to_poslocTP(
                 table_A.init_posintTP)

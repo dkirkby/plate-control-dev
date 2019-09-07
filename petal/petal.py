@@ -61,6 +61,7 @@ class Petal(object):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
         self.printfunc(f'Running code version: {pc.code_version}')
+        self.printfunc(f'poscollider: {poscollider.__file__}')
         # read values from cfg files if not given
         if None in [petal_id, petalbox_id, fidids, posids, shape]:
             self.printfunc('Some parameters not provided to __init__, '

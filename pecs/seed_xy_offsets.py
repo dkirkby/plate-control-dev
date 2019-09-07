@@ -40,6 +40,6 @@ if __name__ == '__main__':
         pc.dirs['calib_logs'],
         f'{pc.filename_timestamp_str_now()}-seed_xy_offsets.csv')
     updates.to_csv(path)
-    print(updates[['DEVICE_ID', 'DEVICE_LOC', 'OFFSET_X', 'OFFSET_Y'
+    print(updates[['DEVICE_ID', 'DEVICE_LOC', 'OFFSET_X', 'OFFSET_Y',
                    'POS_INT_T', 'POS_INT_P', 'LENGTH_R1', 'LENGTH_R2']])
     print(f'Seed XY offsets data saved to: {path}')

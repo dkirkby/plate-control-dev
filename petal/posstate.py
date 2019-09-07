@@ -76,8 +76,11 @@ class PosState(object):
                         # TODO fix this; still reading from a template config
                         self.load_from_cfg(unit_id=self.ptlid)
                     else:
-                        self.set_ptlid_from_pi(unit_id)  # lookup ptlid
-                        self.load_from_db(unit_id=unit_id)
+                        try:
+                            self.set_ptlid_from_pi(unit_id)  # lookup ptlid
+                            self.load_from_db(unit_id=unit_id)
+                        except KeyError:  # test posid, not existent
+                            self.load_from_cfg(unit_id=unit_id)
                 else:  # both unit_id and ptlid are unkonwn, read template
                     self.ptlid = '-1'  # assume ptlid = -1
                     if self.type == 'ptl':  # unit_id and ptlid both unkonwn
