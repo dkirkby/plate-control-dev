@@ -105,6 +105,7 @@ class Petal(object):
         self.sched_stats_on = sched_stats_on
         self.altered_states = set()
         self.altered_calib_states = set()
+        self._last_state = {}
 
 
         # must call the following 3 methods whenever petal alingment changes
@@ -726,12 +727,15 @@ class Petal(object):
                               'PS1_EN':'on', #Positioner Power EN ON
                               'PS2_EN':'on'}
         #Set State
-        for key in self._last_state.keys():
-            self.comm.pbset(key,self._last_state.keys())
-        self.comm.pbset('STATE', hw_state)
-        #Check for errors when setting state - want to know this right away
-        set_state, err_strings = self._get_hardware_state()
-        return set_state, err_stings
+        if not(self.simulator_on):
+            for key in self._last_state.keys():
+                self.comm.pbset(key,self._last_state.keys())
+            self.comm.pbset('STATE', hw_state)
+            #Check for errors when setting state - want to know this right away
+            set_state, err_strings = self._get_hardware_state()
+            return set_state, err_stings
+        else:
+            return hw_state
 
 
     def _get_hardware_state(self):
@@ -742,24 +746,27 @@ class Petal(object):
         returns the state of the PetalController.
         '''
         err_strings = []
-        if self._last_state == {}:
-            self.pbset('STATE','ERROR')
-            return 'ERROR', ['No state yet set by petal']
-        # Look for different settings from what petal last set.
-        for key in self._last_state.keys():
-            fbk = self.pbget(key)
-            if key == 'GFA_FAN': #sadly GFA_FAN is a little weird.
-                for k in fbk.keys(): #should be 'inlet' and 'outlet'
-                    if fbk[k][0] != self._last_state[key][k][0]: #comparing only off/on, not worring about PWM or TACH
-                        err_strings.append(key+' expected: '+str(self._last_state[key][k])+', got: '+str(fbk[k][0]))
-            else:
-                if self._last_state[key] != fbk:
-                    err_strings.append(key+' expected: '+str(self._last_state[key])+', got: '+str(fbk))
-        if err_strings == []: #If no errors found, just return the state that was set
-            return self.pbget('STATE'), err_strings
-        else: #If errors were found, set 'ERROR' state and return 'ERROR' as well as strings explaining why.
-            self.pbset('STATE','ERROR')
-            return 'ERROR', err_strings
+        if not(self.simulator_on):
+            if self._last_state == {}:
+                self.pbset('STATE','ERROR')
+                return 'ERROR', ['No state yet set by petal']
+            # Look for different settings from what petal last set.
+            for key in self._last_state.keys():
+                fbk = self.pbget(key)
+                if key == 'GFA_FAN': #sadly GFA_FAN is a little weird.
+                    for k in fbk.keys(): #should be 'inlet' and 'outlet'
+                        if fbk[k][0] != self._last_state[key][k][0]: #comparing only off/on, not worring about PWM or TACH
+                            err_strings.append(key+' expected: '+str(self._last_state[key][k])+', got: '+str(fbk[k][0]))
+                else:
+                    if self._last_state[key] != fbk:
+                        err_strings.append(key+' expected: '+str(self._last_state[key])+', got: '+str(fbk))
+            if err_strings == []: #If no errors found, just return the state that was set
+                return self.pbget('STATE'), err_strings
+            else: #If errors were found, set 'ERROR' state and return 'ERROR' as well as strings explaining why.
+                self.pbset('STATE','ERROR')
+                return 'ERROR', err_strings
+        else:
+            return 'READY'
 
         def reset_petalbox(self):
             """Reset all errors and turn all enables off.  This method
