@@ -199,7 +199,7 @@ class Petal(object):
                 posid, logging=self.local_log_on, device_type='pos',
                 printfunc=self.printfunc, petal_id=self.petal_id)
             self.posmodels[posid] = PosModel(state=self.states[posid],
-                                             petal_transform=self.trans)
+                                             petal_alignment=self.alignment)
             self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
         self.posids = set(self.posmodels.keys())
         self.canids_where_tables_were_just_sent = []

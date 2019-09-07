@@ -59,7 +59,7 @@ class PosSchedule(object):
         if self.stats:
             timer_start = time.clock()
         posmodel = self.petal.posmodels[posid]
-        trans = posmodel.trans
+        # trans = posmodel.trans
         if self.already_requested(posid):
             self.petal.pos_flags[posid] |= self.petal.multi_request_bit
             if self.verbose:
@@ -78,11 +78,11 @@ class PosSchedule(object):
         lims = 'targetable'
         unreachable = False
         if uv_type == 'QS':
-            targt_posintTP, unreachable = trans.QS_to_posintTP([u, v], lims)
+            targt_posintTP, unreachable = posmodel.trans.QS_to_posintTP([u, v], lims)
         elif uv_type == 'obsXY':
-            targt_posintTP, unreachable = trans.obsXY_to_posintTP([u, v], lims)
+            targt_posintTP, unreachable = posmodel.trans.obsXY_to_posintTP([u, v], lims)
         elif uv_type == 'poslocXY':
-            targt_posintTP, unreachable = trans.poslocXY_to_posintTP(
+            targt_posintTP, unreachable = posmodel.trans.poslocXY_to_posintTP(
                 [u, v], lims)
         # elif uv_type == 'obsTP':
         #     targt_posintTP = posmodel.trans.obsTP_to_posintTP([u,v])
@@ -90,15 +90,15 @@ class PosSchedule(object):
             targt_posintTP = [u, v]
         elif uv_type == 'dQdS':
             start_uv = [current_position['Q'], current_position['S']]
-            targt_uv = trans.addto_QS(start_uv, [u, v])
-            targt_posintTP, unreachable = trans.QS_to_posintTP(targt_uv, lims)
+            targt_uv = posmodel.trans.addto_QS(start_uv, [u, v])
+            targt_posintTP, unreachable = posmodel.trans.QS_to_posintTP(targt_uv, lims)
         elif uv_type == 'dXdY':  # in observer CS5 coordinates, not local
             start_uv = [current_position['obsX'], current_position['obsY']]
-            targt_uv = trans.addto_XY(start_uv, [u, v])
-            targt_posintTP, unreachable = trans.obsXY_to_posintTP(
+            targt_uv = posmodel.trans.addto_XY(start_uv, [u, v])
+            targt_posintTP, unreachable = posmodel.trans.obsXY_to_posintTP(
                 targt_uv, lims)
         elif uv_type == 'dTdP':
-            targt_posintTP = trans.delta_posintTP(start_posintTP, [u, v], lims)
+            targt_posintTP = posmodel.trans.delta_posintTP(start_posintTP, [u, v], lims)
         else:
             if self.verbose:
                 self.printfunc(
@@ -110,7 +110,7 @@ class PosSchedule(object):
                 self.printfunc(f'{posid}: target request denied. Target not '
                                f'reachable: {uv_type}, ({u:.3f}, {v:.3f})')
             return False
-        targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
+        targt_poslocTP = posmodel.trans.posintTP_to_poslocTP(targt_posintTP)
         if self._deny_request_because_target_interference(
                 posmodel, targt_poslocTP):
             if self.verbose:

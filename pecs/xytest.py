@@ -243,6 +243,7 @@ class XYTest(PECS):
         movedf = self.data.movedf
         posids = self.data.posids_ptl[ptlid]  # all records obey this order
         ptl = self.ptls[ptlid]
+        ptl.memory_profile()  # debug
         # device_loc = self.data.posdf.loc[posids, 'DEVICE_LOC']
         if n == 0:  # blind move, issue commands just in poslocXY
             for posid in posids:

@@ -6,7 +6,7 @@ import posmodel
 import petaltransforms
 
 
-class PosTransforms(object):
+class PosTransforms(petaltransforms.PetalTransforms):
     """
     This class provides transformations between positioner coordinate systems.
     Requires an input instance of PetalTransforms() to provide support for
@@ -92,25 +92,34 @@ class PosTransforms(object):
 
     """
 
-    def __init__(self, this_posmodel=None, petal_transform=None):
+    def __init__(self, this_posmodel=None, petal_alignment=None):
+        if petal_alignment is None:
+            petal_alignment = {Tx: 0, Ty: 0, Tz: 0,
+                               alpha: 0, beta: 0, gamma: 0}
+        super().__init__(Tx=petal_alignment['Tx'],
+                         Ty=petal_alignment['Ty'],
+                         Tz=petal_alignment['Tz'],
+                         alpha=petal_alignment['alpha'],
+                         beta=petal_alignment['beta'],
+                         gamma=petal_alignment['gamma'], curved=True)
         if this_posmodel is None:
             this_posmodel = posmodel.PosModel()
         self.posmodel = this_posmodel
-        if petal_transform is None:
-            self.ptltrans = petaltransforms.PetalTransforms()
-        else:
-            self.ptltrans = petal_transform
+#        if petal_transform is None:
+#            self.ptltrans = petaltransforms.PetalTransforms()
+#        else:
+#            self.ptltrans = petal_transform
         # set up 2D petal transform aliases for easy access and legacy support
-        self.ptlXY_to_obsXY = self.ptltrans.ptlXY_to_obsXY
-        self.obsXY_to_ptlXY = self.ptltrans.obsXY_to_ptlXY
-        self.obsXY_to_QS = self.ptltrans.obsXY_to_QS
-        self.QS_to_obsXY = self.ptltrans.QS_to_obsXY
-        self.ptlXY_to_QS = self.ptltrans.ptlXY_to_QS
-        self.QS_to_ptlXY = self.ptltrans.QS_to_ptlXY
-        self.flatXY_to_QS = self.ptltrans.flatXY_to_QS
-        self.QS_to_flatXY = self.ptltrans.QS_to_flatXY
-        self.flatXY_to_obsXY = self.ptltrans.flatXY_to_obsXY
-        self.obsXY_to_flatXY = self.ptltrans.obsXY_to_flatXY
+#        self.ptlXY_to_obsXY = self.ptltrans.ptlXY_to_obsXY
+#        self.obsXY_to_ptlXY = self.ptltrans.obsXY_to_ptlXY
+#        self.obsXY_to_QS = self.ptltrans.obsXY_to_QS
+#        self.QS_to_obsXY = self.ptltrans.QS_to_obsXY
+#        self.ptlXY_to_QS = self.ptltrans.ptlXY_to_QS
+#        self.QS_to_ptlXY = self.ptltrans.QS_to_ptlXY
+#        self.flatXY_to_QS = self.ptltrans.flatXY_to_QS
+#        self.QS_to_flatXY = self.ptltrans.QS_to_flatXY
+#        self.flatXY_to_obsXY = self.ptltrans.flatXY_to_obsXY
+#        self.obsXY_to_flatXY = self.ptltrans.obsXY_to_flatXY
         # allow alternate calibration values to temporarily override DB
         self.alt_override = False
         self.alt = {'LENGTH_R1': 3.0,
@@ -503,9 +512,9 @@ if __name__ == '__main__':
     '''
     try several gamma rotaion values here, e.g. 0, 36 deg, 180 deg
     '''
-    ptltrans = petaltransforms.PetalTransforms(Tx=0.1, Ty=0, Tz=0,
-                                               alpha=0, beta=-0, gamma=36)
-    trans = PosTransforms(petal_transform=ptltrans)
+    petal_alignment = {Tx: 0, Ty: 0, Tz: 0,
+                   alpha: 0, beta: 0, gamma: 36/180*np.pi}
+    trans = PosTransforms(petal_alignment=petal_alignment)
     state = trans.posmodel.state
     state._val['OFFSET_X'], state._val['OFFSET_Y'] = 28.134375, 5.201437
     print(f'posstate values:\n{state._val}')

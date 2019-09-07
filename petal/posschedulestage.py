@@ -256,6 +256,7 @@ class PosScheduleStage(object):
         three moving positioners, then all three of those positioners' sweeps
         would still appear in the return dictionary.
         """
+        self.printfunc(f'self.collider.posids: {len(self.collider.posids)}')
         already_checked = {posid: set() for posid in self.collider.posids}
         colliding_sweeps = {posid: set() for posid in self.collider.posids}
         all_sweeps = {}
@@ -285,7 +286,7 @@ class PosScheduleStage(object):
                     if self.verbose:
                         self.printfunc(
                             f'Checking neighbor collision: '
-                            f'{posid} - {neighbor}, '
+                            f'{posid}-{neighbor}, '
                             f'case {sweep.collision_case}, '
                             f'time {sweep.collision_time}')
             for fixed_neighbor in self.collider.fixed_neighbor_cases[posid]:
@@ -299,7 +300,7 @@ class PosScheduleStage(object):
                 if self.verbose:
                     self.printfunc(
                         f'Checking fixed_neighbor collision: '
-                        f'{posid} - {fixed_neighbor}, '
+                        f'{posid}-{fixed_neighbor}, '
                         f'case {posfix_sweep.collision_case}, '
                         f'time {posfix_sweep.collision_time}')
         multiple_collisions = {posid for posid in colliding_sweeps
