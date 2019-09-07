@@ -249,7 +249,7 @@ class XYTest(PECS):
             for posid in posids:
                 movetype, cmd = 'blind', 'obsXY'
                 poslocXY = self.data.targets_pos[posid][i, :]
-                obsXY = ptl.postrans(posid, 'poslocXY_to_obsXY', poslocXY)
+                obsXY = ptl.trans(posid, 'poslocXY_to_obsXY', poslocXY)
                 movedf.loc[idx[i, posid], ['target_x', 'target_y']] = obsXY
 #            poslocXY = np.vstack(   # shape (N_posids, 2)
 #                [self.data.targets_pos[posid][i, :] for posid in posids])
