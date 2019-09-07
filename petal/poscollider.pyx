@@ -1,4 +1,5 @@
 # cython: profile=False
+# cython: language_level=3
 cimport cython
 import numpy as np
 import posconstants as pc
