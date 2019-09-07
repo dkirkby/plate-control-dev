@@ -353,7 +353,7 @@ def plot_id_near_fixed(file, newout=None):
             f.write("%d,%0.6f,%0.6f\n" % (id_near_fixed[i], x_near_fixed[i], y_near_fixed[i]))
         f.close()
 
-def make_code_pf(loc_id, dx, dy, obsT, posP):
+def make_code_pf(loc_id, dx, dy, poslocT, poslocP):
    
     """
     loc_id = 3-digit location id 
@@ -366,8 +366,8 @@ def make_code_pf(loc_id, dx, dy, obsT, posP):
     hhh = str(int(loc_id)).zfill(3)
     xxx = str(dx).zfill(3)
     yyy = str(dy).zfill(3)
-    ttt = str(obsT).zfill(3)
-    ppp = str(posP).zfill(3)
+    ttt = str(poslocT).zfill(3)
+    ppp = str(poslocP).zfill(3)
     
     #code = 'PF-' + hhh + '-' + xxx + '-' + yyy + '-' + ttt + '-' + ppp
     code = hhh + '-' + xxx + '-' + yyy + '-' + ttt + '-' + ppp

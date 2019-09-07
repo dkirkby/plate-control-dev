@@ -78,7 +78,7 @@ class PosModel(object):
         return self.trans.posintTP_to_poslocTP(posintTP)
 
     @property
-    def expected_current_position(self):
+    def expected_current_position(self, coordinate_system):
         """
         Returns a general dictionary of the current expected position in all
         the various coordinate systems.

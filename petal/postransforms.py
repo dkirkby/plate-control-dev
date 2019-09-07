@@ -1,6 +1,6 @@
 import sys
 import math
-import numpy as np
+# import numpy as np
 import posconstants as pc
 import posmodel
 import petaltransforms
@@ -478,7 +478,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
                     unreachable = True
             elif TP[i] > range_max:
                 # try -360 phase wrap
-                TP[i] -= np.floor((TP[i] - range_min)/360.0)*360.0
+                TP[i] -= math.floor((TP[i] - range_min)/360.0)*360.0
                 if TP[i] > range_max:
                     # print(f'TP {i}, {TP[i]} > range_max: {range_max}'
                     #       f'thus unreachable\n{ranges[i]}')
@@ -513,7 +513,7 @@ if __name__ == '__main__':
     try several gamma rotaion values here, e.g. 0, 36 deg, 180 deg
     '''
     petal_alignment = {Tx: 0, Ty: 0, Tz: 0,
-                   alpha: 0, beta: 0, gamma: 36/180*np.pi}
+                   alpha: 0, beta: 0, gamma: 36/180*math.pi}
     trans = PosTransforms(petal_alignment=petal_alignment)
     state = trans.posmodel.state
     state._val['OFFSET_X'], state._val['OFFSET_Y'] = 28.134375, 5.201437
@@ -522,7 +522,7 @@ if __name__ == '__main__':
     print(f'poslocTP1 = {poslocTP1}')
     posintTP1 = trans.poslocTP_to_posintTP(poslocTP1)
     print(f'posintTP1 = {posintTP1}')
-    ptlXY = trans.poslocXY_to_ptlXY([1.5, 1.5*np.sqrt(3)])
+    ptlXY = trans.poslocXY_to_ptlXY([1.5, 1.5*math.sqrt(3)])
     print(f'ptlXY = {ptlXY}')
     poslocXY1 = trans.ptlXY_to_poslocXY(ptlXY)
     print(f'poslocXY1 = {poslocXY1}')

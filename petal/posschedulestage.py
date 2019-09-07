@@ -185,7 +185,7 @@ class PosScheduleStage(object):
                 self.printfunc("===== adjust path: " + str(method) + ' ' + str(posid) + '-' + str(collision_neighbor))
 
             proposed_tables = self._propose_path_adjustment(posid,method)
-            self.printfunc(f'schedule stage finding collisions method {method}: len {len(proposed_tables)}')
+            self.printfunc(f'schedule stage finding collisions method {method}: {len(proposed_tables)}')
             colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables)
             if proposed_tables and not(colliding_sweeps): # i.e., the proposed tables should be accepted
                 self.move_tables.update(proposed_tables)
@@ -218,93 +218,67 @@ class PosScheduleStage(object):
                 return
 
     def find_collisions(self, move_tables):
-        """Identifies any collisions that would be induced by executing a
-        collection of move tables.
+        """Identifies any collisions that would be induced by executing a collection
+        of move tables.
+        
+            move_tables   ... dict with keys = posids, values = PosMoveTable instances.
+        
+        Two items are returned. They are both dicts with keys = posids, values = PosSweep
+        instances (see poscollider.py).
+            
+          1st dict: Only contains sweeps for positioners that collide. It will be
+                    empty if there are no collisions. These sweeps may indicate
+                    collision with another positioner or with a fixed boundary. This
+                    information is given internally within each sweep instance.
 
-            move_tables     ... dict with keys = posids,
-                                values = PosMoveTable instances.
-
-        Two items are returned. They are both dicts with keys = posids,
-        values = PosSweep instances (see poscollider.py).
-
-            1st dict:   Only contains sweeps for positioners that collide. It
-                        will be empty if there are no collisions. These sweeps
-                        may indicate collision with another positioner or with
-                        a fixed boundary. This information is given internally
-                        within each sweep instance.
-
-            2nd dict:   Contains all sweeps that were generated during this
-                        function call.
-
-        For any pair of positioners that collide, the returned collisions dict
-        will contain separate sweeps for each of the pair. These two sweeps are
-        giving you information about the same collision event, but from the
-        perspectives of the two different positioners. In other words, if there
-        is an entry for posid 'M00001', colliding with neighbor 'M00002', then
-        the dict will also contain an entry for posid 'M00002', colliding with
-        neighbor 'M0001'.
-
-        If positioner A collides with a fixed boundary, or with a disabled
-        neighbor positioner B, then the returned collisions dict only contains
-        the sweep of A.
-
-        If a positioner has collisions with multiple other postioners / fixed
-        boundaries, then only the first collision event in time is included in
-        the returned collisions dict.
-
-        In the rare event of a three-way exactly simultaneous collision between
-        three moving positioners, then all three of those positioners' sweeps
-        would still appear in the return dictionary.
+          2nd dict: Contains all sweeps that were generated during this function call.                      
+        
+        For any pair of positioners that collide, the returned collisions dict will contain
+        separate sweeps for each of the pair. These two sweeps are giving you information
+        about the same collision event, but from the perspectives of the two different
+        positioners. In other words, if there is an entry for posid 'M00001', colliding with
+        neighbor 'M00002', then the dict will also contain an entry for posid 'M00002',
+        colliding with neighbor 'M0001'.
+        
+        If positioner A collides with a fixed boundary, or with a disabled neighbor
+        positioner B, then the returned collisions dict only contains the sweep of A.
+        
+        If a positioner has collisions with multiple other postioners / fixed boundaries,
+        then only the first collision event in time is included in the returned collisions
+        dict.
+        
+        In the rare event of a three-way exactly simultaneous collision between three
+        moving positioners, then all three of those positioners' sweeps would still
+        appear in the return dictionary.
         """
-        self.printfunc(f'self.collider.posids: {len(self.collider.posids)}')
-        already_checked = {posid: set() for posid in self.collider.posids}
-        colliding_sweeps = {posid: set() for posid in self.collider.posids}
+        already_checked = {posid:set() for posid in self.collider.posids}
+        colliding_sweeps = {posid:set() for posid in self.collider.posids}
         all_sweeps = {}
         for posid in move_tables:
             table_A = move_tables[posid]
-            init_poslocTP_A = table_A.posmodel.trans.posintTP_to_poslocTP(
-                table_A.init_posintTP)
+            init_poslocTP_A = table_A.posmodel.trans.posintTP_to_poslocTP(table_A.init_posintTP)
             for neighbor in self.collider.pos_neighbors[posid]:
                 if neighbor not in already_checked[posid]:
-                    table_B = move_tables[neighbor] \
-                        if neighbor in move_tables \
-                        else self._get_or_generate_table(neighbor)
-                    init_poslocTP_B = \
-                        table_B.posmodel.trans.posintTP_to_poslocTP(
-                            table_B.init_posintTP)
-                    pospos_sweeps = \
-                        self.collider.spacetime_collision_between_positioners(
-                            posid, init_poslocTP_A, table_A.for_collider(),
-                            neighbor, init_poslocTP_B, table_B.for_collider())
-                    all_sweeps.update(
-                        {posid: pospos_sweeps[0], neighbor: pospos_sweeps[1]})
+                    table_B = move_tables[neighbor] if neighbor in move_tables else self._get_or_generate_table(neighbor)
+                    init_poslocTP_B = table_B.posmodel.trans.posintTP_to_poslocTP(table_B.init_posintTP)
+                    pospos_sweeps = self.collider.spacetime_collision_between_positioners(posid, init_poslocTP_A, table_A.for_collider(), neighbor, init_poslocTP_B, table_B.for_collider())
+                    all_sweeps.update({posid:pospos_sweeps[0], neighbor:pospos_sweeps[1]})
                     for sweep in pospos_sweeps:
                         if sweep.collision_case != pc.case.I:
                             colliding_sweeps[sweep.posid].add(sweep)
                     already_checked[posid].add(neighbor)
                     already_checked[neighbor].add(posid)
                     if self.verbose:
-                        self.printfunc(
-                            f'Checking neighbor collision: '
-                            f'{posid}-{neighbor}, '
-                            f'case {sweep.collision_case}, '
-                            f'time {sweep.collision_time}')
+                        self.printfunc("checking collision: " + str(posid) + '-' + str(neighbor) + ', case ' + str(sweep.collision_case) + ', time ' + str(sweep.collision_time))
+                        
             for fixed_neighbor in self.collider.fixed_neighbor_cases[posid]:
-                # index 0 to immediately retrieve from the one-element list
-                # this function returns
-                posfix_sweep = self.collider.spacetime_collision_with_fixed(
-                    posid, init_poslocTP_A, table_A.for_collider())[0]
-                all_sweeps.update({posid: posfix_sweep})
+                posfix_sweep = self.collider.spacetime_collision_with_fixed(posid, init_poslocTP_A, table_A.for_collider())[0] # index 0 to immediately retrieve from the one-element list this function returns
+                all_sweeps.update({posid:posfix_sweep})
                 if posfix_sweep.collision_case != pc.case.I:
                     colliding_sweeps[posid].add(posfix_sweep)
                 if self.verbose:
-                    self.printfunc(
-                        f'Checking fixed_neighbor collision: '
-                        f'{posid}-{fixed_neighbor}, '
-                        f'case {posfix_sweep.collision_case}, '
-                        f'time {posfix_sweep.collision_time}')
-        multiple_collisions = {posid for posid in colliding_sweeps
-                               if len(colliding_sweeps[posid]) > 1}
+                    self.printfunc("checking collision: " + str(posid) + '-' + str(fixed_neighbor) + ', case ' + str(posfix_sweep.collision_case) + ', time ' + str(posfix_sweep.collision_time))
+        multiple_collisions = {posid for posid in colliding_sweeps if len(colliding_sweeps[posid]) > 1}
         for posid in multiple_collisions:
             first_collision_time = float('inf')
             for sweep in colliding_sweeps[posid]:
@@ -312,10 +286,7 @@ class PosScheduleStage(object):
                     first_sweep = sweep
                     first_collision_time = sweep.collision_time
             colliding_sweeps[posid] = {first_sweep}
-        # remove set structure from elements, and remove empty elements
-        colliding_sweeps = {
-            posid: colliding_sweeps[posid].pop() for posid in colliding_sweeps
-            if colliding_sweeps[posid]}
+        colliding_sweeps = {posid:colliding_sweeps[posid].pop() for posid in colliding_sweeps if colliding_sweeps[posid]} # remove set structure from elements, and remove empty elements
         all_sweeps.update(colliding_sweeps)
         return colliding_sweeps, all_sweeps
 

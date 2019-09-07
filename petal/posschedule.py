@@ -373,17 +373,15 @@ class PosSchedule(object):
         if self.should_anneal:
             stage.anneal_tables(anneal_time)
         if should_freeze or self.stats:
-            self.printfunc(f'schedule finding collisions: {len(stage.move_tables)}')
+            if self.verbose:
+                self.printfunc(f'schedule finding collisions: {len(stage.move_tables)}')
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
         if should_freeze:
             ori_stage_colliding = copymodule.deepcopy(stage.colliding)
             if self.verbose:
                 self.printfunc("initial stage.colliding " + str(stage.colliding))
-            i = 0
             for posid in colliding_sweeps:
-                i += 1
-                self.printfunc('colliding_sweeps: {i}')
                 if posid in stage.colliding: # re-check, since earlier path adjustments in loop may have already resolved this posid's collision
                     self.petal.pos_flags[posid] |= self.petal.frozen_anticol_bit #Mark as frozen by anticollision
                     stage.adjust_path(posid, ori_stage_colliding, freezing='forced')
@@ -445,7 +443,8 @@ class PosSchedule(object):
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
             if self.should_anneal:
                 stage.anneal_tables(self.anneal_time[name])
-            self.printfunc(f'schedule finding collisions {name}: {len(stage.move_tables)}')
+            if self.verbose:
+                self.printfunc(f'schedule finding collisions {name}: {len(stage.move_tables)}')
             colliding_sweeps, all_sweeps = stage.find_collisions(
                 stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)

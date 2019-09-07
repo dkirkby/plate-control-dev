@@ -63,31 +63,31 @@ class Petal(object):
         self.printfunc(f'Running code version: {pc.code_version}')
         self.printfunc(f'poscollider: {poscollider.__file__}')
         # read values from cfg files if not given
-        if None in [petal_id, petalbox_id, fidids, posids, shape]:
-            self.printfunc('Some parameters not provided to __init__, '
-                           'reading petal config.')
-            self.petal_state = posstate.PosState(  # initialise petal state
-                    unit_id=petal_id, device_type='ptl', logging=True,
-                    printfunc=self.printfunc)
-            if petal_id is None:
-                self.printfunc('Reading Petal_ID from petal_state')
-                # this is the string unique hardware id of the particular petal
-                # (not the integer id of the beaglebone in the petalbox)
-                petal_id = self.petal_state.conf['PETAL_ID']
-            if petalbox_id is None:
-                self.printfunc('Reading petalbox_ID from petal_state')
-                # this is the integer software id of the petalbox (previously
-                # known as 'petal_id', before disambiguation)
-                petalbox_id = self.petal_state.conf['PETALBOX_ID']
-            if posids is None:
-                self.printfunc('posids not given, read from ptl_settings file')
-                posids = self.petal_state.conf['POS_IDS']
-            if fidids is None:
-                self.printfunc('fidids not given, read from ptl_settings file')
-                fidids = self.petal_state.conf['FID_IDS']
-            if shape is None:
-                self.printfunc('Reading shape from petal_state')
-                shape = self.petal_state.conf['SHAPE']
+        # if None in [petal_id, petalbox_id, fidids, posids, shape]:
+        #     self.printfunc('Some parameters not provided to __init__, '
+        #                    'reading petal config.')
+            # self.petal_state = posstate.PosState(  # initialise petal state
+            #         unit_id=petal_id, device_type='ptl', logging=True,
+            #         printfunc=self.printfunc)
+            # if petal_id is None:
+            #     self.printfunc('Reading Petal_ID from petal_state')
+            #     # this is the string unique hardware id of the particular petal
+            #     # (not the integer id of the beaglebone in the petalbox)
+            #     petal_id = self.petal_state.conf['PETAL_ID']
+            # if petalbox_id is None:
+            #     self.printfunc('Reading petalbox_ID from petal_state')
+            #     # this is the integer software id of the petalbox (previously
+            #     # known as 'petal_id', before disambiguation)
+            #     petalbox_id = self.petal_state.conf['PETALBOX_ID']
+            # if posids is None:
+            #     self.printfunc('posids not given, read from ptl_settings file')
+            #     posids = self.petal_state.conf['POS_IDS']
+            # if fidids is None:
+            #     self.printfunc('fidids not given, read from ptl_settings file')
+            #     fidids = self.petal_state.conf['FID_IDS']
+            # if shape is None:
+            #     self.printfunc('Reading shape from petal_state')
+            #     shape = self.petal_state.conf['SHAPE']
         self.petalbox_id = petalbox_id
         self.petal_id = int(petal_id)
         self.shape = shape
@@ -163,17 +163,15 @@ class Petal(object):
             if hasattr(self, 'alignment'):
                 # self.alignment found, just re-use it
                 pass
-            elif hasattr(self, 'petal_state'):
-                # alignment not existent, runnin without ICS, use petal-state
-                self.alignment = {'Tx': self.petal_state.conf['X_OFFSET'],
-                                  'Ty': self.petal_state.conf['Y_OFFSET'],
+            else:
+                self.printfunc('Initialisation requires either alignment'
+                               'to be set, using zeros.')
+                self.alignment = {'Tx': 0,  # x translation
+                                  'Ty': 0,  # y translation
                                   'Tz': 0,  # z translation in mm
                                   'alpha': 0,  # x rotation in deg
                                   'beta': 0,  # y rotation in deg
-                                  'gamma': self.petal_state.conf['ROTATION']}
-            else:
-                raise Exception('Initialisation requires either alignment'
-                                ' or petal_state to be set')
+                                  'gamma': 0}  # z rotation
         else:  # new alingment supplied, overwrite self.aglinment attribute
             self.alignment = alignment
         self.trans = PetalTransforms(Tx=self.alignment['Tx'],
@@ -1203,6 +1201,33 @@ class Petal(object):
 
 
 if __name__ == '__main__':
-    petal = Petal(petal_id=0, petal_loc=0, db_commit_on=True,
-                  simulator_on=True)
-
+    import numpy as np
+    from configobj import ConfigObj
+    # posids and fidids
+    cfg = ConfigObj(
+        "/home/msdos/focalplane/fp_settings/ptl_settings/unit_03.conf",
+        unrepr=True, encoding='utf-8')
+    ptl = Petal(petal_id=3, petal_loc=0,
+                posids=cfg['POS_IDS'], fidids=cfg['FID_IDS'],
+                db_commit_on=True, local_commit_on=False,
+                simulator_on=True, printfunc=print, verbose=False)
+    # tracker = ClassTracker()
+    # tracker.track_object(ptl)
+    # tracker.track_class(PosModel)
+    # tracker.track_class(posschedule.PosSchedule)
+    # targets setup
+    rmin, rmax, npts = 0.3, 4, 5
+    x, y = np.mgrid[-rmax:rmax:npts*1j, -rmax:rmax:npts*1j]  # 1j is step
+    r = np.sqrt(np.square(x) + np.square(y))
+    mask = (rmin < r) & (r < rmax)
+    targets = np.array([x[mask], y[mask]])  # return 2 x N array of targets
+    for i in range(4):
+        print(f'====== i = {i} target')
+        # tracker.create_snapshot()
+        # construct requests
+        request = {'command': 'poslocXY',
+                   'target': (targets[0, i], targets[1, i])}
+        requests = {posid: request for posid in ptl.posids}
+        ptl.request_targets(requests)
+        ptl.schedule_moves(anticollision='adjust')
+        ptl.send_and_execute_moves()
