@@ -60,6 +60,8 @@ class Petal(object):
                  collider_file=None, sched_stats_on=False):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
+        self.printfunc(f'Running code version: {pc.code_version}')
+        self.printfunc(f'poscollider used: {poscollider.__file__}')
         # petal setup
         if None in [petal_id, petalbox_id, fidids, posids, shape]:
             self.printfunc('Some parameters not provided to __init__, reading petal config.')
@@ -215,7 +217,8 @@ class Petal(object):
             self.collider = poscollider.PosCollider(
                 configfile=collider_file, collision_hashpp_exists=False,
                 collision_hashpf_exists=False, hole_angle_file=None)
-            self.anticol_settings = self.collider.config
+            # self.anticol_settings = self.collider.config
+        self.printfunc(f'Collider setting: {self.collider.config}')  # debug
         assert hasattr(self, 'alignment')  # require petal alignment to be set
         self.collider.set_petal_offsets(x0=self.alignment['Tx'],
                                         y0=self.alignment['Ty'],
@@ -1199,28 +1202,24 @@ class Petal(object):
 if __name__ == '__main__':
     import numpy as np
     from configobj import ConfigObj
-    # posids and fidids
     cfg = ConfigObj(
         "/home/msdos/focalplane/fp_settings/ptl_settings/unit_03.conf",
         unrepr=True, encoding='utf-8')
     ptl = Petal(petal_id=3, petal_loc=0,
                 posids=cfg['POS_IDS'], fidids=cfg['FID_IDS'],
                 db_commit_on=True, local_commit_on=False,
-                simulator_on=True, printfunc=print, verbose=True)
-    # tracker = ClassTracker()
-    # tracker.track_object(ptl)
-    # tracker.track_class(PosModel)
-    # tracker.track_class(posschedule.PosSchedule)
-    # targets setup
-    posT = np.linspace(0, 360, 4)
-    posP = np.linspace(0, 180, 4)
-    for i in range(len(posT)):
-        print(f'====== i = {i} target =====')
-        # tracker.create_snapshot()
-        # construct requests
+                simulator_on=True, printfunc=print, verbose=False,
+                sched_stats_on=False)
+    print('Initial posTP of M04078 (make sure inital positions are the same):',
+          ptl.posmodels['M04078'].expected_current_posTP)
+    posT = np.linspace(0, 360, 6)
+    posP = np.linspace(90, 180, 6)
+    for i in range(4):  # 4 targets
+        print(f'==== target {i}, posTP = ({posT[i]:.3f}, {posP[i]:.3f}) ====')
         request = {'command': 'posTP',
                    'target': (posT[i], posP[i])}
         requests = {posid: request for posid in ptl.posids}
         ptl.request_targets(requests)
         ptl.schedule_moves(anticollision='adjust')
         ptl.send_and_execute_moves()
+    # ptl.schedule_stats.save()
