@@ -44,13 +44,12 @@ class PosState(object):
                  logging=False, printfunc=print, defaults = None):    # DOS change
         self.printfunc = printfunc
         self.logging = logging
-        self.write_to_DB = os.getenv('DOS_POSMOVE_WRITE_TO_DB') if DB_COMMIT_AVAILABLE else False
+        self.write_to_DB = bool(os.getenv('DOS_POSMOVE_WRITE_TO_DB')) if DB_COMMIT_AVAILABLE else False
         # data initialization
         if device_type in ['pos', 'fid', 'ptl']:
             self.type = device_type
         else:
             raise Exception('Invalid device_type')
-
         # DOS change
         if device_type == 'ptl':
             self.petal_state_defaults = defaults
