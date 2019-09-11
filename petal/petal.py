@@ -61,7 +61,7 @@ class Petal(object):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
         self.printfunc(f'Running code version: {pc.code_version}')
-        self.printfunc(f'poscollider: {poscollider.__file__}')
+        self.printfunc(f'poscollider used: {poscollider.__file__}')
         # read values from cfg files if not given
         # if None in [petal_id, petalbox_id, fidids, posids, shape]:
         #     self.printfunc('Some parameters not provided to __init__, '
@@ -221,7 +221,8 @@ class Petal(object):
             self.collider = poscollider.PosCollider(
                 configfile=collider_file, collision_hashpp_exists=False,
                 collision_hashpf_exists=False, hole_angle_file=None)
-            self.anticol_settings = self.collider.config
+            # self.anticol_settings = self.collider.config
+        self.printfunc(f'Collider setting: {self.collider.config}')
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
         # this should be turned on/off using the animation start/stop
@@ -286,6 +287,8 @@ class Petal(object):
             pos_flags ... dict keyed by positioner indicating which flag as indicated below that a
                           positioner should receive going to the FLI camera with fvcproxy
         """
+        if self.verbose:
+            self.printfunc(f'petal: requests received {len(requests)}')
         marked_for_delete = set()
         for posid in requests:
             requests[posid]['posmodel'] = self.posmodels[posid]
@@ -302,8 +305,12 @@ class Petal(object):
                 accepted = self.schedule.request_target(posid, requests[posid]['command'], requests[posid]['target'][0], requests[posid]['target'][1], requests[posid]['log_note'])
                 if not accepted:
                     marked_for_delete.add(posid)
+                    # self.printfunc(f'deleting {posid} for target rejected')
         for posid in marked_for_delete:
             del requests[posid]
+        if self.verbose:
+            self.printfunc(f'petal: requests approved {len(requests)} '
+                           f'{len(marked_for_delete)} delected')
         return requests
 
     def request_direct_dtdp(self, requests, cmd_prefix=''):
@@ -1201,32 +1208,27 @@ class Petal(object):
 
 
 if __name__ == '__main__':
+    '''
+    python -m cProfile -s cumtime petal.py
+    '''
     import numpy as np
     from configobj import ConfigObj
-    # posids and fidids
-    cfg = ConfigObj(
+    cfg = ConfigObj(  # posids and fidids
         "/home/msdos/focalplane/fp_settings/ptl_settings/unit_03.conf",
         unrepr=True, encoding='utf-8')
     ptl = Petal(petal_id=3, petal_loc=0,
                 posids=cfg['POS_IDS'], fidids=cfg['FID_IDS'],
-                db_commit_on=True, local_commit_on=False,
-                simulator_on=True, printfunc=print, verbose=False)
-    # tracker = ClassTracker()
-    # tracker.track_object(ptl)
-    # tracker.track_class(PosModel)
-    # tracker.track_class(posschedule.PosSchedule)
-    # targets setup
-    rmin, rmax, npts = 0.3, 4, 5
-    x, y = np.mgrid[-rmax:rmax:npts*1j, -rmax:rmax:npts*1j]  # 1j is step
-    r = np.sqrt(np.square(x) + np.square(y))
-    mask = (rmin < r) & (r < rmax)
-    targets = np.array([x[mask], y[mask]])  # return 2 x N array of targets
+                db_commit_on=True, local_commit_on=False, local_log_on=False,
+                simulator_on=True, printfunc=print, verbose=False,
+                sched_stats_on=False)
+    print('Initial posTP of M04078 (make sure inital positions are the same):',
+          ptl.posmodels['M04078'].expected_current_posintTP)
+    posT = np.linspace(0, 360, 6)
+    posP = np.linspace(90, 180, 6)
     for i in range(4):
-        print(f'====== i = {i} target')
-        # tracker.create_snapshot()
-        # construct requests
-        request = {'command': 'poslocXY',
-                   'target': (targets[0, i], targets[1, i])}
+        print(f'==== target {i}, posTP = ({posT[i]:.3f}, {posP[i]:.3f}) ====')
+        request = {'command': 'posintTP',
+                   'target': (posT[i], posP[i])}
         requests = {posid: request for posid in ptl.posids}
         ptl.request_targets(requests)
         ptl.schedule_moves(anticollision='adjust')

@@ -97,6 +97,7 @@ class PosSchedule(object):
             targt_uv = posmodel.trans.addto_XY(start_uv, [u, v])
             targt_posintTP, unreachable = posmodel.trans.obsXY_to_posintTP(
                 targt_uv, lims)
+            # import pdb; pdb.set_trace()
         elif uv_type == 'dTdP':
             targt_posintTP = posmodel.trans.delta_posintTP(start_posintTP, [u, v], lims)
         else:
@@ -349,6 +350,7 @@ class PosSchedule(object):
         desired_final_posintTP = {}
         dtdp = {}
         for posid, request in self.requests.items():
+            # import pdb; pdb.set_trace()
             start_posintTP[posid] = request['start_posintTP']
             desired_final_posintTP[posid] = request['targt_posintTP']
             trans = self.petal.posmodels[posid].trans
@@ -375,6 +377,7 @@ class PosSchedule(object):
         if should_freeze or self.stats:
             if self.verbose:
                 self.printfunc(f'schedule finding collisions: {len(stage.move_tables)}')
+                self.printfunc('Posschedule first move table:', list(stage.move_tables.values())[0].for_collider())
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
         if should_freeze:
@@ -395,9 +398,11 @@ class PosSchedule(object):
         'rotate', and 'extend' stages with motion paths from start to finish.
         The move tables may include adjustments of paths to avoid collisions.
         """
+        print('posschedule _schedule_requests_with_path_adjustments called')
         start_posintTP = {name: {} for name in self.RRE_stage_order}
         desired_final_posintTP = {name: {} for name in self.RRE_stage_order}
         dtdp = {name: {} for name in self.RRE_stage_order}
+        # import pdb; pdb.set_trace()
         for posid, request in self.requests.items():
             # Some care is taken here to use only delta and add functions
             # provided by PosTransforms to ensure that range wrap limits are
@@ -439,25 +444,27 @@ class PosSchedule(object):
                 range_wrap_limits='targetable')
         for i in range(len(self.RRE_stage_order)):
             name = self.RRE_stage_order[i]
+            self.printfunc('stage name:', name)
             stage = self.stages[name]
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
             if self.should_anneal:
                 stage.anneal_tables(self.anneal_time[name])
-            if self.verbose:
-                self.printfunc(f'schedule finding collisions {name}: {len(stage.move_tables)}')
+            if self.verbose:  # debug
+                self.printfunc(f'posschedule: finding collisions for {len(stage.move_tables)} positioners, trying {name}')
+                self.printfunc('Posschedule first move table:', list(stage.move_tables.values())[0].for_collider())
             colliding_sweeps, all_sweeps = stage.find_collisions(
                 stage.move_tables)
+            # find_t_total += t_section  # debug
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             attempts_remaining = self.max_path_adjustment_passes
             # take this out once stage.colliding is working
             ori_stage_colliding = copymodule.deepcopy(stage.colliding)
             # take this out once stage.colliding is working
             ori_colliding_posid = list(stage.colliding)
-            if self.verbose:
-                self.printfunc(
-                    f'stage name: {name}\n'
-                    f'initial stage.colliding: {ori_colliding_posid}')
+            # if self.verbose:
+            self.printfunc(f'initial stage.colliding: {ori_colliding_posid}')
             while stage.colliding and attempts_remaining:
+                t1 = time.process_time()  # debug
                 for posid in stage.colliding:
                     if self.verbose:
                         self.printfunc(
@@ -480,9 +487,8 @@ class PosSchedule(object):
                 if self.stats:
                     self.stats.add_to_num_adjustment_iters(1)
                 attempts_remaining -= 1
-                if self.verbose:
-                    self.printfunc(
-                        f'Remaining stage.colliding: {stage.colliding}')
+                if self.verbose:  # debug
+                    self.printfunc(f'posschedule: remaining collisions {len(stage.colliding)}, attempts_remaining {attempts_remaining}')
 
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to

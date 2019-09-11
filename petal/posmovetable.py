@@ -219,7 +219,7 @@ class PosMoveTable(object):
         """Internal function that calculates the various output table formats and
         passes them up to the wrapper functions above.
         """
-        true_moves = self._calculate_true_moves()
+        true_moves = self._calculate_true_moves()  # debug
         rows = self.rows.copy()
         rows.extend(self._rows_extra)
         row_range = range(len(rows))

@@ -249,7 +249,7 @@ class XYTest(PECS):
             for posid in posids:
                 movetype, cmd = 'blind', 'obsXY'
                 poslocXY = self.data.targets_pos[posid][i, :]
-                obsXY = ptl.postrans(posid, 'poslocXY_to_obsXY', poslocXY)
+                obsXY = ptl.trans(posid, 'poslocXY_to_obsXY', poslocXY)
                 movedf.loc[idx[i, posid], ['target_x', 'target_y']] = obsXY
 #            poslocXY = np.vstack(   # shape (N_posids, 2)
 #                [self.data.targets_pos[posid][i, :] for posid in posids])
@@ -377,7 +377,7 @@ class XYTest(PECS):
 
 
 if __name__ == '__main__':
-    path = os.path.join(pc.dirs['test_settings'], 'xytest_sim.cfg')
+    path = os.path.join(pc.dirs['test_settings'], 'xytest_ptl0.cfg')
     xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')  # read cfg
     xytest_name = input('Please name this test: ')
     test = XYTest(xytest_name, xytest_cfg)

@@ -94,8 +94,8 @@ class PosTransforms(petaltransforms.PetalTransforms):
 
     def __init__(self, this_posmodel=None, petal_alignment=None):
         if petal_alignment is None:
-            petal_alignment = {Tx: 0, Ty: 0, Tz: 0,
-                               alpha: 0, beta: 0, gamma: 0}
+            petal_alignment = {'Tx': 0, 'Ty': 0, 'Tz': 0,
+                               'alpha': 0, 'beta': 0, 'gamma': 0}
         super().__init__(Tx=petal_alignment['Tx'],
                          Ty=petal_alignment['Ty'],
                          Tz=petal_alignment['Tz'],
@@ -192,7 +192,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
     def obsXY_to_posobsXY(self, obsXY):
         ''' input is list or tuple or 1D array '''
         centre_ptlXY = [self.getval('OFFSET_X'), self.getval('OFFSET_Y')]
-        centre_obsXY = self.ptlXY_to_obsXY(centre_ptlXY, cast=True)
+        centre_obsXY = self.ptlXY_to_obsXY(centre_ptlXY, cast=True).flatten()
         return self.delta_XY(obsXY, centre_obsXY)
 
     def posobsXY_to_obsXY(self, posobsXY):
@@ -272,7 +272,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
     def obsXY_to_posintTP(self, obsXY, range_limits='full'):
         """Composite transformation, performs obsXY --> posXY --> intTP"""
         poslocXY = self.obsXY_to_poslocXY(obsXY)  # tuple
-        return self.poslocXY_to_poslocTP(poslocXY, range_limits=range_limits)
+        return self.poslocXY_to_posintTP(poslocXY, range_limits=range_limits)
 
     # %% composit transformations for convenience (degree 4)
     def posintTP_to_QS(self, posintTP):
@@ -288,7 +288,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
 
     def posintTP_to_posobsXY(self, posintTP):
         obsXY = self.posintTP_to_obsXY(posintTP)
-        return self.obsXY_to_posobsXY(obsXY)  # tuple
+        return tuple(self.obsXY_to_posobsXY(obsXY))  # tuple
 
     # %% composit transformations for convenience (degree 5)
     def posintTP_to_flatXY(self, posintTP):
@@ -327,7 +327,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
         return PosTransforms.vector_delta(qs0, qs1)
 
     def delta_posintTP(self, posintTP0, posintTP1, range_wrap_limits='full'):
-        """Returns dtdp corresponding to tp1 - tp0.
+        """Returns dtdp corresponding to tp0 - tp1, or final - initial
         The range_wrap_limits option can be any of the values for the
         shaft_ranges method, or 'none'. If 'none', then the returned delta is
         a simple vector subtraction with no special checks for angle-wrapping
@@ -335,11 +335,11 @@ class PosTransforms(petaltransforms.PetalTransforms):
         """
         dtdp = PosTransforms.vector_delta(posintTP0, posintTP1)
         if range_wrap_limits != 'none':
-            dtdp = self._wrap_theta(posintTP0, posintTP1, range_wrap_limits)
+            dtdp = self._wrap_theta(posintTP1, dtdp, range_wrap_limits)
         return dtdp
 
     def delta_poslocTP(self, poslocTP0, poslocTP1, range_wrap_limits='full'):
-        """Returns dtdp corresponding to tp1 - tp0.
+        """Returns dtdp corresponding to tp0 - tp1.
         The range_wrap_limits option can be any of the values for the
         shaft_ranges method, or 'none'. If 'none', then the returned delta is
         a simple vector subtraction with no special checks for angle-wrapping
@@ -371,7 +371,11 @@ class PosTransforms(petaltransforms.PetalTransforms):
 
     # %% INTERNAL METHODS
     def _wrap_theta(self, tp0, dtdp, range_wrap_limits='full'):
-        """Returns a modified dtdp after appropriately wrapping the delta theta
+        """
+        tp0     : initial TP positions
+        dtdp    : delta TP movement
+
+        Returns a modified dtdp after appropriately wrapping the delta theta
         to not cross a physical hardstop. The range_wrap_limits option can be
         any of the values for the shaft_ranges method.
         """
@@ -381,8 +385,10 @@ class PosTransforms(petaltransforms.PetalTransforms):
         wrapped_t = tp0[0] + wrapped_dt
         t_range = self.shaft_ranges(range_wrap_limits)[pc.T]
         if min(t_range) <= wrapped_t <= max(t_range):
-            if (min(t_range) > t or max(t_range) < t) \
-                    or (abs(wrapped_dt) < abs(dt)):
+            if (min(t_range) > t or max(t_range) < t) or abs(wrapped_dt) < abs(dt):
+        # if min(t_range) <= wrapped_t <= max(t_range):
+        #     if (min(t_range) > t or max(t_range) < t) \
+        #             or (abs(wrapped_dt) < abs(dt)):
                 dtdp[0] = wrapped_dt
         return dtdp
 
@@ -512,8 +518,8 @@ if __name__ == '__main__':
     '''
     try several gamma rotaion values here, e.g. 0, 36 deg, 180 deg
     '''
-    petal_alignment = {Tx: 0, Ty: 0, Tz: 0,
-                   alpha: 0, beta: 0, gamma: 36/180*math.pi}
+    petal_alignment = {'Tx': 0, 'Ty': 0, 'Tz': 0,
+                       'alpha': 0, 'beta': 0, 'gamma': 36/180*math.pi}
     trans = PosTransforms(petal_alignment=petal_alignment)
     state = trans.posmodel.state
     state._val['OFFSET_X'], state._val['OFFSET_Y'] = 28.134375, 5.201437
