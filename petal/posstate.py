@@ -48,6 +48,7 @@ class PosState(object):
         if DB_COMMIT_AVAILABLE and (os.getenv('DOS_POSMOVE_WRITE_TO_DB')
                                     in ['True', 'true', 'T', 't', '1']):
             self.write_to_DB = True
+        self.write_to_DB = False  # debug
         # data initialization
         if device_type in ['pos', 'fid', 'ptl']:
             self.type = device_type
@@ -226,8 +227,8 @@ class PosState(object):
             if self.type != 'ptl':
                 self.conf.write()
         else:
-            self.printfunc(f'Loading existing unit config for '
-                           f'device_type = {self.type}, path: {unit_fn}')
+            # self.printfunc(f'Loading existing unit config for '
+            #                f'device_type = {self.type}, path: {unit_fn}')
             self.conf = ConfigObj(unit_fn, unrepr=True, encoding='utf-8')
         self._val = self.conf.dict()
 

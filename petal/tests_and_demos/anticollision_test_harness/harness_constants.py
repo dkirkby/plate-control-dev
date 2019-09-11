@@ -43,5 +43,5 @@ def profile(evaluatable_string):
     cProfile.run(evaluatable_string,statsfile)
     p = pstats.Stats(statsfile)
     p.strip_dirs()
-    p.sort_stats('tottime')
+    p.sort_stats('cumtime')
     p.print_stats(n_stats_lines)

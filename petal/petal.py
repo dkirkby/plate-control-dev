@@ -1210,11 +1210,25 @@ if __name__ == '__main__':
                 db_commit_on=True, local_commit_on=False,
                 simulator_on=True, printfunc=print, verbose=False,
                 sched_stats_on=False)
-    print('Initial posTP of M04078 (make sure inital positions are the same):',
-          ptl.posmodels['M04078'].expected_current_posTP)
+    # print('Dumping initial positions in DB')
+    # init_pos_dump = np.zeros((len(ptl.posids), 3))
+    # for i, posid in enumerate(sorted(ptl.posids)):
+    #     init_pos_dump[i, 0] = int(posid[1:])
+    #     init_pos_dump[i, 1:] = ptl.posmodels[posid].expected_current_posTP
+    # np.savetxt(os.path.join(pc.dirs['temp_files'], 'init_pos_dump.txt'), init_pos_dump)
+    init_pos_dump = np.loadtxt(os.path.join(pc.dirs['temp_files'],
+                                            'init_pos_dump.txt'))
+    init_pos = np.zeros((len(ptl.posids), 3))
+    for i, posid in enumerate(sorted(ptl.posids)):
+        init_pos[i, 0] = int(posid[1:])
+        init_pos[i, 1:] = ptl.posmodels[posid].expected_current_posTP
+    np.savetxt(os.path.join(pc.dirs['temp_files'], 'init_pos_1.txt'), init_pos)
+    print(f'Checking if posids and initial positions of all '
+          f'{init_pos.shape[0]} positioners equal to dump: '
+          f'{np.all(init_pos_dump == init_pos)}')
     posT = np.linspace(0, 360, 6)
     posP = np.linspace(90, 180, 6)
-    for i in range(4):  # 4 targets
+    for i in range(1):  # 4 targets
         print(f'==== target {i}, posTP = ({posT[i]:.3f}, {posP[i]:.3f}) ====')
         request = {'command': 'posTP',
                    'target': (posT[i], posP[i])}

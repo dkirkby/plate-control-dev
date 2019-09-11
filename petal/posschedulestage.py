@@ -1,6 +1,7 @@
 import posconstants as pc
 import posmovetable
 import math
+import time
 
 class PosScheduleStage(object):
     """This class encapsulates the concept of a 'stage' of the fiber
@@ -41,6 +42,7 @@ class PosScheduleStage(object):
         physical range limits of the fiber positioner.)
         """
         for posid in start_posTP:
+
             posmodel = self.collider.posmodels[posid]
             final_posTP = posmodel.trans.addto_posTP(start_posTP[posid], dtdp[posid], range_wrap_limits='targetable')
             true_dtdp = posmodel.trans.delta_posTP(final_posTP, start_posTP[posid], range_wrap_limits='targetable')
@@ -191,7 +193,6 @@ class PosScheduleStage(object):
                 self.collisions_resolved[method].add(self._collision_id(posid,collision_neighbor))
                 if self.verbose:
                     self.printfunc("***collision resolved via " + str(method) + ' for ' + str(posid) + '-' + str(collision_neighbor))                
-                
                 stage_colliding.remove(posid)  
                 if collision_neighbor in stage_colliding: stage_colliding.remove(collision_neighbor)      
                 for pos_id in all_sweeps:
@@ -214,7 +215,6 @@ class PosScheduleStage(object):
                 self.store_collision_finding_results(colliding_sweeps, all_sweeps, requests)
                 if method == 'freeze':
                     self.sweeps[posid].register_as_frozen()
-                return
 
     def find_collisions(self, move_tables):
         """Identifies any collisions that would be induced by executing a collection

@@ -44,7 +44,7 @@ for pos_params in pos_param_sequence:
             state.store(key,val)
         state.write()
     ptl = petal.Petal(petal_id        = petal_id,
-                      petal_loc       = 0,
+                      petal_loc       = 3,
                       posids          = pos_params.keys(),
                       fidids          = fidids,
                       simulator_on    = True,
@@ -71,6 +71,9 @@ for pos_params in pos_param_sequence:
                     request['target'][1] = random.uniform(-max_correction_move,max_correction_move)
                 anticollision = 'freeze'
             hc.profile('ptl.request_targets(requests)')
+            posid =  list(requests.keys())[0]
+            posmodel = list(requests.values())[0]['posmodel']
+            print(posid, 'expected current posTP', posmodel.expected_current_posTP)
             hc.profile('ptl.schedule_send_and_execute_moves(anticollision="'+anticollision+'")')
     if ptl.schedule_stats:
         ptl.schedule_stats.save()
