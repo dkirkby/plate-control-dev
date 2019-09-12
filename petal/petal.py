@@ -174,7 +174,7 @@ class Petal(object):
             if hasattr(self, 'alignment'):
                 # self.alignment found, just re-use it
                 if self.verbose:
-                	self.printfunc('Using existing petal.alignment')
+                        self.printfunc('Using existing petal.alignment')
             else:
                 self.printfunc('Initialisation requires petal.alignment '
                                'attribute to be set, using zeros.')
@@ -186,7 +186,7 @@ class Petal(object):
                                   'gamma': 0}  # z rotation
         else:  # new alingment supplied, overwrite self.aglinment attribute
             self.alignment = alignment
-        	self.printfunc('New petal alignment set:', alignment)
+            self.printfunc('New petal alignment set:', alignment)
         # trans attribute below can be set, but is it used at all by anything?
         # self.trans = PetalTransforms(Tx=self.alignment['Tx'],
         #                              Ty=self.alignment['Ty'],
@@ -991,6 +991,11 @@ class Petal(object):
         if should_reset:
             self._initialize_pos_flags()
         return pos_flags
+
+    # for DOS training
+    def _clear_fault(self):
+        self.comm.clear_fault()
+        return 'SUCCESS'
 
 # MOVE SCHEDULING ANIMATOR CONTROLS
 
