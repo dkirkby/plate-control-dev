@@ -32,7 +32,7 @@ class Rehome(PECS):
         else:  # assume is a list of posids
             self.posids = sorted(selection)
 
-    def rehome(self, posids=None, anticollision='freeze', attempt=0):
+    def rehome(self, posids=None, anticollision='freeze', attempt=1):
         # three atetmpts built in, two with ac freeze, one with ac None
         if posids is None:
             posids = self.posids
@@ -42,8 +42,9 @@ class Rehome(PECS):
                        f'{posids}')
         ret = (ptl.rehome_pos(posids, axis=self.axis,
                               anticollision=anticollision)
-               .rename(columns={'X1': 'posT', 'X2': 'posP'})
+               .rename(columns={'X1': 'posintT', 'X2': 'posintP'})
                .sort_values(by='DEVICE_ID').reset_index())
+        ret['STATUS'] = ptl.decipher_posflags(ret['FLAG'])
         mask = ret['FLAG'] != 4
         retry_list = list(ret['DEVICE_ID'][mask])
         if len(retry_list) == 0:
@@ -52,10 +53,10 @@ class Rehome(PECS):
             self.printfunc(f'{len(retry_list)} unsucessful: {retry_list}\n'
                            f'{ret.loc[mask].reset_index().to_string()}\n'
                            f'Retrying...')
-            if attempt < 2:
-                if attempt == 0:  # set anticollision mode for 2nd attempt
+            if attempt <= 2:
+                if attempt == 1:  # set anticollision mode for 2nd attempt
                     ac = 'freeze'  # 2nd attempt ac mode
-                elif attempt == 1:  # set anticollision mode for 3rd attempt
+                elif attempt == 2:  # set anticollision mode for 3rd attempt
                     ac = None  # 3rd attempt ac mode
                 attempt += 1
                 self.rehome(retry_list, anticollision=ac, attempt=attempt)
@@ -88,6 +89,6 @@ if __name__ == '__main__':
                         f'{pc.filename_timestamp_str_now()}-rehome.csv')
     df.to_csv(path)
     print(f'Rehome data saved to: {path}')
-    user_text = input('Verify rehome positions? (y/n)\n: ')
+    user_text = input('Verify rehome positions? (y/n): ')
     if 'y' in user_text:
         VerifyRehome()

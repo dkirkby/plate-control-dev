@@ -72,11 +72,9 @@ class OnePoint(PECS):
         measured_pos.columns = measured_pos.columns.str.upper()
         self.fvc.set(match_radius=old_radius)  # restore old radius
         used_pos = measured_pos[measured_pos['DEVICE_ID'].isin(posids)] #filter only selected positioners
-        unmatched_used_pos = used_pos[used_pos['FLAGS'] & 1 == 0] #split into unmatched and matched
-        matched_used_pos = used_pos[used_pos['FLAGS'] & 1 != 0]
         # Do analysis with test_and_update_TP
         updates = ptl.test_and_update_TP(
-            matched_used_pos, tp_updates_tol=0.0, tp_updates_fraction=1.0,
+            used_pos, tp_updates_tol=0.0, tp_updates_fraction=1.0,
             tp_updates=mode, auto_update=auto_update)
         # Clean up and record additional entries in updates
         updates['auto_update'] = auto_update
@@ -95,8 +93,7 @@ class OnePoint(PECS):
         updates['target_t'] = target_t
         updates['target_p'] = target_p
         updates['enabled_only'] = enabled_only
-        measured_posids = set(updates['DEVICE_ID'])
-        unmatched = unmatched_used_pos['DEVICE_ID'].values
+        unmatched = set(posids) - set(updates['DEVICE_ID'])
         print(f'Missing {len(unmatched)} of the selected positioners:\n{unmatched}')
         unmatched_used_pos.drop(['Q','S'],axis=1) #Drop QS so we don't get columns QS in updates with NaNs
         updates.append(unmatched_used_pos,ignore_index=True) #List unmeasured positioners in updates, even with no data

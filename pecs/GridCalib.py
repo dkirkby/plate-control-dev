@@ -14,9 +14,9 @@ class Grid(PECS):
         return
 
     def grid_calibration(self,selection=None,n_points_P=5, n_points_T=7,enabled_only=True,auto_update=True,match_radius=80.0):
-        if selection is none:
+        if selection is None:
             posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only).loc[:,'DEVICE_ID'])
-        elif posids[0][0] == 'c': #User passed busids
+        elif selection[0][0] == 'c': #User passed busids
             posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only, busids=selection).loc[:,'DEVICE_ID'])
         else: #assume is a list of posids
             posid_list = selection
@@ -35,8 +35,16 @@ class Grid(PECS):
             measured_positions.rename(columns={'q':'MEASURED_Q','s':'MEASURED_S','flags':'FLAGS', 'id':'DEVICE_ID'},inplace=True)
             used_positions = measured_positions[measured_positions['DEVICE_ID'].isin(posid_list)]
             request.rename(columns={'X1':'TARGET_T','X2':'TARGET_P'}, inplace=True)
-            merged_data = used_positions.merge(request, how='outer',on='DEVICE_ID')
-            meas_data.append(merged_data)
+            merged = used_positions.merge(request, how='outer',on='DEVICE_ID')
+            unmatched_merged = merged.loc[merged['FLAGS'].isnull()]
+            #if unmatched_merged.empty:
+            #    unmatched_merged = merged[merged['FLAGS'] & 1 == 0] #split into unmatched and matched
+            #    matched_merged = merged[merged['FLAGS'] & 1 != 0]
+            #else:
+            matched_merged = merged.loc[merged['FLAGS'].notnull()]
+            unmatched = unmatched_merged['DEVICE_ID'].values
+            print(f'Missing {len(unmatched)} of the selected positioners:\n{unmatched}')
+            meas_data.append(merged)
         self.fvc.set(match_radius=old_radius)
         updates = self.ptls[self.ptlid].calibrate_from_grid_data(meas_data,auto_update=auto_update)
         updates['match_radius'] = match_radius
@@ -47,6 +55,7 @@ class Grid(PECS):
 if __name__ == '__main__':
     grid = Grid()
     user_text = input('Please list BUSIDs or POSIDs (not both) seperated by spaces, leave it blank to use all on petal: ')
+    user_text = input('Please list BUSIDs or POSIDs (not both) seperated by spaces, leave it blank to use all on petal: ')
     if user_text != '':
         user_text = user_text.split()
         selection = []
@@ -54,7 +63,13 @@ if __name__ == '__main__':
             selection.append(item)
     else:
         selection = None
-    updates = grid.grid_calibration(selection=selection)
+    print('You chose: %s' % selection)
+    user_text = input('Automatically update calibration? (y/n) ')
+    if 'y' in user_text:
+        auto_update = True
+    else:
+        auto_update = False
+    updates = grid.grid_calibration(selection=selection, auto_update=auto_update)
     print(updates)
     updates.to_csv(os.path.join(
             pc.dirs['all_logs'], 'calib_logs',

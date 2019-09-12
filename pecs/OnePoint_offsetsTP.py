@@ -24,7 +24,9 @@ if __name__ == '__main__':
         auto_update = False
     updates = op.one_point_calib(selection=selection, mode='offsetsTP',
                                  auto_update=auto_update, tp_target=tp_target)
-    updates.to_csv(os.path.join(
-        pc.dirs['all_logs'], 'calib_logs',
-        f'{pc.filename_timestamp_str_now()}-onepoint_calibration-offsetsTP.csv'))
+    path = os.path.join(
+        pc.dirs['calib_logs'],
+        f'{pc.filename_timestamp_str_now()}-onepoint_calib-offsetsTP.csv')
+    updates.to_csv(path)
     print(updates[['DEVICE_ID','OFFSET_T','OFFSET_P','OLD_OFFSET_T','OLD_OFFSET_P','dT','dP']])
+    print(f'OnePoint offsetsTP data saved to: {path}')
