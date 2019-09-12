@@ -1204,7 +1204,6 @@ class Petal(object):
 
 
 if __name__ == '__main__':
-<<<<<<< .working
     '''
     python -m cProfile -s cumtime petal.py
     '''

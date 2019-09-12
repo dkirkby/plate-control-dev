@@ -456,6 +456,7 @@ class PosSchedule(object):
                 self.printfunc('Posschedule first move table:', list(stage.move_tables.values())[0].for_collider())
             colliding_sweeps, all_sweeps = stage.find_collisions(
                 stage.move_tables)
+            # find_t_total += t_section  # debug
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             attempts_remaining = self.max_path_adjustment_passes
             # take this out once stage.colliding is working
