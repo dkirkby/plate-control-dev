@@ -1,8 +1,8 @@
 import numpy as np
-from postransforms import PosTransforms
 import posconstants as pc
 
 
+# %% rotation matrices
 def Rx(angle):  # all in radians
     Rx = np.array([
                    [1.0,           0.0,            0.0],
@@ -34,6 +34,21 @@ def Rxyz(alpha, beta, gamma):  # yaw-pitch-roll system, all in radians
     return Rz(gamma) @ Ry(beta) @ Rx(alpha)  # @ is matrix multiplication
 
 
+def typecast(x):
+    if type(x) is list or tuple:  # 2 or 3 coordinates, reshape into column vec
+        return np.array(x).reshape(len(x), 1)
+    elif type(x) is np.ndarray:
+        if x.ndim == 1:  # a 1D array of 2 or 3 coordinates
+            return x.reshape(x.size, 1)  # reshape into column vector
+        elif x.ndim == 2:  # 2D array, assume each column is a column vector
+            return x
+        else:
+            raise ValueError(f'Wrong numpy array dimension: {x.ndim}')
+    else:
+        raise TypeError(f'Wrong data type: {type(x)}')
+
+
+# %% class definition
 class PetalTransforms(object):
     """
     This class provides transformations between the petal local nominal
@@ -44,7 +59,7 @@ class PetalTransforms(object):
 
     trans_keys = ['petal_offset_x', 'petal_offset_y', 'petal_offset_z',
                   'petal_rot_x', 'petal_rot_y', 'petal_rot_z']
-    which are the input variables, Tx, Ty, Tz in mm, alpha, beta, gamma in deg
+    which are the input variables, Tx, Ty, Tz in mm, alpha, beta, gamma in rad
 
     For forward transformation,
     the transformation defined by these 6 parameters can act on
@@ -65,180 +80,235 @@ class PetalTransforms(object):
 
     The coordinate systems are:
 
-        metXYZ:     (x,y,z) measured device center locations on the aspheric
-                    focal surface, local to an individual petal,
-                    with some arbitrary origin for each petal, such that
-                    metrology data are overall closest to nomial specs in CAD.
-                    These are the projected fibre tip or FIF pinhole centre
-                    coordinates reported from the metrology
-                    (x_meas_proj, y_meas_proj, z_meas_proj), assuming
-                    perfectly built positioners.
+        ptlXYZ:     position of a point in the petal's local coordinate system
+                    according to the CAD design (overlaps with location 3)
+
         obsXYZ:     (x,y,z) global cartesian coordinates on the focal plate
                     cenetered on optical axis, looking at fiber tips
+
         QS:         (q,s) global coordinates on the focal plate, per DESI-0742
                     q is the angle about the optical axis
                     s is the path distance from optical axis,
                     along the curved focal surface,
                     within a plane that intersects the optical axis
 
+        obsXY:      2D projection of obsXY Zabove in CS5
+
+        flatXY:     (x, y) global to focal plate, with focal plate slightly
+                    stretched out and flattened (used for anti-collision)
+
     With QS coordinates, PosTransforms converts into any other
     positioner-specific CS. The wrappers here convert a list of positioner
     coordinates, but that is not acturally supported in PosTransforms.
     We may want to get rid them and unify our transformation methods.
+
+    All methods take list or np.ndarray input as handled in typecast() above.
+    Set optional arg cast=True when feeding a non-column-vector-based array.
+
+    The option "curved" sets whether we are looking at a flat focal plane
+    (such as a laboratory test stand), or a true petal, with its asphere.
+    When curved == False, PosTransforms will treat S as exactly equal to the
+    radius R.
     """
 
     dtb_device_ids = [543, 544, 545]  # three datum tooling balls on a petal
 
-    def __init__(self, Tx=0, Ty=0, Tz=0, alpha=0, beta=0, gamma=0):
-        self.postrans = PosTransforms(curved=True)
+    def __init__(self, Tx=0, Ty=0, Tz=0, alpha=0, beta=0, gamma=0,
+                 curved=True):  # input in mm and radians
+        # self.postrans = PosTransforms(curved=True)
         # tanslation matrix from petal nominal CS to CS5, column vector
         self.T = np.array([Tx, Ty, Tz]).reshape(3, 1)
         # orthogonal rotation matrix
-        self.R = Rxyz(np.radians(alpha), np.radians(beta), np.radians(gamma))
+        self.R = Rxyz(alpha, beta, gamma)
+        self.curved = curved
 
-    def metXYZ_to_obsXYZ(self, metXYZ):
+    # %% fundamental transformations
+    def ptlXYZ_to_obsXYZ(self, ptlXYZ, cast=False):
         """
-        INPUT:  3 x N array, each column vector is metXYZ
+        INPUT:  3 x N array, each column vector is ptlXYZ
         OUTPUT: 3 x N array, each column vector is obsXYZ
         """
-        return self.R @ metXYZ + self.T  # forward transformation
+        if cast:
+            ptlXYZ = typecast(ptlXYZ)
+        return self.R @ ptlXYZ + self.T  # forward transformation
 
-    def obsXYZ_to_metXYZ(self, obsXYZ):
+    def obsXYZ_to_ptlXYZ(self, obsXYZ, cast=False):
         """
         INPUT:  3 x N array, each column vector is obsXYZ
-        OUTPUT: 3 x N array, each column vector is metXYZ
+        OUTPUT: 3 x N array, each column vector is ptlXYZ
         """
-        return self.R.T @ (obsXYZ - self.T)  # backward transformation
+        if cast:
+            obsXYZ = typecast(obsXYZ)
+        return self.R.T @ (typecast(obsXYZ) - self.T)  # backward transform
 
-    def obsXYZ_to_QS(self, obsXYZ):
-        """Transforms list of obsXYZ coordinates into QS system.
+    def ptlXY_to_obsXY(self, ptlXY, cast=False):
+        """
+        INPUT:  2 x N array, each column vector is ptlXY
+        OUTPUT: 2 x N array, each column vector is obsXY
+        On-shell condition is enforced because Z coordinates necessrily mix
+        with XY when doing a (more accurate in principle) 3D transformation
+        """
+        if cast:
+            ptlXY = typecast(ptlXY)
+        R = np.sqrt(np.square(ptlXY[0, :]) + np.square(ptlXY[1, :]))
+        ptlXYZ = np.vstack([ptlXY, pc.R2Z_lookup(R)])
+        return self.ptlXYZ_to_obsXYZ(ptlXYZ)[:2, :]  # only take first 2 rows
+
+    def obsXY_to_ptlXY(self, obsXY, cast=False):
+        """
+        INPUT:  2 x N array, each column vector is obsXY
+        OUTPUT: 2 x N array, each column vector is ptlXY
+        On-shell condition is enforced
+        """
+        if cast:
+            obsXY = typecast(obsXY)
+        R = np.sqrt(np.square(obsXY[0, :]) + np.square(obsXY[1, :]))
+        obsXYZ = np.vstack([obsXY, pc.R2Z_lookup(R)])
+        return self.obsXYZ_to_ptlXYZ(obsXYZ)[:2, :]  # only take first 2 rows
+
+    # %% QS transforms (only need 2D)
+    def obsXY_to_QS(self, obsXY, curved=None, cast=False):
+        """
+        input:  2 x N array
+        output: 2 x N array, each column vector is QS
+        """
+        if cast:
+            obsXY = typecast(obsXY)
+        if curved is None:  # allow forcing flatXY despite curved instance
+            curved = self.curved
+        X, Y = obsXY[0, :], obsXY[1, :]
+        Q = np.degrees(np.arctan2(Y, X))  # Y over X
+        R = np.sqrt(np.square(X) + np.square(Y))
+        S = pc.R2S_lookup(R) if curved else R
+        return np.array([Q, S])
+
+    def QS_to_obsXY(self, QS, curved=None, cast=False):
+        """
+        input:  2 x N array, each column vector is QS
+        output: 2 x N array
+        """
+        if cast:
+            QS = typecast(QS)
+        if curved is None:  # allow forcing flatXY despite curved instance
+            curved = self.curved
+        Q_rad, S = np.radians(QS[0, :]), QS[1, :]
+        R = pc.S2R_lookup(S) if curved else S
+        X = R * np.cos(Q_rad)
+        Y = R * np.sin(Q_rad)
+        return np.array([X, Y])
+
+    def obsXYZ_to_QS(self, obsXYZ, curved=None, cast=False):
+        """Transform obsXYZ coordinates into QS system.
+        Z data (in 3rd row) aren't used at all, as X and Y are sufficient.
         INPUT:  3 x N array, each column vector is obsXYZ
         OUTPUT: 2 x N array of corresponding [[q0,s0],[q1,s1],...]
         """
-        ret = np.zeros((2, obsXYZ.shape[1]))
-        for i in range(obsXYZ.shape[1]):  # loop over all column vectors
-            ret[:, i] = self.postrans.obsXY_to_QS([obsXYZ[0, i], obsXYZ[1, i]])
-        return ret
+        if cast:
+            obsXYZ = typecast(obsXYZ)
+        if curved is None:  # allow forcing flatXY despite curved instance
+            curved = self.curved
+        return self.obsXY_to_QS(obsXYZ[:2, :], curved=curved)
 
-    def QS_to_obsXYZ(self, QS):
-        """Transforms list of obsXYZ coordinates into QS system.
+    def QS_to_obsXYZ(self, QS, curved=None, cast=False):
+        """Transforms list of QS coordinates into obsXYZ system.
+        On-shell condition is enforced
         INPUT:  2 x N array, each column vector is QS
         OUTPUT: 3 x N array, each column vector is obsXYZ
-
-        Note that because QS is only 2 dimensional,
-        the Z coordinate is a nominal value looked up from the Echo22 asphere.
         """
-        ret = np.zeros((3, QS.shape[1]))
-        for i in range(QS.shape[1]):  # loop over all column vectors
-            ret[:2, i] = self.postrans.QS_to_obsXY([QS[0, i], QS[1, i]])
-            r = np.sqrt(np.sum(np.square(ret[:2, i])))
-            ret[2, i] = pc.R2Z_lookup(r)
-        return ret
+        if cast:
+            QS = typecast(QS)
+        if curved is None:  # allow forcing flatXY despite curved instance
+            curved = self.curved
+        obsXY = self.QS_to_obsXY(QS, curved=curved)
+        R = np.sqrt(np.square(obsXY[0, :]) + np.square(obsXY[1, :]))
+        Z = pc.R2Z_lookup(R)
+        return np.vstack([obsXY, Z])  # add z data to the 3rd row
 
-    def metXYZ_to_QS(self, metXYZ):
+    # %% flatXY transforms
+    def QS_to_flatXY(self, QS, cast=False):
         """
-        INPUT:  3 x N array, each column vector is metXYZ
+        INPUT:  2 x N array, each column vector is QS
+        OUTPUT: 2 x N array, each column vector is flatXY
+        """
+        if cast:
+            QS = typecast(QS)
+        return self.QS_to_obsXY(QS, curved=False)
+
+    def flatXY_to_QS(self, flatXY, cast=False):
+        """
+        INPUT:  2 x N array, each column vector is flatXY
+        OUTPUT: 2 x N array, each column vector is QS
+        """
+        if cast:
+            flatXY = typecast(flatXY)
+        return self.obsXY_to_QS(flatXY, curved=False)
+
+    # %% composite transformations for convenience
+    def ptlXYZ_to_QS(self, ptlXYZ, cast=False):
+        """
+        INPUT:  3 x N array, each column vector is ptlXYZ
         OUTPUT: 2 x N array of corresponding [[q0,s0],[q1,s1],...]
         """
-        obsXYZ = self.metXYZ_to_obsXYZ(metXYZ)
+        if cast:
+            ptlXYZ = typecast(ptlXYZ)
+        obsXYZ = self.ptlXYZ_to_obsXYZ(ptlXYZ)
         return self.obsXYZ_to_QS(obsXYZ)
 
-    def QS_to_metXYZ(self, QS):
-        """Transforms list of QS coordinates into metXYZ system.
-        INPUT:  [N][2] array of [[q0,s0],[q1,s1],...]
-        OUTPUT: 3 x N array, each column vector is metXYZ
+    def QS_to_ptlXYZ(self, QS, cast=False):
         """
+        INPUT:  2 x N array of corresponding [[q0,s0],[q1,s1],...]
+        OUTPUT: 3 x N array, each column vector is ptlXYZ
+        """
+        if cast:
+            QS = typecast(QS)
         obsXYZ = self.QS_to_obsXYZ(QS)
-        return self.obsXYZ_to_metXYZ(obsXYZ)
+        return self.obsXYZ_to_ptlXYZ(obsXYZ)
+
+    def ptlXY_to_QS(self, ptlXY, cast=False):
+        if cast:
+            ptlXY = typecast(ptlXY)
+        obsXY = self.ptlXY_to_obsXY(ptlXY)
+        return self.obsXY_to_QS(obsXY)
+
+    def QS_to_ptlXY(self, QS, cast=False):
+        if cast:
+            QS = typecast(QS)
+        obsXY = self.QS_to_obsXY(QS)
+        return self.obsXY_to_ptlXY(obsXY)
+
+    def obsXY_to_flatXY(self, obsXY, cast=False):
+        """Composite transformation, performs obsXY --> QS --> flatXY"""
+        if cast:
+            obsXY = typecast(obsXY)
+        QS = self.obsXY_to_QS(obsXY)
+        return self.QS_to_flatXY(QS)
+
+    def flatXY_to_obsXY(self, flatXY, cast=False):
+        """Composite transformation, performs flatXY --> QS --> obsXY"""
+        if cast:
+            flatXY = typecast(flatXY)
+        QS = self.flatXY_to_QS(flatXY)
+        return self.QS_to_obsXY(QS)
 
 
+# %% main
 if __name__ == '__main__':
-    """The code below allows you to test out the transforms on a real-world
-    set of report files formatted per DESI-2850.
-    Probably not working after the changes.
     """
-    import os
-    import csv
-    import tkinter
-    import tkinter.filedialog
+    Unit test, choose location 4, which is 36 degrees of rotation ccw
+    Taken from petal alignment data， PTL04
+    T = [0.01261281, 0.068910657, 0.017850711]
+    angles = [0.001382631,	-0.002945219,	35.9887675]
+    dtb0_543 = [11.671,	23.542,	-81.893] in CS5
+    [23.233778, 12.1450584, -81.9095268] in petal CS
 
-    gui_root = tkinter.Tk()
-    initialdir = os.getcwd()
-    filetypes = (("CSV file", "*.csv"), ("All Files", "*")),
-    files = {key: '' for key in ['petal_metrology', 'focal_plane_metrology']}
-    data = {}
-    for key in files:
-        message = 'Select ' + key + ' file.'
-        files[key] = tkinter.filedialog.askopenfilename(
-            initialdir=initialdir, filetypes=filetypes, title=message)
-        if files[key]:
-            with open(files[key], 'r', newline='') as csvfile:
-                reader = csv.DictReader(csvfile)
-                data[key] = {field: [] for field in reader.fieldnames}
-                for row in reader:
-                    for field in reader.fieldnames:
-                        data[key][field].append(float(row[field]))
-        initialdir = os.path.split(files[key])[0]
-    if all([key in data for key in files]):
-        petal_id = data['petal_metrology']['petal_id'][0]
-        n = len(data['petal_metrology']['x_meas_proj'])
-        metXYZ = []
-        for i in range(n):
-            this_xyz = [data['petal_metrology'][field][i] for field in
-                        ['x_meas_proj', 'y_meas_proj', 'z_meas_proj']]
-            metXYZ.append(this_xyz)
-        trans_row = data['focal_plane_metrology']['petal_id'].index(petal_id)
-        transforms = {field: data['focal_plane_metrology'][field][trans_row]
-                      for field in PetalTransforms().trans_keys}
-        petal_trans = PetalTransforms(transforms)
-        QS = petal_trans.metXYZ_to_QS(metXYZ)
-        checkXYZ = petal_trans.QS_to_metXYZ(QS)
-        initialdir = os.path.split(files['petal_metrology'])[0]
-        initialfile = 'results_petal_' + str(int(petal_id)) + '.csv'
-        message = 'Save results as'
-        savefile = tkinter.filedialog.asksaveasfilename(
-            initialdir=initialdir, initialfile=initialfile,
-            filetypes=filetypes, title=message)
-        if savefile:
-            with open(savefile, 'w', newline='') as csvfile:
-                writer = csv.DictWriter(
-                    csvfile,
-                    fieldnames=['device_loc', 'metX', 'metY', 'metZ',
-                                'Q', 'S', 'ballX', 'ballY', 'ballZ',
-                                'checkX', 'checkY', 'checkZ',
-                                'errX', 'errY', 'errZ'])
-                writer.writeheader()
-                for i in range(n):
-                    row = {}
-                    row['device_loc'] = int(
-                        data['petal_metrology']['device_loc'][i])
-                    row['metX'] = metXYZ[i][0]
-                    row['metY'] = metXYZ[i][1]
-                    row['metZ'] = metXYZ[i][2]
-                    is_ball = (
-                        row['device_loc'] in PetalTransforms().dtb_device_ids)
-                    if not is_ball:
-                        row['Q'] = QS[i][0]
-                        row['S'] = QS[i][1]
-                        row['checkX'] = checkXYZ[i][0]
-                        row['checkY'] = checkXYZ[i][1]
-                        row['checkZ'] = checkXYZ[i][2]
-                        for letter in ['X', 'Y', 'Z']:
-                            row['err'+letter] = \
-                                row['check'+letter] - row['met'+letter]
-                    else:
-                        ballXYZ = petal_trans.metXYZ_to_obsXYZ(metXYZ[i])[0]
-                        row['ballX'] = ballXYZ[0]
-                        row['ballY'] = ballXYZ[1]
-                        row['ballZ'] = ballXYZ[2]
-                        for letter in ['X', 'Y', 'Z']:
-                            field = [field for field in
-                                     data['focal_plane_metrology']
-                                     if str(row['device_loc']) in field
-                                     and letter.lower() in field][0]
-                            row['check'+letter] = \
-                                data['focal_plane_metrology'][field][trans_row]
-                            row['err'+letter] = \
-                                row['ball'+letter] - row['check'+letter]
-                    writer.writerow(row)
-    gui_root.withdraw()
+    """
+    ptltrans = PetalTransforms(Tx=0.01261281, Ty=0.068910657, Tz=0.017850711,
+                               alpha=0.001382631,
+                               beta=-0.002945219,
+                               gamma=35.9887675/180*np.pi)
+    obsXYZ_actual = np.array([11.671,	23.542,	-81.893]).reshape(3, 1)
+    ptlXYZ_actual = np.array([23.2337, 12.1450, -81.9095]).reshape(3, 1)
+    obsXYZ = ptltrans.ptlXYZ_to_obsXYZ(ptlXYZ_actual)
+    ptlXYZ = ptltrans.obsXYZ_to_ptlXYZ(obsXYZ_actual)
+    print(f'obsXYZ, actual: {obsXYZ_actual.T}\ntransformed: {obsXYZ.T}\n'
+          f'ptlXYZ, actual: {ptlXYZ_actual.T}\ntransformed: {ptlXYZ.T}')

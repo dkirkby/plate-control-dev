@@ -60,7 +60,7 @@ class Petal(object):
                  collider_file=None, sched_stats_on=False):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
-        self.printfunc(f'Running code version: {pc.code_version}')
+        self.printfunc(f'Running plate_control version: {pc.code_version}')
         self.printfunc(f'poscollider used: {poscollider.__file__}')
         # petal setup
         if None in [petal_id, petalbox_id, fidids, posids, shape]:
@@ -83,7 +83,6 @@ class Petal(object):
             if shape is None:
                 self.printfunc('Reading shape from petal_state')
                 shape = self.petal_state.conf['SHAPE']
-
         self.petalbox_id = petalbox_id
         self.petal_id = int(petal_id)
         self.shape = shape
@@ -109,11 +108,10 @@ class Petal(object):
         self.altered_calib_states = set()
         self._last_state = {}
 
-
         # must call the following 3 methods whenever petal alingment changes
         self.init_trans()
         self.init_posmodels(posids)
-        self.init_collider(collider_file, anticollision)
+        self._init_collider(collider_file, anticollision)
 
         # fiducials setup
         self.fidids = {fidids} if isinstance(fidids,str) else set(fidids)
@@ -157,16 +155,18 @@ class Petal(object):
         '''
         if alignment is None:
             # no alingment supplied, try to find self.alingment attribute
-            if not(hasattr(self, 'alignment')):
-                # attribute not existent, runnin without ICS, load cfg
-                self.alignment = {'Tx': self.petal_state.conf['X_OFFSET'],
-                                  'Ty': self.petal_state.conf['Y_OFFSET'],
+            if hasattr(self, 'alignment'):
+                # self.alignment found, just re-use it
+                pass
+            else:
+                self.printfunc('Initialisation requires either alignment'
+                               'to be set, using zeros.')
+                self.alignment = {'Tx': 0,  # x translation
+                                  'Ty': 0,  # y translation
                                   'Tz': 0,  # z translation in mm
                                   'alpha': 0,  # x rotation in deg
                                   'beta': 0,  # y rotation in deg
-                                  'gamma': self.petal_state.conf['ROTATION']}
-            else:  # self.alignment found, just re-use it
-                pass
+                                  'gamma': 0}  # z rotation
         else:  # new alingment supplied, overwrite self.aglinment attribute
             self.alignment = alignment
         self.trans = PetalTransforms(Tx=self.alignment['Tx'],
@@ -186,13 +186,13 @@ class Petal(object):
         self.posmodels = {}  # key posid, value posmodel instance
         self.states = {}  # key posid, value posstate instance
         self.devices = {}  # key device_location_id, value posid
-        installed_on_asphere = self.shape == 'petal'
+        self.shape == 'petal'
         for posid in posids:
             self.states[posid] = posstate.PosState(
                 posid, logging=self.local_log_on, device_type='pos',
                 printfunc=self.printfunc, petal_id=self.petal_id)
-            self.posmodels[posid] = PosModel(self.states[posid],
-                                             installed_on_asphere)
+            self.posmodels[posid] = PosModel(state=self.states[posid],
+                                             petal_alignment=self.alignment)
             self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
         self.posids = set(self.posmodels.keys())
         self.canids_where_tables_were_just_sent = []
@@ -204,9 +204,8 @@ class Petal(object):
         self.set_motor_parameters()
         self.power_supply_map = self._map_power_supplies_to_posids()
 
-    def init_collider(self, collider_file=None, anticollision='freeze'):
+    def _init_collider(self, collider_file=None, anticollision='freeze'):
         '''collider, scheduler, and animator setup
-        this needs to be called whenever petal alignment changes upon slew
         '''
         if hasattr(self, 'anticol_settings'):
             self.printfunc('Using provided anticollision settings')
@@ -218,11 +217,8 @@ class Petal(object):
                 configfile=collider_file, collision_hashpp_exists=False,
                 collision_hashpf_exists=False, hole_angle_file=None)
             # self.anticol_settings = self.collider.config
-        self.printfunc(f'Collider setting: {self.collider.config}')  # debug
-        assert hasattr(self, 'alignment')  # require petal alignment to be set
-        self.collider.set_petal_offsets(x0=self.alignment['Tx'],
-                                        y0=self.alignment['Ty'],
-                                        rot=self.alignment['gamma'])
+        if self.verbose:
+            self.printfunc(f'PosCollider setting: {self.collider.config}')
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
         # this should be turned on/off using the animation start/stop
@@ -287,6 +283,8 @@ class Petal(object):
             pos_flags ... dict keyed by positioner indicating which flag as indicated below that a
                           positioner should receive going to the FLI camera with fvcproxy
         """
+        if self.verbose:
+            self.printfunc(f'petal: requests received {len(requests)}')
         marked_for_delete = set()
         for posid in requests:
             requests[posid]['posmodel'] = self.posmodels[posid]
@@ -303,8 +301,12 @@ class Petal(object):
                 accepted = self.schedule.request_target(posid, requests[posid]['command'], requests[posid]['target'][0], requests[posid]['target'][1], requests[posid]['log_note'])
                 if not accepted:
                     marked_for_delete.add(posid)
+                    # self.printfunc(f'deleting {posid} for target rejected')
         for posid in marked_for_delete:
             del requests[posid]
+        if self.verbose:
+            self.printfunc(f'petal: requests approved {len(requests)} '
+                           f'{len(marked_for_delete)} delected')
         return requests
 
     def request_direct_dtdp(self, requests, cmd_prefix=''):
@@ -740,7 +742,6 @@ class Petal(object):
         else:
             return hw_state
 
-
     def _get_hardware_state(self):
         '''
         Loops through keys in self._last_state to compare with what the
@@ -771,13 +772,13 @@ class Petal(object):
         else:
             return 'READY'
 
-        def reset_petalbox(self):
-            """Reset all errors and turn all enables off.  This method
-            returns the petalbox to its default safe state (how it comes up prior to
-            communicating with the petal).
-            """
-            if not self.simulator_on:
-                self.comm.configure()
+    def reset_petalbox(self):
+        """Reset all errors and turn all enables off.  This method
+        returns the petalbox to its default safe state (how it comes up prior to
+        communicating with the petal).
+        """
+        if not self.simulator_on:
+            self.comm.configure()
 
 # GETTERS, SETTERS, STATUS METHODS
 
@@ -885,26 +886,29 @@ class Petal(object):
         to the internal tracking of its posmodel object. Returns a two element
         list. Valid keys are:
 
-            'QS', 'flatXY', 'obsXY', 'posXY', 'obsTP', 'posTP', 'motTP'
+            'posintTP, 'poslocXY', 'poslocTP',
+            'QS', 'flatXY', 'obsXY', 'ptlXY', 'motTP'
 
         See comments in posmodel.py for explanation of these values.
         """
-        if key == 'posTP':
-            return self.posmodels[posid].expected_current_posTP
-        elif key == 'obsTP':
-            return self.posmodels[posid].expected_current_obsTP
+        if key == 'posintTP':
+            return self.posmodels[posid].expected_current_posintTP
+        elif key == 'poslocTP':
+            return self.posmodels[posid].expected_current_poslocTP
         else:
             vals = self.posmodels[posid].expected_current_position
             if key == 'obsXY':
-                return [vals['obsX'],vals['obsY']]
+                return [vals['obsX'], vals['obsY']]
             elif key == 'QS':
-                return [vals['Q'],vals['S']]
-            elif key == 'posXY':
-                return [vals['posX'],vals['posY']]
+                return [vals['Q'], vals['S']]
+            elif key == 'poslocXY':
+                return [vals['poslocX'], vals['poslocY']]
+            elif key == 'poslocTP':
+                return [vals['poslocT'], vals['poslocT']]
             elif key == 'flatXY':
-                return [vals['flatX'],vals['flatY']]
+                return [vals['flatX'], vals['flatY']]
             elif key == 'motorTP':
-                return [vals['motT'],vals['motP']]
+                return [vals['motT'], vals['motP']]
             else:
                 self.printfunc('Unrecognized key ' + str(key) + ' in request for expected_current_position of posid ' + str(posid) + '.')
 
@@ -1200,14 +1204,17 @@ class Petal(object):
 
 
 if __name__ == '__main__':
+    '''
+    python -m cProfile -s cumtime petal.py
+    '''
     import numpy as np
     from configobj import ConfigObj
-    cfg = ConfigObj(
+    cfg = ConfigObj(  # posids and fidids
         "/home/msdos/focalplane/fp_settings/ptl_settings/unit_03.conf",
         unrepr=True, encoding='utf-8')
     ptl = Petal(petal_id=3, petal_loc=0,
                 posids=cfg['POS_IDS'], fidids=cfg['FID_IDS'],
-                db_commit_on=True, local_commit_on=False,
+                db_commit_on=True, local_commit_on=False, local_log_on=False,
                 simulator_on=True, printfunc=print, verbose=False,
                 sched_stats_on=False)
     # print('Dumping initial positions in DB')
@@ -1228,12 +1235,12 @@ if __name__ == '__main__':
           f'{np.all(init_pos_dump == init_pos)}')
     posT = np.linspace(0, 360, 6)
     posP = np.linspace(90, 180, 6)
-    for i in range(1):  # 4 targets
+    for i in range(4):
         print(f'==== target {i}, posTP = ({posT[i]:.3f}, {posP[i]:.3f}) ====')
-        request = {'command': 'posTP',
+        request = {'command': 'posintTP',
                    'target': (posT[i], posP[i])}
         requests = {posid: request for posid in ptl.posids}
         ptl.request_targets(requests)
         ptl.schedule_moves(anticollision='adjust')
         ptl.send_and_execute_moves()
-    # ptl.schedule_stats.save()
+    # ptl.schedule_stats.save()>>>>>>> .merge-right.r127109

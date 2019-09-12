@@ -308,8 +308,8 @@ class PosCollider(object):
         if self.fixed_neighbor_cases[posid]:
             if self.collision_hashpf_exists:
                 loc_id = self.posmodels[posid].deviceloc
-                dx = abs(self.x0[posid] - self.posmodels[posid].expected_current_position['obsX'])
-                dy = abs(self.y0[posid] - self.posmodels[posid].expected_current_position['obsY'])
+                dx = abs(self.x0[posid] - self.posmodels[posid].expected_current_position['ptlX'])
+                dy = abs(self.y0[posid] - self.posmodels[posid].expected_current_position['ptlY'])
                 code = lookup.make_code_pf(loc_id, dx, dy, obsTP[0], obsTP[1])
                 if code in self.table_pf:
                     return self.table_pf[code]
@@ -499,6 +499,7 @@ class PosSweep(object):
         """Fills in a sweep object based on the input table. Time and position
         are handled continuously and exactly (i.e. not yet quantized).
         """
+        # import pdb; pdb.set_trace()
         time = [start_time]
         tp = [[init_obsTP[0]],[init_obsTP[1]]]
         tp_dot = [[0],[0]]
@@ -531,6 +532,7 @@ class PosSweep(object):
         all as a function of discrete time. The quantization is according to the
         parameter 'timestep'.
         """
+        # import pdb; pdb.set_trace()
         discrete_time = [self.time[0]]
         discrete_position = np.array([[self.tp[pc.T,0]],[self.tp[pc.P,0]]])
         speed = np.array([[self.tp_dot[pc.T,0]],[self.tp_dot[pc.P,0]]])

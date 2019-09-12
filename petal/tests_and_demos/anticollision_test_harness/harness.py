@@ -11,7 +11,7 @@ import posstate
 import random
 
 # Selection of device location ids (which positioners on petal).
-locations_all = 'all'
+# locations_all = 'all'
 locations_near_gfa = {309,328,348,368,389,410,432,454,474,492,508,521,329,349,369,390,411,433,455,475,493,509,522,532,330,350,370,391,412,434,456,476,494,510,523,533,351,371,392,413,435,457,477,495,511,524,372,393,414,436,458,512,525,415,437,459,526}
 device_loc_ids = 'all' # make the selection here
 
@@ -52,7 +52,7 @@ for pos_params in pos_param_sequence:
                       local_commit_on = False,
                       local_log_on    = False,
                       collider_file   = None,
-                      sched_stats_on  = True,
+                      sched_stats_on  = False,
                       anticollision   = 'adjust')
     if should_animate:
         ptl.start_gathering_frames()
@@ -62,7 +62,9 @@ for pos_params in pos_param_sequence:
         m += 1
         for n in range(n_corrections + 1):
             print(' move: ' + str(m) + ' of ' + str(mtot) + ', submove: ' + str(n))
-            requests = {ptl.devices[loc_id]:{'command':data['command'], 'target':[data['u'],data['v']]} for loc_id,data in move_request_data.items()}
+            requests = {ptl.devices[loc_id]: {'command': 'poslocXY',  # data['command'],
+                                              'target': [data['u'], data['v']]}
+                        for loc_id,data in move_request_data.items()}
             anticollision = 'adjust'
             if n > 0:
                 for request in requests.values():
@@ -71,9 +73,10 @@ for pos_params in pos_param_sequence:
                     request['target'][1] = random.uniform(-max_correction_move,max_correction_move)
                 anticollision = 'freeze'
             hc.profile('ptl.request_targets(requests)')
+            # ptl.request_targets(requests)
             posid =  list(requests.keys())[0]
             posmodel = list(requests.values())[0]['posmodel']
-            print(posid, 'expected current posTP', posmodel.expected_current_posTP)
+            print(posid, 'expected current posintTP', posmodel.expected_current_posintTP)
             hc.profile('ptl.schedule_send_and_execute_moves(anticollision="'+anticollision+'")')
     if ptl.schedule_stats:
         ptl.schedule_stats.save()

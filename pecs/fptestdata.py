@@ -163,16 +163,16 @@ class FPTestData:
         existing attributes required (see xytest.py):
             self.ptlids
         '''
-        # build column names and data types
+        # build column names and data types, all in global CS5
         cols0 = ['timestamp', 'cycle', 'move_log']
         dtypes0 = ['datetime64[ns]', np.uint32, str]
         cols1 = ['target_x', 'target_y']
         cols2_base = ['meas_x', 'meas_y', 'err_x', 'err_y', 'err_xy',
-                      'pos_t', 'pos_p', 'pos_flag', 'pos_status']
-        cols2 = []
+                      'pos_int_t', 'pos_int_p', 'pos_flag', 'pos_status']
+        cols2 = []  # add suffix for base column names corrective moves
         for field, i in product(cols2_base, range(self.num_corr_max+1)):
             cols2.append(f'{field}_{i}')
-        cols = cols0 + cols1 + cols2
+        cols = cols0 + cols1 + cols2  # list of all columns
         dtypes = dtypes0 + [np.float32] * (len(cols1) + len(cols2))
         data = {col: pd.Series(dtype=dt) for col, dt in zip(cols, dtypes)}
         # build multi-level index
@@ -202,11 +202,11 @@ class FPTestData:
 
     def make_summary_plot(self, posid):  # make one plot for a given posid
         row = self.posdf.loc[posid]  # row containing calibration values
-        ptlid, offX, offY, r1, r2, posT = row[
+        ptlid, offX, offY, r1, r2, posintT = row[
             ['PETAL_ID', 'OFFSET_X', 'OFFSET_Y', 'LENGTH_R1', 'LENGTH_R2',
              'targetable_range_T']]
         rmin, rmax = r1 - r2, r1 + r2  # min and max patrol radii
-        Tmin, Tmax = np.sort(posT) + row['OFFSET_T']  # targetable obsTheta
+        Tmin, Tmax = np.sort(posintT) + row['OFFSET_T']  # targetable poslocT
         path = os.path.join(self.dirs[ptlid],
                             '{}_xyplot_submove_{{}}.pdf'.format(posid))
         title = (f'XY Accuracy Test {self.test_time}\n'

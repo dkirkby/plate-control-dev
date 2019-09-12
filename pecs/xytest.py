@@ -132,7 +132,7 @@ class XYTest(PECS):
         self.data.posdf = pd.concat(dfs)
 
     @staticmethod
-    def _generate_posXY_targets_grid(rmin, rmax, npts):
+    def _generate_poslocXY_targets_grid(rmin, rmax, npts):
         x, y = np.mgrid[-rmax:rmax:npts*1j, -rmax:rmax:npts*1j]  # 1j is step
         r = np.sqrt(np.square(x) + np.square(y))
         mask = (rmin < r) & (r < rmax)
@@ -141,7 +141,7 @@ class XYTest(PECS):
     def generate_targets(self):
         path = self.data.test_cfg['input_targs_file']
         if path is None:  # no targets supplied, create local targets in posXY
-            tgt = self._generate_posXY_targets_grid(
+            tgt = self._generate_poslocXY_targets_grid(
                 self.data.test_cfg['targ_min_radius'],
                 self.data.test_cfg['targ_max_radius'],
                 self.data.test_cfg['n_pts_across_grid']).T  # shape (N, 2)
@@ -162,7 +162,7 @@ class XYTest(PECS):
                 np.random.seed(self.data.test_cfg['shuffle_seed'])
                 np.random.shuffle(tgt)  # same shuffled target list for all
                 self.data.targets_pos = {pid: tgt for pid in self.data.posids}
-        else:  # same targets for all positioners
+        else:  # same set of targets for all positioners
             self.data.targets_pos = {pid: tgt for pid in self.data.posids}
 
     def _add_device_id_col(self, df, ptlid):
@@ -243,17 +243,21 @@ class XYTest(PECS):
         movedf = self.data.movedf
         posids = self.data.posids_ptl[ptlid]  # all records obey this order
         ptl = self.ptls[ptlid]
+        ptl.memory_profile()  # debug
         # device_loc = self.data.posdf.loc[posids, 'DEVICE_LOC']
-        if n == 0:  # blind move
-            posXY = np.vstack(   # shape (N_posids, 2)
-                [self.data.targets_pos[posid][i, :] for posid in posids])
-            movetype, cmd = 'blind', 'obsXY'  # could use posXY here actually
-            offXY = self.data.posdf.loc[posids, ['OFFSET_X', 'OFFSET_Y']]
-            tgt = posXY + offXY.values  # convert to obsXY, shape (N, 2)
-            movedf.loc[idx[i, posids], ['target_x', 'target_y']] = tgt
+        if n == 0:  # blind move, issue commands just in poslocXY
+            for posid in posids:
+                movetype, cmd = 'blind', 'obsXY'
+                poslocXY = self.data.targets_pos[posid][i, :]
+                obsXY = ptl.trans(posid, 'poslocXY_to_obsXY', poslocXY)
+                movedf.loc[idx[i, posid], ['target_x', 'target_y']] = obsXY
+#            poslocXY = np.vstack(   # shape (N_posids, 2)
+#                [self.data.targets_pos[posid][i, :] for posid in posids])
+#            offXY = self.data.posdf.loc[posids, ['OFFSET_X', 'OFFSET_Y']]
+            tgt = movedf.loc[idx[i, posids], ['target_x', 'target_y']].values
         else:
             movetype, cmd = 'corrective', 'dXdY'
-            tgt = - movedf.loc[idx[i, posids],  # note minus sign
+            tgt = - movedf.loc[idx[i, posids],  # note the minus sign
                                [f'err_x_{n-1}', f'err_y_{n-1}']].values
             tgt = np.nan_to_num(tgt)  # replace NaN with zero for unmatched
         # build move request dataframe for a petal
@@ -271,16 +275,16 @@ class XYTest(PECS):
         # .sort_values(by='DEVICE_ID').reset_index())
         self.loggers[ptlid].debug('execute_move() returns expected QS:\n'
                                   + expected_QS.to_string())
-        # get expected posTP from petal and write to movedf after move
-        ret_TP = ptl.get_positions(posids=posids, return_coord='posTP')
+        # get expected posintTP from petal and write to movedf after move
+        ret_TP = ptl.get_positions(posids=posids, return_coord='posintTP')
         #  .sort_values(by='DEVICE_ID').reset_index())
         ret_TP['STATUS'] = ptl.decipher_posflags(ret_TP['FLAG'])
-        self.loggers[ptlid].debug(f'Expected posTP after move {n}:\n'
+        self.loggers[ptlid].debug(f'Expected posintTP after move {n}:\n'
                                   + ret_TP.to_string())
 
         # record per-move data to movedf for a petal
-        new = pd.DataFrame({f'pos_t_{n}': ret_TP['X1'],
-                            f'pos_p_{n}': ret_TP['X2'],
+        new = pd.DataFrame({f'pos_int_t_{n}': ret_TP['X1'],
+                            f'pos_int_p_{n}': ret_TP['X2'],
                             f'pos_flag_{n}': ret_TP['FLAG'],
                             f'pos_status_{n}': ret_TP['STATUS'],
                             f'DEVICE_ID': ret_TP['DEVICE_ID']})
@@ -326,7 +330,7 @@ class XYTest(PECS):
                     f'All {len(posids)} requested fibres measured by FVC.')
 
     def update_calibrations(self, measured_QS):  # test and update TP here
-        self.logger.info('Testing and updating posTP...')
+        self.logger.info('Testing and updating posintTP...')
         for ptlid in self.data.ptlids:
             posids = set(self.data.posids_ptl[ptlid]).intersection(
                 set(measured_QS.index))  # only update measured, valid posid
@@ -342,10 +346,10 @@ class XYTest(PECS):
     def record_measurement(self, measured_QS, i, n):
         # QS to obsXY conversion here
         # calculate below measured obsXY from measured QS and write to movedf
-        Q_rad = np.radians(measured_QS['Q'])
-        R = pc.S2R_lookup(measured_QS['S'])
-        new = pd.DataFrame({f'meas_x_{n}': R * np.cos(Q_rad),
-                            f'meas_y_{n}': R * np.sin(Q_rad)},
+        QS = measured_QS[['Q', 'S']].values.T  # 2 x N array
+        obsXY = self.ptls[self.ptlids[0]].ptltrans('QS_to_obsXY', QS)
+        new = pd.DataFrame({f'meas_x_{n}': obsXY[0, :],
+                            f'meas_y_{n}': obsXY[1, :]},
                            dtype=np.float32, index=measured_QS.index)
         self._update(new, i)
 

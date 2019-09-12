@@ -12,14 +12,14 @@ class PosMoveTable(object):
     or modified, since there is some extra logic associated with correctly
     appending, inserting, validating, etc. Use the provided setters / getters
     instead.
-    
+
     The initial starting position (in positioner local [theta,phi] coordinates)
     of the move table may be specified upon initialization (1x2 list). If it is
     not provided, then the move table will automatically look up the current
     expected position from the posmodel's state object.
     """
 
-    def __init__(self, this_posmodel=None, init_posTP=None):
+    def __init__(self, this_posmodel=None, init_posintTP=None):
         if not(this_posmodel):
             this_posmodel = posmodel.PosModel()
         self.posmodel = this_posmodel    # the particular positioner this table applies to
@@ -27,11 +27,12 @@ class PosMoveTable(object):
         self.log_note = ''               # optional note string which user can associate with this table, to be stored in any logging
         self.rows = []                   # internal representation of the move data
         self._rows_extra = []            # auto-generated backlash and final creep rows get internally stored here
-        if init_posTP:
-            self.init_posTP = init_posTP  # initial [theta,phi] position (positioner local coordinates)
+        if init_posintTP:
+            self.init_posintTP = init_posintTP  # initial [theta,phi] position (positioner local coordinates)
         else:
-            self.init_posTP = self.posmodel.expected_current_posTP            
-        self.init_obsTP = self.posmodel.trans.posTP_to_obsTP(self.init_posTP) # initial theta,phi position (observer coordinates)
+            self.init_posintTP = self.posmodel.expected_current_posintTP
+        self.init_poslocTP = self.posmodel.trans.posintTP_to_poslocTP(
+            self.init_posintTP)  # initial theta, phi position (in petal CS)
         self.should_antibacklash = self.posmodel.state._val['ANTIBACKLASH_ON']
         self.should_final_creep  = self.posmodel.state._val['FINAL_CREEP_ON']
         self.allow_exceed_limits = self.posmodel.state._val['ALLOW_EXCEED_LIMITS']
@@ -47,7 +48,7 @@ class PosMoveTable(object):
     def for_schedule(self, suppress_any_finalcreep_and_antibacklash=True, _output_type='schedule'):
         """Version of the table suitable for move scheduling. Distances are given at
         the output shafts, in degrees. Times are given in seconds.
-        
+
         An option is provided to select whether final creep and antibacklash
         moves should be suppressed from the schedule-formatted output table.
         Typically this option is left as True, since margin space for these moves
@@ -87,13 +88,13 @@ class PosMoveTable(object):
         """Version of the table with all data.
         """
         return self._for_output_type('full')
-    
+
     @property
     def n_rows(self):
         """Number of rows in table.
         """
         return len(self.rows)
-    
+
     @property
     def is_motionless(self):
         """Boolean saying whether the move table contains no motion at all, on
@@ -218,7 +219,7 @@ class PosMoveTable(object):
         """Internal function that calculates the various output table formats and
         passes them up to the wrapper functions above.
         """
-        true_moves = self._calculate_true_moves()
+        true_moves = self._calculate_true_moves()  # debug
         rows = self.rows.copy()
         rows.extend(self._rows_extra)
         row_range = range(len(rows))
@@ -255,7 +256,7 @@ class PosMoveTable(object):
                         table[key].insert(i,'creep') # speed mode doesn't matter here
                     table['postpause'].insert(i,rows[i].data['prepause'])
             table['nrows'] = len(table['move_time'])
-            table['postpause'] = [int(round(x*1000)) for x in table['postpause']] # hardware postpause in integer milliseconds            
+            table['postpause'] = [int(round(x*1000)) for x in table['postpause']] # hardware postpause in integer milliseconds
             return table
         table['nrows'] = len(table['dT'])
         if output_type == 'collider':
@@ -274,19 +275,24 @@ class PosMoveTable(object):
                 table['TOTAL_CREEP_MOVES_P'] += int(table['speed_mode_P'][i] == 'creep' and table['dP'] != 0)
             table['net_dT'] = table['dT'].copy()
             table['net_dP'] = table['dP'].copy()
-            for i in range(1,table['nrows']):
+            for i in range(1, table['nrows']):
                 table['net_dT'][i] += table['net_dT'][i-1]
                 table['net_dP'][i] += table['net_dP'][i-1]
             table['log_note'] = self.log_note
         if output_type == 'full':
             trans = self.posmodel.trans
-            posT = [self.init_posTP[pc.T] + table['net_dT'][i] for i in row_range]
-            posP = [self.init_posTP[pc.P] + table['net_dP'][i] for i in row_range]  
-            table['posTP'] = [[posT[i],posP[i]] for i in row_range]
-            table['obsTP'] = [trans.posTP_to_obsTP(tp) for tp in table['posTP']]
-            table['posXY'] = [trans.posTP_to_posXY(tp) for tp in table['posTP']]
-            table['obsXY'] = [trans.posXY_to_obsXY(xy) for xy in table['posXY']]
-            table['QS'] = [trans.obsXY_to_QS(xy) for xy in table['obsXY']]            
+            posintT = [self.init_posintTP[pc.T] + table['net_dT'][i]
+                       for i in row_range]
+            posintP = [self.init_posintTP[pc.P] + table['net_dP'][i]
+                       for i in row_range]
+            table['posintTP'] = [[posintT[i], posintP[i]] for i in row_range]
+            table['poslocTP'] = [trans.posintTP_to_poslocTP(tp)
+                                 for tp in table['posintTP']]
+            table['poslocXY'] = [trans.posintTP_to_poslocXY(tp)
+                                 for tp in table['posintTP']]
+            table['obsXY'] = [trans.poslocXY_to_obsXY(xy)
+                              for xy in table['poslocXY']]
+            table['QS'] = [trans.obsXY_to_QS(xy) for xy in table['obsXY']]
         return table
 
 class PosMoveRow(object):

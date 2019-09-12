@@ -6,7 +6,6 @@ import pprint
 import posconstants as pc
 from DOSlib.positioner_index import PositionerIndex
 try:
-    # from DOSlib.constants import ConstantsDB
     from DBSingleton import DBSingleton
     DB_COMMIT_AVAILABLE = True
 except ModuleNotFoundError:
@@ -41,14 +40,13 @@ class PosState(object):
     """
 
     def __init__(self, unit_id=None, device_type='pos', petal_id=None,
-                 logging=False, printfunc=print, defaults = None):    # DOS change
+                 logging=False, printfunc=print, defaults=None):  # DOS change
         self.printfunc = printfunc
         self.logging = logging
         self.write_to_DB = False
         if DB_COMMIT_AVAILABLE and (os.getenv('DOS_POSMOVE_WRITE_TO_DB')
                                     in ['True', 'true', 'T', 't', '1']):
             self.write_to_DB = True
-        self.write_to_DB = False  # debug
         # data initialization
         if device_type in ['pos', 'fid', 'ptl']:
             self.type = device_type
@@ -78,8 +76,11 @@ class PosState(object):
                         # TODO fix this; still reading from a template config
                         self.load_from_cfg(unit_id=self.ptlid)
                     else:
-                        self.set_ptlid_from_pi(unit_id)  # lookup ptlid
-                        self.load_from_db(unit_id=unit_id)
+                        try:
+                            self.set_ptlid_from_pi(unit_id)  # lookup ptlid
+                            self.load_from_db(unit_id=unit_id)
+                        except KeyError:  # test posid, not existent
+                            self.load_from_cfg(unit_id=unit_id)
                 else:  # both unit_id and ptlid are unkonwn, read template
                     self.ptlid = '-1'  # assume ptlid = -1
                     if self.type == 'ptl':  # unit_id and ptlid both unkonwn
@@ -194,7 +195,8 @@ class PosState(object):
         self.unit_id = unit_id
 
     def load_from_cfg(self, unit_id=None):
-        typical_settings_dir = pc.dirs[self.type + '_settings'] # do this here because used in 2 different places below
+        # do this here because used in 2 different places below
+        typical_settings_dir = pc.dirs[self.type + '_settings']
         if unit_id is not None:
             self.unit_basename = 'unit_' + str(unit_id).zfill(2)
             self.logs_dir = pc.dirs[self.type + '_logs']
@@ -210,7 +212,8 @@ class PosState(object):
         unit_fn = os.path.join(self.settings_dir, f'{self.unit_basename}.conf')
         if not(os.path.isfile(unit_fn)):
             # unit config doesn't exisit, read in the generic template file
-            tmpfn = os.path.join(typical_settings_dir,'_unit_settings_DEFAULT.conf')
+            tmpfn = os.path.join(typical_settings_dir,
+                                 '_unit_settings_DEFAULT.conf')
             self.conf = ConfigObj(tmpfn, unrepr=True, encoding='utf-8')
             self.conf.initial_comment = [comment, '']
             self.conf.filename = unit_fn
@@ -235,7 +238,7 @@ class PosState(object):
     def __str__(self):
         files = {'settings':self.conf.filename, 'log':self.log_path}
         return pprint.pformat({'files':files, 'values':self._val})
-        
+
     def read(self,key):
         """Returns current value for a given key. Left in place for legacy usage,
         but it is much faster to directly access _val dictionary (for reading values).
@@ -245,10 +248,10 @@ class PosState(object):
     def store(self, key, val):
         """Store a value to memory. This is the correct way to store values, as
         it contains some checks on tolerance values.
-        
+
         no longer default to nominal value, just reject, and keep current val.
         added boolean return to indicate outcome of storing posstate
-        
+
         (NEVER EVER write directly to state._val dictionary)
         """
         if key not in self._val.keys():  # 1nd check: validate the key name
@@ -277,7 +280,7 @@ class PosState(object):
         else:
             self.conf.update(self._val)
         self.conf.write()
-    
+
     def log_unit(self):
         """All current unit parameters are written to the hardware unit's log file.
         """
@@ -308,7 +311,7 @@ class PosState(object):
             self.curr_log_length += 1
             self.next_log_notes = []
             self.log_unit_called_yet = True # only need to check this the first time through
-    
+
     @property
     def log_path(self):
         """Convenience method for consistent formatting of file path to log file.
@@ -323,7 +326,7 @@ class PosState(object):
         if 'CURRENT_LOG_BASENAME' in self._val.keys():
             return self._val['CURRENT_LOG_BASENAME']
         return ''
-    
+
     @log_basename.setter
     def log_basename(self, name):
         self._val['CURRENT_LOG_BASENAME'] = name
@@ -337,7 +340,7 @@ class PosState(object):
         number = suffix.split(self.log_extension)[0]
         number2 = format(int(number) + 1, self.log_numformat)
         return prefix + self.log_separator + number2 + self.log_extension
-    
+
     def _count_log_length(self):
         '''Counts the number of lines in the current log file.
         Header row is ignored from count.
@@ -351,7 +354,7 @@ class PosState(object):
                     n_lines += 1
             n_lines -= 1 # to ignore the header row
         return n_lines
-    
+
     def _update_legacy_keys(self):
         '''Allows us to replace key labels in the config files with new names, and
         continue using the old files. We may be able to deprecate this at a later date, when such
