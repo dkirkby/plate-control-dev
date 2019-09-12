@@ -1,6 +1,5 @@
 import sys
 import math
-# import numpy as np
 import posconstants as pc
 import posmodel
 import petaltransforms
@@ -105,21 +104,6 @@ class PosTransforms(petaltransforms.PetalTransforms):
         if this_posmodel is None:
             this_posmodel = posmodel.PosModel()
         self.posmodel = this_posmodel
-#        if petal_transform is None:
-#            self.ptltrans = petaltransforms.PetalTransforms()
-#        else:
-#            self.ptltrans = petal_transform
-        # set up 2D petal transform aliases for easy access and legacy support
-#        self.ptlXY_to_obsXY = self.ptltrans.ptlXY_to_obsXY
-#        self.obsXY_to_ptlXY = self.ptltrans.obsXY_to_ptlXY
-#        self.obsXY_to_QS = self.ptltrans.obsXY_to_QS
-#        self.QS_to_obsXY = self.ptltrans.QS_to_obsXY
-#        self.ptlXY_to_QS = self.ptltrans.ptlXY_to_QS
-#        self.QS_to_ptlXY = self.ptltrans.QS_to_ptlXY
-#        self.flatXY_to_QS = self.ptltrans.flatXY_to_QS
-#        self.QS_to_flatXY = self.ptltrans.QS_to_flatXY
-#        self.flatXY_to_obsXY = self.ptltrans.flatXY_to_obsXY
-#        self.obsXY_to_flatXY = self.ptltrans.obsXY_to_flatXY
         # allow alternate calibration values to temporarily override DB
         self.alt_override = False
         self.alt = {'LENGTH_R1': 3.0,
@@ -205,7 +189,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
     def poslocTP_to_poslocXY(self, poslocTP):
         ''' input is list or tuple or 1D array '''
         r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
-        return self.tp2xy(poslocTP, r)  # return (poslocX, poslocY)
+        return PosTransforms.tp2xy(poslocTP, r)  # return (poslocX, poslocY)
 
     def poslocXY_to_poslocTP(self, poslocXY, range_limits='full'):
         ''' input is list or tuple or 1D array '''
@@ -217,18 +201,18 @@ class PosTransforms(petaltransforms.PetalTransforms):
         posloc_ranges = [[poslocTP_min[0], poslocTP_max[0]],  # T min, T max
                          [poslocTP_min[1], poslocTP_max[1]]]  # P min, P max
         r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
-        return self.xy2tp(poslocXY, r, posloc_ranges)  # (tp, unreachable)
+        return PosTransforms.xy2tp(poslocXY, r, posloc_ranges)
 
     def posobsTP_to_posobsXY(self, posobsTP):
         ''' input is list or tuple or 1D array '''
         r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
-        return self.tp2xy(posobsTP, r)  # return (posobsX, posobsY)
+        return PosTransforms.tp2xy(posobsTP, r)  # return (posobsX, posobsY)
 
     def posobsXY_to_posobsTP(self, posobsXY, range_limits='full'):
         ''' input is list or tuple or 1D array '''
         r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
         posobs_ranges = [[0, 359.99999999], [0, 220]]
-        return self.xy2tp(posobsXY, r, posobs_ranges)[0]  # (posobsT, posobsP)
+        return PosTransforms.xy2tp(posobsXY, r, posobs_ranges)[0]
 
     # %% composit transformations for convenience (degree 1)
     def posintTP_to_poslocXY(self, posintTP):
@@ -302,29 +286,19 @@ class PosTransforms(petaltransforms.PetalTransforms):
         QS = self.flatXY_to_QS(flatXY, cast=True)
         return self.QS_to_posintTP(QS, range_limits)  # (tp, unreachable)
 
-#    def obsTP_to_flatXY(self, tp):
-#        """Composite transformation, performs
-#        obsTP --> posTP --> posXY --> obsXY --> QS --> flatXY."""
-#        posTP = self.obsTP_to_posTP(tp)
-#        xy = self.posTP_to_flatXY(posTP)
-#        return xy
-#
-#    def flatXY_to_obsTP(self,xy,range_limits='full'):
-#        """Composite transformation, performs
-#        flatXY --> QS --> obsXY --> posXY --> posTP --> obsTP"""
-#        (posTP,unreachable) = self.flatXY_to_posTP(xy,range_limits)
-#        obsTP = self.posTP_to_obsTP(posTP)
-#        return obsTP, unreachable
+    # %% angle additions and subtractions
 
-    # %% # ADDITION and DIFFERENCE METHODS
-    # difference
-    def delta_XY(self, xy0, xy1):
-        """Returns dxdy corresponding to xy0 - xy1."""
-        return PosTransforms.vector_delta(xy0, xy1)
-
-    def delta_QS(self, qs0, qs1):
-        """Returns dqds corresponding to qs0 - qs1."""
-        return PosTransforms.vector_delta(qs0, qs1)
+    def addto_posintTP(self, posintTP0, dtdp, range_wrap_limits='full'):
+        """Returns tp corresponding to tp0 + dtdp.
+        The range_wrap_limits option can be any of the values for the
+        shaft_ranges method, or 'none'. If 'none', then the returned point is
+        a simple vector addition with no special checks for angle-wrapping
+        across positioner's theta = +/-180 deg.
+        """
+        if range_wrap_limits != 'none':
+            posintT_range = self.shaft_ranges(range_wrap_limits)[pc.T]
+            dtdp = PosTransforms._wrap_theta(posintTP0, dtdp, posintT_range)
+        return PosTransforms.vector_add(posintTP0, dtdp)
 
     def delta_posintTP(self, posintTP0, posintTP1, range_wrap_limits='full'):
         """Returns dtdp corresponding to tp0 - tp1, or final - initial
@@ -335,8 +309,20 @@ class PosTransforms(petaltransforms.PetalTransforms):
         """
         dtdp = PosTransforms.vector_delta(posintTP0, posintTP1)
         if range_wrap_limits != 'none':
-            dtdp = self._wrap_theta(posintTP1, dtdp, range_wrap_limits)
+            posintT_range = self.shaft_ranges(range_wrap_limits)[pc.T]
+            dtdp = PosTransforms._wrap_theta(posintTP1, dtdp, posintT_range)
         return dtdp
+
+    def addto_poslocTP(self, poslocTP0, dtdp, range_wrap_limits='full'):
+        """Returns tp corresponding to tp0 + dtdp.
+        The range_wrap_limits option can be any of the values for the
+        shaft_ranges method, or 'none'. If 'none', then the returned point is
+        a simple vector addition with no special checks for angle-wrapping
+        across positioner's theta = +/-180 deg.
+        """
+        posintTP0 = self.poslocTP_to_posintTP(poslocTP0)
+        posintTP1 = self.addto_posintTP(posintTP0, dtdp, range_wrap_limits)
+        return self.posintTP_to_poslocTP(posintTP1)  # return tuple coords
 
     def delta_poslocTP(self, poslocTP0, poslocTP1, range_wrap_limits='full'):
         """Returns dtdp corresponding to tp0 - tp1.
@@ -349,61 +335,56 @@ class PosTransforms(petaltransforms.PetalTransforms):
         posintTP1 = self.poslocTP_to_posintTP(poslocTP1)
         return self.delta_posintTP(posintTP0, posintTP1, range_wrap_limits)
 
-    # ADDITION METHODS
-    def addto_XY(self, xy0, dxdy):
+    # %% STATIC INTERNAL METHODS
+    @staticmethod
+    def vector_delta(uv0, uv1):
+        """Generic vector difference uv0 - uv1."""
+        return [uv0[0] - uv1[0], uv0[1] - uv1[1]]
+
+    @staticmethod
+    def vector_add(uv0, uv1):
+        """Generic vector addition uv0 + uv1."""
+        return [uv0[0] + uv1[0], uv0[1] + uv1[1]]
+
+    @staticmethod
+    def addto_XY(xy0, dxdy):
         """Returns xy corresponding to xy0 + dxdy."""
         return PosTransforms.vector_add(xy0, dxdy)
 
-    def addto_QS(self, qs0, dqds):
+    @staticmethod
+    def addto_QS(qs0, dqds):
         """Returns qs corresponding to qs0 + dqds."""
         return PosTransforms.vector_add(qs0, dqds)
 
-    def addto_posintTP(self, tp0, dtdp, range_wrap_limits='full'):
-        """Returns tp corresponding to tp0 + dtdp.
-        The range_wrap_limits option can be any of the values for the
-        shaft_ranges method, or 'none'. If 'none', then the returned point is
-        a simple vector addition with no special checks for angle-wrapping
-        across positioner's theta = +/-180 deg.
-        """
-        if range_wrap_limits != 'none':
-            dtdp = self._wrap_theta(tp0, dtdp, range_wrap_limits)
-        return PosTransforms.vector_add(tp0, dtdp)
+    @staticmethod
+    def delta_XY(xy0, xy1):
+        """Returns dxdy corresponding to xy0 - xy1."""
+        return PosTransforms.vector_delta(xy0, xy1)
 
-    # %% INTERNAL METHODS
-    def _wrap_theta(self, tp0, dtdp, range_wrap_limits='full'):
+    @staticmethod
+    def delta_QS(qs0, qs1):
+        """Returns dqds corresponding to qs0 - qs1."""
+        return PosTransforms.vector_delta(qs0, qs1)
+
+    @staticmethod
+    def _wrap_theta(tp0, dtdp, posintT_range):
         """
-        tp0     : initial TP positions
-        dtdp    : delta TP movement
+        tp0             : initial TP positions
+        dtdp            : delta TP movement
+        posintT_range   : allowed range of internal theta, tuple or list
 
         Returns a modified dtdp after appropriately wrapping the delta theta
-        to not cross a physical hardstop. The range_wrap_limits option can be
-        any of the values for the shaft_ranges method.
+        to not cross a physical hardstop. Phi angle is untouched.
         """
-        dt = dtdp[0]
-        t = tp0[0] + dt
+        ti, dt, dp = tp0[0], dtdp[0], dtdp[1]  # t initial, dt, dp
         wrapped_dt = dt - 360*pc.sign(dt)
-        wrapped_t = tp0[0] + wrapped_dt
-        t_range = self.shaft_ranges(range_wrap_limits)[pc.T]
-        if min(t_range) <= wrapped_t <= max(t_range):
-            if (min(t_range) > t or max(t_range) < t) or abs(wrapped_dt) < abs(dt):
-        # if min(t_range) <= wrapped_t <= max(t_range):
-        #     if (min(t_range) > t or max(t_range) < t) \
-        #             or (abs(wrapped_dt) < abs(dt)):
-                dtdp[0] = wrapped_dt
-        return dtdp
-
-    # %% STATIC INTERNAL METHODS
-#    @staticmethod
-#    def R2S(r):
-#        """Uses focal surface definition of DESI-0530 to convert R to S.
-#        """
-#        return pc.R2S_lookup(r)
-#
-#    @staticmethod
-#    def S2R(s):
-#        """Uses focal surface definition of DESI-0530 to convert S to R.
-#        """
-#        return pc.S2R_lookup(s)
+        tf = ti + dt
+        wrapped_tf = ti + wrapped_dt
+        if min(posintT_range) <= wrapped_tf <= max(posintT_range):
+            if ((min(posintT_range) > tf or max(posintT_range) < tf)
+                    or abs(wrapped_dt) < abs(dt)):
+                dt = wrapped_dt
+        return dt, dp
 
     @staticmethod
     def tp2xy(tp, r):
@@ -501,17 +482,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
             if vector_err <= theta_centralizing_err_tol:
                 TP[0] = T_try
                 break
-        return TP, unreachable
-
-    @staticmethod
-    def vector_delta(uv0, uv1):
-        """Generic vector difference uv0 - uv1."""
-        return [uv0[0] - uv1[0], uv0[1] - uv1[1]]
-
-    @staticmethod
-    def vector_add(uv0, uv1):
-        """Generic vector addition uv0 + uv1."""
-        return [uv0[0] + uv1[0], uv0[1] + uv1[1]]
+        return tuple(TP), unreachable
 
 
 if __name__ == '__main__':
@@ -556,3 +527,5 @@ if __name__ == '__main__':
     print(f'flatXY1 = {flatXY1}')
     posintTP4, unreachable = trans.flatXY_to_posintTP(flatXY1)
     print(f'posintTP4 = {posintTP4}, unreachable: {unreachable}')
+    poslocTP3 = trans.addto_poslocTP(poslocTP2, (200, 100))
+    print(f'poslocTP3 = {poslocTP3}, unreachable: {unreachable}')

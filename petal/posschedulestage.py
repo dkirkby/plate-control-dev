@@ -217,6 +217,7 @@ class PosScheduleStage(object):
                 self.store_collision_finding_results(colliding_sweeps, all_sweeps, requests)
                 if method == 'freeze':
                     self.sweeps[posid].register_as_frozen()
+                return
 
     def find_collisions(self, move_tables):
         """Identifies any collisions that would be induced by executing a collection
