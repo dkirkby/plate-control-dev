@@ -17,10 +17,10 @@ class PosCollider(object):
 
     See DESI-0899 for geometry specifications, illustrations, and kinematics.
     """
-    def __init__(self, configfile='', 
-                 collision_hashpp_exists=False, 
-                 collision_hashpf_exists=False, 
-                 hole_angle_file=None, 
+    def __init__(self, configfile='',
+                 collision_hashpp_exists=False,
+                 collision_hashpf_exists=False,
+                 hole_angle_file=None,
                  use_neighbor_loc_dict=False):
         if not configfile:
             filename = '_collision_settings_DEFAULT.conf'
@@ -42,7 +42,7 @@ class PosCollider(object):
         self.use_neighbor_loc_dict = use_neighbor_loc_dict
         self.keepouts_T = {}
         self.keepouts_P = {}
-        
+
         # hash table initializations (if being used)
         self.collision_hashpp_exists = collision_hashpp_exists
         self.collision_hashpf_exists = collision_hashpf_exists
@@ -53,17 +53,17 @@ class PosCollider(object):
             f = open(os.path.join(os.environ.get('collision_table'), hole_angle_file), 'rb')
             self.hole_angle = pickle.load(f)
             f.close()
-            
+
         if self.collision_hashpf_exists:
             f = open(os.path.join(os.environ.get('collision_table'), 'table_pf_50_50_5_5.out'), 'rb')
             self.table_pf = pickle.load(f)
             f.close()
-        
+
         # load fixed dictionary containing locations of neighbors for each positioner DEVICE_LOC (if this option has been selected)
         if self.use_neighbor_loc_dict:
             with open(pc.dirs['positioner_neighbors_file'], 'rb') as f:
                 self.neighbor_locs = pickle.load(f)
-            
+
     def set_petal_offsets(self, x0=0.0, y0=0.0, rot=0.0):
         """Sets information about a particular petal's overall location. This
         information is necessary for handling the fixed collision boundaries of
@@ -75,7 +75,7 @@ class PosCollider(object):
         self._petal_y0 = y0
         self._petal_rot = rot
         self._load_keepouts()
-    
+
     def update_positioner_offsets_and_arm_lengths(self):
         """Loads positioner parameters.  This method is called when new calibration data is available
         for positioner arm lengths and offsets.
@@ -101,7 +101,7 @@ class PosCollider(object):
 
     def add_fixed_to_animator(self, start_time=0):
         """Add unmoving polygon shapes to the animator.
-        
+
             start_time ... seconds, global time when the move begins
         """
         self.animator.add_or_change_item('GFA', '', start_time, self.keepout_GFA.points)
@@ -112,14 +112,14 @@ class PosCollider(object):
             # self.animator.add_or_change_item('Ee', self.posindexes[posid], start_time, self.Ee_polys[posid].points)
             self.animator.add_or_change_item('line at 180', self.posindexes[posid], start_time, self.line180_polys[posid].points)
             self.animator.add_label(format(self.posmodels[posid].deviceloc,'03d'), self.x0[posid], self.y0[posid])
-        
+
     def add_mobile_to_animator(self, start_time, sweeps):
         """Add a collection of PosSweeps to the animator, describing positioners'
         real-time motions.
 
-            start_time ... seconds, global time when the move begins        
+            start_time ... seconds, global time when the move begins
             sweeps     ... dict with keys = posids, values = PosSweep instances
-        """            
+        """
         for posid,s in sweeps.items():
             posidx = self.posindexes[posid]
             for i in range(len(s.time)):
@@ -237,40 +237,40 @@ class PosCollider(object):
         """
         if obsTP_A[1] >= self.Eo_phi and obsTP_B[1] >= self.Eo_phi:
             return pc.case.I
-        
+
         if self.collision_hashpp_exists:
-            
+
             dr = self.hole_angle[posid_A][posid_B][0]
             angle = self.hole_angle[posid_A][posid_B][1]
-            
+
             # to make theta angle ranges from 0-360, rather than -180 to 180
             # to be consistent with angle convention used in table
-            if obsTP_A[0] < 0: 
+            if obsTP_A[0] < 0:
                 t1 = 360 + obsTP_A[0]
             else:
                 t1 = obsTP_A[0]
-                
-            if obsTP_B[0] < 0: 
+
+            if obsTP_B[0] < 0:
                 t2 = 360 + obsTP_B[0]
             else:
                 t2 = obsTP_B[0]
-            
+
             # binning to the resolution of the lookup table
             dr = lookup.nearest(dr, 50, 0, 950)
             t1 = lookup.nearest(t1, 5, 0, 360)
             t2 = lookup.nearest(t2, 5, 0, 360)
             phi1 = lookup.nearest(obsTP_A[1], 5, -20, 205)
             phi2 = lookup.nearest(obsTP_B[1], 5, -20, 205)
-            
+
             if t1 == 360: t1 = 0
             if t2 == 360: t2 = 0
             code = lookup.make_code_pp(dr, t1-angle, phi1, t2-angle, phi2)
-            
+
             if code in self.table_pp:
                 return self.table_pp[code] # <= 0.1 us
             else:
                 return pc.case.I
-            
+
         else:
             if obsTP_A[1] < self.Eo_phi and obsTP_B[1] >= self.Ei_phi: # check case IIIA
                 if self._case_III_collision(posid_A, posid_B, obsTP_A, obsTP_B[0]):
@@ -313,14 +313,14 @@ class PosCollider(object):
                 code = lookup.make_code_pf(loc_id, dx, dy, obsTP[0], obsTP[1])
                 if code in self.table_pf:
                     return self.table_pf[code]
-                
+
             else:
                 poly1 = self.place_phi_arm(posid,obsTP)
                 for fixed_case in self.fixed_neighbor_cases[posid]:
                     poly2 = self.fixed_neighbor_keepouts[fixed_case]
                     if poly1.collides_with(poly2):
                         return fixed_case
-                    
+
         return pc.case.I
 
     def place_phi_arm(self, posid, obsTP):
@@ -332,7 +332,7 @@ class PosCollider(object):
         poly = poly.rotated(obsTP[0])
         poly = poly.translated(self.x0[posid], self.y0[posid])
         return poly
-        
+
     def place_central_body(self, posid, obsT):
         """Rotates and translates the central body of positioner
         to its (x0,y0) and the argued obsT theta angle.
@@ -373,7 +373,7 @@ class PosCollider(object):
         self._load_circle_envelopes()
         self._load_keepouts()
         self._adjust_keepouts()
-            
+
     def _load_positioner_params(self):
         """Read latest versions of all positioner parameters."""
         for posid, posmodel in self.posmodels.items():
@@ -411,7 +411,7 @@ class PosCollider(object):
             self.line180_polys[posid] = self.line180_poly.rotated(self.t0[posid]).translated(x,y)
         self.ferrule_diam = self.config['FERRULE_DIAM']
         self.ferrule_poly = PosPoly(self._circle_poly_points(self.ferrule_diam, self.config['FERRULE_RESLN']).tolist())
-        
+
     def _load_keepouts(self):
         """Read latest versions of all keepout geometries."""
         self.general_keepout_P = PosPoly(self.config['KEEPOUT_PHI'], self.config['KEEPOUT_PHI_PT0'])
@@ -423,7 +423,7 @@ class PosCollider(object):
         self.keepout_GFA = self.keepout_GFA.rotated(self._petal_rot)
         self.keepout_GFA = self.keepout_GFA.translated(self._petal_x0, self._petal_y0)
         self.fixed_neighbor_keepouts = {pc.case.PTL : self.keepout_PTL, pc.case.GFA : self.keepout_GFA}
-    
+
     def _adjust_keepouts(self):
         """Expand/contract, and pre-shift the theta and phi keepouts for each positioner."""
         self.general_keepout_P = self.general_keepout_P.expanded_radially(self.config['KEEPOUT_EXPANSION_PHI_RADIAL'])
@@ -550,35 +550,35 @@ class PosSweep(object):
         self.time = discrete_time
         self.tp = discrete_position
         self.tp_dot = speed
-        
+
     def extend(self, timestep, max_time):
-        """Extends a sweep object to max_time to reflect the postpauses inserted into the move table 
+        """Extends a sweep object to max_time to reflect the postpauses inserted into the move table
         in equalize_table_times() in posschedulestage.py, ensuring that the sweep object
         is in sync with the move table so that the animator is reflecting true moves. """
-        
+
         starttime_extension = self.time[-1] + timestep
         time_extension = np.arange(starttime_extension, max_time + timestep, timestep)
         extended_time = np.append(self.time, time_extension)
-        
+
         #starttime_extension = self.time[-1] + timestep
         #endtime_extension = self.time[-1] + equalizing_pause
         #time_extension = np.arange(starttime_extension, endtime_extension + timestep, timestep)
         #extended_time = np.append(self.time, time_extension)
-        
+
         # tp extension are just the last tp entry repeated throughout the extended time
         theta_extension = self.tp[0,-1]*np.ones(len(time_extension))
         phi_extension = self.tp[1,-1]*np.ones(len(time_extension))
         extended_theta = list(np.append(self.tp[0], theta_extension))
         extended_phi = list(np.append(self.tp[1], phi_extension))
         extended_tp = np.array([extended_theta, extended_phi])
-        
+
         # tp_dot extension are just zeros repeated throughout the extended time
         tdot_extension = np.zeros(len(time_extension))
         pdot_extension = np.zeros(len(time_extension))
         extended_tdot = list(np.append(self.tp_dot[0], tdot_extension))
         extended_pdot= list(np.append(self.tp_dot[1], pdot_extension))
         extended_tp_dot = np.array([extended_tdot, extended_pdot])
-        
+
         self.time = extended_time
         self.tp = extended_tp
         self.tp_dot = extended_tp_dot
@@ -591,25 +591,25 @@ class PosSweep(object):
     def is_frozen(self):
         """Returns boolean value whether the sweep has a "freezing" event."""
         return self.frozen_time < math.inf
-    
+
     def is_moving(self,step):
         """Returns boolean value whether the sweep is moving at the argued timestep."""
         if self.tp[0,step]*self.tp_dot[0,step] or self.tp[1,step]*self.tp_dot[1,step]:
             return True
         return False
-    
+
     def theta(self, step):
         """Returns theta position of the sweep at the specified timestep index."""
         return self.tp[0,step]
-    
+
     def phi(self, step):
         """Returns phi position of the sweep at the specified timestep index."""
         return self.tp[1,step]
-    
+
 class PosPoly(object):
     """Represents a collidable polygonal envelope definition for a mechanical component
     of the fiber positioner.
-    
+
         points        ... [[x1,x2,...], [y1,y2,...]] list of vertices of the polygon
         point0_index  ... first point in the list
         close_polygon ... whether to make an identical last point matching the first
@@ -640,7 +640,7 @@ class PosPoly(object):
         X = [x + val for val in p[0]]
         Y = [y + val for val in p[1]]
         return PosPoly([X,Y], point0_index=0, close_polygon=False)
-    
+
     def expanded_radially(self, dR, center_tol=1e-6):
         """Returns a copy of the polygon object, with points expanded radially by distance dR.
         The linear expansion is made along lines from the polygon's [0,0] center.
@@ -652,7 +652,7 @@ class PosPoly(object):
             X[i] += dR * math.cos(angle)
             Y[i] += dR * math.sin(angle)
         return PosPoly([X,Y], point0_index=0, close_polygon=False)
-    
+
     def expanded_x(self, left_shift, right_shift):
         """Returns a copy of the polygon object, with points expanded along the x direction only.
         Points leftward of the line x=0 are shifted further left by an amount left_shift > 0.
@@ -667,11 +667,11 @@ class PosPoly(object):
             elif X[i] < 0:
                 X[i] -= left_shift
         return PosPoly([X,Y], point0_index=0, close_polygon=False)
-        
+
     def expanded_angularly(self, dA):
         """Returns a copy of the polygon object, with points expanded rotationally by angle dA (in degrees).
         The rotational expansion is made about the polygon's [0,0] center.
-        Expansion is made in both the clockwise and counter-clockwise directions from the line y=0. 
+        Expansion is made in both the clockwise and counter-clockwise directions from the line y=0.
         A value dA < 0 is allowed, causing contraction of the polygon."""
         X = self.points[0].copy()
         Y = self.points[1].copy()
@@ -685,7 +685,7 @@ class PosPoly(object):
             radius = (X[i]**2 + Y[i]**2)**0.5
             X[i] = radius * math.cos(angle)
             Y[i] = radius * math.sin(angle)
-        return PosPoly([X,Y], point0_index=0, close_polygon=False)        
+        return PosPoly([X,Y], point0_index=0, close_polygon=False)
 
     def collides_with(self, other):
         """Searches for collisions in space between this polygon and
@@ -714,7 +714,7 @@ class PosPoly(object):
             return False
         else:
             return True
-    
+
     @staticmethod
     def _polygons_collide(pts1,pts2):
         """Check whether two closed polygons collide.

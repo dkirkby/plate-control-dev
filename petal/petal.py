@@ -10,15 +10,16 @@ import time
 from collections import OrderedDict
 import os
 try:
-    from DBSingleton import * #DBSingleton in the code is a class inside the file DBSingleton of the same name
+    # DBSingleton in the code is a class inside the file DBSingleton
+    from DBSingleton import DBSingleton
     DB_COMMIT_AVAILABLE = True
 except ImportError:
     DB_COMMIT_AVAILABLE = False
-try:
-    from DOSlib.constants import ConstantsDB
-    CONSTANTSDB_AVAILABLE = True
-except ImportError:
-    CONSTANTSDB_AVAILABLE = False
+# try:
+#     from DOSlib.constants import ConstantsDB
+#     CONSTANTSDB_AVAILABLE = True
+# except ImportError:
+#     CONSTANTSDB_AVAILABLE = False
 try:
     from DOSlib.util import raise_error
 except ImportError:
@@ -41,11 +42,11 @@ class Petal(object):
 
     Optional initialization inputs:
         posids          ... list, positioner ids. If provided, validate against the ptl_setting file. If empty [], read from the ptl_setting file directly.
-        fidids          ... list, fiducial ids. If provided, validate against the ptl_setting file. If empty [], read from the ptl_setting file directly. 
+        fidids          ... list, fiducial ids. If provided, validate against the ptl_setting file. If empty [], read from the ptl_setting file directly.
         simulator_on    ... boolean, controls whether in software-only simulation mode
         db_commit_on    ... boolean, controls whether to commit state data to the online system database (can be done with or without local_commit_on (available only if DB_COMMIT_AVAILABLE == True))
         local_commit_on ... boolean, controls whether to commit state data to local .conf files (can be done with or without db_commit_on)
-        local_log_on    ... boolean, controls whether to commit timestamped log of state data to local .csv files (can can be done with or without db_commit_on) 
+        local_log_on    ... boolean, controls whether to commit timestamped log of state data to local .csv files (can can be done with or without db_commit_on)
         printfunc       ... method, used for stdout style printing. we use this for logging during tests
         collider_file   ... string, file name of collider configuration file, no directory loction. If left blank will use default.
         sched_stats_on  ... boolean, controls whether to log statistics about scheduling runs
@@ -60,36 +61,37 @@ class Petal(object):
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
                  printfunc=print, verbose=False,
                  user_interactions_enabled=False, anticollision='freeze',
-                 collider_file=None, sched_stats_on=False,
-                 debug_commit_on=False):
+                 collider_file=None, sched_stats_on=False):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
-        # petal setup
-        if (None in [petal_id, petalbox_id, fidids, posids, shape]) or \
-           (not(hasattr(self, 'Tx')) or not(hasattr(self, 'Ty')) or not(hasattr(self, 'gamma'))):
-            self.printfunc('Some parameters not provided to __init__, reading petal config.')
-            self.petal_state = posstate.PosState(
-                unit_id=petal_id, device_type='ptl', logging=True,
-                printfunc=self.printfunc)
-            if petal_id is None:
-                self.printfunc('Reading Petal_ID from petal_state')
-                petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
-            if petalbox_id is None:
-                self.printfunc('Reading petalbox_ID from petal_state')
-                petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
-            if posids is None:
-                self.printfunc('posids not given, read from ptl_settings file')
-                posids = self.petal_state.conf['POS_IDS']
-            if fidids is None:
-                self.printfunc('fidids not given, read from ptl_settings file')
-                fidids = self.petal_state.conf['FID_IDS']
-            if shape is None:
-                self.printfunc('Reading shape from petal_state')
-                shape = self.petal_state.conf['SHAPE']
-            self.gamma = self.petal_state.conf['ROTATION']
-            self.Tx = self.petal_state.conf['X_OFFSET']
-            self.Ty = self.petal_state.conf['Y_OFFSET']
-        
+        self.printfunc(f'Running code version: {pc.code_version}')
+        self.printfunc(f'poscollider used: {poscollider.__file__}')
+        # read values from cfg files if not given
+        # if None in [petal_id, petalbox_id, fidids, posids, shape]:
+        #     self.printfunc('Some parameters not provided to __init__, '
+        #                    'reading petal config.')
+            # self.petal_state = posstate.PosState(  # initialise petal state
+            #         unit_id=petal_id, device_type='ptl', logging=True,
+            #         printfunc=self.printfunc)
+            # if petal_id is None:
+            #     self.printfunc('Reading Petal_ID from petal_state')
+            #     # this is the string unique hardware id of the particular petal
+            #     # (not the integer id of the beaglebone in the petalbox)
+            #     petal_id = self.petal_state.conf['PETAL_ID']
+            # if petalbox_id is None:
+            #     self.printfunc('Reading petalbox_ID from petal_state')
+            #     # this is the integer software id of the petalbox (previously
+            #     # known as 'petal_id', before disambiguation)
+            #     petalbox_id = self.petal_state.conf['PETALBOX_ID']
+            # if posids is None:
+            #     self.printfunc('posids not given, read from ptl_settings file')
+            #     posids = self.petal_state.conf['POS_IDS']
+            # if fidids is None:
+            #     self.printfunc('fidids not given, read from ptl_settings file')
+            #     fidids = self.petal_state.conf['FID_IDS']
+            # if shape is None:
+            #     self.printfunc('Reading shape from petal_state')
+            #     shape = self.petal_state.conf['SHAPE']
         self.petalbox_id = petalbox_id
         self.petal_id = int(petal_id)
         self.shape = shape
@@ -120,52 +122,17 @@ class Petal(object):
         self.sched_stats_on = sched_stats_on
         self.altered_states = set()
         self.altered_calib_states = set()
+        self._last_state = {}
 
-        # positioners setup
-        self.posmodels = {} # key posid, value posmodel instance
-        self.states = {} # key posid, value posstate instance
-        self.devices = {} # key device_location_id, value posid
-        installed_on_asphere = self.shape == 'petal'
-        for posid in posids:
-            self.states[posid] = posstate.PosState(posid, logging=self.local_log_on, device_type='pos', printfunc=self.printfunc, petal_id=self.petal_id)
-            self.posmodels[posid] = PosModel(self.states[posid], installed_on_asphere)
-            self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
-        self.posids = set(self.posmodels.keys())
-        self.canids_where_tables_were_just_sent = []
-        self.busids_where_tables_were_just_sent = []
-        self.nonresponsive_canids = set()
-        self.sync_mode = 'soft' # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start positioners
-        self.set_motor_parameters()
-        self.power_supply_map = self._map_power_supplies_to_posids()
-        
-        # collider, scheduler, and animator setup
-        if hasattr(self, 'anticol_settings'):
-            self.printfunc('Using provided anticollision settings')
-            self.collider = poscollider.PosCollider(config=self.anticol_settings,
-                                                    collision_hashpp_exists=False, 
-                                                    collision_hashpf_exists=False, 
-                                                    hole_angle_file=None)
-        else:
-            self.collider = poscollider.PosCollider(configfile=collider_file,
-                                                    collision_hashpp_exists=False, 
-                                                    collision_hashpf_exists=False, 
-                                                    hole_angle_file=None)
-            self.anticol_settings = self.collider.config
-        self.collider.set_petal_offsets(x0=self.Tx,
-                                        y0=self.Ty,
-                                        rot=self.gamma)
-        self.collider.add_positioners(self.posmodels.values())
-        self.animator = self.collider.animator
-        self.animator_on = False # this should be turned on/off using the animation start/stop control methods below
-        self.animator_total_time = 0 # keeps track of total time of the current animation
-        self.schedule_stats = posschedstats.PosSchedStats() if self.sched_stats_on else None    
-        self.schedule = self._new_schedule()
-        self.anticollision_default = anticollision
-        
+        # must call the following 3 methods whenever petal alingment changes
+        self.init_trans()
+        self.init_posmodels(posids)
+        self._init_collider(collider_file, anticollision)
+
         # fiducials setup
         self.fidids = {fidids} if isinstance(fidids,str) else set(fidids)
         for fidid in self.fidids:
-            self.states[fidid] = posstate.PosState(fidid, logging=self.local_log_on, device_type='fid', printfunc=self.printfunc, petal_id=self.petal_id)        
+            self.states[fidid] = posstate.PosState(fidid, logging=self.local_log_on, device_type='fid', printfunc=self.printfunc, petal_id=self.petal_id)
             self.devices[self.states[fidid]._val['DEVICE_LOC']] = fidid
 
         # pos flags setup
@@ -188,18 +155,105 @@ class Petal(object):
 
         self.hw_states = {}
 
-        # transformation instance setup for petal
-        # these values can be used for boundary calculation in anti-collision
-        self.trans = PetalTransforms(Tx=self.Tx, Ty=self.Ty, gamma=self.gamma)
+    def init_trans(self, alignment=None):
+        '''
+        initialise PetalTransforms class as a property of petal
+        called upon petal instantiation inside __init__()
+        must also be called whenever petal alignment changes in the focal plane
+        input (self.)alignment is a dict of 6 items structured as follows:
 
-        # set debug mode flag
-        self.debug_commit_on = debug_commit_on
+        self.alignment = {'Tx': 0,  # x translation
+                          'Ty': 0,  # y translation
+                          'Tz': 0,  # z translation in mm
+                          'alpha': 0,  # x rotation in deg
+                          'beta': 0,  # y rotation in deg
+                          'gamma': 0}  # z rotation
+        '''
+        if alignment is None:
+            # no alingment supplied, try to find self.alingment attribute
+            if hasattr(self, 'alignment'):
+                # self.alignment found, just re-use it
+                if self.verbose:
+                	self.printfunc('Using existing petal.alignment')
+            else:
+                self.printfunc('Initialisation requires petal.alignment '
+                               'attribute to be set, using zeros.')
+                self.alignment = {'Tx': 0,  # x translation
+                                  'Ty': 0,  # y translation
+                                  'Tz': 0,  # z translation in mm
+                                  'alpha': 0,  # x rotation in deg
+                                  'beta': 0,  # y rotation in deg
+                                  'gamma': 0}  # z rotation
+        else:  # new alingment supplied, overwrite self.aglinment attribute
+            self.alignment = alignment
+        	self.printfunc('New petal alignment set:', alignment)
+        # trans attribute below can be set, but is it used at all by anything?
+        # self.trans = PetalTransforms(Tx=self.alignment['Tx'],
+        #                              Ty=self.alignment['Ty'],
+        #                              Tz=self.alignment['Tz'],
+        #                              alpha=self.alignment['alpha'],
+        #                              beta=self.alignment['beta'],
+        #                              gamma=self.alignment['gamma'])
 
-# METHODS FOR POSITIONER CONTROL
+    def init_posmodels(self, posids=None):
+        # positioners setup
+        if posids is None:  # posids are not supplied, only alingment changed
+            assert hasattr(self, 'posids')  # re-use self.posids
+            posids = self.posids
+        else:  # posids are supplied
+            pass  # just use supplied posids, ignore self.posids that may exist
+        self.posmodels = {}  # key posid, value posmodel instance
+        self.states = {}  # key posid, value posstate instance
+        self.devices = {}  # key device_location_id, value posid
+        self.shape == 'petal'
+        for posid in posids:
+            self.states[posid] = posstate.PosState(
+                posid, logging=self.local_log_on, device_type='pos',
+                printfunc=self.printfunc, petal_id=self.petal_id)
+            self.posmodels[posid] = PosModel(state=self.states[posid],
+                                             petal_alignment=self.alignment)
+            self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
+        self.posids = set(self.posmodels.keys())
+        self.canids_where_tables_were_just_sent = []
+        self.busids_where_tables_were_just_sent = []
+        self.nonresponsive_canids = set()
+        # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start
+        # positioners
+        self.sync_mode = 'soft'
+        self.set_motor_parameters()
+        self.power_supply_map = self._map_power_supplies_to_posids()
+
+    def _init_collider(self, collider_file=None, anticollision='freeze'):
+        '''collider, scheduler, and animator setup
+        '''
+        if hasattr(self, 'anticol_settings'):
+            self.printfunc('Using provided anticollision settings')
+            self.collider = poscollider.PosCollider(
+                config=self.anticol_settings, collision_hashpp_exists=False,
+                collision_hashpf_exists=False, hole_angle_file=None)
+        else:
+            self.collider = poscollider.PosCollider(
+                configfile=collider_file, collision_hashpp_exists=False,
+                collision_hashpf_exists=False, hole_angle_file=None)
+            # self.anticol_settings = self.collider.config
+        self.printfunc(f'Collider setting: {self.collider.config}')
+        self.collider.add_positioners(self.posmodels.values())
+        self.animator = self.collider.animator
+        # this should be turned on/off using the animation start/stop
+        # control methods below
+        self.animator_on = False
+        # keeps track of total time of the current animation
+        self.animator_total_time = 0
+        self.schedule_stats = posschedstats.PosSchedStats() \
+            if self.sched_stats_on else None
+        self.schedule = self._new_schedule()
+        self.anticollision_default = anticollision
+
+    # %% METHODS FOR POSITIONER CONTROL
 
     def request_targets(self, requests):
         """Put in requests to the scheduler for specific positioners to move to specific targets.
-        
+
         This method is for requesting that each robot does a complete repositioning sequence to get
         to the desired target. This means:
 
@@ -207,17 +261,17 @@ class Petal(object):
             - Only one requested target per positioner.
             - Theta angles are wrapped across +/-180 deg
             - Contact of hard limits is prevented.
-        
+
         INPUT:
             requests ... dictionary of dictionaries
-            
+
                 dictionary format:
-                
+
                     key     ... posid (referencing a single subdictionary for that positioner)
                     value   ... subdictionary (see below)
 
                 subdictionary format:
-                
+
                     KEYS        VALUES
                     ----        ------
                     command     move command string
@@ -229,24 +283,26 @@ class Petal(object):
                     log_note    optional string to store alongside in the log data for this move
                                     ... gets stored in the 'NOTE' field
                                     ... if the subdict contains no note field, then '' will be added automatically
-            
+
         OUTPUT:
             Same dictionary, but with the following new entries in each subdictionary:
-            
+
                     KEYS        VALUES
                     ----        ------
                     posmodel    object handle for the posmodel corresponding to posid
                     log_note    same as log_note above, or '' is added automatically if no note was argued in requests
-            
+
             In cases where this is a second request to the same robot (which is not allowed), the
             subdictionary will be deleted from the return.
-            
+
             In cases where the request was made to a disabled positioner, the subdictionary will be
             deleted from the return.
 
             pos_flags ... dict keyed by positioner indicating which flag as indicated below that a
                           positioner should receive going to the FLI camera with fvcproxy
         """
+        if self.verbose:
+            self.printfunc(f'petal: requests received {len(requests)}')
         marked_for_delete = set()
         for posid in requests:
             requests[posid]['posmodel'] = self.posmodels[posid]
@@ -260,11 +316,15 @@ class Petal(object):
                 marked_for_delete.add(posid)
                 self.pos_flags[posid] |= self.multi_request_bit
             else:
-                accepted = self.schedule.request_target(posid, requests[posid]['command'], requests[posid]['target'][0], requests[posid]['target'][1], requests[posid]['log_note'])            
+                accepted = self.schedule.request_target(posid, requests[posid]['command'], requests[posid]['target'][0], requests[posid]['target'][1], requests[posid]['log_note'])
                 if not accepted:
                     marked_for_delete.add(posid)
+                    # self.printfunc(f'deleting {posid} for target rejected')
         for posid in marked_for_delete:
             del requests[posid]
+        if self.verbose:
+            self.printfunc(f'petal: requests approved {len(requests)} '
+                           f'{len(marked_for_delete)} delected')
         return requests
 
     def request_direct_dtdp(self, requests, cmd_prefix=''):
@@ -280,14 +340,14 @@ class Petal(object):
 
         INPUT:
             requests ... dictionary of dictionaries
-            
+
                 dictionary format:
-                
+
                     key     ... posid (referencing a single subdictionary for that positioner)
                     value   ... subdictionary (see below)
 
                 subdictionary format:
-                
+
                     KEYS        VALUES
                     ----        ------
                     target      pair of target deltas, of the form [dT,dP]
@@ -295,7 +355,7 @@ class Petal(object):
                     log_note    optional string to store alongside in the log data for this move
                                     ... gets embedded in the  in the 'NOTE' field
                                     ... if the subdict contains no note field, then '' will be added automatically
-            
+
             cmd_prefix ... Optional argument, allows embedding a descriptive string to the log, embedded
                            in the 'MOVE_CMD' field. This is different from log_note. Generally,
                            log_note is meant for users, whereas cmd_prefix is meant for internal lower-
@@ -303,18 +363,18 @@ class Petal(object):
 
         OUTPUT:
             Same dictionary, but with the following new entries in each subdictionary:
-            
+
                     KEYS        VALUES
                     ----        ------
                     command     'direct_dTdP'
                     posmodel    object handle for the posmodel corresponding to posid
                     log_note    same as log_note above, or '' is added automatically if no note was argued in requests
-                    
+
             In cases where the request was made to a disabled positioner, the subdictionary will be
             deleted from the return.
 
             pos_flags ... dictionary, contains appropriate positioner flags for FVC see request_targets()
-            
+
         It is allowed to repeatedly request_direct_dtdp on the same positioner, in cases where one
         wishes a sequence of theta and phi rotations to all be done in one shot. (This is unlike the
         request_targets command, where only the first request to a given positioner would be valid.)
@@ -336,7 +396,7 @@ class Petal(object):
             table.log_note += (' ' if table.log_note else '') + requests[posid]['log_note']
             table.allow_exceed_limits = True
             self.schedule.expert_add_table(table)
-        return requests            
+        return requests
 
     def request_limit_seek(self, posids, axisid, direction, anticollision='freeze', cmd_prefix='', log_note=''):
         """Request hardstop seeking sequence for a single positioner or all positioners
@@ -386,7 +446,7 @@ class Petal(object):
         """Request homing sequence for positioners in single posid or iterable collection of
         posids. Finds the primary hardstop, and sets values for the max position and min position.
         Requests to disabled positioners will be ignored.
-        
+
         axis ... string, 'both' (default), 'theta_only', 'phi_only', optional argument that allows for homing either
                  theta or phi only
         """
@@ -423,10 +483,10 @@ class Petal(object):
         """Generate the schedule of moves and submoves that get positioners
         from start to target. Call this after having input all desired moves
         using the move request methods.
-        
+
         See posschedule.py for valid arguments to the anticollision flag. If
         no argument is given, then the petal's default flag is used.
-        
+
         The should_anneal flag should generally be left True. It causes moves
         to be spread out in time to reduce peak current draw by the full array
         of positioners. (But there are certain 'expert use' test cases in the
@@ -487,7 +547,7 @@ class Petal(object):
         """Command the positioners to do the move tables that were sent out to them.
         Then do clean-up and logging routines to keep track of the moves that were done.
         """
-        self.info('execute_moves called')        
+        self.info('execute_moves called')
         if self.simulator_on:
             if self.verbose:
                 self.printfunc('Simulator skips sending execute moves command to positioners.')
@@ -508,7 +568,7 @@ class Petal(object):
             self._wait_while_moving()
         self.canids_where_tables_were_just_sent = []
         self.busids_where_tables_were_just_sent = []
-        self.info('execute_moves: Done')        
+        self.info('execute_moves: Done')
 
     def schedule_send_and_execute_moves(self, anticollision='default', should_anneal=True):
         """Convenience wrapper to schedule, send, and execute the pending requested
@@ -549,7 +609,7 @@ class Petal(object):
         direct (delta theta, delta phi) relative move. There is NO anti-collision calculation. This
         method is intended for expert usage only. You can argue an iterable collection of posids if
         you want, though note they will all get the same (dt,dp) sent to them.
-        
+
         INPUTS:     posids    ... either a single posid or a list of posids
                     dtdp      ... [dt,dp], note that all posids get sent the same [dt,dp] here. i.e. dt and dp are each just one number
                     log_note  ... optional string to include in the log file
@@ -562,23 +622,23 @@ class Petal(object):
         self.request_direct_dtdp(requests)
         self.schedule_send_and_execute_moves(None,should_anneal)
 
-# METHODS FOR FIDUCIAL CONTROL        
+# METHODS FOR FIDUCIAL CONTROL
     def set_fiducials(self, fidids='all', setting='on', save_as_default=False):
         """Set specific fiducials on or off.
-        
+
         fidids ... one fiducial id string, or an iterable collection of fiducial id strings, or 'all'
-                   
+
         setting ... what to set the fiducials to, as described below:
             'on'         ... turns each fiducial to its default on value
             'off'        ... turns each fiducial individually to its default off value
             int or float ... a single integer or float from 0-100 sets all the argued fiducials uniformly to that one value
-        
+
         save_as_default ... only used when seting is a number, in which case True means we will store that setting permanently to the fiducials' config file, False means its just a temporary setting this time
-        
+
         Method returns a dictionary of all the settings that were made, where
             key   --> fiducial id
             value --> duty state that was set
-        
+
         Fiducials that do not have control enabled will not appear in this dictionary.
         """
         if self.simulator_on:
@@ -605,7 +665,7 @@ class Petal(object):
         for idx, busid in enumerate(busids):
             fiducial_settings_by_busid[busid][canids[idx]] = duties[idx]
         self.comm.pbset('fiducials', fiducial_settings_by_busid)
-        
+
         settings_done = {}
         for i in range(len(enabled)):
             self.set_posfid_val(enabled[i], 'DUTY_STATE', duties[i])
@@ -674,7 +734,7 @@ class Petal(object):
             self._last_state=OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
                                           'GFA_FAN':({'inlet':['on',20],'outlet':['on',20]}, 1.0), #GFA Fan Power ON
                                           'GFAPWR_EN':('on', 1.0), #GFA Power Enable ON
-                                          'TEC_CTRL': ('on', 15.0), #TEC Power EN ON 
+                                          'TEC_CTRL': ('on', 15.0), #TEC Power EN ON
                                           'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON - what about SYNC?
                                           #GFA CCD OFF
                                           #GFA CCD Voltages EN OFF
@@ -687,7 +747,7 @@ class Petal(object):
             self._last_state=OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
                                           'GFA_FAN':({'inlet':['on',20],'outlet':['on',20]}, 1.0), #GFA Fan Power ON
                                           'GFAPWR_EN':('on', 1.0), #GFA Power Enable ON
-                                          'TEC_CTRL':('on', 5.0), #TEC Power EN ON 
+                                          'TEC_CTRL':('on', 5.0), #TEC Power EN ON
                                           'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON - what about SYNC?
                                           #GFA CCD ON
                                           #GFA CCD Voltages EN ON
@@ -695,10 +755,11 @@ class Petal(object):
                                           #PetalBox Power ON - controlled by physical raritan switch
                                           'PS1_EN':('on', 1.0), #Positioner Power EN ON
                                           'PS2_EN':('on', 1.0)})
-        #Set State
+        # Set petalbox State
+        if self.simulator_on:
+            return None  # bypasse everything below if in sim mode
         for key in self._last_state.keys():
-            self.comm.pbset(key,self._last_state[key][0])
-
+            self.comm.pbset(key, self._last_state.keys())
         # now check if all state changes are complete
         # wait for timeout, if still inconsistent raise exception
         todo = list(self._last_state.keys())
@@ -728,7 +789,6 @@ class Petal(object):
         else:
             self.printfunc('_set_hardware_state: FAILED: some inconsistent device states: %r' % failed)
             raise_error('_set_hardware_state: Inconsistent device states: %r' % failed)
-
         return hw_state
 
     def _get_hardware_state(self):
@@ -739,38 +799,34 @@ class Petal(object):
         returns the state of the PetalController.
         '''
         err_strings = []
+        if self.simulator_on:
+            return 'READY', err_strings
         if self._last_state == {}:
-            raise_error('_get_hardware_state: current state has not yet been set')
+            self.pbset('STATE', 'ERROR')
+            return 'ERROR', ['No state yet set by petal']
         # Look for different settings from what petal last set.
         for key in self._last_state.keys():
-            fbk = self.comm.pbget(key)
+            fbk = self.pbget(key)
             if key == 'GFA_FAN': #sadly GFA_FAN is a little weird.
                 for k in fbk.keys(): #should be 'inlet' and 'outlet'
-                    if fbk[k][0] != self._last_state[key][0][k][0]: #comparing only off/on, not worring about PWM or TACH
-                        err_strings.append(key+' '+k+' expected: '+str(self._last_state[key][k])+', got: '+str(fbk[k][0]))
+                    if fbk[k][0] != self._last_state[key][k][0]: #comparing only off/on, not worring about PWM or TACH
+                        err_strings.append(key+' expected: '+str(self._last_state[key][k])+', got: '+str(fbk[k][0]))
             else:
-                if self._last_state[key][0] != fbk:
+                if self._last_state[key] != fbk:
                     err_strings.append(key+' expected: '+str(self._last_state[key])+', got: '+str(fbk))
         if err_strings == []: #If no errors found, just return the state that was set
-            return self.comm.ops_state()
+            return self.pbget('STATE'), err_strings
         else: #If errors were found, set 'ERROR' state and return 'ERROR' as well as strings explaining why.
-            raise_error('_get_hardware_state: petalcontroller reports inconsistent device state: %r' % err_strings)
-        
+            self.pbset('STATE','ERROR')
+            return 'ERROR', err_strings
+
     def reset_petalbox(self):
         """Reset all errors and turn all enables off.  This method
-        returns the petalbox to its default safe state (how it comes up prior to 
+        returns the petalbox to its default safe state (how it comes up prior to
         communicating with the petal).
-        KH: note that there is now initial_configure and configure implemented on the petalcontroller
-            Decide what should be done to the petalbox. I switched to initial_configure which is equivalent to the original configure 
-            before the code was adapted for DOS.
-            Calling reset_petalbox will reset the petalcontroller state (ops_state) to INITIALIZED
         """
         if not self.simulator_on:
-            try:
-                self.comm.initial_configure()
-            except Exception as e:
-                return 'FAILED: Exception calling petalcontroller initial_configure: %s' % str(e)
-        return 'SUCCESS'
+            self.comm.configure()
 
 # GETTERS, SETTERS, STATUS METHODS
     def get_information(self, what):
@@ -782,7 +838,7 @@ class Petal(object):
     def get_posfid_val(self, uniqueid, key):
         """Retrieve the state value identified by string key, for positioner or fiducial uniqueid."""
         return self.states[uniqueid]._val[key]
-    
+
     def set_posfid_val(self, uniqueid, key, value):
         """Sets a single value to a positioner or fiducial. In the case of a fiducial, note that
         this call does NOT turn the fiducial physically on or off. It only saves a value."""
@@ -791,19 +847,19 @@ class Petal(object):
             self.altered_calib_states.add(self.states[uniqueid])
         else:
             self.altered_states.add(self.states[uniqueid])
-    
+
     def get_pbdata_val(self, key):
         """Requests data from petalbox using the pbget method.
         key ... string, corresponds to petalbox pbget method keys (eg 'TELEMETRY', 'CONF_FILE')
         """
-        return self.comm.pbget(key) 
-    
+        return self.comm.pbget(key)
+
     def get_ptl_performance_telemetry(self):
         """Returns an abbreviated summary of key performance parameters
         to be plotted with the telemetry viewer.  These stats are provided
         for the latest shedule only.
-        
-        Returns dictionary of anticollision statistic parameters (if self.schedule_stats is initialized, 
+
+        Returns dictionary of anticollision statistic parameters (if self.schedule_stats is initialized,
         else returns an empty dictionary).
         key ... value
         'found total collisions' ... integer number of total collisions found
@@ -827,7 +883,7 @@ class Petal(object):
         data_for_telemetry['resolved freeze collisions'] = data['freeze'][idx]
         data_for_telemetry['total schedule time'] = total_time
         return data_for_telemetry
-    
+
     def commit(self, log_note='', *args, **kwargs):
         '''Commit data to the local config and log files, and/or the online database.
         A note string may optionally be included to go along with this entry in the logs.
@@ -862,7 +918,7 @@ class Petal(object):
         '''Commit data to the pos_calib table. This is to be called at the end of a calibration
         sequence. No local commit option since local calibration recordings are andled in the
         commit function.
-        ''' 
+        '''
         if self.db_commit_on and not(self.simulator_on):
             pos_commit_list = []
             fid_commit_list = []
@@ -882,30 +938,33 @@ class Petal(object):
         """Retrieve the current position, for a positioner identied by posid, according
         to the internal tracking of its posmodel object. Returns a two element
         list. Valid keys are:
-            
-            'QS', 'flatXY', 'obsXY', 'posXY', 'obsTP', 'posTP', 'motTP'
-        
+
+            'posintTP, 'poslocXY', 'poslocTP',
+            'QS', 'flatXY', 'obsXY', 'ptlXY', 'motTP'
+
         See comments in posmodel.py for explanation of these values.
         """
-        if key == 'posTP':
-            return self.posmodels[posid].expected_current_posTP
-        elif key == 'obsTP':
-            return self.posmodels[posid].expected_current_obsTP
+        if key == 'posintTP':
+            return self.posmodels[posid].expected_current_posintTP
+        elif key == 'poslocTP':
+            return self.posmodels[posid].expected_current_poslocTP
         else:
             vals = self.posmodels[posid].expected_current_position
             if key == 'obsXY':
-                return [vals['obsX'],vals['obsY']]
+                return [vals['obsX'], vals['obsY']]
             elif key == 'QS':
-                return [vals['Q'],vals['S']]
-            elif key == 'posXY':
-                return [vals['posX'],vals['posY']]
+                return [vals['Q'], vals['S']]
+            elif key == 'poslocXY':
+                return [vals['poslocX'], vals['poslocY']]
+            elif key == 'poslocTP':
+                return [vals['poslocT'], vals['poslocT']]
             elif key == 'flatXY':
-                return [vals['flatX'],vals['flatY']]
+                return [vals['flatX'], vals['flatY']]
             elif key == 'motorTP':
-                return [vals['motT'],vals['motP']]
+                return [vals['motT'], vals['motP']]
             else:
                 self.printfunc('Unrecognized key ' + str(key) + ' in request for expected_current_position of posid ' + str(posid) + '.')
-                
+
     def enabled_posmodels(self, posids):
         """Returns dict with keys = posids, values = posmodels, but only for
         those positioners in the collection posids which are enabled.
@@ -923,7 +982,7 @@ class Petal(object):
         for posid in posids:
             if not(self.posmodels[posid].is_enabled):
                 self.pos_flags[posid] |= self.ctrl_disabled_bit #final check for disabled
-            if not(self.get_posfid_val(posid, 'FIBER_INTACT')):  
+            if not(self.get_posfid_val(posid, 'FIBER_INTACT')):
                 self.pos_flags[posid] |= self.fiber_broken_bit
                 self.pos_flags[posid] |= self.bad_fiber_fvc_bit
             if self.get_posfid_val(posid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
@@ -934,7 +993,7 @@ class Petal(object):
         return pos_flags
 
 # MOVE SCHEDULING ANIMATOR CONTROLS
-        
+
     def start_gathering_frames(self):
         """Frame data representing scheduled moves will begin to be collected as
         it is generated (during move scheduling) and will be retained for making
@@ -944,13 +1003,13 @@ class Petal(object):
         self.animator.clear()
         self.animator_on = True
         self.animator_total_time = 0
-        self.collider.add_fixed_to_animator(self.animator_total_time)        
-    
+        self.collider.add_fixed_to_animator(self.animator_total_time)
+
     def stop_gathering_frames(self):
         """Stop collecting frame data of scheduled moves for the animator.
         """
         self.animator_on = False
-    
+
     def generate_animation(self):
         """Use the current collection of move frames in the animator to plot
         the animation.
@@ -1030,7 +1089,7 @@ class Petal(object):
                     status_updated = True
             if status_updated:
                 self.commit(log_note = 'Disabled sending control commands because device was detected to be nonresponsive.')
-                
+
     def _clear_temporary_state_values(self):
         '''Clear out any existing values in the state objects that were only temporarily
         held until we could get the state committed to the log / db.
@@ -1055,7 +1114,7 @@ class Petal(object):
         acknowledged there may be 'better', i.e. multi-threaded, ways to achieve this.
         """
         if self.simulator_on:
-            return        
+            return
         timeout = 20.0 # seconds
         poll_period = 0.5 # seconds
         keep_waiting = True
@@ -1069,7 +1128,7 @@ class Petal(object):
                 keep_waiting = False
             else:
                 time.sleep(poll_period)
-    
+
     def _map_power_supplies_to_posids(self):
         """Reads in data for positioner canids and petal power supply ids, and
         returns a dict mapping power supply ids (keys) to sets of posids (values).
@@ -1086,10 +1145,10 @@ class Petal(object):
             already_mapped.union(mapped_posids)
         power_supply_map['other'] = set(canids.keys()).difference(already_mapped)
         return power_supply_map
-    
+
     def _update_and_send_can_enabled_info(self, power_supply_mode = 'both'):
         """Set up CAN and CTRL_ENABLED information based on positioner power supply or supplies being enabled.
-        
+
         power_supply_mode ... string ('both' or 'None') or integer (1 or 2) specifying the power supply or supplies being enabled.
         """
         if power_supply_mode == 'None':
@@ -1103,7 +1162,7 @@ class Petal(object):
                     self.set_posfid_val(devid, 'CTRL_ENABLED', True)
                     self.pos_flags[devid] &= ~(self.comm_error_bit)
             both_supplies_map = self.can_enabled_map['V1'].copy()
-            both_supplies_map.update(self.can_enabled_map['V2'])   
+            both_supplies_map.update(self.can_enabled_map['V2'])
             self.comm.pbset('CAN_ENABLED', both_supplies_map)
         else:
             for devid in self.posids.union(self.fidids):
@@ -1114,9 +1173,9 @@ class Petal(object):
                     self.set_posfid_val(devid, 'CTRL_ENABLED', True)
                     self.pos_flags[devid] &= ~(self.comm_error_bit)
             self.comm.pbset('CAN_ENABLED', self.can_enabled_map['V{}'.format(power_supply_mode)])
-            
+
     def _map_can_enabled_devices(self):
-        """Reads in enable statuses for all devices and builds a formatted for petalbox can 
+        """Reads in enable statuses for all devices and builds a formatted for petalbox can
         id map by power supply key.
         """
         self.can_enabled_map = {}
@@ -1142,8 +1201,8 @@ class Petal(object):
         if enabled:
             self.can_enabled_map[dev_supply][busid][canid] = devtype
         else:
-            self.can_enabled_map[dev_supply][busid].pop(canid, None) 
-            
+            self.can_enabled_map[dev_supply][busid].pop(canid, None)
+
     def _initialize_pos_flags(self, ids = 'all'):
         '''
         Sets pos_flags to initial values: 4 for positioners and 8 for fiducials.
@@ -1154,11 +1213,11 @@ class Petal(object):
         1 - Pinhole Center
         2 - Fiber Center
         3 - Fiducial Center
-        4 - 
+        4 -
         5 - Bad Fiber or Fiducial
         6 - 15 reserved
 
-        PETAL BITS    
+        PETAL BITS
         16 - CTRL_ENABLED = False
         17 - FIBER_INTACT = False
         18 - Communication error
@@ -1193,16 +1252,15 @@ class Petal(object):
                     self.set_posfid_val(devid, 'CTRL_ENABLED', False)
                     self.pos_flags[devid] |= self.ctrl_disabled_bit
                     self.pos_flags[devid] |= self.fiber_broken_bit
-                    self.pos_flags[devid] |= self.bad_fiber_fvc_bit 
-                    self.disabled_devids.append(devid)           
-
+                    self.pos_flags[devid] |= self.bad_fiber_fvc_bit
+                    self.disabled_devids.append(devid)
 
     def _petal_configure(self, constants = 'DEFAULT'):
         """
         petal.py internal configure function.
         calls petalcontroller configure
         calls get_ready to change ops_state to READY
-        
+
         Resets posflags, schedule, clears temporary posstate values,
         commits uncommitted state changes to the DB
         """
@@ -1236,7 +1294,7 @@ class Petal(object):
         self._initialize_pos_flags() # Reset posflags
         self._apply_state_enable_settings()
         for posmodel in self.posmodels.values(): #Clean up posmodel and posstate
-            posmodel.clear_postmove_cleanup_cmds_without_executing() 
+            posmodel.clear_postmove_cleanup_cmds_without_executing()
 
         self._clear_temporary_state_values()
         self.commit(log_note='configuring') #commit uncommitted changes to DB
@@ -1244,3 +1302,31 @@ class Petal(object):
         self.schedule = self._new_schedule() # Refresh schedule so it has no tables
 
         return 'SUCCESS'
+
+
+if __name__ == '__main__':
+    '''
+    python -m cProfile -s cumtime petal.py
+    '''
+    import numpy as np
+    from configobj import ConfigObj
+    cfg = ConfigObj(  # posids and fidids
+        "/home/msdos/focalplane/fp_settings/ptl_settings/unit_03.conf",
+        unrepr=True, encoding='utf-8')
+    ptl = Petal(petal_id=3, petal_loc=0,
+                posids=cfg['POS_IDS'], fidids=cfg['FID_IDS'],
+                db_commit_on=True, local_commit_on=False, local_log_on=False,
+                simulator_on=True, printfunc=print, verbose=False,
+                sched_stats_on=False)
+    print('Initial posTP of M04078 (make sure inital positions are the same):',
+          ptl.posmodels['M04078'].expected_current_posintTP)
+    posT = np.linspace(0, 360, 6)
+    posP = np.linspace(90, 180, 6)
+    for i in range(4):
+        print(f'==== target {i}, posTP = ({posT[i]:.3f}, {posP[i]:.3f}) ====')
+        request = {'command': 'posintTP',
+                   'target': (posT[i], posP[i])}
+        requests = {posid: request for posid in ptl.posids}
+        ptl.request_targets(requests)
+        ptl.schedule_moves(anticollision='adjust')
+        ptl.send_and_execute_moves()

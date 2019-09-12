@@ -11,12 +11,13 @@ class PosModel(object):
     One instance of PosModel corresponds to one PosState to physical positioner.
     """
 
-    def __init__(self, state=None, is_installed_on_asphere=False):
+    def __init__(self, state=None, petal_alignment=None):
         if not(state):
             self.state = posstate.PosState()
         else:
             self.state = state
-        self.trans = postransforms.PosTransforms(self, is_installed_on_asphere)
+        self.trans = postransforms.PosTransforms(
+            this_posmodel=self, petal_alignment=petal_alignment)
         self.axis = [None,None]
         self.axis[pc.T] = Axis(self,pc.T)
         self.axis[pc.P] = Axis(self,pc.P)
@@ -52,70 +53,104 @@ class PosModel(object):
     def busid(self):
         """Returns the name of the can bus that the positioner belongs to."""
         return self.state._val['BUS_ID']
-    
+
     @property
     def deviceloc(self):
         """Returns the device location id (on the petal) of the positioner."""
         return self.state._val['DEVICE_LOC']
-    
+
     @property
     def is_enabled(self):
         """Returns whether the positioner has its control enabled or not."""
         return self.state._val['CTRL_ENABLED']
 
     @property
-    def expected_current_posTP(self):
-        """Returns the internally-tracked expected position of the theta and phi shafts
-        at the output of the gearbox."""
-        return [self.axis[pc.T].pos, self.axis[pc.P].pos]
-    
+    def expected_current_posintTP(self):
+        """Returns the internally-tracked expected position of the
+        theta and phi shafts at the output of the gearbox."""
+        return self.axis[pc.T].pos, self.axis[pc.P].pos
+
     @property
-    def expected_current_obsTP(self):
-        """Returns the expected position of theta and phi bodies, as seen by an external
-        observer."""
-        posTP = self.expected_current_posTP
-        return self.trans.posTP_to_obsTP(posTP)
+    def expected_current_poslocTP(self):
+        """Returns the expected position of theta and phi bodies, as seen by
+        an external observer."""
+        posintTP = self.expected_current_posintTP
+        return self.trans.posintTP_to_poslocTP(posintTP)
 
     @property
     def expected_current_position(self):
-        """Returns a general dictionary of the current expected position in all the various coordinate systems.
-        The keys are:
-            'Q'     ... float, deg, dependent variable, expected global Q position
-            'S'     ... float, mm,  dependent variable, expected global S position
-            'flatX' ... float, mm, dependent variable, expected global x in a system where focal surface curvature is flattened out to an approximate plane
-            'flatY' ... float, mm, dependent variable, expected global y in a system where focal surface curvature is flattened out to an approximate plane
-            'obsX'  ... float, mm,  dependent variable, expected global x position
-            'obsY'  ... float, mm,  dependent variable, expected global y position
-            'posX'  ... float, mm,  dependent variable, expected local x position
-            'posY'  ... float, mm,  dependent variable, expected local y position
-            'obsT'  ... float, deg, dependent variable, expected position of theta axis, including offsets as seen by an external observer
-            'obsP'  ... float, deg, dependent variable, expected position of phi axis, including offsets as seen by an external observer
-            'posT'  ... float, deg, independent variable, the internally-tracked expected position of the theta shaft at the output of the gearbox
-            'posP'  ... float, deg, independent variable, the internally-tracked expected position of the phi shaft at the output of the gearbox
-            'motT'  ... float, deg, dependent variable, expected position of theta motor
-            'motP'  ... float, deg, dependent variable, expected position of phi motor
         """
-        posTP = self.expected_current_posTP
-        d = {}
-        d['posT'] = posTP[0]
-        d['posP'] = posTP[1]
-        d['motT'] = self.axis[pc.T].shaft_to_motor(d['posT'])
-        d['motP'] = self.axis[pc.P].shaft_to_motor(d['posP'])
-        obsTP = self.trans.posTP_to_obsTP(posTP)
-        d['obsT'] = obsTP[0]
-        d['obsP'] = obsTP[1]
-        posXY = self.trans.posTP_to_posXY(posTP)
-        d['posX'] = posXY[0]
-        d['posY'] = posXY[1]
-        obsXY = self.trans.posXY_to_obsXY(posXY)
-        d['obsX'] = obsXY[0]
-        d['obsY'] = obsXY[1]
-        QS = self.trans.obsXY_to_QS(obsXY)
-        d['Q'] = QS[0]
-        d['S'] = QS[1]
-        flatXY = self.trans.QS_to_flatXY(QS)
-        d['flatX'] = flatXY[0]
-        d['flatY'] = flatXY[1]
+        Returns a general dictionary of the current expected position in all
+        the various coordinate systems.
+        The keys are:
+            'posintT'   float, deg, independent variable,
+                        the internally-tracked expected position of the
+                        theta shaft at the output of the gearbox
+            'posintP'   float, deg, independent variable,
+                        the internally-tracked expected position of the
+                        phi shaft at the output of the gearbox
+            'poslocT'
+            'poslocP'
+            'poslocX'   float, mm, dependent variable,
+                        expected local x position
+            'poslocY'   float, mm, dependent variable,
+                        expected local y position
+            'Q'         float, deg, dependent variable,
+                        expected global Q position
+            'S'         float, mm,  dependent variable,
+                        expected global S position
+            'flatX'     float, mm, dependent variable,
+                        expected global x in a system where focal surface
+                        curvature is flattened out to an approximate plane
+            'flatY'     float, mm, dependent variable,
+                        expected global y in a system where focal surface
+                        curvature is flattened out to an approximate plane
+            'obsX'      float, mm, dependent variable,
+                        expected global x position
+            'obsY'      float, mm, dependent variable,
+                        expected global y position
+            'posobsX'   float, mm, dependent variable,
+                        expected global x with pos centre theta axis as origin
+            'posobsY'   float, mm, dependent variable,
+                        expected global y with pos centre theta axis as origin
+            'posobsT'   float, deg, dependent variable,
+                        expected global T with pos centre theta axis as origin
+            'posobsP'   float, deg, dependent variable,
+                        expected global P with pos centre theta axis as origin
+            'motT'      float, deg, dependent variable, expected position
+                        of theta motor
+            'motP'      float, deg, dependent variable, expected position
+                        of phi motor
+        """
+        posintTP = self.expected_current_posintTP
+        poslocTP = self.trans.posintTP_to_poslocTP(posintTP)
+        poslocXY = self.trans.posintTP_to_poslocXY(posintTP)
+        obsXY = self.trans.posintTP_to_obsXY(posintTP)
+        posobsXY = self.trans.obsXY_to_posobsXY(obsXY)
+        posobsTP = self.trans.posobsXY_to_posobsTP(posobsXY)
+        ptlXY = self.trans.posintTP_to_ptlXY(posintTP)
+        QS = self.trans.posintTP_to_QS(posintTP)
+        flatXY = self.trans.posintTP_to_flatXY(posintTP)
+        d = {'posintT': posintTP[0],
+             'posintP': posintTP[1],
+             'motT': self.axis[pc.T].shaft_to_motor(posintTP[0]),
+             'motP': self.axis[pc.P].shaft_to_motor(posintTP[1]),
+             'poslocT': poslocTP[0],
+             'poslocP': poslocTP[1],
+             'poslocX': poslocXY[0],
+             'poslocY': poslocXY[1],
+             'ptlX': ptlXY[0],
+             'ptlY': ptlXY[1],
+             'obsX': obsXY[0],
+             'obsY': obsXY[1],
+             'posobsX': posobsXY[0],
+             'posobsY': posobsXY[1],
+             'posobsT': posobsTP[0],
+             'posobsP': posobsTP[1],
+             'Q': QS[0],
+             'S': QS[1],
+             'flatX': flatXY[0],
+             'flatY': flatXY[1]}
         return d
 
     @property
@@ -123,14 +158,20 @@ class PosModel(object):
         """One-line string summarizing current expected position.
         """
         pos = self.expected_current_position
-        s = 'Q:{:8.3f}{}, S:{:8.3f}{} | flatX:{:8.3f}{}, flatY:{:8.3f}{} | obsX:{:8.3f}{}, obsY:{:8.3f}{} | posX:{:8.3f}{}, posY:{:8.3f}{} | obsT:{:8.3f}{}, obsP:{:8.3f}{} | posT:{:8.3f}{}, posP:{:8.3f}{} | motT:{:8.1f}{}, motP:{:8.1f}{}'. \
-            format(pos['Q'],     pc.deg, pos['S'],     pc.mm,
-                   pos['flatX'], pc.mm,  pos['flatY'], pc.mm,
-                   pos['obsX'],  pc.mm,  pos['obsY'],  pc.mm,
-                   pos['posX'],  pc.mm,  pos['posY'],  pc.mm,
-                   pos['obsT'],  pc.deg, pos['obsP'],  pc.deg,
-                   pos['posT'],  pc.deg, pos['posP'],  pc.deg,
-                   pos['motT'],  pc.deg, pos['motP'],  pc.deg)
+        s = ('Q:{:8.3f}{}, S:{:8.3f}{} | '
+             'flatX:{:8.3f}{}, flatY:{:8.3f}{} | '
+             'obsX:{:8.3f}{}, obsY:{:8.3f}{} | '
+             'poslocX:{:8.3f}{}, poslocY:{:8.3f}{} | '
+             'poslocT:{:8.3f}{}, poslocP:{:8.3f}{} | '
+             'posintT:{:8.3f}{}, posintP:{:8.3f}{} | '
+             'motT:{:8.1f}{}, motP:{:8.1f}{}'). \
+            format(pos['Q'],       pc.deg, pos['S'],       pc.mm,
+                   pos['flatX'],   pc.mm,  pos['flatY'],   pc.mm,
+                   pos['obsX'],    pc.mm,  pos['obsY'],    pc.mm,
+                   pos['poslocX'], pc.mm,  pos['poslocY'], pc.mm,
+                   pos['poslocT'], pc.deg, pos['poslocP'], pc.deg,
+                   pos['posintT'], pc.deg, pos['posintP'], pc.deg,
+                   pos['motT'],    pc.deg, pos['motP'],    pc.deg)
         return s
 
     @property
@@ -188,8 +229,8 @@ class PosModel(object):
         future shaft position changes. This is necessary for correct checking of
         software travel limits, when a sequence of multiple moves is being planned out.
         """
-        pos = self.expected_current_posTP
-        start = self.trans.addto_posTP([pos[0],pos[1]], expected_prior_dTdP, range_wrap_limits='none') # since expected_prior_dTdP is just tracking already-existing commands, do not perform range wrapping on it
+        pos = self.expected_current_posintTP
+        start = self.trans.addto_posintTP([pos[0],pos[1]], expected_prior_dTdP, range_wrap_limits='none') # since expected_prior_dTdP is just tracking already-existing commands, do not perform range wrapping on it
         if not(allow_exceed_limits):
             distance = self.axis[axisid].truncate_to_limits(distance,start[axisid])
         motor_dist = self.axis[axisid].shaft_to_motor(distance)
@@ -211,7 +252,7 @@ class PosModel(object):
             move_data['speed']        = self._motor_speed_creep
             move_data['move_time']    = abs(move_data['distance']) / move_data['speed']
         else:
-            dist_cruise = distance - dist_spinup 
+            dist_cruise = distance - dist_spinup
             move_data['motor_step']   = int(round(dist_cruise / self._stepsize_cruise))
             move_data['distance']     = move_data['motor_step'] * self._stepsize_cruise + dist_spinup
             move_data['speed_mode']   = 'cruise'
@@ -220,10 +261,11 @@ class PosModel(object):
         return move_data
 
     def postmove_cleanup(self, cleanup_table):
-        """Always perform this after positioner physical moves have been completed,
-        to update the internal tracking of shaft positions and variables.
+        """Always perform this after positioner physical moves have been
+        completed, to update the internal tracking of shaft positions and
+        variables.
         """
-        if self.state._val['CTRL_ENABLED'] == False:
+        if self.state._val['CTRL_ENABLED'] is False:
             return
         self.state.store('POS_T', self.state._val['POS_T'] + cleanup_table['net_dT'][-1])
         self.state.store('POS_P', self.state._val['POS_P'] + cleanup_table['net_dP'][-1])
@@ -282,7 +324,7 @@ class Axis(object):
         self.hardstop_clearance = self.calc_hardstop_clearance()
         self.hardstop_debounce = self.calc_hardstop_debounce()
         self.signed_gear_ratio = self.motor_calib_properties['ccw_sign']*self.motor_calib_properties['gear_ratio']
-        
+
     @property
     def pos(self):
         """Internally-tracked angular position of the axis, at the output of the gear.
@@ -293,11 +335,11 @@ class Axis(object):
             return self.posmodel.state._val['POS_P']
 
     @pos.setter
-    def pos(self,value):
+    def pos(self, value):
         if self.axisid == pc.T:
-            self.posmodel.state.store('POS_T',value)
+            self.posmodel.state.store('POS_T', value)
         else:
-            self.posmodel.state.store('POS_P',value)
+            self.posmodel.state.store('POS_P', value)
 
     @property
     def full_range(self):
@@ -386,13 +428,15 @@ class Axis(object):
             prop['ccw_sign'] = self.posmodel.state._val['MOTOR_CCW_DIR_P']
         return prop
 
-    def motor_to_shaft(self,distance):
-        """Convert a distance in motor angle to shaft angle at the gearbox output.
+    def motor_to_shaft(self, distance):
+        """
+        Convert a distance in motor angle to shaft angle at the gearbox output.
         """
         return distance / self.signed_gear_ratio
 
-    def shaft_to_motor(self,distance):
-        """Convert a distance in shaft angle to motor angle at the gearbox output.
+    def shaft_to_motor(self, distance):
+        """
+        Convert a distance in shaft angle to motor angle at the gearbox output.
         """
         return distance * self.signed_gear_ratio
 
@@ -422,13 +466,13 @@ class Axis(object):
             return self.posmodel.state._val['PRINCIPLE_HARDSTOP_DIR_T']
         else:
             return self.posmodel.state._val['PRINCIPLE_HARDSTOP_DIR_P']
-        
+
     def calc_antibacklash_final_move_dir(self):
         if self.axisid == pc.T:
             return self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_T']
         else:
             return self.posmodel.state._val['ANTIBACKLASH_FINAL_MOVE_DIR_P']
-        
+
     def calc_hardstop_debounce(self):
         """This is the amount to debounce off the hardstop after striking it.
         It is the hardstop clearance distance plus the backlash removal distance.

@@ -7,18 +7,18 @@ To check for collision between any two positioners:
     1. Form the code based on:
         ... center-to-center distance between positioners
         ... theta of each positioner
-        ... phi w.r.t. theta for each positioner    
+        ... phi w.r.t. theta for each positioner
     2. See if the code is in the collisions lookup set.
 
     CODE FORMAT: 'rrr-ttt-ppp-qqq-nnn', all digits are integers.
-        rrr ... [um]  rrr = ctr_to_ctr_dist - 10.1 mm 
+        rrr ... [um]  rrr = ctr_to_ctr_dist - 10.1 mm
                       (10.1 mm is the nominal distance between the centers of two positioners)
         ttt ... [deg] ttt = obsT1
         ppp ... [deg] ppp = posP1
         qqq ... [deg] qqq = obsT2 (neighbor)
-        nnn ... [deg] nnn = posP2 
+        nnn ... [deg] nnn = posP2
         [WHAT ABOUT VARIATION OF R1 ON EACH POSITIONER?]
-    
+
 POS-FIXED CASE
 To check for collision between a positioner and fixed:
     1. Form the code based on:
@@ -26,11 +26,11 @@ To check for collision between a positioner and fixed:
         ... dx,dy center variation from nominal
         ... obsT, obsP
     2. See if the code is in the collisions lookup set.
-    
+
     CODE FORMAT: 'hhh-xxx-yyy-ttt-ppp', all digits are integers.
         hhh ... integer device location (hole) id number
         xxx ... [um]  xxx = actual_obsX - nominal_X
-        yyy ... [um]  yyy = actual_obsY - nominal_Y 
+        yyy ... [um]  yyy = actual_obsY - nominal_Y
         ttt ... [deg] ttt = obsT
         ppp ... [deg] ppp = posP
         [WHAT ABOUT VARIATION OF R1?]
@@ -51,7 +51,7 @@ To check for collision between a positioner and fixed:
 #
 # Start much **much** coarser than this and see how long it takes to generate / how big is the set.
 # Issue: I really want 0.5 deg ~ 53 um resolution @ fully-extended phi. But that may be unreasonable.
-# 
+#
 # POS-FIXED calculations:
 # Import petal layout data (device_location_id vs. obsX,obsY).
 # Generate a set of simulation positioners filling all locations.
@@ -61,7 +61,7 @@ To check for collision between a positioner and fixed:
 #           etc...
 #
 
-import os, sys, time
+import time
 from astropy.io import ascii
 from matplotlib import pyplot as plt
 from matplotlib.pyplot import show
@@ -83,63 +83,63 @@ xc, yc = posloc['X'][pos_ind], posloc['Y'][pos_ind] # center locations of positi
 ptl = pos.fixed_neighbor_keepouts[5] # petal keepout
 gfa = pos.fixed_neighbor_keepouts[4] # gfa keepout
 
-def place_phi_arm(obsT, obsP, x0=0, y0=0):
-        
+def place_phi_arm(poslocT, poslocP, x0=0, y0=0):
+
     """
     copied from poscollider.py
     """
-    
-    poly = pos.keepout_P.rotated(obsP)
+
+    poly = pos.keepout_P.rotated(poslocP)
     poly = poly.translated(R1, 0)
-    poly = poly.rotated(obsT)
+    poly = poly.rotated(poslocT)
     poly = poly.translated(x0, y0)
     return poly
 
-def place_central_body(obsT, x0=0, y0=0):
-        
+def place_central_body(poslocT, x0=0, y0=0):
+
     """
     copied from poscollider.py
     """
-    
-    poly = pos.keepout_T.rotated(obsT)
+
+    poly = pos.keepout_T.rotated(poslocT)
     poly = poly.translated(x0, y0)
     return poly
-    
-def plot_placements(x1, y1, x2, y2, obsT1, posP1, obsT2, posP2):
-    
+
+def plot_placements(x1, y1, x2, y2, poslocT1, posintP1, poslocT2, posintP2):
+
     """
     plot configurations of 2 positioners (arm+central body)
-    
+
     x1, y1 = (x, y) positions for pos1
     x2, y2 = (x, y) positions for pos2
     obsT1, posP1 = theta and phi angles for pos1
     obsT2, posP2 = theta and phi angles for pos2
     """
     # create pos1 with angle obsT1 and obsP1 angle
-    central1 = place_central_body(obsT1, x0=x1, y0=y1)
-    arm1 = place_phi_arm(obsT1, posP1, x0=x1, y0=y1)
+    central1 = place_central_body(poslocT1, x0=x1, y0=y1)
+    arm1 = place_phi_arm(poslocT1, posintP1, x0=x1, y0=y1)
 
     # create pos2 with angle obsT2 and posP2 angle
-    central2 = place_central_body(obsT2, x0=x2, y0=y2)
-    arm2 = place_phi_arm(obsT2, posP2, x0=x2, y0=y2)
-    
+    central2 = place_central_body(poslocT2, x0=x2, y0=y2)
+    arm2 = place_phi_arm(poslocT2, posintP2, x0=x2, y0=y2)
+
     # plot the 2 positioners
     plt.plot(central1.points[0], central1.points[1], 'k-')
     plt.plot(arm1.points[0], arm1.points[1], 'k-')
-        
+
     plt.plot(central2.points[0], central2.points[1], 'r-')
     plt.plot(arm2.points[0], arm2.points[1], 'r-')
 
 def around_pos1(dr, theta1, phi1, theta2, phi2):
-    
+
     pos2_circle = np.arange(0, 360, 60)
     unitX = np.cos(np.pi*pos2_circle/180)
     unitY = np.sin(np.pi*pos2_circle/180)
-    
+
     rnew = 10.1 + dr/1000.
-    xnew = rnew*unitX 
+    xnew = rnew*unitX
     ynew = rnew*unitY
-    
+
     central0 = place_central_body(theta1)
     central1 = place_central_body(theta2, x0=xnew[0], y0=ynew[0])
     central2 = place_central_body(theta2, x0=xnew[1], y0=ynew[1])
@@ -147,7 +147,7 @@ def around_pos1(dr, theta1, phi1, theta2, phi2):
     central4 = place_central_body(theta2, x0=xnew[3], y0=ynew[3])
     central5 = place_central_body(theta2, x0=xnew[4], y0=ynew[4])
     central6 = place_central_body(theta2, x0=xnew[5], y0=ynew[5])
-    
+
     arm0 = place_phi_arm(theta1, phi1)
     arm1 = place_phi_arm(theta2, phi2, x0=xnew[0], y0=ynew[0])
     arm2 = place_phi_arm(theta2, phi2, x0=xnew[1], y0=ynew[1])
@@ -155,7 +155,7 @@ def around_pos1(dr, theta1, phi1, theta2, phi2):
     arm4 = place_phi_arm(theta2, phi2, x0=xnew[3], y0=ynew[3])
     arm5 = place_phi_arm(theta2, phi2, x0=xnew[4], y0=ynew[4])
     arm6 = place_phi_arm(theta2, phi2, x0=xnew[5], y0=ynew[5])
-    
+
     plt.text(0, 0, '1', fontsize=15, color='r')
     plt.text(xnew[0], ynew[0], '2', fontsize=15, color='r')
     plt.text(xnew[1], ynew[1], '3', fontsize=15, color='r')
@@ -163,7 +163,7 @@ def around_pos1(dr, theta1, phi1, theta2, phi2):
     plt.text(xnew[3], ynew[3], '5', fontsize=15, color='r')
     plt.text(xnew[4], ynew[4], '6', fontsize=15, color='r')
     plt.text(xnew[5], ynew[5], '7', fontsize=15, color='r')
-    
+
     plt.plot(central0.points[0], central0.points[1], 'k-')
     plt.plot(central1.points[0], central1.points[1], 'k-')
     plt.plot(central2.points[0], central2.points[1], 'k-')
@@ -171,7 +171,7 @@ def around_pos1(dr, theta1, phi1, theta2, phi2):
     plt.plot(central4.points[0], central4.points[1], 'k-')
     plt.plot(central5.points[0], central5.points[1], 'k-')
     plt.plot(central6.points[0], central6.points[1], 'k-')
-    
+
     plt.plot(arm0.points[0], arm0.points[1], 'k-')
     plt.plot(arm1.points[0], arm1.points[1], 'k-')
     plt.plot(arm2.points[0], arm2.points[1], 'k-')
@@ -180,28 +180,28 @@ def around_pos1(dr, theta1, phi1, theta2, phi2):
     plt.plot(arm5.points[0], arm5.points[1], 'k-')
     plt.plot(arm6.points[0], arm6.points[1], 'k-')
 
-def make_code_pp(dr, obsT1, posP1, obsT2, posP2):
+def make_code_pp(dr, poslocT1, posintP1, poslocT2, posintP2):
 
     # ~ 7 us to run on my laptop
-    
+
     """
-    dr    = [um] center-to-center distance between 2 positioners 
+    dr    = [um] center-to-center distance between 2 positioners
     obsT1 = [deg] theta angle of pos1
     posP1 = [deg] phi angle of pos1
     obsT2 = [deg] theta angle of pos2
     posP2 = [deg] phi angle of pos2
     """
-    
-    if obsT1 < 0: obsT1 = 360 + obsT1
-    if obsT2 < 0: obsT2 = 360 + obsT2
-    
+
+    if poslocT1 < 0: poslocT1 = 360 + poslocT1
+    if poslocT2 < 0: poslocT2 = 360 + poslocT2
+
     rrr = str(int(dr)).zfill(3)     # ~1 us
-    ttt1 = str(int(obsT1)).zfill(3) # ...
-    ppp = str(int(posP1)).zfill(3)
-    ttt2 = str(int(obsT2)).zfill(3) # ...
-    nnn = str(int(posP2)).zfill(3)
-    
-    # join() is faster than using '+' 
+    ttt1 = str(int(poslocT1)).zfill(3) # ...
+    ppp = str(int(posintP1)).zfill(3)
+    ttt2 = str(int(poslocT2)).zfill(3) # ...
+    nnn = str(int(posintP2)).zfill(3)
+
+    # join() is faster than using '+'
     code = '-'.join([rrr, ttt1, ppp, ttt2, nnn])
     return code
 
@@ -210,97 +210,97 @@ def make_table_pp(obsT1_start=0, obsT1_end=360, obsT1_step=5, \
                   posP1_start=-20, posP1_end=210, posP1_step=5, \
                   posP2_start=-20, posP2_end=210, posP2_step=5,
                   dr_step=50):
-    
+
     """
-    dr_step in um (for now, dr_start=0 and dr_end=1000 hardcoded). 
+    dr_step in um (for now, dr_start=0 and dr_end=1000 hardcoded).
     5 deg res: ~18 hrs (on lear)
-    
-    For now pickle save the output table separately. 
+
+    For now pickle save the output table separately.
     File naming convention: table_pp_[dr_step]_[obsT1_step]_[obsT2_step]_[posP1_step]_[posP2_step].out
     """
 
     table_pp = {}
     n1, n2, n3 = 0, 0, 0
-    
+
     start = time.time()
-    
-    # 60 deg increment is chosen because a closer look at the petal geometry 
-    # suggests that each positioner is surrounded (evenly) by at most 6 other positioners, 
-    # therefore giving 360/6 = 60 deg spacing. 
+
+    # 60 deg increment is chosen because a closer look at the petal geometry
+    # suggests that each positioner is surrounded (evenly) by at most 6 other positioners,
+    # therefore giving 360/6 = 60 deg spacing.
     pos2_circle = np.arange(0, 360, 60)
     unitX = np.cos(np.pi*pos2_circle/180)
     unitY = np.sin(np.pi*pos2_circle/180)
-    
+
     # rotating pos1 by (theta, phi)
     for obsT1 in range(obsT1_start, obsT1_end, obsT1_step):
         for posP1 in range(posP1_start, posP1_end, posP1_step):
-            
+
             central1 = place_central_body(obsT1)
             arm1 = place_phi_arm(obsT1, posP1)
 
-            # creating pos2 at a range of (theta, phi) angles 
+            # creating pos2 at a range of (theta, phi) angles
             # displaced (dr, dx, dy) away from pos1
             for dr in range(0, 1000, dr_step):
                 rnew = nominal_r + dr/1000.
                 xnew = rnew*unitX # dx distance of pos2 from pos1 at [0, 60, 120, .., 300] deg
-                ynew = rnew*unitY # dy distance ... 
-            
+                ynew = rnew*unitY # dy distance ...
+
                 # rotating pos2 by (theta, phi)
                 for obsT2 in range(obsT2_start, obsT2_end, obsT2_step):
                     for posP2 in range(posP2_start, posP2_end, posP2_step):
-                        
-                        # translating pos2 by (dx, dy) 
+
+                        # translating pos2 by (dx, dy)
                         for i in range(len(xnew)):
                             central2 = place_central_body(obsT2, x0=xnew[i], y0=ynew[i])
                             arm2 = place_phi_arm(obsT2, posP2, x0=xnew[i], y0=ynew[i])
 
                             # case II
                             if arm1.collides_with(central2):
-                                
+
                                 # Remove the relative angle between pos1 and pos2 by subtracting out this angle
-                                # from obsT1 and obsT2: 
-                                # obsT1 = obsT1-pos2_circle[i] 
-                                # obsT2 = obsT2-pos2_circle[i] 
-                                
+                                # from obsT1 and obsT2:
+                                # obsT1 = obsT1-pos2_circle[i]
+                                # obsT2 = obsT2-pos2_circle[i]
+
                                 code_pp = make_code_pp(dr, obsT1-pos2_circle[i], posP1, obsT2-pos2_circle[i], posP2)
                                 table_pp[code_pp] = 2
                                 n2 += 1
-                                
+
                             # case III
                             elif arm2.collides_with(central1):
                                 code_pp = make_code_pp(dr, obsT1-pos2_circle[i], posP1, obsT2-pos2_circle[i], posP2)
                                 table_pp[code_pp] = 3
                                 n3 += 1
-                                
+
                             # case I
                             elif arm1.collides_with(arm2):
                                 code_pp = make_code_pp(dr, obsT1-pos2_circle[i], posP1, obsT2-pos2_circle[i], posP2)
                                 table_pp[code_pp] = 1
                                 n1 += 1
-                
+
     end = time.time()
     print((end-start)/60.)
     print(len(table_pp))
     print(n1, n2, n3)
 
     return table_pp
-    
+
 ################################### POS-FIXED ###################################
 def identify_id_near_fixed(start, end, write=True):
 
     """
-    One-time run: manually identity the location id of positioners (really the hole ids) 
-    near the petal or a gfa. Outputs a file containing these location ids. 
+    One-time run: manually identity the location id of positioners (really the hole ids)
+    near the petal or a gfa. Outputs a file containing these location ids.
 
     start = index corresponding to xc/yc, from 0-499
     end = [same]
     """
 
     f = open('ids_near_fixed.dat', 'a') # where the loc id will be written
-    
+
     # loop through positioner in a petal and plot where it is on the petal
     # requests for user input after each plot to determine whether to record down
-    # the center positions of that positioner or not. 
+    # the center positions of that positioner or not.
     for i in range(start, end):
         plt.plot(xc, yc, 'ko')
 
@@ -313,21 +313,21 @@ def identify_id_near_fixed(start, end, write=True):
             if user == 'y':
                 f.write(str(pos_loc_id[i]) + '\n')
     f.close()
-            
+
 def plot_id_near_fixed(file, newout=None):
-    
+
     """
-    Also one-time run; plots the recorded loc ids and saves the center positions of 
-    the positioners at these loc ids to "newout". 
+    Also one-time run; plots the recorded loc ids and saves the center positions of
+    the positioners at these loc ids to "newout".
 
     file = "ids_near_fixed.dat"
     newout = "pos_near_fixed.csv"
     """
-    
+
     # extract the loc ids from "ids_near_fixed.dat"
     f = open(file, 'r')
     id_near_fixed = []
-    
+
     for line in f:
         id_near_fixed.append(int(line.strip('\n')))
 
@@ -339,13 +339,13 @@ def plot_id_near_fixed(file, newout=None):
         if pos_loc_id[i] in id_near_fixed:
             x_near_fixed.append(xc[i])
             y_near_fixed.append(yc[i])
-    
+
     plt.plot(ptl.points[0], ptl.points[1])
     plt.plot(gfa.points[0], gfa.points[1])
     plt.plot(xc, yc, 'ko')
     plt.plot(x_near_fixed, y_near_fixed, 'ro')
     plt.savefig('pos_near_fixed.png')
-    
+
     # write out the (loc_id, xc, yc) of the loc ids if an output file is provided
     if newout != None:
         f = open(newout, 'w')
@@ -353,12 +353,12 @@ def plot_id_near_fixed(file, newout=None):
             f.write("%d,%0.6f,%0.6f\n" % (id_near_fixed[i], x_near_fixed[i], y_near_fixed[i]))
         f.close()
 
-def make_code_pf(loc_id, dx, dy, obsT, posP):
-   
+def make_code_pf(loc_id, dx, dy, poslocT, poslocP):
+
     """
-    loc_id = 3-digit location id 
-    dx = 
-    dy = 
+    loc_id = 3-digit location id
+    dx =
+    dy =
     obsT = theta angle of positioner
     posP = phi angle of positioner
     """
@@ -366,9 +366,9 @@ def make_code_pf(loc_id, dx, dy, obsT, posP):
     hhh = str(int(loc_id)).zfill(3)
     xxx = str(dx).zfill(3)
     yyy = str(dy).zfill(3)
-    ttt = str(obsT).zfill(3)
-    ppp = str(posP).zfill(3)
-    
+    ttt = str(poslocT).zfill(3)
+    ppp = str(poslocP).zfill(3)
+
     #code = 'PF-' + hhh + '-' + xxx + '-' + yyy + '-' + ttt + '-' + ppp
     code = hhh + '-' + xxx + '-' + yyy + '-' + ttt + '-' + ppp
     return code
@@ -376,27 +376,27 @@ def make_code_pf(loc_id, dx, dy, obsT, posP):
 def make_table_pf(dx_step=50, dy_step=50, \
                   obsT_start=0, obsT_end=360, obsT_step=5, \
                   posP_start=-20, posP_end=150, posP_step=5):
-    
+
     """
     dx_step, dy_step in um.
     phi angle ranges from -20 to 150 deg (phi arm fully tucked in >150 deg and so should never
     collides with a fixed neighbor; checked)
-    
-    For now pickle save the output table separately. 
+
+    For now pickle save the output table separately.
     File naming convention: table_pf_[dx_step]_[dy_step]_[obsT_step]_[posP_step].out
     """
-    
+
     # retrieve the location id and center positions of holes near fixed neighbors
     pos_near_fixed = ascii.read('pos_near_fixed.csv')
     near_fixed_id = pos_near_fixed['device_location_id']
     xc_near_fixed = pos_near_fixed['X']
     yc_near_fixed = pos_near_fixed['Y']
-    
+
     table = dict()
     #case4, case5 = [], []
-    
+
     start = time.time()
-    
+
     # loop through all hole id near fixed boundaries
     for i in range(len(near_fixed_id)):
         # "dx" and "dy" are xy variation of phi arm from their nominal locations (x0, y0)
@@ -405,22 +405,22 @@ def make_table_pf(dx_step=50, dy_step=50, \
 
                 new_x = xc_near_fixed[i]+dx/1000.
                 new_y = yc_near_fixed[i]+dy/1000.
-                
-                # rotate phi arm by (obsT, posP) 
+
+                # rotate phi arm by (obsT, posP)
                 # translate phi arm to (new_x, new_y)
                 for obsT in range(obsT_start, obsT_end, obsT_step):
                     for posP in range(posP_start, posP_end, posP_step):
                         arm = place_phi_arm(obsT, posP, x0=new_x, y0=new_y)
-                                
+
                         # loop through ptl and gfa keepouts and check for collisions
                         for ind in pos.fixed_neighbor_keepouts:
                             fixed_neighbor = pos.fixed_neighbor_keepouts[ind]
-                            
+
                             if arm.collides_with(fixed_neighbor):
                                 code = make_code_pf(near_fixed_id[i], dx, dy, obsT, posP)
                                 table[code] = ind  # ind either 4 or 5 as ptl = fixed_neighbor_keepouts[5]
                                                    # and gfa = fixed_neighbor_keepout[4]
-                        
+
     end = time.time()
     print((end-start)/60.)
     print(len(table))
@@ -447,17 +447,17 @@ def random_collide(n):
     pos2_angle = np.arange(0, 360, 60) # possible pos2 angles
     unitX = np.cos(np.pi*pos2_angle/180)
     unitY = np.sin(np.pi*pos2_angle/180)
-    
+
     for k in range(n):
 
         # randomly draw theta1, theta2, phi1, and phi2 values within the allowed range
-        # for now drawing integers rather than floats. 
+        # for now drawing integers rather than floats.
         obsT1 = np.random.randint(0, 360)
         posP1 = np.random.randint(-20, 210)
         obsT2 = np.random.randint(0, 360)
         posP2 = np.random.randint(-20, 210)
 
-        # randomly draw values of dr, then compute the corresponding (pos2_x, pos2_y) 
+        # randomly draw values of dr, then compute the corresponding (pos2_x, pos2_y)
         # locations at the 6 angles
         dr = np.random.randint(0, 950)
         rnew = dr/1000. + nominal_r
@@ -467,39 +467,39 @@ def random_collide(n):
         # place pos1 at the randomly-drawn angles
         central1 = place_central_body(obsT1)
         arm1 = place_phi_arm(obsT1, posP1)
-    
+
         # loop through each pos2 angle
         for i in range(len(xnew)):
             central2 = place_central_body(obsT2, x0=xnew[i], y0=ynew[i])
             arm2 = place_phi_arm(obsT2, posP2, x0=xnew[i], y0=ynew[i])
-            
-            # if you use random.uniform() for drawing theta and phi angles, 
+
+            # if you use random.uniform() for drawing theta and phi angles,
             # you need to bin these values before checking for collision
 
             # obsT1 = nearest(obsT1, 1, 0, 359)
             # obsT2 = nearest(obsT2, 1, 0, 359)
             # posP1 = nearest(posP1, 1, -20, 209)
             # posP2 = nearest(posP2, 1, -20, 209)
-            
+
             # record down the configuration of the collision
             if arm1.collides_with(central2):
                 collide.append([pos2_angle[i], dr, obsT1, posP1, obsT2, posP2])
-                
+
             elif arm2.collides_with(central1):
                 collide.append([pos2_angle[i], dr, obsT1, posP1, obsT2, posP2])
-                
+
             elif arm1.collides_with(arm2):
                 collide.append([pos2_angle[i], dr, obsT1, posP1, obsT2, posP2])
-    
+
     print(len(collide))
     return collide
-    
+
 def create_validation_never_collides(dr_step, theta_step, phi_step, n):
-   
+
     """
-    create validation cases where collision should NEVER happen 
+    create validation cases where collision should NEVER happen
     (both phi and phi2 within inner envelopes), by randomly-drawing
-    phi1 and phi2 within 145-210 degrees. Theta angles are left free. 
+    phi1 and phi2 within 145-210 degrees. Theta angles are left free.
 
     dr_step = hash table ctr-to-ctr resolution
     theta_step = hash table theta angle resolution
@@ -518,25 +518,25 @@ def create_validation_never_collides(dr_step, theta_step, phi_step, n):
     phi_min, phi_max = 145, 210 # boundaries of phi angle within inner envelope
     ind = np.where((phi >= phi_min) & (phi <= phi_max))[0]
     phi = phi[ind]
-    
+
     # random draws
     angle_random = angle[np.random.randint(0, len(angle), n)]
     dr_random = dr[np.random.randint(0, len(dr), n)]
     theta1_random = theta[np.random.randint(0, len(theta), n)]
     theta2_random = theta[np.random.randint(0, len(theta), n)]
-    
+
     # randomly draw phi angles between 145-210 deg
     phi1_random = phi[np.random.randint(0, len(phi), n)]
     phi2_random = phi[np.random.randint(0, len(phi), n)]
-   
+
     # put the cases in the right format
     nevercollide_sets = np.stack((angle_random, dr_random, theta1_random, phi1_random, theta2_random, phi2_random), axis=1)
     return nevercollide_sets
-    
+
 def create_validation_others():
 
     # examples of validation sets for collide and no-collide
-    # these sets have been vosually inspected. 
+    # these sets have been vosually inspected.
     # created using random_collide()
     collide_sets = [[0, 845, 329, 36, 181, 195], \
                     [0, 950, 25, 29, 119, 44], \
@@ -562,7 +562,7 @@ def create_validation_others():
                     [60, 0, 100, 10, 200, -15], \
                     # another 2-way collision
                     [60, 19, 61, -15, 301, 10], \
-                    [120, 19, 61, -15, 301, 10]] 
+                    [120, 19, 61, -15, 301, 10]]
 
     # constructed based on subset of collide_sets by changing the angle in each case
     # to other non-colliding angles, as well as some manually inserted cases
@@ -584,23 +584,23 @@ def create_validation_others():
                         [240, 950, 215, 10, 120, 95], \
                         [60, 350, 130, 15, 221, 19], \
                         [180, 180, 155, 50, 65, 201]]
-    
+
     return collide_sets, nocollide_sets
-        
+
 def plot_validation(valid_set, ind):
 
     """
-    Visually check that the validation set is "valid". 
-    In the figure: 
+    Visually check that the validation set is "valid".
+    In the figure:
     left panel: pos1 always at (0,0) with pos2 configuration duplicated at all 6 positions
     right panel: after removing the angle between pos1 and pos2
 
     For checking the "nocollide" set, left panel could be confusing, so just look at the
-    the right panel. 
-    For checking the "collide" set, both panels should show a collision, with the left 
-    panel showing the pos2 angle where the collision happens. 
+    the right panel.
+    For checking the "collide" set, both panels should show a collision, with the left
+    panel showing the pos2 angle where the collision happens.
 
-    valid_set = list of list, with [angle, dr, obsT1, posP1, obsT2, posP2]. 
+    valid_set = list of list, with [angle, dr, obsT1, posP1, obsT2, posP2].
                 Same output format from create_validation...() and same input format
                 for validate_table...()
 
@@ -630,15 +630,15 @@ def plot_validation(valid_set, ind):
     plt.tight_layout()
 
 def validate_table(table, cases_to_validate, check_collide, bin_dr, bin_theta, bin_phi):
-    
+
     """
     1) Go through each case in the validation set
     2) Bin the case to the resolution of the hash table
-    3) Assert that the resultant code is found (for check_collide=True) or not found 
+    3) Assert that the resultant code is found (for check_collide=True) or not found
     (for check_collide=False) in the table.
 
     This validates the table by checking for the existence/non-existence of a certain
-    collision in the table, rather than validating the type of collision. 
+    collision in the table, rather than validating the type of collision.
 
     table = hash table
     cases_to_validate =  list of list, with [angle, dr, obsT1, posP1, obsT2, posP2]
@@ -659,7 +659,7 @@ def validate_table(table, cases_to_validate, check_collide, bin_dr, bin_theta, b
         posP1 = nearest(case[3], bin_phi, -20, 210)
         obsT2 = nearest(case[4], bin_theta, 0, 360)
         posP2 = nearest(case[5], bin_phi, -20, 210)
-       
+
         new_case = [angle, dr, obsT1, posP1, obsT2, posP2]
         code = make_code_pp(dr, obsT1-angle, posP1, obsT2-angle, posP2)
 
@@ -673,7 +673,7 @@ def validate_table(table, cases_to_validate, check_collide, bin_dr, bin_theta, b
                 print("Binned case:   ", new_case)
                 print("Resulting code:", code)
                 print()
-             
+
         # if want to check for non-collision, assert that code is NOT found
         else:
             try:
@@ -698,22 +698,22 @@ def validate_table_all(table, nevercollide, collide, nocollide, bin_dr, bin_thet
 
 ############################### VALIDATION SETS (POS-FIX) ###################################
 def create_validation_nevercollides_pf(n):
-    
+
     """
-    create validation cases for pos-fixed where collision should NEVER happen, 
-    by random drawing hole ids that are not located directly to a fixed neighbor. 
-    
+    create validation cases for pos-fixed where collision should NEVER happen,
+    by random drawing hole ids that are not located directly to a fixed neighbor.
+
     n = number of random draws
     """
-    
+
     # hole ids near fixed neighbors
     f = open('ids_near_fixed.dat', 'r')
     near_fixed = []
-    
+
     for line in f:
         near_fixed.append(int(line.strip('\n')))
     f.close()
-    
+
     # get the hole ids that are not near fixed neigbors and their xy-centers
     not_near_fixed = list(set(pos_loc_id) - set(near_fixed))
     xc_notnearfixed, yc_notnearfixed = [], []
@@ -721,21 +721,21 @@ def create_validation_nevercollides_pf(n):
         ind = np.where(pos_loc_id == id)[0]
         xc_notnearfixed.append(xc[ind])
         yc_notnearfixed.append(yc[ind])
-        
+
     # randomly draw n holes from these
     ind_random = np.random.randint(0, len(not_near_fixed), n)
     random_id = np.array(not_near_fixed)[ind_random]
     random_xc = np.array(xc_notnearfixed)[ind_random]
     random_yc = np.array(yc_notnearfixed)[ind_random]
-    
+
     random_xc = random_xc[:,0]
     random_yc = random_yc[:,0]
-    
+
     # randomly draw dx and dy values
     # dx and dy are variations from the nominal positions of the positioner
     dx = np.random.randint(0, 950, n)
     dy = np.random.randint(0, 950, n)
-    
+
     # positions to translate the phi arms
     new_x = random_xc + dx/1000.
     new_y = random_yc + dy/1000.
@@ -748,13 +748,13 @@ def create_validation_nevercollides_pf(n):
     nevercollide = []
     for i in range(n):
         nevercollide.append([random_id[i], new_x[i], new_y[i], dx[i], dy[i], obsT[i], posP[i]])
-    
+
     return nevercollide
 
 def create_validation_collide_pf():
-    
+
     """
-    validation set that collides, set manually; visually inspection done.  
+    validation set that collides, set manually; visually inspection done.
     format is [hole-id, new_x (mm), new_y (mm), dx (um), dy (um), obsT, posP]
     """
 
@@ -766,41 +766,41 @@ def create_validation_collide_pf():
                [54, 153.117665, 5.201978, 0, 0, 270, 0], \
                [124, 226.004616, 5.20282, 0, 0, 270, 0], \
                [416, 404.081201, 5.208477, 0, 0, 270, 0]]
-    
+
     return collide
-    
+
 def plot_validation_pf(valid_set, ind):
-    
+
     """
     visually inspect a validation set
     """
-    
+
     new_x = valid_set[ind][1]
     new_y = valid_set[ind][2]
     obsT = valid_set[ind][5]
     posP = valid_set[ind][6]
-    
+
     arm = place_phi_arm(obsT, posP, x0=new_x, y0=new_y)
     plt.plot(gfa.points[0], gfa.points[1])
     plt.plot(ptl.points[0], ptl.points[1])
     plt.plot(arm.points[0], arm.points[1])
-    
-    
+
+
 def validate_table_pf(table, cases_to_validate, check_collide, bin_dx, bin_dy, bin_theta, bin_phi):
 
     """
-    same as validate_table() for pos-pos. 
+    same as validate_table() for pos-pos.
     """
-    
+
     for case in cases_to_validate:
         id = case[0]
-        
+
         # bin to the same resolution as hash table
         dx = nearest(case[3], bin_dx, 0, 950)
         dy = nearest(case[4], bin_dy, 0, 950)
         obsT = nearest(case[5], bin_theta, 0, 360)
         posP = nearest(case[6], bin_phi, -20, 150)
-        
+
         new_case = [id, dx, dy, obsT, posP]
         code = make_code_pf(id, dx, dy, obsT, posP) # create code using binned values
 
@@ -814,7 +814,7 @@ def validate_table_pf(table, cases_to_validate, check_collide, bin_dx, bin_dy, b
                 print("Binned case:   ", new_case)
                 print("Resulting code:", code)
                 print()
-             
+
         # if want to check for non-collision, assert that code is NOT found
         else:
             try:

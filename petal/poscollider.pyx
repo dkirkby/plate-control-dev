@@ -1,4 +1,5 @@
 # cython: profile=False
+# cython: language_level=3
 cimport cython
 import numpy as np
 import posconstants as pc
@@ -20,10 +21,10 @@ class PosCollider(object):
 
     See DESI-0899 for geometry specifications, illustrations, and kinematics.
     """
-    def __init__(self, configfile='', 
-                 collision_hashpp_exists=False, 
-                 collision_hashpf_exists=False, 
-                 hole_angle_file=None, 
+    def __init__(self, configfile='',
+                 collision_hashpp_exists=False,
+                 collision_hashpf_exists=False,
+                 hole_angle_file=None,
                  use_neighbor_loc_dict=False,
                  config=None):
         if not config:
@@ -42,14 +43,13 @@ class PosCollider(object):
         self.pos_neighbors = {} # all the positioners that surround a given positioner. key is a posid, value is a set of neighbor posids
         self.fixed_neighbor_cases = {} # all the fixed neighbors that apply to a given positioner. key is a posid, value is a set of the fixed neighbor cases
         self.R1, self.R2, self.x0, self.y0, self.t0, self.p0 = {}, {}, {}, {}, {}, {}
-        self.set_petal_offsets() # default values are used here. one should call this function with actual values after initializing collider
         self.plotting_on = True
         self.timestep = self.config['TIMESTEP']
         self.animator = posanimator.PosAnimator(fignum=0, timestep=self.timestep)
         self.use_neighbor_loc_dict = use_neighbor_loc_dict
         self.keepouts_T = {} # key: posid, value: central body keepout of type PosPoly
         self.keepouts_P = {} # key: posid, value: phi arm keepout of type PosPoly
-        
+
         # hash table initializations (if being used)
         self.collision_hashpp_exists = collision_hashpp_exists
         self.collision_hashpf_exists = collision_hashpf_exists
@@ -60,29 +60,17 @@ class PosCollider(object):
             f = open(os.path.join(os.environ.get('collision_table'), hole_angle_file), 'rb')
             self.hole_angle = pickle.load(f)
             f.close()
-            
+
         if self.collision_hashpf_exists:
             f = open(os.path.join(os.environ.get('collision_table'), 'table_pf_50_50_5_5.out'), 'rb')
             self.table_pf = pickle.load(f)
             f.close()
-        
+
         # load fixed dictionary containing locations of neighbors for each positioner DEVICE_LOC (if this option has been selected)
         if self.use_neighbor_loc_dict:
             with open(pc.dirs['positioner_neighbors_file'], 'rb') as f:
                 self.neighbor_locs = pickle.load(f)
-            
-    def set_petal_offsets(self, x0=0.0, y0=0.0, rot=0.0):
-        """Sets information about a particular petal's overall location. This
-        information is necessary for handling the fixed collision boundaries of
-        petal exterior and GFA.
-            x0 and y0 units are mm
-            rot units are deg
-        """
-        self._petal_x0 = x0
-        self._petal_y0 = y0
-        self._petal_rot = rot
-        self._load_keepouts()
-		
+
     def update_positioner_offsets_and_arm_lengths(self):
         """Loads positioner parameters.  This method is called when new calibration data is available
         for positioner arm lengths and offsets.
@@ -108,7 +96,7 @@ class PosCollider(object):
 
     def add_fixed_to_animator(self, start_time=0):
         """Add unmoving polygon shapes to the animator.
-        
+
             start_time ... seconds, global time when the move begins
         """
         self.animator.add_or_change_item('GFA', '', start_time, self.keepout_GFA.points)
@@ -119,14 +107,14 @@ class PosCollider(object):
             # self.animator.add_or_change_item('Ee', self.posindexes[posid], start_time, self.Ee_polys[posid].points)
             self.animator.add_or_change_item('line at 180', self.posindexes[posid], start_time, self.line180_polys[posid].points)
             self.animator.add_label(format(self.posmodels[posid].deviceloc,'03d'), self.x0[posid], self.y0[posid])
-        
+
     def add_mobile_to_animator(self, start_time, sweeps):
         """Add a collection of PosSweeps to the animator, describing positioners'
         real-time motions.
 
-            start_time ... seconds, global time when the move begins        
+            start_time ... seconds, global time when the move begins
             sweeps     ... dict with keys = posids, values = PosSweep instances
-        """            
+        """
         for posid,s in sweeps.items():
             posidx = self.posindexes[posid]
             for i in range(len(s.time)):
@@ -146,26 +134,29 @@ class PosCollider(object):
                 elif collision_has_occurred and s.collision_case == pc.case.PTL:
                     self.animator.add_or_change_item('PTL', '', time, self.keepout_PTL.points, style_override)
 
-    def spacetime_collision_between_positioners(self, posid_A, init_obsTP_A, tableA, posid_B, init_obsTP_B, tableB):
-        """Wrapper for spacetime_collision method, specifically for checking two positioners
-        against each other."""
-        return self.spacetime_collision(posid_A, init_obsTP_A, tableA, posid_B, init_obsTP_B, tableB)
+    def spacetime_collision_between_positioners(
+            self, posid_A, init_poslocTP_A, tableA,
+            posid_B, init_poslocTP_B, tableB):
+        """Wrapper for spacetime_collision method, specifically for checking
+        two positioners against each other."""
+        return self.spacetime_collision(posid_A, init_poslocTP_A, tableA,
+                                        posid_B, init_poslocTP_B, tableB)
 
-    def spacetime_collision_with_fixed(self, posid, init_obsTP, table):
-        """Wrapper for spacetime_collision method, specifically for checking one positioner
-        against the fixed keepouts.
+    def spacetime_collision_with_fixed(self, posid, init_poslocTP, table):
+        """Wrapper for spacetime_collision method, specifically for checking
+        one positioner against the fixed keepouts.
         """
-        return self.spacetime_collision(posid, init_obsTP, table)
+        return self.spacetime_collision(posid, init_poslocTP, table)
 
-    def spacetime_collision(self, posid_A, init_obsTP_A, tableA, posid_B=None, init_obsTP_B=None, tableB=None):
+    def spacetime_collision(self, posid_A, init_poslocTP_A, tableA, posid_B=None, init_poslocTP_B=None, tableB=None):
         """Searches for collisions in time and space between two positioners
         which are rotating according to the argued tables.
 
             posid_A, posid_B            ...  posid strings of the two positioners to check against each other
-            init_obsTP_A, init_obsTP_B  ...  starting (theta,phi) positions, in the obsTP coordinate systems
+            init_poslocTP_A, init_poslocTP_B  ...  starting (theta,phi) positions, in the poslocTP coordinate systems
             tableA, tableB              ...  dictionaries defining rotation schedules as described below
 
-        If no arguments are provided for the "B" positioner (i.e. no args for idxB, init_obsTP_B, tableB)
+        If no arguments are provided for the "B" positioner (i.e. no args for idxB, init_poslocTP_B, tableB)
         then the method checks the "A" positioner against the fixed keepout envelopes.
 
         The input table dictionaries must contain the following fields:
@@ -184,14 +175,14 @@ class PosCollider(object):
         """
         pospos = posid_B is not None # whether this is checking collisions between two positioners (or if false, between one positioner and fixed keepouts)
         if pospos:
-            init_obsTPs = [init_obsTP_A,init_obsTP_B]
+            init_poslocTPs = [init_poslocTP_A, init_poslocTP_B]
             tables = [tableA,tableB]
             sweeps = [PosSweep(posid_A),PosSweep(posid_B)]
             steps_remaining = [0,0]
             step = [0,0]
             pos_range = [0,1]
         else:
-            init_obsTPs = [init_obsTP_A]
+            init_poslocTPs = [init_poslocTP_A]
             tables = [tableA]
             sweeps = [PosSweep(posid_A)]
             steps_remaining = [0]
@@ -199,7 +190,7 @@ class PosCollider(object):
             pos_range = [0]
         rev_pos_range = pos_range[::-1]
         for i in pos_range:
-            sweeps[i].fill_exact(init_obsTPs[i], tables[i])
+            sweeps[i].fill_exact(init_poslocTPs[i], tables[i])
             sweeps[i].quantize(self.timestep)
             steps_remaining[i] = len(sweeps[i].time)
         while any(steps_remaining):
@@ -233,83 +224,83 @@ class PosCollider(object):
                     pass
         return sweeps
 
-    def spatial_collision_between_positioners(self, posid_A, posid_B, obsTP_A, obsTP_B):
+    def spatial_collision_between_positioners(self, posid_A, posid_B, poslocTP_A, poslocTP_B):
         """Searches for collisions in space between two fiber positioners.
 
             posid_A, posid_B  ...  posid strings of the two positioners to check against each other
-            obsTP_A, obsTP_B  ...  (theta,phi) positions of the axes for the two positioners
+            poslocTP_A, poslocTP_B  ...  (theta,phi) positions of the axes for the two positioners
 
-        obsTP_A and obsTP_B are in the (obsT,obsP) coordinate system, as defined in
+        poslocTP_A and poslocTP_B are in the (poslocT,poslocP) coordinate system, as defined in
         PosTransforms.
 
         The return is an enumeration of type "case", indicating what kind of collision
         was first detected, if any.
         """
-        if obsTP_A[1] >= self.Eo_phi and obsTP_B[1] >= self.Eo_phi:
+        if poslocTP_A[1] >= self.Eo_phi and poslocTP_B[1] >= self.Eo_phi:
             return pc.case.I
-        
+
         if self.collision_hashpp_exists:
-            
+
             dr = self.hole_angle[posid_A][posid_B][0]
             angle = self.hole_angle[posid_A][posid_B][1]
-            
+
             # to make theta angle ranges from 0-360, rather than -180 to 180
             # to be consistent with angle convention used in table
-            if obsTP_A[0] < 0: 
-                t1 = 360 + obsTP_A[0]
+            if poslocTP_A[0] < 0:
+                t1 = 360 + poslocTP_A[0]
             else:
-                t1 = obsTP_A[0]
-                
-            if obsTP_B[0] < 0: 
-                t2 = 360 + obsTP_B[0]
+                t1 = poslocTP_A[0]
+
+            if poslocTP_B[0] < 0:
+                t2 = 360 + poslocTP_B[0]
             else:
-                t2 = obsTP_B[0]
-            
+                t2 = poslocTP_B[0]
+
             # binning to the resolution of the lookup table
             dr = lookup.nearest(dr, 50, 0, 950)
             t1 = lookup.nearest(t1, 5, 0, 360)
             t2 = lookup.nearest(t2, 5, 0, 360)
-            phi1 = lookup.nearest(obsTP_A[1], 5, -20, 205)
-            phi2 = lookup.nearest(obsTP_B[1], 5, -20, 205)
-            
+            phi1 = lookup.nearest(poslocTP_A[1], 5, -20, 205)
+            phi2 = lookup.nearest(poslocTP_B[1], 5, -20, 205)
+
             if t1 == 360: t1 = 0
             if t2 == 360: t2 = 0
             code = lookup.make_code_pp(dr, t1-angle, phi1, t2-angle, phi2)
-            
+
             if code in self.table_pp:
                 return self.table_pp[code] # <= 0.1 us
             else:
                 return pc.case.I
-            
+
         else:
-            if obsTP_A[1] < self.Eo_phi and obsTP_B[1] >= self.Ei_phi: # check case IIIA
-                if self._case_III_collision(posid_A, posid_B, obsTP_A, obsTP_B[0]):
+            if poslocTP_A[1] < self.Eo_phi and poslocTP_B[1] >= self.Ei_phi: # check case IIIA
+                if self._case_III_collision(posid_A, posid_B, poslocTP_A, poslocTP_B[0]):
                     return pc.case.IIIA
                 else:
                     return pc.case.I
-            elif obsTP_B[1] < self.Eo_phi and obsTP_A[1] >= self.Ei_phi: # check case IIIB
-                if self._case_III_collision(posid_B, posid_A, obsTP_B, obsTP_A[0]):
+            elif poslocTP_B[1] < self.Eo_phi and poslocTP_A[1] >= self.Ei_phi: # check case IIIB
+                if self._case_III_collision(posid_B, posid_A, poslocTP_B, poslocTP_A[0]):
                     return pc.case.IIIB
                 else:
                     return pc.case.I
             else: # check cases II and III
-                if self._case_III_collision(posid_A, posid_B, obsTP_A, obsTP_B[0]):
+                if self._case_III_collision(posid_A, posid_B, poslocTP_A, poslocTP_B[0]):
                     return pc.case.IIIA
-                elif self._case_III_collision(posid_B, posid_A, obsTP_B, obsTP_A[0]):
+                elif self._case_III_collision(posid_B, posid_A, poslocTP_B, poslocTP_A[0]):
                     return pc.case.IIIB
-                elif self._case_II_collision(posid_A, posid_B, obsTP_A, obsTP_B):
+                elif self._case_II_collision(posid_A, posid_B, poslocTP_A, poslocTP_B):
                     return pc.case.II
                 else:
                     return pc.case.I
 
-    def spatial_collision_with_fixed(self, posid, obsTP):
+    def spatial_collision_with_fixed(self, posid, poslocTP):
         """Searches for collisions in space between a fiber positioner and all
         fixed keepout envelopes.
 
             posid    ...  positioner to check
-            obsTP    ...  (theta,phi) position of the axes of the positioner
+            poslocTP    ...  (theta,phi) position of the axes of the positioner
 
-        obsTP is in the (obsT,obsP) coordinate system, as defined in
+        poslocTP is in the (poslocT,poslocP) coordinate system, as defined in
         PosTransforms.
 
         The return is an enumeration of type "case", indicating what kind of collision
@@ -318,41 +309,41 @@ class PosCollider(object):
         if self.fixed_neighbor_cases[posid]:
             if self.collision_hashpf_exists:
                 loc_id = self.posmodels[posid].deviceloc
-                dx = abs(self.x0[posid] - self.posmodels[posid].expected_current_position['obsX'])
-                dy = abs(self.y0[posid] - self.posmodels[posid].expected_current_position['obsY'])
-                code = lookup.make_code_pf(loc_id, dx, dy, obsTP[0], obsTP[1])
+                dx = abs(self.x0[posid] - self.posmodels[posid].expected_current_position['ptlX'])
+                dy = abs(self.y0[posid] - self.posmodels[posid].expected_current_position['ptlY'])
+                code = lookup.make_code_pf(loc_id, dx, dy, poslocTP[0], poslocTP[1])
                 if code in self.table_pf:
                     return self.table_pf[code]
-                
+
             else:
-                poly1 = self.place_phi_arm(posid,obsTP)
+                poly1 = self.place_phi_arm(posid,poslocTP)
                 for fixed_case in self.fixed_neighbor_cases[posid]:
                     poly2 = self.fixed_neighbor_keepouts[fixed_case]
                     if poly1.collides_with(poly2):
                         return fixed_case
-                    
+
         return pc.case.I
 
-    def place_phi_arm(self, posid, obsTP):
+    def place_phi_arm(self, posid, poslocTP):
         """Rotates and translates the phi arm to position defined by the positioner's
-        (x0,y0) and the argued obsTP (theta,phi) angles.
+        (x0,y0) and the argued poslocTP (theta,phi) angles.
         """
-        return self.keepouts_P[posid].place_as_phi_arm(obsTP[0],obsTP[1],self.x0[posid],self.y0[posid],self.R1[posid])
+        return self.keepouts_P[posid].place_as_phi_arm(poslocTP[0],poslocTP[1],self.x0[posid],self.y0[posid],self.R1[posid])
 
-    def place_central_body(self, posid, obsT):
+    def place_central_body(self, posid, poslocT):
         """Rotates and translates the central body of positioner
-        to its (x0,y0) and the argued obsT theta angle.
+        to its (x0,y0) and the argued poslocT theta angle.
         """
-        return self.keepouts_T[posid].place_as_central_body(obsT,self.x0[posid],self.y0[posid])
+        return self.keepouts_T[posid].place_as_central_body(poslocT,self.x0[posid],self.y0[posid])
 
-    def place_ferrule(self, posid, obsTP):
+    def place_ferrule(self, posid, poslocTP):
         """Rotates and translates the ferrule to position defined by the positioner's
-        (x0,y0) and the argued obsTP (theta,phi) angles.
+        (x0,y0) and the argued poslocTP (theta,phi) angles.
         """
         poly = self.ferrule_poly.translated(self.R2[posid], 0)
-        poly = poly.rotated(obsTP[1])
+        poly = poly.rotated(poslocTP[1])
         poly = poly.translated(self.R1[posid],0)
-        poly = poly.rotated(obsTP[0])
+        poly = poly.rotated(poslocTP[0])
         poly = poly.translated(self.x0[posid], self.y0[posid])
         return poly
 
@@ -415,19 +406,15 @@ class PosCollider(object):
             self.line180_polys[posid] = self.line180_poly.rotated(self.t0[posid]).translated(x,y)
         self.ferrule_diam = self.config['FERRULE_DIAM']
         self.ferrule_poly = PosPoly(self._circle_poly_points(self.ferrule_diam, self.config['FERRULE_RESLN']).tolist())
-        
+
     def _load_keepouts(self):
         """Read latest versions of all keepout geometries."""
         self.general_keepout_P_unexpanded = PosPoly(self.config['KEEPOUT_PHI'])
         self.general_keepout_T_unexpanded = PosPoly(self.config['KEEPOUT_THETA'])
         self.keepout_PTL = PosPoly(self.config['KEEPOUT_PTL'])
         self.keepout_GFA = PosPoly(self.config['KEEPOUT_GFA'])
-        self.keepout_PTL = self.keepout_PTL.rotated(self._petal_rot)
-        self.keepout_PTL = self.keepout_PTL.translated(self._petal_x0, self._petal_y0)
-        self.keepout_GFA = self.keepout_GFA.rotated(self._petal_rot)
-        self.keepout_GFA = self.keepout_GFA.translated(self._petal_x0, self._petal_y0)
         self.fixed_neighbor_keepouts = {pc.case.PTL : self.keepout_PTL, pc.case.GFA : self.keepout_GFA}
-    
+
     def _adjust_keepouts(self):
         """Expand/contract, and pre-shift the theta and phi keepouts for each positioner."""
         self.general_keepout_P = self.general_keepout_P_unexpanded.expanded_radially(self.config['KEEPOUT_EXPANSION_PHI_RADIAL'])
@@ -499,12 +486,12 @@ class PosSweep(object):
     def copy(self):
         return copymodule.deepcopy(self)
 
-    def fill_exact(self, init_obsTP, table, start_time=0):
+    def fill_exact(self, init_poslocTP, table, start_time=0):
         """Fills in a sweep object based on the input table. Time and position
         are handled continuously and exactly (i.e. not yet quantized).
         """
         time = [start_time]
-        tp = [[init_obsTP[0]],[init_obsTP[1]]]
+        tp = [[init_poslocTP[0]],[init_poslocTP[1]]]
         tp_dot = [[0],[0]]
         for i in range(0,table['nrows']):
             if table['prepause'][i]:
@@ -554,35 +541,35 @@ class PosSweep(object):
         self.time = discrete_time
         self.tp = discrete_position
         self.tp_dot = speed
-        
+
     def extend(self, timestep, max_time):
-        """Extends a sweep object to max_time to reflect the postpauses inserted into the move table 
+        """Extends a sweep object to max_time to reflect the postpauses inserted into the move table
         in equalize_table_times() in posschedulestage.py, ensuring that the sweep object
         is in sync with the move table so that the animator is reflecting true moves. """
-        
+
         starttime_extension = self.time[-1] + timestep
         time_extension = np.arange(starttime_extension, max_time + timestep, timestep)
         extended_time = np.append(self.time, time_extension)
-        
+
         #starttime_extension = self.time[-1] + timestep
         #endtime_extension = self.time[-1] + equalizing_pause
         #time_extension = np.arange(starttime_extension, endtime_extension + timestep, timestep)
         #extended_time = np.append(self.time, time_extension)
-        
+
         # tp extension are just the last tp entry repeated throughout the extended time
         theta_extension = self.tp[0,-1]*np.ones(len(time_extension))
         phi_extension = self.tp[1,-1]*np.ones(len(time_extension))
         extended_theta = list(np.append(self.tp[0], theta_extension))
         extended_phi = list(np.append(self.tp[1], phi_extension))
         extended_tp = np.array([extended_theta, extended_phi])
-        
+
         # tp_dot extension are just zeros repeated throughout the extended time
         tdot_extension = np.zeros(len(time_extension))
         pdot_extension = np.zeros(len(time_extension))
         extended_tdot = list(np.append(self.tp_dot[0], tdot_extension))
         extended_pdot= list(np.append(self.tp_dot[1], pdot_extension))
         extended_tp_dot = np.array([extended_tdot, extended_pdot])
-        
+
         self.time = extended_time
         self.tp = extended_tp
         self.tp_dot = extended_tp_dot
@@ -595,17 +582,17 @@ class PosSweep(object):
     def is_frozen(self):
         """Returns boolean value whether the sweep has a "freezing" event."""
         return self.frozen_time < math.inf
-    
+
     def is_moving(self,step):
         """Returns boolean value whether the sweep is moving at the argued timestep."""
         if self.tp[0,step]*self.tp_dot[0,step] or self.tp[1,step]*self.tp_dot[1,step]:
             return True
         return False
-    
+
     def theta(self, step):
         """Returns theta position of the sweep at the specified timestep index."""
         return self.tp[0,step]
-    
+
     def phi(self, step):
         """Returns phi position of the sweep at the specified timestep index."""
         return self.tp[1,step]
@@ -623,13 +610,13 @@ cdef double deg_per_rad = 180.0 / c_pi
 cdef class PosPoly:
     """Represents a collidable polygonal envelope definition for a mechanical component
     of the fiber positioner.
-    
+
         points ... normal usage: 2 x N list of x and y coordinates of polygon vertices
                ... expert usage: ignored
-               
+
         close_polygon ... normal usage: whether to make an identical last point matching the first
                       ... expert usage: ignored
-        
+
         allocation ... normal usage: leave False, and it is ignored
                    ... expert usage: positive integer, stating just a size of arrays to allocate.
                                      (overrides both points and close_polygon)
@@ -637,7 +624,7 @@ cdef class PosPoly:
     cdef double* x
     cdef double* y
     cdef unsigned int n_pts
-    
+
     def __cinit__(self, points, close_polygon=True, allocation=False):
         cdef size_t xlen
         cdef size_t ylen
@@ -746,7 +733,7 @@ cdef class PosPoly:
             new.x[i] += delta_r * c_cos(angle)
             new.y[i] += delta_r * c_sin(angle)
         return new
-    
+
     cpdef PosPoly expanded_x(self, left_shift, right_shift):
         """Returns a copy of the polygon object, with points expanded along the x direction only.
         Points leftward of the line x=0 are shifted further left by an amount left_shift > 0.
@@ -763,11 +750,11 @@ cdef class PosPoly:
             elif new.x[i] < 0:
                 new.x[i] -= L
         return new
-        
+
     cpdef PosPoly expanded_angularly(self, dA):
         """Returns a copy of the polygon object, with points expanded rotationally by angle dA (in degrees).
         The rotational expansion is made about the polygon's [0,0] center.
-        Expansion is made in both the clockwise and counter-clockwise directions from the line y=0. 
+        Expansion is made in both the clockwise and counter-clockwise directions from the line y=0.
         A value dA < 0 is allowed, causing contraction of the polygon."""
         cdef PosPoly new = self.copy()
         cdef unsigned int i
@@ -829,11 +816,11 @@ cdef class PosPoly:
 
 cdef unsigned int _bounding_boxes_collide(double x1[], double y1[], unsigned int len1, double x2[], double y2[], unsigned int len2):
     """Check whether the rectangular bounding boxes of two polygons collide.
-        
+
        x1,y1 ... 1xN c-arrays of the 1st polygon's vertices
        len1  ... length of x1 and y1
        x2,y2,len ... similarly for polygon 2
-    
+
     Returns True if the bounding boxes collide, False if they do not. Intended as
     a fast check, to enhance speed of other collision detection functions.
     """
@@ -850,13 +837,13 @@ cdef unsigned int _bounding_boxes_collide(double x1[], double y1[], unsigned int
 
 cdef unsigned int _polygons_collide(double x1[], double y1[], unsigned int len1, double x2[], double y2[], unsigned int len2):
     """Check whether two closed polygons collide.
-    
+
        x1,y1 ... 1xN c-arrays of the 1st polygon's vertices
        len1  ... length of x1 and y1
        x2,y2,len ... similarly for polygon 2
 
     Returns True if the polygons intersect, False if they do not.
-    
+
     The algorithm is by detecting intersection of line segments, therefore the case of
     a small polygon completely enclosed by a larger polygon will return False. Not checking
     for this condition admittedly breaks some conceptual logic, but this case is not
@@ -889,7 +876,7 @@ cdef unsigned int _segments_intersect(double A1[2], double A2[2], double B1[2], 
     s = (dx_A * (B1[1] - A1[1]) + dy_A * (A1[0] - B1[0])) / delta
     t = (dx_B * (A1[1] - B1[1]) + dy_B * (B1[0] - A1[0])) / (-delta)
     return (0 <= s <= 1) and (0 <= t <= 1)
-    
+
 cdef double _c_max(double x[], unsigned int length):
     """Get the max of a c-array of doubles."""
     cdef unsigned int i
@@ -901,7 +888,7 @@ cdef double _c_max(double x[], unsigned int length):
         return max_val
     else:
         return 0.0
-    
+
 cdef double _c_min(double x[], unsigned int length):
     """Get the min of a c-array of doubles."""
     cdef unsigned int i
