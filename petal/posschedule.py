@@ -98,6 +98,7 @@ class PosSchedule(object):
             targt_posintTP, unreachable = posmodel.trans.obsXY_to_posintTP(
                 targt_uv, lims)
             # import pdb; pdb.set_trace()
+            # import pdb; pdb.set_trace()
         elif uv_type == 'dTdP':
             targt_posintTP = posmodel.trans.delta_posintTP(start_posintTP, [u, v], lims)
         else:
@@ -383,7 +384,7 @@ class PosSchedule(object):
         if should_freeze:
             ori_stage_colliding = copymodule.deepcopy(stage.colliding)
             if self.verbose:
-                self.printfunc("initial stage.colliding " + str(stage.colliding))
+                self.printfunc("initial stage.colliding: " + str(stage.colliding))
             for posid in colliding_sweeps:
                 if posid in stage.colliding: # re-check, since earlier path adjustments in loop may have already resolved this posid's collision
                     self.petal.pos_flags[posid] |= self.petal.frozen_anticol_bit #Mark as frozen by anticollision
@@ -443,6 +444,7 @@ class PosSchedule(object):
                 start_posintTP['extend'][posid],
                 range_wrap_limits='targetable')
         for i in range(len(self.RRE_stage_order)):
+            counter = 0
             name = self.RRE_stage_order[i]
             self.printfunc('stage name:', name)
             stage = self.stages[name]
@@ -454,7 +456,6 @@ class PosSchedule(object):
                 self.printfunc('Posschedule first move table:', list(stage.move_tables.values())[0].for_collider())
             colliding_sweeps, all_sweeps = stage.find_collisions(
                 stage.move_tables)
-            # find_t_total += t_section  # debug
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             attempts_remaining = self.max_path_adjustment_passes
             # take this out once stage.colliding is working
@@ -489,7 +490,6 @@ class PosSchedule(object):
                 attempts_remaining -= 1
                 if self.verbose:  # debug
                     self.printfunc(f'posschedule: remaining collisions {len(stage.colliding)}, attempts_remaining {attempts_remaining}')
-
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
         consistently take with regard to post-move cleanup, if a request is going to be denied.

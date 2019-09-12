@@ -1,7 +1,6 @@
 import posconstants as pc
 import posmovetable
 import math
-import time
 
 class PosScheduleStage(object):
     """This class encapsulates the concept of a 'stage' of the fiber
@@ -42,6 +41,7 @@ class PosScheduleStage(object):
         physical range limits of the fiber positioner.)
         """
         for posid in start_posintTP:
+
             posmodel = self.collider.posmodels[posid]
             final_posintTP = posmodel.trans.addto_posintTP(start_posintTP[posid], dtdp[posid], range_wrap_limits='targetable')
             true_dtdp = posmodel.trans.delta_posintTP(final_posintTP, start_posintTP[posid], range_wrap_limits='targetable')
@@ -188,13 +188,11 @@ class PosScheduleStage(object):
 
             proposed_tables = self._propose_path_adjustment(posid,method)
             colliding_sweeps, all_sweeps = self.find_collisions(proposed_tables)
-            # t_total += t_section
             if proposed_tables and not(colliding_sweeps): # i.e., the proposed tables should be accepted
                 self.move_tables.update(proposed_tables)
                 self.collisions_resolved[method].add(self._collision_id(posid,collision_neighbor))
                 if self.verbose:
                     self.printfunc("***collision resolved via " + str(method) + ' for ' + str(posid) + '-' + str(collision_neighbor))
-
                 stage_colliding.remove(posid)
                 if collision_neighbor in stage_colliding: stage_colliding.remove(collision_neighbor)
                 for pos_id in all_sweeps:
@@ -212,12 +210,10 @@ class PosScheduleStage(object):
                             all_sweeps[pos_id].collision_time = self.sweeps[pos_id].collision_time
                             all_sweeps[pos_id].collision_idx = self.sweeps[pos_id].collision_idx
                             colliding_sweeps[pos_id] = all_sweeps[pos_id]
-
                 # sweep information for all positioners updated here
                 self.store_collision_finding_results(colliding_sweeps, all_sweeps, requests)
                 if method == 'freeze':
                     self.sweeps[posid].register_as_frozen()
-                return
 
     def find_collisions(self, move_tables):
         """Identifies any collisions that would be induced by executing a collection
@@ -256,33 +252,22 @@ class PosScheduleStage(object):
         already_checked = {posid:set() for posid in self.collider.posids}
         colliding_sweeps = {posid:set() for posid in self.collider.posids}
         all_sweeps = {}
-        t_total = 0
         for posid in move_tables:
-
             table_A = move_tables[posid]
-            # print('checking table_A', table_A.for_collider())  # debug
             init_poslocTP_A = table_A.posmodel.trans.posintTP_to_poslocTP(table_A.init_posintTP)
-
             for neighbor in self.collider.pos_neighbors[posid]:
                 if neighbor not in already_checked[posid]:
-
                     table_B = move_tables[neighbor] if neighbor in move_tables else self._get_or_generate_table(neighbor)
-
                     init_poslocTP_B = table_B.posmodel.trans.posintTP_to_poslocTP(table_B.init_posintTP)
-                    t1 = time.process_time()  # debug
                     pospos_sweeps = self.collider.spacetime_collision_between_positioners(posid, init_poslocTP_A, table_A.for_collider(), neighbor, init_poslocTP_B, table_B.for_collider())
-                    t2 = time.process_time()  # debug
                     all_sweeps.update({posid:pospos_sweeps[0], neighbor:pospos_sweeps[1]})
-
                     for sweep in pospos_sweeps:
                         if sweep.collision_case != pc.case.I:
                             colliding_sweeps[sweep.posid].add(sweep)
                     already_checked[posid].add(neighbor)
                     already_checked[neighbor].add(posid)
-                    # del table_B, pospos_sweeps
                     if self.verbose:
                         self.printfunc("checking collision: " + str(posid) + '-' + str(neighbor) + ', case ' + str(sweep.collision_case) + ', time ' + str(sweep.collision_time))
-
             for fixed_neighbor in self.collider.fixed_neighbor_cases[posid]:
                 posfix_sweep = self.collider.spacetime_collision_with_fixed(posid, init_poslocTP_A, table_A.for_collider())[0] # index 0 to immediately retrieve from the one-element list this function returns
                 all_sweeps.update({posid:posfix_sweep})
@@ -290,8 +275,6 @@ class PosScheduleStage(object):
                     colliding_sweeps[posid].add(posfix_sweep)
                 if self.verbose:
                     self.printfunc("checking collision: " + str(posid) + '-' + str(fixed_neighbor) + ', case ' + str(posfix_sweep.collision_case) + ', time ' + str(posfix_sweep.collision_time))
-
-            t_total += t2-t1
         multiple_collisions = {posid for posid in colliding_sweeps if len(colliding_sweeps[posid]) > 1}
         for posid in multiple_collisions:
             first_collision_time = float('inf')
@@ -302,14 +285,6 @@ class PosScheduleStage(object):
             colliding_sweeps[posid] = {first_sweep}
         colliding_sweeps = {posid:colliding_sweeps[posid].pop() for posid in colliding_sweeps if colliding_sweeps[posid]} # remove set structure from elements, and remove empty elements
         all_sweeps.update(colliding_sweeps)
-        try:
-            del pospos_sweeps
-        except:
-            pass
-        try:
-            del posfix_sweep
-        except:
-            pass
         return colliding_sweeps, all_sweeps
 
     def store_collision_finding_results(self, colliding_sweeps, all_sweeps,

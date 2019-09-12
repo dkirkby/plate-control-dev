@@ -1,5 +1,11 @@
+<<<<<<< .working
 import sys
 import math
+||||||| .merge-left.r126993
+import numpy as np
+=======
+# import numpy as np
+>>>>>>> .merge-right.r127109
 import posconstants as pc
 import posmodel
 import petaltransforms

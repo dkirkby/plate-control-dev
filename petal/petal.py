@@ -60,34 +60,29 @@ class Petal(object):
                  collider_file=None, sched_stats_on=False):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
-        self.printfunc(f'Running code version: {pc.code_version}')
+        self.printfunc(f'Running plate_control version: {pc.code_version}')
         self.printfunc(f'poscollider used: {poscollider.__file__}')
-        # read values from cfg files if not given
-        # if None in [petal_id, petalbox_id, fidids, posids, shape]:
-        #     self.printfunc('Some parameters not provided to __init__, '
-        #                    'reading petal config.')
-            # self.petal_state = posstate.PosState(  # initialise petal state
-            #         unit_id=petal_id, device_type='ptl', logging=True,
-            #         printfunc=self.printfunc)
-            # if petal_id is None:
-            #     self.printfunc('Reading Petal_ID from petal_state')
-            #     # this is the string unique hardware id of the particular petal
-            #     # (not the integer id of the beaglebone in the petalbox)
-            #     petal_id = self.petal_state.conf['PETAL_ID']
-            # if petalbox_id is None:
-            #     self.printfunc('Reading petalbox_ID from petal_state')
-            #     # this is the integer software id of the petalbox (previously
-            #     # known as 'petal_id', before disambiguation)
-            #     petalbox_id = self.petal_state.conf['PETALBOX_ID']
-            # if posids is None:
-            #     self.printfunc('posids not given, read from ptl_settings file')
-            #     posids = self.petal_state.conf['POS_IDS']
-            # if fidids is None:
-            #     self.printfunc('fidids not given, read from ptl_settings file')
-            #     fidids = self.petal_state.conf['FID_IDS']
-            # if shape is None:
-            #     self.printfunc('Reading shape from petal_state')
-            #     shape = self.petal_state.conf['SHAPE']
+        # petal setup
+        if None in [petal_id, petalbox_id, fidids, posids, shape]:
+            self.printfunc('Some parameters not provided to __init__, reading petal config.')
+            self.petal_state = posstate.PosState(
+                unit_id=petal_id, device_type='ptl', logging=True,
+                printfunc=self.printfunc)
+            if petal_id is None:
+                self.printfunc('Reading Petal_ID from petal_state')
+                petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
+            if petalbox_id is None:
+                self.printfunc('Reading petalbox_ID from petal_state')
+                petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
+            if posids is None:
+                self.printfunc('posids not given, read from ptl_settings file')
+                posids = self.petal_state.conf['POS_IDS']
+            if fidids is None:
+                self.printfunc('fidids not given, read from ptl_settings file')
+                fidids = self.petal_state.conf['FID_IDS']
+            if shape is None:
+                self.printfunc('Reading shape from petal_state')
+                shape = self.petal_state.conf['SHAPE']
         self.petalbox_id = petalbox_id
         self.petal_id = int(petal_id)
         self.shape = shape
@@ -222,7 +217,8 @@ class Petal(object):
                 configfile=collider_file, collision_hashpp_exists=False,
                 collision_hashpf_exists=False, hole_angle_file=None)
             # self.anticol_settings = self.collider.config
-        self.printfunc(f'Collider setting: {self.collider.config}')
+        if self.verbose:
+            self.printfunc(f'PosCollider setting: {self.collider.config}')
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
         # this should be turned on/off using the animation start/stop
@@ -1208,6 +1204,7 @@ class Petal(object):
 
 
 if __name__ == '__main__':
+<<<<<<< .working
     '''
     python -m cProfile -s cumtime petal.py
     '''
@@ -1221,8 +1218,22 @@ if __name__ == '__main__':
                 db_commit_on=True, local_commit_on=False, local_log_on=False,
                 simulator_on=True, printfunc=print, verbose=False,
                 sched_stats_on=False)
-    print('Initial posTP of M04078 (make sure inital positions are the same):',
-          ptl.posmodels['M04078'].expected_current_posintTP)
+    # print('Dumping initial positions in DB')
+    # init_pos_dump = np.zeros((len(ptl.posids), 3))
+    # for i, posid in enumerate(sorted(ptl.posids)):
+    #     init_pos_dump[i, 0] = int(posid[1:])
+    #     init_pos_dump[i, 1:] = ptl.posmodels[posid].expected_current_posTP
+    # np.savetxt(os.path.join(pc.dirs['temp_files'], 'init_pos_dump.txt'), init_pos_dump)
+    init_pos_dump = np.loadtxt(os.path.join(pc.dirs['temp_files'],
+                                            'init_pos_dump.txt'))
+    init_pos = np.zeros((len(ptl.posids), 3))
+    for i, posid in enumerate(sorted(ptl.posids)):
+        init_pos[i, 0] = int(posid[1:])
+        init_pos[i, 1:] = ptl.posmodels[posid].expected_current_posTP
+    np.savetxt(os.path.join(pc.dirs['temp_files'], 'init_pos_1.txt'), init_pos)
+    print(f'Checking if posids and initial positions of all '
+          f'{init_pos.shape[0]} positioners equal to dump: '
+          f'{np.all(init_pos_dump == init_pos)}')
     posT = np.linspace(0, 360, 6)
     posP = np.linspace(90, 180, 6)
     for i in range(4):
@@ -1233,3 +1244,4 @@ if __name__ == '__main__':
         ptl.request_targets(requests)
         ptl.schedule_moves(anticollision='adjust')
         ptl.send_and_execute_moves()
+    # ptl.schedule_stats.save()>>>>>>> .merge-right.r127109

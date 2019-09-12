@@ -6,7 +6,6 @@ import pprint
 import posconstants as pc
 from DOSlib.positioner_index import PositionerIndex
 try:
-    # from DOSlib.constants import ConstantsDB
     from DBSingleton import DBSingleton
     DB_COMMIT_AVAILABLE = True
 except ModuleNotFoundError:
@@ -53,7 +52,6 @@ class PosState(object):
             self.type = device_type
         else:
             raise Exception('Invalid device_type')
-
         # DOS change
         if device_type == 'ptl':
             self.petal_state_defaults = defaults
