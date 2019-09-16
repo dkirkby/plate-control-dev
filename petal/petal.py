@@ -95,6 +95,7 @@ class Petal(object):
             import petalcomm
             self.comm = petalcomm.PetalComm(self.petalbox_id, user_interactions_enabled=user_interactions_enabled)
             self.comm.pbset('non_responsives', 'clear') #reset petalcontroller's list of non-responsive canids
+        self.tables_sent_successfully = True
 
         # database setup
         self.db_commit_on = db_commit_on if DB_COMMIT_AVAILABLE else False
@@ -484,6 +485,7 @@ class Petal(object):
         """
         if self.simulator_on:
             if self.verbose:
+                self.tables_sent_successfully = True
                 self.printfunc('Simulator skips sending move tables to positioners.')
             return
         hw_tables = self._hardware_ready_move_tables()
@@ -495,7 +497,11 @@ class Petal(object):
         self.canids_where_tables_were_just_sent = canids
         self.busids_where_tables_were_just_sent = busids
         self._wait_while_moving()
-        self.comm.send_tables(hw_tables)
+        response = self.comm.send_tables(hw_tables)
+        if 'FAILED' in response:
+            self.tables_sent_successfully = False
+        else:
+            self.tables_sent_successfully = True
 
     def set_motor_parameters(self):
         """Send the motor current and period settings to the positioners.
@@ -1006,7 +1012,7 @@ class Petal(object):
         """
         self._check_and_disable_nonresponsive_pos_and_fid()
         for m in self.schedule.move_tables.values():
-            if m.posmodel.is_enabled: #In general, non responsive pos do not move
+            if m.posmodel.is_enabled and self.tables_sent_successfully: #In general, non responsive pos do not move
                 m.posmodel.postmove_cleanup(m.for_cleanup())
                 self.altered_states.add(m.posmodel.state)
             else:
