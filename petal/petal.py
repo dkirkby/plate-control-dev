@@ -806,7 +806,7 @@ class Petal(object):
             return 'ERROR', ['No state yet set by petal']
         # Look for different settings from what petal last set.
         for key in self._last_state.keys():
-            fbk = self.pbget(key)
+            fbk = self.comm.pbget(key)
             if key == 'GFA_FAN': #sadly GFA_FAN is a little weird.
                 for k in fbk.keys(): #should be 'inlet' and 'outlet'
                     if fbk[k][0] != self._last_state[key][k][0]: #comparing only off/on, not worring about PWM or TACH
@@ -815,7 +815,7 @@ class Petal(object):
                 if self._last_state[key] != fbk:
                     err_strings.append(key+' expected: '+str(self._last_state[key])+', got: '+str(fbk))
         if err_strings == []: #If no errors found, just return the state that was set
-            return self.pbget('STATE'), err_strings
+            return self.comm.pbget('STATE'), err_strings
         else: #If errors were found, set 'ERROR' state and return 'ERROR' as well as strings explaining why.
             self.pbset('STATE','ERROR')
             return 'ERROR', err_strings
