@@ -262,7 +262,7 @@ class Petal(object):
                     KEYS        VALUES
                     ----        ------
                     command     move command string
-                                    ... valid values are 'QS', 'dQdS', 'obsXY', 'poslocXY', 'dXdY', 'poslocTP', 'posintTP' or 'dTdP'
+                                    ... valid values are 'QS', 'dQdS', 'obsXY', 'ptlXY', 'poslocXY', 'dXdY', 'poslocTP', 'posintTP' or 'dTdP'
                                     ... Note: dXdY is CS5 aligned XY, not Petal aligned
                     target      pair of target coordinates or deltas, of the form [u,v]
                                     ... the elements u and v can be floats or integers
@@ -928,7 +928,8 @@ class Petal(object):
         list. Valid keys are:
 
             'posintTP, 'poslocXY', 'poslocTP',
-            'QS', 'flatXY', 'obsXY', 'ptlXY', 'motTP'
+            'QS', 'flatXY', 'obsXY', 'ptlXY', 'motTP',
+            'posobsTP', 'posobsXY'
 
         See comments in posmodel.py for explanation of these values.
         """
