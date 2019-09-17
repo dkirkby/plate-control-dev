@@ -757,7 +757,9 @@ class Petal(object):
                                           'PS2_EN':('on', 1.0)})
         # Set petalbox State
         if self.simulator_on:
-            return 'READY' # bypass everything below if in sim mode - sim should always be ready
+            if hasattr(self, 'ops_state_sv'):
+                self.ops_state_sv.write('READY')
+            return 'READY' # bypass everything below if in petal sim mode - sim should always be ready
         for key in self._last_state.keys():
             ret = self.comm.pbset(key, self._last_state[key][0])
             if 'FAILED' in ret:
@@ -788,9 +790,12 @@ class Petal(object):
             time.sleep(1)
 
         if len(failed) == 0:
-            ret = self.comm.ops_state(hw_state)
+            if hasattr(self, 'comm'):
+                ret = self.comm.ops_state(hw_state)
             if 'FAILED' not in ret:
                 self.printfunc('_set_hardware_state: all devices have changed state.')
+                if hasattr(self, 'ops_state_sv'):
+                    self.ops_state_sv.write(ret)
             else:
                 self.printfunc('_set_hardware_state: FAILED: when calling comm.ops_state: %s' % ret)
                 raise_error('_set_hardware_state: comm.ops_state returned %s' % ret)
@@ -810,7 +815,7 @@ class Petal(object):
         if self.simulator_on: #Sim should always be ready
             return 'READY', err_strings
         if not(self._last_state):
-            raise_error('_get_hardware_state: No state yet set by petal')
+            return 'ERROR', ['No state yet set by petal']
         # Look for different settings from what petal last set.
         for key in self._last_state.keys():
             fbk = self.comm.pbget(key)
@@ -821,10 +826,18 @@ class Petal(object):
             else:
                 if self._last_state[key][0] != fbk:
                     err_strings.append(key+' expected: '+str(self._last_state[key][0])+', got: '+str(fbk))
+        # Check if petal and PC ops states match
+        pc_ops = self.comm.ops_state()
+        if pc_ops != self.ops_state_sv._value:
+            err_string.append('opsstate petal: %r, PC: %r' % (self.ops_state_sv._value, pc_ops))
         if err_strings == []: #If no errors found, just return the state that was set
-            return self.comm.get('ops_state'), err_strings
-        else: #If errors were found, return 'ERROR' as well as strings explaining why.
-            raise_error('_get_hardware_state: %r' % err_strings)
+            if hasattr(self, 'ops_state_sv'):
+                return self.ops_state_sv._value, err_strings
+            else:
+                err_strings.append['OPS STATE SV not available']
+                return 'ERROR', err_strings
+        else: #If errors were found, set 'ERROR' state and return 'ERROR' as well as strings explaining why.
+            return 'ERROR', err_strings
 
     def reset_petalbox(self):
         """Reset all errors and turn all enables off.  This method
@@ -1296,7 +1309,8 @@ class Petal(object):
 
         # move petalcontroller to STANDBY state
         self.printfunc('_petal_configure: ops_state is now STANDBY')
-        self.ops_state_sv.write('STANDBY')
+        if hasattr(self, 'ops_state_sv'):
+            self.ops_state_sv.write('STANDBY')
 
         #Reset values
         self.canids_where_tables_were_just_sent = []
