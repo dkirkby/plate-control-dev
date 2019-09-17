@@ -81,11 +81,15 @@ class PosSchedule(object):
             targt_posintTP, unreachable = posmodel.trans.QS_to_posintTP([u, v], lims)
         elif uv_type == 'obsXY':
             targt_posintTP, unreachable = posmodel.trans.obsXY_to_posintTP([u, v], lims)
+        elif uv_type == 'ptlXY':
+            targt_posintTP, unreachable = posmodel.trans.ptlXY_to_posintTP([u, v], lims)
         elif uv_type == 'poslocXY':
             targt_posintTP, unreachable = posmodel.trans.poslocXY_to_posintTP(
                 [u, v], lims)
         # elif uv_type == 'obsTP':
         #     targt_posintTP = posmodel.trans.obsTP_to_posintTP([u,v])
+        elif uv_type == 'poslocTP':
+            targt_posintTP = posmodel.trans.poslocTP_to_posintTP([u, v])
         elif uv_type == 'posintTP':
             targt_posintTP = [u, v]
         elif uv_type == 'dQdS':
@@ -97,8 +101,6 @@ class PosSchedule(object):
             targt_uv = posmodel.trans.addto_XY(start_uv, [u, v])
             targt_posintTP, unreachable = posmodel.trans.obsXY_to_posintTP(
                 targt_uv, lims)
-            # import pdb; pdb.set_trace()
-            # import pdb; pdb.set_trace()
         elif uv_type == 'dTdP':
             targt_posintTP = posmodel.trans.delta_posintTP(start_posintTP, [u, v], lims)
         else:
@@ -351,7 +353,6 @@ class PosSchedule(object):
         desired_final_posintTP = {}
         dtdp = {}
         for posid, request in self.requests.items():
-            # import pdb; pdb.set_trace()
             start_posintTP[posid] = request['start_posintTP']
             desired_final_posintTP[posid] = request['targt_posintTP']
             trans = self.petal.posmodels[posid].trans
@@ -403,7 +404,6 @@ class PosSchedule(object):
         start_posintTP = {name: {} for name in self.RRE_stage_order}
         desired_final_posintTP = {name: {} for name in self.RRE_stage_order}
         dtdp = {name: {} for name in self.RRE_stage_order}
-        # import pdb; pdb.set_trace()
         for posid, request in self.requests.items():
             # Some care is taken here to use only delta and add functions
             # provided by PosTransforms to ensure that range wrap limits are

@@ -262,7 +262,8 @@ class Petal(object):
                     KEYS        VALUES
                     ----        ------
                     command     move command string
-                                    ... valid values are 'QS', 'dQdS', 'obsXY', 'posXY', 'dXdY', 'obsTP', 'posTP' or 'dTdP'
+                                    ... valid values are 'QS', 'dQdS', 'obsXY', 'poslocXY', 'dXdY', 'poslocTP', 'posintTP' or 'dTdP'
+                                    ... Note: dXdY is CS5 aligned XY, not Petal aligned
                     target      pair of target coordinates or deltas, of the form [u,v]
                                     ... the elements u and v can be floats or integers
                                     ... 1st element (u) is the value for q, dq, x, dx, t, or dt
@@ -949,6 +950,12 @@ class Petal(object):
                 return [vals['flatX'], vals['flatY']]
             elif key == 'motorTP':
                 return [vals['motT'], vals['motP']]
+            elif key == 'ptlXY':
+                return [vals['ptlX'], vals['ptlY']]
+            elif key == 'posobsTP':
+                return [vals['posobsT'], vals['posobsP']]
+            elif key == 'posobsXY':
+                return [vals['posobsX'], vals['posobsY']]
             else:
                 self.printfunc('Unrecognized key ' + str(key) + ' in request for expected_current_position of posid ' + str(posid) + '.')
 

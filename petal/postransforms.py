@@ -58,6 +58,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
         degree 2:
             poslocXY    <--> obsXY
             obsXY       <--> flatXY
+            QS           --> ptlXY
         degree 3:
             posintTP    <--> obsXY
         degree 4:
@@ -214,7 +215,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
         posobs_ranges = [[0, 359.99999999], [0, 220]]
         return PosTransforms.xy2tp(posobsXY, r, posobs_ranges)[0]
 
-    # %% composit transformations for convenience (degree 1)
+    # %% composite transformations for convenience (degree 1)
     def posintTP_to_poslocXY(self, posintTP):
         ''' input is list or tuple '''
         poslocTP = self.posintTP_to_poslocTP(posintTP)
@@ -226,7 +227,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
             poslocXY, range_limits=range_limits)
         return self.poslocTP_to_posintTP(poslocTP), unreachable  # tuple
 
-    # %% composit transformations for convenience (degree 2)
+    # %% composite transformations for convenience (degree 2)
     def poslocXY_to_obsXY(self, poslocXY):
         ''' input is list or tuple '''
         ptlXY = self.poslocXY_to_ptlXY(poslocXY)  # tuple
@@ -248,7 +249,12 @@ class PosTransforms(petaltransforms.PetalTransforms):
         poslocXY = self.posintTP_to_poslocXY(posintTP)
         return self.poslocXY_to_ptlXY(poslocXY)
 
-    # %% composit transformations for convenience (degree 3)
+    def QS_to_ptlXY(self, QS):
+        ''' input is list or tuple '''
+        obsXY = self.QS_to_obsXY(QS)
+        return self.obsXY_to_ptlXY(obsXY)
+
+    # %% composite transformations for convenience (degree 3)
     def posintTP_to_obsXY(self, posintTP):
         poslocXY = self.posintTP_to_poslocXY(posintTP)  # tuple
         return self.poslocXY_to_obsXY(poslocXY)  # return (obsX, obsY)
@@ -258,7 +264,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
         poslocXY = self.obsXY_to_poslocXY(obsXY)  # tuple
         return self.poslocXY_to_posintTP(poslocXY, range_limits=range_limits)
 
-    # %% composit transformations for convenience (degree 4)
+    # %% composite transformations for convenience (degree 4)
     def posintTP_to_QS(self, posintTP):
         """Composite transformation, performs intTP --> obsXY --> QS"""
         obsXY = self.posintTP_to_obsXY(posintTP)  # tuple (obsX, obsY)
@@ -274,7 +280,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
         obsXY = self.posintTP_to_obsXY(posintTP)
         return tuple(self.obsXY_to_posobsXY(obsXY))  # tuple
 
-    # %% composit transformations for convenience (degree 5)
+    # %% composite transformations for convenience (degree 5)
     def posintTP_to_flatXY(self, posintTP):
         """Composite transformation, performs intTP --> QS --> flatXY"""
         QS = self.posintTP_to_QS(posintTP)
