@@ -110,7 +110,7 @@ class Petal(object):
                 o = self.comm.ops_state()
                 self.ops_state_sv.write(o)
             except Exception as e:
-                self.printfunc('__init__: Exception calling petalcontroller ops_state: %s' % str(e))
+                self.printfunc('init: Exception calling petalcontroller ops_state: %s' % str(e))
 
         # database setup
         self.db_commit_on = db_commit_on if DB_COMMIT_AVAILABLE else False
@@ -122,7 +122,7 @@ class Petal(object):
         self.sched_stats_on = sched_stats_on
         self.altered_states = set()
         self.altered_calib_states = set()
-        self._last_state = {}
+        self._last_state = OrderedDict()
 
         # must call the following 3 methods whenever petal alingment changes
         self.init_trans()
@@ -703,7 +703,7 @@ class Petal(object):
         assert hw_state in state_list, '_set_hardware_state: invalid state requested, possible states: %s' % state_list
         # Setup what values are expected when checking the state in the future
         # Notation: key (device name), tuple with value, max wait time for state change
-        if hw_state == 'INITIALIZED':
+        if hw_state == 'INITIALIZED': #Note: only here for complete definition, state_list prevents this from being used
             #AC Positioner Power ON - not controlled by software
             self._last_state=OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
                                           'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
@@ -757,9 +757,12 @@ class Petal(object):
                                           'PS2_EN':('on', 1.0)})
         # Set petalbox State
         if self.simulator_on:
-            return None  # bypasse everything below if in sim mode
+            return 'READY' # bypass everything below if in sim mode - sim should always be ready
         for key in self._last_state.keys():
-            self.comm.pbset(key, self._last_state.keys())
+            ret = self.comm.pbset(key, self._last_state[key][0])
+            if 'FAILED' in ret:
+                #fail message, should only happen if petalcontroller changes - code will raise error later on
+                self.printfunc('_set_hardware_state: WARNING: key %s returned %s from pbset.' % (key,ret))
         # now check if all state changes are complete
         # wait for timeout, if still inconsistent raise exception
         todo = list(self._last_state.keys())
@@ -772,22 +775,27 @@ class Petal(object):
                 new_state = self.comm.pbget(key)
                 if new_state == self._last_state[key][0]:
                     todo.remove(key)
-                elif key == 'GFA_FAN':
+                elif key == 'GFA_FAN': #GFA has different structure
                     req = self._last_state[key][0]['inlet'][0], self._last_state[key][0]['outlet'][0]
                     new = new_state['inlet'][0], new_state['outlet'][0]
                     if req == new:
                         todo.remove(key)
                 else:   # check timeout
-                    self.printfunc('xxxxxxxxxxxxx %r' % key)
                     if time.time() > start + self._last_state[key][1]:
                         failed[key] = (new_state, self._last_state[key][0])
+                        self.printfunc('_set_hardware_state: Timeout for %r' % key)
                         todo.remove(key)
             time.sleep(1)
 
         if len(failed) == 0:
-            self.printfunc('_set_hardware_state: all devices have changed state.')
+            ret = self.comm.ops_state(hw_state)
+            if 'FAILED' not in ret:
+                self.printfunc('_set_hardware_state: all devices have changed state.')
+            else:
+                self.printfunc('_set_hardware_state: FAILED: when calling comm.ops_state: %s' % ret)
+                raise_error('_set_hardware_state: comm.ops_state returned %s' % ret)
         else:
-            self.printfunc('_set_hardware_state: FAILED: some inconsistent device states: %r' % failed)
+            self.printfunc('_set_hardware_state: FAILED: some inconsistent device states (new/last): %r' % failed)
             raise_error('_set_hardware_state: Inconsistent device states: %r' % failed)
         return hw_state
 
@@ -799,26 +807,24 @@ class Petal(object):
         returns the state of the PetalController.
         '''
         err_strings = []
-        if self.simulator_on:
+        if self.simulator_on: #Sim should always be ready
             return 'READY', err_strings
-        if self._last_state == {}:
-            self.pbset('STATE', 'ERROR')
-            return 'ERROR', ['No state yet set by petal']
+        if not(self._last_state):
+            raise_error('_get_hardware_state: No state yet set by petal')
         # Look for different settings from what petal last set.
         for key in self._last_state.keys():
             fbk = self.comm.pbget(key)
             if key == 'GFA_FAN': #sadly GFA_FAN is a little weird.
                 for k in fbk.keys(): #should be 'inlet' and 'outlet'
-                    if fbk[k][0] != self._last_state[key][k][0]: #comparing only off/on, not worring about PWM or TACH
-                        err_strings.append(key+' expected: '+str(self._last_state[key][k])+', got: '+str(fbk[k][0]))
+                    if fbk[k][0] != self._last_state[key][0][k][0]: #comparing only off/on, not worring about PWM or TACH
+                        err_strings.append(key+' expected: '+str(self._last_state[key][0][k][0])+', got: '+str(fbk[k][0]))
             else:
-                if self._last_state[key] != fbk:
-                    err_strings.append(key+' expected: '+str(self._last_state[key])+', got: '+str(fbk))
+                if self._last_state[key][0] != fbk:
+                    err_strings.append(key+' expected: '+str(self._last_state[key][0])+', got: '+str(fbk))
         if err_strings == []: #If no errors found, just return the state that was set
-            return self.comm.pbget('STATE'), err_strings
-        else: #If errors were found, set 'ERROR' state and return 'ERROR' as well as strings explaining why.
-            self.pbset('STATE','ERROR')
-            return 'ERROR', err_strings
+            return self.comm.get('ops_state'), err_strings
+        else: #If errors were found, return 'ERROR' as well as strings explaining why.
+            raise_error('_get_hardware_state: %r' % err_strings)
 
     def reset_petalbox(self):
         """Reset all errors and turn all enables off.  This method
