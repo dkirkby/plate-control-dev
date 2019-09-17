@@ -3,22 +3,24 @@ Runs a one_point_calibration through petal and fvc proxies.
 Needs running DOS instance. See pecs.py
 '''
 import os
-from pecs import PECS
 import pandas as pd
-from DOSlib.positioner_index import PositionerIndex
 import posconstants as pc
 
 
 class OnePoint(PECS):
 
-    def __init__(self, petal_id=None, platemaker_instrument=None,
+    def __init__(self, pecs=None, petal_id=None, platemaker_instrument=None,
                  fvc_role=None, printfunc=print):
-        PECS.__init__(self, ptlids=petal_id, fvc_role=fvc_role,
-                      platemaker_instrument=platemaker_instrument,
-                      printfunc=printfunc)
-        self.obsP = 135 # phi_close angle in posmovemeasure
-        self.ptlid = list(self.ptls.keys())[0]
-        self.index = PositionerIndex()
+        if pecs is None:
+            from pecs import PECS
+            self.pecs = PECS(self,ptlids=petal_id, platemaker_instrument=platemaker_instrument, fvc_role=fvc_role, printfunc=printfunc)
+        else:
+            self.pecs = pecs
+        self.verbose = verbose
+        self.poslocP = 135
+        if self.verbose:
+            print('Selecting default petal, override with a call to select_petal.')
+        self.select_petal(petal_id=petal_id)
 
     def one_point_calib(self, selection=None, enabled_only=True, mode='posTP',
                         auto_update=True, tp_target='default',
@@ -42,9 +44,9 @@ class OnePoint(PECS):
                 offsetPs[posid] = offsetP
                 tp_target = [0.0,self.obsP]
                 row = {'DEVICE_ID': posid,
-                       'COMMAND': 'posTP',
+                       'COMMAND': 'posintTP',
                        'X1': 0.0,
-                       'X2': self.obsP - offsetP, #conversion obsP to posP as in posmovemeasure
+                       'X2': self.poslocP - offsetP, #conversion obsP to posP as in posmovemeasure
                        'LOG_NOTE': f'One point calibration {mode}'}
                 rows.append(row)
             ptl.prepare_move(pd.DataFrame(rows), anticollision=None)
@@ -57,7 +59,7 @@ class OnePoint(PECS):
                 row = {'DEVICE_ID': posid,
                        'COMMAND': 'posTP',
                        'X1': tp_target[0],
-                       'X2': tp_target[1] - offsetP, #conversion obsP to posP as in posmovemeasure
+                       'X2': tp_target[1] - offsetP, #conversion poslocP to posingP as in posmovemeasure
                        'LOG_NOTE': f'One point calibration {mode}'}
                 rows.append(row)
             ptl.prepare_move(pd.DataFrame(rows), anticollision=None)
@@ -99,29 +101,89 @@ class OnePoint(PECS):
         updates.append(unmatched_used_pos,ignore_index=True) #List unmeasured positioners in updates, even with no data
         return updates
 
+    def run_interactively(self, petal=None, selection=None, enabled_only=None, mode=None,auto_update=None, tp_target=None,match_radius=None):
+        print('Running interactive grid calibration.')
+        # Ask for petal_id
+        if petal is None:
+            ptlid = self._get_integer('Please select a petal_id, availible petal_IDs: %s ' % list(self.pecs.ptls.keys()))
+            self.select_petal(petal_id = ptlid)
+        # Ask for selection
+        if selection is None:
+            user_text = input('Please list BUSIDs or POSIDs (not both) seperated by spaces, leave it blank to use all on petal: ')
+            if user_text != '':
+                user_text = user_text.split()
+                selection = []
+                for item in user_text:
+                    selection.append(item)
+            else:
+                selection = None
+            print('You chose: %s' % selection)
+        # Ask for enabled_only
+        if enabled_only is None:
+            user_text = input('Use enabled positioners only? (y/n) ')
+            enabled_only = self._parse_yn(user_text)
+        # Ask for mode
+        if mode is None:
+            mode = input('Please enter the calibration mode you wish to use (posTP, offsetsTP): ')
+            if mode not in ['posTP','offsetsTP','both']:
+                mode = input('Invalid entry, please try again (posTP, offsetsTP): ')
+       # Ask for auto_update
+        if auto_update is None:
+            user_text = input('Automatically update positioner calibration? (y/n) ')
+            enabled_only = self._parse_yn(user_text)
+        # Ask for tp_target
+        if tp_target is None:
+            user_text = self._parse_yn('Do you want to move positioners? (y/n) ')
+            if user_text:
+                tp_target = 'default'
+            else:
+                tp_target = None #this was already true but is more readable
+        # Ask for match_radius
+        if match_radius is None:
+            match_radius = self._get_integer('Enter the match_radius for spotmatch: ')
+        updates = op.one_point_calib(selection=selection, mode='posTP',
+                                     auto_update=auto_update, tp_target=tp_target)
+        updates.to_csv(os.path.join(
+            pc.dirs['all_logs'], 'calib_logs',
+            f'{pc.filename_timestamp_str_now()}-onepoint_calibration-{mode}.csv'))
+        #TODO: call analysis function here
+        print(updates[['DEVICE_ID','POS_T','POS_P','dT','dP']])
+        return updates
+
+    #TODO: add some sort of analysis function, takes in updates and decides if
+    # the calib needs to be looked at for each positioner
+    # Maybe return a list to repeat so that can be used in interactive terminal?
+
+    def select_petal(self, petal_id=None, index=None):
+        if petal_id is None:
+            if index is None:
+                print(f'No petal selected, choosing index=0 as default, petal_id {list(self.pecs.ptls.keys())[0]}')
+                self.ptl = self.pecs.ptls[list(self.pecs.ptls.keys())[0]]
+            else:
+                print(f'Choosing petal in index {index}, petal_id {list(self.pecs.ptls.keys())[index]}')
+                self.ptl = self.pecs.ptls[list(self.pecs.ptls.keys())[index]]
+        else:
+            print('Choosing petal_id %s' % petal_id)
+            self.ptl = self.ptl = self.pecs.ptls[petal_id]
+
+    def _parse_yn(yn_str):
+        if 'y' in yn_str.lower():
+            return True
+        else:
+            return False
+
+    def _get_integer(prompt_string):
+        user_text = input(prompt_string)
+        if user_text.isdigit():
+            return int(user_text)
+        else:
+            user_text = input('You did not enter an integer, try again. ' + prompt_string)
+            if user_text.isdigit():
+                return int(user_text)
+            else:
+                raise ValueError('Input requires an integer.')
+
 
 if __name__ == '__main__':
     op = OnePoint()
-    user_text = input(
-        'Please list BUSIDs or POSIDs (not both) seperated by spaces, '
-        'leave it blank to use all on petal: ')
-    if user_text == '':
-        selection = None
-    else:
-        selection = [item for item in user_text.split()]
-    user_text = input('Do you want to move positioners? (y/n) ')
-    if 'y' in user_text:
-        tp_target = 'default'
-    else:
-        tp_target = None
-    user_text = input('Automatically update calibration? (y/n) ')
-    if 'y' in user_text:
-        auto_update = True
-    else:
-        auto_update = False
-    updates = op.one_point_calib(selection=selection, mode='posTP',
-                                 auto_update=auto_update, tp_target=tp_target)
-    updates.to_csv(os.path.join(
-        pc.dirs['all_logs'], 'calib_logs',
-        f'{pc.filename_timestamp_str_now()}-onepoint_calibration-posTP.csv'))
-    print(updates[['DEVICE_ID','POS_T','POS_P','dT','dP']])
+    op.run_interactively(mode='posTP',match_radius=80.0)

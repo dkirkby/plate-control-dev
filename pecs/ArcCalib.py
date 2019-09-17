@@ -72,10 +72,10 @@ class Arc(object):
         print(f'Missing {len(unmatched)} of the selected positioners:\n{unmatched}')
         return merged
 
-    def run_interactively(self,selection=None,enabled_only=None,n_points_P=None, n_points_T=None,auto_update=None, match_radius=None):
+    def run_interactively(self,petal=None,selection=None,enabled_only=None,n_points_P=None, n_points_T=None,auto_update=None, match_radius=None):
         print('Running interactive arc calibration.')
         # Ask for petal_id
-        if petal = None:
+        if petal is None:
             ptlid = self._get_integer('Please select a petal_id, availible petal_IDs: %s ' % list(self.pecs.ptls.keys()))
             self.select_petal(petal_id = ptlid)
         # Ask for selection
@@ -111,15 +111,21 @@ class Arc(object):
         data.to_csv(os.path.join(
                 pc.dirs['all_logs'], 'calib_logs',
                 f'{pc.filename_timestamp_str_now()}-arc_calibration.csv'))
+        #Run analysis script here?
         print(data[['DEVICE_ID','LENGTH_R1','LENGTH_R2','OFFSET_X','OFFSET_Y','OFFSET_T','OFFSET_P']])
+        return data
 
-    def select_petal(self, petal_id=None, index=None)
+    #TODO: add some sort of analysis function, takes in updates and decides if
+    # the calib needs to be looked at for each positioner
+    # Maybe return a list to repeat so that can be used in interactive terminal?
+
+    def select_petal(self, petal_id=None, index=None):
         if petal_id is None:
             if index is None:
-                print('No petal selected, choosing index=0 as default, petal_id %s', % list(self.pecs.ptls.keys())[0])
+                print(f'No petal selected, choosing index=0 as default, petal_id {list(self.pecs.ptls.keys())[0]}')
                 self.ptl = self.pecs.ptls[list(self.pecs.ptls.keys())[0]]
             else:
-                print('Choosing petal in index %s, petal_id %s' % (index, self.list(self.pecs.ptls.keys())[index]))
+                print(f'Choosing petal in index {index}, petal_id {list(self.pecs.ptls.keys())[index]}')
                 self.ptl = self.pecs.ptls[list(self.pecs.ptls.keys())[index]]
         else:
             print('Choosing petal_id %s' % petal_id)
