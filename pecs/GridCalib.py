@@ -5,7 +5,7 @@ import os
 import posconstants as pc
 import pandas
 
-class Grid(PECS):
+class Grid(object):
     
     def __init__(self,pecs=None, petal_id=None, platemaker_instrument=None, fvc_role=None, printfunc = print, verbose=False):
         if pecs is None:

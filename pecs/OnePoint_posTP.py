@@ -7,7 +7,7 @@ import pandas as pd
 import posconstants as pc
 
 
-class OnePoint(PECS):
+class OnePoint(object):
 
     def __init__(self, pecs=None, petal_id=None, platemaker_instrument=None,
                  fvc_role=None, printfunc=print):
