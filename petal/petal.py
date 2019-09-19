@@ -105,6 +105,7 @@ class Petal(object):
             import petalcomm
             self.comm = petalcomm.PetalComm(self.petalbox_id, user_interactions_enabled=user_interactions_enabled)
             self.comm.pbset('non_responsives', 'clear') #reset petalcontroller's list of non-responsive canids
+            self.tables_sent_successfully = True
             # get ops_state from petalcontroller
             try:
                 o = self.comm.ops_state()
@@ -122,7 +123,6 @@ class Petal(object):
         self.sched_stats_on = sched_stats_on
         self.altered_states = set()
         self.altered_calib_states = set()
-        self._last_state = OrderedDict()
 
         # must call the following 3 methods whenever petal alingment changes
         self.init_trans()
@@ -275,7 +275,8 @@ class Petal(object):
                     KEYS        VALUES
                     ----        ------
                     command     move command string
-                                    ... valid values are 'QS', 'dQdS', 'obsXY', 'posXY', 'dXdY', 'obsTP', 'posTP' or 'dTdP'
+                                    ... valid values are 'QS', 'dQdS', 'obsXY', 'ptlXY', 'poslocXY', 'dXdY', 'poslocTP', 'posintTP' or 'dTdP'
+                                    ... Note: dXdY is CS5 aligned XY, not Petal aligned
                     target      pair of target coordinates or deltas, of the form [u,v]
                                     ... the elements u and v can be floats or integers
                                     ... 1st element (u) is the value for q, dq, x, dx, t, or dt
@@ -503,6 +504,7 @@ class Petal(object):
         """
         self.info('send_move_tables called')
         if self.simulator_on:
+            self.tables_sent_successfully = True
             if self.verbose:
                 self.printfunc('Simulator skips sending move tables to positioners.')
             return
@@ -515,7 +517,11 @@ class Petal(object):
         self.canids_where_tables_were_just_sent = canids
         self.busids_where_tables_were_just_sent = busids
         self._wait_while_moving()
-        self.comm.send_tables(hw_tables)
+        response = self.comm.send_tables(hw_tables)
+        if 'FAILED' in response:
+            self.tables_sent_successfully = False
+        else:
+            self.tables_sent_successfully = True
         self.info('send_move_tables: Done')
 
     def set_motor_parameters(self):
@@ -732,7 +738,7 @@ class Petal(object):
         elif hw_state == 'READY':
             #AC Positioner Power ON - not controlled by software
             self._last_state=OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
-                                          'GFA_FAN':({'inlet':['on',20],'outlet':['on',20]}, 1.0), #GFA Fan Power ON
+                                          'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
                                           'GFAPWR_EN':('on', 1.0), #GFA Power Enable ON
                                           'TEC_CTRL': ('on', 15.0), #TEC Power EN ON
                                           'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON - what about SYNC?
@@ -745,7 +751,7 @@ class Petal(object):
         elif hw_state == 'OBSERVING':
             #AC Positioner Power ON - not controlled by software
             self._last_state=OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
-                                          'GFA_FAN':({'inlet':['on',20],'outlet':['on',20]}, 1.0), #GFA Fan Power ON
+                                          'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
                                           'GFAPWR_EN':('on', 1.0), #GFA Power Enable ON
                                           'TEC_CTRL':('on', 5.0), #TEC Power EN ON
                                           'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON - what about SYNC?
@@ -959,7 +965,8 @@ class Petal(object):
         list. Valid keys are:
 
             'posintTP, 'poslocXY', 'poslocTP',
-            'QS', 'flatXY', 'obsXY', 'ptlXY', 'motTP'
+            'QS', 'flatXY', 'obsXY', 'ptlXY', 'motTP',
+            'posobsTP', 'posobsXY'
 
         See comments in posmodel.py for explanation of these values.
         """
@@ -981,6 +988,12 @@ class Petal(object):
                 return [vals['flatX'], vals['flatY']]
             elif key == 'motorTP':
                 return [vals['motT'], vals['motP']]
+            elif key == 'ptlXY':
+                return [vals['ptlX'], vals['ptlY']]
+            elif key == 'posobsTP':
+                return [vals['posobsT'], vals['posobsP']]
+            elif key == 'posobsXY':
+                return [vals['posobsX'], vals['posobsY']]
             else:
                 self.printfunc('Unrecognized key ' + str(key) + ' in request for expected_current_position of posid ' + str(posid) + '.')
 
@@ -1083,7 +1096,7 @@ class Petal(object):
         """
         self._check_and_disable_nonresponsive_pos_and_fid()
         for m in self.schedule.move_tables.values():
-            if m.posmodel.is_enabled: #In general, non responsive pos do not move
+            if m.posmodel.is_enabled and self.tables_sent_successfully: #In general, non responsive pos do not move
                 m.posmodel.postmove_cleanup(m.for_cleanup())
                 self.altered_states.add(m.posmodel.state)
             else:

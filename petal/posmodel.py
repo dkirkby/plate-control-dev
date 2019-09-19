@@ -161,6 +161,7 @@ class PosModel(object):
         s = ('Q:{:8.3f}{}, S:{:8.3f}{} | '
              'flatX:{:8.3f}{}, flatY:{:8.3f}{} | '
              'obsX:{:8.3f}{}, obsY:{:8.3f}{} | '
+             'ptlX:{:8.3f}{}, ptlY:{:8.3f}{} |'
              'poslocX:{:8.3f}{}, poslocY:{:8.3f}{} | '
              'poslocT:{:8.3f}{}, poslocP:{:8.3f}{} | '
              'posintT:{:8.3f}{}, posintP:{:8.3f}{} | '
@@ -168,6 +169,7 @@ class PosModel(object):
             format(pos['Q'],       pc.deg, pos['S'],       pc.mm,
                    pos['flatX'],   pc.mm,  pos['flatY'],   pc.mm,
                    pos['obsX'],    pc.mm,  pos['obsY'],    pc.mm,
+                   pos['ptlX'],    pc.mm,  pos['ptlY'],    pc.mm,
                    pos['poslocX'], pc.mm,  pos['poslocY'], pc.mm,
                    pos['poslocT'], pc.deg, pos['poslocP'], pc.deg,
                    pos['posintT'], pc.deg, pos['posintP'], pc.deg,
@@ -177,28 +179,28 @@ class PosModel(object):
     @property
     def targetable_range_T(self):
         """Returns a [1x2] array of theta_min, theta_max, after subtracting buffer zones near the hardstops.
-        The return is in the posTP coordinates, not obsTP. Understand therefore that OFFSET_T is not included in these values.
+        The return is in the posintTP coordinates, not poslocTP. Understand therefore that OFFSET_T is not included in these values.
         """
         return self.axis[pc.T].debounced_range
 
     @property
     def targetable_range_P(self):
         """Returns a [1x2] array of phi_min, phi_max, after subtracting buffer zones near the hardstops.
-        The return is in the posTP coordinates, not obsTP. Understand therefore that OFFSET_P is not included in these values.
+        The return is in the posintTP coordinates, not poslocTP. Understand therefore that OFFSET_P is not included in these values.
         """
         return self.axis[pc.P].debounced_range
 
     @property
     def full_range_T(self):
         """Returns a [1x2] array of [theta_min, theta_max], from hardstop-to-hardstop.
-        The return is in the posTP coordinates, not obsTP. Understand therefore that OFFSET_T is not included in these values.
+        The return is in the posintTP coordinates, not poslocTP. Understand therefore that OFFSET_T is not included in these values.
         """
         return self.axis[pc.T].full_range
 
     @property
     def full_range_P(self):
         """Returns a [1x2] array of [phi_min, phi_max], from hardstop-to-hardstop.
-        The return is in the posTP coordinates, not obsTP. Understand therefore that OFFSET_P is not included in these values.
+        The return is in the posintTP coordinates, not poslocTP. Understand therefore that OFFSET_P is not included in these values.
         """
         return self.axis[pc.P].full_range
 

@@ -4,7 +4,6 @@ import time
 import copy as copymodule
 import numpy as np
 
-
 class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners
     from starts to finishes. The move tables are instances of the PosMoveTable
@@ -12,8 +11,7 @@ class PosSchedule(object):
 
         petal   ... Instance of Petal that this schedule applies to.
 
-        stats   ... Instance of PosSchedStats in which to register scheduling
-                    statistics.
+        stats   ... Instance of PosSchedStats in which to register scheduling statistics.
                     If stats=None, then no statistics are logged.
 
         verbose ... Control verbosity at stdout.
@@ -82,11 +80,16 @@ class PosSchedule(object):
         if uv_type == 'QS':
             targt_posintTP, unreachable = trans.QS_to_posintTP([u, v], lims)
         elif uv_type == 'obsXY':
-            targt_posintTP, unreachable = trans.obsXY_to_posintTP(
-                    [u, v], lims)
+            targt_posintTP, unreachable = trans.obsXY_to_posintTP([u, v], lims)
+        elif uv_type == 'ptlXY':
+            targt_posintTP, unreachable = trans.ptlXY_to_posintTP([u, v], lims)
         elif uv_type == 'poslocXY':
             targt_posintTP, unreachable = trans.poslocXY_to_posintTP(
-                    [u, v], lims)
+                [u, v], lims)
+        # elif uv_type == 'obsTP':
+        #     targt_posintTP = trans.obsTP_to_posintTP([u,v])
+        elif uv_type == 'poslocTP':
+            targt_posintTP = trans.poslocTP_to_posintTP([u, v])
         elif uv_type == 'posintTP':
             targt_posintTP = [u, v]
         elif uv_type == 'dQdS':
@@ -96,9 +99,8 @@ class PosSchedule(object):
         elif uv_type == 'dXdY':  # in observer CS5 coordinates, not local
             start_uv = [current_position['obsX'], current_position['obsY']]
             targt_uv = trans.addto_XY(start_uv, [u, v])
-            targt_posintTP, unreachable = trans.obsXY_to_posintTP(
-                    targt_uv, lims)
-            # import pdb; pdb.set_trace()
+            targt_posintTP, unreachable = posmodel.trans.obsXY_to_posintTP(
+                targt_uv, lims)
         elif uv_type == 'dTdP':
             targt_posintTP = trans.delta_posintTP(start_posintTP, [u, v], lims)
         else:
@@ -263,10 +265,8 @@ class PosSchedule(object):
         all_ind = [ind_tdot_pos, ind_tdot_neg, ind_pdot_pos, ind_pdot_neg]
         all_moving = [ind for ind in all_ind if ind.size]
 
-        # check_table will be populated based on sweep, and used to check
-        # against move_table
-        check_table = {'dT': [], 'dP': [], 'Tdot': [], 'Pdot': [],
-                       'move_time': [], }
+        # check_table will be populated based on sweep, and used to check against move_table
+        check_table = {'dT':[], 'dP': [], 'move_time': [], 'Tdot':[], 'Pdot': []}
         if all_moving:
             from operator import itemgetter
             all_moving = sorted(all_moving, key=itemgetter(0))
@@ -292,17 +292,11 @@ class PosSchedule(object):
 
         # cross-checking final tp positions
         end_tp_sweep = [sweep.theta(-1), sweep.phi(-1)]
-        end_tp_table = [sum(np.array(move_table['dT'])) + sweep.theta(0),
-                        sum(np.array(move_table['dP'])) + sweep.phi(0)]
-        # tolerance set to half the timestep...?
-        endpos_tol = (180.*self.collider.timestep)/2.
+        end_tp_table = [sum(np.array(move_table['dT'])) + sweep.theta(0), sum(np.array(move_table['dP'])) + sweep.phi(0)]
+        endpos_tol = (180.*self.collider.timestep)/2. # tolerance set to half the timestep...?
 
-        if (abs(np.array(end_tp_sweep) - np.array(end_tp_table))
-                <= endpos_tol).all():
-            pass
-        else:
-            self.printfunc(f'{sweep.posid} end_tp: check={end_tp_sweep}, '
-                           f'move={end_tp_table}')
+        if (abs(np.array(end_tp_sweep) - np.array(end_tp_table)) <= endpos_tol).all(): pass
+        else: self.printfunc(f'{sweep.posid} end_tp: check={end_tp_sweep}, move={end_tp_table}')
 
     def already_requested(self, posid):
         """Returns boolean whether a request has already been registered in the
@@ -375,7 +369,7 @@ class PosSchedule(object):
         if should_freeze:
             ori_stage_colliding = copymodule.deepcopy(stage.colliding)
             if self.verbose:
-                self.printfunc("initial stage.colliding " + str(stage.colliding))
+                self.printfunc("initial stage.colliding: " + str(stage.colliding))
             for posid in colliding_sweeps:
                 if posid in stage.colliding: # re-check, since earlier path adjustments in loop may have already resolved this posid's collision
                     self.petal.pos_flags[posid] |= self.petal.frozen_anticol_bit #Mark as frozen by anticollision
@@ -394,7 +388,6 @@ class PosSchedule(object):
         start_posintTP = {name: {} for name in self.RRE_stage_order}
         desired_final_posintTP = {name: {} for name in self.RRE_stage_order}
         dtdp = {name: {} for name in self.RRE_stage_order}
-        # import pdb; pdb.set_trace()
         for posid, request in self.requests.items():
             # Some care is taken here to use only delta and add functions
             # provided by PosTransforms to ensure that range wrap limits are
@@ -442,24 +435,16 @@ class PosSchedule(object):
             if self.should_anneal:
                 stage.anneal_tables(self.anneal_time[name])
             if self.verbose:
-                self.printfunc(
-                    f'posschedule: finding collisions for '
-                    f'{len(stage.move_tables)} positioners, trying {name}')
-                self.printfunc(
-                    'Posschedule first move table:',
-                    list(stage.move_tables.values())[0].for_collider())
+                self.printfunc(f'posschedule: finding collisions for {len(stage.move_tables)} positioners, trying {name}')
+                self.printfunc('Posschedule first move table:', list(stage.move_tables.values())[0].for_collider())
             colliding_sweeps, all_sweeps = stage.find_collisions(
                 stage.move_tables)
-            # find_t_total += t_section  # debug
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             attempts_remaining = self.max_path_adjustment_passes
-            # take this out once stage.colliding is working
-            ori_stage_colliding = copymodule.deepcopy(stage.colliding)
             if self.verbose:
                 # take this out once stage.colliding is working
                 ori_colliding_posid = list(stage.colliding)
-                self.printfunc(
-                    f'initial stage.colliding: {ori_colliding_posid}')
+                self.printfunc(f'initial stage.colliding: {ori_colliding_posid}')
             while stage.colliding and attempts_remaining:
                 for posid in stage.colliding:
                     if self.verbose:
@@ -483,10 +468,8 @@ class PosSchedule(object):
                 if self.stats:
                     self.stats.add_to_num_adjustment_iters(1)
                 attempts_remaining -= 1
-                if self.verbose:
-                    self.printfunc(
-                        f'remaining stage.colliding {stage.colliding}, '
-                        f'attempts_remaining {attempts_remaining}')
+                if self.verbose:  # debug
+                    self.printfunc(f'posschedule: remaining collisions {len(stage.colliding)}, attempts_remaining {attempts_remaining}')
 
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
