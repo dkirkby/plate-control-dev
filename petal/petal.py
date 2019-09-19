@@ -151,29 +151,27 @@ class Petal(object):
         must also be called whenever petal alignment changes in the focal plane
         input (self.)alignment is a dict of 6 items structured as follows:
 
-        self.alignment = {'Tx': 0,  # x translation
-                          'Ty': 0,  # y translation
+        self.alignment = {'Tx': 0,  # x translation in mm
+                          'Ty': 0,  # y translation in mm
                           'Tz': 0,  # z translation in mm
-                          'alpha': 0,  # x rotation in deg
-                          'beta': 0,  # y rotation in deg
-                          'gamma': 0}  # z rotation
+                          'alpha': 0,  # x rotation in rad from DB
+                          'beta': 0,  # y rotation in rad from DB
+                          'gamma': 0}  # z rotation in rad from DB
         '''
         if alignment is None:
             # no alingment supplied, try to find self.alingment attribute
-            if hasattr(self, 'alignment'):
-                # self.alignment found, just re-use it
+            if hasattr(self, 'alignment'):  # attribute found, just re-use it
                 if self.verbose:
                     self.printfunc('Using existing petal.alignment')
-                pass
             else:
                 self.printfunc('Initialization requires petal.alignment'
                                'attribute to be set, using zeros.')
-                self.alignment = {'Tx': 0,  # x translation
-                                  'Ty': 0,  # y translation
+                self.alignment = {'Tx': 0,  # x translation in mm
+                                  'Ty': 0,  # y translation in mm
                                   'Tz': 0,  # z translation in mm
-                                  'alpha': 0,  # x rotation in deg
-                                  'beta': 0,  # y rotation in deg
-                                  'gamma': 0}  # z rotation
+                                  'alpha': 0,  # x rotation in rad
+                                  'beta': 0,  # y rotation in rad
+                                  'gamma': 0}  # z rotation rad
         else:  # new alingment supplied, overwrite self.aglinment attribute
             self.alignment = alignment
         self.trans = PetalTransforms(Tx=self.alignment['Tx'],
