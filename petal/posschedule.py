@@ -59,7 +59,7 @@ class PosSchedule(object):
         if self.stats:
             timer_start = time.clock()
         posmodel = self.petal.posmodels[posid]
-        # trans = posmodel.trans
+        trans = posmodel.trans
         if self.already_requested(posid):
             self.petal.pos_flags[posid] |= self.petal.multi_request_bit
             if self.verbose:
@@ -78,31 +78,31 @@ class PosSchedule(object):
         lims = 'targetable'
         unreachable = False
         if uv_type == 'QS':
-            targt_posintTP, unreachable = posmodel.trans.QS_to_posintTP([u, v], lims)
+            targt_posintTP, unreachable = trans.QS_to_posintTP([u, v], lims)
         elif uv_type == 'obsXY':
-            targt_posintTP, unreachable = posmodel.trans.obsXY_to_posintTP([u, v], lims)
+            targt_posintTP, unreachable = trans.obsXY_to_posintTP([u, v], lims)
         elif uv_type == 'ptlXY':
-            targt_posintTP, unreachable = posmodel.trans.ptlXY_to_posintTP([u, v], lims)
+            targt_posintTP, unreachable = trans.ptlXY_to_posintTP([u, v], lims)
         elif uv_type == 'poslocXY':
-            targt_posintTP, unreachable = posmodel.trans.poslocXY_to_posintTP(
+            targt_posintTP, unreachable = trans.poslocXY_to_posintTP(
                 [u, v], lims)
         # elif uv_type == 'obsTP':
-        #     targt_posintTP = posmodel.trans.obsTP_to_posintTP([u,v])
+        #     targt_posintTP = trans.obsTP_to_posintTP([u,v])
         elif uv_type == 'poslocTP':
-            targt_posintTP = posmodel.trans.poslocTP_to_posintTP([u, v])
+            targt_posintTP = trans.poslocTP_to_posintTP([u, v])
         elif uv_type == 'posintTP':
             targt_posintTP = [u, v]
         elif uv_type == 'dQdS':
             start_uv = [current_position['Q'], current_position['S']]
-            targt_uv = posmodel.trans.addto_QS(start_uv, [u, v])
-            targt_posintTP, unreachable = posmodel.trans.QS_to_posintTP(targt_uv, lims)
+            targt_uv = trans.addto_QS(start_uv, [u, v])
+            targt_posintTP, unreachable = trans.QS_to_posintTP(targt_uv, lims)
         elif uv_type == 'dXdY':  # in observer CS5 coordinates, not local
             start_uv = [current_position['obsX'], current_position['obsY']]
-            targt_uv = posmodel.trans.addto_XY(start_uv, [u, v])
+            targt_uv = trans.addto_XY(start_uv, [u, v])
             targt_posintTP, unreachable = posmodel.trans.obsXY_to_posintTP(
                 targt_uv, lims)
         elif uv_type == 'dTdP':
-            targt_posintTP = posmodel.trans.delta_posintTP(start_posintTP, [u, v], lims)
+            targt_posintTP = trans.delta_posintTP(start_posintTP, [u, v], lims)
         else:
             if self.verbose:
                 self.printfunc(
@@ -114,7 +114,7 @@ class PosSchedule(object):
                 self.printfunc(f'{posid}: target request denied. Target not '
                                f'reachable: {uv_type}, ({u:.3f}, {v:.3f})')
             return False
-        targt_poslocTP = posmodel.trans.posintTP_to_poslocTP(targt_posintTP)
+        targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
         if self._deny_request_because_target_interference(
                 posmodel, targt_poslocTP):
             if self.verbose:
@@ -278,7 +278,7 @@ class PosSchedule(object):
 
                 move_time = time_moving[-1] - time_moving[0]
                 dT = sweep.theta(end) - sweep.theta(start-1)
-                dP = sweep.phi(end)- sweep.phi(start-1)
+                dP = sweep.phi(end) - sweep.phi(start-1)
 
                 # need to be more robust, as this assumes tdot value is unique
                 tdot = sweep.tp_dot[0][all_moving[i]][0]
@@ -290,29 +290,13 @@ class PosSchedule(object):
                 check_table['Tdot'].append(tdot)
                 check_table['Pdot'].append(pdot)
 
-#        creep_tol = 2.7
-#        for key,value in check_table.items():
-#            idx_movetable_moving = np.where(np.array(move_table['move_time']) > 0.)
-#            movetable_value = np.array(move_table[key])[idx_movetable_moving].tolist()
-#
-#            rounded_movetable_value = np.round(movetable_value, 2)
-#            rounded_checktable_value = np.round(value, 2)
-            """
-            if key in {'Tdot', 'Pdot'}:
-                if (abs(rounded_movetable_value - rounded_checktable_value) > creep_tol).any():
-                    self.printfunc(sweep.posid + ' ' + str(key) + ': check=' + str(rounded_checktable_value) + ' move=' + str(rounded_movetable_value))
-            else:
-                if not np.array_equal(rounded_movetable_value, rounded_checktable_value):
-                    self.printfunc(sweep.posid + ' ' + str(key) + ': check=' + str(rounded_checktable_value) + ' move=' + str(rounded_movetable_value))
-            """
-
         # cross-checking final tp positions
         end_tp_sweep = [sweep.theta(-1), sweep.phi(-1)]
         end_tp_table = [sum(np.array(move_table['dT'])) + sweep.theta(0), sum(np.array(move_table['dP'])) + sweep.phi(0)]
         endpos_tol = (180.*self.collider.timestep)/2. # tolerance set to half the timestep...?
 
         if (abs(np.array(end_tp_sweep) - np.array(end_tp_table)) <= endpos_tol).all(): pass
-        else: self.printfunc(sweep.posid + ' ' + 'end_tp: check=' + str(end_tp_sweep) + ' move=' + str(end_tp_table))
+        else: self.printfunc(f'{sweep.posid} end_tp: check={end_tp_sweep}, move={end_tp_table}')
 
     def already_requested(self, posid):
         """Returns boolean whether a request has already been registered in the
@@ -444,29 +428,24 @@ class PosSchedule(object):
                 start_posintTP['extend'][posid],
                 range_wrap_limits='targetable')
         for i in range(len(self.RRE_stage_order)):
-            counter = 0
             name = self.RRE_stage_order[i]
             self.printfunc('stage name:', name)
             stage = self.stages[name]
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
             if self.should_anneal:
                 stage.anneal_tables(self.anneal_time[name])
-            if self.verbose:  # debug
+            if self.verbose:
                 self.printfunc(f'posschedule: finding collisions for {len(stage.move_tables)} positioners, trying {name}')
                 self.printfunc('Posschedule first move table:', list(stage.move_tables.values())[0].for_collider())
             colliding_sweeps, all_sweeps = stage.find_collisions(
                 stage.move_tables)
-            # find_t_total += t_section  # debug
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             attempts_remaining = self.max_path_adjustment_passes
-            # take this out once stage.colliding is working
-            ori_stage_colliding = copymodule.deepcopy(stage.colliding)
-            # take this out once stage.colliding is working
-            ori_colliding_posid = list(stage.colliding)
-            # if self.verbose:
-            self.printfunc(f'initial stage.colliding: {ori_colliding_posid}')
+            if self.verbose:
+                # take this out once stage.colliding is working
+                ori_colliding_posid = list(stage.colliding)
+                self.printfunc(f'initial stage.colliding: {ori_colliding_posid}')
             while stage.colliding and attempts_remaining:
-                t1 = time.process_time()  # debug
                 for posid in stage.colliding:
                     if self.verbose:
                         self.printfunc(
@@ -491,6 +470,7 @@ class PosSchedule(object):
                 attempts_remaining -= 1
                 if self.verbose:  # debug
                     self.printfunc(f'posschedule: remaining collisions {len(stage.colliding)}, attempts_remaining {attempts_remaining}')
+             
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
         consistently take with regard to post-move cleanup, if a request is going to be denied.

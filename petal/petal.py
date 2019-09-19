@@ -90,6 +90,7 @@ class Petal(object):
         self.petalbox_id = petalbox_id
         self.petal_id = int(petal_id)
         self.shape = shape
+        self._last_state = OrderedDict()
         if fidids in ['',[''],{''}]: # check included to handle simulation cases, where no fidids argued
             fidids = {}
 
@@ -111,7 +112,6 @@ class Petal(object):
         self.sched_stats_on = sched_stats_on
         self.altered_states = set()
         self.altered_calib_states = set()
-        self._last_state = {}
 
         # must call the following 3 methods whenever petal alingment changes
         self.init_trans()
@@ -146,7 +146,7 @@ class Petal(object):
 
     def init_trans(self, alignment=None):
         '''
-        initialise PetalTransforms class as a property of petal
+        initialize PetalTransforms class as a property of petal
         called upon petal instantiation inside __init__()
         must also be called whenever petal alignment changes in the focal plane
         input (self.)alignment is a dict of 6 items structured as follows:
@@ -162,10 +162,12 @@ class Petal(object):
             # no alingment supplied, try to find self.alingment attribute
             if hasattr(self, 'alignment'):
                 # self.alignment found, just re-use it
+                if self.verbose:
+                    self.printfunc('Using existing petal.alignment')
                 pass
             else:
-                self.printfunc('Initialisation requires either alignment'
-                               'to be set, using zeros.')
+                self.printfunc('Initialization requires petal.alignment'
+                               'attribute to be set, using zeros.')
                 self.alignment = {'Tx': 0,  # x translation
                                   'Ty': 0,  # y translation
                                   'Tz': 0,  # z translation in mm
@@ -719,7 +721,7 @@ class Petal(object):
         elif hw_state == 'READY':
             #AC Positioner Power ON - not controlled by software
             self._last_state=OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
-                                          'GFA_FAN':({'inlet':['on',20],'outlet':['on',20]}, 1.0), #GFA Fan Power ON
+                                          'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
                                           'GFAPWR_EN':('on', 1.0), #GFA Power Enable ON
                                           'TEC_CTRL': ('on', 15.0), #TEC Power EN ON
                                           'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON - what about SYNC?
@@ -732,7 +734,7 @@ class Petal(object):
         elif hw_state == 'OBSERVING':
             #AC Positioner Power ON - not controlled by software
             self._last_state=OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
-                                          'GFA_FAN':({'inlet':['on',20],'outlet':['on',20]}, 1.0), #GFA Fan Power ON
+                                          'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
                                           'GFAPWR_EN':('on', 1.0), #GFA Power Enable ON
                                           'TEC_CTRL':('on', 5.0), #TEC Power EN ON
                                           'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON - what about SYNC?
