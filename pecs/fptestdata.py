@@ -163,7 +163,7 @@ class FPTestData:
         existing attributes required (see xytest.py):
             self.ptlids
         '''
-        # build column names and data types, all in global CS5
+        # build column names and data types, all in petal-local flatXY CS
         cols0 = ['timestamp', 'cycle', 'move_log']
         dtypes0 = ['datetime64[ns]', np.uint32, str]
         cols1 = ['target_x', 'target_y']

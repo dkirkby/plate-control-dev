@@ -4,6 +4,7 @@ import time
 import copy as copymodule
 import numpy as np
 
+
 class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners
     from starts to finishes. The move tables are instances of the PosMoveTable
@@ -45,8 +46,8 @@ class PosSchedule(object):
         coordinate system indicated by uv_type.
 
               posid ... string, unique id of positioner
-            uv_type ... string, 'QS', 'dQdS', 'obsXY', 'poslocXY', 'dXdY',
-                        'posintTP' or 'dTdP'
+            uv_type ... string, 'QS'/'dQdS', 'poslocXY',
+                        'posintTP'/'dTdP'
                   u ... float, value of q, dq, x, dx, t, or dt
                   v ... float, value of s, ds, y, dy, p, or dp
            log_note ... optional string to store alongside the requested move
@@ -73,36 +74,33 @@ class PosSchedule(object):
                     f'{posid}: target request denied. Positioner is disabled.')
             return False
         current_position = posmodel.expected_current_position
-        start_posintTP = [current_position['posintT'],
-                          current_position['posintP']]
+        start_posintTP = current_position['posintTP']
         lims = 'targetable'
         unreachable = False
         if uv_type == 'QS':
             targt_posintTP, unreachable = trans.QS_to_posintTP([u, v], lims)
-        elif uv_type == 'obsXY':
-            targt_posintTP, unreachable = trans.obsXY_to_posintTP([u, v], lims)
-        elif uv_type == 'ptlXY':
-            targt_posintTP, unreachable = trans.ptlXY_to_posintTP([u, v], lims)
+        elif uv_type == 'dQdS':
+            start_uv = current_position['QS']
+            targt_uv = posmodel.trans.addto_QS(start_uv, [u, v])
+            targt_posintTP, unreachable = trans.QS_to_posintTP(targt_uv, lims)
         elif uv_type == 'poslocXY':
             targt_posintTP, unreachable = trans.poslocXY_to_posintTP(
                 [u, v], lims)
-        # elif uv_type == 'obsTP':
-        #     targt_posintTP = trans.obsTP_to_posintTP([u,v])
-        elif uv_type == 'poslocTP':
-            targt_posintTP = trans.poslocTP_to_posintTP([u, v])
+        elif uv_type == 'dXdY':  # in poslocXY coordinates, not global
+            start_uv = current_position['poslocXY']
+            targt_uv = posmodel.trans.addto_XY(start_uv, [u, v])
+            targt_posintTP, unreachable = posmodel.trans.poslocXY_to_posintTP(
+                targt_uv, lims)
         elif uv_type == 'posintTP':
             targt_posintTP = [u, v]
-        elif uv_type == 'dQdS':
-            start_uv = [current_position['Q'], current_position['S']]
-            targt_uv = trans.addto_QS(start_uv, [u, v])
-            targt_posintTP, unreachable = trans.QS_to_posintTP(targt_uv, lims)
-        elif uv_type == 'dXdY':  # in observer CS5 coordinates, not local
-            start_uv = [current_position['obsX'], current_position['obsY']]
-            targt_uv = trans.addto_XY(start_uv, [u, v])
-            targt_posintTP, unreachable = posmodel.trans.obsXY_to_posintTP(
-                targt_uv, lims)
         elif uv_type == 'dTdP':
             targt_posintTP = trans.delta_posintTP(start_posintTP, [u, v], lims)
+        # elif uv_type == 'obsXY':
+        #     targt_posintTP, unreachable = trans.obsXY_to_posintTP([u, v], lims)
+        # elif uv_type == 'ptlXY':
+        #     targt_posintTP, unreachable = trans.ptlXY_to_posintTP([u, v], lims)
+        # elif uv_type == 'poslocTP':
+        #     targt_posintTP = trans.poslocTP_to_posintTP([u, v])
         else:
             if self.verbose:
                 self.printfunc(
@@ -469,8 +467,11 @@ class PosSchedule(object):
                     self.stats.add_to_num_adjustment_iters(1)
                 attempts_remaining -= 1
                 if self.verbose:  # debug
-                    self.printfunc(f'posschedule: remaining collisions {len(stage.colliding)}, attempts_remaining {attempts_remaining}')
-             
+                    self.printfunc(f'posschedule: remaining collisions '
+                                   f'{len(stage.colliding)}, '
+                                   f'attempts_remaining {attempts_remaining}')
+
+
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
         consistently take with regard to post-move cleanup, if a request is going to be denied.

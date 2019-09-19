@@ -874,99 +874,66 @@ class Petal(object):
         data_for_telemetry['total schedule time'] = total_time
         return data_for_telemetry
 
-    def commit(self, log_note='', *args, **kwargs):
-        '''Commit data to the local config and log files, and/or the online database.
-        A note string may optionally be included to go along with this entry in the logs.
+    def commit(self, mode='move', log_note=''):
+        '''Commit move data or calibration data to DB and/or local config and
+        log files.
+        A note string may optionally be included to go along with this entry.
+        mode can be: 'move', 'calib', 'both'
         '''
-        if log_note and (self.local_log_on or self.local_commit_on):
-            for state in self.altered_states:
-                state.next_log_notes.append(log_note)
-        if self.db_commit_on and not(self.simulator_on):
-            pos_commit_list = []
-            fid_commit_list = []
-            for state in self.altered_states:
-                if state.type == 'pos':
-                    pos_commit_list.append(state)
-                elif state.type == 'fid':
-                    fid_commit_list.append(state)
-            if len(pos_commit_list) != 0:
-                self.posmoveDB.WriteToDB(pos_commit_list,self.petal_id,'pos_move')
-            if len(fid_commit_list) != 0:
-                self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid_data')
-        # avoid overwriting local config data and logs when testing in simulator mode
-        # but stills allows DB commits above #changed by kevin 6/25/19
-        if not self.simulator_on:
-            if self.local_commit_on:
-                for state in self.altered_states:
-                    state.write()  # this writes posstate to local config
-            if self.local_log_on:
-                for state in self.altered_states:
-                    state.log_unit()  # this writes the local log
-        self.altered_states = set()
-
-    def commit_calib_DB(self, *args, **kwargs):
-        '''Commit data to the pos_calib table. This is to be called at the end of a calibration
-        sequence. No local commit option since local calibration recordings are andled in the
-        commit function.
-        '''
-        if self.db_commit_on and not(self.simulator_on):
-            pos_commit_list = []
-            fid_commit_list = []
-            for state in self.altered_calib_states:
-                if state.type == 'pos':
-                    pos_commit_list.append(state)
-                elif state.type == 'fid':
-                    fid_commit_list.append(state)
-            if len(pos_commit_list) != 0:
-                self.posmoveDB.WriteToDB(pos_commit_list,self.petal_id,'pos_calib')
-            if len(fid_commit_list) != 0:
-                self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid_calib')
-        self.altered_calib_states = set()
-        return
+        # set up type names to write to DB as well as log for move data only
+        if mode == 'move':
+            type1, type2 = 'pos_move', 'fid_data'
+            states = self.altered_states
+            if log_note and (self.local_log_on or self.local_commit_on):
+                for state in states:
+                    state.next_log_notes.append(log_note)
+        elif mode == 'calib':
+            type1, type2 = 'pos_calib', 'fid_calib'
+            states = self.altered_calib_states
+        elif mode == 'both':
+            self.commit(mode='move', log_note='')
+            self.commit(mode='calib')
+        if self.db_commit_on and not self.simulator_on:  # write to DB
+            pos_commit_list = [st for st in states if st.type == 'pos']
+            fid_commit_list = [st for st in states if st.type == 'fid']
+            if len(pos_commit_list) > 0:
+                self.posmoveDB.WriteToDB(pos_commit_list, self.petal_id, type1)
+            if len(fid_commit_list) > 0:
+                self.posmoveDB.WriteToDB(fid_commit_list, self.petal_id, type2)
+        if mode == 'move':
+            # only allow writing local config and logs when not in sim mode
+            if not self.simulator_on:
+                if self.local_commit_on:
+                    for state in self.altered_states:
+                        state.write()  # this writes posstate to local config
+                if self.local_log_on:
+                    for state in self.altered_states:
+                        state.log_unit()  # this writes the local log
+            self.altered_states = set()
+        elif mode == 'calib':
+            self.altered_calib_states = set()
 
     def expected_current_position(self, posid, key):
-        """Retrieve the current position, for a positioner identied by posid, according
-        to the internal tracking of its posmodel object. Returns a two element
-        list. Valid keys are:
-
+        """Retrieve the current position, for a positioner identied by posid,
+        according to the internal tracking of its posmodel object.
+        Returns a two element list. Valid keys are:
             'posintTP, 'poslocXY', 'poslocTP',
             'QS', 'flatXY', 'obsXY', 'ptlXY', 'motTP',
-            'posobsTP', 'posobsXY'
-
         See comments in posmodel.py for explanation of these values.
         """
-        if key == 'posintTP':
-            return self.posmodels[posid].expected_current_posintTP
-        elif key == 'poslocTP':
-            return self.posmodels[posid].expected_current_poslocTP
+        pos = self.posmodels[posid].expected_current_position
+        if key in pos.keys():
+            return pos[key]
         else:
-            vals = self.posmodels[posid].expected_current_position
-            if key == 'obsXY':
-                return [vals['obsX'], vals['obsY']]
-            elif key == 'QS':
-                return [vals['Q'], vals['S']]
-            elif key == 'poslocXY':
-                return [vals['poslocX'], vals['poslocY']]
-            elif key == 'poslocTP':
-                return [vals['poslocT'], vals['poslocT']]
-            elif key == 'flatXY':
-                return [vals['flatX'], vals['flatY']]
-            elif key == 'motorTP':
-                return [vals['motT'], vals['motP']]
-            elif key == 'ptlXY':
-                return [vals['ptlX'], vals['ptlY']]
-            elif key == 'posobsTP':
-                return [vals['posobsT'], vals['posobsP']]
-            elif key == 'posobsXY':
-                return [vals['posobsX'], vals['posobsY']]
-            else:
-                self.printfunc('Unrecognized key ' + str(key) + ' in request for expected_current_position of posid ' + str(posid) + '.')
+            self.printfunc(f'Unrecognized key {key} when requesting '
+                           f'expected_current_position of posid {posid}')
 
     def enabled_posmodels(self, posids):
         """Returns dict with keys = posids, values = posmodels, but only for
         those positioners in the collection posids which are enabled.
         """
-        return {p:self.posmodels[p] for p in posids if self.posmodels[p].is_enabled}
+        return {p: self.posmodels[p] for p in posids
+                if self.posmodels[p].is_enabled}
 
     def get_pos_flags(self, posids = 'all', should_reset = False):
         '''Getter function for self.pos_flags that carries out a final is_enabed

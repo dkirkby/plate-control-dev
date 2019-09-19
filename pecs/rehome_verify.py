@@ -9,13 +9,10 @@ import os
 import numpy as np
 import pandas as pd
 from pecs import PECS
-# from seed_xy_offsets import XY_Offsets
 import posconstants as pc
-# import pandas as pd
-# from DOSlib.positioner_index import PositionerIndex
 
 
-class VerifyRehome(PECS):
+class RehomeVerify(PECS):
 
     def __init__(self, petal_id=None, platemaker_instrument=None,
                  fvc_role=None, printfunc=print,
@@ -107,4 +104,4 @@ class VerifyRehome(PECS):
 
 
 if __name__ == '__main__':
-    VerifyRehome()
+    RehomeVerify()

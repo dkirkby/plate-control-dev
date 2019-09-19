@@ -7,7 +7,7 @@ from pecs import PECS
 # import pandas as pd
 # from DOSlib.positioner_index import PositionerIndex
 import posconstants as pc
-from verify_rehome import VerifyRehome
+from rehome_verify import RehomeVerify
 
 
 class Rehome(PECS):
@@ -48,7 +48,7 @@ class Rehome(PECS):
         mask = ret['FLAG'] != 4
         retry_list = list(ret['DEVICE_ID'][mask])
         if len(retry_list) == 0:
-            self.printfunc(f'Rehoming sucessful for all positioners.')
+            self.printfunc(f'Rehoming (3 tries) complete for all positioners.')
         else:  # non-empty list, need another attempt
             self.printfunc(f'{len(retry_list)} unsucessful: {retry_list}\n'
                            f'{ret.loc[mask].reset_index().to_string()}\n'
@@ -91,4 +91,4 @@ if __name__ == '__main__':
     print(f'Rehome data saved to: {path}')
     user_text = input('Verify rehome positions? (y/n): ')
     if 'y' in user_text:
-        VerifyRehome()
+        RehomeVerify()

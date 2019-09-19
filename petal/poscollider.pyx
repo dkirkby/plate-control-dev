@@ -309,8 +309,8 @@ class PosCollider(object):
         if self.fixed_neighbor_cases[posid]:
             if self.collision_hashpf_exists:
                 loc_id = self.posmodels[posid].deviceloc
-                dx = abs(self.x0[posid] - self.posmodels[posid].expected_current_position['ptlX'])
-                dy = abs(self.y0[posid] - self.posmodels[posid].expected_current_position['ptlY'])
+                dx = abs(self.x0[posid] - self.posmodels[posid].expected_current_position['flatXY'][0])
+                dy = abs(self.y0[posid] - self.posmodels[posid].expected_current_position['flatYY'][1])
                 code = lookup.make_code_pf(loc_id, dx, dy, poslocTP[0], poslocTP[1])
                 if code in self.table_pf:
                     return self.table_pf[code]
@@ -388,6 +388,7 @@ class PosCollider(object):
         self.Ei_phi = self.config['PHI_EI']   # angle above which phi is guaranteed to be within envelope Ei
         self.Eo = self.config['ENVELOPE_EO']  # outer clear rotation envelope
         self.Ei = self.config['ENVELOPE_EI']  # inner clear rotation envelope
+        self.phi_clear = self.Eo_phi + 3  # clear angle with margin ~ 3 deg
         self.Ee = self._max_extent() * 2      # extended-phi clear rotation envelope
         self.Eo_poly = PosPoly(self._circle_poly_points(self.Eo, self.config['RESOLUTION_EO']).tolist())
         self.Ei_poly = PosPoly(self._circle_poly_points(self.Ei, self.config['RESOLUTION_EI']).tolist())

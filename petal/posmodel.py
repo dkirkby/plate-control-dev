@@ -83,75 +83,31 @@ class PosModel(object):
         Returns a general dictionary of the current expected position in all
         the various coordinate systems.
         The keys are:
-            'posintT'   float, deg, independent variable,
+            'posintTP'  tuple in deg, independent variable,
                         the internally-tracked expected position of the
                         theta shaft at the output of the gearbox
-            'posintP'   float, deg, independent variable,
-                        the internally-tracked expected position of the
-                        phi shaft at the output of the gearbox
-            'poslocT'
-            'poslocP'
-            'poslocX'   float, mm, dependent variable,
-                        expected local x position
-            'poslocY'   float, mm, dependent variable,
-                        expected local y position
-            'Q'         float, deg, dependent variable,
-                        expected global Q position
-            'S'         float, mm,  dependent variable,
-                        expected global S position
-            'flatX'     float, mm, dependent variable,
-                        expected global x in a system where focal surface
+            'poslocTP'  tuple in deg, pos local coordinates with offsets
+            'poslocXY   tuple in, mm, expected local x position
+            'QS'        tuple in (deg, mm), expected global Q position
+            'flatXY'    tuple in, mm, dependent variable,
+                        expected local x in a system where focal surface
                         curvature is flattened out to an approximate plane
-            'flatY'     float, mm, dependent variable,
-                        expected global y in a system where focal surface
-                        curvature is flattened out to an approximate plane
-            'obsX'      float, mm, dependent variable,
-                        expected global x position
-            'obsY'      float, mm, dependent variable,
-                        expected global y position
-            'posobsX'   float, mm, dependent variable,
-                        expected global x with pos centre theta axis as origin
-            'posobsY'   float, mm, dependent variable,
-                        expected global y with pos centre theta axis as origin
-            'posobsT'   float, deg, dependent variable,
-                        expected global T with pos centre theta axis as origin
-            'posobsP'   float, deg, dependent variable,
-                        expected global P with pos centre theta axis as origin
-            'motT'      float, deg, dependent variable, expected position
+            'ptlXY'     tuple in mm, petal local XY projection of ptlXYZ
+            'obsXY'     tuple in mm, dependent, expected global x position
+            'motTP'     tuple in deg, dependent variable, expected position
                         of theta motor
-            'motP'      float, deg, dependent variable, expected position
-                        of phi motor
         """
         posintTP = self.expected_current_posintTP
-        poslocTP = self.trans.posintTP_to_poslocTP(posintTP)
-        poslocXY = self.trans.posintTP_to_poslocXY(posintTP)
-        obsXY = self.trans.posintTP_to_obsXY(posintTP)
-        posobsXY = self.trans.obsXY_to_posobsXY(obsXY)
-        posobsTP = self.trans.posobsXY_to_posobsTP(posobsXY)
-        ptlXY = self.trans.posintTP_to_ptlXY(posintTP)
         QS = self.trans.posintTP_to_QS(posintTP)
-        flatXY = self.trans.posintTP_to_flatXY(posintTP)
-        d = {'posintT': posintTP[0],
-             'posintP': posintTP[1],
-             'motT': self.axis[pc.T].shaft_to_motor(posintTP[0]),
-             'motP': self.axis[pc.P].shaft_to_motor(posintTP[1]),
-             'poslocT': poslocTP[0],
-             'poslocP': poslocTP[1],
-             'poslocX': poslocXY[0],
-             'poslocY': poslocXY[1],
-             'ptlX': ptlXY[0],
-             'ptlY': ptlXY[1],
-             'obsX': obsXY[0],
-             'obsY': obsXY[1],
-             'posobsX': posobsXY[0],
-             'posobsY': posobsXY[1],
-             'posobsT': posobsTP[0],
-             'posobsP': posobsTP[1],
-             'Q': QS[0],
-             'S': QS[1],
-             'flatX': flatXY[0],
-             'flatY': flatXY[1]}
-        return d
+        return {'posintTP': posintTP,
+                'motTP': (self.axis[pc.T].shaft_to_motor(posintTP[0]),
+                          self.axis[pc.P].shaft_to_motor(posintTP[1])),
+                'poslocTP': self.trans.posintTP_to_poslocTP(posintTP),
+                'poslocXY': self.trans.posintTP_to_poslocXY(posintTP),
+                'flatXY': self.trans.posintTP_to_flatXY(posintTP),
+                'ptlXY': self.trans.posintTP_to_ptlXY(posintTP),
+                'obsXY': self.trans.QS_to_obsXY(QS, cast=True),
+                'QS': QS}
 
     @property
     def expected_current_position_str(self):
