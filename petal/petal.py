@@ -631,20 +631,20 @@ class Petal(object):
 # METHODS FOR FIDUCIAL CONTROL
     def set_fiducials(self, fidids='all', setting='on', save_as_default=False):
         """Set specific fiducials on or off.
-
+        
         fidids ... one fiducial id string, or an iterable collection of fiducial id strings, or 'all'
-
+        [KH: note that the fidids list might include devices that are not on this petal. The code must ignore those]           
         setting ... what to set the fiducials to, as described below:
             'on'         ... turns each fiducial to its default on value
             'off'        ... turns each fiducial individually to its default off value
             int or float ... a single integer or float from 0-100 sets all the argued fiducials uniformly to that one value
-
+        
         save_as_default ... only used when seting is a number, in which case True means we will store that setting permanently to the fiducials' config file, False means its just a temporary setting this time
-
+        
         Method returns a dictionary of all the settings that were made, where
             key   --> fiducial id
             value --> duty state that was set
-
+        
         Fiducials that do not have control enabled will not appear in this dictionary.
         """
         if self.simulator_on:
@@ -654,7 +654,8 @@ class Petal(object):
             fidids = self.fidids
         else:
             fidids = {fidids} if isinstance(fidids,str) else set(fidids)
-        enabled = [fidid for fidid in fidids if True or self.get_posfid_val(fidid,'CTRL_ENABLED')]   # needs to be fixed (True)
+        # currently fiducials don't have an enable flag in pos state (bypass for now)
+        enabled = [fidid for fidid in fidids if True or self.get_posfid_val(fidid,'CTRL_ENABLED')]
         busids = [self.get_posfid_val(fidid,'BUS_ID') for fidid in enabled]
         canids = [self.get_posfid_val(fidid,'CAN_ID') for fidid in enabled]
         if isinstance(setting,int) or isinstance(setting,float):
@@ -663,6 +664,11 @@ class Petal(object):
             if setting > 100:
                 setting = 100
             duties = [setting]*len(enabled)
+        elif isinstance(setting, (list, tuple)):
+            duties = []
+            for f in enabled:
+                i = enabled.index(f)
+                duties.append(setting[i])
         elif setting == 'on':
             duties = [self.get_posfid_val(fidid,'DUTY_DEFAULT_ON') for fidid in enabled]
         else:
@@ -671,7 +677,7 @@ class Petal(object):
         for idx, busid in enumerate(busids):
             fiducial_settings_by_busid[busid][canids[idx]] = duties[idx]
         self.comm.pbset('fiducials', fiducial_settings_by_busid)
-
+        
         settings_done = {}
         for i in range(len(enabled)):
             self.set_posfid_val(enabled[i], 'DUTY_STATE', duties[i])
