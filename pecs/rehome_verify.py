@@ -2,7 +2,7 @@
 """
 Created on Tue Jul 16 14:04:52 2019
 
-@author: givoltage
+@author: Duan Yutong (dyt@physics.bu.edu)
 """
 
 import os
@@ -23,7 +23,7 @@ class RehomeVerify(PECS):
         self.printfunc = printfunc
         self.ptlid = list(self.ptls.keys())[0]
         self.axis = axis
-        if not selection:
+        if selection is None:
             self.posids = list(self.ptls[self.ptlid].get_positioners(
                 enabled_only=enabled_only).loc[:, 'DEVICE_ID'])
         elif selection[0][0] == 'c':  # User passed busids
@@ -31,7 +31,7 @@ class RehomeVerify(PECS):
                 self.ptls[self.ptlid].get_positioners(
                     enabled_only=enabled_only, busids=selection)
                 .loc[:, 'DEVICE_ID'])
-        else:  # assume is a list of posids
+        else:  # assume it is a list of posids
             self.posids = sorted(selection)
         self.printfunc(f'Verifying homing positions for all '
                        f'{len(self.posids)} enabled positioners...')
@@ -41,66 +41,66 @@ class RehomeVerify(PECS):
             f'{pc.filename_timestamp_str_now()}-rehome_verify.csv')
         df.to_csv(path)
         self.printfunc(f'Rehome verification data saved to: {path}')
+        if input('Open verification table? (y/n): ') in ['y', 'yes']:
+            os.system(f'xdg-open {path}')
 
     def compare_xy(self):
         ptl = self.ptls[self.ptlid]
         # all backlit fibres, including those disabled, needed for FVC
-        expected_pos = ptl.get_positions(return_coord='QS')
-        df = (ptl.get_pos_vals(['OFFSET_X', 'OFFSET_Y'],
-                               posids=list(expected_pos['DEVICE_ID']))
-              .set_index('DEVICE_ID'))
-        offX, offY = df['OFFSET_X'].values, df['OFFSET_Y'].values
-        Q = np.degrees(np.arctan2(offY, offX))  # convert offsetXY to QS
-        R = np.sqrt(np.square(offX) + np.square(offY))
-        S = pc.R2S_lookup(R)  # convert offsetXY to QS
-        # set nominal offsetsXY (in QS) as expected postiions for FVC spotmatch
-        expected_pos['X1'], expected_pos['X2'] = Q, S
+        exppos = (ptl.get_positions(return_coord='QS')
+                  .sort_values(by='DEVICE_ID'))
+        exp_obsXY = (ptl.get_positions(return_coord='obsXY')
+                     .sort_values(by='DEVICE_ID')[['X1', 'X2']]).values.T
+        # get guessed QS (theta centres in QS) for FVC measurement
+        df = (ptl.get_pos_vals(['OFFSET_X', 'OFFSET_Y'],  # offsets in flatXY
+                               posids=sorted(list(exppos['DEVICE_ID'])))
+              .set_index('DEVICE_ID'))  # indexed by DEVICE_ID
+        offXY = df[['OFFSET_X', 'OFFSET_Y']].values.T
+        hom_QS = ptl.ptltrans('flatXY_to_QS', offXY)  # 2xN array
+        hom_obsXY = ptl.ptltrans('QS_to_obsXY', hom_QS)  # 2xN array
+        # set nominal homed QS as expected postiions for FVC spotmatch
+        exppos[['X1', 'X2']] = hom_QS.T
         self.printfunc('Taking FVC exposure to confirm home positions...')
-        mr_old = self.fvc.get('match_radius')  # hold old radius
+        mr_old = self.fvc.get('match_radius')  # hold old match radius
         self.fvc.set(match_radius=80)  # set larger radius for calib
-        # self.printfunc(f'Sending the following expected positions to FVC:\n'
-        #                f'{expected_pos}')
-        mQS = (pd.DataFrame(self.fvc.measure(expected_pos))  # measured_QS
-               .rename(columns={'id': 'DEVICE_ID'})  # exp_pos changed in place
-               .set_index('DEVICE_ID').sort_index())  # sorted
-        mQS.columns = mQS.columns.str.upper()
-        self.fvc.set(match_radius=mr_old)  # restore old radius
-        # get expected positions again, only interested in flags
-        # expected_pos = ptl.get_positions().set_index('DEVICE_ID')
-        # find what's unmatched
-        unmatched = sorted(set(self.posids) - set(mQS.index))
-        self.printfunc(f'{len(unmatched)} unmatched positioners:\n{unmatched}')
+        # measured_QS, note that expected_pos was changed in place
+        meapos = (
+            pd.DataFrame(self.fvc.measure(exppos))
+            .rename(columns={'id': 'DEVICE_ID'})
+            .set_index('DEVICE_ID').sort_index())  # indexed by DEVICE_ID
+        self.fvc.set(match_radius=mr_old)  # restore old radius after measure
+        meapos.columns = meapos.columns.str.upper()  # clean up header to save
+        # find the posids that are unmatched, missing from FVC return
+        unmatched = sorted(set(self.posids) - set(meapos.index))
+        umstr = f':\n{unmatched}' if len(unmatched) > 0 else ''
+        self.printfunc(f'{len(unmatched)} unmatched positioners' + umstr)
         # write columns to measured_QS using auto index matching
-        mQS['FLAG'] = \
-            expected_pos.set_index('id').loc[mQS.index]['flags'].values
-        mQS['STATUS'] = ptl.decipher_posflags(mQS['FLAG'])
-        mQS['expectedX'] = df.loc[mQS.index]['OFFSET_X'].values
-        mQS['expectedY'] = df.loc[mQS.index]['OFFSET_Y'].values
-        # filter expected pos because there are unmatched fibres
-        # expected_pos = expected_pos.loc[measured_QS.index]  # same order
-        # expected_pos['expectedX'] = df.loc[measured_QS.index]['OFFSET_X']
-        # expected_pos['expectedY'] = df.loc[measured_QS.index]['OFFSET_Y']
-        # convert QS to obsXY for measuredXY
-        Q_rad = np.radians(mQS['Q'])
-        R = pc.S2R_lookup(mQS['S'])
-        mQS['measuredX'] = R * np.cos(Q_rad)
-        mQS['measuredY'] = R * np.sin(Q_rad)
-        mQS['obsdX'] = mQS['measuredX'] - mQS['expectedX']
-        mQS['obsdY'] = mQS['measuredY'] - mQS['expectedY']
-        mQS['dr'] = np.sqrt(np.square(mQS['obsdX'])
-                            + np.square(mQS['obsdY']))
-        mQS = mQS.sort_values(by='dr', ascending=False).reset_index()
-        mask = mQS['dr'] > 1
-        bad_posids = list(mQS[mask].index)
-        self.printfunc(mQS)
+        meapos['FLAG'] = (exppos.set_index('id')
+                          .loc[meapos.index]['flags'].values)
+        meapos['STATUS'] = ptl.decipher_posflags(meapos['FLAG'])
+        for col in ['exp_obsX', 'hom_obsX', 'mea_obsX',
+                    'exp_obsY', 'hom_obsY', 'mea_obsY']:
+            meapos[col] = np.nan
+        meapos[['exp_obsX', 'exp_obsY']] = exp_obsXY.T  # internally tracked
+        meapos[['hom_obsX', 'hom_obsY']] = hom_obsXY.T
+        mea_obsXY = ptl.ptltrans('QS_to_obsXY', meapos[['Q', 'S']].values.T)
+        meapos[['mea_obsX', 'mea_obsY']] = mea_obsXY.T
+        meapos['obsdX'] = meapos['mea_obsX'] - meapos['hom_obsX']
+        meapos['obsdY'] = meapos['mea_obsY'] - meapos['hom_obsY']
+        meapos['dr'] = np.linalg.norm(meapos[['obsdX', 'obsdY']], axis=1)
+        meapos = meapos.sort_values(by='dr', ascending=False).reset_index()
+        mask = meapos['dr'] > 1
+        bad_posids = list(meapos[mask].index)
+        # self.printfunc(meapos)
         if len(bad_posids) == 0:
-            self.printfunc(f'All {len(mQS)} matched fibres verified rehomed.')
+            self.printfunc(
+                f'All {len(meapos)} matched fibres verified to have rehomed.')
         else:
-            self.printfunc(f'Possibly {len(bad_posids)} positioners not '
-                           f'rehomed (radial deviations > 1 mm):\n\n'
-                           f'{mQS[mask]}\n\n'
+            self.printfunc(f'{len(bad_posids)} positioners not '
+                           f'rehomed (radial deviations > 1 mm) properly:\n\n'
+                           f'{meapos[mask].iloc[:, ]}\n\n'
                            f'Positioner IDs:\n{bad_posids}')
-        return mQS
+        return meapos
 
 
 if __name__ == '__main__':

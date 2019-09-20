@@ -1,7 +1,3 @@
-'''
-Runs a one_point_calibration through petal and fvc proxies.
-Needs running DOS instance. See pecs.py
-'''
 import os
 import pandas as pd
 import posconstants as pc
@@ -10,31 +6,24 @@ import posconstants as pc
 class OnePoint(object):
 
     def __init__(self, pecs=None, petal_id=None, platemaker_instrument=None,
-                 fvc_role=None, printfunc=print):
+                 fvc_role=None, printfunc=print, verbose=False):
         if pecs is None:
             from pecs import PECS
-            self.pecs = PECS(self,ptlids=petal_id, platemaker_instrument=platemaker_instrument, fvc_role=fvc_role, printfunc=printfunc)
+            self.pecs = PECS(self, ptlids=petal_id,
+                             platemaker_instrument=platemaker_instrument,
+                             fvc_role=fvc_role, printfunc=printfunc)
         else:
             self.pecs = pecs
         self.verbose = verbose
         self.poslocP = 135
         if self.verbose:
-            print('Selecting default petal, override with a call to select_petal.')
+            self.printfunc(f'Selecting default petal: PTL {petal_id}')
         self.select_petal(petal_id=petal_id)
 
-    def one_point_calib(self, selection=None, enabled_only=True, mode='posTP',
-                        auto_update=True, tp_target='default',
-                        match_radius=80.0):
-        ptl = self.ptls[self.ptlids[0]]
-        # Interpret selection, decide what positioner to use
-        if selection is None: 
-            posids = list(ptl.get_positioners(
-                enabled_only=enabled_only)['DEVICE_ID'])
-        elif 'can' in selection[0]:  # User passed a list of canids
-            posids = list(ptl.get_positioners(
-                enabled_only=enabled_only, busids=selection)['DEVICE_ID'])
-        else:  # assume is a list of posids
-            posids = selection
+    def one_point_calib(self, selection=None, enabled_only=True,
+                        mode='posintTP', tp_target='default',
+                        auto_update=True, match_radius=80.0):
+
         # Interpret tp_target and move if target != None
         offsetPs = {}
         if tp_target == 'default':  # use (0, self.obsP to posP) as target
@@ -101,27 +90,13 @@ class OnePoint(object):
         updates.append(unmatched_used_pos,ignore_index=True) #List unmeasured positioners in updates, even with no data
         return updates
 
-    def run_interactively(self, petal=None, selection=None, enabled_only=None, mode=None,auto_update=None, tp_target=None,match_radius=None):
-        print('Running interactive grid calibration.')
-        # Ask for petal_id
-        if petal is None:
-            ptlid = self._get_integer('Please select a petal_id, availible petal_IDs: %s ' % list(self.pecs.ptls.keys()))
-            self.select_petal(petal_id = ptlid)
-        # Ask for selection
-        if selection is None:
-            user_text = input('Please list BUSIDs or POSIDs (not both) seperated by spaces, leave it blank to use all on petal: ')
-            if user_text != '':
-                user_text = user_text.split()
-                selection = []
-                for item in user_text:
-                    selection.append(item)
-            else:
-                selection = None
-            print('You chose: %s' % selection)
+    def run_interactively(self, petal=None, mode=None, tp_target=None,
+                          selection=None, enabled_only=None,
+                          auto_update=None, match_radius=None):
+
+
         # Ask for enabled_only
-        if enabled_only is None:
-            user_text = input('Use enabled positioners only? (y/n) ')
-            enabled_only = self._parse_yn(user_text)
+
         # Ask for mode
         if mode is None:
             mode = input('Please enter the calibration mode you wish to use (posTP, offsetsTP): ')
@@ -154,36 +129,4 @@ class OnePoint(object):
     # the calib needs to be looked at for each positioner
     # Maybe return a list to repeat so that can be used in interactive terminal?
 
-    def select_petal(self, petal_id=None, index=None):
-        if petal_id is None:
-            if index is None:
-                print(f'No petal selected, choosing index=0 as default, petal_id {list(self.pecs.ptls.keys())[0]}')
-                self.ptl = self.pecs.ptls[list(self.pecs.ptls.keys())[0]]
-            else:
-                print(f'Choosing petal in index {index}, petal_id {list(self.pecs.ptls.keys())[index]}')
-                self.ptl = self.pecs.ptls[list(self.pecs.ptls.keys())[index]]
-        else:
-            print('Choosing petal_id %s' % petal_id)
-            self.ptl = self.ptl = self.pecs.ptls[petal_id]
-
-    def _parse_yn(yn_str):
-        if 'y' in yn_str.lower():
-            return True
-        else:
-            return False
-
-    def _get_integer(prompt_string):
-        user_text = input(prompt_string)
-        if user_text.isdigit():
-            return int(user_text)
-        else:
-            user_text = input('You did not enter an integer, try again. ' + prompt_string)
-            if user_text.isdigit():
-                return int(user_text)
-            else:
-                raise ValueError('Input requires an integer.')
-
-
-if __name__ == '__main__':
-    op = OnePoint()
-    op.run_interactively(mode='posTP',match_radius=80.0)
+        self.select_petal(petal_id = int(ptlid))

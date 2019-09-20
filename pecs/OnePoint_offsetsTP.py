@@ -1,6 +1,6 @@
-from OnePoint_posTP import OnePoint
+from OnePoint import OnePoint
 
 if __name__ == '__main__':
     op = OnePoint()
-    print('Notice: this will update offsetsTP!')
-    op.run_interactively(mode='offsetsTP',match_radius=80.0)
+    print('This will update TP offsets using one point calibration.')
+    op.run_interactively(mode='offsetsTP', match_radius=80.0)

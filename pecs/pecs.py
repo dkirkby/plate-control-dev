@@ -29,7 +29,7 @@ import os
 class PECS:
 
     '''input:
-        ptlids:                list of petal ids, each petal id is a string
+        ptlids:                list of petal ids, each petal id is an integer
         printfuncs:            dict of print functions, or a single print func
                                (each petal may have its own print function or
                                 logger instance for log level filtering and
@@ -51,7 +51,7 @@ class PECS:
             from configobj import ConfigObj
             pecs_local = ConfigObj(
                 os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                             'pecs_local.conf'),
+                             'pecs_local.cfg'),
                 unrepr=True, encoding='utf-8')
             platemaker_instrument = pecs_local['pm_instrument']
             fvc_role = pecs_local['fvc_role']
@@ -98,11 +98,60 @@ class PECS:
         for pf in self.printfuncs.values():
             pf(msg)
 
-    # We don't need this since any PetalApp methods can be directly called
-    # Was a more PML like call to petal, but yes, not needed.
-    # def call_petal(self, ptlid, command, *args, **kwargs):
-    #     '''
-    #     Call petal app, command is a command listed in PetalApp.commands.
-    #     Required args/kwargs can be passed along.
-    #     '''
-    #     return self.ptls[ptlid](command, *args, **kwargs)
+    def _parse_yn(self, yn_str):
+        if 'y' in yn_str.lower():
+            return True
+        elif 'n':
+            return False
+        else:
+            self.printfunc(f'Invalid input: {yn_str}. Must be y/n.')
+
+    def ptl_setup(self, petal_id=None, posids=None):
+
+        if petal_id is None:
+            petal_id = self.ptlids[0]
+            self.printfunc(f'Defaulting to ptlid = {self.ptlid}')
+        self.ptlid = petal_id
+        self.ptl = self.ptls[self.ptlid]
+        if posids is None:
+            posids = sorted(list(self.ptl.get_positioners(
+                enabled_only=True)['DEVICE_ID']))
+            self.printfunc(
+                f'Defaulting to all {len(posids)} enabled positioners')
+        self.posids = posids
+
+    def interactive_ptl_setup(self):
+        self.printfunc(f'Running interactive setup for PECS')
+        ptlid = self._interactively_get_ptl()  # set selected ptlid
+        posids = self._interactively_get_posids(ptlid)  # set selected posids
+        self.ptl_setup(petal_id=ptlid, posids=posids)
+
+    def _interactively_get_ptl(self):
+        ptlid = input(f'Availible petal IDs: {list(self.ptls.keys())}\n'
+                      f'Please enter a petal ID (integer only): ')
+        if ptlid.isdigit():
+            self.printfunc(f'Selecting ptlid = {ptlid}')
+            return int(ptlid)
+        else:
+            self.printfunc('Invalid input, must be an integer, retry')
+            self._get_ptlid()
+
+    def _interactively_get_posids(self, ptlid):
+        user_text = input('Please list CAN bus IDs or posids, seperated by '
+                          'SPACES. \nLeave blank to use all positioners: ')
+        if user_text == '':
+            selection = None
+        else:
+            selection = user_text.split()
+        user_text = input('Use enabled positioners only? (y/n): ')
+        enabled_only = self._parse_yn(user_text)
+        if selection is None:
+            posids = sorted(list(self.ptls[ptlid].get_positioners(
+                enabled_only=enabled_only)['DEVICE_ID']))
+        elif 'can' in selection[0]:  # User passed a list of canids
+            posids = sorted(list(self.ptls[ptlid].get_positioners(
+                enabled_only=enabled_only, busids=selection)['DEVICE_ID']))
+        else:  # assume is a list of posids
+            posids = sorted(selection)
+        self.printfunc(f'Selecting {len(posids)} positioners')
+        return posids
