@@ -35,12 +35,12 @@ def Rxyz(alpha, beta, gamma):  # yaw-pitch-roll system, all in radians
 
 
 def typecast(x):
-    if type(x) is list or tuple:  # 2 or 3 coordinates, reshape into column vec
+    if type(x) in [list, tuple]:  # 2 or 3 coordinates, reshape into column vec
         return np.array(x).reshape(len(x), 1)
     elif type(x) is np.ndarray:
         if x.ndim == 1:  # a 1D array of 2 or 3 coordinates
             return x.reshape(x.size, 1)  # reshape into column vector
-        elif x.ndim == 2:  # 2D array, assume each column is a column vector
+        elif x.ndim == 2:  # 2D array, assume each column is a column vec
             return x
         else:
             raise ValueError(f'Wrong numpy array dimension: {x.ndim}')
@@ -140,7 +140,7 @@ class PetalTransforms(object):
         """
         if cast:
             obsXYZ = typecast(obsXYZ)
-        return self.R.T @ (typecast(obsXYZ) - self.T)  # backward transform
+        return self.R.T @ (obsXYZ - self.T)  # backward transform
 
     # %% QS transforms (only need 2D)
     def obsXY_to_QS(self, obsXY, curved=None, cast=False):
