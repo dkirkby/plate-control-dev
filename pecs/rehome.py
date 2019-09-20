@@ -12,7 +12,6 @@ class Rehome(PECS):
         input('WARNING: Driving positioners to their hardstops. '
               'Be sure you know what you are doing!\n'
               f'(Enter to continue): ')
-
         if interactive:
             self.interactive_ptl_setup()
         else:
@@ -61,5 +60,5 @@ class Rehome(PECS):
 
 
 if __name__ == '__main__':
-    rh = Rehome(interactive=True)  # main runs interactively
-    # rh = Rehome(interactive=False)
+    # rh = Rehome(interactive=True)  # main runs interactively
+    rh = Rehome(interactive=False)

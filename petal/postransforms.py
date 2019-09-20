@@ -27,11 +27,11 @@ class PosTransforms(petaltransforms.PetalTransforms):
                     theta offset depends on the individual rotation of
                     positioner when installed formerly posTP
 
-        poslocTP:   (theta, phi) in the petal local flat CS with pos origin
-                    (centred on theta axis) renamed, does not exist before
+        poslocTP:   (theta, phi) in the positioner local CS, aligned with
+                    petal flatXY, centred on theta axis
 
-        poslocXY:   (x, y) in the petal local flat CS with pos origin
-                    (centered on theta axis), directly corresponds to poslocTP
+        poslocXY:   (x, y) in the positioner local CS, aligned with
+                    petal flatXY, centred on theta axis
 
         flatXY:     (x, y) in the petal local flat CS on the focal surface
 

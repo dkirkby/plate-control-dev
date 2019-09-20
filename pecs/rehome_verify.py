@@ -14,27 +14,14 @@ import posconstants as pc
 
 class RehomeVerify(PECS):
 
-    def __init__(self, petal_id=None, platemaker_instrument=None,
-                 fvc_role=None, printfunc=print,
-                 selection=None, enabled_only=True, axis='both'):
-        PECS.__init__(self, ptlids=petal_id,
-                      platemaker_instrument=platemaker_instrument,
-                      fvc_role=fvc_role, printfunc=printfunc)
-        self.printfunc = printfunc
-        self.ptlid = list(self.ptls.keys())[0]
-        self.axis = axis
-        if selection is None:
-            self.posids = list(self.ptls[self.ptlid].get_positioners(
-                enabled_only=enabled_only).loc[:, 'DEVICE_ID'])
-        elif selection[0][0] == 'c':  # User passed busids
-            self.posids = list(
-                self.ptls[self.ptlid].get_positioners(
-                    enabled_only=enabled_only, busids=selection)
-                .loc[:, 'DEVICE_ID'])
-        else:  # assume it is a list of posids
-            self.posids = sorted(selection)
-        self.printfunc(f'Verifying homing positions for all '
-                       f'{len(self.posids)} enabled positioners...')
+    def __init__(self, petal_id=None, posids=None, interactive=False):
+        super().__init__()
+        if interactive:
+            self.interactive_ptl_setup()
+        else:
+            self.ptl_setup(petal_id, posids)
+        self.printfunc(f'Verifying homing positions for '
+                       f'{len(self.posids)} positioners...')
         df = self.compare_xy()
         path = os.path.join(
             pc.dirs['calib_logs'],
@@ -104,4 +91,4 @@ class RehomeVerify(PECS):
 
 
 if __name__ == '__main__':
-    RehomeVerify()
+    RehomeVerify(interactive=True)

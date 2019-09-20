@@ -109,9 +109,9 @@ class PECS:
     def ptl_setup(self, petal_id=None, posids=None):
 
         if petal_id is None:
-            petal_id = self.ptlids[0]
-            self.printfunc(f'Defaulting to ptlid = {self.ptlid}')
-        self.ptlid = petal_id
+            ptlid = self.ptlids[0]
+            self.printfunc(f'Defaulting to ptlid = {ptlid}')
+        self.ptlid = ptlid
         self.ptl = self.ptls[self.ptlid]
         if posids is None:
             posids = sorted(list(self.ptl.get_positioners(
