@@ -49,7 +49,6 @@ class PECS:
         if None in [platemaker_instrument, fvc_role, ptlids,
                     constants_version]:
             from configobj import ConfigObj
-            #Why the change from conf to cfg? - Kevin
             pecs_local = ConfigObj(
                 os.path.join(os.path.dirname(os.path.realpath(__file__)),
                              'pecs_local.cfg'),
