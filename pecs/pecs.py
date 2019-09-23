@@ -49,6 +49,7 @@ class PECS:
         if None in [platemaker_instrument, fvc_role, ptlids,
                     constants_version]:
             from configobj import ConfigObj
+            #Why the change from conf to cfg? - Kevin
             pecs_local = ConfigObj(
                 os.path.join(os.path.dirname(os.path.realpath(__file__)),
                              'pecs_local.cfg'),
@@ -99,9 +100,10 @@ class PECS:
             pf(msg)
 
     def _parse_yn(self, yn_str):
+        #Trying to accept varieties like y/n, yes/no
         if 'y' in yn_str.lower():
             return True
-        elif 'n':
+        elif 'n' in yn_str.lower():
             return False
         else:
             self.printfunc(f'Invalid input: {yn_str}. Must be y/n.')
