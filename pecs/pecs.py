@@ -24,6 +24,7 @@ Added illuminator proxy for xy test control over LED (Duan 2019/06/07)
 from DOSlib.proxies import FVC, Petal  # , Illuminator
 from fvc_sim import FVC_proxy_sim
 import os
+import pandas as pd
 
 
 class PECS:
@@ -81,7 +82,7 @@ class PECS:
                            constants_version=self.constants_version,
                            all_fiducials=all_fiducials)
         self.printfunc(
-            "FVC proxy created for instrument: {self.fvc.get('instrument')}")
+            f"FVC proxy created for instrument: {self.fvc.get('instrument')}")
         self.ptls = {}  # call petal proxy
         for ptlid in ptlids:
             self.ptls[ptlid] = Petal(petal_id=ptlid)  # no sim state control
@@ -99,7 +100,7 @@ class PECS:
             pf(msg)
 
     def _parse_yn(self, yn_str):
-        #Trying to accept varieties like y/n, yes/no
+        #  Trying to accept varieties like y/n, yes/no
         if 'y' in yn_str.lower():
             return True
         elif 'n' in yn_str.lower():
@@ -110,9 +111,9 @@ class PECS:
     def ptl_setup(self, petal_id=None, posids=None):
 
         if petal_id is None:
-            ptlid = self.ptlids[0]
-            self.printfunc(f'Defaulting to ptlid = {ptlid}')
-        self.ptlid = ptlid
+            petal_id = self.ptlids[0]
+            self.printfunc(f'Defaulting to ptlid = {petal_id}')
+        self.ptlid = petal_id
         self.ptl = self.ptls[self.ptlid]
         if posids is None:
             posids = sorted(list(self.ptl.get_positioners(
@@ -135,7 +136,7 @@ class PECS:
             return int(ptlid)
         else:
             self.printfunc('Invalid input, must be an integer, retry')
-            self._get_ptlid()
+            self._interactively_get_ptl()
 
     def _interactively_get_posids(self, ptlid):
         user_text = input('Please list CAN bus IDs or posids, seperated by '
@@ -156,3 +157,29 @@ class PECS:
             posids = sorted(selection)
         self.printfunc(f'Selecting {len(posids)} positioners')
         return posids
+
+    def fvc_measure(self, exppos=None):
+        '''use the expected positions given, or by default use internallly
+        tracked current expected positions for fvc measurement
+        returns expected_positions (df), measured_positions (df),
+        matched_posids (set), unmatched_posids (set)'''
+        if exppos is None:
+            exppos = (self.ptl.get_positions(return_coord='QS')
+                      .sort_values(by='DEVICE_ID'))  # includes all posids
+        mr_old = self.fvc.get('match_radius')  # hold old match radius
+        self.fvc.set(match_radius=80)  # set larger radius for calib
+        # measured_QS, note that expected_pos was changed in place
+        meapos = (pd.DataFrame(self.fvc.measure(exppos))
+                  .rename(columns={'id': 'DEVICE_ID'})
+                  .set_index('DEVICE_ID').sort_index())  # indexed by DEVICE_ID
+        self.fvc.set(match_radius=mr_old)  # restore old radius after measure
+        meapos.columns = meapos.columns.str.upper()  # clean up header to save
+        # find the posids that are unmatched, missing from FVC return
+        matched = set(self.posids).intersection(set(meapos.index))
+        unmatched = set(self.posids) - matched
+        if len(unmatched) == 0:
+            self.printfunc(f'All {len(self.posids)} positioners matched.')
+        else:
+            self.printfunc(f'Missing {len(unmatched)} of selected positioners'
+                           f'\n{sorted(list(unmatched))}')
+        return exppos, meapos, sorted(matched), sorted(unmatched)

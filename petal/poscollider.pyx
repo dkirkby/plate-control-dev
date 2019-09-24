@@ -388,7 +388,6 @@ class PosCollider(object):
         self.Ei_phi = self.config['PHI_EI']   # angle above which phi is guaranteed to be within envelope Ei
         self.Eo = self.config['ENVELOPE_EO']  # outer clear rotation envelope
         self.Ei = self.config['ENVELOPE_EI']  # inner clear rotation envelope
-        self.phi_clear = self.Eo_phi + 3  # clear angle with margin ~ 3 deg
         self.Ee = self._max_extent() * 2      # extended-phi clear rotation envelope
         self.Eo_poly = PosPoly(self._circle_poly_points(self.Eo, self.config['RESOLUTION_EO']).tolist())
         self.Ei_poly = PosPoly(self._circle_poly_points(self.Ei, self.config['RESOLUTION_EI']).tolist())
