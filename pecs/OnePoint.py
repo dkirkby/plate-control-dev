@@ -62,6 +62,7 @@ class OnePoint(PECS):
             rows.append(row)
         requests = pd.DataFrame(rows)
         self.ptl.prepare_move(requests, anticollision=None)
+        self.ptl.execute_move()
         exppos, meapos, matched, unmatched = self.fvc_measure()
         used_pos = meapos.loc[sorted(list(matched))]  # only matched rows
         unused_pos = meapos.loc[sorted(list(unmatched))]

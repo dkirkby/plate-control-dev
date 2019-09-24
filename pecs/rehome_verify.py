@@ -21,7 +21,14 @@ class RehomeVerify(PECS):
             self.ptl_setup(petal_id, posids)
         self.printfunc(f'Verifying homing positions for '
                        f'{len(self.posids)} positioners...')
-        self.compare_xy()
+        df = self.compare_xy()
+        path = os.path.join(  # save results
+            pc.dirs['calib_logs'],
+            f'{pc.filename_timestamp_str_now()}-rehome_verify.csv')
+        df.to_csv(path)
+        self.printfunc(f'Rehome verification data saved to: {path}')
+        if input('Open verification table? (y/n): ') in ['y', 'yes']:
+            os.system(f'xdg-open {path}')
 
     def compare_xy(self):
         ptl = self.ptls[self.ptlid]
@@ -72,13 +79,7 @@ class RehomeVerify(PECS):
                            f'properly (radial deviations > {tol} mm):\n\n'
                            f'{meapos[mask].iloc[:, ]}\n\n'
                            f'Positioner IDs for retry:\n{bad_posids}')
-        path = os.path.join(  # save results
-            pc.dirs['calib_logs'],
-            f'{pc.filename_timestamp_str_now()}-rehome_verify.csv')
-        df.to_csv(path)
-        self.printfunc(f'Rehome verification data saved to: {path}')
-        if input('Open verification table? (y/n): ') in ['y', 'yes']:
-            os.system(f'xdg-open {path}')
+        return meapos
 
 
 if __name__ == '__main__':

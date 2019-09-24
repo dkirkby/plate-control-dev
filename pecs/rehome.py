@@ -21,7 +21,7 @@ class Rehome(PECS):
         path = os.path.join(pc.dirs['all_logs'], 'calib_logs',
                             f'{pc.filename_timestamp_str_now()}-rehome.csv')
         df.to_csv(path)
-        print(f'Rehome (interally-tracked) data saved to: {path}')
+        self.printfunc(f'Rehome (interally-tracked) data saved to: {path}')
         if input('Verify rehome positions with FVC? (y/n): ') in ['y', 'yes']:
             RehomeVerify(petal_id=self.ptlid, posids=self.posids)
 

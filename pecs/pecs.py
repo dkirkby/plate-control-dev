@@ -132,7 +132,7 @@ class PECS:
         ptlid = input(f'Availible petal IDs: {list(self.ptls.keys())}\n'
                       f'Please enter a petal ID (integer only): ')
         if ptlid.isdigit():
-            self.printfunc(f'Selecting ptlid = {ptlid}')
+            self.printfunc(f'Selected ptlid = {ptlid}')
             return int(ptlid)
         else:
             self.printfunc('Invalid input, must be an integer, retry')
@@ -155,7 +155,7 @@ class PECS:
                 enabled_only=enabled_only, busids=selection)['DEVICE_ID']))
         else:  # assume is a list of posids
             posids = sorted(selection)
-        self.printfunc(f'Selecting {len(posids)} positioners')
+        self.printfunc(f'Selected {len(posids)} positioners')
         return posids
 
     def fvc_measure(self, exppos=None):

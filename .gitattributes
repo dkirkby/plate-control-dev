@@ -16,9 +16,10 @@ pecs/pecs.py -text
 pecs/pecs_local.cfg -text
 pecs/rehome.py -text
 pecs/rehome_verify.py -text
+pecs/seed_all_calibration_values.py -text
 pecs/seed_armlengths.py -text
-pecs/seed_tp_offsets.py -text
-pecs/seed_xy_offsets.py -text
+pecs/seed_offsets_tp.py -text
+pecs/seed_offsets_xy.py -text
 pecs/xytest.py -text
 petal/collision_lookup_generator.py -text
 petal/collision_lookup_generator_subset.py -text
