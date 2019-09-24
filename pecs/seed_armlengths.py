@@ -8,8 +8,6 @@ class Armlengths(PECS):
 
     def __init__(self,ptlids=None, platemaker_instrument=None, fvc_role=None, printfunc = print):
         PECS.__init__(self,ptlids=ptlids, platemaker_instrument=platemaker_instrument, fvc_role=fvc_role, printfunc=printfunc)
-        self.Eo_phi = 104.0
-        self.clear_angle_margin = 3.0
         self.ptlid = list(self.ptls.keys())[0]
 
     def seed_vals(self, selection=None,enabled_only=False):
