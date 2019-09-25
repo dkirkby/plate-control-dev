@@ -32,6 +32,8 @@ class Rehome(PECS):
         self.printfunc(f'Attempt {attempt}, rehoming {len(posids)} '
                        f'positioners with anticollision: {anticollision}\n\n'
                        f'{posids}\n')
+        if self.allow_pause:
+            input('Paused for heat load monitoring, press enter to continue: ')
         ret = (self.ptl.rehome_pos(posids, axis=self.axis,
                                    anticollision=anticollision)
                .rename(columns={'X1': 'posintT', 'X2': 'posintP'})

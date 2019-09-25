@@ -19,14 +19,14 @@ class SeedOffsetsXY(PECS):
             self.interactive_ptl_setup()
         else:
             self.ptl_setup(petal_id, posids)
-        df = self.seed_vals()
+        updates = self.seed_vals()
         path = os.path.join(
             pc.dirs['calib_logs'],
             f'{pc.filename_timestamp_str_now()}-seed_offsets_xy.csv')
-        df.to_csv(path)
-        self.printfunc(
-            df[['DEVICE_ID', 'DEVICE_LOC', 'OFFSET_X', 'OFFSET_Y',
-                'POS_T', 'POS_P', 'LENGTH_R1', 'LENGTH_R2']])
+        updates.to_csv(path)
+        self.printfunc(  # preview calibration updates
+            updates[['DEVICE_ID', 'DEVICE_LOC', 'OFFSET_X', 'OFFSET_Y',
+                     'POS_T', 'POS_P', 'LENGTH_R1', 'LENGTH_R2']])
         self.printfunc(f'Seed offsets XY data saved to: {path}')
         if interactive:
             if self._parse_yn(input('Open offsets XY table? (y/n): ')):
@@ -68,18 +68,17 @@ class SeedOffsetsXY(PECS):
         updates = []
         for posid in self.posids:
             pos_info = index.find_by_device_id(posid)
+            device_loc = int(pos_info['DEVICE_LOC'])
+            x, y = pos[0, device_loc], pos[1, device_loc]
             update = {'DEVICE_ID': posid,
                       'DEVICE_LOC': pos_info['DEVICE_LOC'],
                       'PETAL_LOC': pos_info['PETAL_LOC'],
                       'MODE': 'initialize_offsets_xy'}
             update = self.ptl.collect_calib(update, tag='OLD_')
-            device_loc = int(pos_info['DEVICE_LOC'])
-            x, y = pos[0, device_loc], pos[1, device_loc]
-            update = self.ptl.collect_calib(update, tag='')
-            update['OFFSET_X'], update['OFFSET_Y'] = x, y
-            updates.append(update)
             self.ptl.set_posfid_val(posid, 'OFFSET_X', x)
             self.ptl.set_posfid_val(posid, 'OFFSET_Y', y)
+            update = self.ptl.collect_calib(update, tag='')
+            updates.append(update)
         self.ptl.commit(mode='calib', log_note='initialize_offsets_xy')
         return pd.DataFrame(updates)
 

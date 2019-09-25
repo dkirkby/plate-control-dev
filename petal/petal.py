@@ -909,6 +909,9 @@ class Petal(object):
                         state.log_unit()  # this writes the local log
             self.altered_states = set()
         elif mode == 'calib':
+            if self.local_commit_on:
+                for state in self.altered_calib_states:
+                    state.write()
             self.altered_calib_states = set()
 
     def expected_current_position(self, posid, key):

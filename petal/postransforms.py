@@ -244,11 +244,11 @@ class PosTransforms(petaltransforms.PetalTransforms):
         return self.poslocXY_to_posintTP(poslocXY, range_limits=range_limits)
 
     # %% composite transformations for convenience (degree 4)
-    def ptlXY_to_posintTP(self, ptlXY):
+    def ptlXY_to_posintTP(self, ptlXY, range_limits='full'):
         ''' input is list or tuple '''
         ptlXYZ = self.QS_to_obsXYZ(self.obsXY_to_QS(ptlXY, cast=True))  # add Z
         flatXY = self.ptlXYZ_to_flatXY(ptlXYZ).flatten()
-        return self.flatXY_to_posintTP(flatXY)
+        return self.flatXY_to_posintTP(flatXY, range_limits=range_limits)
 
     def posintTP_to_ptlXY(self, posintTP):
         ''' input is list or tuple '''
@@ -369,7 +369,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
         return dt, dp
 
     @staticmethod
-    def _wrap_consecutive_angles(self, angles, expected_direction):
+    def _wrap_consecutive_angles(angles, expected_direction):
         """
         input angles is a list of [120, 150, 180, 220, 300...]
         Wrap angles in one expected direction. It is expected that the
@@ -386,7 +386,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
         return wrapped
 
     @staticmethod
-    def _centralized_angular_offset_value(self, offset_angle):
+    def _centralized_angular_offset_value(offset_angle):
         """
         A special unwrapping check for OFFSET_T and OFFSET_P angles,
         for which we are always going to want to default to the option closer
@@ -535,3 +535,31 @@ if __name__ == '__main__':
     QS = trans.posintTP_to_QS(posintTP)
     print(f'QS = {QS}')
     print(f'posintTP, unreachable = {trans.QS_to_posintTP(QS)}')
+    
+    # arc test
+    posPs = [116.00129654158374, 128.601037233267, 141.20077792495024, 153.8005186166335, 166.40025930831675, 179.0]
+    posT = 0.345711781
+    
+    
+    posintTP = (0.345711781, 116.00129654158374)
+    from posstate import PosState
+    state = PosState(unit_id='M01135')
+    print(state._val)
+    model = posmodel.PosModel(state=state)
+    trans = PosTransforms(this_posmodel=model)
+    flatXY = trans.posintTP_to_flatXY(posintTP)
+    print('\nflatXY', flatXY)
+    QS = trans.posintTP_to_QS(posintTP)
+    print('QS', QS)
+    flatXY = trans.QS_to_flatXY(QS, cast=True).flatten()
+    print('back to flatXY', flatXY)
+    print('back to posintTP', trans.QS_to_posintTP(QS))
+    print('back to posintTP', trans.flatXY_to_posintTP(flatXY))
+    
+    
+#    tplist = []
+#    xylist = []
+#    for i, posP in enumerate(posPs):
+#        tplist.append((posT, posP))
+#        xylist.append(trans.posintTP_to_flatXY(tplist[i]))
+#    print(xylist)

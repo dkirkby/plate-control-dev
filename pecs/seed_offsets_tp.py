@@ -16,15 +16,15 @@ class SeedOffsetsTP(PECS):
             self.interactive_ptl_setup()
         else:
             self.ptl_setup(petal_id, posids)
-        df = self.seed_vals()
+        updates = self.seed_vals()
         path = os.path.join(
             pc.dirs['calib_logs'],
             f'{pc.filename_timestamp_str_now()}-seed_offsets_tp.csv')
-        df.to_csv(path)
-        self.printfunc(
-            df[['DEVICE_ID', 'POS_T', 'POS_P',
-                'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
-                'LENGTH_R1', 'LENGTH_R2']])
+        updates.to_csv(path)
+        self.printfunc(  # preview calibration updates
+            updates[['DEVICE_ID', 'POS_T', 'POS_P',
+                     'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
+                     'LENGTH_R1', 'LENGTH_R2']])
         self.printfunc(f'Seed offsets TP data saved to: {path}')
         if interactive:
             if self._parse_yn(input('Open offsets TP table? (y/n): ')):
@@ -42,12 +42,10 @@ class SeedOffsetsTP(PECS):
             self.ptl.set_posfid_val(posid, 'OFFSET_P',
                                     pc.nominals['OFFSET_P']['value'])
             update = self.ptl.collect_calib(update, tag='')
-            update['OFFSET_T'] = pc.nominals['OFFSET_T']['value']
-            update['OFFSET_P'] = pc.nominals['OFFSET_P']['value']
             updates.append(update)
         self.ptl.commit(mode='calib', log_note='initialize_offsets_xy')
         return pd.DataFrame(updates)
 
 
 if __name__ == '__main__':
-    SeedOffsetsTP(interactive=False)
+    SeedOffsetsTP(interactive=True)
