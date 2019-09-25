@@ -3,8 +3,9 @@ import posconstants as pc
 
 
 class SeedArmlengths(PECS):
-    def __init__(self, petal_id=None, posids=None, interactive=False):
-        super().__init__()
+    def __init__(self, fvc=None, ptls=None,
+                 petal_id=None, posids=None, interactive=False):
+        super().__init__(fvc=fvc, ptls=ptls)
         self.printfunc('\nSeeding armlengths...\n')
         if interactive:
             self.interactive_ptl_setup()

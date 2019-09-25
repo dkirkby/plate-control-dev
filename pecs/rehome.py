@@ -6,9 +6,9 @@ from rehome_verify import RehomeVerify
 
 class Rehome(PECS):
 
-    def __init__(self, petal_id=None, posids=None, axis='both',
-                 interactive=False):
-        super().__init__()
+    def __init__(self, fvc=None, ptls=None, axis='both',
+                 petal_id=None, posids=None, interactive=False):
+        super().__init__(fvc=fvc, ptls=ptls)
         input('WARNING: Driving positioners to their hardstops. '
               'Be sure you know what you are doing!\n'
               f'(Enter to continue): ')

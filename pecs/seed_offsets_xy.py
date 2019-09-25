@@ -11,8 +11,9 @@ from pecs import PECS
 
 
 class SeedOffsetsXY(PECS):
-    def __init__(self, petal_id=None, posids=None, interactive=False):
-        super().__init__()
+    def __init__(self, fvc=None, ptls=None,
+                 petal_id=None, posids=None, interactive=False):
+        super().__init__(fvc=fvc, ptls=ptls)
         self.printfunc('\nSeeding offsets XY...\n')
         if interactive:
             self.interactive_ptl_setup()

@@ -10,6 +10,6 @@ from seed_offsets_xy import SeedOffsetsXY
 from seed_offsets_tp import SeedOffsetsTP
 
 
-SeedArmlengths()
-SeedOffsetsXY()
-SeedOffsetsTP()
+calib = SeedArmlengths()
+SeedOffsetsXY(fvc=calib.fvc, ptls=calib.ptls)
+SeedOffsetsTP(fvc=calib.fvc, ptls=calib.ptls)

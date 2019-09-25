@@ -22,75 +22,64 @@ Added illuminator proxy for xy test control over LED (Duan 2019/06/07)
 '''
 
 from DOSlib.proxies import FVC, Petal  # , Illuminator
-from fvc_sim import FVC_proxy_sim
 import os
 import pandas as pd
+from configobj import ConfigObj
+from fvc_sim import FVC_proxy_sim
 
 
 class PECS:
-
-    '''input:
-        ptlids:                list of petal ids, each petal id is an integer
-        printfuncs:            dict of print functions, or a single print func
-                               (each petal may have its own print function or
-                                logger instance for log level filtering and
-                                log file separation purposes)
-        platemaker_instrument: name of the platemaker instrument file
-                               (for single usually something like petal5)
-        fvc_role:              The DOS role name of the the FVC application
-                               usually FVC or FVC1 or FVC2
+    '''if there is already a PECS instance from which you want to re-use
+       the proxies, simply pass in pecs.fvc and pecs.ptls
     '''
-
-    def __init__(self, ptlids=None, printfunc=print,
-                 platemaker_instrument=None, fvc_role=None,
-                 illuminator_role=None, constants_version=None):
+    def __init__(self, fvc=None, ptls=None, printfunc=print):
         # Allow local config so scripts do not always have to collect roles
         # and names from the user. No check for illuminator at the moment
         # since it is not used in tests.
-        if None in [platemaker_instrument, fvc_role, ptlids,
-                    constants_version]:
-            from configobj import ConfigObj
-            pecs_local = ConfigObj(
-                os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                             'pecs_local.cfg'),
-                unrepr=True, encoding='utf-8')
-            platemaker_instrument = pecs_local['pm_instrument']
-            fvc_role = pecs_local['fvc_role']
-            ptlids = pecs_local['ptlids']
-            constants_version = pecs_local['constants_version']
-            all_fiducials = (True if 'T' in
-                             str(pecs_local['all_fiducials']).upper()
-                             else False)
-        self.ptlids = ptlids
-        if type(printfunc) is not dict:  # if a single printfunc is supplied
-            printfuncs = {ptlid: printfunc for ptlid in ptlids}
+        pecs_local = ConfigObj(  # set basic self attributes
+            os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                         'pecs_local.cfg'),
+            unrepr=True, encoding='utf-8')
+        for attr in pecs_local.keys():
+            setattr(self, attr, pecs_local[attr])
+        # self.ptlids = pecs_local['ptlids']
+        # self.all_fiducials = pecs_local['all_fiducials']
+        # self.constants_version = pecs_local['constants_version']
+        # self.pm_instrument = pecs_local['pm_instrument']
+        # self.fvc_role = pecs_local['fvc_role']
+        # self.illuminator_role = pecs_local['illuminator_role']
+        if type(printfunc) is dict:  # a dict for all petals
+            # if input printfunc is already a dict, check consistency
+            assert set(self.ptlids) == set(printfunc.keys()), (
+                'Input ptlids mismatch')
+            self.printfuncs = printfunc
+        else:  # if a single printfunc is supplied
+            self.printfuncs = {ptlid: printfunc for ptlid in self.ptlids}
+        if fvc is None:  # instantiate FVC proxy, sim or real
+            if 'SIM' in self.fvc_role.upper():
+                self.fvc = FVC_proxy_sim()
+            else:
+                self.fvc = FVC(self.pm_instrument, fvc_role=self.fvc_role,
+                               constants_version=self.constants_version,
+                               all_fiducials=self.all_fiducials)
+            self.printfunc(f"FVC proxy created for instrument: "
+                           f"{self.fvc.get('instrument')}")
         else:
-            printfuncs = printfunc
-        # if input printfunc is already a dict, need to check consistency still
-        assert set(ptlids) == set(printfuncs.keys()), 'Input ptlids mismatch'
-        self.ptlids = ptlids
-        self.printfuncs = printfuncs
-        self.platemaker_instrument = platemaker_instrument
-        self.fvc_role = fvc_role
-        self.illuminator_role = illuminator_role
-        self.constants_version = constants_version
-        # call fvc proxy
-        if 'SIM' in self.fvc_role.upper():
-            self.fvc = FVC_proxy_sim()
+            self.fvc = fvc
+            self.printfunc(f"Reusing existing FVC proxy: "
+                           f"{self.fvc.get('instrument')}")
+        if ptls is None:
+            self.ptls = {}  # call petal proxy
+            for ptlid in self.ptlids:
+                self.ptls[ptlid] = Petal(petal_id=ptlid)  # no sim state ctrl
+                self.printfuncs[ptlid](
+                    f'Petal proxy initialised for {ptlid}, '
+                    f'simulator mode: {self.ptls[ptlid].simulator_on}')
         else:
-            self.fvc = FVC(self.platemaker_instrument, fvc_role=self.fvc_role,
-                           constants_version=self.constants_version,
-                           all_fiducials=all_fiducials)
-        self.printfunc(
-            f"FVC proxy created for instrument: {self.fvc.get('instrument')}")
-        self.ptls = {}  # call petal proxy
-        for ptlid in ptlids:
-            self.ptls[ptlid] = Petal(petal_id=ptlid)  # no sim state control
-            self.printfuncs[ptlid](
-                f'Petal proxy initialised for {ptlid}, '
-                f'simulator mode: {self.ptls[ptlid].simulator_on}')
-        # this crashes don't uncomment this KF 06/18/19
-        # self.illuminator = Illuminator()
+            self.ptls = ptls
+            self.printfunc(
+                f'Reusing existing petal proxies for petals {self.ptlids}')
+        # self.illuminator = Illuminator()  # this crashes KF 06/18/19
 
     def printfunc(self, msg):
         '''self.printfuncs is a dict indexed by ptlids as specified for input,
