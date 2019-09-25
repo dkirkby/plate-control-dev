@@ -154,11 +154,12 @@ class PECS:
             posids = sorted(list(self.ptls[ptlid].get_positioners(
                 enabled_only=enabled_only, busids=selection)['DEVICE_ID']))
         else:  # assume is a list of posids
-            posids = sorted(selection)
+            posids = sorted(list(self.ptls[ptlid].get_positioners(
+                enabled_only=enabled_only, posids=selection)['DEVICE_ID']))
         self.printfunc(f'Selected {len(posids)} positioners')
         return posids
 
-    def fvc_measure(self, exppos=None):
+    def fvc_measure(self, exppos=None, match_radius=80):
         '''use the expected positions given, or by default use internallly
         tracked current expected positions for fvc measurement
         returns expected_positions (df), measured_positions (df),
@@ -167,7 +168,7 @@ class PECS:
             exppos = (self.ptl.get_positions(return_coord='QS')
                       .sort_values(by='DEVICE_ID'))  # includes all posids
         mr_old = self.fvc.get('match_radius')  # hold old match radius
-        self.fvc.set(match_radius=80)  # set larger radius for calib
+        self.fvc.set(match_radius=match_radius)  # set larger radius for calib
         # measured_QS, note that expected_pos was changed in place
         meapos = (pd.DataFrame(self.fvc.measure(exppos))
                   .rename(columns={'id': 'DEVICE_ID'})
