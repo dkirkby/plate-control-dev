@@ -10,13 +10,14 @@ pecs/GridCalib.py -text
 pecs/OnePoint.py -text
 pecs/OnePoint_offsetsTP.py -text
 pecs/OnePoint_posTP.py -text
+pecs/batch_seed.py -text
+pecs/batch_seed_1p.py -text
 pecs/fptestdata.py -text
 pecs/fvc_sim.py -text
 pecs/pecs.py -text
 pecs/pecs_local.cfg -text
 pecs/rehome.py -text
 pecs/rehome_verify.py -text
-pecs/seed_all_calibration_values.py -text
 pecs/seed_armlengths.py -text
 pecs/seed_offsets_tp.py -text
 pecs/seed_offsets_xy.py -text

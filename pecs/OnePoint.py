@@ -15,6 +15,7 @@ class OnePoint(PECS):
     '''
     def __init__(self, fvc=None, ptls=None, mode='posTP',
                  petal_id=None, posids=None, interactive=False):
+        self.printfunc(f'Running 1p calibration, mode = {mode}')
         super().__init__(fvc=fvc, ptls=ptls)
         if interactive:
             self.interactive_ptl_setup()
