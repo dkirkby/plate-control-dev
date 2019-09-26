@@ -505,7 +505,7 @@ if __name__ == '__main__':
     try several gamma rotaion values here, e.g. 0, 36 deg, 180 deg
     '''
     petal_alignment = {'Tx': 0, 'Ty': 0, 'Tz': 0,
-                       'alpha': 0, 'beta': 0, 'gamma': 0/180*math.pi}
+                       'alpha': 0, 'beta': 0, 'gamma': 180/180*math.pi}
     trans = PosTransforms(petal_alignment=petal_alignment)
     state = trans.posmodel.state
     # device location 0 on petal
@@ -535,31 +535,4 @@ if __name__ == '__main__':
     QS = trans.posintTP_to_QS(posintTP)
     print(f'QS = {QS}')
     print(f'posintTP, unreachable = {trans.QS_to_posintTP(QS)}')
-    
-    # arc test
-    posPs = [116.00129654158374, 128.601037233267, 141.20077792495024, 153.8005186166335, 166.40025930831675, 179.0]
-    posT = 0.345711781
-    
-    
-    posintTP = (0.345711781, 116.00129654158374)
-    from posstate import PosState
-    state = PosState(unit_id='M01135')
-    print(state._val)
-    model = posmodel.PosModel(state=state)
-    trans = PosTransforms(this_posmodel=model)
-    flatXY = trans.posintTP_to_flatXY(posintTP)
-    print('\nflatXY', flatXY)
-    QS = trans.posintTP_to_QS(posintTP)
-    print('QS', QS)
-    flatXY = trans.QS_to_flatXY(QS, cast=True).flatten()
-    print('back to flatXY', flatXY)
-    print('back to posintTP', trans.QS_to_posintTP(QS))
-    print('back to posintTP', trans.flatXY_to_posintTP(flatXY))
-    
-    
-#    tplist = []
-#    xylist = []
-#    for i, posP in enumerate(posPs):
-#        tplist.append((posT, posP))
-#        xylist.append(trans.posintTP_to_flatXY(tplist[i]))
-#    print(xylist)
+

@@ -223,8 +223,8 @@ class PetalTransforms(object):
             flatXY = typecast(flatXY)
         # assume this petal is mounted nomically in location 3
         # i.e. let the petal local CS align with CS5 and QS coordinates
-        QS = self.obsXY_to_QS(flatXY, curved=False)  # effectively flatXY to QS
-        return self.QS_to_ptlXYZ(QS)
+        QS = self.obsXY_to_QS(flatXY, curved=False)  # this is QS in CS5
+        return self.QS_to_obsXYZ(QS)
 
     # %% composite transformations for convenience
     def ptlXYZ_to_QS(self, ptlXYZ, cast=False):
@@ -332,31 +332,31 @@ if __name__ == '__main__':
     [23.233778, 12.1450584, -81.9095268] in petal CS
 
     """
-    ptltrans = PetalTransforms(Tx=0.01261281, Ty=0.068910657, Tz=0.017850711,
-                               alpha=0.001382631,
-                               beta=-0.002945219,
-                               gamma=35.9887675/180*np.pi)
-    obsXYZ_actual = np.array([11.671,	23.542,	-81.893]).reshape(3, 1)
-    ptlXYZ_actual = np.array([23.2337, 12.1450, -81.9095]).reshape(3, 1)
+    trans = PetalTransforms(Tx=0.01261281, Ty=0.068910657, Tz=0.017850711,
+                            alpha=0.001382631,
+                            beta=-0.002945219,
+                            gamma=-180/180*np.pi)
+    # location 0
+    ptlXYZ = np.array([28.134375, 5.201437, -0.082419]).reshape(3, 1)
+    # obsXYZ_actual = np.array([11.671,	23.542,	-81.893]).reshape(3, 1)
+    # ptlXYZ_actual = np.array([23.2337, 12.1450, -81.9095]).reshape(3, 1)
     # print(f'obsXYZ, actual: {obsXYZ_actual.T}\ntransformed: {obsXYZ.T}\n'
     #       f'ptlXYZ, actual: {ptlXYZ_actual.T}\ntransformed: {ptlXYZ.T}')
-    ptltrans = PetalTransforms()
     # device location 526
-    ptlXYZ = np.array([346.797988,	194.710169,	-17.737838]).reshape(3, 1)
-    obsXYZ = ptltrans.ptlXYZ_to_obsXYZ(ptlXYZ)
-    ptlXYZ = ptltrans.obsXYZ_to_ptlXYZ(obsXYZ)
+    obsXYZ = trans.ptlXYZ_to_obsXYZ(ptlXYZ)
+    ptlXYZ = trans.obsXYZ_to_ptlXYZ(obsXYZ)
     print(f'obsXYZ = {obsXYZ.T}')
     print(f'ptlXYZ = {ptlXYZ.T}')
-    QS = ptltrans.obsXYZ_to_QS(obsXYZ)
+    QS = trans.obsXYZ_to_QS(obsXYZ)
     print(f'QS = {QS.T}')
-    print(f'obsXYZ = {ptltrans.QS_to_obsXYZ(QS).T}')
-    obsXY = ptltrans.QS_to_obsXY(QS)
+    print(f'obsXYZ = {trans.QS_to_obsXYZ(QS).T}')
+    obsXY = trans.QS_to_obsXY(QS)
     print(f'obsXY = {obsXY.T}')
-    print(f'QS = {ptltrans.obsXY_to_QS(obsXY).T}')
-    flatXY = ptltrans.ptlXYZ_to_flatXY(ptlXYZ)
+    print(f'QS = {trans.obsXY_to_QS(obsXY).T}')
+    flatXY = trans.ptlXYZ_to_flatXY(ptlXYZ)
     print(f'flatXY = {flatXY.T}')
-    print(f'ptlXYZ = {ptltrans.flatXY_to_ptlXYZ(flatXY).T}')
-    print(f'QS = {ptltrans.ptlXYZ_to_QS(ptlXYZ).T}')
-    print(f'ptlXYZ = {ptltrans.QS_to_ptlXYZ(QS).T}')
-    print(f'QS = {ptltrans.flatXY_to_QS(flatXY).T}')
-    print(f'flatXY = {ptltrans.QS_to_flatXY(QS).T}')
+    print(f'ptlXYZ = {trans.flatXY_to_ptlXYZ(flatXY).T}')
+    print(f'QS = {trans.ptlXYZ_to_QS(ptlXYZ).T}')
+    print(f'ptlXYZ = {trans.QS_to_ptlXYZ(QS).T}')
+    print(f'QS = {trans.flatXY_to_QS(flatXY).T}')
+    print(f'flatXY = {trans.QS_to_flatXY(QS).T}')

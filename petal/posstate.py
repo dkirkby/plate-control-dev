@@ -58,6 +58,7 @@ class PosState(object):
         else:
             self.petal_state_defaults = None
         if self.write_to_DB:  # data initialization from database
+            self.printfunc('posstate DB write on')
             if petal_id is not None:  # ptlid is given, simple
                 self.ptlid = petal_id
                 if unit_id is not None:  # both ptlid and unit_id given
@@ -93,8 +94,9 @@ class PosState(object):
             # below is directly repositioned from old version
             if petal_id is None:  # ptlid is none, what about unit id?
                 if unit_id is not None and self.type == 'ptl':
-                    self.ptlid = unit_id
+                    self.unit_id = self.ptlid = unit_id
             else:
+                self.unit_id = unit_id
                 self.ptlid = petal_id
                 self.unit_basename = 'unit_' + str(unit_id)
             self.load_from_cfg(unit_id=unit_id)
@@ -152,7 +154,7 @@ class PosState(object):
 
     def set_ptlid_from_pi(self, unit_id):
         ''' lookup petal id using unit_id for pos, fid from PositionerIndex '''
-        pi = PositionerIndex(os.getenv('DOS_POSITIONERINDEXTABLE'))
+        pi = PositionerIndex()
         ret = pi.find_by_arbitrary_keys(DEVICE_TYPE=self.type.upper(),
                                         DEVICE_ID=unit_id)
         assert len(ret) == 1, f'lookup not unique, {ret}'
