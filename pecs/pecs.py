@@ -125,7 +125,7 @@ class PECS:
             return int(ptlid)
         else:
             self.printfunc('Invalid input, must be an integer, retry')
-            self._interactively_get_ptl()
+            return self._interactively_get_ptl()
 
     def _interactively_get_posids(self, ptlid):
         user_text = input('Please list CAN bus IDs or posids, seperated by '
