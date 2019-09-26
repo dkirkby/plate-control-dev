@@ -175,6 +175,7 @@ class Petal(object):
         else:  # new alingment supplied, overwrite self.aglinment attribute
             self.alignment = alignment
         # debug
+        self.printfunc(f'Overiding petal alignment in DB for testing')
         self.alignment = {'Tx': 0,  # x translation in mm
                           'Ty': 0,  # y translation in mm
                           'Tz': 0,  # z translation in mm
@@ -230,8 +231,8 @@ class Petal(object):
                 configfile=collider_file, collision_hashpp_exists=False,
                 collision_hashpf_exists=False, hole_angle_file=None)
             # self.anticol_settings = self.collider.config
-        if self.verbose:
-            self.printfunc(f'PosCollider setting: {self.collider.config}')
+        # if self.verbose:
+        self.printfunc(f'PosCollider setting: {self.collider.config}')  # debug
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
         # this should be turned on/off using the animation start/stop

@@ -174,9 +174,9 @@ class PetalTransforms:
         return np.array([X, Y])
 
     def obsXYZ_to_QS(self, obsXYZ, curved=None, cast=False):
-        """Transform obsXYZ coordinates into QS system.
+        """Transform obsXYZ or obsXY coordinates into QS system.
         Z data (in 3rd row) aren't used at all, as X and Y are sufficient.
-        INPUT:  3 x N array, each column vector is obsXYZ
+        INPUT:  3 x N or 2 x N array, each column vector is obsXYZ
         OUTPUT: 2 x N array of corresponding [[q0,s0],[q1,s1],...]
         """
         if cast:
@@ -203,7 +203,8 @@ class PetalTransforms:
     # %% flatXY transforms within petal local coordinates
     def ptlXYZ_to_flatXY(self, ptlXYZ, cast=False):
         """
-        INPUT:  3 x N array, each column vector is ptlXYZ, petal-local
+        INPUT:  3 x N or 2 x N array, each column vector is ptlXYZ or ptlXY
+                in petal-local
         OUTPUT: 2 x N array, each column vector is flatXY, petal-local
         useful for seeding xy offsets on flattened focal surface
         """
