@@ -47,7 +47,8 @@ class ArcCalib(PECS):
             if match_radius is None:  # Ask for match_radius
                 match_radius = float(input(
                     'Please provide a spotmatch radius: '))
-            self.calibrate(auto_update=auto_update, match_radius=match_radius)
+            return self.calibrate(auto_update=auto_update,
+                                  match_radius=match_radius)
 
         req_list_T, req_list_P = self.ptl.get_arc_requests(
             ids=self.posids,

@@ -57,7 +57,7 @@ class PECS:
             self.printfuncs = {ptlid: printfunc for ptlid in self.ptlids}
         if fvc is None:  # instantiate FVC proxy, sim or real
             if 'SIM' in self.fvc_role.upper():
-                self.fvc = FVC_proxy_sim(max_err=0.005)
+                self.fvc = FVC_proxy_sim(max_err=0.0001)
             else:
                 self.fvc = FVC(self.pm_instrument, fvc_role=self.fvc_role,
                                constants_version=self.constants_version,

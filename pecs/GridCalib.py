@@ -47,7 +47,8 @@ class GridCalib(PECS):
             if match_radius is None:  # Ask for match_radius
                 match_radius = float(input(
                     'Please provide a spotmatch radius: '))
-            self.calibrate(auto_update=auto_update, match_radius=match_radius)
+            return self.calibrate(auto_update=auto_update,
+                                  match_radius=match_radius)
 
         req_list = self.ptl.get_grid_requests(ids=self.posids,
                                               n_points_T=self.n_points_T,
