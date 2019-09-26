@@ -543,4 +543,3 @@ if __name__ == '__main__':
     model = PosModel(state=state)
     trans = model.trans
     print(model.expected_current_position)
-    
