@@ -174,6 +174,13 @@ class Petal(object):
                                   'gamma': 0}  # z rotation rad
         else:  # new alingment supplied, overwrite self.aglinment attribute
             self.alignment = alignment
+        # debug
+        self.alignment = {'Tx': 0,  # x translation in mm
+                          'Ty': 0,  # y translation in mm
+                          'Tz': 0,  # z translation in mm
+                          'alpha': 0,  # x rotation in rad
+                          'beta': 0,  # y rotation in rad
+                          'gamma': 3.14159265359}  # z rotation rad
         self.printfunc(f'Petal transform initialised with\n{self.alignment}')
         self.trans = PetalTransforms(Tx=self.alignment['Tx'],
                                      Ty=self.alignment['Ty'],

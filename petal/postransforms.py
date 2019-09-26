@@ -258,13 +258,13 @@ class PosTransforms(petaltransforms.PetalTransforms):
 
     # %% composite transformations for convenience (degree 6)
     def posintTP_to_QS(self, posintTP):
-        """Composite transformation, performs posintTP --> obsXY --> QS"""
+        """Composite transformation, performs posintTP --> flatXY --> QS"""
         flatXY = self.posintTP_to_flatXY(posintTP)  # ptl local (flatX, flatY)
         QS = self.flatXY_to_QS(flatXY, cast=True).flatten()  # 1D array
         return tuple(QS)
 
     def QS_to_posintTP(self, QS, range_limits='full'):
-        """Composite transformation, performs QS --> obsXY --> posintTP"""
+        """Composite transformation, performs QS --> flatXY --> posintTP"""
         flatXY = self.QS_to_flatXY(QS, cast=True).flatten()  # 1D array
         return self.flatXY_to_posintTP(flatXY, range_limits)  # tp, unreachable
 
@@ -505,11 +505,11 @@ if __name__ == '__main__':
     try several gamma rotaion values here, e.g. 0, 36 deg, 180 deg
     '''
     petal_alignment = {'Tx': 0, 'Ty': 0, 'Tz': 0,
-                       'alpha': 0, 'beta': 0, 'gamma': 180/180*math.pi}
+                       'alpha': 0, 'beta': 0, 'gamma': 0/180*math.pi}
     trans = PosTransforms(petal_alignment=petal_alignment)
     state = trans.posmodel.state
     # device location 0 on petal
-    state._val['OFFSET_X'], state._val['OFFSET_Y'] = 28.134375, 5.201437
+    state._val['OFFSET_X'], state._val['OFFSET_Y'] = 346.797988, 194.710169
     print(f'posstate values:\n{state._val}')
     posintTP = (0, 120)
     poslocTP = trans.posintTP_to_poslocTP(posintTP)
@@ -535,4 +535,12 @@ if __name__ == '__main__':
     QS = trans.posintTP_to_QS(posintTP)
     print(f'QS = {QS}')
     print(f'posintTP, unreachable = {trans.QS_to_posintTP(QS)}')
+    print(f'flatXY = {trans.QS_to_flatXY(QS, cast=True).flatten()}')
 
+    from posstate import PosState
+    from posmodel import PosModel
+    state = PosState('M00677')
+    model = PosModel(state=state)
+    trans = model.trans
+    print(model.expected_current_position)
+    

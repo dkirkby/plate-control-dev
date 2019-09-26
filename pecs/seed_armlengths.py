@@ -11,10 +11,10 @@ class SeedArmlengths(PECS):
             self.interactive_ptl_setup()
         else:
             self.ptl_setup(petal_id, posids)
-        self.seed_armlengths()
+        self.seed_vals()
         self.printfunc('Please check DB to ensure new values are committed.')
 
-    def seed_armlengths(self):
+    def seed_vals(self):
         for posid in self.posids:
             self.ptl.set_posfid_val(posid, 'LENGTH_R1',
                                     pc.nominals['LENGTH_R1']['value'])

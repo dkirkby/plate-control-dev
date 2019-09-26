@@ -49,7 +49,7 @@ def typecast(x):
 
 
 # %% class definition
-class PetalTransforms(object):
+class PetalTransforms:
     """
     This class provides transformations between the petal local nominal
     coordinate system (CAD model) and the focal plane CS5.
@@ -335,9 +335,10 @@ if __name__ == '__main__':
     trans = PetalTransforms(Tx=0.01261281, Ty=0.068910657, Tz=0.017850711,
                             alpha=0.001382631,
                             beta=-0.002945219,
-                            gamma=-180/180*np.pi)
-    # location 0
-    ptlXYZ = np.array([28.134375, 5.201437, -0.082419]).reshape(3, 1)
+                            gamma=0/180*np.pi)
+    trans = PetalTransforms(gamma=-180/180*np.pi)
+    # location 408
+    ptlXYZ = np.array([319.951289, 131.457285, -13.262356]).reshape(3, 1)
     # obsXYZ_actual = np.array([11.671,	23.542,	-81.893]).reshape(3, 1)
     # ptlXYZ_actual = np.array([23.2337, 12.1450, -81.9095]).reshape(3, 1)
     # print(f'obsXYZ, actual: {obsXYZ_actual.T}\ntransformed: {obsXYZ.T}\n'
@@ -345,6 +346,10 @@ if __name__ == '__main__':
     # device location 526
     obsXYZ = trans.ptlXYZ_to_obsXYZ(ptlXYZ)
     ptlXYZ = trans.obsXYZ_to_ptlXYZ(obsXYZ)
+    QS = trans.obsXY_to_QS(obsXYZ[:2, :])
+    print(f'QS = {QS.T}')
+    obsXY = trans.QS_to_obsXY(QS)
+    print(f'obsXY = {obsXY.T}')
     print(f'obsXYZ = {obsXYZ.T}')
     print(f'ptlXYZ = {ptlXYZ.T}')
     QS = trans.obsXYZ_to_QS(obsXYZ)

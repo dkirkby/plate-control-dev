@@ -4,8 +4,6 @@ Requires running DOS instance. See pecs.py
 Currently only runs one Petal at a time, awaiting a petalMan proxy.
 '''
 import os
-# import pandas as pd
-# from ast import literal_eval
 import posconstants as pc
 from pecs import PECS
 
@@ -34,22 +32,18 @@ class ArcCalib(PECS):
                      'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P']])
         updates.to_csv(path+'.csv')
         updates.to_pickle(path+'.pkl')
-        self.printfunc(f'Arc cabration data saved to: {path}')
-        if self._parse_yn(input('Open arc calibration data table? (y/n): ')):
-            os.system(f'xdg-open {path+.csv}')
+        self.printfunc(f'Arc calibration data saved to: {path}')
+        if interactive:
+            if self._parse_yn(input(
+                    'Open arc calibration data table? (y/n): ')):
+                os.system(f"xdg-open {path+'.csv'}")
 
     def calibrate(self, auto_update=True, match_radius=80,
                   interactive=False):
-        '''
-        Executes an Arc calibration and sets data and data_path attributes
-        '''
         if interactive:
             if auto_update is None:  # Ask for auto_update
                 auto_update = self._parse_yn(input(
                         'Automatically update calibration? (y/n): '))
-            # if user_confirmation is None:  # weather to pause
-            #     user_confirmation = self._parse_yn(input(
-            #         'Pause between moves for heat monitoring? (y/n) '))
             if match_radius is None:  # Ask for match_radius
                 match_radius = float(input(
                     'Please provide a spotmatch radius: '))

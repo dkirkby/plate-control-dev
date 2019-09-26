@@ -22,7 +22,19 @@ class OnePointCalib(PECS):
         else:
             self.ptl_setup(petal_id, posids)
         self.poslocP = 135  # phi arm angle for 1 point calibration
-        self.calibrate(mode=mode, interactive=interactive)
+        updates = self.calibrate(mode=mode, interactive=interactive)
+        # save results
+        path = os.path.join(
+            pc.dirs['calib_logs'],
+            f'{pc.filename_timestamp_str_now()}-1p_calibration-{mode}.csv')
+        updates.to_csv(path)
+        self.printfunc(  # preview calibration updates
+            updates[['POS_T', 'POS_P', 'dT', 'dP', 'OFFSET_T', 'OFFSET_P']])
+        self.printfunc(f'Seed offsets TP data saved to: {path}')
+        if interactive:
+            if self._parse_yn(input(
+                    'Open 1p calibration data table? (y/n): ')):
+                os.system(f'xdg-open {path}')
 
     def calibrate(self, mode='posTP', tp_target='default',
                   auto_update=True, match_radius=80.0, interactive=False):
@@ -86,16 +98,7 @@ class OnePointCalib(PECS):
         updates['auto_update'] = auto_update
         updates['target_t'] = requests.set_index('DEVICE_ID')['X1']
         updates['target_p'] = requests.set_index('DEVICE_ID')['X2']
-        # save results
-        path = os.path.join(
-            pc.dirs['calib_logs'],
-            f'{pc.filename_timestamp_str_now()}-1p_calibration-{mode}.csv')
-        updates.to_csv(path)
-        self.printfunc(  # preview calibration updates
-            updates[['POS_T', 'POS_P', 'dT', 'dP', 'OFFSET_T', 'OFFSET_P']])
-        self.printfunc(f'Seed offsets TP data saved to: {path}')
-        if self._parse_yn(input('Open 1p calibration data table? (y/n): ')):
-            os.system(f'xdg-open {path}')
+        return updates
 
     # def set_calibration(self, posids=None, reset=False,
     #                     avoid_big_changes=True):
