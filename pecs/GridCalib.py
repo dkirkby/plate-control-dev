@@ -21,8 +21,8 @@ class GridCalib(PECS):
             self.interactive_ptl_setup()
         else:
             self.ptl_setup(petal_id, posids)
-        self.n_points_P = 3 # 5
-        self.n_points_T = 3 # 7
+        self.n_points_P = 4 # 5
+        self.n_points_T = 4 # 7
         updates = self.calibrate(interactive=interactive)
         path = os.path.join(
             pc.dirs['calib_logs'],
@@ -104,4 +104,4 @@ class GridCalib(PECS):
 
 
 if __name__ == '__main__':
-    GridCalib()
+    GridCalib(interactive=True)

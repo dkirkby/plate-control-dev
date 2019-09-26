@@ -63,4 +63,4 @@ class Rehome(PECS):
 
 if __name__ == '__main__':
     # Rehome(interactive=True)  # main runs interactively
-    Rehome(interactive=False)
+    Rehome(interactive=True)
