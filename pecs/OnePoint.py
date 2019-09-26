@@ -39,28 +39,19 @@ class OnePointCalib(PECS):
     def calibrate(self, mode='posTP', tp_target='default',
                   auto_update=True, match_radius=80.0, interactive=False):
         if interactive:
-            if mode is None:  # Ask for mode
-                mode = input('Please enter one point calibration mode '
-                             '(posTP/offsetsTP/both): ')
-                assert mode in ['posTP', 'offsetsTP', 'both'], 'Invalid mode!'
-            if tp_target is None:  # Ask for tp_target
-                user_text = self._parse_yn(
-                    input('Do you want to move positioners? (y/n): '))
-                if user_text:
-                    tp_target = 'default'
-                else:
-                    tp_target = None
-            if auto_update is None:  # Ask for auto_update
-                auto_update = self._parse_yn(input(
-                        'Automatically update calibration? (y/n): '))
-            # if user_confirmation is None:  # weather to pause
-            #     user_confirmation = self._parse_yn(input(
-            #         'Pause between moves for heat monitoring? (y/n) '))
-            if match_radius is None:  # Ask for match_radius
-                match_radius = float(input(
-                    'Please provide a spotmatch radius: '))
-            self.calibrate(mode=mode, tp_target=tp_target,
-                           auto_update=auto_update, match_radius=match_radius)
+            user_text = self._parse_yn(
+                input('Do you want to move positioners? (y/n): '))
+            if user_text:
+                tp_target = 'default'
+            else:
+                tp_target = None
+            auto_update = self._parse_yn(input(
+                    'Automatically update calibration? (y/n): '))
+            match_radius = float(input(
+                'Please provide a spotmatch radius: '))
+            return self.calibrate(mode=mode, tp_target=tp_target,
+                                  auto_update=auto_update,
+                                  match_radius=match_radius)
         do_move = True
         if tp_target == 'default':  # tp_target as target
             poslocTP = (0.0, self.poslocP)  # same target for all posids
@@ -68,8 +59,8 @@ class OnePointCalib(PECS):
             poslocTP = tp_target
         else:
             do_move = False
-        if do_move:  # then build move requests and move positioners
-            rows = []
+        rows = []
+        if do_move:  # then build requests and make the moves
             for posid in self.posids:
                 posintTP = self.ptl.postrans(posid,
                                              'poslocTP_to_posintTP', poslocTP)
@@ -81,6 +72,9 @@ class OnePointCalib(PECS):
             requests = pd.DataFrame(rows)
             self.ptl.prepare_move(requests, anticollision=None)
             self.ptl.execute_move()
+        else:  # then use current position as targets in requests
+            requests = self.ptl.get_positions(posids=self.posids,
+                                              return_coord='posintTP')
         exppos, meapos, matched, unmatched = self.fvc_measure(
                 match_radius=match_radius)
         used_pos = meapos.loc[sorted(list(matched))]  # only matched rows

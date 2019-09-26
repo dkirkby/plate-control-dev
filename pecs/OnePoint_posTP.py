@@ -1,3 +1,3 @@
 from OnePoint import OnePointCalib
 if __name__ == '__main__':
-    OnePointCalib(mode='posTP', interactive=False)
+    OnePointCalib(mode='posTP', interactive=True)
