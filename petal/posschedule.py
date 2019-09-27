@@ -382,7 +382,6 @@ class PosSchedule(object):
         'rotate', and 'extend' stages with motion paths from start to finish.
         The move tables may include adjustments of paths to avoid collisions.
         """
-        print('posschedule _schedule_requests_with_path_adjustments called')
         start_posintTP = {name: {} for name in self.RRE_stage_order}
         desired_final_posintTP = {name: {} for name in self.RRE_stage_order}
         dtdp = {name: {} for name in self.RRE_stage_order}
@@ -427,7 +426,6 @@ class PosSchedule(object):
                 range_wrap_limits='targetable')
         for i in range(len(self.RRE_stage_order)):
             name = self.RRE_stage_order[i]
-            self.printfunc('stage name:', name)
             stage = self.stages[name]
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
             if self.should_anneal:
@@ -439,6 +437,10 @@ class PosSchedule(object):
                 stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             attempts_remaining = self.max_path_adjustment_passes
+            # take this out once stage.colliding is working
+            ori_stage_colliding = copymodule.deepcopy(stage.colliding)
+            # take this out once stage.colliding is working
+            ori_colliding_posid = list(stage.colliding)
             if self.verbose:
                 # take this out once stage.colliding is working
                 ori_colliding_posid = list(stage.colliding)

@@ -61,12 +61,11 @@ class XYTest(PECS):
         self.logger = self.data.logger
         # petalids are just ints now, DB and DOS have forced the conversion
         printfuncs = {pid: self.loggers[pid].info for pid in self.data.ptlids}
-        PECS.__init__(self, ptlids=self.data.ptlids, printfunc=printfuncs)
-        self.enable_debugg_log()
+        super().__init__(printfunc=printfuncs)
         self._get_pos_info()
         self.generate_targets()  # generate local targets or load from file
         self.logger.info([
-            f'PlateMaker instrument: {self.platemaker_instrument}',
+            f'PlateMaker instrument: {self.pm_instrument}',
             f'FVC role: {self.fvc_role}',
             f'Max num of corrections: {self.data.num_corr_max}',
             f'Num of local targets: {len(self.data.targets)}'])
@@ -195,7 +194,7 @@ class XYTest(PECS):
         try:
             for ptlid in self.data.ptlids:
                 self.ptls[ptlid].schedule_stats.save()
-        except NameError:
+        except (NameError, AttributeError):
             self.logger.warning('Call to schedule_stats.save() failed')
         # self.illuminator.set(led=led_initial)  # restore initial LED state
 
@@ -331,13 +330,15 @@ class XYTest(PECS):
     def record_measurement(self, measured_QS, i, n):
         def lookup_ptlid(posid):
             for ptlid, posids in self.data.posids_ptl.items():
-                if posid in posids:
-                    return ptlid
+                return ptlid if posid in posids else None
+        for posid in measured_QS.index:
+            if lookup_ptlid(posid) is None:  # keep only the selected posids
+                measured_QS.drop(posid, inplace=True)
         QS = measured_QS[['Q', 'S']].values.T  # 2 x N array
         poslocXY = np.zeros(QS.shape)  # empty array
-        for i, posid in enumerate(measured_QS.index):
-            poslocXY[:, i] = self.ptls[lookup_ptlid(posid)].postrans(
-                posid, 'QS_to_poslocXY', QS)
+        for j, posid in enumerate(measured_QS.index):
+            poslocXY[:, j] = self.ptls[lookup_ptlid(posid)].postrans(
+                posid, 'QS_to_poslocXY', QS[:, j])
         new = pd.DataFrame({f'meas_q_{n}': QS[0, :],
                             f'meas_s_{n}': QS[1, :],
                             f'meas_x_{n}': poslocXY[0, :],
@@ -369,7 +370,7 @@ class XYTest(PECS):
 
 
 if __name__ == '__main__':
-    path = os.path.join(pc.dirs['test_settings'], 'xytest_ptl0.cfg')
+    path = os.path.join(pc.dirs['test_settings'], 'xytest_sim.cfg')
     xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')  # read cfg
     xytest_name = input('Please name this test: ')
     test = XYTest(xytest_name, xytest_cfg)

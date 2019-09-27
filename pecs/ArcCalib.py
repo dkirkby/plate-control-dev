@@ -94,4 +94,4 @@ class ArcCalib(PECS):
 
 
 if __name__ == '__main__':
-    ArcCalib(interactive=True)
+    ArcCalib(interactive=False)
