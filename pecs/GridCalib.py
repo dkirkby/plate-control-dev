@@ -1,76 +1,108 @@
 '''
-Runs a Grid Calibration using fvc and petal proxies. Requires running DOS instance. See pecs.py
+Runs an Grid Calibration using fvc and petal proxies.
+Requires running DOS instance. See pecs.py
+Currently only runs one Petal at a time, awaiting a petalMan proxy.
 '''
 import os
-from pecs import PECS
 import posconstants as pc
-import pandas
+from pecs import PECS
 
-class Grid(PECS):
-    
-    def __init__(self,petal_id=None, platemaker_instrument=None, fvc_role=None, printfunc = print):
-        PECS.__init__(self,ptlids=petal_id, platemaker_instrument=platemaker_instrument, fvc_role=fvc_role, printfunc=printfunc)
-        self.ptlid = list(self.ptls.keys())[0]
-        return
 
-    def grid_calibration(self,selection=None,n_points_P=5, n_points_T=7,enabled_only=True,auto_update=True,match_radius=80.0):
-        if selection is None:
-            posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only).loc[:,'DEVICE_ID'])
-        elif selection[0][0] == 'c': #User passed busids
-            posid_list = list(self.ptls[self.ptlid].get_positioners(enabled_only=enabled_only, busids=selection).loc[:,'DEVICE_ID'])
-        else: #assume is a list of posids
-            posid_list = selection
-        requests_list = self.ptls[self.ptlid].get_grid_requests(ids=posid_list,n_points_T=n_points_T,n_points_P=n_points_P)
-        meas_data = []
-        i = 1
-        old_radius = self.fvc.get('match_radius')
-        self.fvc.set(match_radius=match_radius)
-        for request in requests_list:
-            print('Measuring grid point '+str(i)+' of '+str(len(requests_list)))
-            i += 1 
-            self.ptls[self.ptlid].prepare_move(request, anticollision=None)
-            expected_positions = self.ptls[self.ptlid].execute_move()
-            measured_positions = self.fvc.measure(expected_positions)
-            measured_positions = pandas.DataFrame.from_dict(measured_positions)
-            measured_positions.rename(columns={'q':'MEASURED_Q','s':'MEASURED_S','flags':'FLAGS', 'id':'DEVICE_ID'},inplace=True)
-            used_positions = measured_positions[measured_positions['DEVICE_ID'].isin(posid_list)]
-            request.rename(columns={'X1':'TARGET_T','X2':'TARGET_P'}, inplace=True)
-            merged = used_positions.merge(request, how='outer',on='DEVICE_ID')
-            unmatched_merged = merged.loc[merged['FLAGS'].isnull()]
-            #if unmatched_merged.empty:
-            #    unmatched_merged = merged[merged['FLAGS'] & 1 == 0] #split into unmatched and matched
-            #    matched_merged = merged[merged['FLAGS'] & 1 != 0]
-            #else:
-            matched_merged = merged.loc[merged['FLAGS'].notnull()]
-            unmatched = unmatched_merged['DEVICE_ID'].values
-            print(f'Missing {len(unmatched)} of the selected positioners:\n{unmatched}')
-            meas_data.append(merged)
-        self.fvc.set(match_radius=old_radius)
-        updates = self.ptls[self.ptlid].calibrate_from_grid_data(meas_data,auto_update=auto_update)
-        updates['match_radius'] = match_radius
+class GridCalib(PECS):
+    '''
+    subclass of PECS that adds functions to run an Grid calibration.
+    In the future: add methods to display, judge and analyze calibration.
+    '''
+    def __init__(self, fvc=None, ptls=None,
+                 petal_id=None, posids=None, interactive=False):
+        super().__init__(fvc=fvc, ptls=ptls)
+        self.printfunc(f'Running arc calibration')
+        if interactive:
+            self.interactive_ptl_setup()
+        else:
+            self.ptl_setup(petal_id, posids)
+        self.n_points_P = 4 # 5
+        self.n_points_T = 4 # 7
+        updates = self.calibrate(interactive=interactive)
+        path = os.path.join(
+            pc.dirs['calib_logs'],
+            f'{pc.filename_timestamp_str_now()}-grid_calibration')
+        self.printfunc(
+            updates[['DEVICE_ID', 'LENGTH_R1', 'LENGTH_R2',
+                     'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P']])
+        updates.to_csv(path+'.csv')
+        updates.to_pickle(path+'.pkl')
+        self.printfunc(f'Grid calibration data saved to: {path}')
+        if interactive:
+            if self._parse_yn(input(
+                    'Open grid calibration data table? (y/n): ')):
+                os.system(f"xdg-open {path+'.csv'}")
+
+    def calibrate(self, auto_update=True, match_radius=80,
+                  interactive=False):
+        if interactive:
+            if auto_update is None:  # Ask for auto_update
+                auto_update = self._parse_yn(input(
+                        'Automatically update calibration? (y/n): '))
+            if match_radius is None:  # Ask for match_radius
+                match_radius = float(input(
+                    'Please provide a spotmatch radius: '))
+            return self.calibrate(auto_update=auto_update,
+                                  match_radius=match_radius)
+
+        req_list = self.ptl.get_grid_requests(ids=self.posids,
+                                              n_points_T=self.n_points_T,
+                                              n_points_P=self.n_points_P)
+        grid_data = []
+        for i, request in enumerate(req_list):
+            self.printfunc(f'Measuring grid point {i+1} of {len(req_list)}...')
+            merged_data = self.move_measure(request, match_radius=match_radius)
+            grid_data.append(merged_data)
+            if self.allow_pause and i+1 < len(req_list):
+                input('Paused for heat load monitoring, '
+                      'press enter to continue: ')
+        updates = self.ptl.calibrate_from_grid_data(grid_data,
+                                                    auto_update=auto_update)
         updates['auto_update'] = auto_update
-        updates['enabled_only'] = enabled_only
         return updates
 
+    def move_measure(self, request, match_radius=80):
+        '''
+        Wrapper for often repeated moving and measuring sequence.
+        Prints missing positioners, returns data merged with request
+        '''
+        self.ptl.prepare_move(request, anticollision=None)
+        self.ptl.execute_move()
+        exppos, meapos, matched, unmatched = self.fvc_measure(
+                match_radius=match_radius)
+        # Want to collect both matched and unmatched
+        used_pos = meapos.loc[sorted(list(matched))]  # only matched rows
+        request.rename(columns={'X1': 'TARGET_T', 'X2': 'TARGET_P'},
+                       inplace=True)
+        merged = used_pos.merge(request, how='outer', on='DEVICE_ID')
+        return merged
+
+    # def set_calibration(self, posids=None, reset=False, avoid_big_changes=True):
+    #     '''
+    #     calls set_calibration function in petalApp
+
+    #     allows a filter on posids using the posids kwarg
+    #     if reset, the calibration values will reset to their old values
+    #     if avoid_big_changes petalApp will avoid setting widly different values
+    #     '''
+    #     assert self.data is not None, 'Must have data to set!'
+    #     assert self.ptl is not None, 'Must set an active petal!'
+    #     if posids is not None:
+    #         calib_df = self.data.loc[sorted(posids)]
+    #     else:
+    #         calib_df = self.data
+    #     if reset:
+    #         tag = '_OLD'
+    #     else:
+    #         tag = ''
+    #     self.ptl.set_calibration(calib_df, tag=tag,
+    #                              avoid_big_changes=avoid_big_changes)
+
+
 if __name__ == '__main__':
-    grid = Grid()
-    user_text = input('Please list BUSIDs or POSIDs (not both) seperated by spaces, leave it blank to use all on petal: ')
-    user_text = input('Please list BUSIDs or POSIDs (not both) seperated by spaces, leave it blank to use all on petal: ')
-    if user_text != '':
-        user_text = user_text.split()
-        selection = []
-        for item in user_text:
-            selection.append(item)
-    else:
-        selection = None
-    print('You chose: %s' % selection)
-    user_text = input('Automatically update calibration? (y/n) ')
-    if 'y' in user_text:
-        auto_update = True
-    else:
-        auto_update = False
-    updates = grid.grid_calibration(selection=selection, auto_update=auto_update)
-    print(updates)
-    updates.to_csv(os.path.join(
-            pc.dirs['all_logs'], 'calib_logs',
-            f'{pc.filename_timestamp_str_now()}-grid_calibration.csv'))
+    GridCalib(interactive=True)

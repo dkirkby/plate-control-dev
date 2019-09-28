@@ -6,7 +6,6 @@ import pprint
 import posconstants as pc
 from DOSlib.positioner_index import PositionerIndex
 try:
-    # from DOSlib.constants import ConstantsDB
     from DBSingleton import DBSingleton
     DB_COMMIT_AVAILABLE = True
 except ModuleNotFoundError:
@@ -53,13 +52,13 @@ class PosState(object):
             self.type = device_type
         else:
             raise Exception('Invalid device_type')
-
         # DOS change
         if device_type == 'ptl':
             self.petal_state_defaults = defaults
         else:
             self.petal_state_defaults = None
         if self.write_to_DB:  # data initialization from database
+            self.printfunc('posstate DB write on')
             if petal_id is not None:  # ptlid is given, simple
                 self.ptlid = petal_id
                 if unit_id is not None:  # both ptlid and unit_id given
@@ -95,8 +94,9 @@ class PosState(object):
             # below is directly repositioned from old version
             if petal_id is None:  # ptlid is none, what about unit id?
                 if unit_id is not None and self.type == 'ptl':
-                    self.ptlid = unit_id
+                    self.unit_id = self.ptlid = unit_id
             else:
+                self.unit_id = unit_id
                 self.ptlid = petal_id
                 self.unit_basename = 'unit_' + str(unit_id)
             self.load_from_cfg(unit_id=unit_id)
@@ -154,7 +154,7 @@ class PosState(object):
 
     def set_ptlid_from_pi(self, unit_id):
         ''' lookup petal id using unit_id for pos, fid from PositionerIndex '''
-        pi = PositionerIndex(os.getenv('DOS_POSITIONERINDEXTABLE'))
+        pi = PositionerIndex()
         ret = pi.find_by_arbitrary_keys(DEVICE_TYPE=self.type.upper(),
                                         DEVICE_ID=unit_id)
         assert len(ret) == 1, f'lookup not unique, {ret}'
@@ -214,8 +214,6 @@ class PosState(object):
         unit_fn = os.path.join(self.settings_dir, f'{self.unit_basename}.conf')
         if not(os.path.isfile(unit_fn)):
             # unit config doesn't exisit, read in the generic template file
-            self.printfunc(f'Loading new temp unit config for '
-                           f'device_type = {self.type}, path: {unit_fn}')
             tmpfn = os.path.join(typical_settings_dir,
                                  '_unit_settings_DEFAULT.conf')
             self.conf = ConfigObj(tmpfn, unrepr=True, encoding='utf-8')
@@ -234,19 +232,18 @@ class PosState(object):
             if self.type != 'ptl':
                 self.conf.write()
         else:
-            self.printfunc(f'Loading existing unit config for '
-                           f'device_type = {self.type}, path: {unit_fn}')
+            # self.printfunc(f'Loading existing unit config for '
+            #                f'device_type = {self.type}, path: {unit_fn}')
             self.conf = ConfigObj(unit_fn, unrepr=True, encoding='utf-8')
         self._val = self.conf.dict()
 
     def __str__(self):
-        files = {'settings': self.conf.filename, 'log': self.log_path}
-        return pprint.pformat({'files': files, 'values': self._val})
+        files = {'settings':self.conf.filename, 'log':self.log_path}
+        return pprint.pformat({'files':files, 'values':self._val})
 
-    def read(self, key):
-        """Returns current value for a given key. Left in place for legac
-        usage, but it is much faster to directly access _val dictionary
-        (for reading values).
+    def read(self,key):
+        """Returns current value for a given key. Left in place for legacy usage,
+        but it is much faster to directly access _val dictionary (for reading values).
         """
         return self._val[key]
 
@@ -287,15 +284,13 @@ class PosState(object):
         self.conf.write()
 
     def log_unit(self):
-        """All current unit params are written to the hardware unit's log file.
+        """All current unit parameters are written to the hardware unit's log file.
         """
         if self.logging:
             timestamp = pc.timestamp_str_now()
-
             def start_new_file():
                 with open(self.log_path, 'w', newline='') as csvfile:
                     csv.writer(csvfile).writerow(self.log_fieldnames)
-
             if self.curr_log_length >= self.max_log_length:
                 self.log_basename = self._increment_suffix(self.log_basename)
                 self.curr_log_length = 0

@@ -309,8 +309,8 @@ class PosCollider(object):
         if self.fixed_neighbor_cases[posid]:
             if self.collision_hashpf_exists:
                 loc_id = self.posmodels[posid].deviceloc
-                dx = abs(self.x0[posid] - self.posmodels[posid].expected_current_position['ptlX'])
-                dy = abs(self.y0[posid] - self.posmodels[posid].expected_current_position['ptlY'])
+                dx = abs(self.x0[posid] - self.posmodels[posid].expected_current_position['flatXY'][0])
+                dy = abs(self.y0[posid] - self.posmodels[posid].expected_current_position['flatYY'][1])
                 code = lookup.make_code_pf(loc_id, dx, dy, poslocTP[0], poslocTP[1])
                 if code in self.table_pf:
                     return self.table_pf[code]

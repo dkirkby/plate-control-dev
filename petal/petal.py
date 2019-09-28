@@ -64,34 +64,38 @@ class Petal(object):
                  collider_file=None, sched_stats_on=False):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
-        self.printfunc(f'Running code version: {pc.code_version}')
+        self.printfunc(f'Running plate_control version: {pc.code_version}')
         self.printfunc(f'poscollider used: {poscollider.__file__}')
-        # read values from cfg files if not given
-        # if None in [petal_id, petalbox_id, fidids, posids, shape]:
-        #     self.printfunc('Some parameters not provided to __init__, '
-        #                    'reading petal config.')
-            # self.petal_state = posstate.PosState(  # initialise petal state
-            #         unit_id=petal_id, device_type='ptl', logging=True,
-            #         printfunc=self.printfunc)
-            # if petal_id is None:
-            #     self.printfunc('Reading Petal_ID from petal_state')
-            #     # this is the string unique hardware id of the particular petal
-            #     # (not the integer id of the beaglebone in the petalbox)
-            #     petal_id = self.petal_state.conf['PETAL_ID']
-            # if petalbox_id is None:
-            #     self.printfunc('Reading petalbox_ID from petal_state')
-            #     # this is the integer software id of the petalbox (previously
-            #     # known as 'petal_id', before disambiguation)
-            #     petalbox_id = self.petal_state.conf['PETALBOX_ID']
-            # if posids is None:
-            #     self.printfunc('posids not given, read from ptl_settings file')
-            #     posids = self.petal_state.conf['POS_IDS']
-            # if fidids is None:
-            #     self.printfunc('fidids not given, read from ptl_settings file')
-            #     fidids = self.petal_state.conf['FID_IDS']
-            # if shape is None:
-            #     self.printfunc('Reading shape from petal_state')
-            #     shape = self.petal_state.conf['SHAPE']
+        # petal setup
+        if None in [petal_id, petalbox_id, fidids, posids, shape] or \
+                not hasattr('alignment'):
+            self.printfunc('Some parameters not provided to __init__, reading petal config.')
+            self.petal_state = posstate.PosState(
+                unit_id=petal_id, device_type='ptl', logging=True,
+                printfunc=self.printfunc)
+            if petal_id is None:
+                self.printfunc('Reading Petal_ID from petal_state')
+                petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
+            if petalbox_id is None:
+                self.printfunc('Reading petalbox_ID from petal_state')
+                petalbox_id = self.petal_state.conf['PETALBOX_ID'] # this is the integer software id of the petalbox (previously known as 'petal_id', before disambiguation)
+            if posids is None:
+                self.printfunc('posids not given, read from ptl_settings file')
+                posids = self.petal_state.conf['POS_IDS']
+            if fidids is None:
+                self.printfunc('fidids not given, read from ptl_settings file')
+                fidids = self.petal_state.conf['FID_IDS']
+            if shape is None:
+                self.printfunc('Reading shape from petal_state')
+                shape = self.petal_state.conf['SHAPE']
+            if not hasattr('alignment'):
+                self.alignment = {'Tx': self.petal_state.conf['X_OFFSET'],
+                                  'Ty': self.petal_state.conf['Y_OFFSET'],
+                                  'Tz': 0,
+                                  'alpha': 0,
+                                  'beta': 0,
+                                  'gamma': self.petal_state.conf['ROTATION']}
+
         self.petalbox_id = petalbox_id
         self.petal_id = int(petal_id)
         self.shape = shape
@@ -105,13 +109,13 @@ class Petal(object):
             import petalcomm
             self.comm = petalcomm.PetalComm(self.petalbox_id, user_interactions_enabled=user_interactions_enabled)
             self.comm.pbset('non_responsives', 'clear') #reset petalcontroller's list of non-responsive canids
-            self.tables_sent_successfully = True
             # get ops_state from petalcontroller
             try:
                 o = self.comm.ops_state()
                 self.ops_state_sv.write(o)
             except Exception as e:
                 self.printfunc('init: Exception calling petalcontroller ops_state: %s' % str(e))
+        self.tables_sent_successfully = True
 
         # database setup
         self.db_commit_on = db_commit_on if DB_COMMIT_AVAILABLE else False
@@ -161,39 +165,36 @@ class Petal(object):
         called upon petal instantiation inside __init__()
         must also be called whenever petal alignment changes in the focal plane
         input (self.)alignment is a dict of 6 items structured as follows:
-
-        self.alignment = {'Tx': 0,  # x translation
-                          'Ty': 0,  # y translation
+        self.alignment = {'Tx': 0,  # x translation in mm
+                          'Ty': 0,  # y translation in mm
                           'Tz': 0,  # z translation in mm
-                          'alpha': 0,  # x rotation in deg
-                          'beta': 0,  # y rotation in deg
-                          'gamma': 0}  # z rotation
+                          'alpha': 0,  # x rotation in rad from DB
+                          'beta': 0,  # y rotation in rad from DB
+                          'gamma': 0}  # z rotation in rad from DB
         '''
         if alignment is None:
             # no alingment supplied, try to find self.alingment attribute
-            if hasattr(self, 'alignment'):
-                # self.alignment found, just re-use it
+            if hasattr(self, 'alignment'):  # attribute found, just re-use it
                 if self.verbose:
-                        self.printfunc('Using existing petal.alignment')
+                    self.printfunc('Using existing petal.alignment')
             else:
-                self.printfunc('Initialisation requires petal.alignment '
+                self.printfunc('Initialization requires petal.alignment'
                                'attribute to be set, using zeros.')
-                self.alignment = {'Tx': 0,  # x translation
-                                  'Ty': 0,  # y translation
+                self.alignment = {'Tx': 0,  # x translation in mm
+                                  'Ty': 0,  # y translation in mm
                                   'Tz': 0,  # z translation in mm
-                                  'alpha': 0,  # x rotation in deg
-                                  'beta': 0,  # y rotation in deg
-                                  'gamma': 0}  # z rotation
+                                  'alpha': 0,  # x rotation in rad
+                                  'beta': 0,  # y rotation in rad
+                                  'gamma': 0}  # z rotation rad
         else:  # new alingment supplied, overwrite self.aglinment attribute
             self.alignment = alignment
-            self.printfunc('New petal alignment set:', alignment)
-        # trans attribute below can be set, but is it used at all by anything?
-        # self.trans = PetalTransforms(Tx=self.alignment['Tx'],
-        #                              Ty=self.alignment['Ty'],
-        #                              Tz=self.alignment['Tz'],
-        #                              alpha=self.alignment['alpha'],
-        #                              beta=self.alignment['beta'],
-        #                              gamma=self.alignment['gamma'])
+        self.printfunc(f'Petal transform initialised with\n{self.alignment}')
+        self.trans = PetalTransforms(Tx=self.alignment['Tx'],
+                                     Ty=self.alignment['Ty'],
+                                     Tz=self.alignment['Tz'],
+                                     alpha=self.alignment['alpha'],
+                                     beta=self.alignment['beta'],
+                                     gamma=self.alignment['gamma'])
 
     def init_posmodels(self, posids=None):
         # positioners setup
@@ -235,7 +236,7 @@ class Petal(object):
             self.collider = poscollider.PosCollider(
                 configfile=collider_file, collision_hashpp_exists=False,
                 collision_hashpf_exists=False, hole_angle_file=None)
-            # self.anticol_settings = self.collider.config
+            self.anticol_settings = self.collider.config
         self.printfunc(f'Collider setting: {self.collider.config}')
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
@@ -506,6 +507,7 @@ class Petal(object):
         if self.simulator_on:
             self.tables_sent_successfully = True
             if self.verbose:
+                self.tables_sent_successfully = True
                 self.printfunc('Simulator skips sending move tables to positioners.')
             return
         hw_tables = self._hardware_ready_move_tables()
@@ -631,20 +633,20 @@ class Petal(object):
 # METHODS FOR FIDUCIAL CONTROL
     def set_fiducials(self, fidids='all', setting='on', save_as_default=False):
         """Set specific fiducials on or off.
-        
+
         fidids ... one fiducial id string, or an iterable collection of fiducial id strings, or 'all'
         [KH: note that the fidids list might include devices that are not on this petal. The code must ignore those]           
         setting ... what to set the fiducials to, as described below:
             'on'         ... turns each fiducial to its default on value
             'off'        ... turns each fiducial individually to its default off value
             int or float ... a single integer or float from 0-100 sets all the argued fiducials uniformly to that one value
-        
+
         save_as_default ... only used when seting is a number, in which case True means we will store that setting permanently to the fiducials' config file, False means its just a temporary setting this time
-        
+
         Method returns a dictionary of all the settings that were made, where
             key   --> fiducial id
             value --> duty state that was set
-        
+
         Fiducials that do not have control enabled will not appear in this dictionary.
         """
         if self.simulator_on:
@@ -677,7 +679,7 @@ class Petal(object):
         for idx, busid in enumerate(busids):
             fiducial_settings_by_busid[busid][canids[idx]] = duties[idx]
         self.comm.pbset('fiducials', fiducial_settings_by_busid)
-        
+
         settings_done = {}
         for i in range(len(enabled)):
             self.set_posfid_val(enabled[i], 'DUTY_STATE', duties[i])
@@ -841,12 +843,12 @@ class Petal(object):
         # Check if petal and PC ops states match
         pc_ops = self.comm.ops_state()
         if pc_ops != self.ops_state_sv._value:
-            err_string.append('opsstate petal: %r, PC: %r' % (self.ops_state_sv._value, pc_ops))
+            err_strings.append('opsstate petal: %r, PC: %r' % (self.ops_state_sv._value, pc_ops))
         if err_strings == []: #If no errors found, just return the state that was set
             if hasattr(self, 'ops_state_sv'):
                 return self.ops_state_sv._value, err_strings
             else:
-                err_strings.append['OPS STATE SV not available']
+                err_strings.append('OPS STATE SV not available')
                 return 'ERROR', err_strings
         else: #If errors were found, set 'ERROR' state and return 'ERROR' as well as strings explaining why.
             return 'ERROR', err_strings
@@ -915,99 +917,73 @@ class Petal(object):
         data_for_telemetry['total schedule time'] = total_time
         return data_for_telemetry
 
-    def commit(self, log_note='', *args, **kwargs):
-        '''Commit data to the local config and log files, and/or the online database.
-        A note string may optionally be included to go along with this entry in the logs.
+    def commit(self, mode='move', log_note='', *args, **kwargs):
+        '''Commit move data or calibration data to DB and/or local config and
+        log files.
+        A note string may optionally be included to go along with this entry.
+        mode can be: 'move', 'calib', 'both'
         '''
-        if log_note and (self.local_log_on or self.local_commit_on):
-            for state in self.altered_states:
-                state.next_log_notes.append(log_note)
-        if self.db_commit_on and not(self.simulator_on):
-            pos_commit_list = []
-            fid_commit_list = []
-            for state in self.altered_states:
-                if state.type == 'pos':
-                    pos_commit_list.append(state)
-                elif state.type == 'fid':
-                    fid_commit_list.append(state)
-            if len(pos_commit_list) != 0:
-                self.posmoveDB.WriteToDB(pos_commit_list,self.petal_id,'pos_move')
-            if len(fid_commit_list) != 0:
-                self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid_data')
-        # avoid overwriting local config data and logs when testing in simulator mode
-        # but stills allows DB commits above #changed by kevin 6/25/19
-        if not self.simulator_on:
+        # set up type names to write to DB as well as log for move data only
+        if mode == 'move':
+            type1, type2 = 'pos_move', 'fid_data'
+            states = self.altered_states
+            if log_note and (self.local_log_on or self.local_commit_on):
+                for state in states:
+                    state.next_log_notes.append(log_note)
+        elif mode == 'calib':
+            type1, type2 = 'pos_calib', 'fid_calib'
+            states = self.altered_calib_states
+        elif mode == 'both':
+            self.commit(mode='move', log_note='')
+            self.commit(mode='calib')
+        if self.db_commit_on and not self.simulator_on:  # write to DB
+            pos_commit_list = [st for st in states if st.type == 'pos']
+            fid_commit_list = [st for st in states if st.type == 'fid']
+            if len(pos_commit_list) > 0:
+                self.posmoveDB.WriteToDB(pos_commit_list, self.petal_id, type1)
+            if len(fid_commit_list) > 0:
+                self.posmoveDB.WriteToDB(fid_commit_list, self.petal_id, type2)
+        if mode == 'move':
+            # only allow writing local config and logs when not in sim mode
+            if not self.simulator_on:
+                if self.local_commit_on:
+                    for state in self.altered_states:
+                        state.write()  # this writes posstate to local config
+                if self.local_log_on:
+                    for state in self.altered_states:
+                        state.log_unit()  # this writes the local log
+            self.altered_states = set()
+        elif mode == 'calib':
             if self.local_commit_on:
-                for state in self.altered_states:
-                    state.write()  # this writes posstate to local config
-            if self.local_log_on:
-                for state in self.altered_states:
-                    state.log_unit()  # this writes the local log
-        self.altered_states = set()
-
-    def commit_calib_DB(self, *args, **kwargs):
-        '''Commit data to the pos_calib table. This is to be called at the end of a calibration
-        sequence. No local commit option since local calibration recordings are andled in the
-        commit function.
-        '''
-        if self.db_commit_on and not(self.simulator_on):
-            pos_commit_list = []
-            fid_commit_list = []
-            for state in self.altered_calib_states:
-                if state.type == 'pos':
-                    pos_commit_list.append(state)
-                elif state.type == 'fid':
-                    fid_commit_list.append(state)
-            if len(pos_commit_list) != 0:
-                self.posmoveDB.WriteToDB(pos_commit_list,self.petal_id,'pos_calib')
-            if len(fid_commit_list) != 0:
-                self.posmoveDB.WriteToDB(fid_commit_list,self.petal_id,'fid_calib')
-        self.altered_calib_states = set()
-        return
+                for state in self.altered_calib_states:
+                    state.write()
+            self.altered_calib_states = set()
 
     def expected_current_position(self, posid, key):
-        """Retrieve the current position, for a positioner identied by posid, according
-        to the internal tracking of its posmodel object. Returns a two element
-        list. Valid keys are:
-
+        """Retrieve the current position, for a positioner identied by posid,
+        according to the internal tracking of its posmodel object.
+        Returns a two element list. Valid keys are:
             'posintTP, 'poslocXY', 'poslocTP',
             'QS', 'flatXY', 'obsXY', 'ptlXY', 'motTP',
-            'posobsTP', 'posobsXY'
-
         See comments in posmodel.py for explanation of these values.
         """
         if key == 'posintTP':
             return self.posmodels[posid].expected_current_posintTP
         elif key == 'poslocTP':
             return self.posmodels[posid].expected_current_poslocTP
+        pos = self.posmodels[posid].expected_current_position
+        if key in pos.keys():
+            return pos[key]
         else:
-            vals = self.posmodels[posid].expected_current_position
-            if key == 'obsXY':
-                return [vals['obsX'], vals['obsY']]
-            elif key == 'QS':
-                return [vals['Q'], vals['S']]
-            elif key == 'poslocXY':
-                return [vals['poslocX'], vals['poslocY']]
-            elif key == 'poslocTP':
-                return [vals['poslocT'], vals['poslocT']]
-            elif key == 'flatXY':
-                return [vals['flatX'], vals['flatY']]
-            elif key == 'motorTP':
-                return [vals['motT'], vals['motP']]
-            elif key == 'ptlXY':
-                return [vals['ptlX'], vals['ptlY']]
-            elif key == 'posobsTP':
-                return [vals['posobsT'], vals['posobsP']]
-            elif key == 'posobsXY':
-                return [vals['posobsX'], vals['posobsY']]
-            else:
-                self.printfunc('Unrecognized key ' + str(key) + ' in request for expected_current_position of posid ' + str(posid) + '.')
+            self.printfunc(f'Unrecognized key {key} when requesting '
+                           f'expected_current_position of posid {posid}')
 
     def enabled_posmodels(self, posids):
         """Returns dict with keys = posids, values = posmodels, but only for
         those positioners in the collection posids which are enabled.
         """
-        return {p:self.posmodels[p] for p in posids if self.posmodels[p].is_enabled}
+        return {p: self.posmodels[p] for p in posids
+                if self.posmodels[p].is_enabled}
 
     def get_pos_flags(self, posids = 'all', should_reset = False):
         '''Getter function for self.pos_flags that carries out a final is_enabed
@@ -1341,12 +1317,10 @@ class Petal(object):
             posmodel.clear_postmove_cleanup_cmds_without_executing()
 
         self._clear_temporary_state_values()
-        self.commit(log_note='configuring') #commit uncommitted changes to DB
-        self.commit_calib_DB()
+        self.commit(mode='both', log_note='configuring') #commit uncommitted changes to DB
         self.schedule = self._new_schedule() # Refresh schedule so it has no tables
 
         return 'SUCCESS'
-
 
 if __name__ == '__main__':
     '''
@@ -1362,8 +1336,22 @@ if __name__ == '__main__':
                 db_commit_on=True, local_commit_on=False, local_log_on=False,
                 simulator_on=True, printfunc=print, verbose=False,
                 sched_stats_on=False)
-    print('Initial posTP of M04078 (make sure inital positions are the same):',
-          ptl.posmodels['M04078'].expected_current_posintTP)
+    # print('Dumping initial positions in DB')
+    # init_pos_dump = np.zeros((len(ptl.posids), 3))
+    # for i, posid in enumerate(sorted(ptl.posids)):
+    #     init_pos_dump[i, 0] = int(posid[1:])
+    #     init_pos_dump[i, 1:] = ptl.posmodels[posid].expected_current_posTP
+    # np.savetxt(os.path.join(pc.dirs['temp_files'], 'init_pos_dump.txt'), init_pos_dump)
+    init_pos_dump = np.loadtxt(os.path.join(pc.dirs['temp_files'],
+                                            'init_pos_dump.txt'))
+    init_pos = np.zeros((len(ptl.posids), 3))
+    for i, posid in enumerate(sorted(ptl.posids)):
+        init_pos[i, 0] = int(posid[1:])
+        init_pos[i, 1:] = ptl.posmodels[posid].expected_current_posTP
+    np.savetxt(os.path.join(pc.dirs['temp_files'], 'init_pos_1.txt'), init_pos)
+    print(f'Checking if posids and initial positions of all '
+          f'{init_pos.shape[0]} positioners equal to dump: '
+          f'{np.all(init_pos_dump == init_pos)}')
     posT = np.linspace(0, 360, 6)
     posP = np.linspace(90, 180, 6)
     for i in range(4):

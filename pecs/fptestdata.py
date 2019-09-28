@@ -163,11 +163,12 @@ class FPTestData:
         existing attributes required (see xytest.py):
             self.ptlids
         '''
-        # build column names and data types, all in global CS5
+        # build column names and data types, all in petal-local flatXY CS
         cols0 = ['timestamp', 'cycle', 'move_log']
         dtypes0 = ['datetime64[ns]', np.uint32, str]
         cols1 = ['target_x', 'target_y']
-        cols2_base = ['meas_x', 'meas_y', 'err_x', 'err_y', 'err_xy',
+        cols2_base = ['meas_q', 'meas_s', 'meas_x', 'meas_y',
+                      'err_x', 'err_y', 'err_xy',
                       'pos_int_t', 'pos_int_p', 'pos_flag', 'pos_status']
         cols2 = []  # add suffix for base column names corrective moves
         for field, i in product(cols2_base, range(self.num_corr_max+1)):
@@ -193,7 +194,7 @@ class FPTestData:
             p.start()
         self.logger.info('Waiting for the last MP chunk to complete...')
         p.join()
-        self.logger.info('Creating xyplot binders...')
+        self.logger.info('Last MP chunk completed. Creating xyplot binders...')
         for ptlid, n in tqdm(product(self.ptlids, range(self.num_corr_max+1))):
             p = Process(target=self.make_summary_plot_binder, args=(ptlid, n))
             p.start()
@@ -202,9 +203,9 @@ class FPTestData:
 
     def make_summary_plot(self, posid):  # make one plot for a given posid
         row = self.posdf.loc[posid]  # row containing calibration values
-        ptlid, offX, offY, r1, r2, posintT = row[
-            ['PETAL_ID', 'OFFSET_X', 'OFFSET_Y', 'LENGTH_R1', 'LENGTH_R2',
-             'targetable_range_T']]
+        offX, offY = 0, 0
+        ptlid, r1, r2, posintT = row[
+            ['PETAL_ID', 'LENGTH_R1', 'LENGTH_R2', 'targetable_range_T']]
         rmin, rmax = r1 - r2, r1 + r2  # min and max patrol radii
         Tmin, Tmax = np.sort(posintT) + row['OFFSET_T']  # targetable poslocT
         path = os.path.join(self.dirs[ptlid],
@@ -262,7 +263,7 @@ class FPTestData:
     def make_summary_plot_binder(self, ptlid, n):
         template = os.path.join(self.dirs[ptlid],
                                 f'*_xyplot_submove_{n}.pdf')
-        paths = glob(template)
+        paths = sorted(glob(template))
         assert len(paths) == len(self.posids_ptl[ptlid]), (
                 f'Length mismatch: {len(paths)} ≠ '
                 f'{len(self.posids_ptl[ptlid])}')
