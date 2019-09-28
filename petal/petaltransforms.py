@@ -164,7 +164,7 @@ class PetalTransforms:
             else:
                 N0 = N1
         # use the delta Z equation to calculate T since dZ is bigger than dR
-        T = pc.S2Z_lookup(S) - Z / np.cos(np.radians(pc.S2N_lookup(S)))
+        T = (Z - pc.S2Z_lookup(S)) / np.cos(np.radians(pc.S2N_lookup(S)))
         return np.vstack([Q, S, T])  # 3 x N array
 
     # %% QS transforms in 2D as projected from QST onto the focal surface
@@ -384,7 +384,7 @@ if __name__ == '__main__':
     trans = PetalTransforms(gamma=0/180*np.pi)
     # location 408
     ptlXYZ = np.array([346.797988, 194.710169, -17.737838]).reshape(3, 1)
-    QST = np.array([29.312088, 398.257190, 0.2]).reshape(3, 1)  # 200 microns
+    QST = np.array([29.312088, 398.257190, -0.2]).reshape(3, 1)  # 200 microns
     obsXYZ = trans.QST_to_obsXYZ(QST)
     print(f'obsXYZ = {obsXYZ.T}')
     QST = trans.obsXYZ_to_QST(obsXYZ)
