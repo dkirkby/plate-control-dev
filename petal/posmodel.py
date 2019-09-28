@@ -107,7 +107,7 @@ class PosModel(object):
                 'flatXY': self.trans.posintTP_to_flatXY(posintTP),
                 'ptlXY': self.trans.posintTP_to_ptlXY(posintTP),
                 'obsXY': tuple(
-                        self.trans.QS_to_obsXY(QS, cast=True).flatten()),
+                        self.trans.QS_to_obsXYZ(QS, cast=True).flatten()[:2]),
                 'QS': QS}
 
     @property

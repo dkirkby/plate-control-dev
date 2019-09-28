@@ -86,11 +86,12 @@ class PetalTransforms:
         obsXYZ:     (x, y, z) global cartesian coordinates on the focal plate
                     cenetered on optical axis looking at fiber tips (don't use)
 
-        QS:         (q,s) global coordinates on the focal plate, per DESI-0742
+        QST:        (q,s, t) global coordinates on the focal plate, per
+                    DESI-0742, 5288
                     q is the angle about the optical axis
-                    s is the path distance from optical axis,
-                    along the curved focal surface,
-                    within a plane that intersects the optical axis
+                    s is the path distance from optical axis, along the curved
+                        focal surface,
+                    t is the local normal vector out of the focal surface
 
         flatXY:     reserved for petal local CS, with focal plate slightly
                     stretched out and flattened (used for anti-collision)
@@ -123,7 +124,121 @@ class PetalTransforms:
         self.R = Rxyz(alpha, beta, gamma)
         self.curved = curved
 
-    # %% fundamental transformations
+    # %% QST transforms in 3D
+    @staticmethod
+    def QST_to_obsXYZ(QST, cast=False):
+        """Transforms QST coordinates into obsXYZ system.
+        INPUT:  3 x N array, each column vector is QST
+        OUTPUT: 3 x N array, each column vector is obsXYZ
+        """
+        if cast:
+            QST = typecast(QST)
+        Q_rad, S, T = np.radians(QST[0, :]), QST[1, :], QST[2, :]
+        R = pc.S2R_lookup(S) + T * np.sin(np.radians(pc.S2N_lookup(S)))
+        Z = pc.S2Z_lookup(S) + T * np.cos(np.radians(pc.S2N_lookup(S)))
+        X, Y = R * np.cos(Q_rad), R * np.sin(Q_rad)
+        return np.vstack([X, Y, Z])  # 3 x N array
+
+    @staticmethod
+    def obsXYZ_to_QST(obsXYZ, cast=False, max_iter=10, tol=1e-5):
+        """Transform obsXYZ coordinates into QST system, tol of dtheta in deg
+        INPUT:  3 x N array, each column vector is obsXYZ
+        OUTPUT: 3 x N array, each column vector is QST
+        """
+        if cast:
+            obsXYZ = typecast(obsXYZ)
+        X, Y, Z = obsXYZ[0, :], obsXYZ[1, :], obsXYZ[2, :]
+        Q = np.degrees(np.arctan2(Y, X))  # Y over X, azimuthal angle in deg
+        R = np.sqrt(np.square(X) + np.square(Y))
+        # iteratively find S, use nutation which is the fastest changing coord
+        N0 = pc.R2N_lookup(R)  # get nutation angle in the ballpark
+        for i in range(max_iter):
+            # print(f'iter {i}, starting with N0 = {N0}')  # debug
+            S = (pc.R2S_lookup(R)  # S correction with nutation angle
+                 - (Z - pc.R2Z_lookup(R)) * np.sin(np.radians(N0)))
+            N1 = pc.S2N_lookup(S)  # update nutation with better S
+            diff = N1 - N0
+            # print(f'diff = {diff}')  # debug
+            if np.all(np.abs(diff) < tol):  # deg
+                break  # now we have S that satisfies the equality sufficiently
+            else:
+                N0 = N1
+        # use the delta Z equation to calculate T since dZ is bigger than dR
+        T = (Z - pc.S2Z_lookup(S)) / np.cos(np.radians(pc.S2N_lookup(S)))
+        return np.vstack([Q, S, T])  # 3 x N array
+
+    # %% QS transforms in 2D as projected from QST onto the focal surface
+    @staticmethod
+    def obsXYZ_to_QS(obsXYZ, cast=False):
+        '''obsXYZ -> QST -> QS'''
+        if cast:
+            obsXYZ = typecast(obsXYZ)
+        return PetalTransforms.obsXYZ_to_QST(obsXYZ)[:2, :]  # 2 x N array
+
+    @staticmethod
+    def QS_to_obsXYZ(QS, cast=False):
+        """QS -> QST -> obsXYZ
+        On-shell condition is assumed, so T = 0
+        INPUT:  2 x N array, each column vector is QS
+        OUTPUT: 3 x N array, each column vector is obsXYZ
+        """
+        if cast:
+            QS = typecast(QS)
+        QST = np.vstack([QS, np.zeros(QS.shape[1])])  # add zeros as T data
+        return PetalTransforms.QST_to_obsXYZ(QST)
+
+    @staticmethod
+    def QS_to_flatXY(QS, cast=True):
+        """On-shell condition is assumed
+        INPUT:  2 x N array, each column vector is QS
+        OUTPUT: 2 x N array, each column vector is flatXY, can be CS5 or PTL
+        """
+        if cast:
+            QS = typecast(QS)
+        Q_rad, S = np.radians(QS[0, :]), QS[1, :]
+        X, Y = S * np.cos(Q_rad), S * np.sin(Q_rad)  # use S on shell as radius
+        return np.vstack([X, Y])
+
+    @staticmethod
+    def flatXY_to_QS(flatXY, cast=False):
+        """On-shell condition is assumed
+        INPUT:  2 x N array, each column vector is flatXY, can be CS5 or PTL
+        OUTPUT: 2 x N array, each column vector is QS
+        """
+        if cast:
+            flatXY = typecast(flatXY)
+        X, Y = flatXY[0, :], flatXY[1, :]
+        Q = np.degrees(np.arctan2(Y, X))  # Y over X
+        S = np.sqrt(np.square(X) + np.square(Y))  # R in flatXY is S on shell
+        return np.vstack([Q, S])
+
+    # %% flatXY transforms within petal local coordinates
+    @staticmethod
+    def ptlXYZ_to_flatXY(ptlXYZ, cast=False):
+        """ptlXYZ -> QST -> QS -> flatXY
+        INPUT:  3 x N or 2 x N array, each column vector is ptlXYZ or ptlXY
+                in petal-local CS
+        OUTPUT: 2 x N array, each column vector is flatXY, petal-local CS
+        useful for seeding xy offsets on flattened focal surface
+        """
+        if cast:
+            ptlXYZ = typecast(ptlXYZ)
+        QS = PetalTransforms.obsXYZ_to_QS(ptlXYZ)  # use location 3
+        return PetalTransforms.QS_to_flatXY(QS)
+
+    @staticmethod
+    def flatXY_to_ptlXYZ(flatXY, cast=False):
+        """flatXY -> QS -> QST -> ptlXYZ
+        INPUT:  2 x N array, each column vector is flatXY, petal-local CS
+        OUTPUT: 3 x N array, each column vector is ptlXYZ
+                in petal-local CS
+        """
+        if cast:
+            flatXY = typecast(flatXY)
+        QS = PetalTransforms.flatXY_to_QS(flatXY)  # use location 3
+        return PetalTransforms.QS_to_obsXYZ(QS)
+
+    # %% petal transformations with 6 dof
     def ptlXYZ_to_obsXYZ(self, ptlXYZ, cast=False):
         """
         INPUT:  3 x N array, each column vector is ptlXYZ
@@ -140,98 +255,13 @@ class PetalTransforms:
         """
         if cast:
             obsXYZ = typecast(obsXYZ)
-        return self.R.T @ (obsXYZ - self.T)  # backward transform
-
-    # %% QS transforms (only need 2D)
-    def obsXY_to_QS(self, obsXY, curved=None, cast=False):
-        """
-        input:  2 x N array
-        output: 2 x N array, each column vector is QS
-        """
-        if cast:
-            obsXY = typecast(obsXY)
-        if curved is None:  # allow forcing flatXY despite curved instance
-            curved = self.curved
-        X, Y = obsXY[0, :], obsXY[1, :]
-        Q = np.degrees(np.arctan2(Y, X))  # Y over X
-        R = np.sqrt(np.square(X) + np.square(Y))
-        S = pc.R2S_lookup(R) if curved else R
-        return np.array([Q, S])
-
-    def QS_to_obsXY(self, QS, curved=None, cast=False):
-        """
-        input:  2 x N array, each column vector is QS
-        output: 2 x N array, if curved=False, returns flatXY on focal surface
-        """
-        if cast:
-            QS = typecast(QS)
-        if curved is None:  # allow forcing flatXY despite curved instance
-            curved = self.curved
-        Q_rad, S = np.radians(QS[0, :]), QS[1, :]
-        R = pc.S2R_lookup(S) if curved else S
-        X = R * np.cos(Q_rad)
-        Y = R * np.sin(Q_rad)
-        return np.array([X, Y])
-
-    def obsXYZ_to_QS(self, obsXYZ, curved=None, cast=False):
-        """Transform obsXYZ or obsXY coordinates into QS system.
-        Z data (in 3rd row) aren't used at all, as X and Y are sufficient.
-        INPUT:  3 x N or 2 x N array, each column vector is obsXYZ
-        OUTPUT: 2 x N array of corresponding [[q0,s0],[q1,s1],...]
-        """
-        if cast:
-            obsXYZ = typecast(obsXYZ)
-        if curved is None:  # allow forcing flatXY despite curved instance
-            curved = self.curved
-        return self.obsXY_to_QS(obsXYZ[:2, :], curved=curved)  # use only XY
-
-    def QS_to_obsXYZ(self, QS, curved=None, cast=False):
-        """Transforms list of QS coordinates into obsXYZ system.
-        On-shell condition is enforced
-        INPUT:  2 x N array, each column vector is QS
-        OUTPUT: 3 x N array, each column vector is obsXYZ
-        """
-        if cast:
-            QS = typecast(QS)
-        if curved is None:  # allow forcing flatXY despite curved instance
-            curved = self.curved
-        obsXY = self.QS_to_obsXY(QS, curved=curved)  # convert XY
-        R = np.sqrt(np.square(obsXY[0, :]) + np.square(obsXY[1, :]))  # get Z
-        Z = pc.R2Z_lookup(R)
-        return np.vstack([obsXY, Z])  # add z data to the 3rd row
-
-    # %% flatXY transforms within petal local coordinates
-    def ptlXYZ_to_flatXY(self, ptlXYZ, cast=False):
-        """
-        INPUT:  3 x N or 2 x N array, each column vector is ptlXYZ or ptlXY
-                in petal-local
-        OUTPUT: 2 x N array, each column vector is flatXY, petal-local
-        useful for seeding xy offsets on flattened focal surface
-        """
-        if cast:
-            ptlXYZ = typecast(ptlXYZ)
-        # assume this petal is mounted nomically in location 3
-        # i.e. let the petal local CS align with CS5 and QS coordinates
-        QS = self.obsXYZ_to_QS(ptlXYZ)
-        return self.QS_to_obsXY(QS, curved=False)  # effectively QS to flatXY
-
-    def flatXY_to_ptlXYZ(self, flatXY, cast=False):
-        """
-        INPUT:  2 x N array, each column vector is flatXY, petal-local
-        OUTPUT: 3 x N array, each column vector is ptlXYZ, petal-local
-        """
-        if cast:
-            flatXY = typecast(flatXY)
-        # assume this petal is mounted nomically in location 3
-        # i.e. let the petal local CS align with CS5 and QS coordinates
-        QS = self.obsXY_to_QS(flatXY, curved=False)  # this is QS in CS5
-        return self.QS_to_obsXYZ(QS)
+        return self.R.T @ (obsXYZ - self.T)  # backward transformation
 
     # %% composite transformations for convenience
     def ptlXYZ_to_QS(self, ptlXYZ, cast=False):
-        """
+        """ptlXYZ -> obsXYZ -> QST -> QS
         INPUT:  3 x N array, each column vector is ptlXYZ, petal-local
-        OUTPUT: 2 x N array of corresponding [[q0,s0],[q1,s1],...], global
+        OUTPUT: 2 x N array, each column vector is QS
         """
         if cast:
             ptlXYZ = typecast(ptlXYZ)
@@ -239,8 +269,8 @@ class PetalTransforms:
         return self.obsXYZ_to_QS(obsXYZ)
 
     def QS_to_ptlXYZ(self, QS, cast=False):
-        """
-        INPUT:  2 x N array of corresponding [[q0,s0],[q1,s1],...], global
+        """QS -> QST -> obsXYZ -> ptlXYZ
+        INPUT:  2 x N array, each column vector is QS
         OUTPUT: 3 x N array, each column vector is ptlXYZ, petal-local
         """
         if cast:
@@ -248,27 +278,37 @@ class PetalTransforms:
         obsXYZ = self.QS_to_obsXYZ(QS)
         return self.obsXYZ_to_ptlXYZ(obsXYZ)
 
-    def flatXY_to_QS(self, flatXY, cast=False):
-        """
-        INPUT:  2 x N array, each column vector is flatXY, petal-local
-        OUTPUT: 2 x N array of corresponding [[q0,s0],[q1,s1],...], global
-        """
-        if cast:
-            flatXY = typecast(flatXY)
-        ptlXYZ = self.flatXY_to_ptlXYZ(flatXY)  # petal local
-        return self.ptlXYZ_to_QS(ptlXYZ)  # to global
-
-    def QS_to_flatXY(self, QS, cast=False):
-        """
-        INPUT:  2 x N array of corresponding [[q0,s0],[q1,s1],...], global
-        OUTPUT: 2 x N array, each column vector is flatXY, petal-local
-        """
-        if cast:
-            QS = typecast(QS)
-        ptlXYZ = self.QS_to_ptlXYZ(QS)  # global to petal local
-        return self.ptlXYZ_to_flatXY(ptlXYZ)  # petal local
-
 # %% written but discouraged transformations
+
+    # def obsXY_to_QS(self, obsXY, curved=None, cast=False):
+    #     """
+    #     input:  2 x N array
+    #     output: 2 x N array, each column vector is QS
+    #     """
+    #     if cast:
+    #         obsXY = typecast(obsXY)
+    #     if curved is None:  # allow forcing flatXY despite curved instance
+    #         curved = self.curved
+    #     X, Y = obsXY[0, :], obsXY[1, :]
+    #     Q = np.degrees(np.arctan2(Y, X))  # Y over X
+    #     R = np.sqrt(np.square(X) + np.square(Y))
+    #     S = pc.R2S_lookup(R) if curved else R
+    #     return np.array([Q, S])
+
+    # def QS_to_obsXY(self, QS, curved=None, cast=False):
+    #     """
+    #     input:  2 x N array, each column vector is QS
+    #     output: 2 x N array, if curved=False, returns flatXY on focal surface
+    #     """
+    #     if cast:
+    #         QS = typecast(QS)
+    #     if curved is None:  # allow forcing flatXY despite curved instance
+    #         curved = self.curved
+    #     Q_rad, S = np.radians(QS[0, :]), QS[1, :]
+    #     R = pc.S2R_lookup(S) if curved else S
+    #     X = R * np.cos(Q_rad)
+    #     Y = R * np.sin(Q_rad)
+    #     return np.array([X, Y])
 
     # def ptlXY_to_obsXY(self, ptlXY, cast=False):
     #     """
@@ -337,35 +377,38 @@ if __name__ == '__main__':
                             alpha=0.001382631,
                             beta=-0.002945219,
                             gamma=0/180*np.pi)
-    trans = PetalTransforms(gamma=-180/180*np.pi)
-    # location 408
-    ptlXYZ = np.array([319.951289, 131.457285, -13.262356]).reshape(3, 1)
     # obsXYZ_actual = np.array([11.671,	23.542,	-81.893]).reshape(3, 1)
     # ptlXYZ_actual = np.array([23.2337, 12.1450, -81.9095]).reshape(3, 1)
     # print(f'obsXYZ, actual: {obsXYZ_actual.T}\ntransformed: {obsXYZ.T}\n'
     #       f'ptlXYZ, actual: {ptlXYZ_actual.T}\ntransformed: {ptlXYZ.T}')
-    # device location 526
-    obsXYZ = trans.ptlXYZ_to_obsXYZ(ptlXYZ)
-    ptlXYZ = trans.obsXYZ_to_ptlXYZ(obsXYZ)
-    QS = trans.obsXY_to_QS(obsXYZ[:2, :])
-    print(f'QS = {QS.T}')
-    obsXY = trans.QS_to_obsXY(QS)
-    print(f'obsXY = {obsXY.T}')
+    trans = PetalTransforms(gamma=0/180*np.pi)
+    # location 408
+    ptlXYZ = np.array([346.797988, 194.710169, -17.737838]).reshape(3, 1)
+    QST = np.array([29.312088, 398.257190, -0.2]).reshape(3, 1)  # 200 microns
+    obsXYZ = trans.QST_to_obsXYZ(QST)
     print(f'obsXYZ = {obsXYZ.T}')
-    print(f'ptlXYZ = {ptlXYZ.T}')
+    QST = trans.obsXYZ_to_QST(obsXYZ)
+    print(f'QST = {QST.T}')
     QS = trans.obsXYZ_to_QS(obsXYZ)
     print(f'QS = {QS.T}')
-    print(f'obsXYZ = {trans.QS_to_obsXYZ(QS).T}')
-    obsXY = trans.QS_to_obsXY(QS)
-    print(f'obsXY = {obsXY.T}')
-    print(f'QS = {trans.obsXY_to_QS(obsXY).T}')
+    obsXYZ = trans.QS_to_obsXYZ(QS)
+    print(f'obsXYZ = {obsXYZ.T}')
+    flatXY = trans.QS_to_flatXY(QS)
+    print(f'flatXY = {flatXY.T}')
+    QS = trans.flatXY_to_QS(flatXY)
+    print(f'QS = {QS.T}')
     flatXY = trans.ptlXYZ_to_flatXY(ptlXYZ)
     print(f'flatXY = {flatXY.T}')
-    print(f'ptlXYZ = {trans.flatXY_to_ptlXYZ(flatXY).T}')
-    print(f'QS = {trans.ptlXYZ_to_QS(ptlXYZ).T}')
-    print(f'ptlXYZ = {trans.QS_to_ptlXYZ(QS).T}')
-    print(f'QS = {trans.flatXY_to_QS(flatXY).T}')
-    print(f'flatXY = {trans.QS_to_flatXY(QS).T}')
+    ptlXYZ = trans.flatXY_to_ptlXYZ(flatXY)
+    print(f'ptlXYZ = {ptlXYZ.T}')
+    obsXYZ = trans.ptlXYZ_to_obsXYZ(ptlXYZ)
+    print(f'obsXYZ = {obsXYZ.T}')
+    ptlXYZ = trans.obsXYZ_to_ptlXYZ(obsXYZ)
+    print(f'ptlXYZ = {ptlXYZ.T}')
+    QS = trans.ptlXYZ_to_QS(ptlXYZ)
+    print(f'QS = {QS.T}')
+    ptlXYZ = trans.QS_to_ptlXYZ(QS)
+    print(f'ptlXYZ = {ptlXYZ.T}')
 
     # new KEEPOUT_PTL definition
     ptlXY = np.array([[ 20.260, 410.189, 418.00,  406.3, 399.0, 384.0, 325.837, 20.260,  20.26, 420.0, 420.0, 20.26],
@@ -373,7 +416,7 @@ if __name__ == '__main__':
     R = np.sqrt(np.square(ptlXY[0, :]) + np.square(ptlXY[1, :]))  # get Z
     Z = pc.R2Z_lookup(R)
     ptlXYZ = np.vstack([ptlXY, Z])
-    print(f'flatXY KEEPOUT_PTL:\n{trans.ptlXYZ_to_flatXY(ptlXY)}')
+    print(f'flatXY KEEPOUT_PTL:\n{trans.ptlXYZ_to_flatXY(ptlXYZ)}')
     '''[[ 20.26005608 410.78494559 418.63957706 406.91006116 399.60662524
       384.58654953 326.28936763  20.26008312  20.27039953 361.45760424
       420.61560153  20.26005917]
@@ -387,7 +430,7 @@ if __name__ == '__main__':
     R = np.sqrt(np.square(ptlXY[0, :]) + np.square(ptlXY[1, :]))  # get Z
     Z = pc.R2Z_lookup(R)
     ptlXYZ = np.vstack([ptlXY, Z])
-    print(f'flatXY KEEPOUT_GFA:\n{trans.ptlXYZ_to_flatXY(ptlXY)}')
+    print(f'flatXY KEEPOUT_GFA:\n{trans.ptlXYZ_to_flatXY(ptlXYZ)}')
     '''[[295.8911707  301.97618459 303.87536557 305.78637321 307.8951546
         309.55559758 321.1381771  354.04033488]
         [207.67712193 201.85604887 201.81205383 201.52163337 201.35868775

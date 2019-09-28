@@ -1,6 +1,7 @@
 import os
 import inspect
 import numpy as np
+from scipy.interpolate import interp1d
 import math
 import datetime
 import collections
@@ -55,33 +56,34 @@ R_lookup_data = np.genfromtxt(R_lookup_path, comments="#", delimiter=",")
 
 # Mapping of radial coordinate R to pseudo-radial coordinate S
 # (distance along focal surface from optical axis)
-R2S_poly = [-1.26341e-23, 1.90376e-20, -1.11245e-17, 3.30271e-15, -5.78982e-13,
-            7.31761e-11, 1.72104e-09, 1.91532e-07, 0.999997, 0.50001]
+R2S_lookup = interp1d(R_lookup_data[:, 0], R_lookup_data[:, 2], kind='cubic',
+                      fill_value='extrapolate')
+S2R_lookup = interp1d(R_lookup_data[:, 2], R_lookup_data[:, 0], kind='cubic',
+                      fill_value='extrapolate')
+R2Z_lookup = interp1d(R_lookup_data[:, 0], R_lookup_data[:, 1], kind='cubic',
+                      fill_value='extrapolate')
+Z2R_lookup = interp1d(R_lookup_data[:, 1], R_lookup_data[:, 0], kind='cubic')
+R2N_lookup = interp1d(R_lookup_data[:, 0], R_lookup_data[:, 3], kind='cubic',
+                      fill_value='extrapolate')
+N2R_lookup = interp1d(R_lookup_data[:, 3], R_lookup_data[:, 2], kind='cubic')
 
 
-def R2S_lookup(R):
-    return np.interp(R, R_lookup_data[:, 0], R_lookup_data[:, 2],
-                     left=float('nan'))
+# composite focal surface lookup methods for 3D out-of-shell QST transforms
+def S2N_lookup(S):
+    return R2N_lookup(S2R_lookup(S))  # return nutation angles in degrees
 
 
-def S2R_lookup(S):
-    return np.interp(S, R_lookup_data[:, 2], R_lookup_data[:, 0],
-                     left=float('nan'))
+def S2Z_lookup(S):
+    return R2Z_lookup(S2R_lookup(S))
 
 
-# Mapping of radial coordinate R to Z5 coordinate on the nominal asphere
-R2Z_poly = [6.74215e-23, -7.75243e-20, 2.9168e-17, -5.23944e-15, 1.61621e-12,
-            -4.82781e-10, 1.24578e-08, -0.000100884, 6.63924e-06, -2.33702e-05]
+def Z2S_lookup(Z):
+    return R2S_lookup(Z2R_lookup(Z))
 
 
-def R2Z_lookup(R):
-    return np.interp(R, R_lookup_data[:, 0], R_lookup_data[:, 1],
-                     left=float('nan'))
+def N2S_lookup(N):
+    return R2S_lookup(N2R_lookup(N))  # takes nutation angles in degrees
 
-
-def Z2R_lookup(S):
-    return np.interp(S, R_lookup_data[:, 1], R_lookup_data[:, 0],
-                     left=float('nan'))
 
 # Mapping of positioner power supplies to can channels
 power_supply_can_map = {'V1':{'can10','can11','can13','can22', 'can23'},
