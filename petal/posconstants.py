@@ -67,36 +67,6 @@ R2N_lookup = interp1d(R_lookup_data[:, 0], R_lookup_data[:, 3], kind='cubic',
                       fill_value='extrapolate')
 N2R_lookup = interp1d(R_lookup_data[:, 3], R_lookup_data[:, 2], kind='cubic')
 
-# def R2S_lookup(R):
-#     return np.interp(R, R_lookup_data[:, 0], R_lookup_data[:, 2],
-#                      left=float('nan'))
-
-
-# def S2R_lookup(S):
-#     return np.interp(S, R_lookup_data[:, 2], R_lookup_data[:, 0],
-#                      left=float('nan'))
-
-
-# # Mapping of radial coordinate R to Z5 coordinate on the nominal asphere
-# def R2Z_lookup(R):
-#     return np.interp(R, R_lookup_data[:, 0], R_lookup_data[:, 1],
-#                      left=float('nan'))
-
-# def Z2R_lookup(Z):
-#     return np.interp(Z, R_lookup_data[:, 1], R_lookup_data[:, 0],
-#                      left=float('nan'))
-
-
-# Mapping of radial coordinate R to Nutation angle (deg) on the nominal asphere
-# def R2N_lookup(R):
-#     return np.interp(R, R_lookup_data[:, 0], R_lookup_data[:, 3],
-#                      left=float('nan'))
-
-
-# def N2R_lookup(N):
-#     return np.interp(N, R_lookup_data[:, 3], R_lookup_data[:, 0],
-#                      left=float('nan'))
-
 
 # composite focal surface lookup methods for 3D out-of-shell QST transforms
 def S2N_lookup(S):
