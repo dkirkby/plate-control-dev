@@ -246,8 +246,11 @@ class PosTransforms(petaltransforms.PetalTransforms):
     # %% composite transformations for convenience (degree 4)
     def ptlXY_to_posintTP(self, ptlXY, range_limits='full'):
         ''' input is list or tuple '''
-        ptlXYZ = self.QS_to_obsXYZ(self.obsXY_to_QS(ptlXY, cast=True))  # add Z
-        flatXY = self.ptlXYZ_to_flatXY(ptlXYZ).flatten()
+        X, Y = ptlXY[0], ptlXY[1]
+        R = math.sqrt(X**2 + Y**2)
+        Z = pc.R2Z_lookup(R)
+        ptlXYZ = (X, Y, Z)
+        flatXY = self.ptlXYZ_to_flatXY(ptlXYZ, cast=True).flatten()
         return self.flatXY_to_posintTP(flatXY, range_limits=range_limits)
 
     def posintTP_to_ptlXY(self, posintTP):
@@ -508,7 +511,7 @@ if __name__ == '__main__':
                        'alpha': 0, 'beta': 0, 'gamma': 0/180*math.pi}
     trans = PosTransforms(petal_alignment=petal_alignment)
     state = trans.posmodel.state
-    # device location 0 on petal
+    # device location 526 on petal
     state._val['OFFSET_X'], state._val['OFFSET_Y'] = 346.797988, 194.710169
     print(f'posstate values:\n{state._val}')
     posintTP = (0, 120)
