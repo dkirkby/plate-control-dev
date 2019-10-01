@@ -21,8 +21,8 @@ class GridCalib(PECS):
             self.interactive_ptl_setup()
         else:
             self.ptl_setup(petal_id, posids)
-        self.n_points_P = 4 # 5
-        self.n_points_T = 4 # 7
+        self.n_points_P = 5
+        self.n_points_T = 7
         updates = self.calibrate(interactive=interactive)
         path = os.path.join(
             pc.dirs['calib_logs'],
@@ -41,11 +41,11 @@ class GridCalib(PECS):
     def calibrate(self, auto_update=True, match_radius=80,
                   interactive=False):
         if interactive:
-            if auto_update is None:  # Ask for auto_update
-                auto_update = self._parse_yn(input(
+            # Ask for auto_update
+            auto_update = self._parse_yn(input(
                         'Automatically update calibration? (y/n): '))
-            if match_radius is None:  # Ask for match_radius
-                match_radius = float(input(
+            # Ask for match_radius
+            match_radius = float(input(
                     'Please provide a spotmatch radius: '))
             return self.calibrate(auto_update=auto_update,
                                   match_radius=match_radius)

@@ -44,7 +44,7 @@ class RehomeVerify(PECS):
               .set_index('DEVICE_ID'))  # indexed by DEVICE_ID
         offXY = df[['OFFSET_X', 'OFFSET_Y']].values.T
         hom_QS = self.ptl.ptltrans('flatXY_to_QS', offXY)  # 2xN array
-        hom_obsXY = self.ptl.ptltrans('QS_to_obsXY', hom_QS)  # 2xN array
+        hom_obsXY = self.ptl.ptltrans('QS_to_obsXYZ', hom_QS)[:2]  # 3xN array
         # set nominal homed QS as expected postiions for FVC spotmatch
         exppos[['X1', 'X2']] = hom_QS.T
         self.printfunc('Taking FVC exposure to confirm home positions...')
@@ -60,8 +60,8 @@ class RehomeVerify(PECS):
             meapos[col] = np.nan
         meapos[['exp_obsX', 'exp_obsY']] = exp_obsXY.T  # internally tracked
         meapos[['hom_obsX', 'hom_obsY']] = hom_obsXY.T
-        mea_obsXY = self.ptl.ptltrans('QS_to_obsXY',
-                                      meapos[['Q', 'S']].values.T)
+        mea_obsXY = self.ptl.ptltrans('QS_to_obsXYZ',
+                                      meapos[['Q', 'S']].values.T)[:2]
         meapos[['mea_obsX', 'mea_obsY']] = mea_obsXY.T
         meapos['obsdX'] = meapos['mea_obsX'] - meapos['hom_obsX']
         meapos['obsdY'] = meapos['mea_obsY'] - meapos['hom_obsY']

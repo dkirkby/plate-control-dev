@@ -60,8 +60,7 @@ class PECS:
                 self.fvc = FVC_proxy_sim(max_err=0.0001)
             else:
                 self.fvc = FVC(self.pm_instrument, fvc_role=self.fvc_role,
-                               constants_version=self.constants_version,
-                               all_fiducials=self.all_fiducials)
+                               constants_version=self.constants_version)
             self.printfunc(f"FVC proxy created for instrument: "
                            f"{self.fvc.get('instrument')}")
         else:
@@ -159,7 +158,7 @@ class PECS:
         mr_old = self.fvc.get('match_radius')  # hold old match radius
         self.fvc.set(match_radius=match_radius)  # set larger radius for calib
         # measured_QS, note that expected_pos was changed in place
-        meapos = (pd.DataFrame(self.fvc.measure(exppos))
+        meapos = (pd.DataFrame(self.fvc.measure(exppos, all_fiducials=self.all_fiducials))
                   .rename(columns={'id': 'DEVICE_ID'})
                   .set_index('DEVICE_ID').sort_index())  # indexed by DEVICE_ID
         self.fvc.set(match_radius=mr_old)  # restore old radius after measure

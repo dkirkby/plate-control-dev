@@ -41,11 +41,11 @@ class ArcCalib(PECS):
     def calibrate(self, auto_update=True, match_radius=80,
                   interactive=False):
         if interactive:
-            if auto_update is None:  # Ask for auto_update
-                auto_update = self._parse_yn(input(
+            # Ask for auto_update
+            auto_update = self._parse_yn(input(
                         'Automatically update calibration? (y/n): '))
-            if match_radius is None:  # Ask for match_radius
-                match_radius = float(input(
+            # Ask for match_radius
+            match_radius = float(input(
                     'Please provide a spotmatch radius: '))
             return self.calibrate(auto_update=auto_update,
                                   match_radius=match_radius)
@@ -94,4 +94,4 @@ class ArcCalib(PECS):
 
 
 if __name__ == '__main__':
-    ArcCalib(interactive=False)
+    ArcCalib(interactive=True, auto_update=None, match_radius=None)
