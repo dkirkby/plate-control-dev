@@ -68,7 +68,7 @@ class Petal(object):
         self.printfunc(f'poscollider used: {poscollider.__file__}')
         # petal setup
         if None in [petal_id, petalbox_id, fidids, posids, shape] or \
-                not hasattr('alignment'):
+                not hasattr(self, 'alignment'):
             self.printfunc('Some parameters not provided to __init__, reading petal config.')
             self.petal_state = posstate.PosState(
                 unit_id=petal_id, device_type='ptl', logging=True,
@@ -88,7 +88,7 @@ class Petal(object):
             if shape is None:
                 self.printfunc('Reading shape from petal_state')
                 shape = self.petal_state.conf['SHAPE']
-            if not hasattr('alignment'):
+            if not hasattr(self, 'alignment'):
                 self.alignment = {'Tx': self.petal_state.conf['X_OFFSET'],
                                   'Ty': self.petal_state.conf['Y_OFFSET'],
                                   'Tz': 0,
@@ -936,6 +936,7 @@ class Petal(object):
         elif mode == 'both':
             self.commit(mode='move', log_note='')
             self.commit(mode='calib')
+            return
         if self.db_commit_on and not self.simulator_on:  # write to DB
             pos_commit_list = [st for st in states if st.type == 'pos']
             fid_commit_list = [st for st in states if st.type == 'fid']
