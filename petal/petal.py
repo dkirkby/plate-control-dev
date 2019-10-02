@@ -748,7 +748,7 @@ class Petal(object):
             self._last_state=OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
                                           'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
                                           'GFAPWR_EN':('on', 1.0), #GFA Power Enable ON
-                                          'TEC_CTRL': ('on', 15.0), #TEC Power EN ON
+                                          'TEC_CTRL': ('off', 15.0), #TEC Power EN OFF for now
                                           'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON - what about SYNC?
                                           #GFA CCD OFF
                                           #GFA CCD Voltages EN OFF
@@ -761,7 +761,7 @@ class Petal(object):
             self._last_state=OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
                                           'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
                                           'GFAPWR_EN':('on', 1.0), #GFA Power Enable ON
-                                          'TEC_CTRL':('on', 5.0), #TEC Power EN ON
+                                          'TEC_CTRL':('off', 5.0), #TEC Power EN OFF for now
                                           'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON - what about SYNC?
                                           #GFA CCD ON
                                           #GFA CCD Voltages EN ON
