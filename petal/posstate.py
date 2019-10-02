@@ -22,7 +22,7 @@ class PosState(object):
 
     INPUTS:
         unit_id:  POS_ID, FID_ID, or PETAL_ID of device, must be str
-        logging:  boolean whether to enable logging state data to disk
+        local_log_on:  boolean whether to enable logging state to disk
         type:     'pos', 'fid', 'ptl'
         petal_id: '00' to '11', '900' to '909'
 
@@ -33,20 +33,16 @@ class PosState(object):
         hardware unit) and general parameters (settings which apply
         uniformly to many units).
 
-        to enable config read and write, set DOS_POSMOVE_WRITE_TO_DB to false
-
     For testing:
         use petal 03, pos M05055, fid P051, which are all available in DB
     """
 
     def __init__(self, unit_id=None, device_type='pos', petal_id=None,
-                 logging=False, printfunc=print, defaults=None):  # DOS change
+                 db_commit_on=False, local_log_on=False,
+                 printfunc=print, defaults=None):  # DOS change
         self.printfunc = printfunc
-        self.logging = logging
-        self.write_to_DB = False
-        if DB_COMMIT_AVAILABLE and (os.getenv('DOS_POSMOVE_WRITE_TO_DB')
-                                    in ['True', 'true', 'T', 't', '1']):
-            self.write_to_DB = True
+        self.db_commit_on = db_commit_on
+        self.local_log_on = local_log_on
         # data initialization
         if device_type in ['pos', 'fid', 'ptl']:
             self.type = device_type
@@ -57,8 +53,7 @@ class PosState(object):
             self.petal_state_defaults = defaults
         else:
             self.petal_state_defaults = None
-        if self.write_to_DB:  # data initialization from database
-            self.printfunc('posstate DB write on')
+        if self.db_commit_on:  # data initialization from database
             if petal_id is not None:  # ptlid is given, simple
                 self.ptlid = petal_id
                 if unit_id is not None:  # both ptlid and unit_id given
@@ -286,7 +281,7 @@ class PosState(object):
     def log_unit(self):
         """All current unit parameters are written to the hardware unit's log file.
         """
-        if self.logging:
+        if self.local_log_on:
             timestamp = pc.timestamp_str_now()
             def start_new_file():
                 with open(self.log_path, 'w', newline='') as csvfile:

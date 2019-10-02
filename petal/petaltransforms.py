@@ -140,7 +140,7 @@ class PetalTransforms:
         return np.vstack([X, Y, Z])  # 3 x N array
 
     @staticmethod
-    def obsXYZ_to_QST(obsXYZ, cast=False, max_iter=10, tol=1e-5):
+    def obsXYZ_to_QST(obsXYZ, cast=False, max_iter=10, tol=1e-6):
         """Transform obsXYZ coordinates into QST system, tol of dtheta in deg
         INPUT:  3 x N array, each column vector is obsXYZ
         OUTPUT: 3 x N array, each column vector is QST

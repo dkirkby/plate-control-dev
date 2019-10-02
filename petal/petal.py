@@ -66,12 +66,14 @@ class Petal(object):
         self.printfunc = printfunc
         self.printfunc(f'Running plate_control version: {pc.code_version}')
         self.printfunc(f'poscollider used: {poscollider.__file__}')
+        self.printfunc(f'simulator_on={simulator_on}, db_commit_on={db_commit_on}, local_commit_on={local_commit_on}, local_log_on={local_log_on}')
         # petal setup
         if None in [petal_id, petalbox_id, fidids, posids, shape]:
             self.printfunc('Some parameters not provided to __init__, reading petal config.')
             self.petal_state = posstate.PosState(
-                unit_id=petal_id, device_type='ptl', logging=True,
-                printfunc=self.printfunc)
+                unit_id=petal_id, device_type='ptl', 
+                db_commit_on=db_commit_on, local_commit_on=local_commit_on,
+                local_log_on=local_log_on, printfunc=self.printfunc)
             if petal_id is None:
                 self.printfunc('Reading Petal_ID from petal_state')
                 petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
@@ -121,7 +123,10 @@ class Petal(object):
         # fiducials setup
         self.fidids = {fidids} if isinstance(fidids,str) else set(fidids)
         for fidid in self.fidids:
-            self.states[fidid] = posstate.PosState(fidid, logging=self.local_log_on, device_type='fid', printfunc=self.printfunc, petal_id=self.petal_id)
+            self.states[fidid] = posstate.PosState(
+            	unit_id=fidid, device_type='fid', 
+            	db_commit_on=self.db_commit_on, local_log_on=self.local_log_on,
+            	printfunc=self.printfunc, petal_id=self.petal_id)
             self.devices[self.states[fidid]._val['DEVICE_LOC']] = fidid
 
         # pos flags setup
@@ -203,8 +208,10 @@ class Petal(object):
         self.shape == 'petal'
         for posid in posids:
             self.states[posid] = posstate.PosState(
-                posid, logging=self.local_log_on, device_type='pos',
-                printfunc=self.printfunc, petal_id=self.petal_id)
+                unit_id=posid, device_type='pos', petal_id=self.petal_id,
+                db_commit_on=self.db_commit_on,
+                local_log_on=self.local_log_on,
+                printfunc=self.printfunc, )
             self.posmodels[posid] = PosModel(state=self.states[posid],
                                              petal_alignment=self.alignment)
             self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
