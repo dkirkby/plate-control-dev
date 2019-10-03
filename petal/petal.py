@@ -686,7 +686,12 @@ class Petal(object):
             settings_done[enabled[i]] = duties[i]
             if save_as_default:
                 self.set_posfid_val(enabled[i], 'DUTY_DEFAULT_ON', duties[i])
-        self.commit(log_note='set fiducial parameters')
+                self.altered_calib_states.add(self.states[enabled[i]])
+        if save_as_default:
+            mode = 'both'
+        else:
+            mode = 'move'
+        self.commit(mode=mode, log_note='set fiducial parameters')
         return settings_done
 
     @property
