@@ -309,6 +309,15 @@ class PetalTransforms:
         obsXYZ = self.QS_to_obsXYZ(QS)
         return self.obsXYZ_to_ptlXYZ(obsXYZ)
 
+    def ptlXYZ_to_obsXY(self, ptlXYZ, cast=False):
+        """
+        INPUT:  3 x N array, each column vector is ptlXYZ
+        OUTPUT: 2 x N array, each column vector is obsXY
+        """
+        if cast:
+            ptlXYZ = typecast(ptlXYZ)
+        return self.ptlXYZ_to_obsXYZ(ptlXYZ)[:2, :]
+
 # %% written but discouraged transformations
 
     # def obsXY_to_QS(self, obsXY, curved=None, cast=False):
