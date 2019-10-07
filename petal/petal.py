@@ -728,7 +728,7 @@ class Petal(object):
                                           'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
                                           'GFAPWR_EN':('off', 60.0),  #GFA Power Enable OFF
                                           'TEC_CTRL':('off', 15.0), #TEC Power EN OFF
-                                          'BUFFERS':(['off','off'], 1.0), #SYNC Buffer EN OFF - what about SYNC?
+                                          'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN OFF
                                           #GFA CCD OFF
                                           #GFA CCD Voltages EN OFF
                                           #TEC Control EN OFF - handeled by camera.py
@@ -741,7 +741,7 @@ class Petal(object):
                                           'GFAPWR_EN':('off', 60.0), #GFA Power Enable OFF
                                           'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
                                           'TEC_CTRL': ('off', 15.0), #TEC Power EN OFF
-                                          'BUFFERS':(['off','off'], 1.0), #SYNC Buffer EN OFF - what about SYNC?
+                                          'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN OFF
                                           #GFA CCD OFF
                                           #GFA CCD Voltages EN OFF
                                           #TEC Control EN OFF - handeled by camera.py
