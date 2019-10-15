@@ -158,11 +158,16 @@ class PECS:
         mr_old = self.fvc.get('match_radius')  # hold old match radius
         self.fvc.set(match_radius=match_radius)  # set larger radius for calib
         # measured_QS, note that expected_pos was changed in place
-        meapos = (pd.DataFrame(self.fvc.measure(exppos, all_fiducials=self.all_fiducials))
+        meapos = (pd.DataFrame(self.fvc.measure(
+                    exppos,
+                    all_fiducials=self.all_fiducials))
                   .rename(columns={'id': 'DEVICE_ID'})
                   .set_index('DEVICE_ID').sort_index())  # indexed by DEVICE_ID
         self.fvc.set(match_radius=mr_old)  # restore old radius after measure
         meapos.columns = meapos.columns.str.upper()  # clean up header to save
+        exppos.rename(columns={'id': 'DEVICE_ID'}, inplace=True)
+        exppos.set_index('DEVICE_ID', inplace=True)
+        exppos.columns = exppos.columns.str.upper()
         # find the posids that are unmatched, missing from FVC return
         matched = set(self.posids).intersection(set(meapos.index))
         unmatched = set(self.posids) - matched

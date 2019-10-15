@@ -58,29 +58,31 @@ class RehomeVerify(PECS):
         for col in ['exp_obsX', 'hom_obsX', 'mea_obsX',
                     'exp_obsY', 'hom_obsY', 'mea_obsY']:
             meapos[col] = np.nan
-        meapos[['exp_obsX', 'exp_obsY']] = exp_obsXY.T  # internally tracked
-        meapos[['hom_obsX', 'hom_obsY']] = hom_obsXY.T
+        # meapos['exp_obsX'] = exp_obsXY.T  # internally tracked
+        for col in meapos.columns:
+            exppos.loc[meapos.index, col] = meapos[col]
+        exppos[['exp_obsX', 'exp_obsY']] = exp_obsXY.T  # internally tracked
+        exppos[['hom_obsX', 'hom_obsY']] = hom_obsXY.T
         mea_obsXY = self.ptl.ptltrans('QS_to_obsXYZ',
                                       meapos[['Q', 'S']].values.T)[:2]
-        meapos[['mea_obsX', 'mea_obsY']] = mea_obsXY.T
-        meapos['obsdX'] = meapos['mea_obsX'] - meapos['hom_obsX']
-        meapos['obsdY'] = meapos['mea_obsY'] - meapos['hom_obsY']
-        meapos['dr'] = np.linalg.norm(meapos[['obsdX', 'obsdY']], axis=1)
-        meapos = meapos.sort_values(by='dr', ascending=False).reset_index()
+        exppos.loc[meapos.index, ['mea_obsX', 'mea_obsY']] = mea_obsXY.T
+        exppos['obsdX'] = exppos['mea_obsX'] - exppos['hom_obsX']
+        exppos['obsdY'] = exppos['mea_obsY'] - exppos['hom_obsY']
+        exppos['dr'] = np.linalg.norm(exppos[['obsdX', 'obsdY']], axis=1)
+        exppos = exppos.sort_values(by='dr', ascending=False).reset_index()
         tol = 1
-        mask = meapos['dr'] > tol
-        bad_posids = list(meapos[mask].index)
-        # self.printfunc(meapos)
+        mask = exppos['dr'] > tol
+        bad_posids = list(exppos[mask].index)
         if len(bad_posids) == 0:
             self.printfunc(
-                f'All {len(meapos)} matched fibres verified to have rehomed, '
+                f'All {len(exppos)} matched fibres verified to have rehomed, '
                 f'with tolerance dr = √(dX² + dY²) ≤ {tol} mm.')
         else:
             self.printfunc(f'{len(bad_posids)} positioners not rehomed '
                            f'properly (radial deviations > {tol} mm):\n\n'
-                           f'{meapos[mask].iloc[:, ]}\n\n'
+                           f'{exppos[mask].iloc[:, ]}\n\n'
                            f'Positioner IDs for retry:\n{bad_posids}')
-        return meapos
+        return exppos
 
 
 if __name__ == '__main__':
