@@ -140,7 +140,7 @@ class PetalTransforms:
         return np.vstack([X, Y, Z])  # 3 x N array
 
     @staticmethod
-    def obsXYZ_to_QST(obsXYZ, cast=False, max_iter=10, tol=1e-5):
+    def obsXYZ_to_QST(obsXYZ, cast=False, max_iter=10, tol=1e-6):
         """Transform obsXYZ coordinates into QST system, tol of dtheta in deg
         INPUT:  3 x N array, each column vector is obsXYZ
         OUTPUT: 3 x N array, each column vector is QST
@@ -186,6 +186,17 @@ class PetalTransforms:
             QS = typecast(QS)
         QST = np.vstack([QS, np.zeros(QS.shape[1])])  # add zeros as T data
         return PetalTransforms.QST_to_obsXYZ(QST)
+
+    @staticmethod
+    def QS_to_obsXY(QS, cast=False):
+        """QS -> QST -> obsXY
+        On-shell condition is assumed, so T = 0
+        INPUT:  2 x N array, each column vector is QS
+        OUTPUT: 2 x N array, each column vector is obsXY
+        """
+        if cast:
+            QS = typecast(QS)
+        return PetalTransforms.QS_to_obsXYZ(QS)[:2, :]  # 2 x N array
 
     @staticmethod
     def QS_to_flatXY(QS, cast=True):
@@ -258,6 +269,26 @@ class PetalTransforms:
         return self.R.T @ (obsXYZ - self.T)  # backward transformation
 
     # %% composite transformations for convenience
+    def ptlXYZ_to_QST(self, ptlXYZ, cast=False):
+        """ptlXYZ -> obsXYZ -> QST -> QS
+        INPUT:  3 x N array, each column vector is ptlXYZ, petal-local
+        OUTPUT: 3 x N array, each column vector is QST
+        """
+        if cast:
+            ptlXYZ = typecast(ptlXYZ)
+        obsXYZ = self.ptlXYZ_to_obsXYZ(ptlXYZ)
+        return self.obsXYZ_to_QST(obsXYZ)
+
+    def QST_to_ptlXYZ(self, QST, cast=False):
+        """QS -> QST -> obsXYZ -> ptlXYZ
+        INPUT:  3 x N array, each column vector is QST
+        OUTPUT: 3 x N array, each column vector is ptlXYZ, petal-local
+        """
+        if cast:
+            QS = typecast(QS)
+        obsXYZ = self.QST_to_obsXYZ(QS)
+        return self.obsXYZ_to_ptlXYZ(obsXYZ)
+
     def ptlXYZ_to_QS(self, ptlXYZ, cast=False):
         """ptlXYZ -> obsXYZ -> QST -> QS
         INPUT:  3 x N array, each column vector is ptlXYZ, petal-local
@@ -277,6 +308,15 @@ class PetalTransforms:
             QS = typecast(QS)
         obsXYZ = self.QS_to_obsXYZ(QS)
         return self.obsXYZ_to_ptlXYZ(obsXYZ)
+
+    def ptlXYZ_to_obsXY(self, ptlXYZ, cast=False):
+        """
+        INPUT:  3 x N array, each column vector is ptlXYZ
+        OUTPUT: 2 x N array, each column vector is obsXY
+        """
+        if cast:
+            ptlXYZ = typecast(ptlXYZ)
+        return self.ptlXYZ_to_obsXYZ(ptlXYZ)[:2, :]
 
 # %% written but discouraged transformations
 
@@ -435,3 +475,20 @@ if __name__ == '__main__':
         309.55559758 321.1381771  354.04033488]
         [207.67712193 201.85604887 201.81205383 201.52163337 201.35868775
          200.19538472 184.24423152 208.13277865]]'''
+
+    # additional QST tests
+    obsXYZ = np.array([295.3328802, 207.2633873, -14.737207]).reshape(3, 1)
+    print(f'Fitted obsXYZ = {obsXYZ.T}')
+    QST = trans.obsXYZ_to_QST(obsXYZ)
+    print(f'QST = {QST.T}')
+    obsXYZ = trans.QST_to_obsXYZ(QST)
+    print(f'obsXYZ = {obsXYZ.T}')
+
+
+    # device_loc 541, fid
+    obsXYZ = np.array([295.332581765, 207.26336747500002, -14.743447455]).reshape(3, 1)
+    print(f'CMM obsXYZ = {obsXYZ.T}')
+    QST = trans.obsXYZ_to_QST(obsXYZ)
+    print(f'QST = {QST.T}')
+    obsXYZ = trans.QST_to_obsXYZ(QST)
+    print(f'obsXYZ = {obsXYZ.T}')
