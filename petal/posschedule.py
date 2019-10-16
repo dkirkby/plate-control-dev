@@ -94,7 +94,7 @@ class PosSchedule(object):
         elif uv_type == 'posintTP':
             targt_posintTP = [u, v]
         elif uv_type == 'dTdP':
-            targt_posintTP = trans.delta_posintTP(start_posintTP, [u, v], lims)
+            targt_posintTP = trans.addto_posintTP(start_posintTP, [u, v], lims)
         # elif uv_type == 'obsXY':
         #     targt_posintTP, unreachable = trans.obsXY_to_posintTP([u, v], lims)
         # elif uv_type == 'ptlXY':
