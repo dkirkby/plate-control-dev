@@ -569,6 +569,7 @@ class Petal(object):
         response = self.comm.send_tables(hw_tables)
         if 'FAILED' in response:
             self.tables_sent_successfully = False
+            self.printfunc('WARNING: Movetables rejected by petalcontroller!')
         else:
             self.tables_sent_successfully = True
         self.info('send_move_tables: Done')
