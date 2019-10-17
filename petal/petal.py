@@ -354,6 +354,8 @@ class Petal(object):
             self.printfunc(f'petal: requests received {len(requests)}')
         marked_for_delete = set()
         for posid in requests:
+            if posid not in self.posids:
+                pass
             requests[posid]['posmodel'] = self.posmodels[posid]
             self._initialize_pos_flags(ids = {posid})
             if 'log_note' not in requests[posid]:
@@ -434,6 +436,8 @@ class Petal(object):
             self.pos_flags[posid] |= self.ctrl_disabled_bit
             del requests[posid]
         for posid in requests:
+            if posid not in self.posids:
+                pass
             requests[posid]['posmodel'] = self.posmodels[posid]
             if 'log_note' not in requests[posid]:
                 requests[posid]['log_note'] = ''
@@ -894,16 +898,23 @@ class Petal(object):
 
     def get_posfid_val(self, uniqueid, key):
         """Retrieve the state value identified by string key, for positioner or fiducial uniqueid."""
-        return self.states[uniqueid]._val[key]
+        if uniqueid in self.posids.union(self.fidids):
+            return self.states[uniqueid]._val[key]
+        else:
+            return 'FAILED: not in petal'
 
     def set_posfid_val(self, uniqueid, key, value):
         """Sets a single value to a positioner or fiducial. In the case of a fiducial, note that
         this call does NOT turn the fiducial physically on or off. It only saves a value."""
-        self.states[uniqueid].store(key,value)
-        if key.split('_')[0] in ['LENGTH','OFFSET','PHYSICAL']:
-            self.altered_calib_states.add(self.states[uniqueid])
+        if uniqueid in self.posids.union(self.fidids):
+            self.states[uniqueid].store(key,value)
+            if key.split('_')[0] in ['LENGTH','OFFSET','PHYSICAL']:
+                self.altered_calib_states.add(self.states[uniqueid])
+            else:
+                self.altered_states.add(self.states[uniqueid])
+            return 'SUCCESS, key %s, value %s' % (key, value)
         else:
-            self.altered_states.add(self.states[uniqueid])
+            return 'FAILED: not in petal' 
 
     def get_pbdata_val(self, key):
         """Requests data from petalbox using the pbget method.
@@ -1007,7 +1018,8 @@ class Petal(object):
         """Returns dict with keys = posids, values = posmodels, but only for
         those positioners in the collection posids which are enabled.
         """
-        return {p: self.posmodels[p] for p in posids
+        pos = set(posids).intersection(self.posids)
+        return {p: self.posmodels[p] for p in pos
                 if self.posmodels[p].is_enabled}
 
     def get_pos_flags(self, posids = 'all', should_reset = False):
@@ -1019,6 +1031,8 @@ class Petal(object):
         if posids == 'all':
             posids = self.posids
         for posid in posids:
+            if posid not in self.posids:
+                pass
             if not(self.posmodels[posid].is_enabled):
                 self.pos_flags[posid] |= self.ctrl_disabled_bit #final check for disabled
             if not(self.get_posfid_val(posid, 'FIBER_INTACT')):
@@ -1275,6 +1289,8 @@ class Petal(object):
         if ids == 'all':
             ids = self.posids.union(self.fidids)
         for posfidid in ids:
+            if posfidid not in self.posids.union(self.fidids):
+                pass
             if posfidid.startswith('M') or posfidid.startswith('D') or posfidid.startswith('UM'):
                 self.pos_flags[posfidid] = self.pos_bit
             else:
