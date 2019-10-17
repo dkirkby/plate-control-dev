@@ -901,7 +901,7 @@ class Petal(object):
         if uniqueid in self.posids.union(self.fidids):
             return self.states[uniqueid]._val[key]
         else:
-            return 'FAILED: not in petal'
+            return 'Not in petal'
 
     def set_posfid_val(self, uniqueid, key, value):
         """Sets a single value to a positioner or fiducial. In the case of a fiducial, note that
@@ -914,7 +914,7 @@ class Petal(object):
                 self.altered_states.add(self.states[uniqueid])
             return 'SUCCESS, key %s, value %s' % (key, value)
         else:
-            return 'FAILED: not in petal' 
+            return 'Not in petal' 
 
     def get_pbdata_val(self, key):
         """Requests data from petalbox using the pbget method.
