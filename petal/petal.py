@@ -56,6 +56,53 @@ class Petal(object):
     Note that if petal.py is used within PetalApp.py, the code has direct access to variables defined in PetalApp. For example self.anticol_settings
     Eventually we could clean up the constructure (__init__) and pass viewer arguments.
     """
+
+    # Hardware (operations) States
+    PETAL_OPS_STATES = {'INITIALIZED' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                                                     'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
+                                                     'GFAPWR_EN':('off', 60.0),  #GFA Power Enable OFF
+                                                     'TEC_CTRL':('off', 15.0), #TEC Power EN OFF
+                                                     'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON
+                                                     #GFA CCD OFF
+                                                     #GFA CCD Voltages EN OFF
+                                                     #TEC Control EN OFF - handeled by camera.py
+                                                     #PetalBox Power ON - controlled by physical raritan switch
+                                                     'PS1_EN':('off', 1.0), #Positioner Power EN OFF
+                                                     'PS2_EN':('off', 1.0)}),
+                        'STANDBY' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                                                 'GFAPWR_EN':('off', 60.0), #GFA Power Enable OFF
+                                                 'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
+                                                 'TEC_CTRL': ('off', 15.0), #TEC Power EN OFF
+                                                 'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON
+                                                 #GFA CCD OFF
+                                                 #GFA CCD Voltages EN OFF
+                                                 #TEC Control EN OFF - handeled by camera.py
+                                                 #PetalBox Power ON - controlled by physical raritan switch
+                                                 'PS1_EN':('off', 1.0), #Positioner Power EN OFF
+                                                 'PS2_EN':('off', 1.0)}),
+                        'READY' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                                               'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
+                                               'GFAPWR_EN':('on', 60.0), #GFA Power Enable ON
+                                               'TEC_CTRL': ('off', 15.0), #TEC Power EN OFF for now
+                                               'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON
+                                               #GFA CCD OFF
+                                               #GFA CCD Voltages EN OFF
+                                               #TEC Control EN ON - controlled by camera.py
+                                               #PetalBox Power ON - controlled by physical raritan switch
+                                               'PS1_EN': ('off', 1.0), #Positioner Power EN OFF
+                                               'PS2_EN': ('off', 1.0)}),
+                        'OBSERVING' : OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
+                                                   'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
+                                                   'GFAPWR_EN':('on', 60.0), #GFA Power Enable ON
+                                                   'TEC_CTRL':('off', 15.0), #TEC Power EN OFF for now
+                                                   'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON
+                                                   #GFA CCD ON
+                                                   #GFA CCD Voltages EN ON
+                                                   #TEC Control EN ON - controlled by camera.py
+                                                   #PetalBox Power ON - controlled by physical raritan switch
+                                                   'PS1_EN':('on', 1.0), #Positioner Power EN ON
+                                                   'PS2_EN':('on', 1.0)})}
+
     def __init__(self, petal_id=None, petal_loc=None, posids=None, fidids=None,
                  simulator_on=False, petalbox_id=None, shape=None,
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
@@ -66,14 +113,13 @@ class Petal(object):
         self.printfunc = printfunc
         self.printfunc(f'Running plate_control version: {pc.code_version}')
         self.printfunc(f'poscollider used: {poscollider.__file__}')
-        self.printfunc(f'simulator_on={simulator_on}, db_commit_on={db_commit_on}, local_commit_on={local_commit_on}, local_log_on={local_log_on}')
         # petal setup
-        if None in [petal_id, petalbox_id, fidids, posids, shape]:
+        if None in [petal_id, petalbox_id, fidids, posids, shape] or \
+                not hasattr(self, 'alignment'):
             self.printfunc('Some parameters not provided to __init__, reading petal config.')
             self.petal_state = posstate.PosState(
-                unit_id=petal_id, device_type='ptl', 
-                db_commit_on=db_commit_on, local_commit_on=local_commit_on,
-                local_log_on=local_log_on, printfunc=self.printfunc)
+                unit_id=petal_id, device_type='ptl', logging=True,
+                printfunc=self.printfunc)
             if petal_id is None:
                 self.printfunc('Reading Petal_ID from petal_state')
                 petal_id = self.petal_state.conf['PETAL_ID'] # this is the string unique hardware id of the particular petal (not the integer id of the beaglebone in the petalbox)
@@ -89,10 +135,18 @@ class Petal(object):
             if shape is None:
                 self.printfunc('Reading shape from petal_state')
                 shape = self.petal_state.conf['SHAPE']
+            if not hasattr(self, 'alignment'):
+                self.alignment = {'Tx': self.petal_state.conf['X_OFFSET'],
+                                  'Ty': self.petal_state.conf['Y_OFFSET'],
+                                  'Tz': 0,
+                                  'alpha': 0,
+                                  'beta': 0,
+                                  'gamma': self.petal_state.conf['ROTATION']}
+
         self.petalbox_id = petalbox_id
         self.petal_id = int(petal_id)
         self.shape = shape
-        self._last_state = OrderedDict()
+        self._last_state = None
         if fidids in ['',[''],{''}]: # check included to handle simulation cases, where no fidids argued
             fidids = {}
 
@@ -102,6 +156,12 @@ class Petal(object):
             import petalcomm
             self.comm = petalcomm.PetalComm(self.petalbox_id, user_interactions_enabled=user_interactions_enabled)
             self.comm.pbset('non_responsives', 'clear') #reset petalcontroller's list of non-responsive canids
+            # get ops_state from petalcontroller
+            try:
+                o = self.comm.ops_state()
+                self.ops_state_sv.write(o)
+            except Exception as e:
+                self.printfunc('init: Exception calling petalcontroller ops_state: %s' % str(e))
         self.tables_sent_successfully = True
 
         # database setup
@@ -123,10 +183,7 @@ class Petal(object):
         # fiducials setup
         self.fidids = {fidids} if isinstance(fidids,str) else set(fidids)
         for fidid in self.fidids:
-            self.states[fidid] = posstate.PosState(
-            	unit_id=fidid, device_type='fid', 
-            	db_commit_on=self.db_commit_on, local_log_on=self.local_log_on,
-            	printfunc=self.printfunc, petal_id=self.petal_id)
+            self.states[fidid] = posstate.PosState(fidid, logging=self.local_log_on, device_type='fid', printfunc=self.printfunc, petal_id=self.petal_id)
             self.devices[self.states[fidid]._val['DEVICE_LOC']] = fidid
 
         # pos flags setup
@@ -151,11 +208,10 @@ class Petal(object):
 
     def init_trans(self, alignment=None):
         '''
-        initialize PetalTransforms class as a property of petal
+        initialise PetalTransforms class as a property of petal
         called upon petal instantiation inside __init__()
         must also be called whenever petal alignment changes in the focal plane
         input (self.)alignment is a dict of 6 items structured as follows:
-
         self.alignment = {'Tx': 0,  # x translation in mm
                           'Ty': 0,  # y translation in mm
                           'Tz': 0,  # z translation in mm
@@ -179,14 +235,6 @@ class Petal(object):
                                   'gamma': 0}  # z rotation rad
         else:  # new alingment supplied, overwrite self.aglinment attribute
             self.alignment = alignment
-        # debug
-        self.printfunc(f'Overiding petal alignment in DB for testing')
-        self.alignment = {'Tx': 0,  # x translation in mm
-                          'Ty': 0,  # y translation in mm
-                          'Tz': 0,  # z translation in mm
-                          'alpha': 0,  # x rotation in rad
-                          'beta': 0,  # y rotation in rad
-                          'gamma': 3.14159265359}  # z rotation rad
         self.printfunc(f'Petal transform initialised with\n{self.alignment}')
         self.trans = PetalTransforms(Tx=self.alignment['Tx'],
                                      Ty=self.alignment['Ty'],
@@ -208,10 +256,8 @@ class Petal(object):
         self.shape == 'petal'
         for posid in posids:
             self.states[posid] = posstate.PosState(
-                unit_id=posid, device_type='pos', petal_id=self.petal_id,
-                db_commit_on=self.db_commit_on,
-                local_log_on=self.local_log_on,
-                printfunc=self.printfunc, )
+                posid, logging=self.local_log_on, device_type='pos',
+                printfunc=self.printfunc, petal_id=self.petal_id)
             self.posmodels[posid] = PosModel(state=self.states[posid],
                                              petal_alignment=self.alignment)
             self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
@@ -237,9 +283,8 @@ class Petal(object):
             self.collider = poscollider.PosCollider(
                 configfile=collider_file, collision_hashpp_exists=False,
                 collision_hashpf_exists=False, hole_angle_file=None)
-            # self.anticol_settings = self.collider.config
-        # if self.verbose:
-        self.printfunc(f'PosCollider setting: {self.collider.config}')  # debug
+            self.anticol_settings = self.collider.config
+        self.printfunc(f'Collider setting: {self.collider.config}')
         self.collider.add_positioners(self.posmodels.values())
         self.animator = self.collider.animator
         # this should be turned on/off using the animation start/stop
@@ -496,6 +541,7 @@ class Petal(object):
         of positioners. (But there are certain 'expert use' test cases in the
         lab, where we want this feature turned off.)
         """
+        self.info('schedule_moves called with anticollision = %r' % anticollision)
         if anticollision not in {None,'freeze','adjust'}:
             anticollision = self.anticollision_default
         self.schedule.should_anneal = should_anneal
@@ -504,7 +550,9 @@ class Petal(object):
     def send_move_tables(self):
         """Send move tables that have been scheduled out to the positioners.
         """
+        self.info('send_move_tables called')
         if self.simulator_on:
+            self.tables_sent_successfully = True
             if self.verbose:
                 self.tables_sent_successfully = True
                 self.printfunc('Simulator skips sending move tables to positioners.')
@@ -521,8 +569,10 @@ class Petal(object):
         response = self.comm.send_tables(hw_tables)
         if 'FAILED' in response:
             self.tables_sent_successfully = False
+            self.printfunc('WARNING: Movetables rejected by petalcontroller!')
         else:
             self.tables_sent_successfully = True
+        self.info('send_move_tables: Done')
 
     def set_motor_parameters(self):
         """Send the motor current and period settings to the positioners.
@@ -553,6 +603,7 @@ class Petal(object):
         """Command the positioners to do the move tables that were sent out to them.
         Then do clean-up and logging routines to keep track of the moves that were done.
         """
+        self.info('execute_moves called')
         if self.simulator_on:
             if self.verbose:
                 self.printfunc('Simulator skips sending execute moves command to positioners.')
@@ -566,12 +617,14 @@ class Petal(object):
             table_times = [sum([pp/1000 for pp in hw_table['postpause']]) + sum(hw_table['move_time']) for hw_table in hw_tables] # note postpauses are in ms
             if table_times != []: #Prevent a crash if no move tables were actually sent (IE all positioners in a move are disabled)
                 delay = buffer + max(table_times)
+                self.info('execute_moves: max(table_times) = %r' % delay)
                 time.sleep(delay)
             #END OF TEMPORARY FIX
             self._postmove_cleanup()
             self._wait_while_moving()
         self.canids_where_tables_were_just_sent = []
         self.busids_where_tables_were_just_sent = []
+        self.info('execute_moves: Done')
 
     def schedule_send_and_execute_moves(self, anticollision='default', should_anneal=True):
         """Convenience wrapper to schedule, send, and execute the pending requested
@@ -630,7 +683,7 @@ class Petal(object):
         """Set specific fiducials on or off.
 
         fidids ... one fiducial id string, or an iterable collection of fiducial id strings, or 'all'
-
+        [KH: note that the fidids list might include devices that are not on this petal. The code must ignore those]           
         setting ... what to set the fiducials to, as described below:
             'on'         ... turns each fiducial to its default on value
             'off'        ... turns each fiducial individually to its default off value
@@ -651,7 +704,8 @@ class Petal(object):
             fidids = self.fidids
         else:
             fidids = {fidids} if isinstance(fidids,str) else set(fidids)
-        enabled = [fidid for fidid in fidids if self.get_posfid_val(fidid,'CTRL_ENABLED')]
+        # currently fiducials don't have an enable flag in pos state (bypass for now)
+        enabled = [fidid for fidid in fidids if True or self.get_posfid_val(fidid,'CTRL_ENABLED')]
         busids = [self.get_posfid_val(fidid,'BUS_ID') for fidid in enabled]
         canids = [self.get_posfid_val(fidid,'CAN_ID') for fidid in enabled]
         if isinstance(setting,int) or isinstance(setting,float):
@@ -660,6 +714,11 @@ class Petal(object):
             if setting > 100:
                 setting = 100
             duties = [setting]*len(enabled)
+        elif isinstance(setting, (list, tuple)):
+            duties = []
+            for f in enabled:
+                i = enabled.index(f)
+                duties.append(setting[i])
         elif setting == 'on':
             duties = [self.get_posfid_val(fidid,'DUTY_DEFAULT_ON') for fidid in enabled]
         else:
@@ -675,7 +734,12 @@ class Petal(object):
             settings_done[enabled[i]] = duties[i]
             if save_as_default:
                 self.set_posfid_val(enabled[i], 'DUTY_DEFAULT_ON', duties[i])
-        self.commit(log_note='set fiducial parameters')
+                self.altered_calib_states.add(self.states[enabled[i]])
+        if save_as_default:
+            mode = 'both'
+        else:
+            mode = 'move'
+        self.commit(mode=mode, log_note='set fiducial parameters')
         return settings_done
 
     @property
@@ -702,90 +766,42 @@ class Petal(object):
         hw_state = hw_state.upper()
         state_list = ['STANDBY','READY','OBSERVING'] #INITIALIZED ops_state also exists but can only be reached when BBB reboots
         if not hasattr(self, '_last_state'):
-            self._last_state = OrderedDict()
+            self._last_state = None
         assert hw_state in state_list, '_set_hardware_state: invalid state requested, possible states: %s' % state_list
         # Setup what values are expected when checking the state in the future
         # Notation: key (device name), tuple with value, max wait time for state change
-        if hw_state == 'INITIALIZED': #Note: only here for complete definition, state_list prevents this from being used
-            #AC Positioner Power ON - not controlled by software
-            self._last_state=OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
-                                          'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
-                                          'GFAPWR_EN':('off', 60.0),  #GFA Power Enable OFF
-                                          'TEC_CTRL':('off', 1.0), #TEC Power EN OFF
-                                          'BUFFERS':(['off','off'], 1.0), #SYNC Buffer EN OFF - what about SYNC?
-                                          #GFA CCD OFF
-                                          #GFA CCD Voltages EN OFF
-                                          #TEC Control EN OFF - handeled by camera.py
-                                          #PetalBox Power ON - controlled by physical raritan switch
-                                          'PS1_EN':('off', 1.0), #Positioner Power EN OFF
-                                          'PS2_EN':('off', 1.0)})
-        elif hw_state == 'STANDBY':
-            #AC Positioner Power ON - not controlled by software
-            self._last_state=OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
-                                          'GFAPWR_EN':('off', 60.0), #GFA Power Enable OFF
-                                          'GFA_FAN':({'inlet':['off',0],'outlet':['off',0]}, 1.0), #GFA Fan Power OFF
-                                          'TEC_CTRL': ('off', 1.0), #TEC Power EN OFF
-                                          'BUFFERS':(['off','off'], 1.0), #SYNC Buffer EN OFF - what about SYNC?
-                                          #GFA CCD OFF
-                                          #GFA CCD Voltages EN OFF
-                                          #TEC Control EN OFF - handeled by camera.py
-                                          #PetalBox Power ON - controlled by physical raritan switch
-                                          'PS1_EN':('off', 1.0), #Positioner Power EN OFF
-                                          'PS2_EN':('off', 1.0)})
-        elif hw_state == 'READY':
-            #AC Positioner Power ON - not controlled by software
-            self._last_state=OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
-                                          'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
-                                          'GFAPWR_EN':('on', 1.0), #GFA Power Enable ON
-                                          'TEC_CTRL': ('on', 15.0), #TEC Power EN ON
-                                          'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON - what about SYNC?
-                                          #GFA CCD OFF
-                                          #GFA CCD Voltages EN OFF
-                                          #TEC Control EN ON - controlled by camera.py
-                                          #PetalBox Power ON - controlled by physical raritan switch
-                                          'PS1_EN': ('off', 1.0), #Positioner Power EN OFF
-                                          'PS2_EN': ('off', 1.0)})
-        elif hw_state == 'OBSERVING':
-            #AC Positioner Power ON - not controlled by software
-            self._last_state=OrderedDict({'CAN_EN':(['on','on'], 1.0), #CAN Power ON
-                                          'GFA_FAN':({'inlet':['on',15],'outlet':['on',15]}, 1.0), #GFA Fan Power ON
-                                          'GFAPWR_EN':('on', 1.0), #GFA Power Enable ON
-                                          'TEC_CTRL':('on', 5.0), #TEC Power EN ON
-                                          'BUFFERS':(['on','on'], 1.0), #SYNC Buffer EN ON - what about SYNC?
-                                          #GFA CCD ON
-                                          #GFA CCD Voltages EN ON
-                                          #TEC Control EN ON - controlled by camera.py
-                                          #PetalBox Power ON - controlled by physical raritan switch
-                                          'PS1_EN':('on', 1.0), #Positioner Power EN ON
-                                          'PS2_EN':('on', 1.0)})
+        if hw_state in ['INITIALIZED', 'STANDBY', 'READY', 'OBSERVING']: 
+            self._last_state = hw_state
         # Set petalbox State
         if self.simulator_on:
-            return 'READY' # bypass everything below if in sim mode - sim should always be ready
-        for key in self._last_state.keys():
-            ret = self.comm.pbset(key, self._last_state[key][0])
+            if hasattr(self, 'ops_state_sv'):
+                self.ops_state_sv.write('READY')
+            return 'OBSERVING' # bypass everything below if in petal sim mode - sim should always be observing
+        for key, value in self.PETAL_OPS_STATES[self._last_state].items():
+            ret = self.comm.pbset(key, value[0])
             if 'FAILED' in ret:
                 #fail message, should only happen if petalcontroller changes - code will raise error later on
                 self.printfunc('_set_hardware_state: WARNING: key %s returned %s from pbset.' % (key,ret))
         # now check if all state changes are complete
         # wait for timeout, if still inconsistent raise exception
-        todo = list(self._last_state.keys())
+        todo = list(self.PETAL_OPS_STATES[self._last_state].keys())
         failed = {}
         start = time.time()
         while len(todo) != 0:
-            for key in self._last_state.keys():
+            for key in self.PETAL_OPS_STATES[self._last_state].keys():
                 if key not in todo:
                     continue
                 new_state = self.comm.pbget(key)
-                if new_state == self._last_state[key][0]:
+                if new_state == self.PETAL_OPS_STATES[self._last_state][key][0]:
                     todo.remove(key)
                 elif key == 'GFA_FAN': #GFA has different structure
-                    req = self._last_state[key][0]['inlet'][0], self._last_state[key][0]['outlet'][0]
+                    req = self.PETAL_OPS_STATES[self._last_state][key][0]['inlet'][0], self.PETAL_OPS_STATES[self._last_state][key][0]['outlet'][0]
                     new = new_state['inlet'][0], new_state['outlet'][0]
                     if req == new:
                         todo.remove(key)
                 else:   # check timeout
-                    if time.time() > start + self._last_state[key][1]:
-                        failed[key] = (new_state, self._last_state[key][0])
+                    if time.time() > start + self.PETAL_OPS_STATES[self._last_state][key][1]:
+                        failed[key] = (new_state, self.PETAL_OPS_STATES[self._last_state][key][0])
                         self.printfunc('_set_hardware_state: Timeout for %r' % key)
                         todo.remove(key)
             time.sleep(1)
@@ -794,6 +810,8 @@ class Petal(object):
             ret = self.comm.ops_state(hw_state)
             if 'FAILED' not in ret:
                 self.printfunc('_set_hardware_state: all devices have changed state.')
+                if hasattr(self, 'ops_state_sv'):
+                    self.ops_state_sv.write(ret)
             else:
                 self.printfunc('_set_hardware_state: FAILED: when calling comm.ops_state: %s' % ret)
                 raise_error('_set_hardware_state: comm.ops_state returned %s' % ret)
@@ -802,32 +820,62 @@ class Petal(object):
             raise_error('_set_hardware_state: Inconsistent device states: %r' % failed)
         return hw_state
 
-    def _get_hardware_state(self):
+    def _get_hardware_state(self, what = None):
         '''
-        Loops through keys in self._last_state to compare with what the
+        Loops through keys in self.PETAL_OPS_STATES[self._last_state] to compare with what the
         PetalController thinks they are. Any differences are recorded and
         'ERROR' state is set if there are any discrepencies. Otherwise
         returns the state of the PetalController.
+
+        Arguments:
+        what =  list (returns list of current settings for variables in last_state)
+             =  <key> (returns current value of key)
         '''
         err_strings = []
-        if self.simulator_on: #Sim should always be ready
-            return 'READY', err_strings
-        if not(self._last_state):
-            raise_error('_get_hardware_state: No state yet set by petal')
+        if self.simulator_on: #Sim should always be observing
+            return 'OBSERVING', err_strings
+        if self._last_state is None:
+            self.printfunc('_get_hardware_state: No state yet set by petal. Trying to reconstruct from PC settings')
+            for state in ['INITIALIZED', 'STANDBY', 'READY', 'OBSERVING']:
+                errors = self._check_hardware_state(state)
+                if errors == []:
+                    self._last_state = state
+                    break
+            if self._last_state is None:
+                return 'ERROR', 'petal hardware state unknown'
         # Look for different settings from what petal last set.
-        for key in self._last_state.keys():
+        errors = self._check_hardware_state(self._last_state, what = what)
+        if what != None:
+            return errors
+        if isinstance(errors, list) and len(errors) == 0:
+            # Check if petal and PC ops states match
+            pc_ops = self.comm.ops_state()
+            if pc_ops != self._last_state:
+                self.printfunc('_get_hardware_state: PC ops state (%r) does not match device settings (%r). Corrected.' % (pc_ops, self._last_state))
+                self.comm.ops_state(self._last_state)
+            return self._last_state, errors
+        else: #If errors were found, set 'ERROR' state and return 'ERROR' as well as strings explaining why.
+            return 'ERROR', errors
+
+    def _check_hardware_state(self, state, what = None):
+        # Look for different settings from what petal last set.
+        err_strings = []
+        current = {}
+        for key in self.PETAL_OPS_STATES[state].keys():
             fbk = self.comm.pbget(key)
+            if what == 'list' or what == key:
+                current[key] = fbk
             if key == 'GFA_FAN': #sadly GFA_FAN is a little weird.
                 for k in fbk.keys(): #should be 'inlet' and 'outlet'
-                    if fbk[k][0] != self._last_state[key][0][k][0]: #comparing only off/on, not worring about PWM or TACH
-                        err_strings.append(key+' expected: '+str(self._last_state[key][0][k][0])+', got: '+str(fbk[k][0]))
+                    if fbk[k][0] != self.PETAL_OPS_STATES[state][key][0][k][0]: #comparing only off/on, not worring about PWM or TACH
+                        err_strings.append(key+' expected: '+str(self.PETAL_OPS_STATES[state][key][0][k][0])+', got: '+str(fbk[k][0]))
             else:
-                if self._last_state[key][0] != fbk:
-                    err_strings.append(key+' expected: '+str(self._last_state[key][0])+', got: '+str(fbk))
-        if err_strings == []: #If no errors found, just return the state that was set
-            return self.comm.get('ops_state'), err_strings
-        else: #If errors were found, return 'ERROR' as well as strings explaining why.
-            raise_error('_get_hardware_state: %r' % err_strings)
+                if self.PETAL_OPS_STATES[state][key][0] != fbk:
+                    err_strings.append(key+' expected: '+str(self.PETAL_OPS_STATES[state][key][0])+', got: '+str(fbk))
+        if what == None:
+            return err_strings
+        else:
+            return current
 
     def reset_petalbox(self):
         """Reset all errors and turn all enables off.  This method
@@ -838,6 +886,11 @@ class Petal(object):
             self.comm.configure()
 
 # GETTERS, SETTERS, STATUS METHODS
+    def get_information(self, what):
+        """
+        returns petalcontroller information
+        """
+        return self.comm.get(what)
 
     def get_posfid_val(self, uniqueid, key):
         """Retrieve the state value identified by string key, for positioner or fiducial uniqueid."""
@@ -888,7 +941,7 @@ class Petal(object):
         data_for_telemetry['total schedule time'] = total_time
         return data_for_telemetry
 
-    def commit(self, mode='move', log_note=''):
+    def commit(self, mode='move', log_note='', *args, **kwargs):
         '''Commit move data or calibration data to DB and/or local config and
         log files.
         A note string may optionally be included to go along with this entry.
@@ -907,6 +960,7 @@ class Petal(object):
         elif mode == 'both':
             self.commit(mode='move', log_note='')
             self.commit(mode='calib')
+            return
         if self.db_commit_on and not self.simulator_on:  # write to DB
             pos_commit_list = [st for st in states if st.type == 'pos']
             fid_commit_list = [st for st in states if st.type == 'fid']
@@ -938,6 +992,10 @@ class Petal(object):
             'QS', 'flatXY', 'obsXY', 'ptlXY', 'motTP',
         See comments in posmodel.py for explanation of these values.
         """
+        if key == 'posintTP':
+            return self.posmodels[posid].expected_current_posintTP
+        elif key == 'poslocTP':
+            return self.posmodels[posid].expected_current_poslocTP
         pos = self.posmodels[posid].expected_current_position
         if key in pos.keys():
             return pos[key]
@@ -972,6 +1030,11 @@ class Petal(object):
         if should_reset:
             self._initialize_pos_flags()
         return pos_flags
+
+    # for DOS training
+    def _clear_fault(self):
+        self.comm.clear_fault()
+        return 'SUCCESS'
 
 # MOVE SCHEDULING ANIMATOR CONTROLS
 
@@ -1188,7 +1251,7 @@ class Petal(object):
         '''
         Sets pos_flags to initial values: 4 for positioners and 8 for fiducials.
 
-        FVC/Petal bit string
+        FVC/Petal bit string (When bits are passed to FVC, petal bits are wiped out)
 
         FVC BITS
         1 - Pinhole Center
@@ -1236,6 +1299,50 @@ class Petal(object):
                     self.pos_flags[devid] |= self.bad_fiber_fvc_bit
                     self.disabled_devids.append(devid)
 
+    def _petal_configure(self, constants = 'DEFAULT'):
+        """
+        petal.py internal configure function.
+        calls petalcontroller configure
+        calls get_ready to change ops_state to READY
+
+        Resets posflags, schedule, clears temporary posstate values,
+        commits uncommitted state changes to the DB
+        """
+        self.printfunc('_petal_configure: configuring Petalbox %r' % self.petalbox_id)
+        if hasattr(self, 'comm'):
+            #First configure, then worry about opsstate (don't trust PC code)
+            try:
+                retcode = self.comm.configure(constants = constants)
+                self.printfunc('_petal_configure: petalbox returns %r' % retcode)
+            except Exception as e:
+                rstring = '_petal_configure: Exception configuring petalbox: %s' % str(e)
+                self.printfunc(rstring)
+                return 'FAILED: ' + rstring
+            # Manually check opsstate for inconsistancies (will catch INITIALIZED)
+            hwstate, err_strings = self._get_hardware_state()
+            if hwstate == 'ERROR':
+                # Someone mucked with the settings, just move to standby
+                self._set_hardware_state('STANDBY')
+                self.printfunc('_petal_configure: ops_state is now STANDBY')
+                if self.verbose:
+                    self.printfunc('_petal_configure: error strings from checking opsstate: %s' % err_strings)
+            else:
+                self.printfunc('_petal_configure: ops_state remains in %s' % hwstate)
+
+        #Reset values
+        self.canids_where_tables_were_just_sent = []
+        self.busids_where_tables_were_just_sent = []
+        self.nonresponsive_canids = set()
+        self._initialize_pos_flags() # Reset posflags
+        self._apply_state_enable_settings()
+        for posmodel in self.posmodels.values(): #Clean up posmodel and posstate
+            posmodel.clear_postmove_cleanup_cmds_without_executing()
+
+        self._clear_temporary_state_values()
+        self.commit(mode='both', log_note='configuring') #commit uncommitted changes to DB
+        self.schedule = self._new_schedule() # Refresh schedule so it has no tables
+
+        return 'SUCCESS'
 
 if __name__ == '__main__':
     '''
@@ -1277,4 +1384,3 @@ if __name__ == '__main__':
         ptl.request_targets(requests)
         ptl.schedule_moves(anticollision='adjust')
         ptl.send_and_execute_moves()
-    # ptl.schedule_stats.save()>>>>>>> .merge-right.r127109

@@ -426,6 +426,7 @@ class PosSchedule(object):
                 range_wrap_limits='targetable')
         for i in range(len(self.RRE_stage_order)):
             name = self.RRE_stage_order[i]
+            self.printfunc('stage name:', name)
             stage = self.stages[name]
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
             if self.should_anneal:
@@ -472,7 +473,6 @@ class PosSchedule(object):
                     self.printfunc(f'posschedule: remaining collisions '
                                    f'{len(stage.colliding)}, '
                                    f'attempts_remaining {attempts_remaining}')
-
 
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
