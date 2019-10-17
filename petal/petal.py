@@ -820,12 +820,16 @@ class Petal(object):
             raise_error('_set_hardware_state: Inconsistent device states: %r' % failed)
         return hw_state
 
-    def _get_hardware_state(self):
+    def _get_hardware_state(self, what = None):
         '''
         Loops through keys in self.PETAL_OPS_STATES[self._last_state] to compare with what the
         PetalController thinks they are. Any differences are recorded and
         'ERROR' state is set if there are any discrepencies. Otherwise
         returns the state of the PetalController.
+
+        Arguments:
+        what =  list (returns list of current settings for variables in last_state)
+             =  <key> (returns current value of key)
         '''
         err_strings = []
         if self.simulator_on: #Sim should always be observing
@@ -840,7 +844,9 @@ class Petal(object):
             if self._last_state is None:
                 return 'ERROR', 'petal hardware state unknown'
         # Look for different settings from what petal last set.
-        errors = self._check_hardware_state(self._last_state)
+        errors = self._check_hardware_state(self._last_state, what = what)
+        if what != None:
+            return errors
         if isinstance(errors, list) and len(errors) == 0:
             # Check if petal and PC ops states match
             pc_ops = self.comm.ops_state()
@@ -849,13 +855,16 @@ class Petal(object):
                 self.comm.ops_state(self._last_state)
             return self._last_state, errors
         else: #If errors were found, set 'ERROR' state and return 'ERROR' as well as strings explaining why.
-            return 'ERROR', err_strings
+            return 'ERROR', errors
 
-    def _check_hardware_state(self, state):
+    def _check_hardware_state(self, state, what = None):
         # Look for different settings from what petal last set.
         err_strings = []
+        current = {}
         for key in self.PETAL_OPS_STATES[state].keys():
             fbk = self.comm.pbget(key)
+            if what == 'list' or what == key:
+                current[key] = fbk
             if key == 'GFA_FAN': #sadly GFA_FAN is a little weird.
                 for k in fbk.keys(): #should be 'inlet' and 'outlet'
                     if fbk[k][0] != self.PETAL_OPS_STATES[state][key][0][k][0]: #comparing only off/on, not worring about PWM or TACH
@@ -863,7 +872,10 @@ class Petal(object):
             else:
                 if self.PETAL_OPS_STATES[state][key][0] != fbk:
                     err_strings.append(key+' expected: '+str(self.PETAL_OPS_STATES[state][key][0])+', got: '+str(fbk))
-        return err_strings
+        if what == None:
+            return err_strings
+        else:
+            return current
 
     def reset_petalbox(self):
         """Reset all errors and turn all enables off.  This method
