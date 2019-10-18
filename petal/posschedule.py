@@ -95,12 +95,12 @@ class PosSchedule(object):
             targt_posintTP = [u, v]
         elif uv_type == 'dTdP':
             targt_posintTP = trans.addto_posintTP(start_posintTP, [u, v], lims)
-        # elif uv_type == 'obsXY':
-        #     targt_posintTP, unreachable = trans.obsXY_to_posintTP([u, v], lims)
-        # elif uv_type == 'ptlXY':
-        #     targt_posintTP, unreachable = trans.ptlXY_to_posintTP([u, v], lims)
-        # elif uv_type == 'poslocTP':
-        #     targt_posintTP = trans.poslocTP_to_posintTP([u, v])
+        elif uv_type == 'obsXY':
+            targt_posintTP, unreachable = trans.obsXY_to_posintTP([u, v], lims)
+        elif uv_type == 'ptlXY':
+            targt_posintTP, unreachable = trans.ptlXY_to_posintTP([u, v], lims)
+        elif uv_type == 'poslocTP':
+            targt_posintTP = trans.poslocTP_to_posintTP([u, v])
         else:
             if self.verbose:
                 self.printfunc(
@@ -361,7 +361,7 @@ class PosSchedule(object):
         if should_freeze or self.stats:
             if self.verbose:
                 self.printfunc(f'schedule finding collisions: {len(stage.move_tables)}')
-                self.printfunc('Posschedule first move table:', list(stage.move_tables.values())[0].for_collider())
+                self.printfunc('Posschedule first move table: \n' + str(list(stage.move_tables.values())[0].for_collider()))
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
         if should_freeze:
@@ -426,14 +426,14 @@ class PosSchedule(object):
                 range_wrap_limits='targetable')
         for i in range(len(self.RRE_stage_order)):
             name = self.RRE_stage_order[i]
-            self.printfunc('stage name:', name)
+            self.printfunc('stage name:'+ str(name))
             stage = self.stages[name]
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
             if self.should_anneal:
                 stage.anneal_tables(self.anneal_time[name])
             if self.verbose:
                 self.printfunc(f'posschedule: finding collisions for {len(stage.move_tables)} positioners, trying {name}')
-                self.printfunc('Posschedule first move table:', list(stage.move_tables.values())[0].for_collider())
+                self.printfunc('Posschedule first move table: \n' + str(list(stage.move_tables.values())[0].for_collider()))
             colliding_sweeps, all_sweeps = stage.find_collisions(
                 stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
