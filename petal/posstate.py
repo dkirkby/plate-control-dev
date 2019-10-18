@@ -58,7 +58,7 @@ class PosState(object):
         else:
             self.petal_state_defaults = None
         if self.write_to_DB:  # data initialization from database
-            self.printfunc('posstate DB write on')
+            #self.printfunc('posstate DB write on')
             if petal_id is not None:  # ptlid is given, simple
                 self.ptlid = petal_id
                 if unit_id is not None:  # both ptlid and unit_id given
