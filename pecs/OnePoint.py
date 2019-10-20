@@ -66,7 +66,7 @@ class OnePointCalib(PECS):
                 ptl = self.get_owning_ptl(posid)
                 posintTP = self.ptlm.postrans(posid,
                                              'poslocTP_to_posintTP', poslocTP,
-                                             participating_petals=ptl)
+                                             participating_petals=[ptl])
                 # Work with ptl/dev loc for filtering in PetalMan.prepare_move
                 rows.append({'PETAL_LOC': row['PETAL_LOC'],
                              'DEVICE_LOC': row['DEVICE_LOC'],

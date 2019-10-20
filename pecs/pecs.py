@@ -120,7 +120,7 @@ class PECS:
         assert(isinstance(posid,str)), 'Must be single positioner!'
         retcode = self.ptlm.get_positioners(enabled_only=False, posids=[posid])
         for ptl in retcode.keys():
-            if not retcode[ptl].is_empty():
+            if not retcode[ptl].empty:
                 return ptl
         return
 
