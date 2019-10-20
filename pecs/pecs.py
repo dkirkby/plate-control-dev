@@ -85,7 +85,7 @@ class PECS:
             self.printfunc(f'Defaulting to petal roles = {self.ptlm.participating_petals}')
         else:
             for ptl in petal_roles:
-                assert('PETAL' in ptl, 'Petal role names are always PETAL###, invalid role name %s' % ptl)
+                assert ('PETAL' in ptl), 'Petal role names are always PETAL###, invalid role name {ptl}'
             self.ptlm.participating_petals = petal_roles
         if (posids is None) and (ids is None):
             retcode = self.ptlm.get_positioners(enabled_only=True)
@@ -117,7 +117,7 @@ class PECS:
         """
         Finds the petal that owns this positioner
         """
-        assert(isinstance(posid,str), 'Must be single positioner!')
+        assert(isinstance(posid,str)), 'Must be single positioner!'
         retcode = self.ptlm.get_positioners(enabled_only=False, posids=[posid])
         for ptl in retcode.keys():
             if not retcode[ptl].is_empty():
