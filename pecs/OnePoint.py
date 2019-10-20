@@ -85,11 +85,16 @@ class OnePointCalib(PECS):
                 match_radius=match_radius)
         used_pos = meapos.loc[sorted(list(matched))]  # only matched rows
         unused_pos = meapos.loc[sorted(list(unmatched))]
-        updates = (
-            self.ptlm.test_and_update_TP(
+        retcode = self.ptlm.test_and_update_TP(
                 used_pos.reset_index(), mode=mode, auto_update=auto_update,
                 tp_updates_tol=0.0, tp_updates_fraction=1.0)
-            .set_index('DEVICE_ID').sort_index())
+        if isinstance(retcode, dict):
+            dflist = []
+            for df in retcode.items():
+                dflist.append(df)
+            updates = pd.concat(dflist).set_index('DEVICE_ID').sort_index()
+        else:
+            updates = retcode.set_index('DEVICE_ID').sort_index()
         # Drop QS so we don't get columns QS in updates with NaNs
         unused_pos.drop(['Q', 'S'], axis=1)
         # List unmeasured positioners in updates, even with no data

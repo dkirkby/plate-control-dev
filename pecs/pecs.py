@@ -113,7 +113,7 @@ class PECS:
         posids, ids = self._interactively_get_posids()  # set selected posids
         self.ptl_setup(petal_roles=ptls, posids=posids, ids=ids)
 
-    def get_owning_petal(self, posid):
+    def get_owning_ptl(self, posid):
         """
         Finds the petal that owns this positioner
         """
@@ -140,6 +140,7 @@ class PECS:
             if not accepted:
                 self.printfunc(f'Invalid role {role}, try again.')
                 return self._interactively_get_ptl()
+        self.ptlm.participating_petals = petal_roles
         return petal_roles
 
 
