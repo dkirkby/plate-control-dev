@@ -19,10 +19,10 @@ class SeedArmlengths(PECS):
             ptl = self.get_owning_ptl(posid)
             self.ptlm.set_posfid_val(posid, 'LENGTH_R1',
                                     pc.nominals['LENGTH_R1']['value'],
-                                    participating_petals=ptl)
+                                    participating_petals=[ptl])
             self.ptlm.set_posfid_val(posid, 'LENGTH_R2',
                                     pc.nominals['LENGTH_R2']['value'],
-                                    participating_petals=ptl)
+                                    participating_petals=[ptl])
         self.ptlm.commit(mode='calib')
 
 

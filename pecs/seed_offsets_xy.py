@@ -11,14 +11,14 @@ from pecs import PECS
 
 
 class SeedOffsetsXY(PECS):
-    def __init__(self, fvc=None, ptls=None,
-                 petal_id=None, posids=None, interactive=False):
-        super().__init__(fvc=fvc, ptls=ptls)
+    def __init__(self, fvc=None, ptlm=None,
+                 petal_roles=None, posids=None, interactive=False):
+        super().__init__(fvc=fvc, ptlm=ptlm)
         self.printfunc('\nSeeding offsets XY...\n')
         if interactive:
             self.interactive_ptl_setup()
         else:
-            self.ptl_setup(petal_id, posids)
+            self.ptl_setup(petal_roles, posids)
         updates = self.seed_vals()
         path = os.path.join(
             pc.dirs['calib_logs'],
@@ -75,10 +75,10 @@ class SeedOffsetsXY(PECS):
                       'DEVICE_LOC': pos_info['DEVICE_LOC'],
                       'PETAL_LOC': pos_info['PETAL_LOC'],
                       'MODE': 'initialize_offsets_xy'}
-            update = self.ptlm.collect_calib(update, tag='OLD_', participating_petals=[ptl])
+            update = self.ptlm.collect_calib(update, tag='OLD_', participating_petals=[ptl])[ptl]
             self.ptlm.set_posfid_val(posid, 'OFFSET_X', x, participating_petals=[ptl])
             self.ptlm.set_posfid_val(posid, 'OFFSET_Y', y, participating_petals=[ptl])
-            update = self.ptlm.collect_calib(update, tag='', participating_petals=[ptl])
+            update = self.ptlm.collect_calib(update, tag='', participating_petals=[ptl])[ptl]
             updates.append(update)
         self.ptlm.commit(mode='calib', log_note='initialize_offsets_xy')
         return pd.DataFrame(updates)
