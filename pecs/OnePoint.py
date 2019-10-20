@@ -13,14 +13,14 @@ class OnePointCalib(PECS):
     subclass of PECS that adds functions to run a OnePoint calibration.
     In the future: add methods to display, judge and analyze calibration.
     '''
-    def __init__(self, fvc=None, ptls=None, mode='posTP',
-                 petal_id=None, posids=None, interactive=False):
-        super().__init__(fvc=fvc, ptls=ptls)
+    def __init__(self, fvc=None, ptlm=None, mode='posTP',
+                 petal_roles=None, posids=None, interactive=False):
+        super().__init__(fvc=fvc, ptlm=ptlm)
         self.printfunc(f'Running 1p calibration, mode = {mode}')
         if interactive:
             self.interactive_ptl_setup()
         else:
-            self.ptl_setup(petal_id, posids)
+            self.ptl_setup(petal_roles, posids)
         self.poslocP = 135  # phi arm angle for 1 point calibration
         updates = self.calibrate(mode=mode, interactive=interactive)
         # save results
@@ -61,26 +61,32 @@ class OnePointCalib(PECS):
             do_move = False
         rows = []
         if do_move:  # then build requests and make the moves
-            for posid in self.posids:
-                posintTP = self.ptl.postrans(posid,
-                                             'poslocTP_to_posintTP', poslocTP)
-                rows.append({'DEVICE_ID': posid,
+            for i, row in self.ids.iterrows():
+                posid = row['DEVICE_ID']
+                ptl = self.get_owning_ptl(posid)
+                posintTP = self.ptlm.postrans(posid,
+                                             'poslocTP_to_posintTP', poslocTP,
+                                             participating_petals=ptl)
+                # Work with ptl/dev loc for filtering in PetalMan.prepare_move
+                rows.append({'PETAL_LOC': row['PETAL_LOC'],
+                             'DEVICE_LOC': row['DEVICE_LOC'],
                              'COMMAND': 'posintTP',
                              'X1': posintTP[0],
                              'X2': posintTP[1],
                              'LOG_NOTE': f'One point calibration {mode}'})
             requests = pd.DataFrame(rows)
-            self.ptl.prepare_move(requests, anticollision=None)
-            self.ptl.execute_move()
+            self.ptlm.prepare_move(requests, anticollision=None)
+            self.ptlm.execute_move()
         else:  # then use current position as targets in requests
-            requests = self.ptl.get_positions(posids=self.posids,
-                                              return_coord='posintTP')
+            requests = self.ptlm.get_positions(return_coord='posintTP')
+            # PetalMan.get_positions does not take posid arg, filter
+            requests = requests[requests['DEVICE_ID'].isin(self.posids)]
         exppos, meapos, matched, unmatched = self.fvc_measure(
                 match_radius=match_radius)
         used_pos = meapos.loc[sorted(list(matched))]  # only matched rows
         unused_pos = meapos.loc[sorted(list(unmatched))]
         updates = (
-            self.ptl.test_and_update_TP(
+            self.ptlm.test_and_update_TP(
                 used_pos.reset_index(), mode=mode, auto_update=auto_update,
                 tp_updates_tol=0.0, tp_updates_fraction=1.0)
             .set_index('DEVICE_ID').sort_index())
