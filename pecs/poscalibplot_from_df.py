@@ -101,7 +101,7 @@ def plot_arc(df_name, posid,show=False,bad_files=False):
         plt.margins(0.1, 0.1)
 
     plt.tight_layout(pad=2.0)
-    plt.savefig(posid + '_' + df_name.split('.')[0]+'.png',dpi=150)
+    plt.savefig(posid + '_' + df_name.split('.')[0]+'.pdf')  # save vector gfcs
     if show:
         plt.show()
     plt.close(fig)
@@ -166,7 +166,7 @@ def plot_grid(df_name,posid,show=False):
         if param_label == 'OFFSET_X' or param_label == 'OFFSET_Y':
             plt.yticks(plt.yticks()[0], [format(x,'.2f') for x in plt.yticks()[0]])
     plt.tight_layout(pad=2.0)
-    plt.savefig(posid + '_' + df_name.split('.')[0]+'.png',dpi=150)
+    plt.savefig(posid + '_' + df_name.split('.')[0]+'.pdf')
     if show:
         plt.show()
     plt.close(fig)

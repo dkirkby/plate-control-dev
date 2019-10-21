@@ -187,7 +187,7 @@ class FPTestData:
         self.logger.info(f'Move data table initialised '
                          f'for {len(self.posids)} positioners.')
 
-    def make_summary_plots(self):  # make plots using MP
+    def make_summary_plots(self, make_binder=True):  # make plots using MP
         self.logger.info('Making xyplots with multiprocessing...')
         pool = []
         for posid in tqdm(self.posids):
@@ -196,13 +196,17 @@ class FPTestData:
             pool.append(p)
         self.logger.info('Waiting for the last MP chunk to complete...')
         [p.join() for p in pool]
-        self.logger.info('Last MP chunk completed. Creating xyplot binders...')
-        for ptlid, n in tqdm(product(self.ptlids, range(self.num_corr_max+1))):
-            p = Process(target=self.make_summary_plot_binder, args=(ptlid, n))
-            p.start()
-            pool.append(p)
-        self.logger.info('Waiting for the last MP chunk to complete...')
-        [p.join() for p in pool]
+        if make_binder:
+            self.logger.info('Last MP chunk completed. '
+                             'Creating xyplot binders...')
+            for ptlid, n in tqdm(product(self.ptlids,
+                                 range(self.num_corr_max+1))):
+                p = Process(target=self.make_summary_plot_binder,
+                            args=(ptlid, n))
+                p.start()
+                pool.append(p)
+            self.logger.info('Waiting for the last MP chunk to complete...')
+            [p.join() for p in pool]
 
     def make_summary_plot(self, posid):  # make one plot for a given posid
         row = self.posdf.loc[posid]  # row containing calibration values

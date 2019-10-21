@@ -179,6 +179,9 @@ class XYTest(PECS):
         for i in range(self.data.ntargets):  # test loop over all test targets
             self.logger.info(f'Target {i+1} of {self.data.ntargets}')
             self.record_basic_move_data(i)  # for each target, record basics
+            if self.allow_pause and i > 0:  # don't pause for the 1st target
+                input('Paused for heat load monitoring, '
+                      'press enter to continue: ')
             for n in range(self.data.num_corr_max + 1):
                 self.logger.info(
                     f'Target {i+1} of {self.data.ntargets}, '
