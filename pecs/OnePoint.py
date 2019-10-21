@@ -14,7 +14,8 @@ class OnePointCalib(PECS):
     In the future: add methods to display, judge and analyze calibration.
     '''
     def __init__(self, fvc=None, ptls=None, mode='posTP',
-                 petal_id=None, posids=None, interactive=False):
+                 petal_id=None, posids=None, interactive=False,
+                 tp_target='default',auto_update=True, match_radius=80.0):
         super().__init__(fvc=fvc, ptls=ptls)
         self.printfunc(f'Running 1p calibration, mode = {mode}')
         if interactive:
@@ -22,7 +23,9 @@ class OnePointCalib(PECS):
         else:
             self.ptl_setup(petal_id, posids)
         self.poslocP = 135  # phi arm angle for 1 point calibration
-        updates = self.calibrate(mode=mode, interactive=interactive)
+        updates = self.calibrate(mode=mode, interactive=interactive,
+                                 tp_target=tp_target, auto_update=auto_update,
+                                 match_radius=match_radius)
         # save results
         path = os.path.join(
             pc.dirs['calib_logs'],
