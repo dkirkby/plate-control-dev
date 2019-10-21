@@ -153,8 +153,10 @@ class PECS:
         returns expected_positions (df), measured_positions (df),
         matched_posids (set), unmatched_posids (set)'''
         if exppos is None:
-            exppos = (self.ptl.get_positions(return_coord='QS')
-                      .sort_values(by='DEVICE_ID'))  # includes all posids
+            exppos_list = [(self.ptls[ptlid].get_positions(return_coord='QS')
+                         .sort_values(by='DEVICE_ID'))
+                        for ptlid in self.ptlids]  # includes all posids
+            exppos = pd.concat(exppos_list)
         mr_old = self.fvc.get('match_radius')  # hold old match radius
         self.fvc.set(match_radius=match_radius)  # set larger radius for calib
         # measured_QS, note that expected_pos was changed in place
