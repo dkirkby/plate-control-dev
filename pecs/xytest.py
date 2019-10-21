@@ -225,15 +225,14 @@ class XYTest(PECS):
         # [p.start() for p in ps]
         # for p in ps:
         #     p.join()
-        ret = [self.move_petal(ptlid, i, n) for ptlid in self.data.ptlids]
+        _ = [self.move_petal(ptlid, i, n) for ptlid in self.data.ptlids]
         # combine expected QS list for all petals to form a single dataframe
-        expected_QS = pd.concat(ret)
+        # expected_QS = pd.concat(ret)
         # measure ten petals with FVC at once, FVC after all petals have moved
-        measured_QS = (pd.DataFrame(self.fvc.measure(expected_QS))
-                       .rename(columns={'id': 'DEVICE_ID'}))
-        measured_QS.columns = measured_QS.columns.str.upper()  # rename upper
-        self.logger.debug(f'FVC measured_QS:\n{measured_QS.to_string()}')
-        return measured_QS.set_index('DEVICE_ID')
+        _, meapos, _, _ = self.fvc_measure()
+        # measured_QS.columns = measured_QS.columns.str.upper()  # rename upper
+        self.logger.debug(f'FVC measured_QS:\n{meapos.to_string()}')
+        return meapos
 
     def move_petal(self, ptlid, i, n):
         movedf = self.data.movedf
