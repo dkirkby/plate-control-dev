@@ -14,9 +14,9 @@ pecs/batch_seed.py -text
 pecs/batch_seed_1p.py -text
 pecs/fptestdata.py -text
 pecs/fvc_sim.py -text
+pecs/loop_phi_moves.py -text
 pecs/pecs.py -text
 pecs/pecs_local.cfg -text
-pecs/pos_calib_plot_from_csv.py -text
 pecs/poscalibplot_from_df.py -text
 pecs/rehome.py -text
 pecs/rehome_verify.py -text
