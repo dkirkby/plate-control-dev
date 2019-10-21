@@ -171,10 +171,10 @@ class PECS:
         exppos.set_index('DEVICE_ID', inplace=True)
         exppos.columns = exppos.columns.str.upper()
         # find the posids that are unmatched, missing from FVC return
-        matched = set(self.posids).intersection(set(meapos.index))
-        unmatched = set(self.posids) - matched
+        matched = set(exppos.index).intersection(set(meapos.index))
+        unmatched = set(exppos.index) - matched
         if len(unmatched) == 0:
-            self.printfunc(f'All {len(self.posids)} positioners matched.')
+            self.printfunc(f'All {len(exppos.index)} positioners matched.')
         else:
             self.printfunc(f'Missing {len(unmatched)} of selected positioners'
                            f'\n{sorted(list(unmatched))}')
