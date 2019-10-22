@@ -1117,7 +1117,7 @@ class Petal(object):
         """
         self._check_and_disable_nonresponsive_pos_and_fid()
         for m in self.schedule.move_tables.values():
-            if m.posmodel.is_enabled and self.tables_sent_successfully: #In general, non responsive pos do not move
+            if self.tables_sent_successfully:
                 m.posmodel.postmove_cleanup(m.for_cleanup())
                 self.altered_states.add(m.posmodel.state)
             else:
