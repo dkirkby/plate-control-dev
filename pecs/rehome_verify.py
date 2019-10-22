@@ -72,7 +72,7 @@ class RehomeVerify(PECS):
         exppos = exppos.sort_values(by='dr', ascending=False).reset_index()
         tol = 1
         mask = exppos['dr'] > tol
-        bad_posids = list(exppos[mask].index)
+        bad_posids = list(exppos[mask]['DEVICE_ID'])
         if len(bad_posids) == 0:
             self.printfunc(
                 f'All {len(exppos)} matched fibres verified to have rehomed, '
