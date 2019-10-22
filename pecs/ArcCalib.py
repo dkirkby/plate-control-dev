@@ -58,7 +58,8 @@ class ArcCalib(PECS):
             self.printfunc(f'Measuring theta arc point {i+1} of '
                            f'{len(req_list_T)}')
             merged_data = self.move_measure(request, match_radius=match_radius)
-            T_data.append(merged_data)
+            T_data.append(merged_data.set_index('DEVICE_ID').loc[self.posids]
+                          .reset_index())
             if self.allow_pause and i+1 < len(req_list_T):
                 input('Paused for heat load monitoring, '
                       'press enter to continue: ')
@@ -67,7 +68,8 @@ class ArcCalib(PECS):
             self.printfunc(f'Measuring phi arc point {i+1} of '
                            f'{len(req_list_P)}')
             merged_data = self.move_measure(request, match_radius=match_radius)
-            P_data.append(merged_data)
+            P_data.append(merged_data.set_index('DEVICE_ID').loc[self.posids]
+                          .reset_index())
             if self.allow_pause and i+1 < len(req_list_T):
                 input('Paused for heat load monitoring, '
                       'press enter to continue: ')

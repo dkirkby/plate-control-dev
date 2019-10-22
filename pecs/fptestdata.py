@@ -31,7 +31,7 @@ import pandas as pd
 from PyPDF2 import PdfFileMerger
 import posconstants as pc
 import matplotlib
-matplotlib.use('pdf')
+# matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.family': 'serif',
                      'mathtext.fontset': 'cm'})
@@ -98,8 +98,8 @@ class FPTestData:
                         f'PTL{ptlid:02d}')
             # write configs to logs
             if petal_cfgs is not None:  # dump petal cfg to petal logger
-                self._log_cfg(logger, petal_cfgs[ptlid])
-            self._log_cfg(logger, test_cfg)
+                self._log_cfg(logger.debug, petal_cfgs[ptlid])
+            self._log_cfg(logger.debug, test_cfg)
             self.logs[ptlid] = log  # assign logs and loggers to attributes
             self.loggers[ptlid] = logger
         self.logger = self.BroadcastLogger(self.ptlids, self.loggers)
@@ -108,7 +108,7 @@ class FPTestData:
                           f'Anticollision mode: {self.anticollision}'])
 
     @staticmethod
-    def _log_cfg(logger, config):
+    def _log_cfg(printfunc, config):
         '''ConfigObj module has an outstanding bug that hasn't been fixed.
         It can only write to real files and not in-memory virtual viles
         that are newer io.StringIO objects.
@@ -118,12 +118,12 @@ class FPTestData:
         also loggers only accept one line of string at a time.
         note ConfigObj.write() only spits out strings when filename is None
         '''
-        logger.debug(f'=== Config file dump: {config.filename} ===')
         configcopy = copy(config)
         configcopy.filename = None
+        printfunc(f'=== Config file dump: {config.filename} ===')
         for line in configcopy.write():
-            logger.debug(line.decode('utf_8'))  # convert byte str to str
-        logger.debug(f'=== End of config file dump: {config.filename} ===')
+            printfunc(line.decode('utf_8'))  # convert byte str to str
+        printfunc(f'=== End of config file dump: {config.filename} ===')
 
     class BroadcastLogger:
         '''must call methods below for particular logger levels below
@@ -313,6 +313,7 @@ class FPTestData:
         with tarfile.open(path, 'w:gz') as arc:  # ^tgz doesn't work properly
             arc.add(self.dir, arcname=os.path.basename(self.dir))
         self.logger.info(f'Test data archived: {path}')
+        return path
 
     def dump_as_one_pickle(self):
         del self.logger
