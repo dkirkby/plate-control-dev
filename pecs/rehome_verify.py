@@ -48,7 +48,7 @@ class RehomeVerify(PECS):
         # set nominal homed QS as expected postiions for FVC spotmatch
         exppos[['X1', 'X2']] = hom_QS.T
         self.printfunc('Taking FVC exposure to confirm home positions...')
-        exppos, meapos, _, unmatched = self.fvc_measure(exppos=exppos)
+        exppos, meapos, _, unmatched = self.fvc_measure(exppos=exppos, match_radius=30)
         umstr = f':\n{unmatched}' if len(unmatched) > 0 else ''
         self.printfunc(f'{len(unmatched)} unmatched positioners' + umstr)
         # write columns to measured_QS using auto index matching
