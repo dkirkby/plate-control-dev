@@ -372,7 +372,7 @@ class XYTest(PECS):
 
 
 if __name__ == '__main__':
-    path = os.path.join(pc.dirs['test_settings'], 'xytest_sim.cfg')
+    path = os.path.join(pc.dirs['test_settings'], 'xytest_ptl3.cfg')
     xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')  # read cfg
     xytest_name = input('Please name this test: ')
     test = XYTest(xytest_name, xytest_cfg)
