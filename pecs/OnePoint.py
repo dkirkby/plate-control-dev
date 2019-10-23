@@ -80,10 +80,10 @@ class OnePointCalib(PECS):
                                               return_coord='posintTP')
         exppos, meapos, matched, unmatched = self.fvc_measure(
                 match_radius=match_radius)
-        used_pos = meapos.loc[sorted(list(
-            matched.intersection(set(self.posids))))]  # only matched rows
-        unused_pos = meapos.loc[sorted(list(
-            unmatched.intersection(set(self.posids))))]  # only matched rows
+        used_pos = meapos.loc[sorted(
+            matched.intersection(set(self.posids)))]  # only matched rows
+        unused_pos = meapos.loc[sorted(
+            unmatched.intersection(set(self.posids)))]  # only matched rows
         updates = (
             self.ptl.test_and_update_TP(
                 used_pos.reset_index(), mode=mode, auto_update=auto_update,
