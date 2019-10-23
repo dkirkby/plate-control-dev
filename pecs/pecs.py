@@ -147,7 +147,7 @@ class PECS:
         self.printfunc(f'Selected {len(posids)} positioners')
         return posids
 
-    def fvc_measure(self, exppos=None, match_radius=30, matched_only=False):
+    def fvc_measure(self, exppos=None, match_radius=30, matched_only=True):
         '''use the expected positions given, or by default use internallly
         tracked current expected positions for fvc measurement
         returns expected_positions (df), measured_positions (df)
