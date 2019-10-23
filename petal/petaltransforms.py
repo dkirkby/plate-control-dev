@@ -198,31 +198,6 @@ class PetalTransforms:
             QS = typecast(QS)
         return PetalTransforms.QS_to_obsXYZ(QS)[:2, :]  # 2 x N array
 
-    @staticmethod
-    def QS_to_flatXY(QS, cast=True):
-        """On-shell condition is assumed
-        INPUT:  2 x N array, each column vector is QS
-        OUTPUT: 2 x N array, each column vector is flatXY, can be CS5 or PTL
-        """
-        if cast:
-            QS = typecast(QS)
-        Q_rad, S = np.radians(QS[0, :]), QS[1, :]
-        X, Y = S * np.cos(Q_rad), S * np.sin(Q_rad)  # use S on shell as radius
-        return np.vstack([X, Y])
-
-    @staticmethod
-    def flatXY_to_QS(flatXY, cast=False):
-        """On-shell condition is assumed
-        INPUT:  2 x N array, each column vector is flatXY, can be CS5 or PTL
-        OUTPUT: 2 x N array, each column vector is QS
-        """
-        if cast:
-            flatXY = typecast(flatXY)
-        X, Y = flatXY[0, :], flatXY[1, :]
-        Q = np.degrees(np.arctan2(Y, X))  # Y over X
-        S = np.sqrt(np.square(X) + np.square(Y))  # R in flatXY is S on shell
-        return np.vstack([Q, S])
-
     # %% flatXY transforms within petal local coordinates
     @staticmethod
     def ptlXYZ_to_flatXY(ptlXYZ, cast=False):
@@ -234,8 +209,8 @@ class PetalTransforms:
         """
         if cast:
             ptlXYZ = typecast(ptlXYZ)
-        QS = PetalTransforms.obsXYZ_to_QS(ptlXYZ)  # use location 3
-        return PetalTransforms.QS_to_flatXY(QS)
+        QS = PetalTransforms.obsXYZ_to_QS(ptlXYZ)  # assume location 3
+        return PetalTransforms._QS_to_flatXY(QS)
 
     @staticmethod
     def flatXY_to_ptlXYZ(flatXY, cast=False):
@@ -246,8 +221,33 @@ class PetalTransforms:
         """
         if cast:
             flatXY = typecast(flatXY)
-        QS = PetalTransforms.flatXY_to_QS(flatXY)  # use location 3
+        QS = PetalTransforms._flatXY_to_QS(flatXY)  # assume location 3
         return PetalTransforms.QS_to_obsXYZ(QS)
+
+    @staticmethod
+    def _QS_to_flatXY(QS, cast=False):
+        """On-shell condition is assumed, global to global
+        INPUT:  2 x N array, each column vector is QS
+        OUTPUT: 2 x N array, each column vector is flatXY in CS5, reserved
+        """
+        if cast:
+            QS = typecast(QS)
+        Q_rad, S = np.radians(QS[0, :]), QS[1, :]
+        X, Y = S * np.cos(Q_rad), S * np.sin(Q_rad)  # use S on shell as radius
+        return np.vstack([X, Y])
+
+    @staticmethod
+    def _flatXY_to_QS(flatXY, cast=False):
+        """On-shell condition is assumed, global to global
+        INPUT:  2 x N array, each column vector is flatXY in CS5, reserved
+        OUTPUT: 2 x N array, each column vector is QS
+        """
+        if cast:
+            flatXY = typecast(flatXY)
+        X, Y = flatXY[0, :], flatXY[1, :]
+        Q = np.degrees(np.arctan2(Y, X))  # Y over X
+        S = np.sqrt(np.square(X) + np.square(Y))  # R in flatXY is S on shell
+        return np.vstack([Q, S])
 
     # %% petal transformations with 6 dof
     def ptlXYZ_to_obsXYZ(self, ptlXYZ, cast=False):
@@ -267,6 +267,26 @@ class PetalTransforms:
         if cast:
             obsXYZ = typecast(obsXYZ)
         return self.R.T @ (obsXYZ - self.T)  # backward transformation
+
+    def QS_to_flatXY(self, QS, cast=False):
+        """On-shell condition is assumed, global to local
+        INPUT:  2 x N array, each column vector is QS, global
+        OUTPUT: 2 x N array, each column vector is flatXY, petal-local
+        """
+        if cast:
+            QS = typecast(QS)
+        ptlXYZ = self.QS_to_ptlXYZ(QS)
+        return self.ptlXYZ_to_flatXY(ptlXYZ)
+
+    def flatXY_to_QS(self, flatXY, cast=False):
+        """On-shell condition is assumed, local to global
+        INPUT:  2 x N array, each column vector is flatXY, petal-local
+        OUTPUT: 2 x N array, each column vector is QS, global
+        """
+        if cast:
+            flatXY = typecast(flatXY)
+        ptlXYZ = self.flatXY_to_ptlXYZ()
+        return self.ptlXYZ_to_QS(ptlXYZ)
 
     # %% composite transformations for convenience
     def ptlXYZ_to_QST(self, ptlXYZ, cast=False):
