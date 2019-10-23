@@ -177,6 +177,7 @@ class PECS:
         if len(unmatched) == 0:
             self.printfunc(f'All {len(exppos.index)} positioners matched.')
         else:
-            self.printfunc(f'Missing {len(unmatched)} of selected positioners'
-                           f'\n{sorted(list(unmatched))}')
+            self.printfunc(
+                f'Missing {len(unmatched)} of expected backlit fibres'
+                f'\n{sorted(list(unmatched))}')
         return exppos, meapos, sorted(matched), sorted(unmatched)
