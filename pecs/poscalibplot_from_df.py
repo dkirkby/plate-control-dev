@@ -101,7 +101,9 @@ def plot_arc(df_name, posid,show=False,bad_files=False):
         plt.margins(0.1, 0.1)
 
     plt.tight_layout(pad=2.0)
-    plt.savefig(posid + '_' + df_name.split('.')[0]+'.pdf')  # save vector gfcs
+    import os
+    fig_name = os.path.splitext(os.path.split(df_name)[1])[0]
+    plt.savefig(posid + '_%s.pdf'%fig_name) # + df_name.split('.')[0]+'.pdf')  # save vector gfcs
     if show:
         plt.show()
     plt.close(fig)

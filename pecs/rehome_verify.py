@@ -83,8 +83,8 @@ class RehomeVerify(PECS):
                            f'{exppos[mask].iloc[:, ]}\n\n'
                            f'Positioner IDs for retry:\n{bad_posids}')
         # add can bus ids
-        device_info = self.ptl.get_posiitoners(enabled_only=True,
-                                               posids=exppos['DEVICE_ID'])
+        device_info = self.ptl.get_positoners(enabled_only=True,
+                                              posids=exppos['DEVICE_ID'])
 
         return exppos.merge(device_info, how='outer', on='DEVICE_ID')
 
