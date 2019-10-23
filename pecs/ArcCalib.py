@@ -83,10 +83,10 @@ class ArcCalib(PECS):
         self.ptl.prepare_move(request, anticollision=None)
         self.ptl.execute_move()
         exppos, meapos, matched, unmatched = self.fvc_measure(
-            matched_only=False, match_radius=match_radius)
+            matched_only=True, match_radius=match_radius)
         # Want to collect both matched and unmatched
         # meapos contains not only matched ones but all posids in expected pos
-        matched_df = meapos.loc[self.posids]
+        matched_df = meapos.loc[self.posids].reset_index()
         request.rename(columns={'X1': 'TARGET_T', 'X2': 'TARGET_P'},
                        inplace=True)
         merged = matched_df.merge(request, how='outer', on='DEVICE_ID')
