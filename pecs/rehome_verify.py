@@ -69,8 +69,8 @@ class RehomeVerify(PECS):
         # filter out only the selected positioners
         exppos = exppos.loc[self.posids]
         # add can bus ids
-        device_info = (self.ptl.get_positions(enabled_only=True,
-                                              posids=exppos.index)
+        device_info = (self.ptl.get_positioners(enabled_only=True,
+                                                posids=exppos.index)
                        .set_index('DEVICE_ID'))
         exppos = exppos.merge(device_info, how='outer')
         tol = 1
