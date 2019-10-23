@@ -32,11 +32,11 @@ class RehomeVerify(PECS):
             os.system(f'xdg-open {path}')
 
     def compare_xy(self):
-        ptl = self.ptls[self.ptlid]
+        # ptl = self.ptls[self.ptlid]
         # all backlit fibres, including those disabled, needed for FVC
-        exppos = (ptl.get_positions(return_coord='QS')
+        exppos = (self.ptl.get_positions(return_coord='QS')
                   .sort_values(by='DEVICE_ID'))
-        exp_obsXY = (ptl.get_positions(return_coord='obsXY')
+        exp_obsXY = (self.ptl.get_positions(return_coord='obsXY')
                      .sort_values(by='DEVICE_ID')[['X1', 'X2']]).values.T
         # get guessed QS (theta centres in QS) for FVC measurement
         df = (self.ptl.get_pos_vals(['OFFSET_X', 'OFFSET_Y'],
@@ -82,7 +82,11 @@ class RehomeVerify(PECS):
                            f'properly (radial deviations > {tol} mm):\n\n'
                            f'{exppos[mask].iloc[:, ]}\n\n'
                            f'Positioner IDs for retry:\n{bad_posids}')
-        return exppos
+        # add can bus ids
+        device_info = self.ptl.get_posiitoners(enabled_only=True,
+                                               posids=exppos['DEVICE_ID'])
+
+        return exppos.merge(device_info, how='outer', on='DEVICE_ID')
 
 
 if __name__ == '__main__':
