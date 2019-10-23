@@ -253,18 +253,14 @@ class PosScheduleStage(object):
         colliding_sweeps = {posid:set() for posid in self.collider.posids}
         all_sweeps = {}
         for posid in move_tables:
-
             table_A = move_tables[posid]
-            # print('checking table_A', table_A.for_collider())  # debug
             init_poslocTP_A = table_A.posmodel.trans.posintTP_to_poslocTP(table_A.init_posintTP)
-
             for neighbor in self.collider.pos_neighbors[posid]:
                 if neighbor not in already_checked[posid]:
                     table_B = move_tables[neighbor] if neighbor in move_tables else self._get_or_generate_table(neighbor)
                     init_poslocTP_B = table_B.posmodel.trans.posintTP_to_poslocTP(table_B.init_posintTP)
                     pospos_sweeps = self.collider.spacetime_collision_between_positioners(posid, init_poslocTP_A, table_A.for_collider(), neighbor, init_poslocTP_B, table_B.for_collider())
                     all_sweeps.update({posid:pospos_sweeps[0], neighbor:pospos_sweeps[1]})
-
                     for sweep in pospos_sweeps:
                         if sweep.collision_case != pc.case.I:
                             colliding_sweeps[sweep.posid].add(sweep)
