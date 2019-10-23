@@ -54,22 +54,18 @@ class ArcCalib(PECS):
             ids=self.posids,
             n_points_T=self.n_points_T, n_points_P=self.n_points_P)
         T_data = []
-        for i, request in enumerate(req_list_T):
+        for i, req in enumerate(req_list_T):
             self.printfunc(f'Measuring theta arc point {i+1} of '
                            f'{len(req_list_T)}')
-            merged_data = self.move_measure(request, match_radius=match_radius)
-            T_data.append(merged_data.set_index('DEVICE_ID').loc[self.posids]
-                          .reset_index())
+            T_data.append(self.move_measure(req, match_radius=match_radius))
             if self.allow_pause and i+1 < len(req_list_T):
                 input('Paused for heat load monitoring, '
                       'press enter to continue: ')
         P_data = []
-        for i, request in enumerate(req_list_P):
+        for i, req in enumerate(req_list_P):
             self.printfunc(f'Measuring phi arc point {i+1} of '
                            f'{len(req_list_P)}')
-            merged_data = self.move_measure(request, match_radius=match_radius)
-            P_data.append(merged_data.set_index('DEVICE_ID').loc[self.posids]
-                          .reset_index())
+            P_data.append(self.move_measure(req, match_radius=match_radius))
             if self.allow_pause and i+1 < len(req_list_T):
                 input('Paused for heat load monitoring, '
                       'press enter to continue: ')
@@ -78,21 +74,27 @@ class ArcCalib(PECS):
         updates['auto_update'] = auto_update
         return updates
 
-    def move_measure(self, request, match_radius=80):
+    def move_measure(self, request, match_radius=30):
         '''
         Wrapper for often repeated moving and measuring sequence.
         Prints missing positioners, returns data merged with request
+        by default also include
         '''
         self.ptl.prepare_move(request, anticollision=None)
         self.ptl.execute_move()
         exppos, meapos, matched, unmatched = self.fvc_measure(
-                match_radius=match_radius)
+            matched_only=False, match_radius=match_radius)
         # Want to collect both matched and unmatched
-        used_pos = meapos.loc[sorted(list(matched))]  # only matched rows
+        # meapos contains not only matched ones but all posids in expected pos
+        matched_df = meapos.loc[self.posids]
+        matched_selected_df = (matched_df.set_index('DEVICE_ID')
+                               .loc[self.posids].reset_index())
         request.rename(columns={'X1': 'TARGET_T', 'X2': 'TARGET_P'},
                        inplace=True)
-        merged = used_pos.merge(request, how='outer', on='DEVICE_ID')
+        merged = matched_selected_df.merge(request, how='outer', on='DEVICE_ID')
         return merged
+
+merged_data.
 
 
 if __name__ == '__main__':

@@ -147,28 +147,29 @@ class PECS:
         self.printfunc(f'Selected {len(posids)} positioners')
         return posids
 
-    def fvc_measure(self, exppos=None, match_radius=80):
+    def fvc_measure(self, exppos=None, match_radius=30, matched_only=False):
         '''use the expected positions given, or by default use internallly
         tracked current expected positions for fvc measurement
-        returns expected_positions (df), measured_positions (df),
+        returns expected_positions (df), measured_positions (df)
+        (bot have DEVICE_ID as index) and
         matched_posids (set), unmatched_posids (set)'''
         if exppos is None:
             exppos_list = [(self.ptls[ptlid].get_positions(return_coord='QS')
-                         .sort_values(by='DEVICE_ID'))
-                        for ptlid in self.ptlids]  # includes all posids
+                            .sort_values(by='DEVICE_ID'))
+                           for ptlid in self.ptlids]  # includes all posids
             exppos = pd.concat(exppos_list)
         mr_old = self.fvc.get('match_radius')  # hold old match radius
         self.fvc.set(match_radius=match_radius)  # set larger radius for calib
         # measured_QS, note that expected_pos was changed in place
         meapos = (pd.DataFrame(self.fvc.measure(
-                    exppos,
-                    all_fiducials=self.all_fiducials))
+                      exppos, matched_only=matched_only,
+                      all_fiducials=self.all_fiducials))
                   .rename(columns={'id': 'DEVICE_ID'})
                   .set_index('DEVICE_ID').sort_index())  # indexed by DEVICE_ID
         self.fvc.set(match_radius=mr_old)  # restore old radius after measure
         meapos.columns = meapos.columns.str.upper()  # clean up header to save
-        exppos.rename(columns={'id': 'DEVICE_ID'}, inplace=True)
-        exppos.set_index('DEVICE_ID', inplace=True)
+        exppos = (exppos.rename(columns={'id': 'DEVICE_ID'})
+                  .set_index('DEVICE_ID').sort_index())
         exppos.columns = exppos.columns.str.upper()
         # find the posids that are unmatched, missing from FVC return
         matched = set(exppos.index).intersection(set(meapos.index))
