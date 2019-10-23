@@ -72,7 +72,7 @@ class RehomeVerify(PECS):
         device_info = (self.ptl.get_positioners(enabled_only=True,
                                                 posids=exppos.index)
                        .set_index('DEVICE_ID'))
-        exppos = exppos.merge(device_info, how='outer')
+        exppos = exppos.join(device_info)
         tol = 1
         mask = exppos['dr'] > tol
         print_df = exppos[mask].sort_values(by='dr', ascending=False)
