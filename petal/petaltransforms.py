@@ -285,7 +285,7 @@ class PetalTransforms:
         """
         if cast:
             flatXY = typecast(flatXY)
-        ptlXYZ = self.flatXY_to_ptlXYZ()
+        ptlXYZ = self.flatXY_to_ptlXYZ(flatXY)
         return self.ptlXYZ_to_QS(ptlXYZ)
 
     # %% composite transformations for convenience
