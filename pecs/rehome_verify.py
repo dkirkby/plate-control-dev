@@ -20,7 +20,7 @@ class RehomeVerify(PECS):
             self.interactive_ptl_setup()
         else:
             self.ptl_setup(petal_id, posids)
-        self.printfunc(f'Verifying homing positions for '
+        self.printfunc(f'Verifying rehome positions for '
                        f'{len(self.posids)} positioners...')
         df = self.compare_xy()
         path = os.path.join(  # save results
@@ -86,7 +86,7 @@ class RehomeVerify(PECS):
                            f'properly (√(dX² + dY²) > {tol} mm):\n\n'
                            f'{print_df}\n\n'
                            f'Positioner IDs for retry:\n{bad_posids}')
-        return 
+        return exppos
 
 
 if __name__ == '__main__':
