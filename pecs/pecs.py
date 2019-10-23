@@ -151,7 +151,7 @@ class PECS:
         '''use the expected positions given, or by default use internallly
         tracked current expected positions for fvc measurement
         returns expected_positions (df), measured_positions (df)
-        (bot have DEVICE_ID as index) and
+        (bot have DEVICE_ID as index and sorted) and
         matched_posids (set), unmatched_posids (set)'''
         if exppos is None:
             exppos_list = [(self.ptls[ptlid].get_positions(return_coord='QS')

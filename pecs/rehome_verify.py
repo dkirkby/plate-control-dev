@@ -49,16 +49,13 @@ class RehomeVerify(PECS):
         exppos[['X1', 'X2']] = hom_QS.T
         self.printfunc('Taking FVC exposure to confirm home positions...')
         exppos, meapos, _, unmatched = self.fvc_measure(exppos=exppos, match_radius=30)
+        unmatched = set(unmatched).intersection(set(self.posids))
         umstr = f':\n{unmatched}' if len(unmatched) > 0 else ''
-        self.printfunc(f'{len(unmatched)} unmatched positioners' + umstr)
-        # write columns to measured_QS using auto index matching
-        # meapos['FLAG'] = (exppos.set_index('id')
-        #                   .loc[meapos.index]['flags'].values)
-        # meapos['STATUS'] = self.ptl.decipher_posflags(meapos['FLAG'])
+        self.printfunc(f'{len(unmatched)} selected positioners unmatched'
+                       + umstr)
         for col in ['exp_obsX', 'hom_obsX', 'mea_obsX',
                     'exp_obsY', 'hom_obsY', 'mea_obsY']:
             meapos[col] = np.nan
-        # meapos['exp_obsX'] = exp_obsXY.T  # internally tracked
         for col in meapos.columns:
             exppos.loc[meapos.index, col] = meapos[col]
         exppos[['exp_obsX', 'exp_obsY']] = exp_obsXY.T  # internally tracked
@@ -69,24 +66,27 @@ class RehomeVerify(PECS):
         exppos['obsdX'] = exppos['mea_obsX'] - exppos['hom_obsX']
         exppos['obsdY'] = exppos['mea_obsY'] - exppos['hom_obsY']
         exppos['dr'] = np.linalg.norm(exppos[['obsdX', 'obsdY']], axis=1)
-        exppos = exppos.sort_values(by='dr', ascending=False).reset_index()
+        # filter out only the selected positioners
+        exppos = exppos.loc[self.posids]
+        # add can bus ids
+        device_info = (self.ptl.get_posiitoners(enabled_only=True,
+                                                posids=exppos.index)
+                       .set_index('DEVICE_ID'))
+        exppos = exppos.merge(device_info, how='outer')
         tol = 1
         mask = exppos['dr'] > tol
-        bad_posids = list(exppos[mask]['DEVICE_ID'])
+        print_df = exppos[mask].sort_values(by='dr', ascending=False)
+        bad_posids = sorted(print_df.index)
         if len(bad_posids) == 0:
             self.printfunc(
                 f'All {len(exppos)} matched fibres verified to have rehomed, '
                 f'with tolerance dr = √(dX² + dY²) ≤ {tol} mm.')
         else:
             self.printfunc(f'{len(bad_posids)} positioners not rehomed '
-                           f'properly (radial deviations > {tol} mm):\n\n'
-                           f'{exppos[mask].iloc[:, ]}\n\n'
+                           f'properly (√(dX² + dY²) > {tol} mm):\n\n'
+                           f'{print_df}\n\n'
                            f'Positioner IDs for retry:\n{bad_posids}')
-        # add can bus ids
-        device_info = self.ptl.get_positoners(enabled_only=True,
-                                              posids=exppos['DEVICE_ID'])
-
-        return exppos.merge(device_info, how='outer', on='DEVICE_ID')
+        return 
 
 
 if __name__ == '__main__':
