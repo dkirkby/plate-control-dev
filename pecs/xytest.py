@@ -299,7 +299,7 @@ class XYTest(PECS):
                     self.loggers[ptlid].info(
                         f'Disabling unmatched fibres and their neighbours:\n'
                         f'{unmatched}')
-                    disabled = self.ptls[ptlid].disable_pos_and_neighbors(
+                    disabled = self.ptls[ptlid].disable_positioner_and_neighbors(
                         list(unmatched))
                     if disabled is None:
                         disabled = []
