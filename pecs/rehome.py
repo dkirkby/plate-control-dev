@@ -11,7 +11,7 @@ class Rehome(PECS):
         super().__init__(fvc=fvc, ptls=ptls)
         input('WARNING: Driving positioners to their hardstops. '
               'Be sure you know what you are doing!\n'
-              f'(Enter to continue): ')
+              f'Rehoming for axis: {axis}. (Press enter to continue): ')
         if interactive:
             self.interactive_ptl_setup()
         else:
@@ -62,5 +62,4 @@ class Rehome(PECS):
 
 
 if __name__ == '__main__':
-    # Rehome(interactive=True)  # main runs interactively
-    Rehome(interactive=True)
+    Rehome(axis='theta_only', interactive=True)  # theta_only, phi_only, or both
