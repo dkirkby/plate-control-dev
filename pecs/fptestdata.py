@@ -187,8 +187,7 @@ class FPTestData:
         self.logger.info(f'Move data table initialised '
                          f'for {len(self.posids)} positioners.')
 
-    def make_summary_plots(self, make_binder=True):  # make plots using MP
-        self.logger.info('Making xyplots with multiprocessing...')
+    def make_summary_plots(self, make_binder=True, n_threads=16):
 #        pool = []
 #        for posid in tqdm(self.posids):
 #            p = Process(target=self.make_summary_plot, args=(posid,))
@@ -207,20 +206,23 @@ class FPTestData:
 #                pool.append(p)
 #            self.logger.info('Waiting for the last MP chunk to complete...')
 #            [p.join() for p in pool]
-        with Pool(processes=8) as p:
-            for posid in tqdm(self.posids):
-                p.apply_async(self.make_summary_plot, args=(posid,))
-            p.close()
-            p.join()
-            if make_binder:
-                self.logger.info('Last MP chunk completed. '
-                                 'Creating xyplot binders...')
-                for ptlid, n in tqdm(product(self.ptlids,
-                                     range(self.num_corr_max+1))):
-                    p.apply_async(self.make_summary_plot_binder,
-                                  args=(ptlid, n))
-                    p.close()
-                    p.join
+        try:
+            self.logger.info(f'Making xyplots with {n_threads} threads...')
+            with Pool(processes=n_threads) as p:
+                for posid in tqdm(self.posids):
+                    p.apply_async(self.make_summary_plot, args=(posid,))
+                if make_binder:
+                    self.logger.info('Last MP chunk completed. '
+                                     'Creating xyplot binders...')
+                    for ptlid, n in tqdm(product(self.ptlids,
+                                         range(self.num_corr_max+1))):
+                        p.apply_async(self.make_summary_plot_binder,
+                                      args=(ptlid, n))
+                p.close()
+                p.join()
+        except:
+            n_threads = int(input('Specify a smaller number of threads: '))
+            self.make_summary_plots(n_threads=n_threads)
 
     def make_summary_plot(self, posid):  # make one plot for a given posid
         row = self.posdf.loc[posid]  # row containing calibration values
