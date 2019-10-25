@@ -48,7 +48,8 @@ class RehomeVerify(PECS):
         # set nominal homed QS as expected postiions for FVC spotmatch
         exppos[['X1', 'X2']] = hom_QS.T
         self.printfunc('Taking FVC exposure to confirm home positions...')
-        exppos, meapos, _, unmatched = self.fvc_measure(exppos=exppos, match_radius=30)
+        exppos, meapos, _, unmatched = self.fvc_measure(exppos=exppos,
+                                                        match_radius=30)
         unmatched = set(unmatched).intersection(set(self.posids))
         umstr = f':\n{unmatched}' if len(unmatched) > 0 else ''
         self.printfunc(f'{len(unmatched)} selected positioners unmatched'
@@ -66,8 +67,9 @@ class RehomeVerify(PECS):
         exppos['obsdX'] = exppos['mea_obsX'] - exppos['hom_obsX']
         exppos['obsdY'] = exppos['mea_obsY'] - exppos['hom_obsY']
         exppos['dr'] = np.linalg.norm(exppos[['obsdX', 'obsdY']], axis=1)
-        # filter out only the selected positioners
-        exppos = exppos.loc[self.posids]
+        # filter out only the selected positioners and drop duplicate col
+        exppos = exppos.loc[self.posids].drop(
+            columns=['PETAL_LOC', 'DEVICE_LOC'], errors='ignore')
         # add can bus ids
         device_info = (self.ptl.get_positioners(enabled_only=True,
                                                 posids=exppos.index)
