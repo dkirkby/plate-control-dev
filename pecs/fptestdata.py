@@ -19,8 +19,7 @@ import logging
 from glob import glob
 from itertools import product
 from functools import partial
-# from datetime import datetime
-from multiprocessing import Process, Pool
+from multiprocessing import Pool
 from tqdm import tqdm
 import io
 import shutil
@@ -188,24 +187,6 @@ class FPTestData:
                          f'for {len(self.posids)} positioners.')
 
     def make_summary_plots(self, make_binder=True, n_threads=16):
-#        pool = []
-#        for posid in tqdm(self.posids):
-#            p = Process(target=self.make_summary_plot, args=(posid,))
-#            p.start()
-#            pool.append(p)
-#        self.logger.info('Waiting for the last MP chunk to complete...')
-#        [p.join() for p in pool]
-#        if make_binder:
-#            self.logger.info('Last MP chunk completed. '
-#                             'Creating xyplot binders...')
-#            for ptlid, n in tqdm(product(self.ptlids,
-#                                 range(self.num_corr_max+1))):
-#                p = Process(target=self.make_summary_plot_binder,
-#                            args=(ptlid, n))
-#                p.start()
-#                pool.append(p)
-#            self.logger.info('Waiting for the last MP chunk to complete...')
-#            [p.join() for p in pool]
         try:
             self.logger.info(f'Making xyplots with {n_threads} threads...')
             with Pool(processes=n_threads) as p:
@@ -321,10 +302,6 @@ class FPTestData:
                                      f'{self.dirs[ptlid]}')
 
     def make_archive(self):
-        # shutil.make_archive(  # recursion w/itself...file grows indefinitely
-        #     os.path.join(self.dir, self.dir_name), 'zip',
-        #     root_dir=pc.dirs['xytest_data'], base_dir=self.dir_name)
-        # print(f'saved: {os.path.join(self.dir, self.dir_name)}')
         path = os.path.join(self.dir, f'{os.path.basename(self.dir)}.tar.gz')
         with tarfile.open(path, 'w:gz') as arc:  # ^tgz doesn't work properly
             arc.add(self.dir, arcname=os.path.basename(self.dir))
