@@ -284,7 +284,7 @@ class FPTestData:
 
     def export_move_data(self):
         '''must have writte self.posids_ptl, a dict keyed by ptlid'''
-        self.movedf.to_pickle(os.path.join(self.dir, 'move_df.pkl'),
+        self.movedf.to_pickle(os.path.join(self.dir, 'move_df.pkl.gz'),
                               compression='gzip')
         self.movedf.to_csv(os.path.join(self.dir, 'move_df.csv'))
         self.logger.info(f'Focal plane move data written to: {self.dir}')
@@ -292,7 +292,7 @@ class FPTestData:
             def makepath(name): return os.path.join(self.dirs[ptlid], name)
             for posid in self.posids_ptl[ptlid]:  # write move data csv
                 df_pos = self.movedf.loc[idx[:, posid], :].droplevel(1)
-                df_pos.to_pickle(makepath(f'{posid}_df.pkl'),
+                df_pos.to_pickle(makepath(f'{posid}_df.pkl.gz'),
                                  compression='gzip')
                 df_pos.to_csv(makepath(f'{posid}_df.csv'))
             with open(makepath(f'ptl_{ptlid}_export.log'), 'w') as handle:
