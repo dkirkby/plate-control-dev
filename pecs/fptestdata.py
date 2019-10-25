@@ -20,7 +20,7 @@ from glob import glob
 from itertools import product
 from functools import partial
 # from datetime import datetime
-from multiprocessing import Process
+from multiprocessing import Process, Pool
 from tqdm import tqdm
 import io
 import shutil
@@ -189,24 +189,38 @@ class FPTestData:
 
     def make_summary_plots(self, make_binder=True):  # make plots using MP
         self.logger.info('Making xyplots with multiprocessing...')
-        pool = []
-        for posid in tqdm(self.posids):
-            p = Process(target=self.make_summary_plot, args=(posid,))
-            p.start()
-            pool.append(p)
-        self.logger.info('Waiting for the last MP chunk to complete...')
-        [p.join() for p in pool]
-        if make_binder:
-            self.logger.info('Last MP chunk completed. '
-                             'Creating xyplot binders...')
-            for ptlid, n in tqdm(product(self.ptlids,
-                                 range(self.num_corr_max+1))):
-                p = Process(target=self.make_summary_plot_binder,
-                            args=(ptlid, n))
-                p.start()
-                pool.append(p)
-            self.logger.info('Waiting for the last MP chunk to complete...')
-            [p.join() for p in pool]
+#        pool = []
+#        for posid in tqdm(self.posids):
+#            p = Process(target=self.make_summary_plot, args=(posid,))
+#            p.start()
+#            pool.append(p)
+#        self.logger.info('Waiting for the last MP chunk to complete...')
+#        [p.join() for p in pool]
+#        if make_binder:
+#            self.logger.info('Last MP chunk completed. '
+#                             'Creating xyplot binders...')
+#            for ptlid, n in tqdm(product(self.ptlids,
+#                                 range(self.num_corr_max+1))):
+#                p = Process(target=self.make_summary_plot_binder,
+#                            args=(ptlid, n))
+#                p.start()
+#                pool.append(p)
+#            self.logger.info('Waiting for the last MP chunk to complete...')
+#            [p.join() for p in pool]
+        with Pool(processes=8) as p:
+            for posid in tqdm(self.posids):
+                p.apply_async(self.make_summary_plot, args=(posid,))
+            p.close()
+            p.join()
+            if make_binder:
+                self.logger.info('Last MP chunk completed. '
+                                 'Creating xyplot binders...')
+                for ptlid, n in tqdm(product(self.ptlids,
+                                     range(self.num_corr_max+1))):
+                    p.apply_async(self.make_summary_plot_binder,
+                                  args=(ptlid, n))
+                    p.close()
+                    p.join
 
     def make_summary_plot(self, posid):  # make one plot for a given posid
         row = self.posdf.loc[posid]  # row containing calibration values
@@ -289,8 +303,8 @@ class FPTestData:
         '''must have writte self.posids_ptl, a dict keyed by ptlid'''
         self.movedf.to_pickle(os.path.join(self.dir, 'move_df.pkl'),
                               compression='gzip')
-        self.logger.info(f'Focal plane move data written to: {self.dir}')
         self.movedf.to_csv(os.path.join(self.dir, 'move_df.csv'))
+        self.logger.info(f'Focal plane move data written to: {self.dir}')
         for ptlid in self.ptlids:
             def makepath(name): return os.path.join(self.dirs[ptlid], name)
             for posid in self.posids_ptl[ptlid]:  # write move data csv
@@ -322,9 +336,9 @@ class FPTestData:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def save_test_products(self):
+        self.export_move_data()
         if self.test_cfg['make_plots']:
             self.make_summary_plots()  # plot for all positioners by default
-        self.export_move_data()
         self.make_archive()
         self.dump_as_one_pickle()
 
