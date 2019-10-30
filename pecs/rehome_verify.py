@@ -48,11 +48,12 @@ class RehomeVerify(PECS):
         # set nominal homed QS as expected postiions for FVC spotmatch
         exppos[['X1', 'X2']] = hom_QS.T
         self.printfunc('Taking FVC exposure to confirm home positions...')
-        exppos, meapos, _, unmatched = self.fvc_measure(exppos=exppos,
+        exppos, meapos, matched, unmatched = self.fvc_measure(exppos=exppos,
                                                         match_radius=30)
         unmatched = set(unmatched).intersection(set(self.posids))
-        umstr = f':\n{unmatched}' if len(unmatched) > 0 else ''
-        self.printfunc(f'{len(unmatched)} selected positioners unmatched'
+        matched = set(matched).intersection(set(self.posids))
+        umstr = f':\n{sorted(unmatched)}' if len(unmatched) > 0 else ''
+        self.printfunc(f'{len(unmatched)} selected positioners not matched'
                        + umstr)
         for col in ['exp_obsX', 'hom_obsX', 'mea_obsX',
                     'exp_obsY', 'hom_obsY', 'mea_obsY']:
@@ -76,12 +77,13 @@ class RehomeVerify(PECS):
                        .set_index('DEVICE_ID'))
         exppos = exppos.join(device_info)
         tol = 1
-        mask = exppos['dr'] > tol
+        # now only consider matched, selected positioners, check deviations
+        mask = exppos.index.isin(matched) & (exppos['dr'] > tol)
         print_df = exppos[mask].sort_values(by='dr', ascending=False)
         bad_posids = sorted(print_df.index)
         if len(bad_posids) == 0:
             self.printfunc(
-                f'All {len(exppos)} matched fibres verified to have rehomed, '
+                f'All {len(matched)} matched fibres verified to have rehomed, '
                 f'with tolerance dr = √(dX² + dY²) ≤ {tol} mm.')
         else:
             self.printfunc(f'{len(bad_posids)} positioners not rehomed '

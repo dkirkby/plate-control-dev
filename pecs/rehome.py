@@ -40,12 +40,12 @@ class Rehome(PECS):
                .sort_values(by='DEVICE_ID').reset_index())
         ret['STATUS'] = self.ptl.decipher_posflags(ret['FLAG'])
         mask = ret['FLAG'] != 4
-        retry_list = list(ret['DEVICE_ID'][mask])
+        retry_list = list(ret.loc[mask, 'DEVICE_ID'])
         if len(retry_list) == 0:
             self.printfunc(f'Rehoming (3 tries) complete for all positioners.')
         else:  # non-empty list, need another attempt
             self.printfunc(f'{len(retry_list)} unsucessful: {retry_list}\n\n'
-                           f'{ret.loc[mask].reset_index().to_string()}\n\n'
+                           f'{ret[mask].to_string()}\n\n'
                            f'Retrying...')
             if attempt <= 2:
                 if attempt == 1:  # set anticollision mode for 2nd attempt
@@ -58,7 +58,8 @@ class Rehome(PECS):
                 self.printfunc(f'3rd attempt did not complete successfully '
                                f'for positioners: {posids}')
         ret = self.ptl.get_positions(posids=self.posids, return_coord='obsXY')
-        return ret.rename(columns={'X1': 'expectedX', 'X2': 'expectedY'})
+        return ret.rename(columns={'X1': 'expected_obsX',
+                                   'X2': 'expected_obsY'})
 
 
 if __name__ == '__main__':

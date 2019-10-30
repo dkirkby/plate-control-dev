@@ -179,5 +179,5 @@ class PECS:
         else:
             self.printfunc(
                 f'Missing {len(unmatched)} of expected backlit fibres'
-                f'\n{sorted(list(unmatched))}')
+                f'\n{sorted(unmatched)}')
         return exppos, meapos, matched, unmatched
