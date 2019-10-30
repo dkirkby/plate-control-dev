@@ -27,8 +27,10 @@ import tarfile
 import pickle
 import numpy as np
 import pandas as pd
-from PyPDF2 import PdfFileMerger
 import posconstants as pc
+from PyPDF2 import PdfFileMerger
+import psycopg2
+import pweave
 import matplotlib
 # matplotlib.use('pdf')
 import matplotlib.pyplot as plt
@@ -51,10 +53,10 @@ class FPTestData:
     def __init__(self, test_name, test_cfg, petal_cfgs=None):
 
         self.test_name = test_name
-        self.test_time = pc.now()
+        self.start_time = pc.now()
         self.test_cfg = test_cfg  # petal id sections are string ids
         self.anticollision = test_cfg['anticollision']
-        self.num_corr_max = self.test_cfg['num_corr_max']
+        self.num_corr_max = test_cfg['num_corr_max']
         self.petal_cfgs = petal_cfgs
         self.ptlids = [  # validate string petal id sections and create list
             int(key) for key in test_cfg.keys() if len(key) == 2
@@ -186,6 +188,19 @@ class FPTestData:
         self.logger.info(f'Move data table initialised '
                          f'for {len(self.posids)} positioners.')
 
+    def finalise_data(self):
+        self.end_time = pc.now()  # define end time
+        if self.test_cfg['report_temperature']:
+            conn = psycopg2.connect(host="desi-db", port="5442",
+                                    database="desi_dev",
+                                    user="desi_reader", password="reader")
+            query = pd.read_sql_query(  # get temperature data
+                f"""SELECT posfid_temps, time, pcid FROM pc_telemetry_can_all
+                    WHERE time_recorded >= '{self.start_time}'
+                    AND time_recorded < '{self.end_time}'""",
+                conn).sort_values('time_recorded')
+            self.temp_query = query
+
     def make_summary_plots(self, make_binder=True, n_threads=16):
         try:
             self.logger.info(f'Making xyplots with {n_threads} threads...')
@@ -214,7 +229,7 @@ class FPTestData:
         Tmin, Tmax = np.sort(posintT) + row['OFFSET_T']  # targetable poslocT
         path = os.path.join(self.dirs[ptlid],
                             '{}_xyplot_submove_{{}}.pdf'.format(posid))
-        title = (f'XY Accuracy Test {self.test_time}\n'
+        title = (f'XY Accuracy Test {self.start_time}\n'
                  f'Positioner {posid} ({self.ntargets} Targets)')
         moves = self.movedf.loc[idx[:, posid], :]  # all targets for a posid
         tgtX, tgtY = moves['target_x'], moves['target_y']  # target obsXY
@@ -282,7 +297,7 @@ class FPTestData:
         self.loggers[ptlid].info(
             f'Binder for submove {n} saved to: {savepath}')
 
-    def export_move_data(self):
+    def export_data_logs(self):
         '''must have writte self.posids_ptl, a dict keyed by ptlid'''
         self.movedf.to_pickle(os.path.join(self.dir, 'move_df.pkl.gz'),
                               compression='gzip')
@@ -301,31 +316,43 @@ class FPTestData:
             self.loggers[ptlid].info('Petal move data written to: '
                                      f'{self.dirs[ptlid]}')
 
-    def make_archive(self):
-        path = os.path.join(self.dir, f'{os.path.basename(self.dir)}.tar.gz')
-        with tarfile.open(path, 'w:gz') as arc:  # ^tgz doesn't work properly
-            arc.add(self.dir, arcname=os.path.basename(self.dir))
-        self.logger.info(f'Test data archived: {path}')
-        return path
-
     def dump_as_one_pickle(self):
         del self.logger
         del self.loggers
         with open(os.path.join(self.dir, 'data_dump.pkl'), 'wb') as handle:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-    def save_test_products(self):
-        self.export_move_data()
+    def generate_report(self):
+        # define input and output paths for pweave
+        paths = [os.path.join(self.dir, 'data_dump.pkl'),
+                 os.path.join(self.dir, '{self.dir_name}-xytest_report.pdf')]
+        with open(os.path.join(pc.dirs['xytest_data'], 'pweave_test_src.txt'),
+                  'w') as h:
+            h.write('\n'.join(paths))
+        pweave.weave('generate_xytest_report.py', doctype='script')
+
+    def make_archive(self):
+        path = os.path.join(self.dir, f'{os.path.basename(self.dir)}.tar.gz')
+        with tarfile.open(path, 'w:gz') as arc:  # ^tgz doesn't work properly
+            arc.add(self.dir, arcname=os.path.basename(self.dir))
+        print(f'Test data archived: {path}')
+        return path
+
+    def finish_xyaccuracy_test(self):
+        self.finialise_data()
+        self.export_data_logs()
         if self.test_cfg['make_plots']:
             self.make_summary_plots()  # plot for all positioners by default
+        self.dump_as_one_pickle()  # loggers lost as they cannot be serialised
+        # self.generate_report()
         self.make_archive()
-        self.dump_as_one_pickle()
 
 
 if __name__ == '__main__':
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    dir_name = "2019_07_03-12_10_58-0700-hw_ac_default_24_bad_pos"
-    with open(os.path.join(pc.dirs['xytest_data'], dir_name, 'data_dump.pkl'),
+    dir_name = '20191025T144321-0700-test'
+    with open(os.path.join(pc.dirs['xytest_data'],
+                           dir_name, 'data_dump.pkl.gz'),
               'rb') as handle:
         data = pickle.load(handle)
     data.dir = os.path.join(pc.dirs['xytest_data'], dir_name)

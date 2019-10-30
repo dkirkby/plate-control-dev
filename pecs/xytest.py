@@ -71,8 +71,9 @@ class XYTest(PECS):
             f'Num of local targets: {len(self.data.targets)}'])
         self.logger.debug(f'Local targets xy positions:\n{self.data.targets}')
         self.data.initialise_movedata(self.data.posids, self.data.ntargets)
-        self.run_xyaccuracy_test(disable_unmatched=True)
-        self.data.save_test_products()
+        self.run_xyaccuracy_test(
+            disable_unmatched=self.data.test_cfg['disable_unmatched'])
+        self.finish_xyaccuracy_test()
 
     def _get_pos_info(self):
         '''get enabled positioners, according to given posids or busids
@@ -299,8 +300,9 @@ class XYTest(PECS):
                     self.loggers[ptlid].info(
                         f'Disabling unmatched fibres and their neighbours:\n'
                         f'{unmatched}')
-                    disabled = self.ptls[ptlid].disable_positioner_and_neighbors(
-                        list(unmatched))
+                    disabled = (
+                        self.ptls[ptlid].disable_positioner_and_neighbors(
+                            list(unmatched)))
                     if disabled is None:
                         disabled = []
                     self.loggers[ptlid].info(
@@ -372,7 +374,7 @@ class XYTest(PECS):
 
 
 if __name__ == '__main__':
-    path = os.path.join(pc.dirs['test_settings'], 'xytest_ptl3.cfg')
+    path = os.path.join(pc.dirs['test_settings'], 'xytest_ptl3_sim.cfg')
     xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')  # read cfg
     xytest_name = input('Please name this test: ')
     test = XYTest(xytest_name, xytest_cfg)
