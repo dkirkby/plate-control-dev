@@ -131,7 +131,7 @@ class PosScheduleStage(object):
                 table.insert_new_row(idx)
                 table.set_postpause(idx,equalizing_pause)
                 if self.sweeps: # because no collision checking is performed if anticollsion=None
-                    if self.sweeps[posid]: #Added from B141 PAF 5/28/19
+                    if posid in self.sweeps.keys():
                         self.sweeps[posid].extend(self.collider.timestep, max_time)
         return max_time
 
