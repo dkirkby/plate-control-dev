@@ -360,4 +360,4 @@ if __name__ == '__main__':
               'rb') as handle:
         data = pickle.load(handle)
     data.generate_report()
-    data.make_archive()
+    # data.make_archive()
