@@ -326,6 +326,7 @@ class FPTestData:
 
     def generate_report(self):
         # define input and output paths for pweave
+        print('Producing HTML test report...')
         path_output = os.path.join(self.dir,
                                    f'{self.dir_name}-xytest_report.html')
         with open(os.path.join(pc.dirs['xytest_data'], 'pweave_test_src.txt'),
@@ -353,7 +354,7 @@ class FPTestData:
 
 if __name__ == '__main__':
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    dir_name = '20191030T143809-0700-test'
+    dir_name = '20191030T174830-0700-test'
     with open(os.path.join(pc.dirs['xytest_data'],
                            dir_name, 'data_dump.pkl'),
               'rb') as handle:
