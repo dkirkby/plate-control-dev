@@ -14,6 +14,7 @@ FPTestData.loggers[petal_id]:       logger which writes new lines to log file
 """
 
 import os
+# import sys
 from copy import copy
 import logging
 from glob import glob
@@ -23,6 +24,7 @@ from multiprocessing import Pool
 from tqdm import tqdm
 import io
 import shutil
+import subprocess
 import tarfile
 import pickle
 import numpy as np
@@ -30,15 +32,15 @@ import pandas as pd
 import posconstants as pc
 from PyPDF2 import PdfFileMerger
 import psycopg2
-import pweave
 import matplotlib
-# matplotlib.use('pdf')
+matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.family': 'serif',
                      'mathtext.fontset': 'cm'})
 Circle = matplotlib.patches.Circle
 idx = pd.IndexSlice
 np.rms = lambda x: np.sqrt(np.mean(np.square(x)))
+# sys.path.append(os.path.abspath('.'))
 
 
 class FPTestData:
@@ -188,7 +190,7 @@ class FPTestData:
         self.logger.info(f'Move data table initialised '
                          f'for {len(self.posids)} positioners.')
 
-    def finalise_data(self):
+    def complete_data(self):
         self.end_time = pc.now()  # define end time
         if self.test_cfg['report_temperature']:
             conn = psycopg2.connect(host="desi-db", port="5442",
@@ -324,12 +326,13 @@ class FPTestData:
 
     def generate_report(self):
         # define input and output paths for pweave
-        paths = [os.path.join(self.dir, 'data_dump.pkl'),
-                 os.path.join(self.dir, '{self.dir_name}-xytest_report.pdf')]
+        path_output = os.path.join(self.dir,
+                                   f'{self.dir_name}-xytest_report.html')
         with open(os.path.join(pc.dirs['xytest_data'], 'pweave_test_src.txt'),
                   'w') as h:
-            h.write('\n'.join(paths))
-        pweave.weave('generate_xytest_report.py', doctype='script')
+            h.write(os.path.join(self.dir, 'data_dump.pkl'))
+        subprocess.call(['pweave', 'generate_xytest_report.md',
+                         '-f', 'pandoc2html', '-o', path_output])
 
     def make_archive(self):
         path = os.path.join(self.dir, f'{os.path.basename(self.dir)}.tar.gz')
@@ -338,25 +341,22 @@ class FPTestData:
         print(f'Test data archived: {path}')
         return path
 
-    def finish_xyaccuracy_test(self):
-        self.finialise_data()
+    def finish_xyaccuracy_test_products(self):
+        self.complete_data()
         self.export_data_logs()
         if self.test_cfg['make_plots']:
             self.make_summary_plots()  # plot for all positioners by default
         self.dump_as_one_pickle()  # loggers lost as they cannot be serialised
-        # self.generate_report()
+        self.generate_report()
         self.make_archive()
 
 
 if __name__ == '__main__':
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    dir_name = '20191025T144321-0700-test'
+    dir_name = '20191030T143809-0700-test'
     with open(os.path.join(pc.dirs['xytest_data'],
-                           dir_name, 'data_dump.pkl.gz'),
+                           dir_name, 'data_dump.pkl'),
               'rb') as handle:
         data = pickle.load(handle)
-    data.dir = os.path.join(pc.dirs['xytest_data'], dir_name)
-    data.dir_name = dir_name
-    print(f'Making archive: {data.dir}')
+    data.generate_report()
     data.make_archive()
-    print(f'Archive saved to: {data.dir}')

@@ -969,7 +969,7 @@ class Petal(object):
             type1, type2 = 'pos_calib', 'fid_calib'
             states = self.altered_calib_states
         elif mode == 'both':
-            self.commit(mode='move', log_note='')
+            self.commit(mode='move', log_note=log_note)
             self.commit(mode='calib')
             return
         if self.db_commit_on and not self.simulator_on:  # write to DB

@@ -73,7 +73,7 @@ class XYTest(PECS):
         self.data.initialise_movedata(self.data.posids, self.data.ntargets)
         self.run_xyaccuracy_test(
             disable_unmatched=self.data.test_cfg['disable_unmatched'])
-        self.finish_xyaccuracy_test()
+        self.data.finish_xyaccuracy_test_products()
 
     def _get_pos_info(self):
         '''get enabled positioners, according to given posids or busids
