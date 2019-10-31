@@ -4,6 +4,7 @@ Requires running DOS instance. See pecs.py
 Currently only runs one Petal at a time, awaiting a petalMan proxy.
 '''
 import os
+import pandas as pd
 import posconstants as pc
 from pecs import PECS
 
@@ -13,14 +14,14 @@ class GridCalib(PECS):
     subclass of PECS that adds functions to run an Grid calibration.
     In the future: add methods to display, judge and analyze calibration.
     '''
-    def __init__(self, fvc=None, ptls=None,
-                 petal_id=None, posids=None, interactive=False):
-        super().__init__(fvc=fvc, ptls=ptls)
+    def __init__(self, fvc=None, ptlm=None,
+                 petal_roles=None, posids=None, interactive=False):
+        super().__init__(fvc=fvc, ptlm=ptlm)
         self.printfunc(f'Running arc calibration')
         if interactive:
             self.interactive_ptl_setup()
         else:
-            self.ptl_setup(petal_id, posids)
+            self.ptl_setup(petal_roles, posids)
         self.n_points_P = 5
         self.n_points_T = 7
         updates = self.calibrate(interactive=interactive)
@@ -50,9 +51,18 @@ class GridCalib(PECS):
             return self.calibrate(auto_update=auto_update,
                                   match_radius=match_radius)
 
-        req_list = self.ptl.get_grid_requests(ids=self.posids,
+        ret = self.ptlm.get_grid_requests(ids=self.posids,
                                               n_points_T=self.n_points_T,
                                               n_points_P=self.n_points_P)
+        if isinstance(ret, dict):
+            req_list = []
+            for i in len(self.n_points_P*self.n_points_T):
+                dflist = []
+                for df in ret.items():
+                    dflist.append(df[i])
+                req_list.append(pd.concat(dflist))
+        else:
+            req_list = ret
         grid_data = []
         for i, request in enumerate(req_list):
             self.printfunc(f'Measuring grid point {i+1} of {len(req_list)}...')
@@ -61,8 +71,15 @@ class GridCalib(PECS):
             if self.allow_pause and i+1 < len(req_list):
                 input('Paused for heat load monitoring, '
                       'press enter to continue: ')
-        updates = self.ptl.calibrate_from_grid_data(grid_data,
+        retcode = self.ptlm.calibrate_from_grid_data(grid_data,
                                                     auto_update=auto_update)
+        if isinstance(retcode, dict):
+            dflist = []
+            for df in retcode.items():
+                dflist.append(df)
+            updates = pd.concat(dflist).set_index('DEVICE_ID').sort_index()
+        else:
+            updates = retcode.set_index('DEVICE_ID').sort_index()
         updates['auto_update'] = auto_update
         return updates
 
@@ -71,8 +88,8 @@ class GridCalib(PECS):
         Wrapper for often repeated moving and measuring sequence.
         Prints missing positioners, returns data merged with request
         '''
-        self.ptl.prepare_move(request, anticollision=None)
-        self.ptl.execute_move()
+        self.ptlm.prepare_move(request, anticollision=None)
+        self.ptlm.execute_move()
         exppos, meapos, matched, unmatched = self.fvc_measure(
                 match_radius=match_radius)
         # Want to collect both matched and unmatched

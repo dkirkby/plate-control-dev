@@ -14,7 +14,8 @@ class OnePointCalib(PECS):
     In the future: add methods to display, judge and analyze calibration.
     '''
     def __init__(self, fvc=None, ptlm=None, mode='posTP',
-                 petal_roles=None, posids=None, interactive=False):
+                 petal_roles=None, posids=None, interactive=False,
+                 auto_update=True):
         super().__init__(fvc=fvc, ptlm=ptlm)
         self.printfunc(f'Running 1p calibration, mode = {mode}')
         if interactive:
