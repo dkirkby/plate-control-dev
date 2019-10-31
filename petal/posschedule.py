@@ -426,7 +426,6 @@ class PosSchedule(object):
                 range_wrap_limits='targetable')
         for i in range(len(self.RRE_stage_order)):
             name = self.RRE_stage_order[i]
-            self.printfunc('stage name:'+ str(name))
             stage = self.stages[name]
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
             if self.should_anneal:
