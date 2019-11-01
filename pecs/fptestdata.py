@@ -33,7 +33,7 @@ import posconstants as pc
 from PyPDF2 import PdfFileMerger
 import psycopg2
 import matplotlib
-matplotlib.use('pdf')
+# matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.family': 'serif',
                      'mathtext.fontset': 'cm'})
@@ -354,10 +354,11 @@ class FPTestData:
 
 if __name__ == '__main__':
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    dir_name = '20191030T174830-0700-test'
+    dir_name = '20191031T150117-0700-petal0_can1011'
     with open(os.path.join(pc.dirs['xytest_data'],
                            dir_name, 'data_dump.pkl'),
               'rb') as handle:
         data = pickle.load(handle)
+    data.make_summary_plots()
     data.generate_report()
     # data.make_archive()
