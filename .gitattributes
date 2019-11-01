@@ -14,7 +14,7 @@ pecs/batch_seed.py -text
 pecs/batch_seed_1p.py -text
 pecs/fptestdata.py -text
 pecs/fvc_sim.py -text
-pecs/generate_xytest_report.py -text
+pecs/generate_xytest_report.md -text
 pecs/loop_phi_moves.py -text
 pecs/pecs.py -text
 pecs/pecs_local.cfg -text
