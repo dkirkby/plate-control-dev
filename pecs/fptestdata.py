@@ -205,13 +205,21 @@ class FPTestData:
 
     def make_summary_plots(self, make_binder=True, n_threads=16):
         try:
-            self.logger.info(f'Making xyplots with {n_threads} threads...')
+            pstr = f'Making xyplots with {n_threads} threads...'
+            if hasattr(self, 'logger'):
+                self.logger.info(pstr)
+            else:
+                print(pstr)
             with Pool(processes=n_threads) as p:
                 for posid in tqdm(self.posids):
                     p.apply_async(self.make_summary_plot, args=(posid,))
                 if make_binder:
-                    self.logger.info('Last MP chunk completed. '
-                                     'Creating xyplot binders...')
+                    pstr = ('Last MP chunk completed. '
+                            'Creating xyplot binders...')
+                    if hasattr(self, 'logger'):
+                        self.logger.info(pstr)
+                    else:
+                        print(pstr)
                     for ptlid, n in tqdm(product(self.ptlids,
                                          range(self.num_corr_max+1))):
                         p.apply_async(self.make_summary_plot_binder,
@@ -294,11 +302,18 @@ class FPTestData:
             binder.append(path)
         savepath = os.path.join(self.dirs[ptlid],
                                 f'{len(paths)}_xyplot_submove_{n}.pdf')
-        self.loggers[ptlid].info(f'Writing xyplot binder for submove {n}...')
+        pstr = f'Writing xyplot binder for submove {n}...'
+        if hasattr(self, 'loggers'):
+            self.loggers[ptlid].info(pstr)
+        else:
+            print(pstr)
         binder.write(savepath)
         binder.close()
-        self.loggers[ptlid].info(
-            f'Binder for submove {n} saved to: {savepath}')
+        pstr = f'Binder for submove {n} saved to: {savepath}'
+        if hasattr(self, 'loggers'):
+            self.loggers[ptlid].info(pstr)
+        else:
+            print(pstr)
 
     def export_data_logs(self):
         '''must have writte self.posids_ptl, a dict keyed by ptlid'''
