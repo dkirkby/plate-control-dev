@@ -218,7 +218,8 @@ class FPTestData:
                                       args=(ptlid, n))
                 p.close()
                 p.join()
-        except:
+        except Exception as e:
+            print(e)
             n_threads = int(input('Specify a smaller number of threads: '))
             self.make_summary_plots(n_threads=n_threads)
 
