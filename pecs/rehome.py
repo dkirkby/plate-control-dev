@@ -34,10 +34,15 @@ class Rehome(PECS):
                        f'{posids}\n')
         if self.allow_pause:
             input('Paused for heat load monitoring, press enter to continue: ')
-        ret = (self.ptl.rehome_pos(posids, axis=self.axis,
+        ret = self.ptl.rehome_pos(posids, axis=self.axis,
                                    anticollision=anticollision)
-               .rename(columns={'X1': 'posintT', 'X2': 'posintP'})
-               .sort_values(by='DEVICE_ID').reset_index())
+        if ret is None:
+          self.printfunc('Rehome failed, check PetalApp console for error log')
+          raise Exception('None received as return from rehome_pos')
+        else:
+          ret = (ret
+                 .rename(columns={'X1': 'posintT', 'X2': 'posintP'})
+                 .sort_values(by='DEVICE_ID').reset_index())
         ret['STATUS'] = self.ptl.decipher_posflags(ret['FLAG'])
         mask = ret['FLAG'] != 4
         retry_list = list(ret.loc[mask, 'DEVICE_ID'])
