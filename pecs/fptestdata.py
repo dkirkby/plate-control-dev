@@ -213,21 +213,25 @@ class FPTestData:
             with Pool(processes=n_threads) as p:
                 for posid in tqdm(self.posids):
                     p.apply_async(self.make_summary_plot, args=(posid,))
-                if make_binder:
-                    pstr = ('Last MP chunk completed. '
-                            'Creating xyplot binders...')
-                    if hasattr(self, 'logger'):
-                        self.logger.info(pstr)
-                    else:
-                        print(pstr)
-                    for ptlid, n in tqdm(product(self.ptlids,
-                                         range(self.num_corr_max+1))):
-                        p.apply_async(self.make_summary_plot_binder,
-                                      args=(ptlid, n))
                 p.close()
                 p.join()
+                # p.join()
+            if make_binder:
+                pstr = ('Last MP chunk completed. '
+                        'Creating xyplot binders...')
+                if hasattr(self, 'logger'):
+                    self.logger.info(pstr)
+                else:
+                    print(pstr)
+                with Pool(processes=n_threads) as p:
+                    for ptlid, n in product(self.ptlids,
+                                            range(self.num_corr_max+1)):
+                        p.apply_async(self.make_summary_plot_binder,
+                                      args=(ptlid, n))
+                    p.close()
+                    p.join()
         except Exception as e:
-            print(e)
+            print('Exception when making xy plots', e)
             n_threads = int(input('Specify a smaller number of threads: '))
             self.make_summary_plots(n_threads=n_threads)
 
@@ -287,8 +291,12 @@ class FPTestData:
             ax.set_ylabel(r'$y/\mathrm{mm}$')
             ax.legend(loc='upper right', fontsize=10)
             fig.savefig(path.format(n), bbox_inches='tight')
-            self.loggers[ptlid].debug(f'saved xyplot: {path.format(n)}')
-            plt.close(fig)
+            pstr = f'saved xyplot: {path.format(n)}'
+            if hasattr(self, 'loggers'):
+                self.loggers[ptlid].debug(pstr)
+            else:
+                pass  # print(pstr)
+            plt.close(fig=fig)
 
     def make_summary_plot_binder(self, ptlid, n):
         template = os.path.join(self.dirs[ptlid],
@@ -300,8 +308,9 @@ class FPTestData:
         binder = PdfFileMerger()
         for path in paths:
             binder.append(path)
-        savepath = os.path.join(self.dirs[ptlid],
-                                f'{len(paths)}_xyplot_submove_{n}.pdf')
+        savepath = os.path.join(
+            self.dirs[ptlid],
+            f'{len(paths)}_positioners-xyplot_submove_{n}.pdf')
         pstr = f'Writing xyplot binder for submove {n}...'
         if hasattr(self, 'loggers'):
             self.loggers[ptlid].info(pstr)
@@ -342,7 +351,7 @@ class FPTestData:
 
     def generate_report(self):
         # define input and output paths for pweave
-        print('Producing HTML test report...')
+        print('Producing xy accuracy test report...')
         path_output = os.path.join(self.dir,
                                    f'{self.dir_name}-xytest_report.html')
         with open(os.path.join(pc.dirs['xytest_data'], 'pweave_test_src.txt'),
@@ -364,17 +373,24 @@ class FPTestData:
         if self.test_cfg['make_plots']:
             self.make_summary_plots()  # plot for all positioners by default
         self.dump_as_one_pickle()  # loggers lost as they cannot be serialised
-        self.generate_report()
+        if shutil.which('pandoc') is None:
+            print('To generate an xy test report, you must have a complete '
+                  'installation of pandoc and/or TexLive. '
+                  'Skipping test report generation from markdown template...')
+        else:
+            self.generate_report()
         self.make_archive()
 
 
 if __name__ == '__main__':
+
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    dir_name = '20191031T150117-0700-petal0_can1011'
+    dir_name = '20191101T131705-0700-test'
     with open(os.path.join(pc.dirs['xytest_data'],
                            dir_name, 'data_dump.pkl'),
               'rb') as handle:
         data = pickle.load(handle)
     data.make_summary_plots()
-    data.generate_report()
-    # data.make_archive()
+    if shutil.which('pandoc') is not None:
+        data.generate_report()
+    data.make_archive()
