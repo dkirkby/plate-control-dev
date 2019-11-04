@@ -12,7 +12,6 @@ from configobj import ConfigObj
 from tqdm import tqdm
 import posconstants as pc
 from pecs import PECS
-from postransforms import PosTransforms
 from fptestdata import FPTestData
 idx = pd.IndexSlice  # pandas slice for selecting slice using multiindex
 
