@@ -9,8 +9,10 @@ import numpy as np
 import pandas as pd
 # from multiprocessing import Queue, Process
 from configobj import ConfigObj
+from tqdm import tqdm
 import posconstants as pc
 from pecs import PECS
+from postransforms import PosTransforms
 from fptestdata import FPTestData
 idx = pd.IndexSlice  # pandas slice for selecting slice using multiindex
 
@@ -140,25 +142,37 @@ class XYTest(PECS):
                 self.data.test_cfg['targ_min_radius'],
                 self.data.test_cfg['targ_max_radius'],
                 self.data.test_cfg['n_pts_across_grid']).T  # shape (N, 2)
-        else:  # input target table shoud have two colummns (posX, posY)
+            if self.data.test_cfg['shuffle_targets']:  # target shuffling logic
+                if self.data.test_cfg['shuffle_seed'] is None:  # posid as seed
+                    self.data.targets_pos = {}  # keyed by posid
+                    for posid in self.data.posids:
+                        np.random.seed(int(posid[1:]))  # only the numeral part
+                        np.random.shuffle(tgt)  # numpy shuffles in place
+                        self.data.targets_pos[posid] = tgt  # shape (N, 2)
+                else:  # use the same given seed for all posids
+                    np.random.seed(self.data.test_cfg['shuffle_seed'])
+                    np.random.shuffle(tgt)  # same shuffled target list for all
+                    self.data.targets_pos = {posid: tgt
+                                             for posid in self.data.posids}
+            self.data.ntargets = tgt.shape[0]  # shape (N_targets, 2)
+        else:  # use input target table, see xytest_psf.csv as an exampl
             assert os.path.isfile(path), f'Invald target file path: {path}'
-            tgt = np.genfromtxt(path, delimiter=',')  # load csv file
-            assert tgt.shape[1] == 2, 'Targets should be of dimension (N, 2)'
-        self.data.targets = tgt
-        self.data.ntargets = tgt.shape[0]  # shape (N_targets, 2)
-        if self.data.test_cfg['shuffle_targets']:  # target shuffling logic
-            if self.data.test_cfg['shuffle_seed'] is None:  # posid as seed
-                self.data.targets_pos = {}  # different targets for each pos
-                for posid in self.data.posids:
-                    np.random.seed(int(posid[1:]))  # only the numeral part
-                    np.random.shuffle(tgt)  # numpy shuffles in place
-                    self.data.targets_pos[posid] = tgt  # shape (N, 2)
-            else:  # use the same given seed for all posids
-                np.random.seed(self.data.test_cfg['shuffle_seed'])
-                np.random.shuffle(tgt)  # same shuffled target list for all
-                self.data.targets_pos = {pid: tgt for pid in self.data.posids}
-        else:  # same set of targets for all positioners
-            self.data.targets_pos = {pid: tgt for pid in self.data.posids}
+            self.data.targets = {}
+            df = pd.read_csv(path, index_col='target_no')
+            self.data.ntargets = len(df)  # set number of targets
+            for ptlid in self.data.ptlids:  # set targets for each positioner
+                for i, posid in enumerate(self.posids_ptl[ptlid]):
+                    tgt = df[[f'theta_{i}', f'phi_{i}']].values
+                    self.data.targets_pos[posid] = tgt
+        # set move command according to target type
+        if 'target_type' in self.data.test_cfg.keys():
+            self.data.target_type = self.data.test_cfg['target_type']
+            if ('XY' not in self.data.target_type or
+                    'TP' not in self.data.target_type):
+                self.logger.error('Bad target type, must be XY or TP.')
+                raise ValueError('Bad target type, must be XY or TP.')
+        else:
+            self.data.target_type = 'poslocXY'
 
     def _add_device_id_col(self, df, ptlid):
         '''when df only has DEVICE_LOC, add DEVICE_ID column and use as index
@@ -240,11 +254,21 @@ class XYTest(PECS):
         posids = self.data.posids_ptl[ptlid]  # all records obey this order
         ptl = self.ptls[ptlid]
         if n == 0:  # blind move, issue cmd in obsXY for easy check with FVC
+            self.logger.info(f'Setting up target {i} in poslocXY...')
             movetype, cmd = 'blind', 'poslocXY'
-            for posid in posids:  # write targets to move df
-                poslocXY = self.data.targets_pos[posid][i, :]
-                movedf.loc[idx[i, posid], ['target_x', 'target_y']] = poslocXY
-            tgt = movedf.loc[idx[i, posids], ['target_x', 'target_y']].values
+            for posid in tqdm(posids):  # write targets to move df
+                tgt = self.data.targets_pos[posid][i, :]  # two elements
+                if self.data.target_type == 'poslocTP':
+                    tgt = ptl.postrans(posid, 'poslocTP_to_poslocXY', tgt)
+                elif self.data.target_type == 'poslocXY':
+                    pass
+                else:
+                    self.logger.error('Target not supported, must be posloc')
+                    raise ValueError('Target not supported, must be posloc')
+                movedf.loc[idx[i, posid],
+                           ['target_x', 'target_y']] = tgt
+            tgt = movedf.loc[idx[i, posids],
+                             ['target_x', 'target_y']].values
         else:
             movetype, cmd = 'corrective', 'dXdY'
             tgt = - movedf.loc[idx[i, posids],  # note minus sign, last move
