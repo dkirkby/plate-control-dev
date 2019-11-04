@@ -161,10 +161,10 @@ class XYTest(PECS):
             df = pd.read_csv(path, index_col='target_no')
             self.data.ntargets = len(df)  # set number of targets
             for ptlid in self.data.ptlids:  # set targets for each positioner
-                for i, posid in enumerate(self.posids_ptl[ptlid]):
+                for posid in self.posids_ptl[ptlid]:
                     dl = self.data.posdf.loc[posid]['DEVICE_LOC']
-                    tgt = df[[f'theta_{dl}', f'phi_{dl}']].values
-                    self.data.targets_pos[posid] = tgt
+                    self.data.targets_pos[posid] = df[[f'theta_{dl}',
+                                                       f'phi_{dl}']].values
         # set move command according to target type
         if 'target_type' in self.data.test_cfg.keys():
             self.data.target_type = self.data.test_cfg['target_type']
