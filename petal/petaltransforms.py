@@ -338,22 +338,20 @@ class PetalTransforms:
             ptlXYZ = typecast(ptlXYZ)
         return self.ptlXYZ_to_obsXYZ(ptlXYZ)[:2, :]
 
-# %% written but discouraged transformations
+    def obsXY_to_QS(self, obsXY, cast=False):
+        """
+        input:  2 x N array
+        output: 2 x N array, each column vector is QS
+        """
+        if cast:
+            obsXY = typecast(obsXY)
+        X, Y = obsXY[0, :], obsXY[1, :]
+        Q = np.degrees(np.arctan2(Y, X))  # Y over X
+        R = np.sqrt(np.square(X) + np.square(Y))
+        S = pc.R2S_lookup(R) if self.curved else R
+        return np.vstack([Q, S])
 
-    # def obsXY_to_QS(self, obsXY, curved=None, cast=False):
-    #     """
-    #     input:  2 x N array
-    #     output: 2 x N array, each column vector is QS
-    #     """
-    #     if cast:
-    #         obsXY = typecast(obsXY)
-    #     if curved is None:  # allow forcing flatXY despite curved instance
-    #         curved = self.curved
-    #     X, Y = obsXY[0, :], obsXY[1, :]
-    #     Q = np.degrees(np.arctan2(Y, X))  # Y over X
-    #     R = np.sqrt(np.square(X) + np.square(Y))
-    #     S = pc.R2S_lookup(R) if curved else R
-    #     return np.array([Q, S])
+# %% written but discouraged transformations
 
     # def QS_to_obsXY(self, QS, curved=None, cast=False):
     #     """
