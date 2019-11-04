@@ -275,7 +275,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
     def obsXY_to_posintTP(self, obsXY, range_limits='full'):
         """Composite transformation, performs QS --> obsXY --> posintTP"""
         QS = self.obsXY_to_QS(obsXY, cast=True).flatten()
-        return self.QS_to_posintTP(self, QS, range_limits=range_limits)
+        return self.QS_to_posintTP(QS, range_limits=range_limits)
 
     # %% angle additions and subtractions
 
