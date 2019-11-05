@@ -545,7 +545,7 @@ class Petal(object):
         of positioners. (But there are certain 'expert use' test cases in the
         lab, where we want this feature turned off.)
         """
-        self.info('schedule_moves called with anticollision = %r' % anticollision)
+        self.printfunc('schedule_moves called with anticollision = %r' % anticollision)
         if anticollision not in {None,'freeze','adjust'}:
             anticollision = self.anticollision_default
         self.schedule.should_anneal = should_anneal
@@ -554,7 +554,7 @@ class Petal(object):
     def send_move_tables(self):
         """Send move tables that have been scheduled out to the positioners.
         """
-        self.info('send_move_tables called')
+        self.printfunc('send_move_tables called')
         if self.simulator_on:
             self.tables_sent_successfully = True
             if self.verbose:
@@ -576,7 +576,7 @@ class Petal(object):
             self.printfunc('WARNING: Movetables rejected by petalcontroller!')
         else:
             self.tables_sent_successfully = True
-        self.info('send_move_tables: Done')
+        self.printfunc('send_move_tables: Done')
 
     def set_motor_parameters(self):
         """Send the motor current and period settings to the positioners.
@@ -607,7 +607,7 @@ class Petal(object):
         """Command the positioners to do the move tables that were sent out to them.
         Then do clean-up and logging routines to keep track of the moves that were done.
         """
-        self.info('execute_moves called')
+        self.printfunc('execute_moves called')
         if self.simulator_on:
             if self.verbose:
                 self.printfunc('Simulator skips sending execute moves command to positioners.')
@@ -621,14 +621,14 @@ class Petal(object):
             table_times = [sum([pp/1000 for pp in hw_table['postpause']]) + sum(hw_table['move_time']) for hw_table in hw_tables] # note postpauses are in ms
             if table_times != []: #Prevent a crash if no move tables were actually sent (IE all positioners in a move are disabled)
                 delay = buffer + max(table_times)
-                self.info('execute_moves: max(table_times) = %r' % delay)
+                self.printfunc('execute_moves: max(table_times) = %r' % delay)
                 time.sleep(delay)
             #END OF TEMPORARY FIX
             self._postmove_cleanup()
             self._wait_while_moving()
         self.canids_where_tables_were_just_sent = []
         self.busids_where_tables_were_just_sent = []
-        self.info('execute_moves: Done')
+        self.printfunc('execute_moves: Done')
 
     def schedule_send_and_execute_moves(self, anticollision='default', should_anneal=True):
         """Convenience wrapper to schedule, send, and execute the pending requested
