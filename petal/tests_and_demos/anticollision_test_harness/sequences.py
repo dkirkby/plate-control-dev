@@ -9,14 +9,19 @@ import harness_constants as hc
 positioner_param_sequences = {0:[0],
                               1:[0,1],
                               2:[2],
-                              3:[3]}
+                              3:[3],
+                              'one real petal':[10004],
+                              'two real petals':[10002,10003],
+                              'many real petals':[10002,10003,10004,10005,10006,10007,10008,10009,10010,10011],
+                             }
 
 move_request_sequences     = {0:[0],
                               1:[0,1],
 							  2:[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
                               3:[20,21,22,23,24],
                               4:[20,21],
-                              5:[21]}
+                              5:[21],
+                              'many':[i for i in range(100)]}
 
 def get_positioner_param_sequence(sequence_id, device_loc_ids='all'):
     """Select a sequence of positioner parameter sets.
