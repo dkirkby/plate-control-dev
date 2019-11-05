@@ -82,6 +82,16 @@ petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_00
 petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_00001.csv -text
 petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_00002.csv -text
 petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_00003.csv -text
+petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_10002.csv -text
+petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_10003.csv -text
+petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_10004.csv -text
+petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_10005.csv -text
+petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_10006.csv -text
+petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_10007.csv -text
+petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_10008.csv -text
+petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_10009.csv -text
+petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_10010.csv -text
+petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_10011.csv -text
 petal/tests_and_demos/anticollision_test_harness/read_nominal_pos_locations.py -text
 petal/tests_and_demos/anticollision_test_harness/sequences.py -text
 petal/tests_and_demos/collision_test_cases.py -text
