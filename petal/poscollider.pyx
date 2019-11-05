@@ -418,9 +418,9 @@ class PosCollider(object):
     def _adjust_keepouts(self):
         """Expand/contract, and pre-shift the theta and phi keepouts for each positioner."""
         self.general_keepout_P = self.general_keepout_P_unexpanded.expanded_radially(self.config['KEEPOUT_EXPANSION_PHI_RADIAL'])
-        self.general_keepout_P = self.general_keepout_P_unexpanded.expanded_angularly(self.config['KEEPOUT_EXPANSION_PHI_ANGULAR'])
+        self.general_keepout_P = self.general_keepout_P.expanded_angularly(self.config['KEEPOUT_EXPANSION_PHI_ANGULAR'])
         self.general_keepout_T = self.general_keepout_T_unexpanded.expanded_radially(self.config['KEEPOUT_EXPANSION_THETA_RADIAL'])
-        self.general_keepout_T = self.general_keepout_T_unexpanded.expanded_angularly(self.config['KEEPOUT_EXPANSION_THETA_ANGULAR'])
+        self.general_keepout_T = self.general_keepout_T.expanded_angularly(self.config['KEEPOUT_EXPANSION_THETA_ANGULAR'])
         for posid in self.posids:
             R1_error = self.R1[posid] - pc.nominals['LENGTH_R1']['value']
             R2_error = self.R2[posid] - pc.nominals['LENGTH_R2']['value']
