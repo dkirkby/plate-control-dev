@@ -13,7 +13,7 @@ pos_settings_dir_abs = os.path.abspath(pos_settings_dir_rel)
 all_files = os.listdir(pos_settings_dir_abs)
 m_files = [file for file in all_files if 'unit_M' in file]
 data = {petal_id:{} for petal_id in petals_to_generate}
-keys_to_copy = ['DEVICE_LOC','CTRL_ENABLED',
+keys_to_copy = ['POS_ID','DEVICE_LOC','CTRL_ENABLED',
                 'LENGTH_R1','LENGTH_R2',
                 'OFFSET_T','OFFSET_P','OFFSET_X','OFFSET_Y',
                 'PHYSICAL_RANGE_T','PHYSICAL_RANGE_P']
