@@ -50,6 +50,7 @@ petal/tests_and_demos/anticol_sim.py -text
 petal/tests_and_demos/anticollision_test_harness/generate_posparam_sets.py -text
 petal/tests_and_demos/anticollision_test_harness/generate_posparam_sets_from_posconfigs.py -text
 petal/tests_and_demos/anticollision_test_harness/generate_request_sets.py -text
+petal/tests_and_demos/anticollision_test_harness/generate_request_sets_from_fiberassignment.py -text
 petal/tests_and_demos/anticollision_test_harness/harness.py -text
 petal/tests_and_demos/anticollision_test_harness/harness_constants.py -text
 petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00000.csv -text
