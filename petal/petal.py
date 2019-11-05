@@ -363,18 +363,26 @@ class Petal(object):
             if not(self.get_posfid_val(posid,'CTRL_ENABLED')):
                 self.pos_flags[posid] |= self.ctrl_disabled_bit
                 marked_for_delete.add(posid)
+                if self.verbose:
+                    self.printfunc(f'petal: {posid} CTRL_ENABLED=False, '
+                                   f'{len(marked_for_delete)} to delete')
             elif self.schedule.already_requested(posid):
-                marked_for_delete.add(posid)
                 self.pos_flags[posid] |= self.multi_request_bit
+                marked_for_delete.add(posid)
+                if self.verbose:
+                    self.printfunc(f'petal: {posid} already requested, '
+                                   f'{len(marked_for_delete)} to delete')
             else:
                 accepted = self.schedule.request_target(posid, requests[posid]['command'], requests[posid]['target'][0], requests[posid]['target'][1], requests[posid]['log_note'])
                 if not accepted:
                     marked_for_delete.add(posid)
-                    # self.printfunc(f'deleting {posid} for target rejected')
+                    if self.verbose:
+                        self.printfunc(f'petal: {posid} request not accepted, '
+                                       f'{len(marked_for_delete)} to delete')
         for posid in marked_for_delete:
             del requests[posid]
         if self.verbose:
-            self.printfunc(f'petal: requests approved {len(requests)} '
+            self.printfunc(f'petal: {len(requests)} requests approved, '
                            f'{len(marked_for_delete)} delected')
         return requests
 
