@@ -153,6 +153,7 @@ petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_0009
 petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00097.csv -text
 petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00098.csv -text
 petal/tests_and_demos/anticollision_test_harness/move_request_sets/requests_00099.csv -text
+petal/tests_and_demos/anticollision_test_harness/multiharness.py -text
 petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_00000.csv -text
 petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_00001.csv -text
 petal/tests_and_demos/anticollision_test_harness/pos_parameter_sets/posparams_00002.csv -text
