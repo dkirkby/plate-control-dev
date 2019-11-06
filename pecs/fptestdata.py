@@ -206,7 +206,7 @@ class FPTestData:
     def make_summary_plots(self, make_binder=True, n_threads=8):
         try:
             pstr = (f'Making xyplots with {n_threads} threads for '
-                    f'{self.num_corr_max} submoves...')
+                    f'submoves {list(range(self.num_corr_max+1))}...')
             if hasattr(self, 'logger'):
                 self.logger.info(pstr)
             else:
