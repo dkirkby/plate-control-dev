@@ -203,7 +203,7 @@ class FPTestData:
                 conn).sort_values('time_recorded')
             self.temp_query = query
 
-    def make_summary_plots(self, make_binder=True, n_threads=8):
+    def make_summary_plots(self, make_binder=True, n_threads=16):
         try:
             pstr = (f'Making xyplots with {n_threads} threads for '
                     f'submoves {list(range(self.num_corr_max+1))}...')
