@@ -17,7 +17,7 @@ device_loc_ids = 'all' # make the selection here
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 pos_param_sequence_id = 'one real petal'
-move_request_sequence_id = 'many'
+move_request_sequence_id = '04000-04099'
 
 # Other ids
 fidids = {}
@@ -27,6 +27,7 @@ petal_id = 666
 should_animate = False
 n_corrections = 0 # number of correction moves to simulate after each target
 max_correction_move = 0.050/1.414 # mm
+should_profile = False
 
 # randomizer for correction moves
 randomizer_seed = 0
@@ -42,7 +43,7 @@ for pos_params in pos_param_sequence:
         state.store('POS_P',180.0)
         for key,val in params.items():
             state.store(key,val)
-        #state.write()
+        state.write()
     ptl = petal.Petal(petal_id        = petal_id,
                       petal_loc       = 3,
                       posids          = pos_params.keys(),
@@ -75,14 +76,22 @@ for pos_params in pos_param_sequence:
                     request['target'][0] = random.uniform(-max_correction_move,max_correction_move)
                     request['target'][1] = random.uniform(-max_correction_move,max_correction_move)
                 anticollision = 'freeze'
-            hc.profile('ptl.request_targets(requests)')
-            # ptl.request_targets(requests)
+            if should_profile:
+                hc.profile('ptl.request_targets(requests)')
+            else:
+                ptl.request_targets(requests)
             # posid =  list(requests.keys())[0]
             # posmodel = list(requests.values())[0]['posmodel']
             # print(posid, 'expected current posintTP', posmodel.expected_current_posintTP)
-            hc.profile('ptl.schedule_send_and_execute_moves(anticollision="'+anticollision+'")')
+            if should_profile:
+                hc.profile('ptl.schedule_send_and_execute_moves(anticollision="'+anticollision+'")')
+            else:
+                ptl.schedule_send_and_execute_moves(anticollision='anticollision')
     if ptl.schedule_stats:
         ptl.schedule_stats.save()
     if should_animate:
         ptl.stop_gathering_frames()
-        hc.profile('ptl.generate_animation()')
+        if should_profile:
+            hc.profile('ptl.generate_animation()')
+        else:
+            ptl.generate_animation()
