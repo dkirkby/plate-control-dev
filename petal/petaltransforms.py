@@ -168,9 +168,25 @@ class PetalTransforms:
         return np.vstack([Q, S, T])  # 3 x N array
 
     # %% QS transforms in 2D as projected from QST onto the focal surface
+
+    @staticmethod
+    def obsXY_to_QS(obsXY, cast=False):
+        """
+        On-shell condition is assumed, so T = 0
+        input:  2 x N array
+        output: 2 x N array, each column vector is QS
+        """
+        if cast:
+            obsXY = typecast(obsXY)
+        X, Y = obsXY[0, :], obsXY[1, :]
+        Q = np.degrees(np.arctan2(Y, X))  # Y over X
+        R = np.sqrt(np.square(X) + np.square(Y))
+        S = pc.R2S_lookup(R)
+        return np.vstack([Q, S])
+
     @staticmethod
     def obsXYZ_to_QS(obsXYZ, cast=False):
-        '''obsXYZ -> QST -> QS'''
+        '''obsXYZ -> QST -> QS, point can be off-shell and have nonzero T'''
         if cast:
             obsXYZ = typecast(obsXYZ)
         return PetalTransforms.obsXYZ_to_QST(obsXYZ)[:2, :]  # 2 x N array
@@ -305,8 +321,8 @@ class PetalTransforms:
         OUTPUT: 3 x N array, each column vector is ptlXYZ, petal-local
         """
         if cast:
-            QS = typecast(QS)
-        obsXYZ = self.QST_to_obsXYZ(QS)
+            QST = typecast(QST)
+        obsXYZ = self.QST_to_obsXYZ(QST)
         return self.obsXYZ_to_ptlXYZ(obsXYZ)
 
     def ptlXYZ_to_QS(self, ptlXYZ, cast=False):
@@ -337,19 +353,6 @@ class PetalTransforms:
         if cast:
             ptlXYZ = typecast(ptlXYZ)
         return self.ptlXYZ_to_obsXYZ(ptlXYZ)[:2, :]
-
-    def obsXY_to_QS(self, obsXY, cast=False):
-        """
-        input:  2 x N array
-        output: 2 x N array, each column vector is QS
-        """
-        if cast:
-            obsXY = typecast(obsXY)
-        X, Y = obsXY[0, :], obsXY[1, :]
-        Q = np.degrees(np.arctan2(Y, X))  # Y over X
-        R = np.sqrt(np.square(X) + np.square(Y))
-        S = pc.R2S_lookup(R) if self.curved else R
-        return np.vstack([Q, S])
 
 # %% written but discouraged transformations
 
@@ -502,7 +505,6 @@ if __name__ == '__main__':
     obsXYZ = trans.QST_to_obsXYZ(QST)
     print(f'obsXYZ = {obsXYZ.T}')
 
-
     # device_loc 541, fid
     obsXYZ = np.array([295.332581765, 207.26336747500002, -14.743447455]).reshape(3, 1)
     print(f'CMM obsXYZ = {obsXYZ.T}')
@@ -510,3 +512,10 @@ if __name__ == '__main__':
     print(f'QST = {QST.T}')
     obsXYZ = trans.QST_to_obsXYZ(QST)
     print(f'obsXYZ = {obsXYZ.T}')
+    
+    # QS <-> obsXY transformation tests
+    QS = np.array([65.55674, 411.2830]).reshape(2, 1)
+    obsXY = trans.QS_to_obsXY(QS)
+    print(f'obsXY = {obsXY.T}')
+    flatXY = trans._QS_to_flatXY(QS)
+    print(f'flatXY = {flatXY.T}')
