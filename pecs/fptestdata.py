@@ -216,13 +216,13 @@ class FPTestData:
             def update_pbar(*a):
                 pbar.update()
 
-            with Pool(processes=n_threads) as p:
-                for posid in self.posids:
-                    p.apply_async(self.make_summary_plot, args=(posid,),
-                                  callback=update_pbar)
-                p.close()
-                p.join()
-                # p.join()
+            # with Pool(processes=n_threads) as p:
+            p = Pool(processes=n_threads)
+            for posid in self.posids:
+                p.apply_async(self.make_summary_plot, args=(posid,),
+                              callback=update_pbar)
+            p.close()
+            p.join()
             if make_binder:
                 pstr = ('Last MP chunk completed. '
                         'Creating xyplot binders...')
@@ -230,13 +230,14 @@ class FPTestData:
                     self.logger.info(pstr)
                 else:
                     print(pstr)
-                with Pool(processes=n_threads) as p:
-                    for ptlid, n in product(self.ptlids,
-                                            range(self.num_corr_max+1)):
-                        p.apply_async(self.make_summary_plot_binder,
-                                      args=(ptlid, n))
-                    p.close()
-                    p.join()
+                # with Pool(processes=n_threads) as p:
+                p = Pool(processes=n_threads)
+                for ptlid, n in product(self.ptlids,
+                                        range(self.num_corr_max+1)):
+                    p.apply_async(self.make_summary_plot_binder,
+                                  args=(ptlid, n))
+                p.close()
+                p.join()
         except Exception as e:
             print('Exception when making xy plots', e)
             n_threads = int(input('Specify a smaller number of threads: '))
