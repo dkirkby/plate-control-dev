@@ -1,6 +1,7 @@
 import os
 import csv
 import posconstants as pc
+import math
 
 class PosSchedStats(object):
     """Collects statistics from runs of the PosSchedule.
@@ -135,22 +136,47 @@ class PosSchedStats(object):
         data.update(self.numbers)
         data.update(self.summarize_num_moving())
         data.update(self.summarize_collision_resolutions())
-        return data
+        nrows = len(next(iter(data.values())))
+        if not self.real_data_yet_in_latest_row:
+            nrows -= 1
+        safe_divide = lambda a,b: a / b if b else math.inf # avoid divide-by-zero errors
+        data['calc: n move tables / n pos'] = [safe_divide(data['n move tables'][i], data['n pos'][i]) for i in range(nrows)]
+        data['calc: unresolved / n move tables'] = [safe_divide(data['found total collisions'][i] - data['resolved total collisions'][i], data['n move tables'][i]) for i in range(nrows)]
+        data['calc: freeze / n move tables'] = [safe_divide(data['freeze'][i], data['n move tables'][i]) for i in range(nrows)]
+        return data, nrows
     
     def save(self):
         """Saves stats results to disk."""
         filename = pc.filename_timestamp_str_now() + '_schedule_stats.csv'
         path = os.path.join(pc.dirs['temp_files'],filename)
-        data = self.summarize_all()
-        nrows = len(next(iter(data.values())))
-        if not self.real_data_yet_in_latest_row:
-            nrows -= 1
+        data, nrows = self.summarize_all()
+        blank_row = {'method':''}
+        max_stats = {'method':'max'}
+        min_stats = {'method':'min'}
+        rms_stats = {'method':'rms'}
+        avg_stats = {'method':'avg'}            
+        for key in data:
+            if len(data[key]) > 0:
+                type_test_val = data[key][0]
+                if isinstance(type_test_val,int) or isinstance(type_test_val,float):
+                    this_data = [data[key][i] for i in range(nrows)]
+                    max_stats[key] = max(this_data)
+                    min_stats[key] = min(this_data)
+                    rms_stats[key] = (sum([x**2 for x in this_data])/len(this_data))**0.5
+                    avg_stats[key] = sum(this_data)/len(this_data)
+        
         with open(path, 'w', newline='') as csvfile:
             writer = csv.DictWriter(csvfile,fieldnames=data.keys())
             writer.writeheader()
             for i in range(nrows):
                 row = {key:val[i] for key,val in data.items()}
                 writer.writerow(row)
+            writer.writerow(blank_row)
+            writer.writerow(max_stats)
+            writer.writerow(min_stats)
+            writer.writerow(rms_stats)
+            writer.writerow(avg_stats)
+
         
                     
         
