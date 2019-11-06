@@ -69,8 +69,8 @@ class XYTest(PECS):
             f'PlateMaker instrument: {self.pm_instrument}',
             f'FVC role: {self.fvc_role}',
             f'Max num of corrections: {self.data.num_corr_max}',
-            f'Num of local targets: {len(self.data.targets)}'])
-        self.logger.debug(f'Local targets xy positions:\n{self.data.targets}')
+            f'Num of local targets: {self.data.ntargets}'])
+        self.logger.debug(f'Test targets:\n{self.data.targets_pos}')
         self.data.initialise_movedata(self.data.posids, self.data.ntargets)
         self.run_xyaccuracy_test(
             disable_unmatched=self.data.test_cfg['disable_unmatched'])
