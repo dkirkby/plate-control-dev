@@ -232,8 +232,6 @@ class FPTestData:
                     with Pool(processes=n_threads) as p:
                         for ptlid, n in product(self.ptlids,
                                                 range(self.num_corr_max+1)):
-                            print(f'Adding binder job for PTL{ptlid}, '
-                                  f'submove {n} to pool...')
                             p.apply_async(self.make_summary_plot_binder,
                                           args=(ptlid, n))
                         p.close()
@@ -308,7 +306,7 @@ class FPTestData:
             if hasattr(self, 'loggers'):
                 self.loggers[ptlid].debug(pstr)
             else:
-                print(pstr)  # pass  # print(pstr)
+                pass  # print(pstr)
             # plt.close(fig=fig)
 
     def make_summary_plot_binder(self, ptlid, n):
