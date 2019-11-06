@@ -204,7 +204,7 @@ class FPTestData:
                 conn).sort_values('time_recorded')
             self.temp_query = query
 
-    def make_summary_plots(self, make_binder=True, n_threads=16):
+    def make_summary_plots(self, make_binder=True, n_threads=16, mp=True):
         try:
             pstr = (f'Making xyplots with {n_threads} threads for '
                     f'submoves {list(range(self.num_corr_max+1))}...')
@@ -212,38 +212,36 @@ class FPTestData:
                 self.logger.info(pstr)
             else:
                 print(pstr)
-            pbar = tqdm(total=len(self.posids))
+            if mp:
+                pbar = tqdm(total=len(self.posids))
 
-            def update_pbar(*a):
-                pbar.update()
+                def update_pbar(*a):
+                    pbar.update()
 
-#            with Pool(processes=n_threads) as p:
-#                for posid in self.posids:
-#                    p.apply_async(self.make_summary_plot, args=(posid,),
-#                                  callback=update_pbar)
-#                p.close()
-#                p.join()
-            for posid in tqdm(self.posids):
-                self.make_summary_plot(posid)
+                with Pool(processes=n_threads) as p:
+                    for posid in self.posids:
+                        p.apply_async(self.make_summary_plot, args=(posid,),
+                                      callback=update_pbar)
+                    p.close()
+                    p.join()
+            else:
+                for posid in tqdm(self.posids):
+                    self.make_summary_plot(posid)
             if make_binder:
-                # pstr = ('Last MP chunk completed. '
-                #         'Creating xyplot binders...')
-                # if hasattr(self, 'logger'):
-                #     self.logger.info(pstr)
-                # else:
-                #     print(pstr)
-                for ptlid, n in tqdm(product(self.ptlids,
-                                             range(self.num_corr_max+1))):
-                    self.make_summary_plot_binder(ptlid, n)
-#                with Pool(processes=n_threads) as p:
-#                    for ptlid, n in product(self.ptlids,
-#                                            range(self.num_corr_max+1)):
-#                        print(f'Adding binder job for PTL{ptlid}, submove {n} '
-#                              'to pool...')
-#                        p.apply_async(self.make_summary_plot_binder,
-#                                      args=(ptlid, n))
-#                    p.close()
-#                    p.join()
+                if mp:
+                    with Pool(processes=n_threads) as p:
+                        for ptlid, n in product(self.ptlids,
+                                                range(self.num_corr_max+1)):
+                            print(f'Adding binder job for PTL{ptlid}, '
+                                  f'submove {n} to pool...')
+                            p.apply_async(self.make_summary_plot_binder,
+                                          args=(ptlid, n))
+                        p.close()
+                        p.join()
+                else:
+                    for ptlid, n in tqdm(product(self.ptlids,
+                                                 range(self.num_corr_max+1))):
+                        self.make_summary_plot_binder(ptlid, n)
         except Exception as e:
             print('Exception when making xy plots', e)
             n_threads = int(input('Specify a smaller number of threads: '))
