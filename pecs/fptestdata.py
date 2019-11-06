@@ -203,16 +203,23 @@ class FPTestData:
                 conn).sort_values('time_recorded')
             self.temp_query = query
 
-    def make_summary_plots(self, make_binder=True, n_threads=16):
+    def make_summary_plots(self, make_binder=True, n_threads=8):
         try:
-            pstr = f'Making xyplots with {n_threads} threads...'
+            pstr = (f'Making xyplots with {n_threads} threads for '
+                    f'{self.num_corr_max} submoves...')
             if hasattr(self, 'logger'):
                 self.logger.info(pstr)
             else:
                 print(pstr)
+            pbar = tqdm(total=len(self.posids))
+
+            def update_pbar(*a):
+                pbar.update()
+
             with Pool(processes=n_threads) as p:
-                for posid in tqdm(self.posids):
-                    p.apply_async(self.make_summary_plot, args=(posid,))
+                for posid in self.posids:
+                    p.apply_async(self.make_summary_plot, args=(posid,),
+                                  callback=update_pbar)
                 p.close()
                 p.join()
                 # p.join()
