@@ -35,6 +35,7 @@ import psycopg2
 import matplotlib
 # matplotlib.use('pdf')
 import matplotlib.pyplot as plt
+plt.ioff()  # turn off interactive mode
 plt.rcParams.update({'font.family': 'serif',
                      'mathtext.fontset': 'cm'})
 Circle = matplotlib.patches.Circle
@@ -310,7 +311,7 @@ class FPTestData:
                 self.loggers[ptlid].debug(pstr)
             else:
                 print(pstr)  # pass  # print(pstr)
-            plt.close(fig=fig)
+            # plt.close(fig=fig)
 
     def make_summary_plot_binder(self, ptlid, n):
         template = os.path.join(self.dirs[ptlid],
