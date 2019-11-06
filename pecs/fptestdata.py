@@ -216,13 +216,12 @@ class FPTestData:
             def update_pbar(*a):
                 pbar.update()
 
-            # with Pool(processes=n_threads) as p:
-            p = Pool(processes=n_threads)
-            for posid in self.posids:
-                p.apply_async(self.make_summary_plot, args=(posid,),
-                              callback=update_pbar)
-            p.close()
-            p.join()
+            with Pool(processes=n_threads) as p:
+                for posid in self.posids:
+                    p.apply_async(self.make_summary_plot, args=(posid,),
+                                  callback=update_pbar)
+                p.close()
+                p.join()
             if make_binder:
                 pstr = ('Last MP chunk completed. '
                         'Creating xyplot binders...')
@@ -230,14 +229,14 @@ class FPTestData:
                     self.logger.info(pstr)
                 else:
                     print(pstr)
-                # with Pool(processes=n_threads) as p:
-                p = Pool(processes=n_threads)
-                for ptlid, n in product(self.ptlids,
-                                        range(self.num_corr_max+1)):
-                    p.apply_async(self.make_summary_plot_binder,
-                                  args=(ptlid, n))
-                p.close()
-                p.join()
+                with Pool(processes=n_threads) as p:
+                    for ptlid, n in product(self.ptlids,
+                                            range(self.num_corr_max+1)):
+                        print(f'Adding binder job for submove {n} to pool...')
+                        p.apply_async(self.make_summary_plot_binder,
+                                      args=(ptlid, n))
+                    p.close()
+                    p.join()
         except Exception as e:
             print('Exception when making xy plots', e)
             n_threads = int(input('Specify a smaller number of threads: '))
@@ -262,6 +261,7 @@ class FPTestData:
         Tmax_line_y = [offY, offY + rmax * np.sin(np.radians(Tmax))]
         # make one plot for each submove
         for n in range(self.num_corr_max+1):  # one plot for each submove
+            print(f'{posid}, plotting submove {n} of {self.num_corr_max}...')
             fig, ax = plt.subplots(figsize=(10, 8))
             ax.plot(Tmin_line_x, Tmin_line_y, '-', lw=0.5, color='C2',
                     label=r'$\theta_\mathrm{min}$')  # theta min line
