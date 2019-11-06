@@ -264,7 +264,6 @@ class FPTestData:
         Tmax_line_y = [offY, offY + rmax * np.sin(np.radians(Tmax))]
         # make one plot for each submove
         for n in range(self.num_corr_max+1):  # one plot for each submove
-            print(f'{posid}, plotting submove {n} of {self.num_corr_max}...')
             fig, ax = plt.subplots(figsize=(10, 8))
             ax.plot(Tmin_line_x, Tmin_line_y, '-', lw=0.5, color='C2',
                     label=r'$\theta_\mathrm{min}$')  # theta min line
