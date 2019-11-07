@@ -151,10 +151,8 @@ class XYTest(PECS):
                 else:  # use the same given seed for all posids
                     np.random.seed(self.data.test_cfg['shuffle_seed'])
                     np.random.shuffle(tgt)  # same shuffled target list for all
-                    self.data.targets_pos = {posid: tgt
-                                             for posid in self.data.posids}
-            else:  # not shuffle targets
-                self.data.targets_pos[posid] = tgt  # shape (N, 2)
+            self.data.targets_pos = {posid: tgt  # shape (N, 2)
+                                     for posid in self.data.posids}
             self.data.ntargets = tgt.shape[0]  # shape (N_targets, 2)
         else:  # use input target table, see xytest_psf.csv as an exampl
             assert os.path.isfile(path), f'Invald target file path: {path}'
