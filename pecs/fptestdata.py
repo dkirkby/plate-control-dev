@@ -400,7 +400,7 @@ if __name__ == '__main__':
                            dir_name, 'data_dump.pkl'),
               'rb') as handle:
         data = pickle.load(handle)
-    data.make_summary_plots()
+    # data.make_summary_plots()
     if shutil.which('pandoc') is not None:
         data.generate_report()
     data.make_archive()

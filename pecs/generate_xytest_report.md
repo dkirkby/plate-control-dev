@@ -73,7 +73,6 @@ def calculate_grades(data):
                               err_corr_max*1000, err_corr_rms*1000,
                               err_corr_95p_max*1000, err_corr_95p_rms*1000)
         rows.append({'DEVICE_ID': posid,
-                     'PETAL_ID': pos_data['PETAL_ID'][0],
                      'err_0_max': err_0_max,  # max blind move xy error
                      'err_corr_max': err_corr_max,  # max corrective move err
                      'err_corr_rms': err_corr_rms,  # max corrective move rms
@@ -81,6 +80,7 @@ def calculate_grades(data):
                      'err_corr_95p_rms': err_corr_95p_rms,  # best 95 percent
                      'grade': grade})
     data.grade_df = pd.DataFrame(rows).set_index('DEVICE_ID')
+    data.grade_df = data.grade_df.join(data.posdf)
 
 
 def grade_pos(err_0_max, err_corr_max, err_corr_rms,
