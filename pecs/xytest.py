@@ -153,6 +153,8 @@ class XYTest(PECS):
                     np.random.shuffle(tgt)  # same shuffled target list for all
                     self.data.targets_pos = {posid: tgt
                                              for posid in self.data.posids}
+            else:  # not shuffle targets
+                self.data.targets_pos[posid] = tgt  # shape (N, 2)
             self.data.ntargets = tgt.shape[0]  # shape (N_targets, 2)
         else:  # use input target table, see xytest_psf.csv as an exampl
             assert os.path.isfile(path), f'Invald target file path: {path}'
@@ -399,6 +401,7 @@ class XYTest(PECS):
 
 if __name__ == '__main__':
     path = os.path.join(pc.dirs['test_settings'], 'xytest_ptl3_sim.cfg')
+    print(f'Loading test config: {path}')
     xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')  # read cfg
     xytest_name = input('Please name this test: ')
     test = XYTest(xytest_name, xytest_cfg)
