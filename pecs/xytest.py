@@ -151,12 +151,13 @@ class XYTest(PECS):
                 else:  # use the same given seed for all posids
                     np.random.seed(self.data.test_cfg['shuffle_seed'])
                     np.random.shuffle(tgt)  # same shuffled target list for all
-            self.data.targets_pos = {posid: tgt  # shape (N, 2)
-                                     for posid in self.data.posids}
+            self.data.targets_pos = self.data.targets = \
+                {posid: tgt for posid in self.data.posids}  # shape (N, 2)
             self.data.ntargets = tgt.shape[0]  # shape (N_targets, 2)
         else:  # use input target table, see xytest_psf.csv as an exampl
             assert os.path.isfile(path), f'Invald target file path: {path}'
-            self.data.targets = {}
+            self.data.targets = path
+            self.data.targets_pos = {}
             df = pd.read_csv(path, index_col='target_no')
             self.data.ntargets = len(df)  # set number of targets
             for ptlid in self.data.ptlids:  # set targets for each positioner
@@ -254,7 +255,7 @@ class XYTest(PECS):
         posids = self.data.posids_ptl[ptlid]  # all records obey this order
         ptl = self.ptls[ptlid]
         if n == 0:  # blind move, issue cmd in obsXY for easy check with FVC
-            self.logger.info(f'Setting up target {i} in poslocXY...')
+            self.logger.info(f'Setting up targets {i} in poslocXY...')
             movetype, cmd = 'blind', 'poslocXY'
             for posid in tqdm(posids):  # write targets to move df
                 tgt = self.data.targets_pos[posid][i, :]  # two elements

@@ -113,6 +113,8 @@ with open(path_input, "rb") as h:
 # h = open(path_input, "rb")
 # data = pickle.load(h)
 # h.close()
+targets = getattr(data, 'targets', data.targets_pos[list(data.targets_pos)[0]])
+
 ```
 
 +------------------------+---------------------------------------------------------------------------------------------------------------+
@@ -134,7 +136,7 @@ with open(path_input, "rb") as h:
 | **Max radius of targets**\          | ``<%=data.test_cfg['targ_max_radius']%> mm``\  |
 | **Number of targets**\              | ``<%=data.ntargets%>``\                        |
 +------------------------+-------------------------------------------------------------+
-| **Grid target points (poslocXY)**\  | ``<%=repr([list(t) for t in data.targets])%>`` |
+| **Grid target points**\             | ``<%=repr([list(t) for t in targets])%>`` |
 +-------------------------------------+------------------------------------------------+
 
 
