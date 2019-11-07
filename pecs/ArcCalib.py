@@ -6,7 +6,7 @@ Currently only runs one Petal at a time, awaiting a petalMan proxy.
 import os
 import posconstants as pc
 from pecs import PECS
-
+import time
 
 class ArcCalib(PECS):
     '''
@@ -59,16 +59,20 @@ class ArcCalib(PECS):
                            f'{len(req_list_T)}')
             T_data.append(self.move_measure(req, match_radius=match_radius))
             if self.allow_pause and i+1 < len(req_list_T):
-                input('Paused for heat load monitoring, '
-                      'press enter to continue: ')
+                print('Paused for heat load, waiting 70 sec.')
+                time.sleep(70)
+                #input('Paused for heat load monitoring, '
+                #      'press enter to continue: ')
         P_data = []
         for i, req in enumerate(req_list_P):
             self.printfunc(f'Measuring phi arc point {i+1} of '
                            f'{len(req_list_P)}')
             P_data.append(self.move_measure(req, match_radius=match_radius))
             if self.allow_pause and i+1 < len(req_list_T):
-                input('Paused for heat load monitoring, '
-                      'press enter to continue: ')
+                print('Paused for heat load, waiting 70 sec.')
+                time.sleep(70)
+                #input('Paused for heat load monitoring, '
+                #      'press enter to continue: ')
         updates = self.ptl.calibrate_from_arc_data(T_data, P_data,
                                                    auto_update=auto_update)
         updates['auto_update'] = auto_update

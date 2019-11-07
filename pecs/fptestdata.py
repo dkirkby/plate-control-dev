@@ -35,7 +35,7 @@ import psycopg2
 import matplotlib
 # matplotlib.use('pdf')
 import matplotlib.pyplot as plt
-plt.ioff()  # turn off interactive mode
+# plt.ioff()  # turn off interactive mode, doesn't work in matplotlib2
 plt.rcParams.update({'font.family': 'serif',
                      'mathtext.fontset': 'cm'})
 Circle = matplotlib.patches.Circle
@@ -204,7 +204,7 @@ class FPTestData:
                 conn).sort_values('time_recorded')
             self.temp_query = query
 
-    def make_summary_plots(self, make_binder=True, n_threads=16, mp=True):
+    def make_summary_plots(self, make_binder=True, n_threads=32, mp=True):
         try:
             pstr = (f'Making xyplots with {n_threads} threads for '
                     f'submoves {list(range(self.num_corr_max+1))}...')
@@ -306,7 +306,7 @@ class FPTestData:
                 self.loggers[ptlid].debug(pstr)
             else:
                 pass  # print(pstr)
-            # plt.close(fig=fig)
+            plt.close(fig)
 
     def make_summary_plot_binder(self, ptlid, n):
         template = os.path.join(self.dirs[ptlid],
@@ -395,7 +395,7 @@ class FPTestData:
 if __name__ == '__main__':
 
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    dir_name = '20191101T131705-0700-test'
+    dir_name = '20191107T114725-0700-petal0_short'
     with open(os.path.join(pc.dirs['xytest_data'],
                            dir_name, 'data_dump.pkl'),
               'rb') as handle:

@@ -68,4 +68,4 @@ class Rehome(PECS):
 
 
 if __name__ == '__main__':
-    Rehome(axis='theta_only', interactive=True)  # theta_only, phi_only, or both
+    Rehome(axis='both', interactive=True)  # theta_only, phi_only, or both
