@@ -17,7 +17,7 @@ device_loc_ids = 'all' # make the selection here
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 pos_param_sequence_id = 'one real petal'
-move_request_sequence_id = '04000-04099'
+move_request_sequence_id = '04000-04049'
 
 # Other ids
 fidids = {}
