@@ -519,3 +519,12 @@ if __name__ == '__main__':
     print(f'obsXY = {obsXY.T}')
     flatXY = trans._QS_to_flatXY(QS)
     print(f'flatXY = {flatXY.T}')
+    
+    # QS obsXY consistency check
+    ptlXYZ = np.array([346.797988, 194.710169, -17.737838]).reshape(3, 1)
+    QS = trans.ptlXYZ_to_QS(ptlXYZ)
+    print(f'QS = {QS.T}')
+    obsXY1 = trans.ptlXYZ_to_obsXY(ptlXYZ)
+    print(f'obsXY1 = {obsXY1.T}')
+    obsXY2 = trans.QS_to_obsXY(QS)
+    print(f'obsXY2 = {obsXY2.T}')
