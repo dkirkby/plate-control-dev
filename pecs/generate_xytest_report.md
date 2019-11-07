@@ -55,7 +55,7 @@ def calculate_grades(data):
         for i in range(data.num_corr_max+1):
             mask = pos_data[f'pos_flag_{i}'] != 4
             pos_data.loc[mask, f'err_xy_{i}'] = np.nan
-        err_0_max = np.max(pos_data['err_xy_0'])  # max blind error, skip nan
+        err_0_max = np.max(pos_data['err_xy_0']) * 1000  # max blind error, μm
         err_corr = pos_data[  # select corrective moves only
             [f'err_xy_{i}' for i in range(1, data.num_corr_max+1)]].values
         err_corr = err_corr[~np.isnan(err_corr)]  # filter out nan
@@ -63,24 +63,28 @@ def calculate_grades(data):
             err_corr_max = err_corr_rms = np.nan
             grade = 'N/A'
         else:
-            err_corr_max = np.max(err_corr)
-            err_corr_rms = np.rms(err_corr)
-            # take reduced sample at 95 percentile, excluding 5% worst pots
+            err_corr_max = np.max(err_corr) * 1000  # μm
+            err_corr_rms = np.rms(err_corr) * 1000  # μm
+            # take reduced sample at 95 percentile, excluding 5% worst points
             err_corr_95p = err_corr[err_corr <= np.percentile(err_corr, 95)]
-            err_corr_95p_max = np.max(err_corr_95p)
-            grade = grade_pos(err_0_max*1000, err_corr_max*1000,
-                              err_corr_rms*1000, err_corr_95p_max*1000)
+            err_corr_95p_max = np.max(err_corr_95p) * 1000  # μm
+            err_corr_95p_rms = np.rms(err_corr_95p) * 1000  # μm
+            grade = grade_pos(err_0_max*1000,
+                              err_corr_max*1000, err_corr_rms*1000,
+                              err_corr_95p_max*1000, err_corr_95p_rms*1000)
         rows.append({'DEVICE_ID': posid,
                      'PETAL_ID': pos_data['PETAL_ID'][0],
                      'err_0_max': err_0_max,  # max blind move xy error
                      'err_corr_max': err_corr_max,  # max corrective move err
-                     'err_corr_rms': err_corr_rms,
+                     'err_corr_rms': err_corr_rms,  # max corrective move rms
+                     'err_corr_95p_max': err_corr_95p_max,  # best 95 percent
+                     'err_corr_95p_rms': err_corr_95p_rms,  # best 95 percent
                      'grade': grade})
     data.grade_df = pd.DataFrame(rows).set_index('DEVICE_ID')
 
 
 def grade_pos(err_0_max, err_corr_max, err_corr_rms,
-              err_corr_95p_max):
+              err_corr_95p_max, err_corr_95p_rms):
     '''these criteria were set by UMich lab tests, all in microns
     '''
     if np.any(np.isnan([err_0_max, err_corr_max, err_corr_rms,
@@ -89,13 +93,13 @@ def grade_pos(err_0_max, err_corr_max, err_corr_rms,
     if (err_0_max <= 100) & (err_corr_max <= 15) & (err_corr_rms <= 5):
         grade = grades[1]
     elif ((err_0_max <= 250) & (err_corr_max <= 25) & (err_corr_95p_max <= 15)
-          & (err_corr_rms <= 10) & (err_corr_rms <= 5)):
+          & (err_corr_rms <= 10) & (err_corr_95p_rms <= 5)):
         grade = grades[2]
     elif ((err_0_max <= 250) & (err_corr_max <= 50) & (err_corr_95p_max <= 25)
-          & (err_corr_rms <= 20) & (err_corr_rms <= 10)):
+          & (err_corr_rms <= 20) & (err_corr_95p_rms <= 10)):
         grade = grades[3]
     elif ((err_0_max <= 500) & (err_corr_max <= 50) & (err_corr_95p_max <= 25)
-          & (err_corr_rms <= 20) & (err_corr_rms <= 10)):
+          & (err_corr_rms <= 20) & (err_corr_95p_rms <= 10)):
         grade = grades[4]
     else:
         grade = grades[5]
@@ -139,9 +143,13 @@ targets = getattr(data, 'targets', data.targets_pos[list(data.targets_pos)[0]])
 | **Grid target points**\             | ``<%=repr([list(t) for t in targets])%>`` |
 +-------------------------------------+------------------------------------------------+
 
-
 ```python, fig=True, width='12 cm', echo=False
 calculate_grades(data)
+data.grade_df.to_pickle(os.path.join(data.dir, 'grade_df.pkl.gz'),
+                        compression='gzip')
+data.grade_df.to_csv(os.path.join(data.dir, 'grade_df.csv'))
+with open(os.path.join(data.dir, 'data_dump.pkl'), 'wb') as handle:
+    pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
 ptlid = data.ptlids[0]  # turn the following into a loop in future version
 grades_ptl = data.grade_df[data.grade_df['PETAL_ID'] == ptlid]
 masks = []
