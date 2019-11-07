@@ -1,6 +1,6 @@
 % DESI Positioner Accuracy Test Report
 % Focal Plane Team
-% 2019-11-01
+% 2019-11-07 (report template last revised)
 
 ```python, echo=False, results='hidden'
 # -*- coding: utf-8 -*-
@@ -23,7 +23,7 @@ sys.path.append(os.path.abspath('.'))
 idx = pd.IndexSlice
 np.rms = lambda x: np.sqrt(np.mean(np.square(x)))
 np.nanrms = lambda x: np.sqrt(np.nanmean(np.square(x)))
-grades = ['N/A', 'A', 'B', 'C', 'D', 'F']
+grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
 
 #def calculate_percentiles(data, individual_ptl=True):
 #    # grade positioners by comparing to performance of all peers tested
@@ -88,20 +88,20 @@ def grade_pos(err_0_max, err_corr_max, err_corr_rms,
     '''
     if np.any(np.isnan([err_0_max, err_corr_max, err_corr_rms,
               err_corr_95p_max])):
-        return grades[0]
+        return grades[-1]
     if (err_0_max <= 100) & (err_corr_max <= 15) & (err_corr_rms <= 5):
+        grade = grades[0]
+    elif ((err_0_max <= 250) & (err_corr_max <= 25) & (err_corr_rms <= 10)
+          & (err_corr_95p_max <= 15) & (err_corr_95p_rms <= 5)):
         grade = grades[1]
-    elif ((err_0_max <= 250) & (err_corr_max <= 25) & (err_corr_95p_max <= 15)
-          & (err_corr_rms <= 10) & (err_corr_95p_rms <= 5)):
+    elif ((err_0_max <= 250) & (err_corr_max <= 50) & (err_corr_rms <= 20)
+          & (err_corr_95p_max <= 25) & (err_corr_95p_rms <= 10)):
         grade = grades[2]
-    elif ((err_0_max <= 250) & (err_corr_max <= 50) & (err_corr_95p_max <= 25)
-          & (err_corr_rms <= 20) & (err_corr_95p_rms <= 10)):
+    elif ((err_0_max <= 500) & (err_corr_max <= 50) & (err_corr_rms <= 20)
+          & (err_corr_95p_max <= 25) & (err_corr_95p_rms <= 10)):
         grade = grades[3]
-    elif ((err_0_max <= 500) & (err_corr_max <= 50) & (err_corr_95p_max <= 25)
-          & (err_corr_rms <= 20) & (err_corr_95p_rms <= 10)):
-        grade = grades[4]
     else:
-        grade = grades[5]
+        grade = grades[4]
     return grade
 
 
@@ -149,21 +149,55 @@ data.grade_df.to_pickle(os.path.join(data.dir, 'grade_df.pkl.gz'),
 data.grade_df.to_csv(os.path.join(data.dir, 'grade_df.csv'))
 with open(os.path.join(data.dir, 'data_dump.pkl'), 'wb') as handle:
     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
-ptlid = data.ptlids[0]  # turn the following into a loop in future version
+```
+
+# Temt Temperature
+
+temperature time plot here
+
+# Test Results
+
+```python, fig=True, width='12 cm', echo=False, results='raw'
+
+def plot_grade_hist(ptlid=None):
+    if ptlid is None:  # show all positioners tested
+        grade_counts = data.grade_df['grade'].value_counts()
+        title = (f'Grade Distribution of all {len(data.posids)} '
+                 f'positioners tested')
+    else:
+        grade_counts = data.grade_df['grade'].value_counts()
+        title = ('Grade Distribution of {} positioners of PTL'
+                 + f'{ptlid}'.zfill(2))
+    for grade in grades:
+        if grade not in grade_counts.index:  # no count, set to zero
+            grade_counts[grade] = 0
+    ax = grade_counts.reindex(grades).plot(kind='bar', figsize=(6, 3))
+    ax.set_xlabel('Postiioner Grade')
+    ax.set_ylabel('Count')
+    ax.set_title(title)
+    for i, grade in enumerate(grades):  # add annotations
+        ax.annotate(f'{grade_counts['grade']}',
+                    xycoords='figure fraction', xy=(1/6, 0.99),
+                    textcoords='offset points, xytext=(0, 3),
+                    ha='center', va='bottom')
+
+# show overall statistics across all petals
+plot_grade_hist()
+
+# show statistics for each petal
+
+ptlid = data.ptlids[0]
+
+# turn the following into a loop in future version
+print('### PTL<%=str(ptlid).zfill(2)%>')
+print(``<%=len(data.posids_ptl[ptlid])%>`` positioners tested total)
+plot_grade_hist(petal_id=ptlid)
 grades_ptl = data.grade_df[data.grade_df['PETAL_ID'] == ptlid]
 masks = []
 for grade in grades:
     masks.append(grades_ptl['grade'] == grade)
+
 ```
-
-# Test Results
-
-### PTL<%=str(ptlid).zfill(2)%>
-``<%=len(data.posids_ptl[ptlid])%>`` positioners tested total
-
-grade histogram here
-
-temperature time plot here
 
 ##### Grade A: ``<%=masks[1].sum()%>`` positioners
 ``<%=sorted(data.grade_df[masks[1]].index)%>``
