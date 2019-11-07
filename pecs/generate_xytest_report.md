@@ -69,9 +69,9 @@ def calculate_grades(data):
             err_corr_95p = err_corr[err_corr <= np.percentile(err_corr, 95)]
             err_corr_95p_max = np.max(err_corr_95p) * 1000  # μm
             err_corr_95p_rms = np.rms(err_corr_95p) * 1000  # μm
-            grade = grade_pos(err_0_max*1000,
-                              err_corr_max*1000, err_corr_rms*1000,
-                              err_corr_95p_max*1000, err_corr_95p_rms*1000)
+            grade = grade_pos(err_0_max,
+                              err_corr_max, err_corr_rms,
+                              err_corr_95p_max, err_corr_95p_rms)
         rows.append({'DEVICE_ID': posid,
                      'err_0_max': err_0_max,  # max blind move xy error
                      'err_corr_max': err_corr_max,  # max corrective move err
@@ -79,8 +79,7 @@ def calculate_grades(data):
                      'err_corr_95p_max': err_corr_95p_max,  # best 95 percent
                      'err_corr_95p_rms': err_corr_95p_rms,  # best 95 percent
                      'grade': grade})
-    data.grade_df = pd.DataFrame(rows).set_index('DEVICE_ID')
-    data.grade_df = data.grade_df.join(data.posdf)
+    data.grade_df = pd.DataFrame(rows).set_index('DEVICE_ID').join(data.posdf)
 
 
 def grade_pos(err_0_max, err_corr_max, err_corr_rms,
