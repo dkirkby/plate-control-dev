@@ -142,7 +142,7 @@ targets = getattr(data, 'targets', data.targets_pos[list(data.targets_pos)[0]])
 | **Grid target points**\             | ``<%=repr([list(t) for t in targets])%>`` |
 +-------------------------------------+------------------------------------------------+
 
-```python, fig=True, width='12 cm', echo=False
+```python, echo=False
 calculate_grades(data)
 data.grade_df.to_pickle(os.path.join(data.dir, 'grade_df.pkl.gz'),
                         compression='gzip')
@@ -157,7 +157,7 @@ temperature time plot here
 
 # Test Results
 
-```python, fig=True, width='12 cm', echo=False, results='raw'
+```python, echo=False
 
 def plot_grade_hist(ptlid=None):
     if ptlid is None:  # show all positioners tested
@@ -176,58 +176,13 @@ def plot_grade_hist(ptlid=None):
     ax.set_ylabel('Count')
     ax.set_title(title)
     for i, grade in enumerate(grades):  # add annotations
-        ax.annotate(f'{grade_counts['grade']}',
+        ax.annotate(f'{grade_counts[grade]}',
                     xycoords='figure fraction', xy=(1/6, 0.99),
-                    textcoords='offset points, xytext=(0, 3),
+                    textcoords='offset points', xytext=(0, 3),
                     ha='center', va='bottom')
 
 # show overall statistics across all petals
 plot_grade_hist()
 
-# show statistics for each petal
-
-ptlid = data.ptlids[0]
-
-# turn the following into a loop in future version
-print('### PTL<%=str(ptlid).zfill(2)%>')
-print(``<%=len(data.posids_ptl[ptlid])%>`` positioners tested total)
-plot_grade_hist(petal_id=ptlid)
-grades_ptl = data.grade_df[data.grade_df['PETAL_ID'] == ptlid]
-masks = []
-for grade in grades:
-    masks.append(grades_ptl['grade'] == grade)
-
 ```
 
-##### Grade A: ``<%=masks[1].sum()%>`` positioners
-``<%=sorted(data.grade_df[masks[1]].index)%>``
-
-##### Grade B: ``<%=masks[2].sum()%>`` positioners
-``<%=sorted(data.grade_df[masks[2]].index)%>``
-
-##### Grade C: ``<%=masks[3].sum()%>`` positioners
-``<%=sorted(data.grade_df[masks[3]].index)%>``
-
-##### Grade D: ``<%=masks[4].sum()%>`` positioners
-``<%=sorted(data.grade_df[masks[4]].index)%>``
-
-##### Grade F: ``<%=masks[5].sum()%>`` positioners
-``<%=sorted(data.grade_df[masks[5]].index)%>``
-
-##### Grade N/A: ``<%=masks[0].sum()%>`` positioners
-``<%=sorted(data.grade_df[masks[0]].index)%>``
-
-
-```python, fig=True, width='12 cm', echo=False
-if data.test_cfg['report_temperature']:
-    # turn this into time plots, with max, min, mean as floating texts
-    print('max, min, median posfid temperatures: ',
-          np.max(data.temp_query['posfid_temps_max']),
-          np.min(data.temp_query['posfid_temps_mean']),
-          np.mean(data.temp_query['posfid_temps_median']))
-    print('max fiducial temperatures:',
-          np.max(data.temp_query['fid_temps_max']))
-```
-
-#### Complete list of positioners tested
-``<%=sorted(data.posids_ptl[ptlid])%>``

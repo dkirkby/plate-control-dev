@@ -198,10 +198,10 @@ class FPTestData:
                                     database="desi_dev",
                                     user="desi_reader", password="reader")
             query = pd.read_sql_query(  # get temperature data
-                f"""SELECT posfid_temps, time, pcid FROM pc_telemetry_can_all
+                f"""SELECT * FROM pc_telemetry_can_all
                     WHERE time_recorded >= '{self.start_time}'
                     AND time_recorded < '{self.end_time}'""",
-                conn).sort_values('time_recorded')
+                conn).sort_values('time_recorded')  # posfid_temps, time, pcid
             self.temp_query = query
 
     def make_summary_plots(self, make_binder=True, n_threads=32, mp=True):
@@ -367,7 +367,58 @@ class FPTestData:
         with open(os.path.join(pc.dirs['xytest_data'], 'pweave_test_src.txt'),
                   'w') as h:
             h.write(os.path.join(self.dir, 'data_dump.pkl'))
-        subprocess.call(['pweave', 'generate_xytest_report.md',
+        # add sections for each petal id to markdown document
+        shutil.copyfile('xytest_report_master.md', 'xytest_report.md')
+        petal_section = '''
+        ### PTL<%=str({0}).zfill(2)%>
+        ``<%=len(data.posids_ptl[{0}])%>`` positioners tested total
+
+        ```python, echo=False
+        # turn the following into a loop in future version
+        plot_grade_hist(ptlid={0})
+        grades_ptl = data.grade_df[data.grade_df['PETAL_ID'] == {0}]
+        masks = []
+        for grade in grades:
+            masks.append(grades_ptl['grade'] == grade)
+        ```
+
+        ##### Grade A: ``<%=masks[1].sum()%>`` positioners
+        ``<%=sorted(data.grade_df[masks[0]].index)%>``
+
+        ##### Grade B: ``<%=masks[2].sum()%>`` positioners
+        ``<%=sorted(data.grade_df[masks[1]].index)%>``
+
+        ##### Grade C: ``<%=masks[3].sum()%>`` positioners
+        ``<%=sorted(data.grade_df[masks[2]].index)%>``
+
+        ##### Grade D: ``<%=masks[4].sum()%>`` positioners
+        ``<%=sorted(data.grade_df[masks[3]].index)%>``
+
+        ##### Grade F: ``<%=masks[5].sum()%>`` positioners
+        ``<%=sorted(data.grade_df[masks[4]].index)%>``
+
+        ##### Grade N/A: ``<%=masks[0].sum()%>`` positioners
+        ``<%=sorted(data.grade_df[masks[-1]].index)%>``
+
+        ```python, fig=True, width='12 cm', echo=False
+        if data.test_cfg['report_temperature']:
+            # turn this into time plots, with max/min/mean as floating txt
+            print('max, min, median posfid temperatures: ',
+                  np.max(data.temp_query['posfid_temps_max']),
+                  np.min(data.temp_query['posfid_temps_mean']),
+                  np.mean(data.temp_query['posfid_temps_median']))
+        ```
+
+        '''
+        posid_section = '''
+        #### Complete list of positioners tested
+        ``<%=sorted(data.posids_ptl[ptlid])%>``
+        '''
+        with open('xytest_report.md', 'a+') as h:
+            for ptlid in self.ptlids:
+                h.write(petal_section.format(ptlid))
+                h.write(posid_section)
+        subprocess.call(['pweave', 'xytest_report.md',
                          '-f', 'pandoc2html', '-o', path_output])
 
     def make_archive(self):

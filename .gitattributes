@@ -14,7 +14,6 @@ pecs/batch_seed.py -text
 pecs/batch_seed_1p.py -text
 pecs/fptestdata.py -text
 pecs/fvc_sim.py -text
-pecs/generate_xytest_report.md -text
 pecs/loop_phi_moves.py -text
 pecs/pecs.py -text
 pecs/pecs_local.cfg -text
@@ -25,6 +24,7 @@ pecs/seed_armlengths.py -text
 pecs/seed_offsets_tp.py -text
 pecs/seed_offsets_xy.py -text
 pecs/xytest.py -text
+pecs/xytest_report_master.md -text
 petal/collision_lookup_generator.py -text
 petal/collision_lookup_generator_subset.py -text
 petal/focal_surface_lookup.csv -text
