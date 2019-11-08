@@ -123,7 +123,7 @@ class XYTest(PECS):
             ret2 = (self.ptls[pcid].get_posmodel_prop(props, posids)
                     .set_index('DEVICE_ID'))
             self.loggers[pcid].debug(f'PosModel properties read:\n'
-                                      f'{ret2.to_string()}')
+                                     f'{ret2.to_string()}')
             dfs.append(l1.join(ret1).join(ret2))
         self.data.posdf = pd.concat(dfs)
 
@@ -151,8 +151,8 @@ class XYTest(PECS):
                 else:  # use the same given seed for all posids
                     np.random.seed(self.data.test_cfg['shuffle_seed'])
                     np.random.shuffle(tgt)  # same shuffled target list for all
-            self.data.targets_pos = self.data.targets = \
-                {posid: tgt for posid in self.data.posids}  # shape (N, 2)
+            self.data.targets = tgt
+            self.data.targets_pos = {posid: tgt for posid in self.data.posids}
             self.data.ntargets = tgt.shape[0]  # shape (N_targets, 2)
         else:  # use input target table, see xytest_psf.csv as an exampl
             assert os.path.isfile(path), f'Invald target file path: {path}'
@@ -285,6 +285,7 @@ class XYTest(PECS):
                             'X2': tgt[:, 1],  # shape (N_posids, 1)
                             'LOG_NOTE': note})
         self.loggers[pcid].debug(f'Move requests:\n{req.to_string()}')
+        self.loggers[pcid].info(f'Moving positioners...')
         ptl.prepare_move(req, anticollision=self.data.anticollision)
         expected_QS = ptl.execute_move(reset_flags=False, return_coord='QS')
         self.loggers[pcid].debug('execute_move() returns expected QS:\n'

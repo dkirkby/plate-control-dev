@@ -114,9 +114,6 @@ with open(os.path.join(pc.dirs['xytest_data'], 'pweave_test_src.txt'),
 with open(path_input, "rb") as h:
     data = pickle.load(h)
 
-# h = open(path_input, "rb")
-# data = pickle.load(h)
-# h.close()
 targets = getattr(data, 'targets', data.targets_pos[list(data.targets_pos)[0]])
 
 ```
@@ -140,7 +137,7 @@ targets = getattr(data, 'targets', data.targets_pos[list(data.targets_pos)[0]])
 | **Max radius of targets**\          | ``<%=data.test_cfg['targ_max_radius']%> mm``\  |
 | **Number of targets**\              | ``<%=data.ntargets%>``\                        |
 +------------------------+-------------------------------------------------------------+
-| **Grid target points**\             | ``<%=repr([list(t) for t in targets])%>`` |
+| **Target points**\                  | ``<%=repr([list(t) for t in targets])%>`` |
 +-------------------------------------+------------------------------------------------+
 
 # Temperature
