@@ -77,7 +77,7 @@ class FPTestData:
         self.loggers = {}
         for pcid in self.pcids:
             self.log_paths[pcid] = os.path.join(self.dirs[pcid],
-                                                 f'pc{pcid:02}_realtime.log')
+                                                f'pc{pcid:02}_realtime.log')
             # ensure save directory and log file exist if they don't already
             os.makedirs(self.dirs[pcid], exist_ok=True)
             open(self.log_paths[pcid], 'a').close()
@@ -210,7 +210,6 @@ class FPTestData:
                   f' from DB between {self.start_time} and {self.end_time}')
             self.db_telemetry_available = True
         except Exception:
-            print('DB telemetry query unavailable on this platform.')
             self.db_telemetry_available = False
 
     def make_summary_plots(self, make_binder=True, n_threads=32, mp=True):
@@ -240,14 +239,14 @@ class FPTestData:
                 if mp:
                     with Pool(processes=n_threads) as p:
                         for pcid, n in product(self.pcids,
-                                                range(self.num_corr_max+1)):
+                                               range(self.num_corr_max+1)):
                             p.apply_async(self.make_summary_plot_binder,
                                           args=(pcid, n))
                         p.close()
                         p.join()
                 else:
                     for pcid, n in tqdm(product(self.pcids,
-                                                 range(self.num_corr_max+1))):
+                                                range(self.num_corr_max+1))):
                         self.make_summary_plot_binder(pcid, n)
         except Exception as e:
             print('Exception when making xy plots', e)
@@ -360,7 +359,7 @@ class FPTestData:
                 self.logs[pcid].seek(0)
                 shutil.copyfileobj(self.logs[pcid], handle)  # save logs
             self.loggers[pcid].info('Petal move data written to: '
-                                     f'{self.dirs[pcid]}')
+                                    f'{self.dirs[pcid]}')
 
     def dump_as_one_pickle(self):
         del self.logger
@@ -384,7 +383,7 @@ class FPTestData:
 
 ```python, echo=False
 # turn the following into a loop in future version
-plot_grade_hist(pcid={0})
+grade_counts = plot_grade_hist(pcid={0})
 grades_pc = data.grade_df[data.grade_df['PCID'] == {0}]
 posids_grade = {{}}
 for grade in grades:
@@ -392,28 +391,24 @@ for grade in grades:
     posids_grade[grade] = sorted(data.grade_df[mask].index)
 ```
 
-##### Grade A: ``<%=len(posids_grade['A'])%>`` positioners
+##### Grade A: ``<%=grade_counts['A']%>`` positioners
 ``<%=posids_grade['A']%>``
 
-##### Grade B: ``<%=len(posids_grade['B'])%>`` positioners
+##### Grade B: ``<%=grade_counts['B']%>`` positioners
 ``<%=posids_grade['B']%>``
 
-##### Grade C: ``<%=len(posids_grade['C'])%>`` positioners
+##### Grade C: ``<%=grade_counts['C']%>`` positioners
 ``<%=posids_grade['C']%>``
 
-##### Grade D: ``<%=len(posids_grade['D'])%>`` positioners
+##### Grade D: ``<%=grade_counts['D']%>`` positioners
 ``<%=posids_grade['D']%>``
 
-##### Grade F: ``<%=len(posids_grade['F'])%>`` positioners
+##### Grade F: ``<%=grade_counts['F']%>`` positioners
 ``<%=posids_grade['F']%>``
 
-##### Grade N/A: ``<%=len(posids_grade['N/A'])%>`` positioners
+##### Grade N/A: ``<%=grade_counts['N/A']%>`` positioners
 ``<%=posids_grade['N/A']%>``
 
-```python, fig=True, width='12 cm', echo=False
-
-
-```
         '''
         posid_section = '''
 #### Complete list of positioners tested for <%=len(data.pcids)%> petals

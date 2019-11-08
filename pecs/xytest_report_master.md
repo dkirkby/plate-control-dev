@@ -116,6 +116,14 @@ with open(path_input, "rb") as h:
 
 targets = getattr(data, 'targets', data.targets_pos[list(data.targets_pos)[0]])
 
+data.read_telemetry()
+calculate_grades(data)
+data.grade_df.to_pickle(os.path.join(data.dir, 'grade_df.pkl.gz'),
+                        compression='gzip')
+data.grade_df.to_csv(os.path.join(data.dir, 'grade_df.csv'))
+with open(os.path.join(data.dir, 'data_dump.pkl'), 'wb') as handle:
+    pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
 ```
 
 +------------------------+---------------------------------------------------------------------------------------------------------------+
@@ -144,24 +152,20 @@ targets = getattr(data, 'targets', data.targets_pos[list(data.targets_pos)[0]])
 
 ```python, echo=False, results='raw'
 
-data.read_telemetry()
-calculate_grades(data)
-data.grade_df.to_pickle(os.path.join(data.dir, 'grade_df.pkl.gz'),
-                        compression='gzip')
-data.grade_df.to_csv(os.path.join(data.dir, 'grade_df.csv'))
-with open(os.path.join(data.dir, 'data_dump.pkl'), 'wb') as handle:
-    pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    
-# keyed by petal id
-
 def plot_posfid_temp(pcid=None):
 
     def plot_petal(pcid, max=True, mean=True, median=True):
         query = data.telemetry[data.telemetry['pcid'] == pcid]
         if max:
             ax.plot(query['time'], query['posfid_temps_max'],
-                    label=f'PC{pcid:02}')
-            
+                    label=f'PC{pcid:02} max temp')
+        if mean:
+            ax.plot(query['time'], query['posfid_temps_mean'],
+                    label=f'PC{pcid:02} mean temp')
+        if median:
+            ax.plot(query['time'], query['posfid_temps_median'],
+                    label=f'PC{pcid:02} median temp')
+
     fig, ax = plt.subplots()
     if pcid is None:  # loop through all petals, plot max only
         for pcid in data.pcids:
@@ -174,16 +178,22 @@ def plot_posfid_temp(pcid=None):
     ax.xaxis.set_tick_params(rotation=45)
     ax.set_xlabel('Time (UTC)')
     ax.set_ylabel('Temperature (°C)')
+    suffix = '' if pcid is None else f'_pc{pcid:2}'
+    fig.savefig(os.path.join(data.dir, 'figures',
+                         f'posfid_temp{suffix}.pdf'),
+            bbox_inches='tight')
 
 # plot overall temperatures for all petals
 if data.db_telemetry_available:
     pd.plotting.register_matplotlib_converters()
     plot_posfid_temp()
+else:
+    print('DB telemetry query unavailable on this platform.')
 ```
 
 # Results
 
-```python, echo=False
+```python, echo=False, results='hidden'
 
 def plot_grade_hist(pcid=None):
     if pcid is None:  # show all positioners tested
@@ -198,7 +208,7 @@ def plot_grade_hist(pcid=None):
     for grade in grades:
         if grade not in grade_counts.index:  # no count, set to zero
             grade_counts[grade] = 0
-    
+
     fig, ax = plt.subplots()
     grade_counts.reindex(grades).plot(
         ax=ax, kind='bar', figsize=(6, 3), title=title, rot=0,
@@ -212,6 +222,11 @@ def plot_grade_hist(pcid=None):
                     xytext=(0, 3),  # 3 points vertical offset
                     textcoords="offset points",
                     ha='center', va='bottom')
+    suffix = '' if pcid is None else f'_pc{pcid:2}'
+    fig.savefig(os.path.join(data.dir, 'figures',
+                             f'grade_distribution{suffix}.pdf'),
+                bbox_inches='tight')
+    return grade_counts
 
 # show overall statistics across all petals
 plot_grade_hist()
