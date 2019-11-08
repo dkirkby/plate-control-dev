@@ -217,8 +217,10 @@ class FPTestData:
             self.db_telemetry_available = False
 
     def make_summary_plots(self, n_threads_max=32, make_binder=True, mp=True):
-        n_threads = min(n_threads_max, multiprocessing.cpu_count())
-        pstr = (f'Making xyplots with {n_threads} threads for '
+
+        n_threads = min(n_threads_max, 2*multiprocessing.cpu_count())
+        pstr = (f'Making summary xyplots with {n_threads} threads on '
+                f'{multiprocessing.cpu_count()} cores for '
                 f'submoves {list(range(self.num_corr_max+1))}...')
         if hasattr(self, 'logger'):
             self.logger.info(pstr)
@@ -471,13 +473,12 @@ for grade in grades:
 if __name__ == '__main__':
 
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    dir_name = '20191108T140314-0800-pcid'
+    dir_name = '20191108T151933-0800-pcid'
     with open(os.path.join(pc.dirs['xytest_data'],
                            dir_name, 'data_dump.pkl'),
               'rb') as handle:
         data = pickle.load(handle)
-    data._init_loggers()
-    data.make_summary_plots()
+    # data.make_summary_plots()
     if shutil.which('pandoc') is not None:
         data.generate_report()
     # data.make_archive()

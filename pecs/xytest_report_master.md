@@ -62,6 +62,7 @@ def calculate_grades(data):
         err_corr = err_corr[~np.isnan(err_corr)]  # filter out nan
         if len(err_corr) == 0:
             err_corr_max = err_corr_rms = np.nan
+            err_corr_95p_max = err_corr_95p_rms = np.nan
             grade = 'N/A'
         else:
             err_corr_max = np.max(err_corr) * 1000  # μm
@@ -189,6 +190,7 @@ if data.db_telemetry_available:
     plot_posfid_temp()
 else:
     print('DB telemetry query unavailable on this platform\n')
+
 ```
 
 # Results
