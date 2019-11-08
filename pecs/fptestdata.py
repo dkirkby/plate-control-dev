@@ -27,6 +27,7 @@ import shutil
 import subprocess
 import tarfile
 import pickle
+from datetime import timezone
 import numpy as np
 import pandas as pd
 import posconstants as pc
@@ -202,11 +203,11 @@ class FPTestData:
                                     user="desi_reader", password="reader")
             self.telemetry = pd.read_sql_query(  # get temperature data
                 f"""SELECT * FROM pc_telemetry_can_all
-                    WHERE time >= '{self.start_time}'
-                    AND time < '{self.end_time}'""",
+                    WHERE time >= '{self.start_time.astimezone(timezone.utc)}'
+                    AND time < '{self.end_time.astimezone(timezone.utc)}'""",
                 conn).sort_values('time')  # posfid_temps, time, pcid
-            print('{len(self.telemetry)} entries of telemetry data were read '
-                  f'from DB between {self.start_time} and {self.end_time}')
+            print(f'{len(self.telemetry)} entries of telemetry data were read'
+                  f' from DB between {self.start_time} and {self.end_time}')
             self.db_telemetry_available = True
         except Exception:
             print('DB telemetry query unavailable on this platform.')
@@ -369,7 +370,7 @@ class FPTestData:
 
     def generate_report(self):
         # define input and output paths for pweave
-        print('Producing xy accuracy test report...')
+        print('Generating xy accuracy test report...')
         path_output = os.path.join(self.dir,
                                    f'{self.dir_name}-xytest_report.html')
         with open(os.path.join(pc.dirs['xytest_data'], 'pweave_test_src.txt'),
