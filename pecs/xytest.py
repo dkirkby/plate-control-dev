@@ -61,7 +61,7 @@ class XYTest(PECS):
         self.loggers = self.data.loggers  # use these loggers to write to logs
         self.logger = self.data.logger
         # pcids are just ints now, DB and DOS have forced the conversion
-        printfuncs = {pid: self.loggers[pid].info for pid in self.data.pcids}
+        printfuncs = {pcid: self.loggers[pid].info for pcid in self.data.pcids}
         super().__init__(printfunc=printfuncs)
         self._get_pos_info()
         self.generate_targets()  # generate local targets or load from file

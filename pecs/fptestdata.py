@@ -187,7 +187,7 @@ class FPTestData:
         index = pd.MultiIndex.from_product(iterables, names=names)
         self.movedf = pd.DataFrame(data=data, index=index)
         # write pcid column to movedf
-        self.movedf = self.movedf.merge(self.posdf['pcid'].reset_index(),
+        self.movedf = self.movedf.merge(self.posdf['PCID'].reset_index(),
                                         on='DEVICE_ID', right_index=True)
         self.logger.info(f'Move data table initialised '
                          f'for {len(self.posids)} positioners.')
