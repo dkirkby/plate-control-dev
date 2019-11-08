@@ -18,6 +18,9 @@ import numpy as np
 # from scipy.stats import sigmaclip
 import pandas as pd
 from datetime import timezone
+import matplotlib.pyplot as plt
+plt.rcParams.update({'font.family': 'sans-serif',  # both are default
+                     'mathtext.fontset': 'dejavusans'})  # both are default
 import posconstants as pc
 sys.path.append(os.path.abspath('.'))
 idx = pd.IndexSlice
@@ -176,9 +179,9 @@ def plot_grade_hist(ptlid=None):
     ax.set_ylabel('Count')
     ax.set_title(title)
     for i, grade in enumerate(grades):  # add annotations
+        print('adding grade count', grade_counts[grade])
         ax.annotate(f'{grade_counts[grade]}',
-                    xycoords='figure fraction', xy=(1/6, 0.99),
-                    textcoords='offset points', xytext=(0, 3),
+                    xycoords='figure fraction', xy=(1/6*i+1/10, 0.4),
                     ha='center', va='bottom')
 
 # show overall statistics across all petals

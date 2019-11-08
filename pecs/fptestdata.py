@@ -370,49 +370,50 @@ class FPTestData:
         # add sections for each petal id to markdown document
         shutil.copyfile('xytest_report_master.md', 'xytest_report.md')
         petal_section = '''
-        ### PTL<%=str({0}).zfill(2)%>
-        ``<%=len(data.posids_ptl[{0}])%>`` positioners tested total
+### PTL<%=str({0}).zfill(2)%>
+``<%=len(data.posids_ptl[{0}])%>`` positioners tested total
 
-        ```python, echo=False
-        # turn the following into a loop in future version
-        plot_grade_hist(ptlid={0})
-        grades_ptl = data.grade_df[data.grade_df['PETAL_ID'] == {0}]
-        masks = []
-        for grade in grades:
-            masks.append(grades_ptl['grade'] == grade)
-        ```
+```python, echo=False
+# turn the following into a loop in future version
+plot_grade_hist(ptlid={0})
+grades_ptl = data.grade_df[data.grade_df['PETAL_ID'] == {0}]
+posids_grade = {}
+for grade in grades:
+    mask = grades_ptl['grade'] == grade
+    posids_grade[grade] = sorted(data.grade_df[mask].index)
+```
 
-        ##### Grade A: ``<%=masks[1].sum()%>`` positioners
-        ``<%=sorted(data.grade_df[masks[0]].index)%>``
+##### Grade A: ``<%=len(posids_grade['A'])%>`` positioners
+``<%=posids_grade['A']%>``
 
-        ##### Grade B: ``<%=masks[2].sum()%>`` positioners
-        ``<%=sorted(data.grade_df[masks[1]].index)%>``
+##### Grade B: ``<%=len(posids_grade['B'])%>`` positioners
+``<%=posids_grade['B']%>``
 
-        ##### Grade C: ``<%=masks[3].sum()%>`` positioners
-        ``<%=sorted(data.grade_df[masks[2]].index)%>``
+##### Grade C: ``<%=len(posids_grade['C'])%>`` positioners
+``<%=posids_grade['C']%>``
 
-        ##### Grade D: ``<%=masks[4].sum()%>`` positioners
-        ``<%=sorted(data.grade_df[masks[3]].index)%>``
+##### Grade D: ``<%=len(posids_grade['D'])%>`` positioners
+``<%=posids_grade['D']%>``
 
-        ##### Grade F: ``<%=masks[5].sum()%>`` positioners
-        ``<%=sorted(data.grade_df[masks[4]].index)%>``
+##### Grade F: ``<%=len(posids_grade['F'])%>`` positioners
+``<%=posids_grade['F']%>``
 
-        ##### Grade N/A: ``<%=masks[0].sum()%>`` positioners
-        ``<%=sorted(data.grade_df[masks[-1]].index)%>``
+##### Grade N/A: ``<%=len(posids_grade['N/A'])%>`` positioners
+``<%=posids_grade['N/A']%>``
 
-        ```python, fig=True, width='12 cm', echo=False
-        if data.test_cfg['report_temperature']:
-            # turn this into time plots, with max/min/mean as floating txt
-            print('max, min, median posfid temperatures: ',
-                  np.max(data.temp_query['posfid_temps_max']),
-                  np.min(data.temp_query['posfid_temps_mean']),
-                  np.mean(data.temp_query['posfid_temps_median']))
-        ```
+```python, fig=True, width='12 cm', echo=False
+if data.test_cfg['report_temperature']:
+    # turn this into time plots, with max/min/mean as floating txt
+    print('max, min, median posfid temperatures: ',
+          np.max(data.temp_query['posfid_temps_max']),
+          np.min(data.temp_query['posfid_temps_mean']),
+          np.mean(data.temp_query['posfid_temps_median']))
+```
 
         '''
         posid_section = '''
-        #### Complete list of positioners tested
-        ``<%=sorted(data.posids_ptl[ptlid])%>``
+#### Complete list of positioners tested
+``<%=sorted(data.posids_ptl[ptlid])%>``
         '''
         with open('xytest_report.md', 'a+') as h:
             for ptlid in self.ptlids:
