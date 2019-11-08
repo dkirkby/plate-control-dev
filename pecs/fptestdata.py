@@ -205,6 +205,8 @@ class FPTestData:
                     WHERE time >= '{self.start_time}'
                     AND time < '{self.end_time}'""",
                 conn).sort_values('time')  # posfid_temps, time, pcid
+            print('{len(self.telemetry)} entries of telemetry data were read '
+                  f'from DB between {self.start_time} and {self.end_time}')
             self.db_telemetry_available = True
         except Exception:
             print('DB telemetry query unavailable on this platform.')

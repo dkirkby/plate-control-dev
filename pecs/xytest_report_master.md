@@ -184,7 +184,7 @@ def plot_posfid_temp(ptlid=None):
 # plot overall temperatures for all petals
 if data.db_telemetry_available:
     pd.plotting.register_matplotlib_converters()
-    plot_temps_petals(data.telemetry)
+    plot_posfid_temp()
 ```
 
 # Results
