@@ -193,16 +193,22 @@ class FPTestData:
 
     def complete_data(self):
         self.end_time = pc.now()  # define end time
-        if self.test_cfg['report_temperature']:
+        self.read_telemetry()
+
+    def read_telemetry(self):
+        try:
             conn = psycopg2.connect(host="desi-db", port="5442",
                                     database="desi_dev",
                                     user="desi_reader", password="reader")
-            query = pd.read_sql_query(  # get temperature data
+            self.telemetry = pd.read_sql_query(  # get temperature data
                 f"""SELECT * FROM pc_telemetry_can_all
-                    WHERE time_recorded >= '{self.start_time}'
-                    AND time_recorded < '{self.end_time}'""",
-                conn).sort_values('time_recorded')  # posfid_temps, time, pcid
-            self.temp_query = query
+                    WHERE time >= '{self.start_time}'
+                    AND time < '{self.end_time}'""",
+                conn).sort_values('time')  # posfid_temps, time, pcid
+            self.db_telemetry_available = True
+        except Exception:
+            print('DB telemetry query unavailable on this platform.')
+            self.db_telemetry_available = False
 
     def make_summary_plots(self, make_binder=True, n_threads=32, mp=True):
         try:
@@ -371,13 +377,13 @@ class FPTestData:
         shutil.copyfile('xytest_report_master.md', 'xytest_report.md')
         petal_section = '''
 ### PTL<%=str({0}).zfill(2)%>
-``<%=len(data.posids_ptl[{0}])%>`` positioners tested total
+``<%=len(data.posids_ptl[{0}])%>`` positioners tested
 
 ```python, echo=False
 # turn the following into a loop in future version
 plot_grade_hist(ptlid={0})
 grades_ptl = data.grade_df[data.grade_df['PETAL_ID'] == {0}]
-posids_grade = {}
+posids_grade = {{}}
 for grade in grades:
     mask = grades_ptl['grade'] == grade
     posids_grade[grade] = sorted(data.grade_df[mask].index)
@@ -402,18 +408,13 @@ for grade in grades:
 ``<%=posids_grade['N/A']%>``
 
 ```python, fig=True, width='12 cm', echo=False
-if data.test_cfg['report_temperature']:
-    # turn this into time plots, with max/min/mean as floating txt
-    print('max, min, median posfid temperatures: ',
-          np.max(data.temp_query['posfid_temps_max']),
-          np.min(data.temp_query['posfid_temps_mean']),
-          np.mean(data.temp_query['posfid_temps_median']))
-```
 
+
+```
         '''
         posid_section = '''
-#### Complete list of positioners tested
-``<%=sorted(data.posids_ptl[ptlid])%>``
+#### Complete list of positioners tested for <%=len(data.ptlids)%> petals
+``<%=data.posids%>``
         '''
         with open('xytest_report.md', 'a+') as h:
             for ptlid in self.ptlids:
@@ -447,7 +448,7 @@ if data.test_cfg['report_temperature']:
 if __name__ == '__main__':
 
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    dir_name = '20191107T114725-0700-petal0_short'
+    dir_name = '20191101T131705-0700-test'
     with open(os.path.join(pc.dirs['xytest_data'],
                            dir_name, 'data_dump.pkl'),
               'rb') as handle:

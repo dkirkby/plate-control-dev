@@ -15,12 +15,12 @@ import os
 import sys
 import pickle
 import numpy as np
-# from scipy.stats import sigmaclip
 import pandas as pd
 from datetime import timezone
 import matplotlib.pyplot as plt
-plt.rcParams.update({'font.family': 'sans-serif',  # both are default
-                     'mathtext.fontset': 'dejavusans'})  # both are default
+from matplotlib.dates import DateFormatter
+# plt.rcParams.update({'font.family': 'sans-serif',  # both are default
+#                      'mathtext.fontset': 'dejavusans'})  # both are default
 import posconstants as pc
 sys.path.append(os.path.abspath('.'))
 idx = pd.IndexSlice
@@ -145,43 +145,78 @@ targets = getattr(data, 'targets', data.targets_pos[list(data.targets_pos)[0]])
 | **Grid target points**\             | ``<%=repr([list(t) for t in targets])%>`` |
 +-------------------------------------+------------------------------------------------+
 
-```python, echo=False
+# Temperature
+
+```python, echo=False, results='raw'
+
+data.read_telemetry()
 calculate_grades(data)
 data.grade_df.to_pickle(os.path.join(data.dir, 'grade_df.pkl.gz'),
                         compression='gzip')
 data.grade_df.to_csv(os.path.join(data.dir, 'grade_df.csv'))
 with open(os.path.join(data.dir, 'data_dump.pkl'), 'wb') as handle:
     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    
+# keyed by petal id
+petal_locs = {2: 7, 3: 3, 4: 0, 5: 1, 6: 2, 7: 8, 8: 4, 9: 9, 10: 5, 11: 6}
+
+def plot_posfid_temp(ptlid=None):
+
+    def plot_petal(ptlid, max=True, mean=True, median=True):
+        query = data.telemetry[data.telemetry['pcid'] == petal_locs[ptlid]]
+        if max:
+            ax.plot(query['time'], query['posfid_temps_max'],
+                    label=f'PTL{ptlid:02}, PC0{petal_locs[ptlid]}')
+            
+    fig, ax = plt.subplots()
+    if ptlid is None:  # loop through all petals, plot max only
+        for ptlid in data.ptlids:
+            plot_petal(ptlid, max=True, mean=False, median=False)
+    else:  # ptlid is an integer
+        plot_petal(ptlid)
+    
+    ax.legend()
+    ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
+    ax.xaxis.set_tick_params(rotation=45)
+    ax.set_xlabel('Time (UTC)')
+    ax.set_ylabel('Temperature (°C)')
+
+# plot overall temperatures for all petals
+if data.db_telemetry_available:
+    pd.plotting.register_matplotlib_converters()
+    plot_temps_petals(data.telemetry)
 ```
 
-# Temt Temperature
-
-temperature time plot here
-
-# Test Results
+# Results
 
 ```python, echo=False
 
 def plot_grade_hist(ptlid=None):
     if ptlid is None:  # show all positioners tested
         grade_counts = data.grade_df['grade'].value_counts()
-        title = (f'Grade Distribution of all {len(data.posids)} '
-                 f'positioners tested')
+        title = (
+            f'Overall grade distribution '
+            f'({len(data.posids)} positioners, {len(data.ptlids)} petals)')
     else:
         grade_counts = data.grade_df['grade'].value_counts()
-        title = ('Grade Distribution of {} positioners of PTL'
-                 + f'{ptlid}'.zfill(2))
+        title = (f'PTL{ptlid:02} grade distribution '
+                 f'({len(data.posids_ptl[ptlid])} positioners)')
     for grade in grades:
         if grade not in grade_counts.index:  # no count, set to zero
             grade_counts[grade] = 0
-    ax = grade_counts.reindex(grades).plot(kind='bar', figsize=(6, 3))
-    ax.set_xlabel('Postiioner Grade')
+    
+    fig, ax = plt.subplots()
+    grade_counts.reindex(grades).plot(
+        ax=ax, kind='bar', figsize=(6, 3), title=title, rot=0,
+        ylim=(0, grade_counts.max()+80))
+    ax.set_xlabel('Postiioner grade')
     ax.set_ylabel('Count')
-    ax.set_title(title)
-    for i, grade in enumerate(grades):  # add annotations
-        print('adding grade count', grade_counts[grade])
-        ax.annotate(f'{grade_counts[grade]}',
-                    xycoords='figure fraction', xy=(1/6*i+1/10, 0.4),
+    for rect in ax.patches:  # add annotations
+        height = rect.get_height()
+        ax.annotate(f'{height}',
+                    xy=(rect.get_x() + rect.get_width() / 2, height),
+                    xytext=(0, 3),  # 3 points vertical offset
+                    textcoords="offset points",
                     ha='center', va='bottom')
 
 # show overall statistics across all petals
