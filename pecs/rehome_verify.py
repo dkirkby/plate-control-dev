@@ -19,7 +19,7 @@ class RehomeVerify(PECS):
         if interactive:
             self.interactive_ptl_setup()
         else:
-            self.ptl_setup(petal_id, posids)
+            self.ptl_setup(pcid, posids)
         self.printfunc(f'Verifying rehome positions for '
                        f'{len(self.posids)} positioners...')
         df = self.compare_xy()
@@ -32,7 +32,6 @@ class RehomeVerify(PECS):
             os.system(f'xdg-open {path}')
 
     def compare_xy(self):
-        # ptl = self.ptls[self.ptlid]
         # all backlit fibres, including those disabled, needed for FVC
         exppos = (self.ptl.get_positions(return_coord='QS')
                   .sort_values(by='DEVICE_ID'))

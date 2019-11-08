@@ -42,19 +42,13 @@ class PECS:
             unrepr=True, encoding='utf-8')
         for attr in pecs_local.keys():
             setattr(self, attr, pecs_local[attr])
-        # self.ptlids = pecs_local['ptlids']
-        # self.all_fiducials = pecs_local['all_fiducials']
-        # self.constants_version = pecs_local['constants_version']
-        # self.pm_instrument = pecs_local['pm_instrument']
-        # self.fvc_role = pecs_local['fvc_role']
-        # self.illuminator_role = pecs_local['illuminator_role']
         if type(printfunc) is dict:  # a dict for all petals
             # if input printfunc is already a dict, check consistency
-            assert set(self.ptlids) == set(printfunc.keys()), (
-                'Input ptlids mismatch')
+            assert set(self.pcids) == set(printfunc.keys()), (
+                'Input pcids mismatch')
             self.printfuncs = printfunc
         else:  # if a single printfunc is supplied
-            self.printfuncs = {ptlid: printfunc for ptlid in self.ptlids}
+            self.printfuncs = {pcid: printfunc for pcid in self.pcids}
         if fvc is None:  # instantiate FVC proxy, sim or real
             if 'SIM' in self.fvc_role.upper():
                 self.fvc = FVC_proxy_sim(max_err=0.0001)
@@ -69,19 +63,19 @@ class PECS:
                            f"{self.fvc.get('instrument')}")
         if ptls is None:
             self.ptls = {}  # call petal proxy
-            for ptlid in self.ptlids:
-                self.ptls[ptlid] = Petal(petal_id=ptlid)  # no sim state ctrl
-                self.printfuncs[ptlid](
-                    f'Petal proxy initialised for {ptlid}, '
-                    f'simulator mode: {self.ptls[ptlid].simulator_on}')
+            for pcid in self.pcids:
+                self.ptls[pcid] = Petal(pcid=pcid)  # no sim state ctrl
+                self.printfuncs[pcid](
+                    f'Petal proxy initialised for {pcid}, '
+                    f'simulator mode: {self.ptls[pcid].simulator_on}')
         else:
             self.ptls = ptls
             self.printfunc(
-                f'Reusing existing petal proxies for petals {self.ptlids}')
+                f'Reusing existing petal proxies for petals {self.pcids}')
         # self.illuminator = Illuminator()  # this crashes KF 06/18/19
 
     def printfunc(self, msg):
-        '''self.printfuncs is a dict indexed by ptlids as specified for input,
+        '''self.printfuncs is a dict indexed by pcids as specified for input,
         this function prints to all of them for messages shared across petals
         '''
         for pf in self.printfuncs.values():
@@ -96,13 +90,13 @@ class PECS:
         else:
             self.printfunc(f'Invalid input: {yn_str}. Must be y/n.')
 
-    def ptl_setup(self, petal_id=None, posids=None):
+    def ptl_setup(self, pcid=None, posids=None):
 
-        if petal_id is None:
-            petal_id = self.ptlids[0]
-            self.printfunc(f'Defaulting to ptlid = {petal_id}')
-        self.ptlid = petal_id
-        self.ptl = self.ptls[self.ptlid]
+        if pcid is None:
+            pcid = self.pcids[0]
+            self.printfunc(f'Defaulting to pcid = {pcid}')
+        self.pcid = pcid
+        self.ptl = self.ptls[self.pcid]
         if posids is None:
             posids = sorted(list(self.ptl.get_positioners(
                 enabled_only=True)['DEVICE_ID']))
@@ -112,21 +106,21 @@ class PECS:
 
     def interactive_ptl_setup(self):
         self.printfunc(f'Running interactive setup for PECS')
-        ptlid = self._interactively_get_ptl()  # set selected ptlid
-        posids = self._interactively_get_posids(ptlid)  # set selected posids
-        self.ptl_setup(petal_id=ptlid, posids=posids)
+        pcid = self._interactively_get_ptl()  # set selected pcid
+        posids = self._interactively_get_posids(pcid)  # set selected posids
+        self.ptl_setup(pcid=pcid, posids=posids)
 
     def _interactively_get_ptl(self):
-        ptlid = input(f'Availible petal IDs: {list(self.ptls.keys())}\n'
-                      f'Please enter a petal ID (integer only): ')
-        if ptlid.isdigit():
-            self.printfunc(f'Selected ptlid = {ptlid}')
-            return int(ptlid)
+        pcid = input(f'Availible PCIDs: {list(self.ptls.keys())}\n'
+                      f'Please enter a PCID (integer only): ')
+        if pcid.isdigit():
+            self.printfunc(f'Selected PCID = {pcid}')
+            return int(pcid)
         else:
             self.printfunc('Invalid input, must be an integer, retry')
             return self._interactively_get_ptl()
 
-    def _interactively_get_posids(self, ptlid):
+    def _interactively_get_posids(self, pcid):
         user_text = input('Please list CAN bus IDs or posids, seperated by '
                           'SPACES. \nLeave blank to use all positioners: ')
         if user_text == '':
@@ -136,13 +130,13 @@ class PECS:
         user_text = input('Use enabled positioners only? (y/n): ')
         enabled_only = self._parse_yn(user_text)
         if selection is None:
-            posids = sorted(list(self.ptls[ptlid].get_positioners(
+            posids = sorted(list(self.ptls[pcid].get_positioners(
                 enabled_only=enabled_only)['DEVICE_ID']))
         elif 'can' in selection[0]:  # User passed a list of canids
-            posids = sorted(list(self.ptls[ptlid].get_positioners(
+            posids = sorted(list(self.ptls[pcid].get_positioners(
                 enabled_only=enabled_only, busids=selection)['DEVICE_ID']))
         else:  # assume is a list of posids
-            posids = sorted(list(self.ptls[ptlid].get_positioners(
+            posids = sorted(list(self.ptls[pcid].get_positioners(
                 enabled_only=enabled_only, posids=selection)['DEVICE_ID']))
         self.printfunc(f'Selected {len(posids)} positioners')
         return posids
@@ -154,9 +148,9 @@ class PECS:
         (bot have DEVICE_ID as index and sorted) and
         matched_posids (set), unmatched_posids (set)'''
         if exppos is None:
-            exppos_list = [(self.ptls[ptlid].get_positions(return_coord='QS')
+            exppos_list = [(self.ptls[pcid].get_positions(return_coord='QS')
                             .sort_values(by='DEVICE_ID'))
-                           for ptlid in self.ptlids]  # includes all posids
+                           for pcid in self.pcids]  # includes all posids
             exppos = pd.concat(exppos_list)
         mr_old = self.fvc.get('match_radius')  # hold old match radius
         self.fvc.set(match_radius=match_radius)  # set larger radius for calib

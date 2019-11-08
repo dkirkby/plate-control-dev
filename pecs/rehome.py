@@ -7,7 +7,7 @@ from rehome_verify import RehomeVerify
 class Rehome(PECS):
 
     def __init__(self, fvc=None, ptls=None, axis='both',
-                 petal_id=None, posids=None, interactive=False):
+                 pcid=None, posids=None, interactive=False):
         super().__init__(fvc=fvc, ptls=ptls)
         input('WARNING: Driving positioners to their hardstops. '
               'Be sure you know what you are doing!\n'
@@ -15,7 +15,7 @@ class Rehome(PECS):
         if interactive:
             self.interactive_ptl_setup()
         else:
-            self.ptl_setup(petal_id, posids)
+            self.ptl_setup(pcid, posids)
         self.axis = axis
         df = self.rehome()
         path = os.path.join(pc.dirs['all_logs'], 'calib_logs',
@@ -23,7 +23,7 @@ class Rehome(PECS):
         df.to_csv(path)
         self.printfunc(f'Rehome (interally-tracked) data saved to: {path}')
         if input('Verify rehome positions with FVC? (y/n): ') in ['y', 'yes']:
-            RehomeVerify(petal_id=self.ptlid, posids=self.posids)
+            RehomeVerify(pcid=self.pcid, posids=self.posids)
 
     def rehome(self, posids=None, anticollision='freeze', attempt=1):
         # three atetmpts built in, two with ac freeze, one with ac None

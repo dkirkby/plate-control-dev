@@ -7,9 +7,9 @@ Created on Thu May 23 22:18:28 2019
 Store xy test, anti-collision data in a class for debugging.
 Most fields are dictionaries indexed by petal id:
 
-FPTestData.petal_cfgs[petal_id]:    hw setup file for each petal
-FPTestData.logs[petal_id]:          StringIO object equivalent to log file
-FPTestData.loggers[petal_id]:       logger which writes new lines to log file
+FPTestData.petal_cfgs[pcid]:    hw setup file for each petal
+FPTestData.logs[pcid]:          StringIO object equivalent to log file
+FPTestData.loggers[pcid]:       logger which writes new lines to log file
 
 """
 
@@ -47,7 +47,7 @@ np.rms = lambda x: np.sqrt(np.mean(np.square(x)))
 
 class FPTestData:
     ''' data will be saved in:
-            /xytest_data/{time}-{test_name}/PTL{ptlid}/*.*
+            /xytest_data/{time}-{test_name}/PC{pcid}/*.*
     '''
 
     log_formatter = logging.Formatter(  # log format for each line
@@ -58,37 +58,37 @@ class FPTestData:
 
         self.test_name = test_name
         self.start_time = pc.now()
-        self.test_cfg = test_cfg  # petal id sections are string ids
+        self.test_cfg = test_cfg  # pcid sections are string ids
         self.anticollision = test_cfg['anticollision']
         self.num_corr_max = test_cfg['num_corr_max']
         self.petal_cfgs = petal_cfgs
-        self.ptlids = [  # validate string petal id sections and create list
+        self.pcids = [  # validate string pcid sections and create list
             int(key) for key in test_cfg.keys() if len(key) == 2
             and key.isdigit() and (test_cfg[key]['mode'] is not None)]
-        for ptlid in self.test_cfg.sections:  # convert petal id to int now
-            self.test_cfg.rename(ptlid, int(ptlid))
+        for pcid in self.test_cfg.sections:  # convert pcid to int now
+            self.test_cfg.rename(pcid, int(pcid))
         # create save dir for all files: logs, tables, pickels, gzips
         self.dir_name = f'{pc.filename_timestamp_str_now()}-{test_name}'
         self.dir = os.path.join(pc.dirs['xytest_data'], self.dir_name)
-        self.dirs = {ptlid: os.path.join(self.dir, f'PTL{ptlid}')
-                     for ptlid in self.ptlids}
+        self.dirs = {pcid: os.path.join(self.dir, f'PC{pcid:02}')
+                     for pcid in self.pcids}
         self.logs = {}  # set up log files and loggers for each petal
         self.log_paths = {}
         self.loggers = {}
-        for ptlid in self.ptlids:
-            self.log_paths[ptlid] = os.path.join(self.dirs[ptlid],
-                                                 f'ptl_{ptlid}_realtime.log')
+        for pcid in self.pcids:
+            self.log_paths[pcid] = os.path.join(self.dirs[pcid],
+                                                 f'pc{pcid:02}_realtime.log')
             # ensure save directory and log file exist if they don't already
-            os.makedirs(self.dirs[ptlid], exist_ok=True)
-            open(self.log_paths[ptlid], 'a').close()
+            os.makedirs(self.dirs[pcid], exist_ok=True)
+            open(self.log_paths[pcid], 'a').close()
             # create virtual file object for storing log entries
             # using stringio because it supports write() and flush()
             log = io.StringIO(newline='\n')
             # craete a new logger for each petal by unique logger name
-            logger = logging.getLogger(f'PTL{ptlid}')
+            logger = logging.getLogger(f'PC{pcid:02}')
             logger.handlers = []  # clear handlers that might exisit already
             logger.setLevel(logging.DEBUG)  # log everything, DEBUG level up
-            fh = logging.FileHandler(self.log_paths[ptlid],
+            fh = logging.FileHandler(self.log_paths[pcid],
                                      mode='a', encoding='utf-8')
             sh = logging.StreamHandler(stream=log)  # pseudo-file handler
             ch = logging.StreamHandler()  # console handler, higher log level
@@ -100,14 +100,14 @@ class FPTestData:
             logger.addHandler(sh)
             logger.addHandler(ch)
             logger.info(f'Log initialised for test: {test_name}, '
-                        f'PTL{ptlid:02d}')
+                        f'PC{pcid:02d}')
             # write configs to logs
             if petal_cfgs is not None:  # dump petal cfg to petal logger
-                self._log_cfg(logger.debug, petal_cfgs[ptlid])
+                self._log_cfg(logger.debug, petal_cfgs[pcid])
             self._log_cfg(logger.debug, test_cfg)
-            self.logs[ptlid] = log  # assign logs and loggers to attributes
-            self.loggers[ptlid] = logger
-        self.logger = self.BroadcastLogger(self.ptlids, self.loggers)
+            self.logs[pcid] = log  # assign logs and loggers to attributes
+            self.loggers[pcid] = logger
+        self.logger = self.BroadcastLogger(self.pcids, self.loggers)
         self.logger.info([f'petalconstants.py version: {pc.code_version}',
                           f'Saving to directory: {self.dir}',
                           f'Anticollision mode: {self.anticollision}'])
@@ -135,16 +135,16 @@ class FPTestData:
         input message can be a string of list of strings
         msg will be broadcasted to all petals
         '''
-        def __init__(self, ptlids, loggers):
-            self.ptlids = ptlids
+        def __init__(self, pcids, loggers):
+            self.pcids = pcids
             self.loggers = loggers
 
         def _log(self, msg, lvl):  # reserved for in-class use, don't call this
             if type(msg) is list:
                 list(map(partial(self._log, lvl=lvl), msg))
             elif type(msg) is str:
-                for ptlid in self.ptlids:
-                    self.loggers[ptlid].log(lvl, msg)
+                for pcid in self.pcids:
+                    self.loggers[pcid].log(lvl, msg)
             else:
                 raise Exception('Wrong message data type sent to logger')
 
@@ -166,7 +166,7 @@ class FPTestData:
     def initialise_movedata(self, posids, n_targets):
         '''initialise column names for move data table for each positioner
         existing attributes required (see xytest.py):
-            self.ptlids
+            self.pcids
         '''
         # build column names and data types, all in petal-local flatXY CS
         cols0 = ['timestamp', 'cycle', 'move_log']
@@ -186,8 +186,8 @@ class FPTestData:
         names = ['target_no', 'DEVICE_ID']
         index = pd.MultiIndex.from_product(iterables, names=names)
         self.movedf = pd.DataFrame(data=data, index=index)
-        # write ptlid column to movedf
-        self.movedf = self.movedf.merge(self.posdf['PETAL_ID'].reset_index(),
+        # write pcid column to movedf
+        self.movedf = self.movedf.merge(self.posdf['pcid'].reset_index(),
                                         on='DEVICE_ID', right_index=True)
         self.logger.info(f'Move data table initialised '
                          f'for {len(self.posids)} positioners.')
@@ -239,16 +239,16 @@ class FPTestData:
             if make_binder:
                 if mp:
                     with Pool(processes=n_threads) as p:
-                        for ptlid, n in product(self.ptlids,
+                        for pcid, n in product(self.pcids,
                                                 range(self.num_corr_max+1)):
                             p.apply_async(self.make_summary_plot_binder,
-                                          args=(ptlid, n))
+                                          args=(pcid, n))
                         p.close()
                         p.join()
                 else:
-                    for ptlid, n in tqdm(product(self.ptlids,
+                    for pcid, n in tqdm(product(self.pcids,
                                                  range(self.num_corr_max+1))):
-                        self.make_summary_plot_binder(ptlid, n)
+                        self.make_summary_plot_binder(pcid, n)
         except Exception as e:
             print('Exception when making xy plots', e)
             n_threads = int(input('Specify a smaller number of threads: '))
@@ -257,11 +257,11 @@ class FPTestData:
     def make_summary_plot(self, posid):  # make one plot for a given posid
         row = self.posdf.loc[posid]  # row containing calibration values
         offX, offY = 0, 0
-        ptlid, r1, r2, posintT = row[
-            ['PETAL_ID', 'LENGTH_R1', 'LENGTH_R2', 'targetable_range_T']]
+        pcid, r1, r2, posintT = row[
+            ['PCID', 'LENGTH_R1', 'LENGTH_R2', 'targetable_range_T']]
         rmin, rmax = r1 - r2, r1 + r2  # min and max patrol radii
         Tmin, Tmax = np.sort(posintT) + row['OFFSET_T']  # targetable poslocT
-        path = os.path.join(self.dirs[ptlid],
+        path = os.path.join(self.dirs[pcid],
                             '{}_xyplot_submove_{{}}.pdf'.format(posid))
         title = (f'XY Accuracy Test {self.start_time}\n'
                  f'Positioner {posid} ({self.ntargets} Targets)')
@@ -312,55 +312,55 @@ class FPTestData:
             fig.savefig(path.format(n), bbox_inches='tight')
             pstr = f'saved xyplot: {path.format(n)}'
             if hasattr(self, 'loggers'):
-                self.loggers[ptlid].debug(pstr)
+                self.loggers[pcid].debug(pstr)
             else:
                 pass  # print(pstr)
             plt.close(fig)
 
-    def make_summary_plot_binder(self, ptlid, n):
-        template = os.path.join(self.dirs[ptlid],
+    def make_summary_plot_binder(self, pcid, n):
+        template = os.path.join(self.dirs[pcid],
                                 f'*_xyplot_submove_{n}.pdf')
         paths = sorted(glob(template))
-        assert len(paths) == len(self.posids_ptl[ptlid]), (
+        assert len(paths) == len(self.posids_pc[pcid]), (
                 f'Length mismatch: {len(paths)} ≠ '
-                f'{len(self.posids_ptl[ptlid])}')
+                f'{len(self.posids_pc[pcid])}')
         binder = PdfFileMerger()
         for path in paths:
             binder.append(path)
         savepath = os.path.join(
-            self.dirs[ptlid],
+            self.dirs[pcid],
             f'{len(paths)}_positioners-xyplot_submove_{n}.pdf')
         pstr = f'Writing xyplot binder for submove {n}...'
         if hasattr(self, 'loggers'):
-            self.loggers[ptlid].info(pstr)
+            self.loggers[pcid].info(pstr)
         else:
             print(pstr)
         binder.write(savepath)
         binder.close()
         pstr = f'Binder for submove {n} saved to: {savepath}'
         if hasattr(self, 'loggers'):
-            self.loggers[ptlid].info(pstr)
+            self.loggers[pcid].info(pstr)
         else:
             print(pstr)
 
     def export_data_logs(self):
-        '''must have writte self.posids_ptl, a dict keyed by ptlid'''
+        '''must have writte self.posids_pc, a dict keyed by pcid'''
         self.movedf.to_pickle(os.path.join(self.dir, 'move_df.pkl.gz'),
                               compression='gzip')
         self.movedf.to_csv(os.path.join(self.dir, 'move_df.csv'))
         self.logger.info(f'Focal plane move data written to: {self.dir}')
-        for ptlid in self.ptlids:
-            def makepath(name): return os.path.join(self.dirs[ptlid], name)
-            for posid in self.posids_ptl[ptlid]:  # write move data csv
+        for pcid in self.pcids:
+            def makepath(name): return os.path.join(self.dirs[pcid], name)
+            for posid in self.posids_pc[pcid]:  # write move data csv
                 df_pos = self.movedf.loc[idx[:, posid], :].droplevel(1)
                 df_pos.to_pickle(makepath(f'{posid}_df.pkl.gz'),
                                  compression='gzip')
                 df_pos.to_csv(makepath(f'{posid}_df.csv'))
-            with open(makepath(f'ptl_{ptlid}_export.log'), 'w') as handle:
-                self.logs[ptlid].seek(0)
-                shutil.copyfileobj(self.logs[ptlid], handle)  # save logs
-            self.loggers[ptlid].info('Petal move data written to: '
-                                     f'{self.dirs[ptlid]}')
+            with open(makepath(f'pc_{pcid}_export.log'), 'w') as handle:
+                self.logs[pcid].seek(0)
+                shutil.copyfileobj(self.logs[pcid], handle)  # save logs
+            self.loggers[pcid].info('Petal move data written to: '
+                                     f'{self.dirs[pcid]}')
 
     def dump_as_one_pickle(self):
         del self.logger
@@ -376,19 +376,19 @@ class FPTestData:
         with open(os.path.join(pc.dirs['xytest_data'], 'pweave_test_src.txt'),
                   'w') as h:
             h.write(os.path.join(self.dir, 'data_dump.pkl'))
-        # add sections for each petal id to markdown document
+        # add sections for each pcid to markdown document
         shutil.copyfile('xytest_report_master.md', 'xytest_report.md')
         petal_section = '''
-### PTL<%=str({0}).zfill(2)%>
-``<%=len(data.posids_ptl[{0}])%>`` positioners tested
+### pc<%=str({0}).zfill(2)%>
+``<%=len(data.posids_pc[{0}])%>`` positioners tested
 
 ```python, echo=False
 # turn the following into a loop in future version
-plot_grade_hist(ptlid={0})
-grades_ptl = data.grade_df[data.grade_df['PETAL_ID'] == {0}]
+plot_grade_hist(pcid={0})
+grades_pc = data.grade_df[data.grade_df['PCID'] == {0}]
 posids_grade = {{}}
 for grade in grades:
-    mask = grades_ptl['grade'] == grade
+    mask = grades_pc['grade'] == grade
     posids_grade[grade] = sorted(data.grade_df[mask].index)
 ```
 
@@ -416,12 +416,12 @@ for grade in grades:
 ```
         '''
         posid_section = '''
-#### Complete list of positioners tested for <%=len(data.ptlids)%> petals
+#### Complete list of positioners tested for <%=len(data.pcids)%> petals
 ``<%=data.posids%>``
         '''
         with open('xytest_report.md', 'a+') as h:
-            for ptlid in self.ptlids:
-                h.write(petal_section.format(ptlid))
+            for pcid in self.pcids:
+                h.write(petal_section.format(pcid))
                 h.write(posid_section)
         subprocess.call(['pweave', 'xytest_report.md',
                          '-f', 'pandoc2html', '-o', path_output])

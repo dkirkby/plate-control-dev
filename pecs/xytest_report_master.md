@@ -36,8 +36,6 @@ grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
 #    for perc in [95, 98, 100]:
 #        for i in range(data.num_corr_max):
 #            sm_data = data.movedf[f'err_xy_{i}'] * 1000  # mm to microns
-#            # if ptlid is not None:  # restrict cuts within petal
-#            #     sm_data = sm_data[sm_data['PETAL_ID']==ptlid]
 #            pos_data_sm = np.percentile(sm_data, perc)
 #            d.append[perc,
 #                     i,
@@ -127,7 +125,7 @@ targets = getattr(data, 'targets', data.targets_pos[list(data.targets_pos)[0]])
 | **Start time**\        | ``<%=data.start_time.isoformat()%>`` KPNO, ``<%=data.start_time.astimezone(timezone.utc).isoformat()%>`` UTC\ |
 | **End time**\          | ``<%=data.end_time.isoformat()%>`` KPNO, ``<%=data.end_time.astimezone(timezone.utc).isoformat()%>`` UTC\     |
 | **Duration**\          | ``<%=str(data.end_time-data.start_time)%> ``\                                                                 |
-| **Petal IDs**\         | ``<%=data.ptlids%>``\                                                                                         |
+| **PCIDs**\             | ``<%=data.pcids%>``\                                                                                         |
 | **Product directory**\ | ``<%=data.dir%>``\                                                                                            |
 +------------------------+---------------------------------------------------------------------------------------------------------------+
 | **Test logs**\         | ``<%=data.log_paths%>``                                                                                       |
@@ -158,22 +156,21 @@ with open(os.path.join(data.dir, 'data_dump.pkl'), 'wb') as handle:
     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
     
 # keyed by petal id
-petal_locs = {2: 7, 3: 3, 4: 0, 5: 1, 6: 2, 7: 8, 8: 4, 9: 9, 10: 5, 11: 6}
 
-def plot_posfid_temp(ptlid=None):
+def plot_posfid_temp(pcid=None):
 
-    def plot_petal(ptlid, max=True, mean=True, median=True):
-        query = data.telemetry[data.telemetry['pcid'] == petal_locs[ptlid]]
+    def plot_petal(pcid, max=True, mean=True, median=True):
+        query = data.telemetry[data.telemetry['pcid'] == pcid]
         if max:
             ax.plot(query['time'], query['posfid_temps_max'],
-                    label=f'PTL{ptlid:02}, PC0{petal_locs[ptlid]}')
+                    label=f'PC{pcid:02}')
             
     fig, ax = plt.subplots()
-    if ptlid is None:  # loop through all petals, plot max only
-        for ptlid in data.ptlids:
-            plot_petal(ptlid, max=True, mean=False, median=False)
-    else:  # ptlid is an integer
-        plot_petal(ptlid)
+    if pcid is None:  # loop through all petals, plot max only
+        for pcid in data.pcids:
+            plot_petal(pcid, max=True, mean=False, median=False)
+    else:  # pcid is an integer
+        plot_petal(pcid)
     
     ax.legend()
     ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
@@ -191,16 +188,16 @@ if data.db_telemetry_available:
 
 ```python, echo=False
 
-def plot_grade_hist(ptlid=None):
-    if ptlid is None:  # show all positioners tested
+def plot_grade_hist(pcid=None):
+    if pcid is None:  # show all positioners tested
         grade_counts = data.grade_df['grade'].value_counts()
         title = (
             f'Overall grade distribution '
-            f'({len(data.posids)} positioners, {len(data.ptlids)} petals)')
+            f'({len(data.posids)} positioners, {len(data.pcids)} petals)')
     else:
         grade_counts = data.grade_df['grade'].value_counts()
-        title = (f'PTL{ptlid:02} grade distribution '
-                 f'({len(data.posids_ptl[ptlid])} positioners)')
+        title = (f'PC{pcid:02} grade distribution '
+                 f'({len(data.posids_pc[pcid])} positioners)')
     for grade in grades:
         if grade not in grade_counts.index:  # no count, set to zero
             grade_counts[grade] = 0
@@ -223,4 +220,3 @@ def plot_grade_hist(ptlid=None):
 plot_grade_hist()
 
 ```
-
