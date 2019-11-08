@@ -20,7 +20,8 @@ import logging
 from glob import glob
 from itertools import product
 from functools import partial
-from multiprocessing import Pool
+import multiprocessing
+from multiprocessing import Process, Pool
 from tqdm import tqdm
 import io
 import shutil
@@ -72,6 +73,12 @@ class FPTestData:
         self.dir = os.path.join(pc.dirs['xytest_data'], self.dir_name)
         self.dirs = {pcid: os.path.join(self.dir, f'pc{pcid:02}')
                      for pcid in self.pcids}
+        self._init_loggers()
+        self.logger.info([f'petalconstants.py version: {pc.code_version}',
+                          f'Saving to directory: {self.dir}',
+                          f'Anticollision mode: {self.anticollision}'])
+
+    def _init_loggers(self):
         self.logs = {}  # set up log files and loggers for each petal
         self.log_paths = {}
         self.loggers = {}
@@ -99,18 +106,15 @@ class FPTestData:
             logger.addHandler(fh)
             logger.addHandler(sh)
             logger.addHandler(ch)
-            logger.info(f'Log initialised for test: {test_name}, '
-                        f'PC{pcid:02d}')
+            logger.info(f'Logger initialised for test: {self.test_name}, '
+                        f'petal: PC{pcid:02d}')
             # write configs to logs
-            if petal_cfgs is not None:  # dump petal cfg to petal logger
-                self._log_cfg(logger.debug, petal_cfgs[pcid])
-            self._log_cfg(logger.debug, test_cfg)
+            if self.petal_cfgs is not None:  # dump petal cfg to petal logger
+                self._log_cfg(logger.debug, self.petal_cfgs[pcid])
+            self._log_cfg(logger.debug, self.test_cfg)
             self.logs[pcid] = log  # assign logs and loggers to attributes
             self.loggers[pcid] = logger
         self.logger = self.BroadcastLogger(self.pcids, self.loggers)
-        self.logger.info([f'petalconstants.py version: {pc.code_version}',
-                          f'Saving to directory: {self.dir}',
-                          f'Anticollision mode: {self.anticollision}'])
 
     @staticmethod
     def _log_cfg(printfunc, config):
@@ -212,46 +216,67 @@ class FPTestData:
         except Exception:
             self.db_telemetry_available = False
 
-    def make_summary_plots(self, make_binder=True, n_threads=32, mp=True):
-        try:
-            pstr = (f'Making xyplots with {n_threads} threads for '
-                    f'submoves {list(range(self.num_corr_max+1))}...')
-            if hasattr(self, 'logger'):
-                self.logger.info(pstr)
-            else:
-                print(pstr)
+    def make_summary_plots(self, n_threads_max=32, make_binder=True, mp=True):
+        n_threads = min(n_threads_max, multiprocessing.cpu_count())
+        pstr = (f'Making xyplots with {n_threads} threads for '
+                f'submoves {list(range(self.num_corr_max+1))}...')
+        if hasattr(self, 'logger'):
+            self.logger.info(pstr)
+        else:
+            print(pstr)
+        if mp:
+            # the following implementation fails when loggers are present
+            # pbar = tqdm(total=len(self.posids))
+
+            # def update_pbar(*a):
+            #     pbar.update()
+
+            # with Pool(processes=n_threads) as p:
+            #     for posid in self.posids:
+            #         p.apply_async(self.make_summary_plot, args=(posid,),
+            #                       callback=update_pbar)
+            #     p.close()
+            #     p.join()
+            pool = []
+            n_started = 0
+            for posid in tqdm(self.posids):
+                np = Process(target=self.make_summary_plot, args=(posid,))
+                if n_started % n_threads_max == 0:  # all cores occupied, wait
+                    [p.join()
+                     for p in pool[n_started-n_threads_max:n_started-1]]
+                np.start()
+                n_started += 1
+                pool.append(np)
+            self.logger.info(
+                f'Waiting for the last MP chunk of {n_threads} to complete...')
+            [p.join() for p in pool[n_started-n_threads_max:-1]]
+        else:
+            for posid in tqdm(self.posids):
+                self.make_summary_plot(posid)
+        if make_binder:
             if mp:
-                pbar = tqdm(total=len(self.posids))
-
-                def update_pbar(*a):
-                    pbar.update()
-
-                with Pool(processes=n_threads) as p:
-                    for posid in self.posids:
-                        p.apply_async(self.make_summary_plot, args=(posid,),
-                                      callback=update_pbar)
-                    p.close()
-                    p.join()
+                # the following implementation fails when loggers are present
+                # with Pool(processes=n_threads) as p:
+                #     for pcid, n in product(self.pcids,
+                #                            range(self.num_corr_max+1)):
+                #         p.apply_async(self.make_summary_plot_binder,
+                #                       args=(pcid, n))
+                #     p.close()
+                #     p.join()
+                self.logger.info('Last MP chunk completed. '
+                                 'Creating xyplot binders...')
+                for pcid, n in tqdm(product(self.pcids,
+                                    range(self.num_corr_max+1))):
+                    np = Process(target=self.make_summary_plot_binder,
+                                 args=(pcid, n))
+                    np.start()
+                    pool.append(np)
+                [p.join() for p in pool]
             else:
-                for posid in tqdm(self.posids):
-                    self.make_summary_plot(posid)
-            if make_binder:
-                if mp:
-                    with Pool(processes=n_threads) as p:
-                        for pcid, n in product(self.pcids,
-                                               range(self.num_corr_max+1)):
-                            p.apply_async(self.make_summary_plot_binder,
-                                          args=(pcid, n))
-                        p.close()
-                        p.join()
-                else:
-                    for pcid, n in tqdm(product(self.pcids,
-                                                range(self.num_corr_max+1))):
-                        self.make_summary_plot_binder(pcid, n)
-        except Exception as e:
-            print('Exception when making xy plots', e)
-            n_threads = int(input('Specify a smaller number of threads: '))
-            self.make_summary_plots(n_threads=n_threads)
+                for pcid, n in tqdm(product(self.pcids,
+                                            range(self.num_corr_max+1))):
+                    self.make_summary_plot_binder(pcid, n)
+        return True
 
     def make_summary_plot(self, posid):  # make one plot for a given posid
         row = self.posdf.loc[posid]  # row containing calibration values
@@ -410,10 +435,11 @@ for grade in grades:
 ``<%=posids_grade['N/A']%>``
 
         '''
+        ptlstr = 'petals' if len(self.pcids) > 1 else 'petal'
         posid_section = '''
-#### Complete list of positioners tested for <%=len(data.pcids)%> petals
+#### Complete list of positioners tested for <%=len(data.pcids)%> {0}
 ``<%=data.posids%>``
-        '''
+        '''.format(ptlstr)
         with open('xytest_report.md', 'a+') as h:
             for pcid in self.pcids:
                 h.write(petal_section.format(pcid))
@@ -431,27 +457,27 @@ for grade in grades:
     def finish_xyaccuracy_test_products(self):
         self.complete_data()
         self.export_data_logs()
-        if self.test_cfg['make_plots']:
-            self.make_summary_plots()  # plot for all positioners by default
+        self.make_summary_plots()  # plot for all positioners by default
         self.dump_as_one_pickle()  # loggers lost as they cannot be serialised
         if shutil.which('pandoc') is None:
             print('To generate an xy test report, you must have a complete '
                   'installation of pandoc and/or TexLive. '
                   'Skipping test report generation from markdown template...')
         else:
-            self.generate_report()
+            self.generate_report()  # requires pickle
         self.make_archive()
 
 
 if __name__ == '__main__':
 
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    dir_name = '20191108T130106-0800-pcid/'
+    dir_name = '20191108T140314-0800-pcid'
     with open(os.path.join(pc.dirs['xytest_data'],
                            dir_name, 'data_dump.pkl'),
               'rb') as handle:
         data = pickle.load(handle)
-    # data.make_summary_plots()
+    data._init_loggers()
+    data.make_summary_plots()
     if shutil.which('pandoc') is not None:
         data.generate_report()
-    data.make_archive()
+    # data.make_archive()
