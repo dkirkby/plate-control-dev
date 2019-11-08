@@ -739,13 +739,23 @@ class Petal(object):
         for idx, busid in enumerate(busids):
             fiducial_settings_by_busid[busid][canids[idx]] = duties[idx]
         self.comm.pbset('fiducials', fiducial_settings_by_busid)
+        ret = self.comm.pbget('fiduials')
 
         settings_done = {}
         for i in range(len(enabled)):
-            self.set_posfid_val(enabled[i], 'DUTY_STATE', duties[i])
-            settings_done[enabled[i]] = duties[i]
+            set_duty = duties[i]
+            # protect against missing fiducials in ret
+            if busids[i] in ret.keys() and canids[i] in ret[busids[i]].keys():
+                if ret[busids[i]][canids[i]] != duties[i]:
+                    self.printfunc('WARNING: disagreement in fiducial set duty and returned duty, ID: %s' % enabled[i])
+                    set_duty = ret[busids[i]][canids[i]]
+            elif not save_as_default:
+                # Use remembered state, fid not responding but only if not saving defaults
+                set_duty = self.get_posfid_val(enabled[i], 'DUTY_STATE')
+            self.set_posfid_val(enabled[i], 'DUTY_STATE', set_duty)
+            settings_done[enabled[i]] = set_duty
             if save_as_default:
-                self.set_posfid_val(enabled[i], 'DUTY_DEFAULT_ON', duties[i])
+                self.set_posfid_val(enabled[i], 'DUTY_DEFAULT_ON', set_duty)
                 self.altered_calib_states.add(self.states[enabled[i]])
         if save_as_default:
             mode = 'both'
