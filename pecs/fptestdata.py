@@ -70,7 +70,7 @@ class FPTestData:
         # create save dir for all files: logs, tables, pickels, gzips
         self.dir_name = f'{pc.filename_timestamp_str_now()}-{test_name}'
         self.dir = os.path.join(pc.dirs['xytest_data'], self.dir_name)
-        self.dirs = {pcid: os.path.join(self.dir, f'PC{pcid:02}')
+        self.dirs = {pcid: os.path.join(self.dir, f'pc{pcid:02}')
                      for pcid in self.pcids}
         self.logs = {}  # set up log files and loggers for each petal
         self.log_paths = {}
@@ -355,7 +355,7 @@ class FPTestData:
                 df_pos.to_pickle(makepath(f'{posid}_df.pkl.gz'),
                                  compression='gzip')
                 df_pos.to_csv(makepath(f'{posid}_df.csv'))
-            with open(makepath(f'pc_{pcid}_export.log'), 'w') as handle:
+            with open(makepath(f'pc{pcid:02}_export.log'), 'w') as handle:
                 self.logs[pcid].seek(0)
                 shutil.copyfileobj(self.logs[pcid], handle)  # save logs
             self.loggers[pcid].info('Petal move data written to: '
@@ -378,7 +378,7 @@ class FPTestData:
         # add sections for each pcid to markdown document
         shutil.copyfile('xytest_report_master.md', 'xytest_report.md')
         petal_section = '''
-### pc<%=str({0}).zfill(2)%>
+### PC0<%{0}%>
 ``<%=len(data.posids_pc[{0}])%>`` positioners tested
 
 ```python, echo=False
@@ -446,7 +446,7 @@ for grade in grades:
 if __name__ == '__main__':
 
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    dir_name = '20191101T131705-0700-test'
+    dir_name = '20191108T130106-0800-pcid/'
     with open(os.path.join(pc.dirs['xytest_data'],
                            dir_name, 'data_dump.pkl'),
               'rb') as handle:

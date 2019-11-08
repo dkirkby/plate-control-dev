@@ -138,15 +138,15 @@ with open(os.path.join(data.dir, 'data_dump.pkl'), 'wb') as handle:
 
 # Test Configuration
 
-+-------------------------------------+------------------------------------------------+
-| **Anticollision mode**\             | ``<%=data.anticollision%>``\                   |
-| **Number of corrections**\          | ``<%=data.num_corr_max%> ``\                   |
-| **Min radius of targets**\          | ``<%=data.test_cfg['targ_min_radius']%> mm``\  |
-| **Max radius of targets**\          | ``<%=data.test_cfg['targ_max_radius']%> mm``\  |
-| **Number of targets**\              | ``<%=data.ntargets%>``\                        |
-+------------------------+-------------------------------------------------------------+
-| **Target points**\                  | ``<%=repr([list(t) for t in targets])%>`` |
-+-------------------------------------+------------------------------------------------+
++-----------------------------+-----------------------------------------------+
+| **Anticollision mode**\     | ``<%=data.anticollision%>``\                  |
+| **Number of corrections**\  | ``<%=data.num_corr_max%> ``\                  |
+| **Min radius of targets**\  | ``<%=data.test_cfg['targ_min_radius']%> mm``\ |
+| **Max radius of targets**\  | ``<%=data.test_cfg['targ_max_radius']%> mm``\ |
+| **Number of targets**\      | ``<%=data.ntargets%>``\                       |
++------------------------+----------------------------------------------------+
+| **Target points**\          | ``<%=repr([list(t) for t in targets])%>``     |
++-----------------------------+-----------------------------------------------+
 
 # Temperature
 
@@ -198,9 +198,11 @@ else:
 def plot_grade_hist(pcid=None):
     if pcid is None:  # show all positioners tested
         grade_counts = data.grade_df['grade'].value_counts()
+        title_suffix = 'petals' if len(data.pcids) > 1 else 'petal'
         title = (
             f'Overall grade distribution '
-            f'({len(data.posids)} positioners, {len(data.pcids)} petals)')
+            f'({len(data.posids)} positioners, {len(data.pcids)} '
+            + title_suffix + ')')
     else:
         grade_counts = data.grade_df['grade'].value_counts()
         title = (f'PC{pcid:02} grade distribution '
