@@ -739,7 +739,7 @@ class Petal(object):
         for idx, busid in enumerate(busids):
             fiducial_settings_by_busid[busid][canids[idx]] = duties[idx]
         self.comm.pbset('fiducials', fiducial_settings_by_busid)
-        ret = self.comm.pbget('fiduials')
+        ret = self.comm.pbget('FIDUCIALS')
 
         settings_done = {}
         for i in range(len(enabled)):
