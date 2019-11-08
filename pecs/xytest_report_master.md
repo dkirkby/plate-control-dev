@@ -1,6 +1,6 @@
 % DESI Positioner Accuracy Test Report
 % Focal Plane Team
-% 2019-11-07 (report template last revised)
+% 2019-11-08 (master template last revised)
 
 ```python, echo=False, results='hidden'
 # -*- coding: utf-8 -*-
@@ -188,7 +188,7 @@ if data.db_telemetry_available:
     pd.plotting.register_matplotlib_converters()
     plot_posfid_temp()
 else:
-    print('DB telemetry query unavailable on this platform.')
+    print('DB telemetry query unavailable on this platform\n')
 ```
 
 # Results
