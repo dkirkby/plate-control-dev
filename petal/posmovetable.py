@@ -37,6 +37,28 @@ class PosMoveTable(object):
         self.should_final_creep  = self.posmodel.state._val['FINAL_CREEP_ON']
         self.allow_exceed_limits = self.posmodel.state._val['ALLOW_EXCEED_LIMITS']
         self.allow_cruise = not(self.posmodel.state._val['ONLY_CREEP'])
+        
+    def display(self):
+        def fmt(x):
+            if x == None:
+                x = str(x)
+            if type(x) == str:
+                return format(x,'>11s')
+            elif type(x) == int or type(x) == float:
+                return format(x,'>11g')
+        output = str(self.posid) + ': ' + self.__repr__()
+        if self.rows or self._rows_extra:
+            output += '\n'
+            headers = PosMoveRow().data.keys()
+            for header in headers:
+                output += fmt(header)
+            for row in self.rows + self._rows_extra:
+                output += '\n'
+                for header in headers:
+                    output += fmt(row.data[header])
+        else:
+            output += ' (empty)'
+        print(output)
 
     def copy(self):
         new = copymodule.copy(self) # intentionally shallow, then will deep-copy just the row instances as needed below
@@ -309,6 +331,9 @@ class PosMoveRow(object):
                      'command'              : '',        # [string] command corresponding to this row
                      'cmd_val1'             : None,      # [-] command argument 1
                      'cmd_val2'             : None}      # [-] command argument 2
+        
+    def __repr__(self):
+        return repr(self.data)
 
     def copy(self):
         return copymodule.deepcopy(self)
