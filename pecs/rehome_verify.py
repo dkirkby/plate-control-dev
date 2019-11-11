@@ -14,7 +14,7 @@ import posconstants as pc
 class RehomeVerify(PECS):
 
     def __init__(self, fvc=None, ptls=None,
-                 petal_id=None, posids=None, interactive=False):
+                 pcid=None, posids=None, interactive=False):
         super().__init__(fvc=fvc, ptls=ptls)
         if interactive:
             self.interactive_ptl_setup()
