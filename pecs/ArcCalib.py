@@ -90,7 +90,8 @@ class ArcCalib(PECS):
             matched_only=True, match_radius=match_radius)
         # Want to collect both matched and unmatched
         # meapos contains not only matched ones but all posids in expected pos
-        matched_df = meapos.loc[matched].reset_index()
+        matched_df = (meapos.loc[sorted(matched & set(self.posids))]
+                      .reset_index())
         request.rename(columns={'X1': 'TARGET_T', 'X2': 'TARGET_P'},
                        inplace=True)
         merged = matched_df.merge(request, how='outer', on='DEVICE_ID')
