@@ -255,7 +255,7 @@ class XYTest(PECS):
         posids = self.data.posids_pc[pcid]  # all records obey this order
         ptl = self.ptls[pcid]
         if n == 0:  # blind move, issue cmd in obsXY for easy check with FVC
-            self.logger.info(f'Setting up targets {i} in poslocXY...')
+            self.logger.info(f'Setting up target {i} in poslocXY...')
             movetype, cmd = 'blind', 'poslocXY'
             for posid in tqdm(posids):  # write targets to move df
                 tgt = self.data.targets_pos[posid][i, :]  # two elements

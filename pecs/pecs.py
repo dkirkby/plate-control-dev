@@ -64,7 +64,7 @@ class PECS:
         if ptls is None:
             self.ptls = {}  # call petal proxy
             for pcid in self.pcids:
-                self.ptls[pcid] = Petal(petal_num=pcid)  # no sim state ctrl
+                self.ptls[pcid] = Petal(pcid)  # no sim state ctrl
                 self.printfuncs[pcid](
                     f'Petal proxy initialised for {pcid}, '
                     f'simulator mode: {self.ptls[pcid].simulator_on}')
