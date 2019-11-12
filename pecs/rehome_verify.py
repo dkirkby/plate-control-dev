@@ -82,7 +82,7 @@ class RehomeVerify(PECS):
         for posid in exppos.index:
             flags.append(flags_dict[posid])
         exppos['FLAGS'] = flags
-        exppos['STATUS'] = self.ptl.decipher_posflags(exppos['FLAG'])
+        exppos['STATUS'] = self.ptl.decipher_posflags(exppos['FLAGS'])
         tol = 1
         # now only consider matched, selected positioners, check deviations
         mask = exppos.index.isin(matched) & (exppos['dr'] > tol)
