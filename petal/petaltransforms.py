@@ -304,6 +304,26 @@ class PetalTransforms:
         ptlXYZ = self.flatXY_to_ptlXYZ(flatXY)
         return self.ptlXYZ_to_QS(ptlXYZ)
 
+    def flatXY_to_obsXY(self, flatXY, cast=False):
+        """On-shell condition is assumed, local to global
+        INPUT:  2 x N array, each column vector is flatXY, petal-local
+        OUTPUT: 2 x N array, each column vector is obsXY, global
+        """
+        if cast:
+            flatXY = typecast(flatXY)
+        ptlXYZ = self.flatXY_to_ptlXYZ(flatXY)
+        return self.ptlXYZ_to_obsXY(ptlXYZ)
+
+    def obsXY_to_flatXY(self, obsXY, cast=False):
+        """On-shell condition is assumed, global to local
+        INPUT:  2 x N array, each column vector is obsXY, global
+        OUTPUT: 2 x N array, each column vector is flatXY, petal-local
+        """
+        if cast:
+            obsXY = typecast(obsXY)
+        ptlXYZ = self.obsXY_to_ptlXYZ(obsXY)
+        return self.ptlXYZ_to_flatXY(ptlXYZ)
+
     # %% composite transformations for convenience
     def ptlXYZ_to_QST(self, ptlXYZ, cast=False):
         """ptlXYZ -> obsXYZ -> QST -> QS
@@ -353,6 +373,16 @@ class PetalTransforms:
         if cast:
             ptlXYZ = typecast(ptlXYZ)
         return self.ptlXYZ_to_obsXYZ(ptlXYZ)[:2, :]
+
+    def obsXY_to_ptlXYZ(self, obsXY, cast=False):
+        """
+        INPUT:  2 x N array, each column vector is obsXY, global
+        OUTPUT: 3 x N array, each column vector is ptlXYZ, local
+        """
+        if cast:
+            obsXY = typecast(obsXY)
+        QS = self.obsXY_to_QS(obsXY)
+        return self.QS_to_ptlXYZ(QS)
 
 # %% written but discouraged transformations
 
