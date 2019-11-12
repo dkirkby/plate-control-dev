@@ -154,26 +154,28 @@ class XYTest(PECS):
             self.data.targets = tgt
             self.data.targets_pos = {posid: tgt for posid in self.data.posids}
             self.data.ntargets = tgt.shape[0]  # shape (N_targets, 2)
+            self.data.target_type = 'poslocXY'
         else:  # use input target table, see xytest_psf.csv as an exampl
             assert os.path.isfile(path), f'Invald target file path: {path}'
             self.data.targets = path
+            # set move command according to target type
+            self.data.target_type = self.data.test_cfg['target_type']
+            acceptable_types = ['poslocTP', 'obsXY']
+            if self.data.target_type not in acceptable_types:
+                self.logger.error('Bad target type')
+                raise ValueError(
+                    f'Bad target type, acceptable: {acceptable_types}')
+            col1 = self.data.target_type[:-1]
+            col2 = self.data.target_type[:-2] + self.data.target_type[-1]
             self.data.targets_pos = {}
             df = pd.read_csv(path, index_col='target_no')
             self.data.ntargets = len(df)  # set number of targets
             for pcid in self.data.pcids:  # set targets for each positioner
                 for posid in self.posids_pc[pcid]:
-                    dl = self.data.posdf.loc[posid]['DEVICE_LOC']
-                    self.data.targets_pos[posid] = df[[f'theta_{dl}',
-                                                       f'phi_{dl}']].values
-        # set move command according to target type
-        if 'target_type' in self.data.test_cfg.keys():
-            self.data.target_type = self.data.test_cfg['target_type']
-            if ('XY' not in self.data.target_type or
-                    'TP' not in self.data.target_type):
-                self.logger.error('Bad target type, must be XY or TP.')
-                raise ValueError('Bad target type, must be XY or TP.')
-        else:
-            self.data.target_type = 'poslocXY'
+                    i = self.data.posdf.loc[posid]['DEVICE_LOC']
+                    self.data.targets_pos[posid] = df[[f'{col1}_{i}',
+                                                       f'{col2}_{i}']].values
+
 
     def _add_device_id_col(self, df, pcid):
         '''when df only has DEVICE_LOC, add DEVICE_ID column and use as index
