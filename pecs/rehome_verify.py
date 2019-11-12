@@ -48,7 +48,7 @@ class RehomeVerify(PECS):
         exppos[['X1', 'X2']] = hom_QS.T
         self.printfunc('Taking FVC exposure to confirm home positions...')
         exppos, meapos, matched, unmatched = self.fvc_measure(exppos=exppos,
-                                                        match_radius=30)
+                                                              match_radius=50)
         unmatched = set(unmatched).intersection(set(self.posids))
         matched = set(matched).intersection(set(self.posids))
         umstr = f':\n{sorted(unmatched)}' if len(unmatched) > 0 else ''
@@ -71,10 +71,13 @@ class RehomeVerify(PECS):
         exppos = exppos.loc[self.posids].drop(
             columns=['PETAL_LOC', 'DEVICE_LOC'], errors='ignore')
         # add can bus ids
-        device_info = (self.ptl.get_positioners(enabled_only=True,
-                                                posids=exppos.index)
-                       .set_index('DEVICE_ID'))
-        exppos = exppos.join(device_info)
+        df_info = (self.ptl.get_positioners(enabled_only=True,
+                                            posids=exppos.index)
+                   .set_index('DEVICE_ID'))
+        df_flags = (self.ptl.get_position(posids=exppos.index)
+                    .set_index('DEVICE_ID').drop(['X1', 'X2'], axis=1))
+        exppos = exppos.merge(df_info).merge(df_flags)
+        exppos['STATUS'] = self.ptl.decipher_posflags(exppos['FLAG'])
         tol = 1
         # now only consider matched, selected positioners, check deviations
         mask = exppos.index.isin(matched) & (exppos['dr'] > tol)
