@@ -91,8 +91,11 @@ class OnePointCalib(PECS):
         # List unmeasured positioners in updates, even with no data
         updates.append(unused_pos, sort=False)
         # overwrite flags with focalplane flags and add status
-        updates['FLAGS'] = [int(flag) for flag in
-                            self.ptl.get_pos_flags(list(updates.index))]
+        flags_dict = self.ptl.get_pos_flags(list(updates.index))
+        flags = []
+        for posid in updates.index:
+            flags.append(flags_dict[posid])
+        updates['FLAGS'] = flags
         updates['STATUS'] = self.ptl.decipher_posflags(updates['FLAGS'])
         # Clean up and record additional entries in updates
         updates['auto_update'] = auto_update
