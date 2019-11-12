@@ -92,7 +92,7 @@ class OnePointCalib(PECS):
         updates.append(unused_pos, sort=False)
         # overwrite flags with focalplane flags and add status
         updates['FLAGS'] = self.ptl.get_pos_flags(list(updates.index))
-        updates['STATUS'] = self.ptl.decipher_posflags(updates['FLAG'])
+        updates['STATUS'] = self.ptl.decipher_posflags(updates['FLAGS'])
         # Clean up and record additional entries in updates
         updates['auto_update'] = auto_update
         updates['target_t'] = requests.set_index('DEVICE_ID')['X1']
