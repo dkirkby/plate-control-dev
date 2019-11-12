@@ -76,8 +76,10 @@ class RehomeVerify(PECS):
                    .set_index('DEVICE_ID'))
         df_flags = (self.ptl.get_positions(posids=list(exppos.index))
                     .set_index('DEVICE_ID').drop(['X1', 'X2'], axis=1))
-        exppos = (exppos.merge(df_info, left_index=True, right_index=True)
-                  .merge(df_flags, left_index=True, right_index=True))
+        cols = df_info.columns.difference(exppos.columns)
+        exppos = exppos.join(df_info[cols])
+        cols = df_flags.columns.difference(exppos.columns)
+        exppos = exppos.join(df_flags[cols])
         exppos['STATUS'] = self.ptl.decipher_posflags(exppos['FLAG'])
         tol = 1
         # now only consider matched, selected positioners, check deviations

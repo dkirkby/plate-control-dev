@@ -79,19 +79,17 @@ class OnePointCalib(PECS):
                                               return_coord='posintTP')
         exppos, meapos, matched, unmatched = self.fvc_measure(
                 match_radius=match_radius)
-        used_pos = meapos.loc[sorted(
-            matched.intersection(set(self.posids)))]  # only matched rows
-        unused_pos = exppos.loc[sorted(
-            unmatched.intersection(set(self.posids)))]  # only unmatched rows
+        used_pos = meapos.loc[sorted(matched & (set(self.posids)))]
+        unused_pos = exppos.loc[sorted(unmatched & (set(self.posids)))]
         updates = (
             self.ptl.test_and_update_TP(
                 used_pos.reset_index(), mode=mode, auto_update=auto_update,
                 tp_updates_tol=0.0, tp_updates_fraction=1.0)
             .set_index('DEVICE_ID').sort_index())
-        # Drop QS so we don't get columns QS in updates with NaNs
-        unused_pos.drop(['Q', 'S'], axis=1)
+        cols = used_pos.columns.difference(updates.columns)
+        updates = updates.join(used_pos[cols])  # include QS measurements
         # List unmeasured positioners in updates, even with no data
-        updates.append(unused_pos, ignore_index=True, sort=False)
+        updates.append(unused_pos, sort=False)
         # Clean up and record additional entries in updates
         updates['auto_update'] = auto_update
         updates['target_t'] = requests.set_index('DEVICE_ID')['X1']
