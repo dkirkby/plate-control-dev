@@ -176,7 +176,6 @@ class XYTest(PECS):
                     self.data.targets_pos[posid] = df[[f'{col1}_{i}',
                                                        f'{col2}_{i}']].values
 
-
     def _add_device_id_col(self, df, pcid):
         '''when df only has DEVICE_LOC, add DEVICE_ID column and use as index
            this method may not be needed anymore after PetalApp update
@@ -263,11 +262,13 @@ class XYTest(PECS):
                 tgt = self.data.targets_pos[posid][i, :]  # two elements
                 if self.data.target_type == 'poslocTP':
                     tgt = ptl.postrans(posid, 'poslocTP_to_poslocXY', tgt)
+                elif self.data.target_type == 'obsXY':
+                    tgt = ptl.postrans(posid, 'obsXY_to_poslocXY', tgt)
                 elif self.data.target_type == 'poslocXY':
                     pass
                 else:
-                    self.logger.error('Target not supported, must be posloc')
-                    raise ValueError('Target not supported, must be posloc')
+                    self.logger.error('Bad Target type.')
+                    raise ValueError('Bad Target type.')
                 movedf.loc[idx[i, posid],
                            ['target_x', 'target_y']] = tgt
             tgt = movedf.loc[idx[i, posids],
@@ -291,12 +292,12 @@ class XYTest(PECS):
         ptl.prepare_move(req, anticollision=self.data.anticollision)
         expected_QS = ptl.execute_move(reset_flags=False, return_coord='QS')
         self.loggers[pcid].debug('execute_move() returns expected QS:\n'
-                                  + expected_QS.to_string())
+                                 + expected_QS.to_string())
         # get expected posintTP from petal and write to movedf after move
         ret_TP = ptl.get_positions(posids=posids, return_coord='posintTP')
         ret_TP['STATUS'] = ptl.decipher_posflags(ret_TP['FLAG'])
         self.loggers[pcid].debug(f'Expected posintTP after move {n}:\n'
-                                  + ret_TP.to_string())
+                                 + ret_TP.to_string())
         # record per-move data to movedf for a petal
         new = pd.DataFrame({f'pos_int_t_{n}': ret_TP['X1'],
                             f'pos_int_p_{n}': ret_TP['X2'],
@@ -340,7 +341,7 @@ class XYTest(PECS):
                     self.data.posids = [posid for posid in self.data.posids
                                         if posid not in disabled]
                     self.data.posids_pc[pcid] = [posid for posid in posids
-                                                   if posid not in disabled]
+                                                 if posid not in disabled]
             else:
                 self.loggers[pcid].info(
                     f'All {len(posids)} requested fibres measured by FVC.')
@@ -357,7 +358,7 @@ class XYTest(PECS):
                 f'Exception calling test_and_update_TP, returned:\n'
                 f'{updates}')
             self.loggers[pcid].debug(f'test_and_update_TP returned:\n'
-                                      f'{updates.to_string()}')
+                                     f'{updates.to_string()}')
 
     def record_measurement(self, measured_QS, i, n):
         def lookup_pcid(posid):
@@ -398,7 +399,7 @@ class XYTest(PECS):
                 f'    avg: {np.mean(errXY):6.1f} μm\n'
                 f'    min: {np.min(errXY):6.1f} μm')
             self.loggers[pcid].info('Worst 10 positioners:\n'
-                                     f'{err.iloc[:10].to_string()}')
+                                    f'{err.iloc[:10].to_string()}')
 
 
 if __name__ == '__main__':

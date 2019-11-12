@@ -217,10 +217,10 @@ class PosTransforms(petaltransforms.PetalTransforms):
     #     obsXY = self.ptlXY_to_obsXY(ptlXY, cast=True).flatten()  # 1D arr
     #     return tuple(obsXY)  # (x, y)
 
-    # def obsXY_to_poslocXY(self, obsXY):
-    #     ''' input is list or tuple '''
-    #     ptlXY = self.obsXY_to_ptlXY(obsXY, cast=True).flatten()  # 1D arr
-    #     return self.ptlXY_to_poslocXY(ptlXY)  # return (poslocX, poslocY)
+    def obsXY_to_poslocXY(self, obsXY):
+        ''' input is list or tuple '''
+        QS = self.obsXY_to_QS(obsXY, cast=True).flatten()  # 1D arr
+        return self.QS_to_poslocXY(QS)  # return (poslocX, poslocY)
 
     def QS_to_poslocXY(self, QS):
         ''' input is list or tuple '''
