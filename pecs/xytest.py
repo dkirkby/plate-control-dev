@@ -178,7 +178,7 @@ class XYTest(PECS):
                         self.data.targets_pos[posid] = (
                             df[[f'{col1}_{i}', f'{col2}_{i}']].values)
                     else:
-                        self.logger.info(
+                        self.logger.warning(
                             'Missing target assignment for device_loc '
                             f'{i}, posid {posid}')
 
@@ -264,12 +264,18 @@ class XYTest(PECS):
         if n == 0:  # blind move, issue cmd in obsXY for easy check with FVC
             self.logger.info(f'Setting up target {i} in poslocXY...')
             movetype, cmd = 'blind', 'poslocXY'
-            for posid in tqdm(posids):  # write targets to move df
+            for posid in posids:  # write targets to move df
                 if posid not in self.data.targets_pos.keys():
                     continue
                 tgt = self.data.targets_pos[posid][i, :]  # two elements
                 if self.data.target_type == 'poslocTP':
                     tgt = ptl.postrans(posid, 'poslocTP_to_poslocXY', tgt)
+                    posintTP, unreachable = ptl.postrans(
+                        posid, 'poslocXY_to_posintTP', tgt, 'targetable')
+                    if unreachable:
+                        self.logger.warning(f'{posid} unreachable: {posintTP}')
+                    else:
+                        self.logger.info(f'{posid} reachable: {posintTP}')
                 elif self.data.target_type == 'obsXY':
                     tgt = ptl.postrans(posid, 'obsXY_to_poslocXY', tgt)
                 elif self.data.target_type == 'poslocXY':
@@ -279,7 +285,7 @@ class XYTest(PECS):
                     raise ValueError('Bad Target type.')
                 movedf.loc[idx[i, posid],
                            ['target_x', 'target_y']] = tgt
-            tgt = movedf.loc[idx[i, posids],
+            tgt = movedf.loc[idx[i, posids],  # N x 2 array
                              ['target_x', 'target_y']].values
         else:
             movetype, cmd = 'corrective', 'dXdY'

@@ -112,7 +112,7 @@ class PECS:
 
     def _interactively_get_ptl(self):
         pcid = input(f'Availible PCIDs: {list(self.ptls.keys())}\n'
-                      f'Please enter a PCID (integer only): ')
+                     f'Please enter a PCID (integer only): ')
         if pcid.isdigit():
             self.printfunc(f'Selected PCID = {pcid}')
             return int(pcid)
@@ -148,6 +148,7 @@ class PECS:
         (bot have DEVICE_ID as index and sorted) and
         matched_posids (set), unmatched_posids (set)'''
         if exppos is None:
+            # get all backlit fibres
             exppos_list = [(self.ptls[pcid].get_positions(return_coord='QS')
                             .sort_values(by='DEVICE_ID'))
                            for pcid in self.pcids]  # includes all posids
