@@ -86,6 +86,20 @@ class PosSchedule(object):
         elif uv_type == 'poslocXY':
             targt_posintTP, unreachable = trans.poslocXY_to_posintTP(
                 [u, v], lims)
+            if self.verbose:  # debug
+                targt_poslocTP, _ = trans.poslocXY_to_poslocTP(
+                    [u, v], lims)
+                if unreachable:
+                    self.printfunc(
+                        f'{posid} unreachable, target poslocXY = {[u, v]}, '
+                        f'lims = {lims}, '
+                        f'targt_posintTP = {targt_posintTP}, '
+                        f'unreachable = {unreachable}, '
+                        f'targt_poslocTP = {targt_poslocTP}, '
+                        f'targetable_range_T = {posmodel.targetable_range_T}, '
+                        f'targetable_range_P = {posmodel.targetable_range_P}, '
+                        f"offset_T = {trans.getval['OFFEST_T']}, "
+                        f"offset_P = {trans.getval['OFFEST_P']}")
         elif uv_type == 'dXdY':  # in poslocXY coordinates, not global
             start_uv = current_position['poslocXY']
             targt_uv = posmodel.trans.addto_XY(start_uv, [u, v])
@@ -111,6 +125,7 @@ class PosSchedule(object):
             if self.verbose:
                 self.printfunc(f'{posid}: target request denied. Target not '
                                f'reachable: {uv_type}, ({u:.3f}, {v:.3f})')
+
             return False
         targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
         if self._deny_request_because_target_interference(
