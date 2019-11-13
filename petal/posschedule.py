@@ -98,8 +98,8 @@ class PosSchedule(object):
                         f'targt_poslocTP = {targt_poslocTP}, '
                         f'targetable_range_T = {posmodel.targetable_range_T}, '
                         f'targetable_range_P = {posmodel.targetable_range_P}, '
-                        f"offset_T = {trans.getval['OFFEST_T']}, "
-                        f"offset_P = {trans.getval['OFFEST_P']}")
+                        f"offset_T = {trans.getval('OFFEST_T')}, "
+                        f"offset_P = {trans.getval('OFFEST_P')}")
         elif uv_type == 'dXdY':  # in poslocXY coordinates, not global
             start_uv = current_position['poslocXY']
             targt_uv = posmodel.trans.addto_XY(start_uv, [u, v])
