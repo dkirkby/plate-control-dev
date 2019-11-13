@@ -135,8 +135,8 @@ class XYTest(PECS):
         return np.array([x[mask], y[mask]])  # return 2 x N array of targets
 
     def generate_targets(self):
-        path = self.data.test_cfg['input_targs_file']
-        if path is None:  # no targets supplied, create local targets in posXY
+        fn = self.data.test_cfg['input_targs_file']
+        if fn is None:  # no targets supplied, create local targets in posXY
             tgt = self._generate_poslocXY_targets_grid(
                 self.data.test_cfg['targ_min_radius'],
                 self.data.test_cfg['targ_max_radius'],
@@ -156,6 +156,7 @@ class XYTest(PECS):
             self.data.ntargets = tgt.shape[0]  # shape (N_targets, 2)
             self.data.target_type = 'poslocXY'
         else:  # use input target table, see xytest_psf.csv as an exampl
+            path = os.path.join(pc.dirs['test_settings'], fn)
             assert os.path.isfile(path), f'Invald target file path: {path}'
             self.data.targets = path
             # set move command according to target type
@@ -171,10 +172,15 @@ class XYTest(PECS):
             df = pd.read_csv(path, index_col='target_no')
             self.data.ntargets = len(df)  # set number of targets
             for pcid in self.data.pcids:  # set targets for each positioner
-                for posid in self.posids_pc[pcid]:
+                for posid in self.data.posids_pc[pcid]:
                     i = self.data.posdf.loc[posid]['DEVICE_LOC']
-                    self.data.targets_pos[posid] = df[[f'{col1}_{i}',
-                                                       f'{col2}_{i}']].values
+                    if f'{col1}_{i}' in df.columns:
+                        self.data.targets_pos[posid] = (
+                            df[[f'{col1}_{i}', f'{col2}_{i}']].values)
+                    else:
+                        self.logger.info(
+                            'Missing target assignment for device_loc '
+                            f'{i}, posid {posid}')
 
     def _add_device_id_col(self, df, pcid):
         '''when df only has DEVICE_LOC, add DEVICE_ID column and use as index
@@ -259,6 +265,8 @@ class XYTest(PECS):
             self.logger.info(f'Setting up target {i} in poslocXY...')
             movetype, cmd = 'blind', 'poslocXY'
             for posid in tqdm(posids):  # write targets to move df
+                if posid not in self.data.targets_pos.keys():
+                    continue
                 tgt = self.data.targets_pos[posid][i, :]  # two elements
                 if self.data.target_type == 'poslocTP':
                     tgt = ptl.postrans(posid, 'poslocTP_to_poslocXY', tgt)
@@ -403,7 +411,7 @@ class XYTest(PECS):
 
 
 if __name__ == '__main__':
-    path = os.path.join(pc.dirs['test_settings'], 'xytest_ptl3_sim.cfg')
+    path = os.path.join(pc.dirs['test_settings'], 'xytest_cmx_psf.cfg')
     print(f'Loading test config: {path}')
     xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')  # read cfg
     xytest_name = input('Please name this test: ')
