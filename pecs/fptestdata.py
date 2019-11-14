@@ -174,7 +174,7 @@ class FPTestData:
         '''
         # build column names and data types, all in petal-local flatXY CS
         cols0 = ['timestamp', 'cycle', 'move_log']
-        dtypes0 = ['datetime64[ns]', np.uint32, str]
+        dtypes0 = ['datetime64[ns]', np.uint64, str]
         cols1 = ['target_x', 'target_y']
         cols2_base = ['meas_q', 'meas_s', 'meas_x', 'meas_y',
                       'err_x', 'err_y', 'err_xy',
@@ -183,7 +183,7 @@ class FPTestData:
         for field, i in product(cols2_base, range(self.num_corr_max+1)):
             cols2.append(f'{field}_{i}')
         cols = cols0 + cols1 + cols2  # list of all columns
-        dtypes = dtypes0 + [np.float32] * (len(cols1) + len(cols2))
+        dtypes = dtypes0 + [np.float64] * (len(cols1) + len(cols2))
         data = {col: pd.Series(dtype=dt) for col, dt in zip(cols, dtypes)}
         # build multi-level index
         iterables = [np.arange(self.ntargets), posids]
