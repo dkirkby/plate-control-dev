@@ -58,12 +58,12 @@ class ArcCalib(PECS):
         if isinstance(ret, dict):
             for i in range(self.n_points_T):
                 dflist = []
-                for df in ret.items():
+                for df in ret.values():
                     dflist.append(df[0][i])
                 req_list_T.append(pd.concat(dflist))
             for j in range(self.n_points_P):
                     dflist = []
-                    for df in ret.items():
+                    for df in ret.values():
                         dflist.append(df[1][j])
                     req_list_P.append(pd.concat(dflist))
         else:
@@ -87,15 +87,17 @@ class ArcCalib(PECS):
             if self.allow_pause and i+1 < len(req_list_T):
                 input('Paused for heat load monitoring, '
                       'press enter to continue: ')
+        # Control gives 10 min timeout in petalman
         retcode = self.ptlm.calibrate_from_arc_data(T_data, P_data,
-                                                   auto_update=auto_update)
+                                                   auto_update=auto_update,
+                                                   control={'timeout':600})
         if isinstance(retcode, dict):
             dflist = []
-            for df in retcode.items():
+            for df in retcode.values():
                 dflist.append(df)
-            updates = pd.concat(dflist).set_index('DEVICE_ID').sort_index()
+            updates = pd.concat(dflist).sort_values(by=['DEVICE_ID'])
         else:
-            updates = retcode.set_index('DEVICE_ID').sort_index()
+            updates = retcode.sort_values(by=['DEVICE_ID'])
         updates['auto_update'] = auto_update
         return updates
 

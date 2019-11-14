@@ -56,9 +56,9 @@ class GridCalib(PECS):
                                               n_points_P=self.n_points_P)
         if isinstance(ret, dict):
             req_list = []
-            for i in len(self.n_points_P*self.n_points_T):
+            for i in range(self.n_points_P*self.n_points_T):
                 dflist = []
-                for df in ret.items():
+                for df in ret.values():
                     dflist.append(df[i])
                 req_list.append(pd.concat(dflist))
         else:
@@ -71,15 +71,17 @@ class GridCalib(PECS):
             if self.allow_pause and i+1 < len(req_list):
                 input('Paused for heat load monitoring, '
                       'press enter to continue: ')
+        # Control gives 10 minute timeout on calibration
         retcode = self.ptlm.calibrate_from_grid_data(grid_data,
-                                                    auto_update=auto_update)
+                                                    auto_update=auto_update,
+                                                    control={'timeout':600})
         if isinstance(retcode, dict):
             dflist = []
-            for df in retcode.items():
+            for df in retcode.values():
                 dflist.append(df)
-            updates = pd.concat(dflist).set_index('DEVICE_ID').sort_index()
+            updates = pd.concat(dflist).sort_values(by=['DEVICE_ID'])
         else:
-            updates = retcode.set_index('DEVICE_ID').sort_index()
+            updates = retcode.sort_values(by=['DEVICE_ID'])
         updates['auto_update'] = auto_update
         return updates
 

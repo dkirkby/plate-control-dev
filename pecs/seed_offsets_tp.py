@@ -10,7 +10,7 @@ import posconstants as pc
 class SeedOffsetsTP(PECS):
     def __init__(self, fvc=None, ptlm=None,
                  petal_roles=None, posids=None, interactive=False):
-        super().__init__(fvc=fvc, ptls=ptlm)
+        super().__init__(fvc=fvc, ptlm=ptlm)
         self.printfunc('\nSeeding offsetsTP...\n')
         if interactive:
             self.interactive_ptl_setup()

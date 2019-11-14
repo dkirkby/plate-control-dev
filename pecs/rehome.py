@@ -39,14 +39,13 @@ class Rehome(PECS):
                                    anticollision=anticollision)
         if isinstance(ret, dict):
             dflist = []
-            for df in ret.items():
+            for df in ret.values():
                 dflist.append(df)
             ret = pd.concat(dflist)
         ret = (ret.rename(columns={'X1': 'posintT', 'X2': 'posintP'})
                  .sort_values(by='DEVICE_ID').reset_index())
-        # Just ask one petal to decipher so we don't have to assemble retcode
-        ret['STATUS'] = self.ptlm.decipher_posflags(ret['FLAG'],
-                             participating_petals=list(self.ptlm.Petals.keys())[0])
+        # Just take the first petal's result
+        ret['STATUS'] = list(self.ptlm.decipher_posflags(ret['FLAG']).values())[0]
         mask = ret['FLAG'] != 4
         retry_list = list(ret.loc[mask, 'DEVICE_ID'])
         if len(retry_list) == 0:
@@ -65,7 +64,8 @@ class Rehome(PECS):
             else:  # already at 3rd attempt. fail
                 self.printfunc(f'3rd attempt did not complete successfully '
                                f'for positioners: {posids}')
-        ret = self.ptlm.get_positions(posids=self.posids, return_coord='obsXY')
+        ret = self.ptlm.get_positions(return_coord='obsXY')
+        ret = ret[ret['DEVICE_ID'].isin(self.posids)]
         return ret.rename(columns={'X1': 'expected_obsX',
                                    'X2': 'expected_obsY'})
 

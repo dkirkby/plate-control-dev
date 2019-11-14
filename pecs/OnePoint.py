@@ -67,9 +67,10 @@ class OnePointCalib(PECS):
                 ptl = self.get_owning_ptl(posid)
                 posintTP = self.ptlm.postrans(posid,
                                              'poslocTP_to_posintTP', poslocTP,
-                                             participating_petals=[ptl])
+                                              participating_petals=[ptl])
                 # Work with ptl/dev loc for filtering in PetalMan.prepare_move
-                rows.append({'PETAL_LOC': row['PETAL_LOC'],
+                rows.append({'DEVICE_ID':posid,
+                             'PETAL_LOC': row['PETAL_LOC'],
                              'DEVICE_LOC': row['DEVICE_LOC'],
                              'COMMAND': 'posintTP',
                              'X1': posintTP[0],
@@ -82,6 +83,7 @@ class OnePointCalib(PECS):
             requests = self.ptlm.get_positions(return_coord='posintTP')
             # PetalMan.get_positions does not take posid arg, filter
             requests = requests[requests['DEVICE_ID'].isin(self.posids)]
+            print(requests)
         exppos, meapos, matched, unmatched = self.fvc_measure(
                 match_radius=match_radius)
         used_pos = meapos.loc[sorted(list(matched))]  # only matched rows
@@ -91,7 +93,7 @@ class OnePointCalib(PECS):
                 tp_updates_tol=0.0, tp_updates_fraction=1.0)
         if isinstance(retcode, dict):
             dflist = []
-            for df in retcode.items():
+            for df in retcode.values():
                 dflist.append(df)
             updates = pd.concat(dflist).set_index('DEVICE_ID').sort_index()
         else:

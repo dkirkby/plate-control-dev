@@ -44,16 +44,16 @@ class RehomeVerify(PECS):
                                     posids=sorted(list(exppos['DEVICE_ID'])))
         if isinstance(ret, dict):
             dflist = []
-            for d in ret.items():
+            for d in ret.values():
                 dflist.append(d)
             df = pd.concat(dflist).set_index('DEVICE_ID').sort_index()
         else:
             df = ret.set_index('DEVICE_ID').sort_index()
         offXY = df[['OFFSET_X', 'OFFSET_Y']].values.T
         # Just use one petal for ptltrans
-        a_ptl = list(self.ptlm.Petals.keys())
-        hom_QS = self.ptlm.ptltrans('flatXY_to_QS', offXY, participating_petals=a_ptl)  # 2xN array
-        hom_obsXY = self.ptlm.ptltrans('QS_to_obsXYZ', hom_QS, participating_petals=a_ptl)[:2]  # 3xN array
+        a_ptl = list(self.ptlm.Petals.keys())[0]
+        hom_QS = self.ptlm.ptltrans('flatXY_to_QS', offXY, participating_petals=a_ptl)[a_ptl] # 2xN array
+        hom_obsXY = self.ptlm.ptltrans('QS_to_obsXYZ', hom_QS, participating_petals=a_ptl)[a_ptl][:2]  # 3xN array
         # set nominal homed QS as expected postiions for FVC spotmatch
         exppos[['X1', 'X2']] = hom_QS.T
         self.printfunc('Taking FVC exposure to confirm home positions...')
@@ -73,7 +73,7 @@ class RehomeVerify(PECS):
         exppos[['hom_obsX', 'hom_obsY']] = hom_obsXY.T
         mea_obsXY = self.ptlm.ptltrans('QS_to_obsXYZ',
                                       meapos[['Q', 'S']].values.T,
-                                      participating_petals=a_ptl)[:2]
+                                      participating_petals=a_ptl)[a_ptl][:2]
         exppos.loc[meapos.index, ['mea_obsX', 'mea_obsY']] = mea_obsXY.T
         exppos['obsdX'] = exppos['mea_obsX'] - exppos['hom_obsX']
         exppos['obsdY'] = exppos['mea_obsY'] - exppos['hom_obsY']
@@ -86,7 +86,7 @@ class RehomeVerify(PECS):
                                                 posids=exppos.index)
         if isinstance(retcode, dict):
             dflist = []
-            for d in retcode.items():
+            for d in retcode.values():
                 dflist.append(d)
             device_info = pd.concat(dflist).set_index('DEVICE_ID').sort_index()
         else:
