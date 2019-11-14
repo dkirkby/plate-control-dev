@@ -709,6 +709,7 @@ class Petal(object):
 
         Fiducials that do not have control enabled will not appear in this dictionary.
         """
+        error = False
         if self.simulator_on:
             self.printfunc('Simulator skips sending out set_fiducials commands on petal ' + str(self.petal_id) + '.')
             return {}
@@ -749,17 +750,22 @@ class Petal(object):
                 if ret[busids[i]][canids[i]] != duties[i]:
                     self.printfunc('WARNING: set_fiducials: disagreement in fiducial set duty and returned duty, ID: %s' % enabled[i])
                     set_duty = ret[busids[i]][canids[i]]
+                    error = True
             elif not save_as_default:
                 # Use remembered state, fid not responding but only if not saving defaults
-                self.printfunc('set_fiducials: fiducials %s not returned by petalcontroller, state not set.' % enabled[i])
+                self.printfunc('WARNING: set_fiducials: fiducials %s not returned by petalcontroller, state not set.' % enabled[i])
                 set_duty = self.get_posfid_val(enabled[i], 'DUTY_STATE')
+                error = True
             self.set_posfid_val(enabled[i], 'DUTY_STATE', set_duty)
             settings_done[enabled[i]] = set_duty
             if save_as_default:
                 self.set_posfid_val(enabled[i], 'DUTY_DEFAULT_ON', set_duty)
             self.altered_calib_states.add(self.states[enabled[i]])
         self.commit(mode='both', log_note='set fiducial parameters')
-        return settings_done
+        if error:
+            return 'FAILED: not all fiducials set. Try moving to READY if trying to turn them off.'
+        else:
+            return settings_done
 
     @property
     def n_fiducial_dots(self):
@@ -831,6 +837,10 @@ class Petal(object):
                 self.printfunc('_set_hardware_state: all devices have changed state.')
                 if hasattr(self, 'ops_state_sv'):
                     self.ops_state_sv.write(ret)
+                if hw_state != 'OBSERVING':
+                    # fids off
+                    for fid in self.fidids:
+                        self.set_posfid_val(fid, 'DUTY_STATE', 0)
             else:
                 self.printfunc('_set_hardware_state: FAILED: when calling comm.ops_state: %s' % ret)
                 raise_error('_set_hardware_state: comm.ops_state returned %s' % ret)
@@ -1359,7 +1369,10 @@ class Petal(object):
                     self.printfunc('_petal_configure: error strings from checking opsstate: %s' % err_strings)
             else:
                 self.printfunc('_petal_configure: ops_state remains in %s' % hwstate)
-
+            if hwstate != 'OBSERVING':
+                # fids off
+                for fid in self.fidids:
+                    self.set_posfid_val(fid, 'DUTY_STATE', 0)
         #Reset values
         self.canids_where_tables_were_just_sent = []
         self.busids_where_tables_were_just_sent = []
