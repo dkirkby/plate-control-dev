@@ -36,7 +36,8 @@ class Rehome(PECS):
         if self.allow_pause:
             input('Paused for heat load monitoring, press enter to continue: ')
         ret = self.ptlm.rehome_pos(posids, axis=self.axis,
-                                   anticollision=anticollision)
+                                   anticollision=anticollision,
+                                   control = {'timeout': 60.0})
         if isinstance(ret, dict):
             dflist = []
             for df in ret.values():
@@ -71,4 +72,4 @@ class Rehome(PECS):
 
 
 if __name__ == '__main__':
-    Rehome(axis='theta_only', interactive=True)  # theta_only, phi_only, or both
+    Rehome(axis='both', interactive=True)  # theta_only, phi_only, or both

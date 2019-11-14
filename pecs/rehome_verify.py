@@ -44,15 +44,21 @@ class RehomeVerify(PECS):
                                     posids=sorted(list(exppos['DEVICE_ID'])))
         if isinstance(ret, dict):
             dflist = []
-            for d in ret.values():
+            for ptl, d in ret.items():
+                home = self.ptlm.ptltrans('flatXY_to_QS', d[['OFFSET_X','OFFSET_Y']].values.T, participating_petals=ptl)[ptl]
+                d['HOME_Q'] = home[0]
+                d['HOME_S'] = home[1]
                 dflist.append(d)
-            df = pd.concat(dflist).set_index('DEVICE_ID').sort_index()
+            df = pd.concat(dflist).reset_index().set_index('DEVICE_ID').sort_index()
         else:
             df = ret.set_index('DEVICE_ID').sort_index()
+            home = self.ptlm.ptltrans('flatXY_to_QS', df[['OFFSET_X','OFFSET_Y']].values.T)
+            df['HOME_Q'] = home[0]
+            df['HOME_S'] = home[1]
         offXY = df[['OFFSET_X', 'OFFSET_Y']].values.T
         # Just use one petal for ptltrans
         a_ptl = list(self.ptlm.Petals.keys())[0]
-        hom_QS = self.ptlm.ptltrans('flatXY_to_QS', offXY, participating_petals=a_ptl)[a_ptl] # 2xN array
+        hom_QS = df[['HOME_Q','HOME_S']].values.T
         hom_obsXY = self.ptlm.ptltrans('QS_to_obsXYZ', hom_QS, participating_petals=a_ptl)[a_ptl][:2]  # 3xN array
         # set nominal homed QS as expected postiions for FVC spotmatch
         exppos[['X1', 'X2']] = hom_QS.T

@@ -185,6 +185,7 @@ class PECS:
             # participating_petals=None gets responses from all - not just selected petals
             exppos = (self.ptlm.get_positions(return_coord='QS', participating_petals=None)
                       .sort_values(by='DEVICE_ID'))  # includes all posids
+        exppos.reset_index(inplace=True)
         mr_old = self.fvc.get('match_radius')  # hold old match radius
         if mr_old != match_radius: # Ignore call if the same.
             self.fvc.set(match_radius=match_radius)  # set larger radius for calib
