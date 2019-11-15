@@ -288,6 +288,12 @@ class PosMoveTable(object):
             table['net_time'] = [table['move_time'][i] + table['prepause'][i] + table['postpause'][i] for i in row_range]
             for i in range(1,table['nrows']):
                 table['net_time'][i] += table['net_time'][i-1]
+        if output_type in {'schedule','cleanup','full'}:
+            table['net_dT'] = table['dT'].copy()
+            table['net_dP'] = table['dP'].copy()
+            for i in range(1, table['nrows']):
+                table['net_dT'][i] += table['net_dT'][i-1]
+                table['net_dP'][i] += table['net_dP'][i-1]
         if output_type in {'cleanup','full'}:
             table.update({'TOTAL_CRUISE_MOVES_T':0,'TOTAL_CRUISE_MOVES_P':0,'TOTAL_CREEP_MOVES_T':0,'TOTAL_CREEP_MOVES_P':0})
             for i in row_range:
@@ -295,11 +301,6 @@ class PosMoveTable(object):
                 table['TOTAL_CRUISE_MOVES_P'] += int(table['speed_mode_P'][i] == 'cruise' and table['dP'] != 0)
                 table['TOTAL_CREEP_MOVES_T'] += int(table['speed_mode_T'][i] == 'creep' and table['dT'] != 0)
                 table['TOTAL_CREEP_MOVES_P'] += int(table['speed_mode_P'][i] == 'creep' and table['dP'] != 0)
-            table['net_dT'] = table['dT'].copy()
-            table['net_dP'] = table['dP'].copy()
-            for i in range(1, table['nrows']):
-                table['net_dT'][i] += table['net_dT'][i-1]
-                table['net_dP'][i] += table['net_dP'][i-1]
             table['log_note'] = self.log_note
         if output_type == 'full':
             trans = self.posmodel.trans

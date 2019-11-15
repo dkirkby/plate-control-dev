@@ -104,6 +104,7 @@ gear_ratio['faulhaber'] = 256.0  		 # faulhaber "256:1", output rotation/motor i
 T = 0  # theta axis idx -- NOT the motor axis ID!!
 P = 1  # phi axis idx -- NOT the motor axis ID!!
 axis_labels = ('theta', 'phi')
+schedule_checking_numeric_angular_tol = 0.001 # deg, equiv to about 0.1 um at full extension of both arms
 
 # Nominal and tolerance calibration values
 nominals = collections.OrderedDict()

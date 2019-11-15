@@ -10,7 +10,16 @@ class PosSchedStats(object):
         self.schedule_ids = []
         self.collisions = {}
         self.strings = {'method':[]}
-        self.numbers = {'n pos':[], 'n move tables':[], 'max table move time':[],'num path adjustment iters':[], 'request_target calc time':[], 'expert_add_table calc time':[], 'schedule_moves calc time':[]}
+        self.numbers = {'n pos':[],
+                        'n requests':[],
+                        'n requests accepted':[],
+                        'n move tables':[],
+                        'n tables achieving requested targets':[],
+                        'max table move time':[],
+                        'num path adjustment iters':[],
+                        'request_target calc time':[],
+                        'expert_add_table calc time':[],
+                        'schedule_moves calc time':[]}
         self.num_moving = {}
     
     @property
@@ -57,6 +66,21 @@ class PosSchedStats(object):
         this_dict[method] = this_dict[method].union(posids)
         self.real_data_yet_in_latest_row = True
         
+    def add_request(self):
+        """Increment requests count."""
+        self.numbers['n requests'][-1] += 1
+        self.real_data_yet_in_latest_row = True
+        
+    def add_request_accepted(self):
+        """Increment requests accepted count."""
+        self.numbers['n requests accepted'][-1] += 1
+        self.real_data_yet_in_latest_row = True
+    
+    def add_table_matching_request(self):
+        """Increment number of tables matching their original requests."""
+        self.numbers['n tables achieving requested targets'][-1] += 1
+        self.real_data_yet_in_latest_row = True
+    
     def add_requesting_time(self, time):
         """Add in time spent processing target requests in the current schedule."""
         self.numbers['request_target calc time'][-1] += time

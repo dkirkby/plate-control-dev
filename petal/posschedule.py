@@ -59,6 +59,7 @@ class PosSchedule(object):
         """
         if self.stats:
             timer_start = time.clock()
+            self.stats.add_request()
         posmodel = self.petal.posmodels[posid]
         trans = posmodel.trans
         if self.already_requested(posid):
@@ -152,6 +153,7 @@ class PosSchedule(object):
         self.requests[posid] = new_request
         if self.stats:
             self.stats.add_requesting_time(time.clock() - timer_start)
+            self.stats.add_request_accepted()
         return True
 
     def schedule_moves(self, anticollision='freeze'):
@@ -205,12 +207,10 @@ class PosSchedule(object):
                     self.move_tables[posid].extend(table)
                 else:
                     self.move_tables[posid] = table
-                if anticollision == 'adjust':
-                    # note: compare function currently only works correctly for RRE stages
-                    table_for_schedule = table.for_schedule()
+                if self.verbose:
                     stage_sweep = self.stages[name].sweeps[posid] # quantized sweep after path adjustments
-                    self.compare_table_with_sweep(table_for_schedule, stage_sweep)
-
+                    self._table_matches_quantized_sweep(table, stage_sweep) # prints a message if unmatched
+                    
         # for debugging purpose -- can be taken/commented out later
         if self.verbose:
             self.printfunc("MOVE TABLE")
@@ -238,6 +238,9 @@ class PosSchedule(object):
                 req = self.requests.pop(posid)
                 table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
                 table.log_note += (' ' if table.log_note else '') + req['log_note'] # keep the original log notes with move tables
+                if self.stats:
+                    if self._table_matches_original_request(table,req):
+                        self.stats.add_table_matching_request()
         if self.petal.animator_on:
             for name in self.stage_order:
                 stage = self.stages[name]
@@ -265,51 +268,33 @@ class PosSchedule(object):
                         stage_start_time = max(num_moving.keys())
             self.stats.add_num_moving_data(num_moving)
 
-    def compare_table_with_sweep(self, move_table, sweep):
-        """ Takes as input a "for_schedule()" move table and a quantized sweep,
-        and then cross-checks them whether they match.
-
-        Currently only works correctly for RRE move table.
+    def _table_matches_quantized_sweep(self, move_table, sweep):
+        """Takes as input a "for_schedule()" move table and a quantized sweep,
+        and then cross-checks whether their total rotations (theta and phi)
+        match. Returns a boolean.
         """
-        ind_tdot_pos = np.where(sweep.tp_dot[0] > 0)[0]
-        ind_tdot_neg = np.where(sweep.tp_dot[0] < 0)[0]
-        ind_pdot_pos = np.where(sweep.tp_dot[1] > 0)[0]
-        ind_pdot_neg = np.where(sweep.tp_dot[1] < 0)[0]
-        all_ind = [ind_tdot_pos, ind_tdot_neg, ind_pdot_pos, ind_pdot_neg]
-        all_moving = [ind for ind in all_ind if ind.size]
-
-        # check_table will be populated based on sweep, and used to check against move_table
-        check_table = {'dT':[], 'dP': [], 'move_time': [], 'Tdot':[], 'Pdot': []}
-        if all_moving:
-            from operator import itemgetter
-            all_moving = sorted(all_moving, key=itemgetter(0))
-
-            for i in range(len(all_moving)):
-                time_moving = sweep.time[all_moving[i]]
-                start = all_moving[i][0]
-                end = all_moving[i][-1]
-
-                move_time = time_moving[-1] - time_moving[0]
-                dT = sweep.theta(end) - sweep.theta(start-1)
-                dP = sweep.phi(end) - sweep.phi(start-1)
-
-                # need to be more robust, as this assumes tdot value is unique
-                tdot = sweep.tp_dot[0][all_moving[i]][0]
-                pdot = sweep.tp_dot[1][all_moving[i]][0]
-
-                check_table['dT'].append(dT)
-                check_table['dP'].append(dP)
-                check_table['move_time'].append(move_time)
-                check_table['Tdot'].append(tdot)
-                check_table['Pdot'].append(pdot)
-
-        # cross-checking final tp positions
+        tol = pc.schedule_checking_numeric_angular_tol
+        table = move_table.for_schedule()
         end_tp_sweep = [sweep.theta(-1), sweep.phi(-1)]
-        end_tp_table = [sum(np.array(move_table['dT'])) + sweep.theta(0), sum(np.array(move_table['dP'])) + sweep.phi(0)]
-        endpos_tol = (180.*self.collider.timestep)/2. # tolerance set to half the timestep...?
-
-        if (abs(np.array(end_tp_sweep) - np.array(end_tp_table)) <= endpos_tol).all(): pass
-        else: self.printfunc(f'{sweep.posid} end_tp: check={end_tp_sweep}, move={end_tp_table}')
+        end_tp_table = [table['net_dT'][-1] + sweep.theta(0), table['net_dP'][-1] + sweep.phi(0)]
+        endpos_diff = [end_tp_sweep[i] - end_tp_table[i] for i in range(2)]
+        if abs(endpos_diff[0]) > tol or abs(endpos_diff[1]) > tol:
+            self.printfunc(f'table and sweep not matched: {sweep.posid} end_tp: check={end_tp_sweep}, move={end_tp_table}')
+            return False
+        return True
+    
+    def _table_matches_original_request(self, move_table, request):
+        """Input a move table and check whether the total motion matches request.
+        Returns a boolean.
+        """
+        tol = pc.schedule_checking_numeric_angular_tol
+        table = move_table.for_schedule()
+        dtdp_request = [request['targt_posintTP'][i] - request['targt_posintTP'][i] for i in range(2)]
+        dtdp_table = [table['net_dT'][-1], table['net_dP'][-1]]
+        diff = [dtdp_request[i] - dtdp_table[i] for i in range(2)]
+        if abs(diff[0]) > tol or abs(diff[1]) > tol:
+            return False
+        return True
 
     def already_requested(self, posid):
         """Returns boolean whether a request has already been registered in the
