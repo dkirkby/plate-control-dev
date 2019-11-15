@@ -43,6 +43,9 @@ class PECS:
             unrepr=True, encoding='utf-8')
         for attr in pecs_local.keys():
             setattr(self, attr, pecs_local[attr])
+        if self.illuminated_petals is not None:
+            for ptl in self.illuminated_petals:
+                assert(ptl in list(self.ptlm.Petals.keys())), 'Illuminated petals must be in availible petals!'
         # self.all_fiducials = pecs_local['all_fiducials']
         # self.constants_version = pecs_local['constants_version']
         # self.pm_instrument = pecs_local['pm_instrument']
@@ -85,7 +88,9 @@ class PECS:
             self.printfunc(f'Defaulting to petal roles = {self.ptlm.participating_petals}')
         else:
             for ptl in petal_roles:
-                assert ('PETAL' in ptl), 'Petal role names are always PETAL###, invalid role name {ptl}'
+                assert ('PETAL' in ptl), f'Petal role names are always PETAL###, invalid role name {ptl}'
+                if self.illuminated_petals is not None:
+                    assert(ptl in self.illuminated_petals), f'{ptl} must be illuminated!'
             self.ptlm.participating_petals = petal_roles
         if (posids is None) and (ids is None):
             retcode = self.ptlm.get_positioners(enabled_only=True)
