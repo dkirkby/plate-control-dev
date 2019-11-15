@@ -23,6 +23,7 @@ move_request_sequences     = {0:[0],
                               5:[21],
                               'many':[i for i in range(100)],
                               '04000-04001':[4000,4001],
+                              '04000-04009':[i for i in range(4000,4010)],
                               '04000-04049':[i for i in range(4000,4050)],
                               '04000-04099':[i for i in range(4000,4100)]}
 
