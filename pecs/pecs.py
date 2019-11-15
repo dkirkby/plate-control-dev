@@ -43,9 +43,6 @@ class PECS:
             unrepr=True, encoding='utf-8')
         for attr in pecs_local.keys():
             setattr(self, attr, pecs_local[attr])
-        if self.illuminated_petals is not None:
-            for ptl in self.illuminated_petals:
-                assert(ptl in list(self.ptlm.Petals.keys())), 'Illuminated petals must be in availible petals!'
         # self.all_fiducials = pecs_local['all_fiducials']
         # self.constants_version = pecs_local['constants_version']
         # self.pm_instrument = pecs_local['pm_instrument']
@@ -71,6 +68,9 @@ class PECS:
             self.printfunc(
                 f'Reusing existing PetalMan proxy with active petals '
                 f'{self.ptlm.participating_petals}')
+        if self.illuminated_petals is not None:
+            for ptl in self.illuminated_petals:
+                assert(ptl in list(self.ptlm.Petals.keys())), 'Illuminated petals must be in availible petals!'
         # self.illuminator = Illuminator()  # this crashes KF 06/18/19
 
     def _parse_yn(self, yn_str):
