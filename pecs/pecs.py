@@ -198,6 +198,8 @@ class PECS:
         meapos.columns = meapos.columns.str.upper()  # clean up header to save
         exppos = (exppos.rename(columns={'id': 'DEVICE_ID'})
                   .set_index('DEVICE_ID').sort_index())
+        #recover flags
+        meapos['FLAGS'] |= exppos.loc[list(meapos.index)]['FLAGS']
         exppos.columns = exppos.columns.str.upper()
         # find the posids that are unmatched, missing from FVC return
         matched = set(exppos.index).intersection(set(meapos.index))
