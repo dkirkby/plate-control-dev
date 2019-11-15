@@ -95,7 +95,12 @@ class GridCalib(PECS):
         exppos, meapos, matched, unmatched = self.fvc_measure(
                 match_radius=match_radius)
         # Want to collect both matched and unmatched
-        used_pos = meapos.loc[sorted(list(matched))]  # only matched rows
+        matched_select = matched.intersection(set(self.posids))
+        missing_select = unmatched.intersection(set(self.posids))
+        if len(missing_select) > 0:
+            self.printfunc(f'Missing {len(missing_select)} of selected positioners.')
+            self.printfunc(missing_select)
+        used_pos = meapos.loc[sorted(list(matched_select))].reset_index()  # only matched rows
         request.rename(columns={'X1': 'TARGET_T', 'X2': 'TARGET_P'},
                        inplace=True)
         merged = used_pos.merge(request, how='outer', on='DEVICE_ID')

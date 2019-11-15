@@ -86,8 +86,13 @@ class OnePointCalib(PECS):
             print(requests)
         exppos, meapos, matched, unmatched = self.fvc_measure(
                 match_radius=match_radius)
-        used_pos = meapos.loc[sorted(list(matched))]  # only matched rows
-        unused_pos = meapos.loc[sorted(list(unmatched))]
+        matched_select = matched.intersection(set(self.posids))
+        missing_select = unmatched.intersection(set(self.posids))
+        if len(missing_select) > 0:
+            self.printfunc(f'Missing {len(missing_select)} of selected positioners.')
+            self.printfunc(missing_select)
+        used_pos = meapos.loc[sorted(list(matched_select))]  # only matched rows
+        unused_pos = exppos.loc[sorted(list(unmatched))]
         retcode = self.ptlm.test_and_update_TP(
                 used_pos.reset_index(), mode=mode, auto_update=auto_update,
                 tp_updates_tol=0.0, tp_updates_fraction=1.0)

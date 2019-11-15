@@ -60,12 +60,12 @@ class ArcCalib(PECS):
                 dflist = []
                 for df in ret.values():
                     dflist.append(df[0][i])
-                req_list_T.append(pd.concat(dflist))
+                req_list_T.append(pd.concat(dflist).reset_index())
             for j in range(self.n_points_P):
                     dflist = []
                     for df in ret.values():
                         dflist.append(df[1][j])
-                    req_list_P.append(pd.concat(dflist))
+                    req_list_P.append(pd.concat(dflist).reset_index())
         else:
             req_lsit_T = ret[0]
             req_list_P = ret[1]
@@ -95,9 +95,9 @@ class ArcCalib(PECS):
             dflist = []
             for df in retcode.values():
                 dflist.append(df)
-            updates = pd.concat(dflist).sort_values(by=['DEVICE_ID'])
+            updates = pd.concat(dflist).sort_values(by=['DEVICE_ID']).reset_index()
         else:
-            updates = retcode.sort_values(by=['DEVICE_ID'])
+            updates = retcode.sort_values(by=['DEVICE_ID']).reset_index()
         updates['auto_update'] = auto_update
         return updates
 
@@ -111,7 +111,12 @@ class ArcCalib(PECS):
         exppos, meapos, matched, unmatched = self.fvc_measure(
                 match_radius=match_radius)
         # Want to collect both matched and unmatched
-        used_pos = meapos.loc[sorted(list(matched))]  # only matched rows
+        matched_select = matched.intersection(set(self.posids))
+        missing_select = unmatched.intersection(set(self.posids))
+        if len(missing_select) > 0:
+            self.printfunc(f'Missing {len(missing_select)} of selected positioners.')
+            self.printfunc(missing_select)
+        used_pos = meapos.loc[sorted(list(matched_select))].reset_index()# only matched rows
         request.rename(columns={'X1': 'TARGET_T', 'X2': 'TARGET_P'},
                        inplace=True)
         merged = used_pos.merge(request, how='outer', on='DEVICE_ID')

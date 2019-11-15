@@ -183,7 +183,7 @@ class PECS:
         matched_posids (set), unmatched_posids (set)'''
         if exppos is None:
             # participating_petals=None gets responses from all - not just selected petals
-            exppos = (self.ptlm.get_positions(return_coord='QS', participating_petals=None)
+            exppos = (self.ptlm.get_positions(return_coord='QS', participating_petals=self.illuminated_petals)
                       .sort_values(by='DEVICE_ID'))  # includes all posids
         exppos.reset_index(inplace=True)
         mr_old = self.fvc.get('match_radius')  # hold old match radius
@@ -196,12 +196,16 @@ class PECS:
         if mr_old != match_radius:
             self.fvc.set(match_radius=mr_old)  # restore old radius after measure
         meapos.columns = meapos.columns.str.upper()  # clean up header to save
+        exppos = (exppos.rename(columns={'id': 'DEVICE_ID'})
+                  .set_index('DEVICE_ID').sort_index())
+        exppos.columns = exppos.columns.str.upper()
         # find the posids that are unmatched, missing from FVC return
-        matched = set(self.posids).intersection(set(meapos.index))
-        unmatched = set(self.posids) - matched
+        matched = set(exppos.index).intersection(set(meapos.index))
+        unmatched = set(exppos.index) - matched
         if len(unmatched) == 0:
-            self.printfunc(f'All {len(self.posids)} positioners matched.')
+            self.printfunc(f'All {len(exppos.index)} positioners matched.')
         else:
-            self.printfunc(f'Missing {len(unmatched)} of selected positioners'
-                           f'\n{sorted(list(unmatched))}')
-        return exppos, meapos, sorted(matched), sorted(unmatched)
+            self.printfunc(
+                f'Missing {len(unmatched)} of expected positioners'
+                f'\n{sorted(unmatched)}')
+        return exppos, meapos, matched, unmatched
