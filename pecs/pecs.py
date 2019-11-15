@@ -196,8 +196,9 @@ class PECS:
         if mr_old != match_radius:
             self.fvc.set(match_radius=mr_old)  # restore old radius after measure
         meapos.columns = meapos.columns.str.upper()  # clean up header to save
-        exppos = (exppos.rename(columns={'id': 'DEVICE_ID'})
+        exppos = (exppos.rename(columns={'id': 'DEVICE_ID', 'FLAG':'FLAGS'})
                   .set_index('DEVICE_ID').sort_index())
+
         #recover flags
         meapos['FLAGS'] |= exppos.loc[list(meapos.index)]['FLAGS']
         exppos.columns = exppos.columns.str.upper()
