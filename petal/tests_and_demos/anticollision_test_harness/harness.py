@@ -17,7 +17,7 @@ device_loc_ids = 'all' # make the selection here
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 pos_param_sequence_id = 'one real petal'
-move_request_sequence_id = '04000-04049'
+move_request_sequence_id = '04000-04001'
 
 # Other ids
 fidids = {}
@@ -25,7 +25,7 @@ petal_id = 666
 
 # Other options
 should_animate = False
-n_corrections = 0 # number of correction moves to simulate after each target
+n_corrections = 1 # number of correction moves to simulate after each target
 max_correction_move = 0.050/1.414 # mm
 should_profile = False
 
@@ -86,7 +86,7 @@ for pos_params in pos_param_sequence:
             if should_profile:
                 hc.profile('ptl.schedule_send_and_execute_moves(anticollision="'+anticollision+'")')
             else:
-                ptl.schedule_send_and_execute_moves(anticollision='anticollision')
+                ptl.schedule_send_and_execute_moves(anticollision=anticollision)
     if ptl.schedule_stats:
         ptl.schedule_stats.save()
     if should_animate:
