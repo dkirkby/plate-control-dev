@@ -388,37 +388,15 @@ class PosSchedule(object):
             trans = posmodel.trans
             start_posintTP['retract'][posid] = request['start_posintTP']
             starting_phi = start_posintTP['retract'][posid][pc.P]
-            # Ei would also be safe, but unnecessary in most cases.
-            # Costs more time and power to get to.
-            retracted_phi = (starting_phi
-                             if starting_phi > self.collider.Eo_phi
-                             else self.collider.Eo_phi)
-            desired_final_posintTP['retract'][posid] = \
-                [request['start_posintTP'][pc.T], retracted_phi]
-            desired_final_posintTP['rotate'][posid] = \
-                [request['targt_posintTP'][pc.T], retracted_phi]
-            desired_final_posintTP['extend'][posid] = \
-                request['targt_posintTP']
-            dtdp['retract'][posid] = trans.delta_posintTP(
-                desired_final_posintTP['retract'][posid],
-                start_posintTP['retract'][posid],
-                range_wrap_limits='targetable')
-            start_posintTP['rotate'][posid] = trans.addto_posintTP(
-                start_posintTP['retract'][posid],
-                dtdp['retract'][posid],
-                range_wrap_limits='targetable')
-            dtdp['rotate'][posid] = trans.delta_posintTP(
-                desired_final_posintTP['rotate'][posid],
-                start_posintTP['rotate'][posid],
-                range_wrap_limits='targetable')
-            start_posintTP['extend'][posid] = trans.addto_posintTP(
-                start_posintTP['rotate'][posid],
-                dtdp['rotate'][posid],
-                range_wrap_limits='targetable')
-            dtdp['extend'][posid] = trans.delta_posintTP(
-                desired_final_posintTP['extend'][posid],
-                start_posintTP['extend'][posid],
-                range_wrap_limits='targetable')
+            retracted_phi = (starting_phi if starting_phi > self.collider.Eo_phi else self.collider.Eo_phi) # Ei would also be safe, but unnecessary in most cases. Costs more time and power to get to.
+            desired_final_posintTP['retract'][posid] = [request['start_posintTP'][pc.T], retracted_phi]
+            desired_final_posintTP['rotate'][posid] = [request['targt_posintTP'][pc.T], retracted_phi]
+            desired_final_posintTP['extend'][posid] = request['targt_posintTP']
+            dtdp['retract'][posid] = trans.delta_posintTP(desired_final_posintTP['retract'][posid], start_posintTP['retract'][posid], range_wrap_limits='targetable')
+            start_posintTP['rotate'][posid] = trans.addto_posintTP(start_posintTP['retract'][posid], dtdp['retract'][posid], range_wrap_limits='targetable')
+            dtdp['rotate'][posid] = trans.delta_posintTP(desired_final_posintTP['rotate'][posid], start_posintTP['rotate'][posid], range_wrap_limits='targetable')
+            start_posintTP['extend'][posid] = trans.addto_posintTP(start_posintTP['rotate'][posid], dtdp['rotate'][posid], range_wrap_limits='targetable')
+            dtdp['extend'][posid] = trans.delta_posintTP(desired_final_posintTP['extend'][posid], start_posintTP['extend'][posid], range_wrap_limits='targetable')
         for i in range(len(self.RRE_stage_order)):
             name = self.RRE_stage_order[i]
             stage = self.stages[name]
@@ -428,45 +406,28 @@ class PosSchedule(object):
             if self.verbose:
                 self.printfunc(f'posschedule: finding collisions for {len(stage.move_tables)} positioners, trying {name}')
                 self.printfunc('Posschedule first move table: \n' + str(list(stage.move_tables.values())[0].for_collider()))
-            colliding_sweeps, all_sweeps = stage.find_collisions(
-                stage.move_tables)
+            colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             attempts_remaining = self.max_path_adjustment_passes
-            # take this out once stage.colliding is working
-            ori_stage_colliding = copymodule.deepcopy(stage.colliding)
-            # take this out once stage.colliding is working
-            ori_colliding_posid = list(stage.colliding)
-            if self.verbose:
-                # take this out once stage.colliding is working
-                ori_colliding_posid = list(stage.colliding)
-                self.printfunc(f'initial stage.colliding: {ori_colliding_posid}')
             while stage.colliding and attempts_remaining:
-                for posid in stage.colliding:
-                    if self.verbose:
-                        self.printfunc(
-                            f'now adjusting path of {posid}, '
-                            f'remaining attempts: {attempts_remaining}')
-                    freezing = 'off' if attempts_remaining > 1 else 'on'
-                    stage.adjust_path(
-                        posid, ori_stage_colliding, freezing, self.requests)
-                    # this is wrong because stage.collisions_resolved return
-                    # format is 'MXXXXX-MXXXXX'
-                    # if posid in stage.collisions_resolved['freeze']:
-                    if stage.sweeps[posid].is_frozen:
-                        # Mark as frozen by anticollision
-                        self.petal.pos_flags[posid] |= \
-                            self.petal.frozen_anticol_bit
-                        for j in range(i+1, len(self.RRE_stage_order)):
-                            next_name = self.RRE_stage_order[j]
-                            del start_posintTP[next_name][posid]
-                            del dtdp[next_name][posid]
+                stage_colliding_snapshot = stage.colliding.copy()
+                for posid in stage_colliding_snapshot:
+                    if posid in stage.colliding: # because it may have been resolved already when a *neighbor* got previously adjusted
+                        if self.verbose:
+                            self.printfunc(f'now adjusting path of {posid}, remaining attempts: {attempts_remaining}')
+                        freezing = 'off' if attempts_remaining > 1 else 'on'
+                        stage.adjust_path(posid, stage.colliding, freezing, self.requests)
+                        if stage.sweeps[posid].is_frozen:
+                            self.petal.pos_flags[posid] |= self.petal.frozen_anticol_bit # Mark as frozen by anticollision
+                            for j in range(i+1, len(self.RRE_stage_order)):
+                                next_name = self.RRE_stage_order[j]
+                                del start_posintTP[next_name][posid]
+                                del dtdp[next_name][posid]
                 if self.stats:
                     self.stats.add_to_num_adjustment_iters(1)
                 attempts_remaining -= 1
                 if self.verbose:  # debug
-                    self.printfunc(f'posschedule: remaining collisions '
-                                   f'{len(stage.colliding)}, '
-                                   f'attempts_remaining {attempts_remaining}')
+                    self.printfunc(f'posschedule: remaining collisions {len(stage.colliding)}, attempts_remaining {attempts_remaining}')
 
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
