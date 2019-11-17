@@ -23,6 +23,7 @@ Added illuminator proxy for xy test control over LED (Duan 2019/06/07)
 
 from DOSlib.proxies import FVC, Petal  # , Illuminator
 import os
+import numpy as np
 import pandas as pd
 from configobj import ConfigObj
 from fvc_sim import FVC_proxy_sim
@@ -153,6 +154,9 @@ class PECS:
                             .sort_values(by='DEVICE_ID'))
                            for pcid in self.pcids]  # includes all posids
             exppos = pd.concat(exppos_list)
+        if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
+            raise Exception('Expected positions of positioners by PetalApp '
+                            'are contaminated by fiducials.')
         mr_old = self.fvc.get('match_radius')  # hold old match radius
         self.fvc.set(match_radius=match_radius)  # set larger radius for calib
         # measured_QS, note that expected_pos was changed in place
@@ -161,6 +165,9 @@ class PECS:
                       all_fiducials=self.all_fiducials))
                   .rename(columns={'id': 'DEVICE_ID'})
                   .set_index('DEVICE_ID').sort_index())  # indexed by DEVICE_ID
+        if np.any(['P' in device_id for device_id in meapos.index]):
+            raise Exception('Measured positions of positioners by FVC '
+                            'are contaminated by fiducials.')
         self.fvc.set(match_radius=mr_old)  # restore old radius after measure
         meapos.columns = meapos.columns.str.upper()  # clean up header to save
         exppos = (exppos.rename(columns={'id': 'DEVICE_ID'})

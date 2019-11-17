@@ -47,10 +47,14 @@ class RehomeVerify(PECS):
         # set nominal homed QS as expected postiions for FVC spotmatch
         exppos[['X1', 'X2']] = hom_QS.T
         self.printfunc('Taking FVC exposure to confirm home positions...')
+        # make sure no fiducial ID is in exppos DEVICE_ID column
+        if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
+            raise Exception('Expected positions of positioners by PetalApp '
+                            'are contaminated by fiducials.')
         exppos, meapos, matched, unmatched = self.fvc_measure(exppos=exppos,
                                                               match_radius=50)
-        unmatched = set(unmatched).intersection(set(self.posids))
-        matched = set(matched).intersection(set(self.posids))
+        unmatched = set(unmatched) & (set(self.posids))
+        matched = set(matched) & (set(self.posids))
         umstr = f':\n{sorted(unmatched)}' if len(unmatched) > 0 else ''
         self.printfunc(f'{len(unmatched)} selected positioners not matched'
                        + umstr)
