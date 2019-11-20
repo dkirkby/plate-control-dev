@@ -157,7 +157,7 @@ with open(os.path.join(data.dir, 'data_dump.pkl'), 'wb') as handle:
 
 def plot_posfid_temp(pcid=None):
 
-    def plot_petal(pcid, max_on=True, mean_on=True, median_on=True):
+    def plot_petal(pcid, max_on=True, mean_on=False, median_on=True):
         query = data.telemetry[data.telemetry['pcid'] == pcid]
         if max_on:
             ax.plot(query['time'], query['posfid_temps_max'], '-o',
