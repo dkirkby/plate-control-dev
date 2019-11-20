@@ -1,8 +1,8 @@
 % DESI Positioner Accuracy Test Report
 % Focal Plane Team
-% 2019-11-08 (master template last revised)
+% 2019-11-20 (master template last revised)
 
-```python, echo=False, results='hidden'
+```python name='grading', echo=False
 # -*- coding: utf-8 -*-
 """
 generates html/pdf report for xy accuracy test
@@ -14,6 +14,7 @@ Created on Wed Oct 30 12:57:04 2019
 import os
 import sys
 import pickle
+from functools import reduce
 import numpy as np
 import pandas as pd
 from datetime import timezone
@@ -27,6 +28,7 @@ idx = pd.IndexSlice
 np.rms = lambda x: np.sqrt(np.mean(np.square(x)))
 np.nanrms = lambda x: np.sqrt(np.nanmean(np.square(x)))
 grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
+colours = {grade: f'C{i}' for i, grade in enumerate(grades)}
 
 #def calculate_percentiles(data, individual_ptl=True):
 #    # grade positioners by comparing to performance of all peers tested
@@ -81,7 +83,7 @@ def calculate_grades(data):
                      'err_corr_95p_max': err_corr_95p_max,  # best 95 percent
                      'err_corr_95p_rms': err_corr_95p_rms,  # best 95 percent
                      'grade': grade})
-    data.grade_df = pd.DataFrame(rows).set_index('DEVICE_ID').join(data.posdf)
+    data.gradedf = pd.DataFrame(rows).set_index('DEVICE_ID').join(data.posdf)
 
 
 def grade_pos(err_0_max, err_corr_max, err_corr_rms,
@@ -119,9 +121,9 @@ targets = getattr(data, 'targets', data.targets_pos[list(data.targets_pos)[0]])
 
 data.read_telemetry()
 calculate_grades(data)
-data.grade_df.to_pickle(os.path.join(data.dir, 'grade_df.pkl.gz'),
+data.gradedf.to_pickle(os.path.join(data.dir, 'gradedf.pkl.gz'),
                         compression='gzip')
-data.grade_df.to_csv(os.path.join(data.dir, 'grade_df.csv'))
+data.gradedf.to_csv(os.path.join(data.dir, 'gradedf.csv'))
 with open(os.path.join(data.dir, 'data_dump.pkl'), 'wb') as handle:
     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -151,26 +153,27 @@ with open(os.path.join(data.dir, 'data_dump.pkl'), 'wb') as handle:
 
 # Temperature
 
-```python, echo=False, results='raw'
+```python name='posfid temperature', echo=False, results='raw'
 
 def plot_posfid_temp(pcid=None):
 
-    def plot_petal(pcid, max=True, mean=True, median=True):
+    def plot_petal(pcid, max_on=True, mean_on=True, median_on=True):
         query = data.telemetry[data.telemetry['pcid'] == pcid]
-        if max:
-            ax.plot(query['time'], query['posfid_temps_max'],
-                    label=f'PC{pcid:02} max temp')
-        if mean:
-            ax.plot(query['time'], query['posfid_temps_mean'],
-                    label=f'PC{pcid:02} mean temp')
-        if median:
-            ax.plot(query['time'], query['posfid_temps_median'],
-                    label=f'PC{pcid:02} median temp')
+        if max_on:
+            ax.plot(query['time'], query['posfid_temps_max'], '-o',
+                    label=f'PC{pcid:02} posfid max')
+        if mean_on:
+            ax.plot(query['time'], query['posfid_temps_mean'], '-o',
+                    label=f'PC{pcid:02} posfid mean')
+        if median_on:
+            ax.plot(query['time'], query['posfid_temps_median'], '-o',
+                    label=f'PC{pcid:02} posfid median')
 
     fig, ax = plt.subplots()
     if pcid is None:  # loop through all petals, plot max only
-        for pcid in data.pcids:
-            plot_petal(pcid, max=True, mean=False, median=False)
+        for pc in data.pcids:
+            plot_petal(pc,
+                       max_on=True, mean_on=False, median_on=False)
     else:  # pcid is an integer
         plot_petal(pcid)
     
@@ -179,7 +182,7 @@ def plot_posfid_temp(pcid=None):
     ax.xaxis.set_tick_params(rotation=45)
     ax.set_xlabel('Time (UTC)')
     ax.set_ylabel('Temperature (°C)')
-    suffix = '' if pcid is None else f'_pc{pcid:2}'
+    suffix = '' if pcid is None else f'_pc{pcid:02}'
     fig.savefig(os.path.join(data.dir, 'figures',
                          f'posfid_temp{suffix}.pdf'),
             bbox_inches='tight')
@@ -195,18 +198,29 @@ else:
 
 # Results
 
-```python, echo=False, results='hidden'
+```python name='grade distributions', echo=False
 
-def plot_grade_hist(pcid=None):
+def add_hist_annotation(ax):
+    for rect in ax.patches:  # add annotations
+        height = rect.get_height()
+        ax.annotate(f'{int(height)}',
+                    xy=(rect.get_x() + rect.get_width() / 2, height),
+                    xytext=(0, 3),  # 3 points vertical offset
+                    textcoords='offset points',
+                    ha='center', va='bottom')
+    ax.set_ylim([0.1, ax.get_ylim()[1]*3])
+
+def plot_grade_dist(pcid=None):
     if pcid is None:  # show all positioners tested
-        grade_counts = data.grade_df['grade'].value_counts()
-        title_suffix = 'petals' if len(data.pcids) > 1 else 'petal'
+        grade_counts = data.gradedf['grade'].value_counts()
+        ptlstr = 'petals' if len(data.pcids) > 1 else 'petal'
         title = (
             f'Overall grade distribution '
             f'({len(data.posids)} positioners, {len(data.pcids)} '
-            + title_suffix + ')')
+            + ptlstr + ')')
     else:
-        grade_counts = data.grade_df['grade'].value_counts()
+        mask = data.gradedf['PCID'] == pcid
+        grade_counts = data.gradedf[mask]['grade'].value_counts()
         title = (f'PC{pcid:02} grade distribution '
                  f'({len(data.posids_pc[pcid])} positioners)')
     for grade in grades:
@@ -215,24 +229,115 @@ def plot_grade_hist(pcid=None):
 
     fig, ax = plt.subplots()
     grade_counts.reindex(grades).plot(
-        ax=ax, kind='bar', figsize=(6, 3), title=title, rot=0,
-        ylim=(0, grade_counts.max()+80))
+        ax=ax, kind='bar', log=True,
+        figsize=(6, 3), title=title, rot=0, alpha=0.8)
+    add_hist_annotation(ax)
     ax.set_xlabel('Postiioner grade')
     ax.set_ylabel('Count')
-    for rect in ax.patches:  # add annotations
-        height = rect.get_height()
-        ax.annotate(f'{height}',
-                    xy=(rect.get_x() + rect.get_width() / 2, height),
-                    xytext=(0, 3),  # 3 points vertical offset
-                    textcoords="offset points",
-                    ha='center', va='bottom')
-    suffix = '' if pcid is None else f'_pc{pcid:2}'
+    suffix = '' if pcid is None else f'_pc{pcid:02}'
     fig.savefig(os.path.join(data.dir, 'figures',
                              f'grade_distribution{suffix}.pdf'),
                 bbox_inches='tight')
     return grade_counts
 
 # show overall statistics across all petals
-plot_grade_hist()
+_ = plot_grade_dist()
+```
+
+```python name='error distributions', echo=False, width='linewidth'
+
+def plot_error_dist(pcid=None, grade=None):
+    if pcid is None:  # show all positioners tested
+        err = data.gradedf
+        ptlstr = 'petals' if len(data.pcids) > 1 else 'petal'
+        title = (
+            f'Overall {{}} distribution '
+            f'\n({len(data.posids)} positioners, {len(data.pcids)} '
+            + ptlstr + ')')
+    else:
+        err = data.gradedf[data.gradedf['PCID'] == pcid]
+        if grade is not None:
+            err = err[err['grade']==grade]
+        title = (f'PC{pcid:02} {{}} distribution '
+                 f'\n({len(data.posids_pc[pcid])} positioners)')
+
+    def plot_error_hist(ax, column_name, cuts, title, vlines=None):
+        grades_present = sorted(err['grade'].unique())
+        if 'N/A' in grades_present:
+            grades_present.pop('N/A')
+        ax.hist([err[err['grade'] == grade][column_name]
+                 for grade in grades_present],
+                log=True, histtype='bar', stacked=True, alpha=0.8,
+                color = [colours[grade] for grade in grades_present],
+                label=[f'Grade {grade}' for grade in grades_present])
+        add_hist_annotation(ax)
+        ax.set_ylim(top=min([ax.get_ylim()[1]*10, 1e3]))
+        ax.set_title(title)
+        ax.set_xlabel('Error (μm)')
+        ax.set_ylabel('Count')
+        if vlines is not None:
+            for vline in vlines:
+                ax.axvline(vline)
+        ax.legend()
+
+        # add text for counts
+        rows = []
+        cuts = (list(cuts) + [err[column_name].max()]
+                if sorted(cuts)[-1] < err[column_name].max()
+                else list(cuts))
+        for cut in cuts:
+            rows.append({'Error within (μm)': int(cut),
+                        'Count': int(np.sum(err[column_name] <= cut))})
+        text = pd.DataFrame(rows).to_string(index=False)
+        ax.text(0.7, 0.95, text, ha='right', va='top',
+                family='monospace', transform=ax.transAxes,
+                bbox={'boxstyle': 'round', 'alpha': 0.2,
+                          'facecolor': 'white', 'edgecolor': 'lightgrey'})
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+    plot_error_hist(axes[0], 'err_0_max', [0, 100, 200, 300, 400, 500, 1000],
+                    title.format('max blind move error'))
+    plot_error_hist(axes[1], 'err_corr_rms', [0, 5, 10, 20, 30, 50, 100, 200],
+                    title.format('rms corrective move error'))
+    plt.tight_layout()
+    suffix1 = '' if pcid is None else f'_pc{pcid:02}'
+    suffix2 = '' if grade is None else f'_grade_{grade}'.lower()
+    fig.savefig(os.path.join(data.dir, 'figures',
+                             f'error_distribution{suffix1}{suffix2}.pdf'),
+                bbox_inches='tight')
+
+plot_error_dist()
+```
+
+```python name='abnormal positioners', echo=False, results='raw'
+# get postiioners with abnormal flags
+masks = []
+for i in range(data.num_corr_max+1):
+    masks.append(data.movedf[f'pos_flag_{i}'] != 4)
+mask = reduce(lambda x, y: x | y, masks)
+df_abnormal = data.movedf[mask]
+posids_abnormal = df_abnormal.index.droplevel(0).unique()
+
+def abnormal_pos_df(pcid=None):
+    if pcid is None:
+        df = df_abnormal
+    else:
+        df = df_abnormal[df_abnormal['PCID']==pcid]
+    rows = []
+    for posid in posids_abnormal:
+        counts_list = []  # counts by submove
+        for i in range(data.num_corr_max+1):
+            counts_list.append(
+                df.loc[idx[:, posid], :][f'pos_status_{i}'].value_counts())
+        counts = reduce(lambda x, y: x.add(y, fill_value=0), counts_list)  # total
+        rows.append(counts)
+    df_status = pd.DataFrame(rows, index=posids_abnormal).drop('Normal positioner', axis=1)
+    return df_status
+
+##### Abnormal status: ``<%=len(posids_abnormal)%>`` positioners
+
+# ```python name='abnormal pos print', echo=False
+# abnormal_pos_df().reset_index().astype(int, errors='ignore')
+# ```
 
 ```

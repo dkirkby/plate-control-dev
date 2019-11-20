@@ -254,7 +254,8 @@ class XYTest(PECS):
         # measure ten petals with FVC at once, FVC after all petals have moved
         _, meapos, _, _ = self.fvc_measure()
         # measured_QS.columns = measured_QS.columns.str.upper()  # rename upper
-        self.logger.debug(f'FVC measured_QS:\n{meapos.to_string()}')
+        self.logger.debug(f'FVC measured_QS:\n'
+                          f'{meapos.reset_index().to_string()}')
         return meapos
 
     def move_petal(self, pcid, i, n):
@@ -308,7 +309,7 @@ class XYTest(PECS):
         self.loggers[pcid].debug('execute_move() returns expected QS:\n'
                                  + expected_QS.to_string())
         # get expected posintTP from petal and write to movedf after move
-        ret_TP = ptl.get_positions(posids=posids, return_coord='posintTP')
+        ret_TP = ptl.get_positions(return_coord='posintTP')
         ret_TP['STATUS'] = ptl.decipher_posflags(ret_TP['FLAG'])
         self.loggers[pcid].debug(f'Expected posintTP after move {n}:\n'
                                  + ret_TP.to_string())
@@ -366,7 +367,7 @@ class XYTest(PECS):
             posids = set(self.data.posids_pc[pcid]).intersection(
                 set(measured_QS.index))  # only update measured, valid posid
             df = measured_QS.loc[posids].reset_index()
-            assert ('Q' in df.columns and 'S' in df.columns), f'df.columns'
+            assert ('Q' in df.columns and 'S' in df.columns), f'{df.columns}'
             updates = self.ptls[pcid].test_and_update_TP(df)
             assert type(updates) == pd.core.frame.DataFrame, (
                 f'Exception calling test_and_update_TP, returned:\n'
@@ -390,7 +391,7 @@ class XYTest(PECS):
                             f'meas_s_{n}': QS[1, :],
                             f'meas_x_{n}': poslocXY[0, :],
                             f'meas_y_{n}': poslocXY[1, :]},
-                           dtype=np.float32, index=measured_QS.index)
+                           dtype=np.float64, index=measured_QS.index)
         self._update(new, i)
 
     def calculate_xy_errors(self, i, n):  # calculate xy error columns in df

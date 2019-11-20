@@ -149,7 +149,7 @@ class PECS:
         (bot have DEVICE_ID as index and sorted) and
         matched_posids (set), unmatched_posids (set)'''
         if exppos is None:
-            # get all backlit fibres
+            # get all backlit fibres, enabled and disabled
             exppos_list = [(self.ptls[pcid].get_positions(return_coord='QS')
                             .sort_values(by='DEVICE_ID'))
                            for pcid in self.pcids]  # includes all posids
@@ -157,6 +157,8 @@ class PECS:
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
             raise Exception('Expected positions of positioners by PetalApp '
                             'are contaminated by fiducials.')
+        self.printfunc(f'Calling FVC measure expecting '
+                       f'{len(exppos)} positioners...')
         mr_old = self.fvc.get('match_radius')  # hold old match radius
         self.fvc.set(match_radius=match_radius)  # set larger radius for calib
         # measured_QS, note that expected_pos was changed in place
