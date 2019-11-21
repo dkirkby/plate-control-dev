@@ -1,4 +1,27 @@
-### PC0<%{0}%>: ``<%=len(data.posids_pc[{0}])%>`` positioners tested
+```python name='pc{0:02} positioners not tested and disabled', echo=False
+df = pd.DataFrame(pi.find_by_arbitrary_keys(PETAL_LOC={0}))
+df = df[df['DEVICE_TYPE']=='POS']
+posids_all = set(df['DEVICE_ID'].unique())
+if hasattr(data, 'posids_disabled_pc'):
+	posids_tested = set(data.posids_pc[{0}]) |  data.posids_disabled_pc[{0}]
+	posids_disabled = posids_disabled_pc[{0}]
+else:
+	posids_tested = set(data.posids_pc[{0}])
+	posids_disabled = set()
+posids_untested = sorted(posids_all - posids_tested)
+```
+
+### PC0<%{0}%>
+
+``<%=len(posids_tested)%>`` positioners were tested, of which
+``<%=len(posids_disabled)%>`` were disabled during test:
+``<%=sorted(posids_disabled)%>``
+```python name='pc{0:02} positioners disabled', echo=False, results='raw'
+if not hasattr(data, 'posids_disabled_pc'):
+	print('Disabled positioners were not recorded in old test, please check log.')
+```
+``<%=len(posids_untested)%>`` were not tested:
+``<%=sorted(posids_untested)%>``
 
 ```python name='pc{0:02} temp, grade distribution', echo=False
 if data.db_telemetry_available:
@@ -15,13 +38,13 @@ for grade in grades:
 
 ```python name='pc{0:02} median stats by grade', echo=False, caption='Median of error measures by grades'
 dfs = []
-for grade in grades:
+for grade in grades[:-1]:
 	df = grades_pc[grades_pc['grade']==grade]
 	dfs.append(df.median())
-pd.DataFrame(dfs, index=grades).iloc[:, :5]
+pd.DataFrame(dfs, index=grades[:-1]).iloc[:, :5]
 ```
 
-```python, name='pc{0:02} error distribution', echo=False, width='linewidth'
+```python name='pc{0:02} error distribution', echo=False, width='linewidth'
 plot_error_dist(pcid={0})
 n_abnormal = (df_abnormal['PCID']=={0}).index.droplevel(0).unique().size
 ```

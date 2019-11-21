@@ -90,8 +90,11 @@ class XYTest(PECS):
         props = ['targetable_range_T', 'targetable_range_P']
         self.data.posids = []
         self.data.posids_pc = {}
+        self.data.posids_disabled = set()
+        self.data.posids_disabled_pc = {}
         dfs = []
         for pcid in self.data.pcids:  # fast enough, no need to parallelise
+            self.data.posids_disabled_pc[pcid] = set()
             mode = self.data.test_cfg[pcid]['mode']
             ptl = self.ptls[pcid]  # use as a PetalApp instance, pcid is int
             if mode == 'all':
@@ -357,6 +360,9 @@ class XYTest(PECS):
                                         if posid not in disabled]
                     self.data.posids_pc[pcid] = [posid for posid in posids
                                                  if posid not in disabled]
+                    # add disabled to disabled sets for bookkeeping
+                    self.data.posids_disabled |= set(disabled)
+                    self.data.posids_disabled_pc[pcid] |= set(disabled)
             else:
                 self.loggers[pcid].info(
                     f'All {len(posids)} requested fibres measured by FVC.')

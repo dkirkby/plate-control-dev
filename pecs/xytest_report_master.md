@@ -20,6 +20,7 @@ import pandas as pd
 from datetime import timezone
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
+from DOSlib.positioner_index import PositionerIndex
 # plt.rcParams.update({'font.family': 'sans-serif',  # both are default
 #                      'mathtext.fontset': 'dejavusans'})  # both are default
 import posconstants as pc
@@ -29,25 +30,7 @@ np.rms = lambda x: np.sqrt(np.mean(np.square(x)))
 np.nanrms = lambda x: np.sqrt(np.nanmean(np.square(x)))
 grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
 colours = {grade: f'C{i}' for i, grade in enumerate(grades)}
-
-#def calculate_percentiles(data, individual_ptl=True):
-#    # grade positioners by comparing to performance of all peers tested
-#    # and also taking 95 percentile of all targets for each submove
-#    # for each positioner, in case it missed one or two targets
-#    d = []
-#    for perc in [95, 98, 100]:
-#        for i in range(data.num_corr_max):
-#            sm_data = data.movedf[f'err_xy_{i}'] * 1000  # mm to microns
-#            pos_data_sm = np.percentile(sm_data, perc)
-#            d.append[perc,
-#                     i,
-#                     np.max(pos_data_sm),
-#                     np.min(pos_data_sm),
-#                     np.rms(pos_data_sm),
-#                     np.mean(pos_data_sm)]
-#    data.perc_df = pd.DataFrame(
-#        d,
-#        columns=['submove', 'max_err', 'min_err', 'rms_err', 'mean_err'])
+pi = PositionerIndex()
 
 def calculate_grades(data):
     rows = []
@@ -117,8 +100,6 @@ with open(os.path.join(pc.dirs['xytest_data'], 'pweave_test_src.txt'),
 with open(path_input, "rb") as h:
     data = pickle.load(h)
 
-targets = getattr(data, 'targets', data.targets_pos[list(data.targets_pos)[0]])
-
 data.read_telemetry()
 calculate_grades(data)
 data.gradedf.to_pickle(os.path.join(data.dir, 'gradedf.pkl.gz'),
@@ -126,7 +107,6 @@ data.gradedf.to_pickle(os.path.join(data.dir, 'gradedf.pkl.gz'),
 data.gradedf.to_csv(os.path.join(data.dir, 'gradedf.csv'))
 with open(os.path.join(data.dir, 'data_dump.pkl'), 'wb') as handle:
     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
 ```
 
 +------------------------+---------------------------------------------------------------------------------------------------------------+
@@ -148,7 +128,7 @@ with open(os.path.join(data.dir, 'data_dump.pkl'), 'wb') as handle:
 | **Max radius of targets**\  | ``<%=data.test_cfg['targ_max_radius']%> mm``\ |
 | **Number of targets**\      | ``<%=data.ntargets%>``\                       |
 +------------------------+----------------------------------------------------+
-| **Target points**\          | ``<%=repr([list(t) for t in targets])%>``     |
+| **Targets**\                | ``<%=repr([list(t) for t in data.targets])%>``|
 +-----------------------------+-----------------------------------------------+
 
 # Temperature
