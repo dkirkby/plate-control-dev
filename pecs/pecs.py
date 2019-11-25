@@ -155,8 +155,10 @@ class PECS:
                            for pcid in self.pcids]  # includes all posids
             exppos = pd.concat(exppos_list)
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
-            raise Exception('Expected positions of positioners by PetalApp '
-                            'are contaminated by fiducials.')
+            print('Expected positions of positioners by PetalApp '
+                  'are contaminated by fiducials.')
+            # raise Exception('Expected positions of positioners by PetalApp '
+            #                 'are contaminated by fiducials.')
         self.printfunc(f'Calling FVC measure expecting '
                        f'{len(exppos)} positioners...')
         mr_old = self.fvc.get('match_radius')  # hold old match radius
@@ -168,8 +170,10 @@ class PECS:
                   .rename(columns={'id': 'DEVICE_ID'})
                   .set_index('DEVICE_ID').sort_index())  # indexed by DEVICE_ID
         if np.any(['P' in device_id for device_id in meapos.index]):
-            raise Exception('Measured positions of positioners by FVC '
-                            'are contaminated by fiducials.')
+            print('Measured positions of positioners by FVC '
+                  'are contaminated by fiducials.')
+            # raise Exception('Measured positions of positioners by FVC '
+            #                 'are contaminated by fiducials.')
         self.fvc.set(match_radius=mr_old)  # restore old radius after measure
         meapos.columns = meapos.columns.str.upper()  # clean up header to save
         exppos = (exppos.rename(columns={'id': 'DEVICE_ID'})
