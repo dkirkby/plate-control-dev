@@ -107,6 +107,11 @@ data.gradedf.to_pickle(os.path.join(data.dir, 'gradedf.pkl.gz'),
 data.gradedf.to_csv(os.path.join(data.dir, 'gradedf.csv'))
 with open(os.path.join(data.dir, 'data_dump.pkl'), 'wb') as handle:
     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+if type(data.targets) is str:
+    targets = data.targets
+else:  # np array, cast into lists for printing
+    targets = repr([list(t) for t in data.targets])
 ```
 
 +------------------------+---------------------------------------------------------------------------------------------------------------+
@@ -128,7 +133,7 @@ with open(os.path.join(data.dir, 'data_dump.pkl'), 'wb') as handle:
 | **Max radius of targets**\  | ``<%=data.test_cfg['targ_max_radius']%> mm``\ |
 | **Number of targets**\      | ``<%=data.ntargets%>``\                       |
 +------------------------+----------------------------------------------------+
-| **Targets**\                | ``<%=repr([list(t) for t in data.targets])%>``|
+| **Targets**\                | ``<%=targets%>``                              |
 +-----------------------------+-----------------------------------------------+
 
 # Temperature
