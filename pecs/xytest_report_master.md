@@ -249,7 +249,7 @@ def plot_error_dist(pcid=None, grade=None):
     def plot_error_hist(ax, column_name, cuts, title, vlines=None):
         grades_present = sorted(err['grade'].unique())
         if 'N/A' in grades_present:
-            grades_present.pop('N/A')
+            grades_present.remove('N/A')
         ax.hist([err[err['grade'] == grade][column_name]
                  for grade in grades_present],
                 log=True, histtype='bar', stacked=True, alpha=0.8,
