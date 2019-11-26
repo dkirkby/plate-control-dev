@@ -1,6 +1,6 @@
 % DESI Positioner Accuracy Test Report
 % Focal Plane Team
-% 2019-11-20 (master template last revised)
+% 2019-11-25 (master template last revised)
 
 ```python name='grading', echo=False
 # -*- coding: utf-8 -*-
@@ -112,33 +112,13 @@ if type(data.targets) is str:
     targets = data.targets
 else:  # np array, cast into lists for printing
     targets = repr([list(t) for t in data.targets])
-```
 
-+------------------------+---------------------------------------------------------------------------------------------------------------+
-| **Start time**\        | ``<%=data.start_time.isoformat()%>`` KPNO, ``<%=data.start_time.astimezone(timezone.utc).isoformat()%>`` UTC\ |
-| **End time**\          | ``<%=data.end_time.isoformat()%>`` KPNO, ``<%=data.end_time.astimezone(timezone.utc).isoformat()%>`` UTC\     |
-| **Duration**\          | ``<%=str(data.end_time-data.start_time)%> ``\                                                                 |
-| **PCIDs**\             | ``<%=data.pcids%>``\                                                                                         |
-| **Product directory**\ | ``<%=data.dir%>``\                                                                                            |
-+------------------------+---------------------------------------------------------------------------------------------------------------+
-| **Test logs**\         | ``<%=data.log_paths%>``                                                                                       |
-+------------------------+---------------------------------------------------------------------------------------------------------------+
-
-# Test Configuration
-
-+-----------------------------+-----------------------------------------------+
-| **Anticollision mode**\     | ``<%=data.anticollision%>``\                  |
-| **Number of corrections**\  | ``<%=data.num_corr_max%> ``\                  |
-| **Min radius of targets**\  | ``<%=data.test_cfg['targ_min_radius']%> mm``\ |
-| **Max radius of targets**\  | ``<%=data.test_cfg['targ_max_radius']%> mm``\ |
-| **Number of targets**\      | ``<%=data.ntargets%>``\                       |
-+------------------------+----------------------------------------------------+
-| **Targets**\                | ``<%=targets%>``                              |
-+-----------------------------+-----------------------------------------------+
-
-# Temperature
-
-```python name='posfid temperature', echo=False, results='raw'
+# get postiioners with abnormal flags
+masks = []
+for i in range(data.num_corr_max+1):
+    masks.append(data.movedf[f'pos_flag_{i}'] != 4)
+mask = reduce(lambda x, y: x | y, masks)
+df_abnormal = data.movedf[mask]
 
 def plot_posfid_temp(pcid=None):
 
@@ -154,7 +134,7 @@ def plot_posfid_temp(pcid=None):
             ax.plot(query['time'], query['posfid_temps_median'], '-o',
                     label=f'PC{pcid:02} posfid median')
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(6.5, 3.5))
     if pcid is None:  # loop through all petals, plot max only
         for pc in data.pcids:
             plot_petal(pc,
@@ -172,26 +152,14 @@ def plot_posfid_temp(pcid=None):
                          f'posfid_temp{suffix}.pdf'),
             bbox_inches='tight')
 
-# plot overall temperatures for all petals
-if data.db_telemetry_available:
-    pd.plotting.register_matplotlib_converters()
-    plot_posfid_temp()
-else:
-    print('DB telemetry query unavailable on this platform\n')
-
-```
-
-# Results
-
-```python name='grade distributions', echo=False
 
 def add_hist_annotation(ax):
     for rect in ax.patches:  # add annotations
         height = rect.get_height()
         ax.annotate(f'{int(height)}',
                     xy=(rect.get_x() + rect.get_width() / 2, height),
-                    xytext=(0, 3),  # 3 points vertical offset
-                    textcoords='offset points',
+                    xytext=(0, 5),  # vertical offset
+                    textcoords='offset points', size='small',
                     ha='center', va='bottom')
     ax.set_ylim([0.1, ax.get_ylim()[1]*3])
 
@@ -212,10 +180,13 @@ def plot_grade_dist(pcid=None):
         if grade not in grade_counts.index:  # no count, set to zero
             grade_counts[grade] = 0
 
-    fig, ax = plt.subplots()
-    grade_counts.reindex(grades).plot(
-        ax=ax, kind='bar', log=True,
-        figsize=(6, 3), title=title, rot=0, alpha=0.8)
+    fig, ax = plt.subplots(figsize=(6.5, 3.5))
+    ax.bar(grades, grade_counts.reindex(grades),
+           log=True, alpha=0.7)
+    ax.set_title(title)
+    # grade_counts.reindex(grades).plot(
+    #     ax=ax, kind='bar', log=True,
+    #     figsize=(6, 3), title=title, rot=0, alpha=0.8)
     add_hist_annotation(ax)
     ax.set_xlabel('Postiioner grade')
     ax.set_ylabel('Count')
@@ -225,26 +196,25 @@ def plot_grade_dist(pcid=None):
                 bbox_inches='tight')
     return grade_counts
 
-# show overall statistics across all petals
-_ = plot_grade_dist()
-```
-
-```python name='error distributions', echo=False, width='linewidth'
 
 def plot_error_dist(pcid=None, grade=None):
     if pcid is None:  # show all positioners tested
         err = data.gradedf
+        npos = np.sum(err['grade']!='N/A')
         ptlstr = 'petals' if len(data.pcids) > 1 else 'petal'
+        posstr = 'positioners' if npos > 1 else 'positioner'
         title = (
             f'Overall {{}} distribution '
-            f'\n({len(data.posids)} positioners, {len(data.pcids)} '
+            f'\n({npos} {posstr}, {len(data.pcids)} '
             + ptlstr + ')')
     else:
         err = data.gradedf[data.gradedf['PCID'] == pcid]
         if grade is not None:
             err = err[err['grade']==grade]
+        npos = np.sum(err['grade']!='N/A')
+        posstr = 'positioners' if npos > 1 else 'positioner'
         title = (f'PC{pcid:02} {{}} distribution '
-                 f'\n({len(data.posids_pc[pcid])} positioners)')
+                 f'\n({npos} {posstr})')
 
     def plot_error_hist(ax, column_name, cuts, title, vlines=None):
         grades_present = sorted(err['grade'].unique())
@@ -252,11 +222,11 @@ def plot_error_dist(pcid=None, grade=None):
             grades_present.remove('N/A')
         ax.hist([err[err['grade'] == grade][column_name]
                  for grade in grades_present],
-                log=True, histtype='bar', stacked=True, alpha=0.8,
+                log=True, histtype='bar', stacked=False, alpha=0.7,
                 color = [colours[grade] for grade in grades_present],
                 label=[f'Grade {grade}' for grade in grades_present])
         add_hist_annotation(ax)
-        ax.set_ylim(top=min([ax.get_ylim()[1]*10, 1e3]))
+        ax.set_ylim(top=2e3)
         ax.set_title(title)
         ax.set_xlabel('Error (μm)')
         ax.set_ylabel('Count')
@@ -276,7 +246,7 @@ def plot_error_dist(pcid=None, grade=None):
         text = pd.DataFrame(rows).to_string(index=False)
         ax.text(0.7, 0.95, text, ha='right', va='top',
                 family='monospace', transform=ax.transAxes,
-                bbox={'boxstyle': 'round', 'alpha': 0.2,
+                bbox={'boxstyle': 'round', 'alpha': 0.1,
                           'facecolor': 'white', 'edgecolor': 'lightgrey'})
 
     fig, axes = plt.subplots(1, 2, figsize=(11, 4))
@@ -291,23 +261,12 @@ def plot_error_dist(pcid=None, grade=None):
                              f'error_distribution{suffix1}{suffix2}.pdf'),
                 bbox_inches='tight')
 
-plot_error_dist()
-```
-
-```python name='abnormal positioners', echo=False, results='raw'
-# get postiioners with abnormal flags
-masks = []
-for i in range(data.num_corr_max+1):
-    masks.append(data.movedf[f'pos_flag_{i}'] != 4)
-mask = reduce(lambda x, y: x | y, masks)
-df_abnormal = data.movedf[mask]
-posids_abnormal = df_abnormal.index.droplevel(0).unique()
-
 def abnormal_pos_df(pcid=None):
     if pcid is None:
         df = df_abnormal
     else:
         df = df_abnormal[df_abnormal['PCID']==pcid]
+    posids_abnormal = df.index.droplevel(0).unique()
     rows = []
     for posid in posids_abnormal:
         counts_list = []  # counts by submove
@@ -316,13 +275,104 @@ def abnormal_pos_df(pcid=None):
                 df.loc[idx[:, posid], :][f'pos_status_{i}'].value_counts())
         counts = reduce(lambda x, y: x.add(y, fill_value=0), counts_list)  # total
         rows.append(counts)
-    df_status = pd.DataFrame(rows, index=posids_abnormal).drop('Normal positioner', axis=1)
-    return df_status
+    df_status = (pd.DataFrame(rows, index=posids_abnormal, dtype=np.int64)
+                 .drop('Normal positioner', axis=1))
+    return df_status.fillna(value=0)
 
+def plot_error_heatmaps(pcid, posids_exclude=None):
+    # load nominal theta centres for plotting in local ptlXYZ
+    path = os.path.join(os.getenv('PLATE_CONTROL_DIR',
+                                  '/software/products/plate_control-trunk'),
+                        'petal', 'positioner_locations_0530v14.csv')
+    ptlXYZ_df = pd.read_csv(path,
+                            usecols=['device_location_id', 'X', 'Y', 'Z'],
+                            index_col='device_location_id')
+    ptlXYZ_df.index.rename('device_loc', inplace=True)
+    gradedf = data.gradedf[data.gradedf['PCID'] == pcid]
+    n_outliers = 0
+    if posids_exclude is not None:
+        gradedf = gradedf[~gradedf.index.isin(posids_exclude)]
+        n_outliers = len(posids_exclude)
+    def plot_error_heatmap(ax, column_name, vmin, vmax, title):
+        # plot all empty circles
+        ax.scatter(ptlXYZ_df['X'], ptlXYZ_df['Y'],
+                   marker='o', facecolors='none', edgecolors='grey',
+                   s=45, lw=0.8)
+        hm = ax.scatter(gradedf['OFFSET_X'], gradedf['OFFSET_Y'],
+                        c=gradedf[column_name], cmap='plasma', 
+                        marker='o', s=36, vmin=vmin, vmax=vmax)
+        ax.set_aspect('equal')
+        ax.set_xlabel('x (mm)')
+        ax.set_title(title)
+        return hm
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+    col_names = ['err_0_max', 'err_corr_rms']
+    move_names = ['max blind move', 'rms corrective move']
+    vmin = gradedf[col_names].min().min()
+    vmax = gradedf[col_names].max().max()
+    for col_name, move_name, ax in zip(col_names, move_names, axes):
+        title = (
+            f'PC{pcid:02} {move_name} error map\n({len(gradedf)} '
+            f'positioners, excluding {n_outliers} outliers)')
+        hm = plot_error_heatmap(ax, col_name, vmin, vmax, title)
+    axes[0].set_ylabel('y (mm)')
+    fig.subplots_adjust(wspace=0)
+    cbar_ax = fig.add_axes([0.91, 0.225, 0.01, 0.555])
+    fig.colorbar(hm, cax=cbar_ax)
+    fig.savefig(os.path.join(data.dir, 'figures',
+                             f'{pcid}_error_heatmaps.pdf'),
+                bbox_inches='tight')
+
+```
+
++------------------------+---------------------------------------------------------------------------------------------------------------+
+| **Start time**\        | ``<%=data.start_time.isoformat()%>`` KPNO, ``<%=data.start_time.astimezone(timezone.utc).isoformat()%>`` UTC\ |
+| **End time**\          | ``<%=data.end_time.isoformat()%>`` KPNO, ``<%=data.end_time.astimezone(timezone.utc).isoformat()%>`` UTC\     |
+| **Duration**\          | ``<%=str(data.end_time-data.start_time)%> ``\                                                                 |
+| **PCIDs**\             | ``<%=data.pcids%>``\                                                                                          |
+| **Product directory**\ | ``<%=data.dir%>``\                                                                                            |
++------------------------+---------------------------------------------------------------------------------------------------------------+
+| **Test logs**\         | ``<%=data.log_paths%>``                                                                                       |
++------------------------+---------------------------------------------------------------------------------------------------------------+
+
+# Test Configuration
+
++-----------------------------+-----------------------------------------------+
+| **Anticollision mode**\     | ``<%=data.anticollision%>``\                  |
+| **Number of corrections**\  | ``<%=data.num_corr_max%> ``\                  |
+| **Min radius of targets**\  | ``<%=data.test_cfg['targ_min_radius']%> mm``\ |
+| **Max radius of targets**\  | ``<%=data.test_cfg['targ_max_radius']%> mm``\ |
+| **Number of targets**\      | ``<%=data.ntargets%>``\                       |
++------------------------+----------------------------------------------------+
+| **Targets**\                | ``<%=targets%>``                              |
++-----------------------------+-----------------------------------------------+
+
+# Temperature
+
+```python name='posfid temperature', echo=False, results='raw', width='500px'
+# plot overall temperatures for all petals
+if data.db_telemetry_available:
+    pd.plotting.register_matplotlib_converters()
+    plot_posfid_temp()
+else:
+    print('DB telemetry query unavailable on this platform\n')
+
+```
+
+# Results
+
+```python name='grade distributions', echo=False, width='500px'
+# show overall statistics across all petals
+_ = plot_grade_dist()
+```
+
+```python name='error distributions', echo=False, width='linewidth'
+plot_error_dist()
 ##### Abnormal status: ``<%=len(posids_abnormal)%>`` positioners
 
 # ```python name='abnormal pos print', echo=False
 # abnormal_pos_df().reset_index().astype(int, errors='ignore')
 # ```
-
 ```
+

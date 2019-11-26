@@ -4,11 +4,17 @@ df = df[df['DEVICE_TYPE']=='POS']
 posids_all = set(df['DEVICE_ID'].unique())
 if hasattr(data, 'posids_disabled_pc'):
 	posids_tested = set(data.posids_pc[{0}]) |  data.posids_disabled_pc[{0}]
-	posids_disabled = posids_disabled_pc[{0}]
+	posids_disabled = data.posids_disabled_pc[{0}]
 else:
 	posids_tested = set(data.posids_pc[{0}])
 	posids_disabled = set()
 posids_untested = sorted(posids_all - posids_tested)
+
+grades_pc = data.gradedf[data.gradedf['PCID'] == {0}]
+posids_grade = {{}}
+for grade in grades:
+	mask = grades_pc['grade'] == grade
+	posids_grade[grade] = sorted(data.gradedf[mask].index)
 ```
 
 ### PC0<%{0}%>
@@ -20,20 +26,15 @@ posids_untested = sorted(posids_all - posids_tested)
 if not hasattr(data, 'posids_disabled_pc'):
 	print('Disabled positioners were not recorded in old test, please check log.')
 ```
-``<%=len(posids_untested)%>`` were not tested:
+``<%=len(posids_untested)%>`` positioners were not tested:
 ``<%=sorted(posids_untested)%>``
 
-```python name='pc{0:02} temp, grade distribution', echo=False
+```python name='pc{0:02} temp, grade distribution', echo=False, width='500px'
 if data.db_telemetry_available:
     plot_posfid_temp(pcid={0})
 else:
     print('DB telemetry query unavailable on this platform\n')
 grade_counts = plot_grade_dist(pcid={0})
-grades_pc = data.grade_df[data.grade_df['PCID'] == {0}]
-posids_grade = {{}}
-for grade in grades:
-	mask = grades_pc['grade'] == grade
-	posids_grade[grade] = sorted(data.grade_df[mask].index)
 ```
 
 ```python name='pc{0:02} median stats by grade', echo=False, caption='Median of error measures by grades'
@@ -44,7 +45,7 @@ for grade in grades[:-1]:
 pd.DataFrame(dfs, index=grades[:-1]).iloc[:, :5]
 ```
 
-```python name='pc{0:02} error distribution', echo=False, width='linewidth'
+```python name='pc{0:02} error distribution and heatmaps', echo=False, width='linewidth'
 plot_error_dist(pcid={0})
 n_abnormal = (df_abnormal['PCID']=={0}).index.droplevel(0).unique().size
 ```
@@ -56,7 +57,7 @@ gradedf_pc = data.gradedf[data.gradedf['PCID']=={0}]
 gradedf_pc_maxb = gradedf_pc[gradedf_pc['err_0_max']>200]
 gradedf_pc_rmsc = gradedf_pc[gradedf_pc['err_corr_rms']>30]
 posids_exclude = sorted((set(abnormal_pc.index) | set(gradedf_pc_maxb.index)
-                  | set(gradedf_pc_rmsc)))
+                  | set(gradedf_pc_rmsc.index)))
 abnormal_pc.reset_index().astype(int, errors='ignore')
 ```
 
@@ -92,6 +93,11 @@ rms_series = np.sqrt(np.square(movedf_filtered).mean(axis=0))
 median_series = movedf_filtered.mean(axis=0)
 pd.DataFrame([max_series, rms_series, median_series],
              index=['max', 'rms', 'median']).T.astype(int, errors='ignore')
+```
+
+##### Move error maps excluding ``<%=len(posids_exclude)%>`` outliers (μm)
+```python, name='pc{0:02} grade A error distribution', echo=False, width='linewidth', results='verbatim'
+plot_error_heatmaps(pcid={0}, posids_exclude=posids_exclude)
 ```
 
 ##### Grade A: ``<%=grade_counts['A']%>`` positioners
