@@ -355,7 +355,7 @@ class Petal(object):
         marked_for_delete = set()
         for posid in requests:
             if posid not in self.posids:
-                pass
+                continue   # pass
             requests[posid]['posmodel'] = self.posmodels[posid]
             self._initialize_pos_flags(ids = {posid})
             if 'log_note' not in requests[posid]:
