@@ -405,8 +405,8 @@ class FPTestData:
                   'w') as h:
             h.write(os.path.join(self.dir, 'data_dump.pkl'))
         # add sections for each pcid to markdown document
-        shutil.copyfile('xytest_report_master.md', 'xytest_report.md')
-        with open('xytest_report_master_petal.md', 'r') as h:
+        shutil.copyfile('xytest_report_master.pmd', 'xytest_report.pmd')
+        with open('xytest_report_master_petal.pmd', 'r') as h:
             petal_section = h.read()
         ptlstr = 'petals' if len(self.pcids) > 1 else 'petal'
         if hasattr(self, 'posids_disabled'):
@@ -419,11 +419,11 @@ class FPTestData:
 #### Appendix: complete list of positioners tested for <%=len(data.pcids)%> {0}
 ``<%=data.posids%>``
         '''.format(ptlstr)
-        with open('xytest_report.md', 'a+') as h:
+        with open('xytest_report.pmd', 'a+') as h:
             for pcid in self.pcids:
                 h.write(petal_section.format(pcid))
                 h.write(posid_section)
-        subprocess.call(['pweave', 'xytest_report.md',
+        subprocess.call(['pweave', 'xytest_report.pmd',
                          '-f', 'pandoc2html', '-o', path_output])
 
     def make_archive(self):
@@ -450,26 +450,26 @@ class FPTestData:
 if __name__ == '__main__':
 
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    folders = ['20191021T154939-0700-petal3_can10',
-               '20191024T150231-0700-petal9',
-               '20191031T150117-0700-petal0_can1011',
-               '20191106T100257-0700-petal0_can1011',
-               '20191107T114725-0700-petal0_short',
-               '20191112T191119-0700-petal0_full'
-               '20191113T143453-0700-cmx_psf-3',
-               '20191113T145131-0700-cmx_psf-4',
-               '20191113T151057-0700-cmx_psf-1',
-               '20191113T153032-0700-cmx_psf-2',
-               '20191113T191026-0700-cmx_dither',
-               '20191113T191844-0700-cmx_dither',
-               '20191113T192440-0700-cmx_dither',
-               '20191113T203313-0700-petal2_full',
-               '20191113T204603-0700-petal2_full',
-               '20191115T155812-0700-petal9_full',
-               '20191116T184321-0700-cmx_dither_petal0_63064',
-               '20191116T185036-0700-cmx_dither_petal0_63064',
-               '20191122T165937-0700-cmx_dither_63038_petal2',
-               '20191122T171101-0700-cmx_dither_63068_petal0',
+    folders = [ #'20191021T154939-0700-petal3_can10',
+    #            '20191024T150231-0700-petal9',
+    #            '20191031T150117-0700-petal0_can1011',
+    #            '20191106T100257-0700-petal0_can1011',
+    #            '20191107T114725-0700-petal0_short',
+    #            '20191112T191119-0700-petal0_full'
+    #            '20191113T143453-0700-cmx_psf-3',
+    #            '20191113T145131-0700-cmx_psf-4',
+    #            '20191113T151057-0700-cmx_psf-1',
+    #            '20191113T153032-0700-cmx_psf-2',
+    #            '20191113T191026-0700-cmx_dither',
+    #            '20191113T191844-0700-cmx_dither',
+    #            '20191113T192440-0700-cmx_dither',
+    #            '20191113T203313-0700-petal2_full',
+    #            '20191113T204603-0700-petal2_full',
+    #            '20191115T155812-0700-petal9_full',
+    #            '20191116T184321-0700-cmx_dither_petal0_63064',
+    #            '20191116T185036-0700-cmx_dither_petal0_63064',
+    #            '20191122T165937-0700-cmx_dither_63038_petal2',
+    #            '20191122T171101-0700-cmx_dither_63068_petal0',
                '20191125T150043-0700-petal7_full']
     for dir_name in folders:
         try:
@@ -481,6 +481,6 @@ if __name__ == '__main__':
             # data.make_summary_plots()
             if shutil.which('pandoc') is not None:
                 data.generate_report()
-            # data.make_archive()
+            data.make_archive()
         except Exception as e:
             print(e)

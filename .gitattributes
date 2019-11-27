@@ -24,8 +24,8 @@ pecs/seed_armlengths.py -text
 pecs/seed_offsets_tp.py -text
 pecs/seed_offsets_xy.py -text
 pecs/xytest.py -text
-pecs/xytest_report_master.md -text
-pecs/xytest_report_master_petal.md -text
+pecs/xytest_report_master.pmd -text
+pecs/xytest_report_master_petal.pmd -text
 petal/collision_lookup_generator.py -text
 petal/collision_lookup_generator_subset.py -text
 petal/focal_surface_lookup.csv -text

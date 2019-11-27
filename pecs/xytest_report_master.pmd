@@ -1,6 +1,6 @@
 % DESI Positioner Accuracy Test Report
 % Focal Plane Team
-% 2019-11-25 (master template last revised)
+% 2019-11-27 (master template last revised)
 
 ```python name='grading', echo=False
 # -*- coding: utf-8 -*-
@@ -26,6 +26,7 @@ from DOSlib.positioner_index import PositionerIndex
 import posconstants as pc
 sys.path.append(os.path.abspath('.'))
 idx = pd.IndexSlice
+pd.options.display.max_rows = 550
 np.rms = lambda x: np.sqrt(np.mean(np.square(x)))
 np.nanrms = lambda x: np.sqrt(np.nanmean(np.square(x)))
 grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
@@ -188,7 +189,7 @@ def plot_grade_dist(pcid=None):
     #     ax=ax, kind='bar', log=True,
     #     figsize=(6, 3), title=title, rot=0, alpha=0.8)
     add_hist_annotation(ax)
-    ax.set_xlabel('Postiioner grade')
+    ax.set_xlabel('Postiioner performance grade')
     ax.set_ylabel('Count')
     suffix = '' if pcid is None else f'_pc{pcid:02}'
     fig.savefig(os.path.join(data.dir, 'figures',
@@ -197,24 +198,29 @@ def plot_grade_dist(pcid=None):
     return grade_counts
 
 
-def plot_error_dist(pcid=None, grade=None):
-    if pcid is None:  # show all positioners tested
-        err = data.gradedf
-        npos = np.sum(err['grade']!='N/A')
+def plot_error_dist(pcid=None, grade=None, posids_exclude=None):
+    err = data.gradedf  # show all positioners tested by default
+    err = err[err['grade']!='N/A']  # filter out N/A grades
+    if pcid is None:
         ptlstr = 'petals' if len(data.pcids) > 1 else 'petal'
-        posstr = 'positioners' if npos > 1 else 'positioner'
+        posstr = 'positioners' if len(err) > 1 else 'positioner'
         title = (
             f'Overall {{}} distribution '
-            f'\n({npos} {posstr}, {len(data.pcids)} '
+            f'\n({len(err)} {posstr}, {len(data.pcids)} '
             + ptlstr + ')')
-    else:
-        err = data.gradedf[data.gradedf['PCID'] == pcid]
+    else:  # showing only one petal given pcid
+        err = err[err['PCID'] == pcid]
         if grade is not None:
             err = err[err['grade']==grade]
-        npos = np.sum(err['grade']!='N/A')
-        posstr = 'positioners' if npos > 1 else 'positioner'
+        n_pos = len(err)  # n positioners before exclusion
+        if posids_exclude is not None:
+            err = err[~err.index.isin(posids_exclude)]
+        n_outliers = n_pos - len(err)  # after exclusion
+        posstr = 'positioners' if len(err) > 1 else 'positioner'
+        olstr = 'outliers' if n_outliers > 1 else 'outlier'
+        suffix = f', {n_outliers} {olstr} excluded' if n_outliers > 1 else ''
         title = (f'PC{pcid:02} {{}} distribution '
-                 f'\n({npos} {posstr})')
+                 f'\n({len(err)} {posstr}{suffix})')
 
     def plot_error_hist(ax, column_name, cuts, title, vlines=None):
         grades_present = sorted(err['grade'].unique())
@@ -244,10 +250,10 @@ def plot_error_dist(pcid=None, grade=None):
             rows.append({'Error within (μm)': int(cut),
                         'Count': int(np.sum(err[column_name] <= cut))})
         text = pd.DataFrame(rows).to_string(index=False)
-        ax.text(0.7, 0.95, text, ha='right', va='top',
-                family='monospace', transform=ax.transAxes,
+        ax.text(0.7, 0.97, text, ha='right', va='top',
+                family='monospace', size='small', transform=ax.transAxes,
                 bbox={'boxstyle': 'round', 'alpha': 0.1,
-                          'facecolor': 'white', 'edgecolor': 'lightgrey'})
+                      'facecolor': 'white', 'edgecolor': 'grey'})
 
     fig, axes = plt.subplots(1, 2, figsize=(11, 4))
     plot_error_hist(axes[0], 'err_0_max', [0, 100, 200, 300, 400, 500, 1000],
@@ -273,7 +279,7 @@ def abnormal_pos_df(pcid=None):
         for i in range(data.num_corr_max+1):
             counts_list.append(
                 df.loc[idx[:, posid], :][f'pos_status_{i}'].value_counts())
-        counts = reduce(lambda x, y: x.add(y, fill_value=0), counts_list)  # total
+        counts = reduce(lambda x, y: x.add(y, fill_value=0), counts_list)
         rows.append(counts)
     df_status = (pd.DataFrame(rows, index=posids_abnormal, dtype=np.int64)
                  .drop('Normal positioner', axis=1))
@@ -312,9 +318,10 @@ def plot_error_heatmaps(pcid, posids_exclude=None):
     vmin = gradedf[col_names].min().min()
     vmax = gradedf[col_names].max().max()
     for col_name, move_name, ax in zip(col_names, move_names, axes):
+        olstr = 'outliers' if n_outliers > 1 else 'outlier'
         title = (
             f'PC{pcid:02} {move_name} error map\n({len(gradedf)} '
-            f'positioners, excluding {n_outliers} outliers)')
+            f'positioners, {n_outliers} {olstr} excluded)')
         hm = plot_error_heatmap(ax, col_name, vmin, vmax, title)
     axes[0].set_ylabel('y (mm)')
     fig.subplots_adjust(wspace=0)
@@ -375,4 +382,3 @@ plot_error_dist()
 # abnormal_pos_df().reset_index().astype(int, errors='ignore')
 # ```
 ```
-
