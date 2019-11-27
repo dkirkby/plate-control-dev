@@ -102,6 +102,8 @@ class XYTest(PECS):
         props = ['targetable_range_T', 'targetable_range_P']
         self.data.posids = []
         self.data.posids_pc = {}
+        self.data.posids_disabled = set()
+        self.data.posids_disabled_pc = {}
         self.data.petal_locs = []
         self.data.petal_locs_pc = {}
         self.data.device_locs = []
@@ -110,7 +112,8 @@ class XYTest(PECS):
         pos_en = self.ptlm.get_positioners(enabled_only=True)
         dfs = []
         l1s = {}
-        for pcid in self.data.pcids:  # fast enough, no need to parallelise
+        for pcid in self.data.pcids:
+            self.data.posids_disabled_pc[pcid] = set()
             mode = self.data.test_cfg[pcid]['mode']
             role = self._pcid2role(pcid) # petalman returns dict keyed by role
             if mode == 'all':
@@ -275,7 +278,8 @@ class XYTest(PECS):
         # measure ten petals with FVC at once, FVC after all petals have moved
         _, meapos, _, _ = self.fvc_measure()
         # measured_QS.columns = measured_QS.columns.str.upper()  # rename upper
-        self.logger.debug(f'FVC measured_QS:\n{meapos.to_string()}')
+        self.logger.debug(f'FVC measured_QS:\n'
+                          f'{meapos.reset_index().to_string()}')
         return meapos
 
     def move_petals(self, i, n):
@@ -341,7 +345,7 @@ class XYTest(PECS):
                                      + expected_QS[self._pcid2role(pcid)].to_string())
         # get expected posintTP from petal and write to movedf after move
         # Positions are concatenated in petalman
-        ret_TP = self.ptlm.get_positions(posids=posids, return_coord='posintTP')
+        ret_TP = self.ptlm.get_positions(return_coord='posintTP')
         # Just need this sent to one petal
         a_ptl = self._pcid2role(self.data.pcids[0])
         ret_TP['STATUS'] = self.ptlm.decipher_posflags(ret_TP['FLAG'],
@@ -394,6 +398,9 @@ class XYTest(PECS):
                                         if posid not in disabled]
                     self.data.posids_pc[pcid] = [posid for posid in posids
                                                  if posid not in disabled]
+                    # add disabled to disabled sets for bookeeping
+                    self.data.posids_disabled |= set(disabled)
+                    self.data.posids_disabled_pc[pcid] |= set(disabled)
             else:
                 self.loggers[pcid].info(
                     f'All {len(posids)} requested fibres measured by FVC.')
@@ -403,7 +410,7 @@ class XYTest(PECS):
         posids = set(self.data.posids).intersection(
             set(measured_QS.index))  # only update measured, valid posid
         df = measured_QS.loc[posids].reset_index()
-        assert ('Q' in df.columns and 'S' in df.columns), f'df.columns'
+        assert ('Q' in df.columns and 'S' in df.columns), f'{df.columns}'
         updates = self.ptlm.test_and_update_TP(df)
         assert type(updates) == pd.core.frame.DataFrame, (
             f'Exception calling test_and_update_TP, returned:\n'
@@ -427,7 +434,7 @@ class XYTest(PECS):
                             f'meas_s_{n}': QS[1, :],
                             f'meas_x_{n}': poslocXY[0, :],
                             f'meas_y_{n}': poslocXY[1, :]},
-                           dtype=np.float32, index=measured_QS.index)
+                           dtype=np.float64, index=measured_QS.index)
         self._update(new, i)
 
     def calculate_xy_errors(self, i, n):  # calculate xy error columns in df

@@ -21,7 +21,7 @@ from glob import glob
 from itertools import product
 from functools import partial
 import multiprocessing
-from multiprocessing import Process, Pool
+from multiprocessing import Process  # Pool
 from tqdm import tqdm
 import io
 import shutil
@@ -176,6 +176,7 @@ class FPTestData:
         cols0 = ['timestamp', 'cycle', 'move_log']
         dtypes0 = ['datetime64[ns]', np.uint64, str]
         cols1 = ['target_x', 'target_y']
+        dtypes1 = [np.float64] * len(cols1)
         cols2_base = ['meas_q', 'meas_s', 'meas_x', 'meas_y',
                       'err_x', 'err_y', 'err_xy',
                       'pos_int_t', 'pos_int_p', 'pos_flag', 'pos_status']
@@ -183,7 +184,8 @@ class FPTestData:
         for field, i in product(cols2_base, range(self.num_corr_max+1)):
             cols2.append(f'{field}_{i}')
         cols = cols0 + cols1 + cols2  # list of all columns
-        dtypes = dtypes0 + [np.float64] * (len(cols1) + len(cols2))
+        dtypes2 = [np.float64] * (len(cols2) - 2) + [np.int64, str]
+        dtypes = dtypes0 + dtypes1 + dtypes2
         data = {col: pd.Series(dtype=dt) for col, dt in zip(cols, dtypes)}
         # build multi-level index
         iterables = [np.arange(self.ntargets), posids]
@@ -210,8 +212,8 @@ class FPTestData:
                     WHERE time >= '{self.start_time.astimezone(timezone.utc)}'
                     AND time < '{self.end_time.astimezone(timezone.utc)}'""",
                 conn).sort_values('time')  # posfid_temps, time, pcid
-            print(f'{len(self.telemetry)} entries of telemetry data were read'
-                  f' from DB between {self.start_time} and {self.end_time}')
+            print(f'{len(self.telemetry)} entries from telemetry DB '
+                  f'between {self.start_time} and {self.end_time} were loaded')
             self.db_telemetry_available = True
         except Exception:
             self.db_telemetry_available = False
@@ -371,9 +373,9 @@ class FPTestData:
 
     def export_data_logs(self):
         '''must have writte self.posids_pc, a dict keyed by pcid'''
-        self.movedf.to_pickle(os.path.join(self.dir, 'move_df.pkl.gz'),
+        self.movedf.to_pickle(os.path.join(self.dir, 'movedf.pkl.gz'),
                               compression='gzip')
-        self.movedf.to_csv(os.path.join(self.dir, 'move_df.csv'))
+        self.movedf.to_csv(os.path.join(self.dir, 'movedf.csv'))
         self.logger.info(f'Focal plane move data written to: {self.dir}')
         for pcid in self.pcids:
             def makepath(name): return os.path.join(self.dirs[pcid], name)
@@ -404,42 +406,17 @@ class FPTestData:
             h.write(os.path.join(self.dir, 'data_dump.pkl'))
         # add sections for each pcid to markdown document
         shutil.copyfile('xytest_report_master.md', 'xytest_report.md')
-        petal_section = '''
-### PC0<%{0}%>
-``<%=len(data.posids_pc[{0}])%>`` positioners tested
-
-```python, echo=False
-# turn the following into a loop in future version
-grade_counts = plot_grade_hist(pcid={0})
-grades_pc = data.grade_df[data.grade_df['PCID'] == {0}]
-posids_grade = {{}}
-for grade in grades:
-    mask = grades_pc['grade'] == grade
-    posids_grade[grade] = sorted(data.grade_df[mask].index)
-```
-
-##### Grade A: ``<%=grade_counts['A']%>`` positioners
-``<%=posids_grade['A']%>``
-
-##### Grade B: ``<%=grade_counts['B']%>`` positioners
-``<%=posids_grade['B']%>``
-
-##### Grade C: ``<%=grade_counts['C']%>`` positioners
-``<%=posids_grade['C']%>``
-
-##### Grade D: ``<%=grade_counts['D']%>`` positioners
-``<%=posids_grade['D']%>``
-
-##### Grade F: ``<%=grade_counts['F']%>`` positioners
-``<%=posids_grade['F']%>``
-
-##### Grade N/A: ``<%=grade_counts['N/A']%>`` positioners
-``<%=posids_grade['N/A']%>``
-
-        '''
+        with open('xytest_report_master_petal.md', 'r') as h:
+            petal_section = h.read()
         ptlstr = 'petals' if len(self.pcids) > 1 else 'petal'
-        posid_section = '''
-#### Complete list of positioners tested for <%=len(data.pcids)%> {0}
+        if hasattr(self, 'posids_disabled'):
+            posid_section = '''
+#### Appendix: complete list of positioners tested for <%=len(data.pcids)%> {0}
+``<%=sorted(set(data.posids) | data.posids_disabled)%>``
+        '''.format(ptlstr)
+        else:
+            posid_section = '''
+#### Appendix: complete list of positioners tested for <%=len(data.pcids)%> {0}
 ``<%=data.posids%>``
         '''.format(ptlstr)
         with open('xytest_report.md', 'a+') as h:
@@ -473,12 +450,37 @@ for grade in grades:
 if __name__ == '__main__':
 
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    dir_name = '20191108T151933-0800-pcid'
-    with open(os.path.join(pc.dirs['xytest_data'],
-                           dir_name, 'data_dump.pkl'),
-              'rb') as handle:
-        data = pickle.load(handle)
-    # data.make_summary_plots()
-    if shutil.which('pandoc') is not None:
-        data.generate_report()
-    # data.make_archive()
+    folders = ['20191021T154939-0700-petal3_can10',
+               '20191024T150231-0700-petal9',
+               '20191031T150117-0700-petal0_can1011',
+               '20191106T100257-0700-petal0_can1011',
+               '20191107T114725-0700-petal0_short',
+               '20191112T191119-0700-petal0_full'
+               '20191113T143453-0700-cmx_psf-3',
+               '20191113T145131-0700-cmx_psf-4',
+               '20191113T151057-0700-cmx_psf-1',
+               '20191113T153032-0700-cmx_psf-2',
+               '20191113T191026-0700-cmx_dither',
+               '20191113T191844-0700-cmx_dither',
+               '20191113T192440-0700-cmx_dither',
+               '20191113T203313-0700-petal2_full',
+               '20191113T204603-0700-petal2_full',
+               '20191115T155812-0700-petal9_full',
+               '20191116T184321-0700-cmx_dither_petal0_63064',
+               '20191116T185036-0700-cmx_dither_petal0_63064',
+               '20191122T165937-0700-cmx_dither_63038_petal2',
+               '20191122T171101-0700-cmx_dither_63068_petal0',
+               '20191125T150043-0700-petal7_full']
+    for dir_name in folders:
+        try:
+            # dir_name = '20191115T155812-0700-petal9_full'
+            with open(os.path.join(pc.dirs['xytest_data'],
+                                   dir_name, 'data_dump.pkl'),
+                      'rb') as handle:
+                data = pickle.load(handle)
+            # data.make_summary_plots()
+            if shutil.which('pandoc') is not None:
+                data.generate_report()
+            # data.make_archive()
+        except Exception as e:
+            print(e)
