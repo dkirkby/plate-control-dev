@@ -166,6 +166,7 @@ class PECS:
         # measured_QS, note that expected_pos was changed in place
         meapos = (pd.DataFrame(self.fvc.measure(
                       exppos, matched_only=matched_only,
+                      exptime=self.exptime,
                       all_fiducials=self.all_fiducials))
                   .rename(columns={'id': 'DEVICE_ID'})
                   .set_index('DEVICE_ID').sort_index())  # indexed by DEVICE_ID
