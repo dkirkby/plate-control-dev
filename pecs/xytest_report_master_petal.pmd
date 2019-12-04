@@ -66,7 +66,8 @@ gradedf_pc_maxb = gradedf_pc[gradedf_pc['err_0_max']>200]
 gradedf_pc_rmsc = gradedf_pc[gradedf_pc['err_corr_rms']>30]
 posids_exclude = sorted((set(abnormal_pc.index) | set(gradedf_pc_maxb.index)
                   | set(gradedf_pc_rmsc.index)))
-abnormal_pc.reset_index().astype(int, errors='ignore')
+if len(abnormal_pc) > 0:
+	abnormal_pc.reset_index().astype(int, errors='ignore')
 ```
 
 ##### Max blind move error > 200 μm: ``<%=len(gradedf_pc_maxb)%>`` positioners
