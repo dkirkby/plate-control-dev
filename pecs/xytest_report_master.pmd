@@ -282,7 +282,7 @@ def abnormal_pos_df(pcid=None):
         counts = reduce(lambda x, y: x.add(y, fill_value=0), counts_list)
         rows.append(counts)
     df_status = (pd.DataFrame(rows, index=posids_abnormal, dtype=np.int64)
-                 .drop('Normal positioner', axis=1))
+                 .drop('Normal positioner', axis=1, errors='ignore'))
     return df_status.fillna(value=0)
 
 def plot_error_heatmaps(pcid, posids_exclude=None):
