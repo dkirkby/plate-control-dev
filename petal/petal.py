@@ -1314,12 +1314,15 @@ class Petal(object):
         if ids == 'all':
             ids = self.posids.union(self.fidids)
         for posfidid in ids:
-            if posfidid not in self.posids.union(self.fidids):
-                pass
+            if posfidid not in self.posids.union(self.fidids): 
+                continue
             if posfidid.startswith('M') or posfidid.startswith('D') or posfidid.startswith('UM'):
                 self.pos_flags[posfidid] = self.pos_bit
             else:
                 self.pos_flags[posfidid] = self.fid_bit
+        if hasattr(self, 'disabled_fids') and ids == 'all':
+            for fid in self.disabled_fids:
+                self.pos_flags[fid] = self.fid_bit | self.ctrl_disabled_bit
         return
 
     def _apply_state_enable_settings(self):
