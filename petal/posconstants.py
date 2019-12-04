@@ -4,6 +4,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 import math
 import datetime
+import pytz
 import collections
 
 """Constants and convenience methods used in the control of the Fiber Postioner.
@@ -38,8 +39,12 @@ elif 'HOME' in os.environ:
 else:
     print("No DESI_HOME or Home defined in environment, assigning temp file generation to current directory/fp_temp_files")
     dirs['temp_files'] = os.path.abspath('./') + 'fp_temp_files' + os.path.sep
-dir_keys_logs        = ['pos_logs','fid_logs','ptl_logs','xytest_data','xytest_logs','xytest_plots','xytest_summaries', 'calib_logs']
-dir_keys_settings    = ['pos_settings','fid_settings','test_settings','collision_settings','hwsetups','ptl_settings','other_settings']
+dir_keys_logs = ['pos_logs', 'fid_logs', 'ptl_logs', 'xytest_data',
+                 'xytest_logs', 'xytest_plots', 'xytest_summaries',
+                 'calib_logs', 'kpno']
+dir_keys_settings = ['pos_settings', 'fid_settings', 'test_settings',
+                     'collision_settings', 'hwsetups', 'ptl_settings',
+                     'other_settings']
 for key in dir_keys_logs:
     dirs[key] = os.path.join(dirs['all_logs'], key)
 for key in dir_keys_settings:
@@ -236,11 +241,13 @@ not_verbose = 0
 verbose = 1
 very_verbose = 2
 
+
 def is_verbose(verbosity_enum):
     boole = True
     if verbosity_enum == not_verbose:
         boole = False
     return boole
+
 
 def is_very_verbose(verbosity_enum):
     boole = False
@@ -254,15 +261,28 @@ def now():
     # current TZ unaware local time (), then TZ aware in local timezone
     return datetime.datetime.now().astimezone()
 
+
 def timestamp_str_now():
     return now().strftime(timestamp_format)
+
 
 def filename_timestamp_str_now():
     return now().strftime(filename_timestamp_format)
 
+
+def dir_date_str_now():
+    '''returns date string for the directory name, changes at noon Arizona'''
+    t = now().astimezone(pytz.timezone('America/Phoenix'))
+    day = t.day
+    if t.hour > 12:  # past noon, treat as the next day
+        day += 1
+    return f'{t.year:04}{t.month:02}{day:02}'
+
+
 # other misc functions
 def ordinal_str(number):
-    '''Returns a string of the number plus 'st', 'nd', 'rd', 'th' as appropriate.
+    '''
+    Returns a string of the number plus 'st', 'nd', 'rd', 'th' as appropriate.
     '''
     numstr = str(number)
     last_digit = numstr[-1]
