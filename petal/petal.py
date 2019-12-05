@@ -199,6 +199,7 @@ class Petal(object):
         self.restricted_targ_bit = 1<<22
         self.multi_request_bit = 1<<23
         self.dev_nonfunctional_bit = 1<<24
+        self.movetable_rejected_bit = 1<<25
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
         self.disabled_devids = [] #list of devids with DEVICE_CLASSIFIED_NONFUNCTIONAL = True or FIBER_INTACT = False
         self._initialize_pos_flags()
@@ -1147,6 +1148,7 @@ class Petal(object):
                 self.altered_states.add(m.posmodel.state)
             else:
                 m.posmodel.clear_postmove_cleanup_cmds_without_executing()
+                self.pos_flags[m.posid] |= self.movetable_rejected_bit
         self.commit()
         self._clear_temporary_state_values()
         self.schedule = self._new_schedule()
@@ -1154,6 +1156,9 @@ class Petal(object):
     def _check_and_disable_nonresponsive_pos_and_fid(self):
         """Asks petalcomm for a list of what canids are nonresponsive, and then
         handles disabling those positioners and/or fiducials.
+
+        As of 12/04/2019 positioners will not be disabled automatically.
+        No moves are performed and we are welcome to try again. Disabling is done by hand.
         """
         if self.simulator_on:
             pass
@@ -1165,9 +1170,9 @@ class Petal(object):
                     self.nonresponsive_canids.add(canid)
                     for item_id in self.posids.union(self.fidids):
                         if self.get_posfid_val(item_id,'CAN_ID') == canid:
-                            self.set_posfid_val(item_id,'CTRL_ENABLED',False)
+                            #self.set_posfid_val(item_id,'CTRL_ENABLED',False)
                             self.pos_flags[item_id] |= self.comm_error_bit
-                            self.printfunc(str(item_id) + ': was disabled due to a CAN communication error.')
+                            self.printfunc('WARNING: positioner {item_id} had communication error.')
                             break
                     status_updated = True
             if status_updated:
@@ -1310,6 +1315,7 @@ class Petal(object):
         22 - Targeting restricted boundries
         23 - Requested multiple times
         24 - Classified Nonfunctional
+        25 - Movetable rejected
         '''
         if ids == 'all':
             ids = self.posids.union(self.fidids)
