@@ -63,6 +63,11 @@ class XYTest(PECS):
         # pcids are just ints now, DB and DOS have forced the conversion
         printfuncs = {p: self.loggers[p].info for p in self.data.pcids}
         super().__init__(printfunc=printfuncs)
+        if 'pause_interval' in test_cfg:  # override default pecs settings
+            self.logger.info(
+                f"Overriding default pause interval {self.pause_interval} s"
+                f"with {test_cfg['pause_interval']} s")
+            self.pause_interval = test_cfg['pause_interval']
         self.exp_setup()  # set up exposure ID and product directory
         self._get_pos_info()
         self.generate_targets()  # generate local targets or load from file
@@ -204,13 +209,11 @@ class XYTest(PECS):
                 disable_unmatched = True  # do disable by default
         # led_initial = self.illuminator.get('led')  # no illuminator ctrl yet
         # self.illuminator.set(led='ON')  # turn on illuminator
-        t_i = pc.now()
+        self.data.t_i = pc.now()
+        self.logger.info(f'Starting Test at {self.data.t_i}')
         for i in range(self.data.ntargets):  # test loop over all test targets
             self.logger.info(f'Target {i+1} of {self.data.ntargets}')
             self.record_basic_move_data(i)  # for each target, record basics
-            if self.allow_pause and i > 0:  # don't pause for the 1st target
-                input('Paused for heat load monitoring, '
-                      'press enter to continue: ')
             for n in range(self.data.num_corr_max + 1):
                 self.logger.info(
                     f'Target {i+1} of {self.data.ntargets}, '
@@ -221,8 +224,11 @@ class XYTest(PECS):
                 self.update_calibrations(measured_QS)
                 self.record_measurement(measured_QS, i, n)
                 self.calculate_xy_errors(i, n)
-        t_f = pc.now()
-        self.logger.info(f'Test complete, duration {t_f - t_i}. Plotting...')
+            if i+1 < self.data.ntargets:  # no pause after the last target
+                self.pause()
+        self.data.t_f = pc.now()
+        self.data.delta_t = self.data.t_f - self.data.t_i
+        self.logger.info(f'Test complete, duration {self.data.delta_t}.')
         try:
             for pcid in self.data.pcids:
                 self.ptls[pcid].schedule_stats.save()

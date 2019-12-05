@@ -61,7 +61,6 @@ class FPTestData:
     def __init__(self, test_name, test_cfg=None, fvc_collector=None):
 
         self.test_name = test_name
-        self.start_time = pc.now()
         if test_cfg is None:  # for calibration scripts
             self.test_cfg = ConfigObj()
         else:  # for xy accuracy test
@@ -228,11 +227,11 @@ class FPTestData:
                                     user="desi_reader", password="reader")
             self.telemetry = pd.read_sql_query(  # get temperature data
                 f"""SELECT * FROM pc_telemetry_can_all
-                    WHERE time >= '{self.start_time.astimezone(timezone.utc)}'
-                    AND time < '{self.end_time.astimezone(timezone.utc)}'""",
+                    WHERE time >= '{self.t_i.astimezone(timezone.utc)}'
+                    AND time < '{self.t_f.astimezone(timezone.utc)}'""",
                 conn).sort_values('time')  # posfid_temps, time, pcid
             self.print(f'{len(self.telemetry)} entries from telemetry DB '
-                       f'between {self.start_time} and {self.end_time} loaded')
+                       f'between {self.t_i} and {self.t_f} loaded')
             self.db_telemetry_available = True
         except Exception:
             self.db_telemetry_available = False
@@ -299,7 +298,6 @@ class FPTestData:
                         .set_index('DEVICE_ID').join(self.posdf))
 
     def complete_data(self):
-        self.end_time = pc.now()  # define end time
         self.read_telemetry()
         self.calculate_grades()
         masks = []  # get postiioners with abnormal flags
@@ -392,7 +390,7 @@ class FPTestData:
         Tmin, Tmax = np.sort(posintT) + row['OFFSET_T']  # targetable poslocT
         path = os.path.join(self.dirs[pcid],
                             '{}_xyplot_submove_{{}}.pdf'.format(posid))
-        title = (f'XY Accuracy Test {self.start_time}\n'
+        title = (f'XY Accuracy Test {self.t_i}\n'
                  f'Positioner {posid} ({self.ntargets} Targets)')
         moves = self.movedf.loc[idx[:, posid], :]  # all targets for a posid
         tgtX, tgtY = moves['target_x'], moves['target_y']  # target obsXY

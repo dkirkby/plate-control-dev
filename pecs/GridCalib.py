@@ -58,9 +58,8 @@ class GridCalib(PECS):
             self.printfunc(f'Measuring grid point {i+1} of {len(req_list)}...')
             merged_data = self.move_measure(request, match_radius=match_radius)
             grid_data.append(merged_data)
-            if self.allow_pause and i+1 < len(req_list):
-                input('Paused for heat load monitoring, '
-                      'press enter to continue: ')
+            if i+1 < len(req_list):  # no pause after the last iteration
+                self.pause()
         updates = self.ptl.calibrate_from_grid_data(grid_data,
                                                     auto_update=auto_update)
         updates['auto_update'] = auto_update

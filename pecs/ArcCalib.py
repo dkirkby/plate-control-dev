@@ -58,21 +58,15 @@ class ArcCalib(PECS):
             self.printfunc(f'Measuring theta arc point {i+1} of '
                            f'{len(req_list_T)}')
             T_data.append(self.move_measure(req, match_radius=match_radius))
-            if self.allow_pause and i+1 < len(req_list_T):
-                print('Paused for heat load, waiting 70 sec.')
-                time.sleep(70)
-                #input('Paused for heat load monitoring, '
-                #      'press enter to continue: ')
+            if i+1 < len(req_list_T):  # no pause after the last iteration
+                self.pause()
         P_data = []
         for i, req in enumerate(req_list_P):
             self.printfunc(f'Measuring phi arc point {i+1} of '
                            f'{len(req_list_P)}')
+            if i+1 < len(req_list_T):  # pause before first iteration
+                self.pause()
             P_data.append(self.move_measure(req, match_radius=match_radius))
-            if self.allow_pause and i+1 < len(req_list_T):
-                print('Paused for heat load, waiting 70 sec.')
-                time.sleep(70)
-                #input('Paused for heat load monitoring, '
-                #      'press enter to continue: ')
         updates = self.ptl.calibrate_from_arc_data(T_data, P_data,
                                                    auto_update=auto_update)
         updates['auto_update'] = auto_update

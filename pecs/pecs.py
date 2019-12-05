@@ -22,6 +22,8 @@ Added illuminator proxy for xy test control over LED (Duan 2019/06/07)
 '''
 
 import os
+import sys
+import time
 import numpy as np
 import pandas as pd
 from configobj import ConfigObj
@@ -208,3 +210,23 @@ class PECS:
                        f'{self.exp.id} to: {self.data.dir}')
         self.fvc_collector._send_command('collect', expid=self.exp.id,
                                          output_dir=self.data.dir)
+
+    @staticmethod
+    def countdown_sec(t, dt=1):  # in seconds
+        for i in reversed(range(3)):
+            sys.stderr.write(f'\rSleeping... ({i*dt+dt} s / {t} s)')
+            time.sleep(dt)  # sleep until a whole second boundary
+            sys.stdout.flush()
+        print(f'\nSleep finished ({t} s).')
+
+    def pause(self):
+        '''pause operation between positioner moves for heat monitoring'''
+        if self.pause_interval is None:
+            input('Paused for heat load monitoring for unspecified interval. '
+                  'Press enter to continue: ')
+        elif self.pause_interval == 0:
+            # no puase needed, just continue
+            self.printfunc('Pause interval = 0, continuing without pause...')
+        elif self.pause_interval > 0:
+            self.printfunc(f'Pausing for {self.pause_interval} s...')
+            self.countdown_sec(self.pause_interval)

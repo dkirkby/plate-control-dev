@@ -41,9 +41,9 @@ else:  # np array, cast into lists for printing
 ```
 
 +------------------------+---------------------------------------------------------------------------------------------------------------+
-| **Start time**\        | ``<%=data.start_time.isoformat()%>`` KPNO, ``<%=data.start_time.astimezone(timezone.utc).isoformat()%>`` UTC\ |
-| **End time**\          | ``<%=data.end_time.isoformat()%>`` KPNO, ``<%=data.end_time.astimezone(timezone.utc).isoformat()%>`` UTC\     |
-| **Duration**\          | ``<%=str(data.end_time-data.start_time)%> ``\                                                                 |
+| **Start time**\        | ``<%=data.t_i.isoformat()%>`` KPNO, ``<%=data.t_i.astimezone(timezone.utc).isoformat()%>`` UTC\               |
+| **End time**\          | ``<%=data.t_f.isoformat()%>`` KPNO, ``<%=data.t_f.astimezone(timezone.utc).isoformat()%>`` UTC\               |
+| **Duration**\          | ``<%=str(data.delta_t)%> ``\                                                                                  |
 | **PCIDs**\             | ``<%=data.pcids%>``\                                                                                          |
 | **Product directory**\ | ``<%=data.dir%>``\                                                                                            |
 +------------------------+---------------------------------------------------------------------------------------------------------------+
