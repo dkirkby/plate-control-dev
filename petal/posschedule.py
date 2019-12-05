@@ -101,12 +101,14 @@ class PosSchedule(object):
                         f'targetable_range_P = {posmodel.targetable_range_P}, '
                         f"offset_T = {trans.getval('OFFSET_T')}, "
                         f"offset_P = {trans.getval('OFFSET_P')}")
-        elif uv_type == 'dXdY':  # not global projected as returned by platemaker
+        elif uv_type == 'obsdXdY':
+            # global cs5 projected xy, as returned by platemaker
             start_uv = current_position['obsXY']
             targt_uv = posmodel.trans.addto_XY(start_uv, [u, v])
             targt_posintTP, unreachable = posmodel.trans.obsXY_to_posintTP(
                 targt_uv, lims)
-        elif uv_type == 'localdXdY':  # in poslocXY coordinates, not global
+        elif uv_type == 'poslocdXdY':
+            # in poslocXY coordinates in local tangent plane, not global cs5
             start_uv = current_position['poslocXY']
             targt_uv = posmodel.trans.addto_XY(start_uv, [u, v])
             targt_posintTP, unreachable = posmodel.trans.poslocXY_to_posintTP(
