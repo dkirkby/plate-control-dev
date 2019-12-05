@@ -738,27 +738,32 @@ class FPTestData:
 if __name__ == '__main__':
 
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    folders = [ #'20191021T154939-0700-petal3_can10',
-    #            '20191024T150231-0700-petal9',
-    #            '20191031T150117-0700-petal0_can1011',
-    #            '20191106T100257-0700-petal0_can1011',
-    #            '20191107T114725-0700-petal0_short',
-    #            '20191112T191119-0700-petal0_full'
-    #            '20191113T143453-0700-cmx_psf-3',
-    #            '20191113T145131-0700-cmx_psf-4',
-    #            '20191113T151057-0700-cmx_psf-1',
-    #            '20191113T153032-0700-cmx_psf-2',
-    #            '20191113T191026-0700-cmx_dither',
-    #            '20191113T191844-0700-cmx_dither',
-    #            '20191113T192440-0700-cmx_dither',
-    #            '20191113T203313-0700-petal2_full',
-    #            '20191113T204603-0700-petal2_full',
-    #            '20191115T155812-0700-petal9_full',
-    #            '20191116T184321-0700-cmx_dither_petal0_63064',
-    #            '20191116T185036-0700-cmx_dither_petal0_63064',
-    #            '20191122T165937-0700-cmx_dither_63038_petal2',
-    #            '20191122T171101-0700-cmx_dither_63068_petal0',
-               '20191125T150043-0700-petal7_full']
+    folders = [  #'20191021T154939-0700-petal3_can10',
+               # '20191024T150231-0700-petal9',
+               # '20191031T150117-0700-petal0_can1011',
+               # '20191106T100257-0700-petal0_can1011',
+               # '20191107T114725-0700-petal0_short',
+               # '20191112T191119-0700-petal0_full'
+               # '20191113T143453-0700-cmx_psf-3',
+               # '20191113T145131-0700-cmx_psf-4',
+               # '20191113T151057-0700-cmx_psf-1',
+               # '20191113T153032-0700-cmx_psf-2',
+               # '20191113T191026-0700-cmx_dither',
+               # '20191113T191844-0700-cmx_dither',
+               # '20191113T192440-0700-cmx_dither',
+               # '20191113T203313-0700-petal2_full',
+               # '20191113T204603-0700-petal2_full',
+               # '20191115T155812-0700-petal9_full',
+               # '20191116T184321-0700-cmx_dither_petal0_63064',
+               # '20191116T185036-0700-cmx_dither_petal0_63064',
+               # '20191122T165937-0700-cmx_dither_63038_petal2',
+               # '20191122T171101-0700-cmx_dither_63068_petal0',
+               # '20191125T150043-0700-petal7_full',
+               # '20191202T183110-0700-xytest_ptl0_dec02_2019',
+               # '20191203T171232-0700-petal0_full_32disabled',
+               # '20191204T113752-0700-petal4_full',
+               # '20191204T143117-0700-petal2_full_25disabled',
+               '20191204T165915-0700-petal9_full_28disabled']
     for dir_name in folders:
         try:
             # dir_name = '20191115T155812-0700-petal9_full'
