@@ -301,7 +301,7 @@ class XYTest(PECS):
             tgt = movedf.loc[idx[i, posids],  # N x 2 array
                              ['target_x', 'target_y']].values
         else:
-            movetype, cmd = 'corrective', 'dXdY'
+            movetype, cmd = 'corrective', 'poslocdXdY'
             tgt = - movedf.loc[idx[i, posids],  # note minus sign, last move
                                [f'err_x_{n-1}', f'err_y_{n-1}']].values
             tgt = np.nan_to_num(tgt)  # replace NaN with zero for unmatched
