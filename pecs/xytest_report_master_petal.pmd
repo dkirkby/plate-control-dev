@@ -13,7 +13,7 @@ posids_untested = sorted(posids_all - posids_tested)
 
 grades_pc = data.gradedf[data.gradedf['PCID']==pcid]
 posids_grade = dict()
-for grade in grades:
+for grade in pc.grades:
 	mask = grades_pc['grade'] == grade
 	posids_grade[grade] = sorted(data.gradedf[mask].index)
 ```
@@ -32,16 +32,16 @@ if not hasattr(data, 'posids_disabled_pc'):
 
 ```python name='pc{0:02} temp, grade distribution', echo=False, width='500px'
 if data.db_telemetry_available:
-    plot_posfid_temp(pcid=pcid)
+    data.plot_posfid_temp(pcid=pcid)
 else:
     print('DB telemetry query unavailable on this platform\n')
-grade_counts = plot_grade_dist(pcid=pcid)
+grade_counts = data.plot_grade_dist(pcid=pcid)
 ```
 
 Error measures by grades
 ```python name='pc{0:02} median stats by grade', echo=False
 rows = []
-for grade in grades[:-1]:
+for grade in pc.grades[:-1]:
 	df = grades_pc[grades_pc['grade']==grade]
 	row = dict()
 	for col in df.columns:
@@ -50,17 +50,17 @@ for grade in grades[:-1]:
 		elif 'rms' in col:
 			row[col] = np.sqrt(np.mean(np.square(df[col])))
 	rows.append(row)
-pd.DataFrame(rows, index=grades[:-1])
+pd.DataFrame(rows, index=pc.grades[:-1])
 ```
 
 ```python name='pc{0:02} error distribution', echo=False, width='linewidth'
-plot_error_dist(pcid=pcid)
-n_abnormal = (df_abnormal['PCID']==pcid).index.droplevel(0).unique().size
+data.plot_error_dist(pcid=pcid)
+n_abnormal = (data.abnormaldf['PCID']==pcid).index.droplevel(0).unique().size
 ```
 
 ##### Abnormal status: ``<%=n_abnormal%>`` positioners
 ```python name='pc{0:02} abnormal flags', echo=False, results='verbatim'
-abnormal_pc = abnormal_pos_df(pcid=pcid)
+abnormal_pc = data.abnormal_pos_df(pcid=pcid)
 gradedf_pc = data.gradedf[data.gradedf['PCID']==pcid]
 gradedf_pc_maxb = gradedf_pc[gradedf_pc['err_0_max']>200]
 gradedf_pc_rmsc = gradedf_pc[gradedf_pc['err_corr_rms']>30]
@@ -106,13 +106,13 @@ pd.DataFrame([max_series, rms_series, median_series],
 
 ##### Move error maps excluding ``<%=len(posids_exclude)%>`` outliers (μm)
 ```python, name='pc{0:02} grade A error distribution', echo=False, width='linewidth', results='verbatim'
-plot_error_heatmaps(pcid=pcid, posids_exclude=posids_exclude)
+data.plot_error_heatmaps(pcid, posids_exclude=posids_exclude)
 
 def plot_grade_section(grade):
 	if grade_counts[grade] > 0:
-		plot_error_dist(pcid=pcid, grade=grade)
+		data.plot_error_dist(pcid=pcid, grade=grade)
 		if set(posids_grade[grade]) & set(posids_exclude):
-			plot_error_dist(pcid=pcid, grade=grade, posids_exclude=posids_exclude)
+			data.plot_error_dist(pcid=pcid, grade=grade, posids_exclude=posids_exclude)
 ```
 
 ##### Grade A: ``<%=grade_counts['A']%>`` positioners

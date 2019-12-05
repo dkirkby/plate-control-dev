@@ -21,11 +21,12 @@ Added illuminator proxy for xy test control over LED (Duan 2019/06/07)
 
 '''
 
-from DOSlib.proxies import FVC, Petal  # , Illuminator
 import os
 import numpy as np
 import pandas as pd
 from configobj import ConfigObj
+from DOSlib.proxies import FVC, Petal, SimpleProxy  # , Illuminator
+from DOSlib.exposure import Exposure
 from fvc_sim import FVC_proxy_sim
 
 
@@ -74,6 +75,16 @@ class PECS:
             self.printfunc(
                 f'Reusing existing petal proxies for petals {self.pcids}')
         # self.illuminator = Illuminator()  # this crashes KF 06/18/19
+        # fvc stuff
+        self.fvc_collector = SimpleProxy('FVCCOLLECTOR')
+
+    def exp_setup(self):
+        assert hasattr(self, 'data'), (
+            'FPTestData must be initialised before calling exposure setup.')
+        self.exp = Exposure(read_only=False)
+        self.exp.sequence = self.data.test_name
+        # directory setup
+        self.data.set_dirs(self.exp.id)
 
     def printfunc(self, msg):
         '''self.printfuncs is a dict indexed by pcids as specified for input,
@@ -162,11 +173,12 @@ class PECS:
         self.printfunc(f'Calling FVC measure expecting '
                        f'{len(exppos)} positioners...')
         mr_old = self.fvc.get('match_radius')  # hold old match radius
-        self.fvc.set(match_radius=match_radius)  # set larger radius for calib
+        # self.fvc.set(match_radius=match_radius)
         # measured_QS, note that expected_pos was changed in place
         meapos = (pd.DataFrame(self.fvc.measure(
-                      exppos, matched_only=matched_only,
-                      exptime=self.exptime,
+                      expected_positions=exppos, seqid=self.exp.id,
+                      exptime=self.exptime, match_radius=match_radius,
+                      matched_only=matched_only,
                       all_fiducials=self.all_fiducials))
                   .rename(columns={'id': 'DEVICE_ID'})
                   .set_index('DEVICE_ID').sort_index())  # indexed by DEVICE_ID
@@ -190,3 +202,9 @@ class PECS:
                 f'Missing {len(unmatched)} of expected backlit fibres'
                 f'\n{sorted(unmatched)}')
         return exppos, meapos, matched, unmatched
+
+    def fvc_collect(self):
+        self.printfunc('Collecting FVC images associated with exposure ID '
+                       f'{self.exp.id} to: {self.data.dir}')
+        self.fvc_collector._send_command('collect', expid=self.exp.id,
+                                         output_dir=self.data.dir)

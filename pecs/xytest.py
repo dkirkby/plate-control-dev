@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 # from multiprocessing import Queue, Process
 from configobj import ConfigObj
-from tqdm import tqdm
+# from tqdm import tqdm
 import posconstants as pc
 from pecs import PECS
 from fptestdata import FPTestData
@@ -51,18 +51,19 @@ class XYTest(PECS):
         self.data.targets_pos   targets dictionary by DEVICE_ID
     """
 
-    def __init__(self, xytest_name, xytest_cfg):
+    def __init__(self, test_name, test_cfg):
         """Templates for config are found on svn
         https://desi.lbl.gov/svn/code/focalplane/fp_settings/hwsetups/
         https://desi.lbl.gov/svn/code/focalplane/fp_settings/test_settings/
         """
         # self.data.test_cfg = xytest_cfg
-        self.data = FPTestData(xytest_name, xytest_cfg)
+        self.data = FPTestData(test_name, test_cfg=test_cfg)
         self.loggers = self.data.loggers  # use these loggers to write to logs
         self.logger = self.data.logger
         # pcids are just ints now, DB and DOS have forced the conversion
         printfuncs = {p: self.loggers[p].info for p in self.data.pcids}
         super().__init__(printfunc=printfuncs)
+        self.exp_setup()  # set up exposure ID and product directory
         self._get_pos_info()
         self.generate_targets()  # generate local targets or load from file
         self.logger.info([
@@ -72,9 +73,6 @@ class XYTest(PECS):
             f'Num of local targets: {self.data.ntargets}'])
         self.logger.debug(f'Test targets:\n{self.data.targets_pos}')
         self.data.initialise_movedata(self.data.posids, self.data.ntargets)
-        self.run_xyaccuracy_test(
-            disable_unmatched=self.data.test_cfg['disable_unmatched'])
-        self.data.finish_xyaccuracy_test_products()
 
     def _get_pos_info(self):
         '''get enabled positioners, according to given posids or busids
@@ -198,7 +196,12 @@ class XYTest(PECS):
         newdf = newdf.set_index(pd.MultiIndex.from_product([[i], newdf.index]))
         self.data.movedf.update(newdf)  # write to movedf
 
-    def run_xyaccuracy_test(self, disable_unmatched=True):
+    def run_xyaccuracy_test(self, disable_unmatched=None):
+        if disable_unmatched is None:
+            if 'disable_unmatched' in self.data.test_cfg:
+                disable_unmatched = self.data.test_cfg['disable_unmatched']
+            else:
+                disable_unmatched = True  # do disable by default
         # led_initial = self.illuminator.get('led')  # no illuminator ctrl yet
         # self.illuminator.set(led='ON')  # turn on illuminator
         t_i = pc.now()
@@ -428,4 +431,8 @@ if __name__ == '__main__':
     print(f'Loading test config: {path}')
     xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')  # read cfg
     xytest_name = input('Please name this test: ')
-    test = XYTest(xytest_name, xytest_cfg)
+    test = XYTest('xytest-'+xytest_name, xytest_cfg)
+    test.run_xyaccuracy_test(
+        disable_unmatched=test.data.test_cfg['disable_unmatched'])
+    test.fvc_collect()
+    test.data.generate_xyaccuracy_test_products()

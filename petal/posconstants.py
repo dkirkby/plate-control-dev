@@ -124,6 +124,8 @@ nominals['PHYSICAL_RANGE_P'] = {'value': 190.0, 'tol':   50.0}
 nominals['GEAR_CALIB_T']     = {'value':   1.0, 'tol':    0.05}
 nominals['GEAR_CALIB_P']     = {'value':   1.0, 'tol':    0.05}
 
+grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
+
 # Types
 class collision_case(object):
     """Enumeration of collision cases. The I, II, and III cases are described in
