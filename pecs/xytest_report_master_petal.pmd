@@ -31,10 +31,7 @@ if not hasattr(data, 'posids_disabled_pc'):
 ``<%=sorted(posids_untested)%>``
 
 ```python name='pc{0:02} temp, grade distribution', echo=False, width='500px'
-if data.db_telemetry_available:
-    data.plot_posfid_temp(pcid=pcid)
-else:
-    print('DB telemetry query unavailable on this platform\n')
+data.plot_posfid_temp(pcid=pcid)
 grade_counts = data.plot_grade_dist(pcid=pcid)
 ```
 

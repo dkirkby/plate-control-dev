@@ -475,6 +475,9 @@ class FPTestData:
                 ax.plot(query['time'], query['posfid_temps_median'], '-o',
                         label=f'PC{pcid:02} posfid median')
 
+        if not self.db_telemetry_available:
+            print('DB telemetry query unavailable on this platform.')
+            return
         pd.plotting.register_matplotlib_converters()
         fig, ax = plt.subplots(figsize=(6.5, 3.5))
         if pcid is None:  # loop through all petals, plot max only
@@ -482,16 +485,26 @@ class FPTestData:
                 plot_petal(pcid, max_on=True, mean_on=False, median_on=False)
         else:  # pcid is an integer
             plot_petal(pcid)
-
-        ax.legend()
-        ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
-        ax.xaxis.set_tick_params(rotation=45)
-        ax.set_xlabel('Time (UTC)')
-        ax.set_ylabel('Temperature (°C)')
-        suffix = '' if pcid is None else f'_pc{pcid:02}'
-        fig.savefig(os.path.join(self.dir, 'figures',
-                                 f'posfid_temp{suffix}.pdf'),
-                    bbox_inches='tight')
+        # perform telemetry data sanity check needed since there's been
+        # so many issues with the petalcontroller code and bad telemetry data
+        telemetry_clean = True
+        for stat in ['max', 'mean', 'median']:
+            field = f'posfid_temps_{stat}'
+            if self.telemetry[field].isnull().any():
+                print(f'Telemetry data from DB failed sanity check. '
+                      f'Field "{field}" contains null values.')
+                telemetry_clean = False
+        if telemetry_clean:
+            fig, ax = plt.subplots(figsize=(6.5, 3.5))
+            ax.legend()
+            ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
+            ax.xaxis.set_tick_params(rotation=45)
+            ax.set_xlabel('Time (UTC)')
+            ax.set_ylabel('Temperature (°C)')
+            suffix = '' if pcid is None else f'_pc{pcid:02}'
+            fig.savefig(os.path.join(self.dir, 'figures',
+                                     f'posfid_temp{suffix}.pdf'),
+                        bbox_inches='tight')
 
     @staticmethod
     def add_hist_annotation(ax):
