@@ -8,7 +8,6 @@ Store xy test, anti-collision, calibration data in an offline class.
 DOSlib dependence is kept out of this
 Most fields are dictionaries indexed by petal id:
 
-FPTestData.petal_cfgs[pcid]:    hw setup file for each petal
 FPTestData.logs[pcid]:          StringIO object equivalent to log file
 FPTestData.loggers[pcid]:       logger which writes new lines to log file
 
@@ -120,8 +119,6 @@ class FPTestData:
             logger.info(f'Logger initialised for PC{pcid:02}, writing '
                         f'real-time log to: {self.log_paths[pcid]}')
             # write configs to logs
-            if self.petal_cfgs is not None:  # dump petal cfg to petal logger
-                self._log_cfg(logger.debug, self.petal_cfgs[pcid])
             self._log_cfg(logger.debug, self.test_cfg)
             self.logs[pcid] = log  # assign logs and loggers to attributes
             self.loggers[pcid] = logger

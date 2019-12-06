@@ -432,7 +432,7 @@ if __name__ == '__main__':
     path = os.path.join(pc.dirs['test_settings'], 'xytest_cmx_psf.cfg')
     print(f'Loading test config: {path}')
     xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')  # read cfg
-    xytest_name = input(r'Please name this test ("xytest-{test_name}"): ')
+    xytest_name = input(r'Please name this test (xytest-{test_name}): ')
     test = XYTest('xytest-'+xytest_name, xytest_cfg)
     test.run_xyaccuracy_test(
         disable_unmatched=test.data.test_cfg['disable_unmatched'])
