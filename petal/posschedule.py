@@ -2,7 +2,7 @@ import posconstants as pc
 import posschedulestage
 import time
 import copy as copymodule
-import numpy as np
+import math
 
 
 class PosSchedule(object):
@@ -134,6 +134,11 @@ class PosSchedule(object):
                 self.printfunc(f'{posid}: target request denied. Target not '
                                f'reachable: {uv_type}, ({u:.3f}, {v:.3f})')
 
+            return False
+        if self._deny_request_because_limit(posmodel, targt_posintTP):
+            if self.verbose:
+                self.printfunc(f'{posid}: target request denied. Target '
+                               "exceeds expert radial limit.")
             return False
         targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
         if self._deny_request_because_target_interference(
@@ -486,4 +491,17 @@ class PosSchedule(object):
             self.petal.pos_flags[posmodel.posid] |= \
                 self.petal.restricted_targ_bit
             return True
+        return False
+
+    def _deny_request_because_limit(self, posmodel, target_posintTP):
+        '''
+        Check for cases where target exceeds radial limit set by experts.
+        Useful to avoid needed to worry about anticollision.
+        '''
+        if self.petal.limit_radius:
+            poslocXY = posmodel.trans.posintTP_to_poslocXY(target_posintTP)
+            if math.sqrt(poslocXY[0]**2 + poslocXY[1]**2) > self.petal.limit_radius:
+                posmodel.clear_postmove_cleanup_cmds_without_executing()
+                self.petal.pos_flags[posmodel.posid] |= self.petal.exceeded_lims_bit
+                return True
         return False

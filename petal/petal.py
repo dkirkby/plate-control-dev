@@ -146,6 +146,7 @@ class Petal(object):
         self.petalbox_id = petalbox_id
         self.petal_id = int(petal_id)
         self.shape = shape
+        self.limit_radius = 3.5 #mm to reject targets. Set to False or None to skip check
         self._last_state = None
         if fidids in ['',[''],{''}]: # check included to handle simulation cases, where no fidids argued
             fidids = {}
@@ -200,6 +201,7 @@ class Petal(object):
         self.multi_request_bit = 1<<23
         self.dev_nonfunctional_bit = 1<<24
         self.movetable_rejected_bit = 1<<25
+        self.exceeded_lims_bit = 1<<26
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
         self.disabled_devids = [] #list of devids with DEVICE_CLASSIFIED_NONFUNCTIONAL = True or FIBER_INTACT = False
         self._initialize_pos_flags()
