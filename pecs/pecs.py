@@ -207,8 +207,9 @@ class PECS:
         self.printfunc('Collecting FVC images associated with exposure ID '
                        f'{self.exp.id} to: {self.data.dir}')
         os.makedirs(self.data.dir, exist_ok=True)
-        self.fvc_collector._send_command('collect', expid=self.exp.id,
-                                         output_dir=self.data.dir)
+        self.fvc_collector._send_command(
+            'collect', expid=self.exp.id,
+            output_dir=self.data.dir, logbook=False)
 
     @staticmethod
     def countdown_sec(t):  # in seconds
