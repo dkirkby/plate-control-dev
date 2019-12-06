@@ -215,10 +215,10 @@ class PECS:
                                          output_dir=self.data.dir)
 
     @staticmethod
-    def countdown_sec(t, dt=1):  # in seconds
-        for i in reversed(range(3)):
-            sys.stderr.write(f'\rSleeping... ({i*dt+dt} s / {t} s)')
-            time.sleep(dt)  # sleep until a whole second boundary
+    def countdown_sec(t):  # in seconds
+        for i in reversed(range(t)):
+            sys.stderr.write(f'\rSleeping... ({i} s / {t} s)')
+            time.sleep(1)
             sys.stdout.flush()
         print(f'\nSleep finished ({t} s).')
 
