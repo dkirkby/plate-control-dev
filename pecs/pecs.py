@@ -16,9 +16,6 @@ Adding multi-petal support; it doesn't cost any more work now,
 but will simply our life so much (Duan 2019/05/24)
 
 Added basic FVC simulator (Kevin 2019/05/30)
-
-Added illuminator proxy for xy test control over LED (Duan 2019/06/07)
-
 '''
 
 import os
@@ -111,8 +108,8 @@ class PECS:
         self.pcid = pcid
         self.ptl = self.ptls[self.pcid]
         if posids is None:
-            posids = sorted(list(self.ptl.get_positioners(
-                enabled_only=True)['DEVICE_ID']))
+            posids = sorted(self.ptl.get_positioners(
+                enabled_only=True)['DEVICE_ID'])
             self.printfunc(
                 f'Defaulting to all {len(posids)} enabled positioners')
         self.posids = posids
@@ -143,14 +140,14 @@ class PECS:
         user_text = input('Use enabled positioners only? (y/n): ')
         enabled_only = self._parse_yn(user_text)
         if selection is None:
-            posids = sorted(list(self.ptls[pcid].get_positioners(
-                enabled_only=enabled_only)['DEVICE_ID']))
+            posids = sorted(self.ptls[pcid].get_positioners(
+                enabled_only=enabled_only)['DEVICE_ID'])
         elif 'can' in selection[0]:  # User passed a list of canids
-            posids = sorted(list(self.ptls[pcid].get_positioners(
-                enabled_only=enabled_only, busids=selection)['DEVICE_ID']))
+            posids = sorted(self.ptls[pcid].get_positioners(
+                enabled_only=enabled_only, busids=selection)['DEVICE_ID'])
         else:  # assume is a list of posids
-            posids = sorted(list(self.ptls[pcid].get_positioners(
-                enabled_only=enabled_only, posids=selection)['DEVICE_ID']))
+            posids = sorted(self.ptls[pcid].get_positioners(
+                enabled_only=enabled_only, posids=selection)['DEVICE_ID'])
         self.printfunc(f'Selected {len(posids)} positioners')
         return posids
 
@@ -209,7 +206,8 @@ class PECS:
         os.makedirs(self.data.dir, exist_ok=True)
         self.fvc_collector._send_command(
             'collect', expid=self.exp.id,
-            output_dir=self.data.dir, logbook=False)
+            output_dir='/data/msdos/focalplane/', logbook=False)
+            # output_dir=self.data.dir, logbook=False)
 
     @staticmethod
     def countdown_sec(t):  # in seconds
