@@ -80,7 +80,8 @@ class FPTestData:
             self.fvc_collector = fvc_collector
 
     def set_dirs(self, exposure_id):
-        self.filename = f'{pc.filename_timestamp_str_now()}-{self.test_name}'
+        self.filename = (
+            f'{pc.filename_timestamp_str(self.t_i)}-{self.test_name}')
         self.test_cfg.filename = self.filename
         self.dir = os.path.join(pc.dirs['kpno'], pc.dir_date_str_now(),
                                 exposure_id)
@@ -317,18 +318,17 @@ class FPTestData:
             for i in range(self.num_corr_max+1):
                 counts_list.append(abnormaldf.loc[idx[:, posid], :]
                                    [f'pos_status_{i}'].value_counts())
-            counts = reduce(lambda x, y: x.add(y, fill_value=0), counts_list)
-            rows.append(counts)
+            row = reduce(lambda x, y: x.add(y, fill_value=0), counts_list)
+            rows.append(row)
         df_status = (pd.DataFrame(rows, index=posids_abnormal, dtype=np.int64)
                      .drop('Normal positioner', axis=1, errors='ignore'))
         return df_status.fillna(value=0)
 
     def make_summary_plots(self, n_threads_max=32, make_binder=True, mp=True):
         n_threads = min(n_threads_max, 2*multiprocessing.cpu_count())
-        pstr = (f'Making summary xyplots with {n_threads} threads on '
-                f'{multiprocessing.cpu_count()} cores for '
-                f'submoves {list(range(self.num_corr_max+1))}...')
-        self.print(pstr)
+        self.print(f'Making summary xyplots with {n_threads} threads on '
+                   f'{multiprocessing.cpu_count()} cores for '
+                   f'submoves {list(range(self.num_corr_max+1))}...')
         if mp:
             # the following implementation fails when loggers are present
             # pbar = tqdm(total=len(self.posids))
@@ -350,7 +350,7 @@ class FPTestData:
                 np.start()
                 n_started += 1
                 pool.append(np)
-            self.logger.info(
+            self.print(
                 f'Waiting for the last MP chunk of {n_threads} to complete...')
             [p.join() for p in pool[n_started-n_threads_max:-1]]
         else:
@@ -366,8 +366,8 @@ class FPTestData:
                 #                       args=(pcid, n))
                 #     p.close()
                 #     p.join()
-                self.logger.info('Last MP chunk completed. '
-                                 'Creating xyplot binders...')
+                self.print('Last MP chunk completed. '
+                           'Creating xyplot binders...')
                 for pcid, n in tqdm(product(self.pcids,
                                     range(self.num_corr_max+1))):
                     np = Process(target=self.make_summary_plot_binder,
@@ -437,8 +437,8 @@ class FPTestData:
             ax.set_ylabel(r'$y/\mathrm{mm}$')
             ax.legend(loc='upper right', fontsize=10)
             fig.savefig(path.format(n), bbox_inches='tight')
-            pstr = f'saved xyplot: {path.format(n)}'
-            self.print(pstr)
+            if hasattr(self, 'logger'):
+                self.logger.debug(f'xyplot saved: {path.format(n)}')
             plt.close(fig)
 
     def make_summary_plot_binder(self, pcid, n):
@@ -454,16 +454,14 @@ class FPTestData:
         savepath = os.path.join(
             self.dirs[pcid],
             f'{len(paths)}_positioners-xyplot_submove_{n}.pdf')
-        pstr = f'Writing xyplot binder for submove {n}...'
-        self.print(pstr)
+        self.print(f'Writing xyplot binder for submove {n}...')
         binder.write(savepath)
         binder.close()
-        pstr = f'Binder for submove {n} saved to: {savepath}'
-        self.print(pstr)
+        self.print(f'Binder for submove {n} saved to: {savepath}')
 
     def plot_posfid_temp(self, pcid=None):
 
-        def plot_petal(pcid, max_on=True, mean_on=False, median_on=True):
+        def plot_petal(pcid, ax, max_on=True, mean_on=False, median_on=True):
             query = self.telemetry[self.telemetry['pcid'] == pcid]
             if max_on:
                 ax.plot(query['time'], query['posfid_temps_max'], '-o',
@@ -478,24 +476,25 @@ class FPTestData:
         if not self.db_telemetry_available:
             print('DB telemetry query unavailable on this platform.')
             return
-        pd.plotting.register_matplotlib_converters()
-        fig, ax = plt.subplots(figsize=(6.5, 3.5))
-        if pcid is None:  # loop through all petals, plot max only
-            for pcid in self.pcids:
-                plot_petal(pcid, max_on=True, mean_on=False, median_on=False)
-        else:  # pcid is an integer
-            plot_petal(pcid)
         # perform telemetry data sanity check needed since there's been
         # so many issues with the petalcontroller code and bad telemetry data
         telemetry_clean = True
         for stat in ['max', 'mean', 'median']:
             field = f'posfid_temps_{stat}'
             if self.telemetry[field].isnull().any():
-                print(f'Telemetry data from DB failed sanity check. '
+                print(f'Telemetry data from DB failed sanity check for '
+                      f'temperature plot. '
                       f'Field "{field}" contains null values.')
                 telemetry_clean = False
         if telemetry_clean:
+            pd.plotting.register_matplotlib_converters()
             fig, ax = plt.subplots(figsize=(6.5, 3.5))
+            if pcid is None:  # loop through all petals, plot max only
+                for pcid in self.pcids:
+                    plot_petal(pcid, ax,
+                               max_on=True, mean_on=False, median_on=False)
+            else:  # pcid is an integer, plot the one given pcid only
+                plot_petal(pcid)
             ax.legend()
             ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
             ax.xaxis.set_tick_params(rotation=45)
@@ -546,34 +545,12 @@ class FPTestData:
                     bbox_inches='tight')
         return grade_counts
 
-    def plot_error_dist(self, pcid=None, grade=None, posids_exclude=None):
+    def plot_error_dist(self, pcid=None, grade=None,
+                        outliers=None, exclude_outliers=False):
         '''two subplots, left blind moves, right corrective moves'''
-        colours = {grade: f'C{i}' for i, grade in enumerate(pc.grades)}
-        err = self.gradedf  # show all positioners tested by default
-        err = err[err['grade'] != 'N/A']  # filter out N/A grades
-        if pcid is None:
-            ptlstr = 'petals' if len(self.pcids) > 1 else 'petal'
-            posstr = 'positioners' if len(err) > 1 else 'positioner'
-            title = (
-                f'Overall {{}} distribution '
-                f'\n({len(err)} {posstr}, {len(self.pcids)} '
-                + ptlstr + ')')
-        else:  # showing only one petal given pcid
-            err = err[err['PCID'] == pcid]
-            if grade is not None:
-                err = err[err['grade'] == grade]
-            n_pos = len(err)  # n positioners before exclusion
-            if posids_exclude is not None:
-                err = err[~err.index.isin(posids_exclude)]
-            n_outliers = n_pos - len(err)  # after exclusion
-            posstr = 'positioners' if len(err) > 1 else 'positioner'
-            olstr = 'outliers' if n_outliers > 1 else 'outlier'
-            suffix = (f', {n_outliers} {olstr} excluded' if n_outliers > 1
-                      else '')
-            title = (f'PC{pcid:02} {{}} distribution '
-                     f'\n({len(err)} {posstr}{suffix})')
 
         def plot_error_hist(ax, column_name, cuts, title, vlines=None):
+            colours = {grade: f'C{i}' for i, grade in enumerate(pc.grades)}
             grades_present = sorted(err['grade'].unique())
             if 'N/A' in grades_present:
                 grades_present.remove('N/A')
@@ -605,6 +582,31 @@ class FPTestData:
                     bbox={'boxstyle': 'round', 'alpha': 0.1,
                           'facecolor': 'white', 'edgecolor': 'grey'})
 
+        err = self.gradedf  # show all positioners tested by default
+        err = err[err['grade'] != 'N/A']  # filter out N/A grades
+        n_outliers = 0  # initial value
+        if pcid is None:  # no outlier exclusion for entire FP plot
+            ptlstr = 'petals' if len(self.pcids) > 1 else 'petal'
+            posstr = 'positioners' if len(err) > 1 else 'positioner'
+            title = (
+                f'Overall {{}} distribution '
+                f'\n({len(err)} {posstr}, {len(self.pcids)} '
+                + ptlstr + ')')
+        else:  # showing only one petal given pcid
+            err = err[err['PCID'] == pcid]
+            if grade is not None:
+                err = err[err['grade'] == grade]
+            if outliers is not None and exclude_outliers:
+                n_outliers = len(set(err.index) & set(outliers))
+                err = err[~err.index.isin(outliers)]
+            posstr = 'positioners' if len(err) > 1 else 'positioner'
+            olstr = 'outliers' if n_outliers > 1 else 'outlier'
+            suffix = (f', {n_outliers} {olstr} excluded' if n_outliers > 1
+                      else '')
+            title = (f'PC{pcid:02} {{}} distribution '
+                     f'\n({len(err)} {posstr}{suffix})')
+        if len(err) == 0:
+            return  # empty plot
         fig, axes = plt.subplots(1, 2, figsize=(11, 4))
         plot_error_hist(
             axes[0], 'err_0_max', [0, 100, 200, 300, 400, 500, 1000],
@@ -619,7 +621,7 @@ class FPTestData:
                                  f'error_distribution{suffix1}{suffix2}.pdf'),
                     bbox_inches='tight')
 
-    def plot_error_heatmaps(self, pcid, posids_exclude=None):
+    def plot_error_heatmaps(self, pcid, outliers=None):
         # load nominal theta centres for plotting in local ptlXYZ
         path = os.path.join(
             os.getenv('PLATE_CONTROL_DIR',
@@ -631,9 +633,9 @@ class FPTestData:
         ptlXYZ_df.index.rename('device_loc', inplace=True)
         gradedf = self.gradedf[self.gradedf['PCID'] == pcid]
         n_outliers = 0
-        if posids_exclude is not None:
-            gradedf = gradedf[~gradedf.index.isin(posids_exclude)]
-            n_outliers = len(posids_exclude)
+        if outliers is not None:
+            gradedf = gradedf[~gradedf.index.isin(outliers)]
+            n_outliers = len(outliers)
 
         def plot_error_heatmap(ax, column_name, vmin, vmax, title):
             # plot all empty circles
@@ -672,11 +674,11 @@ class FPTestData:
         self.movedf.to_pickle(os.path.join(self.dir, 'movedf.pkl.gz'),
                               compression='gzip')
         self.movedf.to_csv(os.path.join(self.dir, 'movedf.csv'))
-        self.logger.info(f'Positioner move data written to: {self.dir}')
+        self.print(f'Positioner move data written to: {self.dir}')
         self.gradedf.to_pickle(os.path.join(self.dir, 'gradedf.pkl.gz'),
                                compression='gzip')
         self.gradedf.to_csv(os.path.join(self.dir, 'gradedf.csv'))
-        self.logger.info(f'Positioner grades written to: {self.dir}')
+        self.print(f'Positioner grades written to: {self.dir}')
         for pcid in self.pcids:
             def makepath(name): return os.path.join(self.dirs[pcid], name)
             for posid in self.posids_pc[pcid]:  # write move data csv
@@ -687,18 +689,21 @@ class FPTestData:
             with open(makepath(f'pc{pcid:02}_export.log'), 'w') as handle:
                 self.logs[pcid].seek(0)
                 shutil.copyfileobj(self.logs[pcid], handle)  # save logs
-            self.loggers[pcid].info('Petal move data written to: '
-                                    f'{self.dirs[pcid]}')
+            self.print(f'Petal move data for PC{pcid:02} written to: '
+                       f'{self.dirs[pcid]}', pcid=pcid)
 
     def dump_as_one_pickle(self):
-        del self.logger
-        del self.loggers
+        try:
+            del self.logger
+            del self.loggers
+        except AttributeError:
+            pass
         with open(os.path.join(self.dir, 'data_dump.pkl'), 'wb') as handle:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def generate_report(self):
         # define input and output paths for pweave
-        self.print('Generating xy accuracy test report...')
+        self.print(f'Generating xy accuracy test report for {self.filename}')
         path_output = os.path.join(self.dir,
                                    f'{self.filename}-xytest_report.html')
         with open(os.path.join(pc.dirs['xytest_data'], 'pweave_test_src.txt'),
@@ -749,7 +754,7 @@ class FPTestData:
 if __name__ == '__main__':
 
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    folders = [  #'20191021T154939-0700-petal3_can10',
+    folders = [  # '20191021T154939-0700-petal3_can10',
                # '20191024T150231-0700-petal9',
                # '20191031T150117-0700-petal0_can1011',
                # '20191106T100257-0700-petal0_can1011',
@@ -782,9 +787,10 @@ if __name__ == '__main__':
                                    dir_name, 'data_dump.pkl'),
                       'rb') as handle:
                 data = pickle.load(handle)
-            # data.make_summary_plots()
+            # data.generate_xyaccuracy_test_products()
             if shutil.which('pandoc') is not None:
                 data.generate_report()
             data.make_archive()
         except Exception as e:
             print(e)
+            raise

@@ -4,18 +4,18 @@ df = pd.DataFrame(pi.find_by_arbitrary_keys(PETAL_LOC=pcid))
 df = df[df['DEVICE_TYPE']=='POS']
 posids_all = set(df['DEVICE_ID'].unique())
 if hasattr(data, 'posids_disabled_pc'):
-	posids_tested = set(data.posids_pc[pcid]) |  data.posids_disabled_pc[pcid]
-	posids_disabled = data.posids_disabled_pc[pcid]
+    posids_tested = set(data.posids_pc[pcid]) |  data.posids_disabled_pc[pcid]
+    posids_disabled = data.posids_disabled_pc[pcid]
 else:
-	posids_tested = set(data.posids_pc[pcid])
-	posids_disabled = set()
+    posids_tested = set(data.posids_pc[pcid])
+    posids_disabled = set()
 posids_untested = sorted(posids_all - posids_tested)
 
 grades_pc = data.gradedf[data.gradedf['PCID']==pcid]
 posids_grade = dict()
 for grade in pc.grades:
-	mask = grades_pc['grade'] == grade
-	posids_grade[grade] = sorted(data.gradedf[mask].index)
+    mask = grades_pc['grade'] == grade
+    posids_grade[grade] = sorted(data.gradedf[mask].index)
 ```
 
 ### PC``<%=0%><%=pcid%>``
@@ -25,7 +25,7 @@ for grade in pc.grades:
 ``<%=sorted(posids_disabled)%>``
 ```python name='pc{0:02} positioners disabled', echo=False, results='raw'
 if not hasattr(data, 'posids_disabled_pc'):
-	print('Disabled positioners were not recorded in old test, please check log.')
+    print('Disabled positioners were not recorded in old test, please check log.')
 ```
 ``<%=len(posids_untested)%>`` positioners were not tested:
 ``<%=sorted(posids_untested)%>``
@@ -35,18 +35,17 @@ data.plot_posfid_temp(pcid=pcid)
 grade_counts = data.plot_grade_dist(pcid=pcid)
 ```
 
-Error measures by grades
-```python name='pc{0:02} median stats by grade', echo=False
+```python name='pc{0:02} median stats by grade', echo=False, caption='Error measures by grades'
 rows = []
 for grade in pc.grades[:-1]:
-	df = grades_pc[grades_pc['grade']==grade]
-	row = dict()
-	for col in df.columns:
-		if 'max' in col:
-			row[col] = df[col].max()
-		elif 'rms' in col:
-			row[col] = np.sqrt(np.mean(np.square(df[col])))
-	rows.append(row)
+    df = grades_pc[grades_pc['grade']==grade]
+    row = dict()
+    for col in df.columns:
+        if 'max' in col:
+            row[col] = df[col].max()
+        elif 'rms' in col:
+            row[col] = np.sqrt(np.mean(np.square(df[col])))
+    rows.append(row)
 pd.DataFrame(rows, index=pc.grades[:-1])
 ```
 
@@ -56,30 +55,32 @@ n_abnormal = (data.abnormaldf['PCID']==pcid).index.droplevel(0).unique().size
 ```
 
 ##### Abnormal status: ``<%=n_abnormal%>`` positioners
-```python name='pc{0:02} abnormal flags', echo=False, results='verbatim'
+```python name='pc{0:02} abnormal flags', echo=False, caption='Error status counts (in unit of moves)'
 abnormal_pc = data.abnormal_pos_df(pcid=pcid)
 gradedf_pc = data.gradedf[data.gradedf['PCID']==pcid]
 gradedf_pc_maxb = gradedf_pc[gradedf_pc['err_0_max']>200]
 gradedf_pc_rmsc = gradedf_pc[gradedf_pc['err_corr_rms']>30]
-posids_exclude = sorted((set(abnormal_pc.index) | set(gradedf_pc_maxb.index)
+outliers = sorted((set(abnormal_pc.index) | set(gradedf_pc_maxb.index)
                   | set(gradedf_pc_rmsc.index)))
-if len(abnormal_pc) > 0:
-	abnormal_pc.reset_index().astype(int, errors='ignore')
+abnormal_pc.reset_index().astype(int, errors='ignore')
 ```
 
 ##### Max blind move error > 200 μm: ``<%=len(gradedf_pc_maxb)%>`` positioners
-```python name='pc{0:02} max blind', echo=False, results='verbatim'
+```python name='pc{0:02} max blind move error', echo=False
 gradedf_pc_maxb.iloc[:, :6].reset_index().astype(int, errors='ignore')
 ```
 
 ##### RMS corrective move error > 30 μm: ``<%=len(gradedf_pc_rmsc)%>`` positioners
-```python name='pc{0:02} rms corr', echo=False, results='raw'
+```python name='pc{0:02} rms corrective move error', echo=False
 gradedf_pc_rmsc.iloc[:, :6].reset_index().astype(int, errors='ignore')
 ```
 
-##### Move errors by targets excluding ``<%=len(posids_exclude)%>`` outliers (μm)
+##### ``<%=len(outliers)%>`` outlier(s) for exclusion
+``<%=outliers%>``
+
+##### Move errors by targets, excluding ``<%=len(outliers)%>`` outlier(s) (μm)
 ```python name='pc{0:02} errors by targets', echo=False
-movedf_filtered = (data.movedf.drop(posids_exclude, level=1)
+movedf_filtered = (data.movedf.drop(outliers, level=1)
                    [[col for col in data.movedf.columns if 'err_xy_' in col]]
                    * 1000)  # convert to microns
 max_df = movedf_filtered.max(axis=0, level=0)
@@ -91,7 +92,7 @@ df.rename(columns={{col: col.replace('err_xy_', 'submove_') for col in df.column
 df.reset_index().astype(int, errors='ignore')
 ```
 
-##### Move errors by submoves excluding ``<%=len(posids_exclude)%>`` outliers (μm)
+##### Move errors by submoves, excluding ``<%=len(outliers)%>`` outlier(s) (μm)
 
 ```python name='pc{0:02} errors by submoves', echo=False
 max_series = movedf_filtered.max(axis=0)
@@ -101,42 +102,41 @@ pd.DataFrame([max_series, rms_series, median_series],
              index=['max', 'rms', 'median']).T.astype(int, errors='ignore')
 ```
 
-##### Move error maps excluding ``<%=len(posids_exclude)%>`` outliers (μm)
-```python, name='pc{0:02} grade A error distribution', echo=False, width='linewidth', results='verbatim'
-data.plot_error_heatmaps(pcid, posids_exclude=posids_exclude)
+##### Move error maps, excluding ``<%=len(outliers)%>`` outlier(s) (μm)
+```python, name='pc{0:02} error heatmaps', echo=False, width='linewidth', results='verbatim'
+data.plot_error_heatmaps(pcid, outliers=outliers)
 
 def plot_grade_section(grade):
-	if grade_counts[grade] > 0:
-		data.plot_error_dist(pcid=pcid, grade=grade)
-		if set(posids_grade[grade]) & set(posids_exclude):
-			data.plot_error_dist(pcid=pcid, grade=grade, posids_exclude=posids_exclude)
+    data.plot_error_dist(pcid=pcid, grade=grade, exclude_outliers=False)
+    if set(posids_grade[grade]) & set(outliers):  # outliers to exclude nontrivial
+        data.plot_error_dist(pcid=pcid, grade=grade, outliers=outliers, exclude_outliers=True)
 ```
 
-##### Grade A: ``<%=grade_counts['A']%>`` positioners
+##### Grade A: ``<%=grade_counts['A']%>`` positioners, including ``<%=len(set(posids_grade['A']) & set(outliers))%>`` outlier(s)
 ```python, name='pc{0:02} grade A error distribution', echo=False, width='linewidth', results='hidden'
 plot_grade_section('A')
 ```
 ``<%=posids_grade['A']%>``
 
-##### Grade B: ``<%=grade_counts['B']%>`` positioners
+##### Grade B: ``<%=grade_counts['B']%>`` positioners, including ``<%=len(set(posids_grade['B']) & set(outliers))%>`` outlier(s)
 ```python, name='pc{0:02} grade B error distribution', echo=False, width='linewidth', results='hidden'
 plot_grade_section('B')
 ```
 ``<%=posids_grade['B']%>``
 
-##### Grade C: ``<%=grade_counts['C']%>`` positioners
+##### Grade C: ``<%=grade_counts['C']%>`` positioners, including ``<%=len(set(posids_grade['C']) & set(outliers))%>`` outlier(s)
 ```python, name='pc{0:02} grade C error distribution', echo=False, width='linewidth', results='hidden'
 plot_grade_section('C')
 ```
 ``<%=posids_grade['C']%>``
 
-##### Grade D: ``<%=grade_counts['D']%>`` positioners
+##### Grade D: ``<%=grade_counts['D']%>`` positioners, including ``<%=len(set(posids_grade['D']) & set(outliers))%>`` outlier(s)
 ```python, name='pc{0:02} grade D error distribution', echo=False, width='linewidth', results='hidden'
 plot_grade_section('D')
 ```
 ``<%=posids_grade['D']%>``
 
-##### Grade F: ``<%=grade_counts['F']%>`` positioners
+##### Grade F: ``<%=grade_counts['F']%>`` positioners, including ``<%=len(set(posids_grade['F']) & set(outliers))%>`` outlier(s)
 ```python, name='pc{0:02} grade F error distribution', echo=False, width='linewidth', results='hidden'
 plot_grade_section('F')
 ```
