@@ -222,7 +222,7 @@ class PECS:
             sys.stdout.flush()
         print(f'\nSleep finished ({t} s).')
 
-    def pause(self, press_enter=True):
+    def pause(self, press_enter=False):
         '''pause operation between positioner moves for heat monitoring'''
         if self.pause_interval is None or press_enter:
             input('Paused for heat load monitoring for unspecified interval. '
