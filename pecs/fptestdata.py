@@ -49,10 +49,9 @@ np.nanrms = lambda x: np.sqrt(np.nanmean(np.square(x)))
 
 
 class FPTestData:
-    ''' data will be saved in:
-            /xytest_data/{time}-{test_name}/PC{pcid}/*.*
+    ''' on-mountain xy accuracy test and calibration data will be saved in:
+            /data/focalplane/kpno/{date}/{expid}/pc{pcid}/
     '''
-
     log_formatter = logging.Formatter(  # log format for each line
         fmt='%(asctime)s %(name)s [%(levelname)s]: %(message)s',
         datefmt=pc.timestamp_format)
@@ -753,43 +752,17 @@ class FPTestData:
 if __name__ == '__main__':
 
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    folders = [  # '20191021T154939-0700-petal3_can10',
-               # '20191024T150231-0700-petal9',
-               # '20191031T150117-0700-petal0_can1011',
-               # '20191106T100257-0700-petal0_can1011',
-               # '20191107T114725-0700-petal0_short',
-               # '20191112T191119-0700-petal0_full'
-               # '20191113T143453-0700-cmx_psf-3',
-               # '20191113T145131-0700-cmx_psf-4',
-               # '20191113T151057-0700-cmx_psf-1',
-               # '20191113T153032-0700-cmx_psf-2',
-               # '20191113T191026-0700-cmx_dither',
-               # '20191113T191844-0700-cmx_dither',
-               # '20191113T192440-0700-cmx_dither',
-               # '20191113T203313-0700-petal2_full',
-               # '20191113T204603-0700-petal2_full',
-               # '20191115T155812-0700-petal9_full',
-               # '20191116T184321-0700-cmx_dither_petal0_63064',
-               # '20191116T185036-0700-cmx_dither_petal0_63064',
-               # '20191122T165937-0700-cmx_dither_63038_petal2',
-               # '20191122T171101-0700-cmx_dither_63068_petal0',
-               # '20191125T150043-0700-petal7_full',
-               # '20191202T183110-0700-xytest_ptl0_dec02_2019',
-               # '20191203T171232-0700-petal0_full_32disabled',
-               # '20191204T113752-0700-petal4_full',
-               # '20191204T143117-0700-petal2_full_25disabled',
-               '20191204T165915-0700-petal9_full_28disabled']
-    for dir_name in folders:
+    expids = []
+    for expid in expids:
+        test_dir = glob(pc.dirs['kpno']+'*{expid}')
+        assert len(test_dir) == 0, test_dir
+        print(f'Re-processing directory:\n{test_dir[0]}')
         try:
-            # dir_name = '20191115T155812-0700-petal9_full'
-            with open(os.path.join(pc.dirs['xytest_data'],
-                                   dir_name, 'data_dump.pkl'),
-                      'rb') as handle:
-                data = pickle.load(handle)
+            with open(os.path.join(test_dir[0], 'data_dump.pkl'), 'rb') as h:
+                data = pickle.load(h)
             # data.generate_xyaccuracy_test_products()
             if shutil.which('pandoc') is not None:
                 data.generate_report()
             data.make_archive()
-        except Exception as e:
-            print(e)
+        except Exception:
             raise
