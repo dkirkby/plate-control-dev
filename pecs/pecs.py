@@ -169,11 +169,9 @@ class PECS:
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
             print('Expected positions of positioners by PetalApp '
                   'are contaminated by fiducials.')
-            # raise Exception('Expected positions of positioners by PetalApp '
-            #                 'are contaminated by fiducials.')
-        self.printfunc(f'Calling FVC measure expecting '
-                       f'{len(exppos)} positioners...')
-        mr_old = self.fvc.get('match_radius')  # hold old match radius
+        self.printfunc(
+            f'Calling FVC.measure() expecting {len(exppos)} positioners...')
+        # mr_old = self.fvc.get('match_radius')  # hold old match radius
         # self.fvc.set(match_radius=match_radius)
         # measured_QS, note that expected_pos was changed in place
         seqid = None
@@ -189,9 +187,7 @@ class PECS:
         if np.any(['P' in device_id for device_id in meapos.index]):
             print('Measured positions of positioners by FVC '
                   'are contaminated by fiducials.')
-            # raise Exception('Measured positions of positioners by FVC '
-            #                 'are contaminated by fiducials.')
-        self.fvc.set(match_radius=mr_old)  # restore old radius after measure
+        # self.fvc.set(match_radius=mr_old)  # restore old radius after measure
         meapos.columns = meapos.columns.str.upper()  # clean up header to save
         exppos = (exppos.rename(columns={'id': 'DEVICE_ID'})
                   .set_index('DEVICE_ID').sort_index())
@@ -203,7 +199,7 @@ class PECS:
             self.printfunc(f'All {len(exppos.index)} positioners matched.')
         else:
             self.printfunc(
-                f'Missing {len(unmatched)} of expected backlit fibres'
+                f'Missing {len(unmatched)} of expected backlit fibres:'
                 f'\n{sorted(unmatched)}')
         return exppos, meapos, matched, unmatched
 
