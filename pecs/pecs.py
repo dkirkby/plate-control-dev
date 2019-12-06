@@ -83,7 +83,7 @@ class PECS:
     def exp_setup(self):
         assert hasattr(self, 'data'), (
             'FPTestData must be initialised before calling exposure setup.')
-        self.exp = Exposure(read_only=False)
+        self.exp = Exposure(readonly=False)
         self.exp.sequence = self.data.test_name
         self.data.set_dirs(self.exp.id)  # directory setup
 
