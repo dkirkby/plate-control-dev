@@ -7,9 +7,7 @@ Created on Fri May 24 17:46:45 2019
 import os
 import numpy as np
 import pandas as pd
-# from multiprocessing import Queue, Process
 from configobj import ConfigObj
-# from tqdm import tqdm
 import posconstants as pc
 from pecs import PECS
 from fptestdata import FPTestData
