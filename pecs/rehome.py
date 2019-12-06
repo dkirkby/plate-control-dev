@@ -32,17 +32,14 @@ class Rehome(PECS):
         self.printfunc(f'Attempt {attempt}, rehoming {len(posids)} '
                        f'positioners with anticollision: {anticollision}\n\n'
                        f'{posids}\n')
-        if self.allow_pause:
-            input('Paused for heat load monitoring, press enter to continue: ')
+        self.pause(press_enter=True)
         ret = self.ptl.rehome_pos(posids, axis=self.axis,
-                                   anticollision=anticollision)
-        if ret is None:
-          self.printfunc('Rehome failed, check PetalApp console for error log')
-          raise Exception('None received as return from rehome_pos')
-        else:
-          ret = (ret
-                 .rename(columns={'X1': 'posintT', 'X2': 'posintP'})
-                 .sort_values(by='DEVICE_ID').reset_index())
+                                  anticollision=anticollision)
+        assert ret is not None, (
+            'Rehome failed, None received as return from rehome_pos, '
+            'check PetalApp console for error log.')
+        ret = (ret.rename(columns={'X1': 'posintT', 'X2': 'posintP'})
+               .sort_values(by='DEVICE_ID').reset_index())
         ret['STATUS'] = self.ptl.decipher_posflags(ret['FLAG'])
         mask = ret['FLAG'] != 4
         retry_list = list(ret.loc[mask, 'DEVICE_ID'])
