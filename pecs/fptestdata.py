@@ -77,9 +77,9 @@ class FPTestData:
 
     def set_dirs(self, exposure_id):
         self.filename = (
-            f'{pc.filename_timestamp_str(self.t_i)}-{self.test_name}')
-        self.dir = os.path.join(pc.dirs['kpno'], pc.dir_date_str_now(),
-                                exposure_id)
+            f'{pc.filename_timestamp_str(t=self.t_i)}-{self.test_name}')
+        self.dir = os.path.join(
+            pc.dirs['kpno'], pc.dir_date_str(t=self.t_i), exposure_id)
         self.dirs = {pcid: os.path.join(self.dir, f'pc{pcid:02}')
                      for pcid in self.pcids}
         self.test_cfg.filename = os.path.join(self.dir, f'{self.filename}.cfg')
