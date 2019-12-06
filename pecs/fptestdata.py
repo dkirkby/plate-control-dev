@@ -74,11 +74,11 @@ class FPTestData:
         self.logger.info([f'petalconstants.py version: {pc.code_version}',
                           f'anticollision mode: {self.anticollision}'])
 
-    def set_dirs(self, exposure_id):
+    def set_dirs(self, expid):
         self.filename = (
             f'{pc.filename_timestamp_str(t=self.t_i)}-{self.test_name}')
         self.dir = os.path.join(
-            pc.dirs['kpno'], pc.dir_date_str(t=self.t_i), exposure_id)
+            pc.dirs['kpno'], pc.dir_date_str(t=self.t_i), f'{expid:08}')
         self.dirs = {pcid: os.path.join(self.dir, f'pc{pcid:02}')
                      for pcid in self.pcids}
         self.test_cfg.filename = os.path.join(self.dir, f'{self.filename}.cfg')
