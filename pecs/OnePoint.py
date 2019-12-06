@@ -28,7 +28,7 @@ class OnePointCalib(PECS):
         # save results
         path = os.path.join(
             pc.dirs['calib_logs'],
-            f'{pc.filename_timestamp_str_now()}-1p_calibration-{mode}.csv')
+            f'{pc.filename_timestamp_str()}-1p_calibration-{mode}.csv')
         updates.to_csv(path)
         self.printfunc(  # preview calibration updates
             updates[['POS_T', 'POS_P', 'dT', 'dP', 'OFFSET_T', 'OFFSET_P']])

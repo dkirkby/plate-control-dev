@@ -25,7 +25,7 @@ class RehomeVerify(PECS):
         df = self.compare_xy()
         path = os.path.join(  # save results
             pc.dirs['calib_logs'],
-            f'{pc.filename_timestamp_str_now()}-rehome_verify.csv')
+            f'{pc.filename_timestamp_str()}-rehome_verify.csv')
         df.to_csv(path)
         self.printfunc(f'Rehome verification data saved to: {path}')
         if input('Open verification table? (y/n): ') in ['y', 'yes']:

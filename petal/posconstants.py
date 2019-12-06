@@ -124,6 +124,7 @@ nominals['PHYSICAL_RANGE_P'] = {'value': 190.0, 'tol':   50.0}
 nominals['GEAR_CALIB_T']     = {'value':   1.0, 'tol':    0.05}
 nominals['GEAR_CALIB_P']     = {'value':   1.0, 'tol':    0.05}
 
+
 grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
 
 # Types
@@ -264,17 +265,23 @@ def now():
     return datetime.datetime.now().astimezone()
 
 
-def timestamp_str_now():
-    return now().strftime(timestamp_format)
+def timestamp_str(t=None):
+    if t is None:
+        t = now()
+    return t.strftime(timestamp_format)
 
 
-def filename_timestamp_str_now():
-    return now().strftime(filename_timestamp_format)
+def filename_timestamp_str(t=None):
+    if t is None:
+        t = now()
+    return t.strftime(filename_timestamp_format)
 
 
-def dir_date_str_now():
+def dir_date_str(t=None):
     '''returns date string for the directory name, changes at noon Arizona'''
-    t = now().astimezone(pytz.timezone('America/Phoenix'))
+    if t is None:
+        t = now()
+    t = t.astimezone(pytz.timezone('America/Phoenix'))
     day = t.day
     if t.hour > 12:  # past noon, treat as the next day
         day += 1

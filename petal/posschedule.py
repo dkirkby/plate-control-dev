@@ -22,7 +22,7 @@ class PosSchedule(object):
         self.petal = petal
         self.stats = stats
         if stats:
-            schedule_id = pc.filename_timestamp_str_now()
+            schedule_id = pc.filename_timestamp_str()
             self.stats.register_new_schedule(schedule_id, len(self.petal.posids))
         self.verbose = verbose
         self.printfunc = self.petal.printfunc

@@ -12,13 +12,13 @@ import tkinter.filedialog
 import tkinter.messagebox
 import configobj
 
-logfile = pc.dirs['xytest_logs'] + pc.filename_timestamp_str_now() + '_calib.log'
+logfile = pc.dirs['xytest_logs'] + pc.filename_timestamp_str() + '_calib.log'
 
 def logwrite(text,stdout=True):
     """Standard logging function for writing to the test traveler log file.
     """
     global logfile
-    line = '# ' + pc.timestamp_str_now() + ': ' + text
+    line = '# ' + pc.timestamp_str() + ': ' + text
     with open(logfile,'a',encoding='utf8') as fh:
         fh.write(line + '\n')
     if stdout:
@@ -31,7 +31,7 @@ should_avoid_hardstop_strikes = False
 new_and_changed_files = set()
 
 # unique timestamp and fire up the gui
-start_filename_timestamp = pc.filename_timestamp_str_now()
+start_filename_timestamp = pc.filename_timestamp_str()
 gui_root = tkinter.Tk()
 
 # get the station config info

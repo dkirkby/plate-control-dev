@@ -287,7 +287,7 @@ class PosState(object):
         """All current unit parameters are written to the hardware unit's log file.
         """
         if self.logging:
-            timestamp = pc.timestamp_str_now()
+            timestamp = pc.timestamp_str()
             def start_new_file():
                 with open(self.log_path, 'w', newline='') as csvfile:
                     csv.writer(csvfile).writerow(self.log_fieldnames)

@@ -201,7 +201,7 @@ class PosMoveMeasure(object):
             if m['err2D'][-1] > self.err_level_to_save_move0_img:
                 save_img = True
         if save_img:
-            timestamp_str = pc.filename_timestamp_str_now()
+            timestamp_str = pc.filename_timestamp_str()
             for file in imgfiles:
                 os.rename(file, pc.dirs['xytest_plots'] + timestamp_str + '_move0' + file)
                 
@@ -241,7 +241,7 @@ class PosMoveMeasure(object):
                 if m['err2D'][-1] > self.err_level_to_save_moven_img and i == num_corr_max:
                     save_img = True
             if save_img:
-                timestamp_str = pc.filename_timestamp_str_now()
+                timestamp_str = pc.filename_timestamp()
                 for file in imgfiles:
                     os.rename(file, pc.dirs['xytest_plots'] + timestamp_str + '_move' + str(i) + file)                
         for posid in data.keys():

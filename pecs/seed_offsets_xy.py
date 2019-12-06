@@ -22,7 +22,7 @@ class SeedOffsetsXY(PECS):
         updates = self.seed_vals()
         path = os.path.join(
             pc.dirs['calib_logs'],
-            f'{pc.filename_timestamp_str_now()}-seed_offsets_xy.csv')
+            f'{pc.filename_timestamp_str()}-seed_offsets_xy.csv')
         updates.to_csv(path)
         self.printfunc(  # preview calibration updates
             updates[['DEVICE_ID', 'DEVICE_LOC', 'OFFSET_X', 'OFFSET_Y',

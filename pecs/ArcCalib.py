@@ -26,7 +26,7 @@ class ArcCalib(PECS):
         updates = self.calibrate(interactive=interactive)
         path = os.path.join(
             pc.dirs['calib_logs'],
-            f'{pc.filename_timestamp_str_now()}-arc_calibration')
+            f'{pc.filename_timestamp_str()}-arc_calibration')
         self.printfunc(
             updates[['DEVICE_ID', 'LENGTH_R1', 'LENGTH_R2',
                      'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P']])

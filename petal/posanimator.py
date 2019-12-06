@@ -196,7 +196,7 @@ class PosAnimator(object):
         start_end_still_time = 0.5
         frame_number = 1
         image_paths = {}
-        timestamp = pc.filename_timestamp_str_now()
+        timestamp = pc.filename_timestamp_str()
         self.frame_dir = os.path.join(self.save_dir,timestamp + '_frames')
         if self.live_animate:
             plt.show()

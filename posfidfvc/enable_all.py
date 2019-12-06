@@ -19,7 +19,7 @@ sim=False
 new_and_changed_files = set()
 
 # unique timestamp and fire up the gui
-start_filename_timestamp = pc.filename_timestamp_str_now()
+start_filename_timestamp = pc.filename_timestamp_str()
 gui_root = tkinter.Tk()
 
 # get the station config info

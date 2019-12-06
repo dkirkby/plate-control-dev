@@ -177,7 +177,7 @@ class PosSchedStats(object):
     
     def save(self):
         """Saves stats results to disk."""
-        filename = pc.filename_timestamp_str_now() + '_schedule_stats.csv'
+        filename = pc.filename_timestamp_str() + '_schedule_stats.csv'
         path = os.path.join(pc.dirs['temp_files'],filename)
         data, nrows = self.summarize_all()
         blank_row = {'method':''}
