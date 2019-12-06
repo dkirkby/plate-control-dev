@@ -72,9 +72,7 @@ class FPTestData:
             and key.isdigit() and (test_cfg[key]['mode'] is not None)]
         for pcid in self.test_cfg.sections:  # convert pcid to int now
             self.test_cfg.rename(pcid, int(pcid))
-
         self.print(f'petalconstants.py version: {pc.code_version}\n'
-                   f'Saving to directory: {self.dir}\n'
                    f'Anticollision mode: {self.anticollision}')
 
     def set_dirs_and_init_loggers(self, exposure_id):
