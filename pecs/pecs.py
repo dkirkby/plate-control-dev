@@ -177,8 +177,11 @@ class PECS:
         mr_old = self.fvc.get('match_radius')  # hold old match radius
         # self.fvc.set(match_radius=match_radius)
         # measured_QS, note that expected_pos was changed in place
+        seqid = None
+        if hasattr(self, 'exp'):
+            seqid = self.exp.id
         meapos = (pd.DataFrame(self.fvc.measure(
-                      expected_positions=exppos, seqid=self.exp.id,
+                      expected_positions=exppos, seqid=seqid,
                       exptime=self.exptime, match_radius=match_radius,
                       matched_only=matched_only,
                       all_fiducials=self.all_fiducials))
