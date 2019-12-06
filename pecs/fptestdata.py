@@ -92,13 +92,13 @@ class FPTestData:
         self.loggers = {}
         for pcid in self.pcids:
             # use the same directory for all real-time logs
-            self.log_path = pc.dirs['test_logs']
+            self.log_path = pc.dirs['kpno']
             self.log_paths[pcid] = os.path.join(
                 self.log_path,
                 f'{self.test_name}-pc{pcid:02}_realtime.log')
             # ensure save directory and log file exist if they don't already
-            os.makedirs(self.dirs[pcid], exist_ok=True)
-            open(self.log_paths[pcid], 'a').close()
+            os.makedirs(self.log_paths[pcid], exist_ok=True)
+            open(self.log_paths[pcid], 'a').close()  # create empty log files
             # create virtual file object for storing log entries
             # using stringio because it supports write() and flush()
             log = io.StringIO(newline='\n')
