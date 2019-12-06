@@ -58,7 +58,7 @@ class FPTestData:
         fmt='%(asctime)s %(name)s [%(levelname)s]: %(message)s',
         datefmt=pc.timestamp_format)
 
-    def __init__(self, test_name, test_cfg=None, fvc_collector=None):
+    def __init__(self, test_name, test_cfg=None):
 
         self.test_name = test_name
         if test_cfg is None:  # for calibration scripts
@@ -72,14 +72,12 @@ class FPTestData:
             and key.isdigit() and (test_cfg[key]['mode'] is not None)]
         for pcid in self.test_cfg.sections:  # convert pcid to int now
             self.test_cfg.rename(pcid, int(pcid))
-        self._init_loggers()  # also create product dir for all files
-        self.logger.info([f'petalconstants.py version: {pc.code_version}',
-                          f'Saving to directory: {self.dir}',
-                          f'Anticollision mode: {self.anticollision}'])
-        if fvc_collector is not None:
-            self.fvc_collector = fvc_collector
 
-    def set_dirs(self, exposure_id):
+        self.print(f'petalconstants.py version: {pc.code_version}\n'
+                   f'Saving to directory: {self.dir}\n'
+                   f'Anticollision mode: {self.anticollision}')
+
+    def set_dirs_and_init_loggers(self, exposure_id):
         self.filename = (
             f'{pc.filename_timestamp_str(self.t_i)}-{self.test_name}')
         self.test_cfg.filename = self.filename
@@ -87,8 +85,10 @@ class FPTestData:
                                 exposure_id)
         self.dirs = {pcid: os.path.join(self.dir, f'pc{pcid:02}')
                      for pcid in self.pcids}
+        self._init_loggers()  # also create product dir for all files
 
     def _init_loggers(self):
+        '''need to know the product directories before initialising loggers'''
         self.logs = {}  # set up log files and loggers for each petal
         self.log_paths = {}
         self.loggers = {}
