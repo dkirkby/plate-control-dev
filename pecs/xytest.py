@@ -56,14 +56,12 @@ class XYTest(PECS):
         https://desi.lbl.gov/svn/code/focalplane/fp_settings/hwsetups/
         https://desi.lbl.gov/svn/code/focalplane/fp_settings/test_settings/
         """
-        # self.data.test_cfg = xytest_cfg
         self.data = FPTestData(test_name, test_cfg=test_cfg)
-        # pcids are just ints now, DB and DOS have forced the conversion
+        self.loggers = self.data.loggers  # use these loggers to write to logs
+        self.logger = self.data.logger  # broadcast to all petals
         super().__init__(
             printfunc={p: self.loggers[p].info for p in self.data.pcids})
         self.exp_setup()  # set up exposure ID and product directory
-        self.loggers = self.data.loggers  # use these loggers to write to logs
-        self.logger = self.data.logger
         if 'pause_interval' in test_cfg:  # override default pecs settings
             self.logger.info(
                 f"Overriding default pause interval {self.pause_interval} s"
@@ -436,7 +434,7 @@ if __name__ == '__main__':
     path = os.path.join(pc.dirs['test_settings'], 'xytest_cmx_psf.cfg')
     print(f'Loading test config: {path}')
     xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')  # read cfg
-    xytest_name = input(r'Please name this test ("xytest-{}): ')
+    xytest_name = input(r'Please name this test ("xytest-{test_name}"): ')
     test = XYTest('xytest-'+xytest_name, xytest_cfg)
     test.run_xyaccuracy_test(
         disable_unmatched=test.data.test_cfg['disable_unmatched'])

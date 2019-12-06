@@ -85,8 +85,7 @@ class PECS:
             'FPTestData must be initialised before calling exposure setup.')
         self.exp = Exposure(read_only=False)
         self.exp.sequence = self.data.test_name
-        # directory setup
-        self.data.set_dirs_and_init_loggers(self.exp.id)
+        self.data.set_dirs(self.exp.id)  # directory setup
 
     def printfunc(self, msg):
         '''self.printfuncs is a dict indexed by pcids as specified for input,

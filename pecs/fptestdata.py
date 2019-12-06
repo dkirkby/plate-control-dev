@@ -72,18 +72,18 @@ class FPTestData:
             and key.isdigit() and (test_cfg[key]['mode'] is not None)]
         for pcid in self.test_cfg.sections:  # convert pcid to int now
             self.test_cfg.rename(pcid, int(pcid))
-        self.print(f'petalconstants.py version: {pc.code_version}\n'
-                   f'Anticollision mode: {self.anticollision}')
+        self._init_loggers()
+        self.logger.info([f'petalconstants.py version: {pc.code_version}',
+                          f'anticollision mode: {self.anticollision}'])
 
-    def set_dirs_and_init_loggers(self, exposure_id):
+    def set_dirs(self, exposure_id):
         self.filename = (
             f'{pc.filename_timestamp_str(self.t_i)}-{self.test_name}')
-        self.test_cfg.filename = self.filename
         self.dir = os.path.join(pc.dirs['kpno'], pc.dir_date_str_now(),
                                 exposure_id)
         self.dirs = {pcid: os.path.join(self.dir, f'pc{pcid:02}')
                      for pcid in self.pcids}
-        self._init_loggers()  # also create product dir for all files
+        self.test_cfg.filename = os.path.join(self.dir, f'{self.filename}.cfg')
 
     def _init_loggers(self):
         '''need to know the product directories before initialising loggers'''
@@ -91,8 +91,11 @@ class FPTestData:
         self.log_paths = {}
         self.loggers = {}
         for pcid in self.pcids:
-            self.log_paths[pcid] = os.path.join(self.dirs[pcid],
-                                                f'pc{pcid:02}_realtime.log')
+            # use the same directory for all real-time logs
+            self.log_path = pc.dirs['test_logs']
+            self.log_paths[pcid] = os.path.join(
+                self.log_path,
+                f'{self.test_name}-pc{pcid:02}_realtime.log')
             # ensure save directory and log file exist if they don't already
             os.makedirs(self.dirs[pcid], exist_ok=True)
             open(self.log_paths[pcid], 'a').close()
@@ -103,7 +106,7 @@ class FPTestData:
             logger = logging.getLogger(f'PC{pcid:02}')
             logger.handlers = []  # clear handlers that might exisit already
             logger.setLevel(logging.DEBUG)  # log everything, DEBUG level up
-            fh = logging.FileHandler(self.log_paths[pcid],
+            fh = logging.FileHandler(self.log_paths[pcid],  # real-time log
                                      mode='a', encoding='utf-8')
             sh = logging.StreamHandler(stream=log)  # pseudo-file handler
             ch = logging.StreamHandler()  # console handler, higher log level
@@ -114,8 +117,8 @@ class FPTestData:
             logger.addHandler(fh)
             logger.addHandler(sh)
             logger.addHandler(ch)
-            logger.info(f'Logger initialised for test: {self.test_name}, '
-                        f'petal: PC{pcid:02d}')
+            logger.info(f'Logger initialised for PC{pcid:02}, writing '
+                        f'real-time log to: {self.log_paths[pcid]}')
             # write configs to logs
             if self.petal_cfgs is not None:  # dump petal cfg to petal logger
                 self._log_cfg(logger.debug, self.petal_cfgs[pcid])
@@ -669,6 +672,7 @@ class FPTestData:
 
     def export_data_logs(self):
         '''must have writte self.posids_pc, a dict keyed by pcid'''
+        self.test_cfg.write()  # write test config
         self.movedf.to_pickle(os.path.join(self.dir, 'movedf.pkl.gz'),
                               compression='gzip')
         self.movedf.to_csv(os.path.join(self.dir, 'movedf.csv'))
@@ -687,7 +691,7 @@ class FPTestData:
             with open(makepath(f'pc{pcid:02}_export.log'), 'w') as handle:
                 self.logs[pcid].seek(0)
                 shutil.copyfileobj(self.logs[pcid], handle)  # save logs
-            self.print(f'Petal move data for PC{pcid:02} written to: '
+            self.print(f'PC{pcid:02} data written to: '
                        f'{self.dirs[pcid]}', pcid=pcid)
 
     def dump_as_one_pickle(self):
