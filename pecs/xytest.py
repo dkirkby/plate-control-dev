@@ -184,7 +184,7 @@ class XYTest(PECS):
                         self.logger.warning(
                             'Missing target assignment for device_loc '
                             f'{i}, posid {posid}')
-        assert self.data.ntargets == 0, 'Empty target list, exiting...'
+        assert self.data.ntargets > 0, 'Empty target list, exiting...'
 
     def _add_device_id_col(self, df, pcid):
         '''when df only has DEVICE_LOC, add DEVICE_ID column and use as index
