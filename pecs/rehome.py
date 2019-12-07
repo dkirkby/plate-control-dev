@@ -24,7 +24,8 @@ class Rehome(PECS):
         df.to_csv(path)
         self.printfunc(f'Rehome (interally-tracked) data saved to: {path}')
         if input('Verify rehome positions with FVC? (y/n): ') in ['y', 'yes']:
-            RehomeVerify(petal_roles=self.ptlm.participating_petals, posids=self.posids)
+            RehomeVerify(petal_roles=self.ptlm.participating_petals,
+                         posids=self.posids)
 
     def rehome(self, posids=None, anticollision='freeze', attempt=1):
         # three atetmpts built in, two with ac freeze, one with ac None
@@ -33,20 +34,17 @@ class Rehome(PECS):
         self.printfunc(f'Attempt {attempt}, rehoming {len(posids)} '
                        f'positioners with anticollision: {anticollision}\n\n'
                        f'{posids}\n')
-        if self.allow_pause:
-            input('Paused for heat load monitoring, press enter to continue: ')
+        self.pause(press_enter=True)
         ret = self.ptlm.rehome_pos(posids, axis=self.axis,
                                    anticollision=anticollision,
-                                   control = {'timeout': 60.0})
+                                   control={'timeout': 60})
         if isinstance(ret, dict):
-            dflist = []
-            for df in ret.values():
-                dflist.append(df)
-            ret = pd.concat(dflist)
+            ret = pd.concat(list(ret.values()))
         ret = (ret.rename(columns={'X1': 'posintT', 'X2': 'posintP'})
-                 .sort_values(by='DEVICE_ID').reset_index())
+               .sort_values(by='DEVICE_ID').reset_index())
         # Just take the first petal's result
-        ret['STATUS'] = list(self.ptlm.decipher_posflags(ret['FLAG']).values())[0]
+        ret['STATUS'] = list(
+            self.ptlm.decipher_posflags(ret['FLAG']).values())[0]
         mask = ret['FLAG'] != 4
         retry_list = list(ret.loc[mask, 'DEVICE_ID'])
         if len(retry_list) == 0:

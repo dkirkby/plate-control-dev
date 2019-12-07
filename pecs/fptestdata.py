@@ -4,7 +4,8 @@ Created on Thu May 23 22:18:28 2019
 
 @author: Duan Yutong (dyt@physics.bu.edu)
 
-Store xy test, anti-collision data in a class for debugging.
+Store xy test, anti-collision, calibration data in an offline class.
+DOSlib dependence is kept out of this
 Most fields are dictionaries indexed by petal id:
 
 FPTestData.petal_cfgs[pcid]:    hw setup file for each petal
@@ -14,35 +15,37 @@ FPTestData.loggers[pcid]:       logger which writes new lines to log file
 """
 
 import os
-# import sys
-from copy import copy
-import logging
-from glob import glob
-from itertools import product
-from functools import partial
-import multiprocessing
-from multiprocessing import Process  # Pool
-from tqdm import tqdm
 import io
+from itertools import product
+from functools import partial, reduce
 import shutil
 import subprocess
-import tarfile
 import pickle
+import logging
+from copy import copy
 from datetime import timezone
+import multiprocessing
+from multiprocessing import Process  # Pool
+import tarfile
+from glob import glob
 import numpy as np
 import pandas as pd
-import posconstants as pc
+from tqdm import tqdm
 from PyPDF2 import PdfFileMerger
+from configobj import ConfigObj
+import posconstants as pc
 import psycopg2
 import matplotlib
 # matplotlib.use('pdf')
 import matplotlib.pyplot as plt
+from matplotlib.dates import DateFormatter
 # plt.ioff()  # turn off interactive mode, doesn't work in matplotlib2
 plt.rcParams.update({'font.family': 'serif',
                      'mathtext.fontset': 'cm'})
 Circle = matplotlib.patches.Circle
 idx = pd.IndexSlice
 np.rms = lambda x: np.sqrt(np.mean(np.square(x)))
+np.nanrms = lambda x: np.sqrt(np.nanmean(np.square(x)))
 # sys.path.append(os.path.abspath('.'))
 
 
@@ -55,28 +58,34 @@ class FPTestData:
         fmt='%(asctime)s %(name)s [%(levelname)s]: %(message)s',
         datefmt=pc.timestamp_format)
 
-    def __init__(self, test_name, test_cfg, petal_cfgs=None):
+    def __init__(self, test_name, test_cfg=None, fvc_collector=None):
 
         self.test_name = test_name
-        self.start_time = pc.now()
-        self.test_cfg = test_cfg  # pcid sections are string ids
-        self.anticollision = test_cfg['anticollision']
-        self.num_corr_max = test_cfg['num_corr_max']
-        self.petal_cfgs = petal_cfgs
+        if test_cfg is None:  # for calibration scripts
+            self.test_cfg = ConfigObj()
+        else:  # for xy accuracy test
+            self.test_cfg = test_cfg
+            self.anticollision = test_cfg['anticollision']
+            self.num_corr_max = test_cfg['num_corr_max']
         self.pcids = [  # validate string pcid sections and create list
             int(key) for key in test_cfg.keys() if len(key) == 2
             and key.isdigit() and (test_cfg[key]['mode'] is not None)]
         for pcid in self.test_cfg.sections:  # convert pcid to int now
             self.test_cfg.rename(pcid, int(pcid))
-        # create save dir for all files: logs, tables, pickels, gzips
-        self.dir_name = f'{pc.filename_timestamp_str_now()}-{test_name}'
-        self.dir = os.path.join(pc.dirs['xytest_data'], self.dir_name)
-        self.dirs = {pcid: os.path.join(self.dir, f'pc{pcid:02}')
-                     for pcid in self.pcids}
-        self._init_loggers()
+        self._init_loggers()  # also create product dir for all files
         self.logger.info([f'petalconstants.py version: {pc.code_version}',
                           f'Saving to directory: {self.dir}',
                           f'Anticollision mode: {self.anticollision}'])
+        if fvc_collector is not None:
+            self.fvc_collector = fvc_collector
+
+    def set_dirs(self, exposure_id):
+        self.filename = f'{pc.filename_timestamp_str_now()}-{self.test_name}'
+        self.test_cfg.filename = self.filename
+        self.dir = os.path.join(pc.dirs['kpno'], pc.dir_date_str_now(),
+                                exposure_id)
+        self.dirs = {pcid: os.path.join(self.dir, f'pc{pcid:02}')
+                     for pcid in self.pcids}
 
     def _init_loggers(self):
         self.logs = {}  # set up log files and loggers for each petal
@@ -115,6 +124,19 @@ class FPTestData:
             self.logs[pcid] = log  # assign logs and loggers to attributes
             self.loggers[pcid] = logger
         self.logger = self.BroadcastLogger(self.pcids, self.loggers)
+
+    def print(self, string, pcid=None):
+        assert type(string) is str
+        if pcid is None:
+            if hasattr(self, 'logger'):
+                self.logger.info(string)
+            else:
+                print(string)
+        else:
+            if hasattr(self, 'loggers'):
+                self.loggers[pcid].info(string)
+            else:
+                print(string)
 
     @staticmethod
     def _log_cfg(printfunc, config):
@@ -198,10 +220,6 @@ class FPTestData:
         self.logger.info(f'Move data table initialised '
                          f'for {len(self.posids)} positioners.')
 
-    def complete_data(self):
-        self.end_time = pc.now()  # define end time
-        self.read_telemetry()
-
     def read_telemetry(self):
         try:
             conn = psycopg2.connect(host="desi-db", port="5442",
@@ -209,32 +227,113 @@ class FPTestData:
                                     user="desi_reader", password="reader")
             self.telemetry = pd.read_sql_query(  # get temperature data
                 f"""SELECT * FROM pc_telemetry_can_all
-                    WHERE time >= '{self.start_time.astimezone(timezone.utc)}'
-                    AND time < '{self.end_time.astimezone(timezone.utc)}'""",
+                    WHERE time >= '{self.t_i.astimezone(timezone.utc)}'
+                    AND time < '{self.t_f.astimezone(timezone.utc)}'""",
                 conn).sort_values('time')  # posfid_temps, time, pcid
-            print(f'{len(self.telemetry)} entries from telemetry DB '
-                  f'between {self.start_time} and {self.end_time} were loaded')
+            self.print(f'{len(self.telemetry)} entries from telemetry DB '
+                       f'between {self.t_i} and {self.t_f} loaded')
             self.db_telemetry_available = True
         except Exception:
             self.db_telemetry_available = False
 
-    def make_summary_plots(self, n_threads_max=32, make_binder=True, mp=True):
+    @staticmethod
+    def grade_pos(err_0_max, err_corr_max, err_corr_rms,
+                  err_corr_95p_max, err_corr_95p_rms):
+        '''these criteria were set by UMich lab tests, all in microns
+        '''
+        if np.any(np.isnan([err_0_max, err_corr_max, err_corr_rms,
+                  err_corr_95p_max])):
+            return pc.grades[-1]
+        if (err_0_max <= 100) & (err_corr_max <= 15) & (err_corr_rms <= 5):
+            grade = pc.grades[0]
+        elif ((err_0_max <= 250) & (err_corr_max <= 25) & (err_corr_rms <= 10)
+              & (err_corr_95p_max <= 15) & (err_corr_95p_rms <= 5)):
+            grade = pc.grades[1]
+        elif ((err_0_max <= 250) & (err_corr_max <= 50) & (err_corr_rms <= 20)
+              & (err_corr_95p_max <= 25) & (err_corr_95p_rms <= 10)):
+            grade = pc.grades[2]
+        elif ((err_0_max <= 500) & (err_corr_max <= 50) & (err_corr_rms <= 20)
+              & (err_corr_95p_max <= 25) & (err_corr_95p_rms <= 10)):
+            grade = pc.grades[3]
+        else:
+            grade = pc.grades[4]
+        return grade
 
+    def calculate_grades(self):
+        rows = []  # determine performance grade of each positioner one by one
+        for posid in self.posids:
+            pos_data = (self.movedf.loc[idx[:, posid], :]
+                        .reset_index(drop=True).copy())
+            # exclude entries where posflag is not equal to 4, set to nan
+            for i in range(self.num_corr_max+1):
+                mask = pos_data[f'pos_flag_{i}'] != 4
+                pos_data.loc[mask, f'err_xy_{i}'] = np.nan
+            err_0_max = np.max(pos_data['err_xy_0']) * 1000  # max blind err μm
+            err_corr = pos_data[  # select corrective moves only
+                [f'err_xy_{i}' for i in range(1, self.num_corr_max+1)]].values
+            err_corr = err_corr[~np.isnan(err_corr)]  # filter out nan
+            if len(err_corr) == 0:
+                err_corr_max = err_corr_rms = np.nan
+                err_corr_95p_max = err_corr_95p_rms = np.nan
+                grade = 'N/A'
+            else:
+                err_corr_max = np.max(err_corr) * 1000  # μm
+                err_corr_rms = np.rms(err_corr) * 1000  # μm
+                # take reduced sample at 95 percentile, excluding 5% worst pts
+                err_corr_95p = err_corr[
+                    err_corr <= np.percentile(err_corr, 95)]
+                err_corr_95p_max = np.max(err_corr_95p) * 1000  # μm
+                err_corr_95p_rms = np.rms(err_corr_95p) * 1000  # μm
+                grade = self.grade_pos(
+                    err_0_max, err_corr_max, err_corr_rms,
+                    err_corr_95p_max, err_corr_95p_rms)
+            rows.append({'DEVICE_ID': posid,
+                         'err_0_max': err_0_max,  # max blind move xy error
+                         'err_corr_max': err_corr_max,  # max corr move err
+                         'err_corr_rms': err_corr_rms,  # max corr move rms
+                         'err_corr_95p_max': err_corr_95p_max,  # best 95%
+                         'err_corr_95p_rms': err_corr_95p_rms,  # best 95%
+                         'grade': grade})
+        self.gradedf = (pd.DataFrame(rows)
+                        .set_index('DEVICE_ID').join(self.posdf))
+
+    def complete_data(self):
+        self.read_telemetry()
+        self.calculate_grades()
+        masks = []  # get postiioners with abnormal flags
+        for i in range(self.num_corr_max+1):
+            masks.append(self.movedf[f'pos_flag_{i}'] != 4)
+        mask = reduce(lambda x, y: x | y, masks)
+        self.abnormaldf = self.movedf[mask]
+
+    def abnormal_pos_df(self, pcid=None):
+        abnormaldf = self.abnormaldf
+        if pcid is not None:  # then filter out the selected PCID
+            abnormaldf = self.abnormaldf[self.abnormaldf['PCID'] == pcid]
+        posids_abnormal = abnormaldf.index.droplevel(0).unique()
+        rows = []
+        for posid in posids_abnormal:
+            counts_list = []  # counts by submove
+            for i in range(self.num_corr_max+1):
+                counts_list.append(abnormaldf.loc[idx[:, posid], :]
+                                   [f'pos_status_{i}'].value_counts())
+            counts = reduce(lambda x, y: x.add(y, fill_value=0), counts_list)
+            rows.append(counts)
+        df_status = (pd.DataFrame(rows, index=posids_abnormal, dtype=np.int64)
+                     .drop('Normal positioner', axis=1, errors='ignore'))
+        return df_status.fillna(value=0)
+
+    def make_summary_plots(self, n_threads_max=32, make_binder=True, mp=True):
         n_threads = min(n_threads_max, 2*multiprocessing.cpu_count())
         pstr = (f'Making summary xyplots with {n_threads} threads on '
                 f'{multiprocessing.cpu_count()} cores for '
                 f'submoves {list(range(self.num_corr_max+1))}...')
-        if hasattr(self, 'logger'):
-            self.logger.info(pstr)
-        else:
-            print(pstr)
+        self.print(pstr)
         if mp:
             # the following implementation fails when loggers are present
             # pbar = tqdm(total=len(self.posids))
-
             # def update_pbar(*a):
             #     pbar.update()
-
             # with Pool(processes=n_threads) as p:
             #     for posid in self.posids:
             #         p.apply_async(self.make_summary_plot, args=(posid,),
@@ -291,7 +390,7 @@ class FPTestData:
         Tmin, Tmax = np.sort(posintT) + row['OFFSET_T']  # targetable poslocT
         path = os.path.join(self.dirs[pcid],
                             '{}_xyplot_submove_{{}}.pdf'.format(posid))
-        title = (f'XY Accuracy Test {self.start_time}\n'
+        title = (f'XY Accuracy Test {self.t_i}\n'
                  f'Positioner {posid} ({self.ntargets} Targets)')
         moves = self.movedf.loc[idx[:, posid], :]  # all targets for a posid
         tgtX, tgtY = moves['target_x'], moves['target_y']  # target obsXY
@@ -339,10 +438,7 @@ class FPTestData:
             ax.legend(loc='upper right', fontsize=10)
             fig.savefig(path.format(n), bbox_inches='tight')
             pstr = f'saved xyplot: {path.format(n)}'
-            if hasattr(self, 'loggers'):
-                self.loggers[pcid].debug(pstr)
-            else:
-                pass  # print(pstr)
+            self.print(pstr)
             plt.close(fig)
 
     def make_summary_plot_binder(self, pcid, n):
@@ -359,24 +455,215 @@ class FPTestData:
             self.dirs[pcid],
             f'{len(paths)}_positioners-xyplot_submove_{n}.pdf')
         pstr = f'Writing xyplot binder for submove {n}...'
-        if hasattr(self, 'loggers'):
-            self.loggers[pcid].info(pstr)
-        else:
-            print(pstr)
+        self.print(pstr)
         binder.write(savepath)
         binder.close()
         pstr = f'Binder for submove {n} saved to: {savepath}'
-        if hasattr(self, 'loggers'):
-            self.loggers[pcid].info(pstr)
+        self.print(pstr)
+
+    def plot_posfid_temp(self, pcid=None):
+
+        def plot_petal(pcid, max_on=True, mean_on=False, median_on=True):
+            query = self.telemetry[self.telemetry['pcid'] == pcid]
+            if max_on:
+                ax.plot(query['time'], query['posfid_temps_max'], '-o',
+                        label=f'PC{pcid:02} posfid max')
+            if mean_on:
+                ax.plot(query['time'], query['posfid_temps_mean'], '-o',
+                        label=f'PC{pcid:02} posfid mean')
+            if median_on:
+                ax.plot(query['time'], query['posfid_temps_median'], '-o',
+                        label=f'PC{pcid:02} posfid median')
+
+        pd.plotting.register_matplotlib_converters()
+        fig, ax = plt.subplots(figsize=(6.5, 3.5))
+        if pcid is None:  # loop through all petals, plot max only
+            for pcid in self.pcids:
+                plot_petal(pcid, max_on=True, mean_on=False, median_on=False)
+        else:  # pcid is an integer
+            plot_petal(pcid)
+
+        ax.legend()
+        ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
+        ax.xaxis.set_tick_params(rotation=45)
+        ax.set_xlabel('Time (UTC)')
+        ax.set_ylabel('Temperature (°C)')
+        suffix = '' if pcid is None else f'_pc{pcid:02}'
+        fig.savefig(os.path.join(self.dir, 'figures',
+                                 f'posfid_temp{suffix}.pdf'),
+                    bbox_inches='tight')
+
+    @staticmethod
+    def add_hist_annotation(ax):
+        for rect in ax.patches:  # add annotations
+            height = rect.get_height()
+            ax.annotate(f'{int(height)}',
+                        xy=(rect.get_x() + rect.get_width() / 2, height),
+                        xytext=(0, 5),  # vertical offset
+                        textcoords='offset points', size='small',
+                        ha='center', va='bottom')
+        ax.set_ylim([0.1, ax.get_ylim()[1]*3])
+
+    def plot_grade_dist(self, pcid=None):
+        if pcid is None:  # show all positioners tested
+            grade_counts = self.gradedf['grade'].value_counts()
+            ptlstr = 'petals' if len(self.pcids) > 1 else 'petal'
+            title = (
+                f'Overall grade distribution '
+                f'({len(self.posids)} positioners, {len(self.pcids)} '
+                + ptlstr + ')')
         else:
-            print(pstr)
+            mask = self.gradedf['PCID'] == pcid
+            grade_counts = self.gradedf[mask]['grade'].value_counts()
+            title = (f'PC{pcid:02} grade distribution '
+                     f'({len(self.posids_pc[pcid])} positioners)')
+        for grade in pc.grades:
+            if grade not in grade_counts.index:  # no count, set to zero
+                grade_counts[grade] = 0
+        fig, ax = plt.subplots(figsize=(6.5, 3.5))
+        ax.bar(pc.grades, grade_counts.reindex(pc.grades),
+               log=True, alpha=0.7)
+        ax.set_title(title)
+        self.add_hist_annotation(ax)
+        ax.set_xlabel('Postiioner performance grade')
+        ax.set_ylabel('Count')
+        suffix = '' if pcid is None else f'_pc{pcid:02}'
+        fig.savefig(os.path.join(self.dir, 'figures',
+                                 f'grade_distribution{suffix}.pdf'),
+                    bbox_inches='tight')
+        return grade_counts
+
+    def plot_error_dist(self, pcid=None, grade=None, posids_exclude=None):
+        '''two subplots, left blind moves, right corrective moves'''
+        colours = {grade: f'C{i}' for i, grade in enumerate(pc.grades)}
+        err = self.gradedf  # show all positioners tested by default
+        err = err[err['grade'] != 'N/A']  # filter out N/A grades
+        if pcid is None:
+            ptlstr = 'petals' if len(self.pcids) > 1 else 'petal'
+            posstr = 'positioners' if len(err) > 1 else 'positioner'
+            title = (
+                f'Overall {{}} distribution '
+                f'\n({len(err)} {posstr}, {len(self.pcids)} '
+                + ptlstr + ')')
+        else:  # showing only one petal given pcid
+            err = err[err['PCID'] == pcid]
+            if grade is not None:
+                err = err[err['grade'] == grade]
+            n_pos = len(err)  # n positioners before exclusion
+            if posids_exclude is not None:
+                err = err[~err.index.isin(posids_exclude)]
+            n_outliers = n_pos - len(err)  # after exclusion
+            posstr = 'positioners' if len(err) > 1 else 'positioner'
+            olstr = 'outliers' if n_outliers > 1 else 'outlier'
+            suffix = (f', {n_outliers} {olstr} excluded' if n_outliers > 1
+                      else '')
+            title = (f'PC{pcid:02} {{}} distribution '
+                     f'\n({len(err)} {posstr}{suffix})')
+
+        def plot_error_hist(ax, column_name, cuts, title, vlines=None):
+            grades_present = sorted(err['grade'].unique())
+            if 'N/A' in grades_present:
+                grades_present.remove('N/A')
+            ax.hist([err[err['grade'] == grade][column_name]
+                     for grade in grades_present],
+                    log=True, histtype='bar', stacked=False, alpha=0.7,
+                    color=[colours[grade] for grade in grades_present],
+                    label=[f'Grade {grade}' for grade in grades_present])
+            self.add_hist_annotation(ax)
+            ax.set_ylim(top=2e3)
+            ax.set_title(title)
+            ax.set_xlabel('Error (μm)')
+            ax.set_ylabel('Count')
+            if vlines is not None:
+                for vline in vlines:
+                    ax.axvline(vline)
+            ax.legend()
+            # add text for counts
+            rows = []
+            cuts = (list(cuts) + [err[column_name].max()]
+                    if sorted(cuts)[-1] < err[column_name].max()
+                    else list(cuts))
+            for cut in cuts:
+                rows.append({'Error within (μm)': int(cut),
+                            'Count': int(np.sum(err[column_name] <= cut))})
+            text = pd.DataFrame(rows).to_string(index=False)
+            ax.text(0.7, 0.97, text, ha='right', va='top',
+                    family='monospace', size='small', transform=ax.transAxes,
+                    bbox={'boxstyle': 'round', 'alpha': 0.1,
+                          'facecolor': 'white', 'edgecolor': 'grey'})
+
+        fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+        plot_error_hist(
+            axes[0], 'err_0_max', [0, 100, 200, 300, 400, 500, 1000],
+            title.format('max blind move error'))
+        plot_error_hist(
+            axes[1], 'err_corr_rms', [0, 5, 10, 20, 30, 50, 100, 200],
+            title.format('rms corrective move error'))
+        plt.tight_layout()
+        suffix1 = '' if pcid is None else f'_pc{pcid:02}'
+        suffix2 = '' if grade is None else f'_grade_{grade}'.lower()
+        fig.savefig(os.path.join(self.dir, 'figures',
+                                 f'error_distribution{suffix1}{suffix2}.pdf'),
+                    bbox_inches='tight')
+
+    def plot_error_heatmaps(self, pcid, posids_exclude=None):
+        # load nominal theta centres for plotting in local ptlXYZ
+        path = os.path.join(
+            os.getenv('PLATE_CONTROL_DIR',
+                      '/software/products/plate_control-trunk'),
+            'petal', 'positioner_locations_0530v14.csv')
+        ptlXYZ_df = pd.read_csv(path,
+                                usecols=['device_location_id', 'X', 'Y', 'Z'],
+                                index_col='device_location_id')
+        ptlXYZ_df.index.rename('device_loc', inplace=True)
+        gradedf = self.gradedf[self.gradedf['PCID'] == pcid]
+        n_outliers = 0
+        if posids_exclude is not None:
+            gradedf = gradedf[~gradedf.index.isin(posids_exclude)]
+            n_outliers = len(posids_exclude)
+
+        def plot_error_heatmap(ax, column_name, vmin, vmax, title):
+            # plot all empty circles
+            ax.scatter(ptlXYZ_df['X'], ptlXYZ_df['Y'],
+                       marker='o', facecolors='none', edgecolors='grey',
+                       s=45, lw=0.8)
+            hm = ax.scatter(gradedf['OFFSET_X'], gradedf['OFFSET_Y'],
+                            c=gradedf[column_name], cmap='plasma',
+                            marker='o', s=36, vmin=vmin, vmax=vmax)
+            ax.set_aspect('equal')
+            ax.set_xlabel('x (mm)')
+            ax.set_title(title)
+            return hm
+
+        fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+        col_names = ['err_0_max', 'err_corr_rms']
+        move_names = ['max blind move', 'rms corrective move']
+        vmin = gradedf[col_names].min().min()
+        vmax = gradedf[col_names].max().max()
+        for col_name, move_name, ax in zip(col_names, move_names, axes):
+            olstr = 'outliers' if n_outliers > 1 else 'outlier'
+            title = (
+                f'PC{pcid:02} {move_name} error map\n({len(gradedf)} '
+                f'positioners, {n_outliers} {olstr} excluded)')
+            hm = plot_error_heatmap(ax, col_name, vmin, vmax, title)
+        axes[0].set_ylabel('y (mm)')
+        fig.subplots_adjust(wspace=0)
+        cbar_ax = fig.add_axes([0.91, 0.225, 0.01, 0.555])
+        fig.colorbar(hm, cax=cbar_ax)
+        fig.savefig(os.path.join(self.dir, 'figures',
+                                 f'{pcid}_error_heatmaps.pdf'),
+                    bbox_inches='tight')
 
     def export_data_logs(self):
         '''must have writte self.posids_pc, a dict keyed by pcid'''
         self.movedf.to_pickle(os.path.join(self.dir, 'movedf.pkl.gz'),
                               compression='gzip')
         self.movedf.to_csv(os.path.join(self.dir, 'movedf.csv'))
-        self.logger.info(f'Focal plane move data written to: {self.dir}')
+        self.logger.info(f'Positioner move data written to: {self.dir}')
+        self.gradedf.to_pickle(os.path.join(self.dir, 'gradedf.pkl.gz'),
+                               compression='gzip')
+        self.gradedf.to_csv(os.path.join(self.dir, 'gradedf.csv'))
+        self.logger.info(f'Positioner grades written to: {self.dir}')
         for pcid in self.pcids:
             def makepath(name): return os.path.join(self.dirs[pcid], name)
             for posid in self.posids_pc[pcid]:  # write move data csv
@@ -398,15 +685,15 @@ class FPTestData:
 
     def generate_report(self):
         # define input and output paths for pweave
-        print('Generating xy accuracy test report...')
+        self.print('Generating xy accuracy test report...')
         path_output = os.path.join(self.dir,
-                                   f'{self.dir_name}-xytest_report.html')
+                                   f'{self.filename}-xytest_report.html')
         with open(os.path.join(pc.dirs['xytest_data'], 'pweave_test_src.txt'),
                   'w') as h:
             h.write(os.path.join(self.dir, 'data_dump.pkl'))
         # add sections for each pcid to markdown document
-        shutil.copyfile('xytest_report_master.md', 'xytest_report.md')
-        with open('xytest_report_master_petal.md', 'r') as h:
+        shutil.copyfile('xytest_report_master.pmd', 'xytest_report.pmd')
+        with open('xytest_report_master_petal.pmd', 'r') as h:
             petal_section = h.read()
         ptlstr = 'petals' if len(self.pcids) > 1 else 'petal'
         if hasattr(self, 'posids_disabled'):
@@ -419,29 +706,28 @@ class FPTestData:
 #### Appendix: complete list of positioners tested for <%=len(data.pcids)%> {0}
 ``<%=data.posids%>``
         '''.format(ptlstr)
-        with open('xytest_report.md', 'a+') as h:
+        with open('xytest_report.pmd', 'a+') as h:
             for pcid in self.pcids:
                 h.write(petal_section.format(pcid))
                 h.write(posid_section)
-        subprocess.call(['pweave', 'xytest_report.md',
+        subprocess.call(['pweave', 'xytest_report.pmd',
                          '-f', 'pandoc2html', '-o', path_output])
 
     def make_archive(self):
         path = os.path.join(self.dir, f'{os.path.basename(self.dir)}.tar.gz')
         with tarfile.open(path, 'w:gz') as arc:  # ^tgz doesn't work properly
             arc.add(self.dir, arcname=os.path.basename(self.dir))
-        print(f'Test data archived: {path}')
+        self.print(f'Test data archived: {path}')
         return path
 
-    def finish_xyaccuracy_test_products(self):
+    def generate_xyaccuracy_test_products(self):
         self.complete_data()
         self.export_data_logs()
         self.make_summary_plots()  # plot for all positioners by default
         self.dump_as_one_pickle()  # loggers lost as they cannot be serialised
         if shutil.which('pandoc') is None:
-            print('To generate an xy test report, you must have a complete '
-                  'installation of pandoc and/or TexLive. '
-                  'Skipping test report generation from markdown template...')
+            self.print('You must have a complete installation of pandoc '
+                       'and/or TexLive. Skipping test report generation...')
         else:
             self.generate_report()  # requires pickle
         self.make_archive()
@@ -450,27 +736,32 @@ class FPTestData:
 if __name__ == '__main__':
 
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    folders = ['20191021T154939-0700-petal3_can10',
-               '20191024T150231-0700-petal9',
-               '20191031T150117-0700-petal0_can1011',
-               '20191106T100257-0700-petal0_can1011',
-               '20191107T114725-0700-petal0_short',
-               '20191112T191119-0700-petal0_full'
-               '20191113T143453-0700-cmx_psf-3',
-               '20191113T145131-0700-cmx_psf-4',
-               '20191113T151057-0700-cmx_psf-1',
-               '20191113T153032-0700-cmx_psf-2',
-               '20191113T191026-0700-cmx_dither',
-               '20191113T191844-0700-cmx_dither',
-               '20191113T192440-0700-cmx_dither',
-               '20191113T203313-0700-petal2_full',
-               '20191113T204603-0700-petal2_full',
-               '20191115T155812-0700-petal9_full',
-               '20191116T184321-0700-cmx_dither_petal0_63064',
-               '20191116T185036-0700-cmx_dither_petal0_63064',
-               '20191122T165937-0700-cmx_dither_63038_petal2',
-               '20191122T171101-0700-cmx_dither_63068_petal0',
-               '20191125T150043-0700-petal7_full']
+    folders = [  #'20191021T154939-0700-petal3_can10',
+               # '20191024T150231-0700-petal9',
+               # '20191031T150117-0700-petal0_can1011',
+               # '20191106T100257-0700-petal0_can1011',
+               # '20191107T114725-0700-petal0_short',
+               # '20191112T191119-0700-petal0_full'
+               # '20191113T143453-0700-cmx_psf-3',
+               # '20191113T145131-0700-cmx_psf-4',
+               # '20191113T151057-0700-cmx_psf-1',
+               # '20191113T153032-0700-cmx_psf-2',
+               # '20191113T191026-0700-cmx_dither',
+               # '20191113T191844-0700-cmx_dither',
+               # '20191113T192440-0700-cmx_dither',
+               # '20191113T203313-0700-petal2_full',
+               # '20191113T204603-0700-petal2_full',
+               # '20191115T155812-0700-petal9_full',
+               # '20191116T184321-0700-cmx_dither_petal0_63064',
+               # '20191116T185036-0700-cmx_dither_petal0_63064',
+               # '20191122T165937-0700-cmx_dither_63038_petal2',
+               # '20191122T171101-0700-cmx_dither_63068_petal0',
+               # '20191125T150043-0700-petal7_full',
+               # '20191202T183110-0700-xytest_ptl0_dec02_2019',
+               # '20191203T171232-0700-petal0_full_32disabled',
+               # '20191204T113752-0700-petal4_full',
+               # '20191204T143117-0700-petal2_full_25disabled',
+               '20191204T165915-0700-petal9_full_28disabled']
     for dir_name in folders:
         try:
             # dir_name = '20191115T155812-0700-petal9_full'
@@ -481,6 +772,6 @@ if __name__ == '__main__':
             # data.make_summary_plots()
             if shutil.which('pandoc') is not None:
                 data.generate_report()
-            # data.make_archive()
+            data.make_archive()
         except Exception as e:
             print(e)

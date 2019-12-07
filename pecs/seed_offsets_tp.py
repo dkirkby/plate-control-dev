@@ -37,16 +37,18 @@ class SeedOffsetsTP(PECS):
             ptl = self.get_owning_ptl(posid)
             update = {'DEVICE_ID': posid,
                       'MODE': 'seed_offsets_tp'}
-            update = self.ptlm.collect_calib(update, tag='OLD_', participating_petals=[ptl])[ptl]
+            update = self.ptlm.collect_calib(update, tag='OLD_',
+                                             participating_petals=[ptl])[ptl]
             self.ptlm.set_posfid_val(posid, 'OFFSET_T',
-                                    pc.nominals['OFFSET_T']['value'],
-                                    participating_petals=[ptl])
+                                     pc.nominals['OFFSET_T']['value'],
+                                     participating_petals=[ptl])
             self.ptlm.set_posfid_val(posid, 'OFFSET_P',
-                                    pc.nominals['OFFSET_P']['value'],
-                                    participating_petals=[ptl])
-            update = self.ptlm.collect_calib(update, tag='', participating_petals=[ptl])[ptl]
+                                     pc.nominals['OFFSET_P']['value'],
+                                     participating_petals=[ptl])
+            update = self.ptlm.collect_calib(update, tag='',
+                                             participating_petals=[ptl])[ptl]
             updates.append(update)
-        self.ptlm.commit(mode='calib', log_note='initialize_offsets_xy')
+        self.ptlm.commit(mode='calib', log_note='seed_offsets_tp')
         return pd.DataFrame(updates)
 
 

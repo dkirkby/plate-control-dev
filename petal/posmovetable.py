@@ -37,6 +37,28 @@ class PosMoveTable(object):
         self.should_final_creep  = self.posmodel.state._val['FINAL_CREEP_ON']
         self.allow_exceed_limits = self.posmodel.state._val['ALLOW_EXCEED_LIMITS']
         self.allow_cruise = not(self.posmodel.state._val['ONLY_CREEP'])
+        
+    def display(self):
+        def fmt(x):
+            if x == None:
+                x = str(x)
+            if type(x) == str:
+                return format(x,'>11s')
+            elif type(x) == int or type(x) == float:
+                return format(x,'>11g')
+        output = str(self.posid) + ': ' + self.__repr__()
+        if self.rows or self._rows_extra:
+            output += '\n'
+            headers = PosMoveRow().data.keys()
+            for header in headers:
+                output += fmt(header)
+            for row in self.rows + self._rows_extra:
+                output += '\n'
+                for header in headers:
+                    output += fmt(row.data[header])
+        else:
+            output += ' (empty)'
+        print(output)
 
     def copy(self):
         new = copymodule.copy(self) # intentionally shallow, then will deep-copy just the row instances as needed below
@@ -266,6 +288,12 @@ class PosMoveTable(object):
             table['net_time'] = [table['move_time'][i] + table['prepause'][i] + table['postpause'][i] for i in row_range]
             for i in range(1,table['nrows']):
                 table['net_time'][i] += table['net_time'][i-1]
+        if output_type in {'schedule','cleanup','full'}:
+            table['net_dT'] = table['dT'].copy()
+            table['net_dP'] = table['dP'].copy()
+            for i in range(1, table['nrows']):
+                table['net_dT'][i] += table['net_dT'][i-1]
+                table['net_dP'][i] += table['net_dP'][i-1]
         if output_type in {'cleanup','full'}:
             table.update({'TOTAL_CRUISE_MOVES_T':0,'TOTAL_CRUISE_MOVES_P':0,'TOTAL_CREEP_MOVES_T':0,'TOTAL_CREEP_MOVES_P':0})
             for i in row_range:
@@ -273,11 +301,6 @@ class PosMoveTable(object):
                 table['TOTAL_CRUISE_MOVES_P'] += int(table['speed_mode_P'][i] == 'cruise' and table['dP'] != 0)
                 table['TOTAL_CREEP_MOVES_T'] += int(table['speed_mode_T'][i] == 'creep' and table['dT'] != 0)
                 table['TOTAL_CREEP_MOVES_P'] += int(table['speed_mode_P'][i] == 'creep' and table['dP'] != 0)
-            table['net_dT'] = table['dT'].copy()
-            table['net_dP'] = table['dP'].copy()
-            for i in range(1, table['nrows']):
-                table['net_dT'][i] += table['net_dT'][i-1]
-                table['net_dP'][i] += table['net_dP'][i-1]
             table['log_note'] = self.log_note
         if output_type == 'full':
             trans = self.posmodel.trans
@@ -309,6 +332,9 @@ class PosMoveRow(object):
                      'command'              : '',        # [string] command corresponding to this row
                      'cmd_val1'             : None,      # [-] command argument 1
                      'cmd_val2'             : None}      # [-] command argument 2
+        
+    def __repr__(self):
+        return repr(self.data)
 
     def copy(self):
         return copymodule.deepcopy(self)

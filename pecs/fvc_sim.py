@@ -28,7 +28,7 @@ class FVC_proxy_sim:
     def qs_to_fvcxy(self, qs, seqid=None):
         return
 
-    def measure(self, expected_positions, seqid=None, exptime=None, match_radius=None, all_fiducials=False):
+    def measure(self, expected_positions, seqid=None, exptime=None, match_radius=None, all_fiducials=False, matched_only=True):
         """
         Request a list of center positions
         (Illuminator functionality and fiducial control are outside of the scope of measure())

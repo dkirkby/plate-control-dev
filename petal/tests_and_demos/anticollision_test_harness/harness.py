@@ -16,8 +16,8 @@ locations_near_gfa = {309,328,348,368,389,410,432,454,474,492,508,521,329,349,36
 device_loc_ids = 'all' # make the selection here
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
-pos_param_sequence_id = 3
-move_request_sequence_id = 3
+pos_param_sequence_id = 'one real petal'
+move_request_sequence_id = '04000-04001'
 
 # Other ids
 fidids = {}
@@ -27,6 +27,7 @@ petal_id = 666
 should_animate = False
 n_corrections = 1 # number of correction moves to simulate after each target
 max_correction_move = 0.050/1.414 # mm
+should_profile = False
 
 # randomizer for correction moves
 randomizer_seed = 0
@@ -37,7 +38,7 @@ pos_param_sequence = sequences.get_positioner_param_sequence(pos_param_sequence_
 move_request_sequence = sequences.get_move_request_sequence(move_request_sequence_id, device_loc_ids)
 for pos_params in pos_param_sequence:
     for posid,params in pos_params.items():
-        state = posstate.PosState(posid)
+        state = posstate.PosState(unit_id=posid, device_type='pos', petal_id=petal_id)
         state.store('POS_T',0.0)
         state.store('POS_P',180.0)
         for key,val in params.items():
@@ -52,7 +53,7 @@ for pos_params in pos_param_sequence:
                       local_commit_on = False,
                       local_log_on    = False,
                       collider_file   = None,
-                      sched_stats_on  = False,
+                      sched_stats_on  = True,
                       anticollision   = 'adjust')
     if should_animate:
         ptl.start_gathering_frames()
@@ -62,9 +63,12 @@ for pos_params in pos_param_sequence:
         m += 1
         for n in range(n_corrections + 1):
             print(' move: ' + str(m) + ' of ' + str(mtot) + ', submove: ' + str(n))
-            requests = {ptl.devices[loc_id]: {'command': 'poslocXY',  # data['command'],
-                                              'target': [data['u'], data['v']]}
-                        for loc_id,data in move_request_data.items()}
+            requests = {}
+            for loc_id,data in move_request_data.items():
+                if data['command'] == 'posXY': # handles older file format
+                    data['command'] = 'poslocXY'
+                if loc_id in ptl.devices:
+                    requests[ptl.devices[loc_id]] = {'command':data['command'], 'target': [data['u'], data['v']]}
             anticollision = 'adjust'
             if n > 0:
                 for request in requests.values():
@@ -72,14 +76,22 @@ for pos_params in pos_param_sequence:
                     request['target'][0] = random.uniform(-max_correction_move,max_correction_move)
                     request['target'][1] = random.uniform(-max_correction_move,max_correction_move)
                 anticollision = 'freeze'
-            hc.profile('ptl.request_targets(requests)')
-            # ptl.request_targets(requests)
-            posid =  list(requests.keys())[0]
-            posmodel = list(requests.values())[0]['posmodel']
-            print(posid, 'expected current posintTP', posmodel.expected_current_posintTP)
-            hc.profile('ptl.schedule_send_and_execute_moves(anticollision="'+anticollision+'")')
+            if should_profile:
+                hc.profile('ptl.request_targets(requests)')
+            else:
+                ptl.request_targets(requests)
+            # posid =  list(requests.keys())[0]
+            # posmodel = list(requests.values())[0]['posmodel']
+            # print(posid, 'expected current posintTP', posmodel.expected_current_posintTP)
+            if should_profile:
+                hc.profile('ptl.schedule_send_and_execute_moves(anticollision="'+anticollision+'")')
+            else:
+                ptl.schedule_send_and_execute_moves(anticollision=anticollision)
     if ptl.schedule_stats:
         ptl.schedule_stats.save()
     if should_animate:
         ptl.stop_gathering_frames()
-        hc.profile('ptl.generate_animation()')
+        if should_profile:
+            hc.profile('ptl.generate_animation()')
+        else:
+            ptl.generate_animation()

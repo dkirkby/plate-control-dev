@@ -67,7 +67,7 @@ class SeedOffsetsXY(PECS):
         pos = self.ptlm.ptltrans('ptlXYZ_to_flatXY', pos)
         updates = []
         for posid in self.posids:
-            ptl = self.get_owning_ptl(posid)
+            pcid = self.get_owning_ptl(posid)
             pos_info = index.find_by_device_id(posid)
             device_loc = int(pos_info['DEVICE_LOC'])
             x, y = pos[0, device_loc], pos[1, device_loc]
@@ -75,12 +75,16 @@ class SeedOffsetsXY(PECS):
                       'DEVICE_LOC': pos_info['DEVICE_LOC'],
                       'PETAL_LOC': pos_info['PETAL_LOC'],
                       'MODE': 'initialize_offsets_xy'}
-            update = self.ptlm.collect_calib(update, tag='OLD_', participating_petals=[ptl])[ptl]
-            self.ptlm.set_posfid_val(posid, 'OFFSET_X', x, participating_petals=[ptl])
-            self.ptlm.set_posfid_val(posid, 'OFFSET_Y', y, participating_petals=[ptl])
-            update = self.ptlm.collect_calib(update, tag='', participating_petals=[ptl])[ptl]
+            update = self.ptlm.collect_calib(
+                update, tag='OLD_', participating_petals=[pcid])[pcid]
+            self.ptlm.set_posfid_val(posid, 'OFFSET_X', x,
+                                     participating_petals=[pcid])
+            self.ptlm.set_posfid_val(posid, 'OFFSET_Y', y,
+                                     participating_petals=[pcid])
+            update = self.ptlm.collect_calib(update, tag='',
+                                             participating_petals=[pcid])[pcid]
             updates.append(update)
-        self.ptlm.commit(mode='calib', log_note='initialize_offsets_xy')
+        self.ptlm.commit(mode='calib', log_note='seed_offsets_xy')
         return pd.DataFrame(updates)
 
 

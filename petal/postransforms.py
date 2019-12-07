@@ -217,10 +217,10 @@ class PosTransforms(petaltransforms.PetalTransforms):
     #     obsXY = self.ptlXY_to_obsXY(ptlXY, cast=True).flatten()  # 1D arr
     #     return tuple(obsXY)  # (x, y)
 
-    # def obsXY_to_poslocXY(self, obsXY):
-    #     ''' input is list or tuple '''
-    #     ptlXY = self.obsXY_to_ptlXY(obsXY, cast=True).flatten()  # 1D arr
-    #     return self.ptlXY_to_poslocXY(ptlXY)  # return (poslocX, poslocY)
+    def obsXY_to_poslocXY(self, obsXY):
+        ''' input is list or tuple '''
+        QS = self.obsXY_to_QS(obsXY, cast=True).flatten()  # 1D arr
+        return self.QS_to_poslocXY(QS)  # return (poslocX, poslocY)
 
     def QS_to_poslocXY(self, QS):
         ''' input is list or tuple '''
@@ -269,7 +269,13 @@ class PosTransforms(petaltransforms.PetalTransforms):
     def QS_to_posintTP(self, QS, range_limits='full'):
         """Composite transformation, performs QS --> flatXY --> posintTP"""
         flatXY = self.QS_to_flatXY(QS, cast=True).flatten()  # 1D array
-        return self.flatXY_to_posintTP(flatXY, range_limits)  # tp, unreachable
+        return self.flatXY_to_posintTP(flatXY, range_limits=range_limits)
+
+    # %% composite transformations for convenience (degree 7)
+    def obsXY_to_posintTP(self, obsXY, range_limits='full'):
+        """Composite transformation, performs QS --> obsXY --> posintTP"""
+        QS = self.obsXY_to_QS(obsXY, cast=True).flatten()
+        return self.QS_to_posintTP(QS, range_limits=range_limits)
 
     # %% angle additions and subtractions
 

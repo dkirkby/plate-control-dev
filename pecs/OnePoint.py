@@ -66,10 +66,10 @@ class OnePointCalib(PECS):
                 posid = row['DEVICE_ID']
                 ptl = self.get_owning_ptl(posid)
                 posintTP = self.ptlm.postrans(posid,
-                                             'poslocTP_to_posintTP', poslocTP,
+                                              'poslocTP_to_posintTP', poslocTP,
                                               participating_petals=[ptl])
                 # Work with ptl/dev loc for filtering in PetalMan.prepare_move
-                rows.append({'DEVICE_ID':posid,
+                rows.append({'DEVICE_ID': posid,
                              'PETAL_LOC': row['PETAL_LOC'],
                              'DEVICE_LOC': row['DEVICE_LOC'],
                              'COMMAND': 'posintTP',
@@ -86,27 +86,25 @@ class OnePointCalib(PECS):
             print(requests)
         exppos, meapos, matched, unmatched = self.fvc_measure(
                 match_radius=match_radius)
-        matched_select = matched.intersection(set(self.posids))
-        missing_select = unmatched.intersection(set(self.posids))
-        if len(missing_select) > 0:
-            self.printfunc(f'Missing {len(missing_select)} of selected positioners.')
-            self.printfunc(missing_select)
-        used_pos = meapos.loc[sorted(list(matched_select))]  # only matched rows
-        unused_pos = exppos.loc[sorted(list(unmatched))]
-        retcode = self.ptlm.test_and_update_TP(
+        used_pos = meapos.loc[sorted(matched & (set(self.posids)))]
+        unused_pos = exppos.loc[sorted(unmatched & (set(self.posids)))]
+        updates = self.ptlm.test_and_update_TP(
                 used_pos.reset_index(), mode=mode, auto_update=auto_update,
                 tp_updates_tol=0.0, tp_updates_fraction=1.0)
-        if isinstance(retcode, dict):
-            dflist = []
-            for df in retcode.values():
-                dflist.append(df)
-            updates = pd.concat(dflist).set_index('DEVICE_ID').sort_index()
-        else:
-            updates = retcode.set_index('DEVICE_ID').sort_index()
-        # Drop QS so we don't get columns QS in updates with NaNs
-        unused_pos.drop(['Q', 'S'], axis=1)
+        if isinstance(updates, dict):
+            updates = pd.concat(list(updates.values()))
+        updates = updates.set_index('DEVICE_ID').sort_index()
+        cols = used_pos.columns.difference(updates.columns)
+        updates = updates.join(used_pos[cols])  # include QS measurements
         # List unmeasured positioners in updates, even with no data
-        updates.append(unused_pos, ignore_index=True, sort=False)
+        updates.append(unused_pos, sort=False)
+        # overwrite flags with focalplane flags and add status
+        flags_dict = self.ptl.get_pos_flags(list(updates.index))
+        flags = []
+        for posid in updates.index:
+            flags.append(flags_dict[posid])
+        updates['FLAGS'] = flags
+        updates['STATUS'] = self.ptl.decipher_posflags(updates['FLAGS'])
         # Clean up and record additional entries in updates
         updates['auto_update'] = auto_update
         updates['target_t'] = requests.set_index('DEVICE_ID')['X1']

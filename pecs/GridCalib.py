@@ -52,8 +52,8 @@ class GridCalib(PECS):
                                   match_radius=match_radius)
 
         ret = self.ptlm.get_grid_requests(ids=self.posids,
-                                              n_points_T=self.n_points_T,
-                                              n_points_P=self.n_points_P)
+                                          n_points_T=self.n_points_T,
+                                          n_points_P=self.n_points_P)
         if isinstance(ret, dict):
             req_list = []
             for i in range(self.n_points_P*self.n_points_T):
@@ -68,13 +68,12 @@ class GridCalib(PECS):
             self.printfunc(f'Measuring grid point {i+1} of {len(req_list)}...')
             merged_data = self.move_measure(request, match_radius=match_radius)
             grid_data.append(merged_data)
-            if self.allow_pause and i+1 < len(req_list):
-                input('Paused for heat load monitoring, '
-                      'press enter to continue: ')
+            if i+1 < len(req_list):  # no pause after the last iteration
+                self.pause()
         # Control gives 10 minute timeout on calibration
         retcode = self.ptlm.calibrate_from_grid_data(grid_data,
-                                                    auto_update=auto_update,
-                                                    control={'timeout':600})
+                                                     auto_update=auto_update,
+                                                     control={'timeout': 600})
         if isinstance(retcode, dict):
             dflist = []
             for df in retcode.values():
@@ -85,7 +84,7 @@ class GridCalib(PECS):
         updates['auto_update'] = auto_update
         return updates
 
-    def move_measure(self, request, match_radius=80):
+    def move_measure(self, request, match_radius=50):
         '''
         Wrapper for often repeated moving and measuring sequence.
         Prints missing positioners, returns data merged with request
@@ -95,12 +94,7 @@ class GridCalib(PECS):
         exppos, meapos, matched, unmatched = self.fvc_measure(
                 match_radius=match_radius)
         # Want to collect both matched and unmatched
-        matched_select = matched.intersection(set(self.posids))
-        missing_select = unmatched.intersection(set(self.posids))
-        if len(missing_select) > 0:
-            self.printfunc(f'Missing {len(missing_select)} of selected positioners.')
-            self.printfunc(missing_select)
-        used_pos = meapos.loc[sorted(list(matched_select))].reset_index()  # only matched rows
+        used_pos = meapos.loc[sorted(list(matched))]  # only matched rows
         request.rename(columns={'X1': 'TARGET_T', 'X2': 'TARGET_P'},
                        inplace=True)
         merged = used_pos.merge(request, how='outer', on='DEVICE_ID')

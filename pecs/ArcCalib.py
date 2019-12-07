@@ -57,69 +57,54 @@ class ArcCalib(PECS):
             n_points_T=self.n_points_T, n_points_P=self.n_points_P)
         if isinstance(ret, dict):
             for i in range(self.n_points_T):
-                dflist = []
-                for df in ret.values():
-                    dflist.append(df[0][i])
+                dflist = [df[0][i] for df in ret.values()]
                 req_list_T.append(pd.concat(dflist).reset_index())
             for j in range(self.n_points_P):
-                    dflist = []
-                    for df in ret.values():
-                        dflist.append(df[1][j])
-                    req_list_P.append(pd.concat(dflist).reset_index())
+                dflist = [df[1][j] for df in ret.values()]
+                req_list_P.append(pd.concat(dflist).reset_index())
         else:
-            req_lsit_T = ret[0]
+            req_list_T = ret[0]
             req_list_P = ret[1]
         T_data = []
-        for i, request in enumerate(req_list_T):
+        for i, req in enumerate(req_list_T):
             self.printfunc(f'Measuring theta arc point {i+1} of '
                            f'{len(req_list_T)}')
-            merged_data = self.move_measure(request, match_radius=match_radius)
-            T_data.append(merged_data)
-            if self.allow_pause and i+1 < len(req_list_T):
-                input('Paused for heat load monitoring, '
-                      'press enter to continue: ')
+            T_data.append(self.move_measure(req, match_radius=match_radius))
+            if i+1 < len(req_list_T):  # no pause after the last iteration
+                self.pause()
         P_data = []
-        for i, request in enumerate(req_list_P):
+        for i, req in enumerate(req_list_P):
             self.printfunc(f'Measuring phi arc point {i+1} of '
                            f'{len(req_list_P)}')
-            merged_data = self.move_measure(request, match_radius=match_radius)
-            P_data.append(merged_data)
-            if self.allow_pause and i+1 < len(req_list_T):
-                input('Paused for heat load monitoring, '
-                      'press enter to continue: ')
+            if i+1 < len(req_list_T):  # pause before first iteration
+                self.pause()
+            P_data.append(self.move_measure(req, match_radius=match_radius))
         # Control gives 10 min timeout in petalman
-        retcode = self.ptlm.calibrate_from_arc_data(T_data, P_data,
-                                                   auto_update=auto_update,
-                                                   control={'timeout':600})
-        if isinstance(retcode, dict):
-            dflist = []
-            for df in retcode.values():
-                dflist.append(df)
-            updates = pd.concat(dflist).sort_values(by=['DEVICE_ID']).reset_index()
-        else:
-            updates = retcode.sort_values(by=['DEVICE_ID']).reset_index()
+        updates = self.ptlm.calibrate_from_arc_data(T_data, P_data,
+                                                    auto_update=auto_update,
+                                                    control={'timeout': 600})
+        if isinstance(updates, dict):
+            updates = pd.concat(list(updates.values()))
+        updates = updates.reset_index().sort_values(by=['DEVICE_ID'])
         updates['auto_update'] = auto_update
         return updates
 
-    def move_measure(self, request, match_radius=80):
+    def move_measure(self, request, match_radius=50):
         '''
         Wrapper for often repeated moving and measuring sequence.
         Prints missing positioners, returns data merged with request
+        by default also include
         '''
         self.ptlm.prepare_move(request, anticollision=None)
         self.ptlm.execute_move()
         exppos, meapos, matched, unmatched = self.fvc_measure(
-                match_radius=match_radius)
-        # Want to collect both matched and unmatched
-        matched_select = matched.intersection(set(self.posids))
-        missing_select = unmatched.intersection(set(self.posids))
-        if len(missing_select) > 0:
-            self.printfunc(f'Missing {len(missing_select)} of selected positioners.')
-            self.printfunc(missing_select)
-        used_pos = meapos.loc[sorted(list(matched_select))].reset_index()# only matched rows
+            matched_only=True, match_radius=match_radius)
+        # meapos contains not only matched ones but all posids in expected pos
+        matched_df = (meapos.loc[sorted(matched & set(self.posids))]
+                      .reset_index())
         request.rename(columns={'X1': 'TARGET_T', 'X2': 'TARGET_P'},
                        inplace=True)
-        merged = used_pos.merge(request, how='outer', on='DEVICE_ID')
+        merged = matched_df.merge(request, how='outer', on='DEVICE_ID')
         return merged
 
 

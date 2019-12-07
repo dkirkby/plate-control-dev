@@ -21,7 +21,7 @@ class RehomeVerify(PECS):
             self.interactive_ptl_setup()
         else:
             self.ptl_setup(petal_roles, posids)
-        self.printfunc(f'Verifying rehome positions for '
+        self.printfunc(f'Verifying rehome for '
                        f'{len(self.posids)} positioners...')
         df = self.compare_xy()
         path = os.path.join(  # save results
@@ -33,7 +33,6 @@ class RehomeVerify(PECS):
             os.system(f'xdg-open {path}')
 
     def compare_xy(self):
-        # ptl = self.ptls[self.ptlid]
         # all backlit fibres, including those disabled, needed for FVC
         exppos = (self.ptlm.get_positions(return_coord='QS')
                   .sort_values(by='DEVICE_ID'))
@@ -41,32 +40,38 @@ class RehomeVerify(PECS):
                      .sort_values(by='DEVICE_ID')[['X1', 'X2']]).values.T
         # get guessed QS (theta centres in QS) for FVC measurement
         ret = self.ptlm.get_pos_vals(['OFFSET_X', 'OFFSET_Y'],
-                                    posids=sorted(list(exppos['DEVICE_ID'])))
+                                     posids=sorted(exppos['DEVICE_ID']))
         if isinstance(ret, dict):
             dflist = []
-            for ptl, d in ret.items():
-                home = self.ptlm.ptltrans('flatXY_to_QS', d[['OFFSET_X','OFFSET_Y']].values.T, participating_petals=ptl)[ptl]
-                d['HOME_Q'] = home[0]
-                d['HOME_S'] = home[1]
-                dflist.append(d)
-            df = pd.concat(dflist).reset_index().set_index('DEVICE_ID').sort_index()
+            for pcid, df in ret.items():
+                home = self.ptlm.ptltrans(
+                    'flatXY_to_QS',
+                    df[['OFFSET_X', 'OFFSET_Y']].values.T,
+                    participating_petals=pcid)[pcid]
+                df['HOME_Q'], df['HOME_S'] = home[0], home[1]
+                dflist.append(df)
+            df = pd.concat(dflist).set_index('DEVICE_ID').sort_index()
         else:
             df = ret.set_index('DEVICE_ID').sort_index()
-            home = self.ptlm.ptltrans('flatXY_to_QS', df[['OFFSET_X','OFFSET_Y']].values.T)
-            df['HOME_Q'] = home[0]
-            df['HOME_S'] = home[1]
-        offXY = df[['OFFSET_X', 'OFFSET_Y']].values.T
+            home = self.ptlm.ptltrans('flatXY_to_QS',
+                                      df[['OFFSET_X', 'OFFSET_Y']].values.T)
+            df['HOME_Q'], df['HOME_S'] = home[0], home[1]
         # Just use one petal for ptltrans
-        a_ptl = list(self.ptlm.Petals.keys())[0]
-        hom_QS = df[['HOME_Q','HOME_S']].values.T
-        hom_obsXY = self.ptlm.ptltrans('QS_to_obsXYZ', hom_QS, participating_petals=a_ptl)[a_ptl][:2]  # 3xN array
+        pcid0 = list(self.ptlm.Petals.keys())[0]
+        hom_QS = df[['HOME_Q', 'HOME_S']].values.T
+        hom_obsXY = self.ptlm.ptltrans('QS_to_obsXYZ', hom_QS,  # 3xN array
+                                       participating_petals=pcid0)[pcid0][:2]
         # set nominal homed QS as expected postiions for FVC spotmatch
         exppos[['X1', 'X2']] = hom_QS.T
+        # make sure no fiducial ID is in exppos DEVICE_ID column
+        if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
+            raise Exception('Expected positions of positioners by PetalApp '
+                            'are contaminated by fiducials.')
         self.printfunc('Taking FVC exposure to confirm home positions...')
         exppos, meapos, matched, unmatched = self.fvc_measure(exppos=exppos,
-                                                        match_radius=30)
-        unmatched = set(unmatched).intersection(set(self.posids))
-        matched = set(matched).intersection(set(self.posids))
+                                                              match_radius=50)
+        unmatched = set(unmatched) & (set(self.posids))
+        matched = set(matched) & (set(self.posids))
         umstr = f':\n{sorted(unmatched)}' if len(unmatched) > 0 else ''
         self.printfunc(f'{len(unmatched)} selected positioners not matched'
                        + umstr)
@@ -78,8 +83,8 @@ class RehomeVerify(PECS):
         exppos[['exp_obsX', 'exp_obsY']] = exp_obsXY.T  # internally tracked
         exppos[['hom_obsX', 'hom_obsY']] = hom_obsXY.T
         mea_obsXY = self.ptlm.ptltrans('QS_to_obsXYZ',
-                                      meapos[['Q', 'S']].values.T,
-                                      participating_petals=a_ptl)[a_ptl][:2]
+                                       meapos[['Q', 'S']].values.T,
+                                       participating_petals=pcid0)[pcid0][:2]
         exppos.loc[meapos.index, ['mea_obsX', 'mea_obsY']] = mea_obsXY.T
         exppos['obsdX'] = exppos['mea_obsX'] - exppos['hom_obsX']
         exppos['obsdY'] = exppos['mea_obsY'] - exppos['hom_obsY']
@@ -88,16 +93,20 @@ class RehomeVerify(PECS):
         exppos = exppos.loc[self.posids].drop(
             columns=['PETAL_LOC', 'DEVICE_LOC'], errors='ignore')
         # add can bus ids
-        retcode = self.ptlm.get_positioners(enabled_only=True,
-                                                posids=exppos.index)
-        if isinstance(retcode, dict):
-            dflist = []
-            for d in retcode.values():
-                dflist.append(d)
-            device_info = pd.concat(dflist).set_index('DEVICE_ID').sort_index()
-        else:
-            device_info = retcode.set_index('DEVICE_ID').sort_index()
-        exppos = exppos.join(device_info)
+        df_info = self.ptlm.get_positioners(enabled_only=True,
+                                            posids=exppos.index)
+        if isinstance(df_info, dict):
+            df_info = pd.concat([df_info.values()])
+        df_info = df_info.set_index('DEVICE_ID').sort_index()
+        cols = df_info.columns.difference(exppos.columns)
+        exppos = exppos.join(df_info[cols])
+        # overwrite flags with focalplane flags and add status
+        flags_dict = self.ptlm.get_pos_flags(list(exppos.index))
+        flags = [flags_dict[posid] for posid in exppos.index]
+        exppos['FLAGS'] = flags
+        role = self.ptlm.participating_petals[0]
+        exppos['STATUS'] = self.ptlm.decipher_posflags(
+            exppos['FLAG'], participating_petals=role)[role]
         tol = 1
         # now only consider matched, selected positioners, check deviations
         mask = exppos.index.isin(matched) & (exppos['dr'] > tol)

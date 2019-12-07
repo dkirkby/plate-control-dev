@@ -13,7 +13,7 @@ import posstate
 import harness_constants as hc
 
 # input parameters
-num_sets_to_make = 2
+num_sets_to_make = 75
 nom_R1 = 3.0 # mm, nominal LENGTH_R1
 nom_R2 = 3.0 # mm, nominal LENGTH_R2
 min_patrol = abs(nom_R1 - nom_R2)
@@ -55,8 +55,8 @@ for i in range(num_sets_to_make):
                     break
                 attempts_remaining -= 1
             this_posXY = [x,y]
-            this_posTP = model.trans.posXY_to_posTP(this_posXY)[0]
-            this_obsTP = model.trans.posTP_to_obsTP(this_posTP)
+            this_posTP = model.trans.poslocXY_to_posintTP(this_posXY)[0]
+            this_obsTP = model.trans.posintTP_to_poslocTP(this_posTP)
             target_interference = False
             for neighbor in collider.pos_neighbors[posid]:
                 if neighbor in targets_obsTP:
