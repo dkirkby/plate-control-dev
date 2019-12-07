@@ -118,7 +118,7 @@ class XYTest(PECS):
             self.data.posids_pc[pcid] = posids = l1.index.tolist()
             self.data.posids += posids
             # add to existing positioner index table, first calibration values
-            l1['PCID'] = pcid  # add pcid as string column
+            l1['PCID'] = pcid  # add pcid as a column
             ret1 = (self.ptls[pcid].get_pos_vals(keys, posids)
                     .set_index('DEVICE_ID'))
             self.loggers[pcid].debug(f'Calibration read:\n{ret1.to_string()}')
@@ -205,8 +205,6 @@ class XYTest(PECS):
                 disable_unmatched = self.data.test_cfg['disable_unmatched']
             else:
                 disable_unmatched = True  # do disable by default
-        # led_initial = self.illuminator.get('led')  # no illuminator ctrl yet
-        # self.illuminator.set(led='ON')  # turn on illuminator
         self.logger.info(f'Starting Test at {self.data.t_i}')
         for i in range(self.data.ntargets):  # test loop over all test targets
             self.logger.info(f'Target {i+1} of {self.data.ntargets}')
@@ -229,9 +227,8 @@ class XYTest(PECS):
         try:
             for pcid in self.data.pcids:
                 self.ptls[pcid].schedule_stats.save()
-        except (NameError, AttributeError):
-            self.logger.warning('Call to schedule_stats.save() failed')
-        # self.illuminator.set(led=led_initial)  # restore initial LED state
+        except Exception:
+            self.logger.debug('Call to schedule_stats.save() failed')
 
     def record_basic_move_data(self, i):
         self.logger.info('Recording basic move data for new xy target...')

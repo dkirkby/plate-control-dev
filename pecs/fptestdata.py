@@ -82,6 +82,8 @@ class FPTestData:
         self.dirs = {pcid: os.path.join(self.dir, f'pc{pcid:02}')
                      for pcid in self.pcids}
         self.test_cfg.filename = os.path.join(self.dir, f'{self.filename}.cfg')
+        for d in [self.dir] + list(self.dirs.values()):
+            os.makedirs(d, exist_ok=True)
 
     def _init_loggers(self):
         '''need to know the product directories before initialising loggers'''
@@ -123,7 +125,7 @@ class FPTestData:
             self.loggers[pcid] = logger
         self.logger = self.BroadcastLogger(self.pcids, self.loggers)
 
-    def print(self, string, pcid=None):
+    def printfunc(self, string, pcid=None):
         assert type(string) is str
         if pcid is None:
             if hasattr(self, 'logger'):
@@ -228,8 +230,8 @@ class FPTestData:
                     WHERE time >= '{self.t_i.astimezone(timezone.utc)}'
                     AND time < '{self.t_f.astimezone(timezone.utc)}'""",
                 conn).sort_values('time')  # posfid_temps, time, pcid
-            self.print(f'{len(self.telemetry)} entries from telemetry DB '
-                       f'between {self.t_i} and {self.t_f} loaded')
+            self.printfunc(f'{len(self.telemetry)} entries from telemetry DB '
+                           f'between {self.t_i} and {self.t_f} loaded')
             self.db_telemetry_available = True
         except Exception:
             self.db_telemetry_available = False
@@ -323,9 +325,9 @@ class FPTestData:
 
     def make_summary_plots(self, n_threads_max=32, make_binder=True, mp=True):
         n_threads = min(n_threads_max, 2*multiprocessing.cpu_count())
-        self.print(f'Making summary xyplots with {n_threads} threads on '
-                   f'{multiprocessing.cpu_count()} cores for '
-                   f'submoves {list(range(self.num_corr_max+1))}...')
+        self.printfunc(f'Making summary xyplots with {n_threads} threads on '
+                       f'{multiprocessing.cpu_count()} cores for '
+                       f'submoves {list(range(self.num_corr_max+1))}...')
         if mp:
             # the following implementation fails when loggers are present
             # pbar = tqdm(total=len(self.posids))
@@ -347,7 +349,7 @@ class FPTestData:
                 np.start()
                 n_started += 1
                 pool.append(np)
-            self.print(
+            self.printfunc(
                 f'Waiting for the last MP chunk of {n_threads} to complete...')
             [p.join() for p in pool[n_started-n_threads_max:-1]]
         else:
@@ -363,8 +365,8 @@ class FPTestData:
                 #                       args=(pcid, n))
                 #     p.close()
                 #     p.join()
-                self.print('Last MP chunk completed. '
-                           'Creating xyplot binders...')
+                self.printfunc('Last MP chunk completed. '
+                               'Creating xyplot binders...')
                 for pcid, n in tqdm(product(self.pcids,
                                     range(self.num_corr_max+1))):
                     np = Process(target=self.make_summary_plot_binder,
@@ -451,10 +453,10 @@ class FPTestData:
         savepath = os.path.join(
             self.dirs[pcid],
             f'{len(paths)}_positioners-xyplot_submove_{n}.pdf')
-        self.print(f'Writing xyplot binder for submove {n}...')
+        self.printfunc(f'Writing xyplot binder for submove {n}...')
         binder.write(savepath)
         binder.close()
-        self.print(f'Binder for submove {n} saved to: {savepath}')
+        self.printfunc(f'Binder for submove {n} saved to: {savepath}')
 
     def plot_posfid_temp(self, pcid=None):
 
@@ -672,11 +674,11 @@ class FPTestData:
         self.movedf.to_pickle(os.path.join(self.dir, 'movedf.pkl.gz'),
                               compression='gzip')
         self.movedf.to_csv(os.path.join(self.dir, 'movedf.csv'))
-        self.print(f'Positioner move data written to: {self.dir}')
+        self.printfunc(f'Positioner move data written to: {self.dir}')
         self.gradedf.to_pickle(os.path.join(self.dir, 'gradedf.pkl.gz'),
                                compression='gzip')
         self.gradedf.to_csv(os.path.join(self.dir, 'gradedf.csv'))
-        self.print(f'Positioner grades written to: {self.dir}')
+        self.printfunc(f'Positioner grades written to: {self.dir}')
         for pcid in self.pcids:
             def makepath(name): return os.path.join(self.dirs[pcid], name)
             for posid in self.posids_pc[pcid]:  # write move data csv
@@ -687,8 +689,8 @@ class FPTestData:
             with open(makepath(f'pc{pcid:02}_export.log'), 'w') as handle:
                 self.logs[pcid].seek(0)
                 shutil.copyfileobj(self.logs[pcid], handle)  # save logs
-            self.print(f'PC{pcid:02} data written to: '
-                       f'{self.dirs[pcid]}', pcid=pcid)
+            self.printfunc(f'PC{pcid:02} data written to: '
+                           f'{self.dirs[pcid]}', pcid=pcid)
 
     def dump_as_one_pickle(self):
         try:
@@ -701,7 +703,8 @@ class FPTestData:
 
     def generate_report(self):
         # define input and output paths for pweave
-        self.print(f'Generating xy accuracy test report for {self.filename}')
+        self.printfunc(
+            f'Generating xy accuracy test report for {self.filename}')
         path_output = os.path.join(self.dir,
                                    f'{self.filename}-xytest_report.html')
         with open(os.path.join(pc.dirs['xytest_data'], 'pweave_test_src.txt'),
@@ -733,7 +736,7 @@ class FPTestData:
         path = os.path.join(self.dir, f'{os.path.basename(self.dir)}.tar.gz')
         with tarfile.open(path, 'w:gz') as arc:  # ^tgz doesn't work properly
             arc.add(self.dir, arcname=os.path.basename(self.dir))
-        self.print(f'Test data archived: {path}')
+        self.printfunc(f'Test data archived: {path}')
         return path
 
     def generate_xyaccuracy_test_products(self):
@@ -742,8 +745,8 @@ class FPTestData:
         self.make_summary_plots()  # plot for all positioners by default
         self.dump_as_one_pickle()  # loggers lost as they cannot be serialised
         if shutil.which('pandoc') is None:
-            self.print('You must have a complete installation of pandoc '
-                       'and/or TexLive. Skipping test report generation...')
+            self.printfunc('You must have a complete installation of pandoc '
+                           'and/or TexLive. Skipping test report...')
         else:
             self.generate_report()  # requires pickle
         self.make_archive()
