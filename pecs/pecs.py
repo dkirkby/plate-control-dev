@@ -200,13 +200,13 @@ class PECS:
                 f'\n{sorted(unmatched)}')
         return exppos, meapos, matched, unmatched
 
-    def fvc_collect(self):
+    def fvc_collect(self, destination='/data/msdos/focalplane/'):
         self.printfunc('Collecting FVC images associated with exposure ID '
-                       f'{self.exp.id} to: {self.data.dir}')
+                       f'{self.exp.id} to: {destination}')
         os.makedirs(self.data.dir, exist_ok=True)
         self.fvc_collector._send_command(
             'collect', expid=self.exp.id,
-            output_dir='/data/msdos/focalplane/', logbook=False)
+            output_dir=destination, logbook=False)
             # output_dir=self.data.dir, logbook=False)
 
     @staticmethod

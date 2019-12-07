@@ -434,5 +434,5 @@ if __name__ == '__main__':
     test = XYTest('xytest-'+xytest_name, xytest_cfg)
     test.run_xyaccuracy_test(
         disable_unmatched=test.data.test_cfg['disable_unmatched'])
-    test.fvc_collect()
+    test.fvc_collect(destination=self.data.dir)
     test.data.generate_xyaccuracy_test_products()
