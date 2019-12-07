@@ -82,7 +82,6 @@ class ArcCalib(PECS):
         self.ptl.execute_move()
         exppos, meapos, matched, unmatched = self.fvc_measure(
             matched_only=True, match_radius=match_radius)
-        # Want to collect both matched and unmatched
         # meapos contains not only matched ones but all posids in expected pos
         matched_df = (meapos.loc[sorted(matched & set(self.posids))]
                       .reset_index())

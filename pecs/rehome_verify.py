@@ -46,11 +46,11 @@ class RehomeVerify(PECS):
         hom_obsXY = self.ptl.ptltrans('QS_to_obsXYZ', hom_QS)[:2]  # 3xN array
         # set nominal homed QS as expected postiions for FVC spotmatch
         exppos[['X1', 'X2']] = hom_QS.T
-        self.printfunc('Taking FVC exposure to confirm home positions...')
         # make sure no fiducial ID is in exppos DEVICE_ID column
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
             raise Exception('Expected positions of positioners by PetalApp '
                             'are contaminated by fiducials.')
+        self.printfunc('Taking FVC exposure to confirm home positions...')
         exppos, meapos, matched, unmatched = self.fvc_measure(exppos=exppos,
                                                               match_radius=50)
         unmatched = set(unmatched) & (set(self.posids))
@@ -82,9 +82,7 @@ class RehomeVerify(PECS):
         exppos = exppos.join(df_info[cols])
         # overwrite flags with focalplane flags and add status
         flags_dict = self.ptl.get_pos_flags(list(exppos.index))
-        flags = []
-        for posid in exppos.index:
-            flags.append(flags_dict[posid])
+        flags = [flags_dict[posid] for posid in exppos.index]
         exppos['FLAGS'] = flags
         exppos['STATUS'] = self.ptl.decipher_posflags(exppos['FLAGS'])
         tol = 1

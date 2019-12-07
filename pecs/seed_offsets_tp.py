@@ -43,7 +43,7 @@ class SeedOffsetsTP(PECS):
                                     pc.nominals['OFFSET_P']['value'])
             update = self.ptl.collect_calib(update, tag='')
             updates.append(update)
-        self.ptl.commit(mode='calib', log_note='initialize_offsets_xy')
+        self.ptl.commit(mode='calib', log_note='seed_offsets_tp')
         return pd.DataFrame(updates)
 
 

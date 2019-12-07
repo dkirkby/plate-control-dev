@@ -76,6 +76,14 @@ class XYTest(PECS):
         self.logger.debug(f'Test targets:\n{self.data.targets_pos}')
         self.data.initialise_movedata(self.data.posids, self.data.ntargets)
 
+    def _lookup_pcid(posid):
+        for pcid, posids in self.data.posids_pc.items():
+            if if posid in posids:
+                return pcid
+            else:
+                pass
+        return None
+
     def _get_pos_info(self):
         '''get enabled positioners, according to given posids or busids
         also load pos calibration values for each positioner
@@ -378,23 +386,20 @@ class XYTest(PECS):
             df = measured_QS.loc[posids].reset_index()
             assert ('Q' in df.columns and 'S' in df.columns), f'{df.columns}'
             updates = self.ptls[pcid].test_and_update_TP(df)
-            assert type(updates) == pd.core.frame.DataFrame, (
+            assert isinstance(updates, pd.core.frame.DataFrame), (
                 f'Exception calling test_and_update_TP, returned:\n'
                 f'{updates}')
             self.loggers[pcid].debug(f'test_and_update_TP returned:\n'
                                      f'{updates.to_string()}')
 
     def record_measurement(self, measured_QS, i, n):
-        def lookup_pcid(posid):
-            for pcid, posids in self.data.posids_pc.items():
-                return pcid if posid in posids else None
         for posid in measured_QS.index:
-            if lookup_pcid(posid) is None:  # keep only the selected posids
+            if _lookup_pcid(posid) is None:  # keep only the selected posids
                 measured_QS.drop(posid, inplace=True)
         QS = measured_QS[['Q', 'S']].values.T  # 2 x N array
         poslocXY = np.zeros(QS.shape)  # empty array
         for j, posid in enumerate(measured_QS.index):
-            poslocXY[:, j] = self.ptls[lookup_pcid(posid)].postrans(
+            poslocXY[:, j] = self.ptls[_lookup_pcid(posid)].postrans(
                 posid, 'QS_to_poslocXY', QS[:, j])
         new = pd.DataFrame({f'meas_q_{n}': QS[0, :],
                             f'meas_s_{n}': QS[1, :],

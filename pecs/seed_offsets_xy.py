@@ -79,7 +79,7 @@ class SeedOffsetsXY(PECS):
             self.ptl.set_posfid_val(posid, 'OFFSET_Y', y)
             update = self.ptl.collect_calib(update, tag='')
             updates.append(update)
-        self.ptl.commit(mode='calib', log_note='initialize_offsets_xy')
+        self.ptl.commit(mode='calib', log_note='seed_offsets_xy')
         return pd.DataFrame(updates)
 
 

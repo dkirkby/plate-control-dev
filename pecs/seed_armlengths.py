@@ -20,7 +20,7 @@ class SeedArmlengths(PECS):
                                     pc.nominals['LENGTH_R1']['value'])
             self.ptl.set_posfid_val(posid, 'LENGTH_R2',
                                     pc.nominals['LENGTH_R2']['value'])
-        self.ptl.commit(mode='calib')
+        self.ptl.commit(mode='calib', log_note='seed_armlengths')
 
 
 if __name__ == '__main__':

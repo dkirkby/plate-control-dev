@@ -65,7 +65,7 @@ class GridCalib(PECS):
         updates['auto_update'] = auto_update
         return updates
 
-    def move_measure(self, request, match_radius=80):
+    def move_measure(self, request, match_radius=50):
         '''
         Wrapper for often repeated moving and measuring sequence.
         Prints missing positioners, returns data merged with request
