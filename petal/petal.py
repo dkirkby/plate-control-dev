@@ -202,6 +202,8 @@ class Petal(object):
         self.dev_nonfunctional_bit = 1<<24
         self.movetable_rejected_bit = 1<<25
         self.exceeded_lims_bit = 1<<26
+        self.bad_neighbor_bit = 1<<27
+        self.missing_fvc_spot = 1<<28
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
         self.disabled_devids = [] #list of devids with DEVICE_CLASSIFIED_NONFUNCTIONAL = True or FIBER_INTACT = False
         self._initialize_pos_flags()
