@@ -53,13 +53,13 @@ class FPTestData:
             /data/focalplane/kpno/{date}/{expid}/pc{pcid}/
     '''
     log_formatter = logging.Formatter(  # log format for each line
-        fmt='%(asctime)s %(name)s [%(levelname)s]: %(message)s',
+        fmt='%(asctime)s %(name)s [%(levelname)-8s]: %(message)s',
         datefmt=pc.timestamp_format)
 
     def __init__(self, test_name, test_cfg=None):
 
         self.test_name = test_name
-        if test_cfg is None:  # for calibration scripts
+        if test_cfg is None:
             self.test_cfg = ConfigObj()
         else:  # for xy accuracy test
             self.test_cfg = test_cfg
@@ -189,6 +189,151 @@ class FPTestData:
         def debug(self, msg):
             self._log(msg, 10)
 
+    def read_telemetry(self):
+        try:
+            conn = psycopg2.connect(host="desi-db", port="5442",
+                                    database="desi_dev",
+                                    user="desi_reader", password="reader")
+            self.telemetry = pd.read_sql_query(  # get temperature data
+                f"""SELECT * FROM pc_telemetry_can_all
+                    WHERE time >= '{self.t_i.astimezone(timezone.utc)}'
+                    AND time < '{self.t_f.astimezone(timezone.utc)}'""",
+                conn).sort_values('time')  # posfid_temps, time, pcid
+            self.printfunc(f'{len(self.telemetry)} entries from telemetry DB '
+                           f'between {self.t_i} and {self.t_f} loaded')
+            self.db_telemetry_available = True
+        except Exception:
+            self.db_telemetry_available = False
+
+    def complete_data(self):
+        self.read_telemetry()
+        masks = []  # get postiioners with abnormal flags
+        for i in range(self.num_corr_max+1):
+            masks.append(self.movedf[f'pos_flag_{i}'] != 4)
+        mask = reduce(lambda x, y: x | y, masks)
+        self.abnormaldf = self.movedf[mask]
+
+    def abnormal_pos_df(self, pcid=None):
+        abnormaldf = self.abnormaldf
+        if pcid is not None:  # then filter out the selected PCID
+            abnormaldf = self.abnormaldf[self.abnormaldf['PCID'] == pcid]
+        posids_abnormal = abnormaldf.index.droplevel(0).unique()
+        rows = []
+        for posid in posids_abnormal:
+            counts_list = []  # counts by submove
+            for i in range(self.num_corr_max+1):
+                counts_list.append(abnormaldf.loc[idx[:, posid], :]
+                                   [f'pos_status_{i}'].value_counts())
+            row = reduce(lambda x, y: x.add(y, fill_value=0), counts_list)
+            rows.append(row)
+        df_status = (pd.DataFrame(rows, index=posids_abnormal, dtype=np.int64)
+                     .drop('Normal positioner', axis=1, errors='ignore'))
+        return df_status.fillna(value=0)
+
+    def plot_posfid_temp(self, pcid=None):
+
+        def plot_petal(pcid, ax, max_on=True, mean_on=False, median_on=True):
+            query = self.telemetry[self.telemetry['pcid'] == pcid]
+            if max_on:
+                ax.plot(query['time'], query['posfid_temps_max'], '-o',
+                        label=f'PC{pcid:02} posfid max')
+            if mean_on:
+                ax.plot(query['time'], query['posfid_temps_mean'], '-o',
+                        label=f'PC{pcid:02} posfid mean')
+            if median_on:
+                ax.plot(query['time'], query['posfid_temps_median'], '-o',
+                        label=f'PC{pcid:02} posfid median')
+
+        if not self.db_telemetry_available:
+            print('DB telemetry query unavailable on this platform.')
+            return
+        # perform telemetry data sanity check needed since there's been
+        # so many issues with the petalcontroller code and bad telemetry data
+        telemetry_clean = True
+        for stat in ['max', 'mean', 'median']:
+            field = f'posfid_temps_{stat}'
+            if self.telemetry[field].isnull().any():
+                print(f'Telemetry data from DB failed sanity check for '
+                      f'temperature plot. '
+                      f'Field "{field}" contains null values.')
+                telemetry_clean = False
+        if telemetry_clean:
+            pd.plotting.register_matplotlib_converters()
+            fig, ax = plt.subplots(figsize=(6.5, 3.5))
+            if pcid is None:  # loop through all petals, plot max only
+                for pcid in self.pcids:
+                    plot_petal(pcid, ax,
+                               max_on=True, mean_on=False, median_on=False)
+            else:  # pcid is an integer, plot the one given pcid only
+                plot_petal(pcid)
+            ax.legend()
+            ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
+            ax.xaxis.set_tick_params(rotation=45)
+            ax.set_xlabel('Time (UTC)')
+            ax.set_ylabel('Temperature (°C)')
+            suffix = '' if pcid is None else f'_pc{pcid:02}'
+            fig.savefig(os.path.join(self.dir, 'figures',
+                                     f'posfid_temp{suffix}.pdf'),
+                        bbox_inches='tight')
+
+    @staticmethod
+    def add_hist_annotation(ax):
+        for rect in ax.patches:  # add annotations
+            height = rect.get_height()
+            ax.annotate(f'{int(height)}',
+                        xy=(rect.get_x() + rect.get_width() / 2, height),
+                        xytext=(0, 5),  # vertical offset
+                        textcoords='offset points', size='small',
+                        ha='center', va='bottom')
+        ax.set_ylim([0.1, ax.get_ylim()[1]*3])
+
+    def export_data_logs(self):
+        '''must have writte self.posids_pc, a dict keyed by pcid'''
+        self.test_cfg.write()  # write test config
+        self.movedf.to_pickle(os.path.join(self.dir, 'movedf.pkl.gz'),
+                              compression='gzip')
+        self.movedf.to_csv(os.path.join(self.dir, 'movedf.csv'))
+        self.printfunc(f'Positioner move data written to: {self.dir}')
+        if hasattr(self, 'gradedf'):
+            self.gradedf.to_pickle(
+                os.path.join(self.dir, 'gradedf.pkl.gz'),
+                compression='gzip')
+            self.gradedf.to_csv(os.path.join(self.dir, 'gradedf.csv'))
+        self.printfunc(f'Positioner grades written to: {self.dir}')
+        for pcid in self.pcids:
+            def makepath(name): return os.path.join(self.dirs[pcid], name)
+            # for posid in self.posids_pc[pcid]:  # write move data csv
+            #     df_pos = self.movedf.loc[idx[:, posid], :].droplevel(1)
+            #     df_pos.to_pickle(makepath(f'{posid}_df.pkl.gz'),
+            #                      compression='gzip')
+            #     df_pos.to_csv(makepath(f'{posid}_df.csv'))
+            with open(makepath(f'pc{pcid:02}_export.log'), 'w') as handle:
+                self.logs[pcid].seek(0)
+                shutil.copyfileobj(self.logs[pcid], handle)  # save logs
+            self.printfunc(f'PC{pcid:02} data written to: '
+                           f'{self.dirs[pcid]}', pcid=pcid)
+
+    def dump_as_one_pickle(self):
+        try:
+            del self.logger
+            del self.loggers
+        except AttributeError:
+            pass
+        with open(os.path.join(self.dir, 'data_dump.pkl'), 'wb') as handle:
+            pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def make_archive(self):
+        path = os.path.join(self.dir, f'{os.path.basename(self.dir)}.tar.gz')
+        with tarfile.open(path, 'w:gz') as arc:  # ^tgz doesn't work properly
+            arc.add(self.dir, arcname=os.path.basename(self.dir))
+        self.printfunc(f'Test data archived: {path}')
+        return path
+
+
+class XYTestData(FPTestData):
+    def __init__(self, *args, **kwargs):
+        super().__init__( *args, **kwargs)
+
     def initialise_movedata(self, posids, n_targets):
         '''initialise column names for move data table for each positioner
         existing attributes required (see xytest.py):
@@ -219,22 +364,6 @@ class FPTestData:
                                         on='DEVICE_ID', right_index=True)
         self.logger.info(f'Move data table initialised '
                          f'for {len(self.posids)} positioners.')
-
-    def read_telemetry(self):
-        try:
-            conn = psycopg2.connect(host="desi-db", port="5442",
-                                    database="desi_dev",
-                                    user="desi_reader", password="reader")
-            self.telemetry = pd.read_sql_query(  # get temperature data
-                f"""SELECT * FROM pc_telemetry_can_all
-                    WHERE time >= '{self.t_i.astimezone(timezone.utc)}'
-                    AND time < '{self.t_f.astimezone(timezone.utc)}'""",
-                conn).sort_values('time')  # posfid_temps, time, pcid
-            self.printfunc(f'{len(self.telemetry)} entries from telemetry DB '
-                           f'between {self.t_i} and {self.t_f} loaded')
-            self.db_telemetry_available = True
-        except Exception:
-            self.db_telemetry_available = False
 
     @staticmethod
     def grade_pos(err_0_max, err_corr_max, err_corr_rms,
@@ -297,31 +426,6 @@ class FPTestData:
         self.gradedf = (pd.DataFrame(rows)
                         .set_index('DEVICE_ID').join(self.posdf))
 
-    def complete_data(self):
-        self.read_telemetry()
-        self.calculate_grades()
-        masks = []  # get postiioners with abnormal flags
-        for i in range(self.num_corr_max+1):
-            masks.append(self.movedf[f'pos_flag_{i}'] != 4)
-        mask = reduce(lambda x, y: x | y, masks)
-        self.abnormaldf = self.movedf[mask]
-
-    def abnormal_pos_df(self, pcid=None):
-        abnormaldf = self.abnormaldf
-        if pcid is not None:  # then filter out the selected PCID
-            abnormaldf = self.abnormaldf[self.abnormaldf['PCID'] == pcid]
-        posids_abnormal = abnormaldf.index.droplevel(0).unique()
-        rows = []
-        for posid in posids_abnormal:
-            counts_list = []  # counts by submove
-            for i in range(self.num_corr_max+1):
-                counts_list.append(abnormaldf.loc[idx[:, posid], :]
-                                   [f'pos_status_{i}'].value_counts())
-            row = reduce(lambda x, y: x.add(y, fill_value=0), counts_list)
-            rows.append(row)
-        df_status = (pd.DataFrame(rows, index=posids_abnormal, dtype=np.int64)
-                     .drop('Normal positioner', axis=1, errors='ignore'))
-        return df_status.fillna(value=0)
 
     def make_summary_plots(self, n_threads_max=32, make_binder=True, mp=True):
         n_threads = min(n_threads_max, 2*multiprocessing.cpu_count())
@@ -457,63 +561,6 @@ class FPTestData:
         binder.write(savepath)
         binder.close()
         self.printfunc(f'Binder for submove {n} saved to: {savepath}')
-
-    def plot_posfid_temp(self, pcid=None):
-
-        def plot_petal(pcid, ax, max_on=True, mean_on=False, median_on=True):
-            query = self.telemetry[self.telemetry['pcid'] == pcid]
-            if max_on:
-                ax.plot(query['time'], query['posfid_temps_max'], '-o',
-                        label=f'PC{pcid:02} posfid max')
-            if mean_on:
-                ax.plot(query['time'], query['posfid_temps_mean'], '-o',
-                        label=f'PC{pcid:02} posfid mean')
-            if median_on:
-                ax.plot(query['time'], query['posfid_temps_median'], '-o',
-                        label=f'PC{pcid:02} posfid median')
-
-        if not self.db_telemetry_available:
-            print('DB telemetry query unavailable on this platform.')
-            return
-        # perform telemetry data sanity check needed since there's been
-        # so many issues with the petalcontroller code and bad telemetry data
-        telemetry_clean = True
-        for stat in ['max', 'mean', 'median']:
-            field = f'posfid_temps_{stat}'
-            if self.telemetry[field].isnull().any():
-                print(f'Telemetry data from DB failed sanity check for '
-                      f'temperature plot. '
-                      f'Field "{field}" contains null values.')
-                telemetry_clean = False
-        if telemetry_clean:
-            pd.plotting.register_matplotlib_converters()
-            fig, ax = plt.subplots(figsize=(6.5, 3.5))
-            if pcid is None:  # loop through all petals, plot max only
-                for pcid in self.pcids:
-                    plot_petal(pcid, ax,
-                               max_on=True, mean_on=False, median_on=False)
-            else:  # pcid is an integer, plot the one given pcid only
-                plot_petal(pcid)
-            ax.legend()
-            ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
-            ax.xaxis.set_tick_params(rotation=45)
-            ax.set_xlabel('Time (UTC)')
-            ax.set_ylabel('Temperature (°C)')
-            suffix = '' if pcid is None else f'_pc{pcid:02}'
-            fig.savefig(os.path.join(self.dir, 'figures',
-                                     f'posfid_temp{suffix}.pdf'),
-                        bbox_inches='tight')
-
-    @staticmethod
-    def add_hist_annotation(ax):
-        for rect in ax.patches:  # add annotations
-            height = rect.get_height()
-            ax.annotate(f'{int(height)}',
-                        xy=(rect.get_x() + rect.get_width() / 2, height),
-                        xytext=(0, 5),  # vertical offset
-                        textcoords='offset points', size='small',
-                        ha='center', va='bottom')
-        ax.set_ylim([0.1, ax.get_ylim()[1]*3])
 
     def plot_grade_dist(self, pcid=None):
         if pcid is None:  # show all positioners tested
@@ -668,39 +715,6 @@ class FPTestData:
                                  f'{pcid}_error_heatmaps.pdf'),
                     bbox_inches='tight')
 
-    def export_data_logs(self):
-        '''must have writte self.posids_pc, a dict keyed by pcid'''
-        self.test_cfg.write()  # write test config
-        self.movedf.to_pickle(os.path.join(self.dir, 'movedf.pkl.gz'),
-                              compression='gzip')
-        self.movedf.to_csv(os.path.join(self.dir, 'movedf.csv'))
-        self.printfunc(f'Positioner move data written to: {self.dir}')
-        self.gradedf.to_pickle(os.path.join(self.dir, 'gradedf.pkl.gz'),
-                               compression='gzip')
-        self.gradedf.to_csv(os.path.join(self.dir, 'gradedf.csv'))
-        self.printfunc(f'Positioner grades written to: {self.dir}')
-        for pcid in self.pcids:
-            def makepath(name): return os.path.join(self.dirs[pcid], name)
-            for posid in self.posids_pc[pcid]:  # write move data csv
-                df_pos = self.movedf.loc[idx[:, posid], :].droplevel(1)
-                df_pos.to_pickle(makepath(f'{posid}_df.pkl.gz'),
-                                 compression='gzip')
-                df_pos.to_csv(makepath(f'{posid}_df.csv'))
-            with open(makepath(f'pc{pcid:02}_export.log'), 'w') as handle:
-                self.logs[pcid].seek(0)
-                shutil.copyfileobj(self.logs[pcid], handle)  # save logs
-            self.printfunc(f'PC{pcid:02} data written to: '
-                           f'{self.dirs[pcid]}', pcid=pcid)
-
-    def dump_as_one_pickle(self):
-        try:
-            del self.logger
-            del self.loggers
-        except AttributeError:
-            pass
-        with open(os.path.join(self.dir, 'data_dump.pkl'), 'wb') as handle:
-            pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
     def generate_report(self):
         # define input and output paths for pweave
         self.printfunc(
@@ -732,15 +746,9 @@ class FPTestData:
         subprocess.call(['pweave', 'xytest_report.pmd',
                          '-f', 'pandoc2html', '-o', path_output])
 
-    def make_archive(self):
-        path = os.path.join(self.dir, f'{os.path.basename(self.dir)}.tar.gz')
-        with tarfile.open(path, 'w:gz') as arc:  # ^tgz doesn't work properly
-            arc.add(self.dir, arcname=os.path.basename(self.dir))
-        self.printfunc(f'Test data archived: {path}')
-        return path
-
     def generate_xyaccuracy_test_products(self):
         self.complete_data()
+        self.calculate_grades()
         self.export_data_logs()
         self.make_summary_plots()  # plot for all positioners by default
         self.dump_as_one_pickle()  # loggers lost as they cannot be serialised
@@ -751,6 +759,48 @@ class FPTestData:
             self.generate_report()  # requires pickle
         self.make_archive()
 
+
+class CalibrationData(FPTestData):
+    '''
+    mode is either  'arc' or 'grid'
+    '''
+    def __init__(self, mode, n_pts_T=None, n_pts_P=None):
+        assert mode in ['arc', 'grid'], 'Invalid calibration mode.'
+        test_cfg = ConfigObj()
+        test_cfg['n_pts_T'] = n_pts_T  # the first N points are T arc 
+        test_cfg['n_pts_P'] = n_pts_P  # the last N points are P arc 
+        super().__init__(mode+'_calibration', test_cfg=test_cfg)
+
+    def initialise_movedata(self, posids, n_targets):
+        '''initialise column names for move data table for each positioner
+        existing attributes required (see xytest.py):
+            self.pcids
+        '''
+        # build column names and data types, all in petal-local flatXY CS
+        cols0 = ['timestamp', 'cycle', 'move_log']
+        dtypes0 = ['datetime64[ns]', np.uint64, str]
+        cols1 = ['target_x', 'target_y']
+        dtypes1 = [np.float64] * len(cols1)
+        cols2_base = ['meas_q', 'meas_s', 'meas_x', 'meas_y',
+                      'err_x', 'err_y', 'err_xy',
+                      'pos_int_t', 'pos_int_p', 'pos_flag', 'pos_status']
+        cols2 = []  # add suffix for base column names corrective moves
+        for field, i in product(cols2_base, range(self.num_corr_max+1)):
+            cols2.append(f'{field}_{i}')
+        cols = cols0 + cols1 + cols2  # list of all columns
+        dtypes2 = [np.float64] * (len(cols2) - 2) + [np.int64, str]
+        dtypes = dtypes0 + dtypes1 + dtypes2
+        data = {col: pd.Series(dtype=dt) for col, dt in zip(cols, dtypes)}
+        # build multi-level index
+        iterables = [np.arange(self.ntargets), posids]
+        names = ['target_no', 'DEVICE_ID']
+        index = pd.MultiIndex.from_product(iterables, names=names)
+        self.movedf = pd.DataFrame(data=data, index=index)
+        # write pcid column to movedf
+        self.movedf = self.movedf.merge(self.posdf['PCID'].reset_index(),
+                                        on='DEVICE_ID', right_index=True)
+        self.logger.info(f'Move data table initialised '
+                         f'for {len(self.posids)} positioners.')
 
 if __name__ == '__main__':
 

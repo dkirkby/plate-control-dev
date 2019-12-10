@@ -54,7 +54,7 @@ class XYTest(PECS):
         https://desi.lbl.gov/svn/code/focalplane/fp_settings/hwsetups/
         https://desi.lbl.gov/svn/code/focalplane/fp_settings/test_settings/
         """
-        self.data = FPTestData(test_name, test_cfg=test_cfg)
+        self.data = XYTestData(test_name, test_cfg=test_cfg)
         self.loggers = self.data.loggers  # use these loggers to write to logs
         self.logger = self.data.logger  # broadcast to all petals
         super().__init__(
