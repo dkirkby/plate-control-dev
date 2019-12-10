@@ -332,7 +332,7 @@ class FPTestData:
 
 class XYTestData(FPTestData):
     def __init__(self, *args, **kwargs):
-        super().__init__( *args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def initialise_movedata(self, posids, n_targets):
         '''initialise column names for move data table for each positioner
@@ -371,7 +371,7 @@ class XYTestData(FPTestData):
         '''these criteria were set by UMich lab tests, all in microns
         '''
         if np.any(np.isnan([err_0_max, err_corr_max, err_corr_rms,
-                  err_corr_95p_max])):
+                            err_corr_95p_max])):
             return pc.grades[-1]
         if (err_0_max <= 100) & (err_corr_max <= 15) & (err_corr_rms <= 5):
             grade = pc.grades[0]
@@ -426,7 +426,6 @@ class XYTestData(FPTestData):
         self.gradedf = (pd.DataFrame(rows)
                         .set_index('DEVICE_ID').join(self.posdf))
 
-
     def make_summary_plots(self, n_threads_max=32, make_binder=True, mp=True):
         n_threads = min(n_threads_max, 2*multiprocessing.cpu_count())
         self.printfunc(f'Making summary xyplots with {n_threads} threads on '
@@ -472,7 +471,7 @@ class XYTestData(FPTestData):
                 self.printfunc('Last MP chunk completed. '
                                'Creating xyplot binders...')
                 for pcid, n in tqdm(product(self.pcids,
-                                    range(self.num_corr_max+1))):
+                                            range(self.num_corr_max+1))):
                     np = Process(target=self.make_summary_plot_binder,
                                  args=(pcid, n))
                     np.start()
@@ -621,7 +620,7 @@ class XYTestData(FPTestData):
                     else list(cuts))
             for cut in cuts:
                 rows.append({'Error within (μm)': int(cut),
-                            'Count': int(np.sum(err[column_name] <= cut))})
+                             'Count': int(np.sum(err[column_name] <= cut))})
             text = pd.DataFrame(rows).to_string(index=False)
             ax.text(0.7, 0.97, text, ha='right', va='top',
                     family='monospace', size='small', transform=ax.transAxes,
@@ -764,12 +763,18 @@ class CalibrationData(FPTestData):
     '''
     mode is either  'arc' or 'grid'
     '''
+
     def __init__(self, mode, n_pts_T=None, n_pts_P=None):
         assert mode in ['arc', 'grid'], 'Invalid calibration mode.'
         test_cfg = ConfigObj()
-        test_cfg['n_pts_T'] = n_pts_T  # the first N points are T arc 
-        test_cfg['n_pts_P'] = n_pts_P  # the last N points are P arc 
+        test_cfg['n_pts_T'] = n_pts_T  # the first N points are T arc
+        test_cfg['n_pts_P'] = n_pts_P  # the last N points are P arc
         super().__init__(mode+'_calibration', test_cfg=test_cfg)
+
+        # stores calibration values, old and new
+        iterables = [['OLD', 'NEW'], param_keys]
+        columns = pd.MultiIndex.from_product(
+            iterables, names=['label', 'calibration parameter'])
 
     def initialise_movedata(self, posids, n_targets):
         '''initialise column names for move data table for each positioner
@@ -801,6 +806,7 @@ class CalibrationData(FPTestData):
                                         on='DEVICE_ID', right_index=True)
         self.logger.info(f'Move data table initialised '
                          f'for {len(self.posids)} positioners.')
+
 
 if __name__ == '__main__':
 
