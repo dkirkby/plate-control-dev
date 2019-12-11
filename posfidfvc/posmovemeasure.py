@@ -1301,7 +1301,7 @@ class PosMoveMeasure(object):
                     debug_str += ' ERR_NORM=' + format(data[posid]['ERR_NORM'][-1],'.3f')
                     for j in range(len(param_keys)):
                         if param_keys[j] == 'OFFSET_T' or param_keys[j] == 'OFFSET_P':
-                            params_optimized.x[j] = self._centralized_angular_offset_value(params_optimized.x[j])
+                            params_optimized.x[j] = self._centralized_angular_offset(params_optimized.x[j])
                         data[posid][param_keys[j]].append(params_optimized.x[j])
                         debug_str += '  ' + param_keys[j] +': ' + format(data[posid][param_keys[j]][-1],'.3f')
                     # print(debug_str)
@@ -1354,7 +1354,7 @@ class PosMoveMeasure(object):
                 ptl.set_posfid_val(posid,'OFFSET_Y',t_ctr[1])
             p_meas_obsT = np.arctan2(p_ctr[1]-t_ctr[1], p_ctr[0]-t_ctr[0]) * 180/np.pi
             offset_t = p_meas_obsT - p_targ_posT[0] # just using the first target theta angle in the phi sweep
-            offset_t = self._centralized_angular_offset_value(offset_t)
+            offset_t = self._centralized_angular_offset(offset_t)
             if ptl.posmodels[posid].is_enabled:
                 ptl.set_posfid_val(posid,'OFFSET_T',offset_t)
             xy = np.array(p_meas_obsXY)
@@ -1364,7 +1364,7 @@ class PosMoveMeasure(object):
             expected_direction = pc.sign(p_targ_posP[1] - p_targ_posP[0])
             p_meas_obsP_wrapped = self._wrap_consecutive_angles(p_meas_obsP.tolist(), expected_direction)
             offset_p = np.median(np.array(p_meas_obsP_wrapped) - np.array(p_targ_posP))
-            offset_p = self._centralized_angular_offset_value(offset_p)
+            offset_p = self._centralized_angular_offset(offset_p)
             if ptl.posmodels[posid].is_enabled:
                 ptl.set_posfid_val(posid,'OFFSET_P',offset_p)
             p_meas_posP_wrapped = (np.array(p_meas_obsP_wrapped) - offset_p).tolist()
@@ -1750,7 +1750,7 @@ class PosMoveMeasure(object):
             wrapped.append(wrapped[-1] + delta)
         return wrapped
     
-    def _centralized_angular_offset_value(self,offset_angle):
+    def _centralized_angular_offset(self,offset_angle):
         """A special unwrapping check for OFFSET_T and OFFSET_P angles, for which we are always
         going to want to default to the option closer to 0 deg. Hence if our calibration routine
         calculates a best fit value for example of OFFSET_T or OFFSET_P = 351 deg, then the real
