@@ -77,6 +77,7 @@ class PECS:
         # self.illuminator = Illuminator()  # this crashes KF 06/18/19
         # fvc stuff
         self.fvc_collector = SimpleProxy('FVCCOLLECTOR')
+        self.fvc_collector._send_command('configure')
 
     def exp_setup(self):
         assert hasattr(self, 'data'), (

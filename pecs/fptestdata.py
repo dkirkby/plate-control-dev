@@ -294,17 +294,18 @@ class FPTestData:
             getattr(self, attr).to_csv(os.path.join(self.dir, f'{attr}.csv'))
             self.printfunc(f'Positioner {attr} written to: {self.dir}')
         for pcid in self.pcids:
-            def makepath(name): return os.path.join(self.dirs[pcid], name)
+            self.log_paths[pcid] = os.path.join(self.dirs[pcid],
+                                                f'pc{pcid:02}_export.log')
             # for posid in self.posids_pc[pcid]:  # write movedf for each posid
             #     df_pos = self.movedf.loc[idx[:, posid], :].droplevel(1)
             #     df_pos.to_pickle(makepath(f'{posid}_df.pkl.gz'),
             #                      compression='gzip')
             #     df_pos.to_csv(makepath(f'{posid}_df.csv'))
-            with open(makepath(f'pc{pcid:02}_export.log'), 'w') as handle:
+            with open(self.log_paths[pcid], 'w') as handle:
                 self.logs[pcid].seek(0)
                 shutil.copyfileobj(self.logs[pcid], handle)  # save logs
             self.printfunc(f'PC{pcid:02} data written to: '
-                           f'{self.dirs[pcid]}', pcid=pcid)
+                           f'{self.log_paths[pcid]}', pcid=pcid)
 
     def dump_as_one_pickle(self):
         try:
@@ -719,7 +720,7 @@ class XYTestData(FPTestData):
         self.printfunc(
             f'Generating xy accuracy test report for {self.filename}')
         path_output = os.path.join(self.dir,
-                                   f'{self.filename}-xytest_report.html')
+                                   f'{self.filename}-report.html')
         with open(os.path.join(pc.dirs['xytest_data'], 'pweave_test_src.txt'),
                   'w') as h:
             h.write(os.path.join(self.dir, 'data_dump.pkl'))
@@ -831,11 +832,11 @@ if __name__ == '__main__':
     '''load the dumped pickle file as follows, protocol is auto determined'''
     expids = ['00031305']
     for expid in expids:
-        test_dir = glob(pc.dirs['kpno']+f'*{expid}*data_dump.pkl')
-        assert len(test_dir) == 1, test_dir
-        print(f'Re-processing directory:\n{test_dir[0]}')
+        paths = glob(pc.dirs['kpno']+f'/*/{expid}/data_dump.pkl')
+        assert len(paths) == 1, paths
+        print(f'Re-processing FP test data:\n{paths[0]}')
         try:
-            with open(os.path.join(test_dir[0], 'data_dump.pkl'), 'rb') as h:
+            with open(os.path.join(paths[0]), 'rb') as h:
                 data = pickle.load(h)
             # data.generate_xyaccuracy_test_products()
             if shutil.which('pandoc') is not None:

@@ -38,8 +38,9 @@ class PosCalibrations(PECS):
 
     def run_arc_calibration(self, auto_update=False, match_radius=50,
                             interactive=False):
+        self.data.test_cfg['auto_update'] = self.data.auto_update = auto_update
         if interactive:
-            # Ask for auto_update
+            # Ask for 3
             auto_update = self._parse_yn(input(
                         'Automatically update calibration? (y/n): '))
             # Ask for match_radius

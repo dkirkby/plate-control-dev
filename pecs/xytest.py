@@ -63,7 +63,7 @@ class XYTest(PECS):
         self.exp_setup()  # set up exposure ID and product directory
         if 'pause_interval' in test_cfg:  # override default pecs settings
             self.logger.info(
-                f"Overriding default pause interval {self.pause_interval} s"
+                f"Overriding default pause interval {self.pause_interval} s "
                 f"with {test_cfg['pause_interval']} s")
             self.pause_interval = test_cfg['pause_interval']
         self._get_pos_info()

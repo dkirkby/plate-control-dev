@@ -10,7 +10,7 @@ Currently only runs one Petal at a time, awaiting a petalMan proxy.
 """
 from poscalibrations import PosCalibrations
 test = PosCalibrations('arc', interactive=True)
-test.calibrate()
+test.run_arc_calibration(auto_update=False)
 print(test.data.calibdf[['DEVICE_ID', 'OFFSET_X', 'OFFSET_Y',
                          'OFFSET_T', 'OFFSET_P''LENGTH_R1', 'LENGTH_R2']])
 test.fvc_collect(destination=test.data.dir)
