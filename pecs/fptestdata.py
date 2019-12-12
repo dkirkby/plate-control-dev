@@ -261,7 +261,7 @@ class FPTestData:
                     plot_petal(pcid, ax,
                                max_on=True, mean_on=False, median_on=False)
             else:  # pcid is an integer, plot the one given pcid only
-                plot_petal(pcid)
+                plot_petal(pcid, ax)
             ax.legend()
             ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
             ax.xaxis.set_tick_params(rotation=45)
@@ -829,10 +829,10 @@ class CalibrationData(FPTestData):
 if __name__ == '__main__':
 
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    expids = []
+    expids = ['00031305']
     for expid in expids:
-        test_dir = glob(pc.dirs['kpno']+'*{expid}')
-        assert len(test_dir) == 0, test_dir
+        test_dir = glob(pc.dirs['kpno']+f'*{expid}*data_dump.pkl')
+        assert len(test_dir) == 1, test_dir
         print(f'Re-processing directory:\n{test_dir[0]}')
         try:
             with open(os.path.join(test_dir[0], 'data_dump.pkl'), 'rb') as h:

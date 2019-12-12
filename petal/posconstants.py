@@ -127,7 +127,41 @@ nominals['GEAR_CALIB_P']     = {'value':   1.0, 'tol':    0.05}
 
 grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
 
-# Types
+
+def decipher_posflags(flags):
+    '''translates posflag to readable reasons, bits taken from petal.py
+    simple problem of locating the leftmost set bit, always 100 on the
+    right input flags
+    must be a numpy-supported array-like object'''
+    pos_bit_dict = {0:  'Matched',
+                    2:  'Normal positioner',
+                    16: 'Control disabled',
+                    17: 'Fibre nonintact',
+                    18: 'CAN communication error',
+                    19: 'Overlapping targets',
+                    20: 'Frozen by anticollision',
+                    21: 'Unreachable by positioner',
+                    22: 'Out of petal boundaries',
+                    23: 'Multiple requests',
+                    24: 'Device nonfunctional',
+                    25: 'Move table rejected',
+                    26: 'Exceeded patrol limits'}
+    bits = np.floor(np.log2(flags)).astype(int)
+    ret = []
+    try:  # bits is a list-like object, iterable
+        for i, bit in enumerate(bits):
+            if bit in pos_bit_dict.keys():
+                ret.append(pos_bit_dict[bit])
+            else:
+                msg = (f'Invalid input flag {flags[i]} with leftmost '
+                       f'set bit at {bit}')
+                ret.append(msg)
+    except TypeError:  # bits is a single number, not iterable
+        ret = pos_bit_dict[bits]
+    # a list of descriptive strings or a single string depending on input
+    return ret
+
+
 class collision_case(object):
     """Enumeration of collision cases. The I, II, and III cases are described in
     detail in DESI-0899.
