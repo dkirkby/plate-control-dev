@@ -153,7 +153,7 @@ class PECS:
         self.printfunc(f'Selected {len(posids)} positioners')
         return posids
 
-    def fvc_measure(self, exppos=None, match_radius=30, matched_only=True):
+    def fvc_measure(self, exppos=None, match_radius=50, matched_only=True):
         '''use the expected positions given, or by default use internallly
         tracked current expected positions for fvc measurement
         returns expected_positions (df), measured_positions (df)
@@ -170,12 +170,10 @@ class PECS:
                   'are contaminated by fiducials.')
         self.printfunc(
             f'Calling FVC.measure() expecting {len(exppos)} positioners...')
-        # mr_old = self.fvc.get('match_radius')  # hold old match radius
-        # self.fvc.set(match_radius=match_radius)
-        # measured_QS, note that expected_pos was changed in place
         seqid = None
         if hasattr(self, 'exp'):
             seqid = self.exp.id
+        # measured_QS, note that expected_pos was changed in place
         meapos = (pd.DataFrame(self.fvc.measure(
                       expected_positions=exppos, seqid=seqid,
                       exptime=self.exptime, match_radius=match_radius,
@@ -186,7 +184,6 @@ class PECS:
         if np.any(['P' in device_id for device_id in meapos.index]):
             print('Measured positions of positioners by FVC '
                   'are contaminated by fiducials.')
-        # self.fvc.set(match_radius=mr_old)  # restore old radius after measure
         meapos.columns = meapos.columns.str.upper()  # clean up header to save
         exppos = (exppos.rename(columns={'id': 'DEVICE_ID'})
                   .set_index('DEVICE_ID').sort_index())
