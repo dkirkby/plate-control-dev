@@ -427,10 +427,6 @@ class XYTestData(FPTestData):
                         .set_index('DEVICE_ID').join(self.posdf))
 
     def make_summary_plots(self, n_threads_max=32, make_binder=True, mp=True):
-        n_threads = min(n_threads_max, 2*multiprocessing.cpu_count())
-        self.printfunc(f'Making summary xyplots with {n_threads} threads on '
-                       f'{multiprocessing.cpu_count()} cores for '
-                       f'submoves {list(range(self.num_corr_max+1))}...')
         if mp:
             # the following implementation fails when loggers are present
             # pbar = tqdm(total=len(self.posids))
@@ -442,6 +438,10 @@ class XYTestData(FPTestData):
             #                       callback=update_pbar)
             #     p.close()
             #     p.join()
+            n_threads = min(n_threads_max, 2*multiprocessing.cpu_count())
+            self.printfunc(f'Making summary xyplots with {n_threads} threads on '
+                           f'{multiprocessing.cpu_count()} cores for '
+                           f'submoves {list(range(self.num_corr_max+1))}...')
             pool = []
             n_started = 0
             for posid in tqdm(self.posids):

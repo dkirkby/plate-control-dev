@@ -145,7 +145,7 @@ class XYTest(PECS):
         mask = (rmin < r) & (r < rmax)
         return np.array([x[mask], y[mask]])  # return 2 x N array of targets
 
-    def generate_targets(self):
+    def generate_targets(self, ntargets=None):
         fn = self.data.test_cfg['input_targs_file']
         if fn is None:  # no targets supplied, create local targets in posXY
             tgt = self._generate_poslocXY_targets_grid(
@@ -162,6 +162,8 @@ class XYTest(PECS):
                 else:  # use the same given seed for all posids
                     np.random.seed(self.data.test_cfg['shuffle_seed'])
                     np.random.shuffle(tgt)  # same shuffled target list for all
+            if ntargets is not None:
+                tgt = tgt[:ntargets, :]
             self.data.targets = tgt
             self.data.targets_pos = {posid: tgt for posid in self.data.posids}
             self.data.ntargets = tgt.shape[0]  # shape (N_targets, 2)
@@ -181,6 +183,8 @@ class XYTest(PECS):
             col2 = self.data.target_type[:-2] + self.data.target_type[-1]
             self.data.targets_pos = {}
             df = pd.read_csv(path, index_col='target_no')
+            if ntargets is not None:
+                df = df.iloc[:ntargets]
             self.data.ntargets = len(df)  # set number of targets
             for pcid in self.data.pcids:  # set targets for each positioner
                 for posid in self.data.posids_pc[pcid]:
