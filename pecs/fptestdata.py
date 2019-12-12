@@ -63,13 +63,16 @@ class FPTestData:
             self.test_cfg = ConfigObj()
         else:  # for xy accuracy test
             self.test_cfg = test_cfg
-            self.anticollision = test_cfg['anticollision']
-            self.num_corr_max = test_cfg['num_corr_max']
-        self.pcids = [  # validate string pcid sections and create list
-            int(key) for key in test_cfg.keys() if len(key) == 2
-            and key.isdigit() and (test_cfg[key]['mode'] is not None)]
-        for pcid in self.test_cfg.sections:  # convert pcid to int now
-            self.test_cfg.rename(pcid, int(pcid))
+            for key, val in test_cfg.items():
+                setattr(self, key, val)  # copy test settings to self attr
+        if 'pcids' in test_cfg:
+            self.pcids = pcids  # calibration cfg contains pcids
+        else:  # get pcids from xy test cfg
+            self.pcids = [  # validate string pcid sections and create list
+                int(key) for key in test_cfg.keys() if len(key) == 2
+                and key.isdigit() and (test_cfg[key]['mode'] is not None)]
+            for pcid in self.test_cfg.sections:  # convert pcid to int now
+                self.test_cfg.rename(pcid, int(pcid))
         self._init_loggers()
         self.logger.info([f'petalconstants.py version: {pc.code_version}',
                           f'anticollision mode: {self.anticollision}'])
@@ -158,7 +161,7 @@ class FPTestData:
 
     class BroadcastLogger:
         '''must call methods below for particular logger levels below
-        input message can be a string of list of strings
+        support input message as a string of list of strings
         msg will be broadcasted to all petals
         '''
         def __init__(self, pcids, loggers):
@@ -204,14 +207,6 @@ class FPTestData:
             self.db_telemetry_available = True
         except Exception:
             self.db_telemetry_available = False
-
-    def complete_data(self):
-        self.read_telemetry()
-        masks = []  # get postiioners with abnormal flags
-        for i in range(self.num_corr_max+1):
-            masks.append(self.movedf[f'pos_flag_{i}'] != 4)
-        mask = reduce(lambda x, y: x | y, masks)
-        self.abnormaldf = self.movedf[mask]
 
     def abnormal_pos_df(self, pcid=None):
         abnormaldf = self.abnormaldf
@@ -290,19 +285,16 @@ class FPTestData:
     def export_data_logs(self):
         '''must have writte self.posids_pc, a dict keyed by pcid'''
         self.test_cfg.write()  # write test config
-        self.movedf.to_pickle(os.path.join(self.dir, 'movedf.pkl.gz'),
-                              compression='gzip')
-        self.movedf.to_csv(os.path.join(self.dir, 'movedf.csv'))
-        self.printfunc(f'Positioner move data written to: {self.dir}')
-        if hasattr(self, 'gradedf'):
-            self.gradedf.to_pickle(
-                os.path.join(self.dir, 'gradedf.pkl.gz'),
-                compression='gzip')
-            self.gradedf.to_csv(os.path.join(self.dir, 'gradedf.csv'))
-        self.printfunc(f'Positioner grades written to: {self.dir}')
+        for attr in ['movedf', 'gradedf', 'calibdf', 'abnormaldf']:
+            if not hasattr(self, attr):
+                continue  # skip a df if it doesn't exist
+            getattr(self, attr).to_pickle(
+                os.path.join(self.dir, f'{attr}.pkl.gz'), compression='gzip')
+            getattr(self, attr).to_csv(os.path.join(self.dir, f'{attr}.csv'))
+            self.printfunc(f'Positioner {attr} written to: {self.dir}')
         for pcid in self.pcids:
             def makepath(name): return os.path.join(self.dirs[pcid], name)
-            # for posid in self.posids_pc[pcid]:  # write move data csv
+            # for posid in self.posids_pc[pcid]:  # write movedf for each posid
             #     df_pos = self.movedf.loc[idx[:, posid], :].droplevel(1)
             #     df_pos.to_pickle(makepath(f'{posid}_df.pkl.gz'),
             #                      compression='gzip')
@@ -333,6 +325,13 @@ class FPTestData:
 class XYTestData(FPTestData):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def isolate_abnormal_flags(self):
+        masks = []  # get postiioners with abnormal flags
+        for i in range(self.num_corr_max+1):
+            masks.append(self.movedf[f'pos_flag_{i}'] != 4)
+        mask = reduce(lambda x, y: x | y, masks)
+        self.abnormaldf = self.movedf[mask]
 
     def initialise_movedata(self, posids, n_targets):
         '''initialise column names for move data table for each positioner
@@ -745,8 +744,9 @@ class XYTestData(FPTestData):
         subprocess.call(['pweave', 'xytest_report.pmd',
                          '-f', 'pandoc2html', '-o', path_output])
 
-    def generate_xyaccuracy_test_products(self):
-        self.complete_data()
+    def generate_xy_accuracy_test_products(self):
+        self.read_telemetry()
+        self.isolate_abnormal_flags()
         self.calculate_grades()
         self.export_data_logs()
         self.make_summary_plots()  # plot for all positioners by default
@@ -764,9 +764,10 @@ class CalibrationData(FPTestData):
     mode is either  'arc' or 'grid'
     '''
 
-    def __init__(self, mode, n_pts_T=None, n_pts_P=None):
+    def __init__(self, mode, pcids, n_pts_T=None, n_pts_P=None):
         assert mode in ['arc', 'grid'], 'Invalid calibration mode.'
         test_cfg = ConfigObj()
+        test_cfg['pcids'] = pcids
         test_cfg['n_pts_T'] = n_pts_T  # the first N points are T arc
         test_cfg['n_pts_P'] = n_pts_P  # the last N points are P arc
         super().__init__(mode+'_calibration', test_cfg=test_cfg)
@@ -774,7 +775,7 @@ class CalibrationData(FPTestData):
         # stores calibration values, old and new
         iterables = [['OLD', 'NEW'], param_keys]
         columns = pd.MultiIndex.from_product(
-            iterables, names=['label', 'calibration parameter'])
+            iterables, names=['label', 'param_key'])
 
     def initialise_movedata(self, posids, n_targets):
         '''initialise column names for move data table for each positioner
@@ -806,6 +807,22 @@ class CalibrationData(FPTestData):
                                         on='DEVICE_ID', right_index=True)
         self.logger.info(f'Move data table initialised '
                          f'for {len(self.posids)} positioners.')
+
+    def generate_calibration_data_products(self):
+        self.complete_data()
+        self.calculate_grades()
+        self.export_data_logs()
+        self.make_summary_plots()  # plot for all positioners by default
+        self.dump_as_one_pickle()  # loggers lost as they cannot be serialised
+        if shutil.which('pandoc') is None:
+            self.printfunc('You must have a complete installation of pandoc '
+                           'and/or TexLive. Skipping test report...')
+        else:
+            self.generate_report()  # requires pickle
+        self.make_archive()
+        path = os.path.join(
+            pc.dirs['calib_logs'],
+            f'{pc.filename_timestamp_str()}-arc_calibration')
 
 
 if __name__ == '__main__':

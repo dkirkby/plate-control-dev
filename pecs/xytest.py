@@ -59,7 +59,7 @@ class XYTest(PECS):
         self.logger = self.data.logger  # broadcast to all petals
         super().__init__(
             printfunc={p: self.loggers[p].info for p in self.data.pcids})
-        self.data.t_i = pc.now()
+        self.data.t_i = pc.now()  # set initial time before setting dirs
         self.exp_setup()  # set up exposure ID and product directory
         if 'pause_interval' in test_cfg:  # override default pecs settings
             self.logger.info(
@@ -439,5 +439,5 @@ if __name__ == '__main__':
     test = XYTest('xytest-'+xytest_name, xytest_cfg)
     test.run_xyaccuracy_test(
         disable_unmatched=test.data.test_cfg['disable_unmatched'])
-    test.fvc_collect(destination=self.data.dir)
-    test.data.generate_xyaccuracy_test_products()
+    test.fvc_collect(destination=test.data.dir)
+    test.data.generate_xy_accuracy_test_products()

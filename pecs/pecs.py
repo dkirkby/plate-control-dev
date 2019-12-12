@@ -33,6 +33,7 @@ class PECS:
     '''if there is already a PECS instance from which you want to re-use
        the proxies, simply pass in pecs.fvc and pecs.ptls
     '''
+
     def __init__(self, fvc=None, ptls=None, printfunc=print):
         # Allow local config so scripts do not always have to collect roles
         # and names from the user. No check for illuminator at the moment
@@ -204,10 +205,11 @@ class PECS:
         self.printfunc('Collecting FVC images associated with exposure ID '
                        f'{self.exp.id} to: {destination}')
         os.makedirs(self.data.dir, exist_ok=True)
-        self.fvc_collector._send_command(
-            'collect', expid=self.exp.id,
-            output_dir=destination, logbook=False)
-            # output_dir=self.data.dir, logbook=False)
+        try:
+            self.fvc_collector._send_command('collect', expid=self.exp.id,
+                                             output_dir=destination)
+        except Exception as e:
+            self.printfunc(f'FVC collector failed: {e}')
 
     @staticmethod
     def countdown_sec(t):  # in seconds
@@ -222,8 +224,7 @@ class PECS:
         if self.pause_interval is None or press_enter:
             input('Paused for heat load monitoring for unspecified interval. '
                   'Press enter to continue: ')
-        elif self.pause_interval == 0:
-            # no puase needed, just continue
+        elif self.pause_interval == 0:  # no puase needed, just continue
             self.printfunc('Pause interval = 0, continuing without pause...')
         elif self.pause_interval > 0:
             self.printfunc(f'Pausing for {self.pause_interval} s...')

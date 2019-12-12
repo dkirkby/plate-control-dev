@@ -33,14 +33,15 @@ class PosCalibration:
     '''
 
     def __init__(self, petal_alignemnts=None, use_doslib=False,
-                 auto_update=False, printfunc=print):
+                 posmodels=None, printfunc=print):
         if petal_alignemnts is not None:
             self.petal_alignemnts = petal_alignemnts
         else:
             self.read_alignments(use_doslib=use_doslib)
-        self.auto_update = auto_update
         self.printfunc = printfunc
         self.posmodels = {}
+        if posmodels is not None:
+            self.init_posmodels(posmodels)
 
     def read_alignments(self, use_doslib):
         self.printfunc('Reading petal alignments from DB...')
