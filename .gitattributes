@@ -1,12 +1,12 @@
 * text=auto !eol
 bin/petal -text
 bin/petalcontroller -text
-calibrate/calibrate.py -text
 pecs/ArcCalib.py -text
 pecs/GridCalib.py -text
 pecs/OnePoint.py -text
 pecs/OnePoint_offsetsTP.py -text
 pecs/OnePoint_posTP.py -text
+pecs/arc_calibration.py -text
 pecs/batch_seed.py -text
 pecs/batch_seed_1p.py -text
 pecs/fptestdata.py -text
@@ -15,6 +15,7 @@ pecs/loop_phi_moves.py -text
 pecs/pecs.py -text
 pecs/pecs_local.cfg -text
 pecs/poscalibplot_from_df.py -text
+pecs/poscalibrations.py -text
 pecs/rehome.py -text
 pecs/rehome_verify.py -text
 pecs/seed_armlengths.py -text
@@ -31,6 +32,7 @@ petal/petalcomm.py -text
 petal/petaltransforms.py -text
 petal/petsockcomm.py -text
 petal/posanimator.py -text
+petal/poscalibrationfits.py -text
 petal/poscollider.pyx -text
 petal/poscollider_old.py -text
 petal/posconstants.py -text

@@ -10,7 +10,7 @@ import pandas as pd
 from configobj import ConfigObj
 import posconstants as pc
 from pecs import PECS
-from fptestdata import FPTestData
+from fptestdata import XYTestData
 idx = pd.IndexSlice  # pandas slice for selecting slice using multiindex
 
 
@@ -76,9 +76,9 @@ class XYTest(PECS):
         self.logger.debug(f'Test targets:\n{self.data.targets_pos}')
         self.data.initialise_movedata(self.data.posids, self.data.ntargets)
 
-    def _lookup_pcid(posid):
+    def _lookup_pcid(self, posid):
         for pcid, posids in self.data.posids_pc.items():
-            if if posid in posids:
+            if posid in posids:
                 return pcid
             else:
                 pass
@@ -394,12 +394,12 @@ class XYTest(PECS):
 
     def record_measurement(self, measured_QS, i, n):
         for posid in measured_QS.index:
-            if _lookup_pcid(posid) is None:  # keep only the selected posids
+            if self._lookup_pcid(posid) is None:  # keep only selected posids
                 measured_QS.drop(posid, inplace=True)
         QS = measured_QS[['Q', 'S']].values.T  # 2 x N array
         poslocXY = np.zeros(QS.shape)  # empty array
         for j, posid in enumerate(measured_QS.index):
-            poslocXY[:, j] = self.ptls[_lookup_pcid(posid)].postrans(
+            poslocXY[:, j] = self.ptls[self._lookup_pcid(posid)].postrans(
                 posid, 'QS_to_poslocXY', QS[:, j])
         new = pd.DataFrame({f'meas_q_{n}': QS[0, :],
                             f'meas_s_{n}': QS[1, :],

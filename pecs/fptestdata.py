@@ -66,7 +66,7 @@ class FPTestData:
             for key, val in test_cfg.items():
                 setattr(self, key, val)  # copy test settings to self attr
         if 'pcids' in test_cfg:
-            self.pcids = pcids  # calibration cfg contains pcids
+            self.pcids = test_cfg['pcids']  # calibration cfg contains pcids
         else:  # get pcids from xy test cfg
             self.pcids = [  # validate string pcid sections and create list
                 int(key) for key in test_cfg.keys() if len(key) == 2
@@ -164,6 +164,7 @@ class FPTestData:
         support input message as a string of list of strings
         msg will be broadcasted to all petals
         '''
+
         def __init__(self, pcids, loggers):
             self.pcids = pcids
             self.loggers = loggers
@@ -744,7 +745,7 @@ class XYTestData(FPTestData):
         subprocess.call(['pweave', 'xytest_report.pmd',
                          '-f', 'pandoc2html', '-o', path_output])
 
-    def generate_xy_accuracy_test_products(self):
+    def generate_data_products(self):
         self.read_telemetry()
         self.isolate_abnormal_flags()
         self.calculate_grades()
@@ -773,7 +774,7 @@ class CalibrationData(FPTestData):
         super().__init__(mode+'_calibration', test_cfg=test_cfg)
 
         # stores calibration values, old and new
-        iterables = [['OLD', 'NEW'], param_keys]
+        # iterables = [['OLD', 'NEW'], param_keys]
         columns = pd.MultiIndex.from_product(
             iterables, names=['label', 'param_key'])
 
@@ -808,11 +809,10 @@ class CalibrationData(FPTestData):
         self.logger.info(f'Move data table initialised '
                          f'for {len(self.posids)} positioners.')
 
-    def generate_calibration_data_products(self):
-        self.complete_data()
-        self.calculate_grades()
+    def generate_data_products(self):
+        self.read_telemetry()
         self.export_data_logs()
-        self.make_summary_plots()  # plot for all positioners by default
+        self.make_arc_plots()
         self.dump_as_one_pickle()  # loggers lost as they cannot be serialised
         if shutil.which('pandoc') is None:
             self.printfunc('You must have a complete installation of pandoc '
@@ -820,6 +820,7 @@ class CalibrationData(FPTestData):
         else:
             self.generate_report()  # requires pickle
         self.make_archive()
+
         path = os.path.join(
             pc.dirs['calib_logs'],
             f'{pc.filename_timestamp_str()}-arc_calibration')

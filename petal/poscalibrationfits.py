@@ -15,15 +15,15 @@ only serve to ensure spotmatch does not fail.
 import numpy as np
 from scipy import optimize
 import pandas as pd
+from postransforms import PosTransforms
 from posstate import PosState
 from posmodel import PosModel
-from postransforms import PosTransforms
 idx = pd.IndexSlice
 param_keys = ['OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
               'LENGTH_R1', 'LENGTH_R2']  # initial values for fitting
 
 
-class PosCalibration:
+class PosCalibrationFits:
     '''
     DOS app can pass the alignments of all petals as a dict keyed by pcid
     offline analysis can use DOSlib or psycopg2 to read alignments from DB
