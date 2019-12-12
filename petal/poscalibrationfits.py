@@ -180,7 +180,7 @@ class PosCalibrationFits:
                 if len(posdata) < 3:  # require at least 3 points remaining
                     return None
                 else:
-                    return PosCalibration.fit_circle(posmea[arc].values)
+                    return PosCalibrationFits.fit_circle(posmea[arc].values)
 
             fits = [fit_arc(arc) for arc in ['T', 'P']]
             if None in fits:

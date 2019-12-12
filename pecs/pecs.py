@@ -194,7 +194,8 @@ class PECS:
         matched = set(exppos.index) & set(meapos.index)
         unmatched = set(exppos.index) - matched
         if len(unmatched) == 0:
-            self.printfunc(f'All {len(exppos.index)} positioners matched.')
+            self.printfunc(f'All {len(exppos.index)} back-illuminated '
+                           f'positioners measured by FVC.')
         else:
             self.printfunc(
                 f'Missing {len(unmatched)} of expected backlit fibres:'

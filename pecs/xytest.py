@@ -375,8 +375,8 @@ class XYTest(PECS):
                     self.data.posids_disabled |= set(disabled)
                     self.data.posids_disabled_pc[pcid] |= set(disabled)
             else:
-                self.loggers[pcid].info(
-                    f'All {len(posids)} requested fibres measured by FVC.')
+                self.loggers[pcid].info(f'All {len(posids)} requested '
+                                        'positioners measured by FVC.')
 
     def update_calibrations(self, measured_QS):  # test and update TP here
         self.logger.info('Testing and updating posintTP...')
@@ -418,7 +418,8 @@ class XYTest(PECS):
                 np.hstack([c(f'err_x_{n}'), c(f'err_y_{n}')]), axis=1)
         for pcid in self.data.pcids:  # log of error after each move
             err = (movedf.loc[idx[i, self.data.posids_pc[pcid]],
-                              [f'err_x_{n}', f'err_y_{n}', f'err_xy_{n}']]
+                              [f'err_x_{n}', f'err_y_{n}', f'err_xy_{n}',
+                               f'pos_status_{n}']]
                    .sort_values(f'err_xy_{n}', ascending=False))
             errXY = err[f'err_xy_{n}'].values * 1000  # to microns
             self.loggers[pcid].info(
@@ -440,4 +441,4 @@ if __name__ == '__main__':
     test.run_xyaccuracy_test(
         disable_unmatched=test.data.test_cfg['disable_unmatched'])
     test.fvc_collect(destination=test.data.dir)
-    test.data.generate_xy_accuracy_test_products()
+    test.data.generate_data_products()

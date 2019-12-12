@@ -8,7 +8,7 @@ import pandas as pd
 import posconstants as pc
 from pecs import PECS
 from fptestdata import CalibrationData
-from calibrate import PosCalibration
+from poscalibrationfits import PosCalibrationFits
 
 
 class PosCalibrations(PECS):
@@ -77,9 +77,9 @@ class PosCalibrations(PECS):
         posmodels = {}
         for pcid in self.pcids:
             posmodels.update(self.ptls[pcid].posmodels)
-        calib = PosCalibration(petal_alignemnts=petal_alignments,
-                               posmodels=posmodels,
-                               printfunc=self.logger.info)
+        calib = PosCalibrationFits(petal_alignemnts=petal_alignments,
+                                   posmodels=posmodels,
+                                   printfunc=self.logger.info)
         self.data.movedf, calibdf = calib.calibrate_from_arc_data(data_arc)
         self.data.calibdf = pd.concat([collect_calib(update, tag='OLD_')])
         if auto_update:
