@@ -72,7 +72,7 @@ for pos_params in pos_param_sequence:
             anticollision = 'adjust'
             if n > 0:
                 for request in requests.values():
-                    request['command'] = 'dXdY'
+                    request['command'] = 'obsdXdY'
                     request['target'][0] = random.uniform(-max_correction_move,max_correction_move)
                     request['target'][1] = random.uniform(-max_correction_move,max_correction_move)
                 anticollision = 'freeze'
