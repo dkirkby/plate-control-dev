@@ -19,8 +19,8 @@ from postransforms import PosTransforms
 from posstate import PosState
 from posmodel import PosModel
 idx = pd.IndexSlice
-param_keys = ['OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
-              'LENGTH_R1', 'LENGTH_R2']  # initial values for fitting
+keys_fit = ['OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
+            'LENGTH_R1', 'LENGTH_R2']  # initial values for fitting
 
 
 class PosCalibrationFits:
@@ -229,7 +229,7 @@ class PosCalibrationFits:
                      'mea_posintP'] = p_mea_posintP_wrapped
             # done with phi arc, transform measured theta arc to posintTP
             trans.alt_override = True  # enable override in pos transforms
-            trans.alt.update({key: calib[key] for key in param_keys})
+            trans.alt.update({key: calib[key] for key in keys_fit})
             t_mea_posintTP = np.array([
                 trans.flatXY_to_posintTP(flatXY, range_limits='full')[0]
                 for flatXY in posmea['T'].values])  # L x 1 array
@@ -290,9 +290,9 @@ class PosCalibrationFits:
                 'tgt_flatX', 'tgt_flatY', 'tgt_Q', 'tgt_S']
         for col in cols:  # add new empty columns to grid data dataframe
             data[col] = np.nan
-        p0 = [PosTransforms().alt[key] for key in param_keys]
+        p0 = [PosTransforms().alt[key] for key in keys_fit]
         calibs = []  # each entry is a row of calibration for one posid
-        # calibdf = pd.DataFrame(index=posids, columns=param_keys)
+        # calibdf = pd.DataFrame(index=posids, columns=keys_fit)
         for posid in posids:
             trans = self.posmodels[posid].trans
             trans.alt_override = True  # enable override in pos transforms
@@ -303,7 +303,7 @@ class PosCalibrationFits:
             # select only valid measurement data points for fit
             posdata = data.loc[idx[:, posid]].droplevel('DEVICE_ID', axis=0)
             # posdata = posdata[~posdata.isnull().any(axis=1)]  # filter nan
-            if len(posdata) <= len(param_keys):
+            if len(posdata) <= len(keys_fit):
                 self.printfunc(f'{posid} calibration failed, '
                                f'only {len(posdata)} valid grid points')
                 continue  # skip this iteration for this posid in the loop
@@ -311,7 +311,7 @@ class PosCalibrationFits:
             tgt_posintTP = posdata[['tgt_posintT', 'tgt_posintP']].values
 
             def target_xy(params):
-                for key, param in zip(param_keys, params):
+                for key, param in zip(keys_fit, params):
                     trans.alt[key] = param  # override transformation params
                 flatXY = [trans.posintTP_to_flatXY(tp) for tp in tgt_posintTP]
                 return np.array(flatXY)  # N x 2, target posintTP transformed
@@ -328,12 +328,12 @@ class PosCalibrationFits:
             self.printfunc(f'{posid} grid calibration, {mea_flatXY.shape[0]} '
                            f'points, err_rms = {result.fun:.3f}')
             # centralize offsetsTP (why needed if we can limit to +/-180?)
-            # for i, param_key in enumerate(param_keys):
+            # for i, param_key in enumerate(keys_fit):
             #     if param_key in ['OFFSET_T', 'OFFSET_P']:
             #         result.x[i] = (
             #             PosTransforms._centralized_angular_offset_value(
             #                 res.x[i]))
-            calib = {key: result.x[i] for i, key in enumerate(param_keys)}
+            calib = {key: result.x[i] for i, key in enumerate(keys_fit)}
             data.loc[idx[:, posid],
                      ['tgt_flatX', 'tgt_flatY']] = tgtXY = target_xy(result.x)
             data.loc[idx[:, posid], ['tgt_Q', 'tgt_S']] = trans.flatXY_to_QS(

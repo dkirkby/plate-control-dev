@@ -35,10 +35,10 @@ from configobj import ConfigObj
 import posconstants as pc
 import psycopg2
 import matplotlib
-# matplotlib.use('pdf')
+# matplotlib.use('pdf')  # manually specify backend if savefig doesn't work
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
-# plt.ioff()  # turn off interactive mode, doesn't work in matplotlib2
+# plt.ioff()  # turn off interactive mode, doesn't work in matplotlib 2
 plt.rcParams.update({'font.family': 'serif',
                      'mathtext.fontset': 'cm'})
 Circle = matplotlib.patches.Circle
@@ -770,58 +770,133 @@ class XYTestData(FPTestData):
 
 
 class CalibrationData(FPTestData):
-    '''
-    mode is either  'arc' or 'grid'
-    '''
 
-    def __init__(self, mode, pcids, n_pts_T=None, n_pts_P=None):
-        assert mode in ['arc', 'grid'], 'Invalid calibration mode.'
-        test_cfg = ConfigObj()
-        test_cfg['pcids'] = pcids
-        test_cfg['n_pts_T'] = n_pts_T  # the first N points are T arc
-        test_cfg['n_pts_P'] = n_pts_P  # the last N points are P arc
-        super().__init__(mode+'_calibration', test_cfg=test_cfg)
-
+    def __init__(self, test_cfg):
+        # assert mode in ['arc', 'grid'], 'Invalid calibration mode.'
+        test_cfg = ConfigObj().update(test_cfg)
+        super().__init__(test_cfg['mode']+'_calibration', test_cfg=test_cfg)
         # stores calibration values, old and new
         # iterables = [['OLD', 'NEW'], param_keys]
-        columns = pd.MultiIndex.from_product(
-            iterables, names=['label', 'param_key'])
+        # columns = pd.MultiIndex.from_product(
+        #     iterables, names=['label', 'param_key'])
 
-    def initialise_movedata(self, posids, n_targets):
-        '''initialise column names for move data table for each positioner
-        existing attributes required (see xytest.py):
-            self.pcids
-        '''
-        # build column names and data types, all in petal-local flatXY CS
-        cols0 = ['timestamp', 'cycle', 'move_log']
-        dtypes0 = ['datetime64[ns]', np.uint64, str]
-        cols1 = ['target_x', 'target_y']
-        dtypes1 = [np.float64] * len(cols1)
-        cols2_base = ['meas_q', 'meas_s', 'meas_x', 'meas_y',
-                      'err_x', 'err_y', 'err_xy',
-                      'pos_int_t', 'pos_int_p', 'pos_flag', 'pos_status']
-        cols2 = []  # add suffix for base column names corrective moves
-        for field, i in product(cols2_base, range(self.num_corr_max+1)):
-            cols2.append(f'{field}_{i}')
-        cols = cols0 + cols1 + cols2  # list of all columns
-        dtypes2 = [np.float64] * (len(cols2) - 2) + [np.int64, str]
-        dtypes = dtypes0 + dtypes1 + dtypes2
-        data = {col: pd.Series(dtype=dt) for col, dt in zip(cols, dtypes)}
-        # build multi-level index
-        iterables = [np.arange(self.ntargets), posids]
-        names = ['target_no', 'DEVICE_ID']
-        index = pd.MultiIndex.from_product(iterables, names=names)
-        self.movedf = pd.DataFrame(data=data, index=index)
-        # write pcid column to movedf
-        self.movedf = self.movedf.merge(self.posdf['PCID'].reset_index(),
-                                        on='DEVICE_ID', right_index=True)
-        self.logger.info(f'Move data table initialised '
-                         f'for {len(self.posids)} positioners.')
+    def write_calibdf(self, old_calibdf, new_calibdf):
+        self.calibdf = pd.concat([old_calibdf, calibdf], keys=['OLD', 'NEW'],
+                                 names=['label', 'DEVICE_ID'])
+
+    def generate_report(self):
+        path = os.path.join(
+            pc.dirs['calib_logs'],
+            f'{pc.filename_timestamp_str()}-arc_calibration')
+
+    def make_summary_plots(self, n_threads_max=32, make_binder=True, mp=True):
+        pass
+
+    def make_arc_plot(self), posid:
+        posdata = (self.movedf.loc[idx[:, :, posid], :]
+                   .droplevel('DEVICE_ID', axis=0))
+        fig = plt.figure(figsize=(14, 8))
+
+    
+        for arc in ['T','P']:
+            name = 'THETA' if arc == 'T' else 'PHI'
+            other_ax = 'P' if arc == 'T' else 'T'
+            other_name = 'PHI' if ax == 'T' else 'THETA'
+            plot_num_base = 0 if ax == 'T' else 3
+            if ax=='P' and bad_files:
+                target_angles = np.array(literal_eval(data['TARG_POS' + other_ax + '_DURING_' + ax + '_SWEEP']))
+                measured_angles = np.array(literal_eval(data['MEAS_POS' + ax + '_DURING_' + ax + '_SWEEP']))
+                other_axis_angle = data['TARG_POS' + ax + '_DURING_' + ax + '_SWEEP']
+                radius = data[ax+'_RADIUS']
+                center = [data[ax+'_CENTER_X'],data[ax+'_CENTER_Y']]
+                measured_xy = np.array(literal_eval(data['MEASURED_FLATXY_' + ax]))
+            else:
+                target_angles = np.array(literal_eval(data['TARG_POS' + ax + '_DURING_' + ax + '_SWEEP']))
+                measured_angles = np.array(literal_eval(data['MEAS_POS' + ax + '_DURING_' + ax + '_SWEEP']))
+                other_axis_angle = data['TARG_POS' + other_ax + '_DURING_' + ax + '_SWEEP']
+                radius = data[ax+'_RADIUS']
+                center = [data[ax+'_CENTER_X'],data[ax+'_CENTER_Y']]
+                measured_xy = np.array(literal_eval(data['MEASURED_FLATXY_' + ax]))
+            print(measured_xy)
+            print(data['MEASURED_FLATXY_' + ax][0])
+    
+            plt.subplot(2,3,plot_num_base+1)
+            arc_start = np.arctan2(measured_xy[0,1]-center[1],measured_xy[0,0]-center[0]) * 180/np.pi
+            arc_finish = arc_start + np.sum(np.diff(measured_angles))
+            if arc_start > arc_finish:
+                arc_finish += 360
+            ref_arc_angles = np.arange(arc_start,arc_finish,5)*np.pi/180
+            if ref_arc_angles[-1] != arc_finish:
+                ref_arc_angles = np.append(ref_arc_angles,arc_finish*np.pi/180)
+            arc_x = radius * np.cos(ref_arc_angles) + center[0]
+            arc_y = radius * np.sin(ref_arc_angles) + center[1]
+            axis_zero_angle = arc_start - target_angles[0] # where global observer would nominally see the axis's local zero point in this plot
+            axis_zero_line_x = [center[0], radius * np.cos(axis_zero_angle*np.pi/180) + center[0]]
+            axis_zero_line_y = [center[1], radius * np.sin(axis_zero_angle*np.pi/180) + center[1]]
+            plt.plot(arc_x,arc_y,'b-')
+            plt.plot(measured_xy[:,0], measured_xy[:,1], 'ko')
+            plt.plot(measured_xy[0,0], measured_xy[0,1], 'ro')
+            plt.plot(center[0],center[1],'k+')
+            plt.plot(axis_zero_line_x,axis_zero_line_y,'k--')
+            zero_text_angle = np.mod(axis_zero_angle+360, 360)
+            zero_text_angle = zero_text_angle-180 if zero_text_angle > 90 and zero_text_angle < 270 else zero_text_angle
+            zero_text = name + '=0\n(' + other_name + '=' + format(other_axis_angle,'.1f') + ')'
+            plt.text(np.mean(axis_zero_line_x),np.mean(axis_zero_line_y),zero_text,rotation=zero_text_angle,horizontalalignment='center',verticalalignment='top')
+            for i in range(len(measured_xy)):
+                this_angle = np.arctan2(measured_xy[i,1]-center[1],measured_xy[i,0]-center[0])
+                text_x = center[0] + radius*1.1*np.cos(this_angle)
+                text_y = center[1] + radius*1.1*np.sin(this_angle)
+                plt.text(text_x,text_y,str(i),verticalalignment='center',horizontalalignment='center')
+            if ax == 'T':
+                calib_vals_txt = ''
+                for key in ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']:
+                    calib_vals_txt += format(key,'12s') + ' = ' + format(data[key],'.3f') + '\n'
+                plt.text(min(plt.xlim())+0.2,max(plt.ylim())-0.2,calib_vals_txt,fontsize=6,color='gray',family='monospace',horizontalalignment='left',verticalalignment='top')
+            plt.xlabel('x (mm)')
+            plt.ylabel('y (mm)')
+            plt.title(posid + ' ' + name + ' calibration points')
+            plt.grid(True)
+            plt.margins(0.05, 0.05)
+            plt.axis('equal')
+    
+            plt.subplot(2,3,plot_num_base+2)
+            err_angles = measured_angles - target_angles
+            plt.plot(target_angles, err_angles, 'ko-')
+            plt.plot(target_angles[0], err_angles[0], 'ro')
+            for i in range(len(target_angles)):
+                plt.text(target_angles[i],err_angles[i],'\n\n'+str(i),verticalalignment='center',horizontalalignment='center')
+            plt.xlabel('target ' + name + ' angle (deg)')
+            plt.ylabel('measured ' + name + ' - target ' + name + ' (deg)')
+            plt.title('measured angle variation')
+            plt.grid(True)
+            plt.margins(0.1, 0.1)
+    
+            plt.subplot(2,3,plot_num_base+3)
+            measured_radii = np.sqrt(np.sum((measured_xy - center)**2,axis=1)) * 1000 # um
+            best_fit_radius = radius * 1000 # um
+            err_radii = measured_radii - best_fit_radius
+            plt.plot(target_angles, err_radii, 'ko-')
+            plt.plot(target_angles[0], err_radii[0], 'ro')
+            for i in range(len(target_angles)):
+                plt.text(target_angles[i],err_radii[i],'\n\n'+str(i),verticalalignment='center',horizontalalignment='center')
+            plt.xlabel('target ' + name + ' angle (deg)')
+            plt.ylabel('measured radius - best fit radius (um)')
+            plt.title('measured radius variation')
+            plt.grid(True)
+            plt.margins(0.1, 0.1)
+    
+        plt.tight_layout(pad=2.0)
+        import os
+        fig_name = os.path.splitext(os.path.split(df_name)[1])[0]
+        plt.savefig(posid + '_%s.pdf'%fig_name) # + df_name.split('.')[0]+'.pdf')  # save vector gfcs
+        if show:
+            plt.show()
+        plt.close(fig)
 
     def generate_data_products(self):
         self.read_telemetry()
         self.export_data_logs()
-        self.make_arc_plots()
+        # self.make_arc_plots()
         self.dump_as_one_pickle()  # loggers lost as they cannot be serialised
         if shutil.which('pandoc') is None:
             self.printfunc('You must have a complete installation of pandoc '
@@ -829,11 +904,6 @@ class CalibrationData(FPTestData):
         else:
             self.generate_report()  # requires pickle
         self.make_archive()
-
-        path = os.path.join(
-            pc.dirs['calib_logs'],
-            f'{pc.filename_timestamp_str()}-arc_calibration')
-
 
 if __name__ == '__main__':
 

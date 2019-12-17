@@ -203,7 +203,7 @@ class PECS:
     def fvc_collect(self, destination='/data/msdos/focalplane/'):
         self.printfunc('Collecting FVC images associated with exposure ID '
                        f'{self.exp.id} to: {destination}')
-        os.makedirs(self.data.dir, exist_ok=True)
+        os.makedirs(destination, exist_ok=True)
         try:
             self.fvc_collector._send_command('collect', expid=self.exp.id,
                                              output_dir=destination)
