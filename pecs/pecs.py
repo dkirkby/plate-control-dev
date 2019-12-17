@@ -139,8 +139,8 @@ class PECS:
             selection = None
         else:
             selection = user_text.split()
-        user_text = input('Use enabled positioners only? (y/n): ')
-        enabled_only = self._parse_yn(user_text)
+        # user_text = input('Use enabled positioners only? (y/n): ')
+        enabled_only = False  # self._parse_yn(user_text)
         if selection is None:
             posids = sorted(self.ptls[pcid].get_positioners(
                 enabled_only=enabled_only)['DEVICE_ID'])

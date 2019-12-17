@@ -1,27 +1,20 @@
+'''
+Set armlengths R1 and R2 to nominal values. Needs running DOS instance. See pecs.py
+'''
 from pecs import PECS
 import posconstants as pc
 
-
-class SeedArmlengths(PECS):
-    def __init__(self, fvc=None, ptls=None,
-                 pcid=None, posids=None, interactive=False):
-        super().__init__(fvc=fvc, ptls=ptls)
-        self.printfunc('\nSeeding armlengths...\n')
-        if interactive:
-            self.interactive_ptl_setup()
-        else:
-            self.ptl_setup(pcid, posids)
-        self.seed_vals()
-        self.printfunc('Please check DB to ensure new values are committed.')
-
-    def seed_vals(self):
-        for posid in self.posids:
-            self.ptl.set_posfid_val(posid, 'LENGTH_R1',
-                                    pc.nominals['LENGTH_R1']['value'])
-            self.ptl.set_posfid_val(posid, 'LENGTH_R2',
-                                    pc.nominals['LENGTH_R2']['value'])
-        self.ptl.commit(mode='calib', log_note='seed_armlengths')
-
-
-if __name__ == '__main__':
-    SeedArmlengths(interactive=True)
+interactive = True
+seed = PECS(fvc=None, ptls=None, pcid=None, posids=None)
+if interactive:
+    seed.interactive_ptl_setup()
+else:
+    seed.ptl_setup(pcid=None, posids=None)
+print('\nSeeding armlengths...\n')
+for posid in seed.posids:
+    seed.ptl.set_posfid_val(posid, 'LENGTH_R1',
+                            pc.nominals['LENGTH_R1']['value'])
+    seed.ptl.set_posfid_val(posid, 'LENGTH_R2',
+                            pc.nominals['LENGTH_R2']['value'])
+seed.ptl.commit(mode='calib', log_note='seed_armlengths')
+print('Please check DB to ensure new values are committed.')

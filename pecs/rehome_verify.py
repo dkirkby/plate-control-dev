@@ -20,18 +20,10 @@ class RehomeVerify(PECS):
             self.interactive_ptl_setup()
         else:
             self.ptl_setup(pcid, posids)
-        self.printfunc(f'Verifying rehome positions for '
-                       f'{len(self.posids)} positioners...')
-        df = self.compare_xy()
-        path = os.path.join(  # save results
-            pc.dirs['calib_logs'],
-            f'{pc.filename_timestamp_str()}-rehome_verify.csv')
-        df.to_csv(path)
-        self.printfunc(f'Rehome verification data saved to: {path}')
-        if input('Open verification table? (y/n): ') in ['y', 'yes']:
-            os.system(f'xdg-open {path}')
 
     def compare_xy(self):
+        self.printfunc(f'Verifying rehome positions for '
+                       f'{len(self.posids)} positioners...')
         # all backlit fibres, including those disabled, needed for FVC
         exppos = (self.ptl.get_positions(return_coord='QS')
                   .sort_values(by='DEVICE_ID'))
@@ -103,4 +95,9 @@ class RehomeVerify(PECS):
 
 
 if __name__ == '__main__':
-    RehomeVerify(interactive=True)
+    rv = RehomeVerify(interactive=True)
+    df = rv.compare_xy()
+    path = os.path.join(pc.dirs['calib_logs'],
+                        f'{pc.filename_timestamp_str()}-rehome_verify.csv')
+    df.to_csv(path)
+    print(f'Rehome verification data saved to: {path}')

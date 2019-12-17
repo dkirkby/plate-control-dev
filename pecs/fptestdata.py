@@ -781,8 +781,9 @@ class CalibrationData(FPTestData):
         #     iterables, names=['label', 'param_key'])
 
     def write_calibdf(self, old_calibdf, new_calibdf):
-        self.calibdf = pd.concat([old_calibdf, calibdf], keys=['OLD', 'NEW'],
-                                 names=['label', 'DEVICE_ID'])
+        self.calibdf = pd.concat(
+            [old_calibdf, new_calibdf], keys=['OLD', 'NEW'],
+            names=['label', 'DEVICE_ID'])
 
     def generate_report(self):
         path = os.path.join(
@@ -792,30 +793,29 @@ class CalibrationData(FPTestData):
     def make_summary_plots(self, n_threads_max=32, make_binder=True, mp=True):
         pass
 
-    def make_arc_plot(self), posid:
+    def make_arc_plot(self, posid):
         posdata = (self.movedf.loc[idx[:, :, posid], :]
                    .droplevel('DEVICE_ID', axis=0))
         fig = plt.figure(figsize=(14, 8))
 
-    
         for arc in ['T','P']:
             name = 'THETA' if arc == 'T' else 'PHI'
             other_ax = 'P' if arc == 'T' else 'T'
-            other_name = 'PHI' if ax == 'T' else 'THETA'
-            plot_num_base = 0 if ax == 'T' else 3
-            if ax=='P' and bad_files:
-                target_angles = np.array(literal_eval(data['TARG_POS' + other_ax + '_DURING_' + ax + '_SWEEP']))
+            other_name = 'PHI' if arc == 'T' else 'THETA'
+            plot_num_base = 0 if arc == 'T' else 3
+            if arc =='P' and bad_files:
+                target_angles = np.array(literal_eval(data['TARG_POS' + other_ax + '_DURING_' + arc + '_SWEEP']))
                 measured_angles = np.array(literal_eval(data['MEAS_POS' + ax + '_DURING_' + ax + '_SWEEP']))
                 other_axis_angle = data['TARG_POS' + ax + '_DURING_' + ax + '_SWEEP']
-                radius = data[ax+'_RADIUS']
-                center = [data[ax+'_CENTER_X'],data[ax+'_CENTER_Y']]
+                radius = data[arc+'_RADIUS']
+                center = [data[arc+'_CENTER_X'],data[ax+'_CENTER_Y']]
                 measured_xy = np.array(literal_eval(data['MEASURED_FLATXY_' + ax]))
             else:
                 target_angles = np.array(literal_eval(data['TARG_POS' + ax + '_DURING_' + ax + '_SWEEP']))
                 measured_angles = np.array(literal_eval(data['MEAS_POS' + ax + '_DURING_' + ax + '_SWEEP']))
                 other_axis_angle = data['TARG_POS' + other_ax + '_DURING_' + ax + '_SWEEP']
-                radius = data[ax+'_RADIUS']
-                center = [data[ax+'_CENTER_X'],data[ax+'_CENTER_Y']]
+                radius = data[arc+'_RADIUS']
+                center = [data[arc+'_CENTER_X'],data[ax+'_CENTER_Y']]
                 measured_xy = np.array(literal_eval(data['MEASURED_FLATXY_' + ax]))
             print(measured_xy)
             print(data['MEASURED_FLATXY_' + ax][0])
@@ -904,6 +904,7 @@ class CalibrationData(FPTestData):
         else:
             self.generate_report()  # requires pickle
         self.make_archive()
+
 
 if __name__ == '__main__':
 
