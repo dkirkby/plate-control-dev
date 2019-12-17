@@ -15,7 +15,7 @@ FPTestData.loggers[pcid]:       logger which writes new lines to log file
 
 import os
 import io
-from itertools import product
+from itertools import product, chain
 from functools import partial, reduce
 import shutil
 import subprocess
@@ -317,11 +317,19 @@ class FPTestData:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def make_archive(self):
-        path = os.path.join(self.dir, f'{os.path.basename(self.dir)}.tar.gz')
-        with tarfile.open(path, 'w:gz') as arc:  # ^tgz doesn't work properly
-            arc.add(self.dir, arcname=os.path.basename(self.dir))
-        self.printfunc(f'Test data archived: {path}')
-        return path
+        # exclude fits fz file which is typically 1 GB and the existing tgz
+        excl_patterns = ['fvc-*fits.fz', '*.tar.gz']
+        all_paths = glob(os.path.join(self.dir, '*'))
+        excl_paths = list(chain.from_iterable(
+            [glob(os.path.join(self.dir, pattern))
+             for pattern in excl_patterns]))
+        paths = [path for path in all_paths if path not in excl_paths]
+        dirbase = os.path.basename(self.dir)
+        output_path = os.path.join(self.dir, f'{dirbase}.tar.gz')
+        with tarfile.open(output_path, 'w:gz') as arc:
+            for p in paths:
+                arc.add(p, arcname=os.path.join(dirbase, os.path.basename(p)))
+        self.printfunc(f'Test data archived: {output_path}')
 
 
 class XYTestData(FPTestData):
@@ -440,8 +448,8 @@ class XYTestData(FPTestData):
             #     p.close()
             #     p.join()
             n_threads = min(n_threads_max, 2*multiprocessing.cpu_count())
-            self.printfunc(f'Making summary xyplots with {n_threads} threads on '
-                           f'{multiprocessing.cpu_count()} cores for '
+            self.printfunc(f'Making summary xyplots with {n_threads} threads '
+                           f'on {multiprocessing.cpu_count()} cores for '
                            f'submoves {list(range(self.num_corr_max+1))}...')
             pool = []
             n_started = 0
