@@ -41,7 +41,7 @@ class PosCalibrationFits:
         self.printfunc = printfunc
         self.posmodels = {}
         if posmodels is not None:
-            self.init_posmodels(posmodels)
+            self.init_posmodels(posmodels=posmodels)
 
     def read_alignments(self, use_doslib):
         self.printfunc('Reading petal alignments from DB...')
@@ -156,7 +156,7 @@ class PosCalibrationFits:
         """
         self.printfunc(f'Arc calibration for {len(data)} positioners...')
         posids = sorted(data.index.get_level_values('DEVICE_ID').unique())
-        self.init_posmodels(posids)  # double check that all posmodels exist
+        self.init_posmodels(data)  # double check that all posmodels exist
         cols = ['mea_posintT, mea_posintP', 'mea_flatX', 'mea_flatY',
                 'tgt_flatX', 'tgt_flatY', 'tgt_Q', 'tgt_S']
         for col in cols:  # add new empty columns to grid data dataframe
@@ -285,7 +285,7 @@ class PosCalibrationFits:
         """
         self.printfunc(f'Grid calibration for {len(data)} positioners...')
         posids = sorted(data.index.get_level_values('DEVICE_ID').unique())
-        self.init_posmodels(posids)  # double check that all posmodels exist
+        self.init_posmodels(data)  # double check that all posmodels exist
         cols = ['mea_flatX', 'mea_flatY',
                 'tgt_flatX', 'tgt_flatY', 'tgt_Q', 'tgt_S']
         for col in cols:  # add new empty columns to grid data dataframe

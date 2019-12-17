@@ -172,7 +172,7 @@ class PECS:
             print('Expected positions of positioners by PetalApp '
                   'are contaminated by fiducials.')
         self.printfunc(
-            f'Calling FVC.measure() expecting {len(exppos)} positioners...')
+            f'Calling FVC.measure expecting {len(exppos)} positioners...')
         seqid = None
         if hasattr(self, 'exp'):
             seqid = self.exp.id
