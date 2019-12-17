@@ -81,6 +81,7 @@ class RehomeVerify(PECS):
         # now only consider matched, selected positioners, check deviations
         mask = exppos.index.isin(matched) & (exppos['dr'] > tol)
         print_df = exppos[mask].sort_values(by='dr', ascending=False)
+        print_df = print_df[['dr','BUS_ID','DEVICE_LOC','PETAL_LOC','STATUS']]
         bad_posids = sorted(print_df.index)
         if len(bad_posids) == 0:
             self.printfunc(

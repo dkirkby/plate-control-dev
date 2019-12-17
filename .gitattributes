@@ -3,8 +3,6 @@ bin/petal -text
 bin/petalcontroller -text
 pecs/ArcCalib.py -text
 pecs/GridCalib.py -text
-pecs/OnePoint.py -text
-pecs/OnePoint_posTP.py -text
 pecs/arc_calibration.py -text
 pecs/batch_seed.py -text
 pecs/batch_seed_1p.py -text
@@ -13,6 +11,7 @@ pecs/fvc_sim.py -text
 pecs/grid_calibration.py -text
 pecs/loop_phi_moves.py -text
 pecs/onepoint_offsetsTP.py -text
+pecs/onepoint_posintTP.py -text
 pecs/pecs.py -text
 pecs/pecs_local.cfg -text
 pecs/poscalibplot_from_df.py -text
