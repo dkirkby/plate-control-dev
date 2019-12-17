@@ -5,12 +5,12 @@ from pecs import PECS
 import posconstants as pc
 
 interactive = True
-seed = PECS(fvc=None, ptls=None, pcid=None, posids=None)
+seed = PECS(fvc=None, ptls=None)
 if interactive:
     seed.interactive_ptl_setup()
 else:
     seed.ptl_setup(pcid=None, posids=None)
-print('\nSeeding armlengths...\n')
+print('Seeding armlengths...')
 for posid in seed.posids:
     seed.ptl.set_posfid_val(posid, 'LENGTH_R1',
                             pc.nominals['LENGTH_R1']['value'])

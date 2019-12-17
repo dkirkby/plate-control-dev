@@ -7,12 +7,12 @@ from pecs import PECS
 import posconstants as pc
 
 interactive = True
-seed = PECS(fvc=None, ptls=None, pcid=None, posids=None)
+seed = PECS(fvc=None, ptls=None)
 if interactive:
     seed.interactive_ptl_setup()
 else:
     seed.ptl_setup(pcid=None, posids=None)
-print('\nSeeding offsetsTP...\n')
+print('Seeding offsetsTP...')
 updates = []
 for posid in seed.posids:
     update = {'DEVICE_ID': posid,

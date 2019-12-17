@@ -12,22 +12,21 @@ from poscalibrationfits import PosCalibrationFits
 
 
 class PosCalibrations(PECS):
-    '''
-    subclass of PECS that adds functions to run an Arc calibration.
-    In the future: add methods to display, judge and analyze calibration.
-    '''
+    '''mode can be:     1p_offsetsTP, 1p_posintTP, 1p_offsetTposintP,
+                        arc, grid'''
 
     def __init__(self, mode, fvc=None, ptls=None, pcid=None, posids=None,
                  interactive=False):
         cfg = {'pcids': PECS().pcids}
-        if mode == 'arc':
+        if '1p_' in mode:  # phi arm angle for 1p calib is 135 deg
+            cfg.update({'mode': mode, 'poslocP': 135})
+        elif mode == 'arc':
             cfg.update({'mode': 'arc', 'n_pts_T': 6, 'n_pts_P': 6})
         elif mode == 'grid':
             cfg.update({'mode': 'grid', 'n_pts_T': 7, 'n_pts_P': 5})
         else:
             raise Exception(f'Invalid mode: {mode}')
-        self.data = CalibrationData(mode, PECS().pcids,
-                                    n_pts_T=self.npts_T, n_pts_P=self.npts_P)
+        self.data = CalibrationData(mode, PECS().pcids, cfg)
         self.loggers = self.data.loggers  # use these loggers to write to logs
         self.logger = self.data.logger  # broadcast to all petals
         super().__init__(
@@ -49,6 +48,84 @@ class PosCalibrations(PECS):
         return pd.concat(
             [self.ptls[pcid].get_pos_vals(keys_collect, posids=posids)
              for pcid in self.pcids])
+
+    def run_1p_calibration(self, tp_target='default', auto_update=True,
+                           match_radius=50, interactive=False):
+        if interactive:
+            user_text = self._parse_yn(
+                input('Do you want to move positioners? (y/n): '))
+            if user_text:  # moving positioners to default TP target
+                tp_target = 'default'
+            else:  # not moving positioners, use current position
+                tp_target = None
+            auto_update = self._parse_yn(input(
+                    'Automatically update calibration? (y/n): '))
+            match_radius = float(input('Please provide a spotmatch radius: '))
+            return self.run_1p_calibration(
+                tp_target=tp_target, auto_update=auto_update,
+                match_radius=match_radius)
+        self.data.test_cfg['auto_update'] = auto_update
+        self.data.test_cfg['match_radius'] = match_radius
+        old_calibdf = self.collect_calib(self.posids)
+        do_move = True
+        if tp_target == 'default':  # tp_target as target
+            poslocTP = (0, self.data.poslocP)  # same target for all posids
+        elif isinstance(tp_target, (tuple, list)) and len(tp_target) == 2:
+            poslocTP = tp_target
+        else:
+            do_move = False
+        self.printfunc(
+            f'Running one-point calibration, mode = {self.data.mode}, '
+            f'poslocTP = {poslocTP}, do_move = {do_move}')
+        rows = []
+        if do_move:  # then build requests and make the moves
+            for posid in self.posids:
+                posintTP = self.ptl.postrans(posid,
+                                             'poslocTP_to_posintTP', poslocTP)
+                rows.append({'DEVICE_ID': posid,
+                             'COMMAND': 'posintTP',
+                             'X1': posintTP[0],
+                             'X2': posintTP[1],
+                             'LOG_NOTE': f'1p calibration {self.data.mode}'})
+            requests = pd.DataFrame(rows)
+            self.ptl.prepare_move(requests, anticollision=None)
+            self.ptl.execute_move()
+        else:  # then use current position as targets in requests
+            requests = self.ptl.get_positions(posids=self.posids,
+                                              return_coord='posintTP')
+        exppos, meapos, matched, unmatched = self.fvc_measure(
+                match_radius=match_radius)
+        used_pos = meapos.loc[sorted(matched & (set(self.posids)))]
+        unused_pos = exppos.loc[sorted(unmatched & (set(self.posids)))]
+        if self.data.mode == '1p_offsetsTP':
+            update_mode = 'offsetsTP'
+        elif self.data.mode == '1p_posintTP':
+            update_mode = 'posTP'
+        elif self.data.mode == '1p_offsetTposintP':
+            update_mode = 'offsetTposP'
+        updates = (
+            self.ptl.test_and_update_TP(
+                used_pos.reset_index(), mode=update_mode,
+                auto_update=auto_update,
+                tp_updates_tol=0.0, tp_updates_fraction=1.0)
+            .set_index('DEVICE_ID').sort_index())
+        cols = used_pos.columns.difference(updates.columns)
+        updates = updates.join(used_pos[cols])  # include QS measurements
+        # List unmeasured positioners in updates, even with no data
+        updates.append(unused_pos, sort=False)
+        # overwrite flags with focalplane flags and add status
+        flags_dict = self.ptl.get_pos_flags(list(updates.index))
+        flags = []
+        for posid in updates.index:
+            flags.append(flags_dict[posid])
+        updates['FLAGS'] = flags
+        updates['STATUS'] = self.ptl.decipher_posflags(updates['FLAGS'])
+        # Clean up and record additional entries in updates
+        updates['auto_update'] = auto_update
+        updates['target_t'] = requests.set_index('DEVICE_ID')['X1']
+        updates['target_p'] = requests.set_index('DEVICE_ID')['X2']
+        calibdf = updates
+        self.data.write_calibdf(old_calibdf, calibdf)
 
     def run_arc_calibration(self, auto_update=False, match_radius=50,
                             interactive=False):

@@ -32,19 +32,17 @@ import posconstants as pc
 from pecs import PECS
 
 interactive = True
-seed = PECS(fvc=None, ptls=None, pcid=None, posids=None)
+seed = PECS(fvc=None, ptls=None)
 if interactive:
     seed.interactive_ptl_setup()
 else:
     seed.ptl_setup(pcid=None, posids=None)
-print('\nSeeding offsets XY...\n')
+print('Seeding offsets XY...')
 pi = PositionerIndex()
-data = np.genfromtxt(pc.dirs['positioner_locations_file'],
-                     delimiter=',', names=True,
-                     usecols=(0, 2, 3, 4))  # in nominal ptlXY
-# convert structured array to normal np array of shape (3, 543)
-pos = data.view(np.float64).reshape(data.shape[0], 4)[:, 1:].T
-pos = seed.ptl.ptltrans('ptlXYZ_to_flatXY', pos)
+# array of shape (3, 543) in nominal ptlXY
+ptlXYZ = (pd.read_csv(pc.dirs['positioner_locations_file'])
+        [['X', 'Y', 'Z']].values.T)
+pos = seed.ptl.ptltrans('ptlXYZ_to_flatXY', ptlXYZ)
 updates = []
 for posid in seed.posids:
     pos_info = pi.find_by_device_id(posid)
