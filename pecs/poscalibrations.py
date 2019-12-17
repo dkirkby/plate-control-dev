@@ -17,16 +17,16 @@ class PosCalibrations(PECS):
 
     def __init__(self, mode, fvc=None, ptls=None, pcid=None, posids=None,
                  interactive=False):
-        cfg = {'pcids': PECS().pcids}
+        test_cfg = {'pcids': PECS().pcids, 'anticollision': None}
         if '1p_' in mode:  # phi arm angle for 1p calib is 135 deg
-            cfg.update({'mode': mode, 'poslocP': 135})
+            test_cfg.update({'mode': mode, 'poslocP': 135})
         elif mode == 'arc':
-            cfg.update({'mode': 'arc', 'n_pts_T': 6, 'n_pts_P': 6})
+            test_cfg.update({'mode': 'arc', 'n_pts_T': 6, 'n_pts_P': 6})
         elif mode == 'grid':
-            cfg.update({'mode': 'grid', 'n_pts_T': 7, 'n_pts_P': 5})
+            test_cfg.update({'mode': 'grid', 'n_pts_T': 7, 'n_pts_P': 5})
         else:
             raise Exception(f'Invalid mode: {mode}')
-        self.data = CalibrationData(mode, PECS().pcids, cfg)
+        self.data = CalibrationData(test_cfg)
         self.loggers = self.data.loggers  # use these loggers to write to logs
         self.logger = self.data.logger  # broadcast to all petals
         super().__init__(
@@ -47,7 +47,7 @@ class PosCalibrations(PECS):
             'GEAR_CALIB_T', 'GEAR_CALIB_P']
         return pd.concat(
             [self.ptls[pcid].get_pos_vals(keys_collect, posids=posids)
-             for pcid in self.pcids])
+             .set_index('DEVICE_ID') for pcid in self.pcids])
 
     def run_1p_calibration(self, tp_target='default', auto_update=True,
                            match_radius=50, interactive=False):

@@ -156,7 +156,8 @@ class FPTestData:
         configcopy.filename = None
         printfunc(f'=== Config file dump: {config.filename} ===')
         for line in configcopy.write():
-            printfunc(line.decode('utf_8'))  # convert byte str to str
+            printfunc(line)  # now line is utf8 str which needs no decode
+            #  printfunc(line.decode('utf_8'))  # convert byte str to str
         printfunc(f'=== End of config file dump: {config.filename} ===')
 
     class BroadcastLogger:
@@ -771,9 +772,9 @@ class XYTestData(FPTestData):
 
 class CalibrationData(FPTestData):
 
-    def __init__(self, test_cfg):
-        # assert mode in ['arc', 'grid'], 'Invalid calibration mode.'
-        test_cfg = ConfigObj().update(test_cfg)
+    def __init__(self, test_cfg_dict):
+        test_cfg = ConfigObj()
+        test_cfg.update(test_cfg_dict)
         super().__init__(test_cfg['mode']+'_calibration', test_cfg=test_cfg)
         # stores calibration values, old and new
         # iterables = [['OLD', 'NEW'], param_keys]
@@ -783,7 +784,7 @@ class CalibrationData(FPTestData):
     def write_calibdf(self, old_calibdf, new_calibdf):
         self.calibdf = pd.concat(
             [old_calibdf, new_calibdf], keys=['OLD', 'NEW'],
-            names=['label', 'DEVICE_ID'])
+            names=['label', 'DEVICE_ID'], sort=False)
 
     def generate_report(self):
         path = os.path.join(
