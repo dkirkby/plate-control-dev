@@ -227,7 +227,7 @@ class PECS:
             input('Paused for heat load monitoring for unspecified interval. '
                   'Press enter to continue: ')
         elif self.pause_interval == 0:  # no puase needed, just continue
-            self.printfunc('Pause interval = 0, continuing without pause...')
+            self.printfunc('pause_interval = 0, continuing without pause...')
         elif self.pause_interval > 0:
             self.printfunc(f'Pausing for {self.pause_interval} s...')
             self.countdown_sec(self.pause_interval)

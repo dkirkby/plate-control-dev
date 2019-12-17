@@ -140,7 +140,8 @@ class PosCalibrations(PECS):
         self.data.test_cfg['match_radius'] = match_radius
         old_calibdf = self.collect_calib(self.posids)
         req_list_T, req_list_P = self.ptl.get_arc_requests(  # build requests
-            ids=self.posids, n_points_T=self.n_pts_T, n_points_P=self.n_pts_P)
+            ids=self.posids,
+            n_points_T=self.data.n_pts_T, n_points_P=self.data.n_pts_P)
         T_data = []  # move, measure
         for i, req in enumerate(req_list_T):
             self.printfunc(f'Measuring theta arc point {i+1} of '
@@ -156,22 +157,18 @@ class PosCalibrations(PECS):
                 self.pause()
             P_data.append(self.move_measure(req, match_radius=match_radius))
         # put all arc measurement data in one dataframe
-        T_arc = pd.concat(T_data, keys=range(self.n_pts_T))
-        P_arc = pd.concat(P_data, keys=range(self.n_pts_P))
+        T_arc = pd.concat(T_data, keys=range(self.data.n_pts_T))
+        P_arc = pd.concat(P_data, keys=range(self.data.n_pts_P))
         data_arc = pd.concat([T_arc, P_arc], keys=['T', 'P'],
                              names=['arc', 'target_no', 'DEVICE_ID'])
         # run fitting
         petal_alignments = {i: self.ptls[i].alignment for i in self.pcids}
-        posmodels = {}
-        for pcid in self.pcids:
-            posmodels.update(self.ptls[pcid].posmodels)
         calib = PosCalibrationFits(petal_alignemnts=petal_alignments,
-                                   posmodels=posmodels,
                                    printfunc=self.logger.info)
         self.data.movedf, calibdf = calib.calibrate_from_arc_data(data_arc)
         self.data.write_calibdf(old_calibdf, calibdf)
         if auto_update:
-            [self.ptls[pcid].set_calibration(calibdf) for i in self.pcids]
+            [self.ptls[pcid].set_calibration(calibdf) for pcid in self.pcids]
 
     def run_grid_calibration(self, auto_update=False, match_radius=50,
                              interactive=False):
@@ -186,8 +183,8 @@ class PosCalibrations(PECS):
         self.data.test_cfg['match_radius'] = match_radius
         old_calibdf = self.collect_calib(self.posids)
         req_list = self.ptl.get_grid_requests(ids=self.posids,
-                                              n_points_T=self.n_points_T,
-                                              n_points_P=self.n_points_P)
+                                              n_points_T=self.data.n_points_T,
+                                              n_points_P=self.data.n_points_P)
         grid_data = []  # move, measure
         for i, request in enumerate(req_list):
             self.printfunc(f'Measuring grid point {i+1} of {len(req_list)}...')
@@ -199,16 +196,12 @@ class PosCalibrations(PECS):
                               names=['target_no', 'DEVICE_ID'])
         # run fitting
         petal_alignments = {i: self.ptls[i].alignment for i in self.pcids}
-        posmodels = {}
-        for pcid in self.pcids:
-            posmodels.update(self.ptls[pcid].posmodels)
         calib = PosCalibrationFits(petal_alignemnts=petal_alignments,
-                                   posmodels=posmodels,
                                    printfunc=self.logger.info)
         self.data.movedf, calibdf = calib.calibrate_from_grid_data(data_grid)
         self.data.write_calibdf(old_calibdf, calibdf)
         if auto_update:
-            [self.ptls[pcid].set_calibration(calibdf) for i in self.pcids]
+            [self.ptls[pcid].set_calibration(calibdf) for pcid in self.pcids]
 
     def move_measure(self, request, match_radius=30):
         '''
@@ -221,6 +214,7 @@ class PosCalibrations(PECS):
             matched_only=True, match_radius=match_radius)
         # meapos contains not only matched ones but all posids in expected pos
         matched_df = meapos.loc[sorted(matched & set(self.posids))]
-        request.rename(columns={'X1': 'TARGET_T', 'X2': 'TARGET_P'},
-                       inplace=True).set_index('DEVICE_ID')
-        return matched_df.merge(request, how='outer')
+        request = (request.rename(columns={'X1': 'TARGET_T', 'X2': 'TARGET_P'})
+                   .set_index('DEVICE_ID'))
+        return matched_df.merge(request, how='outer',
+                                left_index=True, right_index=True)
