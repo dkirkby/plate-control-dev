@@ -50,7 +50,7 @@ class PosCalibrations(PECS):
             [self.ptls[pcid].get_pos_vals(keys_collect, posids=posids)
              .set_index('DEVICE_ID') for pcid in self.pcids])
 
-    def run_1p_calibration(self, tp_target='default', auto_update=True,
+    def run_1p_calibration(self, tp_target='default', commit=False,
                            match_radius=50, interactive=False):
         if interactive:
             user_text = self._parse_yn(
@@ -59,13 +59,13 @@ class PosCalibrations(PECS):
                 tp_target = 'default'
             else:  # not moving positioners, use current position
                 tp_target = None
-            auto_update = self._parse_yn(input(
-                    'Automatically update calibration? (y/n): '))
+            commit = self._parse_yn(input(
+                    'Commit calibration results? (y/n): '))
             # match_radius = float(input('Spotmatch radius: '))
             return self.run_1p_calibration(
-                tp_target=tp_target, auto_update=auto_update,
+                tp_target=tp_target, commit=commit,
                 match_radius=match_radius)
-        self.data.test_cfg['auto_update'] = auto_update
+        self.data.test_cfg['commit'] = commit
         self.data.test_cfg['match_radius'] = match_radius
         calib_old = self.collect_calib(self.posids)
         do_move = True
@@ -78,7 +78,7 @@ class PosCalibrations(PECS):
         self.printfunc(
             f'Running one-point calibration, mode = {self.data.mode}, '
             f'poslocTP = {poslocTP}, do_move = {do_move}, '
-            f'auto_update = {auto_update}')
+            f'commit = {commit}')
         rows = []
         if do_move:  # then build requests and make the moves
             for posid in self.posids:
@@ -108,7 +108,7 @@ class PosCalibrations(PECS):
         updates = (
             self.ptl.test_and_update_TP(
                 used_pos.reset_index(), mode=update_mode,
-                auto_update=auto_update,
+                auto_update=commit,
                 tp_updates_tol=0.0, tp_updates_fraction=1.0)
             .set_index('DEVICE_ID').sort_index()).rename(
                 columns={'FLAGS': 'FLAG',
@@ -139,21 +139,21 @@ class PosCalibrations(PECS):
         calib_new.update(calib_up)
         self.data.write_calibdf(calib_old, calib_new)
 
-    def run_arc_calibration(self, auto_update=False, match_radius=50,
+    def run_arc_calibration(self, commit=False, match_radius=50,
                             interactive=False):
         if interactive:
-            auto_update = self._parse_yn(input(
+            commit = self._parse_yn(input(
                         'Automatically update calibration? (y/n): '))
             match_radius = float(input(
                     'Please provide a spotmatch radius: '))
-            return self.run_arc_calibration(auto_update=auto_update,
+            return self.run_arc_calibration(commit=commit,
                                             match_radius=match_radius)
-        self.data.test_cfg['auto_update'] = auto_update
+        self.data.test_cfg['commit'] = commit
         self.data.test_cfg['match_radius'] = match_radius
         calib_old = self.collect_calib(self.posids)
         self.printfunc(
             f'Running arc calibration, n_pts_T = {self.data.n_pts_T}, '
-            f'n_pts_P = {self.data.n_pts_P}, auto_update = {auto_update}')
+            f'n_pts_P = {self.data.n_pts_P}, commit = {commit}')
         req_list_T, req_list_P = self.ptl.get_arc_requests(  # build requests
             ids=self.posids,
             n_points_T=self.data.n_pts_T, n_points_P=self.data.n_pts_P)
@@ -186,24 +186,24 @@ class PosCalibrations(PECS):
         calib_new = self.collect_calib(self.posids)
         calib_new.update(calib_fit)
         self.data.write_calibdf(calib_old, calib_new)
-        if auto_update:
+        if commit:
             [self.ptls[pcid].set_calibration(calib_new) for pcid in self.pcids]
 
-    def run_grid_calibration(self, auto_update=False, match_radius=50,
+    def run_grid_calibration(self, commit=False, match_radius=50,
                              interactive=False):
         if interactive:
-            auto_update = self._parse_yn(input(
+            commit = self._parse_yn(input(
                         'Automatically update calibration? (y/n): '))
             match_radius = float(input(
                     'Please provide a spotmatch radius: '))
-            return self.run_grid_calibration(auto_update=auto_update,
+            return self.run_grid_calibration(commit=commit,
                                              match_radius=match_radius)
-        self.data.test_cfg['auto_update'] = auto_update
+        self.data.test_cfg['commit'] = commit
         self.data.test_cfg['match_radius'] = match_radius
         calib_old = self.collect_calib(self.posids)
         self.printfunc(
             f'Running grid calibration, n_pts_T = {self.data.n_pts_T}, '
-            f'n_pts_P = {self.data.n_pts_P}, auto_update = {auto_update}')
+            f'n_pts_P = {self.data.n_pts_P}, commit = {commit}')
         req_list = self.ptl.get_grid_requests(ids=self.posids,
                                               n_points_T=self.data.n_pts_T,
                                               n_points_P=self.data.n_pts_P)
@@ -226,7 +226,7 @@ class PosCalibrations(PECS):
         calib_new = self.collect_calib(self.posids)
         calib_new.update(calib_fit)
         self.data.write_calibdf(calib_old, calib_new)
-        if auto_update:
+        if commit:
             [self.ptls[pcid].set_calibration(calib_new) for pcid in self.pcids]
 
     def move_measure(self, request, match_radius=50):

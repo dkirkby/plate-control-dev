@@ -11,7 +11,7 @@ from poscalibrations import PosCalibrations
 import pandas as pd
 idx = pd.IndexSlice
 test = PosCalibrations('arc', n_pts_TP=(6, 6), interactive=True)
-test.run_arc_calibration(auto_update=False)
+test.run_arc_calibration(commit=False)
 test.fvc_collect(destination=test.data.dir)
 test.data.generate_data_products()
 print(test.data.calibdf.loc[:, idx[:, [  # preview calibration updates
