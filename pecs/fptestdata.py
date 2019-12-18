@@ -229,6 +229,9 @@ class FPTestData:
 
     def plot_posfid_temp(self, pcid=None):
 
+        def temp_telemetry_present(pcid):
+            return not self.telemetry[self.telemetry['pcid'] == pcid].empty
+
         def plot_petal(pcid, ax, max_on=True, mean_on=False, median_on=True):
             query = self.telemetry[self.telemetry['pcid'] == pcid]
             if max_on:
@@ -246,32 +249,41 @@ class FPTestData:
             return
         # perform telemetry data sanity check needed since there's been
         # so many issues with the petalcontroller code and bad telemetry data
-        telemetry_clean = True
         for stat in ['max', 'mean', 'median']:
             field = f'posfid_temps_{stat}'
             if self.telemetry[field].isnull().any():
                 print(f'Telemetry data from DB failed sanity check for '
-                      f'temperature plot. '
-                      f'Field "{field}" contains null values.')
-                telemetry_clean = False
-        if telemetry_clean:
-            pd.plotting.register_matplotlib_converters()
-            fig, ax = plt.subplots(figsize=(6.5, 3.5))
-            if pcid is None:  # loop through all petals, plot max only
-                for pcid in self.pcids:
+                      f'temperature plot. Field "{field}" contains '
+                      f'null values.')
+                return
+        # make sure at least one pcid present has valid temp temeletry data
+        for i in self.pcids:
+            if not temp_telemetry_present(i):
+                print(f'PC{pcid:02} telemetry missing from DB.')
+                if i == pcid:  # plotting only one petal, and it's missing
+                    return
+        if not np.any([temp_telemetry_present(i) for i in self.pcids]):
+            print(f'No telemetry available in DB during this session for '
+                  f'any PCID tested.')
+            return  # plotting all petals, but not any is present
+        pd.plotting.register_matplotlib_converters()
+        fig, ax = plt.subplots(figsize=(6.5, 3.5))  # now ok to plot something
+        if pcid is None:  # loop through all petals, plot max only
+            for pcid in self.pcids:  # at least one is present, not sure which
+                if temp_telemetry_present(pcid):
                     plot_petal(pcid, ax,
                                max_on=True, mean_on=False, median_on=False)
-            else:  # pcid is an integer, plot the one given pcid only
-                plot_petal(pcid, ax)
-            ax.legend()
-            ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
-            ax.xaxis.set_tick_params(rotation=45)
-            ax.set_xlabel('Time (UTC)')
-            ax.set_ylabel('Temperature (°C)')
-            suffix = '' if pcid is None else f'_pc{pcid:02}'
-            fig.savefig(os.path.join(self.dir, 'figures',
-                                     f'posfid_temp{suffix}.pdf'),
-                        bbox_inches='tight')
+        else:  # pcid is an integer, plot the one given pcid only
+            plot_petal(pcid, ax)
+        ax.legend()
+        ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
+        ax.xaxis.set_tick_params(rotation=45)
+        ax.set_xlabel('Time (UTC)')
+        ax.set_ylabel('Temperature (°C)')
+        suffix = '' if pcid is None else f'_pc{pcid:02}'
+        fig.savefig(os.path.join(self.dir, 'figures',
+                                 f'posfid_temp{suffix}.pdf'),
+                    bbox_inches='tight')
 
     @staticmethod
     def add_hist_annotation(ax):
@@ -320,7 +332,9 @@ class FPTestData:
 
     def make_archive(self):
         # exclude fits fz file which is typically 1 GB and the existing tgz
-        excl_patterns = ['fvc-*fits.fz', '*.tar.gz']
+        excl_patterns = ['fvc-*.fits.fz', '*.tar.gz']
+        self.printfunc(f'Making tgz archive with exclusion patterns: '
+                       f'{excl_patterns}')
         all_paths = glob(os.path.join(self.dir, '*'))
         excl_paths = list(chain.from_iterable(
             [glob(os.path.join(self.dir, pattern))
@@ -706,7 +720,7 @@ class XYTestData(FPTestData):
             ax.set_title(title)
             return hm
 
-        fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
         col_names = ['err_0_max', 'err_corr_rms']
         move_names = ['max blind move', 'rms corrective move']
         vmin = gradedf[col_names].min().min()
@@ -717,10 +731,12 @@ class XYTestData(FPTestData):
                 f'PC{pcid:02} {move_name} error map\n({len(gradedf)} '
                 f'positioners, {n_outliers} {olstr} excluded)')
             hm = plot_error_heatmap(ax, col_name, vmin, vmax, title)
+            fig.colorbar(hm, ax=ax, fraction=0.028, pad=0.025)
         axes[0].set_ylabel('y (mm)')
-        fig.subplots_adjust(wspace=0)
-        cbar_ax = fig.add_axes([0.91, 0.225, 0.01, 0.555])
-        fig.colorbar(hm, cax=cbar_ax)
+        plt.tight_layout()
+        # fig.subplots_adjust(wspace=0)
+        # cbar_ax = fig.add_axes([0.91, 0.225, 0.01, 0.555])
+        # fig.colorbar(hm, cax=cbar_ax)
         fig.savefig(os.path.join(self.dir, 'figures',
                                  f'{pcid}_error_heatmaps.pdf'),
                     bbox_inches='tight')
@@ -733,7 +749,7 @@ class XYTestData(FPTestData):
                                    f'{self.filename}-report.html')
         with open(os.path.join(pc.dirs['xytest_data'], 'pweave_test_src.txt'),
                   'w') as h:
-            h.write(os.path.join(self.dir, 'data_dump.pkl'))
+            h.write(os.path.join(self.dir, 'xytestdata.pkl'))
         # add sections for each pcid to markdown document
         shutil.copyfile('xytest_report_master.pmd', 'xytest_report.pmd')
         with open('xytest_report_master_petal.pmd', 'r') as h:
@@ -911,7 +927,8 @@ class CalibrationData(FPTestData):
 if __name__ == '__main__':
 
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    expids = ['00033474']
+    expids = ['00031306', '00031308', '00031611', '00032703', '00032704']
+    expids = ['00031611']
     for expid in expids:
         paths = glob(pc.dirs['kpno']+f'/*/{expid}/*data.pkl')
         assert len(paths) == 1, paths
@@ -919,7 +936,8 @@ if __name__ == '__main__':
         try:
             with open(os.path.join(paths[0]), 'rb') as h:
                 data = pickle.load(h)
-            # data.generate_xyaccuracy_test_products()
+            # data.generate_data_products()
+            data.dump_as_one_pickle()
             if shutil.which('pandoc') is not None:
                 data.generate_report()
             data.make_archive()
