@@ -259,7 +259,7 @@ class FPTestData:
         # make sure at least one pcid present has valid temp temeletry data
         for i in self.pcids:
             if not temp_telemetry_present(i):
-                print(f'PC{pcid:02} telemetry missing from DB.')
+                print(f'PC{i:02} telemetry missing from DB.')
                 if i == pcid:  # plotting only one petal, and it's missing
                     return
         if not np.any([temp_telemetry_present(i) for i in self.pcids]):
