@@ -309,13 +309,9 @@ class PosMoveTable(object):
             posintP = [self.init_posintTP[pc.P] + table['net_dP'][i]
                        for i in row_range]
             table['posintTP'] = [[posintT[i], posintP[i]] for i in row_range]
-            table['poslocTP'] = [trans.posintTP_to_poslocTP(tp)
-                                 for tp in table['posintTP']]
-            table['poslocXY'] = [trans.posintTP_to_poslocXY(tp)
-                                 for tp in table['posintTP']]
-            table['obsXY'] = [trans.poslocXY_to_obsXY(xy)
-                              for xy in table['poslocXY']]
-            table['QS'] = [trans.obsXY_to_QS(xy) for xy in table['obsXY']]
+            table['poslocTP'] = [trans.posintTP_to_poslocTP(tp) for tp in table['posintTP']]
+            table['poslocXY'] = [trans.posintTP_to_poslocXY(tp) for tp in table['posintTP']]
+            table['QS'] = [trans.poslocXY_to_QS(xy) for xy in table['poslocXY']]
         return table
 
 class PosMoveRow(object):
