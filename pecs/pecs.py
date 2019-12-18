@@ -79,7 +79,7 @@ class PECS:
         self.fvc_collector = SimpleProxy('FVCCOLLECTOR')
         try:
             self.fvc_collector._send_command('configure')
-        except:
+        except Exception:
             self.printfunc('FVC collector unavailable')
 
     def exp_setup(self):

@@ -800,8 +800,8 @@ class CalibrationData(FPTestData):
 
     def write_calibdf(self, old_calibdf, new_calibdf):
         self.calibdf = pd.concat(
-            [old_calibdf, new_calibdf], keys=['OLD', 'NEW'],
-            names=['label', 'DEVICE_ID'], sort=False)
+            [old_calibdf, new_calibdf], axis=1, keys=['OLD', 'NEW'],
+            names=['label', 'field'], sort=False)
 
     def generate_report(self):
         path = os.path.join(
