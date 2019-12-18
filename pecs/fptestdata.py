@@ -911,9 +911,9 @@ class CalibrationData(FPTestData):
 if __name__ == '__main__':
 
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    expids = ['00031305']
+    expids = ['00033474']
     for expid in expids:
-        paths = glob(pc.dirs['kpno']+f'/*/{expid}/data_dump.pkl')
+        paths = glob(pc.dirs['kpno']+f'/*/{expid}/*data.pkl')
         assert len(paths) == 1, paths
         print(f'Re-processing FP test data:\n{paths[0]}')
         try:

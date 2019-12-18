@@ -108,8 +108,8 @@ class PosCalibrationFits:
             for posid in tqdm(data.index.get_level_values('DEVICE_ID')
                               .unique()):
                 if posid not in self.posmodels.keys():
-                    petal_loc = (
-                        data.loc[idx[:, :, posid], 'PETAL_LOC'].iloc[0])
+                    petal_loc = data.xs(
+                        posid, level='DEVICE_ID')['PETAL_LOC'].iloc[0]
                     petal_id = self.pi.find_by_device_id(posid)['PETAL_ID']
                     self.posmodels[posid] = PosModel(state=PosState(
                         unit_id=posid, petal_id=petal_id, device_type='pos',
@@ -162,15 +162,16 @@ class PosCalibrationFits:
                         GEAR_RATIO_T, GEAR_RATIO_P
         """
         posids = sorted(data.index.get_level_values('DEVICE_ID').unique())
-        self.printfunc(f'Arc calibration for {len(posids)} positioners...')
+        self.printfunc(
+            f'Fitting arc calibration data, {len(posids)} positioners...')
         self.init_posmodels(data)  # double check that all posmodels exist
         cols = ['mea_posintT, mea_posintP', 'mea_flatX', 'mea_flatY',
                 'tgt_flatX', 'tgt_flatY', 'tgt_Q', 'tgt_S']
         for col in cols:  # add new empty columns to grid data dataframe
             data[col] = np.nan
-        calibs = []  # each entry is a row of calibration values for one posid
+        poscals = []  # each entry is a row of calibration values for one posid
         for posid in posids:
-            calib, posmea = {}, {}
+            poscal, posmea = {}, {}
             trans = self.posmodels[posid].trans
             # measurement always in QS, but fit and derive params in flatXY
             QS = data.loc[idx[:, :, posid], ['mea_Q', 'mea_S']].values  # Nx2
@@ -199,11 +200,11 @@ class PosCalibrationFits:
                 calib[f'residuals_{arc}'] = fits[i][2]
                 data.loc[idx[arc, posmea[arc].index, posid],
                          'err_radial'] = fits[i][2]
-            calib.update({'OFFSET_X': calib['centre_T'][0],
-                          'OFFSET_Y': calib['centre_T'][1],
-                          'LENGTH_R1': np.linalg.norm(calib['centre_T']
-                                                      - calib['centre_P']),
-                          'LENGTH_R2': calib['radius_P'].mean()})
+            poscal.update({'OFFSET_X': calib['centre_T'][0],
+                           'OFFSET_Y': calib['centre_T'][1],
+                           'LENGTH_R1': np.linalg.norm(calib['centre_T']
+                                                       - calib['centre_P']),
+                           'LENGTH_R2': calib['radius_P'].mean()})
             # caluclate offset T using phi arc centre and target posintT
             xy = calib['centre_P'] - calib['centre_T']  # 1 x 2 array
             p_mea_poslocT = np.degrees(np.arctan2(xy[1], xy[0]))  # float
@@ -212,10 +213,10 @@ class PosCalibrationFits:
             p_tgt_posintP = data.loc[idx['P', posmea['P'].index, posid],
                                      'tgt_posintP']  # length M
             # subtract constant target posintT of phi arc
-            calib['OFFSET_T'] = PosTransforms._centralize_angular_offset(
+            poscal['OFFSET_T'] = PosTransforms._centralize_angular_offset(
                 p_mea_poslocT - p_tgt_posintP.values[0])
             # calculate offset P still using phi arc
-            xy = posmea['P'].values - calib['centre_P']  # phi arc wrt phi ctr
+            xy = posmea['P'].values - poscal['centre_P']  # phi arc wrt phi ctr
             angles = np.degrees(np.arctan2(xy[:, 1], xy[:, 0]))  # 1 x M array
             # subtract poslocT of phi arc to convert phi angles to poslocP
             # poslocP = 0 is parallel to T arm
@@ -227,16 +228,16 @@ class PosCalibrationFits:
                     p_mea_poslocP, p_tgt_direction)  # 1 x M array
             # take median difference between wrapped poslocP and
             # expected posintP, ideally these diffences are similar
-            calib['OFFSET_P'] = PosTransforms._centralize_angular_offset(
+            poscal['OFFSET_P'] = PosTransforms._centralize_angular_offset(
                 np.median(p_mea_poslocP_wrapped - p_tgt_posintP))
-            p_mea_posintP_wrapped = p_mea_poslocP_wrapped - calib['OFFSET_P']
+            p_mea_posintP_wrapped = p_mea_poslocP_wrapped - poscal['OFFSET_P']
             data.loc[idx['P', posmea['P'].index, posid],
-                     'mea_posintT'] = p_mea_poslocT - calib['OFFSET_T']
+                     'mea_posintT'] = p_mea_poslocT - poscal['OFFSET_T']
             data.loc[idx['P', posmea['P'].index, posid],
                      'mea_posintP'] = p_mea_posintP_wrapped
             # done with phi arc, transform measured theta arc to posintTP
             trans.alt_override = True  # enable override in pos transforms
-            trans.alt.update({key: calib[key] for key in keys_fit})
+            trans.alt.update({key: poscal[key] for key in keys_fit})
             t_mea_posintTP = np.array([
                 trans.flatXY_to_posintTP(flatXY, range_limits='full')[0]
                 for flatXY in posmea['T'].values])  # L x 1 array
@@ -255,9 +256,9 @@ class PosCalibrationFits:
             data.loc[idx[:, :, posid], ['tgt_Q', 'tgt_S']] = np.array(
                 [trans.posintTP_to_QS(tp) for tp in tgt_posintTP])
             # gear ratios, good feedback on how successful the calib was
-            calib['GEAR_CALIB_T'] = ratio_T = np.median(
+            poscal['GEAR_CALIB_T'] = ratio_T = np.median(
                 np.diff(t_mea_posintT_wrapped) / np.diff(t_tgt_posintT))
-            calib['GEAR_CALIB_P'] = ratio_P = np.median(
+            poscal['GEAR_CALIB_P'] = ratio_P = np.median(
                 np.diff(p_mea_posintP_wrapped) / np.diff(p_tgt_posintP))
             for ratio, arc in zip([ratio_T, ratio_P], ['T', 'P']):
                 if abs(ratio - 1) > 0.06:
@@ -265,8 +266,8 @@ class PosCalibrationFits:
             trans.alt_override = False  # turn it back off when finished
             for c in ['flatX', 'flatY', 'Q', 'S', 'posintT', 'posintP']:
                 data[f'err_{c}'] = data[f'mea_{c}'] - data[f'tgt_{c}']
-            calibs.append(calib)
-        return data, pd.DataFrame(calibs, index=posids)
+            poscals.append(poscal)
+        return data, pd.DataFrame(poscals, index=posids)
 
     def calibrate_from_grid_data(self, data):
         """
@@ -291,25 +292,26 @@ class PosCalibrationFits:
                     'LENGTH_R1', 'LENGTH_R2'
         """
         posids = sorted(data.index.get_level_values('DEVICE_ID').unique())
-        self.printfunc(f'Grid calibration for {len(posids)} positioners...')
+        self.printfunc(
+            f'Fitting grid calibration data, {len(posids)} positioners...')
         self.init_posmodels(data)  # double check that all posmodels exist
         cols = ['mea_flatX', 'mea_flatY',
                 'tgt_flatX', 'tgt_flatY', 'tgt_Q', 'tgt_S']
         for col in cols:  # add new empty columns to grid data dataframe
             data[col] = np.nan
         p0 = [PosTransforms().alt[key] for key in keys_fit]
-        calibs = []  # each entry is a row of calibration for one posid
-        # calibdf = pd.DataFrame(index=posids, columns=keys_fit)
+        poscals = []  # each entry is a row of calibration for one posid
         for posid in posids:
             trans = self.posmodels[posid].trans
             trans.alt_override = True  # enable override in pos transforms
             # measurement always in QS, but fit and derive params in flatXY
-            QS = data.loc[idx[:, posid], ['mea_Q', 'mea_S']].values  # N x 2
+            QS = data.xs(posid, level='DEVICE_ID')[['mea_Q', 'mea_S']].values
             data.loc[idx[:, posid], ['mea_flatX', 'mea_flatY']] = (
                 trans.QS_to_flatXY(QS.T).T)  # doesn't depend on calib
             # select only valid measurement data points for fit
-            posdata = data.loc[idx[:, posid]].droplevel('DEVICE_ID', axis=0)
-            # posdata = posdata[~posdata.isnull().any(axis=1)]  # filter nan
+            posdata = data.loc[idx[:, posid], [
+                'mea_flatX', 'mea_flatY', 'tgt_posintT', 'tgt_posintP']]
+            posdata = posdata[~posdata.isnull().any(axis=1)]  # filter nan
             if len(posdata) <= len(keys_fit):
                 self.printfunc(f'{posid} calibration failed, '
                                f'only {len(posdata)} valid grid points')
@@ -332,24 +334,25 @@ class PosCalibrationFits:
                       (-180, 180), (-50, 50),  # offsetsTP
                       (2.5, 3.5), (2.5, 3.5))  # R1, R2
             result = optimize.minimize(fun=err_rms, x0=p0, bounds=bounds)
-            self.printfunc(f'{posid} grid calibration, {mea_flatXY.shape[0]} '
-                           f'points, err_rms = {result.fun:.3f}')
+            if result.fun > 0.1:
+                self.printfunc(f'{posid} grid calibration, {len(posdata)} '
+                               f'points, err_rms = {result.fun:.3f}')
             # centralize offsetsTP (why needed if we can limit to +/-180?)
             # for i, param_key in enumerate(keys_fit):
             #     if param_key in ['OFFSET_T', 'OFFSET_P']:
             #         result.x[i] = (
             #             PosTransforms._centralized_angular_offset_value(
             #                 res.x[i]))
-            calib = {key: result.x[i] for i, key in enumerate(keys_fit)}
+            poscal = {key: result.x[i] for i, key in enumerate(keys_fit)}
             data.loc[idx[:, posid],
                      ['tgt_flatX', 'tgt_flatY']] = tgtXY = target_xy(result.x)
             data.loc[idx[:, posid], ['tgt_Q', 'tgt_S']] = trans.flatXY_to_QS(
-                tgtXY.values.T).T
+                tgtXY.T).T
             trans.alt_override = False  # turn it back off when finished
             for c in ['flatX', 'flatY', 'Q', 'S']:  # calculate errors
                 data[f'err_{c}'] = data[f'mea_{c}'] - data[f'tgt_{c}']
-            calibs.append(calib)
-        return data, pd.DataFrame(calibs, index=posids)
+            poscals.append(poscal)
+        return data, pd.DataFrame(poscals, index=posids)
 
 
 if __name__ == '__main__':
@@ -367,6 +370,6 @@ if __name__ == '__main__':
     posdata = data_grid.loc[idx[:, 'M00001'], :]
     posdata = data_arc.loc[idx['T', :, 'M00001'], :]
     # debug
-    data_arc = pd.read_pickle('/data/focalplane/logs/data_arc.pkl')
+    data_arc = pd.read_pickle("/data/focalplane/logs/kpno/20191218/00033474/data_grid.pkl.gz")
     calib = PosCalibrationFits(use_doslib=True)
-    movedf, calibdf = calib.calibrate_from_arc_data(data_arc)
+    movedf, calibdf = calib.calibrate_from_grid_data(data_arc)
