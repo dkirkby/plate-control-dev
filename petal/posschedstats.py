@@ -48,23 +48,23 @@ class PosSchedStats(object):
         self.numbers['n move tables'][-1] = n
         self.real_data_yet_in_latest_row = True
         
-    def add_collisions_found(self, posids):
+    def add_collisions_found(self, collision_pair_ids):
         """Add collisions that have been found in the current schedule.
-            posids ... set of colliding posids
+            collision_pair_ids ... set of colliding posids
         """
         these_collisions = self.collisions[self.latest]
-        these_collisions['found'] = these_collisions['found'].union(posids)
+        these_collisions['found'] = these_collisions['found'].union(collision_pair_ids)
         self.real_data_yet_in_latest_row = True
         
-    def add_collisions_resolved(self, method, posids):
+    def add_collisions_resolved(self, method, collision_pair_ids):
         """Add collisions that have been resolved in the current schedule.
             method ... string, collision resolution method
-            posids ... set of posids resolved by method
+            collision_pair_ids ... set of collision_pair_ids resolved by method
         """
         this_dict = self.collisions[self.latest]['resolved']
         if method not in this_dict:
             this_dict[method] = set()
-        this_dict[method] = this_dict[method].union(posids)
+        this_dict[method] = this_dict[method].union(collision_pair_ids)
         self.real_data_yet_in_latest_row = True
         
     def add_request(self):
@@ -132,6 +132,7 @@ class PosSchedStats(object):
         summary['resolved total collisions'] = []
         summary['found set'] = []
         summary['resolved set'] = []
+        summary['found but not resolved (should be empty)'] = []
         for sched in self.schedule_ids:
             coll = self.collisions[sched]
             summary['resolved total collisions'].append(0)
@@ -145,6 +146,7 @@ class PosSchedStats(object):
                 summary['resolved total collisions'][-1] += summary[method][-1]
             summary['found set'].append(coll['found'])
             summary['resolved set'].append(coll['resolved'])
+            summary['found but not resolved (should be empty)'].append(self.found_but_not_resolved(coll['found'],coll['resolved']))
         return summary
     
     def summarize_num_moving(self):
@@ -206,8 +208,23 @@ class PosSchedStats(object):
             writer.writerow(min_stats)
             writer.writerow(rms_stats)
             writer.writerow(avg_stats)
-
+            
+    @staticmethod
+    def found_but_not_resolved(found, resolved):
+        """Searches through the dictionary of resolved collision pairs, and
+        eliminates these from the set of found collision pairs.
         
-                    
-        
-    # function to plot total power density over time of move before / after annealing
+        Inputs:
+            found ... set of strings
+            resolved ... dict with keys = strings, values = sets of strings
+            
+        Output:
+            set of strings
+        """
+        output = found.copy()
+        for f_pair in found:
+            for method in resolved:
+                for r_pair in resolved[method]:
+                    if f_pair == r_pair and f_pair in output: # second check since pair may repeat in multiple resolved[method] sets, for example if collision was fixed first in a retract stage, and then again in an extend stage
+                        output.remove(f_pair)
+        return output
