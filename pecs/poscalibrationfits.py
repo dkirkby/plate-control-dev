@@ -10,6 +10,8 @@ the calibration values in DB at runtime. the calculations here shouldn't
 require knowledge of the calibration values then, but they will be saved
 in the test data products nevertheless. the seeded/initial calibration values
 only serve to ensure spotmatch does not fail.
+
+'mea_' is measured, 'exp_' is internally-tracked/expected, 'tgt_' is target
 """
 import numpy as np
 from scipy import optimize
@@ -154,9 +156,10 @@ class PosCalibrationFits:
 
         and a calibration dataframe with
             index:      DEVICE_ID
-            columns:    'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
-                        'LENGTH_R1', 'LENGTH_R2', 'CENTRE_T', 'CENTRE_P'
-                        'RADIUS_T', 'RADIUS_P', 'GEAR_RATIO_T', 'GEAR_RATIO_P'
+            columns:    OFFSET_X, OFFSET_Y, OFFSET_T, OFFSET_P,
+                        LENGTH_R1, LENGTH_R2, centre_T, centre_P
+                        radius_T, radius_P, residuals_T, residuals_P,
+                        GEAR_RATIO_T, GEAR_RATIO_P
         """
         posids = sorted(data.index.get_level_values('DEVICE_ID').unique())
         self.printfunc(f'Arc calibration for {len(posids)} positioners...')
@@ -191,18 +194,18 @@ class PosCalibrationFits:
                 self.printfunc(f'{posid} arc calibration failed, skipping...')
                 continue
             for i, arc in enumerate(['T', 'P']):  # loop over two arcs
-                calib[f'CENTRE_{arc}'] = fits[i][0]
-                calib[f'RADIUS_{arc}'] = fits[i][1]
-                calib[f'RESIDUALS_{arc}'] = fits[i][2]
+                calib[f'centre_{arc}'] = fits[i][0]
+                calib[f'radius_{arc}'] = fits[i][1]
+                calib[f'residuals_{arc}'] = fits[i][2]
                 data.loc[idx[arc, posmea[arc].index, posid],
                          'err_radial'] = fits[i][2]
-            calib.update({'OFFSET_X': calib['CENTRE_T'][0],
-                          'OFFSET_Y': calib['CENTRE_T'][1],
-                          'LENGTH_R1': np.linalg.norm(calib['CENTRE_T']
-                                                      - calib['CENTRE_P']),
-                          'LENGTH_R2': calib['RADIUS_P'].mean()})
+            calib.update({'OFFSET_X': calib['centre_T'][0],
+                          'OFFSET_Y': calib['centre_T'][1],
+                          'LENGTH_R1': np.linalg.norm(calib['centre_T']
+                                                      - calib['centre_P']),
+                          'LENGTH_R2': calib['radius_P'].mean()})
             # caluclate offset T using phi arc centre and target posintT
-            xy = calib['CENTRE_P'] - calib['CENTRE_T']  # 1 x 2 array
+            xy = calib['centre_P'] - calib['centre_T']  # 1 x 2 array
             p_mea_poslocT = np.degrees(np.arctan2(xy[1], xy[0]))  # float
             t_tgt_posintT = data.loc[idx['T', posmea['T'].index, posid],
                                      'tgt_posintT']  # length L
@@ -212,7 +215,7 @@ class PosCalibrationFits:
             calib['OFFSET_T'] = PosTransforms._centralize_angular_offset(
                 p_mea_poslocT - p_tgt_posintP.values[0])
             # calculate offset P still using phi arc
-            xy = posmea['P'].values - calib['CENTRE_P']  # phi arc wrt phi ctr
+            xy = posmea['P'].values - calib['centre_P']  # phi arc wrt phi ctr
             angles = np.degrees(np.arctan2(xy[:, 1], xy[:, 0]))  # 1 x M array
             # subtract poslocT of phi arc to convert phi angles to poslocP
             # poslocP = 0 is parallel to T arm

@@ -88,7 +88,7 @@ class PosCalibrations(PECS):
                              'COMMAND': 'posintTP',
                              'X1': posintTP[0],
                              'X2': posintTP[1],
-                             'LOG_NOTE': f'1p calibration {self.data.mode}'})
+                             'LOG_NOTE': f'{self.data.mode}'})
             requests = pd.DataFrame(rows)
             self.ptl.prepare_move(requests, anticollision=None)
             self.ptl.execute_move()
@@ -110,20 +110,29 @@ class PosCalibrations(PECS):
                 used_pos.reset_index(), mode=update_mode,
                 auto_update=auto_update,
                 tp_updates_tol=0.0, tp_updates_fraction=1.0)
-            .set_index('DEVICE_ID').sort_index())
+            .set_index('DEVICE_ID').sort_index()).rename(
+                columns={'FLAGS': 'FLAG',
+                         'MEAS_FLATX': 'mea_flatX', 'MEAS_FLATY': 'mea_flatY',
+                         'EXP_FLATX': 'exp_flatX', 'EXP_FLATY': 'exp_flatY'})
+        cols = [col for col in updates.columns
+                if 'OLD_' in col or 'NEW_' in col]
+        updates.drop(cols, axis=1, inplace=True)  # clean up update df
+        used_pos.rename(columns={'Q': 'mea_Q', 'S': 'mea_S',
+                                 'DQ': 'mea_dQ', 'DS': 'mea_dS',
+                                 'FLAGS': 'FLAG'}, inplace=True)
+        unused_pos.rename(columns={'Q': 'mea_Q', 'S': 'mea_S',
+                                   'DQ': 'mea_dQ', 'DS': 'mea_dS',
+                                   'FLAGS': 'FLAG'}, inplace=True)
         calib_up = used_pos
         calib_up.update(updates)
-        # diffcols = used_pos.columns.difference(updates.columns)
-        # updates = updates.join(used_pos[diffcols])  # include QS measurements
         # List unmeasured positioners in updates, even with no data
         calib_up.append(unused_pos, sort=False)
         # overwrite flags with focalplane flags and add status
         calib_up['FLAG'] = pd.DataFrame.from_dict(
             self.ptl.get_pos_flags(list(calib_up.index)),
             orient='index', columns=['FLAG'])
-        calib_up['STATUS'] = pc.decipher_posflags(updates['FLAGS'])
+        calib_up['STATUS'] = pc.decipher_posflags(calib_up['FLAG'])
         # Clean up and record additional entries in updates
-        calib_up['auto_update'] = auto_update
         calib_up['tgt_posintT'] = requests.set_index('DEVICE_ID')['X1']
         calib_up['tgt_posintP'] = requests.set_index('DEVICE_ID')['X2']
         calib_new = self.collect_calib(self.posids)

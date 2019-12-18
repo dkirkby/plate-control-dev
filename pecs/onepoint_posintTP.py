@@ -12,4 +12,4 @@ test = PosCalibrations('1p_posintTP', interactive=True)
 test.run_1p_calibration(auto_update=True)
 test.data.generate_data_products()
 print(  # preview calibration updates
-    test.data.calibdf[['POS_T', 'POS_P', 'dT', 'dP', 'OFFSET_T', 'OFFSET_P']])
+    test.data.calibdf[['POS_T', 'POS_P', 'OFFSET_T', 'OFFSET_P']])
