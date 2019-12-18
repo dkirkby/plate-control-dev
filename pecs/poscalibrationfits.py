@@ -195,18 +195,18 @@ class PosCalibrationFits:
                 self.printfunc(f'{posid} arc calibration failed, skipping...')
                 continue
             for i, arc in enumerate(['T', 'P']):  # loop over two arcs
-                calib[f'centre_{arc}'] = fits[i][0]
-                calib[f'radius_{arc}'] = fits[i][1]
-                calib[f'residuals_{arc}'] = fits[i][2]
+                poscal[f'centre_{arc}'] = fits[i][0]
+                poscal[f'radius_{arc}'] = fits[i][1]
+                poscal[f'residuals_{arc}'] = fits[i][2]
                 data.loc[idx[arc, posmea[arc].index, posid],
                          'err_radial'] = fits[i][2]
-            poscal.update({'OFFSET_X': calib['centre_T'][0],
-                           'OFFSET_Y': calib['centre_T'][1],
-                           'LENGTH_R1': np.linalg.norm(calib['centre_T']
-                                                       - calib['centre_P']),
-                           'LENGTH_R2': calib['radius_P'].mean()})
+            poscal.update({'OFFSET_X': poscal['centre_T'][0],
+                           'OFFSET_Y': poscal['centre_T'][1],
+                           'LENGTH_R1': np.linalg.norm(poscal['centre_T']
+                                                       - poscal['centre_P']),
+                           'LENGTH_R2': poscal['radius_P'].mean()})
             # caluclate offset T using phi arc centre and target posintT
-            xy = calib['centre_P'] - calib['centre_T']  # 1 x 2 array
+            xy = poscal['centre_P'] - poscal['centre_T']  # 1 x 2 array
             p_mea_poslocT = np.degrees(np.arctan2(xy[1], xy[0]))  # float
             t_tgt_posintT = data.loc[idx['T', posmea['T'].index, posid],
                                      'tgt_posintT']  # length L
@@ -370,6 +370,6 @@ if __name__ == '__main__':
     posdata = data_grid.loc[idx[:, 'M00001'], :]
     posdata = data_arc.loc[idx['T', :, 'M00001'], :]
     # debug
-    data_arc = pd.read_pickle("/data/focalplane/logs/kpno/20191218/00033474/data_grid.pkl.gz")
+    data_arc = pd.read_pickle("/data/focalplane/logs/kpno/20191219/00033486/data_arc.pkl.gz")
     calib = PosCalibrationFits(use_doslib=True)
-    movedf, calibdf = calib.calibrate_from_grid_data(data_arc)
+    movedf, calibdf = calib.calibrate_from_arc_data(data_arc)
