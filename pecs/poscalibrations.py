@@ -67,7 +67,7 @@ class PosCalibrations(PECS):
                 match_radius=match_radius)
         self.data.test_cfg['auto_update'] = auto_update
         self.data.test_cfg['match_radius'] = match_radius
-        old_calibdf = self.collect_calib(self.posids)
+        calib_old = self.collect_calib(self.posids)
         do_move = True
         if tp_target == 'default':  # tp_target as target
             poslocTP = (0, self.data.poslocP)  # same target for all posids
@@ -77,7 +77,8 @@ class PosCalibrations(PECS):
             do_move = False
         self.printfunc(
             f'Running one-point calibration, mode = {self.data.mode}, '
-            f'poslocTP = {poslocTP}, do_move = {do_move}')
+            f'poslocTP = {poslocTP}, do_move = {do_move}, '
+            f'auto_update = {auto_update}')
         rows = []
         if do_move:  # then build requests and make the moves
             for posid in self.posids:
@@ -110,23 +111,24 @@ class PosCalibrations(PECS):
                 auto_update=auto_update,
                 tp_updates_tol=0.0, tp_updates_fraction=1.0)
             .set_index('DEVICE_ID').sort_index())
-        diffcols = used_pos.columns.difference(updates.columns)
-        updates = updates.join(used_pos[diffcols])  # include QS measurements
+        calib_up = used_pos
+        calib_up.update(updates)
+        # diffcols = used_pos.columns.difference(updates.columns)
+        # updates = updates.join(used_pos[diffcols])  # include QS measurements
         # List unmeasured positioners in updates, even with no data
-        updates.append(unused_pos, sort=False)
+        calib_up.append(unused_pos, sort=False)
         # overwrite flags with focalplane flags and add status
-        flags_dict = self.ptl.get_pos_flags(list(updates.index))
-        flags = []
-        for posid in updates.index:
-            flags.append(flags_dict[posid])
-        updates['FLAGS'] = flags
-        updates['STATUS'] = self.ptl.decipher_posflags(updates['FLAGS'])
+        calib_up['FLAG'] = pd.DataFrame.from_dict(
+            self.ptl.get_pos_flags(list(calib_up.index)),
+            orient='index', columns=['FLAG'])
+        calib_up['STATUS'] = pc.decipher_posflags(updates['FLAGS'])
         # Clean up and record additional entries in updates
-        updates['auto_update'] = auto_update
-        updates['target_t'] = requests.set_index('DEVICE_ID')['X1']
-        updates['target_p'] = requests.set_index('DEVICE_ID')['X2']
-        calibdf = updates
-        self.data.write_calibdf(old_calibdf, calibdf)
+        calib_up['auto_update'] = auto_update
+        calib_up['tgt_posintT'] = requests.set_index('DEVICE_ID')['X1']
+        calib_up['tgt_posintP'] = requests.set_index('DEVICE_ID')['X2']
+        calib_new = self.collect_calib(self.posids)
+        calib_new.update(calib_up)
+        self.data.write_calibdf(calib_old, calib_new)
 
     def run_arc_calibration(self, auto_update=False, match_radius=50,
                             interactive=False):
@@ -140,6 +142,9 @@ class PosCalibrations(PECS):
         self.data.test_cfg['auto_update'] = auto_update
         self.data.test_cfg['match_radius'] = match_radius
         calib_old = self.collect_calib(self.posids)
+        self.printfunc(
+            f'Running arc calibration, n_pts_T = {self.data.n_pts_T}, '
+            f'n_pts_P = {self.data.n_pts_P}, auto_update = {auto_update}')
         req_list_T, req_list_P = self.ptl.get_arc_requests(  # build requests
             ids=self.posids,
             n_points_T=self.data.n_pts_T, n_points_P=self.data.n_pts_P)
@@ -187,6 +192,9 @@ class PosCalibrations(PECS):
         self.data.test_cfg['auto_update'] = auto_update
         self.data.test_cfg['match_radius'] = match_radius
         calib_old = self.collect_calib(self.posids)
+        self.printfunc(
+            f'Running grid calibration, n_pts_T = {self.data.n_pts_T}, '
+            f'n_pts_P = {self.data.n_pts_P}, auto_update = {auto_update}')
         req_list = self.ptl.get_grid_requests(ids=self.posids,
                                               n_points_T=self.data.n_pts_T,
                                               n_points_P=self.data.n_pts_P)
