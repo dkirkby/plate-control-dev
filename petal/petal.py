@@ -50,6 +50,7 @@ class Petal(object):
         printfunc       ... method, used for stdout style printing. we use this for logging during tests
         collider_file   ... string, file name of collider configuration file, no directory loction. If left blank will use default.
         sched_stats_on  ... boolean, controls whether to log statistics about scheduling runs
+        sched_debug_on  ... boolean, controls whether to run scheduler in debug mode
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
         petal_loc       ... integer, (option) location (0-9) of petal in FPA
 
@@ -108,7 +109,7 @@ class Petal(object):
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
                  printfunc=print, verbose=False,
                  user_interactions_enabled=False, anticollision='freeze',
-                 collider_file=None, sched_stats_on=False):
+                 collider_file=None, sched_stats_on=False, sched_debug_on=False):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
         self.printfunc(f'Running plate_control version: {pc.code_version}')
@@ -172,9 +173,12 @@ class Petal(object):
             self.posmoveDB = DBSingleton(petal_id=int(self.petal_id))
         self.local_commit_on = local_commit_on
         self.local_log_on = local_log_on
-        self.sched_stats_on = sched_stats_on
         self.altered_states = set()
         self.altered_calib_states = set()
+
+        # scheduling options
+        self.sched_stats_on = sched_stats_on
+        self.sched_debug_on = sched_debug_on
 
         # must call the following 3 methods whenever petal alingment changes
         self.init_trans()
@@ -1196,7 +1200,7 @@ class Petal(object):
     def _new_schedule(self):
         """Generate up a new, clear schedule instance.
         """
-        schedule = posschedule.PosSchedule(petal=self, stats=self.schedule_stats, verbose=self.verbose)
+        schedule = posschedule.PosSchedule(petal=self, stats=self.schedule_stats, verbose=self.verbose, debug=self.sched_debug_on)
         schedule.should_check_petal_boundaries = self.shape == 'petal'
         return schedule
 

@@ -18,13 +18,14 @@ class PosSchedule(object):
         verbose ... Control verbosity at stdout.
     """
 
-    def __init__(self, petal, stats=None, verbose=True):
+    def __init__(self, petal, stats=None, verbose=True, debug=False):
         self.petal = petal
         self.stats = stats
         if stats:
             schedule_id = pc.filename_timestamp_str()
             self.stats.register_new_schedule(schedule_id, len(self.petal.posids))
         self.verbose = verbose
+        self.debug = debug # only for debugging use, may add redundant final collision checks, costs time
         self.printfunc = self.petal.printfunc
         self.requests = {} # keys: posids, values: target request dictionaries
         self.max_path_adjustment_passes = 2 # max number of times to go through the set of colliding positioners and try to adjust each of their paths to avoid collisions. After this many passes, it defaults to freezing any that still collide
@@ -210,6 +211,12 @@ class PosSchedule(object):
                 self._schedule_requests_with_path_adjustments() # there is only one possible anticollision method for this scheduling method
             else:
                 self._schedule_requests_with_no_path_adjustments(anticollision)
+        if self.debug:
+            for name in self.stage_order:
+                colliding_sweeps, all_sweeps = self.stages[name].find_collisions(self.stages[name].move_tables)
+                print('Stage: ' + name + ' final check --> num colliding sweeps = ' + str(len(colliding_sweeps)) + ' (should always be zero)')
+                if colliding_sweeps:
+                    print('') # just for setting a conditional debugger breakpoint
         for name in self.stage_order:
             if self.stages[name].is_not_empty() and self.verbose:
                 self.printfunc('equalizing, comparing table for ' + name)
