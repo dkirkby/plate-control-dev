@@ -4,6 +4,7 @@ Created on Thu Dec 12 12:21:10 2019
 
 @author: Duan Yutong (dyt@physics.bu.edu)
 """
+import os
 import pandas as pd
 import posconstants as pc
 from pecs import PECS
@@ -109,8 +110,8 @@ class PosCalibrations(PECS):
                 auto_update=auto_update,
                 tp_updates_tol=0.0, tp_updates_fraction=1.0)
             .set_index('DEVICE_ID').sort_index())
-        cols = used_pos.columns.difference(updates.columns)
-        updates = updates.join(used_pos[cols])  # include QS measurements
+        diffcols = used_pos.columns.difference(updates.columns)
+        updates = updates.join(used_pos[diffcols])  # include QS measurements
         # List unmeasured positioners in updates, even with no data
         updates.append(unused_pos, sort=False)
         # overwrite flags with focalplane flags and add status
@@ -138,7 +139,7 @@ class PosCalibrations(PECS):
                                             match_radius=match_radius)
         self.data.test_cfg['auto_update'] = auto_update
         self.data.test_cfg['match_radius'] = match_radius
-        old_calibdf = self.collect_calib(self.posids)
+        calib_old = self.collect_calib(self.posids)
         req_list_T, req_list_P = self.ptl.get_arc_requests(  # build requests
             ids=self.posids,
             n_points_T=self.data.n_pts_T, n_points_P=self.data.n_pts_P)
@@ -161,14 +162,18 @@ class PosCalibrations(PECS):
         P_arc = pd.concat(P_data, keys=range(self.data.n_pts_P))
         data_arc = pd.concat([T_arc, P_arc], keys=['T', 'P'],
                              names=['arc', 'target_no', 'DEVICE_ID'])
+        data_arc.to_pickle(os.path.join(self.data.dir, 'data_arc.pkl.gz'),
+                           compression='gzip')
         # run fitting
         petal_alignments = {i: self.ptls[i].alignment for i in self.pcids}
-        calib = PosCalibrationFits(petal_alignments=petal_alignments,
-                                   printfunc=self.logger.info)
-        self.data.movedf, calibdf = calib.calibrate_from_arc_data(data_arc)
-        self.data.write_calibdf(old_calibdf, calibdf)
+        fit = PosCalibrationFits(petal_alignments=petal_alignments,
+                                 printfunc=self.logger.info)
+        self.data.movedf, calib_fit = fit.calibrate_from_arc_data(data_arc)
+        calib_new = self.collect_calib(self.posids)
+        calib_new.update(calib_fit)
+        self.data.write_calibdf(calib_old, calib_new)
         if auto_update:
-            [self.ptls[pcid].set_calibration(calibdf) for pcid in self.pcids]
+            [self.ptls[pcid].set_calibration(calib_new) for pcid in self.pcids]
 
     def run_grid_calibration(self, auto_update=False, match_radius=50,
                              interactive=False):
@@ -181,7 +186,7 @@ class PosCalibrations(PECS):
                                              match_radius=match_radius)
         self.data.test_cfg['auto_update'] = auto_update
         self.data.test_cfg['match_radius'] = match_radius
-        old_calibdf = self.collect_calib(self.posids)
+        calib_old = self.collect_calib(self.posids)
         req_list = self.ptl.get_grid_requests(ids=self.posids,
                                               n_points_T=self.data.n_points_T,
                                               n_points_P=self.data.n_points_P)
@@ -194,16 +199,20 @@ class PosCalibrations(PECS):
                 self.pause()
         data_grid = pd.concat(grid_data, keys=range(len(req_list)),
                               names=['target_no', 'DEVICE_ID'])
+        data_grid.to_pickle(os.path.join(self.data.dir, 'data_grid.pkl.gz'),
+                            compression='gzip')
         # run fitting
         petal_alignments = {i: self.ptls[i].alignment for i in self.pcids}
-        calib = PosCalibrationFits(petal_alignments=petal_alignments,
-                                   printfunc=self.logger.info)
-        self.data.movedf, calibdf = calib.calibrate_from_grid_data(data_grid)
-        self.data.write_calibdf(old_calibdf, calibdf)
+        fit = PosCalibrationFits(petal_alignments=petal_alignments,
+                                 printfunc=self.logger.info)
+        self.data.movedf, calib_fit = fit.calibrate_from_grid_data(data_grid)
+        calib_new = self.collect_calib(self.posids)
+        calib_new.update(calib_fit)
+        self.data.write_calibdf(calib_old, calib_new)
         if auto_update:
-            [self.ptls[pcid].set_calibration(calibdf) for pcid in self.pcids]
+            [self.ptls[pcid].set_calibration(calib_new) for pcid in self.pcids]
 
-    def move_measure(self, request, match_radius=30):
+    def move_measure(self, request, match_radius=50):
         '''
         Wrapper for often repeated moving and measuring sequence.
         Returns data merged with request

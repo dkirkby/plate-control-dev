@@ -80,11 +80,11 @@ class PECS:
         try:
             self.fvc_collector._send_command('configure')
         except:
-            self.printfunc('FVC collector unavailable.')
+            self.printfunc('FVC collector unavailable')
 
     def exp_setup(self):
         assert hasattr(self, 'data'), (
-            'FPTestData must be initialised before calling exposure setup.')
+            'FPTestData must be initialised before calling exposure setup')
         self.exp = Exposure(readonly=False)
         self.exp.sequence = self.data.test_name
         self.data.set_dirs(self.exp.id)  # directory setup
@@ -103,7 +103,7 @@ class PECS:
         elif 'n' in yn_str.lower():
             return False
         else:
-            self.printfunc(f'Invalid input: {yn_str}. Must be y/n.')
+            self.printfunc(f'Invalid input: {yn_str}, must be y/n')
 
     def ptl_setup(self, pcid=None, posids=None):
 
@@ -196,7 +196,7 @@ class PECS:
         unmatched = set(exppos.index) - matched
         if len(unmatched) == 0:
             self.printfunc(f'All {len(exppos.index)} back-illuminated '
-                           f'positioners measured by FVC.')
+                           f'positioners measured by FVC')
         else:
             self.printfunc(
                 f'Missing {len(unmatched)} of expected backlit fibres:'

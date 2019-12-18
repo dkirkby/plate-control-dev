@@ -314,7 +314,8 @@ class FPTestData:
             del self.loggers
         except AttributeError:
             pass
-        with open(os.path.join(self.dir, 'data_dump.pkl'), 'wb') as handle:
+        name = self.__class__.__name__.lower()
+        with open(os.path.join(self.dir, f'{name}.pkl'), 'wb') as handle:
             pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def make_archive(self):

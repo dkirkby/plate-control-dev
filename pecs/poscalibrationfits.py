@@ -11,7 +11,6 @@ require knowledge of the calibration values then, but they will be saved
 in the test data products nevertheless. the seeded/initial calibration values
 only serve to ensure spotmatch does not fail.
 """
-
 import numpy as np
 from scipy import optimize
 import pandas as pd
@@ -181,8 +180,8 @@ class PosCalibrationFits:
                                .droplevel(['arc', 'DEVICE_ID'], axis=0))
                 # select valid (non-null) measurement data points only for fit
                 # reduced to tables of length L and M
-                posmea[arc] = posmea[arc][~np.any(posmea[arc].isnull(), axis=1)]
-                if len(posdata) < 3:  # require at least 3 points remaining
+                posmea[arc] = posmea[arc][~posmea[arc].isnull().any(axis=1)]
+                if len(posmea[arc]) < 3:  # require at least 3 points remaining
                     return None
                 else:
                     return PosCalibrationFits.fit_circle(posmea[arc].values)
