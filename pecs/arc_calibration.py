@@ -8,7 +8,7 @@ Runs an Arc Calibration using fvc and petal proxies.
 Requires running DOS instance. See pecs.py
 """
 from poscalibrations import PosCalibrations
-test = PosCalibrations('arc', interactive=True)
+test = PosCalibrations('arc', n_pts_T=(6, 6), interactive=True)
 test.run_arc_calibration(auto_update=False)
 test.fvc_collect(destination=test.data.dir)
 test.data.generate_data_products()

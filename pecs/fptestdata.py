@@ -292,7 +292,7 @@ class FPTestData:
                 continue  # skip a df if it doesn't exist
             getattr(self, attr).to_pickle(
                 os.path.join(self.dir, f'{attr}.pkl.gz'), compression='gzip')
-            getattr(self, attr).to_csv(os.path.join(self.dir, f'{attr}.csv'))
+            # getattr(self, attr).to_csv(os.path.join(self.dir, f'{attr}.csv'))
             self.printfunc(f'Positioner {attr} written to: {self.dir}')
         for pcid in self.pcids:
             self.log_paths[pcid] = os.path.join(self.dirs[pcid],

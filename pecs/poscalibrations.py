@@ -16,18 +16,18 @@ class PosCalibrations(PECS):
     '''mode can be:     1p_offsetsTP, 1p_posintTP, 1p_offsetTposintP,
                         arc, grid'''
 
-    def __init__(self, mode, fvc=None, ptls=None, pcid=None, posids=None,
-                 interactive=False):
-        test_cfg = {'pcids': PECS().pcids, 'anticollision': None}
+    def __init__(self, mode, n_pts_TP=None, fvc=None, ptls=None,
+                 pcid=None, posids=None, interactive=False):
+        n_pts_TP_default = {'arc': (6, 6), 'grid': (7, 5)}
+        cfg = {'pcids': PECS().pcids, 'anticollision': None}
         if '1p_' in mode:  # phi arm angle for 1p calib is 135 deg
-            test_cfg.update({'mode': mode, 'poslocP': 135})
-        elif mode == 'arc':
-            test_cfg.update({'mode': 'arc', 'n_pts_T': 6, 'n_pts_P': 6})
-        elif mode == 'grid':
-            test_cfg.update({'mode': 'grid', 'n_pts_T': 7, 'n_pts_P': 5})
+            cfg.update({'mode': mode, 'poslocP': 135})
+        elif mode in ['arc', 'grid']:
+            nTP = n_pts_TP_default[mode] if n_pts_TP is None else n_pts_TP
+            cfg.update({'mode': mode, 'n_pts_T': nTP[0], 'n_pts_P': nTP[1]})
         else:
             raise Exception(f'Invalid mode: {mode}')
-        self.data = CalibrationData(test_cfg)
+        self.data = CalibrationData(cfg)
         self.loggers = self.data.loggers  # use these loggers to write to logs
         self.logger = self.data.logger  # broadcast to all petals
         super().__init__(
@@ -188,8 +188,8 @@ class PosCalibrations(PECS):
         self.data.test_cfg['match_radius'] = match_radius
         calib_old = self.collect_calib(self.posids)
         req_list = self.ptl.get_grid_requests(ids=self.posids,
-                                              n_points_T=self.data.n_points_T,
-                                              n_points_P=self.data.n_points_P)
+                                              n_points_T=self.data.n_pts_T,
+                                              n_points_P=self.data.n_pts_P)
         grid_data = []  # move, measure
         for i, request in enumerate(req_list):
             self.printfunc(f'Measuring grid point {i+1} of {len(req_list)}...')
