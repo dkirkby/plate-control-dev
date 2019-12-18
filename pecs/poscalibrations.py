@@ -163,7 +163,7 @@ class PosCalibrations(PECS):
                              names=['arc', 'target_no', 'DEVICE_ID'])
         # run fitting
         petal_alignments = {i: self.ptls[i].alignment for i in self.pcids}
-        calib = PosCalibrationFits(petal_alignemnts=petal_alignments,
+        calib = PosCalibrationFits(petal_alignments=petal_alignments,
                                    printfunc=self.logger.info)
         self.data.movedf, calibdf = calib.calibrate_from_arc_data(data_arc)
         self.data.write_calibdf(old_calibdf, calibdf)
@@ -196,7 +196,7 @@ class PosCalibrations(PECS):
                               names=['target_no', 'DEVICE_ID'])
         # run fitting
         petal_alignments = {i: self.ptls[i].alignment for i in self.pcids}
-        calib = PosCalibrationFits(petal_alignemnts=petal_alignments,
+        calib = PosCalibrationFits(petal_alignments=petal_alignments,
                                    printfunc=self.logger.info)
         self.data.movedf, calibdf = calib.calibrate_from_grid_data(data_grid)
         self.data.write_calibdf(old_calibdf, calibdf)
@@ -214,7 +214,11 @@ class PosCalibrations(PECS):
             matched_only=True, match_radius=match_radius)
         # meapos contains not only matched ones but all posids in expected pos
         matched_df = meapos.loc[sorted(matched & set(self.posids))]
-        request = (request.rename(columns={'X1': 'TARGET_T', 'X2': 'TARGET_P'})
-                   .set_index('DEVICE_ID'))
-        return matched_df.merge(request, how='outer',
-                                left_index=True, right_index=True)
+        request.set_index('DEVICE_ID', inplace=True)
+        merged = matched_df.merge(request, how='outer',
+                                  left_index=True, right_index=True)
+        merged.rename(columns={'X1': 'tgt_posintT', 'X2': 'tgt_posintP',
+                               'Q': 'mea_Q', 'S': 'mea_S', 'FLAGS': 'FLAG'},
+                      inplace=True)
+        merged['STATUS'] = pc.decipher_posflags(merged['FLAG'])
+        return merged

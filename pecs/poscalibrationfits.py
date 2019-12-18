@@ -15,9 +15,11 @@ only serve to ensure spotmatch does not fail.
 import numpy as np
 from scipy import optimize
 import pandas as pd
+from tqdm import tqdm
 from postransforms import PosTransforms
 from posstate import PosState
 from posmodel import PosModel
+from DOSlib.positioner_index import PositionerIndex
 idx = pd.IndexSlice
 keys_fit = ['OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
             'LENGTH_R1', 'LENGTH_R2']  # initial values for fitting
@@ -32,16 +34,17 @@ class PosCalibrationFits:
     supply posmodels of all petals, a dict keyed by posids
     '''
 
-    def __init__(self, petal_alignemnts=None, use_doslib=False,
+    def __init__(self, petal_alignments=None, use_doslib=False,
                  posmodels=None, printfunc=print):
-        if petal_alignemnts is not None:
-            self.petal_alignemnts = petal_alignemnts
+        self.printfunc = printfunc
+        if petal_alignments is not None:
+            self.petal_alignments = petal_alignments
         else:
             self.read_alignments(use_doslib=use_doslib)
-        self.printfunc = printfunc
         self.posmodels = {}
         if posmodels is not None:
             self.init_posmodels(posmodels=posmodels)
+        self.pi = PositionerIndex()
 
     def read_alignments(self, use_doslib):
         self.printfunc('Reading petal alignments from DB...')
@@ -94,21 +97,23 @@ class PosCalibrationFits:
                                            'beta': d['petal_rot_2'],
                                            'gamma': d['petal_rot_3']}
                           for petal_loc, d in zip(q.index, q['constants'])}
-        self.alignments = alignments
+        self.petal_alignments = alignments
 
     def init_posmodels(self, data=None, posmodels=None):
         '''called upon receiving calibration data specified below
         supply either posmodels (online) or data (offline)'''
         self.printfunc('Initialising posmodels...')
         if posmodels is None:
-            for posid in data.index.get_level_values('DEVICE_ID'):
+            for posid in tqdm(data.index.get_level_values('DEVICE_ID')
+                              .unique()):
                 if posid not in self.posmodels.keys():
-                    petal_loc = (data.reset_index().set_index('DEVICE_ID')
-                                 .loc[posid, 'PETAL_LOC'].iloc[0])
+                    petal_loc = (
+                        data.loc[idx[:, :, posid], 'PETAL_LOC'].iloc[0])
+                    petal_id = self.pi.find_by_device_id(posid)['PETAL_ID']
                     self.posmodels[posid] = PosModel(state=PosState(
-                        unit_id=posid, device_type='pos',
+                        unit_id=posid, petal_id=petal_id, device_type='pos',
                         printfunc=self.printfunc),
-                        petal_alignment=self.alignments[petal_loc])
+                        petal_alignment=self.petal_alignments[petal_loc])
         else:
             self.posmodels.update(posmodels)
 
@@ -154,8 +159,8 @@ class PosCalibrationFits:
                         'LENGTH_R1', 'LENGTH_R2', 'CENTRE_T', 'CENTRE_P'
                         'RADIUS_T', 'RADIUS_P', 'GEAR_RATIO_T', 'GEAR_RATIO_P'
         """
-        self.printfunc(f'Arc calibration for {len(data)} positioners...')
         posids = sorted(data.index.get_level_values('DEVICE_ID').unique())
+        self.printfunc(f'Arc calibration for {len(posids)} positioners...')
         self.init_posmodels(data)  # double check that all posmodels exist
         cols = ['mea_posintT, mea_posintP', 'mea_flatX', 'mea_flatY',
                 'tgt_flatX', 'tgt_flatY', 'tgt_Q', 'tgt_S']
@@ -168,15 +173,15 @@ class PosCalibrationFits:
             # measurement always in QS, but fit and derive params in flatXY
             QS = data.loc[idx[:, :, posid], ['mea_Q', 'mea_S']].values  # Nx2
             data.loc[idx[:, :, posid], ['mea_flatX', 'mea_flatY']] = (
-                trans.posdataQS_to_flatXY(QS.T).T)  # doesn't depend on calib
+                trans.QS_to_flatXY(QS.T).T)  # doesn't depend on calib
 
             def fit_arc(arc):  # arc is 'T' or 'P', define a func to exit loop
-                posmea = (data.loc[idx[arc, :, posid],
-                                   ['mea_flatX', 'mea_flatY']]
-                          .droplevel(['arc', 'DEVICE_ID'], axis=0))
+                posmea[arc] = (data.loc[idx[arc, :, posid],
+                                        ['mea_flatX', 'mea_flatY']]
+                               .droplevel(['arc', 'DEVICE_ID'], axis=0))
                 # select valid (non-null) measurement data points only for fit
                 # reduced to tables of length L and M
-                posmea[arc] = posmea[~np.any(posmea[arc].isnull(), axis=1)]
+                posmea[arc] = posmea[arc][~np.any(posmea[arc].isnull(), axis=1)]
                 if len(posdata) < 3:  # require at least 3 points remaining
                     return None
                 else:
@@ -196,7 +201,7 @@ class PosCalibrationFits:
                           'OFFSET_Y': calib['CENTRE_T'][1],
                           'LENGTH_R1': np.linalg.norm(calib['CENTRE_T']
                                                       - calib['CENTRE_P']),
-                          'LENGTH_R2': calib['RADIUS_P']})
+                          'LENGTH_R2': calib['RADIUS_P'].mean()})
             # caluclate offset T using phi arc centre and target posintT
             xy = calib['CENTRE_P'] - calib['CENTRE_T']  # 1 x 2 array
             p_mea_poslocT = np.degrees(np.arctan2(xy[1], xy[0]))  # float
@@ -283,8 +288,8 @@ class PosCalibrationFits:
             column: 'OFFSET_T', 'OFFSET_P', 'OFFSET_X', 'OFFSET_Y',
                     'LENGTH_R1', 'LENGTH_R2'
         """
-        self.printfunc(f'Grid calibration for {len(data)} positioners...')
         posids = sorted(data.index.get_level_values('DEVICE_ID').unique())
+        self.printfunc(f'Grid calibration for {len(posids)} positioners...')
         self.init_posmodels(data)  # double check that all posmodels exist
         cols = ['mea_flatX', 'mea_flatY',
                 'tgt_flatX', 'tgt_flatY', 'tgt_Q', 'tgt_S']
@@ -359,3 +364,7 @@ if __name__ == '__main__':
                          names=['arc', 'target_no', 'DEVICE_ID'])
     posdata = data_grid.loc[idx[:, 'M00001'], :]
     posdata = data_arc.loc[idx['T', :, 'M00001'], :]
+    # debug
+    data_arc = pd.read_pickle('/data/focalplane/logs/data_arc.pkl')
+    calib = PosCalibrationFits(use_doslib=True)
+    movedf, calibdf = calib.calibrate_from_arc_data(data_arc)
