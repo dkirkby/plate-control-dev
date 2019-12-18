@@ -61,7 +61,7 @@ class PosCalibrations(PECS):
                 tp_target = None
             auto_update = self._parse_yn(input(
                     'Automatically update calibration? (y/n): '))
-            match_radius = float(input('Please provide a spotmatch radius: '))
+            # match_radius = float(input('Spotmatch radius: '))
             return self.run_1p_calibration(
                 tp_target=tp_target, auto_update=auto_update,
                 match_radius=match_radius)

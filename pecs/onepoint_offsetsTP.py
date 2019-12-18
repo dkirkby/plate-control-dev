@@ -9,7 +9,7 @@ Requires running DOS instance. See pecs.py
 """
 from poscalibrations import PosCalibrations
 test = PosCalibrations('1p_offsetsTP', interactive=True)
-test.run_1p_calibration(auto_update=True)
+test.run_1p_calibration(auto_update=True, interactive=True)
 test.fvc_collect(destination=test.data.dir)
 test.data.generate_data_products()
 print(  # preview calibration updates
