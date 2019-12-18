@@ -74,7 +74,7 @@ class PosCalibrations(PECS):
         elif isinstance(tp_target, (tuple, list)) and len(tp_target) == 2:
             poslocTP = tp_target
         else:
-            do_move = False
+            poslocTP, do_move = None, False
         self.printfunc(
             f'Running one-point calibration, mode = {self.data.mode}, '
             f'poslocTP = {poslocTP}, do_move = {do_move}, '
