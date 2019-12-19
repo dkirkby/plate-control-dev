@@ -48,6 +48,49 @@ np.nanrms = lambda x: np.sqrt(np.nanmean(np.square(x)))
 # sys.path.append(os.path.abspath('.'))
 
 
+class BroadcastLogger:
+    '''must call methods below for particular logger levels below
+    support input message as a string of list of strings
+    msg will be broadcasted to all petals
+    '''
+
+    def __init__(self, loggers=None, printfunc=print):
+        if loggers is None:
+            self.loggers_available = False
+            self.printfunc = printfunc
+        else:
+            self.pcids = list(loggers.keys())
+            self.loggers = loggers
+            self.loggers_available = True
+
+    def _log(self, msg, lvl):  # reserved for in-class use, don't call this
+        if type(msg) is list:
+            list(map(partial(self._log, lvl=lvl), msg))
+        elif type(msg) is str:
+            if self.loggers_available:
+                for pcid in self.pcids:
+                    self.loggers[pcid].log(lvl, msg)
+            else:
+                self.printfunc(msg)
+        else:
+            raise Exception('Wrong message data type sent to logger')
+
+    def critical(self, msg):
+        self._log(msg, 50)
+
+    def error(self, msg):
+        self._log(msg, 40)
+
+    def warning(self, msg):
+        self._log(msg, 30)
+
+    def info(self, msg):
+        self._log(msg, 20)
+
+    def debug(self, msg):
+        self._log(msg, 10)
+
+
 class FPTestData:
     ''' on-mountain xy accuracy test and calibration data will be saved in:
             /data/focalplane/kpno/{date}/{expid}/pc{pcid}/
@@ -126,9 +169,10 @@ class FPTestData:
             self._log_cfg(logger.debug, self.test_cfg)
             self.logs[pcid] = log  # assign logs and loggers to attributes
             self.loggers[pcid] = logger
-        self.logger = self.BroadcastLogger(self.pcids, self.loggers)
+        self.logger = BroadcastLogger(loggers=self.loggers)
 
     def printfunc(self, string, pcid=None):
+        '''use only for info level msg in the absence of logger(s)'''
         assert type(string) is str
         if pcid is None:
             if hasattr(self, 'logger'):
@@ -159,40 +203,6 @@ class FPTestData:
             printfunc(line)  # now line is utf8 str which needs no decode
             #  printfunc(line.decode('utf_8'))  # convert byte str to str
         printfunc(f'=== End of config file dump: {config.filename} ===')
-
-    class BroadcastLogger:
-        '''must call methods below for particular logger levels below
-        support input message as a string of list of strings
-        msg will be broadcasted to all petals
-        '''
-
-        def __init__(self, pcids, loggers):
-            self.pcids = pcids
-            self.loggers = loggers
-
-        def _log(self, msg, lvl):  # reserved for in-class use, don't call this
-            if type(msg) is list:
-                list(map(partial(self._log, lvl=lvl), msg))
-            elif type(msg) is str:
-                for pcid in self.pcids:
-                    self.loggers[pcid].log(lvl, msg)
-            else:
-                raise Exception('Wrong message data type sent to logger')
-
-        def critical(self, msg):
-            self._log(msg, 50)
-
-        def error(self, msg):
-            self._log(msg, 40)
-
-        def warning(self, msg):
-            self._log(msg, 30)
-
-        def info(self, msg):
-            self._log(msg, 20)
-
-        def debug(self, msg):
-            self._log(msg, 10)
 
     def read_telemetry(self):
         try:

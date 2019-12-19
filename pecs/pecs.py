@@ -219,7 +219,7 @@ class PECS:
             sys.stderr.write(f'\rSleeping... ({i} s / {t} s)')
             time.sleep(1)
             sys.stdout.flush()
-        print(f'\nSleep finished ({t} s).')
+        print(f'\nSleep finished ({t} s)')
 
     def pause(self, press_enter=False):
         '''pause operation between positioner moves for heat monitoring'''

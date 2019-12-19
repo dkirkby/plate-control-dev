@@ -75,7 +75,7 @@ class PosCalibrations(PECS):
             poslocTP = tp_target
         else:
             poslocTP, do_move = None, False
-        self.printfunc(
+        self.logger.info(
             f'Running one-point calibration, mode = {self.data.mode}, '
             f'poslocTP = {poslocTP}, do_move = {do_move}, '
             f'commit = {commit}')
@@ -151,7 +151,7 @@ class PosCalibrations(PECS):
         self.data.test_cfg['commit'] = commit
         self.data.test_cfg['match_radius'] = match_radius
         calib_old = self.collect_calib(self.posids)
-        self.printfunc(
+        self.logger.info(
             f'Running arc calibration, n_pts_T = {self.data.n_pts_T}, '
             f'n_pts_P = {self.data.n_pts_P}, commit = {commit}')
         req_list_T, req_list_P = self.ptl.get_arc_requests(  # build requests
@@ -159,15 +159,15 @@ class PosCalibrations(PECS):
             n_points_T=self.data.n_pts_T, n_points_P=self.data.n_pts_P)
         T_data = []  # move, measure
         for i, req in enumerate(req_list_T):
-            self.printfunc(f'Measuring theta arc point {i+1} of '
-                           f'{len(req_list_T)}...')
+            self.logger.info(f'Measuring theta arc point {i+1} of '
+                             f'{len(req_list_T)}...')
             T_data.append(self.move_measure(req, match_radius=match_radius))
             if i+1 < len(req_list_T):  # no pause after the last iteration
                 self.pause()
         P_data = []
         for i, req in enumerate(req_list_P):
-            self.printfunc(f'Measuring phi arc point {i+1} of '
-                           f'{len(req_list_P)}...')
+            self.logger.info(f'Measuring phi arc point {i+1} of '
+                             f'{len(req_list_P)}...')
             if i+1 < len(req_list_T):  # pause before first iteration
                 self.pause()
             P_data.append(self.move_measure(req, match_radius=match_radius))
@@ -201,7 +201,7 @@ class PosCalibrations(PECS):
         self.data.test_cfg['commit'] = commit
         self.data.test_cfg['match_radius'] = match_radius
         calib_old = self.collect_calib(self.posids)
-        self.printfunc(
+        self.logger.info(
             f'Running grid calibration, n_pts_T = {self.data.n_pts_T}, '
             f'n_pts_P = {self.data.n_pts_P}, commit = {commit}')
         req_list = self.ptl.get_grid_requests(ids=self.posids,
@@ -209,7 +209,8 @@ class PosCalibrations(PECS):
                                               n_points_P=self.data.n_pts_P)
         grid_data = []  # move, measure
         for i, request in enumerate(req_list):
-            self.printfunc(f'Measuring grid point {i+1} of {len(req_list)}...')
+            self.logger.info(
+                f'Measuring grid point {i+1} of {len(req_list)}...')
             grid_data.append(self.move_measure(request,
                                                match_radius=match_radius))
             if i+1 < len(req_list):  # no pause after the last iteration
