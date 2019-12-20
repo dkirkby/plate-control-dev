@@ -10,7 +10,7 @@ import pandas as pd
 from configobj import ConfigObj
 import posconstants as pc
 from pecs import PECS
-from fptestdata import FPTestData
+from fptestdata import XYTestData
 idx = pd.IndexSlice  # pandas slice for selecting slice using multiindex
 
 
@@ -55,13 +55,14 @@ class XYTest(PECS):
         https://desi.lbl.gov/svn/code/focalplane/fp_settings/test_settings/
         """
         # self.data.test_cfg = xytest_cfg
-        self.data = FPTestData(test_name, test_cfg=test_cfg)
+        self.data = XYTestData(test_name, test_cfg=test_cfg)
         self.loggers = self.data.loggers  # use these loggers to write to logs
         self.logger = self.data.logger
         super().__init__(
             printfunc={p: self.loggers[p].info for p in self.data.pcids})
         self.ptlm.participating_petals = [
             self._pcid2role(p) for p in self.data.pcids]
+        self.data.t_i = pc.now() # set initial time before setting dirs
         self.exp_setup()  # set up exposure ID and product directory
         if 'pause_interval' in test_cfg:  # override default pecs settings
             self.logger.info(
@@ -145,6 +146,8 @@ class XYTest(PECS):
             l1s[pcid] = l1
         ret1 = self.ptlm.get_pos_vals(keys, self.data.posids)
         # read posmodel properties, for now just targetable_range_T
+        print(props)
+        print(self.data.posids)
         ret2 = self.ptlm.get_posmodel_prop(props, self.data.posids)
         dfs = []
         for pcid in self.data.pcids:
@@ -164,7 +167,7 @@ class XYTest(PECS):
         mask = (rmin < r) & (r < rmax)
         return np.array([x[mask], y[mask]])  # return 2 x N array of targets
 
-    def generate_targets(self):
+    def generate_targets(self, ntargets=None):
         fn = self.data.test_cfg['input_targs_file']
         if fn is None:  # no targets supplied, create local targets in posXY
             tgt = self._generate_poslocXY_targets_grid(
@@ -181,6 +184,8 @@ class XYTest(PECS):
                 else:  # use the same given seed for all posids
                     np.random.seed(self.data.test_cfg['shuffle_seed'])
                     np.random.shuffle(tgt)  # same shuffled target list for all
+            if ntargets is not None:
+                tgt = tgt[:ntargets, :]
             self.data.targets = tgt
             self.data.targets_pos = {posid: tgt for posid in self.data.posids}
             self.data.ntargets = tgt.shape[0]  # shape (N_targets, 2)
@@ -200,6 +205,8 @@ class XYTest(PECS):
             col2 = self.data.target_type[:-2] + self.data.target_type[-1]
             self.data.targets_pos = {}
             df = pd.read_csv(path, index_col='target_no')
+            if ntargets is not None:
+                df = df.iloc[:ntargets]
             self.data.ntargets = len(df)  # set number of targets
             for pcid in self.data.pcids:  # set targets for each positioner
                 for posid in self.data.posids_pc[pcid]:
@@ -350,7 +357,7 @@ class XYTest(PECS):
         self.ptlm.prepare_move(req, anticollision=self.data.anticollision)
         # Execute move returns dict of all individual execute move calls
         expected_QS = self.ptlm.execute_move(reset_flags=False,
-                                             return_coord='QS')
+                                             return_coord='QS', control={'timeout':120.0})
         for pcid in self.data.pcids:
             self.loggers[pcid].debug(
                 'execute_move() returns expected QS:\n'
@@ -361,7 +368,7 @@ class XYTest(PECS):
         # Just need this sent to one petal
         role = self._pcid2role(self.data.pcids[0])
         ret_TP['STATUS'] = self.ptlm.decipher_posflags(
-            ret_TP['FLAG'], participating_petals=role)[role]
+            ret_TP['FLAGS'], participating_petals=role)[role]
         for pcid in self.data.pcids:
             self.loggers[pcid].debug(
                 f'Expected posintTP after move {n}:\n'
@@ -369,7 +376,7 @@ class XYTest(PECS):
         # record per-move data to movedf for a petal
         new = pd.DataFrame({f'pos_int_t_{n}': ret_TP['X1'],
                             f'pos_int_p_{n}': ret_TP['X2'],
-                            f'pos_flag_{n}': ret_TP['FLAG'],
+                            f'pos_flag_{n}': ret_TP['FLAGS'],
                             f'pos_status_{n}': ret_TP['STATUS'],
                             f'DEVICE_ID': ret_TP['DEVICE_ID']})
         self._update(new.set_index('DEVICE_ID'), i)
@@ -416,7 +423,7 @@ class XYTest(PECS):
                     self.data.posids_disabled_pc[pcid] |= set(disabled)
             else:
                 self.loggers[pcid].info(
-                    f'All {len(posids)} requested fibres measured by FVC.')
+                    f'All {len(posids)} requested positioners measured by FVC.')
 
     def update_calibrations(self, measured_QS):  # test and update TP here
         self.logger.info('Testing and updating posintTP...')
@@ -425,9 +432,11 @@ class XYTest(PECS):
         df = measured_QS.loc[posids].reset_index()
         assert ('Q' in df.columns and 'S' in df.columns), f'{df.columns}'
         updates = self.ptlm.test_and_update_TP(df)
-        assert isinstance(updates, pd.core.frame.DataFrame), (
-            f'Exception calling test_and_update_TP, returned:\n'
-            f'{updates}')
+        print(type(updates))
+        #assert isinstance(updates, pd.core.frame.DataFrame), (
+        #    f'Exception calling test_and_update_TP, returned:\n')
+        #    f'{updates}')
+        # updates should be dict
         for pcid in self.data.pcids:
             self.loggers[pcid].debug(
                 f'test_and_update_TP returned:\n'
@@ -443,7 +452,7 @@ class XYTest(PECS):
             role = self._lookup_pcrole(posid)
             poslocXY[:, j] = self.ptlm.postrans(
                 posid, 'QS_to_poslocXY', QS[:, j],
-                participating_petals=role)[role]
+                participating_petals=role)
         new = pd.DataFrame({f'meas_q_{n}': QS[0, :],
                             f'meas_s_{n}': QS[1, :],
                             f'meas_x_{n}': poslocXY[0, :],
@@ -475,12 +484,12 @@ class XYTest(PECS):
 
 
 if __name__ == '__main__':
-    path = os.path.join(pc.dirs['test_settings'], 'xytest_cmx_psf.cfg')
+    path = os.path.join(pc.dirs['test_settings'], 'xytest_all_sim.cfg')
     print(f'Loading test config: {path}')
     xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')  # read cfg
     xytest_name = input('Please name this test: ')
     test = XYTest('xytest-'+xytest_name, xytest_cfg)
     test.run_xyaccuracy_test(
         disable_unmatched=test.data.test_cfg['disable_unmatched'])
-    test.fvc_collect()
-    test.data.generate_xyaccuracy_test_products()
+    test.fvc_collect(destination=test.data.dir)
+    test.data.generate_data_products()

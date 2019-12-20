@@ -72,6 +72,7 @@ class FVC_proxy_sim:
             expected_positions.rename(columns = {'X1':'q'}, inplace=True)
             expected_positions.rename(columns = {'X2':'s'}, inplace=True)
             expected_positions.rename(columns = {'FLAG':'flags'}, inplace=True)
+            expected_positions.rename(columns = {'FLAGS':'flags'}, inplace=True) # FLAG -> FLAGS is fixed in some places but not others so do both
             expected_positions.rename(columns = {'DEVICE_ID':'id'}, inplace=True)
             #expected_positions.drop(columns=['PETAL_LOC','DEVICE_LOC'], inplace=True)
 

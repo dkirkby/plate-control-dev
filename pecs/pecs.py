@@ -83,7 +83,7 @@ class PECS:
     def exp_setup(self):
         assert hasattr(self, 'data'), (
             'FPTestData must be initialised before calling exposure setup.')
-        self.exp = Exposure(read_only=False)
+        self.exp = Exposure(readonly=False)
         self.exp.sequence = self.data.test_name
         # directory setup
         self.data.set_dirs(self.exp.id)
@@ -227,7 +227,7 @@ class PECS:
                   .set_index('DEVICE_ID').sort_index())
         exppos.columns = exppos.columns.str.upper()
         # recover flags
-        meapos['FLAG'] |= exppos.loc[list(meapos.index)]['FLAG']
+        meapos['FLAGS'] |= exppos.loc[list(meapos.index)]['FLAGS']
         # find the posids that are unmatched, missing from FVC return
         matched = set(exppos.index) & set(meapos.index)
         unmatched = set(exppos.index) - matched
