@@ -23,12 +23,14 @@ class PosAnimator(object):
         self.n_framefile_digits = 5
         self.fignum = fignum
         self.timestep = timestep # frame interval for animations
+        self.start_end_still_time = 0.0 # seconds, can add extra still frames at start / end for this duration; gives a visual pause between move sequences
         self.items = {} # keys shall identify the individual items that get drawn, i.e. 'ferrule 321', 'phi arm 42', 'GFA', etc
                         # values are sub-dictionaries, with the entries:
                         #  'time'  : [] # list of time values at which an update or change is to be applied
                         #  'poly'  : [] # list of arrays of polygon points (each is 2xN), defining the item polygon to draw at that time
                         #  'style' : [] # list of dictionaries, defining the plotting style to draw the polygon at that time
         self.labels = {}
+        self.label_size = 'x-small'
         self.pospoly_keys = {'ferrule', 'phi arm', 'central body', 'line at 180', 'Eo', 'Ei', 'Ee'}
         self.fixpoly_keys = {'PTL','GFA'}
         self.styles = {'ferrule':
@@ -178,7 +180,7 @@ class PosAnimator(object):
             item['last_frame'] = self.all_times.tolist().index(item['time'][-1])
             i += 1
         for label in self.labels.values():
-            plt.text(s=label['text'], x=label['x'], y=label['y'], family='monospace', horizontalalignment='center', size='x-small')
+            plt.text(s=label['text'], x=label['x'], y=label['y'], family='monospace', horizontalalignment='center', size=self.label_size)
         plt.xlim(xmin=xmin,xmax=xmax)
         plt.ylim(ymin=ymin,ymax=ymax)
 
@@ -193,8 +195,8 @@ class PosAnimator(object):
     def animate(self):
         self.anim_init()
         plt.ion()
-        start_end_still_time = 0.5
         frame_number = 1
+        stdout_message_period = 50 # number of frames per update message
         image_paths = {}
         timestamp = pc.filename_timestamp_str()
         self.frame_dir = os.path.join(self.save_dir,timestamp + '_frames')
@@ -206,7 +208,7 @@ class PosAnimator(object):
                 os.mkdir(self.save_dir)
             if not(os.path.exists(self.frame_dir)):
                 os.mkdir(self.frame_dir)
-            for i in range(round(start_end_still_time/self.timestep)):
+            for i in range(round(self.start_end_still_time/self.timestep)):
                 frame_number,path = self.grab_frame(frame_number)
                 image_paths[frame_number] = path
         frame_times = np.arange(min(self.all_times), max(self.all_times)+self.timestep/2, self.timestep) # extra half-timestep on max ensures inclusion of max val in range
@@ -217,11 +219,13 @@ class PosAnimator(object):
             if self.save_movie:
                 frame_number,path = self.grab_frame(frame_number)
                 image_paths[frame_number] = path
+                if frame % stdout_message_period == 0:
+                    print(' ... animation frame ' + str(frame) + ' of approx ' + str(len(frame_times)) + ' saved')
             if self.live_animate:
                 plt.pause(0.001) # just to force a refresh of the plot window (hacky, yep. that's matplotlib for ya.)
                 time.sleep(max(0,self.timestep-(time.clock()-frame_start_time))) # likely ineffectual (since matplotlib so slow anyway) attempt to roughly take out frame update / write time
         if self.save_movie:
-            for i in range(round(start_end_still_time/self.timestep)):
+            for i in range(round(self.start_end_still_time/self.timestep)):
                 frame_number,path = self.grab_frame(frame_number)
                 image_paths[frame_number] = path
         plt.close()
