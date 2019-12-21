@@ -24,7 +24,8 @@ fidids = {}
 petal_id = 666
 
 # Other options
-should_animate = False
+should_animate = True
+animation_foci = {'M07961','M08011'} # argue {} or 'all' to animate everything. otherwise, this set limits which robots (plus their surrounding neighbors) get animated. Can include 'GFA' or 'PTL' as desired
 n_corrections = 0 # number of correction moves to simulate after each target
 max_correction_move = 0.050/1.414 # mm
 should_profile = False
@@ -56,7 +57,22 @@ for pos_params in pos_param_sequence:
                       sched_stats_on  = True, # remember to turn off for performance timing
                       sched_debug_on  = True, # remember to turn off for performance timing
                       anticollision   = 'adjust')
+    ptl.limit_radius = None
     if should_animate:
+        if animation_foci != 'all' or len(animation_foci) > 0:
+            posids_to_animate = set()
+            fixed_items_to_animate = set()
+            for identifier in animation_foci:
+                if identifier in ptl.posids:
+                    posids_to_animate.add(identifier)
+                    posids_to_animate.update(ptl.collider.pos_neighbors[identifier])
+                elif identifier in ['PTL','GFA']:
+                    fixed_items_to_animate.add(identifier)
+                else:
+                    print('Warning: ' + str(identifier) + ', requested as an animation focus, is not a known item on this petal, therefore was ignored.')
+            ptl.collider.posids_to_animate = posids_to_animate
+            ptl.collider.fixed_items_to_animate = fixed_items_to_animate
+            ptl.animator.label_size = 'medium' # size in points, 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
         ptl.start_gathering_frames()
     m = 0
     mtot = len(move_request_sequence)
@@ -92,6 +108,7 @@ for pos_params in pos_param_sequence:
         ptl.schedule_stats.save()
     if should_animate:
         ptl.stop_gathering_frames()
+        print('Generating animation (this can be quite slow)...')
         if should_profile:
             hc.profile('ptl.generate_animation()')
         else:
