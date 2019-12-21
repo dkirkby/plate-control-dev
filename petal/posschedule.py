@@ -214,7 +214,7 @@ class PosSchedule(object):
         if self.debug:
             for name in self.stage_order:
                 colliding_sweeps, all_sweeps = self.stages[name].find_collisions(self.stages[name].move_tables)
-                print('Stage: ' + name + ' final check --> num colliding sweeps = ' + str(len(colliding_sweeps)) + ' (should always be zero)')
+                print('stage: ' + format(name.upper(),'>7s') + ', final check --> num colliding sweeps = ' + str(len(colliding_sweeps)) + ' (should always be zero)')
                 if colliding_sweeps:
                     print('') # just for setting a conditional debugger breakpoint
         for name in self.stage_order:
