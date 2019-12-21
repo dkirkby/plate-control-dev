@@ -136,8 +136,7 @@ class PosCalibrations(PECS):
         calib_up['tgt_posintT'] = requests.set_index('DEVICE_ID')['X1']
         calib_up['tgt_posintP'] = requests.set_index('DEVICE_ID')['X2']
         calib_new = self.collect_calib(self.posids)
-        calib_new.update(calib_up)
-        self.data.write_calibdf(calib_old, calib_new)
+        self.data.write_calibdf(calib_old, calib_up, calib_new)
 
     def run_arc_calibration(self, commit=False, match_radius=50,
                             interactive=False):
@@ -175,7 +174,7 @@ class PosCalibrations(PECS):
         T_arc = pd.concat(T_data, keys=range(self.data.n_pts_T))
         P_arc = pd.concat(P_data, keys=range(self.data.n_pts_P))
         data_arc = pd.concat([T_arc, P_arc], keys=['T', 'P'],
-                             names=['arc', 'target_no', 'DEVICE_ID'])
+                             names=['axis', 'target_no', 'DEVICE_ID'])
         data_arc.to_pickle(os.path.join(self.data.dir, 'data_arc.pkl.gz'),
                            compression='gzip')
         # run fitting
@@ -184,8 +183,7 @@ class PosCalibrations(PECS):
                                  printfunc=self.logger.info)
         self.data.movedf, calib_fit = fit.calibrate_from_arc_data(data_arc)
         calib_new = self.collect_calib(self.posids)
-        calib_new.update(calib_fit)
-        self.data.write_calibdf(calib_old, calib_new)
+        self.data.write_calibdf(calib_old, calib_fit, calib_new)
         if commit:
             [self.ptls[pcid].set_calibration(calib_new) for pcid in self.pcids]
 
@@ -225,8 +223,7 @@ class PosCalibrations(PECS):
                                  printfunc=self.logger.info)
         self.data.movedf, calib_fit = fit.calibrate_from_grid_data(data_grid)
         calib_new = self.collect_calib(self.posids)
-        calib_new.update(calib_fit)
-        self.data.write_calibdf(calib_old, calib_new)
+        self.data.write_calibdf(calib_old, calib_fit, calib_new)
         if commit:
             [self.ptls[pcid].set_calibration(calib_new) for pcid in self.pcids]
 

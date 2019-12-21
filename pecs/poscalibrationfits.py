@@ -38,6 +38,10 @@ class PosCalibrationFits:
 
     def __init__(self, petal_alignments=None, use_doslib=False,
                  posmodels=None, loggers=None, printfunc=print):
+        if loggers is None:
+            self.logger = BroadcastLogger(printfunc=printfunc)
+        else:
+            self.logger = BroadcastLogger(loggers=loggers)
         if petal_alignments is not None:
             self.petal_alignments = petal_alignments
         else:
@@ -46,10 +50,6 @@ class PosCalibrationFits:
         if posmodels is not None:
             self.init_posmodels(posmodels=posmodels)
         self.pi = PositionerIndex()
-        if loggers is None:
-            self.logger = BroadcastLogger(printfunc=printfunc)
-        else:
-            self.logger = BroadcastLogger(loggers=loggers)
 
     def read_alignments(self, use_doslib):
         self.logger.info('Reading petal alignments from DB...')
@@ -185,7 +185,7 @@ class PosCalibrationFits:
             def fit_arc(arc):  # arc is 'T' or 'P', define a func to exit loop
                 posmea[arc] = (data.loc[idx[arc, :, posid],
                                         ['mea_flatX', 'mea_flatY']]
-                               .droplevel(['arc', 'DEVICE_ID'], axis=0))
+                               .droplevel(['axis', 'DEVICE_ID'], axis=0))
                 # select valid (non-null) measurement data points only for fit
                 # reduced to tables of length L and M
                 posmea[arc] = posmea[arc][~posmea[arc].isnull().any(axis=1)]
@@ -372,7 +372,7 @@ if __name__ == '__main__':
                           names=['target_no', 'DEVICE_ID'])  # grid
     arc = pd.concat([df]*6, keys=range(10))  # one arc
     data_arc = pd.concat([arc, arc], keys=['T', 'P'],
-                         names=['arc', 'target_no', 'DEVICE_ID'])
+                         names=['axis', 'target_no', 'DEVICE_ID'])
     posdata = data_grid.loc[idx[:, 'M00001'], :]
     posdata = data_arc.loc[idx['T', :, 'M00001'], :]
     # debug
