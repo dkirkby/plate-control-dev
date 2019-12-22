@@ -340,7 +340,7 @@ class PosCalibrationFits:
                       (-180, 180), (-50, 50),  # offsetsTP
                       (2.5, 3.5), (2.5, 3.5))  # R1, R2
             result = optimize.minimize(fun=err_rms, x0=p0, bounds=bounds)
-            if result.fun > 0.1:
+            if result.fun > 0.4:
                 self.logger.warning(f'{posid} grid calibration, {len(posdata)}'
                                     f' points, err_rms = {result.fun:.3f}')
             # centralize offsetsTP (why needed if we can limit to +/-180?)

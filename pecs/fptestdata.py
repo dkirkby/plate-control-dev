@@ -845,7 +845,7 @@ class CalibrationData(FPTestData):
             if ang_i > ang_f:
                 ang_f += 360
             ref_arc_ang = np.radians(np.append(  # 5 deg step
-                np.arange(ang_i, ang_f, 5), ang_f)  # last point at final
+                np.arange(ang_i, ang_f, 5), ang_f))  # last point at final
             arc_x = rad * np.cos(ref_arc_ang) + ctr[0]
             arc_y = rad * np.sin(ref_arc_ang) + ctr[1]
             axis_zero_angle = arc_start - tgt[0] # where global observer would nominally see the axis's local zero point in this plot
@@ -931,30 +931,31 @@ if __name__ == '__main__':
     # expids = ['00031611']
     # arc calib expids
     expids = ['00033473', '00033490']
-    expids = ['00033490']
+    # grid calib expids
+    expids = ['00034382']
     from poscalibrationfits import PosCalibrationFits
     for expid in expids:
         paths = glob(pc.dirs['kpno']+f'/*/{expid}/*data.pkl')
         assert len(paths) == 1, paths
         print(f'Re-processing FP test data:\n{paths[0]}')
         try:
-            path = os.path.join(os.path.dirname(paths[0]), 'data_arc.pkl.gz')
+            path = os.path.join(os.path.dirname(paths[0]), 'data_grid.pkl.gz')
             data_arc = pd.read_pickle(path)
             fit = PosCalibrationFits()
-            _, calib_fit = fit.calibrate_from_arc_data(data_arc)
-            with open(os.path.join(paths[0]), 'rb') as h:
-                data = pickle.load(h)
-            try:
-                calib_old = data.calibdf['OLD']
-                calib_new = data.calibdf['NEW']
-            except:
-                calib_old = data.calibdf.xs('OLD', level='label')
-                calib_new = data.calibdf.xs('NEW', level='label')
-            data.write_calibdf(calib_old, calib_fit, calib_new)
+            movedf, calib_fit = fit.calibrate_from_arc_data(data_arc)
+            # with open(os.path.join(paths[0]), 'rb') as h:
+            #     data = pickle.load(h)
+            # try:
+            #     calib_old = data.calibdf['OLD']
+            #     calib_new = data.calibdf['NEW']
+            # except:
+            #     calib_old = data.calibdf.xs('OLD', level='label')
+            #     calib_new = data.calibdf.xs('NEW', level='label')
+            # data.write_calibdf(calib_old, calib_fit, calib_new)
             # data.movedf.index.set_names('axis', level='arc', inplace=True)
             # # # data.generate_data_products()
-            data.export_data_logs()
-            data.dump_as_one_pickle()
+            # data.export_data_logs()
+            # data.dump_as_one_pickle()
             # # if shutil.which('pandoc') is not None:
             # #     data.generate_report()
             data.make_archive()

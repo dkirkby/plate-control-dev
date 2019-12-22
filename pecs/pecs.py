@@ -142,8 +142,8 @@ class PECS:
             selection = None
         else:
             selection = user_text.split()
-        # user_text = input('Use enabled positioners only? (y/n): ')
-        enabled_only = True  # self._parse_yn(user_text)
+        user_text = input('Use enabled positioners only? (y/n): ')
+        enabled_only = self._parse_yn(user_text)
         if selection is None:
             posids = sorted(self.ptls[pcid].get_positioners(
                 enabled_only=enabled_only)['DEVICE_ID'])
@@ -208,8 +208,9 @@ class PECS:
                        f'{self.exp.id} to: {destination}')
         os.makedirs(destination, exist_ok=True)
         try:
-            self.fvc_collector._send_command('collect', expid=self.exp.id,
-                                             output_dir=destination)
+            self.fvc_collector._send_command(
+                'collect', expid=self.exp.id, output_dir=destination,
+                logbook=False)
         except Exception as e:
             self.printfunc(f'FVC collector failed: {e}')
 

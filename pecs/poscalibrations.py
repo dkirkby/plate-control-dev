@@ -246,3 +246,10 @@ class PosCalibrations(PECS):
                       inplace=True)
         merged['STATUS'] = pc.decipher_posflags(merged['FLAG'])
         return merged
+
+
+if __name__ == '__main__':
+    path = "/data/focalplane/logs/kpno/20191222/00034382/data_grid.pkl.gz"
+    data_grid = pd.read_pickle(path)
+    fit = PosCalibrationFits()
+    movedf, calib_fit = fit.calibrate_from_grid_data(data_grid)
