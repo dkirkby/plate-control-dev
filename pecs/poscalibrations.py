@@ -244,7 +244,9 @@ class PosCalibrations(PECS):
         merged.rename(columns={'X1': 'tgt_posintT', 'X2': 'tgt_posintP',
                                'Q': 'mea_Q', 'S': 'mea_S', 'FLAGS': 'FLAG'},
                       inplace=True)
-        merged['STATUS'] = pc.decipher_posflags(merged['FLAG'])
+        mask = ~merged['FLAG'].isnull()
+        merged.loc[mask, 'STATUS'] = pc.decipher_posflags(
+            merged.loc[mask, 'FLAG'])
         return merged
 
 
