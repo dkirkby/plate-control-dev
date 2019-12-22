@@ -183,12 +183,12 @@ class PosCalibrationFits:
                 trans.QS_to_flatXY(QS.T).T)  # doesn't depend on calib
 
             def fit_arc(arc):  # arc is 'T' or 'P', define a func to exit loop
-                posmea = (data.loc[idx[arc, :, posid],
+                posmeaarc = (data.loc[idx[arc, :, posid],
                                        ['mea_flatX', 'mea_flatY']]
                           .droplevel(['axis', 'DEVICE_ID'], axis=0))
                 # select valid (non-null) measurement data points only for fit
                 # reduced to tables of length L and M
-                posmea[arc] = posmea[~posmea.isnull().any(axis=1)]
+                posmea[arc] = posmeaarc[~posmeaarc.isnull().any(axis=1)]
                 if len(posmea[arc]) < 3:  # require at least 3 points remaining
                     return None
                 else:
