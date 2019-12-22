@@ -183,12 +183,12 @@ class PosCalibrationFits:
                 trans.QS_to_flatXY(QS.T).T)  # doesn't depend on calib
 
             def fit_arc(arc):  # arc is 'T' or 'P', define a func to exit loop
-                posmea[arc] = (data.loc[idx[arc, :, posid],
-                                        ['mea_flatX', 'mea_flatY']]
-                               .droplevel(['axis', 'DEVICE_ID'], axis=0))
+                posmea = (data.loc[idx[arc, :, posid],
+                                       ['mea_flatX', 'mea_flatY']]
+                          .droplevel(['axis', 'DEVICE_ID'], axis=0))
                 # select valid (non-null) measurement data points only for fit
                 # reduced to tables of length L and M
-                posmea[arc] = posmea[arc][~posmea[arc].isnull().any(axis=1)]
+                posmea[arc] = posmea[~posmea.isnull().any(axis=1)]
                 if len(posmea[arc]) < 3:  # require at least 3 points remaining
                     return None
                 else:
@@ -315,9 +315,10 @@ class PosCalibrationFits:
             data.loc[idx[:, posid], ['mea_flatX', 'mea_flatY']] = (
                 trans.QS_to_flatXY(QS.T).T)  # doesn't depend on calib
             # select only valid measurement data points for fit
-            posdata = data.loc[idx[:, posid], [
+            posdata = data.xs(posid, level='DEVICE_ID')[[
                 'mea_flatX', 'mea_flatY', 'tgt_posintT', 'tgt_posintP']]
-            posdata = posdata[~posdata.isnull().any(axis=1)]  # filter nan
+            mask = posdata.index[~posdata.isnull().any(axis=1)]
+            posdata = posdata.loc[mask]  # filter nan
             if len(posdata) <= len(keys_fit):
                 self.logger.error(f'{posid} calibration failed, '
                                   f'only {len(posdata)} valid grid points')
@@ -350,9 +351,9 @@ class PosCalibrationFits:
             #             PosTransforms._centralized_angular_offset_value(
             #                 res.x[i]))
             poscal = {key: result.x[i] for i, key in enumerate(keys_fit)}
-            data.loc[idx[:, posid],
-                     ['tgt_flatX', 'tgt_flatY']] = tgtXY = target_xy(result.x)
-            data.loc[idx[:, posid], ['tgt_Q', 'tgt_S']] = trans.flatXY_to_QS(
+            tgtXY = target_xy(result.x)
+            data.loc[idx[mask, posid], ['tgt_flatX', 'tgt_flatY']] = tgtXY 
+            data.loc[idx[mask, posid], ['tgt_Q', 'tgt_S']] = trans.flatXY_to_QS(
                 tgtXY.T).T
             trans.alt_override = False  # turn it back off when finished
             for c in ['flatX', 'flatY', 'Q', 'S']:  # calculate errors
@@ -376,6 +377,6 @@ if __name__ == '__main__':
     posdata = data_grid.loc[idx[:, 'M00001'], :]
     posdata = data_arc.loc[idx['T', :, 'M00001'], :]
     # debug
-    data_arc = pd.read_pickle("/data/focalplane/logs/kpno/20191219/00033486/data_arc.pkl.gz")
+    data = pd.read_pickle("/data/focalplane/logs/kpno/20191222/00034392/data_grid.pkl.gz")
     calib = PosCalibrationFits(use_doslib=True)
-    movedf, calibdf = calib.calibrate_from_arc_data(data_arc)
+    movedf, calibdf = calib.calibrate_from_grid_data(data)
