@@ -317,8 +317,10 @@ def dir_date_str(t=None):
         t = now()
     t = t.astimezone(pytz.timezone('America/Phoenix'))
     day = t.day
-    if t.hour > 12:  # past noon, treat as the next day
-        day += 1
+    if t.hour >= 12:  # past noon, treat as today
+        pass
+    else:
+        day -= 1  # before noon, treat as yesterday
     return f'{t.year:04}{t.month:02}{day:02}'
 
 
