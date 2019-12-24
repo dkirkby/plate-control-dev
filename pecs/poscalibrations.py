@@ -35,7 +35,7 @@ class PosCalibrations(PECS):
             printfunc={p: self.loggers[p].info for p in self.data.pcids})
         self.data.t_i = pc.now()
         self.exp_setup()  # set up exposure ID and product directory
-        self.logger.info(f'Running arc calibration')
+        self.logger.info(f'Running {mode} calibration')
         if interactive:
             self.interactive_ptl_setup()
         else:
