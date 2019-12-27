@@ -18,17 +18,16 @@ class PosSchedule(object):
         verbose ... Control verbosity at stdout.
     """
 
-    def __init__(self, petal, stats=None, verbose=True, debug=False):
+    def __init__(self, petal, stats=None, verbose=True, redundant_collision_checking=False):
         self.petal = petal
         self.stats = stats
         if stats:
             schedule_id = pc.filename_timestamp_str()
             self.stats.register_new_schedule(schedule_id, len(self.petal.posids))
         self.verbose = verbose
-        self.debug = debug # only for debugging use, may add redundant final collision checks, costs time
+        self.redundant_collision_checking = redundant_collision_checking # only for debugging use, adds a redundant layer of final collision checks, costs time
         self.printfunc = self.petal.printfunc
         self.requests = {} # keys: posids, values: target request dictionaries
-        self.max_path_adjustment_passes = 2 # max number of times to go through the set of colliding positioners and try to adjust each of their paths to avoid collisions. After this many passes, it defaults to freezing any that still collide
         self.stage_order = ['direct','retract','rotate','extend','expert']
         self.RRE_stage_order = ['retract','rotate','extend']
         self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, stats=self.stats, verbose=self.verbose, printfunc=self.printfunc) for name in self.stage_order}
@@ -211,12 +210,11 @@ class PosSchedule(object):
                 self._schedule_requests_with_path_adjustments() # there is only one possible anticollision method for this scheduling method
             else:
                 self._schedule_requests_with_no_path_adjustments(anticollision)
-        if self.debug:
+        if self.redundant_collision_checking:
             for name in self.stage_order:
                 colliding_sweeps, all_sweeps = self.stages[name].find_collisions(self.stages[name].move_tables)
-                print('stage: ' + format(name.upper(),'>7s') + ', final check --> num colliding sweeps = ' + str(len(colliding_sweeps)) + ' (should always be zero)')
-                if colliding_sweeps:
-                    print('') # just for setting a conditional debugger breakpoint
+                self.printfunc('stage: ' + format(name.upper(),'>7s') + ', final check --> num colliding sweeps = ' + str(len(colliding_sweeps)) + ' (should always be zero)')
+                self.stats.add_redundant_collision_check(name,len(colliding_sweeps))
         for name in self.stage_order:
             if self.stages[name].is_not_empty() and self.verbose:
                 self.printfunc('equalizing, comparing table for ' + name)
@@ -379,13 +377,12 @@ class PosSchedule(object):
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
         if should_freeze:
-            ori_stage_colliding = copymodule.deepcopy(stage.colliding)
             if self.verbose:
                 self.printfunc("initial stage.colliding: " + str(stage.colliding))
             for posid in colliding_sweeps:
                 if posid in stage.colliding: # re-check, since earlier path adjustments in loop may have already resolved this posid's collision
-                    self.petal.pos_flags[posid] |= self.petal.frozen_anticol_bit #Mark as frozen by anticollision
-                    stage.adjust_path(posid, ori_stage_colliding, freezing='forced')
+                    stage.adjust_path(posid, freezing='forced')
+                    self.petal.pos_flags[posid] |= self.petal.frozen_anticol_bit # Mark as frozen by anticollision
                     if self.verbose:
                         self.printfunc("remaining stage.colliding " + str(stage.colliding))
             if self.stats and colliding_sweeps:
@@ -411,13 +408,20 @@ class PosSchedule(object):
             desired_final_posintTP['retract'][posid] = [request['start_posintTP'][pc.T], retracted_phi]
             desired_final_posintTP['rotate'][posid] = [request['targt_posintTP'][pc.T], retracted_phi]
             desired_final_posintTP['extend'][posid] = request['targt_posintTP']
-            dtdp['retract'][posid] = trans.delta_posintTP(desired_final_posintTP['retract'][posid], start_posintTP['retract'][posid], range_wrap_limits='targetable')
-            start_posintTP['rotate'][posid] = trans.addto_posintTP(start_posintTP['retract'][posid], dtdp['retract'][posid], range_wrap_limits='targetable')
-            dtdp['rotate'][posid] = trans.delta_posintTP(desired_final_posintTP['rotate'][posid], start_posintTP['rotate'][posid], range_wrap_limits='targetable')
-            start_posintTP['extend'][posid] = trans.addto_posintTP(start_posintTP['rotate'][posid], dtdp['rotate'][posid], range_wrap_limits='targetable')
-            dtdp['extend'][posid] = trans.delta_posintTP(desired_final_posintTP['extend'][posid], start_posintTP['extend'][posid], range_wrap_limits='targetable')
-        for i in range(len(self.RRE_stage_order)):
-            name = self.RRE_stage_order[i]
+            def calc_dtdp(name, posid):
+                tp_start = start_posintTP[name][posid]
+                tp_final = desired_final_posintTP[name][posid]
+                return trans.delta_posintTP(tp_final, tp_start, range_wrap_limits='targetable')
+            def calc_next_tp(last_name, posid):
+                last_tp = start_posintTP[last_name][posid]
+                this_dtdp = dtdp[last_name][posid]
+                return trans.addto_posintTP(last_tp, this_dtdp, range_wrap_limits='targetable')
+            dtdp['retract'][posid] = calc_dtdp('retract',posid)
+            start_posintTP['rotate'][posid] = calc_next_tp('retract',posid)
+            dtdp['rotate'][posid] = calc_dtdp('rotate',posid)
+            start_posintTP['extend'][posid] = calc_next_tp('rotate',posid)
+            dtdp['extend'][posid] = calc_dtdp('extend',posid)
+        for name in self.RRE_stage_order:
             stage = self.stages[name]
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
             if self.should_anneal:
@@ -427,26 +431,35 @@ class PosSchedule(object):
                 self.printfunc('Posschedule first move table: \n' + str(list(stage.move_tables.values())[0].for_collider()))
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
-            attempts_remaining = self.max_path_adjustment_passes
-            while stage.colliding and attempts_remaining:
-                stage_colliding_snapshot = stage.colliding.copy()
-                for posid in stage_colliding_snapshot:
+            attempts_sequence = ['off','on','forced','forced_recursive'] # these are used as freezing arg to adjust_path()
+            while stage.colliding and attempts_sequence:
+                freezing = attempts_sequence.pop(0)
+                for posid in stage.colliding.copy():
                     if posid in stage.colliding: # because it may have been resolved already when a *neighbor* got previously adjusted
-                        if self.verbose:
-                            self.printfunc(f'now adjusting path of {posid}, remaining attempts: {attempts_remaining}')
-                        freezing = 'off' if attempts_remaining > 1 else 'on'
-                        stage.adjust_path(posid, stage.colliding, freezing, self.requests)
-                        if stage.sweeps[posid].is_frozen:
-                            self.petal.pos_flags[posid] |= self.petal.frozen_anticol_bit # Mark as frozen by anticollision
-                            for j in range(i+1, len(self.RRE_stage_order)):
-                                next_name = self.RRE_stage_order[j]
-                                del start_posintTP[next_name][posid]
-                                del dtdp[next_name][posid]
+                        newly_frozen = stage.adjust_path(posid, freezing)
+                        for p in newly_frozen:
+                            self.petal.pos_flags[p] |= self.petal.frozen_anticol_bit # Mark as frozen by anticollision
+                            if name != self.RRE_stage_order[-1]: # i.e. some next stage exists
+                                # must set next stage to begin from the newly-frozen position
+                                frozen_table_data = stage.move_tables[p].for_schedule()
+                                frozen_t = start_posintTP[name][p][pc.T] + frozen_table_data['net_dT'][-1]
+                                frozen_p = start_posintTP[name][p][pc.P] + frozen_table_data['net_dP'][-1]
+                                next_stage_idx = self.RRE_stage_order.index(name) + 1
+                                next_name = self.RRE_stage_order[next_stage_idx]
+                                start_posintTP[next_name][p] = [frozen_t,frozen_p]
+                                dtdp[next_name][p] = calc_dtdp(next_name, p)
                 if self.stats:
                     self.stats.add_to_num_adjustment_iters(1)
-                attempts_remaining -= 1
-                if self.verbose:  # debug
-                    self.printfunc(f'posschedule: remaining collisions {len(stage.colliding)}, attempts_remaining {attempts_remaining}')
+            if stage.colliding:                
+                self.printfunc('Error: During ' + name.upper() + ' stage of move scheduling (see PosSchedule.py), the positioners ' + str([posid for posid in stage.colliding]) + ' had collision(s) that were NOT resolved. This means there is a bug somewhere in the code that needs to be found and fixed. If this move is executed on hardware, these two positioners will collide!')
+                self.printfunc('The move table(s) for these are:')
+                for posid in stage.colliding:
+                    if posid in stage.move_tables:
+                        stage.move_tables[posid].display(self.printfunc)
+                    else:
+                        self.printfunc(str(posid) + ' --> no move table found')
+                if self.stats:
+                    self.stats.add_unresolved_colliding_at_stage(name,stage.colliding)
 
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
