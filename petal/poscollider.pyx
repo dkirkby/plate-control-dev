@@ -26,7 +26,8 @@ class PosCollider(object):
                  collision_hashpf_exists=False,
                  hole_angle_file=None,
                  use_neighbor_loc_dict=False,
-                 config=None):
+                 config=None,
+                 animator_label_type='loc'):
         if not config:
             if not configfile:
                 filename = '_collision_settings_DEFAULT.conf'
@@ -48,7 +49,7 @@ class PosCollider(object):
         self.animator = posanimator.PosAnimator(fignum=0, timestep=self.timestep)
         self.posids_to_animate = set() # set of posids to be animated (i.e., allows restricting which ones get plotted)
         self.fixed_items_to_animate = {'PTL','GFA'} # may contain nothing, 'PTL', and/or 'GFA'
-        self.posids_as_animator_labels = True # each animated pos is labeled by its ID. if false, labeled by device location on petal
+        self.animator_label_type = animator_label_type # 'loc' --> device location ids, 'posid' --> posids, None --> no labels
         self.use_neighbor_loc_dict = use_neighbor_loc_dict
         self.keepouts_T = {} # key: posid, value: central body keepout of type PosPoly
         self.keepouts_P = {} # key: posid, value: phi arm keepout of type PosPoly
@@ -112,15 +113,17 @@ class PosCollider(object):
             # self.animator.add_or_change_item('Ei', self.posindexes[posid], start_time, self.Ei_polys[posid].points)
             # self.animator.add_or_change_item('Ee', self.posindexes[posid], start_time, self.Ee_polys[posid].points)
             self.animator.add_or_change_item('line at 180', self.posindexes[posid], start_time, self.line180_polys[posid].points)
-            if self.posids_as_animator_labels:
+            if self.animator_label_type == 'posid':
                 label = str(posid)
-            else:
+            elif self.animator_label_type == 'loc':
                 label = format(self.posmodels[posid].deviceloc,'03d')
+            else:
+                label = ''
             self.animator.add_label(label, self.x0[posid], self.y0[posid])
 
     def add_mobile_to_animator(self, start_time, sweeps):
         """Add a collection of PosSweeps to the animator, describing positioners'
-        real-time motions.
+        real-time motions.a
 
             start_time ... seconds, global time when the move begins
             sweeps     ... dict with keys = posids, values = PosSweep instances
@@ -588,6 +591,14 @@ class PosSweep(object):
     def register_as_frozen(self):
         """Sets an indicator that the sweep has been frozen at the end."""
         self.frozen_time = self.time[-1]
+        
+    def clear_collision(self):
+        """Resets collision state to default (non-colliding) values."""
+        blank_sample = PosSweep()
+        self.collision_case = blank_sample.collision_case
+        self.collision_time = blank_sample.collision_time
+        self.collision_idx = blank_sample.collision_idx
+        self.collision_neighbor = blank_sample.collision_neighbor
 
     @property
     def is_frozen(self):
