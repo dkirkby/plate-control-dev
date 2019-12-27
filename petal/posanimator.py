@@ -15,6 +15,10 @@ class PosAnimator(object):
     def __init__(self, fignum=0, timestep=0.1):
         self.live_animate = False # whether to plot the animation live
         self.save_movie = True # whether to write out a movie file of animation
+        self.ffmpeg_path = os.path.join(pc.petal_directory,'ffmpeg')
+        if not (os.path.exists(self.ffmpeg_path + '.exe') or os.path.exists(self.ffmpeg_path)):
+            self.ffmpeg_path = 'ffmpeg' # hope the user has it on sys path in this case
+        self.codec = 'libx264' # video codec for ffmpeg to use. alt 'libx265'
         self.delete_imgs = False # whether to delete individual image files after generating animation
         self.save_dir = os.path.join(pc.dirs['temp_files'], 'schedule_animations')
         self.frame_dir = '' # generated automatically when saving frames
@@ -156,7 +160,7 @@ class PosAnimator(object):
         """Sets up the animation, using the data that has been already entered via the
         add_or_change_item method.
         """
-        self.anim_fig = plt.figure(self.fignum, figsize=(16,12))
+        self.anim_fig = plt.figure(self.fignum, figsize=(20,15))
         self.anim_ax = plt.axes()
         temp = np.array([])
         for item in self.items.values():
@@ -183,6 +187,7 @@ class PosAnimator(object):
             plt.text(s=label['text'], x=label['x'], y=label['y'], family='monospace', horizontalalignment='center', size=self.label_size)
         plt.xlim(xmin=xmin,xmax=xmax)
         plt.ylim(ymin=ymin,ymax=ymax)
+        plt.axis('equal')
 
     def anim_frame_update(self, frame):
         """Sequentially update the animation to the next frame.
@@ -232,8 +237,7 @@ class PosAnimator(object):
         if self.save_movie:
             input_file = os.path.join(self.frame_dir, self.framefile_prefix + '%' + str(self.n_framefile_digits) + 'd' + self.framefile_extension)
             output_file = os.path.join(self.save_dir, timestamp + '_schedule_anim.mp4')
-            ffmpeg_cmd = 'ffmpeg -y -r ' + str(fps) + ' -i ' + input_file + ' -c:v libx265 ' + output_file
-            ffmpeg_cmd = 'ffmpeg -y -r ' + str(fps) + ' -i ' + input_file + ' ' + output_file
+            ffmpeg_cmd = self.ffmpeg_path + ' -y -r ' + str(fps) + ' -i ' + input_file + ' -vcodec ' + self.codec + ' ' + output_file
             os.system(ffmpeg_cmd)
         if self.delete_imgs:
             for path in image_paths.values():
