@@ -214,7 +214,8 @@ class PosSchedule(object):
             for name in self.stage_order:
                 colliding_sweeps, all_sweeps = self.stages[name].find_collisions(self.stages[name].move_tables)
                 self.printfunc('stage: ' + format(name.upper(),'>7s') + ', final check --> num colliding sweeps = ' + str(len(colliding_sweeps)) + ' (should always be zero)')
-                self.stats.add_redundant_collision_check(name,len(colliding_sweeps))
+                if self.stats:
+                    self.stats.add_redundant_collision_check(name,len(colliding_sweeps))
         for name in self.stage_order:
             if self.stages[name].is_not_empty() and self.verbose:
                 self.printfunc('equalizing, comparing table for ' + name)
@@ -434,7 +435,7 @@ class PosSchedule(object):
             attempts_sequence = ['off','on','forced','forced_recursive'] # these are used as freezing arg to adjust_path()
             while stage.colliding and attempts_sequence:
                 freezing = attempts_sequence.pop(0)
-                for posid in stage.colliding.copy():
+                for posid in sorted(stage.colliding.copy()): # sort is for repeatabiity (since stage.colliding is an unordered set, and so path adjustments would otherwise get processed in variable order from run to run). the copy() call is redundant with sorted(), but left there for the sake of clarity, that need to be looping on a copy of *some* kind
                     if posid in stage.colliding: # because it may have been resolved already when a *neighbor* got previously adjusted
                         newly_frozen = stage.adjust_path(posid, freezing)
                         for p in newly_frozen:
@@ -459,7 +460,10 @@ class PosSchedule(object):
                     else:
                         self.printfunc(str(posid) + ' --> no move table found')
                 if self.stats:
-                    self.stats.add_unresolved_colliding_at_stage(name,stage.colliding)
+                    sorted_colliding = sorted(stage.colliding) # just for human ease of reading the values
+                    colliding_tables = {posid:stage.move_tables[posid] for posid in sorted_colliding}
+                    colliding_sweeps = {posid:stage.sweeps[posid] for posid in sorted_colliding}
+                    self.stats.add_unresolved_colliding_at_stage(name, sorted_colliding, colliding_tables, colliding_sweeps)
 
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
