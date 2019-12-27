@@ -14,6 +14,8 @@ class PosSchedStats(object):
         self.schedule_ids = []
         self.collisions = {}
         self.unresolved = {}
+        self.unresolved_tables = {}
+        self.unresolved_sweeps = {}
         self.strings = {'method':[]}
         self.numbers = {'n pos':[],
                         'n requests':[],
@@ -139,12 +141,14 @@ class PosSchedStats(object):
             self.numbers[redundant_checks_str][-1] = 0
         self.numbers[redundant_checks_str][-1] += num_colliding
     
-    def add_unresolved_colliding_at_stage(self, stage_name, colliding_set):
+    def add_unresolved_colliding_at_stage(self, stage_name, colliding_set, colliding_tables, colliding_sweeps):
         """Add data recording ids of any bots colliding in a given stage. This
         is distinct from "redundant" check data."""
         if stage_name not in self.unresolved[self.latest]:
             self.unresolved[self.latest][stage_name] = set()
         self.unresolved[self.latest][stage_name].update(colliding_set)
+        self.unresolved_tables[self.latest][stage_name].update(colliding_tables)
+        self.unresolved_sweeps[self.latest][stage_name].update(colliding_sweeps)
     
     def summarize_collision_resolutions(self):
         """Returns a summary dictionary of the collisions and resolutions data."""
@@ -174,9 +178,11 @@ class PosSchedStats(object):
     
     def summarize_unresolved_colliding(self):
         """Returns a summary dictionary of the unresolved colliding items."""
-        summary = {'unresolved colliding':[]}
+        summary = {'unresolved colliding':[], 'unresolved colliding tables':[], 'unresolved colliding sweeps':[]}
         for sched in self.schedule_ids:
             summary['unresolved colliding'].append(self.unresolved[sched])
+            summary['unresolved colliding tables'].append(self.unresolved_tables[sched])
+            summary['unresolved colliding sweeps'].append(self.unresolved_sweeps[sched])
         return summary
     
     def summarize_num_moving(self):
