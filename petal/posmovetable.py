@@ -38,7 +38,7 @@ class PosMoveTable(object):
         self.allow_exceed_limits = self.posmodel.state._val['ALLOW_EXCEED_LIMITS']
         self.allow_cruise = not(self.posmodel.state._val['ONLY_CREEP'])
         
-    def display(self):
+    def display(self,printfunc=print):
         def fmt(x):
             if x == None:
                 x = str(x)
@@ -47,18 +47,25 @@ class PosMoveTable(object):
             elif type(x) == int or type(x) == float:
                 return format(x,'>11g')
         output = str(self.posid) + ': ' + self.__repr__()
+        output += '\n  Initial posintTP: ' + str(self.init_posintTP)
+        output += '\n  Initial poslocTP: ' + str(self.init_poslocTP)
         if self.rows or self._rows_extra:
             output += '\n'
+            output += fmt('row_type')
             headers = PosMoveRow().data.keys()
             for header in headers:
                 output += fmt(header)
-            for row in self.rows + self._rows_extra:
-                output += '\n'
+            for row in self.rows:
+                output += '\n' + fmt('normal')
                 for header in headers:
                     output += fmt(row.data[header])
+            for extra_row in self._rows_extra:
+                output += '\n' + fmt('extra')
+                for header in headers:
+                    output += fmt(extra_row.data[header])
         else:
             output += ' (empty)'
-        print(output)
+        printfunc(output)
 
     def copy(self):
         new = copymodule.copy(self) # intentionally shallow, then will deep-copy just the row instances as needed below
@@ -186,7 +193,7 @@ class PosMoveTable(object):
         """Uses PosModel instance to get the real, quantized, calibrated values.
         Anti-backlash and final creep moves are added as necessary.
         """
-        expected_prior_dTdP = [0,0]
+        latest_TP = [x for x in self.init_posintTP]
         backlash = [0,0]
         true_moves = [[],[]]
         new_moves = [[],[]]
@@ -195,8 +202,9 @@ class PosMoveTable(object):
         for row in self.rows:
             ideal_dist = [row.data['dT_ideal'],row.data['dP_ideal']]
             for i in [pc.T,pc.P]:
-                true_moves[i].append(self.posmodel.true_move(i, ideal_dist[i], self.allow_cruise, self.allow_exceed_limits, expected_prior_dTdP))
-                expected_prior_dTdP[i] += true_moves[i][-1]['distance']
+                limits = None if self.allow_exceed_limits else 'debounced'
+                true_moves[i].append(self.posmodel.true_move(i, ideal_dist[i], self.allow_cruise, limits, latest_TP))
+                latest_TP[i] += true_moves[i][-1]['distance']
                 if true_moves[i][-1]['distance']:
                     has_moved[i] = True
         if self.should_antibacklash and any(has_moved):
@@ -204,23 +212,23 @@ class PosMoveTable(object):
             backlash_mag = self.posmodel.state._val['BACKLASH']
             for i in [pc.T,pc.P]:
                 backlash[i] = -backlash_dir[i] * backlash_mag * has_moved[i]
-                 # note backlash allow_exceed_limits=True, with assumption that these limits the debounced_range, which already accounts for backlash (see Axis class implementation)
-                new_moves[i].append(self.posmodel.true_move(i, backlash[i], self.allow_cruise, allow_exceed_limits=True, expected_prior_dTdP=expected_prior_dTdP))
+                new_moves[i].append(self.posmodel.true_move(i, backlash[i], self.allow_cruise, limits='near_full', init_posintTP=latest_TP))
                 new_moves[i][-1]['command'] = '(auto backlash backup)'
-                new_moves[i][-1]['cmd_val'] = backlash[i]
-                expected_prior_dTdP[i] += new_moves[i][-1]['distance']
+                new_moves[i][-1]['cmd_val'] = new_moves[i][-1]['distance']
+                latest_TP[i] += new_moves[i][-1]['distance']
         if self.should_final_creep or any(backlash):
             ideal_total = [0,0]
             ideal_total[pc.T] = sum([row.data['dT_ideal'] for row in self.rows])
             ideal_total[pc.P] = sum([row.data['dP_ideal'] for row in self.rows])
+            actual_total = [0,0]
             err_dist = [0,0]
             for i in [pc.T,pc.P]:
-                err_dist[i] = ideal_total[i] - expected_prior_dTdP[i]
-                # note allow_exceed_limits=True, with assumption that this move is either within the backlash distance, or a negligibly tiny correction move
-                new_moves[i].append(self.posmodel.true_move(i, err_dist[i], allow_cruise=False, allow_exceed_limits=True, expected_prior_dTdP=expected_prior_dTdP))
+                actual_total[i] = latest_TP[i] - self.init_posintTP[i]
+                err_dist[i] = ideal_total[i] - actual_total[i]
+                new_moves[i].append(self.posmodel.true_move(i, err_dist[i], allow_cruise=False, limits='near_full', init_posintTP=latest_TP))
                 new_moves[i][-1]['command'] = '(auto final creep)'
-                new_moves[i][-1]['cmd_val'] = err_dist[i]
-                expected_prior_dTdP[i] += new_moves[i][-1]['distance']
+                new_moves[i][-1]['cmd_val'] = new_moves[i][-1]['distance']
+                latest_TP[i] += new_moves[i][-1]['distance']
         self._rows_extra = []
         for i in range(len(new_moves[0])):
             self._rows_extra.append(PosMoveRow())
@@ -241,7 +249,7 @@ class PosMoveTable(object):
         """Internal function that calculates the various output table formats and
         passes them up to the wrapper functions above.
         """
-        true_moves = self._calculate_true_moves()  # debug
+        true_moves = self._calculate_true_moves()
         rows = self.rows.copy()
         rows.extend(self._rows_extra)
         row_range = range(len(rows))
