@@ -238,7 +238,7 @@ class PosScheduleStage(object):
                         remainder.add(collision_neighbor)
                     if newly_colliding:
                         self.printfunc('Note: adjust_path(' + str(posid) + ', freezing=\'' + str(freezing) + '\') introduced new collisions for ' + str(newly_colliding))
-                    for p in remainder:
+                    for p in sorted(remainder): # sort is for repeatabiity (since 'remainder' is an unordered set, and so path adjustments would otherwise get processed in variable order from run to run)
                         if not self.move_tables[p].is_motionless: # only freeze if there's some move component available to be frozen
                             newly_frozen.update(self.adjust_path(p,freezing='forced_recursive')) # recursively close out any side-effect new collisions
                         else:
@@ -339,7 +339,6 @@ class PosScheduleStage(object):
         if self.stats:
             found = {self._collision_id(posid, sweep.collision_neighbor) for posid, sweep in colliding_sweeps.items()}
             self.stats.add_collisions_found(found)
-        del all_sweeps, colliding_sweeps
 
     def _propose_path_adjustment(self, posid, method='freeze'):
         """Generates a proposed alternate move table for the positioner posid
@@ -518,4 +517,6 @@ class PosScheduleStage(object):
         string will be the same regardless of whether A or B is argued first.
         """
         s = sorted({str(A),str(B)})
+        if not A or not B:
+            print('Warning: collision id requested with a missing item. A = \'' + str(A) + '\', B = \'' + str(B) + '\'')
         return s[0] + '-' + s[1]
