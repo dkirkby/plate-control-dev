@@ -17,17 +17,17 @@ device_loc_ids = 'all' # make the selection here
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 pos_param_sequence_id = 'one real petal'
-move_request_sequence_id = '04246-04258'# '04000-04999'
+move_request_sequence_id = '04108-04110'#'04000-04999'# '04000-04999'
 
 # Other ids
 fidids = {}
 petal_id = 666
 
 # Other options
-should_animate = True
+should_animate = False
 anim_label_size = 'medium' # size in points, 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
 animation_foci = {'M07362', 'M08144', 'M05823', 'M05899'} # argue {} or 'all' to animate everything. otherwise, this set limits which robots (plus their surrounding neighbors) get animated. Can include 'GFA' or 'PTL' as desired
-n_corrections = 1 # number of correction moves to simulate after each target
+n_corrections = 0 # number of correction moves to simulate after each target
 max_correction_move = 0.050/1.414 # mm
 should_profile = False
 

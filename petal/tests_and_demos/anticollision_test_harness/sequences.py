@@ -30,8 +30,8 @@ move_request_sequences     = {0:[0],
                               '04000-04049':[i for i in range(4000,4050)],
                               '04000-04099':[i for i in range(4000,4100)],
                               '04000-04999':[i for i in range(4000,5000)],
-                              '04246-04258':[i for i in range(4246,4259)],
-                              '04252-04258':[i for i in range(4252,4259)]}
+                              '04108-04110':[i for i in range(4108,4111)],
+                             }
 
 def get_positioner_param_sequence(sequence_id, device_loc_ids='all'):
     """Select a sequence of positioner parameter sets.
