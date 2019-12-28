@@ -2,15 +2,14 @@ import os
 import cProfile
 import pstats
 import sys
-sys.path.append(os.path.abspath('../../../petal/'))
+sys.path.append(os.path.abspath('../../petal/'))
 import posconstants as pc
 
-device_locations_path = '../../positioner_locations_0530v14.csv'
+device_locations_path = '../positioner_locations_0530v14.csv'
 
-pos_dir = 'pos_parameter_sets'
+pos_dir = os.path.join(pc.dirs['all_settings'], 'harness_settings', 'pos_parameter_sets')
+req_dir = os.path.join(pc.dirs['all_settings'], 'harness_settings', 'move_request_sets')
 pos_prefix = 'posparams_'
-
-req_dir = 'move_request_sets'
 req_prefix = 'requests_'
 
 def bool(s):
