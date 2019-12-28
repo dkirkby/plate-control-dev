@@ -13,7 +13,7 @@ import harness_constants as hc
 import sequences
 
 # input parameters
-num_sets_to_make = 100
+num_sets_to_make = 10
 posparams_id = 10004
 posparams = sequences._read_data(data_id=posparams_id)
 
@@ -73,7 +73,9 @@ for i in range(num_sets_to_make):
     
 # save set files
 petal_id = posparams_id - 10000 # quick hack, assuming the "add 10000" to id rule from "generate_request_sets_for_posparams.py" applies
-next_filenumber = petal_id * 1000 # more id number hackery
+start_number = input('Enter starting file number (or nothing, to start at \'000\'). The petal id number will be prefixed. start = ')
+start_number = 0 if not start_number else int(start_number)
+next_filenumber = petal_id * 1000 + start_number # more id number hackery
 for target in all_targets:
     save_path = hc.filepath(hc.req_dir, hc.req_prefix, next_filenumber)
     with open(save_path,'w',newline='') as csvfile:
