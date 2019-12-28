@@ -499,7 +499,35 @@ class PosSweep(object):
 
     def copy(self):
         return copymodule.deepcopy(self)
+    
+    def as_dict(self):
+        """Returns a dictionary containing copies of all the sweep data."""
+        c = self.copy()
+        d = {'posid':               c.posid,
+             'time':                c.time,
+             'tp':                  c.tp,
+             'tp_dot':              c.tp_dot,
+             'collision_case':      c.collision_case,
+             'collision_time':      c.collision_time,
+             'collision_idx':       c.collision_idx,
+             'collision_neighbor':  c.collision_neighbor,
+             'frozen_time':         c.frozen_time}
+        return d
+    
+    def __repr__(self):
+        d = self.as_dict()
+        d['time_start'] = d['time'][0]
+        d['time_final'] = d['time'][-1]
+        d['tp_start'] = [d['tp'][0,0], d['tp'][1,0]]
+        d['tp_final'] = [d['tp'][0,-1], d['tp'][1,-1]]
+        del d['time']
+        del d['tp']
+        del d['tp_dot']
+        return str(d)
 
+    def __str__(self):
+        return self.__repr__()
+    
     def fill_exact(self, init_poslocTP, table, start_time=0):
         """Fills in a sweep object based on the input table. Time and position
         are handled continuously and exactly (i.e. not yet quantized).
