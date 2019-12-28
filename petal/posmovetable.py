@@ -37,8 +37,29 @@ class PosMoveTable(object):
         self.should_final_creep  = self.posmodel.state._val['FINAL_CREEP_ON']
         self.allow_exceed_limits = self.posmodel.state._val['ALLOW_EXCEED_LIMITS']
         self.allow_cruise = not(self.posmodel.state._val['ONLY_CREEP'])
+
+    def as_dict(self):
+        """Returns a dictionary containing copies of all the table data."""
+        c = self.copy()
+        d = {'posid':               c.posid,
+             'log_note':            c.log_note,
+             'rows':                c.rows,
+             '_rows_extra':         c._rows_extra,
+             'init_posintTP':       c.init_posintTP,
+             'init_poslocTP':       c.init_poslocTP,
+             'should_antibacklash': c.should_antibacklash,
+             'should_final_creep':  c.should_final_creep,
+             'allow_exceed_limits': c.allow_exceed_limits,
+             'allow_cruise':        c.allow_cruise}
+        return d
+    
+    def __repr__(self):
+        return str(self.as_dict())
+
+    def __str__(self):
+        return str(self.as_dict())
         
-    def display(self,printfunc=print):
+    def display(self,printfunc=print,show_posid=True):
         def fmt(x):
             if x == None:
                 x = str(x)
@@ -46,9 +67,9 @@ class PosMoveTable(object):
                 return format(x,'>11s')
             elif type(x) == int or type(x) == float:
                 return format(x,'>11g')
-        output = str(self.posid) + ': ' + self.__repr__()
-        output += '\n  Initial posintTP: ' + str(self.init_posintTP)
-        output += '\n  Initial poslocTP: ' + str(self.init_poslocTP)
+        output = '  move table for: ' + str(self.posid) + '\n' if show_posid else ''
+        output += '  Initial posintTP: ' + str(self.init_posintTP) + '\n'
+        output += '  Initial poslocTP: ' + str(self.init_poslocTP)
         if self.rows or self._rows_extra:
             output += '\n'
             output += fmt('row_type')
@@ -66,6 +87,7 @@ class PosMoveTable(object):
         else:
             output += ' (empty)'
         printfunc(output)
+        return output
 
     def copy(self):
         new = copymodule.copy(self) # intentionally shallow, then will deep-copy just the row instances as needed below
