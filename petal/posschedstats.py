@@ -44,6 +44,8 @@ class PosSchedStats(object):
         self.schedule_ids.append(schedule_id)
         self.collisions[self.latest] = {'found':set(), 'resolved':{}}
         self.unresolved[self.latest] = {}
+        self.unresolved_tables[self.latest] = {}
+        self.unresolved_sweeps[self.latest] = {}
         self.num_moving[self.latest] = {0:0}
         for key in self.strings:
             self.strings[key].append('-')
@@ -146,6 +148,8 @@ class PosSchedStats(object):
         is distinct from "redundant" check data."""
         if stage_name not in self.unresolved[self.latest]:
             self.unresolved[self.latest][stage_name] = set()
+            self.unresolved_tables[self.latest][stage_name] = {}
+            self.unresolved_sweeps[self.latest][stage_name] = {}
         self.unresolved[self.latest][stage_name].update(colliding_set)
         self.unresolved_tables[self.latest][stage_name].update(colliding_tables)
         self.unresolved_sweeps[self.latest][stage_name].update(colliding_sweeps)
