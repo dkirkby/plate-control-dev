@@ -451,14 +451,17 @@ class PosSchedule(object):
                                 dtdp[next_name][p] = calc_dtdp(next_name, p)
                 if self.stats:
                     self.stats.add_to_num_adjustment_iters(1)
-            if stage.colliding:                
+            if stage.colliding:
                 self.printfunc('Error: During ' + name.upper() + ' stage of move scheduling (see PosSchedule.py), the positioners ' + str([posid for posid in stage.colliding]) + ' had collision(s) that were NOT resolved. This means there is a bug somewhere in the code that needs to be found and fixed. If this move is executed on hardware, these two positioners will collide!')
                 self.printfunc('The move table(s) for these are:')
                 for posid in stage.colliding:
-                    if posid in stage.move_tables:
-                        stage.move_tables[posid].display(self.printfunc)
-                    else:
-                        self.printfunc(str(posid) + ' --> no move table found')
+                    for n in self.RRE_stage_order:
+                        stage_str = str(posid) + ': ' + n.upper()
+                        if posid in self.stages[n].move_tables:
+                            self.printfunc(stage_str)
+                            self.stages[n].move_tables[posid].display(self.printfunc)
+                        elif n == name:
+                            self.printfunc(stage_str + ' --> no move table found')
                 if self.stats:
                     sorted_colliding = sorted(stage.colliding) # just for human ease of reading the values
                     colliding_tables = {posid:stage.move_tables[posid] for posid in sorted_colliding}
