@@ -17,7 +17,8 @@ device_loc_ids = 'all' # make the selection here
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 pos_param_sequence_id = 'one real petal'
-move_request_sequence_id = '04000-04999' #'04000-04999' #'04108-04110'
+move_request_sequence_id = '04000-04099' #'04000-04999' #'04108-04110'
+stats_filename_suffix = str(move_request_sequence_id) + ''
 
 # Other ids
 fidids = {}
@@ -59,6 +60,8 @@ for pos_params in pos_param_sequence:
                       extra_check_on  = True, # remember to turn off for performance timing
                       anticollision   = 'adjust')
     ptl.limit_radius = None
+    if ptl.schedule_stats:
+        ptl.schedule_stats.filename_suffix = stats_filename_suffix
     if should_animate:
         if animation_foci != 'all' and  len(animation_foci) > 0:
             posids_to_animate = set()
