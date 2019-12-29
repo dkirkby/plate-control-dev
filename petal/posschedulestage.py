@@ -336,6 +336,8 @@ class PosScheduleStage(object):
             if n and self.sweeps[n].collision_neighbor != posid: # i.e., neighbor thinks this collision has been resolved
                 self.sweeps[posid].clear_collision()
                 self.colliding.remove(posid)
+                if posid in colliding_sweeps:
+                    colliding_sweeps.pop(posid)
         if self.stats:
             found = {self._collision_id(posid, sweep.collision_neighbor) for posid, sweep in colliding_sweeps.items()}
             self.stats.add_collisions_found(found)
@@ -394,88 +396,127 @@ class PosScheduleStage(object):
         unmoving_neighbor = self.sweeps[posid].collision_neighbor not in self.move_tables
         if no_collision or (fixed_collision and method != 'freeze') or already_frozen or not_enabled or (unmoving_neighbor and method != 'freeze'):
             return {}
-        table = self._get_or_generate_table(posid,should_copy=True)
+        
+        # table that will be adjusted
+        tables = {posid: self._get_or_generate_table(posid,should_copy=True)}
+        tables_data = {}
+        if method == 'freeze' or 'repel' in method:
+            tables_data[posid] = tables[posid].for_schedule()
+        
+        # freeze method
         if method == 'freeze':
-            table_data = table.for_schedule()
-            for row_idx in reversed(range(table.n_rows)):
-                net_time = table_data['net_time'][row_idx]
+            for row_idx in reversed(range(tables[posid].n_rows)):
+                net_time = tables_data[posid]['net_time'][row_idx]
                 collision_time = self.sweeps[posid].collision_time
                 if math.fmod(net_time, self.collider.timestep): # i.e., if not exactly matching a quantized timestep (almost always the case)
                     collision_time -= self.collider.timestep # handles coarseness of discrete time by treating the collision time as one timestep earlier in the sweep
                 if net_time >= collision_time:
                     if self.verbose:
                         self.printfunc("net time, collision_time " + str(net_time) + ' ' + str(collision_time))
-                    table.delete_row(row_idx)
+                    tables[posid].delete_row(row_idx)
                 else:
                     break
-            if table.n_rows == 0:
-                table.set_move(0,0,0)
-            return {posid:table}
-        neighbor = self.sweeps[posid].collision_neighbor
-        neighbor_table = self._get_or_generate_table(neighbor,should_copy=True)
-        neighbor_table_data = neighbor_table.for_schedule()
-        for neighbor_clearance_time in neighbor_table_data['net_time']:
-            if neighbor_clearance_time > self.sweeps[posid].collision_time:
-                break
-        if method == 'pause':
-            table.insert_new_row(0)
-            table.set_prepause(0,neighbor_clearance_time)
-            return {posid:table}
-        else:
-            tables = {posid:table}
-            posmodel = self.collider.posmodels[posid]
-            if 'extend' in method or 'retract' in method:
-                start = tables[posid].init_posintTP[1]
-                speed = posmodel.abs_shaft_speed_cruise_P
-                targetable_range = posmodel.targetable_range_P
-                if 'retract' in method:
-                    limit = min(start + self._max_jog[method], max(targetable_range), self.collider.Ei_phi) # deeper retraction than Eo, to give better chance of avoidance
-                else:
-                    limit = max(start - self._max_jog[method], min(targetable_range))
-                axis = pc.P
-            else:
-                start = tables[posid].init_posintTP[0]
-                speed = posmodel.abs_shaft_speed_cruise_T
-                targetable_range = posmodel.targetable_range_T
-                if 'ccw' in method:
-                    limit = min(start + self._max_jog[method], max(targetable_range))
-                else:
-                    limit = max(start - self._max_jog[method], min(targetable_range))
-                axis = pc.T
-            distance = limit - start
-            move_time = abs(distance / speed)
-            if self.collider.posmodels[neighbor].is_enabled and not self.sweeps[neighbor].is_frozen:
-                tables[neighbor] = neighbor_table
-                if 'repel' in method:
-                    neighbor_posmodel = self.collider.posmodels[neighbor]
-                    neighbor_targetable_range = neighbor_posmodel.targetable_range_T
-                    neighbor_start = tables[neighbor].init_posintTP[0]
-                    if 'ccw' in method: # primary goes ccw, so neighbor goes cw
-                        neighbor_limit = max(neighbor_start - self._max_jog[method], min(neighbor_targetable_range))
-                    else: # primary goes cw; neighbor goes ccw
-                        neighbor_limit = min(neighbor_start + self._max_jog[method], max(neighbor_targetable_range))
-                    neighbor_distance = neighbor_limit - neighbor_start
-                    neighbor_move_time = abs(neighbor_distance / speed)
-                    primary_jog_time = max(move_time - neighbor_move_time,0)
-                    neighbor_jog_time = max(neighbor_move_time - move_time,0)
-                    table.insert_new_row(0)
-                    table.set_move(0,axis,distance)
-                    table.set_postpause(0,neighbor_jog_time + neighbor_clearance_time)
-                    table.set_move(table.n_rows,axis,-distance)
-                    neighbor_table.insert_new_row(0)
-                    neighbor_table.set_move(0,axis,neighbor_distance)
-                    neighbor_table.set_postpause(0,primary_jog_time)
-                    neighbor_table.set_move(neighbor_table.n_rows,axis,-neighbor_distance)
-                    return tables
-                else:
-                    neighbor_table.insert_new_row(0)
-                    neighbor_table.set_prepause(0,move_time)
-            table.insert_new_row(0)
-            table.insert_new_row(0)
-            table.set_move(0,axis,distance)
-            table.set_postpause(0,neighbor_clearance_time)
-            table.set_move(1,axis,-distance)
+            if tables[posid].n_rows == 0:
+                tables[posid].set_move(0,0,0)
             return tables
+        
+        # get neighbor table
+        neighbor = self.sweeps[posid].collision_neighbor
+        posmodels = {posid:self.collider.posmodels[posid], neighbor:self.collider.posmodels[neighbor]}
+        neighbor_can_move = posmodels[neighbor].is_enabled and not self.sweeps[neighbor].is_frozen
+        if neighbor_can_move:
+            tables[neighbor] = self._get_or_generate_table(neighbor,should_copy=True)
+            tables_data[neighbor] = tables[neighbor].for_schedule()
+            for neighbor_clearance_time in tables_data[neighbor]['net_time']:
+                if neighbor_clearance_time > self.sweeps[posid].collision_time:
+                    break
+            neighbor_clearance_time += pc.num_timesteps_clearance_margin * self.collider.timestep
+        elif method == 'pause':
+            return {} # no point in pausing if neighbor never moves
+            
+        # pause method
+        if method == 'pause':
+            tables[posid].insert_new_row(0)
+            tables[posid].set_prepause(0,neighbor_clearance_time)
+            return {posid:tables[posid]} # exclude neighbor here, since nothing being done to it
+        
+        # retract, rot, extend, repel methods: calculate jog distances
+        max_abs_jog = abs(self._max_jog[method])
+        jogs = {} # will hold distance(s) to move away from target and then back toward target
+        if 'extend' in method or 'retract' in method:
+            axis = pc.P
+            speed = posmodels[posid].abs_shaft_speed_cruise_P
+            limits = posmodels[posid].targetable_range_P
+            if 'retract' in method:
+                limits[1] = min(limits[1], self.collider.Ei_phi) # note deeper retraction than Eo, to give better chance of avoidance
+                direction = +1
+            else:
+                direction = -1
+            jogs[posid] = self._range_limited_jog(nominal=max_abs_jog, direction=direction, start=tables[posid].init_posintTP[1], limits=limits)
+        elif 'rot' in method:
+            axis = pc.T
+            speed = posmodels[posid].abs_shaft_speed_cruise_T
+            direction = +1 if 'ccw' in method else -1
+            jogs[posid] = self._range_limited_jog(nominal=max_abs_jog, direction=direction, start=tables[posid].init_posintTP[0], limits=posmodels[posid].targetable_range_T)
+        elif 'repel' in method:
+            axis = pc.T
+            speed = posmodels[posid].abs_shaft_speed_cruise_T
+            for p,t in tables.items():
+                start = t.init_posintTP[0]
+                limits = posmodels[p].targetable_range_T
+                direction = 1 if p == posid else -1 # neighbor repels from primary
+                if 'cw' in method:
+                    direction *= -1
+                if direction > 0:
+                    furthest_existing_excursion = max(tables_data[p]['net_dT'] + [0]) # zero element prevents accidentally adding margin (if all net_dT < 0) that temporally might not exist when you hoped it would
+                    limits[1] -= furthest_existing_excursion
+                else:
+                    furthest_existing_excursion = min(tables_data[p]['net_dT'] + [0]) # zero element prevents accidentally adding margin (if all net_dT > 0) that temporally might not exist when you hoped it would
+                    limits[0] -= furthest_existing_excursion # minus sign here is correct, since furthest_existing_excursion <= 0
+                jogs[p] = self._range_limited_jog(nominal=max_abs_jog, direction=direction, start=start, limits=limits)
+        else:
+            self.printfunc('Error: unknown path adjustment method \'' + str(method) + '\'')
+            return {}
+        jog_times = {p:abs(jogs[p] / speed) for p in jogs}       
+        
+        # apply jogs and associated pauses to tables
+        if 'repel' in method:
+            if neighbor in tables:
+                jog_times_diff = jog_times[neighbor] - jog_times[posid]
+                wait_for_neighbor_to_jog = max(jog_times_diff,0)
+                wait_for_posid_to_jog = max(-jog_times_diff,0)
+            for p,t in tables.items():
+                t.insert_new_row(0)
+                t.set_move(0, axis, jogs[p])
+                if p == posid:
+                    t.set_postpause(0,wait_for_neighbor_to_jog + neighbor_clearance_time)
+                else:
+                    t.set_postpause(0,wait_for_posid_to_jog)
+                t.set_move(t.n_rows, axis, -jogs[p]) # note how this is happening in a new final row
+        else:
+            tables[posid].insert_new_row(0)
+            tables[posid].insert_new_row(0)
+            tables[posid].set_move(0,axis,jogs[posid])
+            tables[posid].set_postpause(0,neighbor_clearance_time)
+            tables[posid].set_move(1,axis,-jogs[posid])
+            if neighbor in tables:
+                tables[neighbor].insert_new_row(0)
+                tables[neighbor].set_prepause(0,jog_times[posid])   
+        return tables
+    
+    @staticmethod
+    def _range_limited_jog(nominal, direction, start, limits):
+        """Returns a range-limited jog distance.
+            nominal   ... nominal jog distance, prior to applying range limits
+            direction ... +1 means counter-clockwise, -1 means clockwise
+            start     ... starting angle position
+            limits    ... 2-element list or tuple stating max and min accessible angles
+        """
+        if direction >= 0:
+            limited = min(start + nominal, max(limits))
+        else:
+            limited = max(start - nominal, min(limits))
+        return limited - start
 
     def _get_or_generate_table(self, posid, should_copy=False):
         """Fetches move table for posid from self.move_tables. If no such table
@@ -517,6 +558,4 @@ class PosScheduleStage(object):
         string will be the same regardless of whether A or B is argued first.
         """
         s = sorted({str(A),str(B)})
-        if not A or not B:
-            print('Warning: collision id requested with a missing item. A = \'' + str(A) + '\', B = \'' + str(B) + '\'')
         return s[0] + '-' + s[1]
