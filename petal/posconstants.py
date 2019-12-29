@@ -186,6 +186,7 @@ nonfreeze_adjustment_methods = ['pause',
                                 'repel_ccw_A','repel_cw_A',
                                 'repel_ccw_B','repel_cw_B']
 all_adjustment_methods = nonfreeze_adjustment_methods + ['freeze']
+num_timesteps_clearance_margin = 2 # this value * PosCollider.timestep --> small extra wait for a neighbor to move out of way
 
 # Convenience methods
 rotmat2D = lambda angle: [math.cos(angle*rad_per_deg), - math.sin(angle*rad_per_deg), math.sin(angle*rad_per_deg), math.cos(angle*rad_per_deg)]
