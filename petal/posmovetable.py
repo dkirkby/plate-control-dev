@@ -87,7 +87,6 @@ class PosMoveTable(object):
         else:
             output += ' (empty)'
         printfunc(output)
-        return output
 
     def copy(self):
         new = copymodule.copy(self) # intentionally shallow, then will deep-copy just the row instances as needed below
