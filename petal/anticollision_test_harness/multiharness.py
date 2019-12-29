@@ -2,7 +2,7 @@
 
 import os
 import sys
-sys.path.append(os.path.abspath('../../../petal/'))
+sys.path.append(os.path.abspath('../../petal/'))
 import posconstants as pc
 import configobj
 import runpy
