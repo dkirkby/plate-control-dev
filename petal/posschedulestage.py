@@ -301,7 +301,7 @@ class PosScheduleStage(object):
                     already_checked[posid].add(neighbor)
                     already_checked[neighbor].add(posid)
             for fixed_neighbor in self.collider.fixed_neighbor_cases[posid]:
-                posfix_sweep = self.collider.spacetime_collision_with_fixed(posid, init_poslocTP_A, table_A.for_collider())[0] # index 0 to immediately retrieve from the one-element list this function returns
+                posfix_sweep = self.collider.spacetime_collision_with_fixed(posid, table_A.init_poslocTP, table_A.for_collider())[0] # index 0 to immediately retrieve from the one-element list this function returns
                 all_sweeps.update({posid:posfix_sweep}) # don't worry --- if pospos colliding sweep takes precedence, this will be appropriately replaced again below
                 if posfix_sweep.collision_case != pc.case.I:
                     colliding_sweeps[posid].add(posfix_sweep)
