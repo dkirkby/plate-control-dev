@@ -48,6 +48,49 @@ np.nanrms = lambda x: np.sqrt(np.nanmean(np.square(x)))
 # sys.path.append(os.path.abspath('.'))
 
 
+class BroadcastLogger:
+    '''must call methods below for particular logger levels below
+    support input message as a string of list of strings
+    msg will be broadcasted to all petals
+    '''
+
+    def __init__(self, loggers=None, printfunc=print):
+        if loggers is None:
+            self.loggers_available = False
+            self.printfunc = printfunc
+        else:
+            self.pcids = list(loggers.keys())
+            self.loggers = loggers
+            self.loggers_available = True
+
+    def _log(self, msg, lvl):  # reserved for in-class use, don't call this
+        if type(msg) is list:
+            list(map(partial(self._log, lvl=lvl), msg))
+        elif type(msg) is str:
+            if self.loggers_available:
+                for pcid in self.pcids:
+                    self.loggers[pcid].log(lvl, msg)
+            else:
+                self.printfunc(msg)
+        else:
+            raise Exception('Wrong message data type sent to logger')
+
+    def critical(self, msg):
+        self._log(msg, 50)
+
+    def error(self, msg):
+        self._log(msg, 40)
+
+    def warning(self, msg):
+        self._log(msg, 30)
+
+    def info(self, msg):
+        self._log(msg, 20)
+
+    def debug(self, msg):
+        self._log(msg, 10)
+
+
 class FPTestData:
     ''' on-mountain xy accuracy test and calibration data will be saved in:
             /data/focalplane/kpno/{date}/{expid}/pc{pcid}/
@@ -126,9 +169,10 @@ class FPTestData:
             self._log_cfg(logger.debug, self.test_cfg)
             self.logs[pcid] = log  # assign logs and loggers to attributes
             self.loggers[pcid] = logger
-        self.logger = self.BroadcastLogger(self.pcids, self.loggers)
+        self.logger = BroadcastLogger(loggers=self.loggers)
 
     def printfunc(self, string, pcid=None):
+        '''use only for info level msg in the absence of logger(s)'''
         assert type(string) is str
         if pcid is None:
             if hasattr(self, 'logger'):
@@ -159,40 +203,6 @@ class FPTestData:
             printfunc(line)  # now line is utf8 str which needs no decode
             #  printfunc(line.decode('utf_8'))  # convert byte str to str
         printfunc(f'=== End of config file dump: {config.filename} ===')
-
-    class BroadcastLogger:
-        '''must call methods below for particular logger levels below
-        support input message as a string of list of strings
-        msg will be broadcasted to all petals
-        '''
-
-        def __init__(self, pcids, loggers):
-            self.pcids = pcids
-            self.loggers = loggers
-
-        def _log(self, msg, lvl):  # reserved for in-class use, don't call this
-            if type(msg) is list:
-                list(map(partial(self._log, lvl=lvl), msg))
-            elif type(msg) is str:
-                for pcid in self.pcids:
-                    self.loggers[pcid].log(lvl, msg)
-            else:
-                raise Exception('Wrong message data type sent to logger')
-
-        def critical(self, msg):
-            self._log(msg, 50)
-
-        def error(self, msg):
-            self._log(msg, 40)
-
-        def warning(self, msg):
-            self._log(msg, 30)
-
-        def info(self, msg):
-            self._log(msg, 20)
-
-        def debug(self, msg):
-            self._log(msg, 10)
 
     def read_telemetry(self):
         try:
@@ -798,9 +808,10 @@ class CalibrationData(FPTestData):
         # columns = pd.MultiIndex.from_product(
         #     iterables, names=['label', 'param_key'])
 
-    def write_calibdf(self, old_calibdf, new_calibdf):
+    def write_calibdf(self, calibdf_old, calibdf_fit, calibdf_new):
         self.calibdf = pd.concat(
-            [old_calibdf, new_calibdf], axis=1, keys=['OLD', 'NEW'],
+            [calibdf_old, calibdf_fit, calibdf_new], axis=1,
+            keys=['OLD', 'FIT', 'NEW'],
             names=['label', 'field'], sort=False)
 
     def generate_report(self):
@@ -812,43 +823,32 @@ class CalibrationData(FPTestData):
         pass
 
     def make_arc_plot(self, posid):
-        posdata = (self.movedf.loc[idx[:, :, posid], :]
-                   .droplevel('DEVICE_ID', axis=0))
+        posmov = self.movedf.xs(posid, level='DEVICE_ID')
+        poscal = self.calibdf.loc[posid]
         fig = plt.figure(figsize=(14, 8))
-
-        for arc in ['T','P']:
-            name = 'THETA' if arc == 'T' else 'PHI'
-            other_ax = 'P' if arc == 'T' else 'T'
-            other_name = 'PHI' if arc == 'T' else 'THETA'
-            plot_num_base = 0 if arc == 'T' else 3
-            if arc =='P' and bad_files:
-                target_angles = np.array(literal_eval(data['TARG_POS' + other_ax + '_DURING_' + arc + '_SWEEP']))
-                measured_angles = np.array(literal_eval(data['MEAS_POS' + ax + '_DURING_' + ax + '_SWEEP']))
-                other_axis_angle = data['TARG_POS' + ax + '_DURING_' + ax + '_SWEEP']
-                radius = data[arc+'_RADIUS']
-                center = [data[arc+'_CENTER_X'],data[ax+'_CENTER_Y']]
-                measured_xy = np.array(literal_eval(data['MEASURED_FLATXY_' + ax]))
-            else:
-                target_angles = np.array(literal_eval(data['TARG_POS' + ax + '_DURING_' + ax + '_SWEEP']))
-                measured_angles = np.array(literal_eval(data['MEAS_POS' + ax + '_DURING_' + ax + '_SWEEP']))
-                other_axis_angle = data['TARG_POS' + other_ax + '_DURING_' + ax + '_SWEEP']
-                radius = data[arc+'_RADIUS']
-                center = [data[arc+'_CENTER_X'],data[ax+'_CENTER_Y']]
-                measured_xy = np.array(literal_eval(data['MEASURED_FLATXY_' + ax]))
-            print(measured_xy)
-            print(data['MEASURED_FLATXY_' + ax][0])
-    
-            plt.subplot(2,3,plot_num_base+1)
-            arc_start = np.arctan2(measured_xy[0,1]-center[1],measured_xy[0,0]-center[0]) * 180/np.pi
-            arc_finish = arc_start + np.sum(np.diff(measured_angles))
-            if arc_start > arc_finish:
-                arc_finish += 360
-            ref_arc_angles = np.arange(arc_start,arc_finish,5)*np.pi/180
-            if ref_arc_angles[-1] != arc_finish:
-                ref_arc_angles = np.append(ref_arc_angles,arc_finish*np.pi/180)
-            arc_x = radius * np.cos(ref_arc_angles) + center[0]
-            arc_y = radius * np.sin(ref_arc_angles) + center[1]
-            axis_zero_angle = arc_start - target_angles[0] # where global observer would nominally see the axis's local zero point in this plot
+        for plot_row, axis_name in enumerate(['THETA', 'PHI']):
+            axis = axis_name[0]  # 'T' or 'P'
+            other_axis_name = 'THETA' if axis == 'P' else 'PHI'
+            other_axis = other_axis_name[0]
+            tgt = posmov.xs(axis, level='axis')[f'tgt_posint{axis}']
+            mea = posmov.xs(axis, level='axis')[f'mea_posint{axis}']
+            other_tgt = posmov.xs(axis,
+                                  level='axis')[f'tgt_posint{other_axis}']
+            rad = poscal[('FIT', f'radius_{axis}')].mean()
+            ctr = poscal[('FIT', f'centre_{axis}')]
+            mea_xy = (posmov.xs(axis, level='axis')
+                      [['mea_flatX', 'mea_flatY']].values)
+            plt.subplot(2, 3, plot_row + 1)  # cicle/arc plot in xy space
+            ang_i = np.degrees(np.arctan2(  # initial angle
+                mea_xy[0, 1] - ctr[1], mea_xy[0, 0] - ctr[0]))
+            ang_f = ang_i + mea.diff().sum()  # final angle
+            if ang_i > ang_f:
+                ang_f += 360
+            ref_arc_ang = np.radians(np.append(  # 5 deg step
+                np.arange(ang_i, ang_f, 5), ang_f))  # last point at final
+            arc_x = rad * np.cos(ref_arc_ang) + ctr[0]
+            arc_y = rad * np.sin(ref_arc_ang) + ctr[1]
+            axis_zero_angle = arc_start - tgt[0] # where global observer would nominally see the axis's local zero point in this plot
             axis_zero_line_x = [center[0], radius * np.cos(axis_zero_angle*np.pi/180) + center[0]]
             axis_zero_line_y = [center[1], radius * np.sin(axis_zero_angle*np.pi/180) + center[1]]
             plt.plot(arc_x,arc_y,'b-')
@@ -858,7 +858,7 @@ class CalibrationData(FPTestData):
             plt.plot(axis_zero_line_x,axis_zero_line_y,'k--')
             zero_text_angle = np.mod(axis_zero_angle+360, 360)
             zero_text_angle = zero_text_angle-180 if zero_text_angle > 90 and zero_text_angle < 270 else zero_text_angle
-            zero_text = name + '=0\n(' + other_name + '=' + format(other_axis_angle,'.1f') + ')'
+            zero_text = axis_name + '=0\n(' + other_name + '=' + format(tgt_other,'.1f') + ')'
             plt.text(np.mean(axis_zero_line_x),np.mean(axis_zero_line_y),zero_text,rotation=zero_text_angle,horizontalalignment='center',verticalalignment='top')
             for i in range(len(measured_xy)):
                 this_angle = np.arctan2(measured_xy[i,1]-center[1],measured_xy[i,0]-center[0])
@@ -877,26 +877,26 @@ class CalibrationData(FPTestData):
             plt.margins(0.05, 0.05)
             plt.axis('equal')
     
-            plt.subplot(2,3,plot_num_base+2)
-            err_angles = measured_angles - target_angles
-            plt.plot(target_angles, err_angles, 'ko-')
-            plt.plot(target_angles[0], err_angles[0], 'ro')
-            for i in range(len(target_angles)):
-                plt.text(target_angles[i],err_angles[i],'\n\n'+str(i),verticalalignment='center',horizontalalignment='center')
+            plt.subplot(2,3,plot_row+2)
+            err_angles = mea - tgt
+            plt.plot(tgt, err_angles, 'ko-')
+            plt.plot(tgt[0], err_angles[0], 'ro')
+            for i in range(len(tgt)):
+                plt.text(tgt[i],err_angles[i],'\n\n'+str(i),verticalalignment='center',horizontalalignment='center')
             plt.xlabel('target ' + name + ' angle (deg)')
             plt.ylabel('measured ' + name + ' - target ' + name + ' (deg)')
             plt.title('measured angle variation')
             plt.grid(True)
             plt.margins(0.1, 0.1)
     
-            plt.subplot(2,3,plot_num_base+3)
+            plt.subplot(2,3,plot_row+3)
             measured_radii = np.sqrt(np.sum((measured_xy - center)**2,axis=1)) * 1000 # um
             best_fit_radius = radius * 1000 # um
             err_radii = measured_radii - best_fit_radius
-            plt.plot(target_angles, err_radii, 'ko-')
-            plt.plot(target_angles[0], err_radii[0], 'ro')
-            for i in range(len(target_angles)):
-                plt.text(target_angles[i],err_radii[i],'\n\n'+str(i),verticalalignment='center',horizontalalignment='center')
+            plt.plot(tgt, err_radii, 'ko-')
+            plt.plot(tgt[0], err_radii[0], 'ro')
+            for i in range(len(tgt)):
+                plt.text(tgt[i],err_radii[i],'\n\n'+str(i),verticalalignment='center',horizontalalignment='center')
             plt.xlabel('target ' + name + ' angle (deg)')
             plt.ylabel('measured radius - best fit radius (um)')
             plt.title('measured radius variation')
@@ -928,18 +928,37 @@ if __name__ == '__main__':
 
     '''load the dumped pickle file as follows, protocol is auto determined'''
     expids = ['00031306', '00031308', '00031611', '00032703', '00032704']
-    expids = ['00031611']
+    # expids = ['00031611']
+    # arc calib expids
+    expids = ['00033473', '00033490']
+    # grid calib expids
+    expids = ['00034382']
+    from poscalibrationfits import PosCalibrationFits
     for expid in expids:
         paths = glob(pc.dirs['kpno']+f'/*/{expid}/*data.pkl')
         assert len(paths) == 1, paths
         print(f'Re-processing FP test data:\n{paths[0]}')
         try:
-            with open(os.path.join(paths[0]), 'rb') as h:
-                data = pickle.load(h)
-            # data.generate_data_products()
-            data.dump_as_one_pickle()
-            if shutil.which('pandoc') is not None:
-                data.generate_report()
+            path = os.path.join(os.path.dirname(paths[0]), 'data_grid.pkl.gz')
+            data_arc = pd.read_pickle(path)
+            fit = PosCalibrationFits()
+            movedf, calib_fit = fit.calibrate_from_arc_data(data_arc)
+            # with open(os.path.join(paths[0]), 'rb') as h:
+            #     data = pickle.load(h)
+            # try:
+            #     calib_old = data.calibdf['OLD']
+            #     calib_new = data.calibdf['NEW']
+            # except:
+            #     calib_old = data.calibdf.xs('OLD', level='label')
+            #     calib_new = data.calibdf.xs('NEW', level='label')
+            # data.write_calibdf(calib_old, calib_fit, calib_new)
+            # data.movedf.index.set_names('axis', level='arc', inplace=True)
+            # # # data.generate_data_products()
+            # data.export_data_logs()
+            # data.dump_as_one_pickle()
+            # # if shutil.which('pandoc') is not None:
+            # #     data.generate_report()
             data.make_archive()
-        except Exception:
-            raise
+        except Exception as e:
+            print(e)
+            pass

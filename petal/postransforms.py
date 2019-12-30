@@ -395,7 +395,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
         return wrapped
 
     @staticmethod
-    def _centralized_angular_offset_value(offset_angle):
+    def _centralize_angular_offset(offset_angle):
         """
         A special unwrapping check for OFFSET_T and OFFSET_P angles,
         for which we are always going to want to default to the option closer

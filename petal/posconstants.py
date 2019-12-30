@@ -110,6 +110,7 @@ T = 0  # theta axis idx -- NOT the motor axis ID!!
 P = 1  # phi axis idx -- NOT the motor axis ID!!
 axis_labels = ('theta', 'phi')
 schedule_checking_numeric_angular_tol = 0.01 # deg, equiv to about 1 um at full extension of both arms
+near_full_range_reduced_hardstop_clearance_factor = 0.75 # applies to hardstop clearance values in special case of "near_full_range" (c.f. Axis class in posmodel.py)
 
 # Nominal and tolerance calibration values
 nominals = collections.OrderedDict()
@@ -124,9 +125,44 @@ nominals['PHYSICAL_RANGE_P'] = {'value': 190.0, 'tol':   50.0}
 nominals['GEAR_CALIB_T']     = {'value':   1.0, 'tol':    0.05}
 nominals['GEAR_CALIB_P']     = {'value':   1.0, 'tol':    0.05}
 
+
 grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
 
-# Types
+
+def decipher_posflags(flags):
+    '''translates posflag to readable reasons, bits taken from petal.py
+    simple problem of locating the leftmost set bit, always 100 on the
+    right input flags
+    must be a numpy-supported array-like object'''
+    pos_bit_dict = {0:  'Matched',
+                    2:  'Normal positioner',
+                    16: 'Control disabled',
+                    17: 'Fibre nonintact',
+                    18: 'CAN communication error',
+                    19: 'Overlapping targets',
+                    20: 'Frozen by anticollision',
+                    21: 'Unreachable by positioner',
+                    22: 'Out of petal boundaries',
+                    23: 'Multiple requests',
+                    24: 'Device nonfunctional',
+                    25: 'Move table rejected',
+                    26: 'Exceeded patrol limits'}
+    bits = np.floor(np.log2(flags)).astype(int)
+    ret = []
+    try:  # bits is a list-like object, iterable
+        for i, bit in enumerate(bits):
+            if bit in pos_bit_dict.keys():
+                ret.append(pos_bit_dict[bit])
+            else:
+                msg = (f'Invalid input flag {flags[i]} with leftmost '
+                       f'set bit at {bit}')
+                ret.append(msg)
+    except TypeError:  # bits is a single number, not iterable
+        ret = pos_bit_dict[bits]
+    # a list of descriptive strings or a single string depending on input
+    return ret
+
+
 class collision_case(object):
     """Enumeration of collision cases. The I, II, and III cases are described in
     detail in DESI-0899.
@@ -150,6 +186,7 @@ nonfreeze_adjustment_methods = ['pause',
                                 'repel_ccw_A','repel_cw_A',
                                 'repel_ccw_B','repel_cw_B']
 all_adjustment_methods = nonfreeze_adjustment_methods + ['freeze']
+num_timesteps_clearance_margin = 2 # this value * PosCollider.timestep --> small extra wait for a neighbor to move out of way
 
 # Convenience methods
 rotmat2D = lambda angle: [math.cos(angle*rad_per_deg), - math.sin(angle*rad_per_deg), math.sin(angle*rad_per_deg), math.cos(angle*rad_per_deg)]
@@ -264,20 +301,28 @@ def now():
     return datetime.datetime.now().astimezone()
 
 
-def timestamp_str_now():
-    return now().strftime(timestamp_format)
+def timestamp_str(t=None):
+    if t is None:
+        t = now()
+    return t.strftime(timestamp_format)
 
 
-def filename_timestamp_str_now():
-    return now().strftime(filename_timestamp_format)
+def filename_timestamp_str(t=None):
+    if t is None:
+        t = now()
+    return t.strftime(filename_timestamp_format)
 
 
-def dir_date_str_now():
+def dir_date_str(t=None):
     '''returns date string for the directory name, changes at noon Arizona'''
-    t = now().astimezone(pytz.timezone('America/Phoenix'))
+    if t is None:
+        t = now()
+    t = t.astimezone(pytz.timezone('America/Phoenix'))
     day = t.day
-    if t.hour > 12:  # past noon, treat as the next day
-        day += 1
+    if t.hour >= 12:  # past noon, treat as today
+        pass
+    else:
+        day -= 1  # before noon, treat as yesterday
     return f'{t.year:04}{t.month:02}{day:02}'
 
 

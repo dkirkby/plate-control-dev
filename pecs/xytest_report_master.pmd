@@ -64,12 +64,9 @@ else:  # np array, cast into lists for printing
 
 # Temperature
 
-```python name='posfid temperature', echo=False, results='raw', width='500px'
+```python name='posfid temperature', echo=False, width='500px'
 # plot overall temperatures for all petals
-if data.db_telemetry_available:
-    data.plot_posfid_temp()
-else:
-    print('DB telemetry query unavailable on this platform\n')
+data.plot_posfid_temp()
 ```
 
 # Results

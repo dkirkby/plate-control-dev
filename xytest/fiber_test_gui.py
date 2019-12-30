@@ -468,7 +468,7 @@ class Fiber_Test_GUI(object):
     def logwrite(self,text,stdout=True):
         """Standard logging function for writing to the test traveler log file.
         """
-        line = '# ' + pc.timestamp_str_now() + ': ' + text
+        line = '# ' + pc.timestamp_str() + ': ' + text
         with open(self.logfile,'a') as fh:
             fh.write(line + '\n')
         if stdout:

@@ -26,7 +26,8 @@ class PosCollider(object):
                  collision_hashpf_exists=False,
                  hole_angle_file=None,
                  use_neighbor_loc_dict=False,
-                 config=None):
+                 config=None,
+                 animator_label_type='loc'):
         if not config:
             if not configfile:
                 filename = '_collision_settings_DEFAULT.conf'
@@ -46,6 +47,9 @@ class PosCollider(object):
         self.plotting_on = True
         self.timestep = self.config['TIMESTEP']
         self.animator = posanimator.PosAnimator(fignum=0, timestep=self.timestep)
+        self.posids_to_animate = set() # set of posids to be animated (i.e., allows restricting which ones get plotted)
+        self.fixed_items_to_animate = {'PTL','GFA'} # may contain nothing, 'PTL', and/or 'GFA'
+        self.animator_label_type = animator_label_type # 'loc' --> device location ids, 'posid' --> posids, None --> no labels
         self.use_neighbor_loc_dict = use_neighbor_loc_dict
         self.keepouts_T = {} # key: posid, value: central body keepout of type PosPoly
         self.keepouts_P = {} # key: posid, value: phi arm keepout of type PosPoly
@@ -93,46 +97,56 @@ class PosCollider(object):
         self._load_config_data()
         for p in self.posids:
             self._identify_neighbors(p)
+        self.posids_to_animate.update(self.posids) # this doesn't turn the animator on --- just gathering the set in case
 
     def add_fixed_to_animator(self, start_time=0):
         """Add unmoving polygon shapes to the animator.
 
             start_time ... seconds, global time when the move begins
         """
-        self.animator.add_or_change_item('GFA', '', start_time, self.keepout_GFA.points)
-        self.animator.add_or_change_item('PTL', '', start_time, self.keepout_PTL.points)
-        for posid in self.posindexes:
+        if 'GFA' in self.fixed_items_to_animate:
+            self.animator.add_or_change_item('GFA', '', start_time, self.keepout_GFA.points)
+        if 'PTL' in self.fixed_items_to_animate:
+            self.animator.add_or_change_item('PTL', '', start_time, self.keepout_PTL.points)
+        for posid in self.posids_to_animate:
             self.animator.add_or_change_item('Eo', self.posindexes[posid], start_time, self.Eo_polys[posid].points)
             # self.animator.add_or_change_item('Ei', self.posindexes[posid], start_time, self.Ei_polys[posid].points)
             # self.animator.add_or_change_item('Ee', self.posindexes[posid], start_time, self.Ee_polys[posid].points)
             self.animator.add_or_change_item('line at 180', self.posindexes[posid], start_time, self.line180_polys[posid].points)
-            self.animator.add_label(format(self.posmodels[posid].deviceloc,'03d'), self.x0[posid], self.y0[posid])
+            if self.animator_label_type == 'posid':
+                label = str(posid)
+            elif self.animator_label_type == 'loc':
+                label = format(self.posmodels[posid].deviceloc,'03d')
+            else:
+                label = ''
+            self.animator.add_label(label, self.x0[posid], self.y0[posid])
 
     def add_mobile_to_animator(self, start_time, sweeps):
         """Add a collection of PosSweeps to the animator, describing positioners'
-        real-time motions.
+        real-time motions.a
 
             start_time ... seconds, global time when the move begins
             sweeps     ... dict with keys = posids, values = PosSweep instances
         """
         for posid,s in sweeps.items():
-            posidx = self.posindexes[posid]
-            for i in range(len(s.time)):
-                style_override = ''
-                collision_has_occurred = s.time[i] >= s.collision_time
-                freezing_has_occurred = s.time[i] >= s.frozen_time
-                if freezing_has_occurred:
-                    style_override = 'frozen'
-                if collision_has_occurred:
-                    style_override = 'collision'
-                time = start_time + s.time[i]
-                self.animator.add_or_change_item('central body', posidx, time, self.place_central_body(posid, s.tp[0,i]).points, style_override)
-                self.animator.add_or_change_item('phi arm',      posidx, time, self.place_phi_arm(     posid, s.tp[:,i]).points, style_override)
-                self.animator.add_or_change_item('ferrule',      posidx, time, self.place_ferrule(     posid, s.tp[:,i]).points, style_override)
-                if collision_has_occurred and s.collision_case == pc.case.GFA:
-                    self.animator.add_or_change_item('GFA', '', time, self.keepout_GFA.points, style_override)
-                elif collision_has_occurred and s.collision_case == pc.case.PTL:
-                    self.animator.add_or_change_item('PTL', '', time, self.keepout_PTL.points, style_override)
+            if posid in self.posids_to_animate:
+                posidx = self.posindexes[posid]
+                for i in range(len(s.time)):
+                    style_override = ''
+                    collision_has_occurred = s.time[i] >= s.collision_time
+                    freezing_has_occurred = s.time[i] >= s.frozen_time
+                    if freezing_has_occurred:
+                        style_override = 'frozen'
+                    if collision_has_occurred:
+                        style_override = 'collision'
+                    time = start_time + s.time[i]
+                    self.animator.add_or_change_item('central body', posidx, time, self.place_central_body(posid, s.tp[0,i]).points, style_override)
+                    self.animator.add_or_change_item('phi arm',      posidx, time, self.place_phi_arm(     posid, s.tp[:,i]).points, style_override)
+                    self.animator.add_or_change_item('ferrule',      posidx, time, self.place_ferrule(     posid, s.tp[:,i]).points, style_override)
+                    if collision_has_occurred and s.collision_case == pc.case.GFA:
+                        self.animator.add_or_change_item('GFA', '', time, self.keepout_GFA.points, style_override)
+                    elif collision_has_occurred and s.collision_case == pc.case.PTL:
+                        self.animator.add_or_change_item('PTL', '', time, self.keepout_PTL.points, style_override)
 
     def spacetime_collision_between_positioners(
             self, posid_A, init_poslocTP_A, tableA,
@@ -216,7 +230,7 @@ class PosCollider(object):
                             sweeps[i].collision_time = sweeps[i].time[step[i]]
                             sweeps[i].collision_idx = step[i]
                         steps_remaining[i] = 0 # halt the sweep here
-            steps_remaining = np.clip(np.asarray(steps_remaining)-1,0,np.inf)
+            steps_remaining = [max(step-1,0) for step in steps_remaining]
             for i in pos_range:
                 if steps_remaining[i]:
                     step[i] += 1
@@ -485,7 +499,35 @@ class PosSweep(object):
 
     def copy(self):
         return copymodule.deepcopy(self)
+    
+    def as_dict(self):
+        """Returns a dictionary containing copies of all the sweep data."""
+        c = self.copy()
+        d = {'posid':               c.posid,
+             'time':                c.time,
+             'tp':                  c.tp,
+             'tp_dot':              c.tp_dot,
+             'collision_case':      c.collision_case,
+             'collision_time':      c.collision_time,
+             'collision_idx':       c.collision_idx,
+             'collision_neighbor':  c.collision_neighbor,
+             'frozen_time':         c.frozen_time}
+        return d
+    
+    def __repr__(self):
+        d = self.as_dict()
+        d['time_start'] = d['time'][0]
+        d['time_final'] = d['time'][-1]
+        d['tp_start'] = [d['tp'][0,0], d['tp'][1,0]]
+        d['tp_final'] = [d['tp'][0,-1], d['tp'][1,-1]]
+        del d['time']
+        del d['tp']
+        del d['tp_dot']
+        return str(d)
 
+    def __str__(self):
+        return self.__repr__()
+    
     def fill_exact(self, init_poslocTP, table, start_time=0):
         """Fills in a sweep object based on the input table. Time and position
         are handled continuously and exactly (i.e. not yet quantized).
@@ -577,6 +619,14 @@ class PosSweep(object):
     def register_as_frozen(self):
         """Sets an indicator that the sweep has been frozen at the end."""
         self.frozen_time = self.time[-1]
+        
+    def clear_collision(self):
+        """Resets collision state to default (non-colliding) values."""
+        blank_sample = PosSweep()
+        self.collision_case = blank_sample.collision_case
+        self.collision_time = blank_sample.collision_time
+        self.collision_idx = blank_sample.collision_idx
+        self.collision_neighbor = blank_sample.collision_neighbor
 
     @property
     def is_frozen(self):

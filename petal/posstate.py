@@ -45,7 +45,7 @@ class PosState(object):
         self.logging = logging
         self.write_to_DB = False
         if DB_COMMIT_AVAILABLE and (os.getenv('DOS_POSMOVE_WRITE_TO_DB')
-                                    in ['True', 'true', 'T', 't', '1']):
+                                    in ['True', 'true', 'T', 't', '1', None]):
             self.write_to_DB = True
         # data initialization
         if device_type in ['pos', 'fid', 'ptl']:
@@ -287,7 +287,7 @@ class PosState(object):
         """All current unit parameters are written to the hardware unit's log file.
         """
         if self.logging:
-            timestamp = pc.timestamp_str_now()
+            timestamp = pc.timestamp_str()
             def start_new_file():
                 with open(self.log_path, 'w', newline='') as csvfile:
                     csv.writer(csvfile).writerow(self.log_fieldnames)

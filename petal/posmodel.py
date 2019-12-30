@@ -123,14 +123,14 @@ class PosModel(object):
              'poslocT:{:8.3f}{}, poslocP:{:8.3f}{} | '
              'posintT:{:8.3f}{}, posintP:{:8.3f}{} | '
              'motT:{:8.1f}{}, motP:{:8.1f}{}'). \
-            format(pos['Q'],       pc.deg, pos['S'],       pc.mm,
-                   pos['flatX'],   pc.mm,  pos['flatY'],   pc.mm,
-                   pos['obsX'],    pc.mm,  pos['obsY'],    pc.mm,
-                   pos['ptlX'],    pc.mm,  pos['ptlY'],    pc.mm,
-                   pos['poslocX'], pc.mm,  pos['poslocY'], pc.mm,
-                   pos['poslocT'], pc.deg, pos['poslocP'], pc.deg,
-                   pos['posintT'], pc.deg, pos['posintP'], pc.deg,
-                   pos['motT'],    pc.deg, pos['motP'],    pc.deg)
+            format(pos['QS'][0],       pc.deg, pos['QS'][1],       pc.mm,
+                   pos['flatXY'][0],   pc.mm,  pos['flatXY'][1],   pc.mm,
+                   pos['obsXY'][0],    pc.mm,  pos['obsXY'][1],    pc.mm,
+                   pos['ptlXY'][0],    pc.mm,  pos['ptlXY'][1],    pc.mm,
+                   pos['poslocXY'][0], pc.mm,  pos['poslocXY'][1], pc.mm,
+                   pos['poslocTP'][0], pc.deg, pos['poslocTP'][1], pc.deg,
+                   pos['posintTP'][0], pc.deg, pos['posintTP'][1], pc.deg,
+                   pos['motTP'][0],    pc.deg, pos['motTP'][1],    pc.deg)
         return s
 
     @property
@@ -173,7 +173,7 @@ class PosModel(object):
         """
         return self._abs_shaft_speed_cruise_P
 
-    def true_move(self, axisid, distance, allow_cruise, allow_exceed_limits, expected_prior_dTdP=[0,0]):
+    def true_move(self, axisid, distance, allow_cruise, limits='debounced', init_posintTP=None):
         """Input move distance on either the theta or phi axis, as seen by the
         observer, in degrees.
 
@@ -184,14 +184,21 @@ class PosModel(object):
             'speed'        ... approximate speed of travel [deg/sec]. unsigned. note 'move_time' is preferred for precision timing calculations
             'speed_mode'   ... 'cruise' or 'creep'
 
-        The argument 'expected_prior_dTdP' is used to account for expected
+        The argument 'init_posintTP' is used to account for expected
         future shaft position changes. This is necessary for correct checking of
         software travel limits, when a sequence of multiple moves is being planned out.
+        
+        The argument 'limits' may take values:
+            'debounced'
+            'near_full'
+            None
+        See the debounced_range() and near_full_range() methods of Axis class for their
+        specific meanings.
         """
-        pos = self.expected_current_posintTP
-        start = self.trans.addto_posintTP([pos[0],pos[1]], expected_prior_dTdP, range_wrap_limits='none') # since expected_prior_dTdP is just tracking already-existing commands, do not perform range wrapping on it
-        if not(allow_exceed_limits):
-            distance = self.axis[axisid].truncate_to_limits(distance,start[axisid])
+        start = self.expected_current_posintTP if not init_posintTP else init_posintTP
+        if limits:
+            use_near_full_range = (limits == 'near_full')
+            distance = self.axis[axisid].truncate_to_limits(distance, start[axisid], use_near_full_range)
         motor_dist = self.axis[axisid].shaft_to_motor(distance)
         move_data = self.motor_true_move(axisid, motor_dist, allow_cruise)
         move_data['distance'] = self.axis[axisid].motor_to_shaft(move_data['distance'])
@@ -281,6 +288,7 @@ class Axis(object):
         self.principle_hardstop_direction = self.calc_principle_hardstop_direction()
         self.backlash_clearance = self.calc_backlash_clearance()
         self.hardstop_clearance = self.calc_hardstop_clearance()
+        self.hardstop_clearance_near_full_range = self.calc_hardstop_clearance_near_full_range()
         self.hardstop_debounce = self.calc_hardstop_debounce()
         self.signed_gear_ratio = self.motor_calib_properties['ccw_sign']*self.motor_calib_properties['gear_ratio']
 
@@ -320,24 +328,55 @@ class Axis(object):
         Returns [1x2] array of [min,max]
         """
         f = self.full_range
-        h = self.hardstop_debounce
+        h = self.hardstop_debounce # includes "backlash" and "clearance"
         return [f[0] + h[0], f[1] + h[1]]
 
     @property
-    def maxpos(self):
-        if self.last_primary_hardstop_dir >= 0:
-            return max(self.debounced_range)
-        else:
-            d = self.debounced_range
-            return self.minpos + (d[1] - d[0])
+    def near_full_range(self):
+        """In-between full_range and debounced_range. This guarantees sufficient
+        backlash clearance, while giving reasonable probability of not contacting
+        the hard stop. Intended use case is to allow a small amount of numerical
+        margin for making tiny cruise move corrections.
+        Returns [1x2] array of [min,max]
+        """
+        f = self.full_range
+        nh = self.hardstop_clearance_near_full_range # does not include "backlash"
+        return [f[0] + nh[0], f[1] + nh[1]]
 
     @property
-    def minpos(self):
-        if self.last_primary_hardstop_dir < 0:
-            return min(self.debounced_range)
+    def maxpos(self):
+        """Max accessible position, as defined by debounced_range.
+        """
+        return self.get_maxpos() # this redirect is for legacy compatibility with external code
+
+    def get_maxpos(self, use_near_full_range=False):
+        """Function to return accessible position. By default this is within
+        debounced_range. An option exists to get the min as defined by near_full_range
+        instead.
+        """
+        d = self.near_full_range if use_near_full_range else self.debounced_range
+        if self.last_primary_hardstop_dir >= 0:
+            return max(d)
         else:
-            d = self.debounced_range
-            return self.maxpos - (d[1] - d[0])
+            return self.get_minpos(use_near_full_range) + (d[1] - d[0])
+
+    @property
+    def minpos(self, use_near_full_range=False):
+        """Min accessible position. By default this is within debounced_range.
+        An option exists to get the min as defined by near_full_range instead.
+        """
+        return self.get_minpos()
+        
+    def get_minpos(self, use_near_full_range=False):
+        """Function to return accessible position. By default this is within
+        debounced_range. An option exists to get the min as defined by near_full_range
+        instead.
+        """
+        d = self.near_full_range if use_near_full_range else self.debounced_range
+        if self.last_primary_hardstop_dir < 0:
+            return min(d)
+        else:
+            return self.get_maxpos(use_near_full_range) - (d[1] - d[0])
 
     @property
     def last_primary_hardstop_dir(self):
@@ -399,21 +438,28 @@ class Axis(object):
         """
         return distance * self.signed_gear_ratio
 
-    def truncate_to_limits(self, distance, start_pos=None):
+    def truncate_to_limits(self, distance, start_pos=None, use_near_full_range=False):
         """Return distance after truncating it (if necessary) to the software limits.
-        An expected starting position can optionally be argued. If None, then the internally-
-        tracked position is used as the starting point.
+        
+        An expected starting position can optionally be argued. If None, then the
+        internally-tracked position is used as the starting point. 
+        
+        Can also optionally argue with use_near_full_range=True. This uses a slightly
+        wider definiton for the max and min accessible limits at which to truncate.
+        See the maxpos and minpos methods, as well as debounced_range vs near_full_range.
         """
+        maxpos = self.get_maxpos(use_near_full_range)
+        minpos = self.get_minpos(use_near_full_range)
         if start_pos == None:
             start_pos = self.pos
         target_pos = start_pos + distance
-        if self.maxpos < self.minpos:
+        if maxpos < minpos:
             distance = 0
-        elif target_pos > self.maxpos:
-            new_distance = self.maxpos - start_pos
+        elif target_pos > maxpos:
+            new_distance = maxpos - start_pos
             distance = new_distance
-        elif target_pos < self.minpos:
-            new_distance = self.minpos - start_pos
+        elif target_pos < minpos:
+            new_distance = minpos - start_pos
             distance = new_distance
         return distance
 
@@ -463,6 +509,16 @@ class Axis(object):
                 return [+self.posmodel.state._val['SECONDARY_HARDSTOP_CLEARANCE_P'],
                         -self.posmodel.state._val['PRINCIPLE_HARDSTOP_CLEARANCE_P']]
 
+    def calc_hardstop_clearance_near_full_range(self):
+        """Slightly less clearance than provided by the calc_hardstop_clearance
+        function.
+        Returns 1x2 array of [clearance_from_low_side_of_range, clearance_from_high_side].
+        These are DIRECTIONAL quantities (i.e., the sign indicates the direction
+        similarly as the hardstop clearance directions).
+        """
+        h = self.hardstop_clearance
+        return [x * pc.near_full_range_reduced_hardstop_clearance_factor for x in h]
+
     def calc_backlash_clearance(self):
         """Minimum clearance distance required for backlash removal moves.
         Returns 1x2 array of [clearance_from_low_side_of_range, clearance_from_high_side].
@@ -473,3 +529,4 @@ class Axis(object):
             return [+self.posmodel.state._val['BACKLASH'],0]
         else:
             return [0,-self.posmodel.state._val['BACKLASH']]
+        

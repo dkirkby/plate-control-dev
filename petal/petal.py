@@ -50,6 +50,7 @@ class Petal(object):
         printfunc       ... method, used for stdout style printing. we use this for logging during tests
         collider_file   ... string, file name of collider configuration file, no directory loction. If left blank will use default.
         sched_stats_on  ... boolean, controls whether to log statistics about scheduling runs
+        extra_check_on  ... boolean, controls whether to run scheduler in with redundant (for debugging only) collision checks
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
         petal_loc       ... integer, (option) location (0-9) of petal in FPA
 
@@ -108,7 +109,7 @@ class Petal(object):
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
                  printfunc=print, verbose=False,
                  user_interactions_enabled=False, anticollision='freeze',
-                 collider_file=None, sched_stats_on=False):
+                 collider_file=None, sched_stats_on=False, extra_check_on=False):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
         self.printfunc(f'Running plate_control version: {pc.code_version}')
@@ -146,6 +147,7 @@ class Petal(object):
         self.petalbox_id = petalbox_id
         self.petal_id = int(petal_id)
         self.shape = shape
+        self.limit_radius = 3.5 #mm to reject targets. Set to False or None to skip check
         self._last_state = None
         if fidids in ['',[''],{''}]: # check included to handle simulation cases, where no fidids argued
             fidids = {}
@@ -171,9 +173,12 @@ class Petal(object):
             self.posmoveDB = DBSingleton(petal_id=int(self.petal_id))
         self.local_commit_on = local_commit_on
         self.local_log_on = local_log_on
-        self.sched_stats_on = sched_stats_on
         self.altered_states = set()
         self.altered_calib_states = set()
+
+        # scheduling options
+        self.sched_stats_on = sched_stats_on
+        self.extra_check_on = extra_check_on
 
         # must call the following 3 methods whenever petal alingment changes
         self.init_trans()
@@ -200,6 +205,9 @@ class Petal(object):
         self.multi_request_bit = 1<<23
         self.dev_nonfunctional_bit = 1<<24
         self.movetable_rejected_bit = 1<<25
+        self.exceeded_lims_bit = 1<<26
+        self.bad_neighbor_bit = 1<<27
+        self.missing_fvc_spot = 1<<28
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
         self.disabled_devids = [] #list of devids with DEVICE_CLASSIFIED_NONFUNCTIONAL = True or FIBER_INTACT = False
         self._initialize_pos_flags()
@@ -1040,13 +1048,17 @@ class Petal(object):
             self.printfunc(f'Unrecognized key {key} when requesting '
                            f'expected_current_position of posid {posid}')
 
+    def all_enabled_posids(self):
+        """Returns set of all posids of positioners with CTRL_ENABLED = True.
+        """
+        return {p for p in self.posids if self.posmodels[p].is_enabled}
+
     def enabled_posmodels(self, posids):
         """Returns dict with keys = posids, values = posmodels, but only for
         those positioners in the collection posids which are enabled.
         """
         pos = set(posids).intersection(self.posids)
-        return {p: self.posmodels[p] for p in pos
-                if self.posmodels[p].is_enabled}
+        return {p: self.posmodels[p] for p in pos if self.posmodels[p].is_enabled}
 
     def get_pos_flags(self, posids = 'all', should_reset = False):
         '''Getter function for self.pos_flags that carries out a final is_enabed
@@ -1192,7 +1204,7 @@ class Petal(object):
     def _new_schedule(self):
         """Generate up a new, clear schedule instance.
         """
-        schedule = posschedule.PosSchedule(petal=self, stats=self.schedule_stats, verbose=self.verbose)
+        schedule = posschedule.PosSchedule(petal=self, stats=self.schedule_stats, verbose=self.verbose, redundant_collision_checking=self.extra_check_on)
         schedule.should_check_petal_boundaries = self.shape == 'petal'
         return schedule
 

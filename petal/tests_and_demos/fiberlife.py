@@ -44,7 +44,7 @@ if should_simulate:
     positioner_max_move_time = 0.05
 
 # configure the log writer
-filename_timestamp_str = pc.filename_timestamp_str_now()
+filename_timestamp_str = pc.filename_timestamp_str()
 logfile = tkinter.filedialog.asksaveasfilename(title='Save test log as...', initialdir='~', initialfile=filename_timestamp_str + '_fiberlife_log.txt', filetypes=(('Text','.txt'),('All files','.*')))
 if not(logfile):
     tkinter.messagebox.showwarning(title='Quitting.',message='No log file was definedup.')
@@ -53,7 +53,7 @@ if not(logfile):
 with open(logfile,'w') as file:
     file.write('Test log from a run of fiberlife.py\n\n')
 def logwrite(string):
-    timestamp_str = pc.timestamp_str_now()
+    timestamp_str = pc.timestamp_str()
     stamped = timestamp_str + ': ' + string
     print(stamped)
     with open(logfile,'a') as file:

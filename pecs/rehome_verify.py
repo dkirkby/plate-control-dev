@@ -21,18 +21,10 @@ class RehomeVerify(PECS):
             self.interactive_ptl_setup()
         else:
             self.ptl_setup(petal_roles, posids)
-        self.printfunc(f'Verifying rehome for '
-                       f'{len(self.posids)} positioners...')
-        df = self.compare_xy()
-        path = os.path.join(  # save results
-            pc.dirs['calib_logs'],
-            f'{pc.filename_timestamp_str_now()}-rehome_verify.csv')
-        df.to_csv(path)
-        self.printfunc(f'Rehome verification data saved to: {path}')
-        if input('Open verification table? (y/n): ') in ['y', 'yes']:
-            os.system(f'xdg-open {path}')
 
     def compare_xy(self):
+        self.printfunc(f'Verifying rehome positions for '
+                       f'{len(self.posids)} positioners...')
         # all backlit fibres, including those disabled, needed for FVC
         exppos = (self.ptlm.get_positions(return_coord='QS')
                   .sort_values(by='DEVICE_ID'))
@@ -104,13 +96,12 @@ class RehomeVerify(PECS):
         flags_dict = self.ptlm.get_pos_flags(list(exppos.index))
         flags = [flags_dict[posid] for posid in exppos.index]
         exppos['FLAGS'] = flags
-        role = self.ptlm.participating_petals[0]
-        exppos['STATUS'] = self.ptlm.decipher_posflags(
-            exppos['FLAG'], participating_petals=role)[role]
+        exppos['STATUS'] = pc.decipher_posflags(exppos['FLAG'])
         tol = 1
         # now only consider matched, selected positioners, check deviations
         mask = exppos.index.isin(matched) & (exppos['dr'] > tol)
         print_df = exppos[mask].sort_values(by='dr', ascending=False)
+        print_df = print_df[['dr','BUS_ID','DEVICE_LOC','PETAL_LOC','STATUS']]
         bad_posids = sorted(print_df.index)
         if len(bad_posids) == 0:
             self.printfunc(
@@ -125,4 +116,9 @@ class RehomeVerify(PECS):
 
 
 if __name__ == '__main__':
-    RehomeVerify(interactive=True)
+    rv = RehomeVerify(interactive=True)
+    df = rv.compare_xy()
+    path = os.path.join(pc.dirs['calib_logs'],
+                        f'{pc.filename_timestamp_str()}-rehome_verify.csv')
+    df.to_csv(path)
+    print(f'Rehome verification data saved to: {path}')

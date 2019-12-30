@@ -20,7 +20,7 @@ class Rehome(PECS):
         self.axis = axis
         df = self.rehome()
         path = os.path.join(pc.dirs['all_logs'], 'calib_logs',
-                            f'{pc.filename_timestamp_str_now()}-rehome.csv')
+                            f'{pc.filename_timestamp_str()}-rehome.csv')
         df.to_csv(path)
         self.printfunc(f'Rehome (interally-tracked) data saved to: {path}')
         if input('Verify rehome positions with FVC? (y/n): ') in ['y', 'yes']:
@@ -38,13 +38,10 @@ class Rehome(PECS):
         ret = self.ptlm.rehome_pos(posids, axis=self.axis,
                                    anticollision=anticollision,
                                    control={'timeout': 60})
-        if isinstance(ret, dict):
-            ret = pd.concat(list(ret.values()))
+        ret = pd.concat(list(ret.values()))
         ret = (ret.rename(columns={'X1': 'posintT', 'X2': 'posintP'})
                .sort_values(by='DEVICE_ID').reset_index())
-        # Just take the first petal's result
-        ret['STATUS'] = list(
-            self.ptlm.decipher_posflags(ret['FLAG']).values())[0]
+        ret['STATUS'] = pc.decipher_posflags(ret['FLAG'])
         mask = ret['FLAG'] != 4
         retry_list = list(ret.loc[mask, 'DEVICE_ID'])
         if len(retry_list) == 0:
