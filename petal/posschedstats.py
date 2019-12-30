@@ -2,6 +2,7 @@ import os
 import csv
 import posconstants as pc
 import math
+import numpy
 
 # separated out here because so long
 redundant_checks_str = 'num collisions found by redundant final check (should be zero, or None if no check done)'
@@ -17,6 +18,7 @@ class PosSchedStats(object):
         self.unresolved_tables = {}
         self.unresolved_sweeps = {}
         self.strings = {'method':[]}
+        self.blank_str = '-'
         self.numbers = {'n pos':[],
                         'n requests':[],
                         'n requests accepted':[],
@@ -49,7 +51,7 @@ class PosSchedStats(object):
         self.unresolved_sweeps[self.latest] = {}
         self.num_moving[self.latest] = {0:0}
         for key in self.strings:
-            self.strings[key].append('-')
+            self.strings[key].append(self.blank_str)
         for key in self.numbers:
             val = None if key == redundant_checks_str else 0
             self.numbers[key].append(val)
@@ -226,31 +228,37 @@ class PosSchedStats(object):
         path = os.path.join(pc.dirs['temp_files'],filename)
         data, nrows = self.summarize_all()
         blank_row = {'method':''}
-        max_stats = {'method':'max'}
-        min_stats = {'method':'min'}
-        rms_stats = {'method':'rms'}
-        avg_stats = {'method':'avg'}            
+        rms = lambda X: (sum([x**2 for x in X])/len(X))**0.5
+        unique_methods = sorted(set(data['method']) - {self.blank_str})
+        categories = ['overall'] + unique_methods
+        calcs = {'max':max, 'min':min, 'rms':rms, 'avg':numpy.mean, 'med':numpy.median}
+        stats = {}
+        for category in categories:
+            stats[category] = {}
+            for calc in calcs:
+                stats[category][calc] = {'method':calc} # puts the name of this calc in the method column of csv file
+            stats[category]['max']['schedule id'] = category # puts the category of this group of calcs in the schedule id column of csv file, in same row as maxes
         for key in data:
             if len(data[key]) > 0:
                 type_test_val = data[key][0]
                 if isinstance(type_test_val,int) or isinstance(type_test_val,float):
-                    this_data = [data[key][i] for i in range(nrows)]
-                    max_stats[key] = max(this_data)
-                    min_stats[key] = min(this_data)
-                    rms_stats[key] = (sum([x**2 for x in this_data])/len(this_data))**0.5
-                    avg_stats[key] = sum(this_data)/len(this_data)
-        
+                    this_data = {'overall': [data[key][i] for i in range(nrows)]}
+                    for category in unique_methods:
+                        this_data[category] = [this_data['overall'][i] for i in range(nrows) if data['method'][i] == category]
+                    for category in categories:
+                        for calc,stat_function in calcs.items():
+                            if this_data[category]:
+                                stats[category][calc][key] = stat_function(this_data[category])
         with open(path, 'w', newline='') as csvfile:
             writer = csv.DictWriter(csvfile,fieldnames=data.keys())
             writer.writeheader()
             for i in range(nrows):
                 row = {key:val[i] for key,val in data.items()}
                 writer.writerow(row)
-            writer.writerow(blank_row)
-            writer.writerow(max_stats)
-            writer.writerow(min_stats)
-            writer.writerow(rms_stats)
-            writer.writerow(avg_stats)
+            for category in categories:
+                writer.writerow(blank_row)
+                for calc in calcs:
+                    writer.writerow(stats[category][calc])
             
     @staticmethod
     def found_but_not_resolved(found, resolved):
