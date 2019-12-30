@@ -117,16 +117,12 @@ class PosCalibrations(PECS):
         cols = [col for col in updates.columns
                 if 'OLD_' in col or 'NEW_' in col]
         updates.drop(cols, axis=1, inplace=True)  # clean up update df
-        used_pos.rename(columns={'Q': 'mea_Q', 'S': 'mea_S',
-                                 'DQ': 'mea_dQ', 'DS': 'mea_dS',
-                                 'FLAGS': 'FLAG'}, inplace=True)
-        unused_pos.rename(columns={'Q': 'mea_Q', 'S': 'mea_S',
-                                   'DQ': 'mea_dQ', 'DS': 'mea_dS',
-                                   'FLAGS': 'FLAG'}, inplace=True)
-        calib_up = used_pos
-        calib_up.update(updates)
+        for df in [used_pos, unused_pos]:
+            df.rename(columns={'Q': 'mea_Q', 'S': 'mea_S',
+                               'DQ': 'mea_dQ', 'DS': 'mea_dS',
+                               'FLAGS': 'FLAG'}, inplace=True)
         # List unmeasured positioners in updates, even with no data
-        calib_up.append(unused_pos, sort=False)
+        calib_up = used_pos.join(updates).append(unused_pos, sort=False)
         # overwrite flags with focalplane flags and add status
         calib_up['FLAG'] = pd.DataFrame.from_dict(
             self.ptl.get_pos_flags(list(calib_up.index)),
