@@ -240,12 +240,15 @@ class PosScheduleStage(object):
                         self.printfunc('Note: adjust_path(' + str(posid) + ', freezing=\'' + str(freezing) + '\') introduced new collisions for ' + str(newly_colliding))
                     for p in sorted(remainder): # sort is for repeatabiity (since 'remainder' is an unordered set, and so path adjustments would otherwise get processed in variable order from run to run)
                         if not self.move_tables[p].is_motionless: # only freeze if there's some move component available to be frozen
-                            newly_frozen.update(self.adjust_path(p,freezing='forced_recursive')) # recursively close out any side-effect new collisions
+                            recursed_newly_frozen = self.adjust_path(p,freezing='forced_recursive') # recursively close out any side-effect new collisions
+                            newly_frozen.update(recursed_newly_frozen) 
                         else:
                             self.printfunc(' --> no further freezing possible on ' + str(p) + ' --- already motionless')
                         verified = p not in self.colliding
                         self.printfunc(' --> recursive forced freeze attempted on ' + str(p) + '. Verified now non-collidng? ' + str(verified))
                 break # note indentation level of this return statement is essential. it breaks out of the methods for loop. do not remove again!
+        if type(newly_frozen) != set:
+            self.printfunc('Error: unexpected type ' + str(type(newly_frozen)) + ' for adjust_path() return value.')
         return newly_frozen
 
     def find_collisions(self, move_tables):
