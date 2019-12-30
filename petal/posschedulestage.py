@@ -290,30 +290,24 @@ class PosScheduleStage(object):
         all_sweeps = {}
         for posid in move_tables:
             table_A = move_tables[posid]
-            init_poslocTP_A = table_A.posmodel.trans.posintTP_to_poslocTP(table_A.init_posintTP)
             for neighbor in self.collider.pos_neighbors[posid]:
                 if neighbor not in already_checked[posid]:
                     table_B = move_tables[neighbor] if neighbor in move_tables else self._get_or_generate_table(neighbor)
-                    init_poslocTP_B = table_B.posmodel.trans.posintTP_to_poslocTP(table_B.init_posintTP)
-                    pospos_sweeps = self.collider.spacetime_collision_between_positioners(posid, init_poslocTP_A, table_A.for_collider(), neighbor, init_poslocTP_B, table_B.for_collider())
+                    pospos_sweeps = self.collider.spacetime_collision_between_positioners(posid, table_A.init_poslocTP, table_A.for_collider(), neighbor, table_B.init_poslocTP, table_B.for_collider())
                     all_sweeps.update({posid:pospos_sweeps[0], neighbor:pospos_sweeps[1]})
                     for sweep in pospos_sweeps:
                         if sweep.collision_case != pc.case.I:
                             colliding_sweeps[sweep.posid].add(sweep)
                     already_checked[posid].add(neighbor)
                     already_checked[neighbor].add(posid)
-                    if self.verbose:
-                        self.printfunc("checking collision: " + str(posid) + '-' + str(neighbor) + ', case ' + str(sweep.collision_case) + ', time ' + str(sweep.collision_time))
             for fixed_neighbor in self.collider.fixed_neighbor_cases[posid]:
                 posfix_sweep = self.collider.spacetime_collision_with_fixed(posid, init_poslocTP_A, table_A.for_collider())[0] # index 0 to immediately retrieve from the one-element list this function returns
                 all_sweeps.update({posid:posfix_sweep}) # don't worry --- if pospos colliding sweep takes precedence, this will be appropriately replaced again below
                 if posfix_sweep.collision_case != pc.case.I:
                     colliding_sweeps[posid].add(posfix_sweep)
-                if self.verbose:
-                    self.printfunc("checking collision: " + str(posid) + '-' + str(fixed_neighbor) + ', case ' + str(posfix_sweep.collision_case) + ', time ' + str(posfix_sweep.collision_time))
         multiple_collisions = {posid for posid in colliding_sweeps if len(colliding_sweeps[posid]) > 1}
         for posid in multiple_collisions:
-            first_collision_time = float('inf')
+            first_collision_time = math.inf
             for sweep in colliding_sweeps[posid]:
                 if sweep.collision_time < first_collision_time:
                     first_sweep = sweep
