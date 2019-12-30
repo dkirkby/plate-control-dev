@@ -1048,13 +1048,17 @@ class Petal(object):
             self.printfunc(f'Unrecognized key {key} when requesting '
                            f'expected_current_position of posid {posid}')
 
+    def all_enabled_posids(self):
+        """Returns set of all posids of positioners with CTRL_ENABLED = True.
+        """
+        return {p for p in self.posids if self.posmodels[p].is_enabled}
+
     def enabled_posmodels(self, posids):
         """Returns dict with keys = posids, values = posmodels, but only for
         those positioners in the collection posids which are enabled.
         """
         pos = set(posids).intersection(self.posids)
-        return {p: self.posmodels[p] for p in pos
-                if self.posmodels[p].is_enabled}
+        return {p: self.posmodels[p] for p in pos if self.posmodels[p].is_enabled}
 
     def get_pos_flags(self, posids = 'all', should_reset = False):
         '''Getter function for self.pos_flags that carries out a final is_enabed
