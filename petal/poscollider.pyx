@@ -230,7 +230,7 @@ class PosCollider(object):
                             sweeps[i].collision_time = sweeps[i].time[step[i]]
                             sweeps[i].collision_idx = step[i]
                         steps_remaining[i] = 0 # halt the sweep here
-            steps_remaining = np.clip(np.asarray(steps_remaining)-1,0,np.inf)
+            steps_remaining = [max(step-1,0) for step in steps_remaining]
             for i in pos_range:
                 if steps_remaining[i]:
                     step[i] += 1
