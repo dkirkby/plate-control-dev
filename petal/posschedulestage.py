@@ -440,9 +440,9 @@ class PosScheduleStage(object):
         # retract, rot, extend, repel methods: calculate jog distances
         max_abs_jog = abs(self._max_jog[method])
         jogs = {} # will hold distance(s) to move away from target and then back toward target
+        jog_times = {} # will hold corresponding move time for each jog
         if 'extend' in method or 'retract' in method:
             axis = pc.P
-            speed = posmodels[posid].abs_shaft_speed_cruise_P
             limits = posmodels[posid].targetable_range_P
             if 'retract' in method:
                 limits[1] = min(limits[1], self.collider.Ei_phi) # note deeper retraction than Eo, to give better chance of avoidance
@@ -452,12 +452,10 @@ class PosScheduleStage(object):
             jogs[posid] = self._range_limited_jog(nominal=max_abs_jog, direction=direction, start=tables[posid].init_posintTP[1], limits=limits)
         elif 'rot' in method:
             axis = pc.T
-            speed = posmodels[posid].abs_shaft_speed_cruise_T
             direction = +1 if 'ccw' in method else -1
             jogs[posid] = self._range_limited_jog(nominal=max_abs_jog, direction=direction, start=tables[posid].init_posintTP[0], limits=posmodels[posid].targetable_range_T)
         elif 'repel' in method:
             axis = pc.T
-            speed = posmodels[posid].abs_shaft_speed_cruise_T
             for p,t in tables.items():
                 start = t.init_posintTP[0]
                 limits = posmodels[p].targetable_range_T
@@ -474,7 +472,8 @@ class PosScheduleStage(object):
         else:
             self.printfunc('Error: unknown path adjustment method \'' + str(method) + '\'')
             return {}
-        jog_times = {p:abs(jogs[p] / speed) for p in jogs}       
+        for p in jogs:
+            jog_times[p] = posmodels[p].true_move(axisid=axis, distance=jogs[p], allow_cruise=True, limits=None, init_posintTP=None)['move_time']     
         
         # apply jogs and associated pauses to tables
         if 'repel' in method:
