@@ -45,8 +45,10 @@ class PosCollider(object):
         self.plotting_on = True
         self.timestep = self.config['TIMESTEP']
         self.animator = posanimator.PosAnimator(fignum=0, timestep=self.timestep)
+        self.animate_colliding_only = False # overrides posids_to_animate and fixed_items_to_animate
         self.posids_to_animate = set() # set of posids to be animated (i.e., allows restricting which ones get plotted)
         self.fixed_items_to_animate = {'PTL','GFA'} # may contain nothing, 'PTL', and/or 'GFA'
+        self.labeled_posids = set() # tracks those already labeled in animator
         self.animator_label_type = animator_label_type # 'loc' --> device location ids, 'posid' --> posids, None --> no labels
         self.use_neighbor_loc_dict = use_neighbor_loc_dict
         self.keepouts_T = {} # key: posid, value: central body keepout of type PosPoly
@@ -86,32 +88,39 @@ class PosCollider(object):
 
             start_time ... seconds, global time when the move begins
         """
-        if 'GFA' in self.fixed_items_to_animate:
-            self.animator.add_or_change_item('GFA', '', start_time, self.keepout_GFA.points)
-        if 'PTL' in self.fixed_items_to_animate:
-            self.animator.add_or_change_item('PTL', '', start_time, self.keepout_PTL.points)
-        for posid in self.posids_to_animate:
-            self.animator.add_or_change_item('Eo', self.posindexes[posid], start_time, self.Eo_polys[posid].points)
-            # self.animator.add_or_change_item('Ei', self.posindexes[posid], start_time, self.Ei_polys[posid].points)
-            # self.animator.add_or_change_item('Ee', self.posindexes[posid], start_time, self.Ee_polys[posid].points)
-            self.animator.add_or_change_item('line at 180', self.posindexes[posid], start_time, self.line180_polys[posid].points)
-            if self.animator_label_type == 'posid':
-                label = str(posid)
-            elif self.animator_label_type == 'loc':
-                label = format(self.posmodels[posid].deviceloc,'03d')
-            else:
-                label = ''
+        if not self.animate_colliding_only:
+            if 'GFA' in self.fixed_items_to_animate:
+                self.animator.add_or_change_item('GFA', '', start_time, self.keepout_GFA.points)
+            if 'PTL' in self.fixed_items_to_animate:
+                self.animator.add_or_change_item('PTL', '', start_time, self.keepout_PTL.points)
+            for posid in self.posids_to_animate:
+                self.animator.add_or_change_item('Eo', self.posindexes[posid], start_time, self.Eo_polys[posid].points)
+                # self.animator.add_or_change_item('Ei', self.posindexes[posid], start_time, self.Ei_polys[posid].points)
+                # self.animator.add_or_change_item('Ee', self.posindexes[posid], start_time, self.Ee_polys[posid].points)
+                self.animator.add_or_change_item('line at 180', self.posindexes[posid], start_time, self.line180_polys[posid].points)
+                self.add_posid_label(posid)
+            
+    def add_posid_label(self, posid):
+        """Adds label to animator for posid (if not already there)."""
+        if self.animator_label_type == 'posid':
+            label = str(posid)
+        elif self.animator_label_type == 'loc':
+            label = format(self.posmodels[posid].deviceloc,'03d')
+        else:
+            label = ''
+        if posid not in self.labeled_posids:
             self.animator.add_label(label, self.x0[posid], self.y0[posid])
+            self.labeled_posids.add(posid)
 
     def add_mobile_to_animator(self, start_time, sweeps):
         """Add a collection of PosSweeps to the animator, describing positioners'
-        real-time motions.a
+        real-time motions.
 
             start_time ... seconds, global time when the move begins
             sweeps     ... dict with keys = posids, values = PosSweep instances
         """
         for posid,s in sweeps.items():
-            if posid in self.posids_to_animate:
+            if posid in self.posids_to_animate or self.animate_colliding_only:
                 posidx = self.posindexes[posid]
                 for i in range(len(s.time)):
                     style_override = ''

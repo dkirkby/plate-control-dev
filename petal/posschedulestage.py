@@ -151,8 +151,8 @@ class PosScheduleStage(object):
                 'forced' ... only freeze, and *must* do so
                 'forced_recursive' ... like 'forced', then closes any follow-on neighbor collisions
 
-        Return value is a set containing the posids of any robot(s) that were frozen
-        in the course of the function call.
+        Return value is a set containing the posids of any robot(s) whose move
+        tables were adjusted in the course of the function call.
 
         With freezing == 'off' or 'on', the path adjustment algorithm goes through a
         series of options, trying adding various pauses and pre-moves to avoid collision.
@@ -189,7 +189,7 @@ class PosScheduleStage(object):
             methods = pc.nonfreeze_adjustment_methods
         else:
             methods = pc.all_adjustment_methods
-        newly_frozen = set()
+        adjusted = set()
         for method in methods:
             collision_neighbor = self.sweeps[posid].collision_neighbor
             proposed_tables = self._propose_path_adjustment(posid,method)
@@ -198,6 +198,7 @@ class PosScheduleStage(object):
             should_accept &= any(proposed_tables) # nothing to accept if no proposed tables were generated
             if should_accept:
                 self.move_tables.update(proposed_tables)
+                adjusted.update(proposed_tables.keys())
                 
                 # search for any side effect new collisions
                 proposed = set(proposed_tables.keys())
@@ -228,7 +229,7 @@ class PosScheduleStage(object):
                 self.store_collision_finding_results(col_to_store, all_to_store)
                 if method == 'freeze':
                     self.sweeps[posid].register_as_frozen() # needs to occur after storing results above
-                    newly_frozen.add(posid)
+                    adjusted.add(posid)
                
                 # recursively-forced freezing
                 if freezing == 'forced_recursive':
@@ -241,15 +242,13 @@ class PosScheduleStage(object):
                     for p in sorted(remainder): # sort is for repeatabiity (since 'remainder' is an unordered set, and so path adjustments would otherwise get processed in variable order from run to run)
                         if not self.move_tables[p].is_motionless: # only freeze if there's some move component available to be frozen
                             recursed_newly_frozen = self.adjust_path(p,freezing='forced_recursive') # recursively close out any side-effect new collisions
-                            newly_frozen.update(recursed_newly_frozen) 
+                            adjusted.update(recursed_newly_frozen) 
                         else:
                             self.printfunc(' --> no further freezing possible on ' + str(p) + ' --- already motionless')
                         verified = p not in self.colliding
                         self.printfunc(' --> recursive forced freeze attempted on ' + str(p) + '. Verified now non-collidng? ' + str(verified))
                 break # note indentation level of this return statement is essential. it breaks out of the methods for loop. do not remove again!
-        if type(newly_frozen) != set:
-            self.printfunc('Error: unexpected type ' + str(type(newly_frozen)) + ' for adjust_path() return value.')
-        return newly_frozen
+        return adjusted
 
     def find_collisions(self, move_tables):
         """Identifies any collisions that would be induced by executing a collection

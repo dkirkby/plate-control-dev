@@ -259,8 +259,14 @@ class PosSchedule(object):
             self.stats.set_max_table_time(max_net_time)
             self.stats.add_scheduling_time(time.clock() - timer_start)
         if self.petal.animator_on:
-            self.collider.add_mobile_to_animator(self.petal.animator_total_time, all_sweeps)
-            self.petal.animator_total_time += max({sweep.time[-1] for sweep in all_sweeps.values()})
+            sweeps_to_add = colliding_sweeps if self.collider.animate_colliding_only else all_sweeps
+            if sweeps_to_add:
+                self.collider.add_mobile_to_animator(self.petal.animator_total_time, sweeps_to_add)
+                for posid in sweeps_to_add:
+                    self.collider.add_posid_label(posid)
+                self.petal.animator_total_time += max({sweep.time[-1] for sweep in sweeps_to_add.values()})
+                if self.collider.animate_colliding_only:
+                    self.printfunc('Added ' + str(len(sweeps_to_add)) + ' colliding sweeps to the animator.')
 
     def _table_matches_quantized_sweep(self, move_table, sweep):
         """Takes as input a "for_schedule()" move table and a quantized sweep,
@@ -427,17 +433,17 @@ class PosSchedule(object):
                 freezing = attempts_sequence.pop(0)
                 for posid in sorted(stage.colliding.copy()): # sort is for repeatability (since stage.colliding is an unordered set, and so path adjustments would otherwise get processed in variable order from run to run). the copy() call is redundant with sorted(), but left there for the sake of clarity, that need to be looping on a copy of *some* kind
                     if posid in stage.colliding: # because it may have been resolved already when a *neighbor* got previously adjusted
-                        newly_frozen = stage.adjust_path(posid, freezing)
-                        for p in newly_frozen:
+                        adjusted = stage.adjust_path(posid, freezing)
+                        for p in adjusted:
                             self.petal.pos_flags[p] |= self.petal.frozen_anticol_bit # Mark as frozen by anticollision
                             if name != self.RRE_stage_order[-1]: # i.e. some next stage exists
                                 # must set next stage to begin from the newly-frozen position
-                                frozen_table_data = stage.move_tables[p].for_schedule()
-                                frozen_t = start_posintTP[name][p][pc.T] + frozen_table_data['net_dT'][-1]
-                                frozen_p = start_posintTP[name][p][pc.P] + frozen_table_data['net_dP'][-1]
+                                adjusted_table_data = stage.move_tables[p].for_schedule()
+                                adjusted_t = start_posintTP[name][p][pc.T] + adjusted_table_data['net_dT'][-1]
+                                adjusted_p = start_posintTP[name][p][pc.P] + adjusted_table_data['net_dP'][-1]
                                 next_stage_idx = self.RRE_stage_order.index(name) + 1
                                 next_name = self.RRE_stage_order[next_stage_idx]
-                                start_posintTP[next_name][p] = [frozen_t,frozen_p]
+                                start_posintTP[next_name][p] = [adjusted_t,adjusted_p]
                                 dtdp[next_name][p] = calc_dtdp(next_name, p)
                 if self.stats:
                     self.stats.add_to_num_adjustment_iters(1)
