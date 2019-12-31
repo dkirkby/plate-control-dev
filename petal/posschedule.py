@@ -261,7 +261,7 @@ class PosSchedule(object):
         if self.petal.animator_on:
             if self.collider.animate_colliding_only:
                 sweeps_to_add = {}
-                for posid,sweep in colliding_sweeps:
+                for posid,sweep in colliding_sweeps.items():
                     sweeps_to_add.update({posid:sweep})
                     neighbor_sweeps = {n:all_sweeps[n] for n in self.collider.pos_neighbors[posid]}
                     sweeps_to_add.update(neighbor_sweeps)
