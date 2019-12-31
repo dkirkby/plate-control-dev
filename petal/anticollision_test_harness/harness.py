@@ -27,7 +27,7 @@ petal_id = 666
 # Other options
 should_animate = False
 anim_label_size = 'medium' # size in points, 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
-animation_foci = {'M07362', 'M08144', 'M05823', 'M05899'} # argue {} or 'all' to animate everything. otherwise, this set limits which robots (plus their surrounding neighbors) get animated. Can include 'GFA' or 'PTL' as desired
+animation_foci = {} # argue {} or 'all' to animate everything. otherwise, this set limits which robots (plus their surrounding neighbors) get animated. Can include 'GFA' or 'PTL' as desired
 n_corrections = 1 # number of correction moves to simulate after each target
 max_correction_move = 0.050/1.414 # mm
 should_profile = False
@@ -113,7 +113,4 @@ for pos_params in pos_param_sequence:
     if should_animate:
         ptl.stop_gathering_frames()
         print('Generating animation (this can be quite slow)...')
-        if should_profile:
-            hc.profile('ptl.generate_animation()')
-        else:
-            ptl.generate_animation()
+        ptl.generate_animation()
