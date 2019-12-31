@@ -180,7 +180,7 @@ class PosScheduleStage(object):
         In other words, a neighbor's neighbor will not be affected by this function.
         """
         if self.sweeps[posid].collision_case == pc.case.I:
-            return
+            return set()
         elif self.sweeps[posid].collision_case in pc.case.fixed_cases:
             methods = ['freeze'] if freezing != 'off' else []
         elif freezing in {'forced','forced_recursive'}:
