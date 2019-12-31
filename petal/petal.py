@@ -50,7 +50,6 @@ class Petal(object):
         printfunc       ... method, used for stdout style printing. we use this for logging during tests
         collider_file   ... string, file name of collider configuration file, no directory loction. If left blank will use default.
         sched_stats_on  ... boolean, controls whether to log statistics about scheduling runs
-        extra_check_on  ... boolean, controls whether to run scheduler in with redundant (for debugging only) collision checks
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
         petal_loc       ... integer, (option) location (0-9) of petal in FPA
 
@@ -109,7 +108,7 @@ class Petal(object):
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
                  printfunc=print, verbose=False,
                  user_interactions_enabled=False, anticollision='freeze',
-                 collider_file=None, sched_stats_on=False, extra_check_on=False):
+                 collider_file=None, sched_stats_on=False):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
         self.printfunc(f'Running plate_control version: {pc.code_version}')
@@ -178,7 +177,6 @@ class Petal(object):
 
         # scheduling options
         self.sched_stats_on = sched_stats_on
-        self.extra_check_on = extra_check_on
 
         # must call the following 3 methods whenever petal alingment changes
         self.init_trans()
@@ -285,13 +283,9 @@ class Petal(object):
         '''
         if hasattr(self, 'anticol_settings'):
             self.printfunc('Using provided anticollision settings')
-            self.collider = poscollider.PosCollider(
-                config=self.anticol_settings, collision_hashpp_exists=False,
-                collision_hashpf_exists=False, hole_angle_file=None)
+            self.collider = poscollider.PosCollider(config=self.anticol_settings, hole_angle_file=None)
         else:
-            self.collider = poscollider.PosCollider(
-                configfile=collider_file, collision_hashpp_exists=False,
-                collision_hashpf_exists=False, hole_angle_file=None)
+            self.collider = poscollider.PosCollider(configfile=collider_file, hole_angle_file=None)
             self.anticol_settings = self.collider.config
         self.printfunc(f'Collider setting: {self.collider.config}')
         self.collider.add_positioners(self.posmodels.values())
@@ -1204,7 +1198,7 @@ class Petal(object):
     def _new_schedule(self):
         """Generate up a new, clear schedule instance.
         """
-        schedule = posschedule.PosSchedule(petal=self, stats=self.schedule_stats, verbose=self.verbose, redundant_collision_checking=self.extra_check_on)
+        schedule = posschedule.PosSchedule(petal=self, stats=self.schedule_stats, verbose=self.verbose)
         schedule.should_check_petal_boundaries = self.shape == 'petal'
         return schedule
 

@@ -29,6 +29,7 @@ class PECS:
     All selected petals:                self.ptlm.participating_petals
     Selected PCIDs:                     self.pcids from pecs_local.cfg
     '''
+
     def __init__(self, fvc=None, ptlm=None, printfunc=print, interactive=None):
         # Allow local config so scripts do not always have to collect roles
         # and names from the user. No check for illuminator at the moment
@@ -67,7 +68,7 @@ class PECS:
             self.printfunc(
                 f'Reusing existing PetalMan proxy with active petals: '
                 f'{self.ptlm.participating_petals}')
-        if self.illuminated_petals is 'all':
+        if self.illuminated_petals == 'all':
             self.illuminated_petals = self.ptlm.Petals.keys()
         else:
             assert set(self.illuminated_petals).issubset(
@@ -84,7 +85,7 @@ class PECS:
         elif (self.pcids is None) or interactive:  # boolean
             self.interactive_ptl_setup()  # choose which petal to operate
         else:
-            self.ptl_setup(pcids=self.pcids)  # use PCIDs specified in cfg
+            self.ptl_setup(self.pcids)  # use PCIDs specified in cfg
 
     def exp_setup(self):
         assert hasattr(self, 'data'), (
@@ -109,86 +110,81 @@ class PECS:
         else:
             self.printfunc(f'Invalid input: {yn_str}, must be y/n')
 
-    def ptl_setup(self, pcids=None, posids=None):
-        if pcids is 'all':
-            self.printfunc(
-                f'Selecting all petal roles: {self.ptlm.participating_petals}')
-        else:
-            self.printfunc(f'Selected PCIDs: {pcids}')
-            for pcid in pcids:
-                assert f'PETAL{pcid}' in self.illuminated_petals, (
-                    f'PC{pcid:02} must be illuminated.')
-            self.ptlm.participating_petals = [f'PETAL{pcid}' for pcid in pcids]
+    @staticmethod
+    def _pcid2role(pcid):
+        return f'PETAL{pcid}'
+
+    @staticmethod
+    def _role2pcid(role):
+        return role.replace('PETAL', '')
+
+    def ptl_setup(self, pcids, posids=None):
+        '''input pcids must be a list of integer'''
+        self.printfunc(f'Selected PCIDs: {pcids}')
+        for pcid in pcids:  # illumination check
+            assert f'PETAL{pcid}' in self.illuminated_petals, (
+                f'PC{pcid:02} must be illuminated.')
+        self.ptlm.participating_petals = [f'PETAL{pcid}' for pcid in pcids]
         if posids is None:
             ret = self.ptlm.get_positioners(enabled_only=True)
-            posinfo = pd.concat(list(ret.values()))
-            posids = sorted(posinfo['DEVICE_ID'])
+            posinfo = pd.concat(list(ret.values())).set_index('DEVICE_ID')
+            posids = sorted(posinfo.index)
             self.printfunc(
                 f'Defaulting to all {len(posids)} enabled positioners')
         else:
             ret = self.ptlm.get_positioners(posids=posids, enabled_only=True)
-            posinfo = pd.concat(list(ret.values()))
-            posids = list(set(posids) & set(posinfo['DEVICE_ID']))
-            self.printfunc(
-                f'Selected {len(posids)} specified positioners')
+            posinfo = pd.concat(list(ret.values())).set_index('DEVICE_ID')
+            posids = list(set(posids) & set(posinfo.index))
+            self.printfunc(f'Selected {len(posids)} positioners specified')
         self.posids = posids
         self.posinfo = posinfo
+        self.ptl_roles = self.ptlm.participating_petals
 
     def interactive_ptl_setup(self):
         self.printfunc(f'Running interactive setup for PECS')
-        ptls = self._interactively_get_ptl()  # set selected ptlid
-        posids, ids = self._interactively_get_posids()  # set selected posids
-        self.ptl_setup(petal_roles=ptls, posids=posids, ids=ids)
+        pcids = self._interactively_get_pcid()  # set selected ptlid
+        posids = self._interactively_get_posids()  # set selected posids
+        self.ptl_setup(pcids, posids=posids)
 
-    def get_owning_ptl_role(self, posid):
-        """
-        Finds the petal role name that owns this positioner
-        """
-        assert isinstance(posid, str), 'Must be single positioner!'
-        ret = self.ptlm.get_positioners(enabled_only=False, posids=[posid])
-        for ptl in ret.keys():
-            if not ret[ptl].empty:
-                return ptl
-        raise ValueError(f'{posid} not found in petal roles: {ret.keys()}')
+    def pcid_lookup(self, posid):
+        if posid in self.posinfo.index:
+            return self.posinfo.loc[posid, 'PETAL_LOC']
+        else:
+            raise ValueError(f'Invalid posid {posid} not found in PCIDs: '
+                             f'{self.pcids}')
 
-    def _interactively_get_ptl(self):
-        ptls = input(f'Availible petal roles: {list(self.ptlm.Petals.keys())}'
-                     f'\nPlease enter list petal roles seperated by SPACES. '
-                     f'Leave blank for all petals: ')
-        if ptls == '':
-            return list(self.ptlm.Petals.keys())
-        petal_roles = ptls.split()
-        # Validate roles
-        for role in petal_roles:
-            accepted = False
-            for availible in self.ptlm.Petals.keys():
-                if role == availible:
-                    accepted = True
-            if not accepted:
-                self.printfunc(f'Invalid role {role}, try again.')
-                return self._interactively_get_ptl()
-        self.ptlm.participating_petals = petal_roles
-        return petal_roles
+    def ptl_role_lookup(self, posid):
+        return self.pcid2role(self.pcid_lookup(posid))
+
+    def _interactively_get_pcid(self):
+        pcids = input(f'Please enter integer PCIDs seperated by spaces. '
+                      f'Leave blank to select all available petals: ')
+        if pcids == '':
+            pcids = self.pcids
+        # validate pcids against available roles in Petalman
+        for pcid in pcids:
+            assert f'PETAL{pcid}' in self.ptlm.Petals.keys(), (
+                f'PC{pcid:02} unavailable, all available ICS petal roles: '
+                f'{self.ptlm.Petals.keys()}')
+        return [int(pcid) for pcid in pcids]
 
     def _interactively_get_posids(self):
-        user_text = input('Please list CAN bus IDs or posids, seperated by '
-                          'SPACES. \nLeave blank to use all positioners: ')
-        if user_text == '':
-            selection = None
+        user_text = input('Please list canids (can??) or posids, seperated by '
+                          'spaces. Leave blank to select all positioners: ')
+        if user_text == '':  # get all enabled positions
+            ret = self.ptlm.get_positioners(enabled_only=True)
         else:
             selection = user_text.split()
-        if selection is None:
-            ret = self.ptlm.get_positioners(enabled_only=True)
-        elif 'can' in selection[0]:  # User passed a list of canids
-            ret = self.ptlm.get_positioners(enabled_only=True,
-                                            busids=selection)
-        else:  # assume selection is a list of posids
-            ret = self.ptlm.get_positioners(enabled_only=True,
-                                            posids=selection)
+            if 'can' in selection[0]:  # selection is a list of canids
+                ret = self.ptlm.get_positioners(enabled_only=True,
+                                                busids=selection)
+            else:  # selection should be a list of posids
+                ret = self.ptlm.get_positioners(enabled_only=True,
+                                                posids=selection)
         posinfo = pd.concat(list(ret.values()))
         posids = sorted(posinfo['DEVICE_ID'])
         self.printfunc(f'Selected {len(posids)} positioners')
-        return posids, posinfo
+        return posids
 
     def fvc_measure(self, exppos=None, match_radius=50, matched_only=True):
         '''use the expected positions given, or by default use internallly

@@ -22,8 +22,6 @@ class PosCollider(object):
     See DESI-0899 for geometry specifications, illustrations, and kinematics.
     """
     def __init__(self, configfile='',
-                 collision_hashpp_exists=False,
-                 collision_hashpf_exists=False,
                  hole_angle_file=None,
                  use_neighbor_loc_dict=False,
                  config=None,
@@ -47,28 +45,14 @@ class PosCollider(object):
         self.plotting_on = True
         self.timestep = self.config['TIMESTEP']
         self.animator = posanimator.PosAnimator(fignum=0, timestep=self.timestep)
+        self.animate_colliding_only = False # overrides posids_to_animate and fixed_items_to_animate
         self.posids_to_animate = set() # set of posids to be animated (i.e., allows restricting which ones get plotted)
         self.fixed_items_to_animate = {'PTL','GFA'} # may contain nothing, 'PTL', and/or 'GFA'
+        self.labeled_posids = set() # tracks those already labeled in animator
         self.animator_label_type = animator_label_type # 'loc' --> device location ids, 'posid' --> posids, None --> no labels
         self.use_neighbor_loc_dict = use_neighbor_loc_dict
         self.keepouts_T = {} # key: posid, value: central body keepout of type PosPoly
         self.keepouts_P = {} # key: posid, value: phi arm keepout of type PosPoly
-
-        # hash table initializations (if being used)
-        self.collision_hashpp_exists = collision_hashpp_exists
-        self.collision_hashpf_exists = collision_hashpf_exists
-        if self.collision_hashpp_exists:
-            f = open(os.path.join(os.environ.get('collision_table'), 'table_pp_50_5_5_5_5.out'), 'rb')
-            self.table_pp = pickle.load(f)
-            f.close()
-            f = open(os.path.join(os.environ.get('collision_table'), hole_angle_file), 'rb')
-            self.hole_angle = pickle.load(f)
-            f.close()
-
-        if self.collision_hashpf_exists:
-            f = open(os.path.join(os.environ.get('collision_table'), 'table_pf_50_50_5_5.out'), 'rb')
-            self.table_pf = pickle.load(f)
-            f.close()
 
         # load fixed dictionary containing locations of neighbors for each positioner DEVICE_LOC (if this option has been selected)
         if self.use_neighbor_loc_dict:
@@ -104,32 +88,39 @@ class PosCollider(object):
 
             start_time ... seconds, global time when the move begins
         """
-        if 'GFA' in self.fixed_items_to_animate:
-            self.animator.add_or_change_item('GFA', '', start_time, self.keepout_GFA.points)
-        if 'PTL' in self.fixed_items_to_animate:
-            self.animator.add_or_change_item('PTL', '', start_time, self.keepout_PTL.points)
-        for posid in self.posids_to_animate:
-            self.animator.add_or_change_item('Eo', self.posindexes[posid], start_time, self.Eo_polys[posid].points)
-            # self.animator.add_or_change_item('Ei', self.posindexes[posid], start_time, self.Ei_polys[posid].points)
-            # self.animator.add_or_change_item('Ee', self.posindexes[posid], start_time, self.Ee_polys[posid].points)
-            self.animator.add_or_change_item('line at 180', self.posindexes[posid], start_time, self.line180_polys[posid].points)
-            if self.animator_label_type == 'posid':
-                label = str(posid)
-            elif self.animator_label_type == 'loc':
-                label = format(self.posmodels[posid].deviceloc,'03d')
-            else:
-                label = ''
+        if not self.animate_colliding_only:
+            if 'GFA' in self.fixed_items_to_animate:
+                self.animator.add_or_change_item('GFA', '', start_time, self.keepout_GFA.points)
+            if 'PTL' in self.fixed_items_to_animate:
+                self.animator.add_or_change_item('PTL', '', start_time, self.keepout_PTL.points)
+            for posid in self.posids_to_animate:
+                self.animator.add_or_change_item('Eo', self.posindexes[posid], start_time, self.Eo_polys[posid].points)
+                # self.animator.add_or_change_item('Ei', self.posindexes[posid], start_time, self.Ei_polys[posid].points)
+                # self.animator.add_or_change_item('Ee', self.posindexes[posid], start_time, self.Ee_polys[posid].points)
+                self.animator.add_or_change_item('line at 180', self.posindexes[posid], start_time, self.line180_polys[posid].points)
+                self.add_posid_label(posid)
+            
+    def add_posid_label(self, posid):
+        """Adds label to animator for posid (if not already there)."""
+        if self.animator_label_type == 'posid':
+            label = str(posid)
+        elif self.animator_label_type == 'loc':
+            label = format(self.posmodels[posid].deviceloc,'03d')
+        else:
+            label = ''
+        if posid not in self.labeled_posids:
             self.animator.add_label(label, self.x0[posid], self.y0[posid])
+            self.labeled_posids.add(posid)
 
     def add_mobile_to_animator(self, start_time, sweeps):
         """Add a collection of PosSweeps to the animator, describing positioners'
-        real-time motions.a
+        real-time motions.
 
             start_time ... seconds, global time when the move begins
             sweeps     ... dict with keys = posids, values = PosSweep instances
         """
         for posid,s in sweeps.items():
-            if posid in self.posids_to_animate:
+            if posid in self.posids_to_animate or self.animate_colliding_only:
                 posidx = self.posindexes[posid]
                 for i in range(len(s.time)):
                     style_override = ''
@@ -140,9 +131,9 @@ class PosCollider(object):
                     if collision_has_occurred:
                         style_override = 'collision'
                     time = start_time + s.time[i]
-                    self.animator.add_or_change_item('central body', posidx, time, self.place_central_body(posid, s.tp[0,i]).points, style_override)
-                    self.animator.add_or_change_item('phi arm',      posidx, time, self.place_phi_arm(     posid, s.tp[:,i]).points, style_override)
-                    self.animator.add_or_change_item('ferrule',      posidx, time, self.place_ferrule(     posid, s.tp[:,i]).points, style_override)
+                    self.animator.add_or_change_item('central body', posidx, time, self.place_central_body(posid, s.tp[i][0]).points, style_override)
+                    self.animator.add_or_change_item('phi arm',      posidx, time, self.place_phi_arm(     posid, s.tp[i]).points, style_override)
+                    self.animator.add_or_change_item('ferrule',      posidx, time, self.place_ferrule(     posid, s.tp[i]).points, style_override)
                     if collision_has_occurred and s.collision_case == pc.case.GFA:
                         self.animator.add_or_change_item('GFA', '', time, self.keepout_GFA.points, style_override)
                     elif collision_has_occurred and s.collision_case == pc.case.PTL:
@@ -178,8 +169,6 @@ class PosCollider(object):
             'nrows'     : number of rows in the lists below (all must be the same length)
             'dT'        : list of theta rotation distances in degrees
             'dP'        : list of phi rotation distances in degrees
-            'Tdot'      : list of theta rotation speeds in deg/sec
-            'Pdot'      : list of phi rotation speeds in deg/sec
             'prepause'  : list of prepause (before the rotations begin) values in seconds
             'move_time' : list of durations of rotations in seconds, approximately equals max(dT/Tdot,dP/Pdot), but calculated more exactly for the physical hardware
             'postpause' : list of postpause (after the rotations end) values in seconds
@@ -210,13 +199,13 @@ class PosCollider(object):
         while any(steps_remaining):
             check_collision_this_loop = False
             for i in pos_range:
-                if any(sweeps[i].tp_dot[:,step[i]]) or step[i] == 0:
+                if sweeps[i].was_moving_cached[step[i]]:
                     check_collision_this_loop = True
             if check_collision_this_loop:
                 if pospos:
-                    collision_case = self.spatial_collision_between_positioners(posid_A, posid_B, sweeps[0].tp[:,step[0]], sweeps[1].tp[:,step[1]])
+                    collision_case = self.spatial_collision_between_positioners(posid_A, posid_B, sweeps[0].tp[step[0]], sweeps[1].tp[step[1]])
                 else:
-                    collision_case = self.spatial_collision_with_fixed(posid_A, sweeps[0].tp[:,step[0]])
+                    collision_case = self.spatial_collision_with_fixed(posid_A, sweeps[0].tp[step[0]])
                 if collision_case != pc.case.I:
                     for i,j in zip(pos_range, rev_pos_range):
                         sweeps[i].collision_case = collision_case
@@ -252,60 +241,25 @@ class PosCollider(object):
         """
         if poslocTP_A[1] >= self.Eo_phi and poslocTP_B[1] >= self.Eo_phi:
             return pc.case.I
-
-        if self.collision_hashpp_exists:
-
-            dr = self.hole_angle[posid_A][posid_B][0]
-            angle = self.hole_angle[posid_A][posid_B][1]
-
-            # to make theta angle ranges from 0-360, rather than -180 to 180
-            # to be consistent with angle convention used in table
-            if poslocTP_A[0] < 0:
-                t1 = 360 + poslocTP_A[0]
-            else:
-                t1 = poslocTP_A[0]
-
-            if poslocTP_B[0] < 0:
-                t2 = 360 + poslocTP_B[0]
-            else:
-                t2 = poslocTP_B[0]
-
-            # binning to the resolution of the lookup table
-            dr = lookup.nearest(dr, 50, 0, 950)
-            t1 = lookup.nearest(t1, 5, 0, 360)
-            t2 = lookup.nearest(t2, 5, 0, 360)
-            phi1 = lookup.nearest(poslocTP_A[1], 5, -20, 205)
-            phi2 = lookup.nearest(poslocTP_B[1], 5, -20, 205)
-
-            if t1 == 360: t1 = 0
-            if t2 == 360: t2 = 0
-            code = lookup.make_code_pp(dr, t1-angle, phi1, t2-angle, phi2)
-
-            if code in self.table_pp:
-                return self.table_pp[code] # <= 0.1 us
+        elif poslocTP_A[1] < self.Eo_phi and poslocTP_B[1] >= self.Ei_phi: # check case IIIA
+            if self._case_III_collision(posid_A, posid_B, poslocTP_A, poslocTP_B[0]):
+                return pc.case.IIIA
             else:
                 return pc.case.I
-
-        else:
-            if poslocTP_A[1] < self.Eo_phi and poslocTP_B[1] >= self.Ei_phi: # check case IIIA
-                if self._case_III_collision(posid_A, posid_B, poslocTP_A, poslocTP_B[0]):
-                    return pc.case.IIIA
-                else:
-                    return pc.case.I
-            elif poslocTP_B[1] < self.Eo_phi and poslocTP_A[1] >= self.Ei_phi: # check case IIIB
-                if self._case_III_collision(posid_B, posid_A, poslocTP_B, poslocTP_A[0]):
-                    return pc.case.IIIB
-                else:
-                    return pc.case.I
-            else: # check cases II and III
-                if self._case_III_collision(posid_A, posid_B, poslocTP_A, poslocTP_B[0]):
-                    return pc.case.IIIA
-                elif self._case_III_collision(posid_B, posid_A, poslocTP_B, poslocTP_A[0]):
-                    return pc.case.IIIB
-                elif self._case_II_collision(posid_A, posid_B, poslocTP_A, poslocTP_B):
-                    return pc.case.II
-                else:
-                    return pc.case.I
+        elif poslocTP_B[1] < self.Eo_phi and poslocTP_A[1] >= self.Ei_phi: # check case IIIB
+            if self._case_III_collision(posid_B, posid_A, poslocTP_B, poslocTP_A[0]):
+                return pc.case.IIIB
+            else:
+                return pc.case.I
+        else: # check cases II and III
+            if self._case_III_collision(posid_A, posid_B, poslocTP_A, poslocTP_B[0]):
+                return pc.case.IIIA
+            elif self._case_III_collision(posid_B, posid_A, poslocTP_B, poslocTP_A[0]):
+                return pc.case.IIIB
+            elif self._case_II_collision(posid_A, posid_B, poslocTP_A, poslocTP_B):
+                return pc.case.II
+            else:
+                return pc.case.I
 
     def spatial_collision_with_fixed(self, posid, poslocTP):
         """Searches for collisions in space between a fiber positioner and all
@@ -320,22 +274,14 @@ class PosCollider(object):
         The return is an enumeration of type "case", indicating what kind of collision
         was first detected, if any.
         """
+        cdef PosPoly poly1
+        cdef PosPoly poly2
         if self.fixed_neighbor_cases[posid]:
-            if self.collision_hashpf_exists:
-                loc_id = self.posmodels[posid].deviceloc
-                dx = abs(self.x0[posid] - self.posmodels[posid].expected_current_position['flatXY'][0])
-                dy = abs(self.y0[posid] - self.posmodels[posid].expected_current_position['flatYY'][1])
-                code = lookup.make_code_pf(loc_id, dx, dy, poslocTP[0], poslocTP[1])
-                if code in self.table_pf:
-                    return self.table_pf[code]
-
-            else:
-                poly1 = self.place_phi_arm(posid,poslocTP)
-                for fixed_case in self.fixed_neighbor_cases[posid]:
-                    poly2 = self.fixed_neighbor_keepouts[fixed_case]
-                    if poly1.collides_with(poly2):
-                        return fixed_case
-
+            poly1 = self.place_phi_arm(posid,poslocTP)
+            for fixed_case in self.fixed_neighbor_cases[posid]:
+                poly2 = self.fixed_neighbor_keepouts[fixed_case]
+                if poly1.collides_with(poly2):
+                    return fixed_case
         return pc.case.I
 
     def place_phi_arm(self, posid, poslocTP):
@@ -354,6 +300,7 @@ class PosCollider(object):
         """Rotates and translates the ferrule to position defined by the positioner's
         (x0,y0) and the argued poslocTP (theta,phi) angles.
         """
+        cdef PosPoly poly
         poly = self.ferrule_poly.translated(self.R2[posid], 0)
         poly = poly.rotated(poslocTP[1])
         poly = poly.translated(self.R1[posid],0)
@@ -363,12 +310,16 @@ class PosCollider(object):
 
     def _case_II_collision(self, posid1, posid2, tp1, tp2):
         """Search for case II collision, positioner 1 arm against positioner 2 arm."""
+        cdef PosPoly poly1
+        cdef PosPoly poly2
         poly1 = self.place_phi_arm(posid1, tp1)
         poly2 = self.place_phi_arm(posid2, tp2)
         return poly1.collides_with(poly2)
 
     def _case_III_collision(self, posid1, posid2, tp1, t2):
         """Search for case III collision, positioner 1 arm against positioner 2 central body."""
+        cdef PosPoly poly1
+        cdef PosPoly poly2
         poly1 = self.place_phi_arm(posid1, tp1)
         poly2 = self.place_central_body(posid2, t2)
         return poly1.collides_with(poly2)
@@ -487,10 +438,10 @@ class PosSweep(object):
     geometries through space.
     """
     def __init__(self, posid=None):
-        self.posid     = posid              # unique posid string of the positioner
-        self.time      = np.array([])       # time at which each TP position value occurs
-        self.tp        = np.array([[],[]])  # theta,phi angles as function of time (sign indicates direction)
-        self.tp_dot    = np.array([[],[]])  # theta,phi rotation speeds as function of time (sign indicates direction)
+        self.posid = posid                  # unique posid string of the positioner
+        self.time = []                      # time at which each TP position value occurs
+        self.tp = []                        # theta,phi angles as function of time (sign indicates direction)
+        self.was_moving_cached = []         # cached boolean values, corresponding to timesteps, as computed by "was_moving() method
         self.collision_case = pc.case.I     # enumeration of type "case", indicating what kind of collision first detected, if any
         self.collision_time = math.inf      # time at which collision occurs. if no collision, the time is inf
         self.collision_idx = None           # index in time and theta,phi lists at which collision occurs
@@ -506,7 +457,7 @@ class PosSweep(object):
         d = {'posid':               c.posid,
              'time':                c.time,
              'tp':                  c.tp,
-             'tp_dot':              c.tp_dot,
+             'was_moving':          c.was_moving_cached,
              'collision_case':      c.collision_case,
              'collision_time':      c.collision_time,
              'collision_idx':       c.collision_idx,
@@ -516,13 +467,13 @@ class PosSweep(object):
     
     def __repr__(self):
         d = self.as_dict()
-        d['time_start'] = d['time'][0]
-        d['time_final'] = d['time'][-1]
-        d['tp_start'] = [d['tp'][0,0], d['tp'][1,0]]
-        d['tp_final'] = [d['tp'][0,-1], d['tp'][1,-1]]
+        d['time_start'] = d['time'][0] if d['time'] else None
+        d['time_final'] = d['time'][-1] if d['time'] else None
+        d['tp_start'] = d['tp'][0] if d['tp'] else None
+        d['tp_final'] = d['tp'][-1] if d['tp'] else None
         del d['time']
         del d['tp']
-        del d['tp_dot']
+        del d['was_moving']
         return str(d)
 
     def __str__(self):
@@ -533,56 +484,45 @@ class PosSweep(object):
         are handled continuously and exactly (i.e. not yet quantized).
         """
         time = [start_time]
-        tp = [[init_poslocTP[0]],[init_poslocTP[1]]]
-        tp_dot = [[0],[0]]
-        for i in range(0,table['nrows']):
+        tp = [list(init_poslocTP)]
+        for i in range(table['nrows']):
             if table['prepause'][i]:
                 time.append(table['prepause'][i] + time[-1])
-                tp[0].append(tp[0][-1])
-                tp[1].append(tp[1][-1])
-                tp_dot[0].append(0)
-                tp_dot[1].append(0)
+                tp.append(tp[-1].copy())
             if table['move_time'][i]:
                 time.append(table['move_time'][i] + time[-1])
-                tp[0].append(table['dT'][i] + tp[0][-1])
-                tp[1].append(table['dP'][i] + tp[1][-1])
-                tp_dot[0].append(pc.sign(table['dT'][i]) * abs(table['Tdot'][i]))
-                tp_dot[1].append(pc.sign(table['dP'][i]) * abs(table['Pdot'][i]))
+                tp.append([table['dT'][i] + tp[-1][0],
+                           table['dP'][i] + tp[-1][1]])
             if table['postpause'][i]:
                 time.append(table['postpause'][i] + time[-1])
-                tp[0].append(tp[0][-1])
-                tp[1].append(tp[1][-1])
-                tp_dot[0].append(0)
-                tp_dot[1].append(0)
-        self.time = np.array(time)
-        self.tp = np.array(tp)
-        self.tp_dot = np.array(tp_dot)
-
+                tp.append(tp[-1].copy())
+        self.time = time
+        self.tp = tp
+        self.was_moving_cached = [self.was_moving(step) for step in range(len(self.time))]
+        
     def quantize(self, timestep):
         """Converts itself from exact, continuous time to quantized, discrete time.
         The result has approximate intermediate (theta,phi) positions and speeds,
         all as a function of discrete time. The quantization is according to the
         parameter 'timestep'.
         """
+        axes = [pc.T,pc.P]
         discrete_time = [self.time[0]]
-        discrete_position = np.array([[self.tp[pc.T,0]],[self.tp[pc.P,0]]])
-        speed = np.array([[self.tp_dot[pc.T,0]],[self.tp_dot[pc.P,0]]])
+        discrete_position = [self.tp[0].copy()]
         for i in range(1,len(self.time)):
-            this_discrete_time = np.arange(discrete_time[-1], self.time[i], timestep) + timestep # additional timestep shifts times such that they correspond to when steps are finished, rather than when they're started
-            this_discrete_position = [[],[]]
-            this_speed = [[],[]]
-            for ax in [pc.T,pc.P]:
-                discrete_step = self.tp_dot[ax,i] * timestep
-                this_discrete_position[ax] = discrete_position[ax,-1] + np.arange(1,len(this_discrete_time)+1)*discrete_step
-                if len(this_discrete_position[ax]>0):
-                     this_discrete_position[ax][-1] = self.tp[ax,i] # force the final step to end at the right place (thus slightly changing the effective speed of the final step)
-                this_speed[ax] = self.tp_dot[ax,i]*np.ones_like(this_discrete_time) # for book keeping
-            discrete_position = np.append(discrete_position, this_discrete_position, axis=1)
-            discrete_time = np.append(discrete_time, this_discrete_time)
-            speed = np.append(speed, this_speed, axis=1)
+            time_diff = self.time[i] - discrete_time[-1]
+            n_steps = int(time_diff / timestep)
+            distance_diffs = [self.tp[i][ax] - self.tp[i-1][ax] for ax in axes]
+            if n_steps == 0 and any(distance_diffs):
+                n_steps = 1
+            if n_steps:                
+                distance_steps = [distance_diffs[ax] / n_steps for ax in axes]
+                for j in range(n_steps):
+                    discrete_time.append(discrete_time[-1] + timestep)
+                    discrete_position.append([discrete_position[-1][ax] + distance_steps[ax] for ax in axes])
         self.time = discrete_time
         self.tp = discrete_position
-        self.tp_dot = speed
+        self.was_moving_cached = [self.was_moving(step) for step in range(len(self.time))]
 
     def extend(self, timestep, max_time):
         """Extends a sweep object to max_time to reflect the postpauses inserted into the move table
@@ -590,31 +530,12 @@ class PosSweep(object):
         is in sync with the move table so that the animator is reflecting true moves. """
 
         starttime_extension = self.time[-1] + timestep
-        time_extension = np.arange(starttime_extension, max_time + timestep, timestep)
-        extended_time = np.append(self.time, time_extension)
-
-        #starttime_extension = self.time[-1] + timestep
-        #endtime_extension = self.time[-1] + equalizing_pause
-        #time_extension = np.arange(starttime_extension, endtime_extension + timestep, timestep)
-        #extended_time = np.append(self.time, time_extension)
-
-        # tp extension are just the last tp entry repeated throughout the extended time
-        theta_extension = self.tp[0,-1]*np.ones(len(time_extension))
-        phi_extension = self.tp[1,-1]*np.ones(len(time_extension))
-        extended_theta = list(np.append(self.tp[0], theta_extension))
-        extended_phi = list(np.append(self.tp[1], phi_extension))
-        extended_tp = np.array([extended_theta, extended_phi])
-
-        # tp_dot extension are just zeros repeated throughout the extended time
-        tdot_extension = np.zeros(len(time_extension))
-        pdot_extension = np.zeros(len(time_extension))
-        extended_tdot = list(np.append(self.tp_dot[0], tdot_extension))
-        extended_pdot= list(np.append(self.tp_dot[1], pdot_extension))
-        extended_tp_dot = np.array([extended_tdot, extended_pdot])
-
-        self.time = extended_time
-        self.tp = extended_tp
-        self.tp_dot = extended_tp_dot
+        n_steps = int((max_time + timestep)/timestep)
+        time_extension = [starttime_extension + k * timestep for k in range(n_steps)]
+        self.time += time_extension
+        tp_extension = [self.tp[-1].copy() for k in range(n_steps)]
+        self.tp += tp_extension
+        self.was_moving_cached += [self.was_moving(step) for step in range(len(self.was_moving_cached),len(self.time))]
 
     def register_as_frozen(self):
         """Sets an indicator that the sweep has been frozen at the end."""
@@ -633,19 +554,23 @@ class PosSweep(object):
         """Returns boolean value whether the sweep has a "freezing" event."""
         return self.frozen_time < math.inf
 
-    def is_moving(self,step):
-        """Returns boolean value whether the sweep is moving at the argued timestep."""
-        if self.tp[0,step]*self.tp_dot[0,step] or self.tp[1,step]*self.tp_dot[1,step]:
-            return True
-        return False
+    def was_moving(self, step):
+        """Returns boolean value whether the sweep is moving in the most recent
+        timestep. 'Most recent' here means the period from (step-1) to step.
+        By definition, when step == 0 this function returns False."""
+        if step <= 0 or step >= len(self.tp):
+            return False
+        if self.tp[step][0] == self.tp[step-1][0] and self.tp[step][1] == self.tp[step-1][1]:
+            return False
+        return True
 
     def theta(self, step):
         """Returns theta position of the sweep at the specified timestep index."""
-        return self.tp[0,step]
+        return self.tp[step][0]
 
     def phi(self, step):
         """Returns phi position of the sweep at the specified timestep index."""
-        return self.tp[1,step]
+        return self.tp[step][1]
 
 from cpython.mem cimport PyMem_Malloc, PyMem_Free
 from libc.math cimport sin as c_sin
@@ -979,3 +904,18 @@ cpdef test():
     a = a.translated(x,y)
     b = polys[0].place_as_phi_arm(t,p,x,y,r1)
     return polys,bools, a, b
+
+cpdef test2():
+    t = {'nrows':5,
+              'dT':[10,-20,0,0,0],
+              'dP':[ 0,  0,-10,20,-10],
+              'Tdot':[10,10,1,10,20],
+              'Pdot':[5,5,5,5,5],
+              'prepause':[1,0,0,0,0],
+              'postpause':[0,0,0,0,1]}
+    t['move_time'] = [max(abs(t['dT'][i]/t['Tdot'][i]), abs(t['dP'][i]/t['Pdot'][i])) for i in range(t['nrows'])]
+    s = PosSweep('posid')
+    s.fill_exact([100,-100], t, start_time=10)
+    q = s.copy()
+    q.quantize(0.1)
+    return t, s, q

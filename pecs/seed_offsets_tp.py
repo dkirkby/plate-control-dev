@@ -6,22 +6,22 @@ import pandas as pd
 from pecs import PECS
 import posconstants as pc
 
-seed = PECS(fvc=None, ptls=None, interactive=True)
-print('Seeding offsetsTP...')
+seed = PECS(fvc=None, ptls=None, interactive=False)
+print(f'Seeding offsetsTP for PCIDs: {seed.pcids}')
 updates = []
-for posid in self.posids:
-    role = self.get_owning_ptl_role(posid)
+for posid in seed.posids:
+    role = seed.get_owning_ptl_role(posid)
     update = {'DEVICE_ID': posid,
               'MODE': 'seed_offsets_tp'}
-    update = self.ptlm.collect_calib(update, tag='OLD_',
+    update = seed.ptlm.collect_calib(update, tag='OLD_',
                                      participating_petals=role)[role]
-    self.ptlm.set_posfid_val(posid, 'OFFSET_T',
+    seed.ptlm.set_posfid_val(posid, 'OFFSET_T',
                              pc.nominals['OFFSET_T']['value'],
                              participating_petals=role)
-    self.ptlm.set_posfid_val(posid, 'OFFSET_P',
+    seed.ptlm.set_posfid_val(posid, 'OFFSET_P',
                              pc.nominals['OFFSET_P']['value'],
                              participating_petals=role)
-    update = self.ptlm.collect_calib(update, tag='',
+    update = seed.ptlm.collect_calib(update, tag='',
                                      participating_petals=role)[role]
     updates.append(update)
 seed.ptlm.commit(mode='calib', log_note='seed_offsets_tp')

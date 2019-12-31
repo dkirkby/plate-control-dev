@@ -78,17 +78,6 @@ class XYTest(PECS):
         self.logger.debug(f'Test targets:\n{self.data.targets_pos}')
         self.data.initialise_movedata(self.data.posids, self.data.ntargets)
 
-    def _pcid2role(self, pcid):
-        return f'PETAL{pcid}'
-
-    def _lookup_pcrole(self, posid):
-        for pcid, posids in self.data.posids_pc.items():
-            if posid in posids:
-                return self._pcid2role(pcid)
-            else:
-                pass
-        return None  # nothing matches
-
     def _get_pos_info(self):
         '''get enabled positioners, according to given posids or busids
         also load pos calibration values for each positioner
@@ -299,7 +288,7 @@ class XYTest(PECS):
             movetype, cmd = 'blind', 'poslocXY'
             for posid in posids:  # write targets to move df
                 # No need to ask all petals to transform one pos
-                role = self._lookup_pcrole(posid)
+                role = self.ptl_role_lookup(posid)
                 if posid not in self.data.targets_pos.keys():
                     continue
                 tgt = self.data.targets_pos[posid][i, :]  # two elements
@@ -350,8 +339,8 @@ class XYTest(PECS):
             self.loggers[pcid].info(f'Moving positioners...')
         self.ptlm.prepare_move(req, anticollision=self.data.anticollision)
         # Execute move returns dict of all individual execute move calls
-        expected_QS = self.ptlm.execute_move(reset_flags=False,
-                                             return_coord='QS', control={'timeout':120.0})
+        expected_QS = self.ptlm.execute_move(
+            reset_flags=False, return_coord='QS', control={'timeout': 120})
         for pcid in self.data.pcids:
             self.loggers[pcid].debug(
                 'execute_move() returns expected QS:\n'
@@ -432,12 +421,12 @@ class XYTest(PECS):
 
     def record_measurement(self, measured_QS, i, n):
         for posid in measured_QS.index:
-            if self._lookup_pcrole(posid) is None:  # keep only selected posids
+            if self.ptl_role_lookup(posid) is None:  # only selected posids
                 measured_QS.drop(posid, inplace=True)
         QS = measured_QS[['Q', 'S']].values.T  # 2 x N array
         poslocXY = np.zeros(QS.shape)  # empty array
         for j, posid in enumerate(measured_QS.index):
-            role = self._lookup_pcrole(posid)
+            role = self.ptl_role_lookup(posid)
             poslocXY[:, j] = self.ptlm.postrans(
                 posid, 'QS_to_poslocXY', QS[:, j], participating_petals=role)
         new = pd.DataFrame({f'meas_q_{n}': QS[0, :],
