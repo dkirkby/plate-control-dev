@@ -196,12 +196,13 @@ class PosSchedule(object):
         """
         if self.stats:
             timer_start = time.clock()
+            self.stats.set_scheduling_method(str(anticollision))
+            original_request_posids = set(self.requests.keys())
+            max_net_time = 0
         if not self.requests and not self.stages['expert'].is_not_empty():
             if self.verbose:
                 self.printfunc('No requests nor existing move tables found. No move scheduling performed.')
             return
-        if self.stats:
-            self.stats.set_scheduling_method(str(anticollision))
         if self.stages['expert'].is_not_empty():
             self._schedule_expert_tables(anticollision)
         else:
@@ -238,38 +239,24 @@ class PosSchedule(object):
                 table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
                 log_note_addendum = req['log_note'] # keep the original log notes with move tables
                 if self.stats:
-                    if self._table_matches_original_request(table,req):
+                    table_for_schedule = table.for_schedule()
+                    if posid in original_request_posids and self._table_matches_request(table_for_schedule,req):
                         self.stats.add_table_matching_request()
+                    max_net_time = max(table_for_schedule['net_time'][-1], max_net_time)
             else:
                 self.printfunc('Error: ' + str(posid) + ' has a move table despite no request.')
                 table.display()
             table.log_note += (' ' if table.log_note else '') + log_note_addendum
+        if self.stats:
+            self.stats.set_num_move_tables(len(self.move_tables))
+            self.stats.set_max_table_time(max_net_time)
+            self.stats.add_scheduling_time(time.clock() - timer_start)
         if self.petal.animator_on:
             for name in self.stage_order:
                 stage = self.stages[name]
                 if stage.is_not_empty():
                     self.collider.add_mobile_to_animator(self.petal.animator_total_time, stage.sweeps)
                     self.petal.animator_total_time += max({sweep.time[-1] for sweep in stage.sweeps.values()})
-        if self.stats:
-            self.stats.add_scheduling_time(time.clock() - timer_start)
-            self.stats.set_num_move_tables(len(self.move_tables))
-            net_times = {table.for_schedule()['net_time'][-1] for table in self.move_tables.values()}
-            self.stats.set_max_table_time(max(net_times))
-            stage_start_time = 0
-            num_moving = {} # key is time, value is number of positioners moving at that time
-            for name in self.stage_order:
-                stage = self.stages[name]
-                if stage.is_not_empty():
-                    if stage.sweeps:
-                        for sweep in stage.sweeps.values():
-                            for i in range(len(sweep.time)):
-                                this_time = sweep.time[i] + stage_start_time
-                                if this_time not in num_moving:
-                                    num_moving[this_time] = 0
-                                if sweep.is_moving(i):
-                                    num_moving[this_time] += 1
-                        stage_start_time = max(num_moving.keys())
-            self.stats.add_num_moving_data(num_moving)
 
     def _table_matches_quantized_sweep(self, move_table, sweep):
         """Takes as input a "for_schedule()" move table and a quantized sweep,
@@ -286,14 +273,13 @@ class PosSchedule(object):
             return False
         return True
     
-    def _table_matches_original_request(self, move_table, request):
-        """Input a move table and check whether the total motion matches request.
-        Returns a boolean.
+    def _table_matches_request(self, table_for_schedule, request):
+        """Input a move table (for_schedule format) and check whether the total
+        motion matches request. Returns a boolean.
         """
         tol = pc.schedule_checking_numeric_angular_tol
-        table = move_table.for_schedule()
         dtdp_request = [request['targt_posintTP'][i] - request['start_posintTP'][i] for i in range(2)]
-        dtdp_table = [table['net_dT'][-1], table['net_dP'][-1]]
+        dtdp_table = [table_for_schedule['net_dT'][-1], table_for_schedule['net_dP'][-1]]
         diff = [dtdp_request[i] - dtdp_table[i] for i in range(2)]
         diff_abs = [abs(x) for x in diff]
         for i in range(len(diff_abs)):
