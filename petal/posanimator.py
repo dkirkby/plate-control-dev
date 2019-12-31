@@ -166,6 +166,8 @@ class PosAnimator(object):
         for item in self.items.values():
             temp = np.append(temp, item['time'])
         self.all_times = np.unique(temp)
+        if len(self.all_times) == 0:
+            return False
         self.finish_time = max(self.all_times)
         self.patches = []
         xmin = np.inf
@@ -188,6 +190,7 @@ class PosAnimator(object):
         plt.xlim(xmin=xmin,xmax=xmax)
         plt.ylim(ymin=ymin,ymax=ymax)
         plt.axis('equal')
+        return True
 
     def anim_frame_update(self, frame):
         """Sequentially update the animation to the next frame.
@@ -198,7 +201,10 @@ class PosAnimator(object):
                 self.set_patch(self.patches[i], item, frame)
 
     def animate(self):
-        self.anim_init()
+        successful = self.anim_init()
+        if not successful:
+            print('Animator not initialized. Usually due to no frames available to animate.')
+            return
         plt.ion()
         frame_number = 1
         stdout_message_period = 50 # number of frames per update message
