@@ -251,6 +251,9 @@ class PosSchedule(object):
                 collision_pairs = {}
             if self.stats:
                 self.stats.add_redundant_collision_check(collision_pairs)
+                colliding_posids = set(colliding_sweeps.keys())
+                colliding_tables = {p:self.move_tables[p] for p in colliding_posids}
+                self.stats.add_unresolved_colliding_at_stage('combined',colliding_posids,colliding_tables,colliding_sweeps)
         if self.stats:
             self.stats.set_num_move_tables(len(self.move_tables))
             self.stats.set_max_table_time(max_net_time)
