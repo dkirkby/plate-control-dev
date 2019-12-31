@@ -5,7 +5,7 @@ import math
 import numpy
 
 # separated out here because so long
-redundant_checks_str = 'num collisions found by redundant final check (should be zero, or None if no check done)'
+final_checks_str = 'num collisions found by final check (should be zero, or None if no check done)'
 found_not_registered_str = 'found but not directly resolved (useful for debugging, not necessarily empty -- some collisions may be indirectly resolved)'
 
 class PosSchedStats(object):
@@ -17,7 +17,7 @@ class PosSchedStats(object):
         self.unresolved = {}
         self.unresolved_tables = {}
         self.unresolved_sweeps = {}
-        self.redundantly_checked_collision_pairs = {}
+        self.final_checked_collision_pairs = {}
         self.strings = {'method':[]}
         self.blank_str = '-'
         self.numbers = {'n pos':[],
@@ -25,7 +25,7 @@ class PosSchedStats(object):
                         'n requests accepted':[],
                         'n move tables':[],
                         'n tables achieving requested-and-accepted targets':[],
-                        redundant_checks_str:[],
+                        final_checks_str:[],
                         'max table move time':[],
                         'num path adjustment iters':[],
                         'request_target calc time':[],
@@ -50,11 +50,11 @@ class PosSchedStats(object):
         self.unresolved[self.latest] = {}
         self.unresolved_tables[self.latest] = {}
         self.unresolved_sweeps[self.latest] = {}
-        self.redundantly_checked_collision_pairs[self.latest] = {}
+        self.final_checked_collision_pairs[self.latest] = {}
         for key in self.strings:
             self.strings[key].append(self.blank_str)
         for key in self.numbers:
-            val = None if key == redundant_checks_str else 0
+            val = None if key == final_checks_str else 0
             self.numbers[key].append(val)
         self.numbers['n pos'][-1] = num_pos
         self.real_data_yet_in_latest_row = False
@@ -129,18 +129,17 @@ class PosSchedStats(object):
         """Add data recording number of iterations of path adjustment were made."""
         self.numbers['num path adjustment iters'][-1] += iterations
         
-    def add_redundant_collision_check(self, collision_pairs):
+    def add_final_collision_check(self, collision_pairs):
         """Add data recording if there were still any bots colliding after a
-        redundant check."""
-        # currently ignoring stage_name, seems overly elaborate to check separately
-        if self.numbers[redundant_checks_str][-1] == None:
-            self.numbers[redundant_checks_str][-1] = 0
-        self.numbers[redundant_checks_str][-1] += len(collision_pairs)
-        self.redundantly_checked_collision_pairs[self.latest] = collision_pairs
+        final check."""
+        if self.numbers[final_checks_str][-1] == None:
+            self.numbers[final_checks_str][-1] = 0
+        self.numbers[final_checks_str][-1] += len(collision_pairs)
+        self.final_checked_collision_pairs[self.latest] = collision_pairs
     
     def add_unresolved_colliding_at_stage(self, stage_name, colliding_set, colliding_tables, colliding_sweeps):
         """Add data recording ids of any bots colliding in a given stage. This
-        is distinct from "redundant" check data."""
+        is distinct from "final" check data."""
         if stage_name not in self.unresolved[self.latest]:
             self.unresolved[self.latest][stage_name] = set()
             self.unresolved_tables[self.latest][stage_name] = {}
@@ -177,12 +176,12 @@ class PosSchedStats(object):
     
     def summarize_unresolved_colliding(self):
         """Returns a summary dictionary of the unresolved colliding items."""
-        summary = {'unresolved colliding':[], 'unresolved colliding tables':[], 'unresolved colliding sweeps':[], 'redundant check collision pairs found':[]}
+        summary = {'unresolved colliding':[], 'unresolved colliding tables':[], 'unresolved colliding sweeps':[], 'final check collision pairs found':[]}
         for sched in self.schedule_ids:
             summary['unresolved colliding'].append(self.unresolved[sched])
             summary['unresolved colliding tables'].append(self.unresolved_tables[sched])
             summary['unresolved colliding sweeps'].append(self.unresolved_sweeps[sched])
-            summary['redundant check collision pairs found'].append(self.redundantly_checked_collision_pairs[sched])
+            summary['final check collision pairs found'].append(self.final_checked_collision_pairs[sched])
         return summary
         
     def summarize_all(self):
