@@ -160,8 +160,6 @@ class PosCollider(object):
             'nrows'     : number of rows in the lists below (all must be the same length)
             'dT'        : list of theta rotation distances in degrees
             'dP'        : list of phi rotation distances in degrees
-            'Tdot'      : list of theta rotation speeds in deg/sec
-            'Pdot'      : list of phi rotation speeds in deg/sec
             'prepause'  : list of prepause (before the rotations begin) values in seconds
             'move_time' : list of durations of rotations in seconds, approximately equals max(dT/Tdot,dP/Pdot), but calculated more exactly for the physical hardware
             'postpause' : list of postpause (after the rotations end) values in seconds
@@ -192,7 +190,7 @@ class PosCollider(object):
         while any(steps_remaining):
             check_collision_this_loop = False
             for i in pos_range:
-                if any(sweeps[i].tp_dot[step[i]]) or step[i] == 0:
+                if sweeps[i].was_moving_cached[step[i]]:
                     check_collision_this_loop = True
             if check_collision_this_loop:
                 if pospos:
@@ -431,10 +429,10 @@ class PosSweep(object):
     geometries through space.
     """
     def __init__(self, posid=None):
-        self.posid     = posid              # unique posid string of the positioner
-        self.time      = []                 # time at which each TP position value occurs
-        self.tp        = []                 # theta,phi angles as function of time (sign indicates direction)
-        self.tp_dot    = []                 # theta,phi rotation speeds as function of time (sign indicates direction)
+        self.posid = posid                  # unique posid string of the positioner
+        self.time = []                      # time at which each TP position value occurs
+        self.tp = []                        # theta,phi angles as function of time (sign indicates direction)
+        self.was_moving_cached = []         # cached boolean values, corresponding to timesteps, as computed by "was_moving() method
         self.collision_case = pc.case.I     # enumeration of type "case", indicating what kind of collision first detected, if any
         self.collision_time = math.inf      # time at which collision occurs. if no collision, the time is inf
         self.collision_idx = None           # index in time and theta,phi lists at which collision occurs
@@ -450,7 +448,7 @@ class PosSweep(object):
         d = {'posid':               c.posid,
              'time':                c.time,
              'tp':                  c.tp,
-             'tp_dot':              c.tp_dot,
+             'was_moving':          c.was_moving_cached,
              'collision_case':      c.collision_case,
              'collision_time':      c.collision_time,
              'collision_idx':       c.collision_idx,
@@ -460,13 +458,13 @@ class PosSweep(object):
     
     def __repr__(self):
         d = self.as_dict()
-        d['time_start'] = d['time'][0]
-        d['time_final'] = d['time'][-1]
-        d['tp_start'] = d['tp'][0]
-        d['tp_final'] = d['tp'][-1]
+        d['time_start'] = d['time'][0] if d['time'] else None
+        d['time_final'] = d['time'][-1] if d['time'] else None
+        d['tp_start'] = d['tp'][0] if d['tp'] else None
+        d['tp_final'] = d['tp'][-1] if d['tp'] else None
         del d['time']
         del d['tp']
-        del d['tp_dot']
+        del d['was_moving']
         return str(d)
 
     def __str__(self):
@@ -478,27 +476,20 @@ class PosSweep(object):
         """
         time = [start_time]
         tp = [list(init_poslocTP)]
-        tp_dot = [[table['Tdot'][0],table['Pdot'][0]]]
         for i in range(table['nrows']):
             if table['prepause'][i]:
                 time.append(table['prepause'][i] + time[-1])
                 tp.append(tp[-1].copy())
-                if len(tp_dot) == 1:
-                    tp_dot[0] = [0,0]
-                tp_dot.append([0,0])
             if table['move_time'][i]:
                 time.append(table['move_time'][i] + time[-1])
                 tp.append([table['dT'][i] + tp[-1][0],
                            table['dP'][i] + tp[-1][1]])
-                tp_dot.append([pc.sign(table['dT'][i]) * abs(table['Tdot'][i]),
-                               pc.sign(table['dP'][i]) * abs(table['Pdot'][i])])
             if table['postpause'][i]:
                 time.append(table['postpause'][i] + time[-1])
                 tp.append(tp[-1].copy())
-                tp_dot.append([0,0])
         self.time = time
         self.tp = tp
-        self.tp_dot = tp_dot
+        self.was_moving_cached = [self.was_moving(step) for step in range(len(self.time))]
         
     def quantize(self, timestep):
         """Converts itself from exact, continuous time to quantized, discrete time.
@@ -506,23 +497,23 @@ class PosSweep(object):
         all as a function of discrete time. The quantization is according to the
         parameter 'timestep'.
         """
+        axes = [pc.T,pc.P]
         discrete_time = [self.time[0]]
         discrete_position = [self.tp[0].copy()]
-        speed = [self.tp_dot[0].copy()]
         for i in range(1,len(self.time)):
             time_diff = self.time[i] - discrete_time[-1]
             n_steps = int(time_diff / timestep)
-            for j in range(n_steps):
-                discrete_time.append(discrete_time[-1] + timestep)
-                discrete_position.append([discrete_position[-1][ax] + self.tp_dot[i][ax] * timestep for ax in [0,1]])
-                speed.append(self.tp_dot[i].copy()) # for book keeping
-            if len(discrete_position) > 1:
-                discrete_position[-1] = self.tp[i].copy() # force the final step to end at the right place (thus slightly changing the effective speed of the final step)
-            if len(speed) > 1:
-                speed[-1] = [(discrete_position[-1][ax] - discrete_position[-2][ax]) / timestep for ax in [0,1]] # similarly, force the final one to correctly match the altered step size
+            distance_diffs = [self.tp[i][ax] - self.tp[i-1][ax] for ax in axes]
+            if n_steps == 0 and any(distance_diffs):
+                n_steps = 1
+            if n_steps:                
+                distance_steps = [distance_diffs[ax] / n_steps for ax in axes]
+                for j in range(n_steps):
+                    discrete_time.append(discrete_time[-1] + timestep)
+                    discrete_position.append([discrete_position[-1][ax] + distance_steps[ax] for ax in axes])
         self.time = discrete_time
         self.tp = discrete_position
-        self.tp_dot = speed
+        self.was_moving_cached = [self.was_moving(step) for step in range(len(self.time))]
 
     def extend(self, timestep, max_time):
         """Extends a sweep object to max_time to reflect the postpauses inserted into the move table
@@ -533,13 +524,9 @@ class PosSweep(object):
         n_steps = int((max_time + timestep)/timestep)
         time_extension = [starttime_extension + k * timestep for k in range(n_steps)]
         self.time += time_extension
-
-        # tp extension are just the last tp entry repeated throughout the extended time
-        # tp_dot extension are just zeros repeated throughout the extended time
         tp_extension = [self.tp[-1].copy() for k in range(n_steps)]
-        tp_dot_extension = [[0,0] for k in range(n_steps)]
         self.tp += tp_extension
-        self.tp_dot += tp_dot_extension
+        self.was_moving_cached += [self.was_moving(step) for step in range(len(self.was_moving_cached),len(self.time))]
 
     def register_as_frozen(self):
         """Sets an indicator that the sweep has been frozen at the end."""
@@ -558,11 +545,15 @@ class PosSweep(object):
         """Returns boolean value whether the sweep has a "freezing" event."""
         return self.frozen_time < math.inf
 
-    def is_moving(self,step):
-        """Returns boolean value whether the sweep is moving at the argued timestep."""
-        if self.tp[step][0]*self.tp_dot[step][0] or self.tp[step][1]*self.tp_dot[step][1]:
-            return True
-        return False
+    def was_moving(self, step):
+        """Returns boolean value whether the sweep is moving in the most recent
+        timestep. 'Most recent' here means the period from (step-1) to step.
+        By definition, when step == 0 this function returns False."""
+        if step <= 0 or step >= len(self.tp):
+            return False
+        if self.tp[step][0] == self.tp[step-1][0] and self.tp[step][1] == self.tp[step-1][1]:
+            return False
+        return True
 
     def theta(self, step):
         """Returns theta position of the sweep at the specified timestep index."""
