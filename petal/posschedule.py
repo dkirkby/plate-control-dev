@@ -259,14 +259,20 @@ class PosSchedule(object):
             self.stats.set_max_table_time(max_net_time)
             self.stats.add_scheduling_time(time.clock() - timer_start)
         if self.petal.animator_on:
-            sweeps_to_add = colliding_sweeps if self.collider.animate_colliding_only else all_sweeps
+            if self.collider.animate_colliding_only:
+                sweeps_to_add = colliding_sweeps
+                for posid in colliding_sweeps:
+                    neighbor_sweeps = {n:all_sweeps[n] for n in self.collider.pos_neighbors[posid]}
+                    sweeps_to_add.update(neighbor_sweeps)
+            else:
+                sweeps_to_add = all_sweeps
             if sweeps_to_add:
                 self.collider.add_mobile_to_animator(self.petal.animator_total_time, sweeps_to_add)
                 for posid in sweeps_to_add:
                     self.collider.add_posid_label(posid)
                 self.petal.animator_total_time += max({sweep.time[-1] for sweep in sweeps_to_add.values()})
                 if self.collider.animate_colliding_only:
-                    self.printfunc('Added ' + str(len(sweeps_to_add)) + ' colliding sweeps to the animator.')
+                    self.printfunc('Added ' + str(len(colliding_sweeps)) + ' colliding sweeps (and their neighbors) to the animator.')
 
     def _table_matches_quantized_sweep(self, move_table, sweep):
         """Takes as input a "for_schedule()" move table and a quantized sweep,
