@@ -17,8 +17,8 @@ device_loc_ids = 'all' # make the selection here
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 pos_param_sequence_id = 'one real petal'
-move_request_sequence_id = '04000-04049' #'04000-04999' #'04108-04110'
-stats_filename_suffix = str(move_request_sequence_id) + '_AnimateColliding'
+move_request_sequence_id = '04000-04001' #'04000-04999' #'04108-04110'
+stats_filename_suffix = str(move_request_sequence_id) + ''
 
 # Other ids
 fidids = {}
@@ -27,7 +27,7 @@ petal_id = 666
 # Other options
 should_animate = True
 anim_label_size = 'medium' # size in points, 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
-animation_foci = 'colliding' # argue {} or 'all' to animate everything. 'colliding' to only animate colliding bots. otherwise, this set limits which robots (plus their surrounding neighbors) get animated. Can include 'GFA' or 'PTL' as desired
+animation_foci = 'all'#'colliding' # argue {} or 'all' to animate everything. 'colliding' to only animate colliding bots. otherwise, this set limits which robots (plus their surrounding neighbors) get animated. Can include 'GFA' or 'PTL' as desired
 n_corrections = 0 # number of correction moves to simulate after each target
 max_correction_move = 0.050/1.414 # mm
 should_profile = False
@@ -57,7 +57,6 @@ for pos_params in pos_param_sequence:
                       local_log_on    = False,
                       collider_file   = None,
                       sched_stats_on  = True, # remember to turn off for performance timing
-                      extra_check_on  = True, # remember to turn off for performance timing
                       anticollision   = 'adjust')
     ptl.limit_radius = None
     if ptl.schedule_stats:
