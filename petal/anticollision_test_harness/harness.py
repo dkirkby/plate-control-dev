@@ -17,18 +17,18 @@ device_loc_ids = 'all' # make the selection here
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 pos_param_sequence_id = 'one real petal'
-move_request_sequence_id = '04000-04099' #'04000-04999' #'04108-04110'
-stats_filename_suffix = str(move_request_sequence_id) + ''
+move_request_sequence_id = '04000-04049' #'04000-04999' #'04108-04110'
+stats_filename_suffix = str(move_request_sequence_id) + '_AnimateColliding'
 
 # Other ids
 fidids = {}
 petal_id = 666
 
 # Other options
-should_animate = False
+should_animate = True
 anim_label_size = 'medium' # size in points, 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
-animation_foci = {} # argue {} or 'all' to animate everything. otherwise, this set limits which robots (plus their surrounding neighbors) get animated. Can include 'GFA' or 'PTL' as desired
-n_corrections = 1 # number of correction moves to simulate after each target
+animation_foci = 'colliding' # argue {} or 'all' to animate everything. 'colliding' to only animate colliding bots. otherwise, this set limits which robots (plus their surrounding neighbors) get animated. Can include 'GFA' or 'PTL' as desired
+n_corrections = 0 # number of correction moves to simulate after each target
 max_correction_move = 0.050/1.414 # mm
 should_profile = False
 
@@ -63,7 +63,10 @@ for pos_params in pos_param_sequence:
     if ptl.schedule_stats:
         ptl.schedule_stats.filename_suffix = stats_filename_suffix
     if should_animate:
-        if animation_foci != 'all' and  len(animation_foci) > 0:
+        if animation_foci == 'colliding':
+            ptl.collider.animate_colliding_only = True
+            ptl.animator.label_size = anim_label_size
+        elif animation_foci != 'all' and len(animation_foci) > 0:
             posids_to_animate = set()
             fixed_items_to_animate = set()
             for identifier in animation_foci:
