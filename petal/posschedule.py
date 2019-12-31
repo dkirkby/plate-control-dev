@@ -211,12 +211,6 @@ class PosSchedule(object):
                 self._schedule_requests_with_path_adjustments() # there is only one possible anticollision method for this scheduling method
             else:
                 self._schedule_requests_with_no_path_adjustments(anticollision)
-        if self.redundant_collision_checking:
-            for name in self.stage_order:
-                colliding_sweeps, all_sweeps = self.stages[name].find_collisions(self.stages[name].move_tables)
-                self.printfunc('stage: ' + format(name.upper(),'>7s') + ', final check --> num colliding sweeps = ' + str(len(colliding_sweeps)) + ' (should always be zero)')
-                if self.stats:
-                    self.stats.add_redundant_collision_check(name,len(colliding_sweeps))
         for name in self.stage_order:
             if self.stages[name].is_not_empty() and self.verbose:
                 self.printfunc('equalizing, comparing table for ' + name)
@@ -247,16 +241,23 @@ class PosSchedule(object):
                 self.printfunc('Error: ' + str(posid) + ' has a move table despite no request.')
                 table.display()
             table.log_note += (' ' if table.log_note else '') + log_note_addendum
+        if self.redundant_collision_checking or self.petal.animator_on:
+            colliding_sweeps, all_sweeps = self.stages['expert'].find_collisions(self.move_tables) # choice of stage instance doesn't matter
+            self.printfunc('Final collision check --> num colliding sweeps = ' + str(len(colliding_sweeps)) + ' (should always be zero)')
+            if colliding_sweeps:
+                collision_pairs = {self.stages['expert']._collision_id(posid,colliding_sweeps[posid].collision_neighbor) for posid in colliding_sweeps}
+                self.printfunc('Collision pairs: ' + str(collision_pairs))
+            else:
+                collision_pairs = {}
+            if self.stats:
+                self.stats.add_redundant_collision_check(collision_pairs)
         if self.stats:
             self.stats.set_num_move_tables(len(self.move_tables))
             self.stats.set_max_table_time(max_net_time)
             self.stats.add_scheduling_time(time.clock() - timer_start)
         if self.petal.animator_on:
-            for name in self.stage_order:
-                stage = self.stages[name]
-                if stage.is_not_empty():
-                    self.collider.add_mobile_to_animator(self.petal.animator_total_time, stage.sweeps)
-                    self.petal.animator_total_time += max({sweep.time[-1] for sweep in stage.sweeps.values()})
+            self.collider.add_mobile_to_animator(self.petal.animator_total_time, all_sweeps)
+            self.petal.animator_total_time += max({sweep.time[-1] for sweep in all_sweeps.values()})
 
     def _table_matches_quantized_sweep(self, move_table, sweep):
         """Takes as input a "for_schedule()" move table and a quantized sweep,
