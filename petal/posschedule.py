@@ -222,7 +222,7 @@ class PosSchedule(object):
                         final.move_tables[posid].extend(table)
         if anticollision != None:
             colliding_sweeps, all_sweeps = final.find_collisions(final.move_tables)
-            self.printfunc('Penultimate collision check --> num colliding sweeps = ' + str(len(colliding_sweeps)) + ' (should always be zero)')
+            self.printfunc('Penultimate collision check --> num colliding sweeps = ' + str(len(colliding_sweeps)))
             final.store_collision_finding_results(colliding_sweeps, all_sweeps)
             if colliding_sweeps:
                 collision_pairs = {stage._collision_id(posid,colliding_sweeps[posid].collision_neighbor) for posid in colliding_sweeps}
