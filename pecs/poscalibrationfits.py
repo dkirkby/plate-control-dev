@@ -184,8 +184,8 @@ class PosCalibrationFits:
 
             def fit_arc(arc):  # arc is 'T' or 'P', define a func to exit loop
                 posmeaarc = (data.loc[idx[arc, :, posid],
-                                       ['mea_flatX', 'mea_flatY']]
-                          .droplevel(['axis', 'DEVICE_ID'], axis=0))
+                                      ['mea_flatX', 'mea_flatY']]
+                             .droplevel(['axis', 'DEVICE_ID'], axis=0))
                 # select valid (non-null) measurement data points only for fit
                 # reduced to tables of length L and M
                 posmea[arc] = posmeaarc[~posmeaarc.isnull().any(axis=1)]
@@ -352,9 +352,9 @@ class PosCalibrationFits:
             #                 res.x[i]))
             poscal = {key: result.x[i] for i, key in enumerate(keys_fit)}
             tgtXY = target_xy(result.x)
-            data.loc[idx[mask, posid], ['tgt_flatX', 'tgt_flatY']] = tgtXY 
-            data.loc[idx[mask, posid], ['tgt_Q', 'tgt_S']] = trans.flatXY_to_QS(
-                tgtXY.T).T
+            data.loc[idx[mask, posid], ['tgt_flatX', 'tgt_flatY']] = tgtXY
+            data.loc[idx[mask, posid],
+                     ['tgt_Q', 'tgt_S']] = trans.flatXY_to_QS(tgtXY.T).T
             trans.alt_override = False  # turn it back off when finished
             for c in ['flatX', 'flatY', 'Q', 'S']:  # calculate errors
                 data[f'err_{c}'] = data[f'mea_{c}'] - data[f'tgt_{c}']

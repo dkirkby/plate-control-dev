@@ -553,9 +553,9 @@ class XYTestData(FPTestData):
             errXY = moves[f'err_xy_{n}'] * 1000  # convert mm to microns
             for i in range(len(tgtX)):
                 ax.annotate(f'{i+1}', xy=(tgtX[i]-0.2, tgtY[i]), color='C3',
-                            size=6, horizontalalignment='right')
+                            size=6, ha='right')
                 ax.annotate(f'{i+1}', xy=(meaX[i]+0.2, meaY[i]), color='k',
-                            size=6, horizontalalignment='left')
+                            size=6, ha='left')
             u = r'$\mathrm{\mu m}$'
             text = (f'SUBMOVE: {n}\n'  # text box for submove errors
                     f'error max: {np.max(errXY):6.1f} {u}\n'
@@ -563,8 +563,7 @@ class XYTestData(FPTestData):
                     f'      avg: {np.mean(errXY):6.1f} {u}\n'
                     f'      min: {np.min(errXY):6.1f} {u}')
             ax.text(0.02, 0.98, text, transform=ax.transAxes,
-                    horizontalalignment='left', verticalalignment='top',
-                    family='monospace', fontsize=10,
+                    family='monospace', fontsize=10, ha='left', va='top',
                     bbox={'boxstyle': 'round', 'alpha': 0.8,
                           'facecolor': 'white', 'edgecolor': 'lightgrey'})
             ax.grid(linestyle='--')
@@ -824,92 +823,116 @@ class CalibrationData(FPTestData):
 
     def make_arc_plot(self, posid):
         posmov = self.movedf.xs(posid, level='DEVICE_ID')
-        poscal = self.calibdf.loc[posid]
+        poscal = self.calibdf.loc[posid, 'FIT']
+        pcid = posmov['PETAL_LOC'].values[0]
         fig = plt.figure(figsize=(14, 8))
-        for plot_row, axis_name in enumerate(['THETA', 'PHI']):
-            axis = axis_name[0]  # 'T' or 'P'
-            other_axis_name = 'THETA' if axis == 'P' else 'PHI'
-            other_axis = other_axis_name[0]
+        for plot_row, axis in enumerate(['T', 'P']):
+            other_axis = 'P' if axis == 'T' else 'T'
+            axis_name = r'\theta' if axis == 'T' else r'\varphi'
+            other_axis_name = r'\varphi' if axis == 'T' else r'\theta'
             tgt = posmov.xs(axis, level='axis')[f'tgt_posint{axis}']
             mea = posmov.xs(axis, level='axis')[f'mea_posint{axis}']
-            other_tgt = posmov.xs(axis,
-                                  level='axis')[f'tgt_posint{other_axis}']
-            rad = poscal[('FIT', f'radius_{axis}')].mean()
-            ctr = poscal[('FIT', f'centre_{axis}')]
+            other_tgt = posmov.xs(
+                axis, level='axis')[f'tgt_posint{other_axis}'].median()
+            rad = poscal[f'radius_{axis}'].mean()
+            ctr = poscal[f'centre_{axis}']
             mea_xy = (posmov.xs(axis, level='axis')
                       [['mea_flatX', 'mea_flatY']].values)
-            plt.subplot(2, 3, plot_row + 1)  # cicle/arc plot in xy space
-            ang_i = np.degrees(np.arctan2(  # initial angle
+            # column 1: cicle/arc plot in xy space
+            ax = plt.subplot(2, 3, plot_row * 3 + 1)
+            ang_i = np.degrees(np.arctan2(  # initial measured angle in deg
                 mea_xy[0, 1] - ctr[1], mea_xy[0, 0] - ctr[0]))
-            ang_f = ang_i + mea.diff().sum()  # final angle
+            ang_f = ang_i + mea.diff().sum()  # final measured angle in deg
             if ang_i > ang_f:
                 ang_f += 360
             ref_arc_ang = np.radians(np.append(  # 5 deg step
                 np.arange(ang_i, ang_f, 5), ang_f))  # last point at final
-            arc_x = rad * np.cos(ref_arc_ang) + ctr[0]
-            arc_y = rad * np.sin(ref_arc_ang) + ctr[1]
-            axis_zero_angle = arc_start - tgt[0] # where global observer would nominally see the axis's local zero point in this plot
-            axis_zero_line_x = [center[0], radius * np.cos(axis_zero_angle*np.pi/180) + center[0]]
-            axis_zero_line_y = [center[1], radius * np.sin(axis_zero_angle*np.pi/180) + center[1]]
-            plt.plot(arc_x,arc_y,'b-')
-            plt.plot(measured_xy[:,0], measured_xy[:,1], 'ko')
-            plt.plot(measured_xy[0,0], measured_xy[0,1], 'ro')
-            plt.plot(center[0],center[1],'k+')
-            plt.plot(axis_zero_line_x,axis_zero_line_y,'k--')
-            zero_text_angle = np.mod(axis_zero_angle+360, 360)
-            zero_text_angle = zero_text_angle-180 if zero_text_angle > 90 and zero_text_angle < 270 else zero_text_angle
-            zero_text = axis_name + '=0\n(' + other_name + '=' + format(tgt_other,'.1f') + ')'
-            plt.text(np.mean(axis_zero_line_x),np.mean(axis_zero_line_y),zero_text,rotation=zero_text_angle,horizontalalignment='center',verticalalignment='top')
-            for i in range(len(measured_xy)):
-                this_angle = np.arctan2(measured_xy[i,1]-center[1],measured_xy[i,0]-center[0])
-                text_x = center[0] + radius*1.1*np.cos(this_angle)
-                text_y = center[1] + radius*1.1*np.sin(this_angle)
-                plt.text(text_x,text_y,str(i),verticalalignment='center',horizontalalignment='center')
-            if ax == 'T':
+            ref_arc_x = rad * np.cos(ref_arc_ang) + ctr[0]
+            ref_arc_y = rad * np.sin(ref_arc_ang) + ctr[1]
+            # where global observer would nominally see the axis's
+            # local zero point in this plot
+            ang_0 = ang_i - tgt[0]  # just use 1st point to get T/P offset
+            line_0_x = [ctr[0], ctr[0]+rad*np.cos(np.radians(ang_0))]
+            line_0_y = [ctr[1], ctr[1]+rad*np.sin(np.radians(ang_0))]
+            plt.plot(ctr[0], ctr[1], 'k+')  # axis centre black +
+            plt.plot(line_0_x, line_0_y, 'k--')  # zero line of posintTP
+            plt.plot(ref_arc_x, ref_arc_y, 'b-')  # ref arc at 5 deg spacing
+            plt.plot(mea_xy[:, 0], mea_xy[:, 1], 'ko')  # measured pts in black
+            plt.plot(mea_xy[0, 0], mea_xy[0, 1], 'ro')  # 1st measured pt red
+            txt_ang_0 = np.mod(ang_0+360, 360)
+            txt_ang_0 = (txt_ang_0-180 if 90 < txt_ang_0 < 270
+                         else txt_ang_0)
+            txt_0 = (f'${axis_name}=0$\n'
+                     f'$({other_axis_name}={other_tgt:.1f}\\degree)$')
+            line_0 = np.append(np.concatenate([np.diff(line_0_x),
+                                               np.diff(line_0_y)]), 0)  # 3D
+            line_0_ctr = np.array([line_0_x, line_0_y]).mean(axis=1)  # 2D
+            shift = np.cross(line_0, [0, 0, 0.21])[:2]
+            txt_0_xy = line_0_ctr + np.sign(np.abs(txt_ang_0-270)-90) * shift
+            plt.text(txt_0_xy[0], txt_0_xy[1], txt_0, fontsize=12,
+                     rotation=txt_ang_0, ha='center', va='center')
+            for i, xy in enumerate(mea_xy):
+                ang_xy = np.arctan2(xy[1]-ctr[1], xy[0]-ctr[0])  # in rad
+                txt_x = ctr[0] + rad*0.85*np.cos(ang_xy)
+                txt_y = ctr[1] + rad*0.85*np.sin(ang_xy)
+                plt.text(txt_x, txt_y, f'{i}', ha='center', va='center')
+            if axis == 'T':
                 calib_vals_txt = ''
-                for key in ['LENGTH_R1','LENGTH_R2','OFFSET_T','OFFSET_P','GEAR_CALIB_T','GEAR_CALIB_P','OFFSET_X','OFFSET_Y']:
-                    calib_vals_txt += format(key,'12s') + ' = ' + format(data[key],'.3f') + '\n'
-                plt.text(min(plt.xlim())+0.2,max(plt.ylim())-0.2,calib_vals_txt,fontsize=6,color='gray',family='monospace',horizontalalignment='left',verticalalignment='top')
-            plt.xlabel('x (mm)')
-            plt.ylabel('y (mm)')
-            plt.title(posid + ' ' + name + ' calibration points')
+                calib_keys = [
+                    'LENGTH_R1', 'LENGTH_R2', 'OFFSET_T', 'OFFSET_P',
+                    'GEAR_CALIB_T', 'GEAR_CALIB_P', 'OFFSET_X', 'OFFSET_Y']
+                for key in calib_keys:
+                    calib_vals_txt += f'{key:12s} = {poscal[key]:6.3f}\n'
+                plt.text(
+                    0.03, 0.97, calib_vals_txt, transform=ax.transAxes,
+                    fontsize=8, color='gray', family='monospace',
+                    ha='left', va='top',
+                    bbox={'boxstyle': 'round', 'alpha': 0.8,
+                          'facecolor': 'white', 'edgecolor': 'lightgrey'})
+            plt.xlabel('flat$X$/mm')
+            plt.ylabel('flat$Y$/mm')
+            plt.title(f'measured ${axis_name}$ arc points')
             plt.grid(True)
-            plt.margins(0.05, 0.05)
             plt.axis('equal')
-    
-            plt.subplot(2,3,plot_row+2)
-            err_angles = mea - tgt
-            plt.plot(tgt, err_angles, 'ko-')
-            plt.plot(tgt[0], err_angles[0], 'ro')
-            for i in range(len(tgt)):
-                plt.text(tgt[i],err_angles[i],'\n\n'+str(i),verticalalignment='center',horizontalalignment='center')
-            plt.xlabel('target ' + name + ' angle (deg)')
-            plt.ylabel('measured ' + name + ' - target ' + name + ' (deg)')
-            plt.title('measured angle variation')
+            # column 2: angle deviation as a function of target angle
+            plt.subplot(2, 3, plot_row * 3 + 2)
+            err_ang = mea - tgt
+            plt.plot(tgt, err_ang, 'ko-')  # measured points
+            plt.plot(tgt[0], err_ang[0], 'ro')  # 1st measured pt in red
+            for i in tgt.index:
+                plt.annotate(f'{i}', xy=(tgt[i], err_ang[i]), xytext=(0, 15),
+                             textcoords='offset points',
+                             ha='center', va='center')
+            plt.xlabel(f'target ${axis_name} / \\degree$')
+            plt.ylabel(f'$\\delta{axis_name} / \\degree$'.format(axis_name))
+            plt.title(f'${axis_name}$ angle deviations')
             plt.grid(True)
-            plt.margins(0.1, 0.1)
-    
-            plt.subplot(2,3,plot_row+3)
-            measured_radii = np.sqrt(np.sum((measured_xy - center)**2,axis=1)) * 1000 # um
-            best_fit_radius = radius * 1000 # um
-            err_radii = measured_radii - best_fit_radius
-            plt.plot(tgt, err_radii, 'ko-')
-            plt.plot(tgt[0], err_radii[0], 'ro')
-            for i in range(len(tgt)):
-                plt.text(tgt[i],err_radii[i],'\n\n'+str(i),verticalalignment='center',horizontalalignment='center')
-            plt.xlabel('target ' + name + ' angle (deg)')
-            plt.ylabel('measured radius - best fit radius (um)')
-            plt.title('measured radius variation')
+            yr = max(err_ang) - min(err_ang)
+            plt.ylim(top=plt.ylim()[1]+0.1*yr)
+            # column 3: radius variations as a function of target angle
+            plt.subplot(2, 3, plot_row * 3 + 3)
+            err_rad = (poscal[f'radius_{axis}'] - rad) * 1000  # μm
+            plt.plot(tgt, err_rad, 'ko-')
+            plt.plot(tgt[0], err_rad[0], 'ro')
+            for i in tgt.index:
+                plt.annotate(f'{i}', xy=(tgt[i], err_rad[i]),xytext=(0, 15),
+                             textcoords='offset points',
+                             ha='center', va='center')
+            plt.xlabel(f'target ${axis_name} / \\degree$')
+            plt.ylabel(f'$\\delta R / \\mu$m'.format(axis_name))
+            plt.title(r'radius variations')
             plt.grid(True)
-            plt.margins(0.1, 0.1)
-    
-        plt.tight_layout(pad=2.0)
-        import os
-        fig_name = os.path.splitext(os.path.split(df_name)[1])[0]
-        plt.savefig(posid + '_%s.pdf'%fig_name) # + df_name.split('.')[0]+'.pdf')  # save vector gfcs
-        if show:
-            plt.show()
-        plt.close(fig)
+            yr = max(err_rad) - min(err_rad)
+            plt.ylim(top=plt.ylim()[1]+0.1*yr)
+        fig.suptitle(f'Arc calibration {pc.timestamp_str(self.t_i)} '
+                     f'Positioner {posid}')
+        fig.tight_layout(pad=0.5, rect=[0, 0, 1, 0.95])
+        path = os.path.join(
+            self.dirs[pcid],
+            '{posid}-{pc.filename_timestamp_str(self.t_i)}-arc_calib.pdf')
+        # plt.savefig(path)
+        # plt.close(fig)
+        fig.savefig(r'D:\fig.pdf', bbox_inches='tight')
 
     def generate_data_products(self):
         self.read_telemetry()
@@ -933,18 +956,18 @@ if __name__ == '__main__':
     expids = ['00033473', '00033490']
     # grid calib expids
     expids = ['00034382']
-    from poscalibrationfits import PosCalibrationFits
+    # from poscalibrationfits import PosCalibrationFits
     for expid in expids:
         paths = glob(pc.dirs['kpno']+f'/*/{expid}/*data.pkl')
         assert len(paths) == 1, paths
         print(f'Re-processing FP test data:\n{paths[0]}')
         try:
-            path = os.path.join(os.path.dirname(paths[0]), 'data_grid.pkl.gz')
-            data_arc = pd.read_pickle(path)
-            fit = PosCalibrationFits()
-            movedf, calib_fit = fit.calibrate_from_arc_data(data_arc)
-            # with open(os.path.join(paths[0]), 'rb') as h:
-            #     data = pickle.load(h)
+            # path = os.path.join(os.path.dirname(paths[0]), 'data_grid.pkl.gz')
+            # data_arc = pd.read_pickle(path)
+            # fit = PosCalibrationFits()
+            # movedf, calib_fit = fit.calibrate_from_arc_data(data_arc)
+            with open(os.path.join(paths[0]), 'rb') as h:
+                data = pickle.load(h)
             # try:
             #     calib_old = data.calibdf['OLD']
             #     calib_new = data.calibdf['NEW']

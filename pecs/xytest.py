@@ -61,7 +61,7 @@ class XYTest(PECS):
             printfunc={p: self.loggers[p].info for p in self.data.pcids})
         self.ptlm.participating_petals = [
             self._pcid2role(pcid) for pcid in self.data.pcids]
-        self.data.t_i = pc.now() # set initial time before setting dirs
+        self.data.t_i = pc.now()  # set initial time before setting dirs
         self.exp_setup()  # set up exposure ID and product directory
         if 'pause_interval' in test_cfg:  # override default pecs settings
             self.logger.info(
