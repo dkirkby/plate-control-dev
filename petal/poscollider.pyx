@@ -571,6 +571,22 @@ class PosSweep(object):
     def phi(self, step):
         """Returns phi position of the sweep at the specified timestep index."""
         return self.tp[step][1]
+    
+    def check_continuity(self, stepsize):
+        """Checks that no abs delta theta or abs delta phi is greater than
+        stepsize. Returns True if continous by this definition, False if not.
+        Note that this check only makes sense to do after the sweep has been
+        quantized. Returns True if only 0 or 1 elements exist in the sweep.
+        """
+        L = len(self.tp)
+        R = range(1,L)
+        if L < 2:
+            return True
+        abs_delta_t = [abs(self.tp[i][0] - self.tp[i-1][0]) for i in R]
+        abs_delta_p = [abs(self.tp[i][1] - self.tp[i-1][1]) for i in R]
+        if max(abs_delta_t) > stepsize or max(abs_delta_p) > stepsize:
+            return False
+        return True
 
 from cpython.mem cimport PyMem_Malloc, PyMem_Free
 from libc.math cimport sin as c_sin

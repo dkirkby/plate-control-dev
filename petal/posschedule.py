@@ -32,6 +32,7 @@ class PosSchedule(object):
         self.anneal_time = {'direct':1.0, 'retract':2.0, 'rotate':2.0, 'extend':2.0, 'expert':3} # times in seconds, see comments in PosScheduleStage
         self.should_anneal = True # overriding flag, allowing you to turn off all move time annealing
         self.should_check_petal_boundaries = True # allows you to turn off petal-specific boundary checks for non-petal systems (such as positioner test stands)
+        self.should_check_sweeps_continuity = False # if True, inspects all quantized sweeps to confirm well-formed. incurs slowdown, and generally is not needed; more for validating if any changes made to quantize function at a lower level
         self.move_tables = {}
 
     @property
@@ -234,10 +235,15 @@ class PosSchedule(object):
             colliding_sweeps, all_sweeps = final.find_collisions(stage.move_tables)
             final.store_collision_finding_results(colliding_sweeps, all_sweeps)
             self.move_tables = final.move_tables
+            if self.should_check_sweeps_continuity:
+                discontinuous = final.sweeps_continuity_check()
+                self.printfunc('Final check of quantized sweeps --> ' + str(len(discontinuous)) + ' discontinuous (should always be zero)')
+                if discontinuous:
+                    self.printfunc('Discontinous sweeps: ' + str(sorted(discontinuous.keys())))
             self.printfunc('Final collision check --> num colliding sweeps = ' + str(len(colliding_sweeps)) + ' (should always be zero)')
             if colliding_sweeps:
                 collision_pairs = {stage._collision_id(posid,colliding_sweeps[posid].collision_neighbor) for posid in colliding_sweeps}
-                self.printfunc('Collision pairs: ' + str(collision_pairs))
+                self.printfunc('Collision pairs: ' + str(sorted(collision_pairs)))
             else:
                 collision_pairs = {}
             if self.stats:
