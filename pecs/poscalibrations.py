@@ -133,6 +133,7 @@ class PosCalibrations(PECS):
         calib_up['tgt_posintP'] = requests.set_index('DEVICE_ID')['X2']
         calib_new = self.collect_calib(self.posids)
         self.data.write_calibdf(calib_old, calib_up, calib_new)
+        self.data.t_f = pc.now()
 
     def run_arc_calibration(self, commit=False, match_radius=50,
                             interactive=False):
@@ -182,6 +183,7 @@ class PosCalibrations(PECS):
         self.data.write_calibdf(calib_old, calib_fit, calib_new)
         if commit:
             [self.ptls[pcid].set_calibration(calib_new) for pcid in self.pcids]
+        self.data.t_f = pc.now()
 
     def run_grid_calibration(self, commit=False, match_radius=50,
                              interactive=False):
@@ -222,6 +224,7 @@ class PosCalibrations(PECS):
         self.data.write_calibdf(calib_old, calib_fit, calib_new)
         if commit:
             [self.ptls[pcid].set_calibration(calib_new) for pcid in self.pcids]
+        self.data.t_f = pc.now()
 
     def move_measure(self, request, match_radius=50):
         '''
