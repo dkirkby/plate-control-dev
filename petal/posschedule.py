@@ -268,6 +268,7 @@ class PosSchedule(object):
             else:
                 self.printfunc('Error: ' + str(posid) + ' has a move table despite no request.')
                 table.display()
+                log_note_addendum = ''
             table.log_note += (' ' if table.log_note else '') + log_note_addendum
         if self.stats:
             self.stats.set_num_move_tables(len(self.move_tables))
