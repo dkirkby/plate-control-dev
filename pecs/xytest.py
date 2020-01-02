@@ -5,6 +5,7 @@ Created on Fri May 24 17:46:45 2019
 @author: Duan Yutong (dyt@physics.bu.edu)
 """
 import os
+import io
 import numpy as np
 import pandas as pd
 from configobj import ConfigObj
@@ -75,6 +76,8 @@ class XYTest(PECS):
             f'Num of local targets: {self.data.ntargets}'])
         self.logger.debug(f'Test targets:\n{self.data.targets_pos}')
         self.data.initialise_movedata(self.data.posids, self.data.ntargets)
+        for ptl in self.ptls:
+            ptl.set_schedule_stats(enabled=True)
 
     def _lookup_pcid(self, posid):
         for pcid, posids in self.data.posids_pc.items():
@@ -238,9 +241,11 @@ class XYTest(PECS):
         self.logger.info(f'Test complete, duration {self.data.delta_t}.')
         try:
             for pcid in self.data.pcids:
-                self.ptls[pcid].schedule_stats.save()
+                self.data.schedstats[pcid] = (
+                    self.ptls[pcid].schedule_stats.generate_table())
+                self.ptls[pcid].set_schedule_stats(enabled=False)
         except Exception:
-            self.logger.debug('Call to schedule_stats.save() failed')
+            self.logger.debug('Failed to generate schedule stats table')
 
     def record_basic_move_data(self, i):
         self.logger.info('Recording basic move data for new xy target...')

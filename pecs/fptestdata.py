@@ -329,6 +329,9 @@ class FPTestData:
                 shutil.copyfileobj(self.logs[pcid], handle)  # save logs
             self.printfunc(f'PC{pcid:02} data written to: '
                            f'{self.log_paths[pcid]}', pcid=pcid)
+            if pcid in self.data.schedstats:
+                self.data.schedstats[pcid].to_csv(os.path.join(
+                    self.dirs[pcid], 'schedstats.csv'))
 
     def dump_as_one_pickle(self):
         try:
@@ -361,6 +364,7 @@ class FPTestData:
 class XYTestData(FPTestData):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.data.schedstats = {}
 
     def isolate_abnormal_flags(self):
         masks = []  # get postiioners with abnormal flags
