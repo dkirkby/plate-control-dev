@@ -35,6 +35,7 @@ class PosSchedStats(object):
                         'request + schedule calc time':[],
                         'expert_add_table calc time':[],
                         }
+        self.filename_suffix = ''
     
     @property
     def latest(self):
@@ -239,7 +240,9 @@ class PosSchedStats(object):
     def save(self, path=None):
         """Saves stats results to disk."""
         if path is None:
-            filename = f'{pc.filename_timestamp_str()}_schedstats.csv'
+            suffix = str(self.filename_suffix)
+            suffix = '_' + suffix if suffix else ''
+            filename = f'{pc.filename_timestamp_str()}_schedstats{suffix}.csv'
             path = os.path.join(pc.dirs['temp_files'], filename)
         self.generate_table().to_csv(path)
             
