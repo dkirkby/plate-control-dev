@@ -19,11 +19,12 @@ class PosScheduleStage(object):
         self.colliding = set() # positioners currently known to have collisions
         self.stats = stats
         self._power_supply_map = power_supply_map
-        self._theta_max_jog_A = 50  # deg, maximum distance to temporarily shift theta when doing path adjustments
+        self._theta_max_jog_A = 50 # deg, maximum distance to temporarily shift theta when doing path adjustments
         self._theta_max_jog_B = 20
         self._phi_max_jog_A = 45 # deg, maximum distance to temporarily shift phi when doing path adjustments
         self._phi_max_jog_B = 90
         self._max_jog = self._assign_max_jog_values() # collection of all the max jog options above
+        self.sweep_continuity_check_stepsize = 4.5 # deg, see PosSweep.check_continuity function
         self.verbose = verbose
         self.printfunc = printfunc
 
@@ -337,6 +338,11 @@ class PosScheduleStage(object):
         if self.stats:
             found = {self._collision_id(posid, sweep.collision_neighbor) for posid, sweep in colliding_sweeps.items()}
             self.stats.add_collisions_found(found)
+            
+    def sweeps_continuity_check(self):
+        """Returns set of posids for any whose sweeps were found to be discontinous.
+        """
+        return {p for p,s in self.sweeps.items() if not s.check_continuity(self.sweep_continuity_check_stepsize)}  
 
     def _propose_path_adjustment(self, posid, method='freeze'):
         """Generates a proposed alternate move table for the positioner posid

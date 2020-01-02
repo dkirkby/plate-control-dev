@@ -32,6 +32,7 @@ class PosSchedule(object):
         self.anneal_time = {'direct':1.0, 'retract':2.0, 'rotate':2.0, 'extend':2.0, 'expert':3} # times in seconds, see comments in PosScheduleStage
         self.should_anneal = True # overriding flag, allowing you to turn off all move time annealing
         self.should_check_petal_boundaries = True # allows you to turn off petal-specific boundary checks for non-petal systems (such as positioner test stands)
+        self.should_check_sweeps_continuity = False # if True, inspects all quantized sweeps to confirm well-formed. incurs slowdown, and generally is not needed; more for validating if any changes made to quantize function at a lower level
         self.move_tables = {}
 
     @property
@@ -201,7 +202,7 @@ class PosSchedule(object):
             if self.verbose:
                 self.printfunc('No requests nor existing move tables found. No move scheduling performed.')
             return
-        if self.stages['expert'].is_not_empty():
+        if self.expert_mode_is_on():
             self._schedule_expert_tables(anticollision)
         else:
             self._fill_enabled_but_nonmoving_with_dummy_requests()
@@ -221,7 +222,7 @@ class PosSchedule(object):
                         final.move_tables[posid].extend(table)
         if anticollision != None:
             colliding_sweeps, all_sweeps = final.find_collisions(final.move_tables)
-            self.printfunc('Penultimate collision check --> num colliding sweeps = ' + str(len(colliding_sweeps)) + ' (should always be zero)')
+            self.printfunc('Penultimate collision check --> num colliding sweeps = ' + str(len(colliding_sweeps)))
             final.store_collision_finding_results(colliding_sweeps, all_sweeps)
             if colliding_sweeps:
                 collision_pairs = {stage._collision_id(posid,colliding_sweeps[posid].collision_neighbor) for posid in colliding_sweeps}
@@ -234,10 +235,15 @@ class PosSchedule(object):
             colliding_sweeps, all_sweeps = final.find_collisions(stage.move_tables)
             final.store_collision_finding_results(colliding_sweeps, all_sweeps)
             self.move_tables = final.move_tables
+            if self.should_check_sweeps_continuity:
+                discontinuous = final.sweeps_continuity_check()
+                self.printfunc('Final check of quantized sweeps --> ' + str(len(discontinuous)) + ' discontinuous (should always be zero)')
+                if discontinuous:
+                    self.printfunc('Discontinous sweeps: ' + str(sorted(discontinuous.keys())))
             self.printfunc('Final collision check --> num colliding sweeps = ' + str(len(colliding_sweeps)) + ' (should always be zero)')
             if colliding_sweeps:
                 collision_pairs = {stage._collision_id(posid,colliding_sweeps[posid].collision_neighbor) for posid in colliding_sweeps}
-                self.printfunc('Collision pairs: ' + str(collision_pairs))
+                self.printfunc('Collision pairs: ' + str(sorted(collision_pairs)))
             else:
                 collision_pairs = {}
             if self.stats:
@@ -249,7 +255,8 @@ class PosSchedule(object):
         motionless = {posid for posid,table in self.move_tables.items() if table.is_motionless}
         for posid in empties | motionless:
             del self.move_tables[posid]
-        for posid,table in self.move_tables.items():                
+        for posid,table in self.move_tables.items():  
+            log_note_addendum = ''              
             if posid in self.requests:
                 req = self.requests.pop(posid)
                 table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
@@ -259,7 +266,7 @@ class PosSchedule(object):
                     if posid in original_request_posids and self._table_matches_request(table_for_schedule,req):
                         self.stats.add_table_matching_request()
                     max_net_time = max(table_for_schedule['net_time'][-1], max_net_time)
-            else:
+            elif not self.expert_mode_is_on():
                 self.printfunc('Error: ' + str(posid) + ' has a move table despite no request.')
                 table.display()
             table.log_note += (' ' if table.log_note else '') + log_note_addendum
@@ -337,6 +344,13 @@ class PosSchedule(object):
         self.stages['expert'].add_table(move_table)
         if self.stats:
             self.stats.add_expert_table_time(time.clock() - timer_start)
+            
+    def expert_mode_is_on(self):
+        """Returns boolean stating whether scheduling is in expert mode. This is
+        the case if any calls have been made to expert_add_table(). See that
+        function's comments for more detail.
+        """
+        return self.stages['expert'].is_not_empty()
 
     def _schedule_expert_tables(self, anticollision):
         """Gathers data from expert-added move tables and populates the 'expert'

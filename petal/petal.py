@@ -213,6 +213,17 @@ class Petal(object):
 
         self.hw_states = {}
 
+    def is_pc_connected(self):
+        if self.simulator_on:
+            return True
+        elif not hasattr(self, 'comm'):
+            return False
+        else:
+            try:
+                return self.comm.is_connected()
+            except:
+                return False
+
     def init_trans(self, alignment=None):
         '''
         initialise PetalTransforms class as a property of petal
@@ -355,6 +366,7 @@ class Petal(object):
         """
         if self.verbose:
             self.printfunc(f'petal: requests received {len(requests)}')
+        self.info(requests)
         marked_for_delete = set()
         for posid in requests:
             if posid not in self.posids:
@@ -625,16 +637,6 @@ class Petal(object):
             self._postmove_cleanup()
         else:
             self.comm.execute_sync(self.sync_mode)
-            #TEMPORARY FIX FOR FIRMWARE NOT RESPONDING WHILE EXECUTING POST PAUSES, REMOVE AFTER
-            #FW v4.5 DEPLOYMENT
-            hw_tables = self._hardware_ready_move_tables()
-            buffer = 1.0 # sec
-            table_times = [sum([pp/1000 for pp in hw_table['postpause']]) + sum(hw_table['move_time']) for hw_table in hw_tables] # note postpauses are in ms
-            if table_times != []: #Prevent a crash if no move tables were actually sent (IE all positioners in a move are disabled)
-                delay = buffer + max(table_times)
-                self.printfunc('execute_moves: max(table_times) = %r' % delay)
-                time.sleep(delay)
-            #END OF TEMPORARY FIX
             self._postmove_cleanup()
             self._wait_while_moving()
         self.canids_where_tables_were_just_sent = []
@@ -866,6 +868,8 @@ class Petal(object):
         err_strings = []
         if self.simulator_on: #Sim should always be observing
             return 'OBSERVING', err_strings
+        if not hasattr(self, 'comm') or getattr(self, 'comm') is None:
+            return 'ERROR', 'Petal controller is not connected'
         if self._last_state is None:
             self.printfunc('_get_hardware_state: No state yet set by petal. Trying to reconstruct from PC settings')
             for state in ['INITIALIZED', 'STANDBY', 'READY', 'OBSERVING']:
@@ -897,7 +901,7 @@ class Petal(object):
             fbk = self.comm.pbget(key)
             if what == 'list' or what == key:
                 current[key] = fbk
-            if key == 'GFA_FAN': #sadly GFA_FAN is a little weird.
+            if key == 'GFA_FAN' and isinstance(fbk,dict): #sadly GFA_FAN is a little weird.
                 for k in fbk.keys(): #should be 'inlet' and 'outlet'
                     if fbk[k][0] != self.PETAL_OPS_STATES[state][key][0][k][0]: #comparing only off/on, not worring about PWM or TACH
                         err_strings.append(key+' expected: '+str(self.PETAL_OPS_STATES[state][key][0][k][0])+', got: '+str(fbk[k][0]))

@@ -47,7 +47,7 @@ class PosCalibrations(PECS):
              .set_index('DEVICE_ID') for role in self.ptl_roles])
 
     def run_1p_calibration(self, tp_target='default', commit=False,
-                           match_radius=50, interactive=False):
+                           match_radius=80, interactive=False):
         if interactive:
             user_text = self._parse_yn(
                 input('Move positioners? (y/n): '))
@@ -122,6 +122,7 @@ class PosCalibrations(PECS):
                                'DQ': 'mea_dQ', 'DS': 'mea_dS',
                                'FLAGS': 'FLAG'}, inplace=True)
         # List unmeasured positioners in updates, even with no data
+        used_pos.drop('FLAG', axis=1, inplace=True)
         calib_up = used_pos.join(updates).append(unused_pos, sort=False)
         # overwrite flags with focalplane flags and add status
         flags_dicts = self.ptlm.get_pos_flags(list(calib_up.index))
@@ -135,6 +136,7 @@ class PosCalibrations(PECS):
         calib_up['tgt_posintP'] = req.set_index('DEVICE_ID')['X2']
         calib_new = self.collect_calib(self.posids)
         self.data.write_calibdf(calib_old, calib_up, calib_new)
+        self.data.t_f = pc.now()
 
     def run_arc_calibration(self, match_radius=50, interactive=False):
         if interactive:
@@ -197,6 +199,7 @@ class PosCalibrations(PECS):
         self.data.movedf, calib_fit = fit.calibrate_from_arc_data(data_arc)
         calib_new = self.collect_calib(self.posids)
         self.data.write_calibdf(calib_old, calib_fit, calib_new)
+        self.data.t_f = pc.now()
 
     def run_grid_calibration(self, match_radius=50,
                              interactive=False):
@@ -248,6 +251,7 @@ class PosCalibrations(PECS):
         self.data.movedf, calib_fit = fit.calibrate_from_grid_data(data_grid)
         calib_new = self.collect_calib(self.posids)
         self.data.write_calibdf(calib_old, calib_fit, calib_new)
+        self.data.t_f = pc.now()
 
     @property
     def petal_alignments(self):

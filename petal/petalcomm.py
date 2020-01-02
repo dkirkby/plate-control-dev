@@ -117,11 +117,15 @@ class PetalComm(object):
         Returns: return value received from remote function
         """
         try:
+            # kh: to prevent blocking calls if the connection is down
+            self.device['proxy']._pyroTimeout = 20.0
             return getattr(self.device['proxy'],cmd)(*args, **kwargs)
         except:
             if 'pyro_uri' in self.device:
                 try:
                     self.device['proxy'] = Pyro4.Proxy(self.device['pyro_uri'])
+                    # kh: to prevent blocking calls if the connection is down
+                    self.device['proxy']._pyroTimeout = 20.0
                     return getattr(self.device['proxy'],cmd)(*args, **kwargs)
                 except Exception as e:
                     raise RuntimeError('_call_device: Exception for command %s. Message: %s' % (str(cmd),str(e)))
