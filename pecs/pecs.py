@@ -169,8 +169,8 @@ class PECS:
                            for pcid in self.pcids]  # includes all posids
             exppos = pd.concat(exppos_list)
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
-            print('Expected positions of positioners by PetalApp '
-                  'are contaminated by fiducials.')
+            self.printfunc('Expected positions of positioners by PetalApp '
+                           'are contaminated by fiducials.')
         self.printfunc(
             f'Calling FVC.measure expecting {len(exppos)} positioners...')
         seqid = None
@@ -185,8 +185,8 @@ class PECS:
                   .rename(columns={'id': 'DEVICE_ID'})
                   .set_index('DEVICE_ID').sort_index())  # indexed by DEVICE_ID
         if np.any(['P' in device_id for device_id in meapos.index]):
-            print('Measured positions of positioners by FVC '
-                  'are contaminated by fiducials.')
+            self.printfunc('Measured positions of positioners by FVC '
+                           'are contaminated by fiducials.')
         meapos.columns = meapos.columns.str.upper()  # clean up header to save
         exppos = (exppos.rename(columns={'id': 'DEVICE_ID'})
                   .set_index('DEVICE_ID').sort_index())
