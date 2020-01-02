@@ -51,7 +51,7 @@ class PosCalibrations(PECS):
              .set_index('DEVICE_ID') for pcid in self.pcids])
 
     def run_1p_calibration(self, tp_target='default', commit=False,
-                           match_radius=50, interactive=False):
+                           match_radius=80, interactive=False):
         if interactive:
             user_text = self._parse_yn(
                 input('Do you want to move positioners? (y/n): '))
@@ -122,6 +122,7 @@ class PosCalibrations(PECS):
                                'DQ': 'mea_dQ', 'DS': 'mea_dS',
                                'FLAGS': 'FLAG'}, inplace=True)
         # List unmeasured positioners in updates, even with no data
+        used_pos.drop('FLAG', axis=1, inplace=True)
         calib_up = used_pos.join(updates).append(unused_pos, sort=False)
         # overwrite flags with focalplane flags and add status
         calib_up['FLAG'] = pd.DataFrame.from_dict(
