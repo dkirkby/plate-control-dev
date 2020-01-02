@@ -202,10 +202,10 @@ class PosSchedule(object):
             if self.verbose:
                 self.printfunc('No requests nor existing move tables found. No move scheduling performed.')
             return
-        self._fill_enabled_but_nonmoving_with_dummy_requests()
-        if self.stages['expert'].is_not_empty():
+        if self.expert_mode_is_on():
             self._schedule_expert_tables(anticollision)
         else:
+            self._fill_enabled_but_nonmoving_with_dummy_requests()
             if anticollision == 'adjust':
                 self._schedule_requests_with_path_adjustments() # there is only one possible anticollision method for this scheduling method
             else:
@@ -255,7 +255,8 @@ class PosSchedule(object):
         motionless = {posid for posid,table in self.move_tables.items() if table.is_motionless}
         for posid in empties | motionless:
             del self.move_tables[posid]
-        for posid,table in self.move_tables.items():                
+        for posid,table in self.move_tables.items():  
+            log_note_addendum = ''              
             if posid in self.requests:
                 req = self.requests.pop(posid)
                 table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
@@ -265,10 +266,9 @@ class PosSchedule(object):
                     if posid in original_request_posids and self._table_matches_request(table_for_schedule,req):
                         self.stats.add_table_matching_request()
                     max_net_time = max(table_for_schedule['net_time'][-1], max_net_time)
-            else:
+            elif not self.expert_mode_is_on():
                 self.printfunc('Error: ' + str(posid) + ' has a move table despite no request.')
                 table.display()
-                log_note_addendum = ''
             table.log_note += (' ' if table.log_note else '') + log_note_addendum
         if self.stats:
             self.stats.set_num_move_tables(len(self.move_tables))
@@ -344,6 +344,13 @@ class PosSchedule(object):
         self.stages['expert'].add_table(move_table)
         if self.stats:
             self.stats.add_expert_table_time(time.clock() - timer_start)
+            
+    def expert_mode_is_on(self):
+        """Returns boolean stating whether scheduling is in expert mode. This is
+        the case if any calls have been made to expert_add_table(). See that
+        function's comments for more detail.
+        """
+        return self.stages['expert'].is_not_empty()
 
     def _schedule_expert_tables(self, anticollision):
         """Gathers data from expert-added move tables and populates the 'expert'
