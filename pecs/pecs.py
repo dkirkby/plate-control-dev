@@ -215,8 +215,8 @@ class PECS:
                   .rename(columns={'id': 'DEVICE_ID'})
                   .set_index('DEVICE_ID').sort_index())  # indexed by DEVICE_ID
         if np.any(['P' in device_id for device_id in meapos.index]):
-            print('Measured positions of positioners by FVC '
-                  'are contaminated by fiducials.')
+            self.printfunc('Measured positions of positioners by FVC '
+                           'are contaminated by fiducials.')
         meapos.columns = meapos.columns.str.upper()  # clean up header to save
         exppos = (exppos.rename(columns={'id': 'DEVICE_ID'})
                   .set_index('DEVICE_ID').sort_index())

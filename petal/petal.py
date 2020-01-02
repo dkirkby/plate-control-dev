@@ -179,7 +179,7 @@ class Petal(object):
         self.sched_stats_on = sched_stats_on
 
         # must call the following 3 methods whenever petal alingment changes
-        self.init_trans()
+        self.init_ptltrans()
         self.init_posmodels(posids)
         self._init_collider(collider_file, anticollision)
 
@@ -224,7 +224,7 @@ class Petal(object):
             except:
                 return False
 
-    def init_trans(self, alignment=None):
+    def init_ptltrans(self, alignment=None):
         '''
         initialise PetalTransforms class as a property of petal
         called upon petal instantiation inside __init__()

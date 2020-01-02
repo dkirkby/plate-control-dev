@@ -1,5 +1,7 @@
 import os
+import io
 import csv
+import pandas as pd
 import posconstants as pc
 import math
 import numpy
@@ -33,7 +35,6 @@ class PosSchedStats(object):
                         'request + schedule calc time':[],
                         'expert_add_table calc time':[],
                         }
-        self.filename_suffix = ''
     
     @property
     def latest(self):
@@ -197,14 +198,9 @@ class PosSchedStats(object):
         safe_divide = lambda a,b: a / b if b else math.inf # avoid divide-by-zero errors
         data['calc: fraction of target requests accepted'] = [safe_divide(data['n requests accepted'][i], data['n requests'][i]) for i in range(nrows)]
         data['calc: fraction of targets achieved (of those accepted)'] = [safe_divide(data['n tables achieving requested-and-accepted targets'][i], data['n requests accepted'][i]) for i in range(nrows)]
-        return data, nrows    
-    
-    def save(self):
-        """Saves stats results to disk."""
-        suffix = str(self.filename_suffix)
-        suffix = '_' + suffix if suffix else ''
-        filename = pc.filename_timestamp_str() + '_schedstats' + suffix + '.csv'
-        path = os.path.join(pc.dirs['temp_files'],filename)
+        return data, nrows
+
+    def generate_table(self):
         data, nrows = self.summarize_all()
         blank_row = {'method':''}
         rms = lambda X: (sum([x**2 for x in X])/len(X))**0.5
@@ -228,16 +224,24 @@ class PosSchedStats(object):
                         for calc,stat_function in calcs.items():
                             if this_data[category]:
                                 stats[category][calc][key] = stat_function(this_data[category])
-        with open(path, 'w', newline='') as csvfile:
-            writer = csv.DictWriter(csvfile,fieldnames=data.keys())
-            writer.writeheader()
-            for i in range(nrows):
-                row = {key:val[i] for key,val in data.items()}
-                writer.writerow(row)
-            for category in categories:
-                writer.writerow(blank_row)
-                for calc in calcs:
-                    writer.writerow(stats[category][calc])
+        file = io.StringIO(newline='\n')
+        writer = csv.DictWriter(file, fieldnames=data.keys())
+        writer.writeheader()
+        for i in range(nrows):
+            row = {key: val[i] for key, val in data.items()}
+            writer.writerow(row)
+        for category in categories:
+            writer.writerow(blank_row)
+            for calc in calcs:
+                writer.writerow(stats[category][calc])
+        return pd.read_csv(file)
+    
+    def save(self, path=None):
+        """Saves stats results to disk."""
+        if path is None:
+            filename = f'{pc.filename_timestamp_str()}_schedstats.csv'
+            path = os.path.join(pc.dirs['temp_files'], filename)
+        self.generate_table().to_csv(path)
             
     @staticmethod
     def found_but_not_resolved(found, resolved):

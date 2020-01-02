@@ -77,6 +77,8 @@ class XYTest(PECS):
             f'Num of local targets: {self.data.ntargets}'])
         self.logger.debug(f'Test targets:\n{self.data.targets_pos}')
         self.data.initialise_movedata(self.data.posids, self.data.ntargets)
+        for ptl in self.ptls:
+            ptl.set_schedule_stats(enabled=True)
 
     def _get_pos_info(self):
         '''get enabled positioners, according to given posids or busids
@@ -251,9 +253,11 @@ class XYTest(PECS):
         self.logger.info(f'Test complete, duration {self.data.delta_t}.')
         try:
             for pcid in self.data.pcids:
-                self.ptls[pcid].schedule_stats.save()
+                self.data.schedstats[pcid] = (
+                    self.ptls[pcid].schedule_stats.generate_table())
+                self.ptls[pcid].set_schedule_stats(enabled=False)
         except Exception as e:
-            self.logger.debug(f'Call to schedule_stats.save() failed: {e}')
+            self.logger.debug(f'Failed to generate schedule stats table: {e}')
 
     def record_basic_move_data(self, i):
         self.logger.info('Recording basic move data for new xy target...')
