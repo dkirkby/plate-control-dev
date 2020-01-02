@@ -202,10 +202,10 @@ class PosSchedule(object):
             if self.verbose:
                 self.printfunc('No requests nor existing move tables found. No move scheduling performed.')
             return
+        self._fill_enabled_but_nonmoving_with_dummy_requests()
         if self.stages['expert'].is_not_empty():
             self._schedule_expert_tables(anticollision)
         else:
-            self._fill_enabled_but_nonmoving_with_dummy_requests()
             if anticollision == 'adjust':
                 self._schedule_requests_with_path_adjustments() # there is only one possible anticollision method for this scheduling method
             else:
