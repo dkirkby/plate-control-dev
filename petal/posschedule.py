@@ -221,31 +221,33 @@ class PosSchedule(object):
                     else:
                         final.move_tables[posid].extend(table)
         if anticollision != None:
+            collision_pairs = {}
             colliding_sweeps, all_sweeps = final.find_collisions(final.move_tables)
             self.printfunc('Penultimate collision check --> num colliding sweeps = ' + str(len(colliding_sweeps)))
             final.store_collision_finding_results(colliding_sweeps, all_sweeps)
             if colliding_sweeps:
                 collision_pairs = {stage._collision_id(posid,colliding_sweeps[posid].collision_neighbor) for posid in colliding_sweeps}
-                self.printfunc('Collision pairs: ' + str(collision_pairs))
+                self.printfunc('Penultimate collision pairs: ' + str(collision_pairs))
             adjusted = set()
             for posid in colliding_sweeps:
                 these_adjusted = final.adjust_path(posid, freezing='forced_recursive')
                 adjusted.update(these_adjusted)
-            self.printfunc('Adjusted posids: ' + str(adjusted))
-            colliding_sweeps, all_sweeps = final.find_collisions(stage.move_tables)
-            final.store_collision_finding_results(colliding_sweeps, all_sweeps)
+            if colliding_sweeps:
+                self.printfunc('Adjusted posids: ' + str(adjusted))
+                colliding_sweeps, all_sweeps = final.find_collisions(stage.move_tables)
+                final.store_collision_finding_results(colliding_sweeps, all_sweeps)
+                self.printfunc('Final collision check --> num colliding sweeps = ' + str(len(colliding_sweeps)) + ' (should always be zero)')
+                if colliding_sweeps:
+                    collision_pairs = {stage._collision_id(posid,colliding_sweeps[posid].collision_neighbor) for posid in colliding_sweeps}
+                    self.printfunc('Final collision pairs: ' + str(sorted(collision_pairs)))
+            else:
+                self.printfunc('Final collision check --> skipped (because \'penultimate\' check already succeeded)')
             self.move_tables = final.move_tables
             if self.should_check_sweeps_continuity:
                 discontinuous = final.sweeps_continuity_check()
                 self.printfunc('Final check of quantized sweeps --> ' + str(len(discontinuous)) + ' discontinuous (should always be zero)')
                 if discontinuous:
                     self.printfunc('Discontinous sweeps: ' + str(sorted(discontinuous.keys())))
-            self.printfunc('Final collision check --> num colliding sweeps = ' + str(len(colliding_sweeps)) + ' (should always be zero)')
-            if colliding_sweeps:
-                collision_pairs = {stage._collision_id(posid,colliding_sweeps[posid].collision_neighbor) for posid in colliding_sweeps}
-                self.printfunc('Collision pairs: ' + str(sorted(collision_pairs)))
-            else:
-                collision_pairs = {}
             if self.stats:
                 self.stats.add_final_collision_check(collision_pairs)
                 colliding_posids = set(colliding_sweeps.keys())
