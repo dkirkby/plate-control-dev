@@ -5,7 +5,6 @@ Created on Fri May 24 17:46:45 2019
 @author: Duan Yutong (dyt@physics.bu.edu)
 """
 import os
-import io
 import numpy as np
 import pandas as pd
 from configobj import ConfigObj
