@@ -440,7 +440,7 @@ class PosSweep(object):
     def __init__(self, posid=None):
         self.posid = posid                  # unique posid string of the positioner
         self.time = []                      # time at which each TP position value occurs
-        self.tp = []                        # theta,phi angles as function of time (sign indicates direction)
+        self.tp = []                        # theta,phi angles (poslocTP coordinates) as function of time (sign indicates direction)
         self.was_moving_cached = []         # cached boolean values, corresponding to timesteps, as computed by "was_moving() method
         self.collision_case = pc.case.I     # enumeration of type "case", indicating what kind of collision first detected, if any
         self.collision_time = math.inf      # time at which collision occurs. if no collision, the time is inf
@@ -572,18 +572,23 @@ class PosSweep(object):
         """Returns phi position of the sweep at the specified timestep index."""
         return self.tp[step][1]
     
-    def check_continuity(self, stepsize):
+    def check_continuity(self, stepsize, posmodel):
         """Checks that no abs delta theta or abs delta phi is greater than
         stepsize. Returns True if continous by this definition, False if not.
         Note that this check only makes sense to do after the sweep has been
         quantized. Returns True if only 0 or 1 elements exist in the sweep.
+        
+        Note that a jump e.g. from 180 deg to -180 deg (as defined in posintTP
+        coordinates) would intentionally fail this test, because mechanically
+        these do in fact represent an enormous discontinuity (due to theta
+        hardstop).
         """
         L = len(self.tp)
-        R = range(1,L)
         if L < 2:
             return True
-        abs_delta_t = [abs(self.tp[i][0] - self.tp[i-1][0]) for i in R]
-        abs_delta_p = [abs(self.tp[i][1] - self.tp[i-1][1]) for i in R]
+        posintTP = [posmodel.trans.poslocTP_to_posintTP(self.tp[i]) for i in range(0,L)]
+        abs_delta_t = [abs(posintTP[i][0] - posintTP[i-1][0]) for i in range(1,L)]
+        abs_delta_p = [abs(posintTP[i][1] - posintTP[i-1][1]) for i in range(1,L)]
         if max(abs_delta_t) > stepsize or max(abs_delta_p) > stepsize:
             return False
         return True
