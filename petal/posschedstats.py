@@ -196,6 +196,9 @@ class PosSchedStats(object):
         nrows = len(next(iter(data.values())))
         if not self.real_data_yet_in_latest_row:
             nrows -= 1
+            for key in data:
+                if len(data[key]) > nrows:
+                    del data[key][-1]
         safe_divide = lambda a,b: a / b if b else math.inf # avoid divide-by-zero errors
         data['calc: fraction of target requests accepted'] = [safe_divide(data['n requests accepted'][i], data['n requests'][i]) for i in range(nrows)]
         data['calc: fraction of targets achieved (of those accepted)'] = [safe_divide(data['n tables achieving requested-and-accepted targets'][i], data['n requests accepted'][i]) for i in range(nrows)]
