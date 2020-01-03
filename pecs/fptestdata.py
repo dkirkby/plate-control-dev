@@ -381,11 +381,11 @@ class XYTestData(FPTestData):
         # build column names and data types, all in petal-local flatXY CS
         cols0 = ['timestamp', 'cycle', 'move_log']
         dtypes0 = ['datetime64[ns]', np.uint64, str]
-        cols1 = ['target_x', 'target_y']
+        cols1 = ['tgt_x', 'tgt_y']
         dtypes1 = [np.float64] * len(cols1)
-        cols2_base = ['meas_q', 'meas_s', 'meas_x', 'meas_y',
+        cols2_base = ['mea_q', 'mea_s', 'mea_x', 'mea_y',
                       'err_x', 'err_y', 'err_xy',
-                      'pos_int_t', 'pos_int_p', 'pos_flag', 'pos_status']
+                      'posintT', 'posintP', 'flag', 'status']
         cols2 = []  # add suffix for base column names corrective moves
         for field, i in product(cols2_base, range(self.num_corr_max+1)):
             cols2.append(f'{field}_{i}')
@@ -551,7 +551,7 @@ class XYTestData(FPTestData):
                 ax.add_patch(c)
             ax.plot(tgtX, tgtY, 'o', ms=4, color='C3', fillstyle='none',
                     label=r'target $(x, y)$')  # circles for all target points
-            meaX, meaY = moves[f'meas_x_{n}'], moves[f'meas_y_{n}']
+            meaX, meaY = moves[f'mea_x_{n}'], moves[f'mea_y_{n}']
             ax.plot(meaX, meaY, '+', ms=6, mew=1, color='k',
                     label=r'measured $(x, y)$')  # measured xy for nth move
             errXY = moves[f'err_xy_{n}'] * 1000  # convert mm to microns
