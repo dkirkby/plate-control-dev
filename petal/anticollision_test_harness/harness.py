@@ -6,9 +6,22 @@ import sys
 sys.path.append(os.path.abspath('../../petal/'))
 import petal
 import harness_constants as hc
+import posconstants as pc
 import sequences
 import posstate
 import random
+import configobj
+
+# get collision file settings
+collider_filename = '_collision_settings_DEFAULT.conf'
+collider_filepath = os.path.join(pc.dirs['collision_settings'],collider_filename)
+collider_config = configobj.ConfigObj(collider_filepath,unrepr=True)
+collider_value = lambda s: collider_config['KEEPOUT_EXPANSION_' + s]
+keepouts_suffix = '_PhiRad' + str(collider_value('PHI_RADIAL')) + \
+                  '_PhiAng' + str(collider_value('PHI_ANGULAR')) +  \
+                  '_ThtRad' + str(collider_value('THETA_RADIAL')) + \
+                  '_ThtAng' + str(collider_value('THETA_ANGULAR'))
+print('\nNOW RUNNING CASE: ' + keepouts_suffix)
 
 # Selection of device location ids (which positioners on petal).
 # locations_all = 'all'
@@ -17,8 +30,8 @@ device_loc_ids = 'all' # make the selection here
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 pos_param_sequence_id = 'one real petal'
-move_request_sequence_id = '04000-04001' #'04000-04999' #'04108-04110'
-stats_filename_suffix = str(move_request_sequence_id) + ''
+move_request_sequence_id = '04000-04099' #'04000-04999' #'04108-04110'
+stats_filename_suffix = str(move_request_sequence_id) + keepouts_suffix + ''
 
 # Other ids
 fidids = {}
@@ -27,8 +40,8 @@ petal_id = 666
 # Other options
 should_animate = True
 anim_label_size = 'medium' # size in points, 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
-animation_foci = 'all'#'colliding' # argue {} or 'all' to animate everything. 'colliding' to only animate colliding bots. otherwise, this set limits which robots (plus their surrounding neighbors) get animated. Can include 'GFA' or 'PTL' as desired
-n_corrections = 0 # number of correction moves to simulate after each target
+animation_foci = 'colliding' # argue {} or 'all' to animate everything. 'colliding' to only animate colliding bots. otherwise, this set limits which robots (plus their surrounding neighbors) get animated. Can include 'GFA' or 'PTL' as desired
+n_corrections = 1 # number of correction moves to simulate after each target
 max_correction_move = 0.050/1.414 # mm
 should_profile = False
 
@@ -56,7 +69,7 @@ for pos_params in pos_param_sequence:
                       local_commit_on = False,
                       local_log_on    = False,
                       collider_file   = None,
-                      sched_stats_on  = True, # remember to turn off for performance timing
+                      sched_stats_on  = True, # minor speed-up if turn off
                       anticollision   = 'adjust')
     ptl.limit_radius = None
     if ptl.schedule_stats:
