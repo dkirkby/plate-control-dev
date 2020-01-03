@@ -238,6 +238,7 @@ class PosSchedStats(object):
             writer.writerow(blank_row)
             for calc in calcs:
                 writer.writerow(stats[category][calc])
+        file.seek(0)  # go back to the beginning after finishing write
         return pd.read_csv(file)
     
     def save(self, path=None):

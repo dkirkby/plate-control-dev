@@ -366,7 +366,7 @@ class Petal(object):
         """
         if self.verbose:
             self.printfunc(f'petal: requests received {len(requests)}')
-        self.info(requests)
+        # self.info(requests)  # this breaks when petal is not prepared by petalApp
         marked_for_delete = set()
         for posid in requests:
             if posid not in self.posids:
