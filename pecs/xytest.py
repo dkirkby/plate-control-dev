@@ -241,10 +241,11 @@ class XYTest(PECS):
                     f'Target {i+1} of {self.data.ntargets}, '
                     f'submove {n} of {self.data.num_corr_max}')
                 self.expected_QS_list = []
-                measured_QS = self.move_measure_petals(i, n)  # all petals
-                self.check_unmatched(measured_QS, disable_unmatched)
-                self.update_calibrations(measured_QS)
-                self.record_measurement(measured_QS, i, n)
+                _, meapos, matched, unmatched = self.move_measure_petals(i, n)
+                self.check_unmatched(meapos, matched, unmatched,
+                                     disable_unmatched=disable_unmatched)
+                self.update_calibrations(meapos)
+                self.record_measurement(meapos, i, n)
                 self.calculate_xy_errors(i, n)
             if i+1 < self.data.ntargets:  # no pause after the last target
                 self.pause()
@@ -278,11 +279,10 @@ class XYTest(PECS):
         '''move ten petals once, measure once for the ith target, nth move'''
         self.move_petals(i, n)
         # measure ten petals with FVC at once, FVC after all petals have moved
-        _, meapos, _, _ = self.fvc_measure()
-        # measured_QS.columns = measured_QS.columns.str.upper()  # rename upper
+        _, meapos, matched, unmatched = self.fvc_measure()
         self.logger.debug(f'FVC measured_QS:\n'
                           f'{meapos.reset_index().to_string()}')
-        return meapos
+        return meapos, matched, unmatched
 
     def move_petals(self, i, n):
         movedf = self.data.movedf
@@ -316,10 +316,11 @@ class XYTest(PECS):
                 else:
                     self.logger.error('Bad Target type.')
                     raise ValueError('Bad Target type.')
-                movedf.loc[idx[i, posid],
-                           ['target_x', 'target_y']] = tgt
-            tgt = movedf.loc[idx[i, posids],  # N x 2 array
-                             ['target_x', 'target_y']].values
+                movedf.loc[idx[i, posid], ['tgt_x', 'tgt_y']] = tgt
+                movedf.loc[idx[i, posid], ['tgt_q', 'tgt_s']] = (
+                    self.ptlm.postrans(posid, 'poslocXY_to_QS', tgt,
+                                       participating_petals=role)[role])
+            tgt = movedf.loc[idx[i, posids], ['tgt_x', 'tgt_y']].values  # Nx2
         else:
             movetype, cmd = 'corrective', 'poslocdXdY'
             tgt = - movedf.loc[idx[i, posids],  # note minus sign, last move
@@ -351,38 +352,35 @@ class XYTest(PECS):
                 + expected_QS[self._pcid2role(pcid)].to_string())
         # get expected posintTP from petal and write to movedf after move
         # Positions are concatenated in petalman
-        ret_TP = self.ptlm.get_positions(return_coord='posintTP')
-        # Just need this sent to one petal
-        role = self._pcid2role(self.data.pcids[0])
-        ret_TP['STATUS'] = self.ptlm.decipher_posflags(
-            ret_TP['FLAGS'], participating_petals=role)[role]
+        TP = self.ptlm.get_positions(return_coord='posintTP')
         for pcid in self.data.pcids:
             self.loggers[pcid].debug(
                 f'Expected posintTP after move {n}:\n'
-                + ret_TP[ret_TP['PETAL_LOC'] == pcid].to_string())
+                f'{TP[TP['PETAL_LOC'] == pcid].to_string()}')
         # record per-move data to movedf for a petal
-        new = pd.DataFrame({f'pos_int_t_{n}': ret_TP['X1'],
-                            f'pos_int_p_{n}': ret_TP['X2'],
-                            f'pos_flag_{n}': ret_TP['FLAGS'],
-                            f'pos_status_{n}': ret_TP['STATUS'],
-                            f'DEVICE_ID': ret_TP['DEVICE_ID']})
+        new = pd.DataFrame({f'posintT_{n}': TP['X1'],
+                            f'posintP_{n}': TP['X2'],
+                            f'flag_{n}': TP['FLAG'],
+                            f'status_{n}': pc.decipher_posflags(TP['FLAGS']),
+                            f'DEVICE_ID': TP['DEVICE_ID']})
         self._update(new.set_index('DEVICE_ID'), i)
         return expected_QS
 
-    def check_unmatched(self, measured_QS, disable_unmatched):
+    def check_unmatched(self, measured_QS, matched, unmatched,
+                        disable_unmatched=True):
         for pcid in self.data.pcids:  # check unmatched positioners
             posids = self.data.posids_pc[pcid]
-            if not set(posids).issubset(set(measured_QS.index)):
-                matched = set(posids).intersection(set(measured_QS.index))
-                unmatched = set(posids) - matched
+            if not set(posids).issubset(matched):
+                matched_pc = set(posids) & matched
+                unmatched_pc = set(posids) & unmatched
                 self.logger.warning(
                     'Please check the numbers: # unmatched spots = '
                     '# broken fibres + 2 ETC fibres + # unmatched fibres\n'
-                    f'{len(unmatched)} of {len(posids)} requested devices '
+                    f'{len(unmatched_pc)} of {len(posids)} requested devices '
                     f'are missing in FVC measurement, '
                     'possibly including two dark ETC fibres:'
-                    f':\n{unmatched}')
-                for posid in unmatched:  # log unmatched fibres to logger
+                    f':\n{unmatched_pc}')
+                for posid in unmatched_pc:  # log unmatched fibres to logger
                     self.loggers[pcid].debug(
                         f'Missing posid: {posid}, pos details:\n'
                         f'{self.data.posdf.loc[posid].to_string()}')
@@ -390,16 +388,16 @@ class XYTest(PECS):
                     # if anticolliions is on, disable positioner and neighbours
                     self.loggers[pcid].info(
                         f'Disabling unmatched fibres and their neighbours:\n'
-                        f'{unmatched}')
+                        f'{unmatched_pc}')
                     role = self._pcid2role(pcid)
                     disabled = (
                         self.ptlm.disable_positioner_and_neighbors(
-                            list(unmatched), participating_petals=role)[role])
+                            list(unmatched_pc), participating_petals=role)[role])
                     if disabled is None:
                         disabled = []
                     self.loggers[pcid].info(
                         f'Disabled {len(disabled)} positioners:\n{disabled}')
-                    assert set(unmatched).issubset(set(disabled))
+                    assert unmatched_pc.issubset(set(disabled))
                     # remove disabled posids from self attributes
                     self.data.posids = [posid for posid in self.data.posids
                                         if posid not in disabled]
@@ -433,10 +431,10 @@ class XYTest(PECS):
             role = self.ptl_role_lookup(posid)
             poslocXY[:, j] = self.ptlm.postrans(
                 posid, 'QS_to_poslocXY', QS[:, j], participating_petals=role)
-        new = pd.DataFrame({f'meas_q_{n}': QS[0, :],
-                            f'meas_s_{n}': QS[1, :],
-                            f'meas_x_{n}': poslocXY[0, :],
-                            f'meas_y_{n}': poslocXY[1, :]},
+        new = pd.DataFrame({f'mea_q_{n}': QS[0, :],
+                            f'mea_s_{n}': QS[1, :],
+                            f'mea_x_{n}': poslocXY[0, :],
+                            f'mea_y_{n}': poslocXY[1, :]},
                            dtype=np.float64, index=measured_QS.index)
         self._update(new, i)
 
@@ -444,8 +442,8 @@ class XYTest(PECS):
         movedf = self.data.movedf
         # convenience functin c returns a column of the movedf for all pos
         def c(col_name): return movedf.loc[idx[i], [col_name]].values
-        movedf.loc[idx[i], [f'err_x_{n}']] = c(f'meas_x_{n}') - c('target_x')
-        movedf.loc[idx[i], [f'err_y_{n}']] = c(f'meas_y_{n}') - c('target_y')
+        movedf.loc[idx[i], [f'err_x_{n}']] = c(f'mea_x_{n}') - c('tgt_x')
+        movedf.loc[idx[i], [f'err_y_{n}']] = c(f'mea_y_{n}') - c('tgt_y')
         movedf.loc[idx[i], [f'err_xy_{n}']] = np.linalg.norm(
                 np.hstack([c(f'err_x_{n}'), c(f'err_y_{n}')]), axis=1)
         for pcid in self.data.pcids:  # log of error after each move
