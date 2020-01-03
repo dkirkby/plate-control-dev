@@ -24,7 +24,7 @@ class PosScheduleStage(object):
         self._phi_max_jog_A = 45 # deg, maximum distance to temporarily shift phi when doing path adjustments
         self._phi_max_jog_B = 90
         self._max_jog = self._assign_max_jog_values() # collection of all the max jog options above
-        self.sweep_continuity_check_stepsize = 4.5 # deg, see PosSweep.check_continuity function
+        self.sweep_continuity_check_stepsize = 4.0 # deg, see PosSweep.check_continuity function
         self.verbose = verbose
         self.printfunc = printfunc
 
@@ -342,7 +342,11 @@ class PosScheduleStage(object):
     def sweeps_continuity_check(self):
         """Returns set of posids for any whose sweeps were found to be discontinous.
         """
-        return {p for p,s in self.sweeps.items() if not s.check_continuity(self.sweep_continuity_check_stepsize)}  
+        discontinuous = {}
+        for p,s in self.sweeps.items():
+            if not s.check_continuity(self.sweep_continuity_check_stepsize, self.collider.posmodels[p]):
+                discontinuous.add(p)
+        return discontinuous
 
     def _propose_path_adjustment(self, posid, method='freeze'):
         """Generates a proposed alternate move table for the positioner posid
