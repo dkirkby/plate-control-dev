@@ -205,41 +205,8 @@ class PosSchedStats(object):
         return data, nrows
 
     def generate_table(self):
-        data, nrows = self.summarize_all()
-        blank_row = {'method':''}
-        rms = lambda X: (sum([x**2 for x in X])/len(X))**0.5
-        unique_methods = sorted(set(data['method']) - {self.blank_str})
-        categories = ['overall'] + unique_methods
-        calcs = {'max':max, 'min':min, 'rms':rms, 'avg':numpy.mean, 'med':numpy.median}
-        stats = {}
-        for category in categories:
-            stats[category] = {}
-            for calc in calcs:
-                stats[category][calc] = {'method':calc} # puts the name of this calc in the method column of csv file
-            stats[category]['max']['schedule id'] = category # puts the category of this group of calcs in the schedule id column of csv file, in same row as maxes
-        for key in data:
-            if len(data[key]) > 0:
-                type_test_val = data[key][0]
-                if isinstance(type_test_val,int) or isinstance(type_test_val,float):
-                    this_data = {'overall': [data[key][i] for i in range(nrows)]}
-                    for category in unique_methods:
-                        this_data[category] = [this_data['overall'][i] for i in range(nrows) if data['method'][i] == category]
-                    for category in categories:
-                        for calc,stat_function in calcs.items():
-                            if this_data[category]:
-                                stats[category][calc][key] = stat_function(this_data[category])
-        file = io.StringIO(newline='\n')
-        writer = csv.DictWriter(file, fieldnames=data.keys())
-        writer.writeheader()
-        for i in range(nrows):
-            row = {key: val[i] for key, val in data.items()}
-            writer.writerow(row)
-        for category in categories:
-            writer.writerow(blank_row)
-            for calc in calcs:
-                writer.writerow(stats[category][calc])
-        file.seek(0)  # go back to the beginning after finishing write
-        return pd.read_csv(file)
+        data, _ = self.summarize_all()
+        return pd.DataFrame(data)
     
     def save(self, path=None):
         """Saves stats results to disk."""
