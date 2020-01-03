@@ -1,10 +1,8 @@
 import os
-import io
-import csv
+import math
 import pandas as pd
 import posconstants as pc
-import math
-import numpy
+
 
 # separated out here because so long
 final_checks_str = 'num collisions found by final check (should be zero, or None if no check done)'
@@ -202,12 +200,11 @@ class PosSchedStats(object):
         safe_divide = lambda a,b: a / b if b else math.inf # avoid divide-by-zero errors
         data['calc: fraction of target requests accepted'] = [safe_divide(data['n requests accepted'][i], data['n requests'][i]) for i in range(nrows)]
         data['calc: fraction of targets achieved (of those accepted)'] = [safe_divide(data['n tables achieving requested-and-accepted targets'][i], data['n requests accepted'][i]) for i in range(nrows)]
-        return data, nrows
+        return data
 
     def generate_table(self):
-        data, _ = self.summarize_all()
-        return pd.DataFrame(data)
-    
+        return pd.DataFrame(self.summarize_all())
+
     def save(self, path=None):
         """Saves stats results to disk."""
         if path is None:
@@ -216,7 +213,7 @@ class PosSchedStats(object):
             filename = f'{pc.filename_timestamp_str()}_schedstats{suffix}.csv'
             path = os.path.join(pc.dirs['temp_files'], filename)
         self.generate_table().to_csv(path)
-            
+
     @staticmethod
     def found_but_not_resolved(found, resolved):
         """Searches through the dictionary of resolved collision pairs, and
