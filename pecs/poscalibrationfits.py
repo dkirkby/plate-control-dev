@@ -55,16 +55,16 @@ class PosCalibrationFits:
         self.logger.info('Reading petal alignments from DB...')
         if use_doslib:
             from DOSlib.constants import ConstantsDB
-            fpm = pd.DataFrame.from_dict(ConstantsDB().get_constants(
-                group='focal_plane_metrology', tag='CURRENT', snapshot='DESI')
-                ['focal_plane_metrology'], orient='index')
+            group, tag, snapshopt = 'focal_plane_metrology', 'CURRENT', 'DESI'
+            df = pd.DataFrame.from_dict(ConstantsDB().get_constants(
+                group=group, tag=tag, snapshot=snapshot)[group], orient='index')
             alignments = {int(petal_loc): {'Tx': row['petal_offset_x'],
                                            'Ty': row['petal_offset_y'],
                                            'Tz': row['petal_offset_z'],
                                            'alpha': row['petal_rot_1'],
                                            'beta': row['petal_rot_2'],
                                            'gamma': row['petal_rot_3']}
-                          for petal_loc, row in fpm.iterrows()}
+                          for petal_loc, row in df.iterrows()}
         else:
             import psycopg2
             conn = psycopg2.connect(
