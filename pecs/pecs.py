@@ -40,30 +40,30 @@ class PECS:
             unrepr=True, encoding='utf-8')
         for attr in pecs_local.keys():
             setattr(self, attr, pecs_local[attr])
-        self.printfuncs = printfunc  # can be a dict for all pcids or a func
+        self.printfunc = printfunc
         if fvc is None:  # instantiate FVC proxy, sim or real
             if 'SIM' in self.fvc_role.upper():
                 self.fvc = FVC_proxy_sim(max_err=0.0001)
             else:
+                os.environ[]
                 self.fvc = FVC(self.pm_instrument, fvc_role=self.fvc_role,
                                constants_version=self.constants_version)
-            self.printfunc(f"FVC proxy created for instrument: "
-                           f"{self.fvc.get('instrument')}")
+            self.print(f"FVC proxy created for instrument: "
+                       f"{self.fvc.get('instrument')}")
         else:
             self.fvc = fvc
-            self.printfunc(f"Reusing existing FVC proxy: "
-                           f"{self.fvc.get('instrument')}")
+            self.print(f"Reusing existing FVC proxy: "
+                       f"{self.fvc.get('instrument')}")
         if ptlm is None:
             self.ptlm = PetalMan()
             pcids = [self._role2pcid(role)
                      for role in self.ptlm.participating_petals]
-            self.printfunc(f'PetalMan proxy initialised with active petal '
-                           f'role numbers (PCIDs): {pcids}')
+            self.print(f'PetalMan proxy initialised with active petal '
+                       f'role numbers (PCIDs): {pcids}')
         else:
             self.ptlm = ptlm
-            self.printfunc(
-                f'Reusing existing PetalMan proxy with active petals: '
-                f'{self.ptlm.participating_petals}')
+            self.print(f'Reusing existing PetalMan proxy with active petals: '
+                       f'{self.ptlm.participating_petals}')
         if self.illuminated_petals == 'all':
             self.illuminated_petals = self.ptlm.Petals.keys()
         else:
@@ -75,7 +75,7 @@ class PECS:
         try:
             self.fvc_collector._send_command('configure')
         except Exception:
-            self.printfunc('FVC collector unavailable')
+            self.print('FVC collector unavailable')
         if interactive is None:
             pass
         elif (self.pcids is None) or interactive:  # boolean
@@ -89,15 +89,13 @@ class PECS:
         self.exp = Exposure(readonly=False)
         self.exp.sequence = self.data.test_name
         self.data.set_dirs(self.exp.id)  # directory setup
+        self.fvc.save_centers = True
+        self.fvc.save_centers_path = self.data.dir
 
-    def printfunc(self, msg):
-        '''self.printfuncs is a dict indexed by pcids as specified for input,
-        this function prints to all of them for messages shared across petals
-        '''
-        if isinstance(self.printfuncs, dict):
-            [pf(msg) for pf in self.printfuncs.values()]
-        else:
-            self.printfuncs(msg)
+    def print(self, msg):
+        if hasattr(self, logger):
+            self.logger.debug(msg)  # use broadcast logger to log to all pcids
+        self.printfunc(msg)
 
     def _parse_yn(self, yn_str):
         #  Trying to accept varieties like y/n, yes/no
@@ -106,7 +104,7 @@ class PECS:
         elif 'n' in yn_str.lower():
             return False
         else:
-            self.printfunc(f'Invalid input: {yn_str}, must be y/n')
+            self.print(f'Invalid input: {yn_str}, must be y/n')
 
     @staticmethod
     def _pcid2role(pcid):
@@ -118,8 +116,8 @@ class PECS:
 
     def ptl_setup(self, pcids, posids=None):
         '''input pcids must be a list of integers'''
-        self.printfunc(f'Setting up petals and positioners for {len(pcids)} '
-                       f'selected petals, PCIDs: {pcids}')
+        self.print(f'Setting up petals and positioners for {len(pcids)} '
+                   f'selected petals, PCIDs: {pcids}')
         for pcid in pcids:  # illumination check
             assert f'PETAL{pcid}' in self.illuminated_petals, (
                 f'PC{pcid:02} must be illuminated.')
@@ -129,20 +127,19 @@ class PECS:
             ret = self.ptlm.get_positioners(enabled_only=True)
             posinfo = pd.concat(list(ret.values())).set_index('DEVICE_ID')
             posids = sorted(posinfo.index)
-            self.printfunc(
-                f'Defaulting to all {len(posids)} enabled positioners')
+            self.print(f'Defaulting to all {len(posids)} enabled positioners')
         else:
             ret = self.ptlm.get_positioners(posids=posids, enabled_only=True)
             posinfo = pd.concat(list(ret.values())).set_index('DEVICE_ID')
             posids0 = list(set(posids) & set(posinfo.index))
-            self.printfunc(f'Validated {len(posids0)} of {len(posids)} '
-                           f'positioners specified')
+            self.print(f'Validated {len(posids0)} of {len(posids)} '
+                       f'positioners specified')
         self.posids = posids0
         self.posinfo = posinfo
         self.ptl_roles = self.ptlm.participating_petals
 
     def interactive_ptl_setup(self):
-        self.printfunc(f'Running interactive setup for PECS')
+        self.print(f'Running interactive setup for PECS')
         pcids = self._interactively_get_pcid()  # set selected ptlid
         posids = self._interactively_get_posids()  # set selected posids
         self.ptl_setup(pcids, posids=posids)
@@ -166,8 +163,7 @@ class PECS:
             assert f'PETAL{pcid}' in self.ptlm.Petals.keys(), (
                 f'PC{pcid:02} unavailable, all available ICS petal roles: '
                 f'{self.ptlm.Petals.keys()}')
-        self.printfunc(f'Selected {len(self.pcids)} petals, '
-                       f'PCIDs: {self.pcids}')
+        self.print(f'Selected {len(self.pcids)} petals, PCIDs: {self.pcids}')
         self.ptlm.participating_petals = [self._pcid2role(p) for p in pcids]
         return pcids
 
@@ -182,7 +178,7 @@ class PECS:
         ret = self.ptlm.get_positioners(enabled_only=True, **kwarg)
         posinfo = pd.concat(list(ret.values()))
         posids = sorted(posinfo['DEVICE_ID'])
-        self.printfunc(f'Selected {len(posids)} positioners')
+        self.print(f'Selected {len(posids)} positioners')
         return posids
 
     def fvc_measure(self, exppos=None, match_radius=50, matched_only=True):
@@ -199,9 +195,9 @@ class PECS:
                           participating_petals=self.illuminated_petals)
                       .sort_values(by='DEVICE_ID').reset_index())
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
-            self.printfunc('Expected positions of positioners by PetalApp '
-                           'are contaminated by fiducials.')
-        self.printfunc(
+            self.print('Expected positions of positioners by PetalApp '
+                       'are contaminated by fiducials.')
+        self.print(
             f'Calling FVC.measure expecting {len(exppos)} positioners...')
         seqid = None
         if hasattr(self, 'exp'):
@@ -215,8 +211,8 @@ class PECS:
                   .rename(columns={'id': 'DEVICE_ID'})
                   .set_index('DEVICE_ID').sort_index())  # indexed by DEVICE_ID
         if np.any(['P' in device_id for device_id in meapos.index]):
-            self.printfunc('Measured positions of positioners by FVC '
-                           'are contaminated by fiducials.')
+            self.print('Measured positions of positioners by FVC '
+                       'are contaminated by fiducials.')
         meapos.columns = meapos.columns.str.upper()  # clean up header to save
         exppos = (exppos.rename(columns={'id': 'DEVICE_ID'})
                   .set_index('DEVICE_ID').sort_index())
@@ -227,24 +223,23 @@ class PECS:
         matched = set(exppos.index) & set(meapos.index)
         unmatched = set(exppos.index) - matched
         if len(unmatched) == 0:
-            self.printfunc(f'All {len(exppos.index)} back-illuminated '
-                           f'positioners measured by FVC')
+            self.print(f'All {len(exppos.index)} back-illuminated '
+                       f'positioners measured by FVC')
         else:
-            self.printfunc(
-                f'Missing {len(unmatched)} of expected backlit fibres:'
-                f'\n{sorted(unmatched)}')
+            self.print(f'Missing {len(unmatched)} of expected backlit fibres:'
+                       f'\n{sorted(unmatched)}')
         return exppos, meapos, matched, unmatched
 
     def fvc_collect(self, destination='/data/msdos/focalplane/'):
-        self.printfunc('Collecting FVC images associated with exposure ID '
-                       f'{self.exp.id} to: {destination}')
+        self.print('Collecting FVC images associated with exposure ID '
+                   f'{self.exp.id} to: {destination}')
         os.makedirs(destination, exist_ok=True)
         try:
             self.fvc_collector._send_command(
                 'collect', expid=self.exp.id, output_dir=destination,
                 logbook=False)
         except Exception as e:
-            self.printfunc(f'FVC collector failed: {e}')
+            self.print(f'FVC collector failed: {e}')
 
     @staticmethod
     def countdown_sec(t):  # in seconds
@@ -260,7 +255,7 @@ class PECS:
             input('Paused for heat load monitoring for unspecified interval. '
                   'Press enter to continue: ')
         elif self.pause_interval == 0:  # no puase needed, just continue
-            self.printfunc('pause_interval = 0, continuing without pause...')
+            self.print('pause_interval = 0, continuing without pause...')
         elif self.pause_interval > 0:
-            self.printfunc(f'Pausing for {self.pause_interval} s...')
+            self.print(f'Pausing for {self.pause_interval} s...')
             self.countdown_sec(self.pause_interval)

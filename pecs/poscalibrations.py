@@ -28,11 +28,8 @@ class PosCalibrations(PECS):
         else:
             raise Exception(f'Invalid mode: {mode}')
         self.data = CalibrationData(cfg)
-        self.loggers = self.data.loggers  # use these loggers to write to logs
         self.logger = self.data.logger  # broadcast to all petals
-        super().__init__(
-            fvc=fvc, ptlm=ptlm, interactive=interactive,
-            printfunc={p: self.loggers[p].info for p in self.data.pcids})
+        super().__init__(fvc=fvc, ptlm=ptlm, interactive=interactive)
         self.data.t_i = pc.now()
         self.exp_setup()  # set up exposure ID and product directory
         self.logger.info(f'Running {mode} calibration')
@@ -195,7 +192,7 @@ class PosCalibrations(PECS):
                            compression='gzip')
         # run fitting
         fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
-                                 printfunc=self.logger.info)
+                                 logger=self.logger)
         self.data.movedf, calib_fit = fit.calibrate_from_arc_data(data_arc)
         calib_new = self.collect_calib(self.posids)
         self.data.write_calibdf(calib_old, calib_fit, calib_new)
@@ -247,7 +244,7 @@ class PosCalibrations(PECS):
                             compression='gzip')
         # run fitting
         fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
-                                 printfunc=self.logger.info)
+                                 logger=self.logger)
         self.data.movedf, calib_fit = fit.calibrate_from_grid_data(data_grid)
         calib_new = self.collect_calib(self.posids)
         self.data.write_calibdf(calib_old, calib_fit, calib_new)

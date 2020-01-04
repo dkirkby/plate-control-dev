@@ -117,8 +117,8 @@ class FPTestData:
             for pcid in self.test_cfg.sections:  # convert pcid to int now
                 self.test_cfg.rename(pcid, int(pcid))
         self._init_loggers()
-        self.logger.info([f'petalconstants.py version: {pc.code_version}',
-                          f'anticollision mode: {self.anticollision}'])
+        self.logger.debug([f'posconstants.py version: {pc.code_version}',
+                           f'anticollision mode: {self.anticollision}'])
 
     def set_dirs(self, expid):
         self.filename = (
@@ -401,8 +401,8 @@ class XYTestData(FPTestData):
         # write pcid column to movedf
         self.movedf = self.movedf.merge(self.posdf['PCID'].reset_index(),
                                         on='DEVICE_ID', right_index=True)
-        self.logger.info(f'Move data table initialised '
-                         f'for {len(self.posids)} positioners.')
+        self.logger.debug(f'Move data table initialised '
+                          f'for {len(self.posids)} positioners.')
 
     @staticmethod
     def grade_pos(err_0_max, err_corr_max, err_corr_rms,
@@ -578,7 +578,7 @@ class XYTestData(FPTestData):
             ax.legend(loc='upper right', fontsize=10)
             fig.savefig(path.format(n), bbox_inches='tight')
             if hasattr(self, 'logger'):
-                self.logger.debug(f'xyplot saved: {path.format(n)}')
+                self.loggers[pcid].debug(f'xyplot saved: {path.format(n)}')
             plt.close(fig)
 
     def make_summary_plot_binder(self, pcid, n):
