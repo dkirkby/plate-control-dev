@@ -5,6 +5,7 @@ pecs/arc_calibration.py -text
 pecs/fptestdata.py -text
 pecs/fvc_sim.py -text
 pecs/grid_calibration.py -text
+pecs/onepoint_offsetsTP.py -text
 pecs/onepoint_posintTP.py -text
 pecs/pecs.py -text
 pecs/pecs_local.cfg -text

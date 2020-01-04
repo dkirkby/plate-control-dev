@@ -11,10 +11,14 @@ collider_filename = '_collision_settings_DEFAULT.conf'
 collider_filepath = os.path.join(pc.dirs['collision_settings'],collider_filename)
 collider_config = configobj.ConfigObj(collider_filepath,unrepr=True)
 
-run_config = {'PHI_RADIAL':    [  0, 0.1, 0.2, 0.3, 0.4,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0],
-              'PHI_ANGULAR':   [  0,   0,   0,   0,   0,   0,   0,   0,   0, 1.0, 2.0, 3.0,   0,   0,   0],
-              'THETA_RADIAL':  [  0,   0,   0,   0,   0, 0.1, 0.2, 0.3, 0.4,   0,   0,   0,   0,   0,   0],
-              'THETA_ANGULAR': [  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 1.0, 2.0, 3.0]}
+zeros = [0, 0, 0, 0, 0, 0, 0]
+mm = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0]
+deg = [0, 1, 2, 3, 4, 5, 10]
+
+run_config = {'PHI_RADIAL':    [0.1, 0.2, 0.3, 0.4, 0.5, 1.0],
+              'PHI_ANGULAR':   [  1,   2,   3,   4,   5,  10],
+              'THETA_RADIAL':  [0.1, 0.2, 0.3, 0.4, 0.5, 1.0],
+              'THETA_ANGULAR': [  1,   2,   3,   4,   5,  10]}
 
 for i in range(len(run_config['PHI_RADIAL'])):
     for key in run_config.keys():
