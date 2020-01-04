@@ -45,7 +45,6 @@ class PECS:
             if 'SIM' in self.fvc_role.upper():
                 self.fvc = FVC_proxy_sim(max_err=0.0001)
             else:
-                os.environ[]
                 self.fvc = FVC(self.pm_instrument, fvc_role=self.fvc_role,
                                constants_version=self.constants_version)
             self.print(f"FVC proxy created for instrument: "
@@ -93,7 +92,7 @@ class PECS:
         self.fvc.save_centers_path = self.data.dir
 
     def print(self, msg):
-        if hasattr(self, logger):
+        if hasattr(self, 'logger'):
             self.logger.debug(msg)  # use broadcast logger to log to all pcids
         self.printfunc(msg)
 
