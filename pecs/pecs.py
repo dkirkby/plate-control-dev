@@ -88,6 +88,8 @@ class PECS:
         self.exp = Exposure(readonly=False)
         self.exp.sequence = self.data.test_name
         self.data.set_dirs(self.exp.id)  # directory setup
+        self.fvc.save_centers = True
+        self.fvc.save_centers_path = self.data.dir
 
     def printfunc(self, msg):
         '''self.printfuncs is a dict indexed by pcids as specified for input,
