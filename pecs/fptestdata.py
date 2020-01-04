@@ -120,6 +120,7 @@ class FPTestData:
         self._init_loggers()
         self.logger.debug([f'posconstants.py version: {pc.code_version}',
                            f'anticollision mode: {self.anticollision}'])
+        self.data.schedstats = {}
 
     def set_dirs(self, expid):
         self.filename = (
@@ -330,8 +331,8 @@ class FPTestData:
                 shutil.copyfileobj(self.logs[pcid], handle)  # save logs
             self.printfunc(f'PC{pcid:02} data written to: '
                            f'{self.log_paths[pcid]}', pcid=pcid)
-            if pcid in self.data.schedstats:
-                self.data.schedstats[pcid].to_csv(os.path.join(
+            if pcid in self.schedstats:
+                self.schedstats[pcid].to_csv(os.path.join(
                     self.dirs[pcid], 'schedstats.csv'))
 
     def dump_as_one_pickle(self):
@@ -365,7 +366,6 @@ class FPTestData:
 class XYTestData(FPTestData):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.data.schedstats = {}
 
     def isolate_abnormal_flags(self):
         masks = []  # get postiioners with abnormal flags
