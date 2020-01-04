@@ -20,6 +20,7 @@ from configobj import ConfigObj
 from DOSlib.proxies import FVC, PetalMan, SimpleProxy  # , Illuminator
 from DOSlib.exposure import Exposure
 from fvc_sim import FVC_proxy_sim
+pd.options.mode.chained_assignment = 'raise'
 
 
 class PECS:
@@ -34,6 +35,8 @@ class PECS:
         # Allow local config so scripts do not always have to collect roles
         # and names from the user. No check for illuminator at the moment
         # since it is not used in tests.
+        self._pcid2role = lambda pcid: f'PETAL{pcid}'
+        self._role2pcid = lambda role: int(role.replace('PETAL', ''))
         pecs_local = ConfigObj(  # set basic self attributes
             os.path.join(os.path.dirname(os.path.realpath(__file__)),
                          'pecs_local.cfg'),
@@ -63,12 +66,14 @@ class PECS:
             self.ptlm = ptlm
             self.print(f'Reusing existing PetalMan proxy with active petals: '
                        f'{self.ptlm.participating_petals}')
-        if self.illuminated_petals == 'all':
-            self.illuminated_petals = self.ptlm.Petals.keys()
+        if self.illuminated_pcids == 'all':
+            self.illuminated_ptl_roles = list(self.ptlm.Petals.keys())
         else:
-            assert set(self.illuminated_petals).issubset(
-                set(self.ptlm.Petals.keys())), (
-                'Illuminated petals must be in availible petals!')
+            self.illuminated_ptl_roles = [self._pcid2role(pcid)
+                                          for pcid in self.illuminated_pcids]
+        assert set(self.illuminated_ptl_roles) <= set(
+            self.ptlm.Petals.keys()), (
+            'Illuminated petals must be in availible petals!')
         # fvc stuff
         self.fvc_collector = SimpleProxy('FVCCOLLECTOR')
         try:
@@ -105,20 +110,12 @@ class PECS:
         else:
             self.print(f'Invalid input: {yn_str}, must be y/n')
 
-    @staticmethod
-    def _pcid2role(pcid):
-        return f'PETAL{pcid}'
-
-    @staticmethod
-    def _role2pcid(role):
-        return int(role.replace('PETAL', ''))
-
     def ptl_setup(self, pcids, posids=None):
         '''input pcids must be a list of integers'''
         self.print(f'Setting up petals and positioners for {len(pcids)} '
                    f'selected petals, PCIDs: {pcids}')
         for pcid in pcids:  # illumination check
-            assert f'PETAL{pcid}' in self.illuminated_petals, (
+            assert self._pcid2role(pcid) in self.illuminated_ptl_roles, (
                 f'PC{pcid:02} must be illuminated.')
         self.ptlm.participating_petals = [self._pcid2role(pcid)
                                           for pcid in self.pcids]
@@ -191,7 +188,7 @@ class PECS:
             # not just selected petals
             exppos = (self.ptlm.get_positions(
                           return_coord='QS',
-                          participating_petals=self.illuminated_petals)
+                          participating_petals=self.illuminated_ptl_roles)
                       .sort_values(by='DEVICE_ID').reset_index())
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
             self.print('Expected positions of positioners by PetalApp '

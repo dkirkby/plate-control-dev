@@ -23,6 +23,7 @@ from posmodel import PosModel
 from DOSlib.positioner_index import PositionerIndex
 from fptestdata import BroadcastLogger
 idx = pd.IndexSlice
+pd.options.mode.chained_assignment = 'raise'
 keys_fit = ['OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
             'LENGTH_R1', 'LENGTH_R2']  # initial values for fitting
 
