@@ -220,15 +220,17 @@ class PosSchedule(object):
                         final.add_table(table)
                     else:
                         final.move_tables[posid].extend(table)
-        if anticollision != None:
+        if anticollision or self.stats or self.petal.animator_on:
+            adjective = 'Penultimate' if anticollision else 'Final'
             colliding_sweeps, all_sweeps = final.find_collisions(final.move_tables)
-            self.printfunc('Penultimate collision check --> num colliding sweeps = ' + str(len(colliding_sweeps)))
+            self.printfunc(adjective + ' collision check --> num colliding sweeps = ' + str(len(colliding_sweeps)))
             final.store_collision_finding_results(colliding_sweeps, all_sweeps)
             if colliding_sweeps:
                 collision_pairs = {final._collision_id(posid,colliding_sweeps[posid].collision_neighbor) for posid in colliding_sweeps}
-                self.printfunc('Penultimate collision pairs: ' + str(collision_pairs))
+                self.printfunc(adjective + ' collision pairs: ' + str(collision_pairs))
             else:
-                collision_pairs = {}
+                collision_pairs = {}            
+        if anticollision:
             adjusted = set()
             for posid in colliding_sweeps:
                 these_adjusted = final.adjust_path(posid, freezing='forced_recursive')
@@ -243,6 +245,7 @@ class PosSchedule(object):
             else:
                 collision_pairs = {}
                 self.printfunc('Final collision check --> skipped (because \'penultimate\' check already succeeded)')
+        if final.sweeps: # indicates that results from a collision check do exist
             if self.should_check_sweeps_continuity:
                 discontinuous = final.sweeps_continuity_check()
                 self.printfunc('Final check of quantized sweeps --> ' + str(len(discontinuous)) + ' discontinuous (should always be zero)')
@@ -277,7 +280,7 @@ class PosSchedule(object):
             self.stats.set_num_move_tables(len(self.move_tables))
             self.stats.set_max_table_time(max_net_time)
             self.stats.add_scheduling_time(time.clock() - timer_start)
-        if self.petal.animator_on and anticollision != None:
+        if self.petal.animator_on and final.sweeps:
             if self.collider.animate_colliding_only:
                 sweeps_to_add = {}
                 for posid,sweep in colliding_sweeps.items():
@@ -394,13 +397,12 @@ class PosSchedule(object):
         """
         if self.should_anneal:
             stage.anneal_tables(anneal_time)
-        if should_freeze or self.stats:
+        if should_freeze:
             if self.verbose:
                 self.printfunc(f'schedule finding collisions: {len(stage.move_tables)}')
                 self.printfunc('Posschedule first move table: \n' + str(list(stage.move_tables.values())[0].for_collider()))
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
-        if should_freeze:
             if self.verbose:
                 self.printfunc("initial stage.colliding: " + str(stage.colliding))
             adjustment_performed = False
