@@ -178,7 +178,6 @@ class FPTestData:
         if pcid is None:
             if hasattr(self, 'logger'):
                 self.logger.debug(string)
-            print(string)
         else:
             if hasattr(self, 'loggers'):
                 self.loggers[pcid].debug(string)
