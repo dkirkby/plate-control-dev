@@ -58,11 +58,11 @@ class BroadcastLogger:
     def __init__(self, loggers=None, printfunc=print):
         if loggers is None:
             self.loggers_available = False
-            self.printfunc = printfunc
         else:
             self.pcids = list(loggers.keys())
             self.loggers = loggers
             self.loggers_available = True
+        self.printfunc = printfunc
 
     def _log(self, msg, lvl):  # reserved for in-class use, don't call this
         if type(msg) is list:

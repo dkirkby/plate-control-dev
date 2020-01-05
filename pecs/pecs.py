@@ -98,7 +98,8 @@ class PECS:
     def print(self, msg):
         if hasattr(self, 'logger'):
             self.logger.debug(msg)  # use broadcast logger to log to all pcids
-        self.printfunc(msg)
+        else:
+            self.printfunc(msg)
 
     def _parse_yn(self, yn_str):
         #  Trying to accept varieties like y/n, yes/no

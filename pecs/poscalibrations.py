@@ -229,8 +229,8 @@ class PosCalibrations(PECS):
 
     @property
     def petal_alignments(self):
-        return {self._role2pcid(role): ptl.alignment
-                for role, ptl in self.ptlm.Petals.items()}
+        return {self._role2pcid(role): alignment
+                for role, alignment in self.ptlm.alignment.items()}
 
     def move_measure(self, request, match_radius=50):
         '''
