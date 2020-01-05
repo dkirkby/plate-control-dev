@@ -149,7 +149,7 @@ class PosCalibrations(PECS):
         #     n_points_T=self.data.n_pts_T, n_points_P=self.data.n_pts_P)
         ret = self.ptlm.get_arc_requests(
             ids=self.posids,
-            n_points_T=self.n_points_T, n_points_P=self.n_points_P)
+            n_points_T=self.n_pts_T, n_points_P=self.n_pts_P)
         if isinstance(ret, dict):
             print('fix me! get_arc_requests returned dict')
             import pdb; pdb.set_trace()
@@ -211,13 +211,13 @@ class PosCalibrations(PECS):
         #                                       n_points_T=self.data.n_pts_T,
         #                                       n_points_P=self.data.n_pts_P)
         ret = self.ptlm.get_grid_requests(ids=self.posids,
-                                          n_points_T=self.n_points_T,
-                                          n_points_P=self.n_points_P)
+                                          n_points_T=self.n_pts_T,
+                                          n_points_P=self.n_pts_P)
         if isinstance(ret, dict):
             print('fix me! get_grid_requests returned dict')
             import pdb; pdb.set_trace()
             req_list = []
-            for i in range(self.n_points_P*self.n_points_T):
+            for i in range(self.n_pts_P*self.n_pts_T):
                 dflist = []
                 for df in ret.values():
                     dflist.append(df[i])

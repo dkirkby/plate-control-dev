@@ -170,7 +170,7 @@ class PECS:
         if user_text != '':
             selection = user_text.split()
             kw = 'busids' if 'can' in selection[0] else 'posids'
-            kwarg.update({kw, selection})
+            kwarg.update({kw: selection})
         ret = self.ptlm.get_positioners(enabled_only=True, **kwarg)
         posinfo = pd.concat(list(ret.values()))
         posids = sorted(posinfo['DEVICE_ID'])
