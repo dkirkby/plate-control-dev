@@ -10,7 +10,6 @@ import posconstants as pc
 from pecs import PECS
 from fptestdata import CalibrationData
 from poscalibrationfits import PosCalibrationFits
-pd.options.mode.chained_assignment = 'raise'
 
 
 class PosCalibrations(PECS):

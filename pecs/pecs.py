@@ -20,7 +20,6 @@ from configobj import ConfigObj
 from DOSlib.proxies import FVC, PetalMan, SimpleProxy  # , Illuminator
 from DOSlib.exposure import Exposure
 from fvc_sim import FVC_proxy_sim
-pd.options.mode.chained_assignment = 'raise'
 
 
 class PECS:
@@ -153,7 +152,7 @@ class PECS:
 
     def _interactively_get_pcid(self):
         pcids = input(f'Please enter integer PCIDs seperated by '
-                      f'spaces. Leave blank to select all available petals: ')
+                      f'spaces. Leave blank to select petal specified in cfg: ')
         if pcids == '':
             pcids = self.pcids
         for pcid in pcids:  # validate pcids against petalman available roles
