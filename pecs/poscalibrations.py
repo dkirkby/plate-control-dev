@@ -82,13 +82,7 @@ class PosCalibrations(PECS):
                        'X1': posintTP[0], 'X2': posintTP[1],
                        'LOG_NOTE': f'{self.data.mode}'}
                 row.update(self.posinfo.loc[posid].to_dict())
-                rows.append({'DEVICE_ID': posid,
-                             'PETAL_LOC': self.posinfo.locate[posid, 'PETAL_LOC'],
-                             'DEVICE_LOC': self.posinfo.locate[posid, 'DEVICE_LOC'],
-                             'COMMAND': 'posintTP',
-                             'X1': posintTP[0],
-                             'X2': posintTP[1],
-                             'LOG_NOTE': f'{self.data.mode}'})
+                rows.append(row)
             req = pd.DataFrame(rows)
             self.ptlm.prepare_move(req, anticollision=None)
             self.ptlm.execute_move(reset_flags=False, control={'timeout': 120})
