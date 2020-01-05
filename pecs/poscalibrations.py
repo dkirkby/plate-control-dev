@@ -150,22 +150,14 @@ class PosCalibrations(PECS):
         ret = self.ptlm.get_arc_requests(
             ids=self.posids,
             n_points_T=self.data.n_pts_T, n_points_P=self.data.n_pts_P)
-        if isinstance(ret, dict):
-            print('fix me! get_arc_requests returned dict')
-            import pdb; pdb.set_trace()
-            req_list_T = []
-            req_list_P = []
-            for i in range(self.data.n_pts_T):
-                dflist = [df[0][i] for df in ret.values()]
-                req_list_T.append(pd.concat(dflist).reset_index())
-            for j in range(self.data.n_pts_P):
-                dflist = [df[1][j] for df in ret.values()]
-                req_list_P.append(pd.concat(dflist).reset_index())
-        else:
-            print('fix me! get_arc_requests returned tuple/list')
-            import pdb; pdb.set_trace()
-            req_list_T = ret[0]
-            req_list_P = ret[1]
+        req_list_T = []
+        req_list_P = []
+        for i in range(self.data.n_pts_T):
+            dfs = [df[0][i] for df in ret.values()]
+            req_list_T.append(pd.concat(dfs).reset_index())
+        for j in range(self.data.n_pts_P):
+            dfs = [df[1][j] for df in ret.values()]
+            req_list_P.append(pd.concat(dfs).reset_index())
         T_data = []  # move, measure
         for i, req in enumerate(req_list_T):
             self.print(f'Measuring theta arc point {i+1} of '
@@ -213,19 +205,10 @@ class PosCalibrations(PECS):
         ret = self.ptlm.get_grid_requests(ids=self.posids,
                                           n_points_T=self.data.n_pts_T,
                                           n_points_P=self.data.n_pts_P)
-        if isinstance(ret, dict):
-            print('fix me! get_grid_requests returned dict')
-            import pdb; pdb.set_trace()
-            req_list = []
-            for i in range(self.data.n_pts_P*self.data.n_pts_T):
-                dflist = []
-                for df in ret.values():
-                    dflist.append(df[i])
-                req_list.append(pd.concat(dflist))
-        else:
-            print('fix me! get_grid_requests returned request list')
-            import pdb; pdb.set_trace()
-            req_list = ret
+        req_list = []
+        for i in range(self.data.n_pts_P*self.data.n_pts_T):
+            dfs = [dfs[i] for dfs in ret.values()]
+            req_list.append(pd.concat().reset_index())
         grid_data = []  # move, measure
         for i, request in enumerate(req_list):
             self.print(f'Measuring grid point {i+1} of {len(req_list)}...')
