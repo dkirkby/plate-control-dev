@@ -53,7 +53,7 @@ class PosCalibrationFits:
         self.pi = PositionerIndex()
 
     def read_alignments(self, use_doslib):
-        self.logger.info('Reading petal alignments from DB...')
+        self.logger.debug('Reading petal alignments from DB...')
         if use_doslib:
             from DOSlib.constants import ConstantsDB
             group, tag, snapshopt = 'focal_plane_metrology', 'CURRENT', 'DESI'
@@ -108,7 +108,7 @@ class PosCalibrationFits:
     def init_posmodels(self, data=None, posmodels=None):
         '''called upon receiving calibration data specified below
         supply either posmodels (online) or data (offline)'''
-        self.logger.info('Initialising posmodels...')
+        self.logger.debug('Initialising posmodels...')
         if posmodels is None:
             for posid in tqdm(data.index.get_level_values('DEVICE_ID')
                               .unique()):
@@ -118,7 +118,7 @@ class PosCalibrationFits:
                     petal_id = self.pi.find_by_device_id(posid)['PETAL_ID']
                     self.posmodels[posid] = PosModel(state=PosState(
                         unit_id=posid, petal_id=petal_id, device_type='pos',
-                        printfunc=self.logger.info),
+                        printfunc=self.logger.debug),
                         petal_alignment=self.petal_alignments[petal_loc])
         else:
             self.posmodels.update(posmodels)
@@ -167,7 +167,7 @@ class PosCalibrationFits:
                         GEAR_RATIO_T, GEAR_RATIO_P
         """
         posids = sorted(data.index.get_level_values('DEVICE_ID').unique())
-        self.logger.info(
+        self.logger.debug(
             f'Fitting arc calibration data, {len(posids)} positioners...')
         self.init_posmodels(data)  # double check that all posmodels exist
         cols = ['mea_posintT, mea_posintP', 'mea_flatX', 'mea_flatY',
@@ -299,7 +299,7 @@ class PosCalibrationFits:
                     'LENGTH_R1', 'LENGTH_R2'
         """
         posids = sorted(data.index.get_level_values('DEVICE_ID').unique())
-        self.logger.info(
+        self.logger.debug(
             f'Fitting grid calibration data, {len(posids)} positioners...')
         self.init_posmodels(data)  # double check that all posmodels exist
         cols = ['mea_flatX', 'mea_flatY',
