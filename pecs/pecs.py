@@ -149,7 +149,7 @@ class PECS:
                              f'{self.pcids}')
 
     def ptl_role_lookup(self, posid):
-        return self.pcid2role(self.pcid_lookup(posid))
+        return self._pcid2role(self.pcid_lookup(posid))
 
     def _interactively_get_pcid(self):
         pcids = input(f'Please enter integer PCIDs seperated by '
