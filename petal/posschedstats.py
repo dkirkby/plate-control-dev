@@ -1,6 +1,8 @@
 import os
-import math
+import io
+import numpy as np
 import pandas as pd
+import csv
 import posconstants as pc
 
 
@@ -197,13 +199,47 @@ class PosSchedStats(object):
             for key in data:
                 if len(data[key]) > nrows:
                     del data[key][-1]
-        safe_divide = lambda a,b: a / b if b else math.inf # avoid divide-by-zero errors
+        safe_divide = lambda a,b: a / b if b else np.inf # avoid divide-by-zero errors
         data['calc: fraction of target requests accepted'] = [safe_divide(data['n requests accepted'][i], data['n requests'][i]) for i in range(nrows)]
         data['calc: fraction of targets achieved (of those accepted)'] = [safe_divide(data['n tables achieving requested-and-accepted targets'][i], data['n requests accepted'][i]) for i in range(nrows)]
-        return data
+        return data, nrows
 
     def generate_table(self):
-        return pd.DataFrame(self.summarize_all())
+        data, nrows = self.summarize_all()
+        blank_row = {'method':''}
+        rms = lambda X: (sum([x**2 for x in X])/len(X))**0.5
+        unique_methods = sorted(set(data['method']) - {self.blank_str})
+        categories = ['overall'] + unique_methods
+        calcs = {'max':max, 'min':min, 'rms':rms, 'avg':np.mean, 'med':np.median}
+        stats = {}
+        for category in categories:
+            stats[category] = {}
+            for calc in calcs:
+                stats[category][calc] = {'method':calc} # puts the name of this calc in the method column of csv file
+            stats[category]['max']['schedule id'] = category # puts the category of this group of calcs in the schedule id column of csv file, in same row as maxes
+        for key in data:
+            if len(data[key]) > 0:
+                type_test_val = data[key][0]
+                if isinstance(type_test_val,int) or isinstance(type_test_val,float):
+                    this_data = {'overall': [data[key][i] for i in range(nrows)]}
+                    for category in unique_methods:
+                        this_data[category] = [this_data['overall'][i] for i in range(nrows) if data['method'][i] == category]
+                    for category in categories:
+                        for calc,stat_function in calcs.items():
+                            if this_data[category]:
+                                stats[category][calc][key] = stat_function(this_data[category])
+        file = io.StringIO(newline='\n')
+        writer = csv.DictWriter(file, fieldnames=data.keys())
+        writer.writeheader()
+        for i in range(nrows):
+            row = {key: val[i] for key, val in data.items()}
+            writer.writerow(row)
+        for category in categories:
+            writer.writerow(blank_row)
+            for calc in calcs:
+                writer.writerow(stats[category][calc])
+        file.seek(0)  # go back to the beginning after finishing write
+        return pd.read_csv(file)
 
     def save(self, path=None):
         """Saves stats results to disk."""
