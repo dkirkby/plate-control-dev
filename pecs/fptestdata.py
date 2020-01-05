@@ -45,7 +45,6 @@ Circle = matplotlib.patches.Circle
 idx = pd.IndexSlice
 np.rms = lambda x: np.sqrt(np.mean(np.square(x)))
 np.nanrms = lambda x: np.sqrt(np.nanmean(np.square(x)))
-pd.options.mode.chained_assignment = 'raise'
 # sys.path.append(os.path.abspath('.'))
 
 
