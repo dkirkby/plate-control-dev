@@ -193,8 +193,8 @@ class PECS:
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
             self.print('Expected positions of positioners by PetalApp '
                        'are contaminated by fiducials.')
-        self.print(
-            f'Calling FVC.measure expecting {len(exppos)} positioners...')
+        self.print(f'Calling FVC.measure expecting {len(exppos)} '
+                   f'backlit positioners...')
         seqid = None
         if hasattr(self, 'exp'):
             seqid = self.exp.id

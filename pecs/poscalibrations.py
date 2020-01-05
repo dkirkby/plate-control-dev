@@ -32,7 +32,6 @@ class PosCalibrations(PECS):
         super().__init__(fvc=fvc, ptlm=ptlm, interactive=interactive)
         self.data.t_i = pc.now()
         self.exp_setup()  # set up exposure ID and product directory
-        self.print(f'Running {mode} calibration')
 
     def collect_calib(self, posids):
         keys_collect = [

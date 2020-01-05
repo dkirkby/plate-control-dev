@@ -52,6 +52,7 @@ class BroadcastLogger:
     '''must call methods below for particular logger levels below
     support input message as a string of list of strings
     msg will be broadcasted to all petals
+    info level or above will be printed to stdout in terminal
     '''
 
     def __init__(self, loggers=None, printfunc=print):
@@ -70,8 +71,7 @@ class BroadcastLogger:
             if self.loggers_available:
                 for pcid in self.pcids:
                     self.loggers[pcid].log(lvl, msg)
-            else:
-                self.printfunc(msg)
+            self.printfunc(msg)
         else:
             raise Exception('Wrong message data type sent to logger')
 
@@ -172,19 +172,17 @@ class FPTestData:
             self.loggers[pcid] = logger
         self.logger = BroadcastLogger(loggers=self.loggers)
 
-    def printfunc(self, string, pcid=None):
-        '''use only for info level msg in the absence of logger(s)'''
+    def print(self, string, pcid=None):
+        '''use in the absence of logger(s)'''
         assert type(string) is str
         if pcid is None:
             if hasattr(self, 'logger'):
-                self.logger.info(string)
-            else:
-                print(string)
+                self.logger.debug(string)
+            print(string)
         else:
             if hasattr(self, 'loggers'):
-                self.loggers[pcid].info(string)
-            else:
-                print(string)
+                self.loggers[pcid].debug(string)
+            print(string)
 
     @staticmethod
     def _log_cfg(printfunc, config):
@@ -215,8 +213,8 @@ class FPTestData:
                     WHERE time >= '{self.t_i.astimezone(timezone.utc)}'
                     AND time < '{self.t_f.astimezone(timezone.utc)}'""",
                 conn).sort_values('time')  # posfid_temps, time, pcid
-            self.printfunc(f'{len(self.telemetry)} entries from telemetry DB '
-                           f'between {self.t_i} and {self.t_f} loaded')
+            self.print(f'{len(self.telemetry)} entries from telemetry DB '
+                       f'between {self.t_i} and {self.t_f} loaded')
             self.db_telemetry_available = True
         except Exception:
             self.db_telemetry_available = False
@@ -316,7 +314,7 @@ class FPTestData:
             getattr(self, attr).to_pickle(
                 os.path.join(self.dir, f'{attr}.pkl.gz'), compression='gzip')
             # getattr(self, attr).to_csv(os.path.join(self.dir, f'{attr}.csv'))
-            self.printfunc(f'Positioner {attr} written to: {self.dir}')
+            self.print(f'Positioner {attr} written to: {self.dir}')
         for pcid in self.pcids:
             self.log_paths[pcid] = os.path.join(self.dirs[pcid],
                                                 f'pc{pcid:02}_export.log')
@@ -328,8 +326,8 @@ class FPTestData:
             with open(self.log_paths[pcid], 'w') as handle:
                 self.logs[pcid].seek(0)
                 shutil.copyfileobj(self.logs[pcid], handle)  # save logs
-            self.printfunc(f'PC{pcid:02} data written to: '
-                           f'{self.log_paths[pcid]}', pcid=pcid)
+            self.print(f'PC{pcid:02} data written to: '
+                       f'{self.log_paths[pcid]}', pcid=pcid)
             if pcid in self.schedstats:
                 self.schedstats[pcid].to_csv(os.path.join(
                     self.dirs[pcid], 'schedstats.csv'))
@@ -347,7 +345,7 @@ class FPTestData:
     def make_archive(self):
         # exclude fits fz file which is typically 1 GB and the existing tgz
         excl_patterns = ['fvc-*.fits.fz', '*.tar.gz']
-        self.printfunc(f'Making tgz archive with exclusion patterns: '
+        self.print(f'Making tgz archive with exclusion patterns: '
                        f'{excl_patterns}')
         all_paths = glob(os.path.join(self.dir, '*'))
         excl_paths = list(chain.from_iterable(
@@ -359,7 +357,7 @@ class FPTestData:
         with tarfile.open(output_path, 'w:gz') as arc:
             for p in paths:
                 arc.add(p, arcname=os.path.join(dirbase, os.path.basename(p)))
-        self.printfunc(f'Test data archived: {output_path}')
+        self.print(f'Test data archived: {output_path}')
 
 
 class XYTestData(FPTestData):
@@ -478,9 +476,9 @@ class XYTestData(FPTestData):
             #     p.close()
             #     p.join()
             n_threads = min(n_threads_max, 2*multiprocessing.cpu_count())
-            self.printfunc(f'Making summary xyplots with {n_threads} threads '
-                           f'on {multiprocessing.cpu_count()} cores for '
-                           f'submoves {list(range(self.num_corr_max+1))}...')
+            self.print(f'Making summary xyplots with {n_threads} threads '
+                       f'on {multiprocessing.cpu_count()} cores for '
+                       f'submoves {list(range(self.num_corr_max+1))}...')
             pool = []
             n_started = 0
             for posid in tqdm(self.posids):
@@ -491,7 +489,7 @@ class XYTestData(FPTestData):
                 np.start()
                 n_started += 1
                 pool.append(np)
-            self.printfunc(
+            self.print(
                 f'Waiting for the last MP chunk of {n_threads} to complete...')
             [p.join() for p in pool[n_started-n_threads_max:-1]]
         else:
@@ -507,8 +505,7 @@ class XYTestData(FPTestData):
                 #                       args=(pcid, n))
                 #     p.close()
                 #     p.join()
-                self.printfunc('Last MP chunk completed. '
-                               'Creating xyplot binders...')
+                self.print('Last MP chunk completed, creating xyplot binders...')
                 for pcid, n in tqdm(product(self.pcids,
                                             range(self.num_corr_max+1))):
                     np = Process(target=self.make_summary_plot_binder,
@@ -594,10 +591,10 @@ class XYTestData(FPTestData):
         savepath = os.path.join(
             self.dirs[pcid],
             f'{len(paths)}_positioners-xyplot_submove_{n}.pdf')
-        self.printfunc(f'Writing xyplot binder for submove {n}...')
+        self.print(f'Writing xyplot binder for submove {n}...')
         binder.write(savepath)
         binder.close()
-        self.printfunc(f'Binder for submove {n} saved to: {savepath}')
+        self.print(f'Binder for submove {n} saved to: {savepath}')
 
     def plot_grade_dist(self, pcid=None):
         if pcid is None:  # show all positioners tested
@@ -756,8 +753,7 @@ class XYTestData(FPTestData):
 
     def generate_report(self):
         # define input and output paths for pweave
-        self.printfunc(
-            f'Generating xy accuracy test report for {self.filename}')
+        self.print(f'Generating xy accuracy test report for {self.filename}')
         path_output = os.path.join(self.dir,
                                    f'{self.filename}-report.html')
         with open(os.path.join(pc.dirs['xytest_data'], 'pweave_test_src.txt'),
@@ -793,8 +789,8 @@ class XYTestData(FPTestData):
         self.make_summary_plots()  # plot for all positioners by default
         self.dump_as_one_pickle()  # loggers lost as they cannot be serialised
         if shutil.which('pandoc') is None:
-            self.printfunc('You must have a complete installation of pandoc '
-                           'and/or TexLive. Skipping test report...')
+            self.print('You must have a complete installation of pandoc '
+                       'and/or TexLive. Skipping test report...')
         else:
             self.generate_report()  # requires pickle
         self.make_archive()
@@ -944,8 +940,8 @@ class CalibrationData(FPTestData):
         # self.make_arc_plots()
         self.dump_as_one_pickle()  # loggers lost as they cannot be serialised
         if shutil.which('pandoc') is None:
-            self.printfunc('You must have a complete installation of pandoc '
-                           'and/or TexLive. Skipping test report...')
+            self.print('You must have a complete installation of pandoc '
+                       'and/or TexLive. Skipping test report...')
         else:
             self.generate_report()  # requires pickle
         self.make_archive()
