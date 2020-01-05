@@ -243,7 +243,6 @@ class PosSchedule(object):
             else:
                 collision_pairs = {}
                 self.printfunc('Final collision check --> skipped (because \'penultimate\' check already succeeded)')
-            self.move_tables = final.move_tables
             if self.should_check_sweeps_continuity:
                 discontinuous = final.sweeps_continuity_check()
                 self.printfunc('Final check of quantized sweeps --> ' + str(len(discontinuous)) + ' discontinuous (should always be zero)')
@@ -252,8 +251,9 @@ class PosSchedule(object):
             if self.stats:
                 self.stats.add_final_collision_check(collision_pairs)
                 colliding_posids = set(colliding_sweeps.keys())
-                colliding_tables = {p:self.move_tables[p] for p in colliding_posids}
+                colliding_tables = {p:final.move_tables[p] for p in colliding_posids}
                 self.stats.add_unresolved_colliding_at_stage('combined',colliding_posids,colliding_tables,colliding_sweeps)
+        self.move_tables = final.move_tables
         empties = {posid for posid,table in self.move_tables.items() if not table}
         motionless = {posid for posid,table in self.move_tables.items() if table.is_motionless}
         for posid in empties | motionless:
@@ -277,7 +277,7 @@ class PosSchedule(object):
             self.stats.set_num_move_tables(len(self.move_tables))
             self.stats.set_max_table_time(max_net_time)
             self.stats.add_scheduling_time(time.clock() - timer_start)
-        if self.petal.animator_on:
+        if self.petal.animator_on and anticollision != None:
             if self.collider.animate_colliding_only:
                 sweeps_to_add = {}
                 for posid,sweep in colliding_sweeps.items():
