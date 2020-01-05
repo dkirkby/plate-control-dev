@@ -102,11 +102,11 @@ class PosCalibrations(PECS):
             update_mode = 'offsetTposP'
         # if isinstance(updates, dict):
         #     updates = pd.concat(list(updates.values()))
-        updates = (
-            self.ptlm.test_and_update_TP(
+        updates = self.ptlm.test_and_update_TP(
                 used_pos.reset_index(), mode=update_mode, auto_update=commit,
                 tp_updates_tol=0, tp_updates_fraction=1)
-            .set_index('DEVICE_ID').sort_index()).rename(
+        updates = (pd.concat(list(updates.values())).set_index('DEVICE_ID')
+                   .sort_index()).rename(
                 columns={'FLAGS': 'FLAG',
                          'MEAS_FLATX': 'mea_flatX', 'MEAS_FLATY': 'mea_flatY',
                          'EXP_FLATX': 'exp_flatX', 'EXP_FLATY': 'exp_flatY'})
