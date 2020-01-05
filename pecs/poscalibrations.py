@@ -121,10 +121,9 @@ class PosCalibrations(PECS):
         used_pos.drop('FLAG', axis=1, inplace=True)
         calib_up = used_pos.join(updates).append(unused_pos, sort=False)
         # overwrite flags with focalplane flags and add status
-        flags_dicts = self.ptlm.get_pos_flags(list(calib_up.index))
         flags = [pd.DataFrame.from_dict(
                      flags_dict, orient='index', columns=['FLAG'])
-                 for flags_dict in flags_dicts]
+                 for flags_dict in self.ptlm.get_pos_flags().values()]
         calib_up['FLAG'] = pd.concat(flags)
         calib_up['STATUS'] = pc.decipher_posflags(calib_up['FLAG'])
         # clean up and record additional entries in updates
