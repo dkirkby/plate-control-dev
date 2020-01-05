@@ -110,13 +110,14 @@ class PECS:
         else:
             self.print(f'Invalid input: {yn_str}, must be y/n')
 
-    def ptl_setup(self, pcids, posids=None):
+    def ptl_setup(self, pcids, posids=None, illumination_check=False):
         '''input pcids must be a list of integers'''
         self.print(f'Setting up petals and positioners for {len(pcids)} '
                    f'selected petals, PCIDs: {pcids}')
-        for pcid in pcids:  # illumination check
-            assert self._pcid2role(pcid) in self.illuminated_ptl_roles, (
-                f'PC{pcid:02} must be illuminated.')
+        if illumination_check:
+            for pcid in pcids:  # illumination check
+                assert self._pcid2role(pcid) in self.illuminated_ptl_roles, (
+                    f'PC{pcid:02} must be illuminated.')
         self.ptlm.participating_petals = [self._pcid2role(pcid)
                                           for pcid in self.pcids]
         if posids is None:
