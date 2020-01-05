@@ -77,7 +77,7 @@ class PosCalibrations(PECS):
                 role = self.ptl_role_lookup(posid)
                 posintTP = self.ptlm.postrans(posid,
                                               'poslocTP_to_posintTP', poslocTP,
-                                              participating_petals=role)[role]
+                                              participating_petals=role)
                 rows.append({'DEVICE_ID': posid,
                              'COMMAND': 'posintTP',
                              'X1': posintTP[0],

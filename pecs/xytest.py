@@ -299,10 +299,10 @@ class XYTest(PECS):
                 if self.data.target_type == 'poslocTP':
                     tgt = self.ptlm.postrans(
                         posid, 'poslocTP_to_poslocXY', tgt,
-                        participating_petals=role)[role]
+                        participating_petals=role)
                     posintTP, unreachable = self.ptlm.postrans(
                         posid, 'poslocXY_to_posintTP', tgt, 'targetable',
-                        participating_petals=role)[role]
+                        participating_petals=role)
                     if unreachable:
                         self.logger.warning(f'{posid} unreachable: {posintTP}')
                     else:
@@ -310,7 +310,7 @@ class XYTest(PECS):
                 elif self.data.target_type == 'obsXY':
                     tgt = self.ptlm.postrans(
                         posid, 'obsXY_to_poslocXY', tgt,
-                        participating_petals=role)[role]
+                        participating_petals=role)
                 elif self.data.target_type == 'poslocXY':
                     pass
                 else:
@@ -319,7 +319,7 @@ class XYTest(PECS):
                 movedf.loc[idx[i, posid], ['tgt_x', 'tgt_y']] = tgt
                 movedf.loc[idx[i, posid], ['tgt_q', 'tgt_s']] = (
                     self.ptlm.postrans(posid, 'poslocXY_to_QS', tgt,
-                                       participating_petals=role)[role])
+                                       participating_petals=role))
             tgt = movedf.loc[idx[i, posids], ['tgt_x', 'tgt_y']].values  # Nx2
         else:
             movetype, cmd = 'corrective', 'poslocdXdY'
