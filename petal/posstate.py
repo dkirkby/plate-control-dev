@@ -6,9 +6,7 @@ import pprint
 import posconstants as pc
 from DOSlib.positioner_index import PositionerIndex
 try:
-    # don't use singleton class which is persistent and only
-    # applies to single petal
-    from DBSingleton import PosMoveDB
+    from DBSingleton import DBSingleton
     DB_COMMIT_AVAILABLE = True
 except ModuleNotFoundError:
     DB_COMMIT_AVAILABLE = False
@@ -165,7 +163,7 @@ class PosState(object):
     def load_from_db(self, unit_id=None):
 
         self._val = {}  # no local config used to create _val, make empty one
-        self.pDB = PosMoveDB(petal_id=int(self.ptlid))
+        self.pDB = DBSingleton(int(self.ptlid))
         if unit_id is None:  # unit id not supplied, load templates
             unit_id = 'xxxxx'
             if self.type == 'pos':
