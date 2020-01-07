@@ -179,11 +179,14 @@ class PosCalibrations(PECS):
         data_arc.to_pickle(os.path.join(self.data.dir, 'data_arc.pkl.gz'),
                            compression='gzip')
         # run fitting
-        fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
-                                 logger=self.logger)
-        self.data.movedf, calib_fit = fit.calibrate_from_arc_data(data_arc)
-        calib_new = self.collect_calib(self.posids)
-        self.data.write_calibdf(calib_old, calib_fit, calib_new)
+        try:
+            fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
+                                     logger=self.logger)
+            self.data.movedf, calib_fit = fit.calibrate_from_arc_data(data_arc)
+            calib_new = self.collect_calib(self.posids)
+            self.data.write_calibdf(calib_old, calib_fit, calib_new)
+        except Exception as e:
+            self.logger.error(f'calibrate_from_arc_data failed: {e}')
         self.data.t_f = pc.now()
 
     def run_grid_calibration(self, match_radius=50,
@@ -220,11 +223,14 @@ class PosCalibrations(PECS):
         data_grid.to_pickle(os.path.join(self.data.dir, 'data_grid.pkl.gz'),
                             compression='gzip')
         # run fitting
-        fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
-                                 logger=self.logger)
-        self.data.movedf, calib_fit = fit.calibrate_from_grid_data(data_grid)
-        calib_new = self.collect_calib(self.posids)
-        self.data.write_calibdf(calib_old, calib_fit, calib_new)
+        try:
+            fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
+                                     logger=self.logger)
+            self.data.movedf, calib_fit = fit.calibrate_from_grid_data(data_grid)
+            calib_new = self.collect_calib(self.posids)
+            self.data.write_calibdf(calib_old, calib_fit, calib_new)
+        except Exception as e:
+            self.logger.error(f'calibrate_from_grid_data failed: {e}')
         self.data.t_f = pc.now()
 
     @property
