@@ -90,7 +90,9 @@ class PECS:
         assert hasattr(self, 'data'), (
             'FPTestData must be initialised before calling exposure setup.')
         self.exp = Exposure(readonly=False)
-        self.exp.sequence = self.data.test_name
+        self.exp.sequence = 'Focalplane'
+        self.exp.program = self.data.test_name
+        self.exp.exptime = self.exptime
         self.data.set_dirs(self.exp.id)  # directory setup
         self.fvc.save_centers = True
         self.fvc.save_centers_path = self.data.dir
