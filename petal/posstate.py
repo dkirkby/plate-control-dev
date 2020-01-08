@@ -163,7 +163,7 @@ class PosState(object):
     def load_from_db(self, unit_id=None):
 
         self._val = {}  # no local config used to create _val, make empty one
-        self.pDB = DBSingleton(int(self.ptlid))
+        self.pDB = DBSingleton(petal_id=int(self.ptlid))
         if unit_id is None:  # unit id not supplied, load templates
             unit_id = 'xxxxx'
             if self.type == 'pos':

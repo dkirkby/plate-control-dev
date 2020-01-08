@@ -75,6 +75,13 @@ class PosTransforms(petaltransforms.PetalTransforms):
 
     """
 
+    alt = {'LENGTH_R1': 3.0,
+           'LENGTH_R2': 3.0,
+           'OFFSET_X': 0.0,
+           'OFFSET_Y': 0.0,
+           'OFFSET_T': 0.0,
+           'OFFSET_P': 0.0}
+
     def __init__(self, this_posmodel=None, petal_alignment=None):
         if petal_alignment is None:
             petal_alignment = {'Tx': 0, 'Ty': 0, 'Tz': 0,
@@ -90,12 +97,6 @@ class PosTransforms(petaltransforms.PetalTransforms):
         self.posmodel = this_posmodel
         # allow alternate calibration values to temporarily override DB
         self.alt_override = False
-        self.alt = {'LENGTH_R1': 3.0,
-                    'LENGTH_R2': 3.0,
-                    'OFFSET_X': 0.0,
-                    'OFFSET_Y': 0.0,
-                    'OFFSET_T': 0.0,
-                    'OFFSET_P': 0.0}
         self.getval = lambda varname: (  # varname is a string
             self.alt[varname] if self.alt_override
             else self.posmodel.state._val[varname])
