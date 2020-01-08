@@ -123,9 +123,11 @@ class PosSchedule(object):
         elif uv_type == 'poslocTP':
             targt_posintTP = trans.poslocTP_to_posintTP([u, v])
         else:
-            if self.verbose:
-                self.printfunc(
-                    f'{posid}: target request denied. Bad uv_type: {uv_type}')
+            #if self.verbose:
+            # Moving out of verbose - will spam messages but only happens because
+            # a script was written wrong. Will get the point across.
+            self.printfunc(
+                f'{posid}: target request denied. Bad uv_type: {uv_type}')
             return False
         if unreachable:
             self.petal.pos_flags[posid] |= self.petal.unreachable_targ_bit
