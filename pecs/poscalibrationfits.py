@@ -13,6 +13,7 @@ only serve to ensure spotmatch does not fail.
 
 'mea_' is measured, 'exp_' is internally-tracked/expected, 'tgt_' is target
 """
+import os
 import numpy as np
 from scipy import optimize
 import pandas as pd
@@ -42,7 +43,6 @@ class PosCalibrationFits:
             self.logger = BroadcastLogger(printfunc=printfunc)
         else:
             self.logger = logger
-
         if petal_alignments is not None:
             self.petal_alignments = petal_alignments
         else:
@@ -56,9 +56,10 @@ class PosCalibrationFits:
         self.logger.debug('Reading petal alignments from DB...')
         if use_doslib:
             from DOSlib.constants import ConstantsDB
-            group, tag, snapshopt = 'focal_plane_metrology', 'CURRENT', 'DESI'
+            group, tag, snapshot = 'focal_plane_metrology', 'CURRENT', 'DESI'
             df = pd.DataFrame.from_dict(ConstantsDB().get_constants(
-                group=group, tag=tag, snapshot=snapshot)[group], orient='index')
+                group=group, tag=tag, snapshot=snapshot)
+                [group], orient='index')
             alignments = {int(petal_loc): {'Tx': row['petal_offset_x'],
                                            'Ty': row['petal_offset_y'],
                                            'Tz': row['petal_offset_z'],
@@ -116,6 +117,7 @@ class PosCalibrationFits:
                     petal_loc = data.xs(
                         posid, level='DEVICE_ID')['PETAL_LOC'].iloc[0]
                     petal_id = self.pi.find_by_device_id(posid)['PETAL_ID']
+                    print(f'posid = {posid}, petal_id = {petal_id}')
                     self.posmodels[posid] = PosModel(state=PosState(
                         unit_id=posid, petal_id=petal_id, device_type='pos',
                         printfunc=self.logger.debug),
@@ -175,7 +177,7 @@ class PosCalibrationFits:
         for col in cols:  # add new empty columns to grid data dataframe
             data[col] = np.nan
         poscals = []  # each entry is a row of calibration values for one posid
-        for posid in posids:
+        for posid in tqdm(posids):
             poscal, posmea = {}, {}
             trans = self.posmodels[posid].trans
             # measurement always in QS, but fit and derive params in flatXY
@@ -306,9 +308,9 @@ class PosCalibrationFits:
                 'tgt_flatX', 'tgt_flatY', 'tgt_Q', 'tgt_S']
         for col in cols:  # add new empty columns to grid data dataframe
             data[col] = np.nan
-        p0 = [PosTransforms().alt[key] for key in keys_fit]
+        p0 = [PosTransforms.alt[key] for key in keys_fit]
         poscals = []  # each entry is a row of calibration for one posid
-        for posid in posids:
+        for posid in tqdm(posids):
             trans = self.posmodels[posid].trans
             trans.alt_override = True  # enable override in pos transforms
             # measurement always in QS, but fit and derive params in flatXY
@@ -365,19 +367,22 @@ class PosCalibrationFits:
 
 if __name__ == '__main__':
     # sample calibration data
-    df = pd.DataFrame(np.array([[9, -170, 150, 300, 30]]*3),
-                      index=['M00001', 'M00002', 'M00003'],
-                      columns=['PETAL_LOC', 'tgt_posintT', 'tgt_posintP',
-                               'mea_Q', 'mea_S'])
-    df['DEVICE_LOC'] = [78, 324, 517]
-    data_grid = pd.concat([df]*10, keys=range(10),
-                          names=['target_no', 'DEVICE_ID'])  # grid
-    arc = pd.concat([df]*6, keys=range(10))  # one arc
-    data_arc = pd.concat([arc, arc], keys=['T', 'P'],
-                         names=['axis', 'target_no', 'DEVICE_ID'])
-    posdata = data_grid.loc[idx[:, 'M00001'], :]
-    posdata = data_arc.loc[idx['T', :, 'M00001'], :]
+    # df = pd.DataFrame(np.array([[9, -170, 150, 300, 30]]*3),
+    #                   index=['M00001', 'M00002', 'M00003'],
+    #                   columns=['PETAL_LOC', 'tgt_posintT', 'tgt_posintP',
+    #                            'mea_Q', 'mea_S'])
+    # df['DEVICE_LOC'] = [78, 324, 517]
+    # data_grid = pd.concat([df]*10, keys=range(10),
+    #                       names=['target_no', 'DEVICE_ID'])  # grid
+    # arc = pd.concat([df]*6, keys=range(10))  # one arc
+    # data_arc = pd.concat([arc, arc], keys=['T', 'P'],
+    #                      names=['axis', 'target_no', 'DEVICE_ID'])
+    # posdata = data_grid.loc[idx[:, 'M00001'], :]
+    # posdata = data_arc.loc[idx['T', :, 'M00001'], :]
     # debug
-    data = pd.read_pickle("/data/focalplane/logs/kpno/20191222/00034392/data_grid.pkl.gz")
+    directory = "/data/focalplane/logs/kpno/20200104/00037928/"
+    data = pd.read_pickle(os.path.join(directory, "data_arc.pkl.gz"))
     calib = PosCalibrationFits(use_doslib=True)
-    movedf, calibdf = calib.calibrate_from_grid_data(data)
+    movedf, calibdf = calib.calibrate_from_arc_data(data)
+    movedf.to_pickle(os.path.join(directory, "movedf.pkl.gz"))
+    calibdf.to_pickle(os.path.join(directory, "calibdf.pkl.gz"))
