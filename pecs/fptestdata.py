@@ -308,7 +308,7 @@ class FPTestData:
         '''must have writte self.posids_pc, a dict keyed by pcid'''
         self.test_cfg.write()  # write test config
         for attr in ['movedf', 'gradedf', 'calibdf', 'abnormaldf', 
-                     'exppos', 'meapos']:
+                     'exppos', 'meapos', 'calib_fit']:
             if not hasattr(self, attr):
                 continue  # skip a df if it doesn't exist
             getattr(self, attr).to_pickle(
@@ -948,40 +948,37 @@ class CalibrationData(FPTestData):
 
 
 if __name__ == '__main__':
-
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    expids = ['00031306', '00031308', '00031611', '00032703', '00032704']
-    # expids = ['00031611']
     # arc calib expids
-    expids = ['00033473', '00033490']
+    expids = [38563]
     # grid calib expids
-    expids = ['00034382']
-    # from poscalibrationfits import PosCalibrationFits
+    # expids = ['00034382']
+    from poscalibrationfits import PosCalibrationFits
     for expid in expids:
-        paths = glob(pc.dirs['kpno']+f'/*/{expid}/*data.pkl')
+        paths = glob(pc.dirs['kpno']+f'/*/{expid:08}/*data.pkl')
         assert len(paths) == 1, paths
         print(f'Re-processing FP test data:\n{paths[0]}')
-        try:
-            # path = os.path.join(os.path.dirname(paths[0]), 'data_grid.pkl.gz')
-            # data_arc = pd.read_pickle(path)
-            # fit = PosCalibrationFits()
-            # movedf, calib_fit = fit.calibrate_from_arc_data(data_arc)
-            with open(os.path.join(paths[0]), 'rb') as h:
-                data = pickle.load(h)
-            # try:
-            #     calib_old = data.calibdf['OLD']
-            #     calib_new = data.calibdf['NEW']
-            # except:
-            #     calib_old = data.calibdf.xs('OLD', level='label')
-            #     calib_new = data.calibdf.xs('NEW', level='label')
-            # data.write_calibdf(calib_old, calib_fit, calib_new)
-            # data.movedf.index.set_names('axis', level='arc', inplace=True)
-            # # # data.generate_data_products()
-            # data.export_data_logs()
-            # data.dump_as_one_pickle()
-            # # if shutil.which('pandoc') is not None:
-            # #     data.generate_report()
-            data.make_archive()
-        except Exception as e:
-            print(e)
-            pass
+        # try:
+        with open(os.path.join(paths[0]), 'rb') as h:
+            data = pickle.load(h)
+        path = os.path.join(os.path.dirname(paths[0]), 'data_arc.pkl.gz')
+        data_arc = pd.read_pickle(path)
+        fit = PosCalibrationFits()
+        data.movedf, data.calib_fit = fit.calibrate_from_arc_data(data_arc)
+        # try:
+        #     calib_old = data.calibdf['OLD']
+        #     calib_new = data.calibdf['NEW']
+        # except:
+        #     calib_old = data.calibdf.xs('OLD', level='label')
+        #     calib_new = data.calibdf.xs('NEW', level='label')
+        # data.write_calibdf(calib_old, calib_fit, calib_new)
+        # data.movedf.index.set_names('axis', level='arc', inplace=True)
+        # # # data.generate_data_products()
+        data.export_data_logs()
+        data.dump_as_one_pickle()
+        # # if shutil.which('pandoc') is not None:
+        # #     data.generate_report()
+        data.make_archive()
+        # except Exception as e:
+        #     print(e)
+        #     pass

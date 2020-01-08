@@ -4,6 +4,7 @@ Created on Thu Dec 12 12:21:10 2019
 
 @author: Duan Yutong (dyt@physics.bu.edu)
 """
+from glob import glob
 import os
 import pandas as pd
 import posconstants as pc
@@ -176,6 +177,7 @@ class PosCalibrations(PECS):
                                   names=['axis', 'target_no', 'DEVICE_ID'])
         self.data_arc.to_pickle(os.path.join(self.data.dir, 'data_arc.pkl.gz'),
                                 compression='gzip')
+        self.data.t_f = pc.now()
         try:  # run fitting
             fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
                                      logger=self.logger)
@@ -185,7 +187,6 @@ class PosCalibrations(PECS):
             self.data.write_calibdf(calib_old, calib_fit, calib_new)
         except Exception as e:
             self.logger.error(f'Arc calibration fitting failed: {e}')
-        self.data.t_f = pc.now()
 
     def run_grid_calibration(self, match_radius=50,
                              interactive=False):
@@ -217,6 +218,7 @@ class PosCalibrations(PECS):
                               names=['target_no', 'DEVICE_ID'])
         self.data_grid.to_pickle(os.path.join(
             self.data.dir, 'data_grid.pkl.gz'), compression='gzip')
+        self.data.t_f = pc.now()
         try:  # run fitting
             fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
                                      logger=self.logger)
@@ -226,7 +228,6 @@ class PosCalibrations(PECS):
             self.data.write_calibdf(calib_old, calib_fit, calib_new)
         except Exception as e:
             self.logger.error(f'Grid calibration fitting failed: {e}')
-        self.data.t_f = pc.now()
 
     @property
     def petal_alignments(self):
@@ -257,7 +258,14 @@ class PosCalibrations(PECS):
 
 
 if __name__ == '__main__':
-    path = "/data/focalplane/logs/kpno/20191222/00034382/data_grid.pkl.gz"
-    data_grid = pd.read_pickle(path)
-    fit = PosCalibrationFits()
-    movedf, calib_fit = fit.calibrate_from_grid_data(data_grid)
+    expids = [37927,37928,37930,37933]  # arcs
+    for expid in expids:
+        paths = glob(pc.dirs['kpno']+f'/*/{expid:08}/*data_*.pkl.gz')
+        assert len(paths) == 1, paths
+        path = paths[0]
+        print(f'Re-processing FP test data:\n{path}')
+        data_arc = pd.read_pickle(path)
+        fit = PosCalibrationFits()
+        movedf, calib_fit = fit.calibrate_from_arc_data(data_arc)
+        movedf.to_pickle(os.path.join(os.path.dirname(path), 'movedf.pkl.gz'))
+        calib_fit.to_pickle(os.path.join(os.path.dirname(path), 'calib_fit.pkl.gz'))
