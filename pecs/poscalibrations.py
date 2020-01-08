@@ -57,8 +57,6 @@ class PosCalibrations(PECS):
             return self.run_1p_calibration(tp_target=tp_target,
                                            commit=commit,
                                            match_radius=match_radius)
-        self.data.test_cfg['commit'] = commit
-        self.data.test_cfg['match_radius'] = match_radius
         calib_old = self.collect_calib(self.posids)
         do_move = True
         if tp_target == 'default':  # tp_target as target
@@ -67,6 +65,9 @@ class PosCalibrations(PECS):
             poslocTP = tp_target
         else:
             poslocTP, do_move = None, False
+        self.data.test_cfg.update(
+            {'commit': commit, 'tgt_poslocTP': poslocTP, 'do_move': do_move,
+             'match_radius': match_radius})
         self.print(f'Running one-point calibration, mode = {self.data.mode}, '
                    f'poslocTP = {poslocTP}, do_move = {do_move}, '
                    f'commit = {commit}')
@@ -143,9 +144,6 @@ class PosCalibrations(PECS):
         calib_old = self.collect_calib(self.posids)
         self.print(f'Running arc calibration, n_pts_T = {self.data.n_pts_T}, '
                    f'n_pts_P = {self.data.n_pts_P}, with no DB commit')
-        # req_list_T, req_list_P = self.ptlm.get_arc_requests(  # build req
-        #     ids=self.posids,
-        #     n_points_T=self.data.n_pts_T, n_points_P=self.data.n_pts_P)
         ret = self.ptlm.get_arc_requests(
             ids=self.posids,
             n_points_T=self.data.n_pts_T, n_points_P=self.data.n_pts_P)
@@ -174,19 +172,19 @@ class PosCalibrations(PECS):
         # put all arc measurement data in one dataframe
         T_arc = pd.concat(T_data, keys=range(self.data.n_pts_T))
         P_arc = pd.concat(P_data, keys=range(self.data.n_pts_P))
-        data_arc = pd.concat([T_arc, P_arc], keys=['T', 'P'],
-                             names=['axis', 'target_no', 'DEVICE_ID'])
-        data_arc.to_pickle(os.path.join(self.data.dir, 'data_arc.pkl.gz'),
-                           compression='gzip')
-        # run fitting
-        try:
+        self.data_arc = pd.concat([T_arc, P_arc], keys=['T', 'P'],
+                                  names=['axis', 'target_no', 'DEVICE_ID'])
+        self.data_arc.to_pickle(os.path.join(self.data.dir, 'data_arc.pkl.gz'),
+                                compression='gzip')
+        try:  # run fitting
             fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
                                      logger=self.logger)
-            self.data.movedf, calib_fit = fit.calibrate_from_arc_data(data_arc)
+            self.data.movedf, calib_fit = fit.calibrate_from_arc_data(
+                self.data_arc)
             calib_new = self.collect_calib(self.posids)
             self.data.write_calibdf(calib_old, calib_fit, calib_new)
         except Exception as e:
-            self.logger.error(f'calibrate_from_arc_data failed: {e}')
+            self.logger.error(f'Arc calibration fitting failed: {e}')
         self.data.t_f = pc.now()
 
     def run_grid_calibration(self, match_radius=50,
@@ -201,9 +199,6 @@ class PosCalibrations(PECS):
         calib_old = self.collect_calib(self.posids)
         self.print(f'Running grid calibration, n_pts_T = {self.data.n_pts_T}, '
                    f'n_pts_P = {self.data.n_pts_P}, with no DB commit')
-        # req_list = self.ptl.get_grid_requests(ids=self.posids,
-        #                                       n_points_T=self.data.n_pts_T,
-        #                                       n_points_P=self.data.n_pts_P)
         ret = self.ptlm.get_grid_requests(ids=self.posids,
                                           n_points_T=self.data.n_pts_T,
                                           n_points_P=self.data.n_pts_P)
@@ -218,19 +213,19 @@ class PosCalibrations(PECS):
                                                match_radius=match_radius))
             if i+1 < len(req_list):  # no pause after the last iteration
                 self.pause()
-        data_grid = pd.concat(grid_data, keys=range(len(req_list)),
+        self.data_grid = pd.concat(grid_data, keys=range(len(req_list)),
                               names=['target_no', 'DEVICE_ID'])
-        data_grid.to_pickle(os.path.join(self.data.dir, 'data_grid.pkl.gz'),
-                            compression='gzip')
-        # run fitting
-        try:
+        self.data_grid.to_pickle(os.path.join(
+            self.data.dir, 'data_grid.pkl.gz'), compression='gzip')
+        try:  # run fitting
             fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
                                      logger=self.logger)
-            self.data.movedf, calib_fit = fit.calibrate_from_grid_data(data_grid)
+            self.data.movedf, calib_fit = fit.calibrate_from_grid_data(
+                self.data_grid)
             calib_new = self.collect_calib(self.posids)
             self.data.write_calibdf(calib_old, calib_fit, calib_new)
         except Exception as e:
-            self.logger.error(f'calibrate_from_grid_data failed: {e}')
+            self.logger.error(f'Grid calibration fitting failed: {e}')
         self.data.t_f = pc.now()
 
     @property
