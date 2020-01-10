@@ -70,8 +70,11 @@ class BroadcastLogger:
         elif type(msg) is str:
             if self.loggers_available:
                 pcids = self.pcids if pcid is None else [pcid]
-                [self.loggers[pcid].log(lvl, msg) for pcid in self.pcids]
-            self.printfunc(msg)  # always print once for the broadcasted msg
+                [self.loggers[pcid].log(lvl, msg) for pcid in pcids]
+                if lvl <=20:
+                    self.printfunc(msg)  # always print once for info and below
+            else:  # not logged to existing loggers
+                self.printfunc(msg)  # always print regardless of lvl
         else:
             raise TypeError('Wrong message data type sent to logger')
 
