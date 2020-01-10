@@ -111,7 +111,7 @@ class PosCalibrationFits:
         for posid in tqdm(posids):
             posinfo = self.pi.find_by_device_id(posid)
             self.petal_locs[posid] = petal_loc = posinfo['PETAL_LOC']
-            self.petal_ids[posid] = petal_id posinfo['PETAL_ID']
+            self.petal_ids[posid] = petal_id = posinfo['PETAL_ID']
             if posid not in self.posmodels:
                 self.posmodels[posid] = PosModel(state=PosState(
                     unit_id=posid, petal_id=petal_id, device_type='pos',
