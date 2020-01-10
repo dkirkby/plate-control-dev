@@ -103,29 +103,21 @@ class PosCalibrationFits:
         self.logger.info(f'Petal alignments loaded: {alignments}')
         self.petal_alignments = alignments
 
-    def init_posmodels(self, posids=None, posmodels=None):
+    def init_posmodels(self, posids):
         '''called upon receiving calibration data specified below
         supply either posmodels (online) or data (offline)'''
         self.logger.debug('Initialising posmodels...')
-        self.posmodels = {}
-        if posmodels is not None and isinstance(posmodels, dict):
-            self.posmodels.update(posmodels)
-        else:
-            assert posids is not None, 'Must supply either posids or posmodels'
-            for posid in tqdm(posids):
+        self.posmodels, self.petal_locs, self.petal_ids = {}, {}, {}
+        for posid in tqdm(posids):
+            posinfo = self.pi.find_by_device_id(posid)
+            self.petal_locs[posid] = posinfo['PETAL_LOC']
+            self.petal_ids[posid] = posinfo['PETAL_ID']
+            if posid not in self.posmdeos:
                 self.posmodels[posid] = PosModel(state=PosState(
                     unit_id=posid, petal_id=petal_id, device_type='pos',
                     printfunc=self.logger.debug),
                     petal_alignment=self.petal_alignments[petal_loc])
-        self.posids = list(self.posmodels.keys())
-        self._init_posinfo()
-
-    def _init_posinfo(self):
-        self.petal_locs, self.petal_ids = {}, {}
-        for posid in self.posids:
-            posinfo = self.pi.find_by_device_id(posid)
-            self.petal_locs[posid] = posinfo['PETAL_LOC']
-            self.petal_ids[posid] = posinfo['PETAL_ID']
+        self.posids = posids
 
     @staticmethod
     def fit_circle(x):  # input x is a N x 2 array for (x, y) points in 2D
