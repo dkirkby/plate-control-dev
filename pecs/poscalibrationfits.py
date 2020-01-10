@@ -112,7 +112,7 @@ class PosCalibrationFits:
             posinfo = self.pi.find_by_device_id(posid)
             self.petal_locs[posid] = posinfo['PETAL_LOC']
             self.petal_ids[posid] = posinfo['PETAL_ID']
-            if posid not in self.posmdeos:
+            if posid not in self.posmodels:
                 self.posmodels[posid] = PosModel(state=PosState(
                     unit_id=posid, petal_id=petal_id, device_type='pos',
                     printfunc=self.logger.debug),
