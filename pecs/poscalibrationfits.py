@@ -223,7 +223,7 @@ class PosCalibrationFits:
                 poscals.append(poscal)  # the rest will only trigger warnings
                 self.logger.error(
                     f'{posid}: trivial fitted armlength(s): '
-                    f'R1 = {poscal['LENGTH_R1']}, R2 = {poscal['LENGTH_R2']}',
+                    f'R1 = {poscal["LENGTH_R1"]}, R2 = {poscal["LENGTH_R2"]}',
                     pcid=self.petal_locs[posid])
                 continue
             # caluclate offset T using phi arc centre and target posintT
