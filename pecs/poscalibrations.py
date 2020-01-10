@@ -19,8 +19,10 @@ class PosCalibrations(PECS):
 
     def __init__(self, mode, n_pts_TP=None, fvc=None, ptlm=None,
                  pcid=None, posids=None, interactive=False):
+        # first determine what test we are running, set test params/cfg
         n_pts_TP_default = {'arc': (6, 6), 'grid': (7, 5)}
-        cfg = {'pcids': PECS().pcids, 'anticollision': None}
+        cfg = {'pcids': PECS().pcids, 'anticollision': None,
+               'online_fitting': True}
         if '1p_' in mode:  # phi arm angle for 1p calib is 135 deg
             cfg.update({'mode': mode, 'poslocP': 135})
         elif mode in ['arc', 'grid']:
@@ -28,8 +30,10 @@ class PosCalibrations(PECS):
             cfg.update({'mode': mode, 'n_pts_T': nTP[0], 'n_pts_P': nTP[1]})
         else:
             raise Exception(f'Invalid mode: {mode}')
+        # next initilaise test data object with loggers for each petal
         self.data = CalibrationData(cfg)
         self.logger = self.data.logger  # broadcast to all petals
+        self.loggers = self.data.loggers
         super().__init__(fvc=fvc, ptlm=ptlm, interactive=interactive)
         self.data.t_i = pc.now()
         self.exp_setup()  # set up exposure ID and product directory
@@ -44,7 +48,7 @@ class PosCalibrations(PECS):
              .set_index('DEVICE_ID') for role in self.ptl_roles])
 
     def run_1p_calibration(self, tp_target='default', commit=False,
-                           match_radius=80, interactive=False):
+                           match_radius=50, interactive=False):
         if interactive:
             user_text = self._parse_yn(
                 input('Move positioners? (y/n): '))
@@ -138,13 +142,12 @@ class PosCalibrations(PECS):
         if interactive:
             # commit = self._parse_yn(input(
             #             'Automatically update calibration? (y/n): '))
-            match_radius = float(input(
-                    'Please provide a spotmatch radius: '))
+            match_radius = float(input('Please provide a spotmatch radius: '))
             return self.run_arc_calibration(match_radius=match_radius)
         self.data.test_cfg['match_radius'] = match_radius
         calib_old = self.collect_calib(self.posids)
         self.print(f'Running arc calibration, n_pts_T = {self.data.n_pts_T}, '
-                   f'n_pts_P = {self.data.n_pts_P}, with no DB commit')
+                   f'n_pts_P = {self.data.n_pts_P}, DB commit disabled')
         ret = self.ptlm.get_arc_requests(
             ids=self.posids,
             n_points_T=self.data.n_pts_T, n_points_P=self.data.n_pts_P)
@@ -178,15 +181,13 @@ class PosCalibrations(PECS):
         self.data_arc.to_pickle(os.path.join(self.data.dir, 'data_arc.pkl.gz'),
                                 compression='gzip')
         self.data.t_f = pc.now()
-        try:  # run fitting
+        if self.data.online_fitting:
             fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
-                                     logger=self.logger)
+                                     loggers=self.loggers)
             self.data.movedf, calib_fit = fit.calibrate_from_arc_data(
                 self.data_arc)
             calib_new = self.collect_calib(self.posids)
             self.data.write_calibdf(calib_old, calib_fit, calib_new)
-        except Exception as e:
-            self.logger.error(f'Arc calibration fitting failed: {e}')
 
     def run_grid_calibration(self, match_radius=50,
                              interactive=False):
@@ -199,7 +200,7 @@ class PosCalibrations(PECS):
         self.data.test_cfg['match_radius'] = match_radius
         calib_old = self.collect_calib(self.posids)
         self.print(f'Running grid calibration, n_pts_T = {self.data.n_pts_T}, '
-                   f'n_pts_P = {self.data.n_pts_P}, with no DB commit')
+                   f'n_pts_P = {self.data.n_pts_P}, DB commit disabled')
         ret = self.ptlm.get_grid_requests(ids=self.posids,
                                           n_points_T=self.data.n_pts_T,
                                           n_points_P=self.data.n_pts_P)
@@ -219,15 +220,13 @@ class PosCalibrations(PECS):
         self.data_grid.to_pickle(os.path.join(
             self.data.dir, 'data_grid.pkl.gz'), compression='gzip')
         self.data.t_f = pc.now()
-        try:  # run fitting
-            fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
-                                     logger=self.logger)
+        if self.data.online_fitting:
+            fit = PosCalibrationFitss(petal_alignments=self.petal_alignments,
+                                     loggers=self.loggers)
             self.data.movedf, calib_fit = fit.calibrate_from_grid_data(
                 self.data_grid)
             calib_new = self.collect_calib(self.posids)
             self.data.write_calibdf(calib_old, calib_fit, calib_new)
-        except Exception as e:
-            self.logger.error(f'Grid calibration fitting failed: {e}')
 
     @property
     def petal_alignments(self):

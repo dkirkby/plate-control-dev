@@ -38,16 +38,12 @@ class PosCalibrationFits:
     '''
 
     def __init__(self, petal_alignments=None, use_doslib=False,
-                 posmodels=None, logger=None, printfunc=print):
-        if logger is None:
-            self.logger = BroadcastLogger(printfunc=printfunc)
-        else:
-            self.logger = logger
+                 posmodels=None, loggers=None, printfunc=print):
+        self.logger = BroadcastLogger(loggers=loggers, printfunc=printfunc)
         if petal_alignments is not None:
             self.petal_alignments = petal_alignments
         else:
             self.read_alignments(use_doslib=use_doslib)
-        self.posmodels = {}
         if posmodels is not None:
             self.init_posmodels(posmodels=posmodels)
         self.pi = PositionerIndex()
@@ -104,26 +100,32 @@ class PosCalibrationFits:
                                            'beta': d['petal_rot_2'],
                                            'gamma': d['petal_rot_3']}
                           for petal_loc, d in zip(q.index, q['constants'])}
+        self.logger.info(f'Petal alignments loaded: {alignments}')
         self.petal_alignments = alignments
 
-    def init_posmodels(self, data=None, posmodels=None):
+    def init_posmodels(self, posids=None, posmodels=None):
         '''called upon receiving calibration data specified below
         supply either posmodels (online) or data (offline)'''
         self.logger.debug('Initialising posmodels...')
-        if posmodels is None:
-            for posid in tqdm(data.index.get_level_values('DEVICE_ID')
-                              .unique()):
-                if posid not in self.posmodels.keys():
-                    petal_loc = data.xs(
-                        posid, level='DEVICE_ID')['PETAL_LOC'].iloc[0]
-                    petal_id = self.pi.find_by_device_id(posid)['PETAL_ID']
-                    print(f'posid = {posid}, petal_id = {petal_id}')
-                    self.posmodels[posid] = PosModel(state=PosState(
-                        unit_id=posid, petal_id=petal_id, device_type='pos',
-                        printfunc=self.logger.debug),
-                        petal_alignment=self.petal_alignments[petal_loc])
-        else:
+        self.posmodels = {}
+        if posmodels is not None and isinstance(posmodels, dict):
             self.posmodels.update(posmodels)
+        else:
+            assert posids is not None, 'Must supply either posids or posmodels'
+            for posid in tqdm(posids):
+                self.posmodels[posid] = PosModel(state=PosState(
+                    unit_id=posid, petal_id=petal_id, device_type='pos',
+                    printfunc=self.logger.debug),
+                    petal_alignment=self.petal_alignments[petal_loc])
+        self.posids = list(self.posmodels.keys())
+        self._init_posinfo()
+
+    def _init_posinfo(self):
+        self.petal_locs, self.petal_ids = {}, {}
+        for posid in self.posids:
+            posinfo = self.pi.find_by_device_id(posid)
+            self.petal_locs[posid] = posinfo['PETAL_LOC']
+            self.petal_ids[posid] = posinfo['PETAL_ID']
 
     @staticmethod
     def fit_circle(x):  # input x is a N x 2 array for (x, y) points in 2D
@@ -170,7 +172,7 @@ class PosCalibrationFits:
         """
         posids = sorted(data.index.get_level_values('DEVICE_ID').unique())
         self.logger.debug(f'Analysing arc calibration measurement data...')
-        self.init_posmodels(data)  # double check that all posmodels exist
+        self.init_posmodels(posids=posids)  # double check that all posmodels exist
         cols = ['mea_posintT, mea_posintP', 'mea_flatX', 'mea_flatY',
                 'tgt_flatX', 'tgt_flatY', 'tgt_Q', 'tgt_S']
         for col in cols:  # add new empty columns to grid data dataframe
@@ -202,7 +204,8 @@ class PosCalibrationFits:
             fits = [fit_arc(arc) for arc in ['T', 'P']]
             if None in fits:
                 self.logger.error(f'{posid} arc calibration failed, '
-                                  f'at least 3 points required, skipping...')
+                                  f'at least 3 points required, skipping...',
+                                  pcid=self.petal_locs[posid])
                 poscals.append({})
                 continue
             for i, arc in enumerate(['T', 'P']):  # loop over two arcs
@@ -218,6 +221,10 @@ class PosCalibrationFits:
                            'LENGTH_R2': poscal['radius_P'].mean()})
             if poscal['LENGTH_R1'] == 0 or poscal['LENGTH_R2'] == 0:
                 poscals.append(poscal)  # the rest will only trigger warnings
+                self.logger.error(
+                    f'{posid}: trivial fitted armlength(s): '
+                    f'R1 = {poscal['LENGTH_R1']}, R2 = {poscal['LENGTH_R2']}',
+                    pcid=self.petal_locs[posid])
                 continue
             # caluclate offset T using phi arc centre and target posintT
             xy = poscal['centre_P'] - poscal['centre_T']  # 1 x 2 array
@@ -276,7 +283,8 @@ class PosCalibrationFits:
             for ratio, arc in zip([ratio_T, ratio_P], ['T', 'P']):
                 if abs(ratio - 1) > 0.06:
                     self.logger.warning(
-                        f'{posid}: GEAR_CALIB_{arc} = {ratio:.6f}')
+                        f'{posid}: GEAR_CALIB_{arc} = {ratio:.6f}',
+                        pcid=self.petal_locs[posid])
             trans.alt_override = False  # turn it back off when finished
             for c in ['flatX', 'flatY', 'Q', 'S', 'posintT', 'posintP']:
                 data[f'err_{c}'] = data[f'mea_{c}'] - data[f'tgt_{c}']
@@ -329,8 +337,9 @@ class PosCalibrationFits:
             mask = posdata.index[~posdata.isnull().any(axis=1)]
             posdata = posdata.loc[mask]  # filter nan
             if len(posdata) <= len(keys_fit):
-                self.logger.error(f'{posid} calibration failed, '
-                                  f'only {len(posdata)} valid grid points')
+                self.logger.error(f'{posid} calibration failed: '
+                                  f'only {len(posdata)} valid grid points',
+                                  pcid=self.petal_locs[posid])
                 poscals.append({})
                 continue  # skip this iteration for this posid in the loop
             mea_flatXY = posdata[['mea_flatX', 'mea_flatY']].values  # N x 2
@@ -353,7 +362,8 @@ class PosCalibrationFits:
             result = optimize.minimize(fun=err_rms, x0=p0, bounds=bounds)
             if result.fun > 0.4:
                 self.logger.warning(f'{posid} grid calibration, {len(posdata)}'
-                                    f' points, err_rms = {result.fun:.3f}')
+                                    f' points, err_rms = {result.fun:.3f}',
+                                    pcid=self.petal_locs[posid])
             # centralize offsetsTP (why needed if we can limit to +/-180?)
             # for i, param_key in enumerate(keys_fit):
             #     if param_key in ['OFFSET_T', 'OFFSET_P']:

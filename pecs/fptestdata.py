@@ -59,36 +59,36 @@ class BroadcastLogger:
         if loggers is None:
             self.loggers_available = False
         else:
+            self.loggers_available = True
             self.pcids = list(loggers.keys())
             self.loggers = loggers
-            self.loggers_available = True
         self.printfunc = printfunc
 
-    def _log(self, msg, lvl):  # reserved for in-class use, don't call this
+    def _log(self, msg, lvl, pcid=None):  # reserved for in-class use
         if type(msg) is list:
-            list(map(partial(self._log, lvl=lvl), msg))
+            list(map(partial(self._log, lvl=lvl, pcid=pcid), msg))
         elif type(msg) is str:
             if self.loggers_available:
-                for pcid in self.pcids:
-                    self.loggers[pcid].log(lvl, msg)
-            self.printfunc(msg)
+                pcids = self.pcids if pcid is None else [pcid]
+                [self.loggers[pcid].log(lvl, msg) for pcid in self.pcids]
+            self.printfunc(msg)  # always print once for the broadcasted msg
         else:
-            raise Exception('Wrong message data type sent to logger')
+            raise TypeError('Wrong message data type sent to logger')
 
-    def critical(self, msg):
-        self._log(msg, 50)
+    def critical(self, msg, pcid=None):
+        self._log(msg, 50, pcid=pcid)
 
-    def error(self, msg):
-        self._log(msg, 40)
+    def error(self, msg, pcid=None):
+        self._log(msg, 40, pcid=pcid)
 
-    def warning(self, msg):
-        self._log(msg, 30)
+    def warning(self, msg, pcid=None):
+        self._log(msg, 30, pcid=pcid)
 
-    def info(self, msg):
-        self._log(msg, 20)
+    def info(self, msg, pcid=None):
+        self._log(msg, 20, pcid=pcid)
 
-    def debug(self, msg):
-        self._log(msg, 10)
+    def debug(self, msg, pcid=None):
+        self._log(msg, 10, pcid=pcid)
 
 
 class FPTestData:
