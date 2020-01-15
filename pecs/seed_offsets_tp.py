@@ -6,13 +6,13 @@ import pandas as pd
 from pecs import PECS
 import posconstants as pc
 
-seed = PECS(fvc=None, ptls=None, interactive=False)
+seed = PECS(interactive=False)
 print(f'Seeding offsetsTP for PCIDs: {seed.pcids}')
 updates = []
-for posid in seed.posids:
-    role = seed.get_owning_ptl_role(posid)
-    update = {'DEVICE_ID': posid,
-              'MODE': 'seed_offsets_tp'}
+for posid, row in seed.posinfo.iterrows():
+    update = {'DEVICE_ID': posid, 'MODE': 'seed_offsets_tp'}
+    petal_loc = row['PETAL_LOC']
+    role = f'PETAL{petal_loc}'
     update = seed.ptlm.collect_calib(update, tag='OLD_',
                                      participating_petals=role)[role]
     seed.ptlm.set_posfid_val(posid, 'OFFSET_T',
@@ -25,12 +25,11 @@ for posid in seed.posids:
                                      participating_petals=role)[role]
     updates.append(update)
 seed.ptlm.commit(mode='calib', log_note='seed_offsets_tp')
-updates = pd.DataFrame(updates)
+updates = pd.DataFrame(updates).set_index('DEVICE_ID').sort_index()
 path = os.path.join(pc.dirs['calib_logs'],
                     f'{pc.filename_timestamp_str()}-seed_offsets_tp.csv')
 updates.to_csv(path)
 # preview calibration updates
-print(updates[['DEVICE_ID', 'POS_T', 'POS_P',
-               'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
-               'LENGTH_R1', 'LENGTH_R2']])
+print(updates[['POS_T', 'POS_P', 'LENGTH_R1', 'LENGTH_R2',
+               'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P']])
 print(f'Seed offsets TP data saved to: {path}')
