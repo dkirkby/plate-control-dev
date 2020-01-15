@@ -184,10 +184,11 @@ class PosCalibrations(PECS):
         if self.data.online_fitting:
             fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
                                      loggers=self.loggers)
-            self.data.movedf, calib_fit = fit.calibrate_from_arc_data(
-                self.data_arc)
-            calib_new = self.collect_calib(self.posids)
-            self.data.write_calibdf(calib_old, calib_fit, calib_new)
+            self.data.movedf, self.data.calib_fit = (
+                fit.calibrate_from_arc_data(self.data_arc))
+            self.data.calib_new = self.collect_calib(self.posids)
+            self.data.write_calibdf(self.data.calib_old, self.data.calib_fit,
+                                    self.data.calib_new)
 
     def run_grid_calibration(self, match_radius=50,
                              interactive=False):
@@ -198,7 +199,7 @@ class PosCalibrations(PECS):
                     'Please provide a spotmatch radius: '))
             return self.run_grid_calibration(match_radius=match_radius)
         self.data.test_cfg['match_radius'] = match_radius
-        calib_old = self.collect_calib(self.posids)
+        data.calib_old = self.collect_calib(self.posids)
         self.print(f'Running grid calibration, n_pts_T = {self.data.n_pts_T}, '
                    f'n_pts_P = {self.data.n_pts_P}, DB commit disabled')
         ret = self.ptlm.get_grid_requests(ids=self.posids,
@@ -223,10 +224,11 @@ class PosCalibrations(PECS):
         if self.data.online_fitting:
             fit = PosCalibrationFitss(petal_alignments=self.petal_alignments,
                                      loggers=self.loggers)
-            self.data.movedf, calib_fit = fit.calibrate_from_grid_data(
-                self.data_grid)
-            calib_new = self.collect_calib(self.posids)
-            self.data.write_calibdf(calib_old, calib_fit, calib_new)
+            self.data.movedf, self.data.calib_fit = (
+                fit.calibrate_from_grid_data(self.data_grid))
+            self.data.calib_new = self.collect_calib(self.posids)
+            self.data.write_calibdf(self.data.calib_old, self.data.calib_fit,
+                                    self.data.calib_new)
 
     @property
     def petal_alignments(self):

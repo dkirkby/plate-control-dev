@@ -953,7 +953,7 @@ class CalibrationData(FPTestData):
 if __name__ == '__main__':
     '''load the dumped pickle file as follows, protocol is auto determined'''
     # arc calib expids
-    expids = [38563]
+    expids = [39228, 39230]
     # grid calib expids
     # expids = ['00034382']
     from poscalibrationfits import PosCalibrationFits
