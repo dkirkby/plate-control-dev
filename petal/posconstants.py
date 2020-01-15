@@ -7,7 +7,7 @@ import datetime
 import pytz
 import collections
 
-"""Constants and convenience methods used in the control of the Fiber Postioner.
+"""Constants and convenience methods used in the control of Fiber Postioners
 """
 
 # Interpreter settings
@@ -49,11 +49,8 @@ for key in dir_keys_logs:
     dirs[key] = os.path.join(dirs['all_logs'], key)
 for key in dir_keys_settings:
     dirs[key] = os.path.join(dirs['all_settings'], key)
-try:
-    for directory in dirs.values():
-        os.makedirs(directory,exist_ok=True)
-except:
-    pass
+for directory in dirs.values():
+    os.makedirs(directory, exist_ok=True)
 
 # Lookup tables for focal plane coordinate conversions
 R_lookup_path = petal_directory + os.path.sep + 'focal_surface_lookup.csv'
@@ -131,9 +128,9 @@ grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
 
 def decipher_posflags(flags):
     '''translates posflag to readable reasons, bits taken from petal.py
-    simple problem of locating the leftmost set bit, always 100 on the
-    right input flags
-    must be a numpy-supported array-like object'''
+    simple problem of locating the leftmost set bit, always 0b100 on the
+    right input flags. presence of non-positioner bits from FVC/PM is OK
+    input flags must be an array-like or list-like object'''
     pos_bit_dict = {0:  'Matched',
                     2:  'Normal positioner',
                     16: 'Control disabled',
@@ -147,20 +144,20 @@ def decipher_posflags(flags):
                     24: 'Device nonfunctional',
                     25: 'Move table rejected',
                     26: 'Exceeded patrol limits'}
-    bits = np.floor(np.log2(flags)).astype(int)
-    ret = []
-    try:  # bits is a list-like object, iterable
-        for i, bit in enumerate(bits):
-            if bit in pos_bit_dict.keys():
-                ret.append(pos_bit_dict[bit])
-            else:
-                msg = (f'Invalid input flag {flags[i]} with leftmost '
-                       f'set bit at {bit}')
-                ret.append(msg)
-    except TypeError:  # bits is a single number, not iterable
-        ret = pos_bit_dict[bits]
-    # a list of descriptive strings or a single string depending on input
-    return ret
+
+    def decipher_flag(flag):
+        bit = np.floor(np.log2(flag)).astype(int)
+        if bit in pos_bit_dict:
+            return pos_bit_dict[bit]
+        elif bit < 26:  # not a positioner bit, but probably valid from FVC/PM
+            flag_cleared = flag & ~(1 << bit)  # namely, flag - (1<<bit)
+            return decipher_flag(flag_cleared)
+        else:
+            return (f'Invalid input flag {flags} with leftmost '
+                    f'set bit at {bit} further than 26')
+
+    flags = np.array(flags).reshape(-1,)  # convert to 1d to enable indexing
+    return [decipher_flag(flag) for flag in flags]
 
 
 class collision_case(object):
