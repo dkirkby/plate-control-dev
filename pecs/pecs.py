@@ -96,6 +96,7 @@ class PECS:
         self.data.set_dirs(self.exp.id)  # directory setup
         self.fvc.save_centers = True
         self.fvc.save_centers_path = self.data.dir
+        self.print(f'DESI exposure ID set up as: {self.exp.id}')
 
     def print(self, msg):
         if hasattr(self, 'logger'):
@@ -110,7 +111,8 @@ class PECS:
         elif 'n' in yn_str.lower():
             return False
         else:
-            self.print(f'Invalid input: {yn_str}, must be y/n')
+            return self._parse_yn(
+                input(f'Invalid input: {yn_str}, must be y/n:'))
 
     def ptl_setup(self, pcids, posids=None, illumination_check=False):
         '''input pcids must be a list of integers'''
@@ -125,12 +127,12 @@ class PECS:
         if posids is None:
             ret = self.ptlm.get_positioners(enabled_only=True)
             posinfo = pd.concat(list(ret.values())).set_index('DEVICE_ID')
-            posids = sorted(posinfo.index)
-            self.print(f'Defaulting to all {len(posids)} enabled positioners')
+            posids0 = sorted(posinfo.index)
+            self.print(f'Defaulting to all {len(posids0)} enabled positioners')
         else:
             ret = self.ptlm.get_positioners(posids=posids, enabled_only=True)
             posinfo = pd.concat(list(ret.values())).set_index('DEVICE_ID')
-            posids0 = list(set(posids) & set(posinfo.index))
+            posids0 = sorted(set(posids) & set(posinfo.index))  # double check
             self.print(f'Validated {len(posids0)} of {len(posids)} '
                        f'positioners specified')
         self.posids = posids0
