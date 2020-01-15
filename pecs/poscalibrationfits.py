@@ -164,7 +164,7 @@ class PosCalibrationFits:
         """
         posids = sorted(data.index.get_level_values('DEVICE_ID').unique())
         self.logger.debug(f'Analysing arc calibration measurement data...')
-        self.init_posmodels(posids=posids)  # double check that all posmodels exist
+        self.init_posmodels(posids=posids)  # double check all posmodels exist
         cols = ['mea_posintT, mea_posintP', 'mea_flatX', 'mea_flatY',
                 'tgt_flatX', 'tgt_flatY', 'tgt_Q', 'tgt_S']
         for col in cols:  # add new empty columns to grid data dataframe
@@ -307,12 +307,12 @@ class PosCalibrationFits:
         """
         posids = sorted(data.index.get_level_values('DEVICE_ID').unique())
         self.logger.debug(f'Analysing grid calibration measurement data...')
-        self.init_posmodels(data)  # double check that all posmodels exist
+        self.init_posmodels(posids=posids)  # double check all posmodels exist
         cols = ['mea_flatX', 'mea_flatY',
                 'tgt_flatX', 'tgt_flatY', 'tgt_Q', 'tgt_S']
         for col in cols:  # add new empty columns to grid data dataframe
             data[col] = np.nan
-        p0 = [PosTransforms().alt[key] for key in keys_fit]
+        p0 = [PosTransforms.alt[key] for key in keys_fit]
         poscals = []  # each entry is a row of calibration for one posid
         self.logger.debug(f'Fitting loop for {len(posids)} positioners...')
         for posid in tqdm(posids):

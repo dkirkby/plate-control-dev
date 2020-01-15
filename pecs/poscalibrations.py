@@ -6,6 +6,7 @@ Created on Thu Dec 12 12:21:10 2019
 """
 from glob import glob
 import os
+import numpy as np
 import pandas as pd
 import posconstants as pc
 from pecs import PECS
@@ -62,7 +63,7 @@ class PosCalibrations(PECS):
             return self.run_1p_calibration(tp_target=tp_target,
                                            commit=commit,
                                            match_radius=match_radius)
-        calib_old = self.collect_calib(self.posids)
+        self.data.calib_old = self.collect_calib(self.posids)
         do_move = True
         if tp_target == 'default':  # tp_target as target
             poslocTP = (0, self.data.poslocP)  # same target for all posids
@@ -77,6 +78,7 @@ class PosCalibrations(PECS):
                    f'poslocTP = {poslocTP}, do_move = {do_move}, '
                    f'commit = {commit}')
         rows = []
+        import pdb; pdb.set_trace()
         if do_move:  # then build requests and make the moves
             for posid in self.posids:
                 role = self.ptl_role_lookup(posid)
@@ -105,8 +107,6 @@ class PosCalibrations(PECS):
             update_mode = 'posTP'
         elif self.data.mode == '1p_offsetTposintP':
             update_mode = 'offsetTposP'
-        # if isinstance(updates, dict):
-        #     updates = pd.concat(list(updates.values()))
         updates = self.ptlm.test_and_update_TP(
                 used_pos.reset_index(), mode=update_mode, auto_update=commit,
                 tp_updates_tol=0, tp_updates_fraction=1)
@@ -116,7 +116,7 @@ class PosCalibrations(PECS):
                          'MEAS_FLATX': 'mea_flatX', 'MEAS_FLATY': 'mea_flatY',
                          'EXP_FLATX': 'exp_flatX', 'EXP_FLATY': 'exp_flatY'})
         cols = [col for col in updates.columns  # columns to drop
-                if 'OLD_' in col or 'NEW_' in col]
+                if 'OLD_' in col or 'NEW_' in col] + ['ERR_XY']
         updates.drop(cols, axis=1, inplace=True)  # clean up update df
         for df in [used_pos, unused_pos]:
             df.rename(columns={'Q': 'mea_Q', 'S': 'mea_S',
@@ -124,18 +124,41 @@ class PosCalibrations(PECS):
                                'FLAGS': 'FLAG'}, inplace=True)
         # List unmeasured positioners in updates, even with no data
         used_pos.drop('FLAG', axis=1, inplace=True)
-        calib_up = used_pos.join(updates).append(unused_pos, sort=False)
+        calib_fit = used_pos.join(updates).append(unused_pos, sort=False)
         # overwrite flags with focalplane flags and add status
-        flags = [pd.DataFrame.from_dict(
+        flags = [pd.DataFrame.from_dict(  # device_id in dict becomes index
                      flags_dict, orient='index', columns=['FLAG'])
                  for flags_dict in self.ptlm.get_pos_flags().values()]
-        calib_up['FLAG'] = pd.concat(flags)
-        calib_up['STATUS'] = pc.decipher_posflags(calib_up['FLAG'])
+        calib_fit['FLAG'] = pd.concat(flags)
+        calib_fit['STATUS'] = pc.decipher_posflags(calib_fit['FLAG'])
         # clean up and record additional entries in updates
-        calib_up['tgt_posintT'] = req.set_index('DEVICE_ID')['X1']
-        calib_up['tgt_posintP'] = req.set_index('DEVICE_ID')['X2']
-        calib_new = self.collect_calib(self.posids)
-        self.data.write_calibdf(calib_old, calib_up, calib_new)
+        calib_fit['tgt_posintT'] = req.set_index('DEVICE_ID')['X1']
+        calib_fit['tgt_posintP'] = req.set_index('DEVICE_ID')['X2']
+        for posid, row in calib_fit.iterrows():
+            role = self.ptl_role_lookup(posid)
+            mea_posintTP, _ = self.ptlm.postrans(
+                posid, 'QS_to_posintTP',
+                row[['mea_Q', 'mea_S',]].values.astype(float),
+                participating_petals=role)
+            tgt_flatXY = self.ptlm.postrans(
+                posid, 'posintTP_to_flatXY', 
+                row[['tgt_posintT', 'tgt_posintP',]].values.astype(float),
+                participating_petals=role)
+            calib_fit.loc[posid, 'mea_posintT'] = mea_posintTP[0]
+            calib_fit.loc[posid, 'mea_posintP'] = mea_posintTP[1]
+            calib_fit.loc[posid, 'tgt_flatX'] = tgt_flatXY[0]
+            calib_fit.loc[posid, 'tgt_flatY'] = tgt_flatXY[1]
+        calib_fit['err_flatX'] = calib_fit['mea_flatX'] - calib_fit['tgt_flatX']
+        calib_fit['err_flatY'] = calib_fit['mea_flatY'] - calib_fit['tgt_flatY']
+        calib_fit['err_flatXY'] = np.linalg.norm(
+            calib_fit[['mea_flatX', 'tgt_flatX']], axis=1)
+        calib_fit['err_posintT'] = (calib_fit['mea_posintT']
+                                   - calib_fit['tgt_posintT'])
+        calib_fit['err_posintP'] = (calib_fit['mea_posintP']
+                                   - calib_fit['tgt_posintP'])
+        self.data.calib_fit = calib_fit
+        self.data.calib_new = self.collect_calib(self.posids)
+        self.data.write_calibdf(calib_old, calib_fit, calib_new)
         self.data.t_f = pc.now()
 
     def run_arc_calibration(self, match_radius=50, interactive=False):
@@ -145,7 +168,7 @@ class PosCalibrations(PECS):
             match_radius = float(input('Please provide a spotmatch radius: '))
             return self.run_arc_calibration(match_radius=match_radius)
         self.data.test_cfg['match_radius'] = match_radius
-        calib_old = self.collect_calib(self.posids)
+        self.data.calib_old = self.collect_calib(self.posids)
         self.print(f'Running arc calibration, n_pts_T = {self.data.n_pts_T}, '
                    f'n_pts_P = {self.data.n_pts_P}, DB commit disabled')
         ret = self.ptlm.get_arc_requests(
@@ -197,9 +220,9 @@ class PosCalibrations(PECS):
             #             'Automatically update calibration? (y/n): '))
             match_radius = float(input(
                     'Please provide a spotmatch radius: '))
-            return self.run_grid_calibration(match_radius=match_radius)
+            return self.run_grid_calibreq_listration(match_radius=match_radius)
         self.data.test_cfg['match_radius'] = match_radius
-        data.calib_old = self.collect_calib(self.posids)
+        self.data.calib_old = self.collect_calib(self.posids)
         self.print(f'Running grid calibration, n_pts_T = {self.data.n_pts_T}, '
                    f'n_pts_P = {self.data.n_pts_P}, DB commit disabled')
         ret = self.ptlm.get_grid_requests(ids=self.posids,
@@ -208,7 +231,7 @@ class PosCalibrations(PECS):
         req_list = []
         for i in range(self.data.n_pts_P*self.data.n_pts_T):
             dfs = [dfs[i] for dfs in ret.values()]
-            req_list.append(pd.concat().reset_index())
+            req_list.append(pd.concat(dfs).reset_index())
         grid_data = []  # move, measure
         for i, request in enumerate(req_list):
             self.print(f'Measuring grid point {i+1} of {len(req_list)}...')
@@ -217,12 +240,12 @@ class PosCalibrations(PECS):
             if i+1 < len(req_list):  # no pause after the last iteration
                 self.pause()
         self.data_grid = pd.concat(grid_data, keys=range(len(req_list)),
-                              names=['target_no', 'DEVICE_ID'])
+                                   names=['target_no', 'DEVICE_ID'])
         self.data_grid.to_pickle(os.path.join(
             self.data.dir, 'data_grid.pkl.gz'), compression='gzip')
         self.data.t_f = pc.now()
         if self.data.online_fitting:
-            fit = PosCalibrationFitss(petal_alignments=self.petal_alignments,
+            fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
                                      loggers=self.loggers)
             self.data.movedf, self.data.calib_fit = (
                 fit.calibrate_from_grid_data(self.data_grid))
