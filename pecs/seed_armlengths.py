@@ -1,18 +1,37 @@
 '''
 Set armlengths R1 and R2 to nominal values. Needs running DOS instance
 '''
+import os
+import pandas as pd
 from pecs import PECS
 import posconstants as pc
 
-seed = PECS(fvc=None, ptlm=None, interactive=False)
+seed = PECS(interactive=False)
 print(f'Seeding armlengths for PCIDs: {seed.pcids}')
-for posid in seed.posids:
-    role = seed.get_owning_ptl_role(posid)
+updates = []
+for posid, row in seed.posinfo.iterrows():
+    update = {'DEVICE_ID': posid, 'MODE': 'seed_offsets_tp'}
+    petal_loc = row['PETAL_LOC']
+    role = f'PETAL{petal_loc}'
+    update = seed.ptlm.collect_calib(update, tag='OLD_',
+                                     participating_petals=role)[role]
     seed.ptlm.set_posfid_val(posid, 'LENGTH_R1',
                              pc.nominals['LENGTH_R1']['value'],
                              participating_petals=role)
     seed.ptlm.set_posfid_val(posid, 'LENGTH_R2',
                              pc.nominals['LENGTH_R2']['value'],
                              participating_petals=role)
+    update = seed.ptlm.collect_calib(update, tag='',
+                                     participating_petals=role)[role]
+    update = seed.ptlm.collect_calib(update, tag='',
+                                     participating_petals=role)[role]
+    updates.append(update)
 seed.ptlm.commit(mode='calib', log_note='seed_armlengths')
-print('Please check DB to ensure new values are committed.')
+updates = pd.DataFrame(updates).set_index('DEVICE_ID').sort_index()
+path = os.path.join(pc.dirs['calib_logs'],
+                    f'{pc.filename_timestamp_str()}-seed_armlengths.csv')
+updates.to_csv(path)
+# preview calibration updates
+print(updates[['POS_T', 'POS_P', 'LENGTH_R1', 'LENGTH_R2',
+               'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P']])
+print(f'Seed offsets TP data saved to: {path}')
