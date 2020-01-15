@@ -1068,7 +1068,7 @@ class Petal(object):
             posids = self.posids
         for posid in posids:
             if posid not in self.posids:
-                pass
+                continue  # this posid does not belong to this petal
             if not(self.posmodels[posid].is_enabled):
                 self.pos_flags[posid] |= self.ctrl_disabled_bit #final check for disabled
             if not(self.get_posfid_val(posid, 'FIBER_INTACT')):
