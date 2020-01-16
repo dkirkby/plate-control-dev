@@ -69,10 +69,14 @@ class BroadcastLogger:
             list(map(partial(self._log, lvl=lvl, pcid=pcid), msg))
         elif type(msg) is str:
             if self.loggers_available:
-                pcids = self.pcids if pcid is None else [pcid]
-                [self.loggers[pcid].log(lvl, msg) for pcid in pcids]
-                if lvl <=20:
-                    self.printfunc(msg)  # always print once for info and below
+                if pcid is None and lvl <= 20:  # log to debug for lower levels
+                    [self.loggers[pcid].log(10, msg) for pcid in self.pcids]
+                    if lvl == 20:  # if origianlly info level, print once
+                        self.printfunc(msg)
+                elif pcid is None:  # broadcast warning/err/crit, no print
+                    [self.loggers[pcid].log(lvl, msg) for pcid in self.pcids]
+                else:  # pcid is given, one integer, pass on faithfully
+                    self.loggers[pcid].log(lvl, msg)
             else:  # not logged to existing loggers
                 self.printfunc(msg)  # always print regardless of lvl
         else:
@@ -160,7 +164,7 @@ class FPTestData:
                                      mode='a', encoding='utf-8')
             sh = logging.StreamHandler(stream=log)  # pseudo-file handler
             ch = logging.StreamHandler()  # console handler, higher log level
-            ch.setLevel(logging.INFO)  # only stdout INFO or more severe logs
+            ch.setLevel(logging.INFO)  # only stdout this or more severe log
             fh.setFormatter(self.log_formatter)
             sh.setFormatter(self.log_formatter)
             ch.setFormatter(self.log_formatter)
@@ -231,7 +235,7 @@ class FPTestData:
             counts_list = []  # counts by submove
             for i in range(self.num_corr_max+1):
                 counts_list.append(abnormaldf.loc[idx[:, posid], :]
-                                   [f'pos_status_{i}'].value_counts())
+                                   [f'status_{i}'].value_counts())
             row = reduce(lambda x, y: x.add(y, fill_value=0), counts_list)
             rows.append(row)
         df_status = (pd.DataFrame(rows, index=posids_abnormal, dtype=np.int64)
@@ -310,8 +314,8 @@ class FPTestData:
     def export_data_logs(self):
         '''must have writte self.posids_pc, a dict keyed by pcid'''
         self.test_cfg.write()  # write test config
-        for attr in ['movedf', 'gradedf', 'calibdf', 'abnormaldf', 
-                     'exppos', 'meapos',]:
+        for attr in ['movedf', 'gradedf', 'calibdf', 'abnormaldf',
+                     'exppos', 'meapos']:
             if not hasattr(self, attr):
                 continue  # skip a df if it doesn't exist
             getattr(self, attr).to_pickle(
@@ -321,11 +325,6 @@ class FPTestData:
         for pcid in self.pcids:
             self.log_paths[pcid] = os.path.join(self.dirs[pcid],
                                                 f'pc{pcid:02}_export.log')
-            # for posid in self.posids_pc[pcid]:  # write movedf for each posid
-            #     df_pos = self.movedf.loc[idx[:, posid], :].droplevel(1)
-            #     df_pos.to_pickle(makepath(f'{posid}_df.pkl.gz'),
-            #                      compression='gzip')
-            #     df_pos.to_csv(makepath(f'{posid}_df.csv'))
             with open(self.log_paths[pcid], 'w') as handle:
                 self.logs[pcid].seek(0)
                 shutil.copyfileobj(self.logs[pcid], handle)  # save logs
@@ -349,7 +348,7 @@ class FPTestData:
         # exclude fits fz file which is typically 1 GB and the existing tgz
         excl_patterns = ['fvc-*.fits.fz', '*.tar.gz']
         self.print(f'Making tgz archive with exclusion patterns: '
-                       f'{excl_patterns}')
+                   f'{excl_patterns}')
         all_paths = glob(os.path.join(self.dir, '*'))
         excl_paths = list(chain.from_iterable(
             [glob(os.path.join(self.dir, pattern))
@@ -370,7 +369,7 @@ class XYTestData(FPTestData):
     def isolate_abnormal_flags(self):
         masks = []  # get postiioners with abnormal flags
         for i in range(self.num_corr_max+1):
-            masks.append(self.movedf[f'pos_flag_{i}'] != 4)
+            masks.append(self.movedf[f'flag_{i}'] != 4)
         mask = reduce(lambda x, y: x | y, masks)
         self.abnormaldf = self.movedf[mask]
 
@@ -382,7 +381,7 @@ class XYTestData(FPTestData):
         # build column names and data types, all in petal-local flatXY CS
         cols0 = ['timestamp', 'cycle', 'move_log']
         dtypes0 = ['datetime64[ns]', np.uint64, str]
-        cols1 = ['tgt_x', 'tgt_y']
+        cols1 = ['tgt_x', 'tgt_y', 'tgt_q', 'tgt_s']
         dtypes1 = [np.float64] * len(cols1)
         cols2_base = ['mea_q', 'mea_s', 'mea_x', 'mea_y',
                       'err_x', 'err_y', 'err_xy',
@@ -435,7 +434,7 @@ class XYTestData(FPTestData):
                         .reset_index(drop=True).copy())
             # exclude entries where posflag is not equal to 4, set to nan
             for i in range(self.num_corr_max+1):
-                mask = pos_data[f'pos_flag_{i}'] != 4
+                mask = pos_data[f'flag_{i}'] != 4
                 pos_data.loc[mask, f'err_xy_{i}'] = np.nan
             err_0_max = np.max(pos_data['err_xy_0']) * 1000  # max blind err μm
             err_corr = pos_data[  # select corrective moves only
@@ -508,7 +507,8 @@ class XYTestData(FPTestData):
                 #                       args=(pcid, n))
                 #     p.close()
                 #     p.join()
-                self.print('Last MP chunk completed, creating xyplot binders...')
+                self.print('Last MP chunk completed, '
+                           'creating xyplot binders...')
                 for pcid, n in tqdm(product(self.pcids,
                                             range(self.num_corr_max+1))):
                     np = Process(target=self.make_summary_plot_binder,
@@ -918,7 +918,7 @@ class CalibrationData(FPTestData):
             plt.plot(tgt, err_rad, 'ko-')
             plt.plot(tgt[0], err_rad[0], 'ro')
             for i in tgt.index:
-                plt.annotate(f'{i}', xy=(tgt[i], err_rad[i]),xytext=(0, 15),
+                plt.annotate(f'{i}', xy=(tgt[i], err_rad[i]), xytext=(0, 15),
                              textcoords='offset points',
                              ha='center', va='center')
             plt.xlabel(f'target ${axis_name} / \\degree$')
@@ -933,9 +933,8 @@ class CalibrationData(FPTestData):
         path = os.path.join(
             self.dirs[pcid],
             '{posid}-{pc.filename_timestamp_str(self.t_i)}-arc_calib.pdf')
-        # plt.savefig(path)
-        # plt.close(fig)
-        fig.savefig(r'D:\fig.pdf', bbox_inches='tight')
+        plt.close(fig)
+        fig.savefig(path, bbox_inches='tight')
 
     def generate_data_products(self):
         self.read_telemetry()
