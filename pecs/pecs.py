@@ -79,11 +79,9 @@ class PECS:
             self.fvc_collector._send_command('configure')
         except Exception:
             self.print('FVC collector unavailable')
-        if interactive is None:
-            pass
-        elif (self.pcids is None) or interactive:  # boolean
+        if interactive or (self.pcids is None):
             self.interactive_ptl_setup()  # choose which petal to operate
-        else:
+        elif interactive is False:
             self.ptl_setup(self.pcids)  # use PCIDs specified in cfg
 
     def exp_setup(self):
@@ -100,7 +98,7 @@ class PECS:
 
     def print(self, msg):
         if hasattr(self, 'logger'):
-            self.logger.debug(msg)  # use broadcast logger to log to all pcids
+            self.logger.info(msg)  # use broadcast logger to log to all pcids
         else:
             self.printfunc(msg)
 
