@@ -35,7 +35,7 @@ from configobj import ConfigObj
 import posconstants as pc
 import psycopg2
 import matplotlib
-# matplotlib.use('pdf')  # manually specify backend if savefig doesn't work
+matplotlib.use('pdf')  # manually specify backend if savefig doesn't work
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 # plt.ioff()  # turn off interactive mode, doesn't work in matplotlib 2
@@ -179,16 +179,16 @@ class FPTestData:
             self.loggers[pcid] = logger
         self.logger = BroadcastLogger(loggers=self.loggers)
 
-    def print(self, string, pcid=None):
+    def print(self, msg, pcid=None):
         '''use in the absence of logger(s)'''
-        assert type(string) is str
+        assert type(msg) is str
         if pcid is None:
             if hasattr(self, 'logger'):
-                self.logger.debug(string)
+                self.logger.debug(msg)
         else:
             if hasattr(self, 'loggers'):
-                self.loggers[pcid].debug(string)
-            print(string)
+                self.loggers[pcid].debug(msg)
+        print(msg)
 
     @staticmethod
     def _log_cfg(printfunc, config):
@@ -208,6 +208,40 @@ class FPTestData:
             printfunc(line)  # now line is utf8 str which needs no decode
             #  printfunc(line.decode('utf_8'))  # convert byte str to str
         printfunc(f'=== End of config file dump: {config.filename} ===')
+
+    def _mp(self, target, iterables, n_threads_max=32, mp=True):
+        '''input iterables is a list of iterables'''
+        # the following implementation fails when loggers are present
+        # pbar = tqdm(total=len(self.posids))
+        # def update_pbar(*a):
+        #     pbar.update()
+        # with Pool(processes=n_threads) as p:
+        #     for posid in self.posids:
+        #         p.apply_async(self.make_summary_plot, args=(posid,),
+        #                       callback=update_pbar)
+        #     p.close()
+        #     p.join()
+        if mp:
+            n_threads = min(n_threads_max, 2*multiprocessing.cpu_count())
+            args_list = list(product(*iterables))
+            self.print(f'Runing MP with {n_threads} threads '
+                       f'on node of {multiprocessing.cpu_count()} cores for '
+                       f'{len(args_list)} jobs...')
+            pool, n_started = [], 0
+            for args in tqdm(args_list):
+                np = Process(target=target, args=args)
+                if n_started % n_threads_max == 0:  # all cores occupied, wait
+                    [p.join()
+                     for p in pool[n_started-n_threads_max:n_started-1]]
+                np.start()
+                n_started += 1
+                pool.append(np)
+            self.print(
+                f'Waiting for the last MP chunk of {n_threads} to complete...')
+            [p.join() for p in pool[n_started-n_threads_max:-1]]
+        else:
+            for args in tqdm(product(*iterables)):
+                target(*args)
 
     def read_telemetry(self):
         try:
@@ -328,11 +362,11 @@ class FPTestData:
             with open(self.log_paths[pcid], 'w') as handle:
                 self.logs[pcid].seek(0)
                 shutil.copyfileobj(self.logs[pcid], handle)  # save logs
-            self.print(f'PC{pcid:02} data written to: '
-                       f'{self.log_paths[pcid]}', pcid=pcid)
             if pcid in self.schedstats:
                 self.schedstats[pcid].to_csv(os.path.join(
                     self.dirs[pcid], 'schedstats.csv'))
+            self.print(f'PC{pcid:02} data written to: '
+                       f'{self.dirs[pcid]}', pcid=pcid)
 
     def dump_as_one_pickle(self):
         try:
@@ -465,62 +499,13 @@ class XYTestData(FPTestData):
         self.gradedf = (pd.DataFrame(rows)
                         .set_index('DEVICE_ID').join(self.posdf))
 
-    def make_summary_plots(self, n_threads_max=32, make_binder=True, mp=True):
-        if mp:
-            # the following implementation fails when loggers are present
-            # pbar = tqdm(total=len(self.posids))
-            # def update_pbar(*a):
-            #     pbar.update()
-            # with Pool(processes=n_threads) as p:
-            #     for posid in self.posids:
-            #         p.apply_async(self.make_summary_plot, args=(posid,),
-            #                       callback=update_pbar)
-            #     p.close()
-            #     p.join()
-            n_threads = min(n_threads_max, 2*multiprocessing.cpu_count())
-            self.print(f'Making summary xyplots with {n_threads} threads '
-                       f'on {multiprocessing.cpu_count()} cores for '
-                       f'submoves {list(range(self.num_corr_max+1))}...')
-            pool = []
-            n_started = 0
-            for posid in tqdm(self.posids):
-                np = Process(target=self.make_summary_plot, args=(posid,))
-                if n_started % n_threads_max == 0:  # all cores occupied, wait
-                    [p.join()
-                     for p in pool[n_started-n_threads_max:n_started-1]]
-                np.start()
-                n_started += 1
-                pool.append(np)
-            self.print(
-                f'Waiting for the last MP chunk of {n_threads} to complete...')
-            [p.join() for p in pool[n_started-n_threads_max:-1]]
-        else:
-            for posid in tqdm(self.posids):
-                self.make_summary_plot(posid)
+    def make_summary_plots(self, make_binder=True, mp=True):
+        self.print(f'Making summary plots for {len(self.posids)} positioners '
+                   f'and {self.num_corr_max+1} submoves...')
+        self._mp(self.make_summary_plot, [self.posids], mp=mp)
         if make_binder:
-            if mp:
-                # the following implementation fails when loggers are present
-                # with Pool(processes=n_threads) as p:
-                #     for pcid, n in product(self.pcids,
-                #                            range(self.num_corr_max+1)):
-                #         p.apply_async(self.make_summary_plot_binder,
-                #                       args=(pcid, n))
-                #     p.close()
-                #     p.join()
-                self.print('Last MP chunk completed, '
-                           'creating xyplot binders...')
-                for pcid, n in tqdm(product(self.pcids,
-                                            range(self.num_corr_max+1))):
-                    np = Process(target=self.make_summary_plot_binder,
-                                 args=(pcid, n))
-                    np.start()
-                    pool.append(np)
-                [p.join() for p in pool]
-            else:
-                for pcid, n in tqdm(product(self.pcids,
-                                            range(self.num_corr_max+1))):
-                    self.make_summary_plot_binder(pcid, n)
-        return True
+            self._mp(self.make_summary_plot_binder,
+                     [self.pcids, range(self.num_corr_max+1)], mp=mp)
 
     def make_summary_plot(self, posid):  # make one plot for a given posid
         row = self.posdf.loc[posid]  # row containing calibration values
@@ -534,7 +519,7 @@ class XYTestData(FPTestData):
         title = (f'XY Accuracy Test {self.t_i}\n'
                  f'Positioner {posid} ({self.ntargets} Targets)')
         moves = self.movedf.loc[idx[:, posid], :]  # all targets for a posid
-        tgtX, tgtY = moves['target_x'], moves['target_y']  # target obsXY
+        tgtX, tgtY = moves['tgt_x'], moves['tgt_y']  # target obsXY
         Tmin_line_x = [offX, offX + rmax * np.cos(np.radians(Tmin))]
         Tmin_line_y = [offY, offY + rmax * np.sin(np.radians(Tmin))]
         Tmax_line_x = [offX, offX + rmax * np.cos(np.radians(Tmax))]
@@ -953,9 +938,7 @@ if __name__ == '__main__':
     '''load the dumped pickle file as follows, protocol is auto determined'''
     # arc calib expids
     expids = [39228, 39230]
-    # grid calib expids
-    # expids = ['00034382']
-    from poscalibrationfits import PosCalibrationFits
+    expids = [41115]
     for expid in expids:
         paths = glob(pc.dirs['kpno']+f'/*/{expid:08}/*data.pkl')
         assert len(paths) == 1, paths
@@ -963,10 +946,12 @@ if __name__ == '__main__':
         # try:
         with open(os.path.join(paths[0]), 'rb') as h:
             data = pickle.load(h)
-        path = os.path.join(os.path.dirname(paths[0]), 'data_arc.pkl.gz')
-        data_arc = pd.read_pickle(path)
-        fit = PosCalibrationFits()
-        data.movedf, data.calib_fit = fit.calibrate_from_arc_data(data_arc)
+        data.generate_data_products()
+        # from poscalibrationfits import PosCalibrationFits
+        # path = os.path.join(os.path.dirname(paths[0]), 'data_arc.pkl.gz')
+        # data_arc = pd.read_pickle(path)
+        # fit = PosCalibrationFits()
+        # data.movedf, data.calib_fit = fit.calibrate_from_arc_data(data_arc)
         # try:
         #     calib_old = data.calibdf['OLD']
         #     calib_new = data.calibdf['NEW']
@@ -976,11 +961,11 @@ if __name__ == '__main__':
         # data.write_calibdf(calib_old, calib_fit, calib_new)
         # data.movedf.index.set_names('axis', level='arc', inplace=True)
         # # # data.generate_data_products()
-        data.export_data_logs()
-        data.dump_as_one_pickle()
+        # data.export_data_logs()
+        # data.dump_as_one_pickle()
         # # if shutil.which('pandoc') is not None:
         # #     data.generate_report()
-        data.make_archive()
+        # data.make_archive()
         # except Exception as e:
         #     print(e)
         #     pass
