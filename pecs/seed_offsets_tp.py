@@ -12,7 +12,7 @@ updates = []
 for posid, row in seed.posinfo.iterrows():
     update = {'DEVICE_ID': posid, 'MODE': 'seed_offsets_tp'}
     petal_loc = row['PETAL_LOC']
-    role = f'PETAL{petal_loc}'
+    role = seed._pcid2role(petal_loc)
     update = seed.ptlm.collect_calib(update, tag='OLD_',
                                      participating_petals=role)[role]
     seed.ptlm.set_posfid_val(posid, 'OFFSET_T',
