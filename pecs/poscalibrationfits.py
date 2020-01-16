@@ -13,6 +13,7 @@ only serve to ensure spotmatch does not fail.
 
 'mea_' is measured, 'exp_' is internally-tracked/expected, 'tgt_' is target
 """
+import os
 import numpy as np
 from scipy import optimize
 import pandas as pd
@@ -38,26 +39,23 @@ class PosCalibrationFits:
 
     def __init__(self, petal_alignments=None, use_doslib=False,
                  posmodels=None, loggers=None, printfunc=print):
-        if loggers is None:
-            self.logger = BroadcastLogger(printfunc=printfunc)
-        else:
-            self.logger = BroadcastLogger(loggers=loggers)
+        self.logger = BroadcastLogger(loggers=loggers, printfunc=printfunc)
         if petal_alignments is not None:
             self.petal_alignments = petal_alignments
         else:
             self.read_alignments(use_doslib=use_doslib)
-        self.posmodels = {}
         if posmodels is not None:
             self.init_posmodels(posmodels=posmodels)
         self.pi = PositionerIndex()
 
     def read_alignments(self, use_doslib):
-        self.logger.info('Reading petal alignments from DB...')
+        self.logger.debug('Reading petal alignments from DB...')
         if use_doslib:
             from DOSlib.constants import ConstantsDB
-            group, tag, snapshopt = 'focal_plane_metrology', 'CURRENT', 'DESI'
+            group, tag, snapshot = 'focal_plane_metrology', 'CURRENT', 'DESI'
             df = pd.DataFrame.from_dict(ConstantsDB().get_constants(
-                group=group, tag=tag, snapshot=snapshot)[group], orient='index')
+                group=group, tag=tag, snapshot=snapshot)
+                [group], orient='index')
             alignments = {int(petal_loc): {'Tx': row['petal_offset_x'],
                                            'Ty': row['petal_offset_y'],
                                            'Tz': row['petal_offset_z'],
@@ -102,25 +100,24 @@ class PosCalibrationFits:
                                            'beta': d['petal_rot_2'],
                                            'gamma': d['petal_rot_3']}
                           for petal_loc, d in zip(q.index, q['constants'])}
+        self.logger.info(f'Petal alignments loaded: {alignments}')
         self.petal_alignments = alignments
 
-    def init_posmodels(self, data=None, posmodels=None):
+    def init_posmodels(self, posids):
         '''called upon receiving calibration data specified below
         supply either posmodels (online) or data (offline)'''
-        self.logger.info('Initialising posmodels...')
-        if posmodels is None:
-            for posid in tqdm(data.index.get_level_values('DEVICE_ID')
-                              .unique()):
-                if posid not in self.posmodels.keys():
-                    petal_loc = data.xs(
-                        posid, level='DEVICE_ID')['PETAL_LOC'].iloc[0]
-                    petal_id = self.pi.find_by_device_id(posid)['PETAL_ID']
-                    self.posmodels[posid] = PosModel(state=PosState(
-                        unit_id=posid, petal_id=petal_id, device_type='pos',
-                        printfunc=self.logger.info),
-                        petal_alignment=self.petal_alignments[petal_loc])
-        else:
-            self.posmodels.update(posmodels)
+        self.logger.debug('Initialising posmodels...')
+        self.posmodels, self.petal_locs, self.petal_ids = {}, {}, {}
+        for posid in tqdm(posids):
+            posinfo = self.pi.find_by_device_id(posid)
+            self.petal_locs[posid] = petal_loc = posinfo['PETAL_LOC']
+            self.petal_ids[posid] = petal_id = posinfo['PETAL_ID']
+            if posid not in self.posmodels:
+                self.posmodels[posid] = PosModel(state=PosState(
+                    unit_id=posid, petal_id=petal_id, device_type='pos',
+                    printfunc=self.logger.debug),
+                    petal_alignment=self.petal_alignments[petal_loc])
+        self.posids = posids
 
     @staticmethod
     def fit_circle(x):  # input x is a N x 2 array for (x, y) points in 2D
@@ -166,29 +163,31 @@ class PosCalibrationFits:
                         GEAR_RATIO_T, GEAR_RATIO_P
         """
         posids = sorted(data.index.get_level_values('DEVICE_ID').unique())
-        self.logger.info(
-            f'Fitting arc calibration data, {len(posids)} positioners...')
-        self.init_posmodels(data)  # double check that all posmodels exist
+        self.logger.debug(f'Analysing arc calibration measurement data...')
+        self.init_posmodels(posids=posids)  # double check all posmodels exist
         cols = ['mea_posintT, mea_posintP', 'mea_flatX', 'mea_flatY',
                 'tgt_flatX', 'tgt_flatY', 'tgt_Q', 'tgt_S']
         for col in cols:  # add new empty columns to grid data dataframe
             data[col] = np.nan
         poscals = []  # each entry is a row of calibration values for one posid
-        for posid in posids:
+        self.logger.debug(f'Fitting loop for {len(posids)} positioners...')
+        for posid in tqdm(posids):
             poscal, posmea = {}, {}
             trans = self.posmodels[posid].trans
+            trans.alt_override = True  # enable override in pos transforms
             # measurement always in QS, but fit and derive params in flatXY
-            QS = data.loc[idx[:, :, posid], ['mea_Q', 'mea_S']].values  # Nx2
-            data.loc[idx[:, :, posid], ['mea_flatX', 'mea_flatY']] = (
-                trans.QS_to_flatXY(QS.T).T)  # doesn't depend on calib
+            # measured QS may have NaN values if missing, filter out
+            QS = data.loc[idx[:, :, posid], ['mea_Q', 'mea_S']]  # Nx2
+            mask = QS.notnull().all(axis=1)
+            data.loc[QS[mask].index, ['mea_flatX', 'mea_flatY']] = (
+                trans.QS_to_flatXY(QS[mask].T).T)  # doesn't depend on calib
 
             def fit_arc(arc):  # arc is 'T' or 'P', define a func to exit loop
-                posmeaarc = (data.loc[idx[arc, :, posid],
-                                       ['mea_flatX', 'mea_flatY']]
-                          .droplevel(['axis', 'DEVICE_ID'], axis=0))
+                posmeaarc = (data.xs((arc, posid), level=('axis', 'DEVICE_ID'))
+                             [['mea_flatX', 'mea_flatY']])
                 # select valid (non-null) measurement data points only for fit
                 # reduced to tables of length L and M
-                posmea[arc] = posmeaarc[~posmeaarc.isnull().any(axis=1)]
+                posmea[arc] = posmeaarc[posmeaarc.notnull().all(axis=1)]
                 if len(posmea[arc]) < 3:  # require at least 3 points remaining
                     return None
                 else:
@@ -197,7 +196,9 @@ class PosCalibrationFits:
             fits = [fit_arc(arc) for arc in ['T', 'P']]
             if None in fits:
                 self.logger.error(f'{posid} arc calibration failed, '
-                                  f'at least 3 points required, skipping...')
+                                  f'at least 3 points required, skipping...',
+                                  pcid=self.petal_locs[posid])
+                poscals.append({})
                 continue
             for i, arc in enumerate(['T', 'P']):  # loop over two arcs
                 poscal[f'centre_{arc}'] = fits[i][0]
@@ -210,6 +211,13 @@ class PosCalibrationFits:
                            'LENGTH_R1': np.linalg.norm(poscal['centre_T']
                                                        - poscal['centre_P']),
                            'LENGTH_R2': poscal['radius_P'].mean()})
+            if poscal['LENGTH_R1'] == 0 or poscal['LENGTH_R2'] == 0:
+                poscals.append(poscal)  # the rest will only trigger warnings
+                self.logger.error(
+                    f'{posid}: trivial fitted armlength(s): '
+                    f'R1 = {poscal["LENGTH_R1"]}, R2 = {poscal["LENGTH_R2"]}',
+                    pcid=self.petal_locs[posid])
+                continue
             # caluclate offset T using phi arc centre and target posintT
             xy = poscal['centre_P'] - poscal['centre_T']  # 1 x 2 array
             p_mea_poslocT = np.degrees(np.arctan2(xy[1], xy[0]))  # float
@@ -241,7 +249,6 @@ class PosCalibrationFits:
             data.loc[idx['P', posmea['P'].index, posid],
                      'mea_posintP'] = p_mea_posintP_wrapped
             # done with phi arc, transform measured theta arc to posintTP
-            trans.alt_override = True  # enable override in pos transforms
             trans.alt.update({key: poscal[key] for key in keys_fit})
             t_mea_posintTP = np.array([
                 trans.flatXY_to_posintTP(flatXY, range_limits='full')[0]
@@ -268,7 +275,8 @@ class PosCalibrationFits:
             for ratio, arc in zip([ratio_T, ratio_P], ['T', 'P']):
                 if abs(ratio - 1) > 0.06:
                     self.logger.warning(
-                        f'{posid}: GEAR_CALIB_{arc} = {ratio:.6f}')
+                        f'{posid}: GEAR_CALIB_{arc} = {ratio:.6f}',
+                        pcid=self.petal_locs[posid])
             trans.alt_override = False  # turn it back off when finished
             for c in ['flatX', 'flatY', 'Q', 'S', 'posintT', 'posintP']:
                 data[f'err_{c}'] = data[f'mea_{c}'] - data[f'tgt_{c}']
@@ -298,30 +306,33 @@ class PosCalibrationFits:
                     'LENGTH_R1', 'LENGTH_R2'
         """
         posids = sorted(data.index.get_level_values('DEVICE_ID').unique())
-        self.logger.info(
-            f'Fitting grid calibration data, {len(posids)} positioners...')
-        self.init_posmodels(data)  # double check that all posmodels exist
+        self.logger.debug(f'Analysing grid calibration measurement data...')
+        self.init_posmodels(posids=posids)  # double check all posmodels exist
         cols = ['mea_flatX', 'mea_flatY',
                 'tgt_flatX', 'tgt_flatY', 'tgt_Q', 'tgt_S']
         for col in cols:  # add new empty columns to grid data dataframe
             data[col] = np.nan
-        p0 = [PosTransforms().alt[key] for key in keys_fit]
+        p0 = [PosTransforms.alt[key] for key in keys_fit]
         poscals = []  # each entry is a row of calibration for one posid
-        for posid in posids:
+        self.logger.debug(f'Fitting loop for {len(posids)} positioners...')
+        for posid in tqdm(posids):
             trans = self.posmodels[posid].trans
             trans.alt_override = True  # enable override in pos transforms
             # measurement always in QS, but fit and derive params in flatXY
-            QS = data.xs(posid, level='DEVICE_ID')[['mea_Q', 'mea_S']].values
-            data.loc[idx[:, posid], ['mea_flatX', 'mea_flatY']] = (
-                trans.QS_to_flatXY(QS.T).T)  # doesn't depend on calib
+            QS = data.loc[idx[:, posid], ['mea_Q', 'mea_S']]  # Nx2
+            mask = QS.notnull().all(axis=1)
+            data.loc[QS[mask].index, ['mea_flatX', 'mea_flatY']] = (
+                trans.QS_to_flatXY(QS[mask].T).T)  # doesn't depend on calib
             # select only valid measurement data points for fit
             posdata = data.xs(posid, level='DEVICE_ID')[[
                 'mea_flatX', 'mea_flatY', 'tgt_posintT', 'tgt_posintP']]
             mask = posdata.index[~posdata.isnull().any(axis=1)]
             posdata = posdata.loc[mask]  # filter nan
             if len(posdata) <= len(keys_fit):
-                self.logger.error(f'{posid} calibration failed, '
-                                  f'only {len(posdata)} valid grid points')
+                self.logger.error(f'{posid} calibration failed: '
+                                  f'only {len(posdata)} valid grid points',
+                                  pcid=self.petal_locs[posid])
+                poscals.append({})
                 continue  # skip this iteration for this posid in the loop
             mea_flatXY = posdata[['mea_flatX', 'mea_flatY']].values  # N x 2
             tgt_posintTP = posdata[['tgt_posintT', 'tgt_posintP']].values
@@ -343,7 +354,8 @@ class PosCalibrationFits:
             result = optimize.minimize(fun=err_rms, x0=p0, bounds=bounds)
             if result.fun > 0.4:
                 self.logger.warning(f'{posid} grid calibration, {len(posdata)}'
-                                    f' points, err_rms = {result.fun:.3f}')
+                                    f' points, err_rms = {result.fun:.3f}',
+                                    pcid=self.petal_locs[posid])
             # centralize offsetsTP (why needed if we can limit to +/-180?)
             # for i, param_key in enumerate(keys_fit):
             #     if param_key in ['OFFSET_T', 'OFFSET_P']:
@@ -352,9 +364,9 @@ class PosCalibrationFits:
             #                 res.x[i]))
             poscal = {key: result.x[i] for i, key in enumerate(keys_fit)}
             tgtXY = target_xy(result.x)
-            data.loc[idx[mask, posid], ['tgt_flatX', 'tgt_flatY']] = tgtXY 
-            data.loc[idx[mask, posid], ['tgt_Q', 'tgt_S']] = trans.flatXY_to_QS(
-                tgtXY.T).T
+            data.loc[idx[mask, posid], ['tgt_flatX', 'tgt_flatY']] = tgtXY
+            data.loc[idx[mask, posid],
+                     ['tgt_Q', 'tgt_S']] = trans.flatXY_to_QS(tgtXY.T).T
             trans.alt_override = False  # turn it back off when finished
             for c in ['flatX', 'flatY', 'Q', 'S']:  # calculate errors
                 data[f'err_{c}'] = data[f'mea_{c}'] - data[f'tgt_{c}']
@@ -364,19 +376,22 @@ class PosCalibrationFits:
 
 if __name__ == '__main__':
     # sample calibration data
-    df = pd.DataFrame(np.array([[9, -170, 150, 300, 30]]*3),
-                      index=['M00001', 'M00002', 'M00003'],
-                      columns=['PETAL_LOC', 'tgt_posintT', 'tgt_posintP',
-                               'mea_Q', 'mea_S'])
-    df['DEVICE_LOC'] = [78, 324, 517]
-    data_grid = pd.concat([df]*10, keys=range(10),
-                          names=['target_no', 'DEVICE_ID'])  # grid
-    arc = pd.concat([df]*6, keys=range(10))  # one arc
-    data_arc = pd.concat([arc, arc], keys=['T', 'P'],
-                         names=['axis', 'target_no', 'DEVICE_ID'])
-    posdata = data_grid.loc[idx[:, 'M00001'], :]
-    posdata = data_arc.loc[idx['T', :, 'M00001'], :]
+    # df = pd.DataFrame(np.array([[9, -170, 150, 300, 30]]*3),
+    #                   index=['M00001', 'M00002', 'M00003'],
+    #                   columns=['PETAL_LOC', 'tgt_posintT', 'tgt_posintP',
+    #                            'mea_Q', 'mea_S'])
+    # df['DEVICE_LOC'] = [78, 324, 517]
+    # data_grid = pd.concat([df]*10, keys=range(10),
+    #                       names=['target_no', 'DEVICE_ID'])  # grid
+    # arc = pd.concat([df]*6, keys=range(10))  # one arc
+    # data_arc = pd.concat([arc, arc], keys=['T', 'P'],
+    #                      names=['axis', 'target_no', 'DEVICE_ID'])
+    # posdata = data_grid.loc[idx[:, 'M00001'], :]
+    # posdata = data_arc.loc[idx['T', :, 'M00001'], :]
     # debug
-    data = pd.read_pickle("/data/focalplane/logs/kpno/20191222/00034392/data_grid.pkl.gz")
+    directory = "/data/focalplane/logs/kpno/20200107/00038563/"
+    data = pd.read_pickle(os.path.join(directory, "data_arc.pkl.gz"))
     calib = PosCalibrationFits(use_doslib=True)
-    movedf, calibdf = calib.calibrate_from_grid_data(data)
+    movedf, calibdf = calib.calibrate_from_arc_data(data)
+    movedf.to_pickle(os.path.join(directory, "movedf.pkl.gz"))
+    calibdf.to_pickle(os.path.join(directory, "calibdf.pkl.gz"))

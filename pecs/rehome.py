@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 from pecs import PECS
 import posconstants as pc
 from rehome_verify import RehomeVerify
@@ -6,16 +7,16 @@ from rehome_verify import RehomeVerify
 
 class Rehome(PECS):
 
-    def __init__(self, fvc=None, ptls=None, axis='both',
-                 pcid=None, posids=None, interactive=False):
-        super().__init__(fvc=fvc, ptls=ptls)
+    def __init__(self, fvc=None, ptlm=None, axis='both',
+                 petal_roles=None, posids=None, interactive=False):
+        super().__init__(fvc=fvc, ptlm=ptlm)
         input('WARNING: Driving positioners to their hardstops. '
               'Be sure you know what you are doing!\n'
               f'Rehoming for axis: {axis}. (Press enter to continue): ')
         if interactive:
             self.interactive_ptl_setup()
         else:
-            self.ptl_setup(pcid, posids)
+            self.ptl_setup(petal_roles, posids)
         self.axis = axis
         df = self.rehome()
         path = os.path.join(pc.dirs['all_logs'], 'calib_logs',
@@ -23,7 +24,8 @@ class Rehome(PECS):
         df.to_csv(path)
         self.printfunc(f'Rehome (interally-tracked) data saved to: {path}')
         if input('Verify rehome positions with FVC? (y/n): ') in ['y', 'yes']:
-            RehomeVerify(pcid=self.pcid, posids=self.posids)
+            RehomeVerify(petal_roles=self.ptlm.participating_petals,
+                         posids=self.posids)
 
     def rehome(self, posids=None, anticollision='freeze', attempt=1):
         # three atetmpts built in, two with ac freeze, one with ac None
@@ -33,14 +35,13 @@ class Rehome(PECS):
                        f'positioners with anticollision: {anticollision}\n\n'
                        f'{posids}\n')
         self.pause(press_enter=True)
-        ret = self.ptl.rehome_pos(posids, axis=self.axis,
-                                  anticollision=anticollision)
-        assert ret is not None, (
-            'Rehome failed, None received as return from rehome_pos, '
-            'check PetalApp console for error log.')
+        ret = self.ptlm.rehome_pos(posids, axis=self.axis,
+                                   anticollision=anticollision,
+                                   control={'timeout': 60})
+        ret = pd.concat(list(ret.values()))
         ret = (ret.rename(columns={'X1': 'posintT', 'X2': 'posintP'})
                .sort_values(by='DEVICE_ID').reset_index())
-        ret['STATUS'] = self.ptl.decipher_posflags(ret['FLAG'])
+        ret['STATUS'] = pc.decipher_posflags(ret['FLAG'])
         mask = ret['FLAG'] != 4
         retry_list = list(ret.loc[mask, 'DEVICE_ID'])
         if len(retry_list) == 0:
@@ -59,7 +60,8 @@ class Rehome(PECS):
             else:  # already at 3rd attempt. fail
                 self.printfunc(f'3rd attempt did not complete successfully '
                                f'for positioners: {posids}')
-        ret = self.ptl.get_positions(posids=self.posids, return_coord='obsXY')
+        ret = self.ptlm.get_positions(return_coord='obsXY')
+        ret = ret[ret['DEVICE_ID'].isin(self.posids)]
         return ret.rename(columns={'X1': 'expected_obsX',
                                    'X2': 'expected_obsY'})
 
