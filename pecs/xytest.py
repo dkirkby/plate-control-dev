@@ -35,12 +35,11 @@ class XYTest(PECS):
 
     Useful attributes:
         self.data.posids        list of posids for all petals
-        self.data.posids_pc    dict with pcid as key, list of posids as value
+        self.data.posids_pc     dict with pcid as key, list of posids as value
                                 posids are sorted
         self.data.posdf         dataframe with DEVICE_ID as index and columns:
                                 pcid, PETAL_LOC, DEVICE_LOC, calibration
-                                constants and posmodel properties
-                                for lookup and coordinate conversion
+                                constants and posmodel properties for records
                                 every petal block is contiguous and records
                                 within are sorted by posid
         self.data.movedf        dataframe for positioner move data, with
@@ -58,7 +57,8 @@ class XYTest(PECS):
         self.loggers = self.data.loggers  # use these loggers to write to logs
         self.logger = self.data.logger
         super().__init__(
-            printfunc={p: self.loggers[p].info for p in self.data.pcids})
+            printfunc={p: self.loggers[p].info for p in self.data.pcids},
+            interactive=False)
         self.ptlm.participating_petals = [
             self._pcid2role(pcid) for pcid in self.data.pcids]
         self.data.t_i = pc.now()  # set initial time before setting dirs
@@ -77,8 +77,6 @@ class XYTest(PECS):
             f'Num of local targets: {self.data.ntargets}'])
         self.logger.debug(f'Test targets:\n{self.data.targets_pos}')
         self.data.initialise_movedata(self.data.posids, self.data.ntargets)
-        for ptl in self.ptls:
-            ptl.set_schedule_stats(enabled=True)
 
     def _get_pos_info(self):
         '''get enabled positioners, according to given posids or busids
@@ -96,10 +94,6 @@ class XYTest(PECS):
         self.data.posids_pc = {}
         self.data.posids_disabled = set()
         self.data.posids_disabled_pc = {}
-        self.data.petal_locs = []
-        self.data.petal_locs_pc = {}
-        self.data.device_locs = []
-        self.data.device_locs_pc = {}
         pos_all = self.ptlm.get_positioners(enabled_only=False)
         pos_en = self.ptlm.get_positioners(enabled_only=True)
         l1s = {}
@@ -120,35 +114,31 @@ class XYTest(PECS):
             Nr = len(l0)  # number of requested positioners
             Ne = len(l1)  # nubmer of returned enabled postiioners
             Nd = Nr - Ne  # number of disabled positioners, inferred
-            self.loggers[pcid].info(f'Number of requested positioners: {Nr}')
-            self.loggers[pcid].info(
-                'Numbers of enabled, disabled, and total positioners: '
-                f'{Ne} + {Nd} = {Ne + Nd}')
+            self.logger.info(f'{Nr} positioners requested, # enabled, '
+                             f'disabled, and total: {Ne} + {Nd} = {Ne + Nd}',
+                             pcid)
             l1 = l1.set_index('DEVICE_ID').sort_index()  # sorted within ptl
             self.data.posids_pc[pcid] = l1.index.tolist()
-            self.data.petal_locs_pc[pcid] = list(l1['PETAL_LOC'])
-            self.data.device_locs_pc[pcid] = list(l1['DEVICE_LOC'])
             self.data.posids += self.data.posids_pc[pcid]
-            self.data.petal_locs += self.data.petal_locs_pc[pcid]
-            self.data.device_locs += self.data.device_locs_pc[pcid]
             # add to existing positioner index table, first calibration values
             l1['PCID'] = pcid  # add pcid as a column
             l1s[pcid] = l1
         ret1 = self.ptlm.get_pos_vals(keys, self.data.posids)
         # read posmodel properties, for now just targetable_range_T
-        print(props)
-        print(self.data.posids)
         ret2 = self.ptlm.get_posmodel_prop(props, self.data.posids)
         dfs = []
         for pcid in self.data.pcids:
             role = self._pcid2role(pcid)
             calib = ret1[role].set_index('DEVICE_ID')
             posprop = ret2[role].set_index('DEVICE_ID')
-            self.loggers[pcid].debug(f'Calibration read:\n{calib.to_string()}')
-            self.loggers[pcid].debug(f'PosModel properties read:\n'
-                                     f'{posprop.to_string()}')
+            self.logger.debug([f'Calibration read:', calib.to_string(),
+                               f'PosModel properties read:',
+                               posprop.to_string()], pcid)
             dfs.append(l1s[pcid].join(calib).join(posprop))
         self.data.posdf = pd.concat(dfs)
+        # add columns from self.posinfo, if not already in posdf
+        cols = self.posinfo.columns.difference(self.data.posdf.columns)
+        self.data.posdf = self.data.posdf.join(self.posinfo[cols])
 
     @staticmethod
     def _generate_poslocXY_targets_grid(rmin, rmax, npts):
@@ -200,23 +190,23 @@ class XYTest(PECS):
             self.data.ntargets = len(df)  # set number of targets
             for pcid in self.data.pcids:  # set targets for each positioner
                 for posid in self.data.posids_pc[pcid]:
-                    i = self.data.posdf.loc[posid]['DEVICE_LOC']
+                    i = self.posinfo.loc[posid, 'DEVICE_LOC']
                     if f'{col1}_{i}' in df.columns:
                         self.data.targets_pos[posid] = (
                             df[[f'{col1}_{i}', f'{col2}_{i}']].values)
                     else:
                         self.logger.warning(
                             'Missing target assignment for device_loc '
-                            f'{i}, posid {posid}')
+                            f'{i}, posid {posid}', pcid)
         assert self.data.ntargets > 0, 'Empty target list, exiting...'
 
-    def _add_device_id_col(self, df, pcid):
-        '''when df only has DEVICE_LOC, add DEVICE_ID column and use as index
-           this method may not be needed anymore after PetalApp update
-        '''
-        df0 = self.data.posdf[self.data.posdf['PCID'] == pcid]
-        return df.merge(df0, on=['PETAL_LOC', 'DEVICE_LOC'],
-                        left_index=True).sort_index()
+    # def _add_device_id_col(self, df, pcid):
+    #     '''when df only has DEVICE_LOC, add DEVICE_ID column and use as index
+    #        this method may not be needed anymore after PetalApp update
+    #     '''
+    #     df0 = self.data.posdf[self.data.posdf['PCID'] == pcid]
+    #     return df.merge(df0, on=['PETAL_LOC', 'DEVICE_LOC'],
+    #                     left_index=True).sort_index()
 
     def _update(self, newdf, i):
         '''input newdf is single-index on posid only'''
@@ -230,16 +220,17 @@ class XYTest(PECS):
             else:
                 disable_unmatched = True  # do disable by default
         self.logger.info(f'Starting Test at {self.data.t_i}')
+        try:
+            self.ptlm.set_schedule_stats(enabled=True)
+        except:
+            print('ERROR: Did you update PetalApp?')
         for i in range(self.data.ntargets):  # test loop over all test targets
-            self.logger.info(f'Target {i+1} of {self.data.ntargets}')
             self.record_basic_move_data(i)  # for each target, record basics
-            if self.allow_pause and i > 0:  # don't pause for the 1st target
-                input('Paused for heat load monitoring, '
-                      'press enter to continue: ')
+            if i > 0:  # don't pause for the 1st target
+                self.pause()
             for n in range(self.data.num_corr_max + 1):
-                self.logger.info(
-                    f'Target {i+1} of {self.data.ntargets}, '
-                    f'submove {n} of {self.data.num_corr_max}')
+                self.logger.info(f'Target {i+1} of {self.data.ntargets}, '
+                                 f'submove {n} of {self.data.num_corr_max}')
                 self.expected_QS_list = []
                 _, meapos, matched, unmatched = self.move_measure_petals(i, n)
                 self.check_unmatched(meapos, matched, unmatched,
@@ -255,13 +246,17 @@ class XYTest(PECS):
         try:
             for pcid in self.data.pcids:
                 self.data.schedstats[pcid] = (
-                    self.ptls[pcid].schedule_stats.generate_table())
-                self.ptls[pcid].set_schedule_stats(enabled=False)
+                    self.ptlm.schedule_stats.generate_table())
         except Exception as e:
-            self.logger.debug(f'Failed to generate schedule stats table: {e}')
+            self.logger.warning(
+                f'Failed to generate schedule stats table: {e}')
+        try:
+            self.ptlm.set_schedule_stats(enabled=False)
+        except:
+            print('ERROR: Did you update PetalApp?')
 
     def record_basic_move_data(self, i):
-        self.logger.info('Recording basic move data for new xy target...')
+        self.logger.info('Recording move metadata for new xy target...')
         movedf = self.data.movedf
         # before moving for each target, write time cycle etc. for all posids
         movedf.loc[idx[i, :], 'timestamp'] = pc.now()
@@ -279,10 +274,10 @@ class XYTest(PECS):
         '''move ten petals once, measure once for the ith target, nth move'''
         self.move_petals(i, n)
         # measure ten petals with FVC at once, FVC after all petals have moved
-        _, meapos, matched, unmatched = self.fvc_measure()
-        self.logger.debug(f'FVC measured_QS:\n'
-                          f'{meapos.reset_index().to_string()}')
-        return meapos, matched, unmatched
+        ret = self.fvc_measure()
+        self.logger.debug([f'FVC measured_QS:',
+                           ret[1].reset_index().to_string()])
+        return ret
 
     def move_petals(self, i, n):
         movedf = self.data.movedf
@@ -292,6 +287,7 @@ class XYTest(PECS):
             movetype, cmd = 'blind', 'poslocXY'
             for posid in posids:  # write targets to move df
                 # No need to ask all petals to transform one pos
+                pcid = self.pcid_lookup(posid)
                 role = self.ptl_role_lookup(posid)
                 if posid not in self.data.targets_pos.keys():
                     continue
@@ -304,9 +300,11 @@ class XYTest(PECS):
                         posid, 'poslocXY_to_posintTP', tgt, 'targetable',
                         participating_petals=role)
                     if unreachable:
-                        self.logger.warning(f'{posid} unreachable: {posintTP}')
+                        self.logger.warning(f'{posid} unreachable: {posintTP}',
+                                            pcid=pcid)
                     else:
-                        self.logger.info(f'{posid} reachable: {posintTP}')
+                        self.logger.debug(f'{posid} reachable: {posintTP}',
+                                          pcid=pcid)
                 elif self.data.target_type == 'obsXY':
                     tgt = self.ptlm.postrans(
                         posid, 'obsXY_to_poslocXY', tgt,
@@ -314,7 +312,8 @@ class XYTest(PECS):
                 elif self.data.target_type == 'poslocXY':
                     pass
                 else:
-                    self.logger.error('Bad Target type.')
+                    self.logger.error(
+                        f'Bad Target type: {self.data.target_type}', pcid=pcid)
                     raise ValueError('Bad Target type.')
                 movedf.loc[idx[i, posid], ['tgt_x', 'tgt_y']] = tgt
                 movedf.loc[idx[i, posid], ['tgt_q', 'tgt_s']] = (
@@ -330,37 +329,34 @@ class XYTest(PECS):
         note = (f'xytest: {self.data.test_name}; '  # same for all
                 f'target {i+1} of {self.data.ntargets}; '
                 f'move {n} ({movetype})')
-        # Petalman sorts on device_locs/petal_locs
-        # Keep DEVICE_ID just because
-        req = pd.DataFrame({'DEVICE_ID': posids,
-                            'PETAL_LOC': self.data.petal_locs,
-                            'DEVICE_LOC': self.data.device_locs,
-                            'COMMAND': cmd,
-                            'X1': tgt[:, 0],  # shape (N_posids, 1)
-                            'X2': tgt[:, 1],  # shape (N_posids, 1)
-                            'LOG_NOTE': note})
-        for pcid in self.data.pcids:
-            self.loggers[pcid].debug(f'Move requests:\n{req.to_string()}')
-            self.loggers[pcid].info(f'Moving positioners...')
+        req = pd.DataFrame(
+            {'DEVICE_ID': posids,
+             'PETAL_LOC': self.posinfo.loc[posids, 'PETAL_LOC'],
+             'DEVICE_LOC': self.posinfo.loc[posids, 'DEVICE_LOC'],
+             'COMMAND': cmd, 'X1': tgt[:, 0], 'X2': tgt[:, 1],
+             'LOG_NOTE': note})
+        self.logger.debug([f'Move requests:', req.to_string()])
+        self.logger.info('Calculating move paths...')
         self.ptlm.prepare_move(req, anticollision=self.data.anticollision)
         # Execute move returns dict of all individual execute move calls
+        self.logger.info('Executing moves...')
         expected_QS = self.ptlm.execute_move(
             reset_flags=False, return_coord='QS', control={'timeout': 120})
-        for pcid in self.data.pcids:
-            self.loggers[pcid].debug(
-                'execute_move() returns expected QS:\n'
-                + expected_QS[self._pcid2role(pcid)].to_string())
         # get expected posintTP from petal and write to movedf after move
         # Positions are concatenated in petalman
         TP = self.ptlm.get_positions(return_coord='posintTP')
-        for pcid in self.data.pcids:
-            self.loggers[pcid].debug(
-                f'Expected posintTP after move {n}:\n'
-                f'{TP[TP['PETAL_LOC'] == pcid].to_string()}')
+        for pcid in self.pcids:
+            self.logger.debug(['Target {i}, submove {n}, '
+                               'execute_move() returns expected QS:',
+                               expected_QS[self._pcid2role(pcid)].to_string()],
+                              pcid)
+            self.logger.debug(['Target {i}, submove {n}, '
+                               f'Expected posintTP:',
+                               TP[TP.PETAL_LOC == pcid].to_string()], pcid)
         # record per-move data to movedf for a petal
         new = pd.DataFrame({f'posintT_{n}': TP['X1'],
                             f'posintP_{n}': TP['X2'],
-                            f'flag_{n}': TP['FLAG'],
+                            f'flag_{n}': TP['FLAGS'],
                             f'status_{n}': pc.decipher_posflags(TP['FLAGS']),
                             f'DEVICE_ID': TP['DEVICE_ID']})
         self._update(new.set_index('DEVICE_ID'), i)
@@ -371,28 +367,21 @@ class XYTest(PECS):
         for pcid in self.data.pcids:  # check unmatched positioners
             posids = self.data.posids_pc[pcid]
             if not set(posids).issubset(matched):
-                matched_pc = set(posids) & matched
+                # matched_pc = set(posids) & matched
                 unmatched_pc = set(posids) & unmatched
-                self.logger.warning(
-                    'Please check the numbers: # unmatched spots = '
-                    '# broken fibres + 2 ETC fibres + # unmatched fibres\n'
-                    f'{len(unmatched_pc)} of {len(posids)} requested devices '
-                    f'are missing in FVC measurement, '
-                    'possibly including two dark ETC fibres:'
-                    f':\n{unmatched_pc}')
                 for posid in unmatched_pc:  # log unmatched fibres to logger
-                    self.loggers[pcid].debug(
-                        f'Missing posid: {posid}, pos details:\n'
-                        f'{self.data.posdf.loc[posid].to_string()}')
+                    self.loggers[pcid].warning(
+                        ['Missing {posid}:',
+                         self.posinfo.loc[posid].to_string()])
                 if disable_unmatched:  # disable unmatched fibre positioners
                     # if anticolliions is on, disable positioner and neighbours
                     self.loggers[pcid].info(
                         f'Disabling unmatched fibres and their neighbours:\n'
                         f'{unmatched_pc}')
                     role = self._pcid2role(pcid)
-                    disabled = (
-                        self.ptlm.disable_positioner_and_neighbors(
-                            list(unmatched_pc), participating_petals=role)[role])
+                    disabled = self.ptlm.disable_positioner_and_neighbors(
+                                  list(unmatched_pc),
+                                  participating_petals=role)[role]
                     if disabled is None:
                         disabled = []
                     self.loggers[pcid].info(
@@ -418,8 +407,8 @@ class XYTest(PECS):
         updates = self.ptlm.test_and_update_TP(df)
         for pcid in self.data.pcids:
             self.loggers[pcid].debug(
-                f'test_and_update_TP returned:\n'
-                f'{updates[self._pcid2role(pcid)].to_string()}')
+                ['test_and_update_TP returned:',
+                 updates[self._pcid2role(pcid)].to_string()])
 
     def record_measurement(self, measured_QS, i, n):
         for posid in measured_QS.index:
@@ -446,20 +435,32 @@ class XYTest(PECS):
         movedf.loc[idx[i], [f'err_y_{n}']] = c(f'mea_y_{n}') - c('tgt_y')
         movedf.loc[idx[i], [f'err_xy_{n}']] = np.linalg.norm(
                 np.hstack([c(f'err_x_{n}'), c(f'err_y_{n}')]), axis=1)
-        for pcid in self.data.pcids:  # log of error after each move
-            err = (movedf.loc[idx[i, self.data.posids_pc[pcid]],
-                              [f'err_x_{n}', f'err_y_{n}', f'err_xy_{n}',
-                               f'pos_status_{n}']]
-                   .sort_values(f'err_xy_{n}', ascending=False))
-            errXY = err[f'err_xy_{n}'].values * 1000  # to microns
-            self.loggers[pcid].info(
-                f'\nSUBMOVE: {n}, errXY for all positioners:\n'
-                f'    max: {np.max(errXY):6.1f} μm\n'
-                f'    rms: {np.sqrt(np.mean(np.square(errXY))):6.1f} μm\n'
-                f'    avg: {np.mean(errXY):6.1f} μm\n'
-                f'    min: {np.min(errXY):6.1f} μm')
-            self.loggers[pcid].info('Worst 10 positioners:\n'
-                                    f'{err.iloc[:10].to_string()}')
+        err = (movedf.loc[idx[i, :],
+                          [f'err_x_{n}', f'err_y_{n}', f'err_xy_{n}',
+                           f'status_{n}']]
+               .sort_values(f'err_xy_{n}', ascending=False))
+        errXY = err[f'err_xy_{n}'].values * 1000  # to microns
+        self.logger.info([
+            f'\nSUBMOVE: {n}, errXY for all positioners:',
+            f'    max: {np.max(errXY):6.1f} μm',
+            f'    rms: {np.sqrt(np.mean(np.square(errXY))):6.1f} μm',
+            f'    avg: {np.mean(errXY):6.1f} μm',
+            f'    min: {np.min(errXY):6.1f} μm'])
+        self.logger.info(['Worst 20 positioners:', err.iloc[:10].to_string()])
+        # for pcid in self.data.pcids:  # log of error after each move
+        #     err = (movedf.loc[idx[i, self.data.posids_pc[pcid]],
+        #                       [f'err_x_{n}', f'err_y_{n}', f'err_xy_{n}',
+        #                        f'status_{n}']]
+        #            .sort_values(f'err_xy_{n}', ascending=False))
+        #     errXY = err[f'err_xy_{n}'].values * 1000  # to microns
+        #     self.loggers[pcid].info(
+        #         f'\nSUBMOVE: {n}, errXY for all positioners:\n'
+        #         f'    max: {np.max(errXY):6.1f} μm\n'
+        #         f'    rms: {np.sqrt(np.mean(np.square(errXY))):6.1f} μm\n'
+        #         f'    avg: {np.mean(errXY):6.1f} μm\n'
+        #         f'    min: {np.min(errXY):6.1f} μm')
+        #     self.loggers[pcid].info('Worst 10 positioners:\n'
+        #                             f'{err.iloc[:10].to_string()}')
 
 
 if __name__ == '__main__':
