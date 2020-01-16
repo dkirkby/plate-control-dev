@@ -596,7 +596,8 @@ class Petal(object):
         response = self.comm.send_tables(hw_tables)
         if 'FAILED' in response:
             self.tables_sent_successfully = False
-            self.printfunc('WARNING: Movetables rejected by petalcontroller!')
+            self.printfunc('WARNING: Movetables rejected by petalcontroller! '
+                           f'Response: {response}')
         else:
             self.tables_sent_successfully = True
         self.printfunc('send_move_tables: Done')
@@ -1068,7 +1069,7 @@ class Petal(object):
             posids = self.posids
         for posid in posids:
             if posid not in self.posids:
-                pass
+                continue  # this posid does not belong to this petal
             if not(self.posmodels[posid].is_enabled):
                 self.pos_flags[posid] |= self.ctrl_disabled_bit #final check for disabled
             if not(self.get_posfid_val(posid, 'FIBER_INTACT')):

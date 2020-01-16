@@ -50,7 +50,8 @@ for key in dir_keys_logs:
 for key in dir_keys_settings:
     dirs[key] = os.path.join(dirs['all_settings'], key)
 for directory in dirs.values():
-    os.makedirs(directory, exist_ok=True)
+    if not os.path.isfile(directory):
+        os.makedirs(directory, exist_ok=True)
 
 # Lookup tables for focal plane coordinate conversions
 R_lookup_path = petal_directory + os.path.sep + 'focal_surface_lookup.csv'

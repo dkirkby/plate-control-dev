@@ -24,7 +24,7 @@ class PosState(object):
         unit_id:  POS_ID, FID_ID, or PETAL_ID of device, must be str
         logging:  boolean whether to enable logging state data to disk
         type:     'pos', 'fid', 'ptl'
-        petal_id: '00' to '11', '900' to '909'
+        petal_id: '00' to '11', '900' to '909', must be string
 
     Notes:
         Default settings are used if no unit_id is supplied.
@@ -83,12 +83,12 @@ class PosState(object):
                         except KeyError:  # test posid, not existent
                             self.load_from_cfg(unit_id=unit_id)
                 else:  # both unit_id and ptlid are unkonwn, read template
-                    self.ptlid = '-1'  # assume ptlid = -1
+                    self.ptlid = None  # assume ptlid = -1
                     if self.type == 'ptl':  # unit_id and ptlid both unkonwn
                         # TODO fix this; still reading from a template config
-                        self.load_from_cfg(unit_id=unit_id)
+                        self.load_from_cfg()
                     else:
-                        self.load_from_db(unit_id=unit_id)
+                        self.load_from_db()
         else:
             # no DB commit, use local cfg only, skipped after switchover
             # below is directly repositioned from old version
@@ -158,12 +158,13 @@ class PosState(object):
         ret = pi.find_by_arbitrary_keys(DEVICE_TYPE=self.type.upper(),
                                         DEVICE_ID=unit_id)
         assert len(ret) == 1, f'lookup not unique, {ret}'
-        self.ptlid = ret[0]['PETAL_ID']
+        self.ptlid = f'{ret[0]["PETAL_ID"]:02}'
 
     def load_from_db(self, unit_id=None):
 
         self._val = {}  # no local config used to create _val, make empty one
-        self.pDB = DBSingleton(petal_id=int(self.ptlid))
+        ptlid_int = None if self.ptlid is None else int(self.ptlid)
+        self.pDB = DBSingleton(petal_id=ptlid_int)
         if unit_id is None:  # unit id not supplied, load templates
             unit_id = 'xxxxx'
             if self.type == 'pos':
