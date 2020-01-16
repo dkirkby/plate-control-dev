@@ -17,6 +17,10 @@ from poscalibrationfits import PosCalibrationFits
 class PosCalibrations(PECS):
     '''mode can be:     1p_offsetsTP, 1p_posintTP, 1p_offsetTposintP,
                         arc, grid'''
+    keys_collect = [
+        'POS_T', 'POS_P', 'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
+        'LENGTH_R1', 'LENGTH_R2', 'PHYSICAL_RANGE_T', 'PHYSICAL_RANGE_P',
+        'GEAR_CALIB_T', 'GEAR_CALIB_P']
 
     def __init__(self, mode, n_pts_TP=None, fvc=None, ptlm=None,
                  pcid=None, posids=None, interactive=False):
@@ -40,12 +44,8 @@ class PosCalibrations(PECS):
         self.exp_setup()  # set up exposure ID and product directory
 
     def collect_calib(self, posids):
-        keys_collect = [
-            'POS_T', 'POS_P', 'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
-            'LENGTH_R1', 'LENGTH_R2', 'PHYSICAL_RANGE_T', 'PHYSICAL_RANGE_P',
-            'GEAR_CALIB_T', 'GEAR_CALIB_P']
         return pd.concat(
-            [self.ptlm.get_pos_vals(keys_collect, posids=posids)[role]
+            [self.ptlm.get_pos_vals(self.keys_collect, posids=posids)[role]
              .set_index('DEVICE_ID') for role in self.ptl_roles])
 
     def run_1p_calibration(self, tp_target='default', commit=False,
@@ -78,7 +78,6 @@ class PosCalibrations(PECS):
                    f'poslocTP = {poslocTP}, do_move = {do_move}, '
                    f'commit = {commit}')
         rows = []
-        import pdb; pdb.set_trace()
         if do_move:  # then build requests and make the moves
             for posid in self.posids:
                 role = self.ptl_role_lookup(posid)
@@ -115,9 +114,10 @@ class PosCalibrations(PECS):
                 columns={'FLAGS': 'FLAG',
                          'MEAS_FLATX': 'mea_flatX', 'MEAS_FLATY': 'mea_flatY',
                          'EXP_FLATX': 'exp_flatX', 'EXP_FLATY': 'exp_flatY'})
-        cols = [col for col in updates.columns  # columns to drop
-                if 'OLD_' in col or 'NEW_' in col] + ['ERR_XY']
-        updates.drop(cols, axis=1, inplace=True)  # clean up update df
+        cols = [f'OLD_{key}' for key in self.keys_collect]
+        updates.drop(cols, axis=1, inplace=True)  # clean up proposed change
+        # updates.rename(columns={f'OLD_{key}': key
+        #                         for key in self.keys_collect}, inplace=True)
         for df in [used_pos, unused_pos]:
             df.rename(columns={'Q': 'mea_Q', 'S': 'mea_S',
                                'DQ': 'mea_dQ', 'DS': 'mea_dS',
@@ -158,7 +158,8 @@ class PosCalibrations(PECS):
                                    - calib_fit['tgt_posintP'])
         self.data.calib_fit = calib_fit
         self.data.calib_new = self.collect_calib(self.posids)
-        self.data.write_calibdf(calib_old, calib_fit, calib_new)
+        self.data.write_calibdf(self.data.calib_old, self.data.calib_fit,
+                                self.data.calib_new)
         self.data.t_f = pc.now()
 
     def run_arc_calibration(self, match_radius=50, interactive=False):
