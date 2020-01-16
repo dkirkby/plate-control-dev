@@ -76,8 +76,8 @@ class PosScheduleStage(object):
                              to reduce overall power density consumed by the array. You
                              can also argue None if no spreading should be done.
 
-        If spread_time is less than the time it takes to execute the longest move
-        table, then that longer execution time will be used instead of spread_time.
+        If anneal_time is less than the time it takes to execute the longest move
+        table, then that longer execution time will be used instead of anneal_time.
         """
         if anneal_time == None:
             return
