@@ -158,7 +158,7 @@ class PosState(object):
         ret = pi.find_by_arbitrary_keys(DEVICE_TYPE=self.type.upper(),
                                         DEVICE_ID=unit_id)
         assert len(ret) == 1, f'lookup not unique, {ret}'
-        self.ptlid = f'{ret[0]['PETAL_ID']:02}'
+        self.ptlid = f'{ret[0]["PETAL_ID"]:02}'
 
     def load_from_db(self, unit_id=None):
 
