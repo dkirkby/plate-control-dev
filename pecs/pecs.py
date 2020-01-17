@@ -209,7 +209,7 @@ class PECS:
                       matched_only=matched_only,
                       all_fiducials=self.all_fiducials))
                   .rename(columns={'id': 'DEVICE_ID'})
-                  .set_index('DEVICE_ID').sort_index())  # indexed by DEVICE_ID
+                  .set_index('DEVICE_ID').sort_index(drop=True))
         if np.any(['P' in device_id for device_id in meapos.index]):
             self.print('Measured positions of positioners by FVC '
                        'are contaminated by fiducials.')

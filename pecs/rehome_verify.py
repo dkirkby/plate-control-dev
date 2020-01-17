@@ -20,9 +20,10 @@ class RehomeVerify(PECS):
         super().__init__(fvc=fvc, ptlm=ptlm, interactive=interactive)
 
     def compare_xy(self):
-        self.printfunc(f'Verifying rehome positions for '
+        self.printfunc(f'Verifying home positions for '
                        f'{len(self.posids)} positioners...')
         # all backlit fibres, including those disabled, needed for FVC
+        import pdb; pdb.set_trace()
         exppos = (self.ptlm.get_positions(return_coord='QS')
                   .sort_values(by='DEVICE_ID'))
         exp_obsXY = (self.ptlm.get_positions(return_coord='obsXY')
@@ -39,7 +40,7 @@ class RehomeVerify(PECS):
         hom_QS = df[['HOME_Q', 'HOME_S']].T
         hom_obsXY = PetalTransforms.QS_to_obsXY(hom_QS)  # 2xN array
         # set nominal homed QS as expected postiions for FVC spotmatch
-        exppos[['X1', 'X2']] = hom_QS.T
+        exppos[['X1', 'X2']] = hom_QS.T.values
         # make sure no fiducial ID is in exppos DEVICE_ID column
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
             raise Exception('Expected positions of positioners by PetalApp '
