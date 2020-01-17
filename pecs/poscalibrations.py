@@ -188,14 +188,14 @@ class PosCalibrations(PECS):
             req_list_P.append(pd.concat(dfs).reset_index())
         T_data = []  # move, measure
         for i, req in enumerate(req_list_T):
-            self.print(f'Measuring theta arc point {i+1} of '
+            self.print(f'Starting theta arc point {i+1} of '
                        f'{len(req_list_T)}...')
             T_data.append(self.move_measure(req, match_radius=match_radius))
             if i+1 < len(req_list_T):  # no pause after the last iteration
                 self.pause()
         P_data = []
         for i, req in enumerate(req_list_P):
-            self.print(f'Measuring phi arc point {i+1} of '
+            self.print(f'Starting phi arc point {i+1} of '
                        f'{len(req_list_P)}...')
             if i+1 < len(req_list_T):  # pause before first iteration
                 self.pause()
@@ -267,6 +267,7 @@ class PosCalibrations(PECS):
         Wrapper for often repeated moving and measuring sequence.
         Returns data merged with request
         '''
+        self.logger.info('Moving positioners...')
         self.ptlm.prepare_move(request, anticollision=None)
         self.ptlm.execute_move(reset_flags=False, control={'timeout': 120})
         _, meapos, matched, _ = self.fvc_measure(
