@@ -193,7 +193,7 @@ class PECS:
             exppos = (self.ptlm.get_positions(
                           return_coord='QS',
                           participating_petals=self.illuminated_ptl_roles)
-                      .sort_values(by='DEVICE_ID').reset_index())
+                      .sort_values(by='DEVICE_ID').reset_index(drop=True))
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
             self.print('Expected positions of positioners by PetalApp '
                        'are contaminated by fiducials.')
@@ -209,7 +209,7 @@ class PECS:
                       matched_only=matched_only,
                       all_fiducials=self.all_fiducials))
                   .rename(columns={'id': 'DEVICE_ID'})
-                  .set_index('DEVICE_ID').sort_index(drop=True))
+                  .set_index('DEVICE_ID').sort_index())
         if np.any(['P' in device_id for device_id in meapos.index]):
             self.print('Measured positions of positioners by FVC '
                        'are contaminated by fiducials.')
