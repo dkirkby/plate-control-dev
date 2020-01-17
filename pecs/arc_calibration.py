@@ -14,6 +14,7 @@ test = PosCalibrations('arc', n_pts_TP=(12, 6), interactive=True)
 test.run_arc_calibration()
 test.fvc_collect(destination=test.data.dir)
 test.data.generate_data_products()
-print(test.data.calibdf.loc[:, idx[:, [  # preview calibration updates
-    'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
-    'LENGTH_R1', 'LENGTH_R2']]])
+if hasattr(test.data, 'calibdf'):
+    print(test.data.calibdf.loc[:, idx[:, [  # preview calibration updates
+        'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
+        'LENGTH_R1', 'LENGTH_R2']]])

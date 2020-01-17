@@ -44,9 +44,9 @@ class PosCalibrations(PECS):
         self.exp_setup()  # set up exposure ID and product directory
 
     def collect_calib(self, posids):
-        return pd.concat(
-            [self.ptlm.get_pos_vals(self.keys_collect, posids=posids)[role]
-             .set_index('DEVICE_ID') for role in self.ptl_roles])
+        ret = self.ptlm.get_pos_vals(self.keys_collect, posids=posids)
+        dfs = [ret[role] for role in self.ptl_roles]
+        return pd.concat(dfs).set_index('DEVICE_ID')
 
     def run_1p_calibration(self, tp_target='default', commit=False,
                            match_radius=50, interactive=False):
@@ -100,6 +100,9 @@ class PosCalibrations(PECS):
                 match_radius=match_radius)
         used_pos = meapos.loc[sorted(matched & (set(self.posids)))]
         unused_pos = exppos.loc[sorted(unmatched & (set(self.posids)))]
+        if len(used_pos) == 0:  # at least got some positioners back, update
+            self.logger.critical('No requested positioner was matched')
+            return
         if self.data.mode == '1p_offsetsTP':
             update_mode = 'offsetsTP'
         elif self.data.mode == '1p_posintTP':

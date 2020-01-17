@@ -14,5 +14,6 @@ test = PosCalibrations('1p_posintTP', interactive=True)
 test.run_1p_calibration(commit=False, interactive=True)
 test.fvc_collect(destination=test.data.dir)
 test.data.generate_data_products()
-print(test.data.calibdf.loc[:, idx[:, [  # preview calibration updates
-    'POS_T', 'POS_P', 'OFFSET_T', 'OFFSET_P']]])
+if hasattr(test.data, 'calibdf'):
+    print(test.data.calibdf.loc[:, idx[:, [  # preview calibration updates
+        'POS_T', 'POS_P', 'OFFSET_T', 'OFFSET_P']]])
