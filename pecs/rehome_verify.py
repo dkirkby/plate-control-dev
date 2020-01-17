@@ -23,7 +23,6 @@ class RehomeVerify(PECS):
         self.printfunc(f'Verifying home positions for '
                        f'{len(self.posids)} positioners...')
         # all backlit fibres, including those disabled, needed for FVC
-        import pdb; pdb.set_trace()
         exppos = (self.ptlm.get_positions(return_coord='QS')
                   .sort_values(by='DEVICE_ID'))
         exp_obsXY = (self.ptlm.get_positions(return_coord='obsXY')
