@@ -162,7 +162,7 @@ class PosCalibrationFits:
                         radius_T, radius_P, residuals_T, residuals_P,
                         GEAR_RATIO_T, GEAR_RATIO_P
         """
-        posids = sorted(data.index.get_level_values('DEVICE_ID').unique())
+        posids = data.index.get_level_values('DEVICE_ID').unique()
         self.logger.debug(f'Analysing arc calibration measurement data...')
         self.init_posmodels(posids=posids)  # double check all posmodels exist
         cols = ['mea_posintT, mea_posintP', 'mea_flatX', 'mea_flatY',
@@ -281,6 +281,7 @@ class PosCalibrationFits:
             for c in ['flatX', 'flatY', 'Q', 'S', 'posintT', 'posintP']:
                 data[f'err_{c}'] = data[f'mea_{c}'] - data[f'tgt_{c}']
             poscals.append(poscal)
+        import pdb; pdb.set_trace()
         return data, pd.DataFrame(poscals, index=posids)
 
     def calibrate_from_grid_data(self, data):
@@ -305,7 +306,7 @@ class PosCalibrationFits:
             column: 'OFFSET_T', 'OFFSET_P', 'OFFSET_X', 'OFFSET_Y',
                     'LENGTH_R1', 'LENGTH_R2'
         """
-        posids = sorted(data.index.get_level_values('DEVICE_ID').unique())
+        posids = data.index.get_level_values('DEVICE_ID').unique()
         self.logger.debug(f'Analysing grid calibration measurement data...')
         self.init_posmodels(posids=posids)  # double check all posmodels exist
         cols = ['mea_flatX', 'mea_flatY',
@@ -371,7 +372,8 @@ class PosCalibrationFits:
             for c in ['flatX', 'flatY', 'Q', 'S']:  # calculate errors
                 data[f'err_{c}'] = data[f'mea_{c}'] - data[f'tgt_{c}']
             poscals.append(poscal)
-        return data, pd.DataFrame(poscals, index=posids)
+        return data, pd.DataFrame(poscals,
+                                  index=pd.Series(posids, name='DEVICE_ID'))
 
 
 if __name__ == '__main__':
@@ -389,9 +391,9 @@ if __name__ == '__main__':
     # posdata = data_grid.loc[idx[:, 'M00001'], :]
     # posdata = data_arc.loc[idx['T', :, 'M00001'], :]
     # debug
-    directory = "/data/focalplane/logs/kpno/20200107/00038563/"
+    directory = "/data/focalplane/logs/kpno/20200115/00041100/"
     data = pd.read_pickle(os.path.join(directory, "data_arc.pkl.gz"))
     calib = PosCalibrationFits(use_doslib=True)
     movedf, calibdf = calib.calibrate_from_arc_data(data)
-    movedf.to_pickle(os.path.join(directory, "movedf.pkl.gz"))
-    calibdf.to_pickle(os.path.join(directory, "calibdf.pkl.gz"))
+    # movedf.to_pickle(os.path.join(directory, "movedf.pkl.gz"))
+    # calibdf.to_pickle(os.path.join(directory, "calibdf.pkl.gz"))

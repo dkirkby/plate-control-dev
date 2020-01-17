@@ -35,7 +35,8 @@ from configobj import ConfigObj
 import posconstants as pc
 import psycopg2
 import matplotlib
-if not 'Agg' in matplotlib.get_backend():
+backend =  matplotlib.get_backend()
+if not 'Agg' in backend or 'pdf' in backend:
     matplotlib.use('pdf')  # manually specify backend if savefig doesn't work
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
@@ -801,6 +802,9 @@ class CalibrationData(FPTestData):
             [calibdf_old, calibdf_fit, calibdf_new], axis=1,
             keys=['OLD', 'FIT', 'NEW'],
             names=['label', 'field'], sort=False)
+        if self.calibdf.index.name != 'DEVICE_ID':
+            self.calibdf.index.name = 'DEVICE_ID'
+            self.logger.info('calibdf index is not DEVICE_ID by default!')
 
     def generate_report(self):
         path = os.path.join(
