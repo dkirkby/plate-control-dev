@@ -128,7 +128,7 @@ class PECS:
             posids0 = sorted(posinfo.index)
             self.print(f'Defaulting to all {len(posids0)} enabled positioners')
         else:
-            ret = self.ptlm.get_positioners(posids=posids, enabled_only=True)
+            ret = self.ptlm.get_positioners(posids=posids, enabled_only=False)
             posinfo = pd.concat(list(ret.values())).set_index('DEVICE_ID')
             posids0 = sorted(set(posids) & set(posinfo.index))  # double check
             self.print(f'Validated {len(posids0)} of {len(posids)} '
@@ -169,12 +169,13 @@ class PECS:
     def _interactively_get_posids(self):
         user_text = input('Please list canids (can??) or posids, seperated by '
                           'spaces. Leave blank to select all positioners: ')
-        kwarg = {}
+        enabled_only, kwarg = True, {}
         if user_text != '':
             selection = user_text.split()
             kw = 'busids' if 'can' in selection[0] else 'posids'
             kwarg.update({kw: selection})
-        ret = self.ptlm.get_positioners(enabled_only=True, **kwarg)
+            enabled_only=False
+        ret = self.ptlm.get_positioners(enabled_only=enabled_only, **kwarg)
         posinfo = pd.concat(list(ret.values()))
         posids = sorted(posinfo['DEVICE_ID'])
         self.print(f'Selected {len(posids)} positioners')
