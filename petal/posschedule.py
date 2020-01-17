@@ -29,7 +29,7 @@ class PosSchedule(object):
         self.stage_order = ['direct','retract','rotate','extend','expert','final']
         self.RRE_stage_order = ['retract','rotate','extend']
         self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, stats=self.stats, verbose=self.verbose, printfunc=self.printfunc) for name in self.stage_order}
-        self.anneal_time = {'direct':1.0, 'retract':2.0, 'rotate':2.0, 'extend':2.0, 'expert':3} # times in seconds, see comments in PosScheduleStage
+        self.anneal_time = {'direct':6.6, 'retract':2.0, 'rotate':2.0, 'extend':2.0, 'expert':3} # times in seconds, see comments in PosScheduleStage
         self.should_anneal = True # overriding flag, allowing you to turn off all move time annealing
         self.should_check_petal_boundaries = True # allows you to turn off petal-specific boundary checks for non-petal systems (such as positioner test stands)
         self.should_check_sweeps_continuity = False # if True, inspects all quantized sweeps to confirm well-formed. incurs slowdown, and generally is not needed; more for validating if any changes made to quantize function at a lower level
