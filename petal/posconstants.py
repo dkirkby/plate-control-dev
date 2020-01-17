@@ -157,7 +157,7 @@ def decipher_posflags(flags):
             return (f'Invalid input flag {flags} with leftmost '
                     f'set bit at {bit} further than 26')
 
-    flags = np.array(flags).reshape(-1,)  # convert to 1d to enable indexing
+    flags = np.array(flags).reshape(-1,).astype(int)  # 1d to enable indexing
     return [decipher_flag(flag) for flag in flags]
 
 
