@@ -10,7 +10,7 @@ Requires running DOS instance. See pecs.py
 from poscalibrations import PosCalibrations
 import pandas as pd
 idx = pd.IndexSlice
-test = PosCalibrations('grid', n_pts_TP=(3, 3), interactive=True)
+test = PosCalibrations('grid', n_pts_TP=(6, 6), interactive=True)
 test.run_grid_calibration()
 test.fvc_collect(destination=test.data.dir)
 test.data.generate_data_products()

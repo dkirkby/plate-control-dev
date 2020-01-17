@@ -6,7 +6,7 @@ import pandas as pd
 from pecs import PECS
 import posconstants as pc
 
-seed = PECS(interactive=False)
+seed = PECS(interactive=True)
 print(f'Seeding offsetsTP for PCIDs: {seed.pcids}')
 updates = []
 for posid, row in seed.posinfo.iterrows():
