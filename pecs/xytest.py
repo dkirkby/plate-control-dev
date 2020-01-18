@@ -238,8 +238,6 @@ class XYTest(PECS):
                 self.update_calibrations(meapos)
                 self.record_measurement(meapos, i, n)
                 self.calculate_xy_errors(i, n)
-            if i+1 < self.data.ntargets:  # no pause after the last target
-                self.pause()
         self.data.t_f = pc.now()
         self.data.delta_t = self.data.t_f - self.data.t_i
         self.logger.info(f'Test complete, duration {self.data.delta_t}.')
