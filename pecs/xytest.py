@@ -283,7 +283,7 @@ class XYTest(PECS):
         movedf = self.data.movedf
         posids = self.data.posids  # all records obey this order
         if n == 0:  # blind move, issue cmd in obsXY for easy check with FVC
-            self.logger.info(f'Setting up target {i} in poslocXY...')
+            self.logger.info(f'Setting up target {i+1} in poslocXY...')
             movetype, cmd = 'blind', 'poslocXY'
             for posid in posids:  # write targets to move df
                 # No need to ask all petals to transform one pos
