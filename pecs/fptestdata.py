@@ -35,11 +35,9 @@ from configobj import ConfigObj
 import posconstants as pc
 import psycopg2
 import matplotlib
-backend =  matplotlib.get_backend()
-if not 'Agg' in backend or 'pdf' in backend:
-    matplotlib.use('pdf')  # manually specify backend if savefig doesn't work
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
+plt.switch_backend('Agg')
 # plt.ioff()  # turn off interactive mode, doesn't work in matplotlib 2
 plt.rcParams.update({'font.family': 'serif',
                      'mathtext.fontset': 'cm'})
