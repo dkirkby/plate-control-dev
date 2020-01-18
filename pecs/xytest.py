@@ -114,9 +114,9 @@ class XYTest(PECS):
             Nr = len(l0)  # number of requested positioners
             Ne = len(l1)  # nubmer of returned enabled postiioners
             Nd = Nr - Ne  # number of disabled positioners, inferred
-            self.logger.info(f'{Nr} positioners requested, # enabled, '
-                             f'disabled, and total: {Ne} + {Nd} = {Ne + Nd}',
-                             pcid)
+            self.logger.info(
+                f'{Nr} positioners requested, # enabled, '
+                f'disabled, and total: {Ne:3} + {Nd:3} = {Ne + Nd:3}', pcid)
             l1 = l1.set_index('DEVICE_ID').sort_index()  # sorted within ptl
             self.data.posids_pc[pcid] = l1.index.tolist()
             self.data.posids += self.data.posids_pc[pcid]
@@ -411,6 +411,7 @@ class XYTest(PECS):
                  updates[self._pcid2role(pcid)].to_string()])
 
     def record_measurement(self, measured_QS, i, n):
+        measured_QS = measured_QS[measured_QS.index.isin(self.posids)]
         for posid in measured_QS.index:
             if self.ptl_role_lookup(posid) is None:  # only selected posids
                 measured_QS.drop(posid, inplace=True)
