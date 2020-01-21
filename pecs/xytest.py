@@ -176,7 +176,7 @@ class XYTest(PECS):
             self.data.targets = path
             # set move command according to target type
             self.data.target_type = self.data.test_cfg['target_type']
-            acceptable_types = ['poslocTP', 'obsXY']
+            acceptable_types = ['poslocTP', 'poslocXY', 'obsXY']
             if self.data.target_type not in acceptable_types:
                 self.logger.error('Bad target type')
                 raise ValueError(
@@ -220,10 +220,10 @@ class XYTest(PECS):
             else:
                 disable_unmatched = True  # do disable by default
         self.logger.info(f'Starting Test at {self.data.t_i}')
-        try:
-            self.ptlm.set_schedule_stats(enabled=True)
-        except:
-            print('ERROR: Did you update PetalApp?')
+        #try:
+        #    self.ptlm.set_schedule_stats(enabled=True)
+        #except:
+        #    print('ERROR: Did you update PetalApp?')
         for i in range(self.data.ntargets):  # test loop over all test targets
             self.record_basic_move_data(i)  # for each target, record basics
             if i > 0:  # don't pause for the 1st target
@@ -241,17 +241,17 @@ class XYTest(PECS):
         self.data.t_f = pc.now()
         self.data.delta_t = self.data.t_f - self.data.t_i
         self.logger.info(f'Test complete, duration {self.data.delta_t}.')
-        try:
-            for pcid in self.data.pcids:
-                self.data.schedstats[pcid] = (
-                    self.ptlm.schedule_stats.generate_table())
-        except Exception as e:
-            self.logger.warning(
-                f'Failed to generate schedule stats table: {e}')
-        try:
-            self.ptlm.set_schedule_stats(enabled=False)
-        except:
-            print('ERROR: Did you update PetalApp?')
+        #try:
+        #    for pcid in self.data.pcids:
+        #        self.data.schedstats[pcid] = (
+        #            self.ptlm.schedule_stats.generate_table())
+        #except Exception as e:
+        #    self.logger.warning(
+        #        f'Failed to generate schedule stats table: {e}')
+        #try:
+        #    self.ptlm.set_schedule_stats(enabled=False)
+        #except:
+        #    print('ERROR: Did you update PetalApp?')
 
     def record_basic_move_data(self, i):
         self.logger.info('Recording move metadata for new xy target...')
@@ -463,7 +463,7 @@ class XYTest(PECS):
 
 
 if __name__ == '__main__':
-    path = os.path.join(pc.dirs['test_settings'], 'xytest_all_sim.cfg')
+    path = os.path.join(pc.dirs['test_settings'], 'xytest_psf_rand.cfg')
     print(f'Loading test config: {path}')
     xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')  # read cfg
     xytest_name = input(r'Please name this test (xytest-{test_name}): ')
