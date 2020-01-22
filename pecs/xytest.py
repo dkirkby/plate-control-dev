@@ -220,10 +220,7 @@ class XYTest(PECS):
             else:
                 disable_unmatched = True  # do disable by default
         self.logger.info(f'Starting Test at {self.data.t_i}')
-        #try:
-        #    self.ptlm.set_schedule_stats(enabled=True)
-        #except:
-        #    print('ERROR: Did you update PetalApp?')
+        self.ptlm.set_schedule_stats(enabled=True)
         for i in range(self.data.ntargets):  # test loop over all test targets
             self.record_basic_move_data(i)  # for each target, record basics
             if i > 0:  # don't pause for the 1st target
@@ -472,3 +469,4 @@ if __name__ == '__main__':
         disable_unmatched=test.data.test_cfg['disable_unmatched'])
     test.fvc_collect(destination=test.data.dir)
     test.data.generate_data_products()
+    test.ptlm.set_schedule_stats(enabled=False)
