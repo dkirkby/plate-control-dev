@@ -127,6 +127,7 @@ class FPTestData:
         self.logger.debug([f'posconstants.py version: {pc.code_version}',
                            f'anticollision mode: {self.anticollision}'])
         self.schedstats = {}
+        self.set_dirs()
 
     def set_dirs(self):
         self.filename = (

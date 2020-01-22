@@ -91,8 +91,8 @@ class PECS:
         self.exp.sequence = 'Focalplane'
         self.exp.program = self.data.test_name
         self.exp.exptime = self.exptime
-        self.data.set_dirs(self.exp.id)  # directory setup
         self.fvc.save_centers = True
+        # fvc centre jsons are written by non-msdos account, note access
         self.fvc.save_centers_path = self.data.dir
         self.print(f'DESI exposure ID set up as: {self.exp.id}')
 
@@ -154,8 +154,8 @@ class PECS:
         return self._pcid2role(self.pcid_lookup(posid))
 
     def _interactively_get_pcid(self):
-        pcids = input(f'Please enter integer PCIDs seperated by '
-                      f'spaces. Leave blank to select petal specified in cfg: ')
+        pcids = input(f'Please enter integer PCIDs seperated by spaces. '
+                      f'Leave blank to select petal specified in cfg: ')
         if pcids == '':
             pcids = self.pcids
         for pcid in pcids:  # validate pcids against petalman available roles
@@ -174,7 +174,7 @@ class PECS:
             selection = user_text.split()
             kw = 'busids' if 'can' in selection[0] else 'posids'
             kwarg.update({kw: selection})
-            enabled_only=False
+            enabled_only = False
         ret = self.ptlm.get_positioners(enabled_only=enabled_only, **kwarg)
         posinfo = pd.concat(list(ret.values()))
         posids = sorted(posinfo['DEVICE_ID'])
