@@ -1,6 +1,6 @@
 #import multicens_v17 as multicens
 import multicens
-import pyfits
+import astropy.io.fits as pyfits
 import time
 import sys
 import numpy as np
