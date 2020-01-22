@@ -234,6 +234,8 @@ class FPTestData:
                     [p.join()
                      for p in pool[n_started-n_threads_max:n_started-1]]
                 np.start()
+                if n_started <= n_threads_max:
+                    pool[n_started-n_threads_max].close()
                 n_started += 1
                 pool.append(np)
             self.print(
@@ -562,9 +564,9 @@ class XYTestData(FPTestData):
             ax.set_ylabel(r'$y/\mathrm{mm}$')
             ax.legend(loc='upper right', fontsize=10)
             fig.savefig(path.format(n), bbox_inches='tight')
+            plt.close(fig)
             if hasattr(self, 'logger'):
                 self.loggers[pcid].debug(f'xyplot saved: {path.format(n)}')
-            plt.close(fig)
 
     def make_summary_plot_binder(self, pcid, n):
         template = os.path.join(self.dirs[pcid],
