@@ -148,7 +148,6 @@ class FPTestData:
         for pcid in self.pcids:
             # use the same directory for all real-time logs
             # ensure save directory and log file exist if they don't already
-            os.makedirs(self.log_dir, exist_ok=True)
             self.log_paths[pcid] = os.path.join(
                 self.dir,
                 f'{self.test_name}-pc{pcid:02}_realtime.log')
