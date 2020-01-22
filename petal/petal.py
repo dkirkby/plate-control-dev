@@ -205,10 +205,11 @@ class Petal(object):
         self.movetable_rejected_bit = 1<<25
         self.exceeded_lims_bit = 1<<26
         self.bad_neighbor_bit = 1<<27
-        self.missing_fvc_spot = 1<<28
+        self.missing_fvc_spot_bit = 1<<28
+        self.bad_performance_bit = 1<<29
         self.pos_flags = {} #Dictionary of flags by posid for the FVC, use get_pos_flags() rather than calling directly
         self.disabled_devids = [] #list of devids with DEVICE_CLASSIFIED_NONFUNCTIONAL = True or FIBER_INTACT = False
-        self._initialize_pos_flags()
+        self._initialize_pos_flags(enabled_only=False)
         self._apply_state_enable_settings()
 
         self.hw_states = {}
@@ -1302,7 +1303,7 @@ class Petal(object):
         else:
             self.can_enabled_map[dev_supply][busid].pop(canid, None)
 
-    def _initialize_pos_flags(self, ids = 'all'):
+    def _initialize_pos_flags(self, ids = 'all', enabled_only=True):
         '''
         Sets pos_flags to initial values: 4 for positioners and 8 for fiducials.
 
@@ -1334,7 +1335,8 @@ class Petal(object):
             if posfidid not in self.posids.union(self.fidids): 
                 continue
             if posfidid.startswith('M') or posfidid.startswith('D') or posfidid.startswith('UM'):
-                self.pos_flags[posfidid] = self.pos_bit
+                if not(enabled_only) or self.posmodels[posfidid].is_enabled:
+                    self.pos_flags[posfidid] = self.pos_bit
             else:
                 self.pos_flags[posfidid] = self.fid_bit
         if hasattr(self, 'disabled_fids') and ids == 'all':
