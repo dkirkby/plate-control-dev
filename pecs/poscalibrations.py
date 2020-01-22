@@ -141,29 +141,32 @@ class PosCalibrations(PECS):
             role = self.ptl_role_lookup(posid)
             mea_posintTP, _ = self.ptlm.postrans(
                 posid, 'QS_to_posintTP',
-                row[['mea_Q', 'mea_S',]].values.astype(float),
+                row[['mea_Q', 'mea_S']].values.astype(float),
                 participating_petals=role)
             tgt_flatXY = self.ptlm.postrans(
-                posid, 'posintTP_to_flatXY', 
-                row[['tgt_posintT', 'tgt_posintP',]].values.astype(float),
+                posid, 'posintTP_to_flatXY',
+                row[['tgt_posintT', 'tgt_posintP']].values.astype(float),
                 participating_petals=role)
             calib_fit.loc[posid, 'mea_posintT'] = mea_posintTP[0]
             calib_fit.loc[posid, 'mea_posintP'] = mea_posintTP[1]
             calib_fit.loc[posid, 'tgt_flatX'] = tgt_flatXY[0]
             calib_fit.loc[posid, 'tgt_flatY'] = tgt_flatXY[1]
-        calib_fit['err_flatX'] = calib_fit['mea_flatX'] - calib_fit['tgt_flatX']
-        calib_fit['err_flatY'] = calib_fit['mea_flatY'] - calib_fit['tgt_flatY']
+        calib_fit['err_flatX'] = (
+            calib_fit['mea_flatX'] - calib_fit['tgt_flatX'])
+        calib_fit['err_flatY'] = (
+            calib_fit['mea_flatY'] - calib_fit['tgt_flatY'])
         calib_fit['err_flatXY'] = np.linalg.norm(
             calib_fit[['mea_flatX', 'tgt_flatX']], axis=1)
         calib_fit['err_posintT'] = (calib_fit['mea_posintT']
-                                   - calib_fit['tgt_posintT'])
+                                    - calib_fit['tgt_posintT'])
         calib_fit['err_posintP'] = (calib_fit['mea_posintP']
-                                   - calib_fit['tgt_posintP'])
+                                    - calib_fit['tgt_posintP'])
         self.data.calib_fit = calib_fit
         self.data.calib_new = self.collect_calib(self.posids)
         self.data.write_calibdf(self.data.calib_old, self.data.calib_fit,
                                 self.data.calib_new)
         self.data.t_f = pc.now()
+        self.fvc_collect()
 
     def run_arc_calibration(self, match_radius=50, interactive=False):
         if interactive:
@@ -208,6 +211,7 @@ class PosCalibrations(PECS):
         self.data_arc.to_pickle(os.path.join(self.data.dir, 'data_arc.pkl.gz'),
                                 compression='gzip')
         self.data.t_f = pc.now()
+        self.fvc_collect()
         if self.data.online_fitting:
             fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
                                      loggers=self.loggers)
@@ -248,6 +252,7 @@ class PosCalibrations(PECS):
         self.data_grid.to_pickle(os.path.join(
             self.data.dir, 'data_grid.pkl.gz'), compression='gzip')
         self.data.t_f = pc.now()
+        self.fvc_collect()
         if self.data.online_fitting:
             fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
                                      loggers=self.loggers)

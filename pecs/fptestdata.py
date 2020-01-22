@@ -128,11 +128,10 @@ class FPTestData:
                            f'anticollision mode: {self.anticollision}'])
         self.schedstats = {}
 
-    def set_dirs(self, expid):
+    def set_dirs(self):
         self.filename = (
             f'{pc.filename_timestamp_str(t=self.t_i)}-{self.test_name}')
-        self.dir = os.path.join(
-            pc.dirs['kpno'], pc.dir_date_str(t=self.t_i), f'{expid:08}')
+        self.dir = os.path.join(pc.dirs['kpno'], self.filename)
         self.dirs = {pcid: os.path.join(self.dir, f'pc{pcid:02}')
                      for pcid in self.pcids}
         self.test_cfg.filename = os.path.join(self.dir, f'{self.filename}.cfg')

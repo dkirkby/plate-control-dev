@@ -230,16 +230,18 @@ class PECS:
                        f'\n{sorted(unmatched)}')
         return exppos, meapos, matched, unmatched
 
-    def fvc_collect(self, destination='/data/msdos/focalplane/'):
-        self.print('Collecting FVC images associated with exposure ID '
-                   f'{self.exp.id} to: {destination}')
+    def fvc_collect(self):
+        destination = os.path.join(
+            '/exposures/desi', pc.dir_date_str(t=self.t_i), f'{expid:08}')
         os.makedirs(destination, exist_ok=True)
         try:
             self.fvc_collector._send_command(
                 'collect', expid=self.exp.id, output_dir=destination,
                 logbook=False)
+            self.print('FVC data associated with exposure ID '
+                       f'{self.exp.id} collected to: {destination}')
         except Exception as e:
-            self.print(f'FVC collector failed: {e}')
+            self.print(f'FVC collector call failed: {e}')
 
     @staticmethod
     def countdown_sec(t):  # in seconds
