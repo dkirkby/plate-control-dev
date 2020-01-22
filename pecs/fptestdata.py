@@ -109,6 +109,7 @@ class FPTestData:
     def __init__(self, test_name, test_cfg=None):
 
         self.test_name = test_name
+        self.t_i = pc.now()
         if test_cfg is None:
             self.test_cfg = ConfigObj()
         else:  # for xy accuracy test
@@ -123,13 +124,13 @@ class FPTestData:
                 and key.isdigit() and (test_cfg[key]['mode'] is not None)]
             for pcid in self.test_cfg.sections:  # convert pcid to int now
                 self.test_cfg.rename(pcid, int(pcid))
+        self.set_dirs()  # does not need to know about expid
         self._init_loggers()
         self.logger.debug([f'posconstants.py version: {pc.code_version}',
                            f'anticollision mode: {self.anticollision}'])
         self.schedstats = {}
-        self.set_dirs()
 
-    def set_dirs(self):
+    def set_dirs(self):  # does not need to know about expid
         self.filename = (
             f'{pc.filename_timestamp_str(t=self.t_i)}-{self.test_name}')
         self.dir = os.path.join(pc.dirs['kpno'], self.filename)
@@ -146,11 +147,10 @@ class FPTestData:
         self.loggers = {}
         for pcid in self.pcids:
             # use the same directory for all real-time logs
-            self.log_dir = pc.dirs['kpno']
             # ensure save directory and log file exist if they don't already
             os.makedirs(self.log_dir, exist_ok=True)
             self.log_paths[pcid] = os.path.join(
-                self.log_dir,
+                self.dir,
                 f'{self.test_name}-pc{pcid:02}_realtime.log')
             open(self.log_paths[pcid], 'a').close()  # create empty log files
             # create virtual file object for storing log entries

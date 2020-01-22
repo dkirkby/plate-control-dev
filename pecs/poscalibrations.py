@@ -40,7 +40,6 @@ class PosCalibrations(PECS):
         self.logger = self.data.logger  # broadcast to all petals
         self.loggers = self.data.loggers
         super().__init__(fvc=fvc, ptlm=ptlm, interactive=interactive)
-        self.data.t_i = pc.now()
         self.exp_setup()  # set up exposure ID and product directory
 
     def collect_calib(self, posids):
