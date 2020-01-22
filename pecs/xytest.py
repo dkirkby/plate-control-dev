@@ -200,14 +200,6 @@ class XYTest(PECS):
                             f'{i}, posid {posid}', pcid)
         assert self.data.ntargets > 0, 'Empty target list, exiting...'
 
-    # def _add_device_id_col(self, df, pcid):
-    #     '''when df only has DEVICE_LOC, add DEVICE_ID column and use as index
-    #        this method may not be needed anymore after PetalApp update
-    #     '''
-    #     df0 = self.data.posdf[self.data.posdf['PCID'] == pcid]
-    #     return df.merge(df0, on=['PETAL_LOC', 'DEVICE_LOC'],
-    #                     left_index=True).sort_index()
-
     def _update(self, newdf, i):
         '''input newdf is single-index on posid only'''
         newdf = newdf.set_index(pd.MultiIndex.from_product([[i], newdf.index]))
@@ -238,17 +230,23 @@ class XYTest(PECS):
         self.data.t_f = pc.now()
         self.data.delta_t = self.data.t_f - self.data.t_i
         self.logger.info(f'Test complete, duration {self.data.delta_t}.')
-        #try:
-        #    for pcid in self.data.pcids:
-        #        self.data.schedstats[pcid] = (
-        #            self.ptlm.schedule_stats.generate_table())
+
         #except Exception as e:
         #    self.logger.warning(
         #        f'Failed to generate schedule stats table: {e}')
-        #try:
-        #    self.ptlm.set_schedule_stats(enabled=False)
-        #except:
-        #    print('ERROR: Did you update PetalApp?')
+        # read schedule stats
+        try:
+            ret = self.ptlm.schedule_stats.generate_table()
+            for role, table in ret.items():
+                self.data.schedstats[self._role2pcid(role)] = table
+            print('Try worked')
+        except Exception as e:
+            print(f'Try failed, exception: {e}')
+            for pcid in self.data.pcids:
+                self.data.schedstats[pcid] = (
+                    self.ptlm.schedule_stats.generate_table(
+                        participating_petals=self._pcid2role(pcid)))
+        self.ptlm.set_schedule_stats(enabled=False)
 
     def record_basic_move_data(self, i):
         self.logger.info('Recording move metadata for new xy target...')
@@ -443,20 +441,6 @@ class XYTest(PECS):
             f'    avg: {np.mean(errXY):6.1f} μm',
             f'    min: {np.min(errXY):6.1f} μm'])
         self.logger.info(['Worst 20 positioners:', err.iloc[:10].to_string()])
-        # for pcid in self.data.pcids:  # log of error after each move
-        #     err = (movedf.loc[idx[i, self.data.posids_pc[pcid]],
-        #                       [f'err_x_{n}', f'err_y_{n}', f'err_xy_{n}',
-        #                        f'status_{n}']]
-        #            .sort_values(f'err_xy_{n}', ascending=False))
-        #     errXY = err[f'err_xy_{n}'].values * 1000  # to microns
-        #     self.loggers[pcid].info(
-        #         f'\nSUBMOVE: {n}, errXY for all positioners:\n'
-        #         f'    max: {np.max(errXY):6.1f} μm\n'
-        #         f'    rms: {np.sqrt(np.mean(np.square(errXY))):6.1f} μm\n'
-        #         f'    avg: {np.mean(errXY):6.1f} μm\n'
-        #         f'    min: {np.min(errXY):6.1f} μm')
-        #     self.loggers[pcid].info('Worst 10 positioners:\n'
-        #                             f'{err.iloc[:10].to_string()}')
 
 
 if __name__ == '__main__':
@@ -469,4 +453,3 @@ if __name__ == '__main__':
         disable_unmatched=test.data.test_cfg['disable_unmatched'])
     test.fvc_collect(destination=test.data.dir)
     test.data.generate_data_products()
-    test.ptlm.set_schedule_stats(enabled=False)
