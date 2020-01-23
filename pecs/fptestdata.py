@@ -579,8 +579,6 @@ class XYTestData(FPTestData):
             ax.legend(loc='upper right', fontsize=10)
             fig.savefig(path.format(n), bbox_inches='tight')
             plt.close(fig)
-            del fig
-            gc.collect(generation=2)
             if hasattr(self, 'logger'):
                 self.loggers[pcid].debug(f'xyplot saved: {path.format(n)}')
 
