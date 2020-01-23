@@ -587,7 +587,7 @@ class XYTestData(FPTestData):
         savepath = os.path.join(
             self.dirs[pcid],
             f'{len(paths)}_positioners-xyplot_submove_{n}.pdf')
-        self.print(f'Writing xyplot binder for submove {n}...')
+        self.print(f'Writing xyplot binder for PC{pcid:02} submove {n}...')
         binder.write(savepath)
         binder.close()
         self.print(f'Binder for submove {n} saved to: {savepath}')
