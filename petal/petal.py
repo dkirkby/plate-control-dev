@@ -148,6 +148,7 @@ class Petal(object):
         self.shape = shape
         self.limit_radius = 3.5 #mm to reject targets. Set to False or None to skip check
         self._last_state = None
+        self._canids_where_tables_were_just_sent = set()
         if fidids in ['',[''],{''}]: # check included to handle simulation cases, where no fidids argued
             fidids = {}
 
@@ -163,7 +164,6 @@ class Petal(object):
                 self.ops_state_sv.write(o)
             except Exception as e:
                 self.printfunc('init: Exception calling petalcontroller ops_state: %s' % str(e))
-        self.tables_sent_successfully = True
 
         # database setup
         self.db_commit_on = db_commit_on if DB_COMMIT_AVAILABLE else False
@@ -281,8 +281,9 @@ class Petal(object):
                                              petal_alignment=self.alignment)
             self.devices[self.states[posid]._val['DEVICE_LOC']] = posid
         self.posids = set(self.posmodels.keys())
-        self.canids_where_tables_were_just_sent = []
-        self.busids_where_tables_were_just_sent = []
+        self.canids = {posid:self.posmodels[posid].canid for posid in self.posids}
+        self.busids = {posid:self.posmodels[posid].busid for posid in self.posids}
+        self.canids_to_posids = {canid:posid for posid,canid in self.canids.items()}
         self.nonresponsive_canids = set()
         # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start
         # positioners
@@ -338,8 +339,9 @@ class Petal(object):
                     KEYS        VALUES
                     ----        ------
                     command     move command string
-                                    ... valid values are 'QS', 'dQdS', 'obsXY', 'ptlXY', 'poslocXY', 'dXdY', 'poslocTP', 'posintTP' or 'dTdP'
-                                    ... Note: dXdY is CS5 aligned XY, not Petal aligned
+                                    ... valid values are 'QS', 'dQdS', 'obsXY', 'ptlXY',
+                                        'poslocXY', 'obsdXdY', 'poslocdXdY', 'poslocTP',
+                                        'posintTP', or 'dTdP'
                     target      pair of target coordinates or deltas, of the form [u,v]
                                     ... the elements u and v can be floats or integers
                                     ... 1st element (u) is the value for q, dq, x, dx, t, or dt
@@ -579,28 +581,23 @@ class Petal(object):
         """Send move tables that have been scheduled out to the positioners.
         """
         self.printfunc('send_move_tables called')
+        hw_tables = self._hardware_ready_move_tables()
+        for tbl in hw_tables:
+            self._canids_where_tables_were_just_sent.add(tbl['canid'])
         if self.simulator_on:
-            self.tables_sent_successfully = True
             if self.verbose:
-                self.tables_sent_successfully = True
                 self.printfunc('Simulator skips sending move tables to positioners.')
             return
-        hw_tables = self._hardware_ready_move_tables()
-        canids = []
-        busids = []
-        for tbl in hw_tables:
-            canids.append(tbl['canid'])
-            busids.append(tbl['busid'])
-        self.canids_where_tables_were_just_sent = canids
-        self.busids_where_tables_were_just_sent = busids
-        self._wait_while_moving()
-        response = self.comm.send_tables(hw_tables)
+        self._wait_while_moving() # note how this needs to be preceded by adding positioners to _canids_where_tables_were_just_sent, so that the wait function can await the correct devices
+        response = self.comm.send_tables(hw_tables) # 2020-01-23, TO-DO! add failed_canids set to return tuple, once that has implemented in petalcontroller
         if 'FAILED' in response:
-            self.tables_sent_successfully = False
-            self.printfunc('WARNING: Movetables rejected by petalcontroller! '
-                           f'Response: {response}')
-        else:
-            self.tables_sent_successfully = True
+            self._remove_canid_from_sent_tables('all')
+            self.printfunc('WARNING: ' + str(response) + '. All move tables were rejected by petalcontroller.')
+        elif 'PARTIAL SUCCESS' in response:
+            failed_send_canids = set() # 2020-01-23, TO-DO! replace here with grabbing the actual failed set from response tuple, once that has been implemented in petalcontroller.py
+            for canid in failed_send_canids:
+                self._remove_canid_from_sent_tables(canid)
+            self.printfunc('WARNING: ' + str(response) + '. Move tables to the following canids were rejected by petalcontroller: ' + str(failed_send_canids))
         self.printfunc('send_move_tables: Done')
 
     def set_motor_parameters(self):
@@ -610,7 +607,6 @@ class Petal(object):
             if self.verbose:
                 self.printfunc('Simulator skips sending motor parameters to positioners.')
             return
-
         parameter_keys = ['CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CURR_HOLD', 'CREEP_PERIOD','SPINUPDOWN_PERIOD']
         currents_by_busid = dict((p.busid,{}) for posid,p in self.posmodels.items())
         periods_by_busid =  dict((p.busid,{}) for posid,p in self.posmodels.items())
@@ -641,8 +637,7 @@ class Petal(object):
             self.comm.execute_sync(self.sync_mode)
             self._postmove_cleanup()
             self._wait_while_moving()
-        self.canids_where_tables_were_just_sent = []
-        self.busids_where_tables_were_just_sent = []
+        self._remove_canid_from_sent_tables('all')
         self.printfunc('execute_moves: Done')
 
     def schedule_send_and_execute_moves(self, anticollision='default', should_anneal=True):
@@ -1126,22 +1121,19 @@ class Petal(object):
             Each dictionary is the move table for one positioner.
 
             The dictionary has the following fields:
-                {'posid':'','nrows':0,'motor_steps_T':[],'motor_steps_P':[],'speed_mode_T':[],'speed_mode_P':[],'move_time':[],'postpause':[]}
 
-            The fields have the following types and meanings:
-
-                canid         ... unsigned integer          ... identifies the positioner by 'CAN_ID'
-                nrows         ... unsigned integer          ... number of elements in each of the list fields (i.e. number of rows of the move table)
-                motor_steps_T ... list of signed integers   ... number of motor steps to rotate on theta axis
+                canid          ... unsigned integer          ... identifies the positioner by 'CAN_ID'
+                nrows          ... unsigned integer          ... number of elements in each of the list fields (i.e. number of rows of the move table)
+                motor_steps_T  ... list of signed integers   ... number of motor steps to rotate on theta axis
                                                                     ... motor_steps_T > 0 ... ccw rotation
                                                                     ... motor_steps_T < 0 ... cw rotation
-                motor_steps_P ... list of signed integers   ... number of motor steps to rotate on phi axis
+                motor_steps_P  ... list of signed integers   ... number of motor steps to rotate on phi axis
                                                                     ... motor_steps_P > 0 ... ccw rotation
                                                                     ... motor_steps_P < 0 ... cw rotation
-                speed_mode_T  ... list of strings           ... 'cruise' or 'creep' mode on theta axis
-                speed_mode_P  ... list of strings           ... 'cruise' or 'creep' mode on phi axis
-                move_time     ... list of unsigned floats   ... estimated time the row's motion will take, in seconds, not including the postpause
-                postpause     ... list of unsigned integers ... pause time after the row's motion, in milliseconds, before executing the next row
+                speed_mode_T   ... list of strings           ... 'cruise' or 'creep' mode on theta axis
+                speed_mode_P   ... list of strings           ... 'cruise' or 'creep' mode on phi axis
+                move_time      ... list of unsigned floats   ... estimated time the row's motion will take, in seconds, not including the postpause
+                postpause      ... list of unsigned integers ... pause time after the row's motion, in milliseconds, before executing the next row
         """
         hw_tables = []
         for m in self.schedule.move_tables.values():
@@ -1150,12 +1142,13 @@ class Petal(object):
         return hw_tables
 
     def _postmove_cleanup(self):
-        """This always gets called after performing a set of moves, so that PosModel instances
-        can be informed that the move was physically done on the hardware.
+        """This always gets called after performing a set of moves, so that
+        PosModel instances can be informed that the move was physically done on
+        the hardware.
         """
         self._check_and_disable_nonresponsive_pos_and_fid()
         for m in self.schedule.move_tables.values():
-            if self.tables_sent_successfully:
+            if m.posmodel.canid in self._canids_where_tables_were_just_sent:
                 m.posmodel.postmove_cleanup(m.for_cleanup())
                 self.altered_states.add(m.posmodel.state)
             else:
@@ -1215,16 +1208,18 @@ class Petal(object):
         """
         if self.simulator_on:
             return
-        timeout = 20.0 # seconds
+        min_timeout = 20.0 # seconds
+        timeout = max(min_timeout, self.schedule.conservative_move_timeout_period())
         poll_period = 0.5 # seconds
         keep_waiting = True
         start_time = time.time()
+        canids, busids = self._id_lists_where_tables_were_just_sent()
         while keep_waiting:
             elapsed_time = time.time() - start_time
             if elapsed_time >= timeout:
                 self.printfunc('Timed out at ' + str(timeout) + ' seconds waiting for positioners to be ready to receive next commands.')
                 keep_waiting = False
-            if self.comm.ready_for_tables(self.busids_where_tables_were_just_sent, self.canids_where_tables_were_just_sent):
+            if self.comm.ready_for_tables(busids, canids):
                 keep_waiting = False
             else:
                 time.sleep(poll_period)
@@ -1396,19 +1391,39 @@ class Petal(object):
                 for fid in self.fidids:
                     self.set_posfid_val(fid, 'DUTY_STATE', 0)
         #Reset values
-        self.canids_where_tables_were_just_sent = []
-        self.busids_where_tables_were_just_sent = []
+        self._remove_canid_from_sent_tables('all')
         self.nonresponsive_canids = set()
         self._initialize_pos_flags() # Reset posflags
         self._apply_state_enable_settings()
         for posmodel in self.posmodels.values(): #Clean up posmodel and posstate
             posmodel.clear_postmove_cleanup_cmds_without_executing()
-
         self._clear_temporary_state_values()
         self.commit(mode='both', log_note='configuring') #commit uncommitted changes to DB
         self.schedule = self._new_schedule() # Refresh schedule so it has no tables
-
         return 'SUCCESS'
+
+    def _remove_canid_from_sent_tables(self, canid):
+        """There is an internal list in petal.py of which positioners have had
+        move tables actually sent out to hardware. This function removes a
+        positioner (identified by canid) from the list. You can also argue
+        canid='all', in which case the whole list will get cleared.
+        """
+        if canid == 'all':
+            self._canids_where_tables_were_just_sent = set()         
+        elif canid in self._canids_where_tables_were_just_sent:
+            self._canids_where_tables_were_just_sent.remove(canid)
+                
+    def _id_lists_where_tables_were_just_sent(self):
+        """Returns a pair of lists of ids. The two returned lists are first,
+        canids and second, busids. They represent the internal tracking of which
+        positioners have had move tables actually sent out to hardware. The
+        point of this function is that it guarantees the two lists will be in
+        the same order (which is required by the petalcontroller interface).
+        """
+        canids = sorted(self._canids_where_tables_were_just_sent)
+        posids = [self.canids_to_posids[canid] for canid in canids]
+        busids = [self.busids[posid] for posid in posids]
+        return canids, busids
 
 if __name__ == '__main__':
     '''
