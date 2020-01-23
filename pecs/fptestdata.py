@@ -149,7 +149,7 @@ class FPTestData:
             # use the same directory for all real-time logs
             # ensure save directory and log file exist if they don't already
             self.log_paths[pcid] = os.path.join(
-                self.dir,
+                self.dirs[pcid],
                 f'{self.test_name}-pc{pcid:02}_realtime.log')
             open(self.log_paths[pcid], 'a').close()  # create empty log files
             # create virtual file object for storing log entries

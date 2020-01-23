@@ -17,6 +17,7 @@ import time
 import numpy as np
 import pandas as pd
 from configobj import ConfigObj
+import posconstants as pc
 from DOSlib.proxies import FVC, PetalMan, SimpleProxy  # , Illuminator
 from DOSlib.exposure import Exposure
 from fvc_sim import FVC_proxy_sim
@@ -232,7 +233,7 @@ class PECS:
 
     def fvc_collect(self):
         destination = os.path.join(
-            '/exposures/desi', pc.dir_date_str(t=self.t_i), f'{expid:08}')
+            '/exposures/desi', pc.dir_date_str(t=self.data.t_i), f'{expid:08}')
         os.makedirs(destination, exist_ok=True)
         try:
             self.fvc_collector._send_command(
