@@ -233,7 +233,7 @@ class FPTestData:
                     [p.join()
                      for p in pool[n_started-n_threads_max:n_started-1]]
                 np.start()
-                if n_started <= n_threads_max:
+                if n_started >= n_threads_max:
                     pool[n_started-n_threads_max].close()
                 n_started += 1
                 pool.append(np)

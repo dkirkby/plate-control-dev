@@ -242,9 +242,8 @@ class XYTest(PECS):
             self.logger.info(f'set_schedule_stats False exception: {e}')
         self.fvc_collect()
 
-
     def record_basic_move_data(self, i):
-        self.logger.info(f'Recording move metadata for target {i}...')
+        self.logger.info(f'Recording move metadata for target {i+1}...')
         movedf = self.data.movedf
         # before moving for each target, write time cycle etc. for all posids
         movedf.loc[idx[i, :], 'timestamp'] = pc.now()
