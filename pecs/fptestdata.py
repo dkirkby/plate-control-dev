@@ -15,6 +15,7 @@ FPTestData.loggers[pcid]:       logger which writes new lines to log file
 
 import os
 import io
+import gc
 from itertools import product, chain
 from functools import partial, reduce
 import shutil
@@ -24,7 +25,7 @@ import logging
 from copy import copy
 from datetime import timezone
 import multiprocessing
-from multiprocessing import Process  # Pool
+from multiprocessing import Process, Pool
 import tarfile
 from glob import glob
 import numpy as np
@@ -133,7 +134,7 @@ class FPTestData:
         self.filename = (
             f'{pc.filename_timestamp_str(t=self.t_i)}-{self.test_name}')
         self.dir = os.path.join(pc.dirs['kpno'], 
-                                pc.dir_date_str(t=self.data.t_i),
+                                pc.dir_date_str(t=self.t_i),
                                 f'{expid:08}-{self.test_name}')
         self.dirs = {pcid: os.path.join(self.dir, f'pc{pcid:02}')
                      for pcid in self.pcids}
@@ -212,43 +213,48 @@ class FPTestData:
 
     def _mp(self, target, iterables, n_threads_max=32, mp=True):
         '''input iterables is a list of iterables'''
-        # the following implementation fails when loggers are present
-        # pbar = tqdm(total=len(self.posids))
-        # def update_pbar(*a):
-        #     pbar.update()
-        # with Pool(processes=n_threads) as p:
-        #     for posid in self.posids:
-        #         p.apply_async(self.make_summary_plot, args=(posid,),
-        #                       callback=update_pbar)
-        #     p.close()
-        #     p.join()
         if mp:
             n_threads = min(n_threads_max, 2*multiprocessing.cpu_count())
             args_list = list(product(*iterables))
             self.print(f'Runing MP with {n_threads} threads '
                        f'on node of {multiprocessing.cpu_count()} cores for '
                        f'{len(args_list)} jobs...')
-            pool, n_started = [], 0
+            # the following implementation no longer fails with loggers
+            # but it is 2x slower than the manual pool implementation
+            # pbar = tqdm(total=len(args_list))
+            # def update_pbar(*a):
+            #     pbar.update()
+            # with Pool(processes=n_threads) as p:
+            #     for args in args_list:
+            #         p.apply_async(target, args=args, callback=update_pbar)
+            #     p.close()
+            #     p.join()
+            pool, n_running = [], 0
+            self.print(
+                'WARNING: Upgrade to python 3.7 and matplotlib '
+                'ASAP! Mutiprocessing.Process.close() not '
+                'available in <= python 3.6. You may get '
+                'OSError [24] from too many open files due to '
+                'matplltlib 2 leaving redundant font file open '
+                'handles behind and not closing Process threads '
+                'proerply!')
             for args in tqdm(args_list):
                 np = Process(target=target, args=args)
-                if n_started % n_threads_max == 0:  # all cores occupied, wait
-                    [p.join()
-                     for p in pool[n_started-n_threads_max:n_started-1]]
-                np.start()
-                if n_started >= n_threads_max:
+                if len(pool) == n_threads_max:  # all cores occupied, wait
+                    pool[0].join()
                     try:
-                        pool[n_started-n_threads_max].close()
-                    except:
-                        print('WARNING: UPGRADE TO PYTHON 3.7 TO BE ABLE TO '
-                              'CLOSE SUBPROCESSES, YOU MAY GET ERRORS FROM '
-                              'TOO MANY OPEN PROCESSES')
-                    if not pool[n_started-n_threads_max].is_alive():
-                        pool[n_started-n_threads_max].terminate()  # for py36
-                n_started += 1
+                        pool[0].close()
+                    except Exception as e:
+                        pass
+                    if not pool[0].is_alive():  # should be after .join
+                        pool[0].terminate()  # for py36
+                        del pool[0]  # releases matpltolib font handles
+                np.start()
                 pool.append(np)
+                n_running += 1
             self.print(
                 f'Waiting for the last MP chunk of {n_threads} to complete...')
-            [p.join() for p in pool[n_started-n_threads_max:-1]]
+            [p.join() for p in pool]
         else:
             for args in tqdm(product(*iterables)):
                 target(*args)
@@ -573,6 +579,8 @@ class XYTestData(FPTestData):
             ax.legend(loc='upper right', fontsize=10)
             fig.savefig(path.format(n), bbox_inches='tight')
             plt.close(fig)
+            del fig
+            gc.collect(generation=2)
             if hasattr(self, 'logger'):
                 self.loggers[pcid].debug(f'xyplot saved: {path.format(n)}')
 
@@ -784,8 +792,8 @@ class XYTestData(FPTestData):
         self.isolate_abnormal_flags()
         self.calculate_grades()
         self.export_data_logs()
-        self.make_summary_plots()  # plot for all positioners by default
         self.dump_as_one_pickle()  # loggers lost as they cannot be serialised
+        self.make_summary_plots()  # plot for all positioners by default
         if shutil.which('pandoc') is None:
             self.print('You must have a complete installation of pandoc '
                        'and/or TexLive. Skipping test report...')
@@ -954,9 +962,9 @@ if __name__ == '__main__':
     '''load the dumped pickle file as follows, protocol is auto determined'''
     # arc calib expids
     expids = [39228, 39230]
-    expids = [41115]
+    expids = [43061]
     for expid in expids:
-        paths = glob(pc.dirs['kpno']+f'/*/{expid:08}/*data.pkl')
+        paths = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data.pkl')
         assert len(paths) == 1, paths
         print(f'Re-processing FP test data:\n{paths[0]}')
         # try:
