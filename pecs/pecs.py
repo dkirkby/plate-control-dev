@@ -235,7 +235,7 @@ class PECS:
         destination = os.path.join(
             '/exposures/desi', pc.dir_date_str(t=self.data.t_i),
             f'{self.exp.id:08}')
-        os.makedirs(destination, exist_ok=True)
+        # os.makedirs(destination, exist_ok=True)  # no permission anyway
         try:
             self.fvc_collector._send_command(
                 'collect', expid=self.exp.id, output_dir=destination,
