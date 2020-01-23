@@ -212,7 +212,10 @@ class XYTest(PECS):
             else:
                 disable_unmatched = True  # do disable by default
         self.logger.info('Enabling positioner schedule stats...')
-        self.ptlm.set_schedule_stats(enabled=True)
+        try:
+            self.ptlm.set_schedule_stats(enabled=True)
+        except Exception as e:
+            self.logger.info(f'set_schedule_stats True exception: {e}')
         for i in range(self.data.ntargets):  # test loop over all test targets
             self.record_basic_move_data(i)  # for each target, record basics
             if i > 0:  # don't pause for the 1st target
@@ -230,27 +233,14 @@ class XYTest(PECS):
         self.data.t_f = pc.now()
         self.data.delta_t = self.data.t_f - self.data.t_i
         self.logger.info(f'Test complete, duration {self.data.delta_t}.')
-
-        #except Exception as e:
-        #    self.logger.warning(
-        #        f'Failed to generate schedule stats table: {e}')
-        # read schedule stats
-        try:
-            ret = self.ptlm.schedule_stats.generate_table()
-            for role, table in ret.items():
-                self.data.schedstats[self._role2pcid(role)] = table
-            print('Try worked')
-        except Exception as e:
-            print(f'Try failed, exception: {e}')
-            try:
-                for pcid in self.data.pcids:
-                    self.data.schedstats[pcid] = (
-                        self.ptlm.schedule_stats.generate_table(
-                            participating_petals=self._pcid2role(pcid)))
-            except Exception as e:
-                print(f'Try failed again, exception: {e}')
         self.logger.info('Disabling positioner schedule stats...')
-        self.ptlm.set_schedule_stats(enabled=False)
+        try:
+            ret = self.ptlm.set_schedule_stats(enabled=False)
+            for pcid in self.data.pcids:
+                self.data.schedstats[pcid] = ret[self._pcid2role(pcid)]
+        except Exception as e:
+            self.logger.info(f'set_schedule_stats False exception: {e}')
+
 
     def record_basic_move_data(self, i):
         self.logger.info(f'Recording move metadata for target {i}...')
