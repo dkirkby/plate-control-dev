@@ -124,21 +124,23 @@ class FPTestData:
                 and key.isdigit() and (test_cfg[key]['mode'] is not None)]
             for pcid in self.test_cfg.sections:  # convert pcid to int now
                 self.test_cfg.rename(pcid, int(pcid))
-        self.set_dirs()  # does not need to know about expid
         self._init_loggers()
         self.logger.debug([f'posconstants.py version: {pc.code_version}',
                            f'anticollision mode: {self.anticollision}'])
         self.schedstats = {}
 
-    def set_dirs(self):  # does not need to know about expid
+    def set_dirs(self, expid):  # does not need to know about expid
         self.filename = (
             f'{pc.filename_timestamp_str(t=self.t_i)}-{self.test_name}')
-        self.dir = os.path.join(pc.dirs['kpno'], self.filename)
+        self.dir = os.path.join(pc.dirs['kpno'], 
+                                pc.dir_date_str(t=self.data.t_i),
+                                f'{expid:08}-{self.test_name}')
         self.dirs = {pcid: os.path.join(self.dir, f'pc{pcid:02}')
                      for pcid in self.pcids}
         self.test_cfg.filename = os.path.join(self.dir, f'{self.filename}.cfg')
         for d in [self.dir] + list(self.dirs.values()):
             os.makedirs(d, exist_ok=True)
+        self.expid = expid
 
     def _init_loggers(self):
         '''need to know the product directories before initialising loggers'''
@@ -149,9 +151,9 @@ class FPTestData:
             # use the same directory for all real-time logs
             # ensure save directory and log file exist if they don't already
             self.log_paths[pcid] = os.path.join(
-                self.dirs[pcid],
+                pc.dirs['kpno'],
                 f'{self.test_name}-pc{pcid:02}_realtime.log')
-            open(self.log_paths[pcid], 'a').close()  # create empty log files
+            open(self.log_paths[pcid], 'a').close()  # creat file if not exist
             # create virtual file object for storing log entries
             # using stringio because it supports write() and flush()
             log = io.StringIO(newline='\n')

@@ -95,6 +95,7 @@ class PECS:
         self.fvc.save_centers = True
         # fvc centre jsons are written by non-msdos account, note access
         self.fvc.save_centers_path = self.data.dir
+        self.data.set_dirs(self.exp.id)
         self.print(f'DESI exposure ID set up as: {self.exp.id}')
 
     def print(self, msg):
