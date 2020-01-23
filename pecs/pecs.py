@@ -233,7 +233,8 @@ class PECS:
 
     def fvc_collect(self):
         destination = os.path.join(
-            '/exposures/desi', pc.dir_date_str(t=self.data.t_i), f'{expid:08}')
+            '/exposures/desi', pc.dir_date_str(t=self.data.t_i),
+            f'{self.exp.id:08}')
         os.makedirs(destination, exist_ok=True)
         try:
             self.fvc_collector._send_command(
