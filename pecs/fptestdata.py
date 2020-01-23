@@ -234,7 +234,14 @@ class FPTestData:
                      for p in pool[n_started-n_threads_max:n_started-1]]
                 np.start()
                 if n_started >= n_threads_max:
-                    pool[n_started-n_threads_max].close()
+                    try:
+                        pool[n_started-n_threads_max].close()
+                    except:
+                        print('WARNING: UPGRADE TO PYTHON 3.7 TO BE ABLE TO '
+                              'CLOSE SUBPROCESSES, YOU MAY GET ERRORS FROM '
+                              'TOO MANY OPEN PROCESSES')
+                    if not pool[n_started-n_threads_max].is_alive():
+                        pool[n_started-n_threads_max].terminate()  # for py36
                 n_started += 1
                 pool.append(np)
             self.print(
