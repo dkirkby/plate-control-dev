@@ -29,7 +29,7 @@ class PosSchedule(object):
         self.stage_order = ['direct','retract','rotate','extend','expert','final']
         self.RRE_stage_order = ['retract','rotate','extend']
         self.stages = {name:posschedulestage.PosScheduleStage(self.collider, power_supply_map=self.petal.power_supply_map, stats=self.stats, verbose=self.verbose, printfunc=self.printfunc) for name in self.stage_order}
-        self.anneal_time = {'direct':6.6, 'retract':2.0, 'rotate':2.0, 'extend':2.0, 'expert':3} # times in seconds, see comments in PosScheduleStage
+        self.anneal_time = {'direct':4.0, 'retract':3.0, 'rotate':3.0, 'extend':3.0, 'expert':4.0} # times in seconds, see comments in PosScheduleStage
         self.should_anneal = True # overriding flag, allowing you to turn off all move time annealing
         self.should_check_petal_boundaries = True # allows you to turn off petal-specific boundary checks for non-petal systems (such as positioner test stands)
         self.should_check_sweeps_continuity = False # if True, inspects all quantized sweeps to confirm well-formed. incurs slowdown, and generally is not needed; more for validating if any changes made to quantize function at a lower level
@@ -299,6 +299,18 @@ class PosSchedule(object):
                 if self.collider.animate_colliding_only:
                     self.printfunc('Added ' + str(len(colliding_sweeps)) + ' colliding sweeps (and their neighbors) to the animator.')
 
+    def conservative_move_timeout_period(self, safety_factor=4.0):
+        """Returns a conservative period of time (in seconds) that one should
+        wait for move table execution, before assuming some failure must have
+        occurred. An internal time estimate is done. Then this estimate is
+        multiplied by the argued safety_factor, and returned. No guarantee is
+        made about the efficiency of the time estimate that is returned. For
+        example, in many cases the estimate may be much longer than the actual
+        move time.
+        """
+        anneal_time_sum = sum(t for t in self.anneal_time.values())
+        return anneal_time_sum * safety_factor
+
     def _table_matches_quantized_sweep(self, move_table, sweep):
         """Takes as input a "for_schedule()" move table and a quantized sweep,
         and then cross-checks whether their total rotations (theta and phi)
@@ -359,7 +371,7 @@ class PosSchedule(object):
         function's comments for more detail.
         """
         return self.stages['expert'].is_not_empty()
-
+    
     def _schedule_expert_tables(self, anticollision):
         """Gathers data from expert-added move tables and populates the 'expert'
         stage. Any move requests are ignored.
