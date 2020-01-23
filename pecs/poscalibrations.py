@@ -35,8 +35,9 @@ class PosCalibrations(PECS):
             cfg.update({'mode': mode, 'n_pts_T': nTP[0], 'n_pts_P': nTP[1]})
         else:
             raise Exception(f'Invalid mode: {mode}')
+        test_name = input('Please name this test (calibration-{test_name}): ')
         # next initilaise test data object with loggers for each petal
-        self.data = CalibrationData(cfg)
+        self.data = CalibrationData(test_name, cfg)
         self.logger = self.data.logger  # broadcast to all petals
         self.loggers = self.data.loggers
         super().__init__(fvc=fvc, ptlm=ptlm, interactive=interactive)

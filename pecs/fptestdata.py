@@ -796,10 +796,13 @@ class XYTestData(FPTestData):
 
 class CalibrationData(FPTestData):
 
-    def __init__(self, test_cfg_dict):
+    def __init__(self, test_name, test_cfg_dict):
         test_cfg = ConfigObj()
         test_cfg.update(test_cfg_dict)
-        super().__init__(test_cfg['mode']+'_calibration', test_cfg=test_cfg)
+        fullname = f'{test_cfg["mode"]}_calibration'
+        if test_name:
+            fullname += f'-{test_name}'
+        super().__init__(fullname, test_cfg=test_cfg)
         # stores calibration values, old and new
         # iterables = [['OLD', 'NEW'], param_keys]
         # columns = pd.MultiIndex.from_product(
