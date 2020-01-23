@@ -240,6 +240,7 @@ class XYTest(PECS):
                 self.data.schedstats[pcid] = ret[self._pcid2role(pcid)]
         except Exception as e:
             self.logger.info(f'set_schedule_stats False exception: {e}')
+        self.fvc_collect()
 
 
     def record_basic_move_data(self, i):
@@ -445,5 +446,4 @@ if __name__ == '__main__':
     test = XYTest('xytest-'+xytest_name, xytest_cfg)
     test.run_xyaccuracy_test(
         disable_unmatched=test.data.test_cfg['disable_unmatched'])
-    test.fvc_collect(destination=test.data.dir)
     test.data.generate_data_products()
