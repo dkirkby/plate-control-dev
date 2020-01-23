@@ -56,6 +56,7 @@ class XYTest(PECS):
         self.data = XYTestData(test_name, test_cfg=test_cfg)
         self.loggers = self.data.loggers  # use these loggers to write to logs
         self.logger = self.data.logger
+        self.logger.info(f'Starting Test at {self.data.t_i}')
         super().__init__(
             printfunc={p: self.loggers[p].info for p in self.data.pcids},
             interactive=False)
@@ -210,7 +211,7 @@ class XYTest(PECS):
                 disable_unmatched = self.data.test_cfg['disable_unmatched']
             else:
                 disable_unmatched = True  # do disable by default
-        self.logger.info(f'Starting Test at {self.data.t_i}')
+        self.logger.info('Enabling positioner schedule stats...')
         self.ptlm.set_schedule_stats(enabled=True)
         for i in range(self.data.ntargets):  # test loop over all test targets
             self.record_basic_move_data(i)  # for each target, record basics
@@ -241,14 +242,18 @@ class XYTest(PECS):
             print('Try worked')
         except Exception as e:
             print(f'Try failed, exception: {e}')
-            for pcid in self.data.pcids:
-                self.data.schedstats[pcid] = (
-                    self.ptlm.schedule_stats.generate_table(
-                        participating_petals=self._pcid2role(pcid)))
+            try:
+                for pcid in self.data.pcids:
+                    self.data.schedstats[pcid] = (
+                        self.ptlm.schedule_stats.generate_table(
+                            participating_petals=self._pcid2role(pcid)))
+            except Exception as e:
+                print(f'Try failed again, exception: {e}')
+        self.logger.info('Disabling positioner schedule stats...')
         self.ptlm.set_schedule_stats(enabled=False)
 
     def record_basic_move_data(self, i):
-        self.logger.info('Recording move metadata for new xy target...')
+        self.logger.info(f'Recording move metadata for target {i}...')
         movedf = self.data.movedf
         # before moving for each target, write time cycle etc. for all posids
         movedf.loc[idx[i, :], 'timestamp'] = pc.now()
@@ -439,7 +444,7 @@ class XYTest(PECS):
             f'    rms: {np.sqrt(np.mean(np.square(errXY))):6.1f} μm',
             f'    avg: {np.mean(errXY):6.1f} μm',
             f'    min: {np.min(errXY):6.1f} μm'])
-        self.logger.info(['Worst 20 positioners:', err.iloc[:10].to_string()])
+        self.logger.info(['Worst 20 positioners:', err.iloc[:20].to_string()])
 
 
 if __name__ == '__main__':
