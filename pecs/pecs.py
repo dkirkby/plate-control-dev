@@ -74,12 +74,6 @@ class PECS:
         assert set(self.illuminated_ptl_roles) <= set(
             self.ptlm.Petals.keys()), (
             'Illuminated petals must be in availible petals!')
-        # fvc stuff
-        self.fvc_collector = SimpleProxy('FVCCOLLECTOR')
-        try:
-            self.fvc_collector._send_command('configure')
-        except Exception:
-            self.print('FVC collector unavailable')
         if interactive or (self.pcids is None):
             self.interactive_ptl_setup()  # choose which petal to operate
         elif interactive is False:
@@ -238,13 +232,25 @@ class PECS:
             f'{self.exp.id:08}')
         # os.makedirs(destination, exist_ok=True)  # no permission anyway
         try:
-            self.fvc_collector._send_command(
+            fvccoll = SimpleProxy('FVCCOLLECTOR')
+            retcode = fvccoll._send_command('configure')
+            self.print(f'FVCCollector.configure returned code: {retcode}')
+            retcode = fvccoll._send_command(
                 'collect', expid=self.exp.id, output_dir=destination,
                 logbook=False)
-            self.print('FVC data associated with exposure ID '
-                       f'{self.exp.id} collected to: {destination}')
+            self.print(f'FVCCollector.collect returned code: {retcode}')
+            if retcode == 'SUCCESS':
+                self.print('Waiting for 10 s for FVC collection to complete')
+                self.countdown_sec(10)
+                self.print('FVC data associated with exposure ID '
+                           f'{self.exp.id} collected to: {destination}')
+            expserv = SimpleProxy('EXPOSURESERVER')
+            retcode = expserv._send_command('distribute', source=destination)
+            self.print(f'ExposureServer.distribute returned code: {retcode}')
+            if retcode == 'SUCCESS':
+                self.print(f'symlink created for: {destination}')
         except Exception as e:
-            self.print(f'FVC collector call failed: {e}')
+            self.print(f'FVC collection failed with exception: {e}')
 
     @staticmethod
     def countdown_sec(t):  # in seconds

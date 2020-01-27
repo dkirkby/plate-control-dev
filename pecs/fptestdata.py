@@ -15,7 +15,6 @@ FPTestData.loggers[pcid]:       logger which writes new lines to log file
 
 import os
 import io
-import gc
 from itertools import product, chain
 from functools import partial, reduce
 import shutil
@@ -25,7 +24,7 @@ import logging
 from copy import copy
 from datetime import timezone
 import multiprocessing
-from multiprocessing import Process, Pool
+from multiprocessing import Process  # , Pool
 import tarfile
 from glob import glob
 import numpy as np
@@ -133,7 +132,7 @@ class FPTestData:
     def set_dirs(self, expid):  # does not need to know about expid
         self.filename = (
             f'{pc.filename_timestamp_str(t=self.t_i)}-{self.test_name}')
-        self.dir = os.path.join(pc.dirs['kpno'], 
+        self.dir = os.path.join(pc.dirs['kpno'],
                                 pc.dir_date_str(t=self.t_i),
                                 f'{expid:08}-{self.test_name}')
         self.dirs = {pcid: os.path.join(self.dir, f'pc{pcid:02}')
@@ -244,11 +243,10 @@ class FPTestData:
                     pool[0].join()
                     try:
                         pool[0].close()
-                    except Exception as e:
-                        pass
-                    if not pool[0].is_alive():  # should be after .join
-                        pool[0].terminate()  # for py36
-                        del pool[0]  # releases matpltolib font handles
+                    except Exception:
+                        if not pool[0].is_alive():  # should be after .join
+                            pool[0].terminate()  # for py36
+                            del pool[0]  # releases matpltolib font handles
                 np.start()
                 pool.append(np)
                 n_running += 1
@@ -829,7 +827,10 @@ class CalibrationData(FPTestData):
             f'{pc.filename_timestamp_str()}-arc_calibration')
 
     def make_summary_plots(self, n_threads_max=32, make_binder=True, mp=True):
-        pass
+        self.print(f'Making arc plots for {len(self.posids)} positioners...')
+        self._mp(self.make_arc_plot, [self.posids], mp=mp)
+        if make_binder:
+            self._mp(self.make_arc_plot_binder, [self.posids], mp=mp)
 
     def make_arc_plot(self, posid):
         posmov = self.movedf.xs(posid, level='DEVICE_ID')
@@ -942,6 +943,9 @@ class CalibrationData(FPTestData):
             '{posid}-{pc.filename_timestamp_str(self.t_i)}-arc_calib.pdf')
         plt.close(fig)
         fig.savefig(path, bbox_inches='tight')
+
+    def make_arc_plot_binder(self, posid):
+        pass
 
     def generate_data_products(self):
         self.read_telemetry()
