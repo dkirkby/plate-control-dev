@@ -238,17 +238,18 @@ class PosSchedStats(object):
             writer.writerow(blank_row)
             for calc in calcs:
                 writer.writerow(stats[category][calc])
+        writer.writerow(blank_row)
         file.seek(0)  # go back to the beginning after finishing write
-        return pd.read_csv(file)
+        return pd.read_csv(file)  # returns a pandas dataframe
 
-    def save(self, path=None):
+    def save(self, path=None, mode='w'):
         """Saves stats results to disk."""
         if path is None:
             suffix = str(self.filename_suffix)
             suffix = '_' + suffix if suffix else ''
             filename = f'{pc.filename_timestamp_str()}_schedstats{suffix}.csv'
             path = os.path.join(pc.dirs['temp_files'], filename)
-        self.generate_table().to_csv(path)
+        self.generate_table().to_csv(path, mode=mode)
 
     @staticmethod
     def found_but_not_resolved(found, resolved):
