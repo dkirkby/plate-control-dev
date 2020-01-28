@@ -299,15 +299,19 @@ def now():
     return datetime.datetime.now().astimezone()
 
 
+def utcnow():
+    return datetime.datetime.now().astimezone(pytz.timezone('UTC'))
+
+
 def timestamp_str(t=None):
     if t is None:
-        t = now()
+        t = utcnow()
     return t.strftime(timestamp_format)
 
 
 def filename_timestamp_str(t=None):
     if t is None:
-        t = now()
+        t = utcnow()
     return t.strftime(filename_timestamp_format)
 
 
