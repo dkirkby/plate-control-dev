@@ -818,6 +818,7 @@ class CalibrationData(FPTestData):
             keys=['OLD', 'FIT', 'NEW'],
             names=['label', 'field'], sort=False)
         if self.calibdf.index.name != 'DEVICE_ID':
+            import pdb; pdb.set_trace()
             self.calibdf.index.name = 'DEVICE_ID'
             self.logger.info('calibdf index is not DEVICE_ID by default!')
 

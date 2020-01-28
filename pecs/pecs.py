@@ -200,7 +200,7 @@ class PECS:
         if np.any(['P' in device_id for device_id in exppos['DEVICE_ID']]):
             self.print('Expected positions of positioners by PetalApp '
                        'are contaminated by fiducials.')
-        self.print(f'Calling FVC.measure with exptime = exptime s, '
+        self.print(f'Calling FVC.measure with exptime = {exptime} s, '
                    f'expecting {len(exppos)} backlit positioners...')
         seqid = None
         if hasattr(self, 'exp'):
@@ -247,8 +247,6 @@ class PECS:
                 logbook=False)
             self.print(f'FVCCollector.collect returned code: {retcode}')
             if retcode == 'SUCCESS':
-                self.print('Waiting for 10 s for FVC collection to complete')
-                self.countdown_sec(10)
                 self.print('FVC data associated with exposure ID '
                            f'{self.exp.id} collected to: {destination}')
             expserv = SimpleProxy('EXPOSURESERVER')

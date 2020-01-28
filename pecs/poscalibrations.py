@@ -47,7 +47,7 @@ class PosCalibrations(PECS):
     def collect_calib(self, posids):
         ret = self.ptlm.get_pos_vals(self.keys_collect, posids=posids)
         dfs = [ret[role] for role in self.ptl_roles]
-        return pd.concat(dfs).set_index('DEVICE_ID')
+        return pd.concat(dfs).set_index('DEVICE_ID').sort_index()
 
     def run_1p_calibration(self, tp_target='default', commit=False,
                            match_radius=50, interactive=False):
@@ -128,8 +128,8 @@ class PosCalibrations(PECS):
                                'FLAGS': 'FLAG'}, inplace=True)
         # List unmeasured positioners in updates, even with no data
         used_pos.drop('FLAG', axis=1, inplace=True)
-        calib_fit = used_pos.join(updates).append(unused_pos, sort=False)
-        calib_fit.index.name = 'DEVICE_ID'
+        calib_fit = used_pos.join(updates).append(unused_pos, sort=True)
+        calib_fit.sort_index(inplace=True)
         # overwrite flags with focalplane flags and add status
         flags = [pd.DataFrame.from_dict(  # device_id in dict becomes index
                      flags_dict, orient='index', columns=['FLAG'])
