@@ -129,6 +129,7 @@ class PosCalibrations(PECS):
         # List unmeasured positioners in updates, even with no data
         used_pos.drop('FLAG', axis=1, inplace=True)
         calib_fit = used_pos.join(updates).append(unused_pos, sort=False)
+        calib_fit.index.name = 'DEVICE_ID'
         # overwrite flags with focalplane flags and add status
         flags = [pd.DataFrame.from_dict(  # device_id in dict becomes index
                      flags_dict, orient='index', columns=['FLAG'])
