@@ -211,11 +211,7 @@ class XYTest(PECS):
                 disable_unmatched = self.data.test_cfg['disable_unmatched']
             else:
                 disable_unmatched = True  # do disable by default
-        self.logger.info('Enabling positioner schedule stats...')
-        try:
-            self.ptlm.set_schedule_stats(enabled=True)
-        except Exception as e:
-            self.logger.info(f'set_schedule_stats True exception: {e}')
+        self.set_schedule_stats(enabled=True)
         for i in range(self.data.ntargets):  # test loop over all test targets
             self.record_basic_move_data(i)  # for each target, record basics
             if i > 0:  # don't pause for the 1st target
@@ -234,12 +230,9 @@ class XYTest(PECS):
         self.data.delta_t = self.data.t_f - self.data.t_i
         self.logger.info(f'Test complete, duration {self.data.delta_t}.')
         self.logger.info('Disabling positioner schedule stats...')
-        try:
-            ret = self.ptlm.set_schedule_stats(enabled=False)
-            for pcid in self.data.pcids:
-                self.data.schedstats[pcid] = ret[self._pcid2role(pcid)]
-        except Exception as e:
-            self.logger.info(f'set_schedule_stats False exception: {e}')
+        # for pcid in self.data.pcids:
+        #     self.data.schedstats[pcid] = ret[self._pcid2role(pcid)]
+        self.set_schedule_stats(enabled=False)
         self.fvc_collect()
 
     def record_basic_move_data(self, i):

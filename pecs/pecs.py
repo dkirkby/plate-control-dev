@@ -177,6 +177,13 @@ class PECS:
         self.print(f'Selected {len(posids)} positioners')
         return posids
 
+    def set_schedule_stats(self, enabled=True):
+        self.print(f'Setting pos schedule stats to enabled={enabled}...')
+        try:
+            self.ptlm.set_schedule_stats(enabled=enabled)
+        except Exception as e:
+            self.logger.info(f'ptlm.set_schedule_stats exception: {e}')
+
     def fvc_measure(self, exppos=None, match_radius=50, matched_only=True):
         '''use the expected positions given, or by default use internallly
         tracked current expected positions for fvc measurement
