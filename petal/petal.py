@@ -308,8 +308,11 @@ class Petal(object):
         self.animator_on = False
         # keeps track of total time of the current animation
         self.animator_total_time = 0
-        self.schedule_stats = posschedstats.PosSchedStats() \
-            if self.sched_stats_on else None
+        if self.sched_stats_on:
+            self.schedule_stats = posschedstats.PosSchedStats()
+            self.sched_stats_path = os.path.join(pc.dirs['kpno'],
+                                                 pc.dir_date_str(),
+                                                 'pos_schedule_stats.csv')
         self.schedule = self._new_schedule()
         self.anticollision_default = anticollision
 
@@ -1018,6 +1021,8 @@ class Petal(object):
                     for state in self.altered_states:
                         state.log_unit()  # this writes the local log
             self.altered_states = set()
+            if self.sched_stats_on:  # write schedule stats in any case
+                self.schedule_stats.save(path=self.sched_stats_path, mode='a')
         elif mode == 'calib':
             if self.local_commit_on:
                 for state in self.altered_calib_states:
