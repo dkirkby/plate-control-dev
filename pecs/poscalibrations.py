@@ -42,6 +42,7 @@ class PosCalibrations(PECS):
         self.loggers = self.data.loggers
         super().__init__(fvc=fvc, ptlm=ptlm, interactive=interactive)
         self.exp_setup()  # set up exposure ID and product directory
+        self.set_schedule_stats(enabled=True)
 
     def collect_calib(self, posids):
         ret = self.ptlm.get_pos_vals(self.keys_collect, posids=posids)
@@ -166,6 +167,7 @@ class PosCalibrations(PECS):
         self.data.write_calibdf(self.data.calib_old, self.data.calib_fit,
                                 self.data.calib_new)
         self.data.t_f = pc.now()
+        self.set_schedule_stats(enabled=False)
         self.fvc_collect()
 
     def run_arc_calibration(self, match_radius=50, interactive=False):
@@ -211,6 +213,7 @@ class PosCalibrations(PECS):
         self.data_arc.to_pickle(os.path.join(self.data.dir, 'data_arc.pkl.gz'),
                                 compression='gzip')
         self.data.t_f = pc.now()
+        self.set_schedule_stats(enabled=False)
         self.fvc_collect()
         if self.data.online_fitting:
             fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
@@ -252,6 +255,7 @@ class PosCalibrations(PECS):
         self.data_grid.to_pickle(os.path.join(
             self.data.dir, 'data_grid.pkl.gz'), compression='gzip')
         self.data.t_f = pc.now()
+        self.set_schedule_stats(enabled=False)
         self.fvc_collect()
         if self.data.online_fitting:
             fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
