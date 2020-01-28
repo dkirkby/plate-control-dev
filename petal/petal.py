@@ -308,6 +308,7 @@ class Petal(object):
         self.animator_on = False
         # keeps track of total time of the current animation
         self.animator_total_time = 0
+        self.schedule_stats = None
         if self.sched_stats_on:
             self.schedule_stats = posschedstats.PosSchedStats()
             self.sched_stats_path = os.path.join(pc.dirs['kpno'],
