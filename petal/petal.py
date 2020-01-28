@@ -313,7 +313,7 @@ class Petal(object):
             self.schedule_stats = posschedstats.PosSchedStats()
             self.sched_stats_path = os.path.join(
                 pc.dirs['kpno'], pc.dir_date_str(),
-                'PTL{self.petal_id:02}-pos_schedule_stats.csv')
+                f'PTL{self.petal_id:02}-pos_schedule_stats.csv')
             os.makedirs(os.path.join(pc.dirs['kpno'], pc.dir_date_str()),
                         exist_ok=True)
         self.schedule = self._new_schedule()
