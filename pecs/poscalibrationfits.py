@@ -207,7 +207,7 @@ class PosCalibrationFits:
                 posmea[arc] = posmeaarc[posmeaarc.notnull().all(axis=1)]
                 if len(posmea[arc]) < 3:  # require at least 3 points remaining
                     return None
-                ctr0 = ((state._val['OFFSET_X'], state._val['OFFSET_X']) 
+                ctr0 = ((state._val['OFFSET_X'], state._val['OFFSET_Y']) 
                         if arc == 'T' else None)  # initial guess for centre
                 return self.fit_circle(posmea[arc].values, ctr0=ctr0)
 
@@ -299,7 +299,6 @@ class PosCalibrationFits:
             for c in ['flatX', 'flatY', 'Q', 'S', 'posintT', 'posintP']:
                 data[f'err_{c}'] = data[f'mea_{c}'] - data[f'tgt_{c}']
             poscals.append(poscal)
-        import pdb; pdb.set_trace()
         return data, pd.DataFrame(poscals, index=posids)
 
     def calibrate_from_grid_data(self, data):
@@ -414,4 +413,4 @@ if __name__ == '__main__':
     calib = PosCalibrationFits(use_doslib=True)
     movedf, calibdf = calib.calibrate_from_arc_data(data)
     movedf.to_pickle(os.path.join(directory, "movedf.pkl.gz"))
-    calibdf.to_pickle(os.path.join(directory, "calibdf.pkl.gz"))
+    calibdf.to_pickle(os.path.join(directory, "calibdf_new.pkl.gz"))
