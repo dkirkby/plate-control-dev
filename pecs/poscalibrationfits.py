@@ -119,8 +119,8 @@ class PosCalibrationFits:
                     petal_alignment=self.petal_alignments[petal_loc])
         self.posids = posids
 
-    @staticmethod
-    def fit_circle(x):  # input x is a N x 2 array for (x, y) points in 2D
+    @staticmethod  # this is the old implementation without bounds, often fails
+    def fit_circle_lsq(x):  # input x is a N x 2 array for (x, y) points in 2D
         '''example data: x = np.array([[1, 0], [2, 1], [3, 0]]) '''
         def calc_radius(xc):  # 1 x 2 array
             '''calculate distance of each 2D point from the center (xc, yc)'''
@@ -134,6 +134,23 @@ class PosCalibrationFits:
         ctr0 = np.mean(x, axis=0)  # 1 x 2 np array, initial estimate of centre
         ctr, _ = optimize.leastsq(radial_variations, ctr0)
         return ctr, calc_radius(ctr), radial_variations(ctr)
+
+    @staticmethod
+    def fit_circle(x, ctr0=None):  # input x is a N x 2 array for (x, y) points in 2D
+        '''example data: x = np.array([[1, 0], [2, 1], [3, 0]]) '''
+
+        def circle_min(params):
+            x0, y0, r = params
+            rs = np.linalg.norm(x - (x0, y0), axis=1)
+            return np.sum((np.abs(rs - r)))  # reduced penalty for outliners
+
+        if ctr0 is None:
+            ctr0 = np.mean(x, axis=0)
+        p0 = (ctr0[0], ctr0[1], 3)  # initial values: centre_x, centre_y, radius
+        bounds = ((ctr0[0]-3, ctr0[0]+3), (ctr0[1]-3, ctr0[1]+3), (2.6, 3.4))
+        sol = optimize.minimize(fun=circle_min, x0=p0, bounds=bounds)
+
+        return sol.x[:2], sol.x[2], sol.fun  # centre, radius, residuals sum
 
     def calibrate_from_arc_data(self, data):
         """
@@ -165,15 +182,15 @@ class PosCalibrationFits:
         posids = data.index.get_level_values('DEVICE_ID').unique()
         self.logger.debug(f'Analysing arc calibration measurement data...')
         self.init_posmodels(posids=posids)  # double check all posmodels exist
-        cols = ['mea_posintT, mea_posintP', 'mea_flatX', 'mea_flatY',
+        cols = ['mea_posintT', 'mea_posintP', 'mea_flatX', 'mea_flatY',
                 'tgt_flatX', 'tgt_flatY', 'tgt_Q', 'tgt_S']
         for col in cols:  # add new empty columns to grid data dataframe
             data[col] = np.nan
         poscals = []  # each entry is a row of calibration values for one posid
         self.logger.debug(f'Fitting loop for {len(posids)} positioners...')
         for posid in tqdm(posids):
-            poscal, posmea = {}, {}
-            trans = self.posmodels[posid].trans
+            poscal, posmea, posmodel = {}, {}, self.posmodels[posid]
+            trans, state = posmodel.trans, posmodel.state 
             trans.alt_override = True  # enable override in pos transforms
             # measurement always in QS, but fit and derive params in flatXY
             # measured QS may have NaN values if missing, filter out
@@ -190,8 +207,9 @@ class PosCalibrationFits:
                 posmea[arc] = posmeaarc[posmeaarc.notnull().all(axis=1)]
                 if len(posmea[arc]) < 3:  # require at least 3 points remaining
                     return None
-                else:
-                    return PosCalibrationFits.fit_circle(posmea[arc].values)
+                ctr0 = ((state._val['OFFSET_X'], state._val['OFFSET_X']) 
+                        if arc == 'T' else None)  # initial guess for centre
+                return self.fit_circle(posmea[arc].values, ctr0=ctr0)
 
             fits = [fit_arc(arc) for arc in ['T', 'P']]
             if None in fits:
@@ -204,8 +222,8 @@ class PosCalibrationFits:
                 poscal[f'centre_{arc}'] = fits[i][0]
                 poscal[f'radius_{arc}'] = fits[i][1]
                 poscal[f'residuals_{arc}'] = fits[i][2]
-                data.loc[idx[arc, posmea[arc].index, posid],
-                         'err_radial'] = fits[i][2]
+                # data.loc[idx[arc, posmea[arc].index, posid],
+                #          'err_radial'] = fits[i][2]
             poscal.update({'OFFSET_X': poscal['centre_T'][0],
                            'OFFSET_Y': poscal['centre_T'][1],
                            'LENGTH_R1': np.linalg.norm(poscal['centre_T']
@@ -267,6 +285,7 @@ class PosCalibrationFits:
                 [trans.posintTP_to_flatXY(tp) for tp in tgt_posintTP])
             data.loc[idx[:, :, posid], ['tgt_Q', 'tgt_S']] = np.array(
                 [trans.posintTP_to_QS(tp) for tp in tgt_posintTP])
+            trans.alt_override = False  # disable override in pos transforms
             # gear ratios, good feedback on how successful the calib was
             poscal['GEAR_CALIB_T'] = ratio_T = np.median(
                 np.diff(t_mea_posintT_wrapped) / np.diff(t_tgt_posintT))
@@ -277,7 +296,6 @@ class PosCalibrationFits:
                     self.logger.warning(
                         f'{posid}: GEAR_CALIB_{arc} = {ratio:.6f}',
                         pcid=self.petal_locs[posid])
-            trans.alt_override = False  # turn it back off when finished
             for c in ['flatX', 'flatY', 'Q', 'S', 'posintT', 'posintP']:
                 data[f'err_{c}'] = data[f'mea_{c}'] - data[f'tgt_{c}']
             poscals.append(poscal)
@@ -391,9 +409,9 @@ if __name__ == '__main__':
     # posdata = data_grid.loc[idx[:, 'M00001'], :]
     # posdata = data_arc.loc[idx['T', :, 'M00001'], :]
     # debug
-    directory = "/data/focalplane/logs/kpno/20200115/00041100/"
+    directory = "/data/focalplane/logs/kpno/20200117/00041477"
     data = pd.read_pickle(os.path.join(directory, "data_arc.pkl.gz"))
     calib = PosCalibrationFits(use_doslib=True)
     movedf, calibdf = calib.calibrate_from_arc_data(data)
-    # movedf.to_pickle(os.path.join(directory, "movedf.pkl.gz"))
-    # calibdf.to_pickle(os.path.join(directory, "calibdf.pkl.gz"))
+    movedf.to_pickle(os.path.join(directory, "movedf.pkl.gz"))
+    calibdf.to_pickle(os.path.join(directory, "calibdf.pkl.gz"))
