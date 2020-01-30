@@ -204,52 +204,65 @@ class PosSchedStats(object):
         data['calc: fraction of targets achieved (of those accepted)'] = [safe_divide(data['n tables achieving requested-and-accepted targets'][i], data['n requests accepted'][i]) for i in range(nrows)]
         return data, nrows
 
-    def generate_table(self):
+    def generate_table(self, append_footers=False):
+        """Returns a pandas dataframe representing a complete report table of
+        the current stats.
+        
+        If the argument append_footers=True, then a number of extra rows will
+        be added to the bottom of the returned table. These extra rows will
+        give max, min, mean, rms, and median for each data column, collated by
+        anticollision  method (e.g. 'adjust' vs 'freeze'). That's no new
+        information --- just a convenience when for example evaluating sims of
+        hundreds of targets in a row.
+        """
         data, nrows = self.summarize_all()
-        blank_row = {'method':''}
-        rms = lambda X: (sum([x**2 for x in X])/len(X))**0.5
-        unique_methods = sorted(set(data['method']) - {self.blank_str})
-        categories = ['overall'] + unique_methods
-        calcs = {'max':max, 'min':min, 'rms':rms, 'avg':np.mean, 'med':np.median}
-        stats = {}
-        for category in categories:
-            stats[category] = {}
-            for calc in calcs:
-                stats[category][calc] = {'method':calc} # puts the name of this calc in the method column of csv file
-            stats[category]['max']['schedule id'] = category # puts the category of this group of calcs in the schedule id column of csv file, in same row as maxes
-        for key in data:
-            if len(data[key]) > 0:
-                type_test_val = data[key][0]
-                if isinstance(type_test_val,int) or isinstance(type_test_val,float):
-                    this_data = {'overall': [data[key][i] for i in range(nrows)]}
-                    for category in unique_methods:
-                        this_data[category] = [this_data['overall'][i] for i in range(nrows) if data['method'][i] == category]
-                    for category in categories:
-                        for calc,stat_function in calcs.items():
-                            if this_data[category]:
-                                stats[category][calc][key] = stat_function(this_data[category])
+        if append_footers:
+            blank_row = {'method':''}
+            rms = lambda X: (sum([x**2 for x in X])/len(X))**0.5
+            unique_methods = sorted(set(data['method']) - {self.blank_str})
+            categories = ['overall'] + unique_methods
+            calcs = {'max':max, 'min':min, 'rms':rms, 'avg':np.mean, 'med':np.median}
+            stats = {}
+            for category in categories:
+                stats[category] = {}
+                for calc in calcs:
+                    stats[category][calc] = {'method':calc} # puts the name of this calc in the method column of csv file
+                stats[category]['max']['schedule id'] = category # puts the category of this group of calcs in the schedule id column of csv file, in same row as maxes
+            for key in data:
+                if len(data[key]) > 0:
+                    type_test_val = data[key][0]
+                    if isinstance(type_test_val,int) or isinstance(type_test_val,float):
+                        this_data = {'overall': [data[key][i] for i in range(nrows)]}
+                        for category in unique_methods:
+                            this_data[category] = [this_data['overall'][i] for i in range(nrows) if data['method'][i] == category]
+                        for category in categories:
+                            for calc,stat_function in calcs.items():
+                                if this_data[category]:
+                                    stats[category][calc][key] = stat_function(this_data[category])
         file = io.StringIO(newline='\n')
         writer = csv.DictWriter(file, fieldnames=data.keys())
         writer.writeheader()
         for i in range(nrows):
             row = {key: val[i] for key, val in data.items()}
             writer.writerow(row)
-        for category in categories:
-            writer.writerow(blank_row)
-            for calc in calcs:
-                writer.writerow(stats[category][calc])
-        writer.writerow(blank_row)
+        if append_footers:
+            for category in categories:
+                writer.writerow(blank_row)
+                for calc in calcs:
+                    writer.writerow(stats[category][calc])
         file.seek(0)  # go back to the beginning after finishing write
         return pd.read_csv(file)  # returns a pandas dataframe
 
-    def save(self, path=None, mode='w'):
-        """Saves stats results to disk."""
+    def save(self, path=None, mode='w', append_footers=False):
+        """Saves stats results to disk. See method generate_table() for
+        explanation of the optional append_footers argument.
+        """
         if path is None:
             suffix = str(self.filename_suffix)
             suffix = '_' + suffix if suffix else ''
             filename = f'{pc.filename_timestamp_str()}_schedstats{suffix}.csv'
             path = os.path.join(pc.dirs['temp_files'], filename)
-        self.generate_table().to_csv(path, mode=mode)
+        self.generate_table(append_footers).to_csv(path, mode=mode)
 
     @staticmethod
     def found_but_not_resolved(found, resolved):
