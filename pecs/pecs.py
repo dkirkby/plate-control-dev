@@ -166,11 +166,15 @@ class PECS:
         user_text = input('Please list canids (can??) or posids, seperated by '
                           'spaces. Leave blank to select all positioners: ')
         enabled_only, kwarg = True, {}
-        if user_text != '':
+        if user_text == '':
+            self.print(f'Defaulting to all enabled positioners...')
+        else:
             selection = user_text.split()
             kw = 'busids' if 'can' in selection[0] else 'posids'
             kwarg.update({kw: selection})
             enabled_only = False
+            self.print(f'{len(selection)} items specified, '
+                       'allowing disabled positioners to be selected...')
         ret = self.ptlm.get_positioners(enabled_only=enabled_only, **kwarg)
         posinfo = pd.concat(list(ret.values()))
         posids = sorted(posinfo['DEVICE_ID'])
