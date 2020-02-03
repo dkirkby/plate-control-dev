@@ -93,7 +93,7 @@ class RehomeVerify(PECS):
             self.printfunc(f'{len(bad_posids)} positioners not rehomed '
                            f'properly (√(dX² + dY²) > {tol} mm):\n\n'
                            f'{print_df}\n\n'
-                           f'Positioner IDs for retry:\n{bad_posids}')
+                           f'Positioner IDs for retry: {" ".join(bad_posids)}')
         return exppos
 
 

@@ -2,8 +2,6 @@ import os
 import pandas as pd
 from pecs import PECS
 import posconstants as pc
-from rehome_verify import RehomeVerify
-
 
 class Rehome(PECS):
 
@@ -23,9 +21,6 @@ class Rehome(PECS):
                             f'{pc.filename_timestamp_str()}-rehome.csv')
         df.to_csv(path)
         self.printfunc(f'Rehome (interally-tracked) data saved to: {path}')
-        if input('Verify rehome positions with FVC? (y/n): ') in ['y', 'yes']:
-            RehomeVerify(petal_roles=self.ptlm.participating_petals,
-                         posids=self.posids)
 
     def rehome(self, posids=None, anticollision='freeze', attempt=1):
         # three atetmpts built in, two with ac freeze, one with ac None
@@ -68,3 +63,5 @@ class Rehome(PECS):
 
 if __name__ == '__main__':
     Rehome(axis='both', interactive=True)  # theta_only, phi_only, or both
+    if input('Verify rehome positions with FVC? (y/n): ') in ['y', 'yes']:
+        execfile('rehome_verify.py')
