@@ -812,13 +812,13 @@ class CalibrationData(FPTestData):
         # columns = pd.MultiIndex.from_product(
         #     iterables, names=['label', 'param_key'])
 
-    def write_calibdf(self, calibdf_old, calibdf_fit, calibdf_new):
-        self.calibdf = pd.concat(
-            [calibdf_old, calibdf_fit, calibdf_new], axis=1,
-            keys=['OLD', 'FIT', 'NEW'],
+    def write_calibdf(self, calibdf_old, calibdf_fit, calibdf_new=None):
+        keys = ['OLD', 'FIT', 'NEW']
+        dfs = [calibdf_old, calibdf_fit] + [calibdf_new] * (
+            calibdf_new is not None)
+        self.calibdf = pd.concat(dfs, axis=1, keys=keys[:len(dfs)],
             names=['label', 'field'], sort=False)
         if self.calibdf.index.name != 'DEVICE_ID':
-            import pdb; pdb.set_trace()
             self.calibdf.index.name = 'DEVICE_ID'
             self.logger.info('calibdf index is not DEVICE_ID by default!')
 
@@ -963,14 +963,12 @@ class CalibrationData(FPTestData):
 
 if __name__ == '__main__':
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    # arc calib expids
-    expids = [39228, 39230]
     expids = [43061]
     for expid in expids:
         paths = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data.pkl')
         assert len(paths) == 1, paths
-        print(f'Re-processing FP test data:\n{paths[0]}')
-        # try:
+        path = paths[0]
+        print(f'Re-processing FP test data:\n{path}')
         with open(os.path.join(paths[0]), 'rb') as h:
             data = pickle.load(h)
         data.generate_data_products()
