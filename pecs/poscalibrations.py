@@ -170,6 +170,7 @@ class PosCalibrations(PECS):
         self.data.t_f = pc.now()
         self.set_schedule_stats(enabled=False)
         self.fvc_collect()
+        self.data.generate_data_products()
 
     def run_arc_calibration(self, match_radius=50, interactive=False):
         if interactive:
@@ -224,6 +225,7 @@ class PosCalibrations(PECS):
             self.data.calib_new = self.collect_calib(self.posids)
             self.data.write_calibdf(self.data.calib_old, self.data.calib_fit,
                                     self.data.calib_new)
+        self.data.generate_data_products()
 
     def run_grid_calibration(self, match_radius=50,
                              interactive=False):
@@ -266,6 +268,7 @@ class PosCalibrations(PECS):
             self.data.calib_new = self.collect_calib(self.posids)
             self.data.write_calibdf(self.data.calib_old, self.data.calib_fit,
                                     self.data.calib_new)
+        self.data.generate_data_products()
 
     @property
     def petal_alignments(self):

@@ -12,7 +12,6 @@ import pandas as pd
 idx = pd.IndexSlice
 test = PosCalibrations('arc', n_pts_TP=(6, 6), interactive=True)
 test.run_arc_calibration()
-test.data.generate_data_products()
 if hasattr(test.data, 'calibdf'):
     print(test.data.calibdf.loc[:, idx[:, [  # preview calibration updates
         'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
