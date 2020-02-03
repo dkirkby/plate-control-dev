@@ -960,10 +960,16 @@ class CalibrationData(FPTestData):
         binder.close()
         self.print(f'Binder for PC{pcid:02} saved to: {savepath}')
 
+    def make_grid_plots(self):
+        pass
+
     def generate_data_products(self):
         self.read_telemetry()
         self.export_data_logs()
-        self.make_arc_plots()
+        if 'arc' in self.mode:
+            self.make_arc_plots()
+        elif 'grid' in self.mode:
+            self.make_grid_plots()
         self.dump_as_one_pickle()  # loggers lost as they cannot be serialised
         if shutil.which('pandoc') is None:
             self.print('You must have a complete installation of pandoc '
