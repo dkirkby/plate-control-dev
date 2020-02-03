@@ -168,6 +168,7 @@ class PECS:
         enabled_only, kwarg = True, {}
         if user_text == '':
             self.print(f'Defaulting to all enabled positioners...')
+            posids = None
         else:
             selection = user_text.split()
             kw = 'busids' if 'can' in selection[0] else 'posids'
@@ -175,10 +176,10 @@ class PECS:
             enabled_only = False
             self.print(f'{len(selection)} items specified, '
                        'allowing disabled positioners to be selected...')
-        ret = self.ptlm.get_positioners(enabled_only=enabled_only, **kwarg)
-        posinfo = pd.concat(list(ret.values()))
-        posids = sorted(posinfo['DEVICE_ID'])
-        self.print(f'Selected {len(posids)} positioners')
+            ret = self.ptlm.get_positioners(enabled_only=enabled_only, **kwarg)
+            posinfo = pd.concat(list(ret.values()))
+            posids = sorted(posinfo['DEVICE_ID'])
+            self.print(f'Selected {len(posids)} positioners')
         return posids
 
     def set_schedule_stats(self, enabled=True):
