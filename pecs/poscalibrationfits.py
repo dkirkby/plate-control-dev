@@ -435,10 +435,30 @@ if __name__ == '__main__':
     #                      names=['axis', 'target_no', 'DEVICE_ID'])
     # posdata = data_grid.loc[idx[:, 'M00001'], :]
     # posdata = data_arc.loc[idx['T', :, 'M00001'], :]
-    # debug
-    directory = "/data/focalplane/logs/kpno/20200117/00041477"
-    data = pd.read_pickle(os.path.join(directory, "data_arc.pkl.gz"))
-    calib = PosCalibrationFits(use_doslib=True)
-    movedf, calibdf = calib.calibrate_from_arc_data(data)
-    movedf.to_pickle(os.path.join(directory, "movedf.pkl.gz"))
-    calibdf.to_pickle(os.path.join(directory, "calibdf_new.pkl.gz"))
+
+    # redo calibration by fitting measured data only
+    # directory = "/data/focalplane/logs/kpno/20200117/00041477"
+    # data = pd.read_pickle(os.path.join(directory, "data_arc.pkl.gz"))
+    # calib = PosCalibrationFits(use_doslib=True)
+    # movedf, calibdf = calib.calibrate_from_arc_data(data)
+    # movedf.to_pickle(os.path.join(directory, "movedf.pkl.gz"))
+    # calibdf.to_pickle(os.path.join(directory, "calibdf_new.pkl.gz"))
+
+    # redo calibration by loading CalibrationData and generate new products
+    expids = [43061]  # redo fit
+    for expid in expids:
+        paths = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data.pkl')
+        assert len(paths) == 1, paths
+        path = paths[0]
+        print(f'Re-processing FP test data:\n{path}')
+        # with open(os.path.join(paths[0]), 'rb') as h:
+        #     data = pickle.load(h)
+        # path = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data_*.pkl.gz')[0]
+        # measured = pd.read_pickle(path)
+        calib_type = 'arc' if hasttr(data, 'data_arc') else 'grid'
+        measured = data.data_arc if calib_type == 'arc' else data.data_grid
+        fit = PosCalibrationFits(use_doslib=True)
+        data.movedf, data.calib_fit = getattr(
+            fit, f'calibrate_from_{calib_type}_data')(measured)
+        data.write_calibdf(data.calib_old, data.calib_fit)
+        data.generate_data_products()
