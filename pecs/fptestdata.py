@@ -592,11 +592,11 @@ class XYTestData(FPTestData):
             binder.append(path)
         savepath = os.path.join(
             self.dirs[pcid],
-            f'{len(paths)}_positioners-xyplot_submove_{n}.pdf')
+            f'pc{pcid:02}-{len(paths)}_positioners-xyplot_submove_{n}.pdf')
         self.print(f'Writing xyplot binder for PC{pcid:02} submove {n}...')
         binder.write(savepath)
         binder.close()
-        self.print(f'Binder for submove {n} saved to: {savepath}')
+        self.print(f'Binder for PC{pcid:02} submove {n} saved to: {savepath}')
 
     def plot_grade_dist(self, pcid=None):
         if pcid is None:  # show all positioners tested
@@ -823,15 +823,13 @@ class CalibrationData(FPTestData):
             self.logger.info('calibdf index is not DEVICE_ID by default!')
 
     def generate_report(self):
-        path = os.path.join(
-            pc.dirs['calib_logs'],
-            f'{pc.filename_timestamp_str()}-arc_calibration')
+        pass
 
-    def make_summary_plots(self, n_threads_max=32, make_binder=True, mp=True):
+    def make_arc_plots(self, make_binder=True, mp=True):
         self.print(f'Making arc plots for {len(self.posids)} positioners...')
         self._mp(self.make_arc_plot, [self.posids], mp=mp)
         if make_binder:
-            self._mp(self.make_arc_plot_binder, [self.posids], mp=mp)
+            self._mp(self.make_arc_plot_binder, [self.pcids], mp=mp)
 
     def make_arc_plot(self, posid):
         posmov = self.movedf.xs(posid, level='DEVICE_ID')
@@ -945,13 +943,27 @@ class CalibrationData(FPTestData):
         plt.close(fig)
         fig.savefig(path, bbox_inches='tight')
 
-    def make_arc_plot_binder(self, posid):
-        pass
+    def make_arc_plot_binder(self, pcid):
+        template = os.path.join(self.dirs[pcid], f'*arc_calib.pdf')
+        paths = sorted(glob(template))
+        assert len(paths) == len(self.posids_pc[pcid]), (
+                f'Length mismatch: {len(paths)} ≠ '
+                f'{len(self.posids_pc[pcid])}')
+        binder = PdfFileMerger()
+        for path in paths:
+            binder.append(path)
+        savepath = os.path.join(
+            self.dirs[pcid],
+            f'pc{pcid:02}-{len(paths)}_positioners-arc_calib.pdf')
+        self.print(f'Writing arc plot binder for PC{pcid:02}...')
+        binder.write(savepath)
+        binder.close()
+        self.print(f'Binder for PC{pcid:02} saved to: {savepath}')
 
     def generate_data_products(self):
         self.read_telemetry()
         self.export_data_logs()
-        # self.make_arc_plots()
+        self.make_arc_plots()
         self.dump_as_one_pickle()  # loggers lost as they cannot be serialised
         if shutil.which('pandoc') is None:
             self.print('You must have a complete installation of pandoc '
