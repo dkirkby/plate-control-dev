@@ -455,7 +455,7 @@ if __name__ == '__main__':
         #     data = pickle.load(h)
         # path = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data_*.pkl.gz')[0]
         # measured = pd.read_pickle(path)
-        calib_type = 'arc' if hasttr(data, 'data_arc') else 'grid'
+        calib_type = data.mode.replace('_calibration', '')
         measured = data.data_arc if calib_type == 'arc' else data.data_grid
         fit = PosCalibrationFits(use_doslib=True)
         data.movedf, data.calib_fit = getattr(
