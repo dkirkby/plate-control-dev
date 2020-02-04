@@ -17,6 +17,7 @@ import os
 from glob import glob
 import numpy as np
 from scipy import optimize
+from scipy.stats import linregress
 import pandas as pd
 from tqdm import tqdm
 import posconstants as pc
@@ -138,7 +139,7 @@ class PosCalibrationFits:
         return ctr, calc_radius(ctr), radial_variations(ctr)
 
     @staticmethod
-    def fit_circle(x, ctr0=None, exp=1): 
+    def fit_circle(x, ctr0=None, exp=1, r_bounds=(2.6, 3.4)):
         # input x is a N x 2 array for (x, y) points in 2D
         # example data: x = np.array([[1, 0], [2, 1], [3, 0]])
 
@@ -157,11 +158,33 @@ class PosCalibrationFits:
 
         if ctr0 is None:
             ctr0 = np.mean(x, axis=0)
-        p0 = (ctr0[0], ctr0[1], 3)  # initial values: centre_x, centre_y, radius
-        bounds = ((ctr0[0]-3, ctr0[0]+3), (ctr0[1]-3, ctr0[1]+3), (1, 5))
+        p0 = (ctr0[0], ctr0[1], 3)  # initial values: ctr_x, ctr_y, radius
+        bounds = ((ctr0[0]-3, ctr0[0]+3), (ctr0[1]-3, ctr0[1]+3), r_bounds)
         sol = optimize.minimize(fun=circle_min, x0=p0, bounds=bounds)
         dr = residuals(radial_dist(*sol.x[:2]), sol.x[2])
         return sol.x[:2], sol.x[2], dr  # centre, radius, residuals sum
+
+    @staticmethod
+    def triangle_area(x1, y1, x2, y2, x3, y3):
+        return abs((x1*(y2-y3)+x2*(y3-y1)+x3*(y1-y2))/2)
+
+    @staticmethod
+    def polygon_area(x):
+        # shoelace formula; x is N x 2, each row vector is a vertex
+        area, n = 0, len(x)
+        j = n - 1
+        for i in range(n):
+            area += abs((x[j, 0] + x[i, 0]) * (x[j, 1] - x[i, 1])) / 2
+            j = i   # j is previous vertex to i
+        return area
+
+    @staticmethod
+    def phi_area(x, ctr):  # x is N x 2, each row vector is a vertex
+        area = 0
+        for i in range(len(x)-1):  # calculate wedge area for every pair
+            area += PosCalibrationFits.triangle_area(
+                x[i, 0], x[i, 1], x[i+1, 0], x[i+1, 1], ctr[0], ctr[1])
+        return area
 
     def calibrate_from_arc_data(self, data):
         """
@@ -203,7 +226,7 @@ class PosCalibrationFits:
         self.logger.debug(f'Fitting loop for {len(posids)} positioners...')
         for posid in tqdm(posids):
             poscal, posmea, posmodel = {}, {}, self.posmodels[posid]
-            trans, state = posmodel.trans, posmodel.state 
+            trans, state = posmodel.trans, posmodel.state
             tgt_posintTP = data.loc[idx[:, :, posid],
                                     ['tgt_posintT', 'tgt_posintP']].values
             tgt_XY = np.array(
@@ -227,10 +250,12 @@ class PosCalibrationFits:
                 posmea[arc] = posmeaarc[posmeaarc.notnull().all(axis=1)]
                 if len(posmea[arc]) < 3:  # require at least 3 points remaining
                     return None
-                ctr0 = ((state._val['OFFSET_X'], state._val['OFFSET_Y']) 
+                ctr0 = ((state._val['OFFSET_X'], state._val['OFFSET_Y'])
                         if arc == 'T' else None)  # initial guess for centre
-                exp = 2 if arc == 'T' else 1
-                return self.fit_circle(posmea[arc].values, ctr0=ctr0, exp=exp)
+                exp = 2 if arc == 'T' else 1.1
+                r_bounds = (0.1, 5.5) if arc == 'T' else (2.6, 3.4)
+                return self.fit_circle(posmea[arc].values, ctr0=ctr0,
+                                       exp=exp, r_bounds=r_bounds)
 
             fits = [fit_arc(arc) for arc in ['T', 'P']]
             if None in fits:
@@ -243,8 +268,6 @@ class PosCalibrationFits:
                 poscal[f'centre_{arc}'] = fits[i][0]
                 poscal[f'radius_{arc}'] = fits[i][1]
                 poscal[f'residuals_{arc}'] = fits[i][2]
-                # data.loc[idx[arc, posmea[arc].index, posid],
-                #          'err_radial'] = fits[i][2]
             poscal.update({'OFFSET_X': poscal['centre_T'][0],
                            'OFFSET_Y': poscal['centre_T'][1],
                            'LENGTH_R1': np.linalg.norm(poscal['centre_T']
@@ -319,6 +342,19 @@ class PosCalibrationFits:
                 data[f'err_{c}'] = data[f'exp_{c}'] - data[f'mea_{c}']
             for c in ['posintT', 'posintP']:  # calculate errors
                 data[f'err_{c}'] = data[f'exp_{c}'] - data[f'tgt_{c}']
+            # area bounded by arc points, good indication of movement
+            poscal['area_T'] = self.polygon_area(posmea['T'].values)
+            poscal['area_P'] = self.phi_area(posmea['P'].values,
+                                             poscal['centre_P'])
+            # linear regression for the second column plots
+            err_p = p_exp_posintP_wrapped - p_tgt_posintP
+            r = linregress(p_tgt_posintP, err_p)
+            poscal[f'slope_P'], poscal[f'intercept_P'] = r[0], r[1]
+            poscal[f'rvalue_P'], poscal[f'pvalue_P'] = r[2], r[3]
+            err_t = t_exp_posintT_wrapped - t_tgt_posintT
+            r = linregress(t_tgt_posintT, err_t)
+            poscal[f'slope_T'], poscal[f'intercept_T'] = r[0], r[1]
+            poscal[f'rvalue_T'], poscal[f'pvalue_T'] = r[2], r[3]
             poscals.append(poscal)
             for ratio, arc in zip([ratio_T, ratio_P], ['T', 'P']):
                 if abs(ratio - 1) > 0.3:  # print a warning
@@ -364,12 +400,12 @@ class PosCalibrationFits:
         self.logger.debug(f'Fitting loop for {len(posids)} positioners...')
         for posid in tqdm(posids):
             trans = self.posmodels[posid].trans
-            tgt_posintTP = data.loc[idx[:, :, posid],
+            tgt_posintTP = data.loc[idx[:, posid],
                                     ['tgt_posintT', 'tgt_posintP']].values
             tgt_XY = np.array(
                 [trans.posintTP_to_flatXY(tp) for tp in tgt_posintTP])
-            data.loc[idx[:, :, posid], ['tgt_flatX', 'tgt_flatY']] = tgt_XY
-            data.loc[idx[:, :, posid], ['tgt_Q', 'tgt_S']] = \
+            data.loc[idx[:, posid], ['tgt_flatX', 'tgt_flatY']] = tgt_XY
+            data.loc[idx[:, posid], ['tgt_Q', 'tgt_S']] = \
                 trans.flatXY_to_QS(tgt_XY.T).T
             # measurement always in QS, but fit and derive params in flatXY
             QS = data.loc[idx[:, posid], ['mea_Q', 'mea_S']]  # Nx2
@@ -418,7 +454,7 @@ class PosCalibrationFits:
             data.loc[idx[mask, posid], ['exp_Q', 'exp_S']] = \
                 trans.flatXY_to_QS(exp_XY.T).T
             data.loc[idx[mask, posid], ['exp_posintT', 'exp_posintT']] = \
-                np.array([trans.flatXY_to_posintTP(xy)[1] for xy in exp_XY])
+                np.array([trans.flatXY_to_posintTP(xy)[0] for xy in exp_XY])
             trans.alt_override = False  # turn it back off when finished
             for c in ['flatX', 'flatY', 'Q', 'S']:  # calculate errors
                 data[f'err_{c}'] = data[f'exp_{c}'] - data[f'mea_{c}']
@@ -449,10 +485,10 @@ if __name__ == '__main__':
     # posdata = data_arc.loc[idx['T', :, 'M00001'], :]
 
     # redo calibration by fitting measured data only
-    path = "/data/focalplane/logs/kpno/20200203/00046362-arc_calibration-754_previously_disabled/data_arc.pkl.gz"
+    path = "/data/focalplane/logs/kpno/20200203/00046366-grid_calibration/data_grid.pkl.gz"
     measured = pd.read_pickle(path)
     calib = PosCalibrationFits(use_doslib=True)
-    movedf, calibdf = calib.calibrate_from_arc_data(measured)
+    movedf, calibdf = calib.calibrate_from_grid_data(measured)
     movedf.to_pickle(os.path.join(os.path.dirname(path), "movedf.pkl.gz"))
     calibdf.to_pickle(os.path.join(os.path.dirname(path), "calibdf_new.pkl.gz"))
 
