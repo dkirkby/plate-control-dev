@@ -256,7 +256,6 @@ class FPTestData:
         else:
             for args in tqdm(product(*iterables)):
                 target(*args)
-                
 
     def read_telemetry(self):
         try:
@@ -818,7 +817,7 @@ class CalibrationData(FPTestData):
         dfs = [calibdf_old, calibdf_fit] + [calibdf_new] * (
             calibdf_new is not None)
         self.calibdf = pd.concat(dfs, axis=1, keys=keys[:len(dfs)],
-            names=['label', 'field'], sort=False)
+                                 names=['label', 'field'], sort=False)
         if self.calibdf.index.name != 'DEVICE_ID':
             self.calibdf.index.name = 'DEVICE_ID'
             self.logger.info('calibdf index is not DEVICE_ID by default!')
@@ -842,19 +841,18 @@ class CalibrationData(FPTestData):
             axis_name = r'\theta' if axis == 'T' else r'\varphi'
             other_axis_name = r'\varphi' if axis == 'T' else r'\theta'
             tgt = posmov.xs(axis, level='axis')[f'tgt_posint{axis}']
-            mea = posmov.xs(axis, level='axis')[f'exp_posint{axis}']
+            exp = posmov.xs(axis, level='axis')[f'exp_posint{axis}']
             other_tgt = posmov.xs(
                 axis, level='axis')[f'tgt_posint{other_axis}'].median()
             rad = poscal[f'radius_{axis}']
             ctr = poscal[f'centre_{axis}']
             mea_xy = posmov.xs(axis, level='axis')[['mea_flatX', 'mea_flatY']]
-            exp_xy = posmov.xs(axis, level='axis')[['exp_flatX', 'exp_flatY']]
             xy = mea_xy[mea_xy.notnull().any(axis=1)].values
             # column 1: cicle/arc plot in xy space
             ax = plt.subplot(2, 3, plot_row * 3 + 1)
             ang_i = np.degrees(np.arctan2(  # initial measured angle in deg
                 xy[0, 1] - ctr[1], xy[0, 0] - ctr[0]))
-            ang_f = ang_i + mea.diff().sum()  # final measured angle in deg
+            ang_f = ang_i + exp.diff().sum()  # final measured angle in deg
             if ang_i > ang_f:
                 ang_f += 360
             ref_arc_ang = np.radians(np.append(  # 5 deg step
@@ -883,8 +881,8 @@ class CalibrationData(FPTestData):
             txt_0_xy = line_0_ctr + np.sign(np.abs(txt_ang_0-270)-90) * shift
             plt.text(txt_0_xy[0], txt_0_xy[1], txt_0, fontsize=12,
                      rotation=txt_ang_0, ha='center', va='center')
-            for i, xy in enumerate(xy):
-                ang_xy = np.arctan2(xy[1]-ctr[1], xy[0]-ctr[0])  # in rad
+            for i, pt in enumerate(xy):
+                ang_xy = np.arctan2(pt[1]-ctr[1], pt[0]-ctr[0])  # in rad
                 txt_x = ctr[0] + rad*0.85*np.cos(ang_xy)
                 txt_y = ctr[1] + rad*0.85*np.sin(ang_xy)
                 plt.text(txt_x, txt_y, f'{i}', ha='center', va='center')
@@ -908,7 +906,7 @@ class CalibrationData(FPTestData):
             plt.axis('equal')
             # column 2: angle deviation as a function of target angle
             plt.subplot(2, 3, plot_row * 3 + 2)
-            err_ang = mea - tgt
+            err_ang = exp - tgt
             plt.plot(tgt, err_ang, 'ko-')  # measured points
             plt.plot(tgt[0], err_ang[0], 'ro')  # 1st measured pt in red
             for i in tgt.index:
@@ -946,7 +944,7 @@ class CalibrationData(FPTestData):
         fig.savefig(path, bbox_inches='tight')
 
     def make_arc_plot_binder(self, pcid):
-        template = os.path.join(self.dirs[pcid], f'*arc_calib.pdf')
+        template = os.path.join(self.dirs[pcid], f'M0*arc_calib.pdf')
         paths = sorted(glob(template))
         binder = PdfFileMerger()
         for path in paths:
@@ -988,12 +986,13 @@ if __name__ == '__main__':
         print(f'Re-processing FP test data:\n{path}')
         with open(os.path.join(paths[0]), 'rb') as h:
             data = pickle.load(h)
-        paths = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data_arc.pkl.gz')
-        assert len(paths) == 1, paths
-        path = paths[0]
-        measured = pd.read_pickle(path)
+        # paths = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data_arc.pkl.gz')
+        # assert len(paths) == 1, paths
+        # path = paths[0]
+        # measured = pd.read_pickle(path)
+        # data.data_arc = measured
         calib_type = data.mode.replace('_calibration', '')
-        # measured = data.data_arc if calib_type == 'arc' else data.data_grid
+        measured = data.data_arc if calib_type == 'arc' else data.data_grid
         from poscalibrationfits import PosCalibrationFits
         fit = PosCalibrationFits(use_doslib=True)
         data.movedf, data.calib_fit = getattr(
