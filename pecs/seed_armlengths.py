@@ -23,8 +23,6 @@ for posid, row in seed.posinfo.iterrows():
                              participating_petals=role)
     update = seed.ptlm.collect_calib(update, tag='',
                                      participating_petals=role)[role]
-    update = seed.ptlm.collect_calib(update, tag='',
-                                     participating_petals=role)[role]
     updates.append(update)
 seed.ptlm.commit(mode='calib', log_note='seed_armlengths')
 updates = pd.DataFrame(updates).set_index('DEVICE_ID').sort_index()

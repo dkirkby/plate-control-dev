@@ -41,6 +41,8 @@ class PosCalibrations(PECS):
         self.logger = self.data.logger  # broadcast to all petals
         self.loggers = self.data.loggers
         super().__init__(fvc=fvc, ptlm=ptlm, interactive=interactive)
+        self.data.posids = self.posids
+        self.data.pcids = self.pcids
         self.exp_setup()  # set up exposure ID and product directory
         self.set_schedule_stats(enabled=True)
 
