@@ -14,10 +14,12 @@ only serve to ensure spotmatch does not fail.
 'mea_' is measured, 'exp_' is internally-tracked/expected, 'tgt_' is target
 """
 import os
+from glob import glob
 import numpy as np
 from scipy import optimize
 import pandas as pd
 from tqdm import tqdm
+import posconstants as pc
 from postransforms import PosTransforms
 from posstate import PosState
 from posmodel import PosModel
@@ -136,21 +138,30 @@ class PosCalibrationFits:
         return ctr, calc_radius(ctr), radial_variations(ctr)
 
     @staticmethod
-    def fit_circle(x, ctr0=None):  # input x is a N x 2 array for (x, y) points in 2D
-        '''example data: x = np.array([[1, 0], [2, 1], [3, 0]]) '''
+    def fit_circle(x, ctr0=None, exp=1): 
+        # input x is a N x 2 array for (x, y) points in 2D
+        # example data: x = np.array([[1, 0], [2, 1], [3, 0]])
+
+        def radial_dist(x0, y0):
+            return np.linalg.norm(x - (x0, y0), axis=1)
+
+        def residuals(rs, r):
+            return rs - r
 
         def circle_min(params):
             x0, y0, r = params
-            rs = np.linalg.norm(x - (x0, y0), axis=1)
-            return np.sum((np.abs(rs - r)))  # reduced penalty for outliners
+            rs = radial_dist(x0, y0)
+            dr = residuals(rs, r)
+            # reduced penalty for phi outliners with exp=1
+            return np.sum(np.power(np.abs(dr), exp))
 
         if ctr0 is None:
             ctr0 = np.mean(x, axis=0)
         p0 = (ctr0[0], ctr0[1], 3)  # initial values: centre_x, centre_y, radius
-        bounds = ((ctr0[0]-3, ctr0[0]+3), (ctr0[1]-3, ctr0[1]+3), (2.5, 3.5))
+        bounds = ((ctr0[0]-3, ctr0[0]+3), (ctr0[1]-3, ctr0[1]+3), (1, 5))
         sol = optimize.minimize(fun=circle_min, x0=p0, bounds=bounds)
-
-        return sol.x[:2], sol.x[2], sol.fun  # centre, radius, residuals sum
+        dr = residuals(radial_dist(*sol.x[:2]), sol.x[2])
+        return sol.x[:2], sol.x[2], dr  # centre, radius, residuals sum
 
     def calibrate_from_arc_data(self, data):
         """
@@ -218,7 +229,8 @@ class PosCalibrationFits:
                     return None
                 ctr0 = ((state._val['OFFSET_X'], state._val['OFFSET_Y']) 
                         if arc == 'T' else None)  # initial guess for centre
-                return self.fit_circle(posmea[arc].values, ctr0=ctr0)
+                exp = 2 if arc == 'T' else 1
+                return self.fit_circle(posmea[arc].values, ctr0=ctr0, exp=exp)
 
             fits = [fit_arc(arc) for arc in ['T', 'P']]
             if None in fits:
@@ -437,28 +449,28 @@ if __name__ == '__main__':
     # posdata = data_arc.loc[idx['T', :, 'M00001'], :]
 
     # redo calibration by fitting measured data only
-    # directory = "/data/focalplane/logs/kpno/20200117/00041477"
-    # data = pd.read_pickle(os.path.join(directory, "data_arc.pkl.gz"))
-    # calib = PosCalibrationFits(use_doslib=True)
-    # movedf, calibdf = calib.calibrate_from_arc_data(data)
-    # movedf.to_pickle(os.path.join(directory, "movedf.pkl.gz"))
-    # calibdf.to_pickle(os.path.join(directory, "calibdf_new.pkl.gz"))
+    path = "/data/focalplane/logs/kpno/20200203/00046362-arc_calibration-754_previously_disabled/data_arc.pkl.gz"
+    measured = pd.read_pickle(path)
+    calib = PosCalibrationFits(use_doslib=True)
+    movedf, calibdf = calib.calibrate_from_arc_data(measured)
+    movedf.to_pickle(os.path.join(os.path.dirname(path), "movedf.pkl.gz"))
+    calibdf.to_pickle(os.path.join(os.path.dirname(path), "calibdf_new.pkl.gz"))
 
     # redo calibration by loading CalibrationData and generate new products
-    expids = [43061]  # redo fit
-    for expid in expids:
-        paths = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data.pkl')
-        assert len(paths) == 1, paths
-        path = paths[0]
-        print(f'Re-processing FP test data:\n{path}')
-        # with open(os.path.join(paths[0]), 'rb') as h:
-        #     data = pickle.load(h)
-        # path = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data_*.pkl.gz')[0]
-        # measured = pd.read_pickle(path)
-        calib_type = data.mode.replace('_calibration', '')
-        measured = data.data_arc if calib_type == 'arc' else data.data_grid
-        fit = PosCalibrationFits(use_doslib=True)
-        data.movedf, data.calib_fit = getattr(
-            fit, f'calibrate_from_{calib_type}_data')(measured)
-        data.write_calibdf(data.calib_old, data.calib_fit)
-        data.generate_data_products()
+    # expids = [46362]  # redo fit
+    # for expid in expids:
+    #     paths = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data.pkl')
+    #     assert len(paths) == 1, paths
+    #     path = paths[0]
+    #     print(f'Re-processing FP test data:\n{path}')
+    #     # with open(os.path.join(paths[0]), 'rb') as h:
+    #     #     data = pickle.load(h)
+    #     # path = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data_*.pkl.gz')[0]
+    #     # measured = pd.read_pickle(path)
+    #     calib_type = data.mode.replace('_calibration', '')
+    #     measured = data.data_arc if calib_type == 'arc' else data.data_grid
+    #     fit = PosCalibrationFits(use_doslib=True)
+    #     data.movedf, data.calib_fit = getattr(
+    #         fit, f'calibrate_from_{calib_type}_data')(measured)
+    #     data.write_calibdf(data.calib_old, data.calib_fit)
+    #     data.generate_data_products()
