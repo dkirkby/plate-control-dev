@@ -212,10 +212,11 @@ class PosCalibrations(PECS):
         # put all arc measurement data in one dataframe
         T_arc = pd.concat(T_data, keys=range(self.data.n_pts_T))
         P_arc = pd.concat(P_data, keys=range(self.data.n_pts_P))
-        self.data_arc = pd.concat([T_arc, P_arc], keys=['T', 'P'],
-                                  names=['axis', 'target_no', 'DEVICE_ID'])
-        self.data_arc.to_pickle(os.path.join(self.data.dir, 'data_arc.pkl.gz'),
-                                compression='gzip')
+        self.data.data_arc = pd.concat(
+            [T_arc, P_arc], keys=['T', 'P'],
+            names=['axis', 'target_no', 'DEVICE_ID'])
+        self.data.data_arc.to_pickle(
+            os.path.join(self.data.dir, 'data_arc.pkl.gz'), compression='gzip')
         self.data.t_f = pc.now()
         self.set_schedule_stats(enabled=False)
         self.fvc_collect()
@@ -223,11 +224,15 @@ class PosCalibrations(PECS):
             fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
                                      loggers=self.loggers)
             self.data.movedf, self.data.calib_fit = (
-                fit.calibrate_from_arc_data(self.data_arc))
+                fit.calibrate_from_arc_data(self.data.data_arc))
             self.data.calib_new = self.collect_calib(self.posids)
             self.data.write_calibdf(self.data.calib_old, self.data.calib_fit,
                                     self.data.calib_new)
-        self.data.generate_data_products()
+        try:
+            self.data.generate_data_products()
+        except Exception as e:
+            print(e)
+            self.data.dump_as_one_pickle()
 
     def run_grid_calibration(self, match_radius=50,
                              interactive=False):
@@ -255,9 +260,9 @@ class PosCalibrations(PECS):
                                                match_radius=match_radius))
             if i+1 < len(req_list):  # no pause after the last iteration
                 self.pause()
-        self.data_grid = pd.concat(grid_data, keys=range(len(req_list)),
-                                   names=['target_no', 'DEVICE_ID'])
-        self.data_grid.to_pickle(os.path.join(
+        self.data.data_grid = pd.concat(grid_data, keys=range(len(req_list)),
+                                        names=['target_no', 'DEVICE_ID'])
+        self.data.data_grid.to_pickle(os.path.join(
             self.data.dir, 'data_grid.pkl.gz'), compression='gzip')
         self.data.t_f = pc.now()
         self.set_schedule_stats(enabled=False)
@@ -266,11 +271,15 @@ class PosCalibrations(PECS):
             fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
                                      loggers=self.loggers)
             self.data.movedf, self.data.calib_fit = (
-                fit.calibrate_from_grid_data(self.data_grid))
+                fit.calibrate_from_grid_data(self.data.data_grid))
             self.data.calib_new = self.collect_calib(self.posids)
             self.data.write_calibdf(self.data.calib_old, self.data.calib_fit,
                                     self.data.calib_new)
-        self.data.generate_data_products()
+        try:
+            self.data.generate_data_products()
+        except Exception as e:
+            print(e)
+            self.data.dump_as_one_pickle()
 
     @property
     def petal_alignments(self):
