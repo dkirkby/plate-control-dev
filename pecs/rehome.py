@@ -64,4 +64,4 @@ class Rehome(PECS):
 if __name__ == '__main__':
     Rehome(axis='both', interactive=True)  # theta_only, phi_only, or both
     if input('Verify rehome positions with FVC? (y/n): ') in ['y', 'yes']:
-        execfile('rehome_verify.py')
+        os.system('python rehome_verify.py')
