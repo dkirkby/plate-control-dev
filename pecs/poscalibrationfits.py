@@ -252,8 +252,8 @@ class PosCalibrationFits:
                     return None
                 ctr0 = ((state._val['OFFSET_X'], state._val['OFFSET_Y'])
                         if arc == 'T' else None)  # initial guess for centre
-                exp = 2 if arc == 'T' else 1.1
-                r_bounds = (0.1, 5.5) if arc == 'T' else (2.6, 3.4)
+                exp = 1.5 if arc == 'T' else 1.1
+                r_bounds = (0.1, 5.5) if arc == 'T' else (2.5, 3.5)
                 return self.fit_circle(posmea[arc].values, ctr0=ctr0,
                                        exp=exp, r_bounds=r_bounds)
 
