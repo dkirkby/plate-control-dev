@@ -11,26 +11,25 @@ import posconstants as pc
 from pecs import PECS
 
 # set source calibration file
-path = ''
+path = "/data/focalplane/logs/kpno/20200203/00046362-arc_calibration-754_previously_disabled/calibdf.pkl.gz"
 # set posids to apply calibrations, leave empty to apply to all
 posids = []
 calib = pd.read_pickle(path)['FIT']
-if posids:
-    posids = set(posids) & set(calib.index)
+posids = set(posids) & set(calib.index) if posids else calib.index
 pecs = PECS(interactive=False)
 pecs.ptl_setup(pecs.pcids, posids=posids)
 keys_fit = ['OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
             'LENGTH_R1', 'LENGTH_R2']  # initial values for fitting
-old, new = []
+old, new = [], []
 for posid in tqdm(posids):
     role = pecs._pcid2role(pecs.posinfo.loc[posid, 'PETAL_LOC'])
     update = {'DEVICE_ID': posid, 'MODE': 'set_calibrations'}
-    update = pecs.ptlm.collect_calib(update, tag='OLD',
+    update = pecs.ptlm.collect_calib(update, tag='',
                                      participating_petals=role)[role]
     old.append(update)
     for key in keys_fit:
         pecs.ptlm.set_posfid_val(posid, key, calib.loc[posid, key])
-    update = pecs.ptlm.collect_calib(update, tag='NEW',
+    update = pecs.ptlm.collect_calib(update, tag='',
                                      participating_petals=role)[role]
     new.append(update)
 pecs.ptlm.commit(mode='calib',
@@ -45,5 +44,5 @@ path = os.path.join(pc.dirs['calib_logs'],
 calibdf.to_pickle(path)
 # preview calibration updates
 print(calibdf['NEW'][['POS_T', 'POS_P', 'LENGTH_R1', 'LENGTH_R2',
-                     'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P']])
+                      'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P']])
 print(f'set_calibrations data saved to: {path}')
