@@ -449,11 +449,12 @@ class PosCalibrationFits:
             #             PosTransforms._centralized_angular_offset_value(
             #                 res.x[i]))
             poscal = {key: result.x[i] for i, key in enumerate(keys_fit)}
+            poscal['residuals'] = result.fun
             exp_XY = exp_xy(result.x)  # expected XY using fitteds results
             data.loc[idx[mask, posid], ['exp_flatX', 'exp_flatY']] = exp_XY
             data.loc[idx[mask, posid], ['exp_Q', 'exp_S']] = \
                 trans.flatXY_to_QS(exp_XY.T).T
-            data.loc[idx[mask, posid], ['exp_posintT', 'exp_posintT']] = \
+            data.loc[idx[mask, posid], ['exp_posintT', 'exp_posintP']] = \
                 np.array([trans.flatXY_to_posintTP(xy)[0] for xy in exp_XY])
             trans.alt_override = False  # turn it back off when finished
             for c in ['flatX', 'flatY', 'Q', 'S']:  # calculate errors
