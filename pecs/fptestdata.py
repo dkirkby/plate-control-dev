@@ -230,13 +230,13 @@ class FPTestData:
             #     p.join()
             pool, n_running = [], 0
             self.print(
-                'WARNING: Upgrade to python 3.7 and matplotlib '
+                'WARNING: Upgrade to python 3.7 and matplotlib 3 '
                 'ASAP! Mutiprocessing.Process.close() not '
                 'available in <= python 3.6. You may get '
                 'OSError [24] from too many open files due to '
-                'matplltlib 2 leaving redundant font file open '
+                'matplltlib 2 bug of leaving redundant open font '
                 'handles behind and not closing Process threads '
-                'proerply!')
+                'properly!')
             for args in tqdm(args_list):
                 np = Process(target=target, args=args)
                 if len(pool) == n_threads_max:  # all cores occupied, wait
@@ -256,6 +256,7 @@ class FPTestData:
         else:
             for args in tqdm(product(*iterables)):
                 target(*args)
+                
 
     def read_telemetry(self):
         try:
@@ -592,7 +593,7 @@ class XYTestData(FPTestData):
             binder.append(path)
         savepath = os.path.join(
             self.dirs[pcid],
-            f'pc{pcid:02}-{len(paths)}_positioners-xyplot_submove_{n}.pdf')
+            f'pc{pcid:02}-{len(paths):03}_positioners-xyplot_submove_{n}.pdf')
         self.print(f'Writing xyplot binder for PC{pcid:02} submove {n}...')
         binder.write(savepath)
         binder.close()
@@ -841,17 +842,18 @@ class CalibrationData(FPTestData):
             axis_name = r'\theta' if axis == 'T' else r'\varphi'
             other_axis_name = r'\varphi' if axis == 'T' else r'\theta'
             tgt = posmov.xs(axis, level='axis')[f'tgt_posint{axis}']
-            mea = posmov.xs(axis, level='axis')[f'mea_posint{axis}']
+            mea = posmov.xs(axis, level='axis')[f'exp_posint{axis}']
             other_tgt = posmov.xs(
                 axis, level='axis')[f'tgt_posint{other_axis}'].median()
-            rad = poscal[f'radius_{axis}'].mean()
+            rad = poscal[f'radius_{axis}']
             ctr = poscal[f'centre_{axis}']
-            mea_xy = (posmov.xs(axis, level='axis')
-                      [['mea_flatX', 'mea_flatY']].values)
+            mea_xy = posmov.xs(axis, level='axis')[['mea_flatX', 'mea_flatY']]
+            exp_xy = posmov.xs(axis, level='axis')[['exp_flatX', 'exp_flatY']]
+            xy = mea_xy[mea_xy.notnull().any(axis=1)].values
             # column 1: cicle/arc plot in xy space
             ax = plt.subplot(2, 3, plot_row * 3 + 1)
             ang_i = np.degrees(np.arctan2(  # initial measured angle in deg
-                mea_xy[0, 1] - ctr[1], mea_xy[0, 0] - ctr[0]))
+                xy[0, 1] - ctr[1], xy[0, 0] - ctr[0]))
             ang_f = ang_i + mea.diff().sum()  # final measured angle in deg
             if ang_i > ang_f:
                 ang_f += 360
@@ -867,8 +869,8 @@ class CalibrationData(FPTestData):
             plt.plot(ctr[0], ctr[1], 'k+')  # axis centre black +
             plt.plot(line_0_x, line_0_y, 'k--')  # zero line of posintTP
             plt.plot(ref_arc_x, ref_arc_y, 'b-')  # ref arc at 5 deg spacing
-            plt.plot(mea_xy[:, 0], mea_xy[:, 1], 'ko')  # measured pts in black
-            plt.plot(mea_xy[0, 0], mea_xy[0, 1], 'ro')  # 1st measured pt red
+            plt.plot(xy[:, 0], xy[:, 1], 'ko')  # measured pts in black
+            plt.plot(xy[0, 0], xy[0, 1], 'ro')  # 1st measured pt red
             txt_ang_0 = np.mod(ang_0+360, 360)
             txt_ang_0 = (txt_ang_0-180 if 90 < txt_ang_0 < 270
                          else txt_ang_0)
@@ -881,7 +883,7 @@ class CalibrationData(FPTestData):
             txt_0_xy = line_0_ctr + np.sign(np.abs(txt_ang_0-270)-90) * shift
             plt.text(txt_0_xy[0], txt_0_xy[1], txt_0, fontsize=12,
                      rotation=txt_ang_0, ha='center', va='center')
-            for i, xy in enumerate(mea_xy):
+            for i, xy in enumerate(xy):
                 ang_xy = np.arctan2(xy[1]-ctr[1], xy[0]-ctr[0])  # in rad
                 txt_x = ctr[0] + rad*0.85*np.cos(ang_xy)
                 txt_y = ctr[1] + rad*0.85*np.sin(ang_xy)
@@ -917,12 +919,12 @@ class CalibrationData(FPTestData):
             plt.ylabel(f'$\\delta{axis_name} / \\degree$'.format(axis_name))
             plt.title(f'${axis_name}$ angle deviations')
             plt.grid(True)
-            yr = max(err_ang) - min(err_ang)
+            yr = err_ang.max() - err_ang.min()  # nan friendly
             plt.ylim(top=plt.ylim()[1]+0.1*yr)
             # column 3: radius variations as a function of target angle
             plt.subplot(2, 3, plot_row * 3 + 3)
-            err_rad = (poscal[f'radius_{axis}'] - rad) * 1000  # μm
-            plt.plot(tgt, err_rad, 'ko-')
+            err_rad = ((mea_xy-ctr).apply(np.linalg.norm, axis=1)-rad) * 1000
+            plt.plot(tgt, err_rad, 'ko-')  # nan friendly
             plt.plot(tgt[0], err_rad[0], 'ro')
             for i in tgt.index:
                 plt.annotate(f'{i}', xy=(tgt[i], err_rad[i]), xytext=(0, 15),
@@ -932,29 +934,26 @@ class CalibrationData(FPTestData):
             plt.ylabel(f'$\\delta R / \\mu$m'.format(axis_name))
             plt.title(r'radius variations')
             plt.grid(True)
-            yr = max(err_rad) - min(err_rad)
+            yr = err_rad.max() - err_rad.min()  # nan friendly
             plt.ylim(top=plt.ylim()[1]+0.1*yr)
-        fig.suptitle(f'Arc calibration {pc.timestamp_str(self.t_i)} '
+        fig.suptitle(f'Arc Calibration {pc.timestamp_str(self.t_i)} '
                      f'Positioner {posid}')
         fig.tight_layout(pad=0.5, rect=[0, 0, 1, 0.95])
         path = os.path.join(
             self.dirs[pcid],
-            '{posid}-{pc.filename_timestamp_str(self.t_i)}-arc_calib.pdf')
+            f'{posid}-{pc.filename_timestamp_str(self.t_i)}-arc_calib.pdf')
         plt.close(fig)
         fig.savefig(path, bbox_inches='tight')
 
     def make_arc_plot_binder(self, pcid):
         template = os.path.join(self.dirs[pcid], f'*arc_calib.pdf')
         paths = sorted(glob(template))
-        assert len(paths) == len(self.posids_pc[pcid]), (
-                f'Length mismatch: {len(paths)} ≠ '
-                f'{len(self.posids_pc[pcid])}')
         binder = PdfFileMerger()
         for path in paths:
             binder.append(path)
         savepath = os.path.join(
             self.dirs[pcid],
-            f'pc{pcid:02}-{len(paths)}_positioners-arc_calib.pdf')
+            f'pc{pcid:02}-{len(paths):03}_positioners-arc_calib.pdf')
         self.print(f'Writing arc plot binder for PC{pcid:02}...')
         binder.write(savepath)
         binder.close()
@@ -981,7 +980,7 @@ class CalibrationData(FPTestData):
 
 if __name__ == '__main__':
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    expids = [43061]
+    expids = [46364]
     for expid in expids:
         paths = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data.pkl')
         assert len(paths) == 1, paths
@@ -989,6 +988,18 @@ if __name__ == '__main__':
         print(f'Re-processing FP test data:\n{path}')
         with open(os.path.join(paths[0]), 'rb') as h:
             data = pickle.load(h)
+        paths = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data_arc.pkl.gz')
+        assert len(paths) == 1, paths
+        path = paths[0]
+        measured = pd.read_pickle(path)
+        calib_type = data.mode.replace('_calibration', '')
+        # measured = data.data_arc if calib_type == 'arc' else data.data_grid
+        from poscalibrationfits import PosCalibrationFits
+        fit = PosCalibrationFits(use_doslib=True)
+        data.movedf, data.calib_fit = getattr(
+            fit, f'calibrate_from_{calib_type}_data')(measured)
+        data.write_calibdf(data.calib_old, data.calib_fit)
+        data.dump_as_one_pickle()
         data.generate_data_products()
         # from poscalibrationfits import PosCalibrationFits
         # path = os.path.join(os.path.dirname(paths[0]), 'data_arc.pkl.gz')
