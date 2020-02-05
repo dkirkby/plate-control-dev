@@ -308,19 +308,16 @@ class PosCalibrationFits:
             p_exp_posintP_wrapped = p_mea_poslocP_wrapped - poscal['OFFSET_P']
             data.loc[idx['P', posmea['P'].index, posid],
                      'exp_posintT'] = p_mea_poslocT - poscal['OFFSET_T']
-            data.loc[idx['P', posmea['P'].index, posid],
-                     'exp_posintP'] = p_exp_posintP_wrapped
+            data.loc[idx['P', posmea['P'].index, posid], 'exp_posintP'] = \
+                p_exp_posintP = p_exp_posintP_wrapped % 360
             # done with phi arc, transform measured theta arc to posintTP
             trans.alt_override = True  # enable override in pos transforms
             trans.alt.update({key: poscal[key] for key in keys_fit})
             t_exp_posintTP = np.array([
                 trans.flatXY_to_posintTP(flatXY, range_limits='full')[0]
                 for flatXY in posmea['T'].values])  # L x 1 array
-            t_tgt_direction = np.sign(np.diff(t_tgt_posintT).mean())
-            t_exp_posintT_wrapped = PosTransforms._wrap_consecutive_angles(
-                    t_exp_posintTP[:, 0], t_tgt_direction)  # length L
-            data.loc[idx['T', posmea['T'].index, posid],
-                     'exp_posintT'] = t_exp_posintT_wrapped
+            data.loc[idx['T', posmea['T'].index, posid], 'exp_posintT'] = \
+                t_exp_posintT = t_exp_posintTP[:, 0]
             data.loc[idx['T', posmea['T'].index, posid],
                      'exp_posintP'] = t_exp_posintTP[:, 1].mean()
             # convert target coordinates using existing calibration
@@ -334,24 +331,27 @@ class PosCalibrationFits:
                 trans.flatXY_to_QS(exp_XY.T).T
             trans.alt_override = False  # disable override in pos transforms
             # gear ratios, good feedback on how successful the calib was
+            t_tgt_direction = np.sign(np.diff(t_tgt_posintT).mean())
+            t_exp_posintT_wrapped = PosTransforms._wrap_consecutive_angles(
+                    t_exp_posintT, t_tgt_direction)  # length L
             poscal['GEAR_CALIB_T'] = ratio_T = np.median(
                 np.diff(t_exp_posintT_wrapped) / np.diff(t_tgt_posintT))
             poscal['GEAR_CALIB_P'] = ratio_P = np.median(
-                np.diff(p_exp_posintP_wrapped) / np.diff(p_tgt_posintP))
+                np.abs(np.diff(p_exp_posintP)) / np.diff(p_tgt_posintP))
             for c in ['flatX', 'flatY', 'Q', 'S']:  # calculate errors
                 data[f'err_{c}'] = data[f'exp_{c}'] - data[f'mea_{c}']
             for c in ['posintT', 'posintP']:  # calculate errors
-                data[f'err_{c}'] = data[f'exp_{c}'] - data[f'tgt_{c}']
+                data[f'err_{c}'] = (data[f'exp_{c}'] - data[f'tgt_{c}'])%360
             # area bounded by arc points, good indication of movement
             poscal['area_T'] = self.polygon_area(posmea['T'].values)
             poscal['area_P'] = self.phi_area(posmea['P'].values,
                                              poscal['centre_P'])
             # linear regression for the second column plots
-            err_p = p_exp_posintP_wrapped - p_tgt_posintP
+            err_p = p_exp_posintP - p_tgt_posintP
             r = linregress(p_tgt_posintP, err_p)
             poscal[f'slope_P'], poscal[f'intercept_P'] = r[0], r[1]
             poscal[f'rvalue_P'], poscal[f'pvalue_P'] = r[2], r[3]
-            err_t = t_exp_posintT_wrapped - t_tgt_posintT
+            err_t = t_exp_posintT - t_tgt_posintT
             r = linregress(t_tgt_posintT, err_t)
             poscal[f'slope_T'], poscal[f'intercept_T'] = r[0], r[1]
             poscal[f'rvalue_T'], poscal[f'pvalue_T'] = r[2], r[3]
