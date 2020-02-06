@@ -1213,6 +1213,7 @@ class Petal(object):
         except Exception as e:
             print(f'petal._new_schedule exception: {e}')
             traceback.print_exc()
+            raise
 
     def _wait_while_moving(self):
         """Blocking implementation, to not send move tables while any positioners are
