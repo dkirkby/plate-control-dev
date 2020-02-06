@@ -211,7 +211,7 @@ class XYTest(PECS):
                 disable_unmatched = self.data.test_cfg['disable_unmatched']
             else:
                 disable_unmatched = True  # do disable by default
-        self.set_schedule_stats(enabled=True)
+        self.set_schedule_stats(enabled=self.schedule_stats)
         for i in range(self.data.ntargets):  # test loop over all test targets
             self.record_basic_move_data(i)  # for each target, record basics
             if i > 0:  # don't pause for the 1st target
