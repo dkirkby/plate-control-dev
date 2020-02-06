@@ -123,6 +123,8 @@ class PetalTransforms:
         # orthogonal rotation matrix
         self.R = Rxyz(alpha, beta, gamma)
         self.curved = curved
+        self.petal_alignment = {'Tx': Tx, 'Ty': Ty, 'Tz': Tz,
+                                'alpha': alpha, 'beta': beta, 'gamma': gamma}
 
     # %% QST transforms in 3D
     @staticmethod
