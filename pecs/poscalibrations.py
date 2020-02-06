@@ -44,7 +44,7 @@ class PosCalibrations(PECS):
         self.data.posids = self.posids
         self.data.pcids = self.pcids
         self.exp_setup()  # set up exposure ID and product directory
-        self.set_schedule_stats(enabled=True)
+        self.set_schedule_stats(enabled=self.schedule_stats)
 
     def collect_calib(self, posids):
         ret = self.ptlm.get_pos_vals(self.keys_collect, posids=posids)
