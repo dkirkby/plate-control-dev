@@ -15,9 +15,12 @@ path = "/data/focalplane/logs/kpno/20200203/00046362-arc_calibration-754_previou
 # set posids to apply calibrations, leave empty to apply to all
 posids = []
 calib = pd.read_pickle(path)['FIT']
-posids = set(posids) & set(calib.index) if posids else calib.index
 pecs = PECS(interactive=False)
-pecs.ptl_setup(pecs.pcids, posids=posids)
+if posids:
+    posids = set(posids) & set(calib.index)
+    pecs.ptl_setup(pecs.pcids, posids=posids)
+else:
+    posids = calib.index
 keys_fit = ['OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
             'LENGTH_R1', 'LENGTH_R2']  # initial values for fitting
 old, new = [], []
