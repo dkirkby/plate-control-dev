@@ -944,7 +944,7 @@ class Petal(object):
         It only saves a value."""
         if device_id not in self.posids | self.fidids:
             raise ValueError(f'{device_id} not in PTL{self.petal_id:02}')
-        accepted = self.states[uniqueid].store(key, value):
+        accepted = self.states[uniqueid].store(key, value)
         if accepted:
             if key.split('_')[0] in ['LENGTH', 'OFFSET', 'PHYSICAL']:
                 self.altered_calib_states.add(self.states[device_id])
