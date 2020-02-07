@@ -949,7 +949,7 @@ class Petal(object):
                     self.altered_states.add(self.states[uniqueid])
                 return 'SUCCESS, key %s, value %s' % (key, value)
             else:
-                return 'Invaid setting'
+                return 'Invaid setting, key %s, value %s' % (key, value)
         else:
             return 'Not in petal' 
 
