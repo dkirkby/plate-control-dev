@@ -210,11 +210,15 @@ class FPTestData:
             #  printfunc(line.decode('utf_8'))  # convert byte str to str
         printfunc(f'=== End of config file dump: {config.filename} ===')
 
-    def _mp(self, target, iterables, n_threads_max=32, mp=True):
+    def _mp(self, target, iterables, n_threads_max=32,
+            zip_args=False, mp=True):
         '''input iterables is a list of iterables'''
         if mp:
             n_threads = min(n_threads_max, 2*multiprocessing.cpu_count())
-            args_list = list(product(*iterables))
+            if zip:
+                args_list = list(zip(*iterables))
+            else:
+                args_list = list(product(*iterables))
             self.print(f'Runing MP with {n_threads} threads '
                        f'on node of {multiprocessing.cpu_count()} cores for '
                        f'{len(args_list)} jobs...')
@@ -820,21 +824,34 @@ class CalibrationData(FPTestData):
                                  names=['label', 'field'], sort=False)
         if self.calibdf.index.name != 'DEVICE_ID':
             self.calibdf.index.name = 'DEVICE_ID'
-            self.logger.info('calibdf index is not DEVICE_ID by default!')
+            self.print('calibdf index is not DEVICE_ID by default!')
 
     def generate_report(self):
         pass
 
     def make_arc_plots(self, make_binder=True, mp=True):
         self.print(f'Making arc plots for {len(self.posids)} positioners...')
-        self._mp(self.make_arc_plot, [self.posids], mp=mp)
+        posmovs = [self.movedf.xs(posid, level='DEVICE_ID')
+                   for posid in self.posids]
+        poscals = [self.calibdf.loc[posid, 'FIT'] for posid in self.posids]
+        paths = [os.path.join(
+                     self.dirs[self.movedf.xs(
+                         posid, level='DEVICE_ID')['PETAL_LOC'].values[0]],
+                     f'{posid}-{pc.filename_timestamp_str(self.t_f)}'
+                     '-arc_calib.pdf')
+                 for posid in self.posids]
+        self._mp(self.make_arc_plot, [posmovs, poscals, paths],
+                 zip_args=True, mp=mp)
         if make_binder:
             self._mp(self.make_arc_plot_binder, [self.pcids], mp=mp)
 
-    def make_arc_plot(self, posid):
-        posmov = self.movedf.xs(posid, level='DEVICE_ID')
-        poscal = self.calibdf.loc[posid, 'FIT']
-        pcid = posmov['PETAL_LOC'].values[0]
+    @staticmethod
+    def make_arc_plot(posmov, poscal, path, timestamp=None):
+        if not timestamp:  # datetime object
+            timestamp = pc.now()
+        # posmov = self.movedf.xs(posid, level='DEVICE_ID')
+        # poscal = self.calibdf.loc[posid, 'FIT']
+        posid, pcid = poscal.name, posmov['PETAL_LOC'].values[0]
         fig = plt.figure(figsize=(14, 8))
         for plot_row, axis in enumerate(['T', 'P']):
             other_axis = 'P' if axis == 'T' else 'T'
@@ -852,7 +869,7 @@ class CalibrationData(FPTestData):
             ax = plt.subplot(2, 3, plot_row * 3 + 1)
             ang_i = np.degrees(np.arctan2(  # initial measured angle in deg
                 xy[0, 1] - ctr[1], xy[0, 0] - ctr[0]))
-            ang_f = ang_i + exp.diff().sum()  # final measured angle in deg
+            ang_f = ang_i + exp.diff().abs().sum()  # final measured ang in deg
             if ang_i > ang_f:
                 ang_f += 360
             ref_arc_ang = np.radians(np.append(  # 5 deg step
@@ -906,7 +923,7 @@ class CalibrationData(FPTestData):
             plt.axis('equal')
             # column 2: angle deviation as a function of target angle
             plt.subplot(2, 3, plot_row * 3 + 2)
-            err_ang = exp - tgt
+            err_ang = posmov.xs(axis, level='axis')[f'err_posint{axis}']
             plt.plot(tgt, err_ang, 'ko-')  # measured points
             plt.plot(tgt[0], err_ang[0], 'ro')  # 1st measured pt in red
             for i in tgt.index:
@@ -934,12 +951,9 @@ class CalibrationData(FPTestData):
             plt.grid(True)
             yr = err_rad.max() - err_rad.min()  # nan friendly
             plt.ylim(top=plt.ylim()[1]+0.1*yr)
-        fig.suptitle(f'Arc Calibration {pc.timestamp_str(self.t_i)} '
+        fig.suptitle(f'Arc Calibration {pc.timestamp_str(timestamp)} '
                      f'Positioner {posid}')
         fig.tight_layout(pad=0.5, rect=[0, 0, 1, 0.95])
-        path = os.path.join(
-            self.dirs[pcid],
-            f'{posid}-{pc.filename_timestamp_str(self.t_i)}-arc_calib.pdf')
         plt.close(fig)
         fig.savefig(path, bbox_inches='tight')
 
@@ -986,11 +1000,6 @@ if __name__ == '__main__':
         print(f'Re-processing FP test data:\n{path}')
         with open(os.path.join(paths[0]), 'rb') as h:
             data = pickle.load(h)
-        # paths = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data_arc.pkl.gz')
-        # assert len(paths) == 1, paths
-        # path = paths[0]
-        # measured = pd.read_pickle(path)
-        # data.data_arc = measured
         calib_type = data.mode.replace('_calibration', '')
         measured = data.data_arc if calib_type == 'arc' else data.data_grid
         from poscalibrationfits import PosCalibrationFits
