@@ -234,13 +234,11 @@ class FPTestData:
             #     p.join()
             pool, n_running = [], 0
             self.print(
-                'WARNING: Upgrade to python 3.7 and matplotlib 3 '
-                'ASAP! Mutiprocessing.Process.close() not '
-                'available in <= python 3.6. You may get '
-                'OSError [24] from too many open files due to '
-                'matplltlib 2 bug of leaving redundant open font '
-                'handles behind and not closing Process threads '
-                'properly!')
+                'WARNING: Upgrade to python 3.7 and matplotlib 3 ASAP! '
+                'Mutiprocessing.Process.close() not available in '
+                'python <= 3.6. You may get OSError [24] too many open files '
+                'due to matplltlib 2 bug of leaving redundant open font '
+                'handles behind and not closing Process threads properly!')
             for args in tqdm(args_list):
                 np = Process(target=target, args=args)
                 if len(pool) == n_threads_max:  # all cores occupied, wait
@@ -829,17 +827,19 @@ class CalibrationData(FPTestData):
     def generate_report(self):
         pass
 
-    def make_arc_plots(self, make_binder=True, mp=True):
-        self.print(f'Making arc plots for {len(self.posids)} positioners...')
+    def make_arc_plots(self, make_binder=True, mp=True, posids=None):
+        if not posids:
+            posids = self.posids
+        self.print(f'Making arc plots for {len(posids)} positioners...')
         posmovs = [self.movedf.xs(posid, level='DEVICE_ID')
-                   for posid in self.posids]
-        poscals = [self.calibdf.loc[posid, 'FIT'] for posid in self.posids]
+                   for posid in posids]
+        poscals = [self.calibdf.loc[posid, 'FIT'] for posid in posids]
         paths = [os.path.join(
                      self.dirs[self.movedf.xs(
                          posid, level='DEVICE_ID')['PETAL_LOC'].values[0]],
                      f'{posid}-{pc.filename_timestamp_str(self.t_f)}'
                      '-arc_calib.pdf')
-                 for posid in self.posids]
+                 for posid in posids]
         self._mp(self.make_arc_plot, [posmovs, poscals, paths],
                  zip_args=True, mp=mp)
         if make_binder:
@@ -867,11 +867,9 @@ class CalibrationData(FPTestData):
             xy = mea_xy[mea_xy.notnull().any(axis=1)].values
             # column 1: cicle/arc plot in xy space
             ax = plt.subplot(2, 3, plot_row * 3 + 1)
-            ang_i = np.degrees(np.arctan2(  # initial measured angle in deg
-                xy[0, 1] - ctr[1], xy[0, 0] - ctr[0]))
-            ang_f = ang_i + exp.diff().abs().sum()  # final measured ang in deg
-            if ang_i > ang_f:
-                ang_f += 360
+            ang_i = np.degrees(np.arctan2(*(xy[0] - ctr)[::-1]))
+            ang_f = np.degrees(np.arctan2(*(xy[-1] - ctr)[::-1]))
+            ang_f += 360 * (ang_i > ang_f)
             ref_arc_ang = np.radians(np.append(  # 5 deg step
                 np.arange(ang_i, ang_f, 5), ang_f))  # last point at final
             ref_arc_x = rad * np.cos(ref_arc_ang) + ctr[0]
@@ -992,7 +990,7 @@ class CalibrationData(FPTestData):
 
 if __name__ == '__main__':
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    expids = [46364]
+    expids = [46788]
     for expid in expids:
         paths = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data.pkl')
         assert len(paths) == 1, paths
@@ -1000,14 +998,18 @@ if __name__ == '__main__':
         print(f'Re-processing FP test data:\n{path}')
         with open(os.path.join(paths[0]), 'rb') as h:
             data = pickle.load(h)
+        # data.make_arc_plots(make_binder=False, mp=False, posids=['M06612'])
         calib_type = data.mode.replace('_calibration', '')
-        measured = data.data_arc if calib_type == 'arc' else data.data_grid
+        # measured = data.data_arc if calib_type == 'arc' else data.data_grid
+        path = os.path.join(os.path.dirname(path), 'data_arc.pkl.gz')
+        measured = pd.read_pickle(path)
+        data.data_arc = measured
         from poscalibrationfits import PosCalibrationFits
         fit = PosCalibrationFits(use_doslib=True)
         data.movedf, data.calib_fit = getattr(
             fit, f'calibrate_from_{calib_type}_data')(measured)
         data.write_calibdf(data.calib_old, data.calib_fit)
-        data.dump_as_one_pickle()
+        # data.dump_as_one_pickle()
         data.generate_data_products()
         # from poscalibrationfits import PosCalibrationFits
         # path = os.path.join(os.path.dirname(paths[0]), 'data_arc.pkl.gz')
