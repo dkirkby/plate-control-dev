@@ -21,6 +21,7 @@ if posids:
     pecs.ptl_setup(pecs.pcids, posids=posids)
 else:
     posids = calib.index
+print(f'Setting calibration for {len(posids)} positioners using file: {path}')
 keys_fit = ['OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
             'LENGTH_R1', 'LENGTH_R2']  # initial values for fitting
 old, new = [], []
