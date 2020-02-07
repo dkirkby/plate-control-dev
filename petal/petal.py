@@ -942,12 +942,14 @@ class Petal(object):
         """Sets a single value to a positioner or fiducial. In the case of a fiducial, note that
         this call does NOT turn the fiducial physically on or off. It only saves a value."""
         if uniqueid in self.posids.union(self.fidids):
-            self.states[uniqueid].store(key,value)
-            if key.split('_')[0] in ['LENGTH','OFFSET','PHYSICAL']:
-                self.altered_calib_states.add(self.states[uniqueid])
+            if self.states[uniqueid].store(key,value)
+                if key.split('_')[0] in ['LENGTH','OFFSET','PHYSICAL']:
+                    self.altered_calib_states.add(self.states[uniqueid])
+                else:
+                    self.altered_states.add(self.states[uniqueid])
+                return 'SUCCESS, key %s, value %s' % (key, value)
             else:
-                self.altered_states.add(self.states[uniqueid])
-            return 'SUCCESS, key %s, value %s' % (key, value)
+                return 'Invaid setting'
         else:
             return 'Not in petal' 
 
