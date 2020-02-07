@@ -186,7 +186,12 @@ class PosCalibrationFits:
                 x[i, 0], x[i, 1], x[i+1, 0], x[i+1, 1], ctr[0], ctr[1])
         return area
 
-    def calibrate_from_arc_data(self, data):
+    @staticmethod
+    def regularise_err(err):
+        err[0] = (err[0] + 180) % 360 - 180  # put into [-180, 180]
+        return np.degrees(np.unwrap(np.radians(err)))
+
+    def calibrate_from_arc_data(self, data, posids=None):
         """
         input data is a pd dataframe containing targets and FVC measurements
         for all petals with
@@ -214,7 +219,8 @@ class PosCalibrationFits:
                         radius_T, radius_P, residuals_T, residuals_P,
                         GEAR_RATIO_T, GEAR_RATIO_P
         """
-        posids = data.index.get_level_values('DEVICE_ID').unique()
+        if not posids:
+            posids = data.index.get_level_values('DEVICE_ID').unique()
         self.logger.debug(f'Analysing arc calibration measurement data...')
         self.init_posmodels(posids=posids)  # double check all posmodels exist
         cols = ['tgt_flatX', 'tgt_flatY', 'tgt_Q', 'tgt_S',
@@ -285,11 +291,12 @@ class PosCalibrationFits:
             p_mea_poslocT = np.degrees(np.arctan2(xy[1], xy[0]))  # float
             t_tgt_posintT = data.loc[idx['T', posmea['T'].index, posid],
                                      'tgt_posintT']  # length L
-            p_tgt_posintP = data.loc[idx['P', posmea['P'].index, posid],
-                                     'tgt_posintP']  # length M
+            p_tgt_posintTP = data.loc[idx['P', posmea['P'].index, posid],
+                                      ['tgt_posintT', 'tgt_posintP']]  # len M
+            p_tgt_posintP = p_tgt_posintTP['tgt_posintP']
             # subtract constant target posintT of phi arc
             poscal['OFFSET_T'] = PosTransforms._centralize_angular_offset(
-                p_mea_poslocT - p_tgt_posintP.values[0])
+                p_mea_poslocT - p_tgt_posintTP['tgt_posintT'].values[0])
             # calculate offset P still using phi arc
             xy = posmea['P'].values - poscal['centre_P']  # phi arc wrt phi ctr
             angles = np.degrees(np.arctan2(xy[:, 1], xy[:, 0]))  # 1 x M array
@@ -309,7 +316,8 @@ class PosCalibrationFits:
             data.loc[idx['P', posmea['P'].index, posid],
                      'exp_posintT'] = p_mea_poslocT - poscal['OFFSET_T']
             data.loc[idx['P', posmea['P'].index, posid], 'exp_posintP'] = \
-                p_exp_posintP = p_exp_posintP_wrapped % 360
+                p_exp_posintP = np.degrees(np.unwrap(np.radians(
+                    p_exp_posintP_wrapped)))
             # done with phi arc, transform measured theta arc to posintTP
             trans.alt_override = True  # enable override in pos transforms
             trans.alt.update({key: poscal[key] for key in keys_fit})
@@ -338,20 +346,26 @@ class PosCalibrationFits:
                 np.diff(t_exp_posintT_wrapped) / np.diff(t_tgt_posintT))
             poscal['GEAR_CALIB_P'] = ratio_P = np.median(
                 np.abs(np.diff(p_exp_posintP)) / np.diff(p_tgt_posintP))
-            for c in ['flatX', 'flatY', 'Q', 'S']:  # calculate errors
-                data[f'err_{c}'] = data[f'exp_{c}'] - data[f'mea_{c}']
-            for c in ['posintT', 'posintP']:  # calculate errors
-                data[f'err_{c}'] = (data[f'exp_{c}'] - data[f'tgt_{c}'])%360
+            # calcualte angle errors, theta arc first
+            data.loc[idx['T', posmea['T'].index, posid], 'err_posintT'] = \
+                err_t = self.regularise_err(t_exp_posintT - t_tgt_posintT)
+            data.loc[idx['T', :, posid], 'err_posintP'] = (
+                data.loc[idx['T', :, posid], 'exp_posintP']
+                - data.loc[idx['T', :, posid], 'tgt_posintP'])
+            # phi arc
+            data.loc[idx['P', :, posid], 'err_posintT'] = (
+                data.loc[idx['P', :, posid], 'exp_posintT']
+                - data.loc[idx['P', :, posid], 'tgt_posintT'])
+            data.loc[idx['P', posmea['P'].index, posid], 'err_posintP'] = \
+                err_p = self.regularise_err(p_exp_posintP - p_tgt_posintP)
             # area bounded by arc points, good indication of movement
             poscal['area_T'] = self.polygon_area(posmea['T'].values)
             poscal['area_P'] = self.phi_area(posmea['P'].values,
                                              poscal['centre_P'])
             # linear regression for the second column plots
-            err_p = p_exp_posintP - p_tgt_posintP
             r = linregress(p_tgt_posintP, err_p)
             poscal[f'slope_P'], poscal[f'intercept_P'] = r[0], r[1]
             poscal[f'rvalue_P'], poscal[f'pvalue_P'] = r[2], r[3]
-            err_t = t_exp_posintT - t_tgt_posintT
             r = linregress(t_tgt_posintT, err_t)
             poscal[f'slope_T'], poscal[f'intercept_T'] = r[0], r[1]
             poscal[f'rvalue_T'], poscal[f'pvalue_T'] = r[2], r[3]
@@ -361,6 +375,8 @@ class PosCalibrationFits:
                     self.logger.warning(
                         f'{posid}: GEAR_CALIB_{arc} = {ratio:.6f}',
                         pcid=self.petal_locs[posid])
+        for c in ['flatX', 'flatY', 'Q', 'S']:  # calculate errors
+            data[f'err_{c}'] = data[f'exp_{c}'] - data[f'mea_{c}']
         return data, pd.DataFrame(poscals, index=posids)
 
     def calibrate_from_grid_data(self, data):
