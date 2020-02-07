@@ -237,7 +237,7 @@ class FPTestData:
                 'WARNING: Upgrade to python 3.7 and matplotlib 3 ASAP! '
                 'Mutiprocessing.Process.close() not available in '
                 'python <= 3.6. You may get OSError [24] too many open files '
-                'due to matplltlib 2 bug of leaving redundant open font '
+                'due to matplotlib 2 bug of leaving redundant open font '
                 'handles behind and not closing Process threads properly!')
             for args in tqdm(args_list):
                 np = Process(target=target, args=args)
@@ -868,7 +868,10 @@ class CalibrationData(FPTestData):
             # column 1: cicle/arc plot in xy space
             ax = plt.subplot(2, 3, plot_row * 3 + 1)
             ang_i = np.degrees(np.arctan2(*(xy[0] - ctr)[::-1]))
-            ang_f = np.degrees(np.arctan2(*(xy[-1] - ctr)[::-1]))
+            np.degrees(np.unwrap(np.radians(exp[exp.notnull()])))
+            ang_f = ang_i + np.sum(np.abs(
+                (np.diff(np.degrees(np.unwrap(np.radians(exp[exp.notnull()]))))
+                + 360) % 360))
             ang_f += 360 * (ang_i > ang_f)
             ref_arc_ang = np.radians(np.append(  # 5 deg step
                 np.arange(ang_i, ang_f, 5), ang_f))  # last point at final
@@ -882,8 +885,8 @@ class CalibrationData(FPTestData):
             plt.plot(ctr[0], ctr[1], 'k+')  # axis centre black +
             plt.plot(line_0_x, line_0_y, 'k--')  # zero line of posintTP
             plt.plot(ref_arc_x, ref_arc_y, 'b-')  # ref arc at 5 deg spacing
-            plt.plot(xy[:, 0], xy[:, 1], 'ko')  # measured pts in black
-            plt.plot(xy[0, 0], xy[0, 1], 'ro')  # 1st measured pt red
+            plt.plot(mea_xy['mea_flatX'], mea_xy['mea_flatY'], 'ko')
+            plt.plot(mea_xy['mea_flatX'][0], mea_xy['mea_flatY'][0], 'ro')
             txt_ang_0 = np.mod(ang_0+360, 360)
             txt_ang_0 = (txt_ang_0-180 if 90 < txt_ang_0 < 270
                          else txt_ang_0)
@@ -896,11 +899,12 @@ class CalibrationData(FPTestData):
             txt_0_xy = line_0_ctr + np.sign(np.abs(txt_ang_0-270)-90) * shift
             plt.text(txt_0_xy[0], txt_0_xy[1], txt_0, fontsize=12,
                      rotation=txt_ang_0, ha='center', va='center')
-            for i, pt in enumerate(xy):
-                ang_xy = np.arctan2(pt[1]-ctr[1], pt[0]-ctr[0])  # in rad
-                txt_x = ctr[0] + rad*0.85*np.cos(ang_xy)
-                txt_y = ctr[1] + rad*0.85*np.sin(ang_xy)
-                plt.text(txt_x, txt_y, f'{i}', ha='center', va='center')
+            for i, pt in mea_xy.iterrows():
+                if not pt.isnull().any():
+                    ang_xy = np.arctan2(pt[1]-ctr[1], pt[0]-ctr[0])  # in rad
+                    txt_x = ctr[0] + rad*0.85*np.cos(ang_xy)
+                    txt_y = ctr[1] + rad*0.85*np.sin(ang_xy)
+                    plt.text(txt_x, txt_y, f'{i}', ha='center', va='center')
             if axis == 'T':
                 calib_vals_txt = ''
                 calib_keys = [
@@ -990,7 +994,7 @@ class CalibrationData(FPTestData):
 
 if __name__ == '__main__':
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    expids = [46788]
+    expids = [46364]  # 46364, 46788, 47557
     for expid in expids:
         paths = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data.pkl')
         assert len(paths) == 1, paths
@@ -998,17 +1002,17 @@ if __name__ == '__main__':
         print(f'Re-processing FP test data:\n{path}')
         with open(os.path.join(paths[0]), 'rb') as h:
             data = pickle.load(h)
-        # data.make_arc_plots(make_binder=False, mp=False, posids=['M06612'])
-        calib_type = data.mode.replace('_calibration', '')
-        # measured = data.data_arc if calib_type == 'arc' else data.data_grid
-        path = os.path.join(os.path.dirname(path), 'data_arc.pkl.gz')
-        measured = pd.read_pickle(path)
-        data.data_arc = measured
-        from poscalibrationfits import PosCalibrationFits
-        fit = PosCalibrationFits(use_doslib=True)
-        data.movedf, data.calib_fit = getattr(
-            fit, f'calibrate_from_{calib_type}_data')(measured)
-        data.write_calibdf(data.calib_old, data.calib_fit)
+        data.make_arc_plots(make_binder=False, mp=False, posids=['M03037'])
+        # calib_type = data.mode.replace('_calibration', '')
+        # # measured = data.data_arc if calib_type == 'arc' else data.data_grid
+        # path = os.path.join(os.path.dirname(path), 'data_arc.pkl.gz')
+        # measured = pd.read_pickle(path)
+        # data.data_arc = measured
+        # from poscalibrationfits import PosCalibrationFits
+        # fit = PosCalibrationFits(use_doslib=True)
+        # data.movedf, data.calib_fit = getattr(
+        #     fit, f'calibrate_from_{calib_type}_data')(measured)
+        # data.write_calibdf(data.calib_old, data.calib_fit)
         # data.dump_as_one_pickle()
         data.generate_data_products()
         # from poscalibrationfits import PosCalibrationFits
