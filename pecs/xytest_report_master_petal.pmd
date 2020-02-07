@@ -15,7 +15,7 @@ grades_pc = data.gradedf[data.gradedf['PCID']==pcid]
 posids_grade = dict()
 for grade in pc.grades:
     mask = grades_pc['grade'] == grade
-    posids_grade[grade] = sorted(data.gradedf[mask].index)
+    posids_grade[grade] = sorted(grades_pc[mask].index)
 ```
 
 ### PC``<%=0%><%=pcid%>``
