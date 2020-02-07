@@ -215,7 +215,7 @@ class FPTestData:
         '''input iterables is a list of iterables'''
         if mp:
             n_threads = min(n_threads_max, 2*multiprocessing.cpu_count())
-            if zip:
+            if zip_args:
                 args_list = list(zip(*iterables))
             else:
                 args_list = list(product(*iterables))
@@ -994,7 +994,7 @@ class CalibrationData(FPTestData):
 
 if __name__ == '__main__':
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    expids = [46364]  # 46364, 46788, 47557
+    expids = [47559]  # 46364, 46788, 47557
     for expid in expids:
         paths = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data.pkl')
         assert len(paths) == 1, paths
@@ -1002,7 +1002,7 @@ if __name__ == '__main__':
         print(f'Re-processing FP test data:\n{path}')
         with open(os.path.join(paths[0]), 'rb') as h:
             data = pickle.load(h)
-        data.make_arc_plots(make_binder=False, mp=False, posids=['M03037'])
+        # data.make_arc_plots(make_binder=False, mp=False, posids=['M03037'])
         # calib_type = data.mode.replace('_calibration', '')
         # # measured = data.data_arc if calib_type == 'arc' else data.data_grid
         # path = os.path.join(os.path.dirname(path), 'data_arc.pkl.gz')
@@ -1014,7 +1014,9 @@ if __name__ == '__main__':
         #     fit, f'calibrate_from_{calib_type}_data')(measured)
         # data.write_calibdf(data.calib_old, data.calib_fit)
         # data.dump_as_one_pickle()
-        data.generate_data_products()
+        data.generate_report()
+        data.make_archive()
+        # data.generate_data_products()
         # from poscalibrationfits import PosCalibrationFits
         # path = os.path.join(os.path.dirname(paths[0]), 'data_arc.pkl.gz')
         # data_arc = pd.read_pickle(path)
