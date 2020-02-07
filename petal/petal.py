@@ -938,20 +938,19 @@ class Petal(object):
         else:
             return 'Not in petal'
 
-    def set_posfid_val(self, uniqueid, key, value):
-        """Sets a single value to a positioner or fiducial. In the case of a fiducial, note that
-        this call does NOT turn the fiducial physically on or off. It only saves a value."""
-        if uniqueid in self.posids.union(self.fidids):
-            if self.states[uniqueid].store(key,value)
-                if key.split('_')[0] in ['LENGTH','OFFSET','PHYSICAL']:
-                    self.altered_calib_states.add(self.states[uniqueid])
-                else:
-                    self.altered_states.add(self.states[uniqueid])
-                return 'SUCCESS, key %s, value %s' % (key, value)
+    def set_posfid_val(self, device_id, key, value):
+        """Sets a single value to a positioner or fiducial. In the case of a 
+        fiducial, this call does NOT turn the fiducial physically on or off.
+        It only saves a value."""
+        if device_id not in self.posids | self.fidids:
+            raise ValueError(f'{device_id} not in PTL{self.petal_id:02}')
+        accepted = self.states[uniqueid].store(key, value):
+        if accepted:
+            if key.split('_')[0] in ['LENGTH', 'OFFSET', 'PHYSICAL']:
+                self.altered_calib_states.add(self.states[device_id])
             else:
-                return 'Invaid setting, key %s, value %s' % (key, value)
-        else:
-            return 'Not in petal' 
+                self.altered_states.add(self.states[device_id])
+        return accepted
 
     def get_pbdata_val(self, key):
         """Requests data from petalbox using the pbget method.
