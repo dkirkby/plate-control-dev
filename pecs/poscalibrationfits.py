@@ -139,7 +139,7 @@ class PosCalibrationFits:
         return ctr, calc_radius(ctr), radial_variations(ctr)
 
     @staticmethod
-    def fit_circle(x, ctr0=None, exp=1, r_bounds=(2.6, 3.4)):
+    def fit_circle(x, ctr0=None, exp=1.1, r_bounds=(2.6, 3.4)):
         # input x is a N x 2 array for (x, y) points in 2D
         # example data: x = np.array([[1, 0], [2, 1], [3, 0]])
 
@@ -256,12 +256,11 @@ class PosCalibrationFits:
                 posmea[arc] = posmeaarc[posmeaarc.notnull().all(axis=1)]
                 if len(posmea[arc]) < 3:  # require at least 3 points remaining
                     return None
-                ctr0 = ((state._val['OFFSET_X'], state._val['OFFSET_Y'])
-                        if arc == 'T' else None)  # initial guess for centre
-                exp = 1.5 if arc == 'T' else 1.1
+                # ctr0 = ((state._val['OFFSET_X'], state._val['OFFSET_Y'])
+                #         if arc == 'T' else None)  # initial guess for centre
+                # exp = 1.5 if arc == 'T' else 1.1
                 r_bounds = (0.1, 5.5) if arc == 'T' else (2.6, 3.5)
-                return self.fit_circle(posmea[arc].values, ctr0=ctr0,
-                                       exp=exp, r_bounds=r_bounds)
+                return self.fit_circle(posmea[arc].values, r_bounds=r_bounds)
 
             fits = [fit_arc(arc) for arc in ['T', 'P']]
             if None in fits:
