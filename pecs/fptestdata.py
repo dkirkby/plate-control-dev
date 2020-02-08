@@ -783,6 +783,9 @@ class XYTestData(FPTestData):
             h.write(posid_section)
         subprocess.call(['pweave', 'xytest_report.pmd',
                          '-f', 'pandoc2html', '-o', path_output])
+        self.print('WARNING: If you saw "ERROR:root:Invalid alias" above, '
+                   'it is caused by outdated ipython. Update ipython to the '
+                   'latest version ASAP!')
 
     def generate_data_products(self):
         self.read_telemetry()
