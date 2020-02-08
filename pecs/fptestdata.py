@@ -37,7 +37,7 @@ import psycopg2
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
-plt.switch_backend('Agg')
+# plt.switch_backend('pdf')  # don't switch backend, pweave depends on TKAgg
 # plt.ioff()  # turn off interactive mode, doesn't work in matplotlib 2
 plt.rcParams.update({'font.family': 'serif',
                      'mathtext.fontset': 'cm'})
@@ -349,7 +349,6 @@ class FPTestData:
         fig.savefig(os.path.join(self.dir, 'figures',
                                  f'posfid_temp{suffix}.pdf'),
                     bbox_inches='tight')
-        plt.close(fig)
 
     @staticmethod
     def add_hist_annotation(ax):
@@ -582,7 +581,6 @@ class XYTestData(FPTestData):
             plt.close(fig)
             if hasattr(self, 'logger'):
                 self.loggers[pcid].debug(f'xyplot saved: {path.format(n)}')
-
     def make_summary_plot_binder(self, pcid, n):
         template = os.path.join(self.dirs[pcid],
                                 f'*_xyplot_submove_{n}.pdf')
@@ -628,7 +626,6 @@ class XYTestData(FPTestData):
         fig.savefig(os.path.join(self.dir, 'figures',
                                  f'grade_distribution{suffix}.pdf'),
                     bbox_inches='tight')
-        plt.close(fig)
         return grade_counts
 
     def plot_error_dist(self, pcid=None, grade=None,
@@ -706,7 +703,6 @@ class XYTestData(FPTestData):
         fig.savefig(os.path.join(self.dir, 'figures',
                                  f'error_distribution{suffix1}{suffix2}.pdf'),
                     bbox_inches='tight')
-        plt.close(fig)
 
     def plot_error_heatmaps(self, pcid, outliers=None):
         # load nominal theta centres for plotting in local ptlXYZ
@@ -755,9 +751,8 @@ class XYTestData(FPTestData):
         # cbar_ax = fig.add_axes([0.91, 0.225, 0.01, 0.555])
         # fig.colorbar(hm, cax=cbar_ax)
         fig.savefig(os.path.join(self.dir, 'figures',
-                                 f'{pcid}_error_heatmaps.pdf'),
+                                 f'error_heatmaps_pc{pcid:02}.pdf'),
                     bbox_inches='tight')
-        plt.close(fig)
 
     def generate_report(self):
         # define input and output paths for pweave
@@ -998,7 +993,7 @@ class CalibrationData(FPTestData):
 
 if __name__ == '__main__':
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    expids = [47559]  # 46364, 46788, 47557, 47559
+    expids = [47559, 47562]  # 46364, 46788, 47557, 47559
     for expid in expids:
         paths = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data.pkl')
         assert len(paths) == 1, paths
@@ -1018,9 +1013,9 @@ if __name__ == '__main__':
         #     fit, f'calibrate_from_{calib_type}_data')(measured)
         # data.write_calibdf(data.calib_old, data.calib_fit)
         # data.dump_as_one_pickle()
-        data.generate_report()
+        # data.generate_report()
         # data.make_archive()
-        # data.generate_data_products()
+        data.generate_data_products()
         # from poscalibrationfits import PosCalibrationFits
         # path = os.path.join(os.path.dirname(paths[0]), 'data_arc.pkl.gz')
         # data_arc = pd.read_pickle(path)
