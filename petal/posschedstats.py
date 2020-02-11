@@ -14,6 +14,16 @@ class PosSchedStats(object):
     """Collects statistics from runs of the PosSchedule.
     """
     def __init__(self):
+        self._init_data_structures()
+        self.clear_cache_after_save_by_append = True
+        self.filename_suffix = ''
+        self.blank_str = '-'
+    
+    @property
+    def latest(self):
+        return self.schedule_ids[-1]
+    
+    def _init_data_structures(self):
         self.schedule_ids = []
         self.collisions = {}
         self.unresolved = {}
@@ -21,7 +31,6 @@ class PosSchedStats(object):
         self.unresolved_sweeps = {}
         self.final_checked_collision_pairs = {}
         self.strings = {'method':[]}
-        self.blank_str = '-'
         self.numbers = {'n pos':[],
                         'n requests':[],
                         'n requests accepted':[],
@@ -35,11 +44,7 @@ class PosSchedStats(object):
                         'request + schedule calc time':[],
                         'expert_add_table calc time':[],
                         }
-        self.filename_suffix = ''
-    
-    @property
-    def latest(self):
-        return self.schedule_ids[-1]
+        self.latest_saved_row = None
     
     def register_new_schedule(self, schedule_id, num_pos):
         """Register a new schedule object to track statistics of.
@@ -253,16 +258,25 @@ class PosSchedStats(object):
         file.seek(0)  # go back to the beginning after finishing write
         return pd.read_csv(file)  # returns a pandas dataframe
 
-    def save(self, path=None, mode='w', append_footers=False):
-        """Saves stats results to disk. See method generate_table() for
-        explanation of the optional append_footers argument.
+    def save(self, path=None, mode='w'):
+        """Saves stats results to disk.
         """
         if path is None:
             suffix = str(self.filename_suffix)
             suffix = '_' + suffix if suffix else ''
             filename = f'{pc.filename_timestamp_str()}_schedstats{suffix}.csv'
             path = os.path.join(pc.dirs['temp_files'], filename)
-        self.generate_table(append_footers).to_csv(path, mode=mode)
+        include_headers = True if mode == 'w' or not os.path.exists(path) else False
+        include_footers = False if mode == 'a' else True
+        pd = self.generate_table(append_footers=include_footers)
+        if mode == 'a':
+            start_row = 0 if self.latest_saved_row == None else self.latest_saved_row + 1
+            n_rows_to_save = len(pd) - start_row
+            self.latest_saved_row = len(pd) - 1 # placed intentionally before the tail operation
+            pd = pd.tail(n_rows_to_save)
+        pd.to_csv(path, mode=mode, header=include_headers, index=False)
+        if mode == 'a' and self.clear_cache_after_save_by_append:
+            self._init_data_structures()
 
     @staticmethod
     def found_but_not_resolved(found, resolved):

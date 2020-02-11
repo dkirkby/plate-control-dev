@@ -74,6 +74,7 @@ for pos_params in pos_param_sequence:
     ptl.limit_radius = None
     if ptl.schedule_stats:
         ptl.schedule_stats.filename_suffix = stats_filename_suffix
+        ptl.schedule_stats.clear_cache_after_save_by_append = False
     if should_animate:
         if animation_foci == 'colliding':
             ptl.collider.animate_colliding_only = True
@@ -124,7 +125,7 @@ for pos_params in pos_param_sequence:
             else:
                 ptl.schedule_send_and_execute_moves(anticollision=anticollision)
     if ptl.schedule_stats:
-        ptl.schedule_stats.save(append_footers=True)
+        ptl.schedule_stats.save()
     if should_animate:
         ptl.stop_gathering_frames()
         print('Generating animation (this can be quite slow)...')
