@@ -13,10 +13,10 @@ import harness_constants as hc
 import sequences
 
 # input parameters
-num_sets_to_make = 100
+num_sets_to_make = 1000
 posparams_id = 30001
 posparams = sequences._read_data(data_id=posparams_id)
-posids = {'M04151','M03976','M04409','M04964','M02333','M04415','M04285'} # 'all' for all posids in posparams, otherwise a set of selected ones
+posids =  'all' # 'all' for all posids in posparams, otherwise a set of selected ones
 
 # initialize a poscollider instance (for fair target checking)
 collider = poscollider.PosCollider()
@@ -74,7 +74,7 @@ for i in range(num_sets_to_make):
     all_targets.append(targets_posXY)
     
 # save set files
-petal_id = 37 #posparams_id - 10000 # quick hack, assuming the "add 10000" to id rule from "generate_request_sets_for_posparams.py" applies
+petal_id = 3 #posparams_id - 10000 # quick hack, assuming the "add 10000" to id rule from "generate_request_sets_for_posparams.py" applies
 start_number = input('Enter starting file number (or nothing, to start at \'000\'). The petal id number will be prefixed. start = ')
 start_number = 0 if not start_number else int(start_number)
 next_filenumber = petal_id * 1000 + start_number # more id number hackery

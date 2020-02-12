@@ -26,11 +26,12 @@ print('\nNOW RUNNING CASE: ' + keepouts_suffix)
 # Selection of device location ids (which positioners on petal).
 # locations_all = 'all'
 locations_near_gfa = {309,328,348,368,389,410,432,454,474,492,508,521,329,349,369,390,411,433,455,475,493,509,522,532,330,350,370,391,412,434,456,476,494,510,523,533,351,371,392,413,435,457,477,495,511,524,372,393,414,436,458,512,525,415,437,459,526}
-device_loc_ids = 'all' # make the selection here
+subset7a = {89,79,78,99,87,98,88}
+device_loc_ids = subset7a #'all' # make the selection here
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
-pos_param_sequence_id = 'one real petal'
-move_request_sequence_id = '04000-04001' #'04000-04999' #'04108-04110'
+pos_param_sequence_id = 'PTL03_20200211'
+move_request_sequence_id = '03000-03009' #'04000-04999' #'04108-04110'
 stats_filename_suffix = str(move_request_sequence_id) + keepouts_suffix + ''
 
 # Other ids

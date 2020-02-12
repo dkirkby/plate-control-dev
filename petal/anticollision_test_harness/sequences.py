@@ -13,6 +13,7 @@ positioner_param_sequences = {0:[0],
                               'one real petal':[10004],
                               'two real petals':[10002,10003],
                               'many real petals':[10002,10003,10004,10005,10006,10007,10008,10009,10010,10011],
+                              'PTL03_20200211':[30001],
                              }
 
 move_request_sequences     = {0:[0],
@@ -31,6 +32,7 @@ move_request_sequences     = {0:[0],
                               '04000-04099':[i for i in range(4000,4100)],
                               '04000-04999':[i for i in range(4000,5000)],
                               '04108-04110':[i for i in range(4108,4111)],
+                              '03000-03009':[i for i in range(3000,3010)],
                              }
 
 def get_positioner_param_sequence(sequence_id, device_loc_ids='all'):
