@@ -21,6 +21,7 @@ pecs/set_calibrations.py -text
 pecs/xytest.py -text
 pecs/xytest_report_master.pmd -text
 pecs/xytest_report_master_petal.pmd -text
+petal/anticollision_test_harness/generate_posparam_set_from_dbdata.py -text
 petal/anticollision_test_harness/generate_posparam_sets.py -text
 petal/anticollision_test_harness/generate_posparam_sets_from_posconfigs.py -text
 petal/anticollision_test_harness/generate_request_sets.py -text
