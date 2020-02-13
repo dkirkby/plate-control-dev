@@ -97,6 +97,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
         self.posmodel = this_posmodel
         # allow alternate calibration values to temporarily override DB
         self.alt_override = False
+        self.alt = PosTransforms.alt.copy()
         self.getval = lambda varname: (  # varname is a string
             self.alt[varname] if self.alt_override
             else self.posmodel.state._val[varname])
