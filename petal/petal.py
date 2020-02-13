@@ -146,8 +146,6 @@ class Petal(object):
         self.petalbox_id = petalbox_id
         self.petal_id = int(petal_id)
         self.shape = shape
-        # 104 degrees is Eo phi, 142 is Ei phi
-        self.limit_angle =  104.0 #degree poslocP angle to reject targets. Set to False or None to skip check
         self._last_state = None
         self._canids_where_tables_were_just_sent = set()
         if fidids in ['',[''],{''}]: # check included to handle simulation cases, where no fidids argued
@@ -183,6 +181,7 @@ class Petal(object):
         self.init_ptltrans()
         self.init_posmodels(posids)
         self._init_collider(collider_file, anticollision)
+        self.limit_angle =  self.collider.Eo_phi #degree poslocP angle to reject targets. Set to False or None to skip check
 
         # fiducials setup
         self.fidids = {fidids} if isinstance(fidids,str) else set(fidids)

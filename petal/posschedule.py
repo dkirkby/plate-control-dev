@@ -588,7 +588,7 @@ class PosSchedule(object):
         Useful to avoid needed to worry about anticollision.
         '''
         if self.petal.limit_angle:
-            if target_poslocTP[1] < self.petal.limit_radius:
+            if target_poslocTP[1] < self.petal.limit_angle:
                 posmodel.clear_postmove_cleanup_cmds_without_executing()
                 self.petal.pos_flags[posmodel.posid] |= self.petal.exceeded_lims_bit
                 return True
