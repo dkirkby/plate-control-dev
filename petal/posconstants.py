@@ -123,7 +123,13 @@ nominals['PHYSICAL_RANGE_P'] = {'value': 190.0, 'tol':   50.0}
 nominals['GEAR_CALIB_T']     = {'value':   1.0, 'tol':    0.05}
 nominals['GEAR_CALIB_P']     = {'value':   1.0, 'tol':    0.05}
 
+# keepout envelope expansion parameter keys
+keepout_expansion_keys = ['KEEPOUT_EXPANSION_PHI_RADIAL',
+                          'KEEPOUT_EXPANSION_PHI_ANGULAR',
+                          'KEEPOUT_EXPANSION_THETA_RADIAL',
+                          'KEEPOUT_EXPANSION_THETA_ANGULAR']
 
+# performance grade letters
 grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
 
 
