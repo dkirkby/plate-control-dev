@@ -135,7 +135,7 @@ class PosState(object):
             self.log_fieldnames = (['TIMESTAMP'] + list(self._val.keys())
                                    + ['NOTE'])
             # used for storing specific notes in the next row written to log
-            self.next_log_notes = ['software initialization']
+            self.append_log_note('software initialization')
             # used for one time check whether need to make a new log file,
             # or whether log file headers have changed since last run
             self.log_unit_called_yet = False
@@ -144,13 +144,13 @@ class PosState(object):
             # used for storing specific notes in the next row written to log
             # log notes aren't recorded in DB :(
             # but we still need to 'collect' them
-            self.next_log_notes = ['']
 
         # reset some positioner values in the beginning
         if self.type == 'pos':
             self._val['MOVE_CMD'] = ''
             self._val['MOVE_VAL1'] = ''
             self._val['MOVE_VAL2'] = ''
+        self.clear_log_notes()
 
     def set_ptlid_from_pi(self, unit_id):
         ''' lookup petal id using unit_id for pos, fid from PositionerIndex '''
@@ -196,6 +196,7 @@ class PosState(object):
         # self.cdB = self.pDB.constantsDB.get_constants(
         #     snapshot='DESI', tag='CURRENT', group=group)[group][unit_id]
         self.unit_id = unit_id
+        self.clear_log_notes() # used here to initialize
 
     def load_from_cfg(self, unit_id=None):
         # do this here because used in 2 different places below
@@ -237,6 +238,7 @@ class PosState(object):
             #                f'device_type = {self.type}, path: {unit_fn}')
             self.conf = ConfigObj(unit_fn, unrepr=True, encoding='utf-8')
         self._val = self.conf.dict()
+        self.clear_log_notes() # used here to initialize
 
     def __str__(self):
         files = {'settings':self.conf.filename, 'log':self.log_path}
@@ -308,11 +310,11 @@ class PosState(object):
                             break
             with open(self.log_path, 'a', newline='') as csvfile: # now append a row of data
                 row = self._val.copy()
-                row.update({'TIMESTAMP':timestamp,'NOTE':str(self.next_log_notes)})
+                row.update({'TIMESTAMP':timestamp,'NOTE':str(self._next_log_notes)})
                 writer = csv.DictWriter(csvfile,fieldnames=self.log_fieldnames)
                 writer.writerow(row)
             self.curr_log_length += 1
-            self.next_log_notes = []
+            self.clear_log_notes()
             self.log_unit_called_yet = True # only need to check this the first time through
 
     @property
@@ -333,6 +335,17 @@ class PosState(object):
     @log_basename.setter
     def log_basename(self, name):
         self._val['CURRENT_LOG_BASENAME'] = name
+        
+    def append_log_note(self, note):
+        '''Adds a log note (presumably a string) to the existing note data that
+        will be written to log upon commit or writetodb.'''
+        self._next_log_notes.append(str(note))
+        self._val['LOG_NOTE'] = str(self._next_log_notes)
+        
+    def clear_log_notes(self):
+        '''Re-initializes the stored log notes.'''
+        self._next_log_notes = []
+        self._val['LOG_NOTE'] = str(self._next_log_notes)
 
     def _increment_suffix(self,s):
         """Increments the numeric suffix at the end of s. This function was specifically written
@@ -378,7 +391,11 @@ class PosState(object):
                 self._val[new_key] = temp_val
         # also insert any missing entirely new keys
         if self.type == 'pos':
-            possible_new_keys_and_defaults = {'LAST_MEAS_FWHM':None}
+            possible_new_keys_and_defaults = {'LAST_MEAS_FWHM':None,
+                                              'KEEPOUT_EXPANSION_PHI_RADIAL':0.0,
+                                              'KEEPOUT_EXPANSION_PHI_ANGULAR':0.0,
+                                              'KEEPOUT_EXPANSION_THETA_RADIAL':0.0,
+                                              'KEEPOUT_EXPANSION_THETA_ANGULAR':0.0}
         elif self.type == 'fid':
             possible_new_keys_and_defaults = {'LAST_MEAS_OBS_X':[],
                                               'LAST_MEAS_OBS_Y':[],
