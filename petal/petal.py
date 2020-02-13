@@ -181,7 +181,7 @@ class Petal(object):
         self.init_ptltrans()
         self.init_posmodels(posids)
         self._init_collider(collider_file, anticollision)
-        self.limit_angle =  self.collider.Eo_phi #degree poslocP angle to reject targets. Set to False or None to skip check
+        self.limit_angle = self.collider.Eo_phi #degree poslocP angle to reject targets. Set to False or None to skip check
 
         # fiducials setup
         self.fidids = {fidids} if isinstance(fidids,str) else set(fidids)
@@ -1000,7 +1000,7 @@ class Petal(object):
             states = self.altered_states
             if log_note and self.local_log_on:
                 for state in states:
-                    state.next_log_notes.append(log_note)
+                    state.append_log_note(log_note)
         elif mode == 'calib':
             type1, type2 = 'pos_calib', 'fid_calib'
             states = self.altered_calib_states
@@ -1015,6 +1015,9 @@ class Petal(object):
                 self.posmoveDB.WriteToDB(pos_commit_list, self.petal_id, type1)
             if len(fid_commit_list) > 0:
                 self.posmoveDB.WriteToDB(fid_commit_list, self.petal_id, type2)
+            if mode == 'move':
+                for state in self.altered_states:
+                    state.clear_log_notes() # known minor issue: if local_log_on simultaneously with DB, this may clear the note field
         if mode == 'move':
             # only allow writing local config and logs when not in sim mode
             if not self.simulator_on:
