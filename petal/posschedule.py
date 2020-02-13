@@ -135,12 +135,12 @@ class PosSchedule(object):
                 self.printfunc(f'{posid}: target request denied. Target not '
                                f'reachable: {uv_type}, ({u:.3f}, {v:.3f})')
             return False
-        if self._deny_request_because_limit(posmodel, targt_posintTP):
+        targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
+        if self._deny_request_because_limit(posmodel, targt_poslocTP):
             if self.verbose:
                 self.printfunc(f'{posid}: target request denied. Target '
-                               "exceeds expert radial limit.")
+                               "exceeds expert angular limit.")
             return False
-        targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
         if self._deny_request_because_target_interference(
                 posmodel, targt_poslocTP):
             if self.verbose:
@@ -582,14 +582,13 @@ class PosSchedule(object):
             return True
         return False
 
-    def _deny_request_because_limit(self, posmodel, target_posintTP):
+    def _deny_request_because_limit(self, posmodel, target_poslocTP):
         '''
-        Check for cases where target exceeds radial limit set by experts.
+        Check for cases where target exceeds angle limit set by experts.
         Useful to avoid needed to worry about anticollision.
         '''
-        if self.petal.limit_radius:
-            poslocXY = posmodel.trans.posintTP_to_poslocXY(target_posintTP)
-            if math.sqrt(poslocXY[0]**2 + poslocXY[1]**2) > self.petal.limit_radius:
+        if self.petal.limit_angle:
+            if target_poslocTP[1] < self.petal.limit_radius:
                 posmodel.clear_postmove_cleanup_cmds_without_executing()
                 self.petal.pos_flags[posmodel.posid] |= self.petal.exceeded_lims_bit
                 return True

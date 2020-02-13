@@ -146,7 +146,8 @@ class Petal(object):
         self.petalbox_id = petalbox_id
         self.petal_id = int(petal_id)
         self.shape = shape
-        self.limit_radius = 3.5 #mm to reject targets. Set to False or None to skip check
+        # 104 degrees is Eo phi, 142 is Ei phi
+        self.limit_angle =  104.0 #degree poslocP angle to reject targets. Set to False or None to skip check
         self._last_state = None
         self._canids_where_tables_were_just_sent = set()
         if fidids in ['',[''],{''}]: # check included to handle simulation cases, where no fidids argued
@@ -1186,7 +1187,7 @@ class Petal(object):
                         if self.get_posfid_val(item_id,'CAN_ID') == canid:
                             #self.set_posfid_val(item_id,'CTRL_ENABLED',False)
                             self.pos_flags[item_id] |= self.comm_error_bit
-                            self.printfunc('WARNING: positioner {item_id} had communication error.')
+                            self.printfunc(f'WARNING: positioner {item_id} had communication error.')
                             break
                     status_updated = True
             if status_updated:
