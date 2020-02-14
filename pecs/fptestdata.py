@@ -364,8 +364,8 @@ class FPTestData:
     def export_data_logs(self):
         '''must have writte self.posids_pc, a dict keyed by pcid'''
         self.test_cfg.write()  # write test config
-        for attr in ['movedf', 'gradedf', 'calibdf', 'abnormaldf',
-                     'exppos', 'meapos']:
+        for attr in ['petal_alignments', 'movedf', 'gradedf', 'calibdf',
+                     'abnormaldf', 'exppos', 'meapos']:
             if not hasattr(self, attr):
                 continue  # skip a df if it doesn't exist
             getattr(self, attr).to_pickle(

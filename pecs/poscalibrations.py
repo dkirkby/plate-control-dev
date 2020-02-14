@@ -45,6 +45,8 @@ class PosCalibrations(PECS):
         self.data.pcids = self.pcids
         self.exp_setup()  # set up exposure ID and product directory
         self.set_schedule_stats(enabled=self.schedule_stats)
+        self.data.petal_alignments = pd.DataFrame(self.petal_alignments).T
+        self.data.petal_alignments.index.name = 'petal_loc'
 
     def collect_calib(self, posids):
         ret = self.ptlm.get_pos_vals(self.keys_collect, posids=posids)

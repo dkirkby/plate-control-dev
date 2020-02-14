@@ -40,14 +40,14 @@ class PosCalibrationFits:
     supply posmodels of all petals, a dict keyed by posids
     '''
 
-    def __init__(self, petal_alignments=None, use_doslib=False,
+    def __init__(self, petal_alignments=None, use_doslib=True,
                  posmodels=None, loggers=None, printfunc=print):
         self.logger = BroadcastLogger(loggers=loggers, printfunc=printfunc)
-        if petal_alignments is not None:
+        if petal_alignments:
             self.petal_alignments = petal_alignments
         else:
             self.read_alignments(use_doslib=use_doslib)
-        if posmodels is not None:
+        if posmodels:
             self.init_posmodels(posmodels=posmodels)
         self.pi = PositionerIndex()
 
