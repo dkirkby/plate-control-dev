@@ -34,8 +34,12 @@ class Rehome(PECS):
                                    anticollision=anticollision,
                                    control={'timeout': 60})
         ret = pd.concat(list(ret.values()))
-        ret = (ret.rename(columns={'X1': 'posintT', 'X2': 'posintP'})
-               .sort_values(by='DEVICE_ID').reset_index())
+        try:
+            ret = (ret.rename(columns={'X1': 'posintT', 'X2': 'posintP'})
+                   .sort_values(by='DEVICE_ID').reset_index())
+        except Exception as e:
+            print(f'Exception: {e}, from petalman: {ret}')
+            import pdb; pdb.set_trace()
         ret['STATUS'] = pc.decipher_posflags(ret['FLAG'])
         mask = ret['FLAG'] != 4
         retry_list = list(ret.loc[mask, 'DEVICE_ID'])

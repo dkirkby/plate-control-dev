@@ -32,12 +32,14 @@ for posid in tqdm(posids):
     update = pecs.ptlm.collect_calib(update, tag='',
                                      participating_petals=role)[role]
     old.append(update)
-    accepted = [pecs.ptlm.set_posfid_val(posid, key, calib.loc[posid, key],
-                                         participating_petals=role)[role]
-                for key in keys_fit]
-    if all(accepted):
+    accepted = {key: pecs.ptlm.set_posfid_val(
+                    posid, key, calib.loc[posid, key],
+                    participating_petals=role)[role]
+                for key in keys_fit}
+    if all(val == True for val in accepted.values()):
         accepted.add(posid)
     else:
+        print(f'{posid} rejected: {accepted}')
         rejected.add(posid)
     update = pecs.ptlm.collect_calib(update, tag='',
                                      participating_petals=role)[role]
