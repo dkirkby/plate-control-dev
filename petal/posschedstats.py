@@ -238,6 +238,9 @@ class PosSchedStats(object):
                     type_test_val = data[key][0]
                     if isinstance(type_test_val,int) or isinstance(type_test_val,float):
                         this_data = {'overall': [data[key][i] for i in range(nrows)]}
+                        for i in range(nrows):
+                            if this_data['overall'][i] == None:
+                                this_data['overall'][i] = 0
                         for category in unique_methods:
                             this_data[category] = [this_data['overall'][i] for i in range(nrows) if data['method'][i] == category]
                         for category in categories:
