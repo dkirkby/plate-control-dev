@@ -41,7 +41,8 @@ class PosCollider(object):
         self.devicelocs = {} # key: device loc, value: posid string
         self.pos_neighbors = {} # all the positioners that surround a given positioner. key is a posid, value is a set of neighbor posids
         self.fixed_neighbor_cases = {} # all the fixed neighbors that apply to a given positioner. key is a posid, value is a set of the fixed neighbor cases
-        self.R1, self.R2, self.x0, self.y0, self.t0, self.p0 = {}, {}, {}, {}, {}, {}
+        self.R1, self.R2, self.x0, self.y0, self.t0, self.p0 = {}, {}, {}, {}, {}, {}  # keys are posids
+        self.keepout_expansions = {} # keys are posids, values are subdicts, containing the 4x keepout expansion params for each positioner
         self.plotting_on = True
         self.timestep = self.config['TIMESTEP']
         self.animator = posanimator.PosAnimator(fignum=0, timestep=self.timestep)
@@ -343,6 +344,7 @@ class PosCollider(object):
             self.y0[posid] = posmodel.state.read('OFFSET_Y')
             self.t0[posid] = posmodel.state.read('OFFSET_T')
             self.p0[posid] = posmodel.state.read('OFFSET_P')
+            self.keepout_expansions[posid] = {key:posmodel.state.read(key) for key in pc.keepout_expansion_keys}
 
     def _load_circle_envelopes(self):
         """Read latest versions of all circular envelopes, including outer clear rotation
@@ -374,24 +376,25 @@ class PosCollider(object):
 
     def _load_keepouts(self):
         """Read latest versions of all keepout geometries."""
-        self.general_keepout_P_unexpanded = PosPoly(self.config['KEEPOUT_PHI'])
-        self.general_keepout_T_unexpanded = PosPoly(self.config['KEEPOUT_THETA'])
+        self.general_keepout_P = PosPoly(self.config['KEEPOUT_PHI'])
+        self.general_keepout_T = PosPoly(self.config['KEEPOUT_THETA'])
         self.keepout_PTL = PosPoly(self.config['KEEPOUT_PTL'])
         self.keepout_GFA = PosPoly(self.config['KEEPOUT_GFA'])
         self.fixed_neighbor_keepouts = {pc.case.PTL : self.keepout_PTL, pc.case.GFA : self.keepout_GFA}
 
     def _adjust_keepouts(self):
         """Expand/contract, and pre-shift the theta and phi keepouts for each positioner."""
-        self.general_keepout_P = self.general_keepout_P_unexpanded.expanded_radially(self.config['KEEPOUT_EXPANSION_PHI_RADIAL'])
-        self.general_keepout_P = self.general_keepout_P.expanded_angularly(self.config['KEEPOUT_EXPANSION_PHI_ANGULAR'])
-        self.general_keepout_T = self.general_keepout_T_unexpanded.expanded_radially(self.config['KEEPOUT_EXPANSION_THETA_RADIAL'])
-        self.general_keepout_T = self.general_keepout_T.expanded_angularly(self.config['KEEPOUT_EXPANSION_THETA_ANGULAR'])
         for posid in self.posids:
             R1_error = self.R1[posid] - pc.nominals['LENGTH_R1']['value']
             R2_error = self.R2[posid] - pc.nominals['LENGTH_R2']['value']
-            self.keepouts_P[posid] = self.general_keepout_P.translated(R1_error,0)
-            self.keepouts_P[posid] = self.keepouts_P[posid].expanded_x(left_shift=R1_error, right_shift=R2_error)
-            self.keepouts_T[posid] = self.general_keepout_T.translated(0,0) # effectively just a copy operation
+            expansions = self.keepout_expansions[posid]
+            keepout_P = self.general_keepout_P.expanded_radially(expansions['KEEPOUT_EXPANSION_PHI_RADIAL'])
+            keepout_P = keepout_P.expanded_angularly(expansions['KEEPOUT_EXPANSION_PHI_ANGULAR'])
+            keepout_T = self.general_keepout_T.expanded_radially(expansions['KEEPOUT_EXPANSION_THETA_RADIAL'])
+            keepout_T = keepout_T.expanded_angularly(expansions['KEEPOUT_EXPANSION_THETA_ANGULAR'])
+            keepout_P = keepout_P.translated(R1_error,0)
+            self.keepouts_P[posid] = keepout_P.expanded_x(left_shift=R1_error, right_shift=R2_error)
+            self.keepouts_T[posid] = keepout_T.translated(0,0) # effectively just a copy operation
 
     def _identify_neighbors(self, posid):
         """Find all neighbors which can possibly collide with a given positioner."""
