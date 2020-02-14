@@ -230,8 +230,6 @@ class XYTest(PECS):
         self.data.delta_t = self.data.t_f - self.data.t_i
         self.logger.info(f'Test complete, duration {self.data.delta_t}.')
         self.logger.info('Disabling positioner schedule stats...')
-        # for pcid in self.data.pcids:
-        #     self.data.schedstats[pcid] = ret[self._pcid2role(pcid)]
         self.set_schedule_stats(enabled=False)
         self.fvc_collect()
 
@@ -325,7 +323,7 @@ class XYTest(PECS):
         # get expected posintTP from petal and write to movedf after move
         # Positions are concatenated in petalman
         TP = self.ptlm.get_positions(return_coord='posintTP')
-        for pcid in self.pcids:
+        for pcid in self.data.pcids:
             self.logger.debug(['Target {i}, submove {n}, '
                                'execute_move() returns expected QS:',
                                expected_QS[self._pcid2role(pcid)].to_string()],
