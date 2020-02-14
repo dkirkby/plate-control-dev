@@ -24,6 +24,7 @@ else:
 print(f'Setting calibration for {len(posids)} positioners using file: {path}')
 keys_fit = ['OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
             'LENGTH_R1', 'LENGTH_R2']  # initial values for fitting
+accepted, rejected = set(), set()
 old, new = [], []
 for posid in tqdm(posids):
     role = pecs._pcid2role(pecs.posinfo.loc[posid, 'PETAL_LOC'])
@@ -31,8 +32,13 @@ for posid in tqdm(posids):
     update = pecs.ptlm.collect_calib(update, tag='',
                                      participating_petals=role)[role]
     old.append(update)
-    for key in keys_fit:
-        pecs.ptlm.set_posfid_val(posid, key, calib.loc[posid, key])
+    accepted = [pecs.ptlm.set_posfid_val(posid, key, calib.loc[posid, key],
+                                         participating_petals=role)[role]
+                for key in keys_fit]
+    if all(accepted):
+        accepted.add(posid)
+    else:
+        rejected.add(posid)
     update = pecs.ptlm.collect_calib(update, tag='',
                                      participating_petals=role)[role]
     new.append(update)
@@ -50,3 +56,6 @@ calibdf.to_pickle(path)
 print(calibdf['NEW'][['POS_T', 'POS_P', 'LENGTH_R1', 'LENGTH_R2',
                       'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P']])
 print(f'set_calibrations data saved to: {path}')
+print(f'{len(accepted)} positioners accepted')
+print(f'{len(rejected)} positioneres rejected one or more:\n'
+      f'{sorted(rejected)}')
