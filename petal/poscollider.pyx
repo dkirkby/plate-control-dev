@@ -388,13 +388,16 @@ class PosCollider(object):
             R1_error = self.R1[posid] - pc.nominals['LENGTH_R1']['value']
             R2_error = self.R2[posid] - pc.nominals['LENGTH_R2']['value']
             expansions = self.keepout_expansions[posid]
-            keepout_P = self.general_keepout_P.expanded_radially(expansions['KEEPOUT_EXPANSION_PHI_RADIAL'])
+            keepout_P = self.general_keepout_P.translated(0,0) # effectively just a copy operation
+            keepout_T = self.general_keepout_T.translated(0,0) # effectively just a copy operation
+            keepout_P = keepout_P.expanded_radially(expansions['KEEPOUT_EXPANSION_PHI_RADIAL'])
             keepout_P = keepout_P.expanded_angularly(expansions['KEEPOUT_EXPANSION_PHI_ANGULAR'])
-            keepout_T = self.general_keepout_T.expanded_radially(expansions['KEEPOUT_EXPANSION_THETA_RADIAL'])
-            keepout_T = keepout_T.expanded_angularly(expansions['KEEPOUT_EXPANSION_THETA_ANGULAR'])
             keepout_P = keepout_P.translated(R1_error,0)
-            self.keepouts_P[posid] = keepout_P.expanded_x(left_shift=R1_error, right_shift=R2_error)
-            self.keepouts_T[posid] = keepout_T.translated(0,0) # effectively just a copy operation
+            keepout_P = keepout_P.expanded_x(left_shift=R1_error, right_shift=R2_error)
+            keepout_T = keepout_T.expanded_radially(expansions['KEEPOUT_EXPANSION_THETA_RADIAL'])
+            keepout_T = keepout_T.expanded_angularly(expansions['KEEPOUT_EXPANSION_THETA_ANGULAR'])
+            self.keepouts_P[posid] = keepout_P
+            self.keepouts_T[posid] = keepout_T
 
     def _identify_neighbors(self, posid):
         """Find all neighbors which can possibly collide with a given positioner."""
