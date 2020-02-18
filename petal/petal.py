@@ -998,7 +998,7 @@ class Petal(object):
         if mode == 'move':
             type1, type2 = 'pos_move', 'fid_data'
             states = self.altered_states
-            if log_note and self.local_log_on:
+            if log_note:
                 for state in states:
                     state.append_log_note(log_note)
         elif mode == 'calib':
