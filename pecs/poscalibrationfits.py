@@ -14,13 +14,13 @@ only serve to ensure spotmatch does not fail.
 'mea_' is measured, 'exp_' is internally-tracked/expected, 'tgt_' is target
 """
 import os
-from glob import glob
+# from glob import glob
 import numpy as np
 from scipy import optimize
 from scipy.stats import linregress
 import pandas as pd
 from tqdm import tqdm
-import posconstants as pc
+# import posconstants as pc
 from postransforms import PosTransforms
 from posstate import PosState
 from posmodel import PosModel
@@ -210,7 +210,7 @@ class PosCalibrationFits:
             mea_flatXY (measurements directly from mea_QS)
             exp_flatXY, exp_QS, exp_posintTP(fitted expectation)
             err_flatXY, err_QS (fitted expectation - measured)
-            err_posintTP (fitted expectation - target)
+            err_posintTP (fitted new expectation - old expectation)
 
         and a calibration dataframe with
             index:      DEVICE_ID
@@ -232,7 +232,7 @@ class PosCalibrationFits:
         self.logger.debug(f'Fitting loop for {len(posids)} positioners...')
         for posid in tqdm(posids):
             poscal, posmea, posmodel = {}, {}, self.posmodels[posid]
-            trans, state = posmodel.trans, posmodel.state
+            trans = posmodel.trans
             tgt_posintTP = data.loc[idx[:, :, posid],
                                     ['tgt_posintT', 'tgt_posintP']].values
             tgt_XY = np.array(
@@ -255,7 +255,7 @@ class PosCalibrationFits:
                 # reduced to tables of length L and M
                 posmea[arc] = posmeaarc[posmeaarc.notnull().all(axis=1)]
                 if len(posmea[arc]) < 3:  # require at least 3 points remaining
-                    return None
+                    return
                 # ctr0 = ((state._val['OFFSET_X'], state._val['OFFSET_Y'])
                 #         if arc == 'T' else None)  # initial guess for centre
                 # exp = 1.5 if arc == 'T' else 1.1
@@ -285,17 +285,20 @@ class PosCalibrationFits:
                     f'R1 = {poscal["LENGTH_R1"]}, R2 = {poscal["LENGTH_R2"]}',
                     pcid=self.petal_locs[posid])
                 continue
-            # caluclate offset T using phi arc centre and target posintT
+            # caluclate offset T using phi arc centre and tracked posintT
             xy = poscal['centre_P'] - poscal['centre_T']  # 1 x 2 array
             p_mea_poslocT = np.degrees(np.arctan2(xy[1], xy[0]))  # float
             t_tgt_posintT = data.loc[idx['T', posmea['T'].index, posid],
-                                     'tgt_posintT']  # length L
-            p_tgt_posintTP = data.loc[idx['P', posmea['P'].index, posid],
-                                      ['tgt_posintT', 'tgt_posintP']]  # len M
-            p_tgt_posintP = p_tgt_posintTP['tgt_posintP']
+                                     'tgt_posintT']
+            t_posintT = data.loc[idx['T', posmea['T'].index, posid],
+                                 'posintT']  # length L
+            p_tgt_posintP = data.loc[idx['P', posmea['P'].index, posid],
+                                     'tgt_posintP']  # len M
+            p_posintT = data.loc[idx['P', posmea['P'].index, posid], 'posintT']
+            p_posintP = data.loc[idx['P', posmea['P'].index, posid], 'posintP']
             # subtract constant target posintT of phi arc
             poscal['OFFSET_T'] = PosTransforms._centralize_angular_offset(
-                p_mea_poslocT - p_tgt_posintTP['tgt_posintT'].values[0])
+                p_mea_poslocT - p_posintT.values[0])
             # calculate offset P still using phi arc
             xy = posmea['P'].values - poscal['centre_P']  # phi arc wrt phi ctr
             angles = np.degrees(np.arctan2(xy[:, 1], xy[:, 0]))  # 1 x M array
@@ -310,10 +313,10 @@ class PosCalibrationFits:
             # take median difference between wrapped poslocP and
             # expected posintP, ideally these diffences are similar
             poscal['OFFSET_P'] = PosTransforms._centralize_angular_offset(
-                np.median(p_mea_poslocP_wrapped - p_tgt_posintP))
+                np.median(p_mea_poslocP_wrapped - p_posintP))
             p_exp_posintP_wrapped = p_mea_poslocP_wrapped - poscal['OFFSET_P']
-            data.loc[idx['P', posmea['P'].index, posid],
-                     'exp_posintT'] = p_mea_poslocT - poscal['OFFSET_T']
+            data.loc[idx['P', posmea['P'].index, posid], 'exp_posintT'] = \
+                p_mea_poslocT - poscal['OFFSET_T']
             data.loc[idx['P', posmea['P'].index, posid], 'exp_posintP'] = \
                 p_exp_posintP = np.degrees(np.unwrap(np.radians(
                     p_exp_posintP_wrapped)))
@@ -325,14 +328,14 @@ class PosCalibrationFits:
                 for flatXY in posmea['T'].values])  # L x 1 array
             data.loc[idx['T', posmea['T'].index, posid], 'exp_posintT'] = \
                 t_exp_posintT = t_exp_posintTP[:, 0]
-            data.loc[idx['T', posmea['T'].index, posid],
-                     'exp_posintP'] = t_exp_posintTP[:, 1].mean()
-            # convert target coordinates using existing calibration
-            # these are meant to be equivalent to posintTP issued at the time
-            tgt_posintTP = data.loc[idx[:, :, posid],
-                                    ['tgt_posintT', 'tgt_posintP']].values
+            data.loc[idx['T', posmea['T'].index, posid], 'exp_posintP'] = \
+                t_exp_posintTP[:, 1].mean()
+            # we have new expected posintTP for both arcs, now convert to
+            # other coordinates using new calibration
+            exp_posintTP = data.loc[idx[:, :, posid],
+                                    ['exp_posintT', 'exp_posintP']].values
             exp_XY = np.array(
-                [trans.posintTP_to_flatXY(tp) for tp in tgt_posintTP])
+                [trans.posintTP_to_flatXY(tp) for tp in exp_posintTP])
             data.loc[idx[:, :, posid], ['exp_flatX', 'exp_flatY']] = exp_XY
             data.loc[idx[:, :, posid], ['exp_Q', 'exp_S']] = \
                 trans.flatXY_to_QS(exp_XY.T).T
@@ -342,32 +345,32 @@ class PosCalibrationFits:
             t_exp_posintT_wrapped = PosTransforms._wrap_consecutive_angles(
                     t_exp_posintT, t_tgt_direction)  # length L
             poscal['GEAR_CALIB_T'] = ratio_T = np.median(
-                np.diff(t_exp_posintT_wrapped) / np.diff(t_tgt_posintT))
+                np.diff(t_exp_posintT_wrapped) / np.diff(t_posintT))
             poscal['GEAR_CALIB_P'] = ratio_P = np.median(
-                np.abs(np.diff(p_exp_posintP)) / np.diff(p_tgt_posintP))
+                np.abs(np.diff(p_exp_posintP)) / np.diff(p_posintP))
             # calcualte angle errors, theta arc first
             data.loc[idx['T', posmea['T'].index, posid], 'err_posintT'] = \
-                err_t = self.regularise_err(t_exp_posintT - t_tgt_posintT)
+                err_t = self.regularise_err(t_exp_posintT - t_posintT)
             data.loc[idx['T', :, posid], 'err_posintP'] = (
                 data.loc[idx['T', :, posid], 'exp_posintP']
-                - data.loc[idx['T', :, posid], 'tgt_posintP'])
+                - data.loc[idx['T', :, posid], 'posintP'])
             # phi arc
             data.loc[idx['P', :, posid], 'err_posintT'] = (
                 data.loc[idx['P', :, posid], 'exp_posintT']
-                - data.loc[idx['P', :, posid], 'tgt_posintT'])
+                - data.loc[idx['P', :, posid], 'posintT'])
             data.loc[idx['P', posmea['P'].index, posid], 'err_posintP'] = \
-                err_p = self.regularise_err(p_exp_posintP - p_tgt_posintP)
+                err_p = self.regularise_err(p_exp_posintP - p_posintP)
             # area bounded by arc points, good indication of movement
             poscal['area_T'] = self.polygon_area(posmea['T'].values)
             poscal['area_P'] = self.phi_area(posmea['P'].values,
                                              poscal['centre_P'])
             # linear regression for the second column plots
             r = linregress(p_tgt_posintP, err_p)
-            poscal[f'slope_P'], poscal[f'intercept_P'] = r[0], r[1]
-            poscal[f'rvalue_P'], poscal[f'pvalue_P'] = r[2], r[3]
+            poscal['slope_P'], poscal['intercept_P'] = r[0], r[1]
+            poscal['rvalue_P'], poscal['pvalue_P'] = r[2], r[3]
             r = linregress(t_tgt_posintT, err_t)
-            poscal[f'slope_T'], poscal[f'intercept_T'] = r[0], r[1]
-            poscal[f'rvalue_T'], poscal[f'pvalue_T'] = r[2], r[3]
+            poscal['slope_T'], poscal['intercept_T'] = r[0], r[1]
+            poscal['rvalue_T'], poscal['pvalue_T'] = r[2], r[3]
             poscals.append(poscal)
             for ratio, arc in zip([ratio_T, ratio_P], ['T', 'P']):
                 if abs(ratio - 1) > 0.3:  # print a warning
@@ -395,7 +398,7 @@ class PosCalibrationFits:
             mea_flatXY (measurements directly from mea_QS)
             exp_flatXY, exp_QS, exp_posintTP (fitted expectation)
             err_flatXY, err_QS  (fitted expectation - measured)
-            err_posintTP (fitted expectation - target)
+            err_posintTP (fitted new expectation - old expectation)
 
         and a calibration dataframe with
             index:  DEVICE_ID
@@ -415,7 +418,7 @@ class PosCalibrationFits:
         self.logger.debug(f'Fitting loop for {len(posids)} positioners...')
         for posid in tqdm(posids):
             trans = self.posmodels[posid].trans
-            tgt_posintTP = data.loc[idx[:, posid],
+            tgt_posintTP = data.loc[idx[:, posid],  # no null values ever
                                     ['tgt_posintT', 'tgt_posintP']].values
             tgt_XY = np.array(
                 [trans.posintTP_to_flatXY(tp) for tp in tgt_posintTP])
@@ -424,12 +427,12 @@ class PosCalibrationFits:
                 trans.flatXY_to_QS(tgt_XY.T).T
             # measurement always in QS, but fit and derive params in flatXY
             QS = data.loc[idx[:, posid], ['mea_Q', 'mea_S']]  # Nx2
-            mask = QS.notnull().all(axis=1)
+            mask = QS.notnull().all(axis=1)  # convert all matched points
             data.loc[QS[mask].index, ['mea_flatX', 'mea_flatY']] = (
                 trans.QS_to_flatXY(QS[mask].T).T)  # doesn't depend on calib
             # select only valid measurement data points for fit
             posdata = data.xs(posid, level='DEVICE_ID')[[
-                'mea_flatX', 'mea_flatY', 'tgt_posintT', 'tgt_posintP']]
+                'mea_flatX', 'mea_flatY', 'posintT', 'posintP']]
             mask = posdata.index[~posdata.isnull().any(axis=1)]
             posdata = posdata.loc[mask]  # filter nan
             if len(posdata) <= len(keys_fit):
@@ -439,12 +442,12 @@ class PosCalibrationFits:
                 poscals.append({})
                 continue  # skip this iteration for this posid in the loop
             mea_flatXY = posdata[['mea_flatX', 'mea_flatY']].values  # N x 2
-            tgt_posintTP = posdata[['tgt_posintT', 'tgt_posintP']].values
+            posintTP = posdata[['posintT', 'posintP']].values
 
             def exp_xy(params):
                 for key, param in zip(keys_fit, params):
                     trans.alt[key] = param  # override transformation params
-                flatXY = [trans.posintTP_to_flatXY(tp) for tp in tgt_posintTP]
+                flatXY = [trans.posintTP_to_flatXY(tp) for tp in posintTP]
                 return np.array(flatXY)  # N x 2, target posintTP transformed
 
             def err_rms(params):  # function to be minimised
@@ -469,13 +472,11 @@ class PosCalibrationFits:
             data.loc[idx[mask, posid], ['exp_flatX', 'exp_flatY']] = exp_XY
             data.loc[idx[mask, posid], ['exp_Q', 'exp_S']] = \
                 trans.flatXY_to_QS(exp_XY.T).T
-            data.loc[idx[mask, posid], ['exp_posintT', 'exp_posintP']] = \
-                np.array([trans.flatXY_to_posintTP(xy)[0] for xy in exp_XY])
+            # no expected posintTP bc the expectation never changes after fit
+            # and we hold posintTP fixed to fit for params and get expected xy
             trans.alt_override = False  # turn it back off when finished
             for c in ['flatX', 'flatY', 'Q', 'S']:  # calculate errors
                 data[f'err_{c}'] = data[f'exp_{c}'] - data[f'mea_{c}']
-            for c in ['posintT', 'posintP']:  # calculate errors
-                data[f'err_{c}'] = data[f'exp_{c}'] - data[f'tgt_{c}']
             poscals.append(poscal)
             if result.fun > 0.4:  # print a warning
                 self.logger.warning(f'{posid} grid calibration, {len(posdata)}'

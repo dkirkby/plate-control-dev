@@ -55,6 +55,7 @@ class PosCalibrations(PECS):
 
     def run_1p_calibration(self, tp_target='default', commit=False,
                            match_radius=50, interactive=False):
+        '''err columns are target - measured'''
         if interactive:
             user_text = self._parse_yn(
                 input('Move positioners? (y/n): '))
@@ -124,8 +125,6 @@ class PosCalibrations(PECS):
                          'EXP_FLATX': 'exp_flatX', 'EXP_FLATY': 'exp_flatY'})
         cols = [f'OLD_{key}' for key in self.keys_collect]
         updates.drop(cols, axis=1, inplace=True)  # clean up proposed change
-        # updates.rename(columns={f'OLD_{key}': key
-        #                         for key in self.keys_collect}, inplace=True)
         for df in [used_pos, unused_pos]:
             df.rename(columns={'Q': 'mea_Q', 'S': 'mea_S',
                                'DQ': 'mea_dQ', 'DS': 'mea_dS',
@@ -177,6 +176,7 @@ class PosCalibrations(PECS):
         self.data.generate_data_products()
 
     def run_arc_calibration(self, match_radius=50, interactive=False):
+        '''err columns are interally tracked - measured'''
         if interactive:
             # commit = self._parse_yn(input(
             #             'Automatically update calibration? (y/n): '))
@@ -297,7 +297,7 @@ class PosCalibrations(PECS):
         self.ptlm.prepare_move(request, anticollision=None)
         self.ptlm.execute_move(reset_flags=False, control={'timeout': 120})
         _, meapos, matched, _ = self.fvc_measure(
-            matched_only=True, match_radius=match_radius)
+            exppos=None, matched_only=True, match_radius=match_radius)
         # meapos may contain not only matched but all posids in expected pos
         matched_df = meapos.loc[sorted(matched & set(self.posids))]
         request.set_index('DEVICE_ID', inplace=True)
@@ -309,7 +309,13 @@ class PosCalibrations(PECS):
         mask = ~merged['FLAG'].isnull()
         merged.loc[mask, 'STATUS'] = pc.decipher_posflags(
             merged.loc[mask, 'FLAG'])
-        return merged
+        # get expected (tracked) posintTP angles
+        exppos = (self.ptlm.get_positions(return_coord='posintTP',
+                                          participating_petals=self.ptl_roles)
+                  .sort_values(by='DEVICE_ID').reset_index(drop=True)
+                  [['X1', 'X2']])
+        exppos.rename(columns={'X1': 'posintT', 'X2': 'posintP'}, inplace=True)
+        return merged.join(exppos)
 
 
 if __name__ == '__main__':
