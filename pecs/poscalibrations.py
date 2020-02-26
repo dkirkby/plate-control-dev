@@ -306,14 +306,13 @@ class PosCalibrations(PECS):
         merged.rename(columns={'X1': 'tgt_posintT', 'X2': 'tgt_posintP',
                                'Q': 'mea_Q', 'S': 'mea_S', 'FLAGS': 'FLAG'},
                       inplace=True)
-        mask = ~merged['FLAG'].isnull()
+        mask = merged['FLAG'].notnull()
         merged.loc[mask, 'STATUS'] = pc.decipher_posflags(
             merged.loc[mask, 'FLAG'])
         # get expected (tracked) posintTP angles
         exppos = (self.ptlm.get_positions(return_coord='posintTP',
                                           participating_petals=self.ptl_roles)
-                  .sort_values(by='DEVICE_ID').reset_index(drop=True)
-                  [['X1', 'X2']])
+                  .set_index('DEVICE_ID')[['X1', 'X2']])
         exppos.rename(columns={'X1': 'posintT', 'X2': 'posintP'}, inplace=True)
         return merged.join(exppos)
 

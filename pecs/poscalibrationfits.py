@@ -344,10 +344,17 @@ class PosCalibrationFits:
             t_tgt_direction = np.sign(np.diff(t_tgt_posintT).mean())
             t_exp_posintT_wrapped = PosTransforms._wrap_consecutive_angles(
                     t_exp_posintT, t_tgt_direction)  # length L
-            poscal['GEAR_CALIB_T'] = ratio_T = np.median(
-                np.diff(t_exp_posintT_wrapped) / np.diff(t_posintT))
-            poscal['GEAR_CALIB_P'] = ratio_P = np.median(
-                np.abs(np.diff(p_exp_posintP)) / np.diff(p_posintP))
+            # calculate theta gear ratio
+            if np.diff(t_posintT).any():
+                poscal['GEAR_CALIB_T'] = ratio_T = np.median(
+                    np.diff(t_exp_posintT_wrapped) / np.diff(t_posintT))
+            else:
+                poscal['GEAR_CALIB_T'] = ratio_T = 0
+            if np.diff(p_posintP).any():
+                poscal['GEAR_CALIB_P'] = ratio_P = np.median(
+                    np.abs(np.diff(p_exp_posintP)) / np.diff(p_posintP))
+            else:
+                poscal['GEAR_CALIB_P'] = ratio_P = 0
             # calcualte angle errors, theta arc first
             data.loc[idx['T', posmea['T'].index, posid], 'err_posintT'] = \
                 err_t = self.regularise_err(t_exp_posintT - t_posintT)
