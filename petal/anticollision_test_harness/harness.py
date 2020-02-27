@@ -13,15 +13,19 @@ import random
 import configobj
 
 # get collision file settings
-collider_filename = '_collision_settings_DEFAULT.conf'
-collider_filepath = os.path.join(pc.dirs['collision_settings'],collider_filename)
-collider_config = configobj.ConfigObj(collider_filepath,unrepr=True)
-collider_value = lambda s: collider_config['KEEPOUT_EXPANSION_' + s]
-keepouts_suffix = '_PhiRad' + str(collider_value('PHI_RADIAL')) + \
-                  '_PhiAng' + str(collider_value('PHI_ANGULAR')) +  \
-                  '_ThtRad' + str(collider_value('THETA_RADIAL')) + \
-                  '_ThtAng' + str(collider_value('THETA_ANGULAR'))
-print('\nNOW RUNNING CASE: ' + keepouts_suffix)
+multiharness_on = False
+if multiharness_on:
+    collider_filename = '_collision_settings_DEFAULT.conf'
+    collider_filepath = os.path.join(pc.dirs['collision_settings'],collider_filename)
+    collider_config = configobj.ConfigObj(collider_filepath,unrepr=True)
+    collider_value = lambda s: collider_config['KEEPOUT_EXPANSION_' + s]
+    keepouts_suffix = '_PhiRad' + str(collider_value('PHI_RADIAL')) + \
+                      '_PhiAng' + str(collider_value('PHI_ANGULAR')) +  \
+                      '_ThtRad' + str(collider_value('THETA_RADIAL')) + \
+                      '_ThtAng' + str(collider_value('THETA_ANGULAR'))
+    print('\nNOW RUNNING CASE: ' + keepouts_suffix)
+else:
+    keepouts_suffix = ''
 
 # Selection of device location ids (which positioners on petal).
 # locations_all = 'all'
