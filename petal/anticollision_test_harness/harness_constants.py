@@ -4,6 +4,9 @@ import pstats
 import sys
 sys.path.append(os.path.abspath('../../petal/'))
 import posconstants as pc
+import time
+import numpy as np
+import math
 
 device_locations_path = '../positioner_locations_0530v14.csv'
 
@@ -33,6 +36,19 @@ def filename(prefix,integer):
 
 def filepath(directory,prefix,integer):
     return os.path.join(directory,filename(prefix,integer))
+
+def compact_timestamp(nowtime=None, basetime=1582915648):
+    '''Compact, readable time code. Default return string is six characters
+    in length; will exceed this length at basetime + 69 years. Precision is
+    rounded to seconds. Default argument baselines it at a recent time on
+    Feb 28, 2020, 10:47 AM PST. The argument nowtime is just there for testing.
+    '''
+    maxchar = 6
+    nowtime = time.time() if not nowtime else nowtime
+    relative_now = math.floor(nowtime - basetime)
+    converted = np.base_repr(relative_now, base=36)
+    padded = converted.rjust(maxchar,'0') if len(converted) < maxchar else converted
+    return padded
 
 # Timing profiler wrapper function
 n_stats_lines = 20
