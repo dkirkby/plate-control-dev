@@ -10,22 +10,7 @@ import posconstants as pc
 import sequences
 import posstate
 import random
-import configobj
-
-# get collision file settings
-multiharness_on = False
-if multiharness_on:
-    collider_filename = '_collision_settings_DEFAULT.conf'
-    collider_filepath = os.path.join(pc.dirs['collision_settings'],collider_filename)
-    collider_config = configobj.ConfigObj(collider_filepath,unrepr=True)
-    collider_value = lambda s: collider_config['KEEPOUT_EXPANSION_' + s]
-    keepouts_suffix = '_PhiRad' + str(collider_value('PHI_RADIAL')) + \
-                      '_PhiAng' + str(collider_value('PHI_ANGULAR')) +  \
-                      '_ThtRad' + str(collider_value('THETA_RADIAL')) + \
-                      '_ThtAng' + str(collider_value('THETA_ANGULAR'))
-    print('\nNOW RUNNING CASE: ' + keepouts_suffix)
-else:
-    keepouts_suffix = ''
+import csv
 
 # Selection of device location ids (which positioners on petal).
 # locations_all = 'all'
@@ -34,13 +19,15 @@ subset7a = {89,79,78,99,87,98,88}
 device_loc_ids = subset7a #'all' # make the selection here
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
+runstamp = hc.compact_timestamp()
 pos_param_sequence_id = 'PTL03_20200211'
-move_request_sequence_id = '03000-03009' #'04000-04999' #'04108-04110'
-stats_filename_suffix = str(move_request_sequence_id) + keepouts_suffix + ''
+move_request_sequence_id = '03000' #'04000-04999' #'04108-04110'
+note = ''
+filename_suffix = str(runstamp) + '_' + str(move_request_sequence_id) + ('_' + str(note) if note else '')
 
 # Other ids
 fidids = {}
-petal_id = 666
+petal_id = 3
 
 # Other options
 should_animate = True
@@ -50,6 +37,24 @@ n_corrections = 1 # number of correction moves to simulate after each target
 max_correction_move = 0.050/1.414 # mm
 should_profile = False
 
+# saving of target sets for later use on hardware
+# formatted for direct input to xytest
+should_export_targets = True
+def make_xytest_column_headers(command, device_loc):
+    '''For making the funky column headers of xytest target files. Returns
+    a pair of headers, e.g. for the x and y coordinates or the like.'''
+    u_cmd = command[:-1] + '_' + str(device_loc)
+    v_cmd = command[:-2] + command[-1] + '_' + str(device_loc)
+    return u_cmd, v_cmd
+def make_xytest_header_sortable_key(s):
+    '''Another utility for generating the funky column headers of xytest target
+    files. Returns a key that can be used by sorted() function on a list of
+    headers.'''
+    target_no_1st = s[1]
+    device_loc_2nd = s.split('_')[1].rjust(5,'0')
+    uv_coord_3rd = s.split('_')[0][-1]
+    return target_no_1st + device_loc_2nd + uv_coord_3rd
+
 # randomizer for correction moves
 randomizer_seed = 0
 random.seed(randomizer_seed)
@@ -57,6 +62,7 @@ random.seed(randomizer_seed)
 # Run the sequences.
 pos_param_sequence = sequences.get_positioner_param_sequence(pos_param_sequence_id, device_loc_ids)
 move_request_sequence = sequences.get_move_request_sequence(move_request_sequence_id, device_loc_ids)
+exportable_targets = []
 for pos_params in pos_param_sequence:
     for posid,params in pos_params.items():
         state = posstate.PosState(unit_id=posid, device_type='pos', petal_id=petal_id)
@@ -78,7 +84,7 @@ for pos_params in pos_param_sequence:
                       anticollision   = 'adjust')
     ptl.limit_radius = None
     if ptl.schedule_stats:
-        ptl.schedule_stats.filename_suffix = stats_filename_suffix
+        ptl.schedule_stats.filename_suffix = filename_suffix
         ptl.schedule_stats.clear_cache_after_save_by_append = False
     if should_animate:
         if animation_foci == 'colliding':
@@ -103,6 +109,7 @@ for pos_params in pos_param_sequence:
     mtot = len(move_request_sequence)
     for move_request_data in move_request_sequence:
         m += 1
+        exportable_targets.append({'target_no':m-1})
         for n in range(n_corrections + 1):
             print(' move: ' + str(m) + ' of ' + str(mtot) + ', submove: ' + str(n))
             requests = {}
@@ -111,6 +118,9 @@ for pos_params in pos_param_sequence:
                     data['command'] = 'poslocXY'
                 if loc_id in ptl.devices:
                     requests[ptl.devices[loc_id]] = {'command':data['command'], 'target': [data['u'], data['v']]}
+                    u_header, v_header = make_xytest_column_headers(data['command'], loc_id)
+                    exportable_targets[-1][u_header] = data['u']
+                    exportable_targets[-1][v_header] = data['v']
             anticollision = 'adjust'
             if n > 0:
                 for request in requests.values():
@@ -122,16 +132,26 @@ for pos_params in pos_param_sequence:
                 hc.profile('ptl.request_targets(requests)')
             else:
                 ptl.request_targets(requests)
-            # posid =  list(requests.keys())[0]
-            # posmodel = list(requests.values())[0]['posmodel']
-            # print(posid, 'expected current posintTP', posmodel.expected_current_posintTP)
             if should_profile:
                 hc.profile('ptl.schedule_send_and_execute_moves(anticollision="'+anticollision+'")')
             else:
                 ptl.schedule_send_and_execute_moves(anticollision=anticollision)
     if ptl.schedule_stats:
         ptl.schedule_stats.save()
-    if should_animate:
+    if should_export_targets and exportable_targets:
+        filename = 'xytest_targets_' + runstamp + '.csv'
+        path = os.path.join(pc.dirs['temp_files'], filename)
+        headers = exportable_targets[0].keys()
+        headers = sorted(headers, key=make_xytest_header_sortable_key)
+        headers = [''] + headers # to match weird extra index column in the table format we're trying to match...
+        with open(path, 'w', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=headers)
+            writer.writeheader()
+            for row in exportable_targets:
+                row[''] = row['target_no']
+                writer.writerow(row)
+    if should_animate and not ptl.animator.is_empty():
         ptl.stop_gathering_frames()
         print('Generating animation (this can be quite slow)...')
+        ptl.animator.filename_suffix = runstamp
         ptl.generate_animation()
