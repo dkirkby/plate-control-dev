@@ -723,7 +723,11 @@ class Petal(object):
             return {}
         if fidids == 'all' and setting=='off':
             self.printfunc('set_fiducials: calling comm.all_fiducials_off')
-            return self.comm.all_fiducials_off()
+            ret = self.comm.all_fiducials_off()
+            if 'FAILED' in ret:
+                self.printfunc('WARNING: set_fiducials: calliing comm.all_fiducials_off failed: %s' % str(ret))
+            else:
+                return ret
         if fidids == 'all':
             fidids = self.fidids
         else:
