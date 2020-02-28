@@ -22,6 +22,7 @@ class PosAnimator(object):
         self.delete_imgs = False # whether to delete individual image files after generating animation
         self.save_dir = os.path.join(pc.dirs['temp_files'], 'schedule_animations')
         self.frame_dir = '' # generated automatically when saving frames
+        self.filename_suffix = '' # optional for user to add before generating animation
         self.framefile_prefix = 'frame'
         self.framefile_extension = '.png'
         self.n_framefile_digits = 5
@@ -109,6 +110,10 @@ class PosAnimator(object):
         """Clear the animator completely of old data.
         """
         self = PosAnimator(self.fignum, self.timestep)
+
+    def is_empty(self):
+        """Whether the animator contains any frame data yet."""
+        return len(self.items) == 0
 
     def add_or_change_item(self, item_str, item_idx, time, polygon_points, style_override=''):
         """Add a polygonal item at a particular time to the animation data.
@@ -210,7 +215,8 @@ class PosAnimator(object):
         stdout_message_period = 50 # number of frames per update message
         image_paths = {}
         timestamp = pc.filename_timestamp_str()
-        self.frame_dir = os.path.join(self.save_dir,timestamp + '_frames')
+        suffix = '_' + str(self.filename_suffix) if self.filename_suffix else ''
+        self.frame_dir = os.path.join(self.save_dir,timestamp + '_frames' + suffix)
         if self.live_animate:
             plt.show()
         if self.save_movie:
@@ -242,7 +248,7 @@ class PosAnimator(object):
         plt.close()
         if self.save_movie:
             input_file = os.path.join(self.frame_dir, self.framefile_prefix + '%' + str(self.n_framefile_digits) + 'd' + self.framefile_extension)
-            output_file = os.path.join(self.save_dir, timestamp + '_schedule_anim.mp4')
+            output_file = os.path.join(self.save_dir, timestamp + '_schedule_anim' + suffix + '.mp4')
             ffmpeg_cmd = self.ffmpeg_path + ' -y -r ' + str(fps) + ' -i ' + input_file + ' -vcodec ' + self.codec + ' ' + output_file
             os.system(ffmpeg_cmd)
         if self.delete_imgs:
