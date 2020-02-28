@@ -196,6 +196,15 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not clear fault. Exception: %s' % str(e)
 
+    def all_fiducials_off(self):
+        """
+        Broadcast command to set all fiducials off
+        """
+        try:
+            return self._call_device('all_fiducials_off')
+        except Exception as e:
+            return 'FAILED: Can not call all_fiducials_off. Exception: %s' % str(e)
+
     def pbget(self, key):
         """
         Request telemetry, positioner and fiducial settings from the petal controller.
