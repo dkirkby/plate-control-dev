@@ -718,6 +718,7 @@ class Petal(object):
         Fiducials that do not have control enabled will not appear in this dictionary.
         """
         error = False
+        all_off = False
         if self.simulator_on:
             self.printfunc('Simulator skips sending out set_fiducials commands on petal ' + str(self.petal_id) + '.')
             return {}
@@ -727,7 +728,7 @@ class Petal(object):
             if 'FAILED' in ret:
                 self.printfunc('WARNING: set_fiducials: calliing comm.all_fiducials_off failed: %s' % str(ret))
             else:
-                return ret
+                all_off = True
         if fidids == 'all':
             fidids = self.fidids
         else:
@@ -754,8 +755,11 @@ class Petal(object):
         fiducial_settings_by_busid = {busid:{} for busid in set(busids)}
         for idx, busid in enumerate(busids):
             fiducial_settings_by_busid[busid][canids[idx]] = duties[idx]
-        self.comm.pbset('fiducials', fiducial_settings_by_busid)
-        ret = self.comm.pbget('FIDUCIALS')
+        if all_off:
+            ret = fiducial_settings_by_busid
+        else:
+            self.comm.pbset('fiducials', fiducial_settings_by_busid)
+            ret = self.comm.pbget('FIDUCIALS')
 
         settings_done = {}
         for i in range(len(enabled)):
