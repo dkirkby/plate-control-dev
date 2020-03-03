@@ -306,7 +306,7 @@ class XYTest(PECS):
         # build move request dataframe for a petal
         note = (f'xytest: {self.data.test_name}; '  # same for all
                 f'target {i+1} of {self.data.ntargets}; '
-                f'move {n} ({movetype})')
+                f'move {n} ({movetype}); expid {self.exp.id}')
         req = pd.DataFrame(
             {'DEVICE_ID': posids,
              'PETAL_LOC': self.posinfo.loc[posids, 'PETAL_LOC'],
