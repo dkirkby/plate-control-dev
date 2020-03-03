@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import csv
 import posconstants as pc
+import copy
 
 
 # separated out here because so long
@@ -22,6 +23,10 @@ class PosSchedStats(object):
     @property
     def latest(self):
         return self.schedule_ids[-1]
+    
+    def is_empty(self):
+        '''Whether the stats data cache is currently empty.'''
+        return len(self.schedule_ids) == 0
     
     def _init_data_structures(self):
         self.schedule_ids = []
@@ -47,6 +52,7 @@ class PosSchedStats(object):
                         'expert_add_table calc time':[],
                         }
         self.latest_saved_row = None
+        self.real_data_yet_in_latest_row = None
     
     def register_new_schedule(self, schedule_id, num_pos):
         """Register a new schedule object to track statistics of.
@@ -212,16 +218,18 @@ class PosSchedStats(object):
         data.update(self.summarize_collision_resolutions())
         data.update(self.summarize_unresolved_colliding())
         nrows = len(next(iter(data.values())))
-        if not self.real_data_yet_in_latest_row:
-            nrows -= 1
-            for key in data:
-                if len(data[key]) > nrows:
-                    del data[key][-1]
         safe_divide = lambda a,b: a / b if b else np.inf # avoid divide-by-zero errors
         data['calc: fraction of target requests accepted'] = [safe_divide(data['n requests accepted'][i], data['n requests'][i]) for i in range(nrows)]
         data['calc: fraction of targets achieved (of those accepted)'] = [safe_divide(data['n tables achieving requested-and-accepted targets'][i], data['n requests accepted'][i]) for i in range(nrows)]
         for key in self._strings_to_print_last:
             data.update({key:self.strings[key]})
+        has_a_null_final_row = not self.real_data_yet_in_latest_row and not self.is_empty()
+        if has_a_null_final_row:
+            data = copy.deepcopy(data) # to ensure nothing screwy happens to underlying data before deleting null row below
+            nrows -= 1
+            for key in data:
+                if len(data[key]) > nrows:
+                    del data[key][-1]
         return data, nrows
 
     def generate_table(self, append_footers=False):
