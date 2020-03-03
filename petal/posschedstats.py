@@ -30,7 +30,9 @@ class PosSchedStats(object):
         self.unresolved_tables = {}
         self.unresolved_sweeps = {}
         self.final_checked_collision_pairs = {}
-        self.strings = {'method':[]}
+        self.strings = {'method':[], 'note':[]}
+        self._strings_to_print_first = ['method']
+        self._strings_to_print_last = ['note']
         self.numbers = {'n pos':[],
                         'n requests':[],
                         'n requests accepted':[],
@@ -124,7 +126,17 @@ class PosSchedStats(object):
 
     def set_scheduling_method(self, method):
         """Set scheduling method (a string) for the current schedule."""
-        self.strings['method'][-1] = method
+        self.strings['method'][-1] = str(method)
+        self.real_data_yet_in_latest_row = True
+    
+    def add_note(self, note, separator='; '):
+        """Add a note string for the current schedule. If one already exists,
+        then the argued note will be appended to it, separated by the arg
+        separator."""
+        if not self.strings['note'][-1] or self.strings['note'][-1] == self.blank_str:
+            self.strings['note'][-1] = str(note)
+        else:
+            self.strings['note'][-1] += str(separator) + str(note)
         self.real_data_yet_in_latest_row = True
         
     def set_max_table_time(self, time):
@@ -194,7 +206,8 @@ class PosSchedStats(object):
     def summarize_all(self):
         """Returns a summary dictionary of all data."""
         data = {'schedule id':self.schedule_ids}
-        data.update(self.strings)
+        for key in self._strings_to_print_first:
+            data.update({key:self.strings[key]})
         data.update(self.numbers)
         data.update(self.summarize_collision_resolutions())
         data.update(self.summarize_unresolved_colliding())
@@ -207,6 +220,8 @@ class PosSchedStats(object):
         safe_divide = lambda a,b: a / b if b else np.inf # avoid divide-by-zero errors
         data['calc: fraction of target requests accepted'] = [safe_divide(data['n requests accepted'][i], data['n requests'][i]) for i in range(nrows)]
         data['calc: fraction of targets achieved (of those accepted)'] = [safe_divide(data['n tables achieving requested-and-accepted targets'][i], data['n requests accepted'][i]) for i in range(nrows)]
+        for key in self._strings_to_print_last:
+            data.update({key:self.strings[key]})
         return data, nrows
 
     def generate_table(self, append_footers=False):
