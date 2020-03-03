@@ -492,6 +492,22 @@ class PosCalibrationFits:
         return data, pd.DataFrame(poscals,
                                   index=pd.Series(posids, name='DEVICE_ID'))
 
+    def verify_with_extra_points(self, data, calib_fit):  # feed in data_extra
+        posids = data.index.get_level_values('DEVICE_ID').unique()
+        for posid in tqdm(posids):
+            trans = self.posmodels[posid].trans
+            poscal = {key: calib_fit.loc[posid, key] for key in keys_fit}
+            trans.alt_override = True  # enable override in pos transforms
+            trans.alt.update(poscal)
+            posintTP = data.loc[idx[:, posid], ['posintT', 'posintP']].values
+            flatXY = np.array([trans.posintTP_to_flatXY(x) for x in posintTP])
+            errXY = (data.loc[idx[:, posid], ['mea_flatX', 'mea_flatY']]
+                     - flatXY)
+            calib_fit.loc[posid, 'err_rms'] = np.rms(errXY)
+            calib_fit.loc[posid, 'err_max'] = np.max(errXY)
+            calib_fit.loc[posid, 'err_med'] = np.median(errXY)
+        return calib_fit
+
 
 if __name__ == '__main__':
     # sample calibration data
