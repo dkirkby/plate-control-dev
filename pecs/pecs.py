@@ -264,6 +264,7 @@ class PECS:
 
     @staticmethod
     def countdown_sec(t):  # in seconds
+        t = int(t)
         for i in reversed(range(t)):
             sys.stderr.write(f'\rSleeping... ({i} s / {t} s)')
             time.sleep(1)
