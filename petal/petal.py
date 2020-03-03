@@ -48,10 +48,12 @@ class Petal(object):
         local_commit_on ... boolean, controls whether to commit state data to local .conf files (can be done with or without db_commit_on)
         local_log_on    ... boolean, controls whether to commit timestamped log of state data to local .csv files (can can be done with or without db_commit_on)
         printfunc       ... method, used for stdout style printing. we use this for logging during tests
+        verbose         ... boolean, controls whether verbose printout to console is enabled
         collider_file   ... string, file name of collider configuration file, no directory loction. If left blank will use default.
         sched_stats_on  ... boolean, controls whether to log statistics about scheduling runs
         anticollision   ... string, default parameter on how to schedule moves. See posschedule.py for valid settings.
         petal_loc       ... integer, (option) location (0-9) of petal in FPA
+        phi_limit_on    ... boolean, for experts only, controls whether to enable/disable a safety limit on maximum radius of acceptable positioner move requests
 
     Note that if petal.py is used within PetalApp.py, the code has direct access to variables defined in PetalApp. For example self.anticol_settings
     Eventually we could clean up the constructure (__init__) and pass viewer arguments.
@@ -108,7 +110,8 @@ class Petal(object):
                  db_commit_on=False, local_commit_on=True, local_log_on=True,
                  printfunc=print, verbose=False,
                  user_interactions_enabled=False, anticollision='freeze',
-                 collider_file=None, sched_stats_on=False):
+                 collider_file=None, sched_stats_on=False,
+                 phi_limit_on=True):
         # specify an alternate to print (useful for logging the output)
         self.printfunc = printfunc
         self.printfunc(f'Running plate_control version: {pc.code_version}')
@@ -181,8 +184,13 @@ class Petal(object):
         self.init_ptltrans()
         self.init_posmodels(posids)
         self._init_collider(collider_file, anticollision)
-        self.limit_angle = self.collider.Eo_phi #degree poslocP angle to reject targets. Set to False or None to skip check
-
+        
+        # extra limitations on addressable target area. limit is a minimum phi value (like a maximum radius)
+        if phi_limit_on:
+            self.limit_angle = self.collider.Eo_phi #degree minimum poslocP angle to reject targets. Set to False or None to skip check
+        else:
+            self.limit_angle = None
+            
         # fiducials setup
         self.fidids = {fidids} if isinstance(fidids,str) else set(fidids)
         for fidid in self.fidids:
