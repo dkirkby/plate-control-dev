@@ -46,12 +46,16 @@ def get_positioner_param_sequence(sequence_id, device_loc_ids='all'):
         device_loc_ids ... 'all' --> returns positioner data for all locations on the petal
                            iterable collection of ints --> returns only data for the argued device_loc_ids
         
-    Return value is a list of dicts. Each dict has keys = posid, value = subdictionary.
-    The subdictionary keys / values correspond to PosState parameters. The idea is that
-    these can be immediately stored to state objects to generate a new configuration of
-    the simulated petal.
+    Return value is a dict of dicts. The primary keys are ids of positioner parameter
+    groups at each step in the sequence.
+    
+    Each subdict has keys = posid, value = sub-sub-dictionary.
+    
+    The sub-sub-dictionary keys / values correspond to PosState parameters. The
+    idea is that these can be immediately stored to state objects to generate a
+    new configuration of the simulated petal.
     """
-    return _get_sequence(sequence_id,device_loc_ids,get_positioner_param_sequence)
+    return _get_sequence(sequence_id, device_loc_ids, get_positioner_param_sequence)
 
 def get_move_request_sequence(sequence_id, device_loc_ids='all'):
     """Select a sequence of move requests.
@@ -62,12 +66,21 @@ def get_move_request_sequence(sequence_id, device_loc_ids='all'):
         device_loc_ids ... 'all' --> returns move request data for all locations on the petal
                            iterable collection of ints --> returns only data for the argued device_loc_ids
         
-    Return value is a list of request dictionaries. The request dictionaries have keys
-    being device_location_id (rather than posid), so that they can be used for any petal
-    generically. The other keys in each request dictionary are 'command','u','v', and
-    have the same meaning as described in petal's "request_targets()" method.
+    Return value is a dict of request dictionaries. The primary keys are ids of
+    each step in the sequence.
+    
+    At each step, there is a subdictionary, containing all the target requests
+    for that step in the sequence. The keys for these are device_location_id.
+    
+    Then the subdictionaries have keys device_location_id. (Rather than posid, so
+    that they can be used for any petal generically.
+    
+    Finally, there is a lowest third level of dictionary. These contain the actual
+    move request data for each device. The keys for these are:
+        'command','u', and 'v'
+    having the same meanings as described in petal's "request_targets()" method.
     """
-    return _get_sequence(sequence_id,device_loc_ids,get_move_request_sequence)
+    return _get_sequence(sequence_id, device_loc_ids, get_move_request_sequence)
 
 _pos_dir = hc.pos_dir
 _req_dir = hc.req_dir
@@ -89,10 +102,10 @@ def _get_sequence(sequence_id, device_loc_ids, caller):
         key_label = 'DEVICE_LOC'
     else:
         return
-    sequence = []
+    sequence = {}
     for data_id in sequence_defs[sequence_id]:
         new = _read_data(data_id,directory,prefix,device_loc_ids,key_label)
-        sequence.append(new)
+        sequence[data_id] = new
     return sequence
 
 def _read_data(data_id, directory=_pos_dir, prefix=_pos_prefix, device_loc_ids='all',key_label='POS_ID'):
