@@ -36,6 +36,9 @@ class PosAnimator(object):
                         #  'style' : [] # list of dictionaries, defining the plotting style to draw the polygon at that time
         self.labels = {}
         self.label_size = 'x-small'
+        self.cropping_on = True # crop the frames to just surround the robots
+        self.crop_margin = 14.0 # mm
+        self.crop_box = {'xmin':-np.inf, 'xmax':np.inf, 'ymin': -np.inf, 'ymax':np.inf}
         self.pospoly_keys = {'ferrule', 'phi arm', 'central body', 'line at 180', 'Eo', 'Ei', 'Ee'}
         self.fixpoly_keys = {'PTL','GFA'}
         self.styles = {'ferrule':
@@ -126,7 +129,7 @@ class PosAnimator(object):
         """
         key = str(item_str) + ' ' + str(item_idx)
         if key not in self.items:
-            item = {'time':[], 'poly':[], 'style':[]}
+            item = {'time':[], 'poly':[], 'style':[], 'is pos poly':item_str in self.pospoly_keys}
         else:
             item = self.items[key]
         if time in item['time']:
@@ -153,7 +156,7 @@ class PosAnimator(object):
         else:
             item['time'].insert(idx, time)
             item['poly'].insert(idx, polygon_points)
-            item['style'].insert(idx, style)
+            item['style'].insert(idx, style)            
         self.items[key] = item
         
     def add_label(self, text, x, y):
@@ -163,7 +166,7 @@ class PosAnimator(object):
 
     def anim_init(self):
         """Sets up the animation, using the data that has been already entered via the
-        add_or_change_item method.
+        add_or_change_item method. Returns boolean stating success or not.
         """
         self.anim_fig = plt.figure(self.fignum, figsize=(20,15))
         self.anim_ax = plt.axes()
@@ -183,18 +186,20 @@ class PosAnimator(object):
         for item in self.items.values():
             patch = self.get_patch(item,0)
             self.patches.append(self.anim_ax.add_patch(patch))
-            xmin = min(xmin,min(item['poly'][0][0]))
-            xmax = max(xmax,max(item['poly'][0][0]))
-            ymin = min(ymin,min(item['poly'][0][1]))
-            ymax = max(ymax,max(item['poly'][0][1]))
+            if (self.cropping_on and item['is pos poly']) or not self.cropping_on:
+                margin = self.crop_margin if self.cropping_on else 0.0
+                xmin = min(xmin,min(item['poly'][0][0]) - margin)
+                xmax = max(xmax,max(item['poly'][0][0]) + margin)
+                ymin = min(ymin,min(item['poly'][0][1]) - margin)
+                ymax = max(ymax,max(item['poly'][0][1]) + margin)
             item['patch_idx'] = i
             item['last_frame'] = self.all_times.tolist().index(item['time'][-1])
             i += 1
         for label in self.labels.values():
             plt.text(s=label['text'], x=label['x'], y=label['y'], family='monospace', horizontalalignment='center', size=self.label_size)
-        plt.xlim(xmin=xmin,xmax=xmax)
-        plt.ylim(ymin=ymin,ymax=ymax)
-        plt.axis('equal')
+        plt.axis('square')
+        plt.xlim((xmin,xmax))
+        plt.ylim((ymin,ymax))
         return True
 
     def anim_frame_update(self, frame):
