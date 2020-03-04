@@ -12,6 +12,10 @@ from pecs import PECS
 
 # set source calibration file
 path = "/data/focalplane/logs/kpno/20200212/00048283-arc_calibration-all_good_after_canrestart/calibdf.pkl.gz"
+mode = int(input('Choose mode\n'
+                 '    0: apply to all positioners in the calibration file\n'
+                 '    1: apply to specified positioners in posids\n'
+                 '    2: apply to all except those in posids_exclude\n: '))
 # set posids to apply calibrations, leave mpty to apply to all
 posids = ['M00282', 'M00284', 'M01023', 'M01077', 'M01255', 'M01325',
        'M01471', 'M01702', 'M01712', 'M01814', 'M02011', 'M02021',
@@ -82,13 +86,16 @@ posids = ['M00282', 'M00284', 'M01023', 'M01077', 'M01255', 'M01325',
        'M07257', 'M07280', 'M07285', 'M07286', 'M07291', 'M07301',
        'M07304', 'M07312', 'M07351', 'M07352', 'M07353', 'M07394',
        'M07395', 'M07396'] 
+posids_exclude = []
 calib = pd.read_pickle(path)['FIT']
 pecs = PECS(interactive=False)
-if posids:
-    posids = set(posids) & set(calib.index)
-    pecs.ptl_setup(pecs.pcids, posids=posids)
-else:
+if mode == 0:
     posids = calib.index
+elif mode == 1:
+    posids = set(posids) & set(calib.index)
+else:
+    posids = set(calib.index) - set(posids_exclude)
+pecs.ptl_setup(pecs.pcids, posids=posids)
 print(f'Setting calibration for {len(posids)} positioners using file: {path}')
 keys_fit = ['OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
             'LENGTH_R1', 'LENGTH_R2']  # initial values for fitting
