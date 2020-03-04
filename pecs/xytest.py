@@ -429,7 +429,7 @@ class XYTest(PECS):
 
 
 if __name__ == '__main__':
-    path = os.path.join(pc.dirs['test_settings'], 'xytest_psf_rand.cfg')
+    path = os.path.join(pc.dirs['test_settings'], 'xytest_10ptl.cfg')
     print(f'Loading test config: {path}')
     xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')  # read cfg
     xytest_name = input(r'Please name this test (xytest-{test_name}): ')
