@@ -494,19 +494,27 @@ class PosCalibrationFits:
 
     def verify_with_extra_points(self, data, calib_fit):  # feed in data_extra
         posids = data.index.get_level_values('DEVICE_ID').unique()
+        cols = ['mea_flatX', 'mea_flatY', 'exp_flatX', 'exp_flatY']
+        for col in cols:  # add new empty columns to grid data dataframe
+            data[col] = np.nan
         for posid in tqdm(posids):
             trans = self.posmodels[posid].trans
+            QS = data.loc[idx[:, posid], ['mea_Q', 'mea_S']]  # Nx2
+            mask = QS.notnull().all(axis=1)
+            data.loc[QS[mask].index, ['mea_flatX', 'mea_flatY']] = \
+                mea_flatXY = trans.QS_to_flatXY(QS[mask].T).T
             poscal = {key: calib_fit.loc[posid, key] for key in keys_fit}
             trans.alt_override = True  # enable override in pos transforms
             trans.alt.update(poscal)
-            posintTP = data.loc[idx[:, posid], ['posintT', 'posintP']].values
-            flatXY = np.array([trans.posintTP_to_flatXY(x) for x in posintTP])
-            errXY = (data.loc[idx[:, posid], ['mea_flatX', 'mea_flatY']]
-                     - flatXY)
+            posintTP = data.loc[QS[mask].index, ['posintT', 'posintP']].values
+            data.loc[QS[mask].index, ['exp_flatX', 'exp_flatY']] = \
+                exp_flatXY = np.array(
+                    [trans.posintTP_to_flatXY(x) for x in posintTP])
+            errXY = mea_flatXY - flatXY
             calib_fit.loc[posid, 'err_rms'] = np.rms(errXY)
             calib_fit.loc[posid, 'err_max'] = np.max(errXY)
             calib_fit.loc[posid, 'err_med'] = np.median(errXY)
-        return calib_fit
+        return data, calib_fit
 
 
 if __name__ == '__main__':
