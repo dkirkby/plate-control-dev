@@ -14,7 +14,7 @@ from pecs import PECS
 path = "/data/focalplane/logs/kpno/20200213/00048406-arc_calibration-ptl2_88_disabled/calibdf.pkl.gz"
 mode = int(input('Choose from the following three modes (enter single digit integer)\n'
                  '    0: apply to all positioners in the calibration file\n'
-                 '    1: apply to specified positioners in posids\n'
+                 '    1: apply to only those specified in posids\n'
                  '    2: apply to all except those in posids_exclude\n: '))
 # set posids to apply calibrations, leave mpty to apply to all
 posids = ['M01282', 'M02440', 'M02449', 'M02499', 'M03037', 'M03067',
