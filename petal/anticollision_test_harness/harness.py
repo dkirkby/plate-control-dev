@@ -19,7 +19,7 @@ subset7a = {89,79,78,99,87,98,88}
 
 # Selection of which device location ids to send move requests to
 # (i.e. which positioners on petal to directly command)
-device_loc_to_operate = subset7a
+device_loc_to_operate = locations_all
 
 # Whether to include any untargeted neighbors in the calculations
 include_neighbors = True
@@ -36,7 +36,7 @@ fidids = {}
 petal_id = 3
 
 # Other options
-should_animate = True
+should_animate = False
 anim_label_size = 'medium' # size in points, 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
 animation_foci =  'commanded' # argue {} or 'all' to animate everything, including PTL and GFA.
                              # 'colliding' to only animate colliding bots.
@@ -101,7 +101,7 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                       verbose         = False,
                       phi_limit_on    = False)
     ptl.limit_radius = None
-    if ptl.schedule_stats:
+    if ptl.schedule_stats.is_enabled():
         ptl.schedule_stats.filename_suffix = filename_suffix
         ptl.schedule_stats.clear_cache_after_save_by_append = False
         ptl.schedule_stats.add_note('POS_PARAMS_ID: ' + str(pos_param_id))
@@ -135,7 +135,7 @@ for pos_param_id, pos_params in pos_param_sequence.items():
     for move_requests_id, move_request_data in move_request_sequence.items():
         m += 1
         exportable_targets.append({'target_no':m-1})
-        if ptl.schedule_stats:
+        if ptl.schedule_stats.is_enabled():
             ptl.schedule_stats.add_note('MOVE_REQUESTS_ID: ' + str(move_requests_id))
         for n in range(n_corrections + 1):
             print(' move: ' + str(m) + ' of ' + str(mtot) + ', submove: ' + str(n))
@@ -163,7 +163,7 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                 hc.profile('ptl.schedule_send_and_execute_moves(anticollision="'+anticollision+'")')
             else:
                 ptl.schedule_send_and_execute_moves(anticollision=anticollision)
-    if ptl.schedule_stats:
+    if ptl.schedule_stats.is_enabled():
         ptl.schedule_stats.save()
     if should_export_targets and exportable_targets:
         filename = 'xytest_targets_' + runstamp + '.csv'
