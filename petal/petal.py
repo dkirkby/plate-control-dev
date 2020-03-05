@@ -178,10 +178,11 @@ class Petal(object):
         self.altered_calib_states = set()
 
         # schedule stats module
-        self.schedule_stats = None
-        self.schedule_stats_path = None
-        if sched_stats_on:
-            self.enable_schedule_stats()
+        self.schedule_stats = posschedstats.PosSchedStats(enabled=sched_stats_on)
+        sched_stats_dir = os.path.join(pc.dirs['kpno'], pc.dir_date_str())
+        sched_stats_filename = f'PTL{self.petal_id:02}-pos_schedule_stats.csv'
+        self.sched_stats_path = os.path.join(sched_stats_dir, sched_stats_filename)
+        os.makedirs(sched_stats_dir, exist_ok=True)
 
         # must call the following 3 methods whenever petal alingment changes
         self.init_ptltrans()
@@ -322,28 +323,6 @@ class Petal(object):
         self.schedule = self._new_schedule()
         self.anticollision_default = anticollision
         
-    def enable_schedule_stats(self, directory=None):
-        '''Turn on the posschedstats module, which logs telemetry on performance
-        of move scheduler, including details on anticollision calculations. A
-        custom directory path may be argued for output files to be put in,
-        otherwise an appropriate default path will be generated.'''
-        self.schedule_stats = posschedstats.PosSchedStats()
-        if not directory:
-            directory = os.path.join(pc.dirs['kpno'], pc.dir_date_str())
-        self.schedule_stats_path = os.path.join(directory,
-            f'PTL{self.petal_id:02}-pos_schedule_stats.csv')
-        os.makedirs(directory, exist_ok=True)
-    
-    def disable_schedule_stats(self):
-        '''Turn off the posschedstats module.
-        '''
-        self.schedule_stats = None
-        self.schedule_stats_path = None
-        
-    def schedule_stats_is_enabled(self):
-        '''Returns boolean True if the posschedstats module is currently on,
-        False if not.'''
-        return self.schedule_stats != None
 
     # %% METHODS FOR POSITIONER CONTROL
 
@@ -995,36 +974,6 @@ class Petal(object):
         """
         return self.comm.pbget(key)
 
-    def get_ptl_performance_telemetry(self):
-        """Returns an abbreviated summary of key performance parameters
-        to be plotted with the telemetry viewer.  These stats are provided
-        for the latest shedule only.
-
-        Returns dictionary of anticollision statistic parameters (if self.schedule_stats is initialized,
-        else returns an empty dictionary).
-        key ... value
-        'found total collisions' ... integer number of total collisions found
-        'resolved total collisions' ... integer number of total collisions resolved
-        'resolved freeze collisions' ... integer number of collisions resolved via the 'freeze' method
-        'n pos' ... integer number of positioners included in the schedule
-        'method' ... string name of anticollision method specified for the schedule
-        'avg moving simultaneously' ... float describing the average number of positioners moving simulataneously
-        'max moving simultaneously' ... float describing the maximum number of positioners moving simultaneously
-        'total schedule time' ... float total time (calculation and move) for the schedule
-        """
-        if not self.schedule_stats:
-            return {}
-        data = self.schedule_stats.summarize_all()
-        idx = -2 if not self.schedule_stats.real_data_yet_in_latest_row else -1
-        keys_to_include = ['found total collisions', 'resolved total collisions',\
-                          'freeze', 'n pos', 'method', 'avg moving simultaneously', 'max moving simultaneously']
-        total_time = data['max table move time'][idx] + data['request_target calc time'][idx]\
-                     + data['schedule_moves calc time'][idx] + data['expert_add_table calc time'][idx]
-        data_for_telemetry = {k:data[k][idx] for k in keys_to_include if not k == 'freeze'}
-        data_for_telemetry['resolved freeze collisions'] = data['freeze'][idx]
-        data_for_telemetry['total schedule time'] = total_time
-        return data_for_telemetry
-
     def commit(self, mode='move', log_note='', *args, **kwargs):
         '''Commit move data or calibration data to DB and/or local config and
         log files.
@@ -1065,7 +1014,7 @@ class Petal(object):
                     for state in self.altered_states:
                         state.log_unit()  # this writes the local log
             self.altered_states = set()
-            if self.schedule_stats_is_enabled():  # write schedule stats in any case
+            if self.schedule_stats.is_enabled():  # write schedule stats in any case
                 self.schedule_stats.save(path=self.sched_stats_path, mode='a')
         elif mode == 'calib':
             if self.local_commit_on:
