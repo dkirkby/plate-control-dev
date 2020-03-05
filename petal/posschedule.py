@@ -1,8 +1,6 @@
 import posconstants as pc
 import posschedulestage
 import time
-import math
-
 
 class PosSchedule(object):
     """Generates move table schedules in local (theta,phi) to get positioners

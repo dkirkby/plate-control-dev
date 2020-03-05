@@ -177,8 +177,11 @@ class Petal(object):
         self.altered_states = set()
         self.altered_calib_states = set()
 
-        # scheduling options
-        self.sched_stats_on = sched_stats_on
+        # schedule stats module
+        self.schedule_stats = None
+        self.schedule_stats_path = None
+        if sched_stats_on:
+            self.enable_schedule_stats()
 
         # must call the following 3 methods whenever petal alingment changes
         self.init_ptltrans()
@@ -315,17 +318,32 @@ class Petal(object):
         # control methods below
         self.animator_on = False
         # keeps track of total time of the current animation
-        self.animator_total_time = 0
-        self.schedule_stats = None
-        if self.sched_stats_on:
-            self.schedule_stats = posschedstats.PosSchedStats()
-            self.sched_stats_path = os.path.join(
-                pc.dirs['kpno'], pc.dir_date_str(),
-                f'PTL{self.petal_id:02}-pos_schedule_stats.csv')
-            os.makedirs(os.path.join(pc.dirs['kpno'], pc.dir_date_str()),
-                        exist_ok=True)
+        self.animator_total_time = 0            
         self.schedule = self._new_schedule()
         self.anticollision_default = anticollision
+        
+    def enable_schedule_stats(self, directory=None):
+        '''Turn on the posschedstats module, which logs telemetry on performance
+        of move scheduler, including details on anticollision calculations. A
+        custom directory path may be argued for output files to be put in,
+        otherwise an appropriate default path will be generated.'''
+        self.schedule_stats = posschedstats.PosSchedStats()
+        if not directory:
+            directory = os.path.join(pc.dirs['kpno'], pc.dir_date_str())
+        self.schedule_stats_path = os.path.join(directory,
+            f'PTL{self.petal_id:02}-pos_schedule_stats.csv')
+        os.makedirs(directory, exist_ok=True)
+    
+    def disable_schedule_stats(self):
+        '''Turn off the posschedstats module.
+        '''
+        self.schedule_stats = None
+        self.schedule_stats_path = None
+        
+    def schedule_stats_is_enabled(self):
+        '''Returns boolean True if the posschedstats module is currently on,
+        False if not.'''
+        return self.schedule_stats != None
 
     # %% METHODS FOR POSITIONER CONTROL
 
@@ -1047,7 +1065,7 @@ class Petal(object):
                     for state in self.altered_states:
                         state.log_unit()  # this writes the local log
             self.altered_states = set()
-            if self.sched_stats_on:  # write schedule stats in any case
+            if self.schedule_stats_is_enabled():  # write schedule stats in any case
                 self.schedule_stats.save(path=self.sched_stats_path, mode='a')
         elif mode == 'calib':
             if self.local_commit_on:
