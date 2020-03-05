@@ -10,10 +10,15 @@ import copy
 # separated out here because so long
 final_checks_str = 'num collisions found by final check (should be zero, or None if no check done)'
 found_not_registered_str = 'found but not directly resolved (useful for debugging, not necessarily empty -- some collisions may be indirectly resolved)'
+_unregistered_schedule_str = 'unregistered'
+_blank_str = '-'
 
 class PosSchedStats(object):
-    """Collects statistics from runs of the PosSchedule. By default, the
-    module starts out disabled. See enable() and disable methods below.
+    """Collects statistics from runs of the PosSchedule.
+    
+    By default, the module starts out disabled. You can override this with a
+    boolean value True to initialization argument enabled. Or use the enable()
+    and disable() methods separately.
     """
     def __init__(self, enabled=False):
         self._init_data_structures()
@@ -22,10 +27,7 @@ class PosSchedStats(object):
             self.enable()
         self.clear_cache_after_save_by_append = True
         self.filename_suffix = ''
-        self._blank_str = '-'
-        self._unregistered_schedule_str = 'unregistered'
     
-    @property
     def is_enabled(self):
         '''Boolean whether statistics tracking is currently turned on.'''
         return self._is_enabled and self.schedule_ids # 2nd expression is to avoid storing to improperly empty structure (i.e. no schedule yet registered) 
@@ -41,12 +43,16 @@ class PosSchedStats(object):
         self._is_enabled = False
     
     @property
-    def latest(self):
-        return self.schedule_ids[-1]
+    def n_rows(self):
+        '''Number of rows present in the data structure, considering each
+        registered schedule to be a 'row'.'''
+        return len(self.schedule_ids)
     
-    def is_empty(self):
-        '''Whether the stats data cache is currently empty.'''
-        return len(self.schedule_ids) == 0
+    @property
+    def latest(self):
+        '''Get latest 'row', i.e. latest registered schedule id, which acts
+        as an index to that row.'''
+        return self.schedule_ids[-1]
     
     def _init_data_structures(self):
         self.schedule_ids = []
@@ -72,8 +78,7 @@ class PosSchedStats(object):
                         'expert_add_table calc time':[],
                         }
         self._latest_saved_row = None
-        self._real_data_yet_in_latest_row = None
-        dummy_id = self._unregistered_schedule_str + ' ' + pc.timestamp_str()
+        dummy_id = _unregistered_schedule_str + ' ' + pc.timestamp_str()
         self.register_new_schedule(schedule_id=dummy_id)
     
     def register_new_schedule(self, schedule_id, num_pos=None):
@@ -89,17 +94,15 @@ class PosSchedStats(object):
         self.unresolved_sweeps[self.latest] = {}
         self.final_checked_collision_pairs[self.latest] = {}
         for key in self.strings:
-            self.strings[key].append(self._blank_str)
+            self.strings[key].append(_blank_str)
         for key in self.numbers:
             val = None if key == final_checks_str else 0
             self.numbers[key].append(val)
         self.numbers['n pos'][-1] = num_pos
-        self._real_data_yet_in_latest_row = False
 
     def set_num_move_tables(self, n):
         """Record number of move tables in the current schedule."""
         self.numbers['n move tables'][-1] = n
-        self._real_data_yet_in_latest_row = True
         
     def add_collisions_found(self, collision_pair_ids):
         """Add collisions that have been found in the current schedule.
@@ -107,7 +110,6 @@ class PosSchedStats(object):
         """
         these_collisions = self.collisions[self.latest]
         these_collisions['found'] = these_collisions['found'].union(collision_pair_ids)
-        self._real_data_yet_in_latest_row = True
         
     def add_collisions_resolved(self, method, collision_pair_ids):
         """Add collisions that have been resolved in the current schedule.
@@ -118,59 +120,49 @@ class PosSchedStats(object):
         if method not in this_dict:
             this_dict[method] = set()
         this_dict[method] = this_dict[method].union(collision_pair_ids)
-        self._real_data_yet_in_latest_row = True
         
     def add_request(self):
         """Increment requests count."""
         self.numbers['n requests'][-1] += 1
-        self._real_data_yet_in_latest_row = True
         
     def add_request_accepted(self):
         """Increment requests accepted count."""
         self.numbers['n requests accepted'][-1] += 1
-        self._real_data_yet_in_latest_row = True
     
     def add_table_matching_request(self):
         """Increment number of tables matching their original requests."""
         self.numbers['n tables achieving requested-and-accepted targets'][-1] += 1
-        self._real_data_yet_in_latest_row = True
             
     def add_requesting_time(self, time):
         """Add in time spent processing target requests in the current schedule."""
         self.numbers['request_target calc time'][-1] += time
         self.numbers['request + schedule calc time'][-1] += time
-        self._real_data_yet_in_latest_row = True
 
     def add_scheduling_time(self, time):
         """Add in time spent processing move schedules in the current schedule."""
         self.numbers['schedule_moves calc time'][-1] += time
         self.numbers['request + schedule calc time'][-1] += time
-        self._real_data_yet_in_latest_row = True
 
     def add_expert_table_time(self, time):
         """Add in time spent putting expert tables into the current schedule."""
         self.numbers['expert_add_table calc time'][-1] += time
-        self._real_data_yet_in_latest_row = True
 
     def set_scheduling_method(self, method):
         """Set scheduling method (a string) for the current schedule."""
         self.strings['method'][-1] = str(method)
-        self._real_data_yet_in_latest_row = True
     
     def add_note(self, note, separator='; '):
         """Add a note string for the current schedule. If one already exists,
         then the argued note will be appended to it, separated by the arg
         separator."""
-        if not self.strings['note'][-1] or self.strings['note'][-1] == self._blank_str:
+        if not self.strings['note'][-1] or self.strings['note'][-1] == _blank_str:
             self.strings['note'][-1] = str(note)
         else:
             self.strings['note'][-1] += str(separator) + str(note)
-        self._real_data_yet_in_latest_row = True
         
     def set_max_table_time(self, time):
         """Set the maximum move table time in the current schedule."""
         self.numbers['max table move time'][-1] = time
-        self._real_data_yet_in_latest_row = True
 
     def add_to_num_adjustment_iters(self, iterations):
         """Add data recording number of iterations of path adjustment were made."""
@@ -245,18 +237,75 @@ class PosSchedStats(object):
         data['calc: fraction of targets achieved (of those accepted)'] = [safe_divide(data['n tables achieving requested-and-accepted targets'][i], data['n requests accepted'][i]) for i in range(nrows)]
         for key in self._strings_to_print_last:
             data.update({key:self.strings[key]})
-        null_rows = []
-        has_a_null_final_row = not self._real_data_yet_in_latest_row and not self.is_empty()
-        if has_a_null_final_row:
-            null_rows += [nrows - 1]
-        
-        if has_a_null_final_row:
-            data = copy.deepcopy(data) # to ensure nothing screwy happens to underlying data before deleting null row below
-            nrows -= 1
-            for key in data:
-                if len(data[key]) > nrows:
-                    del data[key][-1]
-        return data, nrows
+        stripped_data, stripped_nrows = self._copy_and_strip_null_rows(data)
+        return stripped_data, stripped_nrows
+    
+    def _copy_and_strip_null_rows(self, data):
+        '''Copies summary data structure and strips out any rows that are
+        considered "null". Very low-level implementation-specifc stuff, broken
+        out into a separate function here just for readability.'''
+        null_rows = [row for row in range(self.n_rows) if not self._row_contains_real_data(row)]
+        stripped = copy.deepcopy(data) # to ensure nothing screwy happens to underlying data before deleting any null rows below
+        stripped_nrows = self.n_rows
+        for row in null_rows:
+            stripped_nrows -= 1
+            for somelist in stripped.values():
+                if 0 <= row < len(somelist):
+                    del somelist[row]
+        return stripped, stripped_nrows
+
+    def _row_contains_real_data(self, row=-1):
+        '''Checks whether a row contains any actual data, or is instead
+        completely filled with "null" values. Arguments to input row:
+            
+            -1 ... last row in data structure
+                   (function returns False if data structure is completely empty)
+            
+            integer >= 0 ... data in that row index
+                   (function returns False if that's not a valid index)
+        '''
+        if row < -1 or row >= self.n_rows or self.n_rows == 0:
+            return False
+        sched_id = self.schedule_ids[row]
+        for dictionary in [self.collisions,
+                           self.unresolved,
+                           self.unresolved_tables,
+                           self.unresolved_sweeps,
+                           self.final_checked_collision_pairs]:
+            is_empty = self._recursive_is_collection_empty(dictionary[sched_id])
+            if not is_empty:
+                return True
+        for strlist in self.strings.values():
+            if strlist[row] != _blank_str:
+                return True
+        for key, numlist in self.numbers.items():
+            value = numlist[row]
+            if key == final_checks_str:
+                if value != None:
+                    return True
+            elif key == 'n pos':
+                pass # n pos is specifically NOT used as a criterion for real data, due to how it may be pre-set upon initializion
+            elif value != 0:
+                return True
+        return False
+    
+    def _recursive_is_collection_empty(self, item):
+        '''Recursively search a collection and any subcollections it contains,
+        returning 1 if any of them contain data, and 0 if not. Here, "data"
+        means anything other than an empty collection. And "collection" is only
+        guaranteed to work for lists, dicts, and sets.'''
+        if isinstance(item, dict) or isinstance(item, list) or isinstance(item, set):
+            if len(item) == 0:
+                return 1
+            else:
+                boolean = 1
+                for sub in item:
+                    if isinstance(item, dict):
+                        sub = item[sub]
+                    boolean *= self._recursive_is_collection_empty(sub)
+                return boolean
+        else:
+            return 0
 
     def generate_table(self, append_footers=False):
         """Returns a pandas dataframe representing a complete report table of
@@ -273,7 +322,7 @@ class PosSchedStats(object):
         if append_footers:
             blank_row = {'method':''}
             rms = lambda X: (sum([x**2 for x in X])/len(X))**0.5
-            unique_methods = sorted(set(data['method']) - {self._blank_str})
+            unique_methods = sorted(set(data['method']) - {_blank_str})
             categories = ['overall'] + unique_methods
             calcs = {'max':max, 'min':min, 'rms':rms, 'avg':np.mean, 'med':np.median}
             stats = {}
