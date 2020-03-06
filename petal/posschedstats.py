@@ -35,7 +35,10 @@ class PosSchedStats(object):
     def enable(self):
         '''Turn module on, ready for statistics tracking. Any existing
         data in the cache will be cleared.'''
-        self._init_data_structures()
+        carryover_npos = None
+        if self.n_rows > 0:
+            carryover_npos = self.numbers['n pos'][-1] # for cases where enabling stats while some posschedule instance (unregistered) already exists
+        self._init_data_structures(num_pos=carryover_npos)
         self._is_enabled = True
     
     def disable(self):
@@ -54,7 +57,14 @@ class PosSchedStats(object):
         as an index to that row.'''
         return self.schedule_ids[-1]
     
-    def _init_data_structures(self):
+    def _init_data_structures(self, num_pos=None):
+        '''Initialize data structures.
+        
+        Note the argument num_pos may be entered in special cases where the
+        number of positioners is already known. This value will be put into the
+        first (unregistered) row of the data structure. In most cases no need
+        to worry about this --- it occurs whenever registering a new schedule.
+        '''
         self.schedule_ids = []
         self.collisions = {}
         self.unresolved = {}
@@ -78,8 +88,8 @@ class PosSchedStats(object):
                         'expert_add_table calc time':[],
                         }
         self._latest_saved_row = None
-        dummy_id = _unregistered_schedule_str + ' ' + pc.timestamp_str()
-        self.register_new_schedule(schedule_id=dummy_id)
+        dummy_id = pc.timestamp_str() + ' (' + _unregistered_schedule_str + ')'
+        self.register_new_schedule(schedule_id=dummy_id, num_pos=num_pos)
     
     def register_new_schedule(self, schedule_id, num_pos=None):
         """Register a new schedule object to track statistics of.
