@@ -24,7 +24,6 @@ class PosSchedule(object):
             self.stats.register_new_schedule(schedule_id, len(self.petal.posids))
         else:
             self.stats = posschedstats.PosSchedStats(enabled=False) # this is really just to get the is_enabled() function available
-        self._stats_enabled = self.stats.is_enabled() # hold this constant during a schedule instance's limited lifetime
         self.verbose = verbose
         self.printfunc = self.petal.printfunc
         self.requests = {} # keys: posids, values: target request dictionaries
@@ -64,7 +63,8 @@ class PosSchedule(object):
 
         Return value is True if the request was accepted and False if denied.
         """
-        if self._stats_enabled:
+        stats_enabled = self.stats.is_enabled()
+        if stats_enabled:
             timer_start = time.clock()
             self.stats.add_request()
         posmodel = self.petal.posmodels[posid]
@@ -171,7 +171,7 @@ class PosSchedule(object):
                        'cmd_val2': v,
                        'log_note': log_note}
         self.requests[posid] = new_request
-        if self._stats_enabled:
+        if stats_enabled:
             self.stats.add_requesting_time(time.clock() - timer_start)
             self.stats.add_request_accepted()
         return True
@@ -203,7 +203,8 @@ class PosSchedule(object):
         then it reverts to 'freeze' instead. An argument of anticollision=None
         remains as-is.
         """
-        if self._stats_enabled:
+        stats_enabled = self.stats.is_enabled()
+        if stats_enabled:
             timer_start = time.clock()
             self.stats.set_scheduling_method(str(anticollision))
             original_request_posids = set(self.requests.keys())
@@ -230,7 +231,7 @@ class PosSchedule(object):
                         final.add_table(table)
                     else:
                         final.move_tables[posid].extend(table)
-        if anticollision or self._stats_enabled or self.petal.animator_on:
+        if anticollision or stats_enabled or self.petal.animator_on:
             adjective = 'Penultimate' if anticollision else 'Final'
             colliding_sweeps, all_sweeps = final.find_collisions(final.move_tables)
             self.printfunc(adjective + ' collision check --> num colliding sweeps = ' + str(len(colliding_sweeps)))
@@ -261,7 +262,7 @@ class PosSchedule(object):
                 self.printfunc('Final check of quantized sweeps --> ' + str(len(discontinuous)) + ' discontinuous (should always be zero)')
                 if discontinuous:
                     self.printfunc('Discontinous sweeps: ' + str(sorted(discontinuous.keys())))
-            if self._stats_enabled:
+            if stats_enabled:
                 self.stats.add_final_collision_check(collision_pairs)
                 colliding_posids = set(colliding_sweeps.keys())
                 colliding_tables = {p:final.move_tables[p] for p in colliding_posids if p in final.move_tables}
@@ -277,7 +278,7 @@ class PosSchedule(object):
                 req = self.requests.pop(posid)
                 table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
                 log_note_addendum = req['log_note'] # keep the original log notes with move tables
-                if self._stats_enabled:
+                if stats_enabled:
                     table_for_schedule = table.for_schedule()
                     if posid in original_request_posids and self._table_matches_request(table_for_schedule,req):
                         self.stats.add_table_matching_request()
@@ -286,7 +287,7 @@ class PosSchedule(object):
                 self.printfunc('Error: ' + str(posid) + ' has a move table despite no request.')
                 table.display()
             table.log_note += (' ' if table.log_note else '') + log_note_addendum
-        if self._stats_enabled:
+        if stats_enabled:
             self.stats.set_num_move_tables(len(self.move_tables))
             self.stats.set_max_table_time(max_net_time)
             self.stats.add_scheduling_time(time.clock() - timer_start)
@@ -363,14 +364,15 @@ class PosSchedule(object):
         will be ignored upon scheduling. Generally, this method should only be used
         by an expert user.
         """
-        if self._stats_enabled:
+        stats_enabled = self.stats.is_enabled()
+        if stats_enabled:
             timer_start = time.clock()
         if self._deny_request_because_disabled(move_table.posmodel):
             if self.verbose:
                 self.printfunc(str(move_table.posmodel.posid) + ': move table addition to schedule denied. Positioner is disabled.')
             return
         self.stages['expert'].add_table(move_table)
-        if self._stats_enabled:
+        if stats_enabled:
             self.stats.add_expert_table_time(time.clock() - timer_start)
             
     def expert_mode_is_on(self):
@@ -436,7 +438,7 @@ class PosSchedule(object):
                         self.petal.pos_flags[p] |= self.petal.frozen_anticol_bit # Mark as frozen by anticollision
                     if self.verbose:
                         self.printfunc("remaining stage.colliding " + str(stage.colliding))
-            if self._stats_enabled and adjustment_performed:
+            if self.stats.is_enabled() and adjustment_performed:
                 self.stats.add_to_num_adjustment_iters(1)
 
     def _schedule_requests_with_path_adjustments(self):
@@ -444,6 +446,7 @@ class PosSchedule(object):
         'rotate', and 'extend' stages with motion paths from start to finish.
         The move tables may include adjustments of paths to avoid collisions.
         """
+        stats_enabled = self.stats.is_enabled()
         start_posintTP = {name: {} for name in self.RRE_stage_order}
         desired_final_posintTP = {name: {} for name in self.RRE_stage_order}
         dtdp = {name: {} for name in self.RRE_stage_order}
@@ -502,7 +505,7 @@ class PosSchedule(object):
                                 next_name = self.RRE_stage_order[next_stage_idx]
                                 start_posintTP[next_name][p] = [adjusted_t,adjusted_p]
                                 dtdp[next_name][p] = calc_dtdp(next_name, p)
-                if self._stats_enabled:
+                if stats_enabled:
                     self.stats.add_to_num_adjustment_iters(1)
             if stage.colliding:
                 self.printfunc('Error: During ' + name.upper() + ' stage of move scheduling (see PosSchedule.py), the positioners ' + str([posid for posid in stage.colliding]) + ' had collision(s) that were NOT resolved. This means there is a bug somewhere in the code that needs to be found and fixed. If this move is executed on hardware, these two positioners will collide!')
@@ -515,7 +518,7 @@ class PosSchedule(object):
                             self.stages[n].move_tables[posid].display(self.printfunc)
                         elif n == name:
                             self.printfunc(stage_str + ' --> no move table found')
-                if self._stats_enabled:
+                if stats_enabled:
                     sorted_colliding = sorted(stage.colliding) # just for human ease of reading the values
                     colliding_tables = {posid:stage.move_tables[posid] for posid in sorted_colliding}
                     colliding_sweeps = {posid:stage.sweeps[posid] for posid in sorted_colliding}

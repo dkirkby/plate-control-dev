@@ -19,7 +19,6 @@ class PosScheduleStage(object):
         self.sweeps = {} # keys: posids, values: instances of PosSweep, corresponding to entries in self.move_tables
         self.colliding = set() # positioners currently known to have collisions
         self.stats = stats
-        self._stats_enabled = self.stats.is_enabled() # hold this constant during a stage instance's limited lifetime
         self._power_supply_map = power_supply_map
         self._theta_max_jog_A = 50 # deg, maximum distance to temporarily shift theta when doing path adjustments
         self._theta_max_jog_B = 20
@@ -182,6 +181,7 @@ class PosScheduleStage(object):
         Adjustments to neighbor's timing only go one level deep of neighborliness.
         In other words, a neighbor's neighbor will not be affected by this function.
         """
+        stats_enabled = self.stats.is_enabled()
         if self.sweeps[posid].collision_case == pc.case.I:
             return set()
         elif self.sweeps[posid].collision_case in pc.case.fixed_cases:
@@ -217,7 +217,7 @@ class PosScheduleStage(object):
                 all_to_store.update({p:s for p,s in all_sweeps.items() if p in proposed})
                 
                 # determine if collision was resolved (for statistics tracking)
-                if self._stats_enabled:
+                if stats_enabled:
                     old_collision_id = self._collision_id(posid,collision_neighbor)
                     if posid in col_to_store:
                         new_collision_id = self._collision_id(posid,col_to_store[posid].collision_neighbor)
@@ -337,7 +337,7 @@ class PosScheduleStage(object):
                 self.colliding.remove(posid)
                 if posid in colliding_sweeps:
                     colliding_sweeps.pop(posid)
-        if self._stats_enabled:
+        if self.stats.is_enabled():
             found = {self._collision_id(posid, sweep.collision_neighbor) for posid, sweep in colliding_sweeps.items()}
             self.stats.add_collisions_found(found)
             
