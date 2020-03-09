@@ -6,6 +6,7 @@ import math
 import datetime
 import pytz
 import collections
+import csv
 
 """Constants and convenience methods used in the control of Fiber Postioners
 """
@@ -28,7 +29,6 @@ dirs = {}
 dirs['all_logs']     = os.environ.get('POSITIONER_LOGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/positioner_logs
 dirs['all_settings'] = os.environ.get('FP_SETTINGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/fp_settings
 dirs['positioner_locations_file'] = os.environ.get('FP_SETTINGS_PATH')+'/hwsetups/Petal_Metrology.csv' # this is NOT metrology, it is a *bad* naming. it is nominals!
-dirs['positioner_neighbors_file'] = os.environ.get('FP_SETTINGS_PATH')+'/hwsetups/neighbor_locs'  # neighbor locations dictionary by DEVICE_LOC
 dirs['small_array_locations_file']=os.getenv('FP_SETTINGS_PATH')+'/hwsetups/SWIntegration_XY.csv'
 dirs['petal2_fiducials_metrology_file']=os.getenv('FP_SETTINGS_PATH')+'/hwsetups/petal2_fiducials_metrology.csv'
 dirs['petalbox_configurations'] = os.getenv('FP_SETTINGS_PATH') + '/ptl_settings/petalbox_configurations_by_ptl_id.json' # temporary until configuration info is sent through petal init
@@ -70,7 +70,6 @@ R2N_lookup = interp1d(R_lookup_data[:, 0], R_lookup_data[:, 3], kind='cubic',
                       fill_value='extrapolate')
 N2R_lookup = interp1d(R_lookup_data[:, 3], R_lookup_data[:, 2], kind='cubic')
 
-
 # composite focal surface lookup methods for 3D out-of-shell QST transforms
 def S2N_lookup(S):
     return R2N_lookup(S2R_lookup(S))  # return nutation angles in degrees
@@ -87,6 +86,18 @@ def Z2S_lookup(Z):
 def N2S_lookup(N):
     return R2S_lookup(N2R_lookup(N))  # takes nutation angles in degrees
 
+# Generic map of positioner device locs to their neighboring locs
+generic_pos_neighbor_locs_path = os.path.join(petal_directory, 'generic_pos_neighbor_locs.csv')
+generic_pos_neighbor_locs = {}
+if os.path.exists(generic_pos_neighbor_locs_path):
+    with open(generic_pos_neighbor_locs_path, 'r', newline='') as file:
+        reader = csv.DictReader(file)
+        neighbor_fields = [f for f in reader.fieldnames if f != 'DEVICE_LOC']
+        for row in reader:
+            neighbors = {int(row[f]) for f in neighbor_fields if row[f] not in ['']}
+            generic_pos_neighbor_locs[int(row['DEVICE_LOC'])] = neighbors
+else:
+    generic_pos_neighbor_locs = 'not found: ' + generic_pos_neighbor_locs_path
 
 # Mapping of positioner power supplies to can channels
 power_supply_can_map = {'V1':{'can10','can11','can13','can22', 'can23'},

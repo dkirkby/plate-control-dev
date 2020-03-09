@@ -57,8 +57,7 @@ class PosCollider(object):
 
         # load fixed dictionary containing locations of neighbors for each positioner DEVICE_LOC (if this option has been selected)
         if self.use_neighbor_loc_dict:
-            with open(pc.dirs['positioner_neighbors_file'], 'rb') as f:
-                self.neighbor_locs = pickle.load(f)
+            self.neighbor_locs = pc.generic_pos_neighbor_locs
 
     def update_positioner_offsets_and_arm_lengths(self):
         """Loads positioner parameters.  This method is called when new calibration data is available
