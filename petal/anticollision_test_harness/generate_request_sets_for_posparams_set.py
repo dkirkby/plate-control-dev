@@ -71,17 +71,28 @@ for i in range(num_sets_to_make):
             v = model.state._val
             print('Warning: no valid target found for posid: ' + posid + ' at location ' + str(v['DEVICE_LOC']) + ' (x,y) = (' + format(v['OFFSET_X'],'.3f') + ',' + format(v['OFFSET_Y'],'.3f') + ')')
     all_targets.append(targets_posXY)
-    
+
+# gather device locations and sort rows
+device_loc_list = sorted(collider.devicelocs.keys())
+all_targets_by_loc = []
+for targets in all_targets:
+    targets_by_loc = {}
+    for loc in device_loc_list:
+        posid = collider.devicelocs[loc]
+        if posid in targets:
+            targets_by_loc[loc] = targets[posid]
+    all_targets_by_loc.append(targets_by_loc)
+
 # save set files
 petal_id = 3 #posparams_id - 10000 # quick hack, assuming the "add 10000" to id rule from "generate_request_sets_for_posparams.py" applies
 start_number = input('Enter starting file number (or nothing, to start at \'000\'). The petal id number will be prefixed. start = ')
 start_number = 0 if not start_number else int(start_number)
 next_filenumber = petal_id * 1000 + start_number # more id number hackery
-for target in all_targets:
+for target in all_targets_by_loc:
     save_path = hc.filepath(hc.req_dir, hc.req_prefix, next_filenumber)
     with open(save_path,'w',newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(['DEVICE_LOC','command','u','v'])
-        for posid,uv in target.items():
-            writer.writerow([posmodels[posid].state._val['DEVICE_LOC'],'poslocXY',uv[0],uv[1]])
+        for loc,uv in target.items():
+            writer.writerow([loc,'poslocXY',uv[0],uv[1]])
     next_filenumber += 1
