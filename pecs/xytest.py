@@ -231,6 +231,7 @@ class XYTest(PECS):
                                  f'submove {n} of {self.data.num_corr_max}')
                 self.expected_QS_list = []
                 _, meapos, matched, unmatched = self.move_measure_petals(i, n)
+                self.record_expected_positions(i, n)
                 self.check_unmatched(meapos, matched, unmatched,
                                      disable_unmatched=disable_unmatched)
                 self.update_calibrations(meapos)
@@ -330,25 +331,35 @@ class XYTest(PECS):
         self.logger.info('Executing moves...')
         expected_QS = self.ptlm.execute_move(
             reset_flags=False, return_coord='QS', control={'timeout': 120})
-        # get expected posintTP from petal and write to movedf after move
-        # Positions are concatenated in petalman
-        TP = self.ptlm.get_positions(return_coord='posintTP')
         for pcid in self.data.pcids:
             self.logger.debug(['Target {i}, submove {n}, '
                                'execute_move() returns expected QS:',
                                expected_QS[self._pcid2role(pcid)].to_string()],
                               pcid)
-            self.logger.debug(['Target {i}, submove {n}, '
-                               f'Expected posintTP:',
-                               TP[TP.PETAL_LOC == pcid].to_string()], pcid)
-        # record per-move data to movedf for a petal
-        new = pd.DataFrame({f'posintT_{n}': TP['X1'],
-                            f'posintP_{n}': TP['X2'],
-                            f'flag_{n}': TP['FLAGS'],
-                            f'status_{n}': pc.decipher_posflags(TP['FLAGS']),
-                            f'DEVICE_ID': TP['DEVICE_ID']})
-        self._update(new.set_index('DEVICE_ID'), i)
         return expected_QS
+
+    def record_expected_positions(i, n):
+        coords = ['posintTP', 'poslocTP', 'poslocXY']
+        # get expected posintTP from petal and write to movedf after move
+        # Positions are concatenated in petalman
+        for coord in coords:
+            x = self.ptlm.get_positions(return_coord=coord).sort_values(
+                'DEVICE_ID')
+            for pcid in self.data.pcids:
+                self.logger.debug(['Target {i}, submove {n}, '
+                                   f'Expected {coord}:\n',
+                                   x[x.PETAL_LOC == pcid].to_string()], pcid)
+            try:  # record per-move data to movedf for a petal
+                new[f'{coord[:-1]}_{n}'] = x['X1']
+                new[f'{coord[:-2]+coord[-1]}_{n}'] = x['X2']
+            except NameError:
+                new = pd.DataFrame(
+                    {f'{coord[:-1]}_{n}': x['X1'],
+                     f'{coord[:-2]+coord[-1]}_{n}': x['X2'],
+                     f'flag_{n}': x['FLAGS'],
+                     f'status_{n}': pc.decipher_posflags(x['FLAGS']),
+                     f'DEVICE_ID': x['DEVICE_ID']})
+        self._update(new.set_index('DEVICE_ID'), i)
 
     def check_unmatched(self, measured_QS, matched, unmatched,
                         disable_unmatched=True):
