@@ -493,6 +493,7 @@ class PosCalibrationFits:
                                   index=pd.Series(posids, name='DEVICE_ID'))
 
     def verify_with_extra_points(self, data, calib_fit):  # feed in data_extra
+        self.logger.info('Verifying derived calibration with extra points...')
         posids = data.index.get_level_values('DEVICE_ID').unique()
         cols = ['mea_flatX', 'mea_flatY', 'exp_flatX', 'exp_flatY']
         for col in cols:  # add new empty columns to grid data dataframe
@@ -510,7 +511,7 @@ class PosCalibrationFits:
             data.loc[QS[mask].index, ['exp_flatX', 'exp_flatY']] = \
                 exp_flatXY = np.array(
                     [trans.posintTP_to_flatXY(x) for x in posintTP])
-            errXY = mea_flatXY - flatXY
+            errXY = mea_flatXY - exp_flatXY
             calib_fit.loc[posid, 'err_rms'] = np.rms(errXY)
             calib_fit.loc[posid, 'err_max'] = np.max(errXY)
             calib_fit.loc[posid, 'err_med'] = np.median(errXY)
