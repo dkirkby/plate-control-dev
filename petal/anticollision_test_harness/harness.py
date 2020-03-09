@@ -15,18 +15,19 @@ import csv
 # Some pre-cooked device location selections (can be used below)
 locations_all = 'all'
 locations_near_gfa = {309,328,348,368,389,410,432,454,474,492,508,521,329,349,369,390,411,433,455,475,493,509,522,532,330,350,370,391,412,434,456,476,494,510,523,533,351,371,392,413,435,457,477,495,511,524,372,393,414,436,458,512,525,415,437,459,526}
-subset7a = {89,79,78,99,87,98,88}
+subset7a = {78, 79, 87, 88, 89, 98, 99}
 
 # Selection of which device location ids to send move requests to
 # (i.e. which positioners on petal to directly command)
-device_loc_to_operate = locations_all
+# either a set of device locations, or the keyword 'all' or 'near_gfa'
+device_loc_to_command = subset7a # note pre-cooked options above
 
 # Whether to include any untargeted neighbors in the calculations
 include_neighbors = True
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
-pos_param_sequence_id = 'PTL03_20200211'
+pos_param_sequence_id = 'PTL03_30001'
 move_request_sequence_id = '03000-03001' #'04000-04999' #'04108-04110'
 note = ''
 filename_suffix = str(runstamp) + '_' + str(move_request_sequence_id) + ('_' + str(note) if note else '')
@@ -35,15 +36,19 @@ filename_suffix = str(runstamp) + '_' + str(move_request_sequence_id) + ('_' + s
 fidids = {}
 petal_id = 3
 
-# Other options
+# Animation on/off options
 should_animate = False
 anim_label_size = 'medium' # size in points, 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
-animation_foci =  'commanded' # argue {} or 'all' to animate everything, including PTL and GFA.
-                             # 'colliding' to only animate colliding bots.
-                             # 'all but fixed' to animate all robots, but no PTL or GFA
-                             # 'commanded' to animate the robots that receive move requests
-                             # otherwise, give a specific set of posids (plus their surrounding neighbors) to animate. Can include 'GFA' or 'PTL' as desired.
 anim_cropping_on = True # crops the plot window to just contain the animation
+
+# Animation foci
+#   {} or 'all' to animate everything, including PTL and GFA.
+#   'colliding' to only animate colliding bots.
+#   'commanded' to only animate the robots that receive move requests
+#   Otherwise, give a specific set of posids to animate. Can include 'GFA' or 'PTL' as desired.
+animation_foci = 'all'
+
+# other options
 n_corrections = 0 # number of correction moves to simulate after each target
 max_correction_move = 0.050/1.414 # mm
 should_profile = False
@@ -70,16 +75,20 @@ def make_xytest_header_sortable_key(s):
 randomizer_seed = 0
 random.seed(randomizer_seed)
 
-# Include any neighbors in the scheduling calculations as necessary.
-all_device_loc = device_loc_to_operate
-if include_neighbors and device_loc_to_operate != 'all':
-    all_device_loc = 'all' # could do more elaborate search for specific neighbors, but this works for most use cases
+# resolve which device locations to operate on
+if device_loc_to_command == 'all':
+    device_loc_to_command = set(pc.generic_pos_neighbor_locs.keys())
+all_device_loc = set(device_loc_to_command)
+if include_neighbors:
+    for loc in device_loc_to_command:
+        neighbors = pc.generic_pos_neighbor_locs[loc]
+        all_device_loc = all_device_loc.union(neighbors)
 
 # Run the sequences.
 pos_param_sequence = sequences.get_positioner_param_sequence(pos_param_sequence_id, all_device_loc)
-move_request_sequence = sequences.get_move_request_sequence(move_request_sequence_id, device_loc_to_operate)
+move_request_sequence = sequences.get_move_request_sequence(move_request_sequence_id, device_loc_to_command)
 exportable_targets = []
-for pos_param_id, pos_params in pos_param_sequence.items():
+for pos_param_id, pos_params in pos_param_sequence.items():         
     for posid,params in pos_params.items():
         state = posstate.PosState(unit_id=posid, device_type='pos', petal_id=petal_id)
         state.store('POS_T',0.0)
@@ -110,11 +119,8 @@ for pos_param_id, pos_params in pos_param_sequence.items():
         ptl.animator.label_size = anim_label_size
         if animation_foci == 'colliding':
             ptl.collider.animate_colliding_only = True  
-        elif animation_foci == 'all but fixed':
-            ptl.collider.posids_to_animate = ptl.posids
-            ptl.collider.fixed_items_to_animate = set()
         elif animation_foci == 'commanded':
-            ptl.collider.posids_to_animate = {ptl.devices[loc] for loc in device_loc_to_operate}
+            ptl.collider.posids_to_animate = {ptl.devices[loc] for loc in device_loc_to_command}
             ptl.collider.fixed_items_to_animate = set()
         elif animation_foci != 'all' and len(animation_foci) > 0:
             posids_to_animate = set()
