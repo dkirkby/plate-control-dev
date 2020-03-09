@@ -254,7 +254,7 @@ class PosCalibrations(PECS):
         req_list, npts = [], self.data.n_pts_P*self.data.n_pts_T
         for i in range(npts):
             dfs = [dfs[i] for dfs in ret.values()]
-            df = pd.concat(dfs).reset_index()
+            df = pd.concat(dfs).set_index('DEVICE_ID')
             df['LOG_NOTE'] = ('grid calibration point {i+1} of {npts}; '
                               'expid {self.exp.id}')
             req_list.append(df)
