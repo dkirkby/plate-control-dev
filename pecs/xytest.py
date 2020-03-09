@@ -212,6 +212,16 @@ class XYTest(PECS):
             else:
                 disable_unmatched = True  # do disable by default
         self.set_schedule_stats(enabled=self.schedule_stats)
+        self.logger.info('Parking positioners...')
+        ret = self.ptlm.park_positioners(self.posids)
+        import pdb; pdb.set_trace()
+        ret = pd.concat(list(ret.values()))
+        mask = ret['FLAG'] != 4
+        ret['STATUS'] = pc.decipher_posflags(ret['FLAG'])
+        retry_list = list(ret.loc[mask, 'DEVICE_ID'])
+        if len(retry_list) > 0:
+            self.logger.info(f'{len(retry_list)} unsucessful: {retry_list}\n\n'
+                             f'{ret[mask].to_string()}')
         for i in range(self.data.ntargets):  # test loop over all test targets
             self.record_basic_move_data(i)  # for each target, record basics
             if i > 0:  # don't pause for the 1st target
@@ -429,7 +439,7 @@ class XYTest(PECS):
 
 
 if __name__ == '__main__':
-    path = os.path.join(pc.dirs['test_settings'], 'xytest_10ptl.cfg')
+    path = os.path.join(pc.dirs['test_settings'], 'xytest_7ptl.cfg')
     print(f'Loading test config: {path}')
     xytest_cfg = ConfigObj(path, unrepr=True, encoding='utf_8')  # read cfg
     xytest_name = input(r'Please name this test (xytest-{test_name}): ')
