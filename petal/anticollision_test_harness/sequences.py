@@ -13,7 +13,7 @@ positioner_param_sequences = {0:[0],
                               'one real petal':[10004],
                               'two real petals':[10002,10003],
                               'many real petals':[10002,10003,10004,10005,10006,10007,10008,10009,10010,10011],
-                              'PTL03_20200211':[30001],
+                              'PTL03_30001':[30001],
                              }
 
 move_request_sequences     = {0:[0],
