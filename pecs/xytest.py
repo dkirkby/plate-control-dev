@@ -212,8 +212,8 @@ class XYTest(PECS):
             else:
                 disable_unmatched = True  # do disable by default
         self.set_schedule_stats(enabled=self.schedule_stats)
-        self.logger.info('Parking positioners...')
-        ret = self.ptlm.park_positioners(self.posids)
+        self.logger.info(f'Parking {len(self.data.posids)} positioners...')
+        ret = self.ptlm.park_positioners(self.data.posids)
         ret = pd.concat(list(ret.values()))
         mask = ret['FLAG'] != 4
         ret['STATUS'] = pc.decipher_posflags(ret['FLAG'])
@@ -409,7 +409,7 @@ class XYTest(PECS):
                  updates[self._pcid2role(pcid)].to_string()])
 
     def record_measurement(self, measured_QS, i, n):
-        measured_QS = measured_QS[measured_QS.index.isin(self.posids)]
+        measured_QS = measured_QS[measured_QS.index.isin(self.data.posids)]
         for posid in measured_QS.index:
             if self.ptl_role_lookup(posid) is None:  # only selected posids
                 measured_QS.drop(posid, inplace=True)

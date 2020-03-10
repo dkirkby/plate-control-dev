@@ -579,7 +579,9 @@ class XYTestData(FPTestData):
             ax.legend(loc='upper right', fontsize=10)
             fig.savefig(path.format(n), bbox_inches='tight')
             plt.close(fig)
-            self.print(f'xyplot saved: {path.format(n)}', pcid=pcid)
+            if hasattr(self, 'logger'):
+                self.logger.debug(msg, pcid=pcid)
+
     def make_summary_plot_binder(self, pcid, n):
         template = os.path.join(self.dirs[pcid],
                                 f'*_xyplot_submove_{n}.pdf')
