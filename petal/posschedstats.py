@@ -30,7 +30,9 @@ class PosSchedStats(object):
     
     def is_enabled(self):
         '''Boolean whether statistics tracking is currently turned on.'''
-        return self._is_enabled and self.schedule_ids # 2nd expression is to avoid storing to improperly empty structure (i.e. no schedule yet registered) 
+        if self._is_enabled and self.schedule_ids: # 2nd expression is to avoid storing to improperly empty structure (i.e. no schedule yet registered) 
+            return True
+        return False
     
     def enable(self):
         '''Turn module on, ready for statistics tracking. Any existing
