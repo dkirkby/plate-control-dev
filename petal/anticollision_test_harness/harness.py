@@ -28,7 +28,7 @@ include_neighbors = True
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
 pos_param_sequence_id = 'PTL03_30001'
-move_request_sequence_id = '03000-03001' #'04000-04999' #'04108-04110'
+move_request_sequence_id = '30001_ntarg001_set000'
 note = ''
 filename_suffix = str(runstamp) + '_' + str(move_request_sequence_id) + ('_' + str(note) if note else '')
 
@@ -37,7 +37,7 @@ fidids = {}
 petal_id = 3
 
 # Animation on/off options
-should_animate = False
+should_animate = True
 anim_label_size = 'medium' # size in points, 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
 anim_cropping_on = True # crops the plot window to just contain the animation
 
@@ -172,7 +172,7 @@ for pos_param_id, pos_params in pos_param_sequence.items():
     if ptl.schedule_stats.is_enabled():
         ptl.schedule_stats.save()
     if should_export_targets and exportable_targets:
-        filename = 'xytest_targets_' + runstamp + '.csv'
+        filename = 'xytest_targets_' + filename_suffix + '.csv'
         path = os.path.join(pc.dirs['temp_files'], filename)
         headers = exportable_targets[0].keys()
         headers = sorted(headers, key=make_xytest_header_sortable_key)
