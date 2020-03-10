@@ -195,8 +195,11 @@ class PosSchedStats(object):
             self.unresolved[self.latest][stage_name] = set()
             self.unresolved_tables[self.latest][stage_name] = {}
             self.unresolved_sweeps[self.latest][stage_name] = {}
+        colliding_tables_copies = {} # stores copy-able / pickle-able versions, rather thatn the complete posmovetable instances
+        for key,table in colliding_tables.items():
+            colliding_tables_copies[key] = table.as_dict()
         self.unresolved[self.latest][stage_name].update(colliding_set)
-        self.unresolved_tables[self.latest][stage_name].update(colliding_tables)
+        self.unresolved_tables[self.latest][stage_name].update(colliding_tables_copies)
         self.unresolved_sweeps[self.latest][stage_name].update(colliding_sweeps)
     
     def summarize_collision_resolutions(self):
