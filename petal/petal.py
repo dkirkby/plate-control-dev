@@ -179,9 +179,10 @@ class Petal(object):
 
         # schedule stats module
         self.schedule_stats = posschedstats.PosSchedStats(enabled=sched_stats_on)
-        sched_stats_dir = os.path.join(pc.dirs['kpno'], pc.dir_date_str())
+        self.sched_stats_dir = os.path.join(pc.dirs['kpno'], pc.dir_date_str())
         sched_stats_filename = f'PTL{self.petal_id:02}-pos_schedule_stats.csv'
-        self.sched_stats_path = os.path.join(sched_stats_dir, sched_stats_filename)
+        self.sched_stats_path = os.path.join(self.sched_stats_dir,
+                                             sched_stats_filename)
 
         # must call the following 3 methods whenever petal alingment changes
         self.init_ptltrans()
