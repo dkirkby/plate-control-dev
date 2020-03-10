@@ -345,7 +345,7 @@ class XYTest(PECS):
             x = self.ptlm.get_positions(return_coord=coord).sort_values(
                 'DEVICE_ID')
             for pcid in self.data.pcids:
-                self.logger.debug(['Target {i}, submove {n}, '
+                self.logger.debug([f'Target {i}, submove {n}, '
                                    f'Expected {coord}:\n',
                                    x[x.PETAL_LOC == pcid].to_string()], pcid)
             try:  # record per-move data to movedf for a petal
