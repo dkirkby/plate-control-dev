@@ -182,7 +182,6 @@ class Petal(object):
         sched_stats_dir = os.path.join(pc.dirs['kpno'], pc.dir_date_str())
         sched_stats_filename = f'PTL{self.petal_id:02}-pos_schedule_stats.csv'
         self.sched_stats_path = os.path.join(sched_stats_dir, sched_stats_filename)
-        os.makedirs(sched_stats_dir, exist_ok=True)
 
         # must call the following 3 methods whenever petal alingment changes
         self.init_ptltrans()
@@ -1014,7 +1013,8 @@ class Petal(object):
                     for state in self.altered_states:
                         state.log_unit()  # this writes the local log
             self.altered_states = set()
-            if self.schedule_stats.is_enabled():  # write schedule stats in any case
+            if self.schedule_stats.is_enabled() and os.path.isdir(
+                self.sched_stats_path)
                 self.schedule_stats.save(path=self.sched_stats_path, mode='a')
         elif mode == 'calib':
             if self.local_commit_on:
