@@ -63,9 +63,14 @@ for shape in output_shapes:
     n_sets = shape['n_sets']
     for s in range(n_sets):
         sequence_name = sequence_prefix + '_ntarg' + format(n_targets,'03d') + '_set' + format(s,'03d')
-        sequence = random.choices(population = stats[requests_key].to_list(),
-                                  weights = weights,
-                                  k = n_targets)
+        sequence = []
+        n_missing = n_targets
+        while n_missing: # while loop here ensures no duplicate entries   
+            new = random.choices(population = stats[requests_key].to_list(),
+                                 weights = weights,
+                                 k = n_missing)
+            sequence.extend(new)
+            n_missing = n_targets - len(set(sequence)) # set conversion ensures uniqueness
         num_coll = [int(stats[found_total_key][stats[requests_key] == request]) for request in sequence]
         sequences[sequence_name] = [int(request) for request in sequence]
         num_collisions_to_avoid[sequence_name] = num_coll
