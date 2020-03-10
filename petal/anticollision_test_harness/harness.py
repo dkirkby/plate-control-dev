@@ -170,7 +170,8 @@ for pos_param_id, pos_params in pos_param_sequence.items():
             else:
                 ptl.schedule_send_and_execute_moves(anticollision=anticollision)
     if ptl.schedule_stats.is_enabled():
-        ptl.schedule_stats.save()
+        stats_path = os.path.join(pc.dirs['temp_files'], 'schedstats_' + filename_suffix + '.csv')
+        ptl.schedule_stats.save(path=stats_path)
     if should_export_targets and exportable_targets:
         filename = 'xytest_targets_' + filename_suffix + '.csv'
         path = os.path.join(pc.dirs['temp_files'], filename)
@@ -186,5 +187,6 @@ for pos_param_id, pos_params in pos_param_sequence.items():
     if should_animate and not ptl.animator.is_empty():
         ptl.stop_gathering_frames()
         print('Generating animation (this can be quite slow)...')
-        ptl.animator.filename_suffix = runstamp
+        ptl.animator.filename_suffix = filename_suffix
+        ptl.animator.add_timestamp_prefix_to_filename = False
         ptl.generate_animation()

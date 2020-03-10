@@ -23,6 +23,7 @@ class PosAnimator(object):
         self.save_dir = os.path.join(pc.dirs['temp_files'], 'schedule_animations')
         self.frame_dir = '' # generated automatically when saving frames
         self.filename_suffix = '' # optional for user to add before generating animation
+        self.add_timestamp_prefix_to_filename = True
         self.framefile_prefix = 'frame'
         self.framefile_extension = '.png'
         self.n_framefile_digits = 5
@@ -219,9 +220,12 @@ class PosAnimator(object):
         frame_number = 1
         stdout_message_period = 50 # number of frames per update message
         image_paths = {}
-        timestamp = pc.filename_timestamp_str()
+        if self.add_timestamp_prefix_to_filename:
+            timestamp = pc.filename_timestamp_str() + '_'
+        else:
+            timestamp = ''
         suffix = '_' + str(self.filename_suffix) if self.filename_suffix else ''
-        self.frame_dir = os.path.join(self.save_dir,timestamp + '_frames' + suffix)
+        self.frame_dir = os.path.join(self.save_dir, timestamp + 'frames' + suffix)
         if self.live_animate:
             plt.show()
         if self.save_movie:
@@ -253,7 +257,7 @@ class PosAnimator(object):
         plt.close()
         if self.save_movie:
             input_file = os.path.join(self.frame_dir, self.framefile_prefix + '%' + str(self.n_framefile_digits) + 'd' + self.framefile_extension)
-            output_file = os.path.join(self.save_dir, timestamp + '_schedule_anim' + suffix + '.mp4')
+            output_file = os.path.join(self.save_dir, timestamp + 'schedule_anim' + suffix + '.mp4')
             ffmpeg_cmd = self.ffmpeg_path + ' -y -r ' + str(fps) + ' -i ' + input_file + ' -vcodec ' + self.codec + ' ' + output_file
             os.system(ffmpeg_cmd)
         if self.delete_imgs:
