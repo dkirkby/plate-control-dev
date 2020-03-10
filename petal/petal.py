@@ -1014,7 +1014,7 @@ class Petal(object):
                         state.log_unit()  # this writes the local log
             self.altered_states = set()
             if self.schedule_stats.is_enabled() and os.path.isdir(
-                self.sched_stats_path)
+                self.sched_stats_path):
                 self.schedule_stats.save(path=self.sched_stats_path, mode='a')
         elif mode == 'calib':
             if self.local_commit_on:
