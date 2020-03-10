@@ -243,7 +243,11 @@ class PosScheduleStage(object):
                     if newly_colliding:
                         self.printfunc('Note: adjust_path(' + str(posid) + ', freezing=\'' + str(freezing) + '\') introduced new collisions for ' + str(newly_colliding))
                     for p in sorted(remainder): # sort is for repeatabiity (since 'remainder' is an unordered set, and so path adjustments would otherwise get processed in variable order from run to run)
-                        if not self.move_tables[p].is_motionless: # only freeze if there's some move component available to be frozen
+                        freeze_is_possible = False # starting assumption for this pos
+                        if p in self.move_tables: # does p have any move_table to be frozen?
+                            if not self.move_tables[p].is_motionless: # does that table have any contents inside to be frozen?
+                                freeze_is_possible = True
+                        if freeze_is_possible: 
                             recursed_newly_frozen = self.adjust_path(p,freezing='forced_recursive') # recursively close out any side-effect new collisions
                             adjusted.update(recursed_newly_frozen) 
                         else:
