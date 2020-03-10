@@ -214,7 +214,6 @@ class XYTest(PECS):
         self.set_schedule_stats(enabled=self.schedule_stats)
         self.logger.info('Parking positioners...')
         ret = self.ptlm.park_positioners(self.posids)
-        import pdb; pdb.set_trace()
         ret = pd.concat(list(ret.values()))
         mask = ret['FLAG'] != 4
         ret['STATUS'] = pc.decipher_posflags(ret['FLAG'])
@@ -338,7 +337,7 @@ class XYTest(PECS):
                               pcid)
         return expected_QS
 
-    def record_expected_positions(i, n):
+    def record_expected_positions(self, i, n):
         coords = ['posintTP', 'poslocTP', 'poslocXY']
         # get expected posintTP from petal and write to movedf after move
         # Positions are concatenated in petalman
