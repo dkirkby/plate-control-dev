@@ -447,6 +447,8 @@ class Axis(object):
         wider definiton for the max and min accessible limits at which to truncate.
         See the maxpos and minpos methods, as well as debounced_range vs near_full_range.
         """
+        if distance == 0:
+            return distance
         maxpos = self.get_maxpos(use_near_full_range)
         minpos = self.get_minpos(use_near_full_range)
         if start_pos == None:
