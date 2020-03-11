@@ -3,7 +3,7 @@ import inspect
 import numpy as np
 from scipy.interpolate import interp1d
 import math
-import datetime
+from datetime import datetime, timedelta
 import pytz
 import collections
 import csv
@@ -313,11 +313,11 @@ def is_very_verbose(verbosity_enum):
 # timestamp functions
 def now():
     # current TZ unaware local time (), then TZ aware in local timezone
-    return datetime.datetime.now().astimezone()
+    return datetime.now().astimezone()
 
 
 def utcnow():
-    return datetime.datetime.now().astimezone(pytz.timezone('UTC'))
+    return datetime.now().astimezone(pytz.timezone('UTC'))
 
 
 def timestamp_str(t=None):
@@ -336,12 +336,7 @@ def dir_date_str(t=None):
     '''returns date string for the directory name, changes at noon Arizona'''
     if t is None:
         t = now()
-    t = t.astimezone(pytz.timezone('America/Phoenix'))
-    day = t.day
-    if t.hour >= 12:  # past noon, treat as today
-        pass
-    else:
-        day -= 1  # before noon, treat as yesterday
+    t = t.astimezone(pytz.timezone('America/Phoenix')) - timedelta(hours=12)
     return f'{t.year:04}{t.month:02}{day:02}'
 
 
