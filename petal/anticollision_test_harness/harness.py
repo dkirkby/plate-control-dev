@@ -28,7 +28,7 @@ include_neighbors = True
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
 pos_param_sequence_id = 'PTL03_30001'
-move_request_sequence_id = '30001_ntarg001_set000'
+move_request_sequence_id = '30001_ntarg001_set000' #'03000-03001'
 note = ''
 filename_suffix = str(runstamp) + '_' + str(move_request_sequence_id) + ('_' + str(note) if note else '')
 
@@ -37,7 +37,7 @@ fidids = {}
 petal_id = 3
 
 # Animation on/off options
-should_animate = True
+should_animate = False
 anim_label_size = 'medium' # size in points, 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
 anim_cropping_on = True # crops the plot window to just contain the animation
 
@@ -49,8 +49,8 @@ anim_cropping_on = True # crops the plot window to just contain the animation
 animation_foci = 'all'
 
 # other options
-n_corrections = 0 # number of correction moves to simulate after each target
-max_correction_move = 0.050/1.414 # mm
+n_corrections = 1 # number of correction moves to simulate after each target
+max_correction_move = 0.1/1.414 # mm
 should_profile = False
 
 # saving of target sets for later use on hardware
@@ -95,6 +95,12 @@ for pos_param_id, pos_params in pos_param_sequence.items():
         state.store('POS_P',180.0)
         for key,val in params.items():
             state.store(key,val)
+        if posid == 'M05052':
+            state.store('POS_T',-302.487)
+            state.store('POS_P',167.294)
+        if posid == 'M04191':
+            state.store('POS_T',163.619)
+            state.store('POS_P',125.144)
         state.write()
     ptl = petal.Petal(petal_id        = petal_id,
                       petal_loc       = 3,
@@ -157,7 +163,7 @@ for pos_param_id, pos_params in pos_param_sequence.items():
             anticollision = 'adjust'
             if n > 0:
                 for request in requests.values():
-                    request['command'] = 'obsdXdY'
+                    request['command'] = 'poslocdXdY'
                     request['target'][0] = random.uniform(-max_correction_move,max_correction_move)
                     request['target'][1] = random.uniform(-max_correction_move,max_correction_move)
                 anticollision = 'freeze'
