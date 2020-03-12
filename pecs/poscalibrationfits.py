@@ -43,7 +43,7 @@ class PosCalibrationFits:
     def __init__(self, petal_alignments=None, use_doslib=True,
                  posmodels=None, loggers=None, printfunc=print):
         self.logger = BroadcastLogger(loggers=loggers, printfunc=printfunc)
-        if petal_alignments:
+        if petal_alignments is not None:
             self.petal_alignments = petal_alignments
         else:
             self.read_alignments(use_doslib=use_doslib)
