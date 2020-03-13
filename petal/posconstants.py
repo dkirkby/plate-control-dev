@@ -337,7 +337,7 @@ def dir_date_str(t=None):
     if t is None:
         t = now()
     t = t.astimezone(pytz.timezone('America/Phoenix')) - timedelta(hours=12)
-    return f'{t.year:04}{t.month:02}{day:02}'
+    return f'{t.year:04}{t.month:02}{t.day:02}'
 
 
 # other misc functions
