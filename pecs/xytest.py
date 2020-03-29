@@ -63,6 +63,7 @@ class XYTest(PECS):
         self.ptlm.participating_petals = [
             self._pcid2role(pcid) for pcid in self.data.pcids]
         self.exp_setup()  # set up exposure ID and product directory
+        self.home_adc()
         if 'pause_interval' in test_cfg:  # override default pecs settings
             self.logger.info(
                 f"Overriding default pause interval {self.pause_interval} s "

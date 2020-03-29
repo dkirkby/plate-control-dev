@@ -238,6 +238,16 @@ class PECS:
                        f'\n{sorted(unmatched)}')
         return exppos, meapos, matched, unmatched
 
+    def home_adc(self):
+        try:
+            adc = SimpleProxy('ADC')
+            if self._parse_yn(input('Home ADC? (y/n): ')):
+                self.print('Homing ADC...')
+                retcode = adc._send_command('home', controllers=[1, 2])
+                self.print(f'ADC.home returned code: {retcode}')
+        except Exception as e:
+            print(f'Exception homing ADC, {e}')
+
     def fvc_collect(self):
         destination = os.path.join(
             '/exposures/desi', pc.dir_date_str(t=self.data.t_i),
