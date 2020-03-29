@@ -580,7 +580,7 @@ class XYTestData(FPTestData):
             fig.savefig(path.format(n), bbox_inches='tight')
             plt.close(fig)
             if hasattr(self, 'logger'):
-                self.logger.debug(msg, pcid=pcid)
+                self.logger.debug(f'xyplot saved: {path.format(n)}', pcid=pcid)
 
     def make_summary_plot_binder(self, pcid, n):
         template = os.path.join(self.dirs[pcid],
@@ -830,10 +830,10 @@ class CalibrationData(FPTestData):
     def generate_report(self):
         pass
 
-    def make_arc_plots(self, make_binder=True, mp=True, posids=None):
+    def make_calib_plots(self, mode, make_binder=True, mp=True, posids=None):
         if not posids:
             posids = self.posids
-        self.print(f'Making arc plots for {len(posids)} positioners...')
+        self.print(f'Making {mode} plots for {len(posids)} positioners...')
         posmovs = [self.movedf.xs(posid, level='DEVICE_ID')
                    for posid in posids]
         poscals = [self.calibdf.loc[posid, 'FIT'] for posid in posids]
@@ -841,20 +841,18 @@ class CalibrationData(FPTestData):
                      self.dirs[self.movedf.xs(
                          posid, level='DEVICE_ID')['PETAL_LOC'].values[0]],
                      f'{posid}-{pc.filename_timestamp_str(self.t_f)}'
-                     '-arc_calib.pdf')
+                     '-{mode}_calib.pdf')
                  for posid in posids]
-        self._mp(self.make_arc_plot, [posmovs, poscals, paths],
+        self._mp(getattr(self, f'make_{mode}_plot'), [posmovs, poscals, paths],
                  zip_args=True, mp=mp)
         if make_binder:
-            self._mp(self.make_arc_plot_binder, [self.pcids], mp=mp)
+            self._mp(self.make_plots_binder, [self.pcids], mp=mp)
 
     @staticmethod
     def make_arc_plot(posmov, poscal, path, timestamp=None):
         if not timestamp:  # datetime object
             timestamp = pc.now()
-        # posmov = self.movedf.xs(posid, level='DEVICE_ID')
-        # poscal = self.calibdf.loc[posid, 'FIT']
-        posid, pcid = poscal.name, posmov['PETAL_LOC'].values[0]
+        posid = poscal.name
         fig = plt.figure(figsize=(14, 8))
         for plot_row, axis in enumerate(['T', 'P']):
             other_axis = 'P' if axis == 'T' else 'T'
@@ -874,7 +872,7 @@ class CalibrationData(FPTestData):
             np.degrees(np.unwrap(np.radians(exp[exp.notnull()])))
             ang_f = ang_i + np.sum(np.abs(
                 (np.diff(np.degrees(np.unwrap(np.radians(exp[exp.notnull()]))))
-                + 360) % 360))
+                 + 360) % 360))
             ang_f += 360 * (ang_i > ang_f)
             ref_arc_ang = np.radians(np.append(  # 5 deg step
                 np.arange(ang_i, ang_f, 5), ang_f))  # last point at final
@@ -885,11 +883,11 @@ class CalibrationData(FPTestData):
             ang_0 = ang_i - tgt[0]  # just use 1st point to get T/P offset
             line_0_x = [ctr[0], ctr[0]+rad*np.cos(np.radians(ang_0))]
             line_0_y = [ctr[1], ctr[1]+rad*np.sin(np.radians(ang_0))]
-            plt.plot(ctr[0], ctr[1], 'k+')  # axis centre black +
-            plt.plot(line_0_x, line_0_y, 'k--')  # zero line of posintTP
-            plt.plot(ref_arc_x, ref_arc_y, 'b-')  # ref arc at 5 deg spacing
-            plt.plot(mea_xy['mea_flatX'], mea_xy['mea_flatY'], 'ko')
-            plt.plot(mea_xy['mea_flatX'][0], mea_xy['mea_flatY'][0], 'ro')
+            ax.plot(ctr[0], ctr[1], 'k+')  # axis centre black +
+            ax.plot(line_0_x, line_0_y, 'k--')  # zero line of posintTP
+            ax.plot(ref_arc_x, ref_arc_y, 'b-')  # ref arc at 5 deg spacing
+            ax.plot(mea_xy['mea_flatX'], mea_xy['mea_flatY'], 'ko')
+            ax.plot(mea_xy['mea_flatX'][0], mea_xy['mea_flatY'][0], 'ro')
             txt_ang_0 = np.mod(ang_0+360, 360)
             txt_ang_0 = (txt_ang_0-180 if 90 < txt_ang_0 < 270
                          else txt_ang_0)
@@ -900,14 +898,14 @@ class CalibrationData(FPTestData):
             line_0_ctr = np.array([line_0_x, line_0_y]).mean(axis=1)  # 2D
             shift = np.cross(line_0, [0, 0, 0.21])[:2]
             txt_0_xy = line_0_ctr + np.sign(np.abs(txt_ang_0-270)-90) * shift
-            plt.text(txt_0_xy[0], txt_0_xy[1], txt_0, fontsize=12,
-                     rotation=txt_ang_0, ha='center', va='center')
+            ax.text(txt_0_xy[0], txt_0_xy[1], txt_0, fontsize=12,
+                    rotation=txt_ang_0, ha='center', va='center')
             for i, pt in mea_xy.iterrows():
                 if not pt.isnull().any():
                     ang_xy = np.arctan2(pt[1]-ctr[1], pt[0]-ctr[0])  # in rad
                     txt_x = ctr[0] + rad*0.85*np.cos(ang_xy)
                     txt_y = ctr[1] + rad*0.85*np.sin(ang_xy)
-                    plt.text(txt_x, txt_y, f'{i}', ha='center', va='center')
+                    ax.text(txt_x, txt_y, f'{i}', ha='center', va='center')
             if axis == 'T':
                 calib_vals_txt = ''
                 calib_keys = [
@@ -915,63 +913,100 @@ class CalibrationData(FPTestData):
                     'GEAR_CALIB_T', 'GEAR_CALIB_P', 'OFFSET_X', 'OFFSET_Y']
                 for key in calib_keys:
                     calib_vals_txt += f'{key:12s} = {poscal[key]:6.3f}\n'
-                plt.text(
-                    0.03, 0.97, calib_vals_txt, transform=ax.transAxes,
-                    fontsize=8, color='gray', family='monospace',
-                    ha='left', va='top',
-                    bbox={'boxstyle': 'round', 'alpha': 0.8,
-                          'facecolor': 'white', 'edgecolor': 'lightgrey'})
-            plt.xlabel('flat$X$/mm')
-            plt.ylabel('flat$Y$/mm')
-            plt.title(f'measured ${axis_name}$ arc points')
-            plt.grid(True)
-            plt.axis('equal')
+                ax.text(0.03, 0.97, calib_vals_txt[:-2],
+                        fontsize=8, color='gray', family='monospace',
+                        transform=ax.transAxes, ha='left', va='top',
+                        bbox={'boxstyle': 'round', 'alpha': 0.8,
+                              'facecolor': 'white', 'edgecolor': 'lightgrey'})
+            ax.set_xlabel('flat$X$/mm')
+            ax.set_ylabel('flat$Y$/mm')
+            ax.set_title(f'measured ${axis_name}$ arc points')
+            ax.grid(True)
+            ax.set_aspect('equal')
             # column 2: angle deviation as a function of target angle
             plt.subplot(2, 3, plot_row * 3 + 2)
             err_ang = posmov.xs(axis, level='axis')[f'err_posint{axis}']
-            plt.plot(tgt, err_ang, 'ko-')  # measured points
-            plt.plot(tgt[0], err_ang[0], 'ro')  # 1st measured pt in red
+            ax.plot(tgt, err_ang, 'ko-')  # measured points
+            ax.plot(tgt[0], err_ang[0], 'ro')  # 1st measured pt in red
             for i in tgt.index:
-                plt.annotate(f'{i}', xy=(tgt[i], err_ang[i]), xytext=(0, 15),
-                             textcoords='offset points',
-                             ha='center', va='center')
-            plt.xlabel(f'target ${axis_name} / \\degree$')
-            plt.ylabel(f'$\\delta{axis_name} / \\degree$'.format(axis_name))
-            plt.title(f'${axis_name}$ angle deviations')
-            plt.grid(True)
+                ax.annotate(f'{i}', xy=(tgt[i], err_ang[i]), xytext=(0, 15),
+                            textcoords='offset points',
+                            ha='center', va='center')
+            ax.set_xlabel(f'target ${axis_name} / \\degree$')
+            ax.set_ylabel(f'$\\delta{axis_name} / \\degree$'.format(axis_name))
+            ax.set_title(f'${axis_name}$ angle deviations')
+            ax.grid(True)
             yr = err_ang.max() - err_ang.min()  # nan friendly
-            plt.ylim(top=plt.ylim()[1]+0.1*yr)
+            ax.set_ylim(top=plt.ylim()[1]+0.1*yr)
             # column 3: radius variations as a function of target angle
             plt.subplot(2, 3, plot_row * 3 + 3)
             err_rad = ((mea_xy-ctr).apply(np.linalg.norm, axis=1)-rad) * 1000
-            plt.plot(tgt, err_rad, 'ko-')  # nan friendly
-            plt.plot(tgt[0], err_rad[0], 'ro')
+            ax.plot(tgt, err_rad, 'ko-')  # nan friendly
+            ax.plot(tgt[0], err_rad[0], 'ro')
             for i in tgt.index:
-                plt.annotate(f'{i}', xy=(tgt[i], err_rad[i]), xytext=(0, 15),
-                             textcoords='offset points',
-                             ha='center', va='center')
-            plt.xlabel(f'target ${axis_name} / \\degree$')
-            plt.ylabel(f'$\\delta R / \\mu$m'.format(axis_name))
-            plt.title(r'radius variations')
-            plt.grid(True)
+                ax.annotate(f'{i}', xy=(tgt[i], err_rad[i]), xytext=(0, 15),
+                            textcoords='offset points',
+                            ha='center', va='center')
+            ax.set_xlabel(f'target ${axis_name} / \\degree$')
+            ax.set_ylabel(f'$\\delta R / \\mu$m'.format(axis_name))
+            ax.set_title(r'radius variations')
+            ax.grid(True)
             yr = err_rad.max() - err_rad.min()  # nan friendly
-            plt.ylim(top=plt.ylim()[1]+0.1*yr)
+            ax.set_ylim(top=plt.ylim()[1]+0.1*yr)
         fig.suptitle(f'Arc Calibration {pc.timestamp_str(timestamp)} '
                      f'Positioner {posid}')
         fig.tight_layout(pad=0.5, rect=[0, 0, 1, 0.95])
         plt.close(fig)
         fig.savefig(path, bbox_inches='tight')
 
-    def make_arc_plot_binder(self, pcid):
-        template = os.path.join(self.dirs[pcid], f'M0*arc_calib.pdf')
+    @staticmethod
+    def make_grid_plot(posmov, poscal, path, timestamp=None):
+        if not timestamp:  # datetime object
+            timestamp = pc.now()
+        posid = poscal.name
+        fig = plt.figure(figsize=(8, 6))
+        ax = plt.subplot(1, 1, 1)
+        ax.plot(posmov['mea_flatX'], posmov['mea_flatY'],
+                'ko', fillstyle='none', label='measured flatXY')
+        ax.plot(posmov['exp_flatX'], posmov['exp_flatY'],
+                'r+', label='fitted flatXY')  # fitted XY from tracked posintTP
+        for i in range(len(posmov)):
+            flatXY = posmov.loc[i, ['mea_flatX', 'mea_flatY']]
+            tgt_posintTP = posmov.loc[i, ['tgt_posintT', 'tgt_posintP']].values
+            ax.text(flatXY[0], flatXY[1]-0.2,
+                    f'({tgt_posintTP[0]:.1f}, {tgt_posintTP[1]:.1f})',
+                    va='center', ha='center', fontsize=6)
+        poscal_txt = ''
+        for idx in poscal.index:
+            poscal_txt += f'{idx:9s} = {poscal[idx]:7.3f}\n'
+            ax.text(0.03, 0.98, poscal_txt[:-2],
+                    fontsize=8, color='gray', family='monospace',
+                    transform=ax.transAxes, ha='left', va='top',
+                    bbox={'boxstyle': 'round', 'alpha': 0.8,
+                          'facecolor': 'white', 'edgecolor': 'lightgrey'})
+        xlims = ax.get_xlim()
+        ax.set_xlim((xlims[0]-1, xlims[1]+1))
+        ax.set_xlabel('flatX / mm')
+        ax.set_ylabel('flatY / mm')
+        ax.set_title('posintTP target grid in flatXY space', fontsize=8)
+        ax.set_aspect('equal')
+        ax.legend(loc='upper right')
+        fig.suptitle(f'Grid Calibration {pc.timestamp_str(timestamp)} '
+                     f'Positioner {posid}')
+        fig.tight_layout(pad=0.5, rect=[0, 0, 1, 0.95])
+        plt.close(fig)
+        fig.savefig(path, bbox_inches='tight')
+
+    def make_plots_binder(self, pcid):
+        template = os.path.join(self.dirs[pcid], f'M0*{self.mode}_calib.pdf')
         paths = sorted(glob(template))
         binder = PdfFileMerger()
         for path in paths:
             binder.append(path)
         savepath = os.path.join(
             self.dirs[pcid],
-            f'pc{pcid:02}-{len(paths):03}_positioners-arc_calib.pdf')
-        self.print(f'Writing arc plot binder for PC{pcid:02}...')
+            f'pc{pcid:02}-{len(paths):03}_positioners-{self.mode}_calib.pdf')
+        self.print(f'Writing {self.mode} plot binder for PC{pcid:02}...')
         binder.write(savepath)
         binder.close()
         self.print(f'Binder for PC{pcid:02} saved to: {savepath}')
@@ -982,10 +1017,7 @@ class CalibrationData(FPTestData):
     def generate_data_products(self):
         self.read_telemetry()
         self.export_data_logs()
-        if 'arc' in self.mode:
-            self.make_arc_plots()
-        elif 'grid' in self.mode:
-            self.make_grid_plots()
+        self.make_calib_plots(self.mode)  # self.mode can be 'arc', 'grid'
         self.dump_as_one_pickle()  # loggers lost as they cannot be serialised
         if shutil.which('pandoc') is None:
             self.print('You must have a complete installation of pandoc '
@@ -997,7 +1029,7 @@ class CalibrationData(FPTestData):
 
 if __name__ == '__main__':
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    expids = [47559, 47562]  # 46364, 46788, 47557, 47559
+    expids = [52645]  # 46364, 46788, 47557, 47559, 47559, 47562
     for expid in expids:
         paths = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data.pkl')
         assert len(paths) == 1, paths
@@ -1005,7 +1037,7 @@ if __name__ == '__main__':
         print(f'Re-processing FP test data:\n{path}')
         with open(os.path.join(paths[0]), 'rb') as h:
             data = pickle.load(h)
-        # data.make_arc_plots(make_binder=False, mp=False, posids=['M03037'])
+        # data.make_calib_plots(make_binder=False, mp=False, posids=['M03037'])
         # calib_type = data.mode.replace('_calibration', '')
         # measured = data.data_arc if calib_type == 'arc' else data.data_grid
         # # path = os.path.join(os.path.dirname(path), 'data_arc.pkl.gz')
