@@ -395,7 +395,8 @@ class PosState(object):
                                               'KEEPOUT_EXPANSION_PHI_RADIAL':0.0,
                                               'KEEPOUT_EXPANSION_PHI_ANGULAR':0.0,
                                               'KEEPOUT_EXPANSION_THETA_RADIAL':0.0,
-                                              'KEEPOUT_EXPANSION_THETA_ANGULAR':0.0}
+                                              'KEEPOUT_EXPANSION_THETA_ANGULAR':0.0,
+                                              'CLASSIFIED_AS_RETRACTED':False}
         elif self.type == 'fid':
             possible_new_keys_and_defaults = {'LAST_MEAS_OBS_X':[],
                                               'LAST_MEAS_OBS_Y':[],
