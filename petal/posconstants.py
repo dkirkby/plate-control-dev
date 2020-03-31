@@ -185,8 +185,8 @@ class collision_case(object):
     def __init__(self):
         self.I    = 0  # no collision
         self.II   = 1  # phi arm against neighboring phi arm
-        self.IIIA = 2  # phi arm of positioner 'A' against neighbor 'B' central body
-        self.IIIB = 3  # phi arm of positioner 'B' against neighbor 'A' central body
+        self.III  = 2  # phi arm against neighboring central body
+        self.IV   = 3  # phi arm against neighboring circular keepout
         self.GFA  = 4  # phi arm against the GFA fixed keepout envelope
         self.PTL  = 5  # phi arm against the Petal edge keepout envelope
         self.fixed_cases = {self.PTL,self.GFA}
