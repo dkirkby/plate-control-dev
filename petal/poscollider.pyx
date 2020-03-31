@@ -3,14 +3,11 @@
 cimport cython
 import numpy as np
 import posconstants as pc
-import posstate
 import posanimator
 import configobj
 import os
 import copy as copymodule
 import math
-import collision_lookup_generator_subset as lookup
-import pickle
 
 class PosCollider(object):
     """PosCollider contains geometry definitions for mechanical components of the
@@ -22,10 +19,10 @@ class PosCollider(object):
     See DESI-0899 for geometry specifications, illustrations, and kinematics.
     """
     def __init__(self, configfile='',
-                 hole_angle_file=None,
                  use_neighbor_loc_dict=False,
                  config=None,
-                 animator_label_type='loc'):
+                 animator_label_type='loc',
+                 printfunc=print):
         if not config:
             if not configfile:
                 filename = '_collision_settings_DEFAULT.conf'
@@ -54,6 +51,7 @@ class PosCollider(object):
         self.use_neighbor_loc_dict = use_neighbor_loc_dict
         self.keepouts_T = {} # key: posid, value: central body keepout of type PosPoly
         self.keepouts_P = {} # key: posid, value: phi arm keepout of type PosPoly
+        self.classified_as_retracted = set() # posids of robots classified as retracted. overrides polygonal keepout calcs
 
         # load fixed dictionary containing locations of neighbors for each positioner DEVICE_LOC (if this option has been selected)
         if self.use_neighbor_loc_dict:
@@ -139,9 +137,8 @@ class PosCollider(object):
                     elif collision_has_occurred and s.collision_case == pc.case.PTL:
                         self.animator.add_or_change_item('PTL', '', time, self.keepout_PTL.points, style_override)
 
-    def spacetime_collision_between_positioners(
-            self, posid_A, init_poslocTP_A, tableA,
-            posid_B, init_poslocTP_B, tableB):
+    def spacetime_collision_between_positioners(self, posid_A, init_poslocTP_A, tableA,
+                                                      posid_B, init_poslocTP_B, tableB):
         """Wrapper for spacetime_collision method, specifically for checking
         two positioners against each other."""
         return self.spacetime_collision(posid_A, init_poslocTP_A, tableA,
@@ -153,7 +150,8 @@ class PosCollider(object):
         """
         return self.spacetime_collision(posid, init_poslocTP, table)
 
-    def spacetime_collision(self, posid_A, init_poslocTP_A, tableA, posid_B=None, init_poslocTP_B=None, tableB=None):
+    def spacetime_collision(self, posid_A, init_poslocTP_A, tableA,
+                                  posid_B=None, init_poslocTP_B=None, tableB=None):
         """Searches for collisions in time and space between two positioners
         which are rotating according to the argued tables.
 
@@ -176,7 +174,7 @@ class PosCollider(object):
         The return is a list of instances of PosSweep. (These contain the theta and phi rotations
         in real time, when if any collision, and the collision type and neighbor.)
         """
-        pospos = posid_B is not None # whether this is checking collisions between two positioners (or if false, between one positioner and fixed keepouts)
+        pospos = posid_B is not None
         if pospos:
             init_poslocTPs = [init_poslocTP_A, init_poslocTP_B]
             tables = [tableA,tableB]
@@ -239,23 +237,35 @@ class PosCollider(object):
         The return is an enumeration of type "case", indicating what kind of collision
         was first detected, if any.
         """
-        if poslocTP_A[1] >= self.Eo_phi and poslocTP_B[1] >= self.Eo_phi:
+        A_is_within_Eo = poslocTP_A[1] >= self.Eo_phi or posid_A in self.classified_as_retracted 
+        B_is_within_Eo = poslocTP_B[1] >= self.Eo_phi or posid_B in self.classified_as_retracted
+        if A_is_within_Eo and B_is_within_Eo:
             return pc.case.I
-        elif poslocTP_A[1] < self.Eo_phi and poslocTP_B[1] >= self.Ei_phi: # check case IIIA
-            if self._case_III_collision(posid_A, posid_B, poslocTP_A, poslocTP_B[0]):
-                return pc.case.IIIA
+        elif not A_is_within_Eo and posid_B in self.classified_as_retracted: # check case IV, A upon B
+            if self._case_IV_collision(posid_A, posid_B, poslocTP_A):
+                return pc.case.IV
             else:
                 return pc.case.I
-        elif poslocTP_B[1] < self.Eo_phi and poslocTP_A[1] >= self.Ei_phi: # check case IIIB
+        elif not B_is_within_Eo and posid_A in self.classified_as_retracted: # check case IV, B upon B
+            if self._case_IV_collision(posid_B, posid_A, poslocTP_B):
+                return pc.case.IV
+            else:
+                return pc.case.I
+        elif poslocTP_A[1] < self.Eo_phi and poslocTP_B[1] >= self.Ei_phi: # check case III, A upon B
+            if self._case_III_collision(posid_A, posid_B, poslocTP_A, poslocTP_B[0]):
+                return pc.case.III
+            else:
+                return pc.case.I
+        elif poslocTP_B[1] < self.Eo_phi and poslocTP_A[1] >= self.Ei_phi: # check case III, B upon A
             if self._case_III_collision(posid_B, posid_A, poslocTP_B, poslocTP_A[0]):
-                return pc.case.IIIB
+                return pc.case.III
             else:
                 return pc.case.I
         else: # check cases II and III
             if self._case_III_collision(posid_A, posid_B, poslocTP_A, poslocTP_B[0]):
-                return pc.case.IIIA
+                return pc.case.III
             elif self._case_III_collision(posid_B, posid_A, poslocTP_B, poslocTP_A[0]):
-                return pc.case.IIIB
+                return pc.case.III
             elif self._case_II_collision(posid_A, posid_B, poslocTP_A, poslocTP_B):
                 return pc.case.II
             else:
@@ -323,6 +333,12 @@ class PosCollider(object):
         poly1 = self.place_phi_arm(posid1, tp1)
         poly2 = self.place_central_body(posid2, t2)
         return poly1.collides_with(poly2)
+    
+    def _case_IV_collision(self, posid1, posid2, tp1):
+        """Search or case IV collision, positioner 1 arm against positioner 2 circular envelope."""
+        cdef PosPoly poly1
+        poly1 = self.place_phi_arm(posid1, tp1)
+        return poly1.collides_with_circle(self.x0[posid2], self.y0[posid2], self.Eo_radius_with_margin)
 
     def _load_config_data(self):
         """Reads latest versions of all configuration file offset, range, and
@@ -344,6 +360,15 @@ class PosCollider(object):
             self.t0[posid] = posmodel.state.read('OFFSET_T')
             self.p0[posid] = posmodel.state.read('OFFSET_P')
             self.keepout_expansions[posid] = {key:posmodel.state.read(key) for key in pc.keepout_expansion_keys}
+            classified_retracted = posmodel.state.read('CLASSIFIED_AS_RETRACTED')
+            disabled = not posmodel.state.read('CTRL_ENABLED')
+            if classified_retracted and disabled:
+                self.classified_as_retracted.add(posid)
+            elif classified_retracted and not disabled:
+                self.printfunc('Warning: While initializing ' + str(posid) + ' in poscollider.pyx, ' +
+                               ' encountered CLASSIFIED_AS_RETRACTED == True while CTRL_ENABLED == True. ' +
+                               'This is inconsistent and must be resolved! For now, proceeding as if ' +
+                               'CLASSIFIED_AS_RETRACTED == False.' )
 
     def _load_circle_envelopes(self):
         """Read latest versions of all circular envelopes, including outer clear rotation
@@ -353,6 +378,8 @@ class PosCollider(object):
         self.Eo_phi = self.config['PHI_EO']   # angle above which phi is guaranteed to be within envelope Eo
         self.Ei_phi = self.config['PHI_EI']   # angle above which phi is guaranteed to be within envelope Ei
         self.Eo = self.config['ENVELOPE_EO']  # outer clear rotation envelope
+        self.Eo_with_margin = self.Eo + 2 * self.config['EO_RADIAL_TOL'] # outer clear rotation envelope for collision checks (diameter)
+        self.Eo_radius_with_margin = self.Eo_with_margin / 2 # outer clear rotation envelope for collision checks (radius)
         self.Ei = self.config['ENVELOPE_EI']  # inner clear rotation envelope
         self.Ee = self._max_extent() * 2      # extended-phi clear rotation envelope
         self.Eo_poly = PosPoly(self._circle_poly_points(self.Eo, self.config['RESOLUTION_EO']).tolist())
@@ -427,9 +454,11 @@ class PosCollider(object):
         the optional argument 'outside' is true. If 'outside' is false, then the
         segment points lie on the circle.
         """
+        assert diameter > 0
+        assert npts > 2
         alpha = np.linspace(0, 2 * math.pi, npts + 1)[0:-1]
         if outside:
-            half_angle = alpha[0]/2
+            half_angle = (alpha[1] - alpha[0])/2
             points_radius = diameter/2 / math.cos(half_angle)
         else:
             points_radius = diameter/2
@@ -814,6 +843,22 @@ cdef class PosPoly:
             return _polygons_collide(self.x, self.y, self.n_pts, other.x, other.y, other.n_pts)
         else:
             return False
+        
+    cpdef unsigned int collides_with_circle(self, x, y, radius):
+        """Searches for collisions in space between this polygon and
+        a circle, defined by center (x,y) and radius. Returns a bool,
+        where true indicates a collision.
+        """
+        cdef double X = x
+        cdef double Y = y
+        cdef double R = radius
+        cdef double distance
+        cdef unsigned int i
+        for i in range(self.n_pts):
+            distance = ((self.x[i] - X)**2 + (self.y[i] - Y)**2)**0.5
+            if distance < R:
+                return True
+        return False
 
 cdef unsigned int _bounding_boxes_collide(double x1[], double y1[], unsigned int len1, double x2[], double y2[], unsigned int len2):
     """Check whether the rectangular bounding boxes of two polygons collide.
@@ -945,3 +990,9 @@ cpdef test2():
     q = s.copy()
     q.quantize(0.1)
     return t, s, q
+
+cpdef test3():
+    keepout_phi = [[3.967, 3.918, 3.269, -1.172, -1.172,  3.269,  3.918],
+                  [0.000, 1.014, 1.583,  1.037, -1.037, -1.583, -1.014]]
+    p = PosPoly(keepout_phi)
+    return p
