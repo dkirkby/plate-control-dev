@@ -308,9 +308,9 @@ class Petal(object):
         '''
         if hasattr(self, 'anticol_settings'):
             self.printfunc('Using provided anticollision settings')
-            self.collider = poscollider.PosCollider(config=self.anticol_settings, hole_angle_file=None)
+            self.collider = poscollider.PosCollider(config=self.anticol_settings, printfunc=self.printfunc)
         else:
-            self.collider = poscollider.PosCollider(configfile=collider_file, hole_angle_file=None)
+            self.collider = poscollider.PosCollider(configfile=collider_file, printfunc=self.printfunc)
             self.anticol_settings = self.collider.config
         self.printfunc(f'Collider setting: {self.collider.config}')
         self.collider.add_positioners(self.posmodels.values())
