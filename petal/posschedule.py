@@ -45,6 +45,11 @@ class PosSchedule(object):
     @property
     def collider(self):
         return self.petal.collider
+    
+    def printv(self, string):
+        """Prints string if verbosity is enabled."""
+        if self.verbose:
+            self.printfunc(string)
 
     def request_target(self, posid, uv_type, u, v, log_note=''):
         """Adds a request to the schedule for a given positioner to move to the
@@ -67,19 +72,17 @@ class PosSchedule(object):
         if stats_enabled:
             timer_start = time.clock()
             self.stats.add_request()
+        def print_denied(string):
+            denied_prefix = str(posid) + ' : target request denied. '
+            self.printv(denied_prefix + str(string))
         posmodel = self.petal.posmodels[posid]
         trans = posmodel.trans
         if self.already_requested(posid):
+            print_denied('Cannot request more than one target per positioner in a given schedule.')
             self.petal.pos_flags[posid] |= self.petal.multi_request_bit
-            if self.verbose:
-                self.printfunc(
-                    f'{posid}: target request denied. Cannot request more than'
-                    f'one target per positioner in a given schedule.')
             return False
         if self._deny_request_because_disabled(posmodel):
-            if self.verbose:
-                self.printfunc(
-                    f'{posid}: target request denied. Positioner is disabled.')
+            print_denied('Positioner is disabled.')
             return False
         current_position = posmodel.expected_current_position
         start_posintTP = current_position['posintTP']
@@ -92,22 +95,7 @@ class PosSchedule(object):
             targt_uv = posmodel.trans.addto_QS(start_uv, [u, v])
             targt_posintTP, unreachable = trans.QS_to_posintTP(targt_uv, lims)
         elif uv_type == 'poslocXY':
-            targt_posintTP, unreachable = trans.poslocXY_to_posintTP(
-                [u, v], lims)
-            if self.verbose:  # debug
-                targt_poslocTP, _ = trans.poslocXY_to_poslocTP(
-                    [u, v], lims)
-                if unreachable:
-                    self.printfunc(
-                        f'{posid} unreachable, target poslocXY = {[u, v]}, '
-                        f'lims = {lims}, '
-                        f'targt_posintTP = {targt_posintTP}, '
-                        f'unreachable = {unreachable}, '
-                        f'targt_poslocTP = {targt_poslocTP}, '
-                        f'targetable_range_T = {posmodel.targetable_range_T}, '
-                        f'targetable_range_P = {posmodel.targetable_range_P}, '
-                        f"offset_T = {trans.getval('OFFSET_T')}, "
-                        f"offset_P = {trans.getval('OFFSET_P')}")
+            targt_posintTP, unreachable = trans.poslocXY_to_posintTP([u, v], lims)
         elif uv_type == 'obsdXdY':
             # global cs5 projected xy, as returned by platemaker
             start_uv = current_position['obsXY']
@@ -118,8 +106,7 @@ class PosSchedule(object):
             # in poslocXY coordinates in local tangent plane, not global cs5
             start_uv = current_position['poslocXY']
             targt_uv = posmodel.trans.addto_XY(start_uv, [u, v])
-            targt_posintTP, unreachable = posmodel.trans.poslocXY_to_posintTP(
-                targt_uv, lims)
+            targt_posintTP, unreachable = posmodel.trans.poslocXY_to_posintTP(targt_uv, lims)
         elif uv_type == 'posintTP':
             targt_posintTP = [u, v]
         elif uv_type == 'dTdP':
@@ -131,36 +118,22 @@ class PosSchedule(object):
         elif uv_type == 'poslocTP':
             targt_posintTP = trans.poslocTP_to_posintTP([u, v])
         else:
-            #if self.verbose:
-            # Moving out of verbose - will spam messages but only happens because
-            # a script was written wrong. Will get the point across.
-            self.printfunc(
-                f'{posid}: target request denied. Bad uv_type: {uv_type}')
+            print_denied('Bad uv_type: ' + str(uv_type))
             return False
         if unreachable:
             self.petal.pos_flags[posid] |= self.petal.unreachable_targ_bit
-            if self.verbose:
-                self.printfunc(f'{posid}: target request denied. Target not '
-                               f'reachable: {uv_type}, ({u:.3f}, {v:.3f})')
+            print_denied(f'Target not reachable: {uv_type}, ({u:.3f}, {v:.3f})')
             return False
         targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
         if self._deny_request_because_limit(posmodel, targt_poslocTP):
-            if self.verbose:
-                self.printfunc(f'{posid}: target request denied. Target '
-                               "exceeds expert angular limit.")
+            print_denied('Target exceeds expert angular limit.')
             return False
-        if self._deny_request_because_target_interference(
-                posmodel, targt_poslocTP):
-            if self.verbose:
-                self.printfunc(f'{posid}: target request denied. Target '
-                               "interferes with a neighbor's existing target.")
+        if self._deny_request_because_target_interference(posmodel, targt_poslocTP):
+            print_denied('Target interferes with a neighbor\'s existing target.')
             return False
-        if (self.should_check_petal_boundaries
-            and self._deny_request_because_out_of_bounds(
-                posmodel, targt_poslocTP)):
-            if self.verbose:
-                self.printfunc(f'{posid}: target request denied. Target '
-                               f'exceeds a fixed boundary.')
+        if self.should_check_petal_boundaries:
+            if self._deny_request_because_out_of_bounds(posmodel, targt_poslocTP):
+                print_denied('Target exceeds a fixed boundary.')
             return False
         new_request = {'start_posintTP': start_posintTP,
                        'targt_posintTP': targt_posintTP,
@@ -203,15 +176,9 @@ class PosSchedule(object):
         then it reverts to 'freeze' instead. An argument of anticollision=None
         remains as-is.
         """
-        stats_enabled = self.stats.is_enabled()
-        if stats_enabled:
-            timer_start = time.clock()
-            self.stats.set_scheduling_method(str(anticollision))
-            original_request_posids = set(self.requests.keys())
-            max_net_time = 0
+        self._schedule_moves_initialize_logging(anticollision)
         if not self.requests and not self.stages['expert'].is_not_empty():
-            if self.verbose:
-                self.printfunc('No requests nor existing move tables found. No move scheduling performed.')
+            self.printfunc('No requests nor existing move tables found. No move scheduling performed.')
             return
         if self.expert_mode_is_on():
             self._schedule_expert_tables(anticollision)
@@ -221,92 +188,33 @@ class PosSchedule(object):
                 self._schedule_requests_with_path_adjustments() # there is only one possible anticollision method for this scheduling method
             else:
                 self._schedule_requests_with_no_path_adjustments(anticollision)
+        self._combine_stages_into_final()
         final = self.stages['final']
-        for name in self.stage_order:
-            stage = self.stages[name]
-            if stage != final:
-                stage.equalize_table_times()
-                for posid,table in stage.move_tables.items():
-                    if posid not in final.move_tables:
-                        final.add_table(table)
-                    else:
-                        final.move_tables[posid].extend(table)
-        if anticollision or stats_enabled or self.petal.animator_on:
-            adjective = 'Penultimate' if anticollision else 'Final'
-            colliding_sweeps, all_sweeps = final.find_collisions(final.move_tables)
-            self.printfunc(adjective + ' collision check --> num colliding sweeps = ' + str(len(colliding_sweeps)))
-            final.store_collision_finding_results(colliding_sweeps, all_sweeps)
-            if colliding_sweeps:
-                collision_pairs = {final._collision_id(posid,colliding_sweeps[posid].collision_neighbor) for posid in colliding_sweeps}
-                self.printfunc(adjective + ' collision pairs: ' + str(collision_pairs))
-            else:
-                collision_pairs = {}            
         if anticollision:
-            adjusted = set()
-            for posid in colliding_sweeps:
-                these_adjusted = final.adjust_path(posid, freezing='forced_recursive')
-                adjusted.update(these_adjusted)
-            if colliding_sweeps:
-                self.printfunc('Adjusted posids: ' + str(adjusted))
-                colliding_sweeps, all_sweeps = final.find_collisions(final.move_tables)
-                final.store_collision_finding_results(colliding_sweeps, all_sweeps)
-                self.printfunc('Final collision check --> num colliding sweeps = ' + str(len(colliding_sweeps)) + ' (should always be zero)')
-                collision_pairs = {final._collision_id(posid,colliding_sweeps[posid].collision_neighbor) for posid in colliding_sweeps}
-                self.printfunc('Final collision pairs: ' + str(sorted(collision_pairs)))
+            c, a, p = self._check_final_stage(msg_prefix='Penultimate')
+        elif self.stats.is_enabled() or self.petal.animator_on:
+            c, a, p = self._check_final_stage(msg_prefix='Final')
+        colliding_sweeps, all_sweeps, collision_pairs = c, a, p # for readability
+        if anticollision:
+            if not colliding_sweeps:
+                self.printfunc('Final collision check --> skipped (because \'penultimate\' check already succeeded)')  
             else:
-                collision_pairs = {}
-                self.printfunc('Final collision check --> skipped (because \'penultimate\' check already succeeded)')
-        if final.sweeps: # indicates that results from a collision check do exist
-            if self.should_check_sweeps_continuity:
-                discontinuous = final.sweeps_continuity_check()
-                self.printfunc('Final check of quantized sweeps --> ' + str(len(discontinuous)) + ' discontinuous (should always be zero)')
-                if discontinuous:
-                    self.printfunc('Discontinous sweeps: ' + str(sorted(discontinuous.keys())))
-            if stats_enabled:
-                self.stats.add_final_collision_check(collision_pairs)
-                colliding_posids = set(colliding_sweeps.keys())
-                colliding_tables = {p:final.move_tables[p] for p in colliding_posids if p in final.move_tables}
-                self.stats.add_unresolved_colliding_at_stage('combined',colliding_posids,colliding_tables,colliding_sweeps)
+                adjusted = set()
+                for posid in colliding_sweeps:
+                    these_adjusted = final.adjust_path(posid, freezing='forced_recursive')
+                    adjusted.update(these_adjusted)
+                self.printfunc('Adjusted posids: ' + str(adjusted))
+                c, a, p = self._check_final_stage(prefix='Final', suffix=' (should always be zero)')
+                colliding_sweeps, all_sweeps, collision_pairs = c, a, p # for readability
+        self._schedule_moves_check_final_sweeps_continuity()
+        self._schedule_moves_store_collisions_and_pairs(colliding_sweeps, collision_pairs)
         self.move_tables = final.move_tables
         empties = {posid for posid,table in self.move_tables.items() if not table}
         motionless = {posid for posid,table in self.move_tables.items() if table.is_motionless}
         for posid in empties | motionless:
             del self.move_tables[posid]
-        for posid,table in self.move_tables.items():  
-            log_note_addendum = ''              
-            if posid in self.requests:
-                req = self.requests.pop(posid)
-                table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
-                log_note_addendum = req['log_note'] # keep the original log notes with move tables
-                if stats_enabled:
-                    table_for_schedule = table.for_schedule()
-                    if posid in original_request_posids and self._table_matches_request(table_for_schedule,req):
-                        self.stats.add_table_matching_request()
-                    max_net_time = max(table_for_schedule['net_time'][-1], max_net_time)
-            elif not self.expert_mode_is_on():
-                self.printfunc('Error: ' + str(posid) + ' has a move table despite no request.')
-                table.display()
-            table.log_note += (' ' if table.log_note else '') + log_note_addendum
-        if stats_enabled:
-            self.stats.set_num_move_tables(len(self.move_tables))
-            self.stats.set_max_table_time(max_net_time)
-            self.stats.add_scheduling_time(time.clock() - timer_start)
-        if self.petal.animator_on and final.sweeps:
-            if self.collider.animate_colliding_only:
-                sweeps_to_add = {}
-                for posid,sweep in colliding_sweeps.items():
-                    sweeps_to_add.update({posid:sweep})
-                    neighbor_sweeps = {n:all_sweeps[n] for n in self.collider.pos_neighbors[posid]}
-                    sweeps_to_add.update(neighbor_sweeps)
-            else:
-                sweeps_to_add = all_sweeps
-            if sweeps_to_add:
-                self.collider.add_mobile_to_animator(self.petal.animator_total_time, sweeps_to_add)
-                for posid in sweeps_to_add:
-                    self.collider.add_posid_label(posid)
-                self.petal.animator_total_time += max({sweep.time[-1] for sweep in sweeps_to_add.values()})
-                if self.collider.animate_colliding_only:
-                    self.printfunc('Added ' + str(len(colliding_sweeps)) + ' colliding sweeps (and their neighbors) to the animator.')
+        self._schedule_moves_store_and_clear_requests_info()
+        self._schedule_moves_finish_logging(colliding_sweeps, all_sweeps)
 
     def conservative_move_timeout_period(self, safety_factor=4.0):
         """Returns a conservative period of time (in seconds) that one should
@@ -319,37 +227,6 @@ class PosSchedule(object):
         """
         anneal_time_sum = sum(t for t in self.anneal_time.values())
         return anneal_time_sum * safety_factor
-
-    def _table_matches_quantized_sweep(self, move_table, sweep):
-        """Takes as input a "for_schedule()" move table and a quantized sweep,
-        and then cross-checks whether their total rotations (theta and phi)
-        match. Returns a boolean.
-        """
-        tol = pc.schedule_checking_numeric_angular_tol
-        table = move_table.for_schedule()
-        end_tp_sweep = [sweep.theta(-1), sweep.phi(-1)]
-        end_tp_table = [table['net_dT'][-1] + sweep.theta(0), table['net_dP'][-1] + sweep.phi(0)]
-        endpos_diff = [end_tp_sweep[i] - end_tp_table[i] for i in range(2)]
-        if abs(endpos_diff[0]) > tol or abs(endpos_diff[1]) > tol:
-            self.printfunc(f'table and sweep not matched: {sweep.posid} end_tp: check={end_tp_sweep}, move={end_tp_table}')
-            return False
-        return True
-    
-    def _table_matches_request(self, table_for_schedule, request):
-        """Input a move table (for_schedule format) and check whether the total
-        motion matches request. Returns a boolean.
-        """
-        tol = pc.schedule_checking_numeric_angular_tol
-        dtdp_request = [request['targt_posintTP'][i] - request['start_posintTP'][i] for i in range(2)]
-        dtdp_table = [table_for_schedule['net_dT'][-1], table_for_schedule['net_dP'][-1]]
-        diff = [dtdp_request[i] - dtdp_table[i] for i in range(2)]
-        diff_abs = [abs(x) for x in diff]
-        for i in range(len(diff_abs)):
-            if diff_abs[i] > 180:
-                diff_abs[i] -= 360
-        if diff_abs[0] > tol or diff_abs[1] > tol:
-            return False
-        return True
 
     def already_requested(self, posid):
         """Returns boolean whether a request has already been registered in the
@@ -604,3 +481,142 @@ class PosSchedule(object):
                 self.petal.pos_flags[posmodel.posid] |= self.petal.exceeded_lims_bit
                 return True
         return False
+
+    def _schedule_moves_initialize_logging(self, anticollision):
+        """Initial logging tasks for the schedule_moves() function."""
+        if self.stats.is_enabled():
+            self.__timer_start = time.clock()
+            self.stats.set_scheduling_method(str(anticollision))
+            self.__original_request_posids = set(self.requests.keys())
+            self.__max_net_time = 0
+    
+    def _combine_stages_into_final(self):
+        """Takes move tables from each individual stage and combines them into
+        the "final" stages.
+        """
+        final = self.stages['final']
+        for name in self.stage_order:
+            stage = self.stages[name]
+            if stage != final:
+                stage.equalize_table_times()
+                for posid,table in stage.move_tables.items():
+                    if posid not in final.move_tables:
+                        final.add_table(table)
+                    else:
+                        final.move_tables[posid].extend(table)
+                        
+    def _check_final_stage(self, msg_prefix='', msg_suffix=''):
+        """Checks the special "final" schedule stage for collisions.
+        
+        Inputs: Some prefix and suffix text may be argued for printed messages customization.
+        
+        Outputs: colliding_sweeps ... dictionary of any colliding sweeps (keys are posids)
+                 all_sweeps       ... dictionary of all sweeps checked (keys are posids)
+                 collision_pairs  ... set of any collision pair id strings
+        """
+        assert isinstance(msg_prefix, str)
+        assert isinstance(msg_suffix, str)
+        final = self.stages['final']
+        colliding_sweeps, all_sweeps = final.find_collisions(final.move_tables)
+        final.store_collision_finding_results(colliding_sweeps, all_sweeps)
+        self.printfunc(msg_prefix + ' collision check --> num colliding sweeps = ' + str(len(colliding_sweeps)) + msg_suffix)
+        collision_pairs = {final._collision_id(posid,colliding_sweeps[posid].collision_neighbor) for posid in colliding_sweeps}
+        self.printfunc(msg_prefix + ' collision pairs: ' + str(collision_pairs))
+        return colliding_sweeps, all_sweeps, collision_pairs
+
+    def _schedule_moves_check_final_sweeps_continuity(self):
+        """Helper function for schedule_moves()."""
+        final = self.stages['final']
+        if final.sweeps: # indicates that results from a collision check do exist
+            if self.should_check_sweeps_continuity:
+                discontinuous = final.sweeps_continuity_check()
+                self.printfunc('Final check of quantized sweeps --> ' + str(len(discontinuous)) + ' discontinuous (should always be zero)')
+                if discontinuous:
+                    self.printfunc('Discontinous sweeps: ' + str(sorted(discontinuous.keys())))
+                    
+    def _schedule_moves_store_collisions_and_pairs(self, colliding_sweeps, collision_pairs):
+        """Helper function for schedule_moves()."""
+        final = self.stages['final']
+        if self.stats.is_enabled():
+            self.stats.add_final_collision_check(collision_pairs)
+            colliding_posids = set(colliding_sweeps.keys())
+            colliding_tables = {p:final.move_tables[p] for p in colliding_posids if p in final.move_tables}
+            self.stats.add_unresolved_colliding_at_stage('combined',colliding_posids,colliding_tables,colliding_sweeps)
+
+    def _schedule_moves_store_and_clear_requests_info(self):
+        """Goes through the move tables, matching up original request information
+        and pushing it into the tables. (This is for logging purposes.)
+        
+        Note that in the current implementation, the request dicts are popped from
+        the self.requests collection as the function proceeds.
+        """
+        stats_enabled = self.stats.is_enabled()
+        for posid,table in self.move_tables.items():  
+            log_note_addendum = ''              
+            if posid in self.requests:
+                req = self.requests.pop(posid) # if change this, be sure to update docstring above
+                table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
+                log_note_addendum = req['log_note'] # keep the original log notes with move tables
+                if stats_enabled:
+                    table_for_schedule = table.for_schedule()
+                    if posid in self.__original_request_posids and self._table_matches_request(table_for_schedule,req):
+                        self.stats.add_table_matching_request()
+                    self.__max_net_time = max(table_for_schedule['net_time'][-1], self.__max_net_time)
+            elif not self.expert_mode_is_on():
+                self.printfunc('Error: ' + str(posid) + ' has a move table despite no request.')
+                table.display()
+            table.log_note += (' ' if table.log_note else '') + log_note_addendum
+
+    def _schedule_moves_finish_logging(self, colliding_sweeps, all_sweeps):
+        """Final logging and animation steps for the schedule_moves() function."""
+        if self.stats.is_enabled():
+            self.stats.set_num_move_tables(len(self.move_tables))
+            self.stats.set_max_table_time(self.__max_net_time)
+            self.stats.add_scheduling_time(time.clock() - self.__timer_start)
+        if self.petal.animator_on and self.stages['final'].sweeps:
+            if self.collider.animate_colliding_only:
+                sweeps_to_add = {}
+                for posid,sweep in colliding_sweeps.items():
+                    sweeps_to_add.update({posid:sweep})
+                    neighbor_sweeps = {n:all_sweeps[n] for n in self.collider.pos_neighbors[posid]}
+                    sweeps_to_add.update(neighbor_sweeps)
+            else:
+                sweeps_to_add = all_sweeps
+            if sweeps_to_add:
+                self.collider.add_mobile_to_animator(self.petal.animator_total_time, sweeps_to_add)
+                for posid in sweeps_to_add:
+                    self.collider.add_posid_label(posid)
+                self.petal.animator_total_time += max({sweep.time[-1] for sweep in sweeps_to_add.values()})
+                if self.collider.animate_colliding_only:
+                    self.printfunc('Added ' + str(len(colliding_sweeps)) + ' colliding sweeps (and their neighbors) to the animator.')
+                    
+    def _table_matches_quantized_sweep(self, move_table, sweep):
+        """Takes as input a "for_schedule()" move table and a quantized sweep,
+        and then cross-checks whether their total rotations (theta and phi)
+        match. Returns a boolean.
+        """
+        tol = pc.schedule_checking_numeric_angular_tol
+        table = move_table.for_schedule()
+        end_tp_sweep = [sweep.theta(-1), sweep.phi(-1)]
+        end_tp_table = [table['net_dT'][-1] + sweep.theta(0), table['net_dP'][-1] + sweep.phi(0)]
+        endpos_diff = [end_tp_sweep[i] - end_tp_table[i] for i in range(2)]
+        if abs(endpos_diff[0]) > tol or abs(endpos_diff[1]) > tol:
+            self.printfunc(f'table and sweep not matched: {sweep.posid} end_tp: check={end_tp_sweep}, move={end_tp_table}')
+            return False
+        return True
+    
+    def _table_matches_request(self, table_for_schedule, request):
+        """Input a move table (for_schedule format) and check whether the total
+        motion matches request. Returns a boolean.
+        """
+        tol = pc.schedule_checking_numeric_angular_tol
+        dtdp_request = [request['targt_posintTP'][i] - request['start_posintTP'][i] for i in range(2)]
+        dtdp_table = [table_for_schedule['net_dT'][-1], table_for_schedule['net_dP'][-1]]
+        diff = [dtdp_request[i] - dtdp_table[i] for i in range(2)]
+        diff_abs = [abs(x) for x in diff]
+        for i in range(len(diff_abs)):
+            if diff_abs[i] > 180:
+                diff_abs[i] -= 360
+        if diff_abs[0] > tol or diff_abs[1] > tol:
+            return False
+        return True
