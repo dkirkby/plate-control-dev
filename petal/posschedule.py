@@ -45,11 +45,6 @@ class PosSchedule(object):
     @property
     def collider(self):
         return self.petal.collider
-    
-    def printv(self, string):
-        """Prints string if verbosity is enabled."""
-        if self.verbose:
-            self.printfunc(string)
 
     def request_target(self, posid, uv_type, u, v, log_note=''):
         """Adds a request to the schedule for a given positioner to move to the
@@ -57,8 +52,14 @@ class PosSchedule(object):
         coordinate system indicated by uv_type.
 
               posid ... string, unique id of positioner
-            uv_type ... string, 'QS'/'dQdS', 'poslocXY',
-                        'posintTP'/'dTdP'
+            uv_type ... string, valid arguments are:
+                              ABSOLUTE       RELATIVE
+                          ... 'QS'           'dQdS'
+                          ... 'obsXY'        'obsdXdY'
+                          ... 'poslocXY'     'poslocdXdY'
+                          ... 'ptlXY'
+                          ... 'posintTP'     'dTdP'
+                          ... 'poslocTP'
                   u ... float, value of q, dq, x, dx, t, or dt
                   v ... float, value of s, ds, y, dy, p, or dp
            log_note ... optional string to store alongside the requested move
@@ -74,7 +75,7 @@ class PosSchedule(object):
             self.stats.add_request()
         def print_denied(string):
             denied_prefix = str(posid) + ' : target request denied. '
-            self.printv(denied_prefix + str(string))
+            self.printfunc(denied_prefix + str(string))
         posmodel = self.petal.posmodels[posid]
         trans = posmodel.trans
         if self.already_requested(posid):
@@ -134,7 +135,7 @@ class PosSchedule(object):
         if self.should_check_petal_boundaries:
             if self._deny_request_because_out_of_bounds(posmodel, targt_poslocTP):
                 print_denied('Target exceeds a fixed boundary.')
-            return False
+                return False
         new_request = {'start_posintTP': start_posintTP,
                        'targt_posintTP': targt_posintTP,
                        'posmodel': posmodel,
