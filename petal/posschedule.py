@@ -205,7 +205,7 @@ class PosSchedule(object):
                     these_adjusted = final.adjust_path(posid, freezing='forced_recursive')
                     adjusted.update(these_adjusted)
                 self.printfunc('Adjusted posids: ' + str(adjusted))
-                c, a, p = self._check_final_stage(prefix='Final', suffix=' (should always be zero)')
+                c, a, p = self._check_final_stage(msg_prefix='Final', msg_suffix=' (should always be zero)')
                 colliding_sweeps, all_sweeps, collision_pairs = c, a, p # for readability
         self._schedule_moves_check_final_sweeps_continuity()
         self._schedule_moves_store_collisions_and_pairs(colliding_sweeps, collision_pairs)
