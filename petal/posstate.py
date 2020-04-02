@@ -4,7 +4,10 @@ from configobj import ConfigObj
 import csv
 import pprint
 import posconstants as pc
-from DOSlib.positioner_index import PositionerIndex
+try:
+    from DOSlib.positioner_index import PositionerIndex
+except:
+    print('DOSlib.positioner_index module not available. (This may be ok for some environments.)')
 try:
     from DBSingleton import DBSingleton
     DB_COMMIT_AVAILABLE = True
