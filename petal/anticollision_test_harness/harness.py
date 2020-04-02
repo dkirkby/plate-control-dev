@@ -28,7 +28,7 @@ include_neighbors = True
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
 pos_param_sequence_id = 'PTL03_30001'
-move_request_sequence_id = '30001_ntarg001_set000' #'03000-03001'
+move_request_sequence_id = 'cmds_unit_test'
 note = ''
 filename_suffix = str(runstamp) + '_' + str(move_request_sequence_id) + ('_' + str(note) if note else '')
 
@@ -37,7 +37,7 @@ fidids = {}
 petal_id = 3
 
 # Animation on/off options
-should_animate = False
+should_animate = True
 anim_label_size = 'medium' # size in points, 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
 anim_cropping_on = True # crops the plot window to just contain the animation
 
@@ -55,7 +55,7 @@ should_profile = False
 
 # saving of target sets for later use on hardware
 # formatted for direct input to xytest
-should_export_targets = True
+should_export_targets = False
 def make_xytest_column_headers(command, device_loc):
     '''For making the funky column headers of xytest target files. Returns
     a pair of headers, e.g. for the x and y coordinates or the like.'''

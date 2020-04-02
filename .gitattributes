@@ -27,6 +27,7 @@ petal/anticollision_test_harness/generate_posparam_sets_from_posconfigs.py -text
 petal/anticollision_test_harness/generate_request_sets.py -text
 petal/anticollision_test_harness/generate_request_sets_for_posparams_set.py -text
 petal/anticollision_test_harness/generate_request_sets_from_fiberassignment.py -text
+petal/anticollision_test_harness/generate_request_sets_testing_all_uv_cmds.py -text
 petal/anticollision_test_harness/harness.py -text
 petal/anticollision_test_harness/harness_constants.py -text
 petal/anticollision_test_harness/multiharness.py -text

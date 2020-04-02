@@ -16,7 +16,8 @@ positioner_param_sequences = {0:[0],
                               'PTL03_30001':[30001],
                              }
 
-move_request_sequences     = {0:[0],
+move_request_sequences     = {'cmds_unit_test':[i for i in range(90000,90020)],
+                              0:[0],
                               1:[0,1],
 							  2:[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
                               3:[20,21,22,23,24],
