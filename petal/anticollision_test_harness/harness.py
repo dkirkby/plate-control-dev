@@ -27,7 +27,7 @@ include_neighbors = True
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
-pos_param_sequence_id = 'PTL03_30001'
+pos_param_sequence_id = 'cmds_unit_test'
 move_request_sequence_id = 'cmds_unit_test'
 note = ''
 filename_suffix = str(runstamp) + '_' + str(move_request_sequence_id) + ('_' + str(note) if note else '')
@@ -49,9 +49,10 @@ anim_cropping_on = True # crops the plot window to just contain the animation
 animation_foci = 'all'
 
 # other options
-n_corrections = 1 # number of correction moves to simulate after each target
+n_corrections = 0 # number of correction moves to simulate after each target
 max_correction_move = 0.1/1.414 # mm
 should_profile = False
+should_inspect_some_TP = False # some *very* verbose printouts of POS_T, OFFSET_T, etc, sometimes helpful for debugging
 
 # saving of target sets for later use on hardware
 # formatted for direct input to xytest
@@ -175,6 +176,19 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                 hc.profile('ptl.schedule_send_and_execute_moves(anticollision="'+anticollision+'")')
             else:
                 ptl.schedule_send_and_execute_moves(anticollision=anticollision)
+            if should_inspect_some_TP:
+                for dev in device_loc_to_command:
+                    posid = ptl.devices[dev]
+                    print('---------------')
+                    print(f'posid {posid}, device {dev}')
+                    vals = ptl.states[posid]._val
+                    print(f'POS_T = {vals["POS_T"]}')
+                    print(f'POS_P = {vals["POS_P"]}')
+                    print(f'OFFSET_T = {vals["OFFSET_T"]}')
+                    print(f'OFFSET_P = {vals["OFFSET_P"]}')
+                    print(f'POS_T + OFFSET_T = {vals["POS_T"] + vals["OFFSET_T"]}')
+                    print(f'POS_P + OFFSET_P = {vals["POS_P"] + vals["OFFSET_P"]}')
+                print('---------------')
     if ptl.schedule_stats.is_enabled():
         stats_path = os.path.join(pc.dirs['temp_files'], 'schedstats_' + filename_suffix + '.csv')
         ptl.schedule_stats.save(path=stats_path)

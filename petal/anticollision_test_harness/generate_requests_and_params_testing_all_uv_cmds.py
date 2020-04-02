@@ -36,8 +36,10 @@ import posstate
 import harness_constants as hc
 import numpy
 
-# file numbers
-first_file_num = 90000
+# save options
+reqests_first_file_num = 90000
+params_file_num = 90000
+should_save = True
 
 # key points
 keypoints = [[0,150],
@@ -117,13 +119,28 @@ for cmd in uv_types:
             these_requests.append(new_request)
         all_requests.append(these_requests)
     
-# save set files
-next_filenumber = first_file_num
-for requests in all_requests:
-    save_path = hc.filepath(hc.req_dir, hc.req_prefix, next_filenumber)
+# save request files
+if should_save:
+    next_filenumber = reqests_first_file_num
+    for requests in all_requests:
+        save_path = hc.filepath(hc.req_dir, hc.req_prefix, next_filenumber)
+        with open(save_path, 'w', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=requests[0].keys())
+            writer.writeheader()
+            for request in requests:
+                writer.writerow(request)
+        next_filenumber += 1
+        
+# save pos param files
+if should_save:
+    save_path = hc.filepath(hc.pos_dir, hc.pos_prefix, params_file_num)
     with open(save_path, 'w', newline='') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=requests[0].keys())
+        headers = ['POS_ID', 'DEVICE_LOC', 'CTRL_ENABLED', 'LENGTH_R1', 'LENGTH_R2',
+                   'OFFSET_T', 'OFFSET_P', 'OFFSET_X', 'OFFSET_Y', 'PHYSICAL_RANGE_T',
+                   'PHYSICAL_RANGE_P']
+        writer = csv.DictWriter(csvfile, fieldnames=headers)
         writer.writeheader()
-        for request in requests:
-            writer.writerow(request)
-    next_filenumber += 1
+        for model in posmodels.values():
+            state = model.state
+            data = {key:state._val[key] for key in headers}
+            writer.writerow(data)

@@ -6,7 +6,8 @@ import csv
 import harness_constants as hc
 
 # Define sequences here. The user selects them by the key (the sequnce id).
-positioner_param_sequences = {0:[0],
+positioner_param_sequences = {'cmds_unit_test':[90000],
+                              0:[0],
                               1:[0,1],
                               2:[2],
                               3:[3],
