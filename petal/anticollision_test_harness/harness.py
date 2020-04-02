@@ -20,15 +20,15 @@ subset7a = {78, 79, 87, 88, 89, 98, 99}
 # Selection of which device location ids to send move requests to
 # (i.e. which positioners on petal to directly command)
 # either a set of device locations, or the keyword 'all' or 'near_gfa'
-device_loc_to_command = subset7a # note pre-cooked options above
+device_loc_to_command = locations_all # note pre-cooked options above
 
 # Whether to include any untargeted neighbors in the calculations
 include_neighbors = True
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
-pos_param_sequence_id = 'cmds_unit_test'
-move_request_sequence_id = 'cmds_unit_test'
+pos_param_sequence_id = 'PTL03_30001' # 'cmds_unit_test'
+move_request_sequence_id = '03000-03009' # 'cmds_unit_test'
 note = ''
 filename_suffix = str(runstamp) + '_' + str(move_request_sequence_id) + ('_' + str(note) if note else '')
 
@@ -37,7 +37,7 @@ fidids = {}
 petal_id = 3
 
 # Animation on/off options
-should_animate = True
+should_animate = False
 anim_label_size = 'medium' # size in points, 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
 anim_cropping_on = True # crops the plot window to just contain the animation
 
@@ -49,7 +49,7 @@ anim_cropping_on = True # crops the plot window to just contain the animation
 animation_foci = 'all'
 
 # other options
-n_corrections = 0 # number of correction moves to simulate after each target
+n_corrections = 1 # number of correction moves to simulate after each target
 max_correction_move = 0.1/1.414 # mm
 should_profile = False
 should_inspect_some_TP = False # some *very* verbose printouts of POS_T, OFFSET_T, etc, sometimes helpful for debugging
