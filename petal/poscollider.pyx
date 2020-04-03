@@ -23,6 +23,7 @@ class PosCollider(object):
                  config=None,
                  animator_label_type='loc',
                  printfunc=print):
+        self.printfunc = printfunc
         if not config:
             if not configfile:
                 filename = '_collision_settings_DEFAULT.conf'
@@ -92,7 +93,8 @@ class PosCollider(object):
             if 'PTL' in self.fixed_items_to_animate:
                 self.animator.add_or_change_item('PTL', '', start_time, self.keepout_PTL.points)
             for posid in self.posids_to_animate:
-                self.animator.add_or_change_item('Eo', self.posindexes[posid], start_time, self.Eo_polys[posid].points)
+                Eo_style_override = 'Eo bold' if posid in self.classified_as_retracted else ''
+                self.animator.add_or_change_item('Eo', self.posindexes[posid], start_time, self.Eo_polys[posid].points, Eo_style_override)
                 # self.animator.add_or_change_item('Ei', self.posindexes[posid], start_time, self.Ei_polys[posid].points)
                 # self.animator.add_or_change_item('Ee', self.posindexes[posid], start_time, self.Ee_polys[posid].points)
                 self.animator.add_or_change_item('line at 180', self.posindexes[posid], start_time, self.line180_polys[posid].points)
@@ -124,6 +126,8 @@ class PosCollider(object):
                     style_override = ''
                     collision_has_occurred = s.time[i] >= s.collision_time
                     freezing_has_occurred = s.time[i] >= s.frozen_time
+                    if posid in self.classified_as_retracted:
+                        style_override = 'positioner element unbold'
                     if freezing_has_occurred:
                         style_override = 'frozen'
                     if collision_has_occurred:
@@ -382,9 +386,10 @@ class PosCollider(object):
         self.Eo_radius_with_margin = self.Eo_with_margin / 2 # outer clear rotation envelope for collision checks (radius)
         self.Ei = self.config['ENVELOPE_EI']  # inner clear rotation envelope
         self.Ee = self._max_extent() * 2      # extended-phi clear rotation envelope
-        self.Eo_poly = PosPoly(self._circle_poly_points(self.Eo, self.config['RESOLUTION_EO']).tolist())
-        self.Ei_poly = PosPoly(self._circle_poly_points(self.Ei, self.config['RESOLUTION_EI']).tolist())
-        self.Ee_poly = PosPoly(self._circle_poly_points(self.Ee, self.config['RESOLUTION_EE']).tolist())
+        self.Eo_poly = PosPoly(self._circle_poly_points(self.Eo, self.config['RESOLUTION_EO']))
+        self.Eo_poly_with_margin = PosPoly(self._circle_poly_points(self.Eo_with_margin, self.config['RESOLUTION_EO']))
+        self.Ei_poly = PosPoly(self._circle_poly_points(self.Ei, self.config['RESOLUTION_EI']))
+        self.Ee_poly = PosPoly(self._circle_poly_points(self.Ee, self.config['RESOLUTION_EE']))
         self.line180_poly = PosPoly([[0,0],[-self.Eo/2,0]],close_polygon=False)
         self.Eo_polys = {}
         self.Ei_polys = {}
@@ -393,12 +398,16 @@ class PosCollider(object):
         for posid in self.posids:
             x = self.x0[posid]
             y = self.y0[posid]
-            self.Eo_polys[posid] = self.Eo_poly.translated(x,y)
+            if posid in self.classified_as_retracted:
+                Eo_poly = self.Eo_poly_with_margin
+            else:
+                Eo_poly = self.Eo_poly
+            self.Eo_polys[posid] = Eo_poly.translated(x,y)
             self.Ei_polys[posid] = self.Ei_poly.translated(x,y)
             self.Ee_polys[posid] = self.Ee_poly.translated(x,y)
             self.line180_polys[posid] = self.line180_poly.rotated(self.t0[posid]).translated(x,y)
         self.ferrule_diam = self.config['FERRULE_DIAM']
-        self.ferrule_poly = PosPoly(self._circle_poly_points(self.ferrule_diam, self.config['FERRULE_RESLN']).tolist())
+        self.ferrule_poly = PosPoly(self._circle_poly_points(self.ferrule_diam, self.config['FERRULE_RESLN']))
 
     def _load_keepouts(self):
         """Read latest versions of all keepout geometries."""
@@ -464,7 +473,7 @@ class PosCollider(object):
             points_radius = diameter/2
         x = points_radius * np.cos(alpha)
         y = points_radius * np.sin(alpha)
-        return np.array([x,y])
+        return [x,y]
 
 
 class PosSweep(object):

@@ -20,7 +20,11 @@ subset7a = {78, 79, 87, 88, 89, 98, 99}
 # Selection of which device location ids to send move requests to
 # (i.e. which positioners on petal to directly command)
 # either a set of device locations, or the keyword 'all' or 'near_gfa'
-device_loc_to_command = locations_all # note pre-cooked options above
+device_loc_to_command = subset7a # note pre-cooked options above
+
+# Select devices to CLASSIFY_AS_RETRACTED and disable
+retract_and_disable = {} # enter device locations to simulate those positioners as retracted and disabled
+retracted_TP = [0, 110]
 
 # Whether to include any untargeted neighbors in the calculations
 include_neighbors = True
@@ -28,7 +32,7 @@ include_neighbors = True
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
 pos_param_sequence_id = 'PTL03_30001' # 'cmds_unit_test'
-move_request_sequence_id = '03000-03009' # 'cmds_unit_test'
+move_request_sequence_id = '03000-03001' # 'cmds_unit_test'
 note = ''
 filename_suffix = str(runstamp) + '_' + str(move_request_sequence_id) + ('_' + str(note) if note else '')
 
@@ -89,6 +93,7 @@ if include_neighbors:
 pos_param_sequence = sequences.get_positioner_param_sequence(pos_param_sequence_id, all_device_loc)
 move_request_sequence = sequences.get_move_request_sequence(move_request_sequence_id, device_loc_to_command)
 exportable_targets = []
+orig_params = {}
 for pos_param_id, pos_params in pos_param_sequence.items():         
     for posid,params in pos_params.items():
         state = posstate.PosState(unit_id=posid, device_type='pos', petal_id=petal_id)
@@ -96,12 +101,12 @@ for pos_param_id, pos_params in pos_param_sequence.items():
         state.store('POS_P',180.0)
         for key,val in params.items():
             state.store(key,val)
-        if posid == 'M05052':
-            state.store('POS_T',-302.487)
-            state.store('POS_P',167.294)
-        if posid == 'M04191':
-            state.store('POS_T',163.619)
-            state.store('POS_P',125.144)
+        if params['DEVICE_LOC'] in retract_and_disable:
+            orig_params[posid] = {key:state._val[key] for key in ['CTRL_ENABLED', 'CLASSIFIED_AS_RETRACTED']}
+            state.store('POS_T', retracted_TP[0])
+            state.store('POS_P', retracted_TP[1])
+            state.store('CTRL_ENABLED', False)
+            state.store('CLASSIFIED_AS_RETRACTED', True)
         state.write()
     ptl = petal.Petal(petal_id        = petal_id,
                       petal_loc       = 3,
@@ -210,3 +215,7 @@ for pos_param_id, pos_params in pos_param_sequence.items():
         ptl.animator.filename_suffix = filename_suffix
         ptl.animator.add_timestamp_prefix_to_filename = False
         ptl.generate_animation()
+    for posid, params in orig_params.items():
+        for key,value in params.items():
+            ptl.states[posid].store(key, value)
+        ptl.states[posid].write()
