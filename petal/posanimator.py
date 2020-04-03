@@ -59,6 +59,12 @@ class PosAnimator(object):
                             'linewidth' : 1,
                             'edgecolor' : 'green',
                             'facecolor' : 'none'},
+                           
+                       'positioner element unbold':
+                           {'linestyle' : '--',
+                            'linewidth' : 0.5,
+                            'edgecolor' : 'green',
+                            'facecolor' : 'none'},
 
                        'collision':
                            {'linestyle' : '-',
@@ -82,6 +88,12 @@ class PosAnimator(object):
                            {'linestyle' : '-',
                             'linewidth' : 0.5,
                             'edgecolor' : '0.9',
+                            'facecolor' : 'none'},
+                           
+                       'Eo bold':
+                           {'linestyle' : '-',
+                            'linewidth' : 1,
+                            'edgecolor' : 'green',
                             'facecolor' : 'none'},
 
                        'Ei':
