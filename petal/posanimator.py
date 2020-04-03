@@ -63,7 +63,7 @@ class PosAnimator(object):
                        'positioner element unbold':
                            {'linestyle' : '--',
                             'linewidth' : 0.5,
-                            'edgecolor' : 'green',
+                            'edgecolor' : '0.6',
                             'facecolor' : 'none'},
 
                        'collision':

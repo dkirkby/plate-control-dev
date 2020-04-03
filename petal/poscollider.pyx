@@ -126,7 +126,7 @@ class PosCollider(object):
                     style_override = ''
                     collision_has_occurred = s.time[i] >= s.collision_time
                     freezing_has_occurred = s.time[i] >= s.frozen_time
-                    if posid in self.classified_as_retracted:
+                    if posid in self.classified_as_retracted or not self.posmodels[posid].is_enabled:
                         style_override = 'positioner element unbold'
                     if freezing_has_occurred:
                         style_override = 'frozen'
