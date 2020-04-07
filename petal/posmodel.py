@@ -16,8 +16,7 @@ class PosModel(object):
             self.state = posstate.PosState()
         else:
             self.state = state
-        self.trans = postransforms.PosTransforms(
-            this_posmodel=self, petal_alignment=petal_alignment)
+        self.trans = postransforms.PosTransforms(this_posmodel=self, petal_alignment=petal_alignment)
         self.axis = [None,None]
         self.axis[pc.T] = Axis(self,pc.T)
         self.axis[pc.P] = Axis(self,pc.P)
