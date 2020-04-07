@@ -154,10 +154,8 @@ class PosTransforms(petaltransforms.PetalTransforms):
     def poslocXY_to_poslocTP(self, poslocXY, range_limits='full'):
         ''' input is list or tuple or 1D array '''
         posintT_range, posintP_range = self.shaft_ranges(range_limits)
-        poslocTP_min = self.posintTP_to_poslocTP(
-            [posintT_range[0], posintP_range[0]])
-        poslocTP_max = self.posintTP_to_poslocTP(
-            [posintT_range[1], posintP_range[1]])
+        poslocTP_min = self.posintTP_to_poslocTP([posintT_range[0], posintP_range[0]])
+        poslocTP_max = self.posintTP_to_poslocTP([posintT_range[1], posintP_range[1]])
         posloc_ranges = [[poslocTP_min[0], poslocTP_max[0]],  # T min, T max
                          [poslocTP_min[1], poslocTP_max[1]]]  # P min, P max
         r = [self.getval('LENGTH_R1'), self.getval('LENGTH_R2')]
