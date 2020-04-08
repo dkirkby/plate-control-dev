@@ -288,7 +288,8 @@ class Axis(object):
         self.hardstop_clearance = self.calc_hardstop_clearance()
         self.hardstop_clearance_near_full_range = self.calc_hardstop_clearance_near_full_range()
         self.hardstop_debounce = self.calc_hardstop_debounce()
-        self.signed_gear_ratio = self.motor_calib_properties['ccw_sign']*self.motor_calib_properties['gear_ratio']
+        motor_props = self.motor_calib_properties
+        self.signed_gear_ratio = motor_props['ccw_sign'] * motor_props['gear_ratio'] / motor_props['gear_calib']
 
     @property
     def pos(self):
@@ -419,9 +420,11 @@ class Axis(object):
         if self.axisid == pc.T:
             prop['gear_ratio'] = pc.gear_ratio[self.posmodel.state._val['GEAR_TYPE_T']]
             prop['ccw_sign'] = self.posmodel.state._val['MOTOR_CCW_DIR_T']
+            prop['gear_calib'] = self.posmodel.state._val['GEAR_CALIB_T']
         else:
             prop['gear_ratio'] = pc.gear_ratio[self.posmodel.state._val['GEAR_TYPE_P']]
             prop['ccw_sign'] = self.posmodel.state._val['MOTOR_CCW_DIR_P']
+            prop['gear_calib'] = self.posmodel.state._val['GEAR_CALIB_P']
         return prop
 
     def motor_to_shaft(self, distance):
