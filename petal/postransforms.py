@@ -271,14 +271,21 @@ class PosTransforms(petaltransforms.PetalTransforms):
         return self.flatXY_to_ptlXY(flatXY)
 
     def posintTP_to_ptlXY(self, posintTP):
-        ''' input is 2-element list or tuple like [t,p] '''
+        '''Composite transformation, performs posintTP --> flatXY --> ptlXY'''
         flatXY = self.posintTP_to_flatXY(posintTP)
         return self.flatXY_to_ptlXY(flatXY)
         
     def flatXY_to_ptlXY(self, flatXY):
-        ''' input is 2-element list or tuple like [x,y] '''
-        ptlXYZ = self.flatXY_to_ptlXYZ(flatXY, cast=True).flatten()
-        return tuple(ptlXYZ)[:2]  # (ptlX, ptlY), petal-local
+        '''Direct transformation from flatXY to ptlXY coordinates.
+        
+        Note that this short-circuits a similar (but 10x slower) implementation
+        in petatransforms.'''
+        Q_rad = math.atan2(flatXY[1], flatXY[0]) # Y over X
+        S = math.hypot(flatXY[0], flatXY[1])
+        R = pc.S2R_lookup(S)
+        ptlX = R * math.cos(Q_rad)
+        ptlY = R * math.sin(Q_rad)
+        return (ptlX, ptlY)
 
     def posintTP_to_QS(self, posintTP):
         """Composite transformation, performs posintTP --> flatXY --> QS"""
