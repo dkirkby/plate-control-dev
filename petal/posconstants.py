@@ -53,35 +53,55 @@ for directory in dirs.values():
     if not os.path.isfile(directory):
         os.makedirs(directory, exist_ok=True)
 
+# Polynomials for focalplane coordinate conversions
+#  - runs ~5x faster than lookups in current (as of 2020-04-09 implementation)
+#  - order of coefficients matches exponents 0, 1, 2, ...
+_R2S_poly_coeff = [9.95083E-06, 9.99997E-01, 1.79466E-07, 1.76983E-09, 7.24320E-11, -5.74381E-13, 3.28356E-15, -1.10626E-17, 1.89154E-20, -1.25367E-23]
+_R2S_poly_range = [i for i in range(len(_R2S_poly_coeff))]
+R2S_polyval = lambda x: sum([_R2S_poly_coeff[i] * x ** i for i in _R2S_poly_range])
+
+_R2Z_poly_coeff = [-2.33702E-05, 6.63924E-06, -1.00884E-04, 1.24578E-08, -4.82781E-10, 1.61621E-12, -5.23944E-15, 2.91680E-17, -7.75243E-20, 6.74215E-23]
+_R2Z_poly_range = [i for i in range(len(_R2Z_poly_coeff))]
+R2Z_polyval = lambda x: sum([_R2Z_poly_coeff[i] * x ** i for i in _R2Z_poly_range])
+
 # Lookup tables for focal plane coordinate conversions
 R_lookup_path = petal_directory + os.path.sep + 'focal_surface_lookup.csv'
 R_lookup_data = np.genfromtxt(R_lookup_path, comments="#", delimiter=",")
 
 # Mapping of radial coordinate R to pseudo-radial coordinate S
 # (distance along focal surface from optical axis)
-R2S_lookup = interp1d(R_lookup_data[:, 0], R_lookup_data[:, 2], kind='cubic',
-                      fill_value='extrapolate')
-S2R_lookup = interp1d(R_lookup_data[:, 2], R_lookup_data[:, 0], kind='cubic',
-                      fill_value='extrapolate')
-R2Z_lookup = interp1d(R_lookup_data[:, 0], R_lookup_data[:, 1], kind='cubic',
-                      fill_value='extrapolate')
-Z2R_lookup = interp1d(R_lookup_data[:, 1], R_lookup_data[:, 0], kind='cubic')
-R2N_lookup = interp1d(R_lookup_data[:, 0], R_lookup_data[:, 3], kind='cubic',
-                      fill_value='extrapolate')
-N2R_lookup = interp1d(R_lookup_data[:, 3], R_lookup_data[:, 2], kind='cubic')
+
+# DEPRECATED 2020-04-09
+# R2S_lookup = interp1d(R_lookup_data[:, 0], R_lookup_data[:, 2], kind='cubic', fill_value='extrapolate')
+# S2R_lookup = interp1d(R_lookup_data[:, 2], R_lookup_data[:, 0], kind='cubic', fill_value='extrapolate')
+# R2Z_lookup = interp1d(R_lookup_data[:, 0], R_lookup_data[:, 1], kind='cubic', fill_value='extrapolate')
+# Z2R_lookup = interp1d(R_lookup_data[:, 1], R_lookup_data[:, 0], kind='cubic')
+# R2N_lookup = interp1d(R_lookup_data[:, 0], R_lookup_data[:, 3], kind='cubic', fill_value='extrapolate')
+# N2R_lookup = interp1d(R_lookup_data[:, 3], R_lookup_data[:, 2], kind='cubic') # wrong R lookup?
+
+# ~5X FASTER, introduced 2020-04-09
+def R2S_lookup(R):
+    return np.interp(R,R_lookup_data[:,0],R_lookup_data[:,2],left=float('nan'))
+def S2R_lookup(S):
+    return np.interp(S,R_lookup_data[:,2],R_lookup_data[:,0],left=float('nan'))
+def R2Z_lookup(R):
+    return np.interp(R,R_lookup_data[:,0],R_lookup_data[:,1],left=float('nan'))
+def Z2R_lookup(S):
+    return np.interp(S,R_lookup_data[:,1],R_lookup_data[:,0],left=float('nan'))
+def R2N_lookup(R):
+    return np.interp(R,R_lookup_data[:,0],R_lookup_data[:,3],left=float('nan'))
+def N2R_lookup(S):
+    return np.interp(S,R_lookup_data[:,3],R_lookup_data[:,0],left=float('nan'))
 
 # composite focal surface lookup methods for 3D out-of-shell QST transforms
 def S2N_lookup(S):
     return R2N_lookup(S2R_lookup(S))  # return nutation angles in degrees
 
-
 def S2Z_lookup(S):
     return R2Z_lookup(S2R_lookup(S))
 
-
 def Z2S_lookup(Z):
     return R2S_lookup(Z2R_lookup(Z))
-
 
 def N2S_lookup(N):
     return R2S_lookup(N2R_lookup(N))  # takes nutation angles in degrees
