@@ -204,7 +204,6 @@ class PosTransforms(petaltransforms.PetalTransforms):
 
     def poslocXY_to_posintTP(self, poslocXY, range_limits='full'):
         ''' Composite transformation, performs poslocXY --> poslocTP --> posintTP.
-                
         Note that this method returns a tuple, where the first item is the
         converted coordinates, and the second item is boolean stating whether
         or not the input coordinates were "unreachable" in the output system.
@@ -234,7 +233,6 @@ class PosTransforms(petaltransforms.PetalTransforms):
 
     def flatXY_to_posintTP(self, flatXY, range_limits='full'):
         """Composite transformation, performs obsXY --> posXY --> posintTP
-        
         Note that this method returns a tuple, where the first item is the
         converted coordinates, and the second item is boolean stating whether
         or not the input coordinates were "unreachable" in the output system.
@@ -243,12 +241,26 @@ class PosTransforms(petaltransforms.PetalTransforms):
         return self.poslocXY_to_posintTP(poslocXY, range_limits=range_limits)
 
     def ptlXY_to_flatXY(self, ptlXY):
-        ''' input is 2-element list or tuple like [x,y] '''
-        X, Y = ptlXY[0], ptlXY[1]
-        R = math.sqrt(X**2 + Y**2)
-        Z = pc.R2Z_lookup(R)
-        ptlXYZ = (X, Y, Z)
-        return self.ptlXYZ_to_flatXY(ptlXYZ, cast=True).flatten()
+        '''Direct transformation from ptlXY to flatXY coordinates.
+        Note that this short-circuits a similar (but 10x slower) implementation
+        in petatransforms.'''
+        Q_rad = math.atan2(ptlXY[1], ptlXY[0])
+        R = math.hypot(ptlXY[0], ptlXY[1])
+        S = pc.R2S_lookup(R)
+        flatX = S * math.cos(Q_rad)
+        flatY = S * math.sin(Q_rad)
+        return (flatX, flatY)
+
+    def flatXY_to_ptlXY(self, flatXY):
+        '''Direct transformation from flatXY to ptlXY coordinates.
+        Note that this short-circuits a similar (but 10x slower) implementation
+        in petatransforms.'''
+        Q_rad = math.atan2(flatXY[1], flatXY[0])
+        S = math.hypot(flatXY[0], flatXY[1])
+        R = pc.S2R_lookup(S)
+        ptlX = R * math.cos(Q_rad)
+        ptlY = R * math.sin(Q_rad)
+        return (ptlX, ptlY)
     
     def ptlXY_to_poslocXY(self, ptlXY):
         ''' input is 2-element list or tuple like [x,y] '''
@@ -257,7 +269,6 @@ class PosTransforms(petaltransforms.PetalTransforms):
         
     def ptlXY_to_posintTP(self, ptlXY, range_limits='full'):
         '''Composite transformation, performs ptlXY --> flatXY --> posintTP
-                        
         Note that this method returns a tuple, where the first item is the
         converted coordinates, and the second item is boolean stating whether
         or not the input coordinates were "unreachable" in the output system.
@@ -274,18 +285,6 @@ class PosTransforms(petaltransforms.PetalTransforms):
         '''Composite transformation, performs posintTP --> flatXY --> ptlXY'''
         flatXY = self.posintTP_to_flatXY(posintTP)
         return self.flatXY_to_ptlXY(flatXY)
-        
-    def flatXY_to_ptlXY(self, flatXY):
-        '''Direct transformation from flatXY to ptlXY coordinates.
-        
-        Note that this short-circuits a similar (but 10x slower) implementation
-        in petatransforms.'''
-        Q_rad = math.atan2(flatXY[1], flatXY[0]) # Y over X
-        S = math.hypot(flatXY[0], flatXY[1])
-        R = pc.S2R_lookup(S)
-        ptlX = R * math.cos(Q_rad)
-        ptlY = R * math.sin(Q_rad)
-        return (ptlX, ptlY)
 
     def posintTP_to_QS(self, posintTP):
         """Composite transformation, performs posintTP --> flatXY --> QS"""
@@ -295,7 +294,6 @@ class PosTransforms(petaltransforms.PetalTransforms):
 
     def QS_to_posintTP(self, QS, range_limits='full'):
         '''Composite transformation, performs QS --> flatXY --> posintTP
-        
         Note that this method returns a tuple, where the first item is the
         converted coordinates, and the second item is boolean stating whether
         or not the input coordinates were "unreachable" in the output system.
@@ -305,7 +303,6 @@ class PosTransforms(petaltransforms.PetalTransforms):
 
     def obsXY_to_posintTP(self, obsXY, range_limits='full'):
         """Composite transformation, performs QS --> obsXY --> posintTP
-                                
         Note that this method returns a tuple, where the first item is the
         converted coordinates, and the second item is boolean stating whether
         or not the input coordinates were "unreachable" in the output system.
