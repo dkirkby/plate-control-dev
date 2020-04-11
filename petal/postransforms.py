@@ -302,11 +302,17 @@ class PosTransforms(petaltransforms.PetalTransforms):
         return self.flatXY_to_posintTP(flatXY, range_limits=range_limits)
 
     def obsXY_to_posintTP(self, obsXY, range_limits='full'):
-        """Composite transformation, performs QS --> obsXY --> posintTP
+        """Composite transformation, performs obsXY --> ptlXY --> posintTP
         Note that this method returns a tuple, where the first item is the
         converted coordinates, and the second item is boolean stating whether
         or not the input coordinates were "unreachable" in the output system.
         """
+        R = math.hypot(obsXY[0], obsXY[1])
+        obsXYZ = [obsXY[0], obsXY[1], pc.R2Z_lookup(R)]
+        ptlXYZ = self.obsXYZ_to_ptlXYZ(obsXYZ, cast=True)
+        return self.ptlXY_to_posintTP(ptlXYZ[:2], range_limits=range_limits)
+    
+    def obsXY_to_posintTP_old(self, obsXY, range_limits='full'):
         QS = self.obsXY_to_QS(obsXY, cast=True).flatten()
         return self.QS_to_posintTP(QS, range_limits=range_limits)
 
