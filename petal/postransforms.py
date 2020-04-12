@@ -307,19 +307,30 @@ class PosTransforms(petaltransforms.PetalTransforms):
         converted coordinates, and the second item is boolean stating whether
         or not the input coordinates were "unreachable" in the output system.
         """
-        R = math.hypot(obsXY[0], obsXY[1])
-        obsXYZ = [obsXY[0], obsXY[1], pc.R2Z_lookup(R)] # Z(R(obsXY)) --> imperfect (but very close) invertibilty with posintTP_to_obsXY
-        ptlXYZ = self.obsXYZ_to_ptlXYZ(obsXYZ, cast=True)
-        return self.ptlXY_to_posintTP(ptlXYZ[:2], range_limits=range_limits)
+        ptlXY = self.obsXY_to_ptlXY(obsXY)
+        return self.ptlXY_to_posintTP(ptlXY, range_limits=range_limits)
 
     def posintTP_to_obsXY(self, posintTP):
         """Composite transformation, performs posintTP --> ptlXY --> obsXY"""
         ptlXY = self.posintTP_to_ptlXY(posintTP)
+        return self.ptlXY_to_obsXY(ptlXY)
+        
+    def obsXY_to_ptlXY(self, obsXY):
+        """Wrapper for similar petaltransforms 3D function. Uses focal surface
+        asphere definition to generate an approximate intermediate Z value."""
+        R = math.hypot(obsXY[0], obsXY[1])
+        obsXYZ = [obsXY[0], obsXY[1], pc.R2Z_lookup(R)] # Z(R(obsXY)) --> imperfect (but very close) invertibilty with posintTP_to_obsXY
+        ptlXYZ = self.obsXYZ_to_ptlXYZ(obsXYZ, cast=True)
+        return [float(ptlXYZ[0]), float(ptlXYZ[1])]
+    
+    def ptlXY_to_obsXY(self, ptlXY):
+        """Wrapper for similar petaltransforms 3D function. Uses focal surface
+        asphere definition to generate an approximate intermediate Z value."""
         R = math.hypot(ptlXY[0], ptlXY[1])
         ptlXYZ = [ptlXY[0], ptlXY[1], pc.R2Z_lookup(R)] # Z(R(ptlXY)) --> imperfect (but very close) invertibilty with obsXY_to_posintTP
         obsXYZ = self.ptlXYZ_to_obsXYZ(ptlXYZ, cast=True)
-        return [float(obsXYZ[0]), float(obsXYZ[1])]
-
+        return [float(obsXYZ[0]), float(obsXYZ[1])]        
+        
     # VECTOR ADDITIONS AND SUBTRACTIONS FOR MOTOR SHAFT COORDINATES
     def addto_posintTP(self, posintTP0, dtdp, range_wrap_limits='full'):
         """Returns tp corresponding to tp0 + dtdp.
