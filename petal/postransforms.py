@@ -133,7 +133,9 @@ class PosTransforms(petaltransforms.PetalTransforms):
             'exact':        means theta range of [-179.999999999,180] and phi
                             range of [0,180]
         """
-        if self.stateless or range_limits == 'exact':
+        if self.stateless:
+            return [[-179.999999999, 180.0], [-20.0, 200.0]]
+        elif range_limits == 'exact':
             return [[-179.999999999, 180.0], [0.0, 180.0]]
         elif range_limits == 'full':
             return [self.posmodel.full_range_T, self.posmodel.full_range_P]
