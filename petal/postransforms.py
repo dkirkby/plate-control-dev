@@ -1,7 +1,6 @@
 import sys
 import math
 import posconstants as pc
-import posmodel
 import petaltransforms
 
 class PosTransforms(petaltransforms.PetalTransforms):
@@ -114,6 +113,7 @@ class PosTransforms(petaltransforms.PetalTransforms):
         else:
             self.stateless = False
             if this_posmodel is None:
+                import posmodel
                 this_posmodel = posmodel.PosModel()
             self.posmodel = this_posmodel
             self.alt_override = False  # allows alternate calibration values to temporarily override PosState values
