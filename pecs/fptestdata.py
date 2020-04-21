@@ -1017,7 +1017,8 @@ class CalibrationData(FPTestData):
     def generate_data_products(self):
         self.read_telemetry()
         self.export_data_logs()
-        self.make_calib_plots(self.mode)  # self.mode can be 'arc', 'grid'
+        if self.mode in ['arc','grid']:
+            self.make_calib_plots(self.mode)  # self.mode can be 'arc', 'grid'
         self.dump_as_one_pickle()  # loggers lost as they cannot be serialised
         if shutil.which('pandoc') is None:
             self.print('You must have a complete installation of pandoc '
