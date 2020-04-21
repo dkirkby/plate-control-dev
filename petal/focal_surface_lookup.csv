@@ -1,6 +1,6 @@
 # Focal surface lookup table,,,
-# Extracted from DESI-0530-v13,,,
-# 2017-05-17 JHS,,,
+# Extracted from DESI-0530-v17,,,
+# 2020-04-09,,,
 # Columns:  R, Z5,  S,   N
 # Units:   mm, mm, mm, deg
 0,0,0,0.001722
