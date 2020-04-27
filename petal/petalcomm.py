@@ -354,7 +354,7 @@ class PetalComm(object):
         """
         try:
             return self._call_device('power_down')
-        except Exceptino as e:
+        except Exception as e:
             return 'FAILED: Could not execute the power_down method: %s' % str(e)
 
     def get(self, what):
