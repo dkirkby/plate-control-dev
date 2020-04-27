@@ -502,15 +502,19 @@ class PosCalibrationFits:
             trans = self.posmodels[posid].trans
             QS = data.loc[idx[:, posid], ['mea_Q', 'mea_S']]  # Nx2
             mask = QS.notnull().all(axis=1)
-            data.loc[QS[mask].index, ['mea_flatX', 'mea_flatY']] = \
-                mea_flatXY = trans.QS_to_flatXY(QS[mask].T).T
-            poscal = {key: calib_fit.loc[posid, key] for key in keys_fit}
-            trans.alt_override = True  # enable override in pos transforms
-            trans.alt.update(poscal)
-            posintTP = data.loc[QS[mask].index, ['posintT', 'posintP']].values
-            data.loc[QS[mask].index, ['exp_flatX', 'exp_flatY']] = \
-                exp_flatXY = np.array(
-                    [trans.posintTP_to_flatXY(x) for x in posintTP])
+            # If no points measured setting exp_flatXY does not execute properly
+            if len(QS[mask].index) > 0:
+                data.loc[QS[mask].index, ['mea_flatX', 'mea_flatY']] = \
+                    mea_flatXY = trans.QS_to_flatXY(QS[mask].T).T
+                poscal = {key: calib_fit.loc[posid, key] for key in keys_fit}
+                trans.alt_override = True  # enable override in pos transforms
+                trans.alt.update(poscal)
+                posintTP = data.loc[QS[mask].index, ['posintT', 'posintP']].values
+                data.loc[QS[mask].index, ['exp_flatX', 'exp_flatY']] = \
+                    exp_flatXY = np.array(
+                        [trans.posintTP_to_flatXY(x) for x in posintTP])
+            else:
+                mea_flatXY = exp_flatXY = np.array([np.nan])
             errXY = mea_flatXY - exp_flatXY
             calib_fit.loc[posid, 'err_rms'] = np.rms(errXY)
             calib_fit.loc[posid, 'err_max'] = np.max(errXY)
