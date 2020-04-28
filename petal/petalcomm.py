@@ -250,15 +250,6 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not setup CAN channels: %s' % str(e)
 
-    def intial_configure(self, *args, **kwargs):
-        """
-        Initial configure call for petalcontroller settings
-        """
-        try:
-            return self._call_device('initial_configure', *args, **kwargs)
-        except Exception as e:
-            return 'FAILED: Can not configure petalcontroller: %s' % str(e)
-
     def configure(self, *args, **kwargs):
         """
         Configure petalcontroller settings
@@ -303,33 +294,6 @@ class PetalComm(object):
             return self._call_device('check_and_exit_stop_mode')
         except Exception as e:
             return 'FAILED: Can not check if stop mode is on or exit stop mode: %s' % str(e)
-
-    def check_and_disable_can_telemetry(self):
-        """
-        Check if CAN telemetry is running/active, wait for it to go idle and then disable.
-        """
-        try:
-            return self._call_device('check_and_disable_can_telemetry')
-        except Exception as e:
-            return 'FAILED: Can not check if CAN telemetry thread is active: %s' % str(e)
-
-    def send_ext_formatted(self, ext_commands_by_busid):
-        """
-        Send out externally formatted dictionary of commands (expert use only, diagnostics)
-        """
-        try:
-            return self._call_device('send_ext_formatted', ext_commands_by_busid)
-        except Exception as e:
-            return 'FAILED: Can not send externally formatted commands: %s' % str(e)
-
-    def recv_ext_formatted(self):
-        """
-        Receive responses to externally formatted commands (expert use only, diagnostics)
-        """
-        try:
-           return self._call_device('recv_ext_formatted')
-        except Exception as e:
-           return 'FAILED: Can not receive externally formatted commands: %s' % str(e)
 
     def power_up(self, en_supplies = 'both', en_can_boards = 'both', en_sync_buffers = 'both'):
         """
