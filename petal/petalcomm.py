@@ -189,13 +189,6 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not execute send_move_excute command. Exception: %s' % str(e)
 
-    # for training only
-    def clear_fault(self):
-        try:
-            return self._call_device('clear_fault')
-        except Exception as e:
-            return 'FAILED: Can not clear fault. Exception: %s' % str(e)
-
     def all_fiducials_off(self):
         """
         Broadcast command to set all fiducials off
