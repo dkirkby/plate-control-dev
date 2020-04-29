@@ -157,7 +157,7 @@ class PetalComm(object):
         """
         Sends move tables for positioners over ethernet to the petal controller,
         where they are then sent over CAN to the positioners. See method
-        "hardware_ready_move_tables" in class PosArrayMaster for definition of the
+        "_hardware_ready_move_tables" in petal.py for definition of the
         move_tables format.
 
         No information on the format of move_tables so we just pass it along
