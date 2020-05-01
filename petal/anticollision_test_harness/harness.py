@@ -23,11 +23,15 @@ subset7a = {78, 79, 87, 88, 89, 98, 99}
 device_loc_to_command = subset7a # note pre-cooked options above
 
 # Select devices to CLASSIFY_AS_RETRACTED and disable
-retract_and_disable = {} # enter device locations to simulate those positioners as retracted and disabled
+retract_and_disable = {87,88} # enter device locations to simulate those positioners as retracted and disabled
 retracted_TP = [0, 110]
 
 # Whether to include any untargeted neighbors in the calculations
 include_neighbors = True
+
+# Whether to test some "expert" mode commands
+test_direct_dTdP = False
+test_homing = False  # note that this one will look a bit weird, since there are no hardstops in simulation. So the results take a bit of extra inspection, but still quite useful esp. to check syntax / basic function
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
@@ -53,7 +57,7 @@ anim_cropping_on = True # crops the plot window to just contain the animation
 animation_foci = 'all'
 
 # other options
-n_corrections = 1 # number of correction moves to simulate after each target
+n_corrections = 0 # number of correction moves to simulate after each target
 max_correction_move = 0.1/1.414 # mm
 should_profile = False
 should_inspect_some_TP = False # some *very* verbose printouts of POS_T, OFFSET_T, etc, sometimes helpful for debugging
@@ -194,6 +198,17 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                     print(f'POS_T + OFFSET_T = {vals["POS_T"] + vals["OFFSET_T"]}')
                     print(f'POS_P + OFFSET_P = {vals["POS_P"] + vals["OFFSET_P"]}')
                 print('---------------')
+        if test_direct_dTdP:
+            posids_to_test = list(requests.keys())
+            for dtdp in [[30,0], [-30,0], [0,-30], [0,30], [30,-30], [-30,30]]:
+                direct_requests = {posid: {'target': dtdp, 'log_note':''} for posid in posids_to_test}
+                ptl.request_direct_dtdp(direct_requests)
+                ptl.schedule_send_and_execute_moves(anticollision='adjust') # 'adjust' here *should* internally be ignored in favor of 'freeze'
+        if test_homing:
+            posids_to_test = list(requests.keys())
+            for axis in ['phi', 'theta', 'both']:
+                ptl.request_homing(posids_to_test, axis=axis)
+                ptl.schedule_send_and_execute_moves(anticollision='adjust') # 'adjust' here *should* internally be ignored in favor of 'freeze'
     if ptl.schedule_stats.is_enabled():
         stats_path = os.path.join(pc.dirs['temp_files'], 'schedstats_' + filename_suffix + '.csv')
         ptl.schedule_stats.save(path=stats_path)
