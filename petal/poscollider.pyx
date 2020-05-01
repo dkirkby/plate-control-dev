@@ -370,7 +370,7 @@ class PosCollider(object):
                 self.classified_as_retracted.add(posid)
             elif classified_retracted and not disabled:
                 self.printfunc('Warning: While initializing ' + str(posid) + ' in poscollider.pyx, ' +
-                               ' encountered CLASSIFIED_AS_RETRACTED == True while CTRL_ENABLED == True. ' +
+                               'encountered CLASSIFIED_AS_RETRACTED == True while CTRL_ENABLED == True. ' +
                                'This is inconsistent and must be resolved! For now, proceeding as if ' +
                                'CLASSIFIED_AS_RETRACTED == False.' )
 
