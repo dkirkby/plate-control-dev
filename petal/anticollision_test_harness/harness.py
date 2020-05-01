@@ -33,6 +33,10 @@ include_neighbors = True
 test_direct_dTdP = False
 test_homing = False  # note that this one will look a bit weird, since there are no hardstops in simulation. So the results take a bit of extra inspection, but still quite useful esp. to check syntax / basic function
 
+# Override for petal simulated hardware failure rates
+sim_fail_freq = {'send_tables': 0.0,
+                 'clear_move_tables': 0.0} 
+
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
 pos_param_sequence_id = 'PTL03_30001' # 'cmds_unit_test'
@@ -125,6 +129,8 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                       anticollision   = 'adjust',
                       verbose         = False,
                       phi_limit_on    = False)
+    for key, val in sim_fail_freq.items():
+        ptl.sim_fail_freq[key] = val
     ptl.limit_radius = None
     if ptl.schedule_stats.is_enabled():
         ptl.schedule_stats.filename_suffix = filename_suffix
