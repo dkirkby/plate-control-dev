@@ -9,6 +9,7 @@ from petaltransforms import PetalTransforms
 import time
 from collections import OrderedDict
 import os
+import random
 try:
     # DBSingleton in the code is a class inside the file DBSingleton
     from DBSingleton import DBSingleton
@@ -156,6 +157,11 @@ class Petal(object):
 
         self.verbose = verbose # whether to print verbose information at the terminal
         self.simulator_on = simulator_on
+        
+        # sim_fail_freq: injects some occasional simulated hardware failures. valid range [0.0, 1.0]
+        self.sim_fail_freq = {'send_tables': 0.0,
+                              'clear_move_tables': 0.0} 
+        
         if not(self.simulator_on):
             import petalcomm
             self.comm = petalcomm.PetalComm(self.petalbox_id, user_interactions_enabled=user_interactions_enabled)
@@ -417,7 +423,7 @@ class Petal(object):
             del requests[posid]
         if self.verbose:
             self.printfunc(f'petal: {len(requests)} requests approved, '
-                           f'{len(marked_for_delete)} delected')
+                           f'{len(marked_for_delete)} deleted')
         return requests
 
     def request_direct_dtdp(self, requests, cmd_prefix=''):
@@ -604,13 +610,22 @@ class Petal(object):
         for tbl in hw_tables:
             self._canids_where_tables_were_just_sent.add(tbl['canid'])
         if self.simulator_on:
+            sim_fail = random.random() <= self.sim_fail_freq['send_tables']
+            if sim_fail:
+                commanded_canids = [table['canid'] for table in hw_tables]
+                num_fail = random.randint(1, len(commanded_canids))
+                sim_fail_canids = set(random.choices(commanded_canids, k=num_fail))
+                response = 'FAILED', sim_fail_canids
+            else:
+                response = 'SUCCESS'
             if self.verbose:
                 self.printfunc('Simulator skips sending move tables to positioners.')
-            return {}
-        self._wait_while_moving() # note how this needs to be preceded by adding positioners to _canids_where_tables_were_just_sent, so that the wait function can await the correct devices
-        response = self.comm.send_tables(hw_tables)
+        else:
+            self._wait_while_moving() # note how this needs to be preceded by adding positioners to _canids_where_tables_were_just_sent, so that the wait function can await the correct devices
+            response = self.comm.send_tables(hw_tables)
         failed_posids = self._handle_any_failed_send_of_move_tables(response, n_retries)
-        self.printfunc('send_move_tables: Done')
+        if n_retries == 0 or not failed_posids:
+            self.printfunc('send_move_tables: Done')
         return failed_posids      
             
     def set_motor_parameters(self):
@@ -1178,7 +1193,15 @@ class Petal(object):
             self._initialize_pos_flags(ids='all', enabled_only=enabled_only)
         if clear_sent_tables:
             self._remove_canid_from_sent_tables('all')
-            response = self.comm.clear_move_tables()
+            if self.simulator_on:
+                if self.verbose:
+                    self.printfunc('Simulator skips sending command to clear move tables from positioners.')
+                if random.random() <= self.sim_fail_freq['clear_move_tables']:
+                    response = 'FAILED'
+                else:
+                    response = 'INITIATED'
+            else:
+                response = self.comm.clear_move_tables()
             if response != 'INITIATED':
                 self.printfunc('ERROR: During _cancel_move(), petalcontroller failed to initiate clearing ' +
                                'existing move tables from positioners. We no longer have definite control ' +
