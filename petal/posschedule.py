@@ -26,7 +26,7 @@ class PosSchedule(object):
             self.stats = posschedstats.PosSchedStats(enabled=False) # this is really just to get the is_enabled() function available
         self.verbose = verbose
         self.printfunc = self.petal.printfunc
-        self.requests = {} # keys: posids, values: target request dictionaries
+        self._requests = {} # keys: posids, values: target request dictionaries
         self.stage_order = ['direct','retract','rotate','extend','expert','final']
         self.RRE_stage_order = ['retract','rotate','extend']
         self.stages = {name:posschedulestage.PosScheduleStage(
@@ -37,10 +37,10 @@ class PosSchedule(object):
                                 printfunc        = self.printfunc
                             ) for name in self.stage_order}
         self.anneal_time = {'direct':4.0, 'retract':3.0, 'rotate':3.0, 'extend':3.0, 'expert':4.0} # times in seconds, see comments in PosScheduleStage
-        self.should_anneal = True # overriding flag, allowing you to turn off all move time annealing
         self.should_check_petal_boundaries = True # allows you to turn off petal-specific boundary checks for non-petal systems (such as positioner test stands)
         self.should_check_sweeps_continuity = False # if True, inspects all quantized sweeps to confirm well-formed. incurs slowdown, and generally is not needed; more for validating if any changes made to quantize function at a lower level
         self.move_tables = {}
+        self._expert_added_tables_sequence = []  # copy of original sequence in which expert tables were added (for error-recovery cases)
 
     @property
     def collider(self):
@@ -143,14 +143,16 @@ class PosSchedule(object):
                        'command': uv_type,
                        'cmd_val1': u,
                        'cmd_val2': v,
-                       'log_note': log_note}
-        self.requests[posid] = new_request
+                       'log_note': log_note,
+                       'is_dummy': False,
+                       }
+        self._requests[posid] = new_request
         if stats_enabled:
             self.stats.add_requesting_time(time.clock() - timer_start)
             self.stats.add_request_accepted()
         return True
 
-    def schedule_moves(self, anticollision='freeze'):
+    def schedule_moves(self, anticollision='freeze', should_anneal=True):
         """Executes the scheduling algorithm upon the stored list of move requests.
 
         A single move table is generated for each positioner that has a request
@@ -176,19 +178,22 @@ class PosSchedule(object):
         for power density annealing. Furthermore, if anticollision='adjust',
         then it reverts to 'freeze' instead. An argument of anticollision=None
         remains as-is.
+        
+        The boolean flag should_anneal controls whether or not to spread out
+        the move density in time.
         """
         self._schedule_moves_initialize_logging(anticollision)
-        if not self.requests and not self.stages['expert'].is_not_empty():
+        if not self._requests and not self.stages['expert'].is_not_empty():
             self.printfunc('No requests nor existing move tables found. No move scheduling performed.')
             return
         if self.expert_mode_is_on():
-            self._schedule_expert_tables(anticollision)
+            self._schedule_expert_tables(anticollision=anticollision, should_anneal=should_anneal)
         else:
             self._fill_enabled_but_nonmoving_with_dummy_requests()
             if anticollision == 'adjust':
-                self._schedule_requests_with_path_adjustments() # there is only one possible anticollision method for this scheduling method
+                self._schedule_requests_with_path_adjustments(should_anneal) # there is only one possible anticollision method for this scheduling method
             else:
-                self._schedule_requests_with_no_path_adjustments(anticollision)
+                self._schedule_requests_with_no_path_adjustments(anticollision=anticollision, should_anneal=should_anneal)
         self._combine_stages_into_final()
         final = self.stages['final']
         if anticollision:
@@ -214,7 +219,7 @@ class PosSchedule(object):
         motionless = {posid for posid,table in self.move_tables.items() if table.is_motionless}
         for posid in empties | motionless:
             del self.move_tables[posid]
-        self._schedule_moves_store_and_clear_requests_info()
+        self._schedule_moves_store_requests_info()
         self._schedule_moves_finish_logging(colliding_sweeps, all_sweeps)
 
     def conservative_move_timeout_period(self, safety_factor=4.0):
@@ -233,7 +238,7 @@ class PosSchedule(object):
         """Returns boolean whether a request has already been registered in the
         schedule for the argued positioner.
         """
-        return posid in self.requests
+        return posid in self._requests
 
     def expert_add_table(self, move_table):
         """Adds an externally-constructed move table to the schedule. Only simple
@@ -250,6 +255,7 @@ class PosSchedule(object):
                 self.printfunc(str(move_table.posmodel.posid) + ': move table addition to schedule denied. Positioner is disabled.')
             return
         self.stages['expert'].add_table(move_table)
+        self._expert_added_tables_sequence.append(move_table.copy())
         if stats_enabled:
             self.stats.add_expert_table_time(time.clock() - timer_start)
             
@@ -260,14 +266,35 @@ class PosSchedule(object):
         """
         return self.stages['expert'].is_not_empty()
     
-    def _schedule_expert_tables(self, anticollision):
+    def get_requests(self, include_dummies=False):
+        """Returns a dict containing copies of all the current requests. Keys
+        are posids. Any dummy requests (auto-generated during anticollision
+        scheduling) by default are excluded. But can be included with the
+        include_dummies boolean.
+        """
+        requests = {}
+        for posid, request in self._requests.items():
+            if not request['is_dummy'] or include_dummies:
+                requests[posid] = request.copy()
+        return requests
+    
+    def get_orig_expert_tables_sequence(self):
+        """Returns a list containing any tables added by the "expert_add_table()"
+        function, in the same order they were added.
+        """
+        return self._expert_added_tables_sequence
+    
+    def _schedule_expert_tables(self, anticollision, should_anneal):
         """Gathers data from expert-added move tables and populates the 'expert'
         stage. Any move requests are ignored.
         """
         should_freeze = not(not(anticollision))
-        self._direct_stage_conditioning(self.stages['expert'], self.anneal_time['expert'], should_freeze)
+        self._direct_stage_conditioning(stage=self.stages['expert'],
+                                        anneal_time=self.anneal_time['expert'],
+                                        should_freeze=should_freeze,
+                                        should_anneal=should_anneal)
 
-    def _schedule_requests_with_no_path_adjustments(self, anticollision):
+    def _schedule_requests_with_no_path_adjustments(self, anticollision, should_anneal):
         """Gathers data from requests dictionary and populates the 'direct'
         stage with direct motions from start to finish. The positioners are
         given no path adjustments to avoid each other.
@@ -275,7 +302,7 @@ class PosSchedule(object):
         start_posintTP = {}
         desired_final_posintTP = {}
         dtdp = {}
-        for posid, request in self.requests.items():
+        for posid, request in self._requests.items():
             start_posintTP[posid] = request['start_posintTP']
             desired_final_posintTP[posid] = request['targt_posintTP']
             trans = self.petal.posmodels[posid].trans
@@ -287,17 +314,20 @@ class PosSchedule(object):
         # double-negative syntax is to be compatible with various
         # False/None/'' negative values
         should_freeze = not(not(anticollision))
-        self._direct_stage_conditioning(
-            stage, self.anneal_time['direct'], should_freeze)
+        self._direct_stage_conditioning(stage=stage,
+                                        anneal_time=self.anneal_time['direct'],
+                                        should_freeze=should_freeze,
+                                        should_anneal=should_anneal)
 
-    def _direct_stage_conditioning(self, stage, anneal_time, should_freeze):
+    def _direct_stage_conditioning(self, stage, anneal_time, should_freeze, should_anneal):
         """Applies annealing and possibly freezing to a 'direct' or 'expert' stage.
 
             stage         ... instance of PosScheduleStage, needs to already have its move tables initialized
             anneal_time   ... time in seconds, for annealing
             should_freeze ... boolean, says whether to check for collisions and freeze
+            should_anneal ... boolean, enables/disables annealing
         """
-        if self.should_anneal:
+        if anneal_time == None:
             stage.anneal_tables(anneal_time)
         if should_freeze:
             if self.verbose:
@@ -319,7 +349,7 @@ class PosSchedule(object):
             if self.stats.is_enabled() and adjustment_performed:
                 self.stats.add_to_num_adjustment_iters(1)
 
-    def _schedule_requests_with_path_adjustments(self):
+    def _schedule_requests_with_path_adjustments(self, should_anneal=True):
         """Gathers data from requests dictionary and populates the 'retract',
         'rotate', and 'extend' stages with motion paths from start to finish.
         The move tables may include adjustments of paths to avoid collisions.
@@ -328,7 +358,7 @@ class PosSchedule(object):
         start_posintTP = {name: {} for name in self.RRE_stage_order}
         desired_final_posintTP = {name: {} for name in self.RRE_stage_order}
         dtdp = {name: {} for name in self.RRE_stage_order}
-        for posid, request in self.requests.items():
+        for posid, request in self._requests.items():
             # Some care is taken here to use only delta and add functions
             # provided by PosTransforms to ensure that range wrap limits are
             # always safely handled from stage to stage.
@@ -359,7 +389,7 @@ class PosSchedule(object):
         for name in self.RRE_stage_order:
             stage = self.stages[name]
             stage.initialize_move_tables(start_posintTP[name], dtdp[name])
-            if self.should_anneal:
+            if should_anneal:
                 stage.anneal_tables(self.anneal_time[name])
             if self.verbose:
                 self.printfunc(f'posschedule: finding collisions for {len(stage.move_tables)} positioners, trying {name}')
@@ -404,7 +434,7 @@ class PosSchedule(object):
 
     def _fill_enabled_but_nonmoving_with_dummy_requests(self):
         enabled = set(self.petal.all_enabled_posids())
-        requested = set(self.requests.keys())
+        requested = set(self._requests.keys())
         enabled_but_not_requested = enabled - requested
         for posid in enabled_but_not_requested:
             posmodel = self.petal.posmodels[posid]
@@ -416,8 +446,10 @@ class PosSchedule(object):
                            'command': '(autogenerated)',
                            'cmd_val1': 0,
                            'cmd_val2': 0,
-                           'log_note': 'generated by path adjustment scheduler for enabled but untargeted positioner'}
-            self.requests[posid] = new_request            
+                           'log_note': 'generated by path adjustment scheduler for enabled but untargeted positioner',
+                           'is_dummy': True,
+                           }
+            self._requests[posid] = new_request
 
     def _deny_request_because_disabled(self, posmodel):
         """This is a special function specifically because there is a bit of care we need to
@@ -430,8 +462,7 @@ class PosSchedule(object):
             return True
         return False
 
-    def _deny_request_because_target_interference(self, posmodel,
-                                                  target_poslocTP):
+    def _deny_request_because_target_interference(self, posmodel, target_poslocTP):
         """Checks for case where a target request is definitively unreachable
         due to incompatibility with already-existing neighbor targets.
         """
@@ -439,11 +470,11 @@ class PosSchedule(object):
         target_interference = False
         neighbors_with_requests = [
             neighbor for neighbor in self.collider.pos_neighbors[posid]
-            if neighbor in self.requests]
+            if neighbor in self._requests]
         for neighbor in neighbors_with_requests:
             neighbor_posmodel = self.petal.posmodels[neighbor]
             neighbor_target_posintTP = \
-                self.requests[neighbor]['targt_posintTP']
+                self._requests[neighbor]['targt_posintTP']
             neighbor_target_poslocTP = \
                 neighbor_posmodel.trans.posintTP_to_poslocTP(
                     neighbor_target_posintTP)
@@ -488,7 +519,7 @@ class PosSchedule(object):
         if self.stats.is_enabled():
             self.__timer_start = time.clock()
             self.stats.set_scheduling_method(str(anticollision))
-            self.__original_request_posids = set(self.requests.keys())
+            self.__original_request_posids = set(self._requests.keys())
             self.__max_net_time = 0
     
     def _combine_stages_into_final(self):
@@ -544,18 +575,15 @@ class PosSchedule(object):
             colliding_tables = {p:final.move_tables[p] for p in colliding_posids if p in final.move_tables}
             self.stats.add_unresolved_colliding_at_stage('combined',colliding_posids,colliding_tables,colliding_sweeps)
 
-    def _schedule_moves_store_and_clear_requests_info(self):
+    def _schedule_moves_store_requests_info(self):
         """Goes through the move tables, matching up original request information
         and pushing it into the tables. (This is for logging purposes.)
-        
-        Note that in the current implementation, the request dicts are popped from
-        the self.requests collection as the function proceeds.
         """
         stats_enabled = self.stats.is_enabled()
         for posid,table in self.move_tables.items():  
             log_note_addendum = ''              
-            if posid in self.requests:
-                req = self.requests.pop(posid) # if change this, be sure to update docstring above
+            if posid in self._requests:
+                req = self._requests[posid]
                 table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
                 log_note_addendum = req['log_note'] # keep the original log notes with move tables
                 if stats_enabled:
