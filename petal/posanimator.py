@@ -126,6 +126,14 @@ class PosAnimator(object):
         """Clear the animator completely of old data.
         """
         self = PosAnimator(self.fignum, self.timestep)
+    
+    def clear_after(self, time):
+        '''Clear the animator of existing data from value time (in seconds)
+        onward.'''
+        for item in self.items.values():
+            while item['time'] and item['time'][-1] >= time:
+                for key in ['time', 'poly', 'style']:
+                    item[key].pop()
 
     def is_empty(self):
         """Whether the animator contains any frame data yet."""
