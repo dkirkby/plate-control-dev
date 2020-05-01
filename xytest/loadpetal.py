@@ -83,11 +83,11 @@ class LoadPetal(object):
         for posid in self.posids:
             print('\n',posid)
             self.ptl.schedule.request_target(posid, 'posTP', 0., 180., log_note='') # extend every positioner
-            print(len(self.ptl.schedule.requests))
+            print(len(self.ptl.schedule.get_requests()))
         # rotate one positioner, check if it can avoid the obstacle?
         for i in range(36): # cannot request more than one target per positioner in a given schedule
             self.ptl.schedule.request_target('M00100', 'posTP', (i+1)*10., 180., log_note='')
-        print(self.ptl.schedule.requests)
+        print(self.ptl.schedule.get_requests())
         self.ptl.schedule._schedule_with_anticollision() # Make move_tables
        
         move_tables=self.ptl.schedule.move_tables
