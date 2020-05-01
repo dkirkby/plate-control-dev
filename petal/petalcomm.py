@@ -156,11 +156,14 @@ class PetalComm(object):
     def send_tables(self, move_tables):
         """
         Sends move tables for positioners over ethernet to the petal controller,
-        where they are then sent over CAN to the positioners. See method
-        "_hardware_ready_move_tables" in petal.py for definition of the
-        move_tables format.
+        where they are then sent over CAN to the positioners.
 
-        No information on the format of move_tables so we just pass it along
+        INPUTS:
+            move_tables ... see method "_hardware_ready_move_tables()" in petal.py
+            
+        OUTPUT:
+            tuple ... 1st element: 'SUCCESS' or 'FAILED'
+                      2nd element: set of canids for any failed cases
         """
         try:
             return self._call_device('send_tables',move_tables)
