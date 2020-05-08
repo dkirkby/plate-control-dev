@@ -1,7 +1,6 @@
 import os
 import inspect
 import numpy as np
-from scipy.interpolate import interp1d
 import math
 from datetime import datetime, timedelta
 import pytz
