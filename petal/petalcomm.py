@@ -132,11 +132,12 @@ class PetalComm(object):
             # Failed to get status from device
             raise RuntimeError('_call_device: remote device not reachable %s' % '' if 'name' not in self.device else self.device)
 
-    def ready_for_tables(self, bus_ids, can_ids):
+    def ready_for_tables(self, bus_ids=[], can_ids=[]):
         """Checks if all the positioners identified by can_id are ready to receive
         move tables.
 
         INPUTS:
+        (all inputs are dummy values, as of 2020-05-08 --- unused by petalcontroller.py!)
         bus_ids: list of CAN bus_ids (list of strings such as 'can10')
         can_ids: list of can_ids (list of integers)
 

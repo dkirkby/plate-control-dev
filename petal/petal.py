@@ -1342,13 +1342,12 @@ class Petal(object):
         poll_period = 0.5 # seconds
         keep_waiting = True
         start_time = time.time()
-        canids, busids = self._id_lists_where_tables_were_just_sent()
         while keep_waiting:
             elapsed_time = time.time() - start_time
             if elapsed_time >= timeout:
                 self.printfunc('Timed out at ' + str(timeout) + ' seconds waiting for positioners to be ready to receive next commands.')
                 keep_waiting = False
-            if self.comm.ready_for_tables(busids, canids):
+            if self.comm.ready_for_tables():
                 keep_waiting = False
             else:
                 time.sleep(poll_period)
@@ -1541,18 +1540,6 @@ class Petal(object):
             self._canids_where_tables_were_just_sent = set()         
         elif canid in self._canids_where_tables_were_just_sent:
             self._canids_where_tables_were_just_sent.remove(canid)
-                
-    def _id_lists_where_tables_were_just_sent(self):
-        """Returns a pair of lists of ids. The two returned lists are first,
-        canids and second, busids. They represent the internal tracking of which
-        positioners have had move tables actually sent out to hardware. The
-        point of this function is that it guarantees the two lists will be in
-        the same order (which is required by the petalcontroller interface).
-        """
-        canids = sorted(self._canids_where_tables_were_just_sent)
-        posids = [self.canids_to_posids[canid] for canid in canids]
-        busids = [self.busids[posid] for posid in posids]
-        return canids, busids
 
 if __name__ == '__main__':
     '''
