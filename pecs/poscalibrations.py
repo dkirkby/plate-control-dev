@@ -322,7 +322,7 @@ class PosCalibrations(PECS):
         exppos.rename(columns={'X1': 'posintT', 'X2': 'posintP'}, inplace=True)
         return merged.join(exppos)
 
-    def run_extra_points(self, max_radius=3.3, grid_width=4):
+    def run_extra_points(self, max_radius=3.3, grid_width=5):
         '''This function will move to and measure a grid of points, without
         any special calibration analysis performed. The purpose is to have an
         independent measurement of internally-tracked (t,p) vs measured (x,y),
