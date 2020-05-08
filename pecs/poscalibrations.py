@@ -322,25 +322,32 @@ class PosCalibrations(PECS):
         exppos.rename(columns={'X1': 'posintT', 'X2': 'posintP'}, inplace=True)
         return merged.join(exppos)
 
-    def run_extra_points(self):
-        # before running extra points, force a one-point posintTP update
+    def run_extra_points(self, max_radius=3.3, grid_width=4):
+        '''This function will move to and measure a grid of points, without
+        any special calibration analysis performed. The purpose is to have an
+        independent measurement of internally-tracked (t,p) vs measured (x,y),
+        performed at the time of the calibration, with all the same conditions
+        in place.
+        
+        INPUTS:
+            max_radius ... target points shall be no further out than this
+                           from nominal device center
+            
+            grid_width ... points will lie on a square grid of size
+                           grid_width x grid_width
+        '''
         self.logger.info('Performing one-point posintTP update before taking '
                          'extra points for calibration verification...')
         self.run_1p_calibration(tp_target=None, commit=True, partial=True)
-        d, n = 3.3, 4
-        x = y = np.linspace(-d/np.sqrt(2), d/np.sqrt(2), n)
+        max_x = max_radius / np.sqrt(2)
+        x = np.linspace(-max_x, max_x, grid_width)
+        y = x.copy()
         xg, yg = np.meshgrid(x, y)
-        lims_T = -190, 190  # minimum range of posintT is 380, max 402.9
-        lims_P = 0, 182  # minimum range of posintP is 182.9, max 230.4
+        trans = PosTransforms(stateless=True)
         targets = []
         for poslocXY in zip(xg.flatten(), yg.flatten()):
-            # generate a static list of targets, by default
-            # posintT = poslocT in (-174, 168)
-            # posintP = poslocP in (113, 159), so should be reachable by all
-            posintTP, unreachable = PosTransforms.xy2tp(
-                poslocXY, (3, 3), (lims_T, lims_P))
-            assert not unreachable, (f'Unreacheable: poslocXY = {poslocXY}',
-                                     f'posintTP = {posintTP}')
+            posintTP, unreachable = trans.poslocXY_to_posintTP(poslocXY)
+            assert not unreachable, (f'Unreachable: poslocXY = {poslocXY}', f'posintTP = {posintTP}')
             targets.append(posintTP)
         req_temp = self.posinfo[['PETAL_LOC', 'DEVICE_LOC']].copy()
         req_temp['COMMAND'] = 'posintTP'
@@ -348,7 +355,7 @@ class PosCalibrations(PECS):
         def gen_req(i):
             req = req_temp.copy()
             req['X1'], req['X2'] = targets[i][0], targets[i][1]
-            req['LOG_NOTE'] = (f'extra point {i+1} of {n**2} for '
+            req['LOG_NOTE'] = (f'extra point {i+1} of {len(targets)} for '
                                f'{self.data.mode}; expid {self.exp.id}')
             return req
 
@@ -356,8 +363,7 @@ class PosCalibrations(PECS):
         dfs = []
         for i, request in enumerate(requests):
             self.print(f'Measuring extra point {i+1} of {len(targets)}...')
-            dfs.append(
-                self.move_measure(request, match_radius=self.match_radius))
+            dfs.append(self.move_measure(request, match_radius=self.match_radius))
             if i+1 < len(requests):  # no pause after the last iteration
                 self.pause()
         self.data.data_extra = pd.concat(dfs, keys=range(len(targets)),
