@@ -1018,11 +1018,11 @@ class CalibrationData(FPTestData):
     def make_grid_plots(self):
         pass
 
-    def generate_data_products(self):
+    def generate_data_products(self, multiprocess=True):
         self.read_telemetry()
         self.export_data_logs()
         if self.mode in ['arc','grid']:
-            self.make_calib_plots(self.mode)  # self.mode can be 'arc', 'grid'
+            self.make_calib_plots(self.mode, mp=multiprocess)  # self.mode can be 'arc', 'grid'
         self.dump_as_one_pickle()  # loggers lost as they cannot be serialised
         if shutil.which('pandoc') is None:
             self.print('You must have a complete installation of pandoc '
@@ -1055,7 +1055,9 @@ if __name__ == '__main__':
             splitter = os.path.basename(data.dir)
             data.log_paths[ptl] = data.dir + logpath.split(splitter)[-1]
             data.dirs[ptl] = os.path.split(data.log_paths[ptl])[0]
-        
+            
+        # 2020-05-11 JHS multiprocess not stable, this gives option to turn off
+        should_multiprocess = False
         
         # data.make_calib_plots(make_binder=False, mp=False, posids=['M03037'])
         # calib_type = data.mode.replace('_calibration', '')
@@ -1071,7 +1073,7 @@ if __name__ == '__main__':
         # data.dump_as_one_pickle()
         # data.generate_report()
         # data.make_archive()
-        data.generate_data_products()
+        data.generate_data_products(multiprocess=should_multiprocess)
         # from poscalibrationfits import PosCalibrationFits
         # path = os.path.join(os.path.dirname(paths[0]), 'data_arc.pkl.gz')
         # data_arc = pd.read_pickle(path)
