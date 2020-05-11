@@ -233,12 +233,16 @@ class FPTestData:
             #     p.close()
             #     p.join()
             pool, n_running = [], 0
-            self.print(
-                'WARNING: Upgrade to python 3.7 and matplotlib 3 ASAP! '
-                'Mutiprocessing.Process.close() not available in '
-                'python <= 3.6. You may get OSError [24] too many open files '
-                'due to matplotlib 2 bug of leaving redundant open font '
-                'handles behind and not closing Process threads properly!')
+            
+            # 2020-05-11 [JHS] deprecated this comment. Demonstrated to be not
+            # true on my machine running python 3.7.7 + matplotlib 3.1.3.
+            # self.print(
+            #     'WARNING: Upgrade to python 3.7 and matplotlib 3 ASAP! '
+            #     'Mutiprocessing.Process.close() not available in '
+            #     'python <= 3.6. You may get OSError [24] too many open files '
+            #     'due to matplotlib 2 bug of leaving redundant open font '
+            #     'handles behind and not closing Process threads properly!')
+            
             for args in tqdm(args_list):
                 np = Process(target=target, args=args)
                 if len(pool) == n_threads_max:  # all cores occupied, wait
