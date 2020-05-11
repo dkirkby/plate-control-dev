@@ -981,7 +981,7 @@ class Petal(object):
             raise ValueError(f'{device_id} not in PTL{self.petal_id:02}')
         accepted = self.states[device_id].store(key, value)
         if accepted:
-            if key.split('_')[0] in ['LENGTH', 'OFFSET', 'PHYSICAL']:
+            if pc.is_calib_key(key):
                 self.altered_calib_states.add(self.states[device_id])
             else:
                 self.altered_states.add(self.states[device_id])

@@ -138,6 +138,12 @@ keepout_expansion_keys = ['KEEPOUT_EXPANSION_PHI_RADIAL',
                           'KEEPOUT_EXPANSION_THETA_RADIAL',
                           'KEEPOUT_EXPANSION_THETA_ANGULAR']
 
+# test for whether certain posstate keys are classified as "calibration" vals
+calib_keys = set(nominals.keys()) | set(keepout_expansion_keys)
+calib_keys.add('CLASSIFIED_AS_RETRACTED')
+def is_calib_key(key):
+    return key.upper() in calib_keys
+
 # performance grade letters
 grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
 
