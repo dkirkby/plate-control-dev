@@ -38,7 +38,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 # plt.switch_backend('pdf')  # don't switch backend, pweave depends on TKAgg
-# plt.ioff()  # turn off interactive mode, doesn't work in matplotlib 2
+plt.ioff()  # turn off interactive mode, doesn't work in matplotlib 2
 plt.rcParams.update({'font.family': 'serif',
                      'mathtext.fontset': 'cm'})
 Circle = matplotlib.patches.Circle
