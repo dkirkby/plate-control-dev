@@ -262,7 +262,7 @@ class PosState(object):
 
         (NEVER EVER write directly to state._val dictionary)
         """
-        if key not in self._val.keys():  # 1nd check: validate the key name
+        if key not in self._val.keys():  # 1st check: validate the key name
             self.printfunc(f'Unit {self.unit_id}: invalid Key {key}')
             return False
         if key in pc.nominals:  # 2nd check: reject values too far from nominal
@@ -392,6 +392,7 @@ class PosState(object):
                 del self._val[old_key]
                 new_key = legacy_key_replacements[old_key]
                 self._val[new_key] = temp_val
+                
         # also insert any missing entirely new keys
         if self.type == 'pos':
             possible_new_keys_and_defaults = {'LAST_MEAS_FWHM':None,
@@ -399,7 +400,12 @@ class PosState(object):
                                               'KEEPOUT_EXPANSION_PHI_ANGULAR':0.0,
                                               'KEEPOUT_EXPANSION_THETA_RADIAL':0.0,
                                               'KEEPOUT_EXPANSION_THETA_ANGULAR':0.0,
-                                              'CLASSIFIED_AS_RETRACTED':False}
+                                              'CLASSIFIED_AS_RETRACTED':False,
+                                              'OBS_X':None,
+                                              'OBS_Y':None,
+                                              'PTL_X':None,
+                                              'PTL_Y':None,
+                                              'PTL_Z':None}
         elif self.type == 'fid':
             possible_new_keys_and_defaults = {'LAST_MEAS_OBS_X':[],
                                               'LAST_MEAS_OBS_Y':[],
