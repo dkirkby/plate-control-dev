@@ -401,16 +401,21 @@ class PosState(object):
                                               'KEEPOUT_EXPANSION_THETA_RADIAL':0.0,
                                               'KEEPOUT_EXPANSION_THETA_ANGULAR':0.0,
                                               'CLASSIFIED_AS_RETRACTED':False,
+                                              'EXPOSURE_ID':None,
+                                              'EXPOSURE_ITER':None,
+                                              'FLAGS':None,
                                               'OBS_X':None,
                                               'OBS_Y':None,
                                               'PTL_X':None,
                                               'PTL_Y':None,
-                                              'PTL_Z':None}
+                                              'PTL_Z':None,
+                                              }
         elif self.type == 'fid':
             possible_new_keys_and_defaults = {'LAST_MEAS_OBS_X':[],
                                               'LAST_MEAS_OBS_Y':[],
                                               'LAST_MEAS_FWHMS':[],
-                                              'DEVICE_CLASSIFIED_NONFUNCTIONAL':False}
+                                              'DEVICE_CLASSIFIED_NONFUNCTIONAL':False,
+                                              }
         elif self.type == 'ptl':
             possible_new_keys_and_defaults ={}
 
