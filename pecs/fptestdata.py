@@ -260,8 +260,12 @@ class FPTestData:
                 f'Waiting for the last MP chunk of {n_threads} to complete...')
             [p.join() for p in pool]
         else:
-            for args in tqdm(product(*iterables)):
-                target(*args)
+            for i in range(len(iterables[0])):
+                a = []
+                for j in range(len(iterables)):
+                    a.append(iterables[j][i])
+                self.print(f'Plot {i+1} of {len(iterables[0])}')
+                target(*a)
 
     def read_telemetry(self):
         try:
@@ -959,7 +963,7 @@ class CalibrationData(FPTestData):
             ax.set_ylim(top=plt.ylim()[1]+0.1*yr)
         fig.suptitle(f'Arc Calibration {pc.timestamp_str(timestamp)} '
                      f'Positioner {posid}')
-        fig.tight_layout(pad=0.5, rect=[0, 0, 1, 0.95])
+        #fig.tight_layout(pad=0.5, rect=[0, 0, 1, 0.95])
         plt.close(fig)
         fig.savefig(path, bbox_inches='tight')
 
