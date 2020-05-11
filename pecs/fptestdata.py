@@ -1030,7 +1030,7 @@ class CalibrationData(FPTestData):
 
 if __name__ == '__main__':
     '''load the dumped pickle file as follows, protocol is auto determined'''
-    expids = [52645]  # 46364, 46788, 47557, 47559, 47559, 47562
+    expids = [1948]  # 46364, 46788, 47557, 47559, 47559, 47562
     for expid in expids:
         paths = glob(pc.dirs['kpno']+f'/*/{expid:08}*/*data.pkl')
         assert len(paths) == 1, paths
@@ -1038,6 +1038,21 @@ if __name__ == '__main__':
         print(f'Re-processing FP test data:\n{path}')
         with open(os.path.join(paths[0]), 'rb') as h:
             data = pickle.load(h)
+            
+        # 2020-05-11 JHS corections of paths for local machine    
+        splitter = os.path.sep + 'focalplane' + os.path.sep
+        local_path_prefix = os.path.normpath(path.split(splitter)[0])
+        norm_cfg_path = os.path.normpath(data.test_cfg.filename)
+        prefixless_cfg_path = norm_cfg_path.split(splitter)[1]
+        new_cfg_path = local_path_prefix + splitter + prefixless_cfg_path
+        data.test_cfg.filename = new_cfg_path
+        data.dir = os.path.split(new_cfg_path)[0]
+        for ptl, logpath in data.log_paths.items():
+            splitter = os.path.basename(data.dir)
+            data.log_paths[ptl] = data.dir + logpath.split(splitter)[-1]
+            data.dirs[ptl] = os.path.split(data.log_paths[ptl])[0]
+        
+        
         # data.make_calib_plots(make_binder=False, mp=False, posids=['M03037'])
         # calib_type = data.mode.replace('_calibration', '')
         # measured = data.data_arc if calib_type == 'arc' else data.data_grid
