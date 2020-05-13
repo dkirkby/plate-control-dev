@@ -44,6 +44,7 @@ class PECS:
         # since it is not used in tests.
         self._pcid2role = lambda pcid: f'PETAL{pcid}'
         self._role2pcid = lambda role: int(role.replace('PETAL', ''))
+        self.use_desimeter = False
         pecs_local = ConfigObj(PECS_CONFIG_FILE, unrepr=True, encoding='utf-8')
         for attr in pecs_local.keys():
             setattr(self, attr, pecs_local[attr])
@@ -53,7 +54,7 @@ class PECS:
                 self.fvc = FVC_proxy_sim(max_err=0.0001)
             else:
                 self.fvc = FVC(self.pm_instrument, fvc_role=self.fvc_role,
-                               constants_version=self.constants_version)
+                               constants_version=self.constants_version,use_desimeter=self.use_desimeter)
             self.print(f"FVC proxy created for instrument: "
                        f"{self.fvc.get('instrument')}")
         else:
