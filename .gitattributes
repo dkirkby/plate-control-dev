@@ -8,7 +8,6 @@ pecs/grid_calibration.py -text
 pecs/onepoint_offsetsTP.py -text
 pecs/onepoint_posintTP.py -text
 pecs/pecs.py -text
-pecs/pecs_local.cfg -text
 pecs/poscalibplot_from_df.py -text
 pecs/poscalibrationfits.py -text
 pecs/poscalibrations.py -text
