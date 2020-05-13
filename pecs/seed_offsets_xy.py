@@ -34,7 +34,7 @@ from pecs import PECS
 seed = PECS(interactive=True)
 print('Seeding offsets XY...')
 # array of shape (3, 543) in nominal ptlXY
-ptlXYZ = (pd.read_csv(pc.dirs['positioner_locations_file'])
+ptlXYZ = (pd.read_csv(pc.positioner_locations_file)
           [['X', 'Y', 'Z']].values.T)
 pos = PetalTransforms.ptlXYZ_to_flatXY(ptlXYZ)
 updates = []

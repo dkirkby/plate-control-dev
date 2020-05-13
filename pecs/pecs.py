@@ -22,25 +22,29 @@ from DOSlib.proxies import FVC, PetalMan, SimpleProxy  # , Illuminator
 from DOSlib.exposure import Exposure
 from fvc_sim import FVC_proxy_sim
 
+# Required environment variable
+PECS_CONFIG_FILE = os.environ.get('PECS_CONFIG_FILE') # corresponds to e.g. 'pecs_default.cfg' or 'pecs_lbnl.cfg'
+assert PECS_CONFIG_FILE
 
 class PECS:
     '''if there is already a PECS instance from which you want to re-use
        the proxies, simply pass in pecs.fvc and pecs.ptls
+       
     All available petal role names:     self.ptlm.Petals.keys()
     All selected petals:                self.ptlm.participating_petals
-    Selected PCIDs:                     self.pcids from pecs_local.cfg
+    Selected PCIDs:                     self.pcids from pecs_*.cfg
+    
+    For different hardware setups, you need to intialize including the
+    correct config file for that local setup. This will be stored in
+    fp_settings/hwsetups/ with a name like pecs_default.cfg or pecs_lbnl.cfg.
     '''
-
     def __init__(self, fvc=None, ptlm=None, printfunc=print, interactive=None):
         # Allow local config so scripts do not always have to collect roles
         # and names from the user. No check for illuminator at the moment
         # since it is not used in tests.
         self._pcid2role = lambda pcid: f'PETAL{pcid}'
         self._role2pcid = lambda role: int(role.replace('PETAL', ''))
-        pecs_local = ConfigObj(  # set basic self attributes
-            os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                         'pecs_local.cfg'),
-            unrepr=True, encoding='utf-8')
+        pecs_local = ConfigObj(PECS_CONFIG_FILE, unrepr=True, encoding='utf-8')
         for attr in pecs_local.keys():
             setattr(self, attr, pecs_local[attr])
         self.printfunc = printfunc

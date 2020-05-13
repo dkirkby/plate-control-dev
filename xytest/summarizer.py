@@ -272,7 +272,7 @@ if __name__=="__main__":
 	filetypes = (('Comma-separated Values','*movedata.csv'),('All Files','*'))
 	gui_root = tkinter.Tk()
 	process_all_files = tkinter.messagebox.askyesno(title='Batch summarize directory?',message='Yes  -->  Process all files in the folder of your choice.\n\nNo -->  Process just one or multiple file(s) of your choice.')
-	start_dir = pc.dirs['all_logs'] + os.path.sep + '..'
+	start_dir = pc.POSITIONER_LOGS_PATH + os.path.sep + '..'
 	if not(process_all_files):
 		files = list(tkinter.filedialog.askopenfilenames(initialdir=start_dir, filetypes=filetypes, title='Select movedata file(s) to process.'))
 	else:

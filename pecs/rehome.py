@@ -17,7 +17,7 @@ class Rehome(PECS):
             self.ptl_setup(petal_roles, posids)
         self.axis = axis
         df = self.rehome()
-        path = os.path.join(pc.dirs['all_logs'], 'calib_logs',
+        path = os.path.join(pc.POSITIONER_LOGS_PATH, 'calib_logs',
                             f'{pc.filename_timestamp_str()}-rehome.csv')
         df.to_csv(path)
         self.printfunc(f'Rehome (interally-tracked) data saved to: {path}')

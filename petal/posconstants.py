@@ -10,6 +10,12 @@ import csv
 """Constants and convenience methods used in the control of Fiber Postioners
 """
 
+# Required environment variables
+POSITIONER_LOGS_PATH = os.environ.get('POSITIONER_LOGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/positioner_logs
+FP_SETTINGS_PATH = os.environ.get('FP_SETTINGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/fp_settings
+assert POSITIONER_LOGS_PATH
+assert FP_SETTINGS_PATH
+
 # Interpreter settings
 np.set_printoptions(suppress=True) # suppress auto-scientific notation when printing np arrays
 
@@ -20,24 +26,15 @@ np.set_printoptions(suppress=True) # suppress auto-scientific notation when prin
 petal_directory = os.path.dirname(os.path.abspath(inspect.getframeinfo(inspect.currentframe()).filename))
 code_version = petal_directory.split(os.path.sep)[-2]
 
-# File location directories
-# For environment paths, set the paths in your .bashrc file, by adding the lines:
-#    export POSITIONER_LOGS_PATH="/my/path/to/positioner_logs"
-#    export FP_SETTINGS_PATH="/my/path/to/fp_settings"
+# Directory locations
 dirs = {}
-dirs['all_logs']     = os.environ.get('POSITIONER_LOGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/positioner_logs
-dirs['all_settings'] = os.environ.get('FP_SETTINGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/fp_settings
-dirs['positioner_locations_file'] = os.environ.get('FP_SETTINGS_PATH')+'/hwsetups/Petal_Metrology.csv' # this is NOT metrology, it is a *bad* naming. it is nominals!
-dirs['small_array_locations_file']=os.getenv('FP_SETTINGS_PATH')+'/hwsetups/SWIntegration_XY.csv'
-dirs['petal2_fiducials_metrology_file']=os.getenv('FP_SETTINGS_PATH')+'/hwsetups/petal2_fiducials_metrology.csv'
-dirs['petalbox_configurations'] = os.getenv('FP_SETTINGS_PATH') + '/ptl_settings/petalbox_configurations_by_ptl_id.json' # temporary until configuration info is sent through petal init
 if 'DESI_HOME' in os.environ:
-    dirs['temp_files']   = os.environ.get('DESI_HOME') + os.path.sep + 'fp_temp_files' + os.path.sep
+    home = os.environ.get('DESI_HOME')
 elif 'HOME' in os.environ:
-    dirs['temp_files'] = os.environ.get('HOME') + os.path.sep + 'fp_temp_files' + os.path.sep
+    home = os.environ.get('HOME')
 else:
-    print("No DESI_HOME or Home defined in environment, assigning temp file generation to current directory/fp_temp_files")
-    dirs['temp_files'] = os.path.abspath('./') + 'fp_temp_files' + os.path.sep
+    home = petal_directory
+dirs['temp_files'] = os.path.join(home, 'fp_temp_files')
 dir_keys_logs = ['pos_logs', 'fid_logs', 'ptl_logs', 'xytest_data',
                  'xytest_logs', 'xytest_plots', 'xytest_summaries',
                  'calib_logs', 'kpno']
@@ -45,12 +42,16 @@ dir_keys_settings = ['pos_settings', 'fid_settings', 'test_settings',
                      'collision_settings', 'hwsetups', 'ptl_settings',
                      'other_settings']
 for key in dir_keys_logs:
-    dirs[key] = os.path.join(dirs['all_logs'], key)
+    dirs[key] = os.path.join(POSITIONER_LOGS_PATH, key)
 for key in dir_keys_settings:
-    dirs[key] = os.path.join(dirs['all_settings'], key)
+    dirs[key] = os.path.join(FP_SETTINGS_PATH, key)
 for directory in dirs.values():
     if not os.path.isfile(directory):
         os.makedirs(directory, exist_ok=True)
+        
+# File locations
+positioner_locations_file = os.path.join(petal_directory, 'positioner_locations_0530v14.csv')
+small_array_locations_file = os.path.join(dirs['hwsetups'], 'SWIntegration_XY.csv')
 
 # Lookup tables for focal plane coordinate conversions
 R_lookup_path = petal_directory + os.path.sep + 'focal_surface_lookup.csv'

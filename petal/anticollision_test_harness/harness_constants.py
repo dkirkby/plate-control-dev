@@ -10,8 +10,8 @@ import math
 
 device_locations_path = '../positioner_locations_0530v14.csv'
 
-pos_dir = os.path.join(pc.dirs['all_settings'], 'harness_settings', 'pos_parameter_sets')
-req_dir = os.path.join(pc.dirs['all_settings'], 'harness_settings', 'move_request_sets')
+pos_dir = os.path.join(pc.FP_SETTINGS_PATH, 'harness_settings', 'pos_parameter_sets')
+req_dir = os.path.join(pc.FP_SETTINGS_PATH, 'harness_settings', 'move_request_sets')
 pos_prefix = 'posparams_'
 req_prefix = 'requests_'
 

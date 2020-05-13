@@ -668,9 +668,9 @@ class PosMoveMeasure(object):
             self.printfunc('No positioners are enabled, I can not move on. Exit. ')
             raise SystemExit
         if ptl.shape == 'petal':
-            self.file_metro=pc.dirs['positioner_locations_file']
+            self.file_metro=pc.positioner_locations_file
         elif ptl.shape == 'small_array':
-            self.file_metro=pc.dirs['small_array_locations_file']
+            self.file_metro=pc.small_array_locations_file
         else:
             self.file_metro=None # might be a bug
 
@@ -810,9 +810,9 @@ class PosMoveMeasure(object):
                 move_arr.append(True)
 
         if this_petal.shape == 'petal':
-            self.file_metro=pc.dirs['positioner_locations_file']
+            self.file_metro=pc.positioner_locations_file
         elif this_petal.shape == 'small_array':
-            self.file_metro=pc.dirs['small_array_locations_file']
+            self.file_metro=pc.small_array_locations_file
         else:
             self.printfunc('Must be a petal or a small_array to proceed. Exit')
             raise SystemExit

@@ -715,11 +715,7 @@ class XYTestData(FPTestData):
 
     def plot_error_heatmaps(self, pcid, outliers=None):
         # load nominal theta centres for plotting in local ptlXYZ
-        path = os.path.join(
-            os.getenv('PLATE_CONTROL_DIR',
-                      '/software/products/plate_control-trunk'),
-            'petal', 'positioner_locations_0530v14.csv')
-        ptlXYZ_df = pd.read_csv(path,
+        ptlXYZ_df = pd.read_csv(pc.positioner_locations_file,
                                 usecols=['device_location_id', 'X', 'Y', 'Z'],
                                 index_col='device_location_id')
         ptlXYZ_df.index.rename('device_loc', inplace=True)

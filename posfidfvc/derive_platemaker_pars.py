@@ -151,9 +151,9 @@ class Derive_Platemaker_Pars(object):
 
 
             if self.ptl.shape == 'petal':
-                self.file_metro=pc.dirs['positioner_locations_file']
+                self.file_metro=pc.positioner_locations_file
             elif self.ptl.shape == 'small_array':
-                self.file_metro=pc.dirs['small_array_locations_file']
+                self.file_metro=pc.small_array_locations_file
             else:
                 self.printfunc('Must be a petal or a small_array to proceed. Exit')
                 raise SystemExit
@@ -288,9 +288,9 @@ class Derive_Platemaker_Pars(object):
         '''Define function for making platemaker instrument file.
         '''
         if self.ptl.shape == 'petal':
-            self.file_metro=pc.dirs['positioner_locations_file']
+            self.file_metro=pc.positioner_locations_file
         elif self.ptl.shape == 'small_array':
-            self.file_metro=pc.dirs['small_array_locations_file']
+            self.file_metro=pc.small_array_locations_file
         else:
             self.printfunc('Must be a petal or a small_array to proceed. Exit')
             raise SystemExit
