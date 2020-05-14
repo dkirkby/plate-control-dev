@@ -297,18 +297,18 @@ class PECS:
             self.print(f'Pausing for {self.pause_interval} s...')
             self.countdown_sec(self.pause_interval)
 
-    def decorate_note(self, log_note):
+    def decorate_note(self, log_note=''):
         '''Adds additional information to a positioner log note. The intended
         usage is to include important facts known only to PECS, when constructing
         the LOG_NOTE field that gets saved to the posmovedb.'''
         if isinstance(log_note, str):
-            log_note = [log_note]
+            log_note = [log_note] if log_note else []
         elif isinstance(log_note, tuple):
             log_note = list(log_note)
         else:
             assert isinstance(log_note, list)
         assert all([isinstance(s, str) for s in log_note])
-        log_note += [f'expid {self.exp.id}']
-        log_note += [f'use_desimeter {self.use_desimeter}']
+        log_note += [f'expid={self.exp.id}']
+        log_note += [f'use_desimeter={self.use_desimeter}']
         return log_note
         
