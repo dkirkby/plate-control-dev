@@ -88,7 +88,7 @@ class PosCalibrations(PECS):
                                               participating_petals=role)
                 row = {'DEVICE_ID': posid, 'COMMAND': 'posintTP',
                        'X1': posintTP[0], 'X2': posintTP[1],
-                       'LOG_NOTE': f'{self.data.mode}; expid {self.exp.id}'}
+                       'LOG_NOTE': self.decorate_note(f'{self.data.mode}')}
                 row.update(self.posinfo.loc[posid].to_dict())
                 rows.append(row)
             req = pd.DataFrame(rows)
@@ -191,16 +191,12 @@ class PosCalibrations(PECS):
         for i in range(self.data.n_pts_T):
             dfs = [df[0][i] for df in ret.values()]
             df = pd.concat(dfs).set_index('DEVICE_ID')
-            df['LOG_NOTE'] = ('arc calibration theta axis '
-                              'point {i+1} of {self.data.n_pts_T}; '
-                              'expid {self.exp.id}')
+            df['LOG_NOTE'] = self.decorate_note(f'arc calibration theta axis point {i+1} of {self.data.n_pts_T}')
             req_list_T.append(df)
         for j in range(self.data.n_pts_P):
             dfs = [df[1][j] for df in ret.values()]
             df = pd.concat(dfs).set_index('DEVICE_ID')
-            df['LOG_NOTE'] = ('arc calibration phi axis '
-                              'point {i+1} of {self.data.n_pts_T}; '
-                              'expid {self.exp.id}')
+            df['LOG_NOTE'] = self.decorate_note(f'arc calibration phi axis point {i+1} of {self.data.n_pts_T}')
             req_list_P.append(df)
         T_data = []  # move, measure
         for i, req in enumerate(req_list_T):
@@ -257,8 +253,7 @@ class PosCalibrations(PECS):
         for i in range(npts):
             dfs = [dfs[i] for dfs in ret.values()]
             df = pd.concat(dfs).set_index('DEVICE_ID')
-            df['LOG_NOTE'] = ('grid calibration point {i+1} of {npts}; '
-                              'expid {self.exp.id}')
+            df['LOG_NOTE'] = self.decorate_note(f'grid calibration point {i+1} of {npts}')
             req_list.append(df)
         grid_data = []  # move, measure
         for i, request in enumerate(req_list):
@@ -354,8 +349,7 @@ class PosCalibrations(PECS):
         def gen_req(i):
             req = req_temp.copy()
             req['X1'], req['X2'] = targets[i][0], targets[i][1]
-            req['LOG_NOTE'] = (f'extra point {i+1} of {len(targets)} for '
-                               f'{self.data.mode}; expid {self.exp.id}')
+            req['LOG_NOTE'] = self.decorate_note(f'extra point {i+1} of {len(targets)} for {self.data.mode}')
             return req
 
         requests = [gen_req(i) for i in range(len(targets))]

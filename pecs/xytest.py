@@ -315,15 +315,15 @@ class XYTest(PECS):
                                [f'err_x_{n-1}', f'err_y_{n-1}']].values
             tgt = np.nan_to_num(tgt)  # replace NaN with zero for unmatched
         # build move request dataframe for a petal
-        note = (f'xytest: {self.data.test_name}; '  # same for all
-                f'target {i+1} of {self.data.ntargets}; '
-                f'move {n} ({movetype}); expid {self.exp.id}')
+        note = [f'xytest: {self.data.test_name}',  # same for all
+                f'target {i+1} of {self.data.ntargets}',
+                f'move {n} ({movetype})']
         req = pd.DataFrame(
             {'DEVICE_ID': posids,
              'PETAL_LOC': self.posinfo.loc[posids, 'PETAL_LOC'],
              'DEVICE_LOC': self.posinfo.loc[posids, 'DEVICE_LOC'],
              'COMMAND': cmd, 'X1': tgt[:, 0], 'X2': tgt[:, 1],
-             'LOG_NOTE': note})
+             'LOG_NOTE': self.decorate_note(note)})
         self.logger.debug([f'Move requests:', req.to_string()])
         self.logger.info('Calculating move paths...')
         self.ptlm.prepare_move(req, anticollision=self.data.anticollision)
