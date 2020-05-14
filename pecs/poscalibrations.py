@@ -13,6 +13,7 @@ from pecs import PECS
 from fptestdata import CalibrationData
 from poscalibrationfits import PosCalibrationFits
 from postransforms import PosTransforms
+import xy_targets_generator
 
 
 class PosCalibrations(PECS):
@@ -322,7 +323,7 @@ class PosCalibrations(PECS):
         exppos.rename(columns={'X1': 'posintT', 'X2': 'posintP'}, inplace=True)
         return merged.join(exppos)
 
-    def run_extra_points(self, max_radius=3.3, grid_width=5):
+    def run_extra_points(self, max_radius=3.3, n_points=24):
         '''This function will move to and measure a grid of points, without
         any special calibration analysis performed. The purpose is to have an
         independent measurement of internally-tracked (t,p) vs measured (x,y),
@@ -333,21 +334,19 @@ class PosCalibrations(PECS):
             max_radius ... target points shall be no further out than this
                            from nominal device center
             
-            grid_width ... points will lie on a square grid of size
-                           grid_width x grid_width
+            n_points   ... grid will be spaced to include this many points
+                           (in some cases a slightly)
         '''
         self.logger.info('Performing one-point posintTP update before taking '
                          'extra points for calibration verification...')
         self.run_1p_calibration(tp_target=None, commit=True, partial=True)
-        max_x = max_radius / np.sqrt(2)
-        x = np.linspace(-max_x, max_x, grid_width)
-        y = x.copy()
-        xg, yg = np.meshgrid(x, y)
+        tgt_xy = xy_targets_generator.filled_circle(n_points=n_points, radius=max_radius)
         trans = PosTransforms(stateless=True)
         targets = []
-        for poslocXY in zip(xg.flatten(), yg.flatten()):
+        for poslocXY in tgt_xy:
             posintTP, unreachable = trans.poslocXY_to_posintTP(poslocXY)
-            assert not unreachable, (f'Unreachable: poslocXY = {poslocXY}', f'posintTP = {posintTP}')
+            # Ignore "unreachable" here, since really we're just interested in
+            # making a set of (theta, phi).
             targets.append(posintTP)
         req_temp = self.posinfo[['PETAL_LOC', 'DEVICE_LOC']].copy()
         req_temp['COMMAND'] = 'posintTP'
@@ -370,7 +369,6 @@ class PosCalibrations(PECS):
                                          names=['target_no', 'DEVICE_ID'])
         self.data.data_extra.to_pickle(os.path.join(
             self.data.dir, 'data_extra.pkl.gz'), compression='gzip')
-
 
 if __name__ == '__main__':
     expids = [37927, 37928, 37930, 37933]  # arcs

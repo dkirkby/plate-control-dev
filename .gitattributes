@@ -17,6 +17,7 @@ pecs/seed_armlengths.py -text
 pecs/seed_offsets_tp.py -text
 pecs/seed_offsets_xy.py -text
 pecs/set_calibrations.py -text
+pecs/xy_targets_generator.py -text
 pecs/xytest.py -text
 pecs/xytest_report_master.pmd -text
 pecs/xytest_report_master_petal.pmd -text
