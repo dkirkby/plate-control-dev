@@ -340,9 +340,13 @@ class PosState(object):
         self._val['CURRENT_LOG_BASENAME'] = name
         
     def append_log_note(self, note):
-        '''Adds a log note (presumably a string) to the existing note data that
-        will be written to log upon commit or writetodb.'''
-        self._next_log_notes.append(str(note))
+        '''Adds a log note (presumably a string or list of strings) to the
+        existing note data that will be written to log upon commit or writetodb.'''
+        if isinstance(note, str):
+            note = [note]
+        elif isinstance(note, list) or isinstance(note, tuple):
+            note = [str(s) for s in note]
+        self._next_log_notes += note
         self._val['LOG_NOTE'] = str(self._next_log_notes)
         
     def clear_log_notes(self):
