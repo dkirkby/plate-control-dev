@@ -80,6 +80,7 @@ class PosCalibrations(PECS):
                    f'poslocTP = {poslocTP}, do_move = {do_move}, '
                    f'commit = {commit}')
         rows = []
+        log_note = self.decorate_note(f'{self.data.mode}')
         if do_move:  # then build requests and make the moves
             for posid in self.posids:
                 role = self.ptl_role_lookup(posid)
@@ -88,7 +89,7 @@ class PosCalibrations(PECS):
                                               participating_petals=role)
                 row = {'DEVICE_ID': posid, 'COMMAND': 'posintTP',
                        'X1': posintTP[0], 'X2': posintTP[1],
-                       'LOG_NOTE': self.decorate_note(f'{self.data.mode}')}
+                       'LOG_NOTE': log_note}
                 row.update(self.posinfo.loc[posid].to_dict())
                 rows.append(row)
             req = pd.DataFrame(rows)
@@ -113,7 +114,7 @@ class PosCalibrations(PECS):
             update_mode = 'posTP'
         updates = self.ptlm.test_and_update_TP(
                 used_pos.reset_index(), mode=update_mode, auto_update=commit,
-                tp_updates_tol=0, tp_updates_fraction=1)
+                tp_updates_tol=0, tp_updates_fraction=1, log_note=log_note)
         if partial:  # skip the following as this is part of arc/grid cal
             return
         updates = (pd.concat(list(updates.values())).set_index('DEVICE_ID')
