@@ -152,6 +152,7 @@ class Petal(object):
         self.shape = shape
         self._last_state = None
         self._canids_where_tables_were_just_sent = set()
+        self._set_exposure_info(exposure_id=None, exposure_iter=None)
         if fidids in ['',[''],{''}]: # check included to handle simulation cases, where no fidids argued
             fidids = {}
 
@@ -494,7 +495,7 @@ class Petal(object):
             table.set_move(0, pc.P, requests[posid]['target'][1])
             cmd_str = (cmd_prefix + ' ' if cmd_prefix else '') + 'direct_dtdp'
             table.store_orig_command(0,cmd_str,requests[posid]['target'][0],requests[posid]['target'][1])
-            table.log_note += (' ' if table.log_note else '') + requests[posid]['log_note']
+            table.append_log_note(requests[posid]['log_note'])
             table.allow_exceed_limits = True
             self.schedule.expert_add_table(table)
         return requests
@@ -524,7 +525,7 @@ class Petal(object):
             table.set_move(0,pc.P,dist[1])
             cmd_str = (cmd_prefix + ' ' if cmd_prefix else '') + 'limit seek'
             table.store_orig_command(0,cmd_str,direction*(axisid == pc.T),direction*(axisid == pc.P))
-            table.log_note += (' ' if table.log_note else '') + log_note
+            table.append_log_note(log_note)
             posmodel.axis[axisid].postmove_cleanup_cmds += 'self.axis[' + repr(axisid) + '].total_limit_seeks += 1\n'
             axis_cmd_prefix = 'self.axis[' + repr(axisid) + ']'
             if direction < 0:
@@ -995,9 +996,8 @@ class Petal(object):
 
     def commit(self, mode='move', log_note='', *args, **kwargs):
         '''Commit move data or calibration data to DB and/or local config and
-        log files.
-        A note string may optionally be included to go along with this entry.
-        mode can be: 'move', 'calib', 'both'
+        log files. A note string may optionally be included to go along with
+        this entry. mode can be: 'move', 'calib', 'both'
         '''
         # set up type names to write to DB as well as log for move data only
         if mode == 'move':
@@ -1017,6 +1017,9 @@ class Petal(object):
             pos_commit_list = [st for st in states if st.type == 'pos']
             fid_commit_list = [st for st in states if st.type == 'fid']
             if len(pos_commit_list) > 0:
+                for state in pos_commit_list:
+                    state.store('EXPOSURE_ID', self._exposure_id)
+                    state.store('EXPOSURE_ITER', self._exposure_iter)
                 self.posmoveDB.WriteToDB(pos_commit_list, self.petal_id, type1)
             if len(fid_commit_list) > 0:
                 self.posmoveDB.WriteToDB(fid_commit_list, self.petal_id, type2)
@@ -1041,6 +1044,62 @@ class Petal(object):
                 for state in self.altered_calib_states:
                     state.write()
             self.altered_calib_states = set()
+            
+    def _late_commit(self, data, exposure_id=None, exposure_iter=None):
+        '''Commits "late" data to the posmovedb. There are several special
+        fields for which this is possible.
+        
+        INPUTS:
+            data ... dict with keys --> posids and values --> subdicts
+                     subdicts --> key/value pairs
+                     valid subdict keys are defined in first line of function
+
+            exposure_id and exposure_iter ... (optional) these two arguments,
+                together, specify a particular row in the posmovedb to store at.
+                Otherwise (according to current understanding of posmovedb
+                module's behavior) the data gets stored to the latest row.
+        
+        OUTPUTS:
+            A status value is passed back from the posmovedb module.
+        '''
+        allowed_keys = {'OBS_X', 'OBS_Y', 'PTL_X', 'PTL_Y', 'PTL_Z', 'FLAGS'}
+        valid_posids = {p for p in data.keys() if p in self.posids}
+        valid_data = []
+        for posid in valid_posids:
+            this_data = {k:v for k,v in data[posid].items() if k in allowed_keys}
+            if this_data:
+                this_data['POS_ID'] = posid
+                valid_data.append(this_data)
+        if valid_data and self.db_commit_on and not self.simulator_on:
+            kwargs = {'input_list': valid_data,
+                      'petal_id': self.petal_id,
+                      'types': 'pos_move'}
+            if exposure_id and exposure_iter:
+                kwargs.update({'expid': exposure_id,
+                              'iteration': exposure_iter})
+            status = self.posmoveDB.UpdateDB(**kwargs)
+        else:
+            status = f'FAILED: no late data committed for petal {self.petal_id}'
+            if not valid_data:
+                status += ' (no valid data supplied)'
+            elif not self.db_commit_on:
+                status += ' (database commits are currently turned off)'
+            elif self.simulator_on:
+                status += ' (because in simulation mode)'
+        return status
+
+    def _set_exposure_info(self, exposure_id, exposure_iter=None):
+        '''Sets exposure identification values. These will be included in the
+        posmovedb upon the next commit(). They will subsequently be cleared
+        during _postmove_cleanup().
+        '''
+        self._exposure_id = exposure_id
+        self._exposure_iter = exposure_iter
+        
+    def _clear_exposure_info(self):
+        '''Clears exposure identification values. C.f. _set_exposure_info().
+        '''
+        self._set_exposure_info(exposure_id=None, exposure_iter=None)
 
     def expected_current_position(self, posid, key):
         """Retrieve the current position, for a positioner identied by posid,
@@ -1312,7 +1371,8 @@ class Petal(object):
         '''
         resets = {'MOVE_CMD'  : '',
                   'MOVE_VAL1' : '',
-                  'MOVE_VAL2' : ''}
+                  'MOVE_VAL2' : '',
+                  }
         for key in resets:
             for posid in self.posids:
                 self.set_posfid_val(posid, key, resets[key])
