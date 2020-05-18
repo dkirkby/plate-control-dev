@@ -345,11 +345,6 @@ class PosState(object):
     def append_log_note(self, note):
         '''Adds a log note (presumably a string or list of strings) to the
         existing note data that will be written to log upon commit or writetodb.'''
-        
-        # remove after debug
-        self.printfunc(f'posstate.append_log_note() received: {note}')
-        self.printfunc(f'current _next_log_notes: {self._next_log_notes}')
-        
         if not note or note == ['']:
             self.printfunc(f'no change')
             return
@@ -359,9 +354,6 @@ class PosState(object):
             note = [str(s) for s in note]
         self._next_log_notes += note
         self._val['LOG_NOTE'] = str(self._next_log_notes)
-        
-        # remove after debug
-        self.printfunc(f'new _next_log_notes: {self._next_log_notes}')
         
     def clear_log_notes(self):
         '''Re-initializes the stored log notes.'''
