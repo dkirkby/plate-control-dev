@@ -273,8 +273,11 @@ class PosState(object):
                     f'{key} rejected, outside nominal range {nom} ± {tol}')
                 # val = nom
                 return False
-        self._val[key] = val  # set value if all 3 checks above are passed
-        # self.printfunc(f'Key {key} set to value: {val}.')  # debug line
+        if key == 'LOG_NOTE':
+            self.append_log_note(val)
+        else:
+            self._val[key] = val  # set value if all 3 checks above are passed
+            # self.printfunc(f'Key {key} set to value: {val}.')  # debug line
         return True
 
     def write(self):
