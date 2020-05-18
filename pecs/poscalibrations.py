@@ -81,10 +81,6 @@ class PosCalibrations(PECS):
                    f'commit = {commit}')
         rows = []
         log_note = self.decorate_note(f'{self.data.mode}')
-        
-        # remove after debug
-        self.print(f'log_note from poscalibrations.py: {log_note}')
-        
         if do_move:  # then build requests and make the moves
             for posid in self.posids:
                 role = self.ptl_role_lookup(posid)
