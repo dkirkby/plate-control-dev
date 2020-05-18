@@ -153,6 +153,7 @@ class PosState(object):
             self._val['MOVE_CMD'] = ''
             self._val['MOVE_VAL1'] = ''
             self._val['MOVE_VAL2'] = ''
+            self._clear_last_meas_entries()
         self.clear_log_notes()
 
     def set_ptlid_from_pi(self, unit_id):
@@ -432,7 +433,14 @@ class PosState(object):
         for key in possible_new_keys_and_defaults:
             if key not in self._val:
                 self._val[key] = possible_new_keys_and_defaults[key]
-
+                
+    def _clear_last_meas_entries(self):
+        '''Clears specific values from legacy "LAST_MEAS_*" fields. Intended
+        to be run upon initialization, to halt useless forward propagation of
+        any old data.'''
+        keys = {key for key in self._val.keys() if 'LAST_MEAS' in key}
+        for key in keys:
+            self._val[key] = None
 
 if __name__ == "__main__":
     # unit tests below, enable DB write
