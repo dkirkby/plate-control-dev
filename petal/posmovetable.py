@@ -24,7 +24,7 @@ class PosMoveTable(object):
             this_posmodel = posmodel.PosModel()
         self.posmodel = this_posmodel    # the particular positioner this table applies to
         self.posid = self.posmodel.posid # the string ID number of the positioner this table applies to
-        self.log_note = ''               # optional note string which user can associate with this table, to be stored in any logging
+        self._log_note = []              # optional notes (string or list of strings) which user can associate with this table, to be stored in any logging
         self.rows = []                   # internal representation of the move data
         self._rows_extra = []            # auto-generated backlash and final creep rows get internally stored here
         if init_posintTP:
@@ -154,6 +154,24 @@ class PosMoveTable(object):
             if row.data['dP_ideal'] or row.data['dT_ideal']:
                 return False
         return True
+    
+    @property
+    def log_note(self):
+        '''Returns a copy of property log_note.'''
+        return self._log_note.copy()
+    
+    @log_note.setter
+    def log_note(self, note):
+        '''Sets property log_note.'''
+        self._log_note = []
+        self.append_log_note(note)
+
+    def append_log_note(self, note):
+        if isinstance(note, str):
+            note = [note]
+        elif isinstance(note, tuple) or isinstance(note, set):
+            note = list(note)
+        self._log_note += note
 
     # setters
     def set_move(self, rowidx, axisid, distance):

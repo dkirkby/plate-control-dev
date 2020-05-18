@@ -594,7 +594,7 @@ class PosSchedule(object):
             elif not self.expert_mode_is_on():
                 self.printfunc('Error: ' + str(posid) + ' has a move table despite no request.')
                 table.display()
-            table.log_note += (' ' if table.log_note else '') + log_note_addendum
+            table.append_log_note(log_note_addendum)
 
     def _schedule_moves_finish_logging(self, colliding_sweeps, all_sweeps):
         """Final logging and animation steps for the schedule_moves() function."""
