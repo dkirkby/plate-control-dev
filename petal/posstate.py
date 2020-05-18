@@ -153,7 +153,7 @@ class PosState(object):
             self._val['MOVE_CMD'] = ''
             self._val['MOVE_VAL1'] = ''
             self._val['MOVE_VAL2'] = ''
-            self._clear_last_meas_entries()
+        self._clear_last_meas_entries()
         self.clear_log_notes()
 
     def set_ptlid_from_pi(self, unit_id):
