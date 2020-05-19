@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import inspect
 import numpy as np
@@ -7,7 +8,8 @@ import pytz
 import collections
 import csv
 
-"""Constants and convenience methods used in the control of Fiber Postioners
+"""Constants, environment variables, and convenience methods used in the
+plate_control code for fiber positioners.
 """
 
 # Required environment variables
