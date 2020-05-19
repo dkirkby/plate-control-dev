@@ -135,8 +135,7 @@ class PosState(object):
                             self.log_basename)
                         break
             # list of fieldnames we save to the log file.
-            self.log_fieldnames = (['TIMESTAMP'] + list(self._val.keys())
-                                   + ['NOTE'])
+            self.log_fieldnames = (['TIMESTAMP'] + list(self._val.keys()))
             # used for storing specific notes in the next row written to log
             self.append_log_note('software initialization')
             # used for one time check whether need to make a new log file,
@@ -277,6 +276,8 @@ class PosState(object):
         if key == 'LOG_NOTE':
             self.append_log_note(val)
         else:
+            if 'MOVE_CMD' == key and self._val[key]:
+                print(self._val[key])
             self._val[key] = val  # set value if all 3 checks above are passed
             # self.printfunc(f'Key {key} set to value: {val}.')  # debug line
         return True
@@ -317,7 +318,7 @@ class PosState(object):
                             break
             with open(self.log_path, 'a', newline='') as csvfile: # now append a row of data
                 row = self._val.copy()
-                row.update({'TIMESTAMP':timestamp,'NOTE':str(self._next_log_notes)})
+                row.update({'TIMESTAMP':timestamp})
                 writer = csv.DictWriter(csvfile,fieldnames=self.log_fieldnames)
                 writer.writerow(row)
             self.curr_log_length += 1
@@ -344,22 +345,18 @@ class PosState(object):
         self._val['CURRENT_LOG_BASENAME'] = name
         
     def append_log_note(self, note):
-        '''Adds a log note (presumably a string or list of strings) to the
-        existing note data that will be written to log upon commit or writetodb.'''
-        if not note or note == ['']:
-            self.printfunc(f'no change')
-            return
-        if isinstance(note, str):
-            note = [note]
-        elif isinstance(note, list) or isinstance(note, tuple):
-            note = [str(s) for s in note]
-        self._next_log_notes += note
-        self._val['LOG_NOTE'] = str(self._next_log_notes)
+        '''Adds a log note to the existing note data that will be written to
+        log upon commit or writetodb.
+        '''
+        if 'LOG_NOTE' not in self._val:
+            self._val['LOG_NOTE'] = str(note)
+        else:
+            self._val['LOG_NOTE'] = pc.join_notes(self._val['LOG_NOTE'], note)
         
     def clear_log_notes(self):
-        '''Re-initializes the stored log notes.'''
-        self._next_log_notes = []
-        self._val['LOG_NOTE'] = str(self._next_log_notes)
+        '''Re-initializes the stored log notes. Can be used as an initiializer
+        if no LOG_NOTE field yet established.'''
+        self._val['LOG_NOTE'] = ''
 
     def _increment_suffix(self,s):
         """Increments the numeric suffix at the end of s. This function was specifically written

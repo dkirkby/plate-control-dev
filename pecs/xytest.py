@@ -315,9 +315,9 @@ class XYTest(PECS):
                                [f'err_x_{n-1}', f'err_y_{n-1}']].values
             tgt = np.nan_to_num(tgt)  # replace NaN with zero for unmatched
         # build move request dataframe for a petal
-        note = [f'xytest: {self.data.test_name}',  # same for all
-                f'target {i+1} of {self.data.ntargets}',
-                f'move {n} ({movetype})']
+        note = f'xytest: {self.data.test_name}'
+        note = pc.join_notes(note, f'target {i+1} of {self.data.ntargets}')
+        note = pc.join_notes(note, f'move {n} ({movetype})')
         req = pd.DataFrame(
             {'DEVICE_ID': posids,
              'PETAL_LOC': self.posinfo.loc[posids, 'PETAL_LOC'],

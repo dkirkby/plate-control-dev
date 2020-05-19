@@ -13,8 +13,6 @@ import csv
 # Required environment variables
 POSITIONER_LOGS_PATH = os.environ.get('POSITIONER_LOGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/positioner_logs
 FP_SETTINGS_PATH = os.environ.get('FP_SETTINGS_PATH') # corresponds to https://desi.lbl.gov/svn/code/focalplane/fp_settings
-assert POSITIONER_LOGS_PATH
-assert FP_SETTINGS_PATH
 
 # Interpreter settings
 np.set_printoptions(suppress=True) # suppress auto-scientific notation when printing np arrays
@@ -221,6 +219,19 @@ def sign(x):
     else:
         return 0
 
+def join_notes(*args):
+    '''Concatenate items into a "note" string with standard format. A list or
+    tuple arg is treated as a single "item". So for example if you want the
+    subelements of a list "joined", then argue it expanded, like *mylist
+    '''
+    separator = '; '
+    if len(args) == 0:
+        return ''
+    elif len(args) == 1:
+        return str(args[0])
+    strings = (str(x) for x in args if x != '')
+    return separator.join(strings)
+
 def linspace(start,stop,num):
     """Return a list of floats linearly spaced from start to stop (inclusive).
     List has num elements."""
@@ -292,8 +303,7 @@ def concat_lists_of_lists(L1, L2):
         L2 = []
     elif not(isinstance(L2[0],list)):
         L2 = [L2]
-    return L1 + L2
-
+    return L1 + L2        
 
 # Enumeration of verbosity level to stdout
 not_verbose = 0
