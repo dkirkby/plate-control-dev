@@ -276,8 +276,6 @@ class PosState(object):
         if key == 'LOG_NOTE':
             self.append_log_note(val)
         else:
-            if 'MOVE_CMD' == key and self._val[key]:
-                print(self._val[key])
             self._val[key] = val  # set value if all 3 checks above are passed
             # self.printfunc(f'Key {key} set to value: {val}.')  # debug line
         return True
