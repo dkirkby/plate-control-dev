@@ -1045,19 +1045,19 @@ class Petal(object):
                     state.write()
             self.altered_calib_states = set()
             
-    def _late_commit(self, data, exposure_id=None, exposure_iter=None):
+    def _late_commit(self, data):
         '''Commits "late" data to the posmovedb. There are several special
-        fields for which this is possible.
+        fields for which this is possible, defined in the first line of this
+        function. If the exposure id and iteration information have been
+        previously stored (c.f. _set_exposure_info() and _clear_exposure_info()
+        functions), then the data should end up in that row. Otherwise it
+        should end up in whatever is the latest row. Here "should" is based
+        on current (2020-05-18) understanding of posmovedb module's behavior.
         
         INPUTS:
             data ... dict with keys --> posids and values --> subdicts
                      subdicts --> key/value pairs
                      valid subdict keys are defined in first line of function
-
-            exposure_id and exposure_iter ... (optional) these two arguments,
-                together, specify a particular row in the posmovedb to store at.
-                Otherwise (according to current understanding of posmovedb
-                module's behavior) the data gets stored to the latest row.
         
         OUTPUTS:
             A status value is passed back from the posmovedb module.
@@ -1074,9 +1074,10 @@ class Petal(object):
             kwargs = {'input_list': valid_data,
                       'petal_id': self.petal_id,
                       'types': 'pos_move'}
-            if exposure_id and exposure_iter:
-                kwargs.update({'expid': exposure_id,
-                              'iteration': exposure_iter})
+            if self._exposure_id:
+                kwargs['expid'] = self._exposure_id
+            if self._exposure_iter:
+                kwargs['iteration'] = self._exposure_iter
             status = self.posmoveDB.UpdateDB(**kwargs)
         else:
             status = f'FAILED: no late data committed for petal {self.petal_id}'
