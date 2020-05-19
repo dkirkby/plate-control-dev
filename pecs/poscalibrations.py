@@ -357,7 +357,9 @@ class PosCalibrations(PECS):
         def gen_req(i):
             req = req_temp.copy()
             req['X1'], req['X2'] = targets[i][0], targets[i][1]
-            req['LOG_NOTE'][i] = self.decorate_note(f'extra point {i+1} of {len(targets)} for {self.data.mode}')
+            common_note = self.decorate_note(f'extra point {i+1} of {len(targets)} for {self.data.mode}')
+            for idx, row in req.iterrows():
+                req['LOG_NOTE'][idx] = common_note
             return req
 
         requests = [gen_req(i) for i in range(len(targets))]
