@@ -1027,14 +1027,12 @@ class Petal(object):
                 for state in self.altered_states:
                     state.clear_log_notes() # known minor issue: if local_log_on simultaneously with DB, this may clear the note field
         if mode == 'move':
-            # only allow writing local config and logs when not in sim mode
-            if not self.simulator_on:
-                if self.local_commit_on:
-                    for state in self.altered_states:
-                        state.write()  # this writes posstate to local config
-                if self.local_log_on:
-                    for state in self.altered_states:
-                        state.log_unit()  # this writes the local log
+            if self.local_commit_on:
+                for state in self.altered_states:
+                    state.write()  # this writes posstate to local config
+            if self.local_log_on:
+                for state in self.altered_states:
+                    state.log_unit()  # this writes the local log
             self.altered_states = set()
             if self.schedule_stats.is_enabled() and os.path.isdir(
                 self.sched_stats_dir):
