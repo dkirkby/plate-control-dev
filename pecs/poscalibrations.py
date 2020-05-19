@@ -194,14 +194,14 @@ class PosCalibrations(PECS):
             df = pd.concat(dfs).set_index('DEVICE_ID')
             common_note = self.decorate_note(f'arc calibration theta axis point {i+1} of {self.data.n_pts_T}')
             for idx, row in df.iterrows():
-                df['LOG_NOTE'][idx] = common_note
+                df.loc[idx,'LOG_NOTE'] = common_note
             req_list_T.append(df)
         for j in range(self.data.n_pts_P):
             dfs = [df[1][j] for df in ret.values()]
             df = pd.concat(dfs).set_index('DEVICE_ID')
             common_note = self.decorate_note(f'arc calibration phi axis point {i+1} of {self.data.n_pts_T}')
             for idx, row in df.iterrows():
-                df['LOG_NOTE'][idx] = common_note
+                df.loc[idx,'LOG_NOTE'] = common_note
             req_list_P.append(df)
         T_data = []  # move, measure
         for i, req in enumerate(req_list_T):
