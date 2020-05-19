@@ -5,8 +5,8 @@ import os
 import sys
 sys.path.append(os.path.abspath('../../petal/'))
 import petal
-import harness_constants as hc
 import posconstants as pc
+import harness_constants as hc
 import sequences
 import posstate
 import random
@@ -167,12 +167,13 @@ for pos_param_id, pos_params in pos_param_sequence.items():
             ptl.schedule_stats.add_note('MOVE_REQUESTS_ID: ' + str(move_requests_id))
         for n in range(n_corrections + 1):
             print(' move: ' + str(m) + ' of ' + str(mtot) + ', submove: ' + str(n))
+            log_note = f'harness move {m} submove {n}'
             requests = {}
             for loc_id,data in move_request_data.items():
                 if data['command'] == 'posXY': # handles older file format
                     data['command'] = 'poslocXY'
                 if loc_id in ptl.devices:
-                    requests[ptl.devices[loc_id]] = {'command':data['command'], 'target': [data['u'], data['v']]}
+                    requests[ptl.devices[loc_id]] = {'command':data['command'], 'target': [data['u'], data['v']], 'log_note':log_note}
                     u_header, v_header = make_xytest_column_headers(data['command'], loc_id)
                     exportable_targets[-1][u_header] = data['u']
                     exportable_targets[-1][v_header] = data['v']
@@ -182,6 +183,7 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                     request['command'] = 'poslocdXdY'
                     request['target'][0] = random.uniform(-max_correction_move,max_correction_move)
                     request['target'][1] = random.uniform(-max_correction_move,max_correction_move)
+                    request['log_note'] = log_note
                 anticollision = 'freeze'
             if should_profile:
                 hc.profile('ptl.request_targets(requests)')
