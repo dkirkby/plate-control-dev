@@ -259,7 +259,9 @@ class PosCalibrations(PECS):
         for i in range(npts):
             dfs = [dfs[i] for dfs in ret.values()]
             df = pd.concat(dfs).set_index('DEVICE_ID')
-            df['LOG_NOTE'] = self.decorate_note(f'grid calibration point {i+1} of {npts}')
+            common_note = self.decorate_note(f'grid calibration point {i+1} of {npts}')
+            for idx, row in df.iterrows():
+                df['LOG_NOTE'][idx] = common_note
             req_list.append(df)
         grid_data = []  # move, measure
         for i, request in enumerate(req_list):
@@ -355,7 +357,7 @@ class PosCalibrations(PECS):
         def gen_req(i):
             req = req_temp.copy()
             req['X1'], req['X2'] = targets[i][0], targets[i][1]
-            req['LOG_NOTE'] = self.decorate_note(f'extra point {i+1} of {len(targets)} for {self.data.mode}')
+            req['LOG_NOTE'][i] = self.decorate_note(f'extra point {i+1} of {len(targets)} for {self.data.mode}')
             return req
 
         requests = [gen_req(i) for i in range(len(targets))]
