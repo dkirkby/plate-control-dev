@@ -301,7 +301,7 @@ class PECS:
         '''Adds additional information to a positioner log note. The intended
         usage is to include important facts known only to PECS, when constructing
         the LOG_NOTE field that gets saved to the posmovedb.'''
-        log_note = pc.join_note(log_note, f'expid={self.exp.id}')
-        log_note = pc.join_note(log_note, f'use_desimeter={self.use_desimeter}')
+        log_note = pc.join_notes(log_note, f'expid={self.exp.id}')
+        log_note = pc.join_notes(log_note, f'use_desimeter={self.use_desimeter}')
         return log_note
         
