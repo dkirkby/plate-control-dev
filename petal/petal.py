@@ -1042,7 +1042,17 @@ class Petal(object):
                 for state in self.altered_calib_states:
                     state.write()
             self.altered_calib_states = set()
-            
+    
+    def _commit_pending(self, mode):
+        '''Returns boolean whether there is a pending commit for the argued
+        mode. Argument mode can be either 'move' or 'calib'.'''
+        if mode == 'move':
+            return len(self.altered_states) > 0
+        elif mode == 'calib':
+            return len(self.altered_calib_states) > 0
+        else:
+            self.printfunc(f'Error: mode {mode} not recognized in _commit_pending()')
+    
     def _late_commit(self, data):
         '''Commits "late" data to the posmovedb. There are several special
         fields for which this is possible, defined in the first line of this
