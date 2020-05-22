@@ -336,10 +336,8 @@ class PosCalibrations(PECS):
             n_points   ... grid will be spaced to include this many points
                            (in some cases a slightly)
         '''
-        self.logger.info('Performing one-point posintTP update before taking '
-                         'extra points for calibration verification...')
-        self.run_1p_calibration(tp_target=None, commit=True, partial=True)
         tgt_xy = xy_targets_generator.filled_circle(n_points=n_points, radius=max_radius)
+        self.logger.info(f'Starting run_extra_points(), with n_points={len(tgt_xy)} and max_radius={max_radius}')
         trans = PosTransforms(stateless=True)
         targets = []
         for poslocXY in tgt_xy:
