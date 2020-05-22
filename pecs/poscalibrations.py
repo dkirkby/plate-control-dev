@@ -27,7 +27,7 @@ class PosCalibrations(PECS):
     def __init__(self, mode, n_pts_TP=None, fvc=None, ptlm=None,
                  pcid=None, posids=None, interactive=False):
         # first determine what test we are running, set test params/cfg
-        n_pts_TP_default = {'arc': (6, 6), 'grid': (7, 5)}
+        n_pts_TP_default = {'arc': (12, 8), 'grid': (6, 6)}
         cfg = {'pcids': PECS().pcids, 'anticollision': None,
                'online_fitting': True, 'poslocP': 135, 'mode': mode}
         if mode in ['arc', 'grid']:
@@ -174,8 +174,10 @@ class PosCalibrations(PECS):
         self.fvc_collect()
         self.data.generate_data_products()
 
-    def run_arc_calibration(self):
-        '''err columns are interally tracked - measured'''
+    def run_arc_calibration(self, extra_pts_num=24, extra_pts_max_radius=3.3):
+        '''err columns are interally tracked - measured
+        if extra_pts_num==0, it is not performed.
+        '''
         # if interactive:
         #     commit = self._parse_yn(input(
         #                 'Automatically update calibration? (y/n): '))
@@ -225,7 +227,8 @@ class PosCalibrations(PECS):
             names=['axis', 'target_no', 'DEVICE_ID'])
         self.data.data_arc.to_pickle(
             os.path.join(self.data.dir, 'data_arc.pkl.gz'), compression='gzip')
-        self.run_extra_points()
+        if extra_pts_num:
+            self.run_extra_points(max_radius=extra_pts_max_radius, n_points=extra_pts_num)
         self.data.t_f = pc.now()
         self.set_schedule_stats(enabled=False)
         self.fvc_collect()
@@ -245,7 +248,9 @@ class PosCalibrations(PECS):
             print(e)
             self.data.dump_as_one_pickle()
 
-    def run_grid_calibration(self):
+    def run_grid_calibration(self, extra_pts_num=24, extra_pts_max_radius=3.3):
+        '''if extra_pts_num==0, it is not performed.
+        '''
         self.data.calib_old = self.collect_calib(self.posids)
         self.print(f'Running grid calibration, n_pts_T = {self.data.n_pts_T}, '
                    f'n_pts_P = {self.data.n_pts_P}, DB commit disabled')
@@ -270,7 +275,8 @@ class PosCalibrations(PECS):
                                         names=['target_no', 'DEVICE_ID'])
         self.data.data_grid.to_pickle(os.path.join(
             self.data.dir, 'data_grid.pkl.gz'), compression='gzip')
-        self.run_extra_points()
+        if extra_pts_num:
+            self.run_extra_points(max_radius=extra_pts_max_radius, n_points=extra_pts_num)
         self.data.t_f = pc.now()
         self.set_schedule_stats(enabled=False)
         self.fvc_collect()
