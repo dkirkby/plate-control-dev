@@ -27,7 +27,7 @@ class PosCalibrations(PECS):
     def __init__(self, mode, n_pts_TP=None, fvc=None, ptlm=None,
                  pcid=None, posids=None, interactive=False):
         # first determine what test we are running, set test params/cfg
-        n_pts_TP_default = {'arc': (12, 8), 'grid': (6, 6)}
+        n_pts_TP_default = {'arc': (12, 12), 'grid': (6, 6)}
         cfg = {'pcids': PECS().pcids, 'anticollision': None,
                'online_fitting': True, 'poslocP': 135, 'mode': mode}
         if mode in ['arc', 'grid']:

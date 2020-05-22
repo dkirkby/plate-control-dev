@@ -10,7 +10,7 @@ Requires running DOS instance. See pecs.py
 from poscalibrations import PosCalibrations
 import pandas as pd
 idx = pd.IndexSlice
-test = PosCalibrations('arc', n_pts_TP=(12, 8), interactive=True)
+test = PosCalibrations('arc', n_pts_TP=(12, 12), interactive=True)
 test.run_arc_calibration(extra_pts_num=24, extra_pts_max_radius=3.3)
 if hasattr(test.data, 'calibdf'):
     print(test.data.calibdf.loc[:, idx[:, [  # preview calibration updates
