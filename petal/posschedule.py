@@ -160,15 +160,15 @@ class PosSchedule(object):
 
         There are three options for anticollision behavior during scheduling:
 
-          None      ... No collisions are searched for. Expert use only.
+          None      ... Expert use only.
 
-          'freeze'  ... Collisions are searched for. If found, the colliding
-                        positioner is frozen at its original position. This
-                        setting is suitable for small correction moves.
+          'freeze'  ... If any collisions are found, the colliding positioner
+                        is frozen at its original position. This setting is
+                        suitable for small correction moves.
 
-          'adjust'  ... Collisions are searched for. If found, the motion paths
-                        of colliding positioners are adjusted to attempt to
-                        avoid each other. If this fails, the colliding positioner
+          'adjust'  ... If any collisions are found, the motion paths of the
+                        colliding positioners are adjusted to attempt to avoid
+                        each other. If this fails, the colliding positioner
                         is frozen at its original position. This setting is
                         suitable for gross retargeting moves.
 
@@ -198,7 +198,7 @@ class PosSchedule(object):
         final = self.stages['final']
         if anticollision:
             c, a, p = self._check_final_stage(msg_prefix='Penultimate')
-        elif self.stats.is_enabled() or self.petal.animator_on:
+        else:
             c, a, p = self._check_final_stage(msg_prefix='Final')
         colliding_sweeps, all_sweeps, collision_pairs = c, a, p # for readability
         if anticollision:
