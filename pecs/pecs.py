@@ -45,6 +45,9 @@ class PECS:
         self._pcid2role = lambda pcid: f'PETAL{pcid}'
         self._role2pcid = lambda role: int(role.replace('PETAL', ''))
         self.use_desimeter = False
+        self.match_to_positioner_centers = False
+        self.match_radius = 50
+        self.exptime = 1.
         pecs_local = ConfigObj(PECS_CONFIG_FILE, unrepr=True, encoding='utf-8')
         for attr in pecs_local.keys():
             setattr(self, attr, pecs_local[attr])
@@ -54,7 +57,9 @@ class PECS:
                 self.fvc = FVC_proxy_sim(max_err=0.0001)
             else:
                 self.fvc = FVC(self.pm_instrument, fvc_role=self.fvc_role,
-                               constants_version=self.constants_version,use_desimeter=self.use_desimeter)
+                               constants_version=self.constants_version,
+                               use_desimeter=self.use_desimeter,
+                               match_to_positioner_centers=self.match_to_positioner_centers)
             self.print(f"FVC proxy created for instrument: "
                        f"{self.fvc.get('instrument')}")
         else:
@@ -194,12 +199,15 @@ class PECS:
         except Exception as e:
             self.logger.info(f'ptlm.set_schedule_stats exception: {e}')
 
-    def fvc_measure(self, exppos=None, match_radius=50, matched_only=True):
+    def fvc_measure(self, exppos=None, match_radius=None, matched_only=True):
         '''use the expected positions given, or by default use internallly
         tracked current expected positions for fvc measurement
         returns expected_positions (df), measured_positions (df)
         (bot have DEVICE_ID as index and sorted) and
         matched_posids (set), unmatched_posids (set)'''
+
+        if match_radius is None :
+            match_radius = self.match_radius
         if exppos is None:
             # participating_petals=None gets responses from all
             # not just selected petals
