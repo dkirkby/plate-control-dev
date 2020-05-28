@@ -1070,7 +1070,7 @@ class Petal(object):
         OUTPUTS:
             A status value is passed back from the posmovedb module.
         '''
-        allowed_keys = pc.late_commit_keys
+        allowed_keys = pc.late_commit_defaults.keys()
         valid_posids = {p for p in data.keys() if p in self.posids}
         valid_data = []
         for posid in valid_posids:
