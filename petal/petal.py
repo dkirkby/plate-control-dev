@@ -1052,7 +1052,7 @@ class Petal(object):
             return len(self.altered_calib_states) > 0
         else:
             self.printfunc(f'Error: mode {mode} not recognized in _commit_pending()')
-    
+        
     def _late_commit(self, data):
         '''Commits "late" data to the posmovedb. There are several special
         fields for which this is possible, defined in the first line of this
@@ -1070,7 +1070,7 @@ class Petal(object):
         OUTPUTS:
             A status value is passed back from the posmovedb module.
         '''
-        allowed_keys = {'OBS_X', 'OBS_Y', 'PTL_X', 'PTL_Y', 'PTL_Z', 'FLAGS'}
+        allowed_keys = pc.late_commit_keys
         valid_posids = {p for p in data.keys() if p in self.posids}
         valid_data = []
         for posid in valid_posids:
@@ -1095,7 +1095,16 @@ class Petal(object):
                 status += ' (database commits are currently turned off)'
             elif self.simulator_on:
                 status += ' (because in simulation mode)'
+        self._clear_late_commit_data()
         return status
+    
+    def _clear_late_commit_data(self):
+        '''Clears special data fields associated with the "_late_commit"
+        function.
+        '''
+        for model in self.posmodels.values():
+            for key, value in pc.late_commit_defaults.items():
+                model.state.store(key, value)
 
     def _set_exposure_info(self, exposure_id, exposure_iter=None):
         '''Sets exposure identification values. These will be included in the

@@ -145,6 +145,14 @@ calib_keys.add('CLASSIFIED_AS_RETRACTED')
 def is_calib_key(key):
     return key.upper() in calib_keys
 
+# state data fields associated with "late" committing to database
+late_commit_defaults = {'OBS_X':None,
+                        'OBS_Y':None,
+                        'PTL_X':None,
+                        'PTL_Y':None,
+                        'PTL_Z':None,
+                        'FLAGS':None}
+
 # performance grade letters
 grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
 

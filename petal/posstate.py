@@ -409,13 +409,8 @@ class PosState(object):
                                               'CLASSIFIED_AS_RETRACTED':False,
                                               'EXPOSURE_ID':None,
                                               'EXPOSURE_ITER':None,
-                                              'FLAGS':None,
-                                              'OBS_X':None,
-                                              'OBS_Y':None,
-                                              'PTL_X':None,
-                                              'PTL_Y':None,
-                                              'PTL_Z':None,
                                               }
+            possible_new_keys_and_defaults.update(pc.late_commit_defaults)
         elif self.type == 'fid':
             possible_new_keys_and_defaults = {'LAST_MEAS_OBS_X':[],
                                               'LAST_MEAS_OBS_Y':[],
