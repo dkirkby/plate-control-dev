@@ -133,6 +133,15 @@ nominals['PHYSICAL_RANGE_P'] = {'value': 190.0, 'tol':   50.0}
 nominals['GEAR_CALIB_T']     = {'value':   1.0, 'tol':    0.05}
 nominals['GEAR_CALIB_P']     = {'value':   1.0, 'tol':    0.05}
 
+# Conservatively accessible angle ranges (intended to be valid for any basically
+# functional postioner, and for which a seed calibration is at least roughly known).
+# All angles in deg.
+conservative_min_posintP_extended = 10.0
+conservative_min_posintP_retracted = 120.0
+conservative_max_posintP = 170.0
+conservative_min_posintT = -170.0
+conservative_max_posintT = 170.0
+
 # keepout envelope expansion parameter keys
 keepout_expansion_keys = ['KEEPOUT_EXPANSION_PHI_RADIAL',
                           'KEEPOUT_EXPANSION_PHI_ANGULAR',
