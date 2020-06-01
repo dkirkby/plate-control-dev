@@ -1318,8 +1318,13 @@ class Petal(object):
         else:
             failed_send_dict = {self.canids_to_posids[canid]:canid for canid in failed_send_canids}
             failed_send_posids = {posid for posid in failed_send_dict.keys()}
-            self.printfunc(f'WARNING: {response_str}. Could not send {len(failed_send_canids)} ' +
-                           f'move tables to petalcontroller. Failed posid/canid pairs: {failed_send_dict}')
+            if len(failed_send_canids) > 0:
+                self.printfunc(f'WARNING: {response_str}. Could not send {len(failed_send_canids)} ' +
+                               f'move tables to petalcontroller. Failed posid/canid pairs: {failed_send_dict}')
+            else:
+                self.printfunc(f'ERROR: {response_str}. Could not send some unknown number of canids. ' +
+                               f'Most likely due petalcontroller not sending back information about which ' +
+                               f'positioners failed to communicate. Further downstream errors are likely.')
             canids_to_retry =  self._canids_where_tables_were_just_sent - failed_send_canids
             posids_to_retry = {self.canids_to_posids[canid] for canid in canids_to_retry}
             if self.schedule.expert_mode_is_on():
