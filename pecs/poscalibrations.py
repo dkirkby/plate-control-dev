@@ -301,33 +301,6 @@ class PosCalibrations(PECS):
         return {self._role2pcid(role): alignment
                 for role, alignment in self.ptlm.alignment.items()}
 
-    def move_measure(self, request, match_radius=50):
-        '''
-        Wrapper for often repeated moving and measuring sequence.
-        Returns data merged with request
-        '''
-        self.logger.info('Moving positioners...')
-        self.ptlm.prepare_move(request, anticollision=None)
-        self.ptlm.execute_move(reset_flags=False, control={'timeout': 120})
-        _, meapos, matched, _ = self.fvc_measure(
-            exppos=None, matched_only=True, match_radius=match_radius)
-        # meapos may contain not only matched but all posids in expected pos
-        matched_df = meapos.loc[sorted(matched & set(self.posids))]
-        merged = matched_df.merge(request, how='outer',
-                                  left_index=True, right_index=True)
-        merged.rename(columns={'X1': 'tgt_posintT', 'X2': 'tgt_posintP',
-                               'Q': 'mea_Q', 'S': 'mea_S', 'FLAGS': 'FLAG'},
-                      inplace=True)
-        mask = merged['FLAG'].notnull()
-        merged.loc[mask, 'STATUS'] = pc.decipher_posflags(
-            merged.loc[mask, 'FLAG'])
-        # get expected (tracked) posintTP angles
-        exppos = (self.ptlm.get_positions(return_coord='posintTP',
-                                          participating_petals=self.ptl_roles)
-                  .set_index('DEVICE_ID')[['X1', 'X2']])
-        exppos.rename(columns={'X1': 'posintT', 'X2': 'posintP'}, inplace=True)
-        return merged.join(exppos)
-
     def run_extra_points(self, max_radius=3.3, n_points=24):
         '''This function will move to and measure a grid of points, without
         any special calibration analysis performed. The purpose is to have an

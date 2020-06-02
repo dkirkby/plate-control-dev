@@ -30,15 +30,16 @@ class PECS:
     '''if there is already a PECS instance from which you want to re-use
        the proxies, simply pass in pecs.fvc and pecs.ptls
        
-    All available petal role names:     self.ptlm.Petals.keys()
-    All selected petals:                self.ptlm.participating_petals
-    Selected PCIDs:                     self.pcids from pecs_*.cfg
-    
-    For different hardware setups, you need to intialize including the
-    correct config file for that local setup. This will be stored in
-    fp_settings/hwsetups/ with a name like pecs_default.cfg or pecs_lbnl.cfg.
+        All available petal role names:     self.ptlm.Petals.keys()
+        All selected petals:                self.ptlm.participating_petals
+        Selected PCIDs:                     self.pcids from pecs_*.cfg
+        
+        For different hardware setups, you need to intialize including the
+        correct config file for that local setup. This will be stored in
+        fp_settings/hwsetups/ with a name like pecs_default.cfg or pecs_lbnl.cfg.
     '''
-    def __init__(self, fvc=None, ptlm=None, printfunc=print, interactive=None):
+    def __init__(self, fvc=None, ptlm=None, printfunc=print, interactive=None,
+                 test_name='PECS'):
         # Allow local config so scripts do not always have to collect roles
         # and names from the user. No check for illuminator at the moment
         # since it is not used in tests.
@@ -48,6 +49,9 @@ class PECS:
         self.match_to_positioner_centers = False
         self.match_radius = 50
         self.exptime = 1.
+        self.start_time = pc.now()
+        self.test_name = test_name
+
         pecs_local = ConfigObj(PECS_CONFIG_FILE, unrepr=True, encoding='utf-8')
         for attr in pecs_local.keys():
             setattr(self, attr, pecs_local[attr])
@@ -88,18 +92,32 @@ class PECS:
             self.interactive_ptl_setup()  # choose which petal to operate
         elif interactive is False:
             self.ptl_setup(self.pcids)  # use PCIDs specified in cfg
+        #Setup exposure ID last incase aborted doing the above
+        self._get_expid()
 
     def exp_setup(self):
+        '''
+        Temp function to setup fptestdata while PECS still has some integration with it
+        '''
         assert hasattr(self, 'data'), (
             'FPTestData must be initialised before calling exposure setup.')
-        self.exp = Exposure(readonly=False)
-        self.exp.sequence = 'Focalplane'
-        self.exp.program = self.data.test_name
-        self.exp.exptime = self.exptime
+        self.test_name = self.data.test_name
+        self.exp.program = self.test_name
         self.data.set_dirs(self.exp.id)
+        self.start_time = self.data.t_i
         self.fvc.save_centers = True
         # fvc centre jsons are written by non-msdos account, note access
         self.fvc.save_centers_path = self.data.dir
+
+    def _get_expid(self):
+        '''
+        Setup entry in exposureDB to get and exposure ID. 
+        '''
+        self.exp = Exposure(readonly=False)
+        self.exp.sequence = 'Focalplane'
+        self.exp.program = self.test_name
+        self.exp.exptime = self.exptime
+        self.iteration = 0
         self.print(f'DESI exposure ID set up as: {self.exp.id}')
 
     def print(self, msg):
@@ -199,7 +217,8 @@ class PECS:
         except Exception as e:
             self.logger.info(f'ptlm.set_schedule_stats exception: {e}')
 
-    def fvc_measure(self, exppos=None, match_radius=None, matched_only=True):
+    def fvc_measure(self, exppos=None, match_radius=None, matched_only=True,
+                    check_unmatched=False, test_tp=False):
         '''use the expected positions given, or by default use internallly
         tracked current expected positions for fvc measurement
         returns expected_positions (df), measured_positions (df)
@@ -249,7 +268,45 @@ class PECS:
         else:
             self.print(f'Missing {len(unmatched)} of expected backlit fibres:'
                        f'\n{sorted(unmatched)}')
+        #Call handle fvc feedback
+        self.ptlm.handle_fvc_feedback(meapos.reset_index(), check_unmatched=check_unmatched,
+                                      test_tp=test_tp, auto_update=True,
+                                      err_thresh=self.max_err, up_tol=self.tp_tol,
+                                      up_frac=self.tp_frac)
+        self.iteration += 1
         return exppos, meapos, matched, unmatched
+
+    def move_measure(self, request, match_radius=None, check_unmatched=False,
+                     test_tp=False):
+        '''
+        Wrapper for often repeated moving and measuring sequence.
+        Returns data merged with request
+        '''
+        self.print(f'Moving positioners... Exposure {self.exp.id}, iteration {self.iteration}')
+        self.ptlm.set_exposure_info(self.exp.id, self.iteration)
+        self.ptlm.prepare_move(request, anticollision=None)
+        self.ptlm.execute_move(reset_flags=False, control={'timeout': 120})
+        _, meapos, matched, _ = self.fvc_measure(
+            exppos=None, matched_only=True, match_radius=match_radius, 
+            check_unmatched=check_unmatched, test_tp=test_tp)
+        # meapos may contain not only matched but all posids in expected pos
+        matched_df = meapos.loc[sorted(matched & set(self.posids))]
+        merged = matched_df.merge(request, how='outer',
+                                  left_index=True, right_index=True)
+        merged.rename(columns={'X1': 'tgt_posintT', 'X2': 'tgt_posintP',
+                               'Q': 'mea_Q', 'S': 'mea_S', 'FLAGS': 'FLAG'},
+                      inplace=True)
+        mask = merged['FLAG'].notnull()
+        merged.loc[mask, 'STATUS'] = pc.decipher_posflags(
+            merged.loc[mask, 'FLAG'])
+        # get expected (tracked) posintTP angles
+        exppos = (self.ptlm.get_positions(return_coord='posintTP',
+                                          participating_petals=self.ptl_roles)
+                  .set_index('DEVICE_ID')[['X1', 'X2']])
+        exppos.rename(columns={'X1': 'posintT', 'X2': 'posintP'}, inplace=True)
+        #cleanup
+        self.ptlm.clear_exposure_info()
+        return merged.join(exppos)
 
     def home_adc(self):
         try:
@@ -263,7 +320,7 @@ class PECS:
 
     def fvc_collect(self):
         destination = os.path.join(
-            '/exposures/desi', pc.dir_date_str(t=self.data.t_i),
+            '/exposures/desi', pc.dir_date_str(t=self.start_time),
             f'{self.exp.id:08}')
         # os.makedirs(destination, exist_ok=True)  # no permission anyway
         try:
