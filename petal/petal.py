@@ -1003,9 +1003,12 @@ class Petal(object):
         if mode == 'move':
             type1, type2 = 'pos_move', 'fid_data'
             states = self.altered_states
-            if log_note:
-                for state in states:
+            this_posids = set()
+            for state in states:
+                if log_note:
                     state.append_log_note(log_note)
+                if state.type == 'pos':
+                    this_posids.add(state.unit_id)
         elif mode == 'calib':
             type1, type2 = 'pos_calib', 'fid_calib'
             states = self.altered_calib_states
@@ -1026,6 +1029,14 @@ class Petal(object):
             if mode == 'move':
                 for state in self.altered_states:
                     state.clear_log_notes() # known minor issue: if local_log_on simultaneously with DB, this may clear the note field
+                # Only worry about repeat commits if expid/iter are assigned.
+                if (self._exposure_id is not None) and (self._exposure_iter is not None):
+                    # warn about multiple rows for one expid/iter pair
+                    if this_posids&self._devids_committed_this_exposure:
+                        self.printfunc(f'WARNING: device_ids {this_posids&self._devids_committed_this_exposure}'+
+                                       f' recieved multiple posDB entries for expid {self._exposure_id},' + 
+                                       f' iteration {self._exposure_iter}.')
+                    self._devids_committed_this_exposure |= this_posids
         if mode == 'move':
             if self.local_commit_on:
                 for state in self.altered_states:
@@ -1073,20 +1084,30 @@ class Petal(object):
         allowed_keys = pc.late_commit_defaults.keys()
         valid_posids = {p for p in data.keys() if p in self.posids}
         valid_data = []
+        new_commit = {}
         for posid in valid_posids:
-            this_data = {k:v for k,v in data[posid].items() if k in allowed_keys}
-            if this_data:
-                this_data['POS_ID'] = posid
-                valid_data.append(this_data)
-        if valid_data and self.db_commit_on and not self.simulator_on:
-            kwargs = {'input_list': valid_data,
-                      'petal_id': self.petal_id,
-                      'types': 'pos_move'}
-            if self._exposure_id:
-                kwargs['expid'] = self._exposure_id
-            if self._exposure_iter:
-                kwargs['iteration'] = self._exposure_iter
-            status = self.posmoveDB.UpdateDB(**kwargs)
+            if posid in self._devids_committed_this_exposure: 
+                this_data = {k:v for k,v in data[posid].items() if k in allowed_keys}
+                if this_data:
+                    this_data['POS_ID'] = posid
+                    valid_data.append(this_data)
+            else:
+                new_commit[posid] = {k:v for k,v in data[posid].items() if k in allowed_keys}
+        if (valid_data or new_commit) and self.db_commit_on and not self.simulator_on:
+            if valid_data:
+                kwargs = {'input_list': valid_data,
+                          'petal_id': self.petal_id,
+                          'types': 'pos_move'}
+                if self._exposure_id:
+                    kwargs['expid'] = self._exposure_id
+                if self._exposure_iter:
+                    kwargs['iteration'] = self._exposure_iter
+                status = self.posmoveDB.UpdateDB(**kwargs)
+            if new_commit:
+                for posid,subdict in new_commit.items():
+                    for k,v in subdict.items():
+                        self.set_posfid_val(posid, k, v)
+                self.commit(mode='move', log_note='late_commit new row')
         else:
             status = f'FAILED: no late data committed for petal {self.petal_id}'
             if not valid_data:
@@ -1113,6 +1134,7 @@ class Petal(object):
         '''
         self._exposure_id = exposure_id
         self._exposure_iter = exposure_iter
+        self._devids_committed_this_exposure = set()
         
     def _clear_exposure_info(self):
         '''Clears exposure identification values. C.f. _set_exposure_info().
@@ -1398,7 +1420,8 @@ class Petal(object):
                   }
         for key in resets:
             for posid in self.posids:
-                self.set_posfid_val(posid, key, resets[key])
+                # Set through state.store to avoid triggering another commit
+                self.states[posid].store(key, resets[key])
 
     def _new_schedule(self):
         """Generate up a new, clear schedule instance.
@@ -1609,6 +1632,7 @@ class Petal(object):
         for posmodel in self.posmodels.values(): #Clean up posmodel and posstate
             posmodel.clear_postmove_cleanup_cmds_without_executing()
         self._clear_temporary_state_values()
+        self._clear_exposure_info() #Get rid of lingering exposure details
         self.commit(mode='both', log_note='configuring') #commit uncommitted changes to DB
         self.schedule = self._new_schedule() # Refresh schedule so it has no tables
         return 'SUCCESS'
