@@ -81,6 +81,7 @@ class PosCalibrations(PECS):
                    f'commit = {commit}')
         rows = []
         log_note = self.decorate_note(f'{self.data.mode}')
+        self.ptlm.set_exposure_info(self.exp.id, self.iteration)
         if do_move:  # then build requests and make the moves
             for posid in self.posids:
                 role = self.ptl_role_lookup(posid)
@@ -101,6 +102,7 @@ class PosCalibrations(PECS):
             req = req[req['DEVICE_ID'].isin(self.posids)]
         exppos, meapos, matched, unmatched = self.fvc_measure(
                 match_radius=self.match_radius)
+        self.ptlm.clear_exposure_info()
         used_pos = meapos.loc[sorted(matched & (set(self.posids)))]
         unused_pos = exppos.loc[sorted(unmatched & (set(self.posids)))]
         if len(used_pos) == 0:  # at least got some positioners back, update

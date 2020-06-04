@@ -45,8 +45,10 @@ class RehomeVerify(PECS):
             raise Exception('Expected positions of positioners by PetalApp '
                             'are contaminated by fiducials.')
         self.printfunc('Taking FVC exposure to confirm home positions...')
+        self.ptlm.set_exposure_info(self.exp.id, self.iteration)
         exppos, meapos, matched, unmatched = self.fvc_measure(exppos=exppos,
                                                               match_radius=50)
+        self.ptlm.clear_exposure_info()
         unmatched = unmatched & (set(self.posids))
         matched = matched & (set(self.posids))
         if len(unmatched) > 0:
