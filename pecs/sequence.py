@@ -118,7 +118,7 @@ class TestSequence(object):
         '''Saves an ecsv file representing the sequence to directory/basename.ecsv
         '''
         path = os.path.join(directory, basename + '.ecsv')
-        self.table.write(path, overwrite=True)
+        self.table.write(path, overwrite=True, delimiter=',')
     
     def non_default_pos_settings(self, row_index):
         '''Return dict containing only those fields for which the given row
