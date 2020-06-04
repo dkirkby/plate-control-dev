@@ -994,64 +994,79 @@ class Petal(object):
         """
         return self.comm.pbget(key)
 
-    def commit(self, mode='move', log_note='', *args, **kwargs):
+    def commit(self, mode='move', log_note=''):
         '''Commit move data or calibration data to DB and/or local config and
         log files. A note string may optionally be included to go along with
         this entry. mode can be: 'move', 'calib', 'both'
         '''
-        # set up type names to write to DB as well as log for move data only
-        if mode == 'move':
-            type1, type2 = 'pos_move', 'fid_data'
-            states = self.altered_states
-            this_posids = set()
-            for state in states:
-                if log_note:
-                    state.append_log_note(log_note)
-                if state.type == 'pos':
-                    this_posids.add(state.unit_id)
-        elif mode == 'calib':
-            type1, type2 = 'pos_calib', 'fid_calib'
-            states = self.altered_calib_states
-        elif mode == 'both':
-            self.commit(mode='move', log_note=log_note)
-            self.commit(mode='calib')
+        if mode == 'both':
+            self._commit(mode='move', log_note=log_note)
+            self._commit(mode='calib')
             return
-        if self.db_commit_on and not self.simulator_on:  # write to DB
-            pos_commit_list = [st for st in states if st.type == 'pos']
-            fid_commit_list = [st for st in states if st.type == 'fid']
-            if len(pos_commit_list) > 0:
-                for state in pos_commit_list:
-                    state.store('EXPOSURE_ID', self._exposure_id)
-                    state.store('EXPOSURE_ITER', self._exposure_iter)
-                self.posmoveDB.WriteToDB(pos_commit_list, self.petal_id, type1)
-            if len(fid_commit_list) > 0:
-                self.posmoveDB.WriteToDB(fid_commit_list, self.petal_id, type2)
-            if mode == 'move':
-                for state in self.altered_states:
-                    state.clear_log_notes() # known minor issue: if local_log_on simultaneously with DB, this may clear the note field
-                if self._currently_in_an_exposure():
-                    overlapping_commits = this_posids & self._devids_committed_this_exposure
-                    if overlapping_commits:
-                        self.printfunc(f'WARNING: device_ids {overlapping_commits} received multiple posDB ' +
-                                       f'commit requests for expid {self._exposure_id}, iteration ' +
-                                       f'{self._exposure_iter}. These have the potential to overwrite data.')
-                    self._devids_committed_this_exposure |= this_posids
+        if not self._commit_pending(mode):
+            return
+        if mode not in {'move', 'calib'}:
+            self.printfunc(f'Error: mode {mode} not recognized in commit()')
+            return
+        self._commit(mode, log_note=log_note)
+
+    def _commit(self, mode, log_note):
+        '''Underlying implemetation for commit().'''
         if mode == 'move':
-            if self.local_commit_on:
-                for state in self.altered_states:
-                    state.write()  # this writes posstate to local config
-            if self.local_log_on:
-                for state in self.altered_states:
-                    state.log_unit()  # this writes the local log
+            states = self.altered_states
+            if log_note:
+                for state in states:
+                    state.append_log_note(log_note)
+        elif mode == 'calib':
+            states = self.altered_calib_states
+        self._send_to_db_as_necessary(states, mode)
+        self._write_local_logs_as_necessary(states)
+        if mode == 'move':
             self.altered_states = set()
             if self.schedule_stats.is_enabled() and os.path.isdir(
                 self.sched_stats_dir):
                 self.schedule_stats.save(path=self.sched_stats_path, mode='a')
         elif mode == 'calib':
-            if self.local_commit_on:
-                for state in self.altered_calib_states:
-                    state.write()
             self.altered_calib_states = set()
+
+    def _send_to_db_as_necessary(self, states, mode):
+        '''Saves state data to posmove database, if that behavior is currently
+        turned on.
+        '''
+        if not self.db_commit_on or self.simulator_on:
+            return
+        if mode == 'move':
+            type1, type2 = 'pos_move', 'fid_data'
+        elif mode == 'calib':
+            type1, type2 = 'pos_calib', 'fid_calib'
+        pos_commit_list = [st for st in states if st.type == 'pos']
+        fid_commit_list = [st for st in states if st.type == 'fid']
+        if len(pos_commit_list) > 0:
+            for state in pos_commit_list:
+                state.store('EXPOSURE_ID', self._exposure_id)
+                state.store('EXPOSURE_ITER', self._exposure_iter)
+            self.posmoveDB.WriteToDB(pos_commit_list, self.petal_id, type1)
+        if len(fid_commit_list) > 0:
+            self.posmoveDB.WriteToDB(fid_commit_list, self.petal_id, type2)
+        if mode == 'move':
+            for state in self.altered_states:
+                state.clear_log_notes() # known minor issue: if local_log_on simultaneously with DB, this may clear the note field
+            if self._currently_in_an_exposure():
+                committed_posids = {state.unit_id for state in pos_commit_list}
+                overlapping_commits = committed_posids & self._devids_committed_this_exposure
+                if overlapping_commits:
+                    self.printfunc(f'WARNING: device_ids {overlapping_commits} received multiple posDB ' +
+                                   f'commit requests for expid {self._exposure_id}, iteration ' +
+                                   f'{self._exposure_iter}. These have the potential to overwrite data.')
+                self._devids_committed_this_exposure |= committed_posids
+            
+    def _write_local_logs_as_necessary(self, states):
+        '''Saves state data to disk, if those behaviors are currently turned on.'''
+        for state in states:
+            if self.local_commit_on:
+                state.write()
+            if self.local_log_on:
+                state.log_unit()
     
     def _commit_pending(self, mode):
         '''Returns boolean whether there is a pending commit for the argued
