@@ -188,8 +188,7 @@ class Petal(object):
         self.schedule_stats = posschedstats.PosSchedStats(enabled=sched_stats_on)
         self.sched_stats_dir = os.path.join(pc.dirs['kpno'], pc.dir_date_str())
         sched_stats_filename = f'PTL{self.petal_id:02}-pos_schedule_stats.csv'
-        self.sched_stats_path = os.path.join(self.sched_stats_dir,
-                                             sched_stats_filename)
+        self.sched_stats_path = os.path.join(self.sched_stats_dir, sched_stats_filename)
 
         # must call the following 3 methods whenever petal alingment changes
         self.init_ptltrans()
@@ -1001,17 +1000,17 @@ class Petal(object):
         '''
         if mode == 'both':
             self._commit(mode='move', log_note=log_note)
-            self._commit(mode='calib')
+            self._commit(mode='calib', log_note=log_note)
             return
-        if not self._commit_pending(mode):
-            return
-        if mode not in {'move', 'calib'}:
+        elif mode not in {'move', 'calib'}:
             self.printfunc(f'Error: mode {mode} not recognized in commit()')
             return
-        self._commit(mode, log_note=log_note)
+        self._commit(mode=mode, log_note=log_note)
 
     def _commit(self, mode, log_note):
         '''Underlying implemetation for commit().'''
+        if not self._commit_pending(mode):
+            return
         if mode == 'move':
             states = self.altered_states
             if log_note:
@@ -1019,12 +1018,13 @@ class Petal(object):
                     state.append_log_note(log_note)
         elif mode == 'calib':
             states = self.altered_calib_states
+            # As of 2020-06-04, no field exists in calib db for log_notes,
+            # hence they are ignored in this case.
         self._send_to_db_as_necessary(states, mode)
         self._write_local_logs_as_necessary(states)
         if mode == 'move':
             self.altered_states = set()
-            if self.schedule_stats.is_enabled() and os.path.isdir(
-                self.sched_stats_dir):
+            if self.schedule_stats.is_enabled():
                 self.schedule_stats.save(path=self.sched_stats_path, mode='a')
         elif mode == 'calib':
             self.altered_calib_states = set()
