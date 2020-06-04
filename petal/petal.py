@@ -1029,13 +1029,12 @@ class Petal(object):
             if mode == 'move':
                 for state in self.altered_states:
                     state.clear_log_notes() # known minor issue: if local_log_on simultaneously with DB, this may clear the note field
-                # Only worry about repeat commits if expid/iter are assigned.
-                if (self._exposure_id is not None) and (self._exposure_iter is not None):
-                    # warn about multiple rows for one expid/iter pair
-                    if this_posids&self._devids_committed_this_exposure:
-                        self.printfunc(f'WARNING: device_ids {this_posids&self._devids_committed_this_exposure}'+
-                                       f' recieved multiple posDB entries for expid {self._exposure_id},' + 
-                                       f' iteration {self._exposure_iter}.')
+                if self._currently_in_an_exposure():
+                    overlapping_commits = this_posids & self._devids_committed_this_exposure
+                    if overlapping_commits:
+                        self.printfunc(f'WARNING: device_ids {overlapping_commits} received multiple posDB ' +
+                                       f'commit requests for expid {self._exposure_id}, iteration ' +
+                                       f'{self._exposure_iter}. These have the potential to overwrite data.')
                     self._devids_committed_this_exposure |= this_posids
         if mode == 'move':
             if self.local_commit_on:
@@ -1140,6 +1139,12 @@ class Petal(object):
         '''Clears exposure identification values. C.f. _set_exposure_info().
         '''
         self._set_exposure_info(exposure_id=None, exposure_iter=None)
+    
+    def _currently_in_an_exposure(self):
+        '''Returns boolean whether the the petal understands that we are
+        currently in the process of an exposure.
+        '''
+        return (self._exposure_id is not None) and (self._exposure_iter is not None)
 
     def expected_current_position(self, posid, key):
         """Retrieve the current position, for a positioner identied by posid,
