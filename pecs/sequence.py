@@ -54,6 +54,17 @@ valid_commands = {'QS', 'dQdS',
 import os
 from astropy.table import Table
 
+        
+def read(path):
+    '''Read in a saved TestSequence from a file. E.g.
+        sequence = TestSequence.read(path)
+    '''
+    table = Table.read(path)
+    sequence = TestSequence(short_name=table.meta['short_name'],
+                            long_name=table.meta['long_name'])
+    sequence.table = table
+    return sequence
+
 class TestSequence(object):
     '''Iterable structure that defines a positioner test, as a sequence of Move instances.
     
@@ -61,6 +72,8 @@ class TestSequence(object):
         long_name  ... string, optional longer descriptive name for the test
         
     After initialization, populate the sequence using the "add_move" function.
+    
+    
     '''
     def __init__(self, short_name, long_name=''):
         names = [key for key in col_defaults.keys()]
