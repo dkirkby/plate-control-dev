@@ -1123,9 +1123,9 @@ class Petal(object):
             kwargs = {'input_list': data_for_existing_rows,
                       'petal_id': self.petal_id,
                       'types': 'pos_move'}
-            if self._exposure_id:
+            if self._exposure_id is not None:
                 kwargs['expid'] = self._exposure_id
-            if self._exposure_iter:
+            if self._exposure_iter is not None:
                 kwargs['iteration'] = self._exposure_iter
             status = self.posmoveDB.UpdateDB(**kwargs)
         if data_for_new_rows:
