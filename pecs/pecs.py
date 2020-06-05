@@ -268,7 +268,7 @@ class PECS:
         else:
             self.print(f'Missing {len(unmatched)} of expected backlit fibres:'
                        f'\n{sorted(unmatched)}')
-        fvc_data = pd.concact([meapos,
+        fvc_data = pd.concat([meapos,
                     exppos[exppos.index.isin(meapos.index)][['PETAL_LOC','DEVICE_LOC']]],
                     axis=1)
         #Call handle fvc feedback
