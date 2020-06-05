@@ -1102,7 +1102,7 @@ class Petal(object):
                      valid subdict keys are defined in first line of function
         
         OUTPUTS:
-            A status value is passed back from the posmovedb module.
+            No outputs
         '''
         if not self.db_commit_on or self.simulator_on:
             return
@@ -1127,7 +1127,7 @@ class Petal(object):
                 kwargs['expid'] = self._exposure_id
             if self._exposure_iter is not None:
                 kwargs['iteration'] = self._exposure_iter
-            status = self.posmoveDB.UpdateDB(**kwargs)
+            self.posmoveDB.UpdateDB(**kwargs)
         if data_for_new_rows:
             for posid, subdict in data_for_new_rows.items():
                 log_note = 'Stored new:'
@@ -1136,16 +1136,7 @@ class Petal(object):
                     log_note += f' {key}'
                 self.set_posfid_val(posid, 'LOG_NOTE', log_note)
             self._commit(mode='move', log_note='')  # no need for extra log note info
-        else:
-            status = f'FAILED: no late data committed for petal {self.petal_id}'
-            if not data_for_existing_rows or data_for_new_rows:
-                status += ' (no valid data supplied)'
-            elif not self.db_commit_on:
-                status += ' (database commits are currently turned off)'
-            elif self.simulator_on:
-                status += ' (because in simulation mode)'
         self._clear_late_commit_data()
-        return status
     
     def _clear_late_commit_data(self):
         '''Clears special data fields associated with the "_late_commit"
