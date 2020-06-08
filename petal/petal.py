@@ -1425,9 +1425,8 @@ class Petal(object):
             self.pos_flags[posid] |= self.comm_error_bit
             if auto_disabling_on:
                 self.set_posfid_val(posid, 'CTRL_ENABLED', False)
-        self.commit(mode='move', log_note='Disabled due to communication error')
-        return
-
+                self.set_posfid_val(posid, 'LOG_NOTE', 'Disabled due to communication error')
+        self.commit(mode='move')
 
     def _check_and_disable_nonresponsive_pos_and_fid(self, auto_disabling_on=False):
         """Asks petalcomm for a list of what canids are nonresponsive, and then
@@ -1436,7 +1435,7 @@ class Petal(object):
         As of 12/04/2019 positioners will not be disabled automatically. No
         moves are performed and we are welcome to try again. Disabling is done
         by hand. As of 2020-04-27 this can be overridden by arguing
-        should_auto_disable=True.
+        auto_disabling_on=True.
 
         08/06/2020 - kfanning - pbget non_responsives has been a dead feature in
         petalcontroller.py for many months. Perhaps depricate this function?
@@ -1468,10 +1467,9 @@ class Petal(object):
                   'MOVE_VAL1' : '',
                   'MOVE_VAL2' : '',
                   }
-        for key in resets:
-            for posid in self.posids:
-                # Set through state.store to avoid triggering another commit
-                self.states[posid].store(key, resets[key])
+        for posid in self.posids:
+            for key in resets:
+                self.states[posid].store(key, resets[key])  # Set through state.store to avoid triggering another commit
 
     def _new_schedule(self):
         """Generate up a new, clear schedule instance.
