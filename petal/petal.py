@@ -1385,6 +1385,8 @@ class Petal(object):
             self.printfunc('Canceling move. Tracking data in petal.py will be reset, and a command will be ' +
                            'sent to petalcontroller, asking it to clear any existing tables from positioners.')
             self._cancel_move(reset_flags='all', clear_sent_tables=True)
+            # set flags and disable nonresponsiives after canceling to so that the moves will not be committed.
+            self._handle_nonresponsive_positioners(failed_send_posids, auto_disabling_on=True)
             if n_retries > 0:
                 self.printfunc(f'Attempting to reschedule and resend move tables to {len(posids_to_retry)} ' +
                                f'positioners (num tries remaining = {n_retries})')
@@ -1405,7 +1407,22 @@ class Petal(object):
             else:
                 self.printfunc(f'WARNING: Number of retries remaining == {n_retries}, despite still having ' +
                                f'failures when sending move tables to positioners. The move will not be performed.') 
-        return failed_send_posids      
+        return failed_send_posids
+
+    def _handle_nonresponsive_positioners(self, posids, auto_disabling_on=True):
+        """Recives a list of positioners that the petalcontroller reports it
+        could not send move tables to. Sets communication error flag.
+
+        Optionally automatically disables positioners to remove them from
+        future send_move_tables attempts.
+        """
+        for posid in posids:
+            self.pos_flags[posid] |= self.comm_error_bit
+            if auto_disabling_on:
+                self.set_posfid_val(posid, 'CTRL_ENABLED', False)
+        self.commit(mode='move', log_note='Disabled due to communication error')
+        return
+
 
     def _check_and_disable_nonresponsive_pos_and_fid(self, auto_disabling_on=False):
         """Asks petalcomm for a list of what canids are nonresponsive, and then
@@ -1415,6 +1432,9 @@ class Petal(object):
         moves are performed and we are welcome to try again. Disabling is done
         by hand. As of 2020-04-27 this can be overridden by arguing
         should_auto_disable=True.
+
+        08/06/2020 - kfanning - pbget non_responsives has been a dead feature in
+        petalcontroller.py for many months. Perhaps depricate this function?
         """
         if self.simulator_on:
             pass
