@@ -151,7 +151,7 @@ class Petal(object):
         self.petal_id = int(petal_id)
         self.shape = shape
         self._last_state = None
-        self._canids_where_tables_were_just_sent = set()
+        self._posids_where_tables_were_just_sent = set()
         self._set_exposure_info(exposure_id=None, exposure_iter=None)
         if fidids in ['',[''],{''}]: # check included to handle simulation cases, where no fidids argued
             fidids = {}
@@ -302,6 +302,7 @@ class Petal(object):
         self.canids = {posid:self.posmodels[posid].canid for posid in self.posids}
         self.busids = {posid:self.posmodels[posid].busid for posid in self.posids}
         self.canids_to_posids = {canid:posid for posid,canid in self.canids.items()}
+        self.buscan_to_posids = {(self.busids[posid], self.canids[posid]): posid for posid in self.posids}
         self.nonresponsive_canids = set()
         # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start
         # positioners
@@ -608,20 +609,20 @@ class Petal(object):
         self.printfunc('send_move_tables called')
         hw_tables = self._hardware_ready_move_tables()
         for tbl in hw_tables:
-            self._canids_where_tables_were_just_sent.add(tbl['canid'])
+            self._posids_where_tables_were_just_sent.add(tbl['posid'])
         if self.simulator_on:
             sim_fail = random.random() <= self.sim_fail_freq['send_tables']
             if sim_fail:
-                commanded_canids = [table['canid'] for table in hw_tables]
-                num_fail = random.randint(1, len(commanded_canids))
-                sim_fail_canids = set(random.choices(commanded_canids, k=num_fail))
-                response = 'FAILED', sim_fail_canids
+                commanded_posids = [table['posid'] for table in hw_tables]
+                num_fail = random.randint(1, len(commanded_posids))
+                sim_fail_posids = set(random.choices(commanded_posids, k=num_fail))
+                response = 'FAILED', sim_fail_posids
             else:
                 response = 'SUCCESS'
             if self.verbose:
                 self.printfunc('Simulator skips sending move tables to positioners.')
         else:
-            self._wait_while_moving() # note how this needs to be preceded by adding positioners to _canids_where_tables_were_just_sent, so that the wait function can await the correct devices
+            self._wait_while_moving() # note how this needs to be preceded by adding positioners to _posids_where_tables_were_just_sent, so that the wait function can await the correct devices
             response = self.comm.send_tables(hw_tables)
         failed_posids = self._handle_any_failed_send_of_move_tables(response, n_retries)
         if n_retries == 0 or not failed_posids:
@@ -665,7 +666,7 @@ class Petal(object):
             self.comm.execute_sync(self.sync_mode)
             self._postmove_cleanup()
             self._wait_while_moving()
-        self._remove_canid_from_sent_tables('all')
+        self._remove_posid_from_sent_tables('all')
         self.printfunc('execute_moves: Done')
 
     def schedule_send_and_execute_moves(self, anticollision='default', should_anneal=True):
@@ -1259,7 +1260,9 @@ class Petal(object):
 
             The dictionary has the following fields:
 
+                posid          ... string                    ... identifies the positioner by 'POS_ID'                
                 canid          ... unsigned integer          ... identifies the positioner by 'CAN_ID'
+                busid          ... string                    ... identified teh canbus the positioner is on
                 nrows          ... unsigned integer          ... number of elements in each of the list fields (i.e. number of rows of the move table)
                 motor_steps_T  ... list of signed integers   ... number of motor steps to rotate on theta axis
                                                                     ... motor_steps_T > 0 ... ccw rotation
@@ -1285,7 +1288,7 @@ class Petal(object):
         """
         self._check_and_disable_nonresponsive_pos_and_fid()
         for m in self.schedule.move_tables.values():
-            if m.posmodel.canid in self._canids_where_tables_were_just_sent:
+            if m.posmodel.posid in self._posids_where_tables_were_just_sent:
                 m.posmodel.postmove_cleanup(m.for_cleanup())
                 self.altered_states.add(m.posmodel.state)
             else:
@@ -1316,7 +1319,7 @@ class Petal(object):
             enabled_only = reset_flags != 'all'
             self._initialize_pos_flags(ids='all', enabled_only=enabled_only)
         if clear_sent_tables:
-            self._remove_canid_from_sent_tables('all')
+            self._remove_posid_from_sent_tables('all')
             if self.simulator_on:
                 if self.verbose:
                     self.printfunc('Simulator skips sending command to clear move tables from positioners.')
@@ -1333,7 +1336,7 @@ class Petal(object):
         if self.animator_on:
             self.animator.clear_after(time=self.previous_animator_total_time)
             self.animator_total_time = self.previous_animator_total_time
-        
+    
     def _handle_any_failed_send_of_move_tables(self, response, n_retries):
         '''Inspects response from petalcontroller after attempt to send move
         tables to hardware.
@@ -1354,26 +1357,28 @@ class Petal(object):
         upon each retargeting. Consensus with the larger team would be wanted
         prior to including any such auto-disabling feature here.
         '''
-        if isinstance(response, tuple):  # 2020-04-27 conditional here is to support past and future implementations of petalcontroller
+        failed_send_posids = set()
+        if isinstance(response, tuple):  # conditional here is to support earlier implementations of petalcontroller (pre v4.18)
             response_str = response[0]
-            failed_send_canids = set(response[1])  # 2020-04-27 this awaits implementation in petalcontroller per Trac ticket #513
+            failed_send_buscanids = response[1]
+            for busid, canids in failed_send_buscanids.items():
+                buscan_combo_keys = {(busid, canid) for canid in canids}
+                failed_send_posids |= {self.buscan_to_posids[key] for key in buscan_combo_keys}            
         else:
             response_str = response
-            failed_send_canids = set() # no other assumption possible, because unknown
-        if response_str == 'SUCCESS':
-            failed_send_posids = {}
-        else:
-            failed_send_dict = {self.canids_to_posids[canid]:canid for canid in failed_send_canids}
-            failed_send_posids = {posid for posid in failed_send_dict.keys()}
-            if len(failed_send_canids) > 0:
-                self.printfunc(f'WARNING: {response_str}. Could not send {len(failed_send_canids)} ' +
-                               f'move tables to petalcontroller. Failed posid/canid pairs: {failed_send_dict}')
+        failed = response_str.upper().find('FAILED') != 0  # petalcomm.py interface specifies that this keyword would be found as first token of response string, in failure case
+        failed |= len(failed_send_posids) > 0  # backup check, in case some formatting inconsistency in response string
+        if failed:
+            if len(failed_send_posids) > 0:
+                buses_with_fails = {self.busids[posid] for posid in failed_send_posids}
+                self.printfunc(f'WARNING: {response_str}. Could not send {len(failed_send_posids)} ' +
+                               f'move tables to petalcontroller. Failed posids: {failed_send_posids}. ' +
+                               f'CAN busids with failures: {buses_with_fails}.')
             else:
                 self.printfunc(f'ERROR: {response_str}. Could not send some unknown number of canids. ' +
                                f'Most likely due petalcontroller not sending back information about which ' +
                                f'positioners failed to communicate. Further downstream errors are likely.')
-            canids_to_retry =  self._canids_where_tables_were_just_sent - failed_send_canids
-            posids_to_retry = {self.canids_to_posids[canid] for canid in canids_to_retry}
+            posids_to_retry =  self._posids_where_tables_were_just_sent - failed_send_posids
             if self.schedule.expert_mode_is_on():
                 expert_mode = True
                 all_tables = self.schedule.get_orig_expert_tables_sequence()
@@ -1670,7 +1675,7 @@ class Petal(object):
                 for fid in self.fidids:
                     self.set_posfid_val(fid, 'DUTY_STATE', 0)
         #Reset values
-        self._remove_canid_from_sent_tables('all')
+        self._remove_posid_from_sent_tables('all')
         self.nonresponsive_canids = set()
         self._initialize_pos_flags() # Reset posflags
         self._apply_state_enable_settings()
@@ -1682,16 +1687,16 @@ class Petal(object):
         self.schedule = self._new_schedule() # Refresh schedule so it has no tables
         return 'SUCCESS'
 
-    def _remove_canid_from_sent_tables(self, canid):
+    def _remove_posid_from_sent_tables(self, posid):
         """There is an internal list in petal.py of which positioners have had
         move tables actually sent out to hardware. This function removes a
-        positioner (identified by canid) from the list. You can also argue
-        canid='all', in which case the whole list will get cleared.
+        positioner (identified by posid) from the list. You can also argue
+        posid='all', in which case the whole list will get cleared.
         """
-        if canid == 'all':
-            self._canids_where_tables_were_just_sent = set()         
-        elif canid in self._canids_where_tables_were_just_sent:
-            self._canids_where_tables_were_just_sent.remove(canid)
+        if posid == 'all':
+            self._posids_where_tables_were_just_sent = set()         
+        elif posid in self._posids_where_tables_were_just_sent:
+            self._posids_where_tables_were_just_sent.remove(posid)
 
 if __name__ == '__main__':
     '''
