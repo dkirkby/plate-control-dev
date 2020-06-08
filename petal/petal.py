@@ -1442,7 +1442,6 @@ class Petal(object):
         if self.simulator_on:
             pass
         else:
-            status_updated = False
             nonresponsives = self.comm.pbget('non_responsives')
             for canid in nonresponsives:
                 if canid not in self.nonresponsive_canids:
@@ -1451,12 +1450,10 @@ class Petal(object):
                         if self.get_posfid_val(item_id, 'CAN_ID') == canid:
                             if auto_disabling_on:
                                 self.set_posfid_val(item_id, 'CTRL_ENABLED', False)
+                                self.set_posfid_val(item_id, 'LOG_NOTE', 'Disabled because device was detected to be nonresponsive.')
                             self.pos_flags[item_id] |= self.comm_error_bit
                             self.printfunc(f'WARNING: positioner {item_id} had communication error.')
                             break
-                    status_updated = True
-            if status_updated:
-                self.commit(log_note = 'Disabled sending control commands because device was detected to be nonresponsive.')
 
     def _clear_temporary_state_values(self):
         '''Clear out any existing values in the state objects that were only temporarily
