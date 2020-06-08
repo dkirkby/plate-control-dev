@@ -309,6 +309,7 @@ class PosMoveTable(object):
             table['cmd_val2'] = [rows[i].data['cmd_val2'] for i in row_range]
         if output_type in {'collider','schedule','full','hardware'}:
             table['move_time'] = [max(true_moves[pc.T][i]['move_time'],true_moves[pc.P][i]['move_time']) for i in row_range]
+        table['posid'] = self.posmodel.posid
         if output_type == 'hardware':
             table['canid'] = self.posmodel.canid
             table['busid'] = self.posmodel.busid
@@ -326,7 +327,6 @@ class PosMoveTable(object):
         table['nrows'] = len(table['dT'])
         if output_type == 'collider':
             return table
-        table['posid'] = self.posmodel.posid
         if output_type in {'schedule','full'}:
             table['net_time'] = [table['move_time'][i] + table['prepause'][i] + table['postpause'][i] for i in row_range]
             for i in range(1,table['nrows']):
