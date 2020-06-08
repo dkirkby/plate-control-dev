@@ -154,7 +154,7 @@ class PetalComm(object):
             print(bus_ids, can_ids)
             return 'FAILED: Can not execute ready_for_tables. Exception: %s' % str(e)           
 
-    def send_tables(self, move_tables):
+    def send_tables(self, move_tables, pc_cmd='send_tables_ex'):
         """
         Sends move tables for positioners over ethernet to the petal controller,
         where they are then sent over CAN to the positioners.
@@ -162,12 +162,21 @@ class PetalComm(object):
         INPUTS:
             move_tables ... see method "_hardware_ready_move_tables()" in petal.py
             
+            pc_cmd ... optional override of the function name to use when sending
+                       to petalcontroller.py. After 2020-06-08 (tag v4.18 and up),
+                       use 'send_tables_ex'. For petalcontroller.py versions prior
+                       to that, use 'send_tables'.
+            
         OUTPUT:
-            tuple ... 1st element: 'SUCCESS' or 'FAILED'
-                      2nd element: set of canids for any failed cases
+            tuple ... 1st element: string with first token being 'SUCCESS' or 'FAILED'
+                  ... 2nd element: dict with keys = busid and values = list of canids,
+                      for any failed cases. The dict will not necessarily contain
+                      entries for all possible busids.
         """
+        valid_cmds = {'send_tables', 'send_tables_ex'}
         try:
-            return self._call_device('send_tables',move_tables)
+            assert pc_cmd in valid_cmds, f'pc_cmd {pc_cmd} invalid'
+            return self._call_device(pc_cmd, move_tables)
         except Exception as e:
             return 'FAILED: Can not send move tables. Exception: %s' % str(e)
 
