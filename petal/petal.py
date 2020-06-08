@@ -1415,7 +1415,7 @@ class Petal(object):
         return failed_send_posids
 
     def _handle_nonresponsive_positioners(self, posids, auto_disabling_on=True):
-        """Recives a list of positioners that the petalcontroller reports it
+        """Receives a list of positioners that the petalcontroller reports it
         could not send move tables to. Sets communication error flag.
 
         Optionally automatically disables positioners to remove them from
@@ -1426,7 +1426,6 @@ class Petal(object):
             if auto_disabling_on:
                 self.set_posfid_val(posid, 'CTRL_ENABLED', False)
                 self.set_posfid_val(posid, 'LOG_NOTE', 'Disabled due to communication error')
-        self.commit(mode='move')
 
     def _check_and_disable_nonresponsive_pos_and_fid(self, auto_disabling_on=False):
         """Asks petalcomm for a list of what canids are nonresponsive, and then
