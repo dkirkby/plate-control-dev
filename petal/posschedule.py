@@ -127,7 +127,8 @@ class PosSchedule(object):
             return False
         targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
         if self._deny_request_because_limit(posmodel, targt_poslocTP):
-            print_denied('Target exceeds expert angular limit.')
+            print_denied(f'Target poslocP={targt_poslocTP[1]:.3f} is outside ' +
+                         f'"expert" petal limit_angle at {self.petal.limit_angle}.')
             return False
         if self._deny_request_because_target_interference(posmodel, targt_poslocTP):
             print_denied('Target interferes with a neighbor\'s existing target.')
