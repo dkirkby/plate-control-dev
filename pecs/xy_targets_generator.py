@@ -73,7 +73,7 @@ def _random_filled_annulus(n_points, r_min, r_max, verbose):
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
-    reg_circle = filled_circle(n_points=48, radius=3.3, random=False, verbose=True)
+    reg_circle = filled_circle(n_points=24, radius=3.0, random=False, verbose=True)
     reg_annulus = filled_annulus(n_points=48, r_min=2.0, r_max=3.3, random=False, verbose=True)
     plt.clf()
     results = [reg_circle, reg_annulus]

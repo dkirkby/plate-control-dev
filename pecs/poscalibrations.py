@@ -303,7 +303,7 @@ class PosCalibrations(PECS):
         return {self._role2pcid(role): alignment
                 for role, alignment in self.ptlm.alignment.items()}
 
-    def run_extra_points(self, max_radius=3.3, n_points=24):
+    def run_extra_points(self, max_radius=3.0, n_points=24):
         '''This function will move to and measure a grid of points, without
         any special calibration analysis performed. The purpose is to have an
         independent measurement of internally-tracked (t,p) vs measured (x,y),

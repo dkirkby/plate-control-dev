@@ -10,7 +10,7 @@ Requires running DOS instance. See pecs.py
 def_npts_T = 12
 def_npts_P = 12
 def_npts_extra = 24
-def_extra_pts_max_radius = 3.3
+def_extra_pts_max_radius = 3.0
 min_npts_T = 4
 min_npts_P = 4
 
