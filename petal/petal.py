@@ -1434,7 +1434,7 @@ class Petal(object):
         """
         for posid in posids:
             self.pos_flags[posid] |= self.comm_error_bit
-            if auto_disabling_on:
+            if auto_disabling_on and self.posmodels[posid].is_enabled:
                 self.set_posfid_val(posid, 'CTRL_ENABLED', False)
                 self.set_posfid_val(posid, 'LOG_NOTE', 'Disabled due to communication error')
 
@@ -1459,7 +1459,7 @@ class Petal(object):
                     self.nonresponsive_canids.add(canid)
                     for item_id in self.posids.union(self.fidids):
                         if self.get_posfid_val(item_id, 'CAN_ID') == canid:
-                            if auto_disabling_on:
+                            if auto_disabling_on and self.posmodels[posid].is_enabled:
                                 self.set_posfid_val(item_id, 'CTRL_ENABLED', False)
                                 self.set_posfid_val(item_id, 'LOG_NOTE', 'Disabled because device was detected to be nonresponsive.')
                             self.pos_flags[item_id] |= self.comm_error_bit
