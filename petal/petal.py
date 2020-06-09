@@ -303,7 +303,6 @@ class Petal(object):
         self.busids = {posid:self.posmodels[posid].busid for posid in self.posids}
         self.canids_to_posids = {canid:posid for posid,canid in self.canids.items()}
         self.buscan_to_posids = {(self.busids[posid], self.canids[posid]): posid for posid in self.posids}
-        self.nonresponsive_canids = set()
         # 'hard' --> hardware sync line, 'soft' --> CAN sync signal to start
         # positioners
         self.sync_mode = 'soft'
@@ -1292,7 +1291,6 @@ class Petal(object):
         PosModel instances can be informed that the move was physically done on
         the hardware.
         """
-        self._check_and_disable_nonresponsive_pos_and_fid()
         for m in self.schedule.move_tables.values():
             if m.posmodel.posid in self._posids_where_tables_were_just_sent:
                 m.posmodel.postmove_cleanup(m.for_cleanup())
@@ -1437,34 +1435,6 @@ class Petal(object):
             if auto_disabling_on and self.posmodels[posid].is_enabled:
                 self.set_posfid_val(posid, 'CTRL_ENABLED', False)
                 self.set_posfid_val(posid, 'LOG_NOTE', 'Disabled due to communication error')
-
-    def _check_and_disable_nonresponsive_pos_and_fid(self, auto_disabling_on=False):
-        """Asks petalcomm for a list of what canids are nonresponsive, and then
-        handles disabling those positioners and/or fiducials.
-
-        As of 12/04/2019 positioners will not be disabled automatically. No
-        moves are performed and we are welcome to try again. Disabling is done
-        by hand. As of 2020-04-27 this can be overridden by arguing
-        auto_disabling_on=True.
-
-        08/06/2020 - kfanning - pbget non_responsives has been a dead feature in
-        petalcontroller.py for many months. Perhaps depricate this function?
-        """
-        if self.simulator_on:
-            pass
-        else:
-            nonresponsives = self.comm.pbget('non_responsives')
-            for canid in nonresponsives:
-                if canid not in self.nonresponsive_canids:
-                    self.nonresponsive_canids.add(canid)
-                    for item_id in self.posids.union(self.fidids):
-                        if self.get_posfid_val(item_id, 'CAN_ID') == canid:
-                            if auto_disabling_on and self.posmodels[posid].is_enabled:
-                                self.set_posfid_val(item_id, 'CTRL_ENABLED', False)
-                                self.set_posfid_val(item_id, 'LOG_NOTE', 'Disabled because device was detected to be nonresponsive.')
-                            self.pos_flags[item_id] |= self.comm_error_bit
-                            self.printfunc(f'WARNING: positioner {item_id} had communication error.')
-                            break
 
     def _clear_temporary_state_values(self):
         '''Clear out any existing values in the state objects that were only temporarily
@@ -1681,7 +1651,6 @@ class Petal(object):
                     self.set_posfid_val(fid, 'DUTY_STATE', 0)
         #Reset values
         self._remove_posid_from_sent_tables('all')
-        self.nonresponsive_canids = set()
         self._initialize_pos_flags() # Reset posflags
         self._apply_state_enable_settings()
         for posmodel in self.posmodels.values(): #Clean up posmodel and posstate
