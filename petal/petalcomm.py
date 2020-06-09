@@ -180,22 +180,6 @@ class PetalComm(object):
         except Exception as e:
             return 'FAILED: Can not send move tables. Exception: %s' % str(e)
 
-    def clear_move_tables(self):
-        '''This function clears existing move tables from all positioners on
-        the petal, so that they will not be executed upon sync signal. The
-        function immediately returns when it has initiated the clearing (which
-        may take some time, during which for example new anticollision
-        schedules can be calculated). Intended usage is that one would
-        subsequently call ready_for_tables() to know when petalcontroller is
-        ready again.
-
-        OUTPUTS:  'INITIATED' or 'FAILED'
-        '''
-        try:
-            return self._call_device('clear_move_tables')
-        except Exception as e:
-            return 'FAILED: Could not initiate clearing of move tables. Exception: %s' % str(e)        
-
     def execute_sync(self, mode):
         """
         Send the command to synchronously begin move sequences to all positioners

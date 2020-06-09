@@ -160,8 +160,7 @@ class Petal(object):
         self.simulator_on = simulator_on
         
         # sim_fail_freq: injects some occasional simulated hardware failures. valid range [0.0, 1.0]
-        self.sim_fail_freq = {'send_tables': 0.0,
-                              'clear_move_tables': 0.0} 
+        self.sim_fail_freq = {'send_tables': 0.0} 
         
         if not(self.simulator_on):
             import petalcomm
@@ -607,13 +606,16 @@ class Petal(object):
         """
         self.printfunc('send_move_tables called')
         hw_tables = self._hardware_ready_move_tables()
+        if not hw_tables:
+            self.printfunc('send_move_tables: no tables to send')
+            return set()
         for tbl in hw_tables:
             self._posids_where_tables_were_just_sent.add(tbl['posid'])
         if self.simulator_on:
             sim_fail = random.random() <= self.sim_fail_freq['send_tables']
             if sim_fail:
                 commanded_posids = [table['posid'] for table in hw_tables]
-                num_fail = random.randint(1, len(commanded_posids))
+                num_fail = random.randint(1, len(commanded_posids)) if commanded_posids else 0
                 sim_fail_posids = set(random.choices(commanded_posids, k=num_fail))
                 sim_fail_buscans = {}
                 for posid in sim_fail_posids:
@@ -1304,13 +1306,10 @@ class Petal(object):
         if self.animator_on:
             self.previous_animator_total_time = self.animator_total_time
         
-    def _cancel_move(self, reset_flags=True, clear_sent_tables=True):
+    def _cancel_move(self, reset_flags=True):
         '''Resets schedule and performs posmodel cleanup commands.
         
-        INPUTS:
-            clear_sent_tables ... clears any move table data that has been
-                                  already sent to positioners
-            
+        INPUTS:            
             reset_flags ... True --> reset posflags (for enabled positioners only)
                             False --> do not reset any posflags
                             'all' --> reset posflags for both enabled and disabled
@@ -1322,21 +1321,7 @@ class Petal(object):
         if reset_flags:
             enabled_only = reset_flags != 'all'
             self._initialize_pos_flags(ids='all', enabled_only=enabled_only)
-        if clear_sent_tables:
-            self._remove_posid_from_sent_tables('all')
-            if self.simulator_on:
-                if self.verbose:
-                    self.printfunc('Simulator skips sending command to clear move tables from positioners.')
-                if random.random() <= self.sim_fail_freq['clear_move_tables']:
-                    response = 'FAILED'
-                else:
-                    response = 'INITIATED'
-            else:
-                response = self.comm.clear_move_tables()
-            if response != 'INITIATED':
-                self.printfunc('ERROR: During _cancel_move(), petalcontroller failed to initiate clearing ' +
-                               'existing move tables from positioners. We no longer have definite control ' +
-                               'of the robot array. This may cause both missed science targets and collisions!')
+        self._remove_posid_from_sent_tables('all')
         if self.animator_on:
             self.animator.clear_after(time=self.previous_animator_total_time)
             self.animator_total_time = self.previous_animator_total_time
@@ -1394,7 +1379,7 @@ class Petal(object):
                 requests_to_retry = {posid:all_requests[posid] for posid in posids_to_retry}
             self.printfunc('Canceling move. Tracking data in petal.py will be reset, and a command will be ' +
                            'sent to petalcontroller, asking it to clear any existing tables from positioners.')
-            self._cancel_move(reset_flags='all', clear_sent_tables=True)
+            self._cancel_move(reset_flags='all')
             # set flags and disable nonresponsiives after canceling to so that the moves will not be committed.
             self._handle_nonresponsive_positioners(failed_send_posids, auto_disabling_on=True)
             if n_retries > 0 and posids_to_retry:
