@@ -641,15 +641,15 @@ class Petal(object):
         periods_by_busid =  dict((p.busid,{}) for posid,p in self.posmodels.items())
         enabled = self.enabled_posmodels(self.posids)
         for posid,posmodel in enabled.items():
-           canid = posmodel.canid
-           busid = posmodel.busid
-           p = {key:posmodel.state._val[key] for key in parameter_keys}
-           currents = tuple([p[key] for key in ['CURR_SPIN_UP_DOWN','CURR_CRUISE','CURR_CREEP','CURR_HOLD']])
-           currents_by_busid[busid][canid] = [currents, currents]
-           periods_by_busid[busid][canid] = (p['CREEP_PERIOD'], p['CREEP_PERIOD'], p['SPINUPDOWN_PERIOD'])
-           if self.verbose:
-               vals_str =  ''.join([' ' + str(key) + '=' + str(p[key]) for key in p])
-               self.printfunc(posid + ' (bus=' + str(busid) + ', canid=' + str(canid) + '): motor currents and periods set:' + vals_str)
+            canid = posmodel.canid
+            busid = posmodel.busid
+            p = {key:posmodel.state._val[key] for key in parameter_keys}
+            currents = tuple([p[key] for key in ['CURR_SPIN_UP_DOWN','CURR_CRUISE','CURR_CREEP','CURR_HOLD']])
+            currents_by_busid[busid][canid] = [currents, currents]
+            periods_by_busid[busid][canid] = (p['CREEP_PERIOD'], p['CREEP_PERIOD'], p['SPINUPDOWN_PERIOD'])
+            if self.verbose:
+                vals_str =  ''.join([' ' + str(key) + '=' + str(p[key]) for key in p])
+                self.printfunc(posid + ' (bus=' + str(busid) + ', canid=' + str(canid) + '): motor currents and periods set:' + vals_str)
         self.comm.pbset('currents', currents_by_busid)
         self.comm.pbset('periods', periods_by_busid)
 
