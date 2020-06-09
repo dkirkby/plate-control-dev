@@ -377,11 +377,15 @@ class PosSchedStats(object):
     def save(self, path=None, mode='w'):
         """Saves stats results to disk.
         """
-        if path is None:
+        dir_name = os.path.dirname(str(path))
+        dir_exists = os.path.isdir(dir_name)
+        if path is None or not dir_exists:
             suffix = str(self.filename_suffix)
             suffix = '_' + suffix if suffix else ''
             filename = f'{pc.filename_timestamp_str()}_schedstats{suffix}.csv'
             path = os.path.join(pc.dirs['temp_files'], filename)
+        if not os.path.exists(path):
+            mode = 'w'  # override append mode in this case
         include_headers = True if mode == 'w' or not os.path.exists(path) else False
         include_footers = False if mode == 'a' else True
         pd = self.generate_table(append_footers=include_footers)
