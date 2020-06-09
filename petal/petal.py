@@ -616,7 +616,13 @@ class Petal(object):
                 commanded_posids = [table['posid'] for table in hw_tables]
                 num_fail = random.randint(1, len(commanded_posids))
                 sim_fail_posids = set(random.choices(commanded_posids, k=num_fail))
-                response = 'FAILED', sim_fail_posids
+                sim_fail_buscans = {}
+                for posid in sim_fail_posids:
+                    busid = self.busids[posid]
+                    if busid not in sim_fail_buscans:
+                        sim_fail_buscans[busid] = []
+                    sim_fail_buscans[busid].append(self.canids[posid])
+                response = 'FAILED', sim_fail_buscans
             else:
                 response = 'SUCCESS'
             if self.verbose:
@@ -1366,7 +1372,7 @@ class Petal(object):
                 failed_send_posids |= {self.buscan_to_posids[key] for key in buscan_combo_keys}            
         else:
             response_str = response
-        failed = response_str.upper().find('FAILED') != 0  # petalcomm.py interface specifies that this keyword would be found as first token of response string, in failure case
+        failed = response_str.upper().find('FAILED') == 0  # petalcomm.py interface specifies that this keyword would be found as first token of response string, in failure case
         failed |= len(failed_send_posids) > 0  # backup check, in case some formatting inconsistency in response string
         if failed:
             if len(failed_send_posids) > 0:
@@ -1375,9 +1381,10 @@ class Petal(object):
                                f'move tables to petalcontroller. Failed posids: {failed_send_posids}. ' +
                                f'CAN busids with failures: {buses_with_fails}.')
             else:
-                self.printfunc(f'ERROR: {response_str}. Could not send some unknown number of canids. ' +
-                               f'Most likely due petalcontroller not sending back information about which ' +
-                               f'positioners failed to communicate. Further downstream errors are likely.')
+                self.printfunc(f'ERROR: {response_str}. Could not send move tables to some unknown number ' +
+                               f'of positioners. Most likely due petalcontroller not sending back information ' +
+                               f'about which positioners failed to communicate. Further downstream errors are ' +
+                               f'likely.')
             posids_to_retry =  self._posids_where_tables_were_just_sent - failed_send_posids
             if self.schedule.expert_mode_is_on():
                 expert_mode = True
@@ -1392,7 +1399,7 @@ class Petal(object):
             self._cancel_move(reset_flags='all', clear_sent_tables=True)
             # set flags and disable nonresponsiives after canceling to so that the moves will not be committed.
             self._handle_nonresponsive_positioners(failed_send_posids, auto_disabling_on=True)
-            if n_retries > 0:
+            if n_retries > 0 and posids_to_retry:
                 self.printfunc(f'Attempting to reschedule and resend move tables to {len(posids_to_retry)} ' +
                                f'positioners (num tries remaining = {n_retries})')
                 if expert_mode:
@@ -1410,8 +1417,12 @@ class Petal(object):
                 self.schedule_moves(anticollision=anticollision, should_anneal=should_anneal)
                 return self.send_move_tables(n_retries - 1)
             else:
-                self.printfunc(f'WARNING: Number of retries remaining == {n_retries}, despite still having ' +
-                               f'failures when sending move tables to positioners. The move will not be performed.') 
+                msg = 'WARNING: Due to failures when sending move tables to positioners, the entire move is canceled.'
+                if n_retries <= 0:
+                    msg += f' No scheduling retries remaining.'
+                if len(posids_to_retry) == 0:
+                    msg += f' No communicable positioners remaining to reschedule.'
+                self.printfunc(msg)
         return failed_send_posids
 
     def _handle_nonresponsive_positioners(self, posids, auto_disabling_on=True):
