@@ -34,7 +34,7 @@ test_direct_dTdP = False
 test_homing = False  # note that this one will look a bit weird, since there are no hardstops in simulation. So the results take a bit of extra inspection, but still quite useful esp. to check syntax / basic function
 
 # Override for petal simulated hardware failure rates
-sim_fail_freq = {'send_tables': 1.0} 
+sim_fail_freq = {'send_tables': 0.0} 
 
 # Selection of which pre-cooked sequences to run. See "sequences.py" for more detail.
 runstamp = hc.compact_timestamp()
