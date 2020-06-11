@@ -1,84 +1,135 @@
+'''Store fiber positioner calibration values to the online database. This is a
+powerful function with risk of major operational errors if used incorrectly.
+Only for focal plane experts, and only to be used with consensus of the focal
+plane team.
+'''
+# Created on Mon Feb  3 18:54:30 2020
+# @author: Duan Yutong (dyt@physics.bu.edu)
+# 
+# 2020-06-11 [JHS] Significant mods to interface. Pull in data from CSV
+# and use command line args. For earlier (Spring 2020) method of pulling in data
+# from pickle-of-pandas file, it's probably easiest to convert that to a CSV
+# first. But you could get an old rev (r130548) from the SVN if necessary.
 
-"""
-Created on Mon Feb  3 18:54:30 2020
+# input file format
+format_info = 'For data model and procedures to generate these values, see DESI-5732.'
+valid_keys = {'LENGTH_R1', 'LENGTH_R2', 'OFFSET_T', 'OFFSET_P', 'OFFSET_X',
+              'OFFSET_Y', 'PHYSICAL_RANGE_T', 'PHYSICAL_RANGE_P',
+              'GEAR_CALIB_T', 'GEAR_CALIB_P', 'SCALE_T', 'SCALE_P'}
+commit_prefix = 'COMMIT_'
+commit_keys = {key: commit_prefix + key for key in valid_keys}
 
-@author: Duan Yutong (dyt@physics.bu.edu)
-"""
+# command line argument parsing
+import argparse
+doc = f'{__doc__} Input CSV file must contain a POS_ID column. Input should'
+doc += f' contain all or any subset of the following parameter columns: {valid_keys}.'
+doc += f' For every parameter column there must be a corresponding boolean column'
+doc += f' prefixed with "{commit_prefix}", stating in each row whether that value is'
+doc += f' intended to be saved to the online db. {format_info}'
+parser = argparse.ArgumentParser(description=doc)
+parser.add_argument('-i', '--infile', type=str, required=True, help='path to input csv file')
+parser.add_argument('-s', '--simulate', action='store_true', help='perform the script "offline" with no storing to memory or database')
+args = parser.parse_args()
+
+# import and validate table format
+from astropy.table import Table
+table = Table.read(args.infile)
+assert 'POS_ID' in table.columns, 'No POS_ID column found in input table'
+keys = valid_keys & set(table.columns)
+assert len(keys) > 0, 'No valid parameter columns found in input table'
+no_commit_key = {key for key in keys if commit_keys[key] not in table.columns}
+assert len(no_commit_key) == 0, f'Input table params {no_commit_key} lack {commit_prefix}-prefixed fields. {format_info}'
+
+# some basic data validation (type and bounds checking)
+# not a guarantee of quality of parameters
+import numpy as np
+try:
+    import posconstants as pc
+except:
+    import sys
+    path_to_petal = '../petal'
+    sys.path.append(os.path.abspath(path_to_petal))
+    print('Couldn\'t find posconstants the usual way, resorting to sys.path.append')
+    import posconstants as pc
+for key in keys:
+    column = table[key]
+    commit_key = commit_keys[key]
+    commit_type_ok = table[commit_key].dtype in [np.int, np.bool]
+    assert commit_type_ok, f'{commit_key} data type must be boolean or integer representing boolean'
+    data_type_ok = column.dtype in [np.int, np.float]
+    assert data_type_ok, f'{key} data type must be numeric'
+    commit_requested = table[commit_key]
+    def assert_ok(is_valid_array, err_desc):
+        cannot_commit = [table['POS_ID'][row] for row in table if not is_valid_array[row]]
+        assert not(any(cannot_commit)), f'cannot commit {err_desc} at key: {key}, posid(s): {cannot_commit}'
+    assert_ok(np.isfinite(column), 'non-finite value(s)')
+    nom = pc.nominals[key]
+    nom_min = nom['value'] - nom['tol']
+    nom_max = nom['value'] + nom['tol']
+    assert_ok(column >= nom_min, f'value(s) below {nom_min}')
+    assert_ok(column <= nom_max, f'value(s) above {nom_max}')
+
+# set up a log file
+# I intentionally only bother doing this *after* the basic formatting validations have passed
 import os
-from tqdm import tqdm
-import pandas as pd
-import posconstants as pc
-from pecs import PECS
+import logging
+import time
+log_dir = os.path.dirname(args.infile)
+log_name = pc.filename_timestamp_str() + '_set_calibrations.log'
+log_path = os.path.join(log_dir, log_name)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+[logger.removeHandler(h) for h in logger.handlers]
+fh = logging.FileHandler(filename=log_path, mode='a', encoding='utf-8')
+sh = logging.StreamHandler()
+formatter = logging.Formatter(fmt='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S %z')
+formatter.converter = time.gmtime
+fh.setFormatter(formatter)
+sh.setFormatter(formatter)
+logger.addHandler(fh)
+logger.addHandler(sh)
+logger.info('Running script to set positioner calibration parameters.')
+logger.info(f'Input file is: {args.infile}')
+if args.simulate:
+    logger.info('Running in simulation mode. No data will stored to petal memory nor database.')
 
-# set source calibration file
-path = "/data/focalplane/logs/kpno/20200213/00048406-arc_calibration-ptl2_88_disabled/calibdf.pkl.gz"
-mode = int(input('Choose from the following three modes (enter single digit integer)\n'
-                 '    0: apply to all positioners in the calibration file\n'
-                 '    1: apply to only those specified in posids\n'
-                 '    2: apply to all except those in posids_exclude\n: '))
-# set posids to apply calibrations, leave mpty to apply to all
-posids = ['M01282', 'M02440', 'M02449', 'M02499', 'M03037', 'M03067',
-       'M03151', 'M03416', 'M04606', 'M04717', 'M05612', 'M05836',
-       'M05952', 'M05961', 'M05967', 'M05970', 'M06812', 'M07127',
-       'M07229', 'M05675', 'M06345', 'M02762', 'M04607', 'M05615',
-       'M06278', 'M07129', 'M01383', 'M01476', 'M02284', 'M02367',
-       'M02393', 'M02763', 'M02855', 'M03315', 'M03392', 'M04608',
-       'M04610', 'M04626', 'M05041', 'M05358', 'M05592', 'M05600',
-       'M05605', 'M05622', 'M05623', 'M05662', 'M05678', 'M05801',
-       'M05809', 'M05839', 'M05948', 'M05950', 'M05969', 'M05971',
-       'M06208', 'M06220', 'M06294', 'M06299', 'M06353', 'M06410',
-       'M06418', 'M06503', 'M06695', 'M06697', 'M06699', 'M06714',
-       'M06723', 'M06745', 'M06770', 'M06774', 'M06813', 'M06913',
-       'M06942', 'M07022', 'M07108', 'M07110', 'M07187', 'M07195',
-       'M07216', 'M07263', 'M07264', 'M07267', 'M07270', 'M07287',
-       'M07289', 'M07294', 'M07295', 'M07296']
-posids_exclude = []
-calib = pd.read_pickle(path)['FIT']
-pecs = PECS(interactive=False)
-if mode == 0:
-    posids = calib.index
-elif mode == 1:
-    posids = set(posids) & set(calib.index)
-else:
-    posids = set(calib.index) - set(posids_exclude)
-pecs.ptl_setup(pecs.pcids, posids=posids)
-print(f'Setting calibration for {len(posids)} positioners using file: {path}')
-keys_fit = ['OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P',
-            'LENGTH_R1', 'LENGTH_R2']  # initial values for fitting
-accepted, rejected = set(), set()
-old, new = [], []
-for posid in tqdm(posids):
-    role = pecs._pcid2role(pecs.posinfo.loc[posid, 'PETAL_LOC'])
-    update = {'DEVICE_ID': posid, 'MODE': 'set_calibrations'}
-    update = pecs.ptlm.collect_calib(update, tag='',
-                                     participating_petals=role)[role]
-    old.append(update)
-    ret = {key: pecs.ptlm.set_posfid_val(
-                    posid, key, calib.loc[posid, key],
-                    participating_petals=role)
-                for key in keys_fit}
-    if all(val == True for val in ret.values()):
-        accepted.add(posid)
-    else:
-        print(f'{posid} rejected: {ret}')
-        rejected.add(posid)
-    update = pecs.ptlm.collect_calib(update, tag='',
-                                     participating_petals=role)[role]
-    new.append(update)
-pecs.ptlm.commit(mode='calib',
-                 log_note=f'set_calibrations: {os.path.basename(path)}')
-old = pd.DataFrame(old).set_index('DEVICE_ID').sort_index()
-new = pd.DataFrame(new).set_index('DEVICE_ID').sort_index()
-calibdf = pd.concat([old, calib, new], axis=1,
-                    keys=['OLD', 'FIT', 'NEW'],
-                    names=['label', 'field'], sort=False)
-path = os.path.join(pc.dirs['calib_logs'],
-                    f'{pc.filename_timestamp_str()}-set_calibrations.pkl.gz')
-calibdf.to_pickle(path)
-# preview calibration updates
-print(calibdf['NEW'][['POS_T', 'POS_P', 'LENGTH_R1', 'LENGTH_R2',
-                      'OFFSET_X', 'OFFSET_Y', 'OFFSET_T', 'OFFSET_P']])
-print(f'set_calibrations data saved to: {path}')
-print(f'{len(accepted)} positioners accepted')
-print(f'{len(rejected)} positioneres rejected one or more params:\n'
-      f'{sorted(rejected)}')
+# set up pecs (access to online system)
+if args.simulate:
+    logger.info(f'Skipping PECS initialization (simulation mode)')
+    from pecs import PECS
+    pecs = PECS(interactive=False)
+    logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
+    pecs.ptl_setup(pecs.pcids)
+
+# interactive human checks, since it is important to get everything right
+
+# store the data
+logger.info(f'Storing data to memory (not yet to database) for {len(table)} positioners.')
+for row in table:
+    posid = row['POS_ID']
+    if not args.simulate:
+        role = pecs._pcid2role(pecs.posinfo.loc[posid, 'PETAL_LOC'])
+    stored = {}
+    for key in keys:
+        value = row[key]
+        if not args.simulate:
+            result = pecs.ptlm.set_posfid_val(posid, key, value, participating_petals=role)
+        else:
+            result = True
+        if result == True:
+            stored[key] = value
+        else:
+            logger.error(f'set_posfid_val(posid={posid}, key={key}, value={value}')
+    if stored:
+        log_note = f'set calibration parameters {stored} from file: {args.infile}'
+        if not args.simulate:
+            pecs.ptlm.set_posfid_val(posid, 'LOG_NOTE', log_note)
+        stored['LOG_NOTE'] = log_note
+        logger.info(f'{posid}: {stored}')
+        
+# commit to online database
+logger.info(f'Committing the data set to online database.')
+if not args.simulate:
+    pecs.ptlm.commit(mode='both', log_note='')  # mode 'both' since LOG_NOTE goes in "moves" db. and blank log_note since done positioner-by-positioner above
+logger.info(f'Commit complete. Please remember to archive the input CSV file,' +
+            ' and the .log file (generated in the same folder) to docdb.')
