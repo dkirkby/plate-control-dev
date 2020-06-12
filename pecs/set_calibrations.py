@@ -156,13 +156,22 @@ except:
     logger.warning(f'PECS initialization failed')
     pecs_on = False
 
+# gather some interactive information from the user
+user = ''
+while not user:
+    user = input2('For the log, please enter your NAME or INITIALS:')
+archive_ref = ''
+while not archive_ref:
+    archive_ref = input2('For the log, enter DESI-XXXX DOCUMENT where this input csv table is archived:')    
+comment = input2('For the log, enter any additional COMMENT:')  # blank is allowed here
+comment = None if not comment else comment # for standardization
+
+
 # interactive human checks, since it is important to get everything right
 if pecs_on:
     # Most checks should be done ahead of time with preparation script in desimeter.
     # Here we would only check about stuff that is known to the online system.
     # Like maybe validating the posids, etc. Might not be essential to do so here.
-
-    # use the input2() function defined above, to ensure proper logging
     pass
 else:
     logger.warning('Skipping interactive checks, since PECS not initialized')
@@ -188,7 +197,7 @@ for row in table:
     if stored:
         # [JHS] Would be nice to include analysis metadata fields in the log_note, drawn
         # from the input table. Presumably when that table is in ecsv format.
-        log_note = pc.join_notes(script_name, f'input_file {args.infile}', f'params {stored}')
+        log_note = pc.join_notes(script_name, f'user {user}', f'comment {comment}', f'input_file {args.infile}', f'archive_ref {archive_ref}', f'params {stored}')
         if not args.simulate:
             pecs.ptlm.set_posfid_val(posid, 'LOG_NOTE', log_note)
         logger.info(f'{posid}: {stored}')
