@@ -162,9 +162,10 @@ while not user:
     user = input2('For the log, please enter your NAME or INITIALS:')
 archive_ref = ''
 while not archive_ref:
-    archive_ref = input2('For the log, enter DESI-XXXX DOCUMENT where this input csv table is archived:')    
-comment = input2('For the log, enter any additional COMMENT:')  # blank is allowed here
-comment = None if not comment else comment # for standardization
+    archive_ref = input2('For the log, enter DESI-XXXX DOCUMENT where this input csv table is archived:')
+comment = ''
+while not comment:
+    comment = input2('For the log, enter any additional COMMENT, giving context/rationale for posting these new values:')
 
 
 # interactive human checks, since it is important to get everything right
