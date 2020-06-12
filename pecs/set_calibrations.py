@@ -175,7 +175,8 @@ if pecs_on:
     # Like maybe validating the posids, etc. Might not be essential to do so here.
     pass
 else:
-    logger.warning('Skipping interactive checks, since PECS not initialized')
+    #logger.warning('Skipping interactive checks, since PECS not initialized')
+    pass
 
 # store the data
 logger.info(f'Storing data to memory (not yet to database) for {len(table)} positioners.')
