@@ -150,7 +150,8 @@ try:
     from pecs import PECS
     pecs = PECS(interactive=False)
     logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
-    pecs.ptl_setup(pecs.pcids)
+    posids = set(table['POS_ID'])
+    pecs.ptl_setup(pecs.pcids, posids=posids)
     pecs_on = True
 except:
     logger.warning(f'PECS initialization failed')
@@ -166,7 +167,6 @@ while not archive_ref:
 comment = ''
 while not comment:
     comment = input2('For the log, enter any additional COMMENT, giving context/rationale for posting these new values:')
-
 
 # interactive human checks, since it is important to get everything right
 if pecs_on:
