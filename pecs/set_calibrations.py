@@ -3,13 +3,6 @@ powerful function with risk of major operational errors if used incorrectly.
 Only for focal plane experts, and only to be used with consensus of the focal
 plane team.
 '''
-# Created on Mon Feb  3 18:54:30 2020
-# @author: Duan Yutong (dyt@physics.bu.edu)
-# 
-# 2020-06-11 [JHS] Significant mods to interface. Pull in data from CSV
-# and use command line args. For earlier (Spring 2020) method of pulling in data
-# from pickle-of-pandas file, it's probably easiest to convert that to a CSV
-# first. But you could get an old rev (r130548) from the SVN if necessary.
 
 import os
 script_name = os.path.basename(__file__)
@@ -60,22 +53,30 @@ except:
     sys.path.append(os.path.abspath(path_to_petal))
     print('Couldn\'t find posconstants the usual way, resorting to sys.path.append')
     import posconstants as pc
-log_dir = os.path.dirname(args.infile)
+    
+# yes, as of 2020-06-17, I'm saving it in two places
+# to be absolutely sure we have a record
+# can cut back to one, once we are confident of logs getting properly saved at KPNO
+log_dirs = [os.path.dirname(args.infile), pc.dirs['calib_logs']]  
+
 log_name = pc.filename_timestamp_str() + '_set_calibrations.log'
-log_path = os.path.join(log_dir, log_name)
+log_paths = [os.path.join(d, log_name) for d in log_dirs]
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 [logger.removeHandler(h) for h in logger.handlers]
-fh = logging.FileHandler(filename=log_path, mode='a', encoding='utf-8')
-sh = logging.StreamHandler()
 formatter = logging.Formatter(fmt='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S %z')
 formatter.converter = time.gmtime
-fh.setFormatter(formatter)
+for p in log_paths:
+    fh = logging.FileHandler(filename=p, mode='a', encoding='utf-8')
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+sh = logging.StreamHandler()
 sh.setFormatter(formatter)
-logger.addHandler(fh)
 logger.addHandler(sh)
 logger.info(f'Running {script_name} to set positioner calibration parameters.')
 logger.info(f'Input file is: {args.infile}')
+for path in log_paths:
+    logger.info(f'Logging to {path}')
 logger.info(f'Table contains {len(table)} rows')
 if args.simulate:
     logger.info('Running in simulation mode. No data will stored to petal memory nor database.')
