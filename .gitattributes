@@ -13,6 +13,7 @@ pecs/poscalibrationfits.py -text
 pecs/poscalibrations.py -text
 pecs/rehome.py -text
 pecs/rehome_verify.py -text
+pecs/run_sequence.py -text
 pecs/seed_armlengths.py -text
 pecs/seed_offsets_tp.py -text
 pecs/seed_offsets_xy.py -text

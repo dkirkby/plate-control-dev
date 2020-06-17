@@ -33,7 +33,7 @@ def describe(seq, axis):
     # print('running total: ' + str(cumsum))
     
 def typ_sequence(prefix, short_suffix, long_suffix, forward_deltas, settings):
-    new = sequence.TestSequence(short_name = prefix.upper() + ' ' + short_suffix.upper(),
+    new = sequence.Sequence(short_name = prefix.upper() + ' ' + short_suffix.upper(),
                                 long_name = prefix + ' ' + long_suffix)
     i = 0 if prefix.lower()[0] == 't' else 1
     deltas = wiggle(forward_deltas, case=i)

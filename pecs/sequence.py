@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Jun  1 16:20:26 2020
-
-@author: joe
+Represents a sequence of positioner moves, with detailed control over motor
+and move scheduling parameters.
 """
 
 col_defaults = {'command': '',
@@ -53,19 +52,34 @@ valid_commands = {'QS', 'dQdS',
 
 import os
 from astropy.table import Table
-
+import numpy as np
         
 def read(path):
-    '''Read in a saved TestSequence from a file. E.g.
-        sequence = TestSequence.read(path)
+    '''Reads in and validates format for a saved Sequence from a file. E.g.
+        sequence = Sequence.read(path)
     '''
     table = Table.read(path)
-    sequence = TestSequence(short_name=table.meta['short_name'],
-                            long_name=table.meta['long_name'])
+    example = Sequence(short_name='dummy')
+    example.add_move(command='QS', target0=0.0, target1=0.0)
+    for col in table.columns:
+        assert col in example.table.columns
+        for i in range(len(table)):
+            assert type(table[col][i]) == type(example.table[col][0])
+        try:
+            np.isfinite(example.table[col][0])
+            isnumber = True
+        except:
+            isnumber = False
+        if isnumber:
+            assert all(np.isfinite(table[col]))
+    for row in table:
+        assert row['command'] in valid_commands
+    sequence = Sequence(short_name=table.meta['short_name'],
+                        long_name=table.meta['long_name'])
     sequence.table = table
     return sequence
 
-class TestSequence(object):
+class Sequence(object):
     '''Iterable structure that defines a positioner test, as a sequence of Move instances.
     
         short_name ... string, brief name for the test
