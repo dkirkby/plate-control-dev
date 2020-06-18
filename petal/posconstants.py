@@ -37,7 +37,7 @@ else:
 dirs['temp_files'] = os.path.join(home, 'fp_temp_files')
 dir_keys_logs = ['pos_logs', 'fid_logs', 'ptl_logs', 'xytest_data',
                  'xytest_logs', 'xytest_plots', 'xytest_summaries',
-                 'calib_logs', 'kpno']
+                 'calib_logs', 'kpno', 'sequence_logs']
 dir_keys_settings = ['pos_settings', 'fid_settings', 'test_settings',
                      'collision_settings', 'hwsetups', 'ptl_settings',
                      'other_settings']
