@@ -136,6 +136,10 @@ def apply_pos_settings(posids, settings):
             val_accepted = pecs.ptlm.set_posfid_val(posid, key, value, participating_petals=role)
             assert2(val_accepted, f'unable to set {key}={value} for {posid}')
     # TO BE IMPLEMENTED:
+    # prep 1 --> search out these specific settings in the petal code
+    #            to determine which can get stale and need some refresh beyond
+    #            simply set_posfid_val
+    # prep 2 --> consider refreshing any stale cases directly in set_posfid_val
     # refresh the posmodels (may need some rework internally)
     # send out new motor values
     # pecs.ptlm.commit(mode='both', log_note='')
@@ -144,7 +148,7 @@ def apply_pos_settings(posids, settings):
 # do the sequence
 last_pos_settings = None
 for row in seq.table:
-    posids = get_enabled_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
+    posids = get_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
     logger.info(f'Now doing move {row.index} of 0-{len(seq.table)-1} on {len(posids)} positioners.')
     kwargs1 = {key: row[key] for key in sequence.move_defaults}
     requests = make_requests(posids, **kwargs1)
