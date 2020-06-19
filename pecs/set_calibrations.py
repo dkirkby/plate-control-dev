@@ -188,7 +188,7 @@ any_stored = False
 for row in table:
     posid = row['POS_ID']
     if not args.simulate:
-        role = pecs._pcid2role(pecs.posinfo.loc[posid, 'PETAL_LOC'])
+        role = pecs.ptl_role_lookup(posid)
     stored = {}
     for key in keys:
         if row[commit_keys[key]]:
