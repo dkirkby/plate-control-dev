@@ -147,9 +147,7 @@ class PECS:
         self.ptlm.participating_petals = [self._pcid2role(pcid)
                                           for pcid in self.pcids]
         if posids is None:
-            ret = self.ptlm.get_positioners(enabled_only=True)
-            posinfo = pd.concat(list(ret.values())).set_index('DEVICE_ID')
-            posids0 = sorted(posinfo.index)
+            posids0 = self.get_enabled_posids(posids='all')
             self.print(f'Defaulting to all {len(posids0)} enabled positioners')
         else:
             ret = self.ptlm.get_positioners(posids=posids, enabled_only=False)
@@ -372,4 +370,24 @@ class PECS:
         log_note = pc.join_notes(log_note, f'expid={self.exp.id}')
         log_note = pc.join_notes(log_note, f'use_desimeter={self.use_desimeter}')
         return log_note
-        
+                
+    def get_enabled_posids(self, posids='sub'):
+        '''Returns list of the enabled posids.
+            posids ... 'sub' --> return enabled subset of PECS' self.posids property
+                   ... 'all' --> return all currently enabled posids
+                   ... some iterable --> return just the enabled subset of iterable
+        '''
+        if posids == 'sub':
+            selected_posids = self.posids
+        if posids == 'all':
+            selected_posids = None
+        else:
+            try:
+                iterator = iter(posids)
+                selected_posids = [p for p in iterator]
+            except:
+                assert False, f'error, could not iterate arg posids={posids}'
+        ret = self.ptlm.get_positioners(enabled_only=True, posids=selected_posids)
+        posinfo = pd.concat(list(ret.values())).set_index('DEVICE_ID')
+        posids = sorted(posinfo.index)
+        return posids
