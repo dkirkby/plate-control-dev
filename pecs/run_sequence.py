@@ -10,10 +10,17 @@ script_name = os.path.basename(__file__)
 import argparse
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('-i', '--infile', type=str, required=True, help='Path to sequence file, readable by sequence.py. For some common pre-cooked sequences, run sequence_generator.py.')
-parser.add_argument('-d', '--debug', action='store_true', help='suppresses sending "SYNC" to positioners, so they will not actually move')
 parser.add_argument('-m', '--match_radius', type=int, default=None, help='int, specify a particular match radius, other than default')
 parser.add_argument('-c', '--check_unmatched', action='store_true', help='turns on auto-disabling of unmatched positioners')
 parser.add_argument('-t', '--test_tp', action='store_true', help='turns on auto-updating of POS_T, POS_P based on measurements')
+
+# TO BE IMPLEMENTED:
+parser.add_argument('-d', '--debug', action='store_true', help='suppresses sending "SYNC" to positioners, so they will not actually move')
+parser.add_argument('-r', '--restore_state_from_cache', type=str,
+                    help='Path to a cached positioner settings file from previous run of this script. Intended' +
+                         ' to be used in event of a crash. Will restore all positioners\' settings to that' +
+                         ' original cached state, and do nothing else.')
+
 args = parser.parse_args()
 
 # read sequence file
@@ -114,45 +121,60 @@ move_meas_settings = {key: args.__dict__[key] for key in ['match_radius', 'check
 logger.info(f'move_measure() general settings: {move_meas_settings}')
 
 # motor settings (must be made known to petal.py and FIPOS)
-motor_settings = {'CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CREEP_PERIOD'}
+motor_settings = {'CURR_SPIN_UP_DOWN', 'CURR_CRUISE', 'CURR_CREEP', 'CREEP_PERIOD', 'SPINUPDOWN_PERIOD'}
 other_settings = {key for key in sequence.pos_defaults if key not in motor_settings}
 
-def apply_pos_settings(posids, settings):
+def cache_current_pos_settings(posids):
+    '''Gathers current positioner settings and caches them to disk. Returns a
+    file path.
+    '''
+    # TO BE IMPLEMENTED, NEEDED FOR RESTORING ORIGINAL STATE AFTER CRASH
+    pass
+
+def retrieve_cached_pos_settings(path):
+    '''Retrieves positioenr settings from file cached to disk. Returns a dict with
+    keys = posids and values = settings dicts. This can be directly used in the
+    apply_pos_settings function.'''
+    # TO BE IMPLEMENTED, NEEDED FOR RESTORING ORIGINAL STATE AFTER CRASH
+    pass
+
+def apply_pos_settings(settings):
     '''Push new settings values to the positioners in posids. The dict settings
+    should have keys = posids, and values = sub-dictionaries. Each sub-dict
     should have keys / value types like pos_defaults in the sequence module.'''
-    for key, value in settings.items():
-        assert2(key in sequence.pos_defaults.keys(), f'unexpected pos settings key {key}')
-        default = sequence.pos_defaults[key]
-        if is_number(default):
-            test = is_number(value)
-        elif is_boolean(default):
-            test = is_boolean(value)
-        else:
-            test = isinstance(value, type(default))
-        assert2(test, f'unexpected type {type(value)} for value {value}')
-        value = settings[key]
-        for posid in posids:
-            role = pecs._pcid2role(pecs.posinfo.loc[posid, 'PETAL_LOC'])
+    if not settings:
+        logger.warning(f'apply_pos_settings: called with null arg settings={settings}')
+        return
+    motor_update_petals = set()
+    for posid, these_settings in settings.items():
+        role = pecs.ptl_role_lookup(posid)
+        for key, value in these_settings.items():
+            assert2(key in sequence.pos_defaults, f'unexpected pos settings key {key} for posid {posid}')
+            default = sequence.pos_defaults[key]
+            if is_number(default):
+                test = is_number(value)
+            elif is_boolean(default):
+                test = is_boolean(value)
+            else:
+                test = isinstance(value, type(default))
+            assert2(test, f'unexpected type {type(value)} for value {value} for posid {posid}')
+            value = settings[key]                
             val_accepted = pecs.ptlm.set_posfid_val(posid, key, value, participating_petals=role)
             assert2(val_accepted, f'unable to set {key}={value} for {posid}')
-    # TO BE IMPLEMENTED:
-    #
-    # prep --> Search out these specific settings in the petal code
-    #          to determine which if any can get stale and what refresh needed.
-    # conclusions:
-    # 'CURR_SPIN_UP_DOWN'        ... just need to call petal.set_motor_parameters()
-    # 'CURR_CRUISE'              ... just need to call petal.set_motor_parameters()
-    # 'CURR_CREEP'               ... just need to call petal.set_motor_parameters()
-    # 'CREEP_PERIOD'             ... just need to call petal.set_motor_parameters()
-    # 'SPINUPDOWN_PERIOD'        ... just need to call petal.set_motor_parameters()
-    # 'FINAL_CREEP_ON'           ... OK, no special treatment (val is only cached upon creaton of posmovetable)
-    # 'ANTIBACKLASH_ON'          ... OK, no special treatment (val is only cached upon creaton of posmovetable)
-    # 'ONLY_CREEP'               ... OK, no special treatment (val is only cached upon creaton of posmovetable)
-    # 'MIN_DIST_AT_CRUISE_SPEED' ... OK, no special treatment (val is only grabbed during motor_true_move function)
-    #
-    # send out new motor values
-    # pecs.ptlm.commit(mode='both', log_note='')
-    # logger.info(f'Commit complete.')
+            if key in motor_settings:
+                motor_update_petals.add(role)
+    logger.info('apply_pos_settings: Positioner settings updated in memory')
+    if motor_update_petals:
+        logger.info('apply_pos_settings: Positioner settings include change(s) to motor' +
+                    ' parameters. Now pushing new settings to petal controllers on petals' +
+                    f' {motor_update_petals}')
+        pecs.ptlm.set_motor_parameters(participating_petals=list(motor_update_petals))
+    pecs.ptlm.commit(mode='both', log_note='')
+    logger.info(f'apply_pos_settings: Positioner settings committed to DB')
+
+# cache the pos settings
+cache_path = cache_current_pos_settings(get_posids())
+logger.info('Initial settings of all positioners cached to: {cache_path}')
 
 # do the sequence
 last_pos_settings = None
@@ -164,16 +186,32 @@ for row in seq.table:
     logger.info(f'General move command: {kwargs1}')
     kwargs2 = {'request': requests}
     kwargs2.update(move_meas_settings)
-    settings = seq.pos_settings(row.index)
-    if settings != last_pos_settings:
+    new_settings = seq.pos_settings(row.index)
+    if new_settings != last_pos_settings:
+        all_settings = {posid:new_settings for posid in posids}  # this extra work improves generality of apply_pos_settings, and I expect not too costly
         if pecs_on:
-            apply_pos_settings(posids, settings)
-        logger.info(f'Positioner settings: {settings}')
-        last_pos_settings = settings
+            apply_pos_settings(all_settings)
+        logger.info(f'Positioner settings: {new_settings}')
+        last_pos_settings = new_settings
     else:
         logger.info('Positioner settings: (no change)')
     if pecs_on:
         result = pecs.move_measure(**kwargs2)
-
 logger.info('Sequence complete!')
+
+# restore the original pos settings
+orig_settings = retrieve_cached_pos_settings(cache_path)
+logger.info('Retrieved original positioner settings from {cache_path}')
+new_cache_path = cache_current_pos_settings(posids)
+new_settings = retrieve_cached_pos_settings(new_cache_path)
+if orig_settings == new_settings:
+    logger.info('No net change of positioner settings detected between start and finish' +
+                'of sequence. No further modifications to postioner state required.')
+else:
+    logger.info('Some net change(s) of positioner settings detected between start and' +
+                ' finish of sequence. Now restoring system to original state.')
+    apply_pos_settings(orig_settings)
+    logger.info('Restoration of original positioner settings complete.')
+
+# final thoughts...
 logger.info(f'Log file: {log_path}')
