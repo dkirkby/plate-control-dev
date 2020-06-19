@@ -32,9 +32,9 @@ def describe(seq, axis):
     # print('delta sequence: ' + str(deltas))
     # print('running total: ' + str(cumsum))
     
-def typ_sequence(prefix, short_suffix, long_suffix, forward_deltas, settings):
+def typ_motortest_sequence(prefix, short_suffix, long_suffix, forward_deltas, settings):
     new = sequence.Sequence(short_name = prefix.upper() + ' ' + short_suffix.upper(),
-                                long_name = prefix + ' ' + long_suffix)
+                            long_name = prefix + ' ' + long_suffix)
     i = 0 if prefix.lower()[0] == 't' else 1
     deltas = wiggle(forward_deltas, case=i)
     for j in range(len(deltas)):
@@ -62,8 +62,8 @@ options = {}
 short_suffix = 'nominal'
 long_suffix = 'performance at nominal settings'
 forward_deltas = [1, 5, 15, 30]
-tests.append(typ_sequence('Theta', short_suffix, long_suffix, forward_deltas, options))
-tests.append(typ_sequence('Phi',   short_suffix, long_suffix, forward_deltas, options))
+tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, forward_deltas, options))
+tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, forward_deltas, options))
 
 # TEST 2 - Theta cruise-only at otherwise nominal settings
 # TEST 3 - Phi cruise-only at otherwise nominal settings
@@ -81,8 +81,8 @@ options = {'FINAL_CREEP_ON': False,
 short_suffix = 'cruise only'
 long_suffix = 'cruise-only, at otherwise nominal settings'
 forward_deltas = [1, 5, 15, 30]
-tests.append(typ_sequence('Theta', short_suffix, long_suffix, forward_deltas, options))
-tests.append(typ_sequence('Phi',   short_suffix, long_suffix, forward_deltas, options))
+tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, forward_deltas, options))
+tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, forward_deltas, options))
 
 # TEST 4 - Theta cruise-only, with spinup/down power disabled
 # TEST 5 - Phi cruise-only, with spinup/down power disabled
@@ -103,8 +103,8 @@ options = {'FINAL_CREEP_ON': False,
 short_suffix = 'cruise no spinupdown'
 long_suffix = 'cruise-only, with spinup/down power disabled'
 forward_deltas = [1, 5, 15, 30]
-tests.append(typ_sequence('Theta', short_suffix, long_suffix, forward_deltas, options))
-tests.append(typ_sequence('Phi',   short_suffix, long_suffix, forward_deltas, options))
+tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, forward_deltas, options))
+tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, forward_deltas, options))
 
 # TEST 6 - Theta creep-only at otherwise nominal settings
 # TEST 7 - Phi creep-only at otherwise nominal settings
@@ -116,8 +116,8 @@ options = {'ONLY_CREEP': True}
 short_suffix = 'creep only'
 long_suffix = 'creep-only, at otherwise nominal settings'
 forward_deltas = [0.5, 1.0, 1.5, 2.0]
-tests.append(typ_sequence('Theta', short_suffix, long_suffix, forward_deltas, options))
-tests.append(typ_sequence('Phi',   short_suffix, long_suffix, forward_deltas, options))
+tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, forward_deltas, options))
+tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, forward_deltas, options))
 
 # TEST 8 - Theta fast creep
 # TEST 9 - Phi fast creep
@@ -131,8 +131,8 @@ options = {'ONLY_CREEP': True,
 short_suffix = 'fast creep'
 long_suffix = 'with fastest available creep speed under firmware v5.0'
 forward_deltas = [0.5, 1.0, 1.5, 2.0]
-tests.append(typ_sequence('Theta', short_suffix, long_suffix, forward_deltas, options))
-tests.append(typ_sequence('Phi',   short_suffix, long_suffix, forward_deltas, options))
+tests.append(typ_motortest_sequence('Theta', short_suffix, long_suffix, forward_deltas, options))
+tests.append(typ_motortest_sequence('Phi',   short_suffix, long_suffix, forward_deltas, options))
 
 # SAVE TO DISK
 for test in tests:
