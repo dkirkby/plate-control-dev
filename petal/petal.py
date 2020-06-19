@@ -1194,9 +1194,14 @@ class Petal(object):
                            f'expected_current_position of posid {posid}')
 
     def all_enabled_posids(self):
-        """Returns set of all posids of positioners with CTRL_ENABLED = True.
+        """Returns set of all posids of positioners with CTRL_ENABLED == True.
         """
         return {p for p in self.posids if self.posmodels[p].is_enabled}
+
+    def all_disabled_posids(self):
+        """Returns set of all posids of positioners with CTRL_ENABLED == False.
+        """
+        return set(self.posids) - set(self.all_enabled_posids())
 
     def enabled_posmodels(self, posids):
         """Returns dict with keys = posids, values = posmodels, but only for
