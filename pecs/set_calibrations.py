@@ -12,6 +12,7 @@ format_info = 'For data model and procedures to generate these values, see DESI-
 valid_keys = {'LENGTH_R1', 'LENGTH_R2', 'OFFSET_T', 'OFFSET_P', 'OFFSET_X',
               'OFFSET_Y', 'PHYSICAL_RANGE_T', 'PHYSICAL_RANGE_P',
               'GEAR_CALIB_T', 'GEAR_CALIB_P', 'SCALE_T', 'SCALE_P'}
+fit_err_keys = {'FIT_ERROR_STATIC', 'FIT_ERROR_DYNAMIC', 'FIT_ERROR'}
 commit_prefix = 'COMMIT_'
 commit_keys = {key: commit_prefix + key for key in valid_keys}
 def dbkey_for_key(key):
@@ -183,6 +184,7 @@ else:
 
 # store the data
 logger.info(f'Storing data to memory (not yet to database) for {len(table)} positioners.')
+any_stored = False
 for row in table:
     posid = row['POS_ID']
     if not args.simulate:
@@ -202,14 +204,25 @@ for row in table:
     if stored:
         # [JHS] Would be nice to include analysis metadata fields in the log_note, drawn
         # from the input table. Presumably when that table is in ecsv format.
-        log_note = pc.join_notes(script_name, f'user {user}', f'comment {comment}', f'input_file {args.infile}', f'archive_ref {archive_ref}', f'params {stored}')
+        log_note = pc.join_notes(script_name, f'user {user}', f'comment {comment}',
+                                 f'input_file {args.infile}', f'archive_ref {archive_ref}',
+                                 f'params {stored}')
+        for key in fit_err_keys:
+            if key in row.columns:
+                log_note = pc.join_notes(log_note, f'{key.lower()} {row[key]}')
+            
         if not args.simulate:
             pecs.ptlm.set_posfid_val(posid, 'LOG_NOTE', log_note)
         logger.info(f'{posid}: {stored}')
+        any_stored = True
         
 # commit to online database
-logger.info(f'Committing the data set to online database.')
-if not args.simulate:
-    pecs.ptlm.commit(mode='both', log_note='')  # mode 'both' since LOG_NOTE goes in "moves" db. and blank log_note since done positioner-by-positioner above
-logger.info(f'Commit complete. Please remember to archive the input CSV file,' +
-            ' and the .log file (generated in the same folder) to docdb.')
+if any_stored:
+    logger.info('Committing the data set to online database.')
+    if not args.simulate:
+        pecs.ptlm.commit(mode='both', log_note='')  # mode 'both' since LOG_NOTE goes in "moves" db. and blank log_note since done positioner-by-positioner above
+    logger.info('Commit complete.')
+else:
+    logger.warning('No data found to commit. Nothing will be changed in the online db.')
+logger.info('Please remember to archive the input CSV file, and the .log file' +
+            ' (generated in the same folder) to docdb.')
