@@ -136,11 +136,20 @@ def apply_pos_settings(posids, settings):
             val_accepted = pecs.ptlm.set_posfid_val(posid, key, value, participating_petals=role)
             assert2(val_accepted, f'unable to set {key}={value} for {posid}')
     # TO BE IMPLEMENTED:
-    # prep 1 --> search out these specific settings in the petal code
-    #            to determine which can get stale and need some refresh beyond
-    #            simply set_posfid_val
-    # prep 2 --> consider refreshing any stale cases directly in set_posfid_val
-    # refresh the posmodels (may need some rework internally)
+    #
+    # prep --> Search out these specific settings in the petal code
+    #          to determine which if any can get stale and what refresh needed.
+    # conclusions:
+    # 'CURR_SPIN_UP_DOWN'        ... just need to call petal.set_motor_parameters()
+    # 'CURR_CRUISE'              ... just need to call petal.set_motor_parameters()
+    # 'CURR_CREEP'               ... just need to call petal.set_motor_parameters()
+    # 'CREEP_PERIOD'             ... just need to call petal.set_motor_parameters()
+    # 'SPINUPDOWN_PERIOD'        ... just need to call petal.set_motor_parameters()
+    # 'FINAL_CREEP_ON'           ... OK, no special treatment (val is only cached upon creaton of posmovetable)
+    # 'ANTIBACKLASH_ON'          ... OK, no special treatment (val is only cached upon creaton of posmovetable)
+    # 'ONLY_CREEP'               ... OK, no special treatment (val is only cached upon creaton of posmovetable)
+    # 'MIN_DIST_AT_CRUISE_SPEED' ... OK, no special treatment (val is only grabbed during motor_true_move function)
+    #
     # send out new motor values
     # pecs.ptlm.commit(mode='both', log_note='')
     # logger.info(f'Commit complete.')
