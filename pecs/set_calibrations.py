@@ -80,12 +80,14 @@ for path in log_paths:
 logger.info(f'Table contains {len(table)} rows')
 if args.simulate:
     logger.info('Running in simulation mode. No data will stored to petal memory nor database.')
+    
 def assert2(test, message):
     '''Like an assert, but cleaner handling of logging.'''
     if not test:
         logger.error(message)
         logger.warning('Now quitting, so user can check inputs.')
-        raise SystemExit
+        assert False  # for ease of jumping back into the error state in ipython debugger
+        
 def input2(message):
     '''Wrapper for input which will log the interaction.'''
     logger.info(f'PROMPT: {message}')
