@@ -64,7 +64,7 @@ try:
     pecs.logger = logger
     logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
     pecs_on = True
-    get_posids = lambda: sorted(set(pecs.posids))
+    get_posids = lambda: pecs.get_enabled_posids('sub')
 except:
     # still a useful case, for testing some portion of the script offline
     logger.info(f'PECS initialization failed')
@@ -144,7 +144,7 @@ def apply_pos_settings(posids, settings):
 # do the sequence
 last_pos_settings = None
 for row in seq.table:
-    posids = get_posids()  # dynamically retrieved, just in case pecs changes something mid-sequence
+    posids = get_enabled_posids()  # dynamically retrieved, in case some positioner gets disabled mid-sequence
     logger.info(f'Now doing move {row.index} of 0-{len(seq.table)-1} on {len(posids)} positioners.')
     kwargs1 = {key: row[key] for key in sequence.move_defaults}
     requests = make_requests(posids, **kwargs1)
