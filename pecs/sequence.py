@@ -4,33 +4,34 @@ Represents a sequence of positioner moves, with detailed control over motor
 and move scheduling parameters.
 """
 
-col_defaults = {'command': '',
-                'target0': 0.0,
-                'target1': 0.0,
-                'log_note': '',
-                }
+move_defaults = {'command': '',
+                 'target0': 0.0,
+                 'target1': 0.0,
+                 'log_note': '',
+                 }
 
 pos_defaults = {'CURR_SPIN_UP_DOWN': 70,
                 'CURR_CRUISE': 70,
                 'CURR_CREEP': 70,
                 'CREEP_PERIOD': 2,
+                'SPINUPDOWN_PERIOD': 12,
                 'FINAL_CREEP_ON': True,
                 'ANTIBACKLASH_ON': True,
                 'ONLY_CREEP': False,
-                'SPINUPDOWN_PERIOD': 12,
                 'MIN_DIST_AT_CRUISE_SPEED': 180.0,
                 }
 
+col_defaults = move_defaults.copy()
 col_defaults.update(pos_defaults)
 
 pos_comments = {'CURR_SPIN_UP_DOWN': 'int, 0-100, spin up / spin down current',
                 'CURR_CRUISE': 'int, 0-100, cruise current',
                 'CURR_CREEP': 'int, 0-100, creep current',
                 'CREEP_PERIOD': 'int, number of timer intervals corresponding to a creep step. a higher value causes slower creep',
+                'SPINUPDOWN_PERIOD': 'int, number of 55 us periods to repeat each displacement during spin up to cruise speed or spin down from cruise speed. a higher value causes slower acceleration, over a longer travel distance',
                 'FINAL_CREEP_ON': 'bool, if true do a finishing creep move after cruising',
                 'ANTIBACKLASH_ON': 'boolean, if true do an antibacklash sequence at end of a move',
                 'ONLY_CREEP': 'bool, if true disable cruising speed',
-                'SPINUPDOWN_PERIOD': 'int, number of 55 us periods to repeat each displacement during spin up to cruise speed or spin down from cruise speed. a higher value causes slower acceleration, over a longer travel distance',
                 'MIN_DIST_AT_CRUISE_SPEED': 'float, minimum rotor distance in deg to travel when at cruise speed before slowing back down',
                 }
 
@@ -146,6 +147,13 @@ class Sequence(object):
         '''
         path = os.path.join(directory, basename + '.ecsv')
         self.table.write(path, overwrite=True, delimiter=',')
+    
+    def pos_settings(self, row_index):
+        '''Return dict containing all pos settings. Will be shaped like
+        pos_defaults.'''
+        row = self.table[row_index]
+        d = {key:row[key] for key in pos_defaults if key}
+        return d
     
     def non_default_pos_settings(self, row_index):
         '''Return dict containing only those fields for which the given row
