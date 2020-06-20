@@ -1382,8 +1382,7 @@ class Petal(object):
                 expert_mode = False
                 all_requests = self.schedule.get_requests()
                 requests_to_retry = {posid:all_requests[posid] for posid in posids_to_retry}
-            self.printfunc('Canceling move. Tracking data in petal.py will be reset, and a command will be ' +
-                           'sent to petalcontroller, asking it to clear any existing tables from positioners.')
+            self.printfunc('Canceling move. Tracking data in petal.py will be reset')
             self._cancel_move(reset_flags='all')
             # set flags and disable nonresponsiives after canceling to so that the moves will not be committed.
             self._handle_nonresponsive_positioners(failed_send_posids, auto_disabling_on=True)
