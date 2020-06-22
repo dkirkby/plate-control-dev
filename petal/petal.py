@@ -533,7 +533,7 @@ class Petal(object):
             posmodel.axis[axisid].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + direction_cmd_suffix
             self.schedule.expert_add_table(table)
 
-    def request_homing(self, posids, axis = 'both'):
+    def request_homing(self, posids, axis='both'):
         """Request homing sequence for positioners in single posid or iterable
         collection of posids. Finds the primary hardstop, and sets values for
         the max position and min position. Requests to disabled positioners
@@ -542,6 +542,9 @@ class Petal(object):
         axis ... string, 'both' (default), 'theta_only', or 'phi_only'. Optional
                  argument that allows for homing either theta or phi only.
         """
+        axis = 'phi_only' if axis == 'phi' else axis  # deal with common typo
+        axis = 'theta_only' if axis == 'theta' else axis  # deal with common typo
+        assert axis in {'both', 'phi_only', 'theta_only'}, f'Error in request_homing, unrecognized arg axis={axis}'
         posids = {posids} if isinstance(posids,str) else set(posids)
         self._initialize_pos_flags(ids = posids)
         enabled = self.enabled_posmodels(posids)
@@ -1346,7 +1349,6 @@ class Petal(object):
         
         As of this writing (2020-04-28) this handler will NOT automatically set
         any CTRL_ENABLED flags to False. Doing so would save some time for the
-        rest of the observing run (or until some human specifically sets that
         flag), by avoiding recalculation of the anticollision move schedules
         upon each retargeting. Consensus with the larger team would be wanted
         prior to including any such auto-disabling feature here.

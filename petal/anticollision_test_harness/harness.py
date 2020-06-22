@@ -208,12 +208,14 @@ for pos_param_id, pos_params in pos_param_sequence.items():
         if test_direct_dTdP:
             posids_to_test = list(requests.keys())
             for dtdp in [[30,0], [-30,0], [0,-30], [0,30], [30,-30], [-30,30]]:
+                print(f'direct_dTdP {dtdp}')
                 direct_requests = {posid: {'target': dtdp, 'log_note':''} for posid in posids_to_test}
                 ptl.request_direct_dtdp(direct_requests)
                 ptl.schedule_send_and_execute_moves(anticollision='adjust') # 'adjust' here *should* internally be ignored in favor of 'freeze'
         if test_homing:
             posids_to_test = list(requests.keys())
-            for axis in ['phi', 'theta', 'both']:
+            for axis in ['phi_only', 'theta_only', 'both']:
+                print(f'homing {axis}')
                 ptl.request_homing(posids_to_test, axis=axis)
                 ptl.schedule_send_and_execute_moves(anticollision='adjust') # 'adjust' here *should* internally be ignored in favor of 'freeze'
     if ptl.schedule_stats.is_enabled():
