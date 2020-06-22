@@ -154,6 +154,7 @@ class PosState(object):
             self._val['MOVE_VAL2'] = ''
         self._clear_last_meas_entries()
         self.clear_log_notes()
+        self.clear_late_commit_entries()
 
     def set_ptlid_from_pi(self, unit_id):
         ''' lookup petal id using unit_id for pos, fid from PositionerIndex '''
@@ -355,6 +356,12 @@ class PosState(object):
         '''Re-initializes the stored log notes. Can be used as an initiializer
         if no LOG_NOTE field yet established.'''
         self._val['LOG_NOTE'] = ''
+                
+    def clear_late_commit_entries(self):
+        '''Clears the "late commit" data fields.'''
+        for key, value in pc.late_commit_defaults.items():
+            if key in self._val:
+                self._val[key] = value
 
     def _increment_suffix(self,s):
         """Increments the numeric suffix at the end of s. This function was specifically written

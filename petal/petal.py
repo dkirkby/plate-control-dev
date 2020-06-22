@@ -1164,9 +1164,8 @@ class Petal(object):
         '''Clears special data fields associated with the "_late_commit"
         function.
         '''
-        for model in self.posmodels.values():
-            for key, value in pc.late_commit_defaults.items():
-                model.state.store(key, value)
+        for posid in self.posids:
+            self.states[posid].clear_late_commit_entries()
 
     def _set_exposure_info(self, exposure_id, exposure_iter=None):
         '''Sets exposure identification values. These will be included in the
