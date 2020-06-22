@@ -450,9 +450,15 @@ class Petal(object):
                     ----        ------
                     target      pair of target deltas, of the form [dT,dP]
                                     ... the elements dT and dP can be floats or integers
+                                    
                     log_note    optional string to store alongside in the log data for this move
                                     ... gets embedded in the  in the 'NOTE' field
                                     ... if the subdict contains no note field, then '' will be added automatically
+                    
+                    postmove_cleanup_cmds
+                                optional dict with posmodel commands to execute after the move
+                                    ... keys are the axisids (i.e. pc.T and pc.P)
+                                    ... values are the command string for each axis
 
             cmd_prefix ... Optional argument, allows embedding a descriptive string to the log, embedded
                            in the 'MOVE_CMD' field. This is different from log_note. Generally,
@@ -482,19 +488,22 @@ class Petal(object):
         for posid in marked_for_delete:
             self.pos_flags[posid] |= self.ctrl_disabled_bit
             del requests[posid]
-        for posid in requests:
+        for posid, request in requests.items():
             if posid not in self.posids:
                 pass
-            requests[posid]['posmodel'] = self.posmodels[posid]
+            request['posmodel'] = self.posmodels[posid]
             if 'log_note' not in requests[posid]:
-                requests[posid]['log_note'] = ''
-            table = posmovetable.PosMoveTable(requests[posid]['posmodel'])
-            table.set_move(0, pc.T, requests[posid]['target'][0])
-            table.set_move(0, pc.P, requests[posid]['target'][1])
+                request['log_note'] = ''
+            table = posmovetable.PosMoveTable(request['posmodel'])
+            table.set_move(0, pc.T, request['target'][0])
+            table.set_move(0, pc.P, request['target'][1])
             cmd_str = (cmd_prefix + ' ' if cmd_prefix else '') + 'direct_dtdp'
-            table.store_orig_command(0,cmd_str,requests[posid]['target'][0],requests[posid]['target'][1])
-            table.append_log_note(requests[posid]['log_note'])
+            table.store_orig_command(0,cmd_str,request['target'][0],request['target'][1])
+            table.append_log_note(request['log_note'])
             table.allow_exceed_limits = True
+            if 'postmove_cleanup_cmds' in request:
+                for axisid, cmd_str in request['postmove_cleanup_cmds'].items():
+                    table.append_postmove_cleanup_cmd(axisid=axisid, cmd_str=cmd_str)
             self.schedule.expert_add_table(table)
         return requests
 
@@ -519,18 +528,18 @@ class Petal(object):
             table.allow_cruise = not(posmodel.state._val['CREEP_TO_LIMITS'])
             dist = [0,0]
             dist[axisid] = search_dist
-            table.set_move(0,pc.T,dist[0])
-            table.set_move(0,pc.P,dist[1])
+            table.set_move(0, pc.T, dist[0])
+            table.set_move(0, pc.P, dist[1])
             cmd_str = (cmd_prefix + ' ' if cmd_prefix else '') + 'limit seek'
             table.store_orig_command(0,cmd_str,direction*(axisid == pc.T),direction*(axisid == pc.P))
             table.append_log_note(log_note)
-            posmodel.axis[axisid].postmove_cleanup_cmds += 'self.axis[' + repr(axisid) + '].total_limit_seeks += 1\n'
-            axis_cmd_prefix = 'self.axis[' + repr(axisid) + ']'
+            axis_cmd_prefix = f'self.axis[{axisid}]'
+            table.append_postmove_cleanup_cmd(axisid=axisid, cmd_str=f'{axis_cmd_prefix}.total_limit_seeks += 1')
             if direction < 0:
-                direction_cmd_suffix = '.minpos\n'
+                direction_cmd_suffix = 'minpos'
             else:
-                direction_cmd_suffix = '.maxpos\n'
-            posmodel.axis[axisid].postmove_cleanup_cmds += axis_cmd_prefix + '.pos = ' + axis_cmd_prefix + direction_cmd_suffix
+                direction_cmd_suffix = 'maxpos'
+            table.append_postmove_cleanup_cmd(axisid=axisid, cmd_str=f'{axis_cmd_prefix}.pos = {axis_cmd_prefix}.{direction_cmd_suffix}')
             self.schedule.expert_add_table(table)
 
     def request_homing(self, posids, axis='both'):
@@ -551,27 +560,29 @@ class Petal(object):
         for posid in posids:
             if posid not in enabled.keys():
                 self.pos_flags[posid] |= self.ctrl_disabled_bit
-        hardstop_debounce = [0,0]
-        direction = [0,0]
         for posid,posmodel in enabled.items():
+            directions = {}
             if axis in {'both', 'phi_only'}:
-                direction[pc.P] = +1 # force this, because anticollision logic depends on it
-                self.request_limit_seek(posid, pc.P, direction[pc.P], cmd_prefix='P', log_note='homing')
+                directions[pc.P] = +1 # force this, because anticollision logic depends on it
+                self.request_limit_seek(posid, pc.P, directions[pc.P], cmd_prefix='P', log_note='homing phi')
             if axis in {'both', 'theta_only'}:
-                direction[pc.T] = posmodel.axis[pc.T].principle_hardstop_direction
-                self.request_limit_seek(posid, pc.T, direction[pc.T], cmd_prefix='T') # no repetition of log note here
-            for i in [pc.T, pc.P]:
-                if (i == pc.T and axis != 'phi_only') or (i == pc.P and axis != 'theta_only'):
-                    axis_cmd_prefix = 'self.axis[' + repr(i) + ']'
-                    if direction[i] < 0:
-                        hardstop_debounce[i] = posmodel.axis[i].hardstop_debounce[0]
-                        posmodel.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = -1.0\n'
-                    else:
-                        hardstop_debounce[i] = posmodel.axis[i].hardstop_debounce[1]
-                        posmodel.axis[i].postmove_cleanup_cmds += axis_cmd_prefix + '.last_primary_hardstop_dir = +1.0\n'
-                    hardstop_debounce_request = {posid:{'target':hardstop_debounce}}
-                    self.request_direct_dtdp(hardstop_debounce_request, cmd_prefix='debounce')
-
+                directions[pc.T] = posmodel.axis[pc.T].principle_hardstop_direction
+                self.request_limit_seek(posid, pc.T, directions[pc.T], cmd_prefix='T', log_note='homing theta')
+            hardstop_debounce = [0,0]
+            postmove_cleanup_cmds = {pc.T: '', pc.P:''}
+            for i, direction in directions.items():
+                cmd_prefix = f'self.axis[{i}].last_primary_hardstop_dir ='
+                if direction < 0:
+                    hardstop_debounce[i] = posmodel.axis[i].hardstop_debounce[0]
+                    postmove_cleanup_cmds[i] = f'{cmd_prefix} -1.0'
+                else:
+                    hardstop_debounce[i] = posmodel.axis[i].hardstop_debounce[1]
+                    postmove_cleanup_cmds[i] = f'{cmd_prefix} +1.0'
+            request = {posid:{'target': hardstop_debounce,
+                              'postmove_cleanup_cmds': postmove_cleanup_cmds}
+                       }
+            self.request_direct_dtdp(request, cmd_prefix='debounce')
+                
     def schedule_moves(self, anticollision='default', should_anneal=True):
         """Generate the schedule of moves and submoves that get positioners
         from start to target. Call this after having input all desired moves
@@ -607,7 +618,7 @@ class Petal(object):
         
         Returns a set containing any posids for which sending the table failed.
         """
-        self.printfunc('send_move_tables called')
+        self.printfunc(f'send_move_tables called (n_retries={n_retries})')
         hw_tables = self._hardware_ready_move_tables()
         if not hw_tables:
             self.printfunc('send_move_tables: no tables to send')
@@ -1306,7 +1317,6 @@ class Petal(object):
                 m.posmodel.postmove_cleanup(m.for_cleanup())
                 self.altered_states.add(m.posmodel.state)
             else:
-                m.posmodel.clear_postmove_cleanup_cmds_without_executing()
                 self.pos_flags[m.posid] |= self.movetable_rejected_bit
         self.commit()
         self._clear_temporary_state_values()
@@ -1322,8 +1332,6 @@ class Petal(object):
                             False --> do not reset any posflags
                             'all' --> reset posflags for both enabled and disabled
         '''
-        for posmodel in self.posmodels.values():
-            posmodel.clear_postmove_cleanup_cmds_without_executing()
         self._clear_temporary_state_values()
         self.schedule = self._new_schedule()
         if reset_flags:
@@ -1644,8 +1652,6 @@ class Petal(object):
         self._remove_posid_from_sent_tables('all')
         self._initialize_pos_flags() # Reset posflags
         self._apply_state_enable_settings()
-        for posmodel in self.posmodels.values(): #Clean up posmodel and posstate
-            posmodel.clear_postmove_cleanup_cmds_without_executing()
         self._clear_temporary_state_values()
         self._clear_exposure_info() #Get rid of lingering exposure details
         self.commit(mode='both', log_note='configuring') #commit uncommitted changes to DB

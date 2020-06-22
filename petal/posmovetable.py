@@ -37,20 +37,23 @@ class PosMoveTable(object):
         self.should_final_creep  = self.posmodel.state._val['FINAL_CREEP_ON']
         self.allow_exceed_limits = self.posmodel.state._val['ALLOW_EXCEED_LIMITS']
         self.allow_cruise = not(self.posmodel.state._val['ONLY_CREEP'])
+        self._postmove_cleanup_cmds = {pc.T: '', pc.P: ''}
 
     def as_dict(self):
         """Returns a dictionary containing copies of all the table data."""
         c = self.copy()
-        d = {'posid':               c.posid,
-             'log_note':            c.log_note,
-             'rows':                c.rows,
-             '_rows_extra':         c._rows_extra,
-             'init_posintTP':       c.init_posintTP,
-             'init_poslocTP':       c.init_poslocTP,
-             'should_antibacklash': c.should_antibacklash,
-             'should_final_creep':  c.should_final_creep,
-             'allow_exceed_limits': c.allow_exceed_limits,
-             'allow_cruise':        c.allow_cruise}
+        d = {'posid':                 c.posid,
+             'log_note':              c.log_note,
+             'rows':                  c.rows,
+             '_rows_extra':           c._rows_extra,
+             'init_posintTP':         c.init_posintTP,
+             'init_poslocTP':         c.init_poslocTP,
+             'should_antibacklash':   c.should_antibacklash,
+             'should_final_creep':    c.should_final_creep,
+             'allow_exceed_limits':   c.allow_exceed_limits,
+             'allow_cruise':          c.allow_cruise,
+             'postmove_cleanup_cmds': c._postmove_cleanup_cmds,
+             }
         return d
     
     def __repr__(self):
@@ -69,9 +72,10 @@ class PosMoveTable(object):
                 return format(x,'>11g')
         output = '  move table for: ' + str(self.posid) + '\n' if show_posid else ''
         output += '  Initial posintTP: ' + str(self.init_posintTP) + '\n'
-        output += '  Initial poslocTP: ' + str(self.init_poslocTP)
+        output += '  Initial poslocTP: ' + str(self.init_poslocTP) + '\n'
+        for axisid, cmd_str in self._postmove_cleanup_cmds.items():
+            output += f'  Axis {axisid} postmove cmds: {repr(cmd_str)}\n'
         if self.rows or self._rows_extra:
-            output += '\n'
             output += fmt('row_type')
             headers = PosMoveRow().data.keys()
             for header in headers:
@@ -85,7 +89,7 @@ class PosMoveTable(object):
                 for header in headers:
                     output += fmt(extra_row.data[header])
         else:
-            output += ' (empty)'
+            output += ' (empty: contains no row data)'
         printfunc(output)
 
     def copy(self):
@@ -185,6 +189,17 @@ class PosMoveTable(object):
         self.rows[rowidx].data['command']  = cmd_string
         self.rows[rowidx].data['cmd_val1'] = val1
         self.rows[rowidx].data['cmd_val2'] = val2
+        
+    def append_postmove_cleanup_cmd(self, axisid, cmd_str):
+        """Add a posmodel cleanup command for execution after the move has
+        been completed.
+        """
+        if cmd_str:
+            separator = '\n'
+            existing = self._postmove_cleanup_cmds[axisid]
+            if existing and existing[-1] != separator:
+                self._postmove_cleanup_cmds[axisid] += separator
+            self._postmove_cleanup_cmds[axisid] += str(cmd_str)
 
     def set_prepause(self, rowidx, prepause):
         """Put or update a prepause into the table.
@@ -222,6 +237,8 @@ class PosMoveTable(object):
             return
         for otherrow in other_move_table.rows:
             self.rows.append(otherrow.copy())
+        for axisid, cmd_str in other_move_table._postmove_cleanup_cmds.items():
+            self.append_postmove_cleanup_cmd(axisid=axisid, cmd_str=cmd_str)
 
     # internal methods
     def _calculate_true_moves(self):
@@ -289,25 +306,25 @@ class PosMoveTable(object):
         rows.extend(self._rows_extra)
         row_range = range(len(rows))
         table = {}
-        if output_type in {'collider','schedule','full','cleanup'}:
+        if output_type in {'collider', 'schedule', 'full', 'cleanup'}:
             table['dT'] = [true_moves[pc.T][i]['distance'] for i in row_range]
             table['dP'] = [true_moves[pc.P][i]['distance'] for i in row_range]
-        if output_type in {'collider','schedule','full'}:
+        if output_type in {'collider', 'schedule', 'full'}:
             table['Tdot'] = [true_moves[pc.T][i]['speed'] for i in row_range]
             table['Pdot'] = [true_moves[pc.P][i]['speed'] for i in row_range]
             table['prepause'] = [rows[i].data['prepause'] for i in row_range]
             table['postpause'] = [rows[i].data['postpause'] for i in row_range]
-        if output_type in {'hardware','full'}:
+        if output_type in {'hardware', 'full'}:
             table['motor_steps_T'] = [true_moves[pc.T][i]['motor_step'] for i in row_range]
             table['motor_steps_P'] = [true_moves[pc.P][i]['motor_step'] for i in row_range]
-        if output_type in {'hardware','full','cleanup'}:
+        if output_type in {'hardware', 'full', 'cleanup'}:
             table['speed_mode_T'] = [true_moves[pc.T][i]['speed_mode'] for i in row_range]
             table['speed_mode_P'] = [true_moves[pc.P][i]['speed_mode'] for i in row_range]
-        if output_type in {'full','cleanup'}:
+        if output_type in {'full', 'cleanup'}:
             table['command'] = [rows[i].data['command'] for i in row_range]
             table['cmd_val1'] = [rows[i].data['cmd_val1'] for i in row_range]
             table['cmd_val2'] = [rows[i].data['cmd_val2'] for i in row_range]
-        if output_type in {'collider','schedule','full','hardware'}:
+        if output_type in {'collider', 'schedule', 'full', 'hardware'}:
             table['move_time'] = [max(true_moves[pc.T][i]['move_time'],true_moves[pc.P][i]['move_time']) for i in row_range]
         if output_type == 'hardware':
             table['posid'] = self.posmodel.posid
@@ -328,17 +345,17 @@ class PosMoveTable(object):
         if output_type == 'collider':
             return table
         table['posid'] = self.posmodel.posid
-        if output_type in {'schedule','full'}:
+        if output_type in {'schedule', 'full'}:
             table['net_time'] = [table['move_time'][i] + table['prepause'][i] + table['postpause'][i] for i in row_range]
             for i in range(1,table['nrows']):
                 table['net_time'][i] += table['net_time'][i-1]
-        if output_type in {'schedule','cleanup','full'}:
+        if output_type in {'schedule', 'cleanup', 'full'}:
             table['net_dT'] = table['dT'].copy()
             table['net_dP'] = table['dP'].copy()
             for i in range(1, table['nrows']):
                 table['net_dT'][i] += table['net_dT'][i-1]
                 table['net_dP'][i] += table['net_dP'][i-1]
-        if output_type in {'cleanup','full'}:
+        if output_type in {'cleanup', 'full'}:
             table.update({'TOTAL_CRUISE_MOVES_T':0,'TOTAL_CRUISE_MOVES_P':0,'TOTAL_CREEP_MOVES_T':0,'TOTAL_CREEP_MOVES_P':0})
             for i in row_range:
                 table['TOTAL_CRUISE_MOVES_T'] += int(table['speed_mode_T'][i] == 'cruise' and table['dT'] != 0)
@@ -346,6 +363,7 @@ class PosMoveTable(object):
                 table['TOTAL_CREEP_MOVES_T'] += int(table['speed_mode_T'][i] == 'creep' and table['dT'] != 0)
                 table['TOTAL_CREEP_MOVES_P'] += int(table['speed_mode_P'][i] == 'creep' and table['dP'] != 0)
             table['log_note'] = self.log_note
+            table['postmove_cleanup_cmds'] = self._postmove_cleanup_cmds
         if output_type == 'full':
             trans = self.posmodel.trans
             posintT = [self.init_posintTP[pc.T] + table['net_dT'][i]

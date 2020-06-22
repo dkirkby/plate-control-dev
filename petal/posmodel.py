@@ -17,9 +17,9 @@ class PosModel(object):
         else:
             self.state = state
         self.trans = postransforms.PosTransforms(this_posmodel=self, petal_alignment=petal_alignment)
-        self.axis = [None,None]
-        self.axis[pc.T] = Axis(self,pc.T)
-        self.axis[pc.P] = Axis(self,pc.P)
+        self.axis = [None, None]
+        self.axis[pc.T] = Axis(self, pc.T)
+        self.axis[pc.P] = Axis(self, pc.P)
         self._timer_update_rate          = 18e3   # Hz
         self._stepsize_creep             = 0.1    # deg
         self._stepsize_cruise            = 3.3    # deg
@@ -235,44 +235,20 @@ class PosModel(object):
         self.state.store('POS_T', self.state._val['POS_T'] + cleanup_table['net_dT'][-1])
         self.state.store('POS_P', self.state._val['POS_P'] + cleanup_table['net_dP'][-1])
         for axis in self.axis:
-            exec(axis.postmove_cleanup_cmds)
-            axis.postmove_cleanup_cmds = ''
-        separator = '; '
+            command = cleanup_table['postmove_cleanup_cmds'][axis.axisid]
+            exec(command)
         try:
-            self.state.store('MOVE_CMD',  separator.join(cleanup_table['command']))
-            value = []
-            for x in cleanup_table['cmd_val1']:
-                try:
-                    value.append('{0:.6g}'.format(float(x)))
-                except:
-                    pass
-            self.state.store('MOVE_VAL1', separator.join(x for x in value))
-            value = []
-            for x in cleanup_table['cmd_val2']:
-                try:
-                    value.append('{0:.6g}'.format(float(x)))
-                except:
-                    pass
-            self.state.store('MOVE_VAL2', separator.join(x for x in value))
+            self.state.store('MOVE_CMD', pc.join_notes(*cleanup_table['command']))
+            self.state.store('MOVE_VAL1', pc.join_notes(*cleanup_table['cmd_val1']))
+            self.state.store('MOVE_VAL2', pc.join_notes(*cleanup_table['cmd_val2']))
         except Exception as e:
             print('postmove_cleanup: %s' % str(e))
-        self.state.store('TOTAL_CRUISE_MOVES_T', self.state._val['TOTAL_CRUISE_MOVES_T']+ cleanup_table['TOTAL_CRUISE_MOVES_T'])
+        self.state.store('TOTAL_CRUISE_MOVES_T', self.state._val['TOTAL_CRUISE_MOVES_T'] + cleanup_table['TOTAL_CRUISE_MOVES_T'])
         self.state.store('TOTAL_CRUISE_MOVES_P', self.state._val['TOTAL_CRUISE_MOVES_P'] + cleanup_table['TOTAL_CRUISE_MOVES_P'])
         self.state.store('TOTAL_CREEP_MOVES_T', self.state._val['TOTAL_CREEP_MOVES_T'] + cleanup_table['TOTAL_CREEP_MOVES_T'])
         self.state.store('TOTAL_CREEP_MOVES_P', self.state._val['TOTAL_CREEP_MOVES_P'] + cleanup_table['TOTAL_CREEP_MOVES_P'])
         self.state.store('TOTAL_MOVE_SEQUENCES', self.state._val['TOTAL_MOVE_SEQUENCES'] + 1)
         self.state.append_log_note(cleanup_table['log_note'])
-
-    def clear_postmove_cleanup_cmds_without_executing(self):
-        """Useful for example if a positioner is disabled, and we don't want any false post-move
-        cleanup to be attempted. The reason this function is needed sometimes is due to a corner
-        I backed into, where the postmove_cleanup_cmds need to be stored separate from the cleanup_table.
-        So for example if scheduler denies a move request, then even though there was no move_table
-        generated, it still needs to separately be able to clear out any of these commands that might
-        be lurking.
-        """
-        for axis in self.axis:
-            axis.postmove_cleanup_cmds = ''
 
 class Axis(object):
     """Handler for a motion axis. Provides move syntax and keeps tracks of position.
@@ -281,7 +257,6 @@ class Axis(object):
     def __init__(self, posmodel, axisid):
         self.posmodel = posmodel
         self.axisid = axisid
-        self.postmove_cleanup_cmds = ''
         self.antibacklash_final_move_dir = self.calc_antibacklash_final_move_dir()
         self.principle_hardstop_direction = self.calc_principle_hardstop_direction()
         self.backlash_clearance = self.calc_backlash_clearance()

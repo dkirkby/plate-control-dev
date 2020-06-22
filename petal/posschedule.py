@@ -459,7 +459,6 @@ class PosSchedule(object):
         enabled = posmodel.is_enabled
         if enabled == False:  # this is specifically NOT worded as "if not enabled:", because here we actually do not want a value of None to pass the test, in case the parameter field 'CTRL_ENABLED' has not yet been implemented in the positioner's .conf file
             self.petal.pos_flags[posmodel.posid] |= self.petal.ctrl_disabled_bit
-            posmodel.clear_postmove_cleanup_cmds_without_executing()
             return True
         return False
 
@@ -485,7 +484,6 @@ class PosSchedule(object):
                 target_interference = True
                 break
         if target_interference:
-            posmodel.clear_postmove_cleanup_cmds_without_executing()
             self.petal.pos_flags[posmodel.posid] |= self.petal.overlap_targ_bit
             return True
         return False
@@ -494,12 +492,9 @@ class PosSchedule(object):
         """Checks for case where a target request is definitively unreachable
         due to being beyond a fixed petal or GFA boundary.
         """
-        out_of_bounds = self.collider.spatial_collision_with_fixed(
-            posmodel.posid, target_poslocTP)
+        out_of_bounds = self.collider.spatial_collision_with_fixed(posmodel.posid, target_poslocTP)
         if out_of_bounds:
-            posmodel.clear_postmove_cleanup_cmds_without_executing()
-            self.petal.pos_flags[posmodel.posid] |= \
-                self.petal.restricted_targ_bit
+            self.petal.pos_flags[posmodel.posid] |= self.petal.restricted_targ_bit
             return True
         return False
 
@@ -510,7 +505,6 @@ class PosSchedule(object):
         '''
         if self.petal.limit_angle:
             if target_poslocTP[1] < self.petal.limit_angle:
-                posmodel.clear_postmove_cleanup_cmds_without_executing()
                 self.petal.pos_flags[posmodel.posid] |= self.petal.exceeded_lims_bit
                 return True
         return False
