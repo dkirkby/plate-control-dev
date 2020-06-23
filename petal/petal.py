@@ -196,7 +196,7 @@ class Petal(object):
         
         # extra limitations on addressable target area. limit is a minimum phi value (like a maximum radius)
         if phi_limit_on:
-            self.limit_angle = self.collider.Eo_phi #degree minimum poslocP angle to reject targets. Set to False or None to skip check
+            self.limit_angle = self.collider.Eo_phi  # [deg] minimum poslocP angle to reject targets. Set to False or None to skip check
         else:
             self.limit_angle = None
             
@@ -706,27 +706,39 @@ class Petal(object):
         self.execute_moves()
         return failed_posids
 
-    def quick_move(self, posids, command, target, log_note='', anticollision='default', should_anneal=True):
+    def quick_move(self, posids=[], command='', target=[None, None],
+                   log_note='', anticollision='default', should_anneal=True,
+                   disable_limit_angle=False):
         """Convenience wrapper to request, schedule, send, and execute a single move command, all in
         one shot. You can argue multiple posids if you want, though note they will all get the same
         command and target sent to them. So for something like a local (theta,phi) coordinate
         this often makes sense, but not for a global coordinate.
 
-        INPUTS:     posids    ... either a single posid or an iterable collection of posids
+        INPUTS:     posids    ... either a single posid or an iterable collection of posids (note sets don't work at DOS Console interface)
                     command   ... string like those usually put in the requests dictionary (see request_targets method)
                     target    ... [u,v] values, note that all positioners here get sent the same [u,v] here
                     log_note  ... optional string to include in the log file
-                    anticollsion  ... see comments in schedule_moves() function
+                    anticollsion  ... 'default', 'adjust', 'freeze', or None. See comments in schedule_moves() function
                     should_anneal ... see comments in schedule_moves() function
+                    disable_limit_angle ... boolean, when True will turn off any phi limit angle
         """
+        old_limit = self.limit_angle
+        if disable_limit_angle:
+            self.limit_angle = None
         requests = {}
         posids = {posids} if isinstance(posids,str) else set(posids)
+        err_prefix = 'quick_move: error,'
+        assert len(posids) > 0, f'{err_prefix} empty posids argument'
+        assert command in pc.valid_move_commands, f'{err_prefix} invalid move command {command}'
+        assert len(target) == 2, f'{err_prefix} target arg len = {len(target)} != 2'
+        assert all(np.isfinite(target)), f'{err_prefix} non-finite target {target}'
         for posid in posids:
             requests[posid] = {'command':command, 'target':target, 'log_note':log_note}
         self.request_targets(requests)
         self.schedule_send_and_execute_moves(anticollision, should_anneal)
+        self.limit_angle = old_limit
 
-    def quick_direct_dtdp(self, posids, dtdp, log_note='', should_anneal=True):
+    def quick_direct_dtdp(self, posids=[], dtdp=[0,0], log_note='', should_anneal=True):
         """Convenience wrapper to request, schedule, send, and execute a single move command for a
         direct (delta theta, delta phi) relative move. There is NO anti-collision calculation. This
         method is intended for expert usage only. You can argue an iterable collection of posids if
@@ -739,6 +751,10 @@ class Petal(object):
         """
         requests = {}
         posids = {posids} if isinstance(posids,str) else set(posids)
+        err_prefix = 'quick_direct_dtdp: error,'
+        assert len(posids) > 0, f'{err_prefix} empty posids argument'
+        assert len(dtdp) == 2, f'{err_prefix} dtdp arg len = {len(dtdp)} != 2'
+        assert all(np.isfinite(dtdp)), f'{err_prefix} non-finite target {dtdp}'
         for posid in posids:
             requests[posid] = {'target':dtdp, 'log_note':log_note}
         self.request_direct_dtdp(requests)
