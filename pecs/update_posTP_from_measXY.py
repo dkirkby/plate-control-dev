@@ -1,9 +1,10 @@
-'''Reads in a table of measured (x,y) values for positioners. Calculates new
-posintT, posintP (same as POS_T, POS_P). This calculation is done using the
-current calibration parameters in the online database. Then stores the new
-theta and phi values to the db. This is a powerful function with risk of major
-operational errors if used incorrectly. Only for focal plane experts, and only
-to be used with consensus of the focal plane team.
+'''Reads in a table of measured (x,y) values for positioners. Triggers the
+internal function test_and_update_TP. (That function calculates new posintT,
+posintP --- same as POS_T, POS_P --- using the current calibration parameters
+in the online database. Then it stores the new theta and phi values to the db.)
+This is a powerful function with risk of major operational errors if used
+incorrectly. Only for focal plane experts, and only to be used with consensus
+of the focal plane team.
 '''
 
 import os
