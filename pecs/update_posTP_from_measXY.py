@@ -96,4 +96,7 @@ kwargs = {'mode': 'posTP',
 logger.info(f'Now performing test_and_update_tp on positioners {posids}.\nInput values:\n{frame}\n{kwargs}')
 updates = pecs.ptlm.test_and_update_TP(measured_data=frame, **kwargs)
 logger.info(f'Result data:\n{updates}')
+logger.info(f'DEBUG Result data to_string():\n{updates.to_string()}')
+logger.info(f'DEBUG Result data columns:\n{updates.columns}')
+updates.to_csv('debug_test.csv')
 logger.info(f'Complete. Please double-check online db to confirm results are what you expected.')
