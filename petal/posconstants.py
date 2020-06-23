@@ -165,6 +165,9 @@ late_commit_defaults = {'OBS_X':None,
 # performance grade letters
 grades = ['A', 'B', 'C', 'D', 'F', 'N/A']
 
+# move command strings
+valid_move_commands = {'QS', 'dQdS', 'obsXY', 'obsdXdY', 'ptlXY', 'poslocXY',
+                       'poslocdXdY', 'poslocTP', 'posintTP', 'dTdP'}
 
 def decipher_posflags(flags):
     '''translates posflag to readable reasons, bits taken from petal.py
