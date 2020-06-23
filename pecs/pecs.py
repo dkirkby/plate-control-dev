@@ -147,7 +147,7 @@ class PECS:
         self.ptlm.participating_petals = [self._pcid2role(pcid)
                                           for pcid in self.pcids]
         if posids is None:
-            posids0 = self.get_enabled_posids(posids='all')
+            posids0, posinfo = self.get_enabled_posids(posids='all')
             self.print(f'Defaulting to all {len(posids0)} enabled positioners')
         else:
             ret = self.ptlm.get_positioners(posids=posids, enabled_only=False)
@@ -390,4 +390,4 @@ class PECS:
         ret = self.ptlm.get_positioners(enabled_only=True, posids=selected_posids)
         posinfo = pd.concat(list(ret.values())).set_index('DEVICE_ID')
         posids = sorted(posinfo.index)
-        return posids
+        return posids, posinfo
