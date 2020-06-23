@@ -59,15 +59,10 @@ for key in frame.columns:
         del frame[key]
 
 # set up pecs (access to online system)
-try:
-    from pecs import PECS
-    pecs = PECS(interactive=False)
-    logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
-    pecs.ptl_setup(pecs.pcids, posids=posids)
-    pecs_on = True
-except:
-    logger.warning(f'PECS initialization failed')
-    pecs_on = False
+from pecs import PECS
+pecs = PECS(interactive=False)
+logger.info(f'PECS initialized, discovered PC ids {pecs.pcids}')
+pecs.ptl_setup(pecs.pcids, posids=posids)
 
 # gather some interactive information from the user
 user = ''
@@ -99,7 +94,6 @@ kwargs = {'mode': 'posTP',
           'commit': True,
           }
 logger.info(f'Now performing test_and_update_tp on positioners {posids}.\nInput values:\n{frame}\n{kwargs}')
-if pecs_on:
-    updates = pecs.ptlm.test_and_update_TP(measured_data=frame, **kwargs)
-    logger.info(f'Result data:\n{updates}')
+updates = pecs.ptlm.test_and_update_TP(measured_data=frame, **kwargs)
+logger.info(f'Result data:\n{updates}')
 logger.info(f'Complete. Please double-check online db to confirm results are what you expected.')
