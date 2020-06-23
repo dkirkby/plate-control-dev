@@ -10,6 +10,7 @@ import time
 from collections import OrderedDict
 import os
 import random
+import numpy as np
 try:
     # DBSingleton in the code is a class inside the file DBSingleton
     from DBSingleton import DBSingleton
@@ -1688,7 +1689,6 @@ if __name__ == '__main__':
     '''
     python -m cProfile -s cumtime petal.py
     '''
-    import numpy as np
     from configobj import ConfigObj
     cfg = ConfigObj(  # posids and fidids
         "/home/msdos/focalplane/fp_settings/ptl_settings/unit_03.conf",
