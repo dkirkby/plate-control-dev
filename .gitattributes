@@ -20,6 +20,7 @@ pecs/seed_offsets_xy.py -text
 pecs/sequence.py -text
 pecs/sequence_generator.py -text
 pecs/set_calibrations.py -text
+pecs/update_posTP_from_measXY.py -text
 pecs/xy_targets_generator.py -text
 pecs/xytest.py -text
 pecs/xytest_report_master.pmd -text
