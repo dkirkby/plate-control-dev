@@ -328,7 +328,7 @@ class PosSchedule(object):
             should_freeze ... boolean, says whether to check for collisions and freeze
             should_anneal ... boolean, enables/disables annealing
         """
-        if anneal_time == None:
+        if should_anneal:
             stage.anneal_tables(anneal_time)
         if should_freeze:
             if self.verbose:
@@ -575,21 +575,21 @@ class PosSchedule(object):
         and pushing it into the tables. (This is for logging purposes.)
         """
         stats_enabled = self.stats.is_enabled()
-        for posid,table in self.move_tables.items():  
+        for posid,table in self.move_tables.items():
+            table_for_schedule = table.for_schedule()
             log_note_addendum = ''              
             if posid in self._requests:
                 req = self._requests[posid]
                 table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
                 log_note_addendum = req['log_note'] # keep the original log notes with move tables
                 if stats_enabled:
-                    table_for_schedule = table.for_schedule()
                     if posid in self.__original_request_posids and self._table_matches_request(table_for_schedule,req):
                         self.stats.add_table_matching_request()
-                    self.__max_net_time = max(table_for_schedule['net_time'][-1], self.__max_net_time)
             elif not self.expert_mode_is_on():
                 self.printfunc('Error: ' + str(posid) + ' has a move table despite no request.')
                 table.display()
             table.append_log_note(log_note_addendum)
+            self.__max_net_time = max(table_for_schedule['net_time'][-1], self.__max_net_time)
 
     def _schedule_moves_finish_logging(self, colliding_sweeps, all_sweeps):
         """Final logging and animation steps for the schedule_moves() function."""
