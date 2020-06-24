@@ -576,7 +576,9 @@ class PosSchedule(object):
         """
         stats_enabled = self.stats.is_enabled()
         for posid,table in self.move_tables.items():
-            table_for_schedule = table.for_schedule()
+            if stats_enabled:
+                table_for_schedule = table.for_schedule()
+                self.__max_net_time = max(table_for_schedule['net_time'][-1], self.__max_net_time)
             log_note_addendum = ''              
             if posid in self._requests:
                 req = self._requests[posid]
@@ -589,8 +591,7 @@ class PosSchedule(object):
                 self.printfunc('Error: ' + str(posid) + ' has a move table despite no request.')
                 table.display()
             table.append_log_note(log_note_addendum)
-            self.__max_net_time = max(table_for_schedule['net_time'][-1], self.__max_net_time)
-
+                
     def _schedule_moves_finish_logging(self, colliding_sweeps, all_sweeps):
         """Final logging and animation steps for the schedule_moves() function."""
         if self.stats.is_enabled():
