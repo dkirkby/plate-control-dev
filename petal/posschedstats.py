@@ -375,7 +375,8 @@ class PosSchedStats(object):
         return pd.read_csv(file)  # returns a pandas dataframe
 
     def save(self, path=None, mode='w'):
-        """Saves stats results to disk.
+        """Saves stats results to disk. If no path was specified, the return
+        value is the path that was generated.
         """
         dir_name = os.path.dirname(str(path))
         dir_exists = os.path.isdir(dir_name)
@@ -397,6 +398,7 @@ class PosSchedStats(object):
         pd.to_csv(path, mode=mode, header=include_headers, index=False)
         if mode == 'a' and self.clear_cache_after_save_by_append:
             self._init_data_structures()
+        return path
 
     @staticmethod
     def found_but_not_resolved(found, resolved):

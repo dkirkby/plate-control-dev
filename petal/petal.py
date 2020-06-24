@@ -1064,7 +1064,11 @@ class Petal(object):
         if mode == 'move':
             self.altered_states = set()
             if self.schedule_stats.is_enabled():
-                self.schedule_stats.save(path=self.sched_stats_path, mode='a')
+                stats_path = self.sched_stats_path
+                new_path = self.schedule_stats.save(path=stats_path, mode='a')
+                if new_path != stats_path:
+                    self.sched_stats_path = new_path
+                    self.printfunc(f'Updated schedule stats path from {stats_path} to {new_path}')
         elif mode == 'calib':
             self.altered_calib_states = set()
 
