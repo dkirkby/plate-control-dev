@@ -232,10 +232,12 @@ class PosModel(object):
         """
         if self.state._val['CTRL_ENABLED'] is False:
             return
-        self.state.store('POS_T', self.state._val['POS_T'] + cleanup_table['net_dT'][-1])
-        self.state.store('POS_P', self.state._val['POS_P'] + cleanup_table['net_dP'][-1])
+        net_distance = {pc.T: cleanup_table['net_dT'][-1],
+                        pc.P: cleanup_table['net_dP'][-1]}
         for axis in self.axis:
             command = cleanup_table['postmove_cleanup_cmds'][axis.axisid]
+            if '.pos' not in command:  # some postmove commands (e.g. limit seeks) force axis position to a particular value
+                axis.pos += net_distance[axis.axisid]
             exec(command)
         try:
             self.state.store('MOVE_CMD', pc.join_notes(*cleanup_table['command']))
