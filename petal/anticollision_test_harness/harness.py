@@ -102,7 +102,7 @@ move_request_sequence = sequences.get_move_request_sequence(move_request_sequenc
 exportable_targets = []
 orig_params = {}
 for pos_param_id, pos_params in pos_param_sequence.items():         
-    for posid,params in pos_params.items():
+    for posid, params in pos_params.items():
         state = posstate.PosState(unit_id=posid, device_type='pos', petal_id=petal_id)
         state.store('POS_T',0.0)
         state.store('POS_P',180.0)

@@ -621,7 +621,6 @@ class Petal(object):
         """
         self.printfunc(f'send_move_tables called (n_retries={n_retries})')
         hw_tables = self._hardware_ready_move_tables()
-        self.printfunc(f'num tables in schedule = {len(hw_tables)}')
         if not hw_tables:
             self.printfunc('send_move_tables: no tables to send')
             return set()

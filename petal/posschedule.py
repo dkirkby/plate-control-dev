@@ -296,7 +296,7 @@ class PosSchedule(object):
         """
         should_freeze = not(not(anticollision))
         if should_freeze:
-            self.printfunc('anticollision method is "freeze" for "expert" move tables')
+            self.printfunc('anticollision method --> \'freeze\', due to presence of expert move tables')
             if self.stats.is_enabled():
                 self.stats.set_scheduling_method('freeze')
                 self.stats.add_note('expert tables')
@@ -624,6 +624,9 @@ class PosSchedule(object):
             freeze_collisions = self.stats.get_collisions_resolved_by(method='freeze')
             if freeze_collisions:
                 self.printfunc(f'{len(freeze_collisions)} collision(s) prevented by "freeze" method: {freeze_collisions}')
+        self.printfunc(f'num move tables in final schedule = {len(self.move_tables)}')
+        if self.verbose:
+            self.printfunc(f'posids with move tables in final schedule: {sorted(self.move_tables.keys())}')
         if self.petal.animator_on and self.stages['final'].sweeps:
             if self.collider.animate_colliding_only:
                 sweeps_to_add = {}
