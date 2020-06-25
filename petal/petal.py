@@ -1471,15 +1471,9 @@ class Petal(object):
     def _new_schedule(self):
         """Generate up a new, clear schedule instance.
         """
-        import traceback
-        try:
-            schedule = posschedule.PosSchedule(petal=self, stats=self.schedule_stats, verbose=self.verbose)
-            schedule.should_check_petal_boundaries = self.shape == 'petal'
-            return schedule
-        except Exception as e:
-            print(f'petal._new_schedule exception: {e}')
-            traceback.print_exc()
-            raise
+        schedule = posschedule.PosSchedule(petal=self, stats=self.schedule_stats, verbose=self.verbose)
+        schedule.should_check_petal_boundaries = self.shape == 'petal'
+        return schedule
 
     def _wait_while_moving(self):
         """Blocking implementation, to not send move tables while any positioners are
