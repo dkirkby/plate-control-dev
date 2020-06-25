@@ -621,6 +621,7 @@ class Petal(object):
         """
         self.printfunc(f'send_move_tables called (n_retries={n_retries})')
         hw_tables = self._hardware_ready_move_tables()
+        self.printfunc(f'num tables in schedule = {len(hw_tables)}')
         if not hw_tables:
             self.printfunc('send_move_tables: no tables to send')
             return set()
@@ -1065,7 +1066,7 @@ class Petal(object):
             self.altered_states = set()
             if self.schedule_stats.is_enabled():
                 stats_path = self.sched_stats_path
-                new_path = self.schedule_stats.save(path=stats_path, mode='a')
+                new_path = self.schedule_stats.save(path=stats_path, mode='a', include_footers=False)
                 if new_path != stats_path:
                     self.sched_stats_path = new_path
                     self.printfunc(f'Updated schedule stats path from {stats_path} to {new_path}')
