@@ -86,7 +86,8 @@ class PosScheduleStage(object):
         times = {posid:post['net_time'][-1] for posid,post in postprocessed.items()}
         orig_max_time = max(times.values())
         new_max_time = anneal_time if anneal_time > orig_max_time else orig_max_time
-        supply_map = {supply:[p for p in posids if p in postprocessed] for supply,posids in self._power_supply_map.items()} # list type is intentional, so easy to check below for last element
+        supply_map = {supply: [p for p in posids if p in postprocessed]  # list type is intentional, so easy to check below for last element
+                      for supply, posids in self._power_supply_map.items()}
         for posids in supply_map.values():
             group = []
             group_time = 0
