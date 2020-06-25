@@ -30,8 +30,8 @@ retracted_TP = [0, 110]
 include_neighbors = True
 
 # Whether to test some "expert" mode commands
-test_direct_dTdP = False
-test_homing = False  # note that this one will look a bit weird, since there are no hardstops in simulation. So the results take a bit of extra inspection, but still quite useful esp. to check syntax / basic function
+test_direct_dTdP = True
+test_homing = True  # note that this one will look a bit weird, since there are no hardstops in simulation. So the results take a bit of extra inspection, but still quite useful esp. to check syntax / basic function
 
 # Override for petal simulated hardware failure rates
 sim_fail_freq = {'send_tables': 0.0} 
@@ -219,8 +219,12 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                 ptl.request_homing(posids_to_test, axis=axis)
                 ptl.schedule_send_and_execute_moves(anticollision='adjust') # 'adjust' here *should* internally be ignored in favor of 'freeze'
     if ptl.schedule_stats.is_enabled():
-        stats_path = os.path.join(pc.dirs['temp_files'], 'schedstats_' + filename_suffix + '.csv')
-        ptl.schedule_stats.save(path=stats_path)
+        if not ptl.sched_stats_path:
+            stats_path = os.path.join(pc.dirs['temp_files'], 'schedstats_' + filename_suffix + '.csv')
+        else:
+            stats_path = ptl.sched_stats_path
+        ptl.schedule_stats.save(path=stats_path, mode='w', include_footers=True)
+        print(f'Stats saved to {stats_path}')
     if should_export_targets and exportable_targets:
         filename = 'xytest_targets_' + filename_suffix + '.csv'
         path = os.path.join(pc.dirs['temp_files'], filename)
