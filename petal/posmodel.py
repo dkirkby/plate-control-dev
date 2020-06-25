@@ -277,6 +277,11 @@ class Axis(object):
 
     @pos.setter
     def pos(self, value):
+        full_range = self.full_range
+        if value < min(full_range) or value > max(full_range):
+            print(f'{self.posmodel.posid} axis {self.axisid}: cannot set pos to {value}' +
+                  f' (outside allowed range of {full_range}). Keeping old value {self.pos}')
+            return
         if self.axisid == pc.T:
             self.posmodel.state.store('POS_T', value)
         else:
@@ -335,7 +340,7 @@ class Axis(object):
             return self.get_minpos(use_near_full_range) + (d[1] - d[0])
 
     @property
-    def minpos(self, use_near_full_range=False):
+    def minpos(self):
         """Min accessible position. By default this is within debounced_range.
         An option exists to get the min as defined by near_full_range instead.
         """
