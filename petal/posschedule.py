@@ -85,6 +85,11 @@ class PosSchedule(object):
         if self._deny_request_because_disabled(posmodel):
             print_denied('Positioner is disabled.')
             return False
+        if self._deny_request_because_bad_initial_position(posmodel):
+            print_denied(f'Bad initial position (POS_T, POS_P) = {posmodel.expected_current_posintTP} is' +
+                         f' outside allowed range T={posmodel.full_range_T} and/or P={posmodel.full_range_P}' +
+                         ' Recovery of this positioner requires an expert move or procedure, c.f. DESI-5732.')
+            return False
         current_position = posmodel.expected_current_position
         start_posintTP = current_position['posintTP']
         lims = 'targetable'
@@ -216,8 +221,8 @@ class PosSchedule(object):
         self._schedule_moves_check_final_sweeps_continuity()
         self._schedule_moves_store_collisions_and_pairs(colliding_sweeps, collision_pairs)
         self.move_tables = final.move_tables
-        empties = {posid for posid,table in self.move_tables.items() if not table}
-        motionless = {posid for posid,table in self.move_tables.items() if table.is_motionless}
+        empties = {posid for posid, table in self.move_tables.items() if not table}
+        motionless = {posid for posid, table in self.move_tables.items() if table.is_motionless}
         for posid in empties | motionless:
             del self.move_tables[posid]
         self._schedule_moves_store_requests_info()
@@ -290,6 +295,11 @@ class PosSchedule(object):
         stage. Any move requests are ignored.
         """
         should_freeze = not(not(anticollision))
+        if should_freeze:
+            self.printfunc('anticollision method is "freeze" for "expert" move tables')
+            if self.stats.is_enabled():
+                self.stats.set_scheduling_method('freeze')
+                self.stats.add_note('expert tables')
         self._direct_stage_conditioning(stage=self.stages['expert'],
                                         anneal_time=self.anneal_time['expert'],
                                         should_freeze=should_freeze,
@@ -508,6 +518,19 @@ class PosSchedule(object):
                 self.petal.pos_flags[posmodel.posid] |= self.petal.exceeded_lims_bit
                 return True
         return False
+    
+    def _deny_request_because_bad_initial_position(self, posmodel):
+        '''Checks for case where a bad initial POS_T or POS_P (the internally-
+        tracked angular postion would cause nonsense moves.
+        '''
+        posintTP = posmodel.expected_current_posintTP
+        rangeT = posmodel.full_range_T
+        if min(rangeT) > posintTP[pc.T] or max(rangeT) < posintTP[pc.T]:
+            return True
+        rangeP = posmodel.full_range_P
+        if min(rangeP) > posintTP[pc.P] or max(rangeP) < posintTP[pc.P]:
+            return True
+        return False
 
     def _schedule_moves_initialize_logging(self, anticollision):
         """Initial logging tasks for the schedule_moves() function."""
@@ -598,6 +621,9 @@ class PosSchedule(object):
             self.stats.set_num_move_tables(len(self.move_tables))
             self.stats.set_max_table_time(self.__max_net_time)
             self.stats.add_scheduling_time(time.clock() - self.__timer_start)
+            freeze_collisions = self.stats.get_collisions_resolved_by(method='freeze')
+            if freeze_collisions:
+                self.printfunc(f'{len(freeze_collisions)} collision(s) prevented by "freeze" method: {freeze_collisions}')
         if self.petal.animator_on and self.stages['final'].sweeps:
             if self.collider.animate_colliding_only:
                 sweeps_to_add = {}
