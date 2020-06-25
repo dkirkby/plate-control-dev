@@ -133,6 +133,14 @@ class PosSchedStats(object):
             this_dict[method] = set()
         this_dict[method] = this_dict[method].union(collision_pair_ids)
         
+    def get_collisions_resolved_by(self, method='freeze'):
+        '''Returns set of all collisions resolved by method in the latest
+        schedule.'''
+        this_dict = self.collisions[self.latest]['resolved']
+        if method in this_dict:
+            return this_dict[method].copy()
+        return {}
+        
     def add_request(self):
         """Increment requests count."""
         self.numbers['n requests'][-1] += 1
@@ -163,14 +171,18 @@ class PosSchedStats(object):
         """Set scheduling method (a string) for the current schedule."""
         self.strings['method'][-1] = str(method)
     
-    def add_note(self, note, separator='; '):
+    def add_note(self, note):
         """Add a note string for the current schedule. If one already exists,
-        then the argued note will be appended to it, separated by the arg
-        separator."""
-        if not self.strings['note'][-1] or self.strings['note'][-1] == _blank_str:
-            self.strings['note'][-1] = str(note)
+        then the argued note will be appended to it, with a standard separator.
+        """
+        if not note:
+            return
+        old = self.strings['note'][-1]
+        if old == _blank_str:
+            new = note
         else:
-            self.strings['note'][-1] += str(separator) + str(note)
+            new = pc.join_notes(old, note)
+        self.strings['note'][-1] = new
         
     def set_max_table_time(self, time):
         """Set the maximum move table time in the current schedule."""
@@ -374,9 +386,16 @@ class PosSchedStats(object):
         file.seek(0)  # go back to the beginning after finishing write
         return pd.read_csv(file)  # returns a pandas dataframe
 
-    def save(self, path=None, mode='w'):
+    def save(self, path=None, mode='w', include_footers=False):
         """Saves stats results to disk. If no path was specified, the return
         value is the path that was generated.
+        
+        Boolean argument "include_footers" enables printing some extra summary
+        statistics to the bottom of the output table. These are helpful for
+        debugging --- saves time processing the table --- but may look weird
+        if you are going to keep appending new results after them. In other
+        words, this option is best applied only when you know you're about to
+        stop appending new data to the file at the current path.'
         """
         dir_name = os.path.dirname(str(path))
         dir_exists = os.path.isdir(dir_name)
@@ -388,7 +407,6 @@ class PosSchedStats(object):
         if not os.path.exists(path):
             mode = 'w'  # override append mode in this case
         include_headers = True if mode == 'w' or not os.path.exists(path) else False
-        include_footers = False if mode == 'a' else True
         pd = self.generate_table(append_footers=include_footers)
         if mode == 'a':
             start_row = 0 if self._latest_saved_row == None else self._latest_saved_row + 1
