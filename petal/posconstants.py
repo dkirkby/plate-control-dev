@@ -99,8 +99,8 @@ else:
     generic_pos_neighbor_locs = 'not found: ' + generic_pos_neighbor_locs_path
 
 # Mapping of positioner power supplies to can channels
-power_supply_can_map = {'V1':{'can10','can11','can13','can22', 'can23'},
-                        'V2':{'can12', 'can14', 'can15', 'can16', 'can17'}}
+power_supply_canbus_map = {'V1':{'can10', 'can11', 'can13', 'can22', 'can23'},
+                           'V2':{'can12', 'can14', 'can15', 'can16', 'can17'}}
 
 # Constants
 deg = '\u00b0'
