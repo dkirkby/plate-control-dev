@@ -307,7 +307,7 @@ class Petal(object):
         # positioners
         self.sync_mode = 'soft'
         self.set_motor_parameters()
-        self.power_supply_map = self._map_power_supplies_to_posids()
+        self.power_supply_map = self._map_power_supplies_to_posids()  # used by posschedulestage for annealing
 
     def _init_collider(self, collider_file=None, anticollision='freeze'):
         '''collider, scheduler, and animator setup
@@ -1504,72 +1504,14 @@ class Petal(object):
         mapping) gets assigned a power_supply_id of 'other'. (This could happen
         for example on a non-petal test stand.)
         """
-        canids = {posid:posmodel.canid for posid,posmodel in self.posmodels.items()}
         power_supply_map = {}
         already_mapped = set()
-        for supply,mapped_cans in pc.power_supply_can_map.items():
-            mapped_posids = {posid for posid in canids.keys() if canids[posid] in mapped_cans}
-            power_supply_map[supply] = mapped_posids
-            already_mapped.union(mapped_posids)
-        power_supply_map['other'] = set(canids.keys()).difference(already_mapped)
+        for supply, these_buses in pc.power_supply_canbus_map.items():
+            these_posids = {p for p in self.posids if self.busids[p] in these_buses}
+            power_supply_map[supply] = these_posids
+            already_mapped |= these_posids
+        power_supply_map['other'] = self.posids - already_mapped
         return power_supply_map
-
-    def _update_and_send_can_enabled_info(self, power_supply_mode = 'both'):
-        """Set up CAN and CTRL_ENABLED information based on positioner power supply or supplies being enabled.
-
-        power_supply_mode ... string ('both' or 'None') or integer (1 or 2) specifying the power supply or supplies being enabled.
-        """
-        if power_supply_mode == 'None':
-            for devid in self.posids.union(self.fidids):
-                self.set_posfid_val(devid, 'CTRL_ENABLED', False)
-                self.pos_flags[devid] |= self.comm_error_bit
-            self.comm.pbset('CAN_ENABLED', {})
-        elif power_supply_mode == 'both':
-            for devid in self.posids.union(self.fidids):
-                if not devid in self.disabled_devids:
-                    self.set_posfid_val(devid, 'CTRL_ENABLED', True)
-                    self.pos_flags[devid] &= ~(self.comm_error_bit)
-            both_supplies_map = self.can_enabled_map['V1'].copy()
-            both_supplies_map.update(self.can_enabled_map['V2'])
-            self.comm.pbset('CAN_ENABLED', both_supplies_map)
-        else:
-            for devid in self.posids.union(self.fidids):
-                if not devid in self.power_supply_map['V{}'.format(power_supply_mode)]:
-                    self.set_posfid_val(devid, 'CTRL_ENABLED', False)
-                    self.pos_flags[devid] |= self.comm_error_bit
-                else:
-                    self.set_posfid_val(devid, 'CTRL_ENABLED', True)
-                    self.pos_flags[devid] &= ~(self.comm_error_bit)
-            self.comm.pbset('CAN_ENABLED', self.can_enabled_map['V{}'.format(power_supply_mode)])
-
-    def _map_can_enabled_devices(self):
-        """Reads in enable statuses for all devices and builds a formatted for petalbox can
-        id map by power supply key.
-        """
-        self.can_enabled_map = {}
-        for supply in pc.power_supply_can_map.keys():
-            self.can_enabled_map[supply] = dict((k, {}) for k in pc.power_supply_can_map[supply])
-        for devid in self.posids.union(self.fidids):
-            if self.get_posfid_val(devid, 'CTRL_ENABLED') and devid not in self.disabled_devids:
-                busid, canid = self.get_posfid_val(devid, 'BUS_ID'), self.get_posfid_val(devid, 'CAN_ID')
-                if busid in pc.power_supply_can_map['V1']:
-                    self.can_enabled_map['V1'][busid][canid] = 1 if devid.startswith('P') else 0
-                elif busid in pc.power_supply_can_map['V2']:
-                    self.can_enabled_map['V2'][busid][canid] = 1 if devid.startswith('P') else 0
-
-    def _update_can_enabled_map(self, devid, enabled = False):
-        """Update self.can_enabled_map by adding or removing a devid (string unique id of positinoer
-        or fiducial).
-        """
-        busid, canid = self.get_posfid_val(devid, 'BUS_ID'), self.get_posfid_val(devid, 'CAN_ID')
-        devtype = 1 if devid.startswith('P') else 0
-        for supply in ['V1', 'V2']:
-            if self.get_posfid_val(devid, 'BUS_ID') in pc.power_supply_can_map[supply]:
-                dev_supply = supply
-        if enabled:
-            self.can_enabled_map[dev_supply][busid][canid] = devtype
-        else:
-            self.can_enabled_map[dev_supply][busid].pop(canid, None)
 
     def _initialize_pos_flags(self, ids='all', enabled_only=True):
         '''
