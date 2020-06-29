@@ -1074,7 +1074,11 @@ class Petal(object):
                     self.printfunc(f'Updated schedule stats path from {stats_path} to {new_path}')
         elif mode == 'calib':
             self.altered_calib_states = set()
-        self.collider.refresh_calibrations(verbose=False)  # 2020-06-29 [JHS] This only takes 0.5 ms on my desktop, and guarantees freshness of collider cache.
+        
+        # 2020-06-29 [JHS] This step is a simple way to guarantee freshness of
+        # the collider cache. Executes in 6.3 ms on my desktop, for a simulated
+        # petal of 502 positioners.
+        self.collider.refresh_calibrations(verbose=False)
 
     def _send_to_db_as_necessary(self, states, mode):
         '''Saves state data to posmove database, if that behavior is currently
