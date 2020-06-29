@@ -597,10 +597,13 @@ class Petal(object):
         of positioners. (But there are certain 'expert use' test cases in the
         lab, where we want this feature turned off.)
         """
-        self.printfunc('schedule_moves called with anticollision = %r' % anticollision)
+        if anticollision == 'None':
+            anticollision = None  # because DOS Console casts None into 'None'
+        self.printfunc(f'schedule_moves called with anticollision = {anticollision}')
         if anticollision not in {None,'freeze','adjust'}:
             anticollision = self.anticollision_default
-        
+            self.printfunc('using default anticollision mode = {self.anticollision_default}')
+            
         # This temporary stateful storage is an unfortunate necessity for error
         # handling, when we need to reschedule the move tables. Needed here
         # because the sequence of schedule_moves() --> send_move_tables()
@@ -707,7 +710,7 @@ class Petal(object):
         self.execute_moves()
         return failed_posids
 
-    def quick_move(self, posids=[], command='', target=[None, None],
+    def quick_move(self, posids='', command='', target=[None, None],
                    log_note='', anticollision='default', should_anneal=True,
                    disable_limit_angle=False):
         """Convenience wrapper to request, schedule, send, and execute a single move command, all in
@@ -739,13 +742,13 @@ class Petal(object):
         self.schedule_send_and_execute_moves(anticollision, should_anneal)
         self.limit_angle = old_limit
 
-    def quick_direct_dtdp(self, posids=[], dtdp=[0,0], log_note='', should_anneal=True):
+    def quick_direct_dtdp(self, posids='', dtdp=[0,0], log_note='', should_anneal=True):
         """Convenience wrapper to request, schedule, send, and execute a single move command for a
         direct (delta theta, delta phi) relative move. There is NO anti-collision calculation. This
         method is intended for expert usage only. You can argue an iterable collection of posids if
         you want, though note they will all get the same (dt,dp) sent to them.
 
-        INPUTS:     posids    ... either a single posid or a list of posids
+        INPUTS:     posids    ... either a single posid or a list of posids (note sets don't work at DOS Console interface)
                     dtdp      ... [dt,dp], note that all posids get sent the same [dt,dp] here. i.e. dt and dp are each just one number
                     log_note  ... optional string to include in the log file
                     should_anneal ... see comments in schedule_moves() function
