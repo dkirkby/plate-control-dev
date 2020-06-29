@@ -122,12 +122,8 @@ class PosScheduleStage(object):
             postprocessed = table.for_schedule()
             times[posid] = postprocessed['net_time'][-1]
         max_time = max(times.values())
-        if self.verbose:
-            self.printfunc("max time " + str(max_time))
         for posid,table in self.move_tables.items():
             equalizing_pause = max_time - times[posid]
-            if self.verbose:
-                self.printfunc(posid + ' ' + str(equalizing_pause) + ' ' + str(times[posid]))
             if equalizing_pause:
                 idx = table.n_rows
                 table.insert_new_row(idx)
@@ -135,6 +131,8 @@ class PosScheduleStage(object):
                 if self.sweeps: # because no collision checking is performed if anticollsion=None
                     if posid in self.sweeps.keys():
                         self.sweeps[posid].extend(self.collider.timestep, max_time)
+        if self.verbose:
+            self.printfunc(f'posschedulestage: move time after annealing = {max_time}')
         return max_time
 
     def adjust_path(self, posid, freezing='on'):

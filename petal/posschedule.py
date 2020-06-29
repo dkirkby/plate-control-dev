@@ -341,9 +341,6 @@ class PosSchedule(object):
         if should_anneal:
             stage.anneal_tables(anneal_time)
         if should_freeze:
-            if self.verbose:
-                self.printfunc(f'schedule finding collisions: {len(stage.move_tables)}')
-                self.printfunc('Posschedule first move table: \n' + str(list(stage.move_tables.values())[0].for_collider()))
             colliding_sweeps, all_sweeps = stage.find_collisions(stage.move_tables)
             stage.store_collision_finding_results(colliding_sweeps, all_sweeps)
             if self.verbose:
