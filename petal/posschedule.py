@@ -602,7 +602,7 @@ class PosSchedule(object):
             log_note_addendum = ''              
             if posid in self._requests:
                 req = self._requests[posid]
-                table.store_orig_command(0,req['command'],req['cmd_val1'],req['cmd_val2']) # keep the original commands with move tables
+                table.store_orig_command(string=req['command'], val1=req['cmd_val1'], val2=req['cmd_val2']) # keep the original commands with move tables
                 log_note_addendum = req['log_note'] # keep the original log notes with move tables
                 if stats_enabled:
                     if posid in self.__original_request_posids and self._table_matches_request(table_for_schedule,req):

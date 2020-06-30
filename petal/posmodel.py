@@ -235,16 +235,20 @@ class PosModel(object):
         net_distance = {pc.T: cleanup_table['net_dT'][-1],
                         pc.P: cleanup_table['net_dP'][-1]}
         for axis in self.axis:
-            command = cleanup_table['postmove_cleanup_cmds'][axis.axisid]
-            if '.pos' not in command:  # some postmove commands (e.g. limit seeks) force axis position to a particular value
+            cleanup_cmd = cleanup_table['postmove_cleanup_cmds'][axis.axisid]
+            if '.pos' not in cleanup_cmd:  # some postmove commands (e.g. limit seeks) force axis position to a particular value
                 axis.pos += net_distance[axis.axisid]
-            exec(command)
-        try:
-            self.state.store('MOVE_CMD', pc.join_notes(*cleanup_table['command']))
-            self.state.store('MOVE_VAL1', pc.join_notes(*cleanup_table['cmd_val1']))
-            self.state.store('MOVE_VAL2', pc.join_notes(*cleanup_table['cmd_val2']))
-        except Exception as e:
-            print('postmove_cleanup: %s' % str(e))
+            exec(cleanup_cmd)
+        move_cmds = {}
+        move_cmds['MOVE_CMD'] = [cleanup_table['orig_command']]
+        move_cmds['MOVE_CMD'] += cleanup_table['auto_commands']
+        for letter, number in zip(['T', 'P'], ['1', '2']):
+            speeds_dists = zip(cleanup_table[f'speed_mode_{letter}'], cleanup_table[f'd{letter}'])
+            move_cmds[f'MOVE_VAL{number}'] = [f'{speed} {dist:.3f}' for speed, dist in speeds_dists]
+        for key, sublist in move_cmds.items():
+            string = pc.join_notes(*sublist)
+            self.state.store(key, string)
+            print(f'{key}: {string}')
         self.state.store('TOTAL_CRUISE_MOVES_T', self.state._val['TOTAL_CRUISE_MOVES_T'] + cleanup_table['TOTAL_CRUISE_MOVES_T'])
         self.state.store('TOTAL_CRUISE_MOVES_P', self.state._val['TOTAL_CRUISE_MOVES_P'] + cleanup_table['TOTAL_CRUISE_MOVES_P'])
         self.state.store('TOTAL_CREEP_MOVES_T', self.state._val['TOTAL_CREEP_MOVES_T'] + cleanup_table['TOTAL_CREEP_MOVES_T'])

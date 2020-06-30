@@ -499,7 +499,7 @@ class Petal(object):
             table.set_move(0, pc.T, request['target'][0])
             table.set_move(0, pc.P, request['target'][1])
             cmd_str = (cmd_prefix + ' ' if cmd_prefix else '') + 'direct_dtdp'
-            table.store_orig_command(0,cmd_str,request['target'][0],request['target'][1])
+            table.store_orig_command(string=cmd_str, val1=request["target"][0], val2=request["target"][1])
             table.append_log_note(request['log_note'])
             table.allow_exceed_limits = True
             if 'postmove_cleanup_cmds' in request:
@@ -532,7 +532,7 @@ class Petal(object):
             table.set_move(0, pc.T, dist[0])
             table.set_move(0, pc.P, dist[1])
             cmd_str = (cmd_prefix + ' ' if cmd_prefix else '') + 'limit seek'
-            table.store_orig_command(0,cmd_str,direction*(axisid == pc.T),direction*(axisid == pc.P))
+            table.store_orig_command(string=f'{cmd_str} dir={direction}')
             table.append_log_note(log_note)
             axis_cmd_prefix = f'self.axis[{axisid}]'
             table.append_postmove_cleanup_cmd(axisid=axisid, cmd_str=f'{axis_cmd_prefix}.total_limit_seeks += 1')
@@ -1347,7 +1347,7 @@ class Petal(object):
         else:
             return out
     
-    def quick_query(self, key=None, op='', value=0, posids='all', display=True):
+    def quick_query(self, key=None, op='', value=0, posids='all', display=False):
         '''Returns a list of posids which have a parameter key with some
         relation op to value. Not all conceivable param keys and ops are
         necessarily supported. Can be applied to all posids on the petal, or

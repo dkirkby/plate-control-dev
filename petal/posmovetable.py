@@ -38,6 +38,7 @@ class PosMoveTable(object):
         self.allow_exceed_limits = self.posmodel.state._val['ALLOW_EXCEED_LIMITS']
         self.allow_cruise = not(self.posmodel.state._val['ONLY_CREEP'])
         self._postmove_cleanup_cmds = {pc.T: '', pc.P: ''}
+        self._orig_command = ''
 
     def as_dict(self):
         """Returns a dictionary containing copies of all the table data."""
@@ -183,12 +184,15 @@ class PosMoveTable(object):
             self.insert_new_row(rowidx)
         self.rows[rowidx].data[dist_label[axisid]] = distance
 
-    def store_orig_command(self, rowidx, cmd_string, val1, val2):
-        """To keep a copy of the original move command with the move table.
-        """
-        self.rows[rowidx].data['command']  = cmd_string
-        self.rows[rowidx].data['cmd_val1'] = val1
-        self.rows[rowidx].data['cmd_val2'] = val2
+    def store_orig_command(self, string, val1=None, val2=None):
+        '''To keep a note of original move command associated with this move
+        table. If any such notes already exist, the action is like an append.
+        args val1 and val2 are optional, and are intended to represent a pair
+        of coordinates.
+        '''
+        if val1 != None or val2 != None:
+            string = f'{string}=[{val1}, {val2}]'
+        self._orig_command = pc.join_notes(self._orig_command, string)
         
     def append_postmove_cleanup_cmd(self, axisid, cmd_str):
         """Add a posmodel cleanup command for execution after the move has
@@ -239,7 +243,8 @@ class PosMoveTable(object):
             self.rows.append(otherrow.copy())
         for axisid, cmd_str in other_move_table._postmove_cleanup_cmds.items():
             self.append_postmove_cleanup_cmd(axisid=axisid, cmd_str=cmd_str)
-
+        self.store_orig_command(string=other_move_table._orig_command)
+        
     # internal methods
     def _calculate_true_moves(self):
         """Uses PosModel instance to get the real, quantized, calibrated values.
@@ -265,8 +270,7 @@ class PosMoveTable(object):
             for i in [pc.T,pc.P]:
                 backlash[i] = -backlash_dir[i] * backlash_mag * has_moved[i]
                 new_moves[i].append(self.posmodel.true_move(i, backlash[i], self.allow_cruise, limits='near_full', init_posintTP=latest_TP))
-                new_moves[i][-1]['command'] = '(auto backlash backup)'
-                new_moves[i][-1]['cmd_val'] = new_moves[i][-1]['distance']
+                new_moves[i][-1]['auto_command'] = '(auto backlash backup)'
                 latest_TP[i] += new_moves[i][-1]['distance']
         if self.should_final_creep or any(backlash):
             ideal_total = [0,0]
@@ -278,20 +282,18 @@ class PosMoveTable(object):
                 actual_total[i] = latest_TP[i] - self.init_posintTP[i]
                 err_dist[i] = ideal_total[i] - actual_total[i]
                 new_moves[i].append(self.posmodel.true_move(i, err_dist[i], allow_cruise=False, limits='near_full', init_posintTP=latest_TP))
-                new_moves[i][-1]['command'] = '(auto final creep)'
-                new_moves[i][-1]['cmd_val'] = new_moves[i][-1]['distance']
+                new_moves[i][-1]['auto_command'] = '(auto final creep)'
                 latest_TP[i] += new_moves[i][-1]['distance']
         self._rows_extra = []
         for i in range(len(new_moves[0])):
             self._rows_extra.append(PosMoveRow())
-            self._rows_extra[i].data = {'dT_ideal'  : new_moves[pc.T][i]['distance'],
-                                        'dP_ideal'  : new_moves[pc.P][i]['distance'],
-                                        'prepause'  : 0,
-                                        'move_time' : max(new_moves[pc.T][i]['move_time'],new_moves[pc.P][i]['move_time']),
-                                        'postpause' : 0,
-                                        'command'   : new_moves[pc.T][i]['command'],
-                                        'cmd_val1'  : new_moves[pc.T][i]['cmd_val'],
-                                        'cmd_val2'  : new_moves[pc.P][i]['cmd_val']}
+            self._rows_extra[i].data = {'dT_ideal': new_moves[pc.T][i]['distance'],
+                                        'dP_ideal': new_moves[pc.P][i]['distance'],
+                                        'prepause': 0,
+                                        'move_time': max(new_moves[pc.T][i]['move_time'],new_moves[pc.P][i]['move_time']),
+                                        'postpause': 0,
+                                        'auto_command': new_moves[pc.T][i]['auto_command'],
+                                        }
         for i in [pc.T,pc.P]:
             true_and_new[i].extend(true_moves[i])
             true_and_new[i].extend(new_moves[i])
@@ -321,9 +323,8 @@ class PosMoveTable(object):
             table['speed_mode_T'] = [true_moves[pc.T][i]['speed_mode'] for i in row_range]
             table['speed_mode_P'] = [true_moves[pc.P][i]['speed_mode'] for i in row_range]
         if output_type in {'full', 'cleanup'}:
-            table['command'] = [rows[i].data['command'] for i in row_range]
-            table['cmd_val1'] = [rows[i].data['cmd_val1'] for i in row_range]
-            table['cmd_val2'] = [rows[i].data['cmd_val2'] for i in row_range]
+            table['orig_command'] = self._orig_command
+            table['auto_commands'] = [rows[i].data['auto_command'] for i in row_range]
         if output_type in {'collider', 'schedule', 'full', 'hardware'}:
             table['move_time'] = [max(true_moves[pc.T][i]['move_time'],true_moves[pc.P][i]['move_time']) for i in row_range]
         if output_type == 'hardware':
@@ -387,9 +388,8 @@ class PosMoveRow(object):
                      'prepause'             : 0,         # [sec] delay for this number of seconds before executing the move
                      'move_time'            : 0,         # [sec] time it takes the move to execute
                      'postpause'            : 0,         # [sec] delay for this number of seconds after the move has completed
-                     'command'              : '',        # [string] command corresponding to this row
-                     'cmd_val1'             : None,      # [-] command argument 1
-                     'cmd_val2'             : None}      # [-] command argument 2
+                     'auto_command'         : '',        # [string] auto-generated command info corresponding to this row
+                     }
         
     def __repr__(self):
         return repr(self.data)
