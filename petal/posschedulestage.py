@@ -444,6 +444,8 @@ class PosScheduleStage(object):
             neighbor_clearance_time += pc.num_timesteps_clearance_margin * self.collider.timestep
         elif method == 'pause':
             return {} # no point in pausing if neighbor never moves
+        else:
+            neighbor_clearance_time = 0
             
         # pause method
         if method == 'pause':
