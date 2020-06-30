@@ -1347,7 +1347,7 @@ class Petal(object):
         else:
             return out
     
-    def get_pos_with(self, key=None, op='', value=0, posids='all', display=True):
+    def quick_query(self, key=None, op='', value=0, posids='all', display=True):
         '''Returns a list of posids which have a parameter key with some
         relation op to value. Not all conceivable param keys and ops are
         necessarily supported. Can be applied to all posids on the petal, or
@@ -1384,7 +1384,7 @@ class Petal(object):
                       'position_keys': sorted(position_keys),
                       'valid_ops': sorted(valid_ops)}
             return valids
-        msg_prefix = 'get_pos_with:'
+        msg_prefix = 'quick_query:'
         err_prefix = f'{msg_prefix} error,'
         assert key in valid_keys, f'{err_prefix} invalid key {key}'
         assert op in valid_ops, 'f{err_prefix} invalid op {op}'
