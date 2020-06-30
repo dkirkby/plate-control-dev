@@ -730,7 +730,7 @@ class Petal(object):
         if disable_limit_angle:
             self.limit_angle = None
         requests = {}
-        posids = {posids} if isinstance(posids,str) else set(posids)
+        posids = {posids} if isinstance(posids, str) else set(posids)
         err_prefix = 'quick_move: error,'
         assert len(posids) > 0, f'{err_prefix} empty posids argument'
         assert command in pc.valid_move_commands, f'{err_prefix} invalid move command {command}'
@@ -754,7 +754,7 @@ class Petal(object):
                     should_anneal ... see comments in schedule_moves() function
         """
         requests = {}
-        posids = {posids} if isinstance(posids,str) else set(posids)
+        posids = {posids} if isinstance(posids, str) else set(posids)
         err_prefix = 'quick_direct_dtdp: error,'
         assert len(posids) > 0, f'{err_prefix} empty posids argument'
         assert len(dtdp) == 2, f'{err_prefix} dtdp arg len = {len(dtdp)} != 2'
@@ -1252,7 +1252,7 @@ class Petal(object):
         pos = set(posids).intersection(self.posids)
         return {p: self.posmodels[p] for p in pos if self.posmodels[p].is_enabled}
 
-    def get_pos_flags(self, posids = 'all', should_reset = False):
+    def get_pos_flags(self, posids='all', should_reset = False):
         '''Getter function for self.pos_flags that carries out a final is_enabled
         check before passing them off. Important in case the PC sets ctrl_enabled = False
         when a positioner is not responding.
@@ -1274,6 +1274,77 @@ class Petal(object):
         if should_reset:
             self._initialize_pos_flags()
         return pos_flags
+    
+    def set_keepouts(self, posids='', radT=0.0, radP=0.0, angT=0.0, angP=0.0, classify_retracted=False):
+        '''Convenience function to set parameters affecting positioner collision
+        envelope(s). One or more posids may be argued. The other args will be
+        uniformly applied to ALL argued posids.
+        
+        INPUTS:
+            posids ... 'all', an id string, or an iterable
+            angT ... new value for 'KEEPOUT_EXPANSION_THETA_RADIAL'
+            radT ... new value for 'KEEPOUT_EXPANSION_PHI_RADIAL'
+            angP ... new value for 'KEEPOUT_EXPANSION_THETA_ANGULAR'
+            radP ... new value for 'KEEPOUT_EXPANSION_PHI_ANGULAR'
+            classify_retracted ... new value for 'CLASSIFIED_AS_RETRACTED'
+        '''
+        if posids == 'all':
+            posids = self.posids
+        else:
+            posids = {posids} if isinstance(posids, str) else set(posids)
+        new = {'KEEPOUT_EXPANSION_THETA_RADIAL': radT,
+               'KEEPOUT_EXPANSION_PHI_RADIAL': radP,
+               'KEEPOUT_EXPANSION_THETA_ANGULAR': angT,
+               'KEEPOUT_EXPANSION_PHI_ANGULAR': angP,
+               'CLASSIFIED_AS_RETRACTED': classify_retracted}
+        msg_prefix = 'set_keepouts:'
+        err_prefix = f'{msg_prefix} error,'
+        assert len(posids) > 0, f'{err_prefix} empty posids argument'
+        for key, val in new.items():
+            try:
+                float(val)
+            except:
+                assert False, f'{err_prefix} non-numeric {key} {val}'
+            assert np.isfinite(val), f'{err_prefix} non-finite {key} {val}'
+        assert isinstance(classify_retracted, bool), f'{err_prefix} non-boolean classify_retracted {classify_retracted}'
+        changed = set()
+        for key, val in new.items():
+            changed_this_key = set()
+            for posid in posids:
+                if self.get_posfid_val(posid, key) != val:
+                    self.set_posfid_val(posid, key, val)
+                    changed_this_key.add(posid)
+            if changed_this_key:
+                self.printfunc(f'{msg_prefix} Changed {key} to {val} for {len(changed_this_key)}' +
+                               f' positioner(s): {changed_this_key}')
+            changed |= changed_this_key
+        if changed:
+            self.printfunc(f'{msg_prefix} Committing new values for {len(changed)} positioner(s)')
+            self.commit(mode='calib')  # as of 2020-06-29, all valid args here are stored in calib table of DB
+        else:
+            self.printfunc(f'{msg_prefix} No positioners found requiring parameter update(s)')
+            
+    def get_collision_params(self, posid, display=True):
+        '''Displays or returns a formatted string, describing the current parameters
+        known to the collider module for a given positioner.
+        
+        INPUTS:     posid ... string identifying the positioner
+                    display ... boolean, if True (default) prints to screen, else returns string
+        '''
+        if posid in self.posids:
+            out = f'{posid}:'
+            for dict_name in ['R1', 'R2', 'x0', 'y0', 't0', 'p0', 'keepout_expansions',
+                              'pos_neighbors', 'fixed_neighbor_cases', 'keepouts_T',
+                              'keepouts_P']:
+                value = getattr(self.collider, dict_name)[posid]
+                out += f'\n {dict_name}: {value}'
+            out += f'\n classified_as_retracted: {posid in self.collider.classified_as_retracted}'
+        else:
+            out = f'No posid {posid} found'
+        if display:
+            self.printfunc(out)
+        else:
+            return out
 
 # MOVE SCHEDULING ANIMATOR CONTROLS
 
