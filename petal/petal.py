@@ -710,7 +710,7 @@ class Petal(object):
         self.execute_moves()
         return failed_posids
 
-    def quick_move(self, posids='', command='', target=[None, None],
+    def quick_move(self, posids='', cmd='', target=[None, None],
                    log_note='', anticollision='default', should_anneal=True,
                    disable_limit_angle=False):
         """Convenience wrapper to request, schedule, send, and execute a single move command, all in
@@ -719,7 +719,7 @@ class Petal(object):
         this often makes sense, but not for a global coordinate.
 
         INPUTS:     posids    ... either a single posid or an iterable collection of posids (note sets don't work at DOS Console interface)
-                    command   ... string like those usually put in the requests dictionary (see request_targets method)
+                    cmd       ... command string like those usually put in the requests dictionary (see request_targets method)
                     target    ... [u,v] values, note that all positioners here get sent the same [u,v] here
                     log_note  ... optional string to include in the log file
                     anticollsion  ... 'default', 'adjust', 'freeze', or None. See comments in schedule_moves() function
@@ -733,11 +733,11 @@ class Petal(object):
         posids = {posids} if isinstance(posids, str) else set(posids)
         err_prefix = 'quick_move: error,'
         assert len(posids) > 0, f'{err_prefix} empty posids argument'
-        assert command in pc.valid_move_commands, f'{err_prefix} invalid move command {command}'
+        assert cmd in pc.valid_move_commands, f'{err_prefix} invalid move command {cmd}'
         assert len(target) == 2, f'{err_prefix} target arg len = {len(target)} != 2'
         assert all(np.isfinite(target)), f'{err_prefix} non-finite target {target}'
         for posid in posids:
-            requests[posid] = {'command':command, 'target':target, 'log_note':log_note}
+            requests[posid] = {'command':cmd, 'target':target, 'log_note':log_note}
         self.request_targets(requests)
         self.schedule_send_and_execute_moves(anticollision, should_anneal)
         self.limit_angle = old_limit
@@ -1275,7 +1275,7 @@ class Petal(object):
             self._initialize_pos_flags()
         return pos_flags
     
-    def set_keepouts(self, posids='', radT=0.0, radP=0.0, angT=0.0, angP=0.0, classify_retracted=False):
+    def set_keepouts(self, posids, radT=0.0, radP=0.0, angT=0.0, angP=0.0, classify_retracted=False):
         '''Convenience function to set parameters affecting positioner collision
         envelope(s). One or more posids may be argued. The other args will be
         uniformly applied to ALL argued posids.
@@ -1328,8 +1328,9 @@ class Petal(object):
         '''Displays or returns a formatted string, describing the current parameters
         known to the collider module for a given positioner.
         
-        INPUTS:     posid ... string identifying the positioner
-                    display ... boolean, if True (default) prints to screen, else returns string
+        INPUTS:
+            posid ... string identifying the positioner
+            display ... boolean, if True (default) prints to screen, else returns string
         '''
         if posid in self.posids:
             out = f'{posid}:'
@@ -1346,17 +1347,83 @@ class Petal(object):
         else:
             return out
     
-    def get_posids_with(self, key, op, value):
-        '''Returns a list of all posids which have a parameter key with some
+    def get_pos_with(self, key=None, op='', value=0, posids='all'):
+        '''Returns a list of posids which have a parameter key with some
         relation op to value. Not all conceivable param keys and ops are
-        necessarily supported.
+        necessarily supported. Can be applied to all posids on the petal, or
+        an argued subset.
         
-        INPUTS:     key ... string like 'POS_P' or 'LENGTH_R1', etc
-                    op ... string, valid options are {'>', '>=', '==', '<', '<='}
-                    value ... the thing to compare against
+        INPUTS:
+            key ... string like 'POS_P' or 'LENGTH_R1', etc
+            op ... string like '>' or '==', etc. Can leave blank to simply retrieve all values.
+            value ... the operand to compare against
+            posids ... 'all' or iterator of positioner id strings
+            
+        Call with no arguments, to get a list of valid keys and ops.
+        
+        Any position value (such as 'posintT' or 'Q' or 'flatX') is the current
+        *expected* position (i.e. the internally-tracked value), based on latest
+        POS_T, POS_P, and calibration params.
         '''
-        self.printfunc('Not yet implemented')
-        return []
+        import operator
+        position_keys = {'posintT', 'posintP', 'poslocT', 'poslocP', 'poslocX',
+                         'poslocY', 'flatX', 'flatY', 'ptlX', 'ptlY', 'obsX',
+                         'obsY', 'Q', 'S'}
+        state_keys = set(pc.calib_keys) | {'POS_P', 'POS_T', 'CTRL_ENABLED'}
+        valid_keys = position_keys | state_keys
+        valid_ops = {'>': operator.gt,
+                     '>=': operator.ge,
+                     '==': operator.eq,
+                     '<': operator.lt,
+                     '<=': operator.le,
+                     '!=': operator.ne,
+                     '': None}
+        if not any([key, op, value]):
+            valids = {'state_keys': sorted(state_keys),
+                      'position_keys': sorted(position_keys),
+                      'valid_ops': sorted(valid_ops)}
+            return valids
+        msg_prefix = 'get_pos_with:'
+        err_prefix = f'{msg_prefix} error,'
+        assert key in valid_keys, f'{err_prefix} invalid key {key}'
+        assert op in valid_ops, 'f{err_prefix} invalid op {op}'
+        op_func = valid_ops[op]
+        try:
+            operand = float(value)
+        except:
+            assert False, f'{err_prefix} invalid type {type(value)} for value {value}'
+        if posids == 'all':
+            posids = self.posids
+        else:
+            posids = {posids} if isinstance(posids, str) else set(posids)
+        assert len(posids) > 0, f'{err_prefix} empty posids argument'
+        if key in position_keys:
+            def getter(posid):
+                expected = self.posmodels[posid].expected_current_position
+                if key in {'Q', 'S'}:
+                    return expected[key]
+                prefix = key[:-1]
+                suffix = key[-1]
+                if suffix in {'T', 'P'}:
+                    pair_key = prefix + 'TP'
+                else:
+                    pair_key = prefix + 'XY'
+                pair = expected[pair_key]
+                if suffix in {'T', 'X'}:
+                    return pair[0]
+                return pair[1]
+        else:
+            def getter(posid):
+                return self.states[posid]._val[key]
+        found = dict() if op == '' else set()
+        posids = sorted(posids)
+        for posid in posids:
+            this_value = getter(posid)
+            if op == '':
+                found[posid] = this_value
+            elif op_func(this_value, operand):
+                found.add(posid)
+        return found
 
 # MOVE SCHEDULING ANIMATOR CONTROLS
 
