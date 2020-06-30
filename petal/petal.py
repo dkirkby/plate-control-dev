@@ -1347,7 +1347,7 @@ class Petal(object):
         else:
             return out
     
-    def get_pos_with(self, key=None, op='', value=0, posids='all'):
+    def get_pos_with(self, key=None, op='', value=0, posids='all', display=True):
         '''Returns a list of posids which have a parameter key with some
         relation op to value. Not all conceivable param keys and ops are
         necessarily supported. Can be applied to all posids on the petal, or
@@ -1358,6 +1358,7 @@ class Petal(object):
             op ... string like '>' or '==', etc. Can leave blank to simply retrieve all values.
             value ... the operand to compare against
             posids ... 'all' or iterator of positioner id strings
+            display ... boolean, if True prints to screen, else returns an iterable (list or dict)
             
         Call with no arguments, to get a list of valid keys and ops.
         
@@ -1415,15 +1416,21 @@ class Petal(object):
         else:
             def getter(posid):
                 return self.states[posid]._val[key]
-        found = dict() if op == '' else set()
+        found = dict() if op == '' else list()
         posids = sorted(posids)
         for posid in posids:
             this_value = getter(posid)
             if op == '':
                 found[posid] = this_value
             elif op_func(this_value, operand):
-                found.add(posid)
-        return found
+                found.append(posid)
+        if display:
+            if isinstance(found, dict):
+                found = [f'{key}: {val}' for key, val in found.items()]
+            found = '\n'.join(found)
+            self.printfunc(f'\n{found}')
+        else:
+            return found
 
 # MOVE SCHEDULING ANIMATOR CONTROLS
 
