@@ -1345,6 +1345,18 @@ class Petal(object):
             self.printfunc(out)
         else:
             return out
+    
+    def get_posids_with(self, key, op, value):
+        '''Returns a list of all posids which have a parameter key with some
+        relation op to value. Not all conceivable param keys and ops are
+        necessarily supported.
+        
+        INPUTS:     key ... string like 'POS_P' or 'LENGTH_R1', etc
+                    op ... string, valid options are {'>', '>=', '==', '<', '<='}
+                    value ... the thing to compare against
+        '''
+        self.printfunc('Not yet implemented')
+        return []
 
 # MOVE SCHEDULING ANIMATOR CONTROLS
 
