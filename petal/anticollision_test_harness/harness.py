@@ -64,6 +64,7 @@ n_corrections = 0 # number of correction moves to simulate after each target
 max_correction_move = 0.1/1.414 # mm
 should_profile = False
 should_inspect_some_TP = False # some *very* verbose printouts of POS_T, OFFSET_T, etc, sometimes helpful for debugging
+ignore_params_ctrl_enabled = False # turn on posids regardless of the CTRL_ENABLED column in params file
 
 # saving of target sets for later use on hardware
 # formatted for direct input to xytest
@@ -104,10 +105,12 @@ orig_params = {}
 for pos_param_id, pos_params in pos_param_sequence.items():         
     for posid, params in pos_params.items():
         state = posstate.PosState(unit_id=posid, device_type='pos', petal_id=petal_id)
-        state.store('POS_T',0.0)
-        state.store('POS_P',180.0)
+        state.store('POS_T', 0.0)
+        state.store('POS_P', 180.0)
         for key,val in params.items():
             state.store(key,val)
+        if ignore_params_ctrl_enabled:
+            state.store('CTRL_ENABLED', True)
         if params['DEVICE_LOC'] in retract_and_disable:
             orig_params[posid] = {key:state._val[key] for key in ['CTRL_ENABLED', 'CLASSIFIED_AS_RETRACTED']}
             state.store('POS_T', retracted_TP[0])
