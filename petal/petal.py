@@ -1346,7 +1346,7 @@ class Petal(object):
             out = f'No posid {posid} found'
         return out
     
-    def quick_query(self, key=None, op='', value=0, posids='all', mode='iterable'):
+    def quick_query(self, key=None, op='', value=0, posids='all', mode='compact'):
         '''Returns a list of posids which have a parameter key with some
         relation op to value. Not all conceivable param keys and ops are
         necessarily supported. Can be applied to all posids on the petal, or
@@ -1423,13 +1423,16 @@ class Petal(object):
                 found[posid] = this_value
             elif op_func(this_value, operand):
                 found.append(posid)
+        out = found
         if mode == 'compact':
-            found = str(found)
+            out = str(found)
         elif mode == 'expanded':
             if isinstance(found, dict):
-                found = [f'{key}: {val}' for key, val in found.items()]
-            found = '\n'.join(found)
-        return found
+                out = [f'{key}: {val}' for key, val in found.items()]
+            out = '\n'.join(out)
+        if isinstance(out, str):
+            out = f'total entries found = {len(found)}\n{out}'
+        return out
 
 # MOVE SCHEDULING ANIMATOR CONTROLS
 
