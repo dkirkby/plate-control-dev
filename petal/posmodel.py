@@ -248,7 +248,6 @@ class PosModel(object):
         for key, sublist in move_cmds.items():
             string = pc.join_notes(*sublist)
             self.state.store(key, string)
-            print(f'{key}: {string}')
         self.state.store('TOTAL_CRUISE_MOVES_T', self.state._val['TOTAL_CRUISE_MOVES_T'] + cleanup_table['TOTAL_CRUISE_MOVES_T'])
         self.state.store('TOTAL_CRUISE_MOVES_P', self.state._val['TOTAL_CRUISE_MOVES_P'] + cleanup_table['TOTAL_CRUISE_MOVES_P'])
         self.state.store('TOTAL_CREEP_MOVES_T', self.state._val['TOTAL_CREEP_MOVES_T'] + cleanup_table['TOTAL_CREEP_MOVES_T'])
