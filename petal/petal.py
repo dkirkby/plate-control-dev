@@ -1330,7 +1330,6 @@ class Petal(object):
         
         INPUTS:
             posid ... string identifying the positioner
-            display ... boolean, if True (default) prints to screen, else returns string
         '''
         if posid in self.posids:
             out = f'{posid}:'
