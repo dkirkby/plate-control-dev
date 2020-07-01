@@ -41,12 +41,13 @@ class PosSchedule(object):
         self.should_check_sweeps_continuity = False # if True, inspects all quantized sweeps to confirm well-formed. incurs slowdown, and generally is not needed; more for validating if any changes made to quantize function at a lower level
         self.move_tables = {}
         self._expert_added_tables_sequence = []  # copy of original sequence in which expert tables were added (for error-recovery cases)
+        self._all_received_requested_posids = set()  # every posid that received a request, whether accepted or not (diferent)
 
     @property
     def collider(self):
         return self.petal.collider
 
-    def request_target(self, posid, uv_type, u, v, log_note=''):
+    def request_target(self, posid, uv_type, u, v, log_note='', allow_initial_interference=False):
         """Adds a request to the schedule for a given positioner to move to the
         target position (u,v) or by the target distance (du,dv) in the
         coordinate system indicated by uv_type.
@@ -66,6 +67,12 @@ class PosSchedule(object):
                         in the log data
 
         A schedule can only contain 1 target request per positioner at a time.
+        
+        The special argument allow_initial_interference takes a boolean. In all
+        normal cases leave it False (the default). In rare expert calls it may
+        be used, for extracting collided positioners from one another (cases
+        where it is known ahead of time that anticollision will be set to None
+        in the next call to schedule_moves).
 
         Return value is True if the request was accepted and False if denied.
         """
@@ -73,8 +80,9 @@ class PosSchedule(object):
         if stats_enabled:
             timer_start = time.clock()
             self.stats.add_request()
+        self._all_received_requested_posids.add(posid)
         def print_denied(string):
-            denied_prefix = str(posid) + ' : target request denied. '
+            denied_prefix = str(posid) + ': Target request denied. '
             self.printfunc(denied_prefix + str(string))
         posmodel = self.petal.posmodels[posid]
         trans = posmodel.trans
@@ -85,11 +93,15 @@ class PosSchedule(object):
         if self._deny_request_because_disabled(posmodel):
             print_denied('Positioner is disabled.')
             return False
-        if self._deny_request_because_bad_initial_position(posmodel):
+        if self._deny_request_because_starting_out_of_range(posmodel):
             print_denied(f'Bad initial position (POS_T, POS_P) = {posmodel.expected_current_posintTP} is' +
-                         f' outside allowed range T={posmodel.full_range_T} and/or P={posmodel.full_range_P}' +
-                         ' Recovery of this positioner requires an expert move or procedure, c.f. DESI-5732.')
+                         f' outside allowed range T={posmodel.full_range_T} and/or P={posmodel.full_range_P}')
             return False
+        if not allow_initial_interference:
+            interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel)
+            if interfering_neighbors:
+                print_denied(f'Interference at initial position with {interfering_neighbors}')
+                return False
         current_position = posmodel.expected_current_position
         start_posintTP = current_position['posintTP']
         lims = 'targetable'
@@ -128,15 +140,16 @@ class PosSchedule(object):
             return False
         if unreachable:
             self.petal.pos_flags[posid] |= self.petal.unreachable_targ_bit
-            print_denied(f'Target not reachable: {uv_type}, ({u:.3f}, {v:.3f})')
+            print_denied(f'Target not reachable: {uv_type} ({u:.3f}, {v:.3f})')
             return False
         targt_poslocTP = trans.posintTP_to_poslocTP(targt_posintTP)
         if self._deny_request_because_limit(posmodel, targt_poslocTP):
             print_denied(f'Target poslocP={targt_poslocTP[1]:.3f} is outside ' +
                          f'"expert" petal limit_angle at {self.petal.limit_angle}.')
             return False
-        if self._deny_request_because_target_interference(posmodel, targt_poslocTP):
-            print_denied('Target interferes with a neighbor\'s existing target.')
+        interfering_neighbors = self._check_init_or_final_neighbor_interference(posmodel, targt_poslocTP)
+        if interfering_neighbors:
+            print_denied(f'Target interferes with existing target(s) of neighbors {interfering_neighbors}')
             return False
         if self.should_check_petal_boundaries:
             if self._deny_request_because_out_of_bounds(posmodel, targt_poslocTP):
@@ -192,6 +205,13 @@ class PosSchedule(object):
         if not self._requests and not self.stages['expert'].is_not_empty():
             self.printfunc('No requests nor existing move tables found. No move scheduling performed.')
             return
+        self.printfunc(f'num target requests received = {len(self._all_received_requested_posids)}')
+        self.printfunc(f'num target requests accepted = {len(self._requests)}')
+        rejected_posids = self._all_received_requested_posids - set(self._requests)
+        self.printfunc(f'num target requests rejected = {len(rejected_posids)}')
+        if rejected_posids:
+            self.printfunc(f'pos with rejected request(s): {rejected_posids}')
+        self.printfunc(f'num expert tables = {len(self.stages["expert"].move_tables)}')
         if self.expert_mode_is_on():
             self._schedule_expert_tables(anticollision=anticollision, should_anneal=should_anneal)
         else:
@@ -468,32 +488,45 @@ class PosSchedule(object):
             self.petal.pos_flags[posmodel.posid] |= self.petal.ctrl_disabled_bit
             return True
         return False
-
-    def _deny_request_because_target_interference(self, posmodel, target_poslocTP):
-        """Checks for case where a target request is definitively unreachable
-        due to incompatibility with already-existing neighbor targets.
-        """
+    
+    def _check_init_or_final_neighbor_interference(self, posmodel, final_poslocTP=None):
+        """Checks for interference of posmodel with any neighbor positioner or fixed
+        boundary, at a single  position (i.e. not a whole sweep).
+        
+        When final_poslocTP is None, checks the initial positions.
+        
+        When final_poslocTP is a coordinate pair, checks final position of posmodel
+        against whatever requested final neighbor positions already exist in the
+        schedule.
+        
+        Returns either empty set (no interference) or the posids of all
+        interfering neighbors.
+        """        
+        use_final = final_poslocTP != None
         posid = posmodel.posid
-        target_interference = False
-        neighbors_with_requests = [
-            neighbor for neighbor in self.collider.pos_neighbors[posid]
-            if neighbor in self._requests]
-        for neighbor in neighbors_with_requests:
-            neighbor_posmodel = self.petal.posmodels[neighbor]
-            neighbor_target_posintTP = \
-                self._requests[neighbor]['targt_posintTP']
-            neighbor_target_poslocTP = \
-                neighbor_posmodel.trans.posintTP_to_poslocTP(
-                    neighbor_target_posintTP)
-            if self.collider.spatial_collision_between_positioners(
-                    posid, neighbor, target_poslocTP,
-                    neighbor_target_poslocTP):
-                target_interference = True
-                break
-        if target_interference:
+        interfering_neighbors = set()
+        neighbors = self.collider.pos_neighbors[posid]
+        if use_final:
+            poslocTP = final_poslocTP
+            neighbors_with_requests = {n for n in neighbors if n in self._requests}
+        else:
+            poslocTP = posmodel.expected_current_poslocTP
+            neighbors_with_requests = []
+        for n in neighbors:
+            n_posmodel = self.petal.posmodels[n]
+            if use_final and n in neighbors_with_requests:
+                n_posintTP = self._requests[n]['targt_posintTP']
+            else:
+                n_posintTP = n_posmodel.expected_current_posintTP
+            n_poslocTP = n_posmodel.trans.posintTP_to_poslocTP(n_posintTP)
+            if self.collider.spatial_collision_between_positioners(posid, n, poslocTP, n_poslocTP):
+                interfering_neighbors.add(n)
+        fixed_case = self.collider.spatial_collision_with_fixed(posid, poslocTP)
+        if fixed_case:
+            interfering_neighbors.add(pc.case.names[fixed_case])
+        if interfering_neighbors:
             self.petal.pos_flags[posmodel.posid] |= self.petal.overlap_targ_bit
-            return True
-        return False
+        return interfering_neighbors
 
     def _deny_request_because_out_of_bounds(self, posmodel, target_poslocTP):
         """Checks for case where a target request is definitively unreachable
@@ -516,9 +549,9 @@ class PosSchedule(object):
                 return True
         return False
     
-    def _deny_request_because_bad_initial_position(self, posmodel):
-        '''Checks for case where a bad initial POS_T or POS_P (the internally-
-        tracked angular postion would cause nonsense moves.
+    def _deny_request_because_starting_out_of_range(self, posmodel):
+        '''Checks for case where an out-of-range initial POS_T or POS_P (the
+        internally-tracked angular postion would cause nonsense moves.
         '''
         posintTP = posmodel.expected_current_posintTP
         rangeT = posmodel.full_range_T

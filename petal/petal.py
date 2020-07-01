@@ -333,7 +333,7 @@ class Petal(object):
 
     # METHODS FOR POSITIONER CONTROL
 
-    def request_targets(self, requests):
+    def request_targets(self, requests, allow_initial_interference=False):
         """Put in requests to the scheduler for specific positioners to move to specific targets.
 
         This method is for requesting that each robot does a complete repositioning sequence to get
@@ -367,6 +367,7 @@ class Petal(object):
                     log_note    optional string to store alongside in the log data for this move
                                     ... gets stored in the 'NOTE' field
                                     ... if the subdict contains no note field, then '' will be added automatically
+                    allow_initial_interference ... rarely used, only by experts, see comments in posschedule.py
 
         OUTPUT:
             Same dictionary, but with the following new entries in each subdictionary:
@@ -413,7 +414,8 @@ class Petal(object):
                                         uv_type=requests[posid]['command'],
                                         u=requests[posid]['target'][0],
                                         v=requests[posid]['target'][1],
-                                        log_note=requests[posid]['log_note'])
+                                        log_note=requests[posid]['log_note'],
+                                        allow_initial_interference=allow_initial_interference)
                 if not accepted:
                     marked_for_delete.add(posid)
                     if self.verbose:
@@ -602,7 +604,7 @@ class Petal(object):
         self.printfunc(f'schedule_moves called with anticollision = {anticollision}')
         if anticollision not in {None,'freeze','adjust'}:
             anticollision = self.anticollision_default
-            self.printfunc('using default anticollision mode = {self.anticollision_default}')
+            self.printfunc(f'using default anticollision mode --> {self.anticollision_default}')
             
         # This temporary stateful storage is an unfortunate necessity for error
         # handling, when we need to reschedule the move tables. Needed here
@@ -738,7 +740,8 @@ class Petal(object):
         assert all(np.isfinite(target)), f'{err_prefix} non-finite target {target}'
         for posid in posids:
             requests[posid] = {'command':cmd, 'target':target, 'log_note':log_note}
-        self.request_targets(requests)
+        allow_initial_interference = anticollision == None
+        self.request_targets(requests, allow_initial_interference)
         self.schedule_send_and_execute_moves(anticollision, should_anneal)
         self.limit_angle = old_limit
 
