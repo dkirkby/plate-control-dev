@@ -40,12 +40,13 @@ sim_fail_freq = {'send_tables': 0.0}
 runstamp = hc.compact_timestamp()
 pos_param_sequence_id = 'PTL03_30001' # 'cmds_unit_test'
 move_request_sequence_id = '03000-03001' # 'cmds_unit_test'
-note = ''
-filename_suffix = str(runstamp) + '_' + str(move_request_sequence_id) + ('_' + str(note) if note else '')
+ignore_params_ctrl_enabled = True # turn on posids regardless of the CTRL_ENABLED column in params file
 
-# Other ids
+# Other ids and notes
 fidids = {}
 petal_id = 3
+note = ''
+filename_suffix = str(runstamp) + '_' + str(move_request_sequence_id) + ('_' + str(note) if note else '')
 
 # Animation on/off options
 should_animate = False
@@ -64,7 +65,6 @@ n_corrections = 0 # number of correction moves to simulate after each target
 max_correction_move = 0.1/1.414 # mm
 should_profile = False
 should_inspect_some_TP = False # some *very* verbose printouts of POS_T, OFFSET_T, etc, sometimes helpful for debugging
-ignore_params_ctrl_enabled = False # turn on posids regardless of the CTRL_ENABLED column in params file
 
 # saving of target sets for later use on hardware
 # formatted for direct input to xytest
