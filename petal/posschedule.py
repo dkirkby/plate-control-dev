@@ -205,13 +205,15 @@ class PosSchedule(object):
         if not self._requests and not self.stages['expert'].is_not_empty():
             self.printfunc('No requests nor existing move tables found. No move scheduling performed.')
             return
-        self.printfunc(f'num target requests received = {len(self._all_received_requested_posids)}')
-        self.printfunc(f'num target requests accepted = {len(self._requests)}')
-        rejected_posids = self._all_received_requested_posids - set(self._requests)
-        self.printfunc(f'num target requests rejected = {len(rejected_posids)}')
-        if rejected_posids:
-            self.printfunc(f'pos with rejected request(s): {rejected_posids}')
-        self.printfunc(f'num expert tables = {len(self.stages["expert"].move_tables)}')
+        num_requests_received = len(self._all_received_requested_posids)
+        self.printfunc(f'num target requests received = {num_requests_received}')
+        if num_requests_received > 0:
+            self.printfunc(f'num target requests accepted = {len(self._requests)}')
+            rejected_posids = self._all_received_requested_posids - set(self._requests)
+            self.printfunc(f'num target requests rejected = {len(rejected_posids)}')
+            if rejected_posids:
+                self.printfunc(f'pos with rejected request(s): {rejected_posids}')
+        self.printfunc(f'num expert move tables = {len(self.stages["expert"].move_tables)}')
         if self.expert_mode_is_on():
             self._schedule_expert_tables(anticollision=anticollision, should_anneal=should_anneal)
         else:
