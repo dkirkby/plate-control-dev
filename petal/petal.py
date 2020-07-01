@@ -1324,9 +1324,9 @@ class Petal(object):
         else:
             self.printfunc(f'{msg_prefix} No positioners found requiring parameter update(s)')
             
-    def get_collision_params(self, posid, display=True):
-        '''Displays or returns a formatted string, describing the current parameters
-        known to the collider module for a given positioner.
+    def get_collision_params(self, posid):
+        '''Returns a formatted string describing the current parameters known to
+        the collider module for a given positioner.
         
         INPUTS:
             posid ... string identifying the positioner
@@ -1342,12 +1342,9 @@ class Petal(object):
             out += f'\n classified_as_retracted: {posid in self.collider.classified_as_retracted}'
         else:
             out = f'No posid {posid} found'
-        if display:
-            self.printfunc(out)
-        else:
-            return out
+        return out
     
-    def quick_query(self, key=None, op='', value=0, posids='all', display=False):
+    def quick_query(self, key=None, op='', value=0, posids='all', mode='iterable'):
         '''Returns a list of posids which have a parameter key with some
         relation op to value. Not all conceivable param keys and ops are
         necessarily supported. Can be applied to all posids on the petal, or
@@ -1358,7 +1355,7 @@ class Petal(object):
             op ... string like '>' or '==', etc. Can leave blank to simply retrieve all values.
             value ... the operand to compare against
             posids ... 'all' or iterator of positioner id strings
-            display ... boolean, if True prints to screen, else returns an iterable (list or dict)
+            mode ... 'compact', 'expanded', 'iterable' ... controls return type
             
         Call with no arguments, to get a list of valid keys and ops.
         
@@ -1424,13 +1421,13 @@ class Petal(object):
                 found[posid] = this_value
             elif op_func(this_value, operand):
                 found.append(posid)
-        if display:
+        if mode == 'compact':
+            found = str(found)
+        elif mode == 'expanded':
             if isinstance(found, dict):
                 found = [f'{key}: {val}' for key, val in found.items()]
             found = '\n'.join(found)
-            self.printfunc(f'\n{found}')
-        else:
-            return found
+        return found
 
 # MOVE SCHEDULING ANIMATOR CONTROLS
 
