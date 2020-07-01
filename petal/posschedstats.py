@@ -25,7 +25,7 @@ class PosSchedStats(object):
         self.disable() # called here in all cases, to ensure consistent initialization of state
         if enabled:
             self.enable()
-        self.clear_cache_after_save_by_append = True
+        self.clear_cache_after_save = True
         self.filename_suffix = ''
     
     def is_enabled(self):
@@ -334,19 +334,19 @@ class PosSchedStats(object):
         else:
             return 0
 
-    def generate_table(self, append_footers=False):
+    def generate_table(self, footers=False):
         """Returns a pandas dataframe representing a complete report table of
         the current stats.
         
-        If the argument append_footers=True, then a number of extra rows will
-        be added to the bottom of the returned table. These extra rows will
+        If the argument footers=True, then a number of rows will be returned
+        instead, which match up to the normal table. These special rows will
         give max, min, mean, rms, and median for each data column, collated by
         anticollision  method (e.g. 'adjust' vs 'freeze'). That's no new
         information --- just a convenience when for example evaluating sims of
         hundreds of targets in a row.
         """
         data, nrows = self.summarize_all()
-        if append_footers:
+        if footers:
             blank_row = {'method':''}
             rms = lambda X: (sum([x**2 for x in X])/len(X))**0.5
             unique_methods = sorted(set(data['method']) - {_blank_str})
@@ -375,10 +375,11 @@ class PosSchedStats(object):
         file = io.StringIO(newline='\n')
         writer = csv.DictWriter(file, fieldnames=data.keys())
         writer.writeheader()
-        for i in range(nrows):
-            row = {key: val[i] for key, val in data.items()}
-            writer.writerow(row)
-        if append_footers:
+        if not footers:
+            for i in range(nrows):
+                row = {key: val[i] for key, val in data.items()}
+                writer.writerow(row)
+        else:
             for category in categories:
                 writer.writerow(blank_row)
                 for calc in calcs:
@@ -386,16 +387,21 @@ class PosSchedStats(object):
         file.seek(0)  # go back to the beginning after finishing write
         return pd.read_csv(file)  # returns a pandas dataframe
 
-    def save(self, path=None, mode='w', include_footers=False):
+    def save(self, path=None, footers=False):
         """Saves stats results to disk. If no path was specified, the return
-        value is the path that was generated.
+        value is the path that was generated. If path is specified, it should
+        have '.csv' file extension. Repeated calls to save() with the same path
+        will generally append rows to that csv file.
         
-        Boolean argument "include_footers" enables printing some extra summary
-        statistics to the bottom of the output table. These are helpful for
-        debugging --- saves time processing the table --- but may look weird
-        if you are going to keep appending new results after them. In other
-        words, this option is best applied only when you know you're about to
-        stop appending new data to the file at the current path.'
+        Boolean argument "footers" instead appends some extra summary  statistics
+        to the bottom of the output table. These are helpful for  debugging ---
+        saves time processing the table --- but may look weird if you are going
+        to keep appending new results after them. In other words, this option is
+        best applied only when you know you're about to stop appending new data
+        to the file at the current path. N.B. Footers will only really work
+        right if the clear_cache_after_save property is set to False at the
+        beginning of the statistics collection. (Otherwise, the data in memory
+        will be flushed after every save to disk.)
         """
         dir_name = os.path.dirname(str(path))
         dir_exists = os.path.isdir(dir_name)
@@ -404,20 +410,17 @@ class PosSchedStats(object):
             suffix = '_' + suffix if suffix else ''
             filename = f'{pc.filename_timestamp_str()}_schedstats{suffix}.csv'
             path = os.path.join(pc.dirs['temp_files'], filename)
-        if not os.path.exists(path):
-            mode = 'w'  # override append mode in this case
-        include_headers = True if mode == 'w' or not os.path.exists(path) else False
-        pd = self.generate_table(append_footers=include_footers)
-        if mode == 'a':
-            start_row = 0 if self._latest_saved_row == None else self._latest_saved_row + 1
-            n_rows_to_save = len(pd) - start_row
-            self._latest_saved_row = len(pd) - 1 # placed intentionally before the tail operation
-            pd = pd.tail(n_rows_to_save)
-        pd.to_csv(path, mode=mode, header=include_headers, index=False)
-        if mode == 'a' and self.clear_cache_after_save_by_append:
+        include_headers = os.path.exists(path) == False
+        frame = self.generate_table(footers=footers)
+        start_row = 0 if self._latest_saved_row == None else self._latest_saved_row + 1
+        n_rows_to_save = len(frame) - start_row
+        save_frame = frame.tail(n_rows_to_save)
+        save_frame.to_csv(path, mode='a', header=include_headers, index=False)
+        self._latest_saved_row = len(frame) - 1
+        if self.clear_cache_after_save:
             self._init_data_structures()
         return path
-
+    
     @staticmethod
     def found_but_not_resolved(found, resolved):
         """Searches through the dictionary of resolved collision pairs, and

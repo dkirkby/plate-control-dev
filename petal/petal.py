@@ -1068,7 +1068,7 @@ class Petal(object):
             self.altered_states = set()
             if self.schedule_stats.is_enabled():
                 stats_path = self.sched_stats_path
-                new_path = self.schedule_stats.save(path=stats_path, mode='a', include_footers=False)
+                new_path = self.schedule_stats.save(path=stats_path)
                 if new_path != stats_path:
                     self.sched_stats_path = new_path
                     self.printfunc(f'Updated schedule stats path from {stats_path} to {new_path}')
