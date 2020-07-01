@@ -219,12 +219,8 @@ for pos_param_id, pos_params in pos_param_sequence.items():
                 ptl.request_homing(posids_to_test, axis=axis)
                 ptl.schedule_send_and_execute_moves(anticollision='adjust') # 'adjust' here *should* internally be ignored in favor of 'freeze'
     if ptl.schedule_stats.is_enabled():
-        if not ptl.sched_stats_path:
-            stats_path = os.path.join(pc.dirs['temp_files'], 'schedstats_' + filename_suffix + '.csv')
-        else:
-            stats_path = ptl.sched_stats_path
-        ptl.schedule_stats.save(path=stats_path, mode='w', include_footers=True)
-        print(f'Stats saved to {stats_path}')
+        ptl.schedule_stats.save(path=ptl.sched_stats_path, footers=True)
+        print(f'Stats saved to {ptl.sched_stats_path}')
     if should_export_targets and exportable_targets:
         filename = 'xytest_targets_' + filename_suffix + '.csv'
         path = os.path.join(pc.dirs['temp_files'], filename)
