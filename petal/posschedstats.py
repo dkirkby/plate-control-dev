@@ -393,7 +393,7 @@ class PosSchedStats(object):
         have '.csv' file extension. Repeated calls to save() with the same path
         will generally append rows to that csv file.
         
-        Boolean argument "footers" instead appends some extra summary  statistics
+        Boolean argument "footers" instead appends some extra summary statistics
         to the bottom of the output table. These are helpful for  debugging ---
         saves time processing the table --- but may look weird if you are going
         to keep appending new results after them. In other words, this option is
@@ -412,11 +412,14 @@ class PosSchedStats(object):
             path = os.path.join(pc.dirs['temp_files'], filename)
         include_headers = os.path.exists(path) == False
         frame = self.generate_table(footers=footers)
-        start_row = 0 if self._latest_saved_row == None else self._latest_saved_row + 1
-        n_rows_to_save = len(frame) - start_row
-        save_frame = frame.tail(n_rows_to_save)
+        if footers:
+            save_frame = frame
+        else:
+            start_row = 0 if self._latest_saved_row == None else self._latest_saved_row + 1
+            n_rows_to_save = len(frame) - start_row
+            save_frame = frame.tail(n_rows_to_save)
+            self._latest_saved_row = len(frame) - 1
         save_frame.to_csv(path, mode='a', header=include_headers, index=False)
-        self._latest_saved_row = len(frame) - 1
         if self.clear_cache_after_save:
             self._init_data_structures()
         return path
