@@ -217,7 +217,13 @@ class collision_case(object):
         self.IV   = 3  # phi arm against neighboring circular keepout
         self.GFA  = 4  # phi arm against the GFA fixed keepout envelope
         self.PTL  = 5  # phi arm against the Petal edge keepout envelope
-        self.fixed_cases = {self.PTL,self.GFA}
+        self.fixed_cases = {self.PTL, self.GFA}
+        self.names = {self.I:   'no collision',
+                      self.II:  'phi',
+                      self.III: 'central body',
+                      self.IV:  'circular keepout',
+                      self.GFA: 'GFA',
+                      self.PTL: 'PTL'}
 case = collision_case()
 
 # Collision resolution methods
