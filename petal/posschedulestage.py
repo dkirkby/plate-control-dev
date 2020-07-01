@@ -428,7 +428,7 @@ class PosScheduleStage(object):
                 else:
                     break
             if tables[posid].n_rows == 0:
-                tables[posid].set_move(0,0,0)
+                tables[posid].set_move(0, 0, 0)
             return tables
         
         # get neighbor table
@@ -495,15 +495,15 @@ class PosScheduleStage(object):
         if 'repel' in method:
             if neighbor in tables:
                 jog_times_diff = jog_times[neighbor] - jog_times[posid]
-                wait_for_neighbor_to_jog = max(jog_times_diff,0)
-                wait_for_posid_to_jog = max(-jog_times_diff,0)
+                wait_for_neighbor_to_jog = max(jog_times_diff, 0)
+                wait_for_posid_to_jog = max(-jog_times_diff, 0)
             for p,t in tables.items():
                 t.insert_new_row(0)
                 t.set_move(0, axis, jogs[p])
                 if p == posid:
-                    t.set_postpause(0,wait_for_neighbor_to_jog + neighbor_clearance_time)
+                    t.set_postpause(0, wait_for_neighbor_to_jog + neighbor_clearance_time)
                 else:
-                    t.set_postpause(0,wait_for_posid_to_jog)
+                    t.set_postpause(0, wait_for_posid_to_jog)
                 t.set_move(t.n_rows, axis, -jogs[p]) # note how this is happening in a new final row
         else:
             tables[posid].insert_new_row(0)
