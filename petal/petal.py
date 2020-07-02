@@ -231,6 +231,7 @@ class Petal(object):
         self._apply_state_enable_settings()
 
         self.hw_states = {}
+        self.debug_verbose = False  # [JHS] 2020-07-01, can be removed soon (and the conditional it controls below) after a few tests on hardware, probably tomorrow
 
     def is_pc_connected(self):
         if self.simulator_on:
@@ -653,6 +654,8 @@ class Petal(object):
             response = self.comm.send_tables(hw_tables)
         failed_posids = self._handle_any_failed_send_of_move_tables(response, n_retries)
         if n_retries == 0 or not failed_posids:
+            times = {tbl['total_time'] for tbl in hw_tables}
+            self.printfunc(f'max move table time = {max(times):.4f} sec')
             self.printfunc('send_move_tables: Done')
         return failed_posids      
             
@@ -1491,6 +1494,25 @@ class Petal(object):
         hw_tables = []
         for m in self.schedule.move_tables.values():
             hw_tbl = m.for_hardware()
+            
+            # 2020-07-01 [JHS] This conditional block should be removable soon,
+            # after confirmation of fix to hardware postpause column in posmovetable.
+            if self.debug_verbose:
+                hw_move_time = sum(hw_tbl['move_time'])
+                hw_pause_time = sum(hw_tbl['postpause'])/1000
+                hw_time = hw_move_time + hw_pause_time
+                assert abs(hw_time - hw_tbl['total_time']) < 0.002
+                full = m.full_table()
+                full_prepause = sum(full['prepause'])
+                full_postpause = sum(full['postpause'])
+                full_move_time = sum(full['move_time'])
+                full_time = full_prepause + full_postpause + full_move_time
+                assert abs(full['net_time'][-1] - full_time) < 0.002
+                posid = hw_tbl['posid']
+                print(f'{posid}: full_time={full_time:6.3f} ... full_move={full_move_time:6.3f}, full_prepause={full_prepause:6.3f}, full_postpause={full_postpause:6.3f}, full_pause={full_prepause + full_postpause:6.3f}' +
+                      f'\n        hdwr_time={hw_time:6.3f} ... hdwr_move={hw_move_time:6.3f},                       hdwr_postpause={hw_pause_time:6.3f}')
+                m.display()
+                
             hw_tables.append(hw_tbl)
         return hw_tables
 
