@@ -1600,6 +1600,7 @@ class Petal(object):
             else:
                 expert_mode = False
                 all_requests = self.schedule.get_requests()
+                posids_to_retry = {p for p in posids_to_retry if p in all_requests}
                 requests_to_retry = {posid:all_requests[posid] for posid in posids_to_retry}
             self.printfunc('Canceling move. Tracking data in petal.py will be reset')
             self._cancel_move(reset_flags='all')
