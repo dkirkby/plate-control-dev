@@ -405,6 +405,12 @@ class PosSchedStats(object):
         """
         dir_name = os.path.dirname(str(path))
         dir_exists = os.path.isdir(dir_name)
+        if not dir_exists:
+            parent_dir = os.path.dirname(dir_name)
+            parent_dir_exists = os.path.isdir(parent_dir)
+            if parent_dir_exists:
+                os.mkdir(dir_name)
+                dir_exists = os.path.isdir(dir_name)
         if path is None or not dir_exists:
             suffix = str(self.filename_suffix)
             suffix = '_' + suffix if suffix else ''
