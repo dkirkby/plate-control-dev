@@ -127,7 +127,6 @@ class FPTestData:
         self._init_loggers()
         self.logger.debug([f'posconstants.py version: {pc.code_version}',
                            f'anticollision mode: {self.anticollision}'])
-        self.schedstats = {}
 
     def set_dirs(self, expid):  # does not need to know about expid
         self.filename = (
@@ -386,9 +385,6 @@ class FPTestData:
             with open(self.log_paths[pcid], 'w') as handle:
                 self.logs[pcid].seek(0)
                 shutil.copyfileobj(self.logs[pcid], handle)  # save logs
-            if pcid in self.schedstats:
-                self.schedstats[pcid].to_csv(os.path.join(
-                    self.dirs[pcid], 'schedstats.csv'))
             self.print(f'PC{pcid:02} data written to: '
                        f'{self.dirs[pcid]}', pcid=pcid)
 

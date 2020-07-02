@@ -212,7 +212,6 @@ class XYTest(PECS):
                 disable_unmatched = self.data.test_cfg['disable_unmatched']
             else:
                 disable_unmatched = True  # do disable by default
-        self.set_schedule_stats(enabled=self.schedule_stats)
         self.logger.info(f'Parking {len(self.data.posids)} positioners...')
         ret = self.ptlm.park_positioners(self.data.posids)
         ret = pd.concat(list(ret.values()))
@@ -240,8 +239,6 @@ class XYTest(PECS):
         self.data.t_f = pc.now()
         self.data.delta_t = self.data.t_f - self.data.t_i
         self.logger.info(f'Test complete, duration {self.data.delta_t}.')
-        self.logger.info('Disabling positioner schedule stats...')
-        self.set_schedule_stats(enabled=False)
         self.fvc_collect()
 
     def record_basic_move_data(self, i):

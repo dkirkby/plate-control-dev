@@ -43,7 +43,6 @@ class PosCalibrations(PECS):
         self.data.pcids = self.pcids
         self.exp_setup()  # set up exposure ID and product directory
         self.home_adc()
-        self.set_schedule_stats(enabled=self.schedule_stats)
         self.data.petal_alignments = pd.DataFrame(self.petal_alignments).T
         self.data.petal_alignments.index.name = 'petal_loc'
 
@@ -172,7 +171,6 @@ class PosCalibrations(PECS):
         self.data.write_calibdf(self.data.calib_old, self.data.calib_fit,
                                 self.data.calib_new)
         self.data.t_f = pc.now()
-        self.set_schedule_stats(enabled=False)
         self.fvc_collect()
         self.data.generate_data_products()
 
@@ -232,7 +230,6 @@ class PosCalibrations(PECS):
         if extra_pts_num:
             self.run_extra_points(max_radius=extra_pts_max_radius, n_points=extra_pts_num)
         self.data.t_f = pc.now()
-        self.set_schedule_stats(enabled=False)
         self.fvc_collect()
         if self.data.online_fitting:
             fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
@@ -280,7 +277,6 @@ class PosCalibrations(PECS):
         if extra_pts_num:
             self.run_extra_points(max_radius=extra_pts_max_radius, n_points=extra_pts_num)
         self.data.t_f = pc.now()
-        self.set_schedule_stats(enabled=False)
         self.fvc_collect()
         if self.data.online_fitting:
             fit = PosCalibrationFits(petal_alignments=self.petal_alignments,
