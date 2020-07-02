@@ -632,15 +632,16 @@ class PosSchedule(object):
         stats_enabled = self.stats.is_enabled()
         for posid,table in self.move_tables.items():
             if stats_enabled:
-                table_for_schedule = table.for_schedule()
-                self.__max_net_time = max(table_for_schedule['net_time'][-1], self.__max_net_time)
+                # for_hardware time is the true time to execute the move, including automatic antibacklash and creep moves (unknown to posschedule)
+                self.__max_net_time = max(table.for_hardware()['total_time'], self.__max_net_time)
             log_note_addendum = ''              
             if posid in self._requests:
                 req = self._requests[posid]
                 table.store_orig_command(string=req['command'], val1=req['cmd_val1'], val2=req['cmd_val2']) # keep the original commands with move tables
                 log_note_addendum = req['log_note'] # keep the original log notes with move tables
                 if stats_enabled:
-                    if posid in self.__original_request_posids and self._table_matches_request(table_for_schedule,req):
+                    match = self._table_matches_request(table.for_schedule(), req)
+                    if posid in self.__original_request_posids and match:
                         self.stats.add_table_matching_request()
             elif not self.expert_mode_is_on():
                 self.printfunc('Error: ' + str(posid) + ' has a move table despite no request.')
