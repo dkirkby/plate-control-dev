@@ -848,11 +848,10 @@ class Petal(object):
                 self.printfunc('WARNING: set_fiducials: fiducials %s not returned by petalcontroller, state not set.' % enabled[i])
                 set_duty = self.get_posfid_val(enabled[i], 'DUTY_STATE')
                 error = True
-            self.set_posfid_val(enabled[i], 'DUTY_STATE', set_duty)
+            self.set_posfid_val(enabled[i], 'DUTY_STATE', set_duty, check_existing=True)
             settings_done[enabled[i]] = set_duty
             if save_as_default:
-                self.set_posfid_val(enabled[i], 'DUTY_DEFAULT_ON', set_duty)
-            self.altered_calib_states.add(self.states[enabled[i]])
+                self.set_posfid_val(enabled[i], 'DUTY_DEFAULT_ON', set_duty, check_existing=True)
         self.commit(mode='both', log_note='set fiducial parameters')
         if error:
             return 'FAILED: not all fiducials set. Try moving to READY if trying to turn them off.'
@@ -932,7 +931,7 @@ class Petal(object):
                 if hw_state != 'OBSERVING':
                     # fids off
                     for fid in self.fidids:
-                        self.set_posfid_val(fid, 'DUTY_STATE', 0)
+                        self.set_posfid_val(fid, 'DUTY_STATE', 0, check_existing=True)
             else:
                 self.printfunc('_set_hardware_state: FAILED: when calling comm.ops_state: %s' % ret)
                 raise_error('_set_hardware_state: comm.ops_state returned %s' % ret)
@@ -1201,10 +1200,12 @@ class Petal(object):
         if data_for_new_rows:
             for posid, subdict in data_for_new_rows.items():
                 log_note = 'Stored new:'
+                accepted = []
                 for key, val in subdict.items():
-                    self.set_posfid_val(posid, key, val)
+                    accepted += [self.set_posfid_val(posid, key, val, check_existing=True)]
                     log_note += f' {key}'
-                self.set_posfid_val(posid, 'LOG_NOTE', log_note)
+                if any(accepted):
+                    self.set_posfid_val(posid, 'LOG_NOTE', log_note)
             self._commit(mode='move', log_note='')  # no need for extra log note info
         self._clear_late_commit_data()
     
@@ -1708,8 +1709,9 @@ class Petal(object):
         for posid in posids:
             self.pos_flags[posid] |= self.comm_error_bit
             if auto_disabling_on and self.posmodels[posid].is_enabled:
-                self.set_posfid_val(posid, 'CTRL_ENABLED', False)
-                self.set_posfid_val(posid, 'LOG_NOTE', 'Disabled due to communication error')
+                accepted = self.set_posfid_val(posid, 'CTRL_ENABLED', False, check_existing=True)
+                if accepted:
+                    self.set_posfid_val(posid, 'LOG_NOTE', 'Disabled due to communication error')
 
     def _clear_temporary_state_values(self):
         '''Clear out any existing values in the state objects that were only temporarily
@@ -1815,13 +1817,13 @@ class Petal(object):
         """
         for devid in self.posids: #.union(self.fidids):
             if self.get_posfid_val(devid, 'DEVICE_CLASSIFIED_NONFUNCTIONAL'):
-                self.set_posfid_val(devid, 'CTRL_ENABLED', False)
+                self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True)
                 self.pos_flags[devid] |= self.ctrl_disabled_bit
                 self.pos_flags[devid] |= self.dev_nonfunctional_bit
                 self.disabled_devids.append(devid)
             if devid in self.posids:
                 if not self.get_posfid_val(devid, 'FIBER_INTACT'):
-                    self.set_posfid_val(devid, 'CTRL_ENABLED', False)
+                    self.set_posfid_val(devid, 'CTRL_ENABLED', False, check_existing=True)
                     self.pos_flags[devid] |= self.ctrl_disabled_bit
                     self.pos_flags[devid] |= self.fiber_broken_bit
                     self.pos_flags[devid] |= self.bad_fiber_fvc_bit
@@ -1859,7 +1861,7 @@ class Petal(object):
             if hwstate != 'OBSERVING':
                 # fids off
                 for fid in self.fidids:
-                    self.set_posfid_val(fid, 'DUTY_STATE', 0)
+                    self.set_posfid_val(fid, 'DUTY_STATE', 0, check_existing=True)
         #Reset values
         self._remove_posid_from_sent_tables('all')
         self._initialize_pos_flags() # Reset posflags
