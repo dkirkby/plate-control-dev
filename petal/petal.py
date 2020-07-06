@@ -11,6 +11,7 @@ from collections import OrderedDict
 import os
 import random
 import numpy as np
+from astropy.table import Table as AstropyTable
 try:
     # DBSingleton in the code is a class inside the file DBSingleton
     from DBSingleton import DBSingleton
@@ -1021,20 +1022,32 @@ class Petal(object):
         else:
             return 'Not in petal'
 
-    def set_posfid_val(self, device_id, key, value):
+    def set_posfid_val(self, device_id, key, value, check_existing=False):
         """Sets a single value to a positioner or fiducial. In the case of a 
         fiducial, this call does NOT turn the fiducial physically on or off.
-        It only saves a value."""
+        It only saves a value.
+        
+        Returns a boolean whether the value was accepted.
+        
+        The boolean arg check_existing only changes things if the old value
+        differs from new. A special return value of None is returned if the
+        new value is the same.
+        """
         if device_id not in self.posids | self.fidids:
             raise ValueError(f'{device_id} not in PTL{self.petal_id:02}')
-        accepted = self.states[device_id].store(key, value)
+        state = self.states[device_id]
+        if check_existing:
+            old = state._val[key] if key in state._val else None
+            if old == value:
+                return None
+        accepted = state.store(key, value)
         if accepted:
             if pc.is_calib_key(key):
-                self.altered_calib_states.add(self.states[device_id])
+                self.altered_calib_states.add(state)
             else:
-                self.altered_states.add(self.states[device_id])
+                self.altered_states.add(state)
         return accepted
-
+    
     def get_pbdata_val(self, key):
         """Requests data from petalbox using the pbget method.
         key ... string, corresponds to petalbox pbget method keys (eg 'TELEMETRY', 'CONF_FILE')
@@ -1298,6 +1311,12 @@ class Petal(object):
             posids = self.posids
         else:
             posids = {posids} if isinstance(posids, str) else set(posids)
+        invalid_posids = {p for p in posids if p not in self.posids}
+        posids -= invalid_posids
+        if invalid_posids:
+            self.printfunc(f'{len(invalid_posids)} positioner id(s) not found on petal id' +
+                           f' {self.petal_id}. These will be skipped: {invalid_posids}')
+            self.printfunc(f'{len(posids)} valid positioner(s) remaining')
         new = {'KEEPOUT_EXPANSION_THETA_RADIAL': radT,
                'KEEPOUT_EXPANSION_PHI_RADIAL': radP,
                'KEEPOUT_EXPANSION_THETA_ANGULAR': angT,
@@ -1317,8 +1336,8 @@ class Petal(object):
         for key, val in new.items():
             changed_this_key = set()
             for posid in posids:
-                if self.get_posfid_val(posid, key) != val:
-                    self.set_posfid_val(posid, key, val)
+                accepted = self.set_posfid_val(posid, key, val, check_existing=True)
+                if accepted:
                     changed_this_key.add(posid)
             if changed_this_key:
                 self.printfunc(f'{msg_prefix} Changed {key} to {val} for {len(changed_this_key)}' +
@@ -1329,6 +1348,53 @@ class Petal(object):
             self.commit(mode='calib')  # as of 2020-06-29, all valid args here are stored in calib table of DB
         else:
             self.printfunc(f'{msg_prefix} No positioners found requiring parameter update(s)')
+            
+    def cache_keepouts(self):
+        '''Cache keepout parameters to a temporary file on disk. Returns the path
+        to the cache file.
+        '''
+        msg_prefix = 'cache_keepouts:'
+        path = pc.get_keepouts_cache_path(self.petal_id)
+        data = {key:[] for key in ['POS_ID'] + pc.keepout_keys}
+        for posid in self.posids:
+            data['POS_ID'] += [posid]
+            for key in pc.keepout_keys:
+                data[key] += [self.states[posid]._val[key]]
+        table = AstropyTable(data)
+        table.write(path, overwrite=True, delimiter=',')
+        self.printfunc(f'{msg_prefix} Collision keepout settings for {len(table)} positioners cached to {path}')
+        return path
+        
+    def restore_keepouts(self, path=None):
+        '''Restores keepout parameters from cache file on disk. In typical usage
+        no path needs to be provided, and the default file path will be used.
+        '''
+        msg_prefix = 'restore_keepouts:'
+        argued_path = str(path)
+        argued_ext = os.path.splitext(argued_path)[1]
+        default_path = pc.get_keepouts_cache_path(self.petal_id)
+        default_ext = os.path.splitext(default_path)[1]
+        if os.path.exists(argued_path) and argued_ext == default_ext:
+            path_to_use = argued_path
+        else:
+            path_to_use = default_path
+        assert os.path.exists(path_to_use), f'{msg_prefix} error, no cache file found at {path_to_use}'
+        self.printfunc(f'{msg_prefix} Restoring collision keepout settings from {path_to_use}')
+        table = AstropyTable.read(path_to_use)
+        changed = set()
+        for row in table:
+            posid = row['POS_ID']
+            for key in pc.keepout_keys:
+                accepted = self.set_posfid_val(posid, key, row[key], check_existing=True)
+                if accepted:
+                    changed.add(posid)
+        self.printfunc(f'{msg_prefix} {len(changed)} of {len(table)} positioners found with keepout values needing change.')
+        skipped = set(table['POS_ID']) - changed
+        if any(skipped):
+            self.printfunc(f'{msg_prefix} {len(skipped)} skipped. The skipped positioners are: {skipped}')
+        if any(changed):
+            self.printfunc(f'{msg_prefix} Committing restored values for {len(changed)} positioners.')
+            self.commit(mode='calib')
             
     def get_collision_params(self, posid):
         '''Returns a formatted string describing the current parameters known to

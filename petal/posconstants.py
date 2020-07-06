@@ -52,6 +52,9 @@ for directory in dirs.values():
 # File locations
 positioner_locations_file = os.path.join(petal_directory, 'positioner_locations_0530v14.csv')
 small_array_locations_file = os.path.join(dirs['hwsetups'], 'SWIntegration_XY.csv')
+def get_keepouts_cache_path(petal_id):
+    filename = f'keepouts_cache_petal_id_{petal_id}.ecsv'
+    return os.path.join(dirs['temp_files'], filename)
 
 # Lookup tables for focal plane coordinate conversions
 R_lookup_path = petal_directory + os.path.sep + 'focal_surface_lookup.csv'
@@ -151,9 +154,10 @@ keepout_expansion_keys = ['KEEPOUT_EXPANSION_PHI_RADIAL',
                           'KEEPOUT_EXPANSION_THETA_RADIAL',
                           'KEEPOUT_EXPANSION_THETA_ANGULAR']
 
+keepout_keys = keepout_expansion_keys + ['CLASSIFIED_AS_RETRACTED']
+
 # test for whether certain posstate keys are classified as "calibration" vals
-calib_keys = set(nominals.keys()) | set(keepout_expansion_keys)
-calib_keys.add('CLASSIFIED_AS_RETRACTED')
+calib_keys = set(nominals.keys()) | set(keepout_keys)
 def is_calib_key(key):
     return key.upper() in calib_keys
 
