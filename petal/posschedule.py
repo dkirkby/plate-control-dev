@@ -516,8 +516,11 @@ class PosSchedule(object):
             neighbors_with_requests = []
         for n in neighbors:
             n_posmodel = self.petal.posmodels[n]
-            if use_final and n in neighbors_with_requests:
-                n_posintTP = self._requests[n]['targt_posintTP']
+            if use_final:
+                if n in neighbors_with_requests:
+                    n_posintTP = self._requests[n]['targt_posintTP']
+                else:
+                    continue
             else:
                 n_posintTP = n_posmodel.expected_current_posintTP
             n_poslocTP = n_posmodel.trans.posintTP_to_poslocTP(n_posintTP)
