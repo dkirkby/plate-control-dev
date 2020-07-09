@@ -29,10 +29,12 @@ fixed_neighbors = ptl.app_get('collider.fixed_neighbor_cases')
 
 selection = set()
 removal = set()
+busids = {}
 for posid in posids:
     busid = ptl.get_posfid_val(posid, 'BUS_ID')
     if busid in allowed_buses:
         selection.add(posid)
+        busids[posid] = busid
     if posid not in enabled:
         removal.add(posid)
     enabled_neighbors = {n for n in neighbors[posid] if n in enabled}
@@ -60,7 +62,12 @@ sorted_selection = [item[0] for item in sorted_closeness]
 def print_pos_info(posid):
     r1 = ptl.get_posfid_val(posid, 'LENGTH_R1')
     r2 = ptl.get_posfid_val(posid, 'LENGTH_R2')
-    s = f'{posid}: enabled={posid in enabled}, r1={r1}, r2={r2}'
+    loc = ptl.get_posfid_val(posid, 'DEVICE_LOC')
+    ptl_id = ptl.get_posfid_val(posid, 'PETAL_ID')
+    s = f'{posid}: enabled={posid in enabled}, busid={busids[posid]}'
+    s += f', ptl_id={ptl_id:2d}, loc={loc:3d}'
+    s += f', r1={r1:6.4f}, r2={r2:6.4f}'
+    s += f', x0={x[posid]:7.3f}, y0={y[posid]:7.3f}'
     s += f', n_neighbors={len(neighbors[posid])}, n_fixed_neighbors={len(fixed_neighbors[posid])}'
     print(s)
 
@@ -83,7 +90,7 @@ else:
     print('')
     print('center posid:', ctr_posid, 'at r:', r[ctr_posid], 'device_loc:', ptl.get_posfid_val(ctr_posid, 'DEVICE_LOC'))
     print('')
-    print('group to test:', group, 'count:', len(group))
+    print('group to test:', group, '\ncount:', len(group))
     for posid in group:
         print_pos_info(posid)
     print('')
@@ -91,6 +98,6 @@ else:
     for posid in group:
         neighbors_of_group |= neighbors[posid]
     neighbors_of_group -= group
-    print('neighbors of group', neighbors_of_group, 'count:', len(neighbors_of_group))
+    print('neighbors of group', neighbors_of_group, '\ncount:', len(neighbors_of_group))
     for posid in neighbors_of_group:
         print_pos_info(posid)
