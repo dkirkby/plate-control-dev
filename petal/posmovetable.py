@@ -54,6 +54,7 @@ class PosMoveTable(object):
              'allow_exceed_limits':   c.allow_exceed_limits,
              'allow_cruise':          c.allow_cruise,
              'postmove_cleanup_cmds': c._postmove_cleanup_cmds,
+             'orig_command':          c._orig_command,
              }
         return d
     
@@ -243,6 +244,7 @@ class PosMoveTable(object):
             self.rows.append(otherrow.copy())
         for axisid, cmd_str in other_move_table._postmove_cleanup_cmds.items():
             self.append_postmove_cleanup_cmd(axisid=axisid, cmd_str=cmd_str)
+        self.append_log_note(other_move_table.log_note)
         self.store_orig_command(string=other_move_table._orig_command)
         
     # internal methods
