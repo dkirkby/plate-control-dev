@@ -1486,22 +1486,29 @@ class Petal(object):
         else:
             def getter(posid):
                 return self.states[posid]._val[key]
-        found = dict() if op == '' else list()
+        found = dict()
         posids = sorted(posids)
         for posid in posids:
             this_value = getter(posid)
-            if op == '':
+            if op == '' or op_func(this_value, operand):
                 found[posid] = this_value
-            elif op_func(this_value, operand):
-                found.append(posid)
-        out = found
+        out = found if op == '' else sorted(found.keys())
         if mode == 'compact':
-            out = str(found)
+            out = str(out)
         elif mode == 'expanded':
-            if isinstance(found, dict):
-                out = [f'{key}: {val}' for key, val in found.items()]
+            out = [f'{key}: {val}' for key, val in found.items()]
             out = '\n'.join(out)
         if isinstance(out, str):
+            try:
+                values = list(found.values()) if isinstance(found, dict) else found
+                max_ = np.max(values)
+                min_ = np.min(values)
+                mean = np.mean(values)
+                std = np.std(values)
+                rms = np.sqrt(np.sum(np.array(values)**2) / len(values))
+                out = f'stats: max={max_:.4f}, min={min_:.4f}, mean={mean:.4f}, std={std:.4f}, rms={rms:.4f}\n{out}'
+            except:
+                pass
             out = f'total entries found = {len(found)}\n{out}'
         return out
 
