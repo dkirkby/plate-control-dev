@@ -1440,7 +1440,8 @@ class Petal(object):
                          'poslocY', 'flatX', 'flatY', 'ptlX', 'ptlY', 'obsX',
                          'obsY', 'Q', 'S'}
         state_keys = set(pc.calib_keys) | {'POS_P', 'POS_T', 'CTRL_ENABLED'}
-        valid_keys = position_keys | state_keys
+        constants_keys = set(pc.constants_keys)
+        valid_keys = position_keys | state_keys | constants_keys
         valid_ops = {'>': operator.gt,
                      '>=': operator.ge,
                      '==': operator.eq,
@@ -1451,6 +1452,7 @@ class Petal(object):
         if not any([key, op, value]):
             valids = {'state_keys': sorted(state_keys),
                       'position_keys': sorted(position_keys),
+                      'constants_keys': sorted(constants_keys),
                       'valid_ops': sorted(valid_ops)}
             return valids
         msg_prefix = 'quick_query:'

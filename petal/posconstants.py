@@ -161,6 +161,41 @@ calib_keys = set(nominals.keys()) | set(keepout_keys)
 def is_calib_key(key):
     return key.upper() in calib_keys
 
+# keys / default types in constants DB
+constants_keys = {"ALLOW_EXCEED_LIMITS": False,
+                  "ANTIBACKLASH_FINAL_MOVE_DIR_P":  1,
+                  "ANTIBACKLASH_FINAL_MOVE_DIR_T": -1,
+                  "ANTIBACKLASH_ON": True,
+                  "BACKLASH": 3.0,
+                  "BUMP_CCW_FLG": False,
+                  "BUMP_CW_FLG": False,
+                  "CREEP_PERIOD": 2,
+                  "CREEP_TO_LIMITS": False,
+                  "CURR_CREEP": 70,
+                  "CURR_CRUISE": 70,
+                  "CURR_HOLD": 0,
+                  "CURR_SPIN_UP_DOWN": 70,
+                  "DEVICE_CLASSIFIED_NONFUNCTIONAL": False,
+                  "FIBER_INTACT": True,
+                  "FINAL_CREEP_ON": True,
+                  "GEAR_TYPE_P": "namiki",
+                  "GEAR_TYPE_T": "namiki",
+                  "LIMIT_SEEK_EXCEED_RANGE_FACTOR": 1.3,
+                  "MIN_DIST_AT_CRUISE_SPEED": 180.0,
+                  "MOTOR_CCW_DIR_P": -1,
+                  "MOTOR_CCW_DIR_T": -1,
+                  "MOTOR_ID_P": 0,
+                  "MOTOR_ID_T": 1,
+                  "ONLY_CREEP": False,
+                  "PRINCIPLE_HARDSTOP_CLEARANCE_P": 3.0,
+                  "PRINCIPLE_HARDSTOP_CLEARANCE_T": 3.0,
+                  "PRINCIPLE_HARDSTOP_DIR_P": 1,
+                  "PRINCIPLE_HARDSTOP_DIR_T": -1,
+                  "SECONDARY_HARDSTOP_CLEARANCE_P": 3.0,
+                  "SECONDARY_HARDSTOP_CLEARANCE_T": 3.0,
+                  "SPINUPDOWN_PERIOD": 12,
+                  }
+
 # state data fields associated with "late" committing to database
 late_commit_defaults = {'OBS_X':None,
                         'OBS_Y':None,
