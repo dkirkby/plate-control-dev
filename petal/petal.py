@@ -232,7 +232,6 @@ class Petal(object):
         self._apply_state_enable_settings()
 
         self.hw_states = {}
-        self.debug_verbose = False  # [JHS] 2020-07-01, can be removed soon (and the conditional it controls below) after a few tests on hardware, probably tomorrow
 
     def is_pc_connected(self):
         if self.simulator_on:
@@ -1102,32 +1101,32 @@ class Petal(object):
         '''Saves state data to posmove database, if that behavior is currently
         turned on.
         '''
-        if not self.db_commit_on or self.simulator_on:
-            return
-        if mode == 'move':
-            type1, type2 = 'pos_move', 'fid_data'
-        elif mode == 'calib':
-            type1, type2 = 'pos_calib', 'fid_calib'
-        pos_commit_list = [st for st in states if st.type == 'pos']
-        fid_commit_list = [st for st in states if st.type == 'fid']
-        if len(pos_commit_list) > 0:
-            for state in pos_commit_list:
-                state.store('EXPOSURE_ID', self._exposure_id)
-                state.store('EXPOSURE_ITER', self._exposure_iter)
-            self.posmoveDB.WriteToDB(pos_commit_list, self.petal_id, type1)
-        if len(fid_commit_list) > 0:
-            self.posmoveDB.WriteToDB(fid_commit_list, self.petal_id, type2)
+        if self.db_commit_on and not self.simulator_on:
+            if mode == 'move':
+                type1, type2 = 'pos_move', 'fid_data'
+            elif mode == 'calib':
+                type1, type2 = 'pos_calib', 'fid_calib'
+            pos_commit_list = [st for st in states if st.type == 'pos']
+            fid_commit_list = [st for st in states if st.type == 'fid']
+            if len(pos_commit_list) > 0:
+                for state in pos_commit_list:
+                    state.store('EXPOSURE_ID', self._exposure_id)
+                    state.store('EXPOSURE_ITER', self._exposure_iter)
+                self.posmoveDB.WriteToDB(pos_commit_list, self.petal_id, type1)
+            if len(fid_commit_list) > 0:
+                self.posmoveDB.WriteToDB(fid_commit_list, self.petal_id, type2)
+            if mode == 'move':
+                if self._currently_in_an_exposure():
+                    committed_posids = {state.unit_id for state in pos_commit_list}
+                    overlapping_commits = committed_posids & self._devids_committed_this_exposure
+                    if overlapping_commits:
+                        self.printfunc(f'WARNING: device_ids {overlapping_commits} received multiple posDB ' +
+                                       f'commit requests for expid {self._exposure_id}, iteration ' +
+                                       f'{self._exposure_iter}. These have the potential to overwrite data.')
+                    self._devids_committed_this_exposure |= committed_posids
         if mode == 'move':
             for state in self.altered_states:
                 state.clear_log_notes() # known minor issue: if local_log_on simultaneously with DB, this may clear the note field
-            if self._currently_in_an_exposure():
-                committed_posids = {state.unit_id for state in pos_commit_list}
-                overlapping_commits = committed_posids & self._devids_committed_this_exposure
-                if overlapping_commits:
-                    self.printfunc(f'WARNING: device_ids {overlapping_commits} received multiple posDB ' +
-                                   f'commit requests for expid {self._exposure_id}, iteration ' +
-                                   f'{self._exposure_iter}. These have the potential to overwrite data.')
-                self._devids_committed_this_exposure |= committed_posids
             
     def _write_local_logs_as_necessary(self, states):
         '''Saves state data to disk, if those behaviors are currently turned on.'''
@@ -1563,25 +1562,6 @@ class Petal(object):
         hw_tables = []
         for m in self.schedule.move_tables.values():
             hw_tbl = m.for_hardware()
-            
-            # 2020-07-01 [JHS] This conditional block should be removable soon,
-            # after confirmation of fix to hardware postpause column in posmovetable.
-            if self.debug_verbose:
-                hw_move_time = sum(hw_tbl['move_time'])
-                hw_pause_time = sum(hw_tbl['postpause'])/1000
-                hw_time = hw_move_time + hw_pause_time
-                assert abs(hw_time - hw_tbl['total_time']) < 0.002
-                full = m.full_table()
-                full_prepause = sum(full['prepause'])
-                full_postpause = sum(full['postpause'])
-                full_move_time = sum(full['move_time'])
-                full_time = full_prepause + full_postpause + full_move_time
-                assert abs(full['net_time'][-1] - full_time) < 0.002
-                posid = hw_tbl['posid']
-                print(f'{posid}: full_time={full_time:6.3f} ... full_move={full_move_time:6.3f}, full_prepause={full_prepause:6.3f}, full_postpause={full_postpause:6.3f}, full_pause={full_prepause + full_postpause:6.3f}' +
-                      f'\n        hdwr_time={hw_time:6.3f} ... hdwr_move={hw_move_time:6.3f},                       hdwr_postpause={hw_pause_time:6.3f}')
-                m.display()
-                
             hw_tables.append(hw_tbl)
         return hw_tables
 
