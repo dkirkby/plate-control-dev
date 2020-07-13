@@ -45,11 +45,19 @@ nominals['spinupdown_dist_per_period'] = sum(range(round(nominals['stepsize_crui
 nominals['spinupdown_distance'] = nominals['spinupdown_dist_per_period'] * pos_defaults['SPINUPDOWN_PERIOD']
 nominals['spinupdown_distance_output'] = nominals['spinupdown_distance'] / nominals['gear_ratio']
 
-valid_commands = {'QS', 'dQdS',
-                  'obsXY', 'obsdXdY',
-                  'ptlXY',
-                  'poslocXY', 'poslocdXdY',
-                  'poslocTP', 'posintTP', 'dTdP'}
+general_commands = {'QS', 'dQdS',
+                    'obsXY', 'obsdXdY',
+                    'ptlXY',
+                    'poslocXY', 'poslocdXdY',
+                    'poslocTP', 'posintTP', 'dTdP',
+                   }
+
+homing_commands = {'home_and_debounce', 'home_no_debounce'}
+# When setting up homing rows in a sequence table, set target0 = 1 if you want
+# to home theta axis, target1 = 1 to home phi axis, or both to home both axes.
+
+valid_commands = general_commands.copy()
+valid_commands.update(homing_commands)
 
 import os
 from astropy.table import Table
@@ -85,17 +93,19 @@ class Sequence(object):
     
         short_name ... string, brief name for the test
         long_name  ... string, optional longer descriptive name for the test
+        min_phi_limit ... 'typical', some float value, or None ... controls min phi limit on targets
         
     After initialization, populate the sequence using the "add_move" function.
     
     
     '''
-    def __init__(self, short_name, long_name=''):
+    def __init__(self, short_name, long_name='', min_phi_limit=None):
         names = [key for key in col_defaults.keys()]
         types = [type(val) for val in col_defaults.values()]
         self.table = Table(names=names, dtype=types)
         self.short_name = short_name
         self.long_name = str(long_name)
+        self.min_phi_limit = min_phi_limit
         
     @property
     def short_name(self):
@@ -112,6 +122,19 @@ class Sequence(object):
     @long_name.setter
     def long_name(self, value):
         self.table.meta['long_name'] = str(value)
+        
+    @property
+    def min_phi_limit(self):
+        return self.table.meta['min_phi_limit']
+    
+    @min_phi_limit.setter
+    def min_phi_limit(self, value):
+        try:
+            ok_val = float(value)
+        except:
+            assert value in {'typical', None}, f'min_phi_limit of {value} not recognized'
+            ok_val = value
+        self.table.meta['min_phi_limit'] = ok_val
     
     def add_move(self, command, target0, target1, log_note='', pos_settings={}, index=None):
         '''Add a move to the sequence.
@@ -141,6 +164,12 @@ class Sequence(object):
             self.table.insert_row(index, row)
         else:
             self.table.add_row(row)
+            
+    def delete_move(self, index):
+        '''Delete a move from the sequence. (Note you can also use the more
+        generic and pythonic del syntax.)'''
+        assert 0 <= index <= len(self.table), f'error index {index} not in sequence'
+        del self.table[index]
     
     def save(self, directory='.', basename='sequence'):
         '''Saves an ecsv file representing the sequence to directory/basename.ecsv
@@ -164,7 +193,7 @@ class Sequence(object):
         return d
     
     def __str__(self):
-        s = self.short_name + ': ' + self.long_name + '\n'
+        s = f'{self.short_name}: {self.long_name}'
         def truncate_and_fill(string, length):
             truncated = string[:length-2] + '..' if len(string) > length else string
             filled = format(truncated, str(length) + 's')
@@ -186,3 +215,34 @@ class Sequence(object):
             s += truncate_and_fill(str(move['log_note']), widths['note']) + '  '
             s += truncate_and_fill(str(self.non_default_pos_settings(i)), widths['settings'])
         return s
+    
+    def __repr__(self):
+        return self.__str__()
+    
+    # Standard sequence functions
+    def __iter__(self):
+        self.__idx = 0
+        return self
+        
+    def __next__(self):
+        if self.__idx < len(self.table):
+            row = self.table[self.__idx]
+            self.__idx += 1
+            return row
+        else:
+            raise StopIteration
+    
+    def __len__(self):
+        return len(self.table)
+    
+    def __getitem__(self, key):
+        return self.table[key]
+        
+    def __setitem__(self, key, value):
+        self.table[key] = value
+
+    def __delitem__(self, key):
+        del self.table[key]
+        
+    def __contains__(self, value):
+        return value in self.table
